@@ -52,6 +52,20 @@ const CONFIG_ACCESS_PATTERN = /config\.\w+/
 const ENV_ACCESS_PATTERN = /(?<!process\.)\benv\.\w+/
 const REQUIRE_ENV_PATTERN = /requireEnv\s*\(/
 const OPTIONAL_ENV_PATTERN = /optionalEnv\s*\(/
+// Boolean coercion is a safe read: `!!process.env.X` / `Boolean(process.env.X)`
+// can never be `undefined`.
+const BOOLEAN_COERCION_PATTERN = /(?:!!|Boolean\s*\(\s*)process\.env\.\w+/
+// A comparison is null-safe: `process.env.X === '1'` / `!== ...` evaluates to a
+// boolean regardless of whether the var is set.
+const COMPARISON_PATTERN = /process\.env\.\w+\s*[=!]==?|[=!]==?\s*process\.env\.\w+/
+// A truthy guard reads the var defensively: `if (process.env.X)` / `if (!process.env.X)`.
+// `(?:!\s*)?` keeps the optional negation unambiguous (no adjacent `\s*` runs).
+const IF_GUARD_PATTERN = /\bif\s*\(\s*(?:!\s*)?process\.env\.\w+/
+// Captures the variable an env read is assigned to, so a guard on that variable
+// (possibly on a following line) can be recognised as safe. The gap is bounded
+// to a single statement (no `=`, no newline) to keep matching linear.
+// eslint-disable-next-line sonarjs/slow-regex -- gap class [^=\n] excludes the delimiters, so the lazy quantifier is single-pass over a bounded window of trusted source
+const ENV_CAPTURE_PATTERN = /(?:const|let|var)\s+(\w+)\s*=\s*[^=\n]*?process\.env\.\w+/
 
 // Env var extraction pattern
 const ENV_VAR_PATTERN = /process\.env\.(\w+)/g
@@ -74,6 +88,9 @@ const SAFE_PATTERNS = [
   ENV_ACCESS_PATTERN,
   REQUIRE_ENV_PATTERN,
   OPTIONAL_ENV_PATTERN,
+  BOOLEAN_COERCION_PATTERN,
+  COMPARISON_PATTERN,
+  IF_GUARD_PATTERN,
 ]
 
 // =============================================================================
@@ -82,8 +99,27 @@ const SAFE_PATTERNS = [
 
 const isExcludedEnvPath = createPathMatcher(NON_RUNTIME_PATTERNS)
 
+/**
+ * A read captured into a variable is safe when that variable is guarded nearby,
+ * e.g. `const endpoint = process.env.X; if (!endpoint) return;`. Looks within the
+ * provided window (the access line plus a couple of following lines).
+ */
+function isCapturedAndGuarded(window: string): boolean {
+  const capture = ENV_CAPTURE_PATTERN.exec(window)
+  const varName = capture?.[1]
+  if (!varName) {
+    return false
+  }
+  // The captured name appears in an if-guard / return-guard, or alongside a
+  // null-ish / boolean / comparison operator.
+  const guard = new RegExp(
+    String.raw`(?:\bif\s*\(|\breturn\b|[!(])[^\n]*\b${varName}\b|\b${varName}\b\s*(?:\?\??|\|\||&&|===|!==|==|!=)`,
+  )
+  return guard.test(window)
+}
+
 function isSafeContext(context: string): boolean {
-  return SAFE_PATTERNS.some((p) => p.test(context))
+  return SAFE_PATTERNS.some((p) => p.test(context)) || isCapturedAndGuarded(context)
 }
 
 function hasNullCheck(context: string): boolean {
@@ -130,10 +166,12 @@ function hasTypeCoercionIssue(context: string, envVarName: string): boolean {
 interface MatchAnalysis {
   envVarName: string
   context: string
+  /** Multi-line window (access line + following lines) for guard detection. */
+  window: string
   matchIndex: number
 }
 
-function analyzeMatch(line: string, match: RegExpMatchArray): MatchAnalysis | null {
+function analyzeMatch(line: string, match: RegExpMatchArray, window: string): MatchAnalysis | null {
   const envVarName = match[1]
   if (!envVarName) {
     return null
@@ -142,7 +180,7 @@ function analyzeMatch(line: string, match: RegExpMatchArray): MatchAnalysis | nu
   const matchIndex = match.index ?? 0
   const context = getMatchContext(line, matchIndex, match[0].length)
 
-  return { envVarName, context, matchIndex }
+  return { envVarName, context, window, matchIndex }
 }
 
 /* v8 ignore start -- switch over issue types; only some cases fire in test fixtures */
@@ -207,10 +245,11 @@ function analyzeMatchForIssues(
   lineNumber: number,
   isConfigFile: boolean,
 ): EnvVarIssue | null {
-  const { envVarName, context } = analysis
+  const { envVarName, context, window } = analysis
 
-  // Skip if in safe context
-  if (isSafeContext(context)) {
+  // Skip if in safe context (idiomatic guards may sit on a following line, so
+  // the safe-context test uses the multi-line window, not just the access line).
+  if (isSafeContext(window)) {
     return null
   }
 
@@ -225,27 +264,35 @@ function analyzeMatchForIssues(
   }
 
   // Check for missing null check
-  if (!hasNullCheck(context)) {
+  if (!hasNullCheck(window)) {
     return createIssue(filePath, lineNumber, 'unvalidated-access', envVarName)
   }
 
   return null
 }
 
+// How many following lines to include in the guard-detection window.
+const GUARD_WINDOW_LINES = 2
+
 function processLine(
-  line: string,
+  lines: readonly string[],
   lineIndex: number,
   filePath: string,
   isConfigFile: boolean,
 ): EnvVarIssue[] {
+  const line = lines[lineIndex] ?? ''
   const issues: EnvVarIssue[] = []
+
+  // Guard idioms (`if (!x) return`) may sit just below the access; include a
+  // small forward window so capture-then-guard reads are recognised as safe.
+  const window = lines.slice(lineIndex, lineIndex + 1 + GUARD_WINDOW_LINES).join('\n')
 
   // Reset regex lastIndex for global patterns
   ENV_VAR_PATTERN.lastIndex = 0
   const matches = line.matchAll(ENV_VAR_PATTERN)
 
   for (const match of matches) {
-    const analysis = analyzeMatch(line, match)
+    const analysis = analyzeMatch(line, match, window)
     if (!analysis) {
       continue
     }
@@ -268,13 +315,12 @@ function analyzeFile(filePath: string, content: string): EnvVarIssue[] {
   const isConfigFile = filePath.includes('config')
   const issues: EnvVarIssue[] = []
 
-  for (const [i, line] of lines.entries()) {
-    if (!line) {
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i]) {
       continue
     }
 
-    const lineIssues = processLine(line, i, filePath, isConfigFile)
-    issues.push(...lineIssues)
+    issues.push(...processLine(lines, i, filePath, isConfigFile))
   }
 
   return issues
@@ -297,7 +343,11 @@ export const envVarValidation = defineCheck({
   id: '47d3e7c7-7dc0-4fd7-bcd6-950837e091df',
   slug: 'env-var-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'raw',
+  // Strip strings/comments so `process.env.X` appearing inside a string literal,
+  // template literal, or comment (e.g. a detection pattern or doc example in
+  // analyzer source) is not mistaken for a real env access — only live code is
+  // scanned. Real `process.env.X` member access is code and is preserved.
+  contentFilter: 'strip-strings-and-comments',
 
   confidence: 'medium',
   description: 'Detects environment variable access without proper validation',
