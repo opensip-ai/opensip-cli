@@ -29,6 +29,44 @@
  * rule pins the new package's dep allowlist.
  */
 
+// ---------------------------------------------------------------------------
+// External-package guard families (ADR-0004 + ADR-0010).
+//
+// These two rules are unusual: their `to` targets an EXTERNAL npm package, not
+// a workspace path. Every other forbidden rule here matches resolved
+// `^packages/...` paths, and `options.includeOnly: '^packages/'` deliberately
+// drops every node_modules edge before rules run — which is exactly why the
+// dev-dep / drizzle-orm hygiene rules could not live here (see the notes by
+// `tables-only-in-persistence`). An npm `to:` rule under a bare
+// `includeOnly: '^packages/'` is therefore STRUCTURALLY INERT: the edge never
+// enters the graph, so the rule cruises 0 dependencies and can never fire
+// (verified empirically with a probe import — 0 dependencies cruised).
+//
+// To make the two ADR guards real, `options.includeOnly` below is a UNION:
+// `^packages/` PLUS these two external families. That surfaces ONLY these
+// specific node_modules edges (the OTel SDK family and web-tree-sitter) into
+// the graph so the rules can match them; all other node_modules edges stay
+// dropped, so no other rule's inertness assumption changes. The only real
+// importers of either family — `packages/tree-sitter/` (web-tree-sitter) and
+// `packages/cli/` (OTel SDK) — are exactly the packages the rules exempt, so
+// the clean tree stays at 0 violations.
+//
+// The `[/+]` alternations match both the bare specifier (`@opentelemetry/sdk-…`)
+// and a pnpm-store resolved path (`@opentelemetry+sdk-…@x.y.z`); the resolved
+// `module`/`resolved` value depcruise reports for an unfollowed npm edge is the
+// bare specifier, but matching both shapes is belt-and-braces.
+// ---------------------------------------------------------------------------
+
+// ADR-0004: the OpenTelemetry SDK family (exporter, sdk-*, context manager,
+// propagator, resources). NOT `@opentelemetry/api` (the no-op facade, allowed
+// everywhere) and NOT `@opentelemetry/core` / `@opentelemetry/semantic-conventions`.
+const OTEL_SDK_FAMILY = String.raw`@opentelemetry[/+](sdk|exporter|context|propagator|resources)`;
+
+// ADR-0010: the tree-sitter Parser substrate. Only `@opensip-tools/tree-sitter`
+// and the `lang-*` adapters may import it; everyone else obtains parsed trees
+// via `@opensip-tools/lang-*`.
+const TREE_SITTER_PARSER = String.raw`(^|[/+])web-tree-sitter([/+]|$)`;
+
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
@@ -326,6 +364,35 @@ module.exports = {
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: { path: String.raw`^packages/output/src/index\.ts$` },
+    },
+
+    // -------------------------------------------------------------------
+    // ADR-0004 — OpenTelemetry SDK lives ONLY at the composition root.
+    //
+    // OTel is opt-in (gated on OTEL_EXPORTER_OTLP_ENDPOINT). `@opentelemetry/api`
+    // (the no-op facade) is the only OTel dependency `core` and the tool
+    // packages carry — surfaced through the `withSpan`/`getTracer` seam in core.
+    // The heavy SDK (exporter, sdk-*, context manager, propagator, resources)
+    // lives ONLY in `packages/cli`, the composition root, initialized from
+    // bootstrapCli. ADR-0004's enforcement-reason states dependency-cruiser
+    // confirms no `@opentelemetry/sdk-*` import leaks into core or any tool
+    // package — this rule is that confirmation. It targets an EXTERNAL package
+    // family, so it depends on the union `includeOnly` (see OTEL_SDK_FAMILY
+    // note at the top of this file); without that surfacing it would cruise 0
+    // dependencies and be inert.
+    // -------------------------------------------------------------------
+    {
+      name: 'otel-sdk-only-in-cli',
+      severity: 'error',
+      comment:
+        'The OpenTelemetry SDK family (@opentelemetry/sdk-*, exporter-*, ' +
+        'context-*, propagator-*, resources) may be imported ONLY by ' +
+        'packages/cli — the composition root that decides whether spans are ' +
+        'exported. core and every tool depend on @opentelemetry/api (the no-op ' +
+        'facade) only, through the withSpan/getTracer seam in core. An SDK ' +
+        'import anywhere else inverts the library/application split. (ADR-0004.)',
+      from: { path: '^packages/', pathNot: '^packages/cli/' },
+      to: { path: OTEL_SDK_FAMILY },
     },
 
     // -------------------------------------------------------------------
@@ -698,6 +765,34 @@ module.exports = {
     // so there is nothing for any engine/src/* file to import.
     // tree-sitter ships only as a dep of the @opensip-tools/graph-
     // (python|rust) adapter packs, where it belongs.
+    //
+    // ADR-0010 restored: that deletion removed the ENGINE-scoped guard, but the
+    // ADR's enforcement-reason requires the broader invariant — construction of
+    // a tree-sitter Parser (i.e. importing web-tree-sitter) is restricted to the
+    // lang-* packages and the @opensip-tools/tree-sitter substrate; every other
+    // package — including the graph adapters and graph-adapter-common — must
+    // obtain parsed trees by importing @opensip-tools/lang-*. The rule below is
+    // that platform-wide guard. It targets an EXTERNAL package, so it depends on
+    // the union includeOnly (see TREE_SITTER_PARSER note at the top of this
+    // file); the graph adapters reference "web-tree-sitter" only in code
+    // comments today, so the clean tree stays at 0 violations.
+    {
+      name: 'tree-sitter-parser-only-in-lang-packs',
+      severity: 'error',
+      comment:
+        'web-tree-sitter (the tree-sitter Parser substrate) may be imported ' +
+        'ONLY by @opensip-tools/tree-sitter (the grammar-agnostic substrate) ' +
+        'and the @opensip-tools/lang-* adapters. Every other package — ' +
+        'including the graph adapters and graph-adapter-common — must obtain ' +
+        'parsed trees via @opensip-tools/lang-*, the single canonical parse ' +
+        'substrate. Constructing a Parser elsewhere duplicates parsing and ' +
+        'double-parses files. (ADR-0010.)',
+      from: {
+        path: '^packages/',
+        pathNot: ['^packages/tree-sitter/', '^packages/languages/lang-'],
+      },
+      to: { path: TREE_SITTER_PARSER },
+    },
     {
       // Audit 2026-05-29 (M1): the prior `graph-may-import-fitness-sarif`
       // info-exception is gone. The only real graph→fitness edge was
@@ -863,7 +958,14 @@ module.exports = {
     // gated by this rule.
     tsPreCompilationDeps: false,
 
-    includeOnly: '^packages/',
+    // Union: workspace source PLUS the two external families the ADR-0004 /
+    // ADR-0010 guards target (OTel SDK + web-tree-sitter). A bare '^packages/'
+    // drops every node_modules edge before rules run, which would make those
+    // two npm-targeting rules structurally inert. Surfacing ONLY these two
+    // families keeps every other node_modules edge dropped (so no other rule's
+    // inertness assumption changes) while letting the two guards fire. See the
+    // OTEL_SDK_FAMILY / TREE_SITTER_PARSER notes at the top of this file.
+    includeOnly: ['^packages/', OTEL_SDK_FAMILY, TREE_SITTER_PARSER],
     exclude: {
       path: [
         '^packages/[^/]+/[^/]+/dist/',

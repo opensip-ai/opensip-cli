@@ -1,0 +1,23 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      # ADR-0017 violations: `pnpm graph:ci` is absent entirely, and
+      # `pnpm fit:ci` runs AFTER the pack step (too late to guard the artifact).
+      - name: Lint
+        run: pnpm lint
+      - name: Test with coverage
+        run: pnpm test:coverage
+      - name: Pack tarballs
+        run: pnpm --filter "$pkg" pack --pack-destination /tmp/tarballs
+      - name: Fitness dogfood
+        run: pnpm fit:ci
+      - name: Publish
+        run: npm publish /tmp/tarballs/*.tgz --provenance

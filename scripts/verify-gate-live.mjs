@@ -69,6 +69,37 @@ const TOOL_OUTPUT_PROBES = [
   },
 ];
 
+// ADR-0004 / ADR-0010 external-package gate liveness. Same rationale as the
+// tool-output probes above, but these two rules are special: their `to` targets
+// an EXTERNAL npm family (the OTel SDK; web-tree-sitter), not a workspace path.
+// They can only fire because .config/dependency-cruiser.cjs surfaces those two
+// families into the cruise graph via a UNION includeOnly. If that union is
+// reverted to a bare '^packages/' (the natural-looking "cleanup"), the npm edge
+// is dropped before rules run and BOTH guards go silently inert — depcruise
+// stays green while enforcing nothing. These probes inject a forbidden external
+// import from a non-exempt package and assert the rule still reports it.
+const EXTERNAL_GATE_PROBES = [
+  {
+    // ADR-0004: OTel SDK family may live only in packages/cli. Inject from a
+    // tool engine (a non-cli package) and expect the rule to fire.
+    file: `${PROBE_DIR}/__gate_probe_otel_sdk__.ts`,
+    source:
+      "import '@opentelemetry/sdk-trace-node';\n" +
+      'export const _gateProbe = 1;\n',
+    rule: 'otel-sdk-only-in-cli',
+  },
+  {
+    // ADR-0010: web-tree-sitter may be imported only by the tree-sitter
+    // substrate and the lang-* adapters. Inject from a non-lang package and
+    // expect the rule to fire.
+    file: 'packages/fitness/engine/src/__gate_probe_tree_sitter__.ts',
+    source:
+      "import { Parser } from 'web-tree-sitter';\n" +
+      'export const _gateProbe = Parser;\n',
+    rule: 'tree-sitter-parser-only-in-lang-packs',
+  },
+];
+
 function depcruiseReport(target) {
   // err-long emits the rule name + offending edge; non-zero exit on
   // violations is expected and not an error for the probe.
@@ -85,15 +116,18 @@ function depcruiseReport(target) {
   }
 }
 
-function verifyToolOutputGatesFire() {
-  for (const probe of TOOL_OUTPUT_PROBES) {
+// Run a set of inject-revert probes: write each probe file, cruise it, assert
+// the expected rule appears in the report, then remove the file in a finally so
+// the working tree is never left dirty even if depcruise throws.
+function verifyProbesFire(probes, label) {
+  for (const probe of probes) {
     try {
       writeFileSync(probe.file, probe.source, 'utf8');
       const report = depcruiseReport(probe.file);
       if (!report.includes(probe.rule)) {
         console.error(
           `verify-gate-live: FAIL — probe import in ${probe.file} did NOT trip ` +
-            `'${probe.rule}'. The ADR-0011 tool-output gate is INERT.\n` +
+            `'${probe.rule}'. The ${label} is INERT.\n` +
             `depcruise report:\n${report}`,
         );
         process.exit(1);
@@ -102,9 +136,21 @@ function verifyToolOutputGatesFire() {
       rmSync(probe.file, { force: true });
     }
   }
+}
+
+function verifyToolOutputGatesFire() {
+  verifyProbesFire(TOOL_OUTPUT_PROBES, 'ADR-0011 tool-output gate');
   console.log(
     `verify-gate-live: OK — all ${TOOL_OUTPUT_PROBES.length} tool-output gates ` +
       'fired on a probe (tools-emit-never-render is live).',
+  );
+}
+
+function verifyExternalGatesFire() {
+  verifyProbesFire(EXTERNAL_GATE_PROBES, 'ADR-0004/ADR-0010 external-package gate');
+  console.log(
+    `verify-gate-live: OK — all ${EXTERNAL_GATE_PROBES.length} external-package gates ` +
+      'fired on a probe (OTel-SDK-only-in-cli + tree-sitter-parser-only-in-lang-packs are live).',
   );
 }
 
@@ -172,6 +218,11 @@ function main() {
 
   // Beyond edge-resolution: prove the ADR-0011 tool-output rules still fire.
   verifyToolOutputGatesFire();
+
+  // Prove the ADR-0004 (OTel SDK) and ADR-0010 (tree-sitter Parser) external-
+  // package guards still fire — they go inert if includeOnly stops surfacing
+  // those two npm families into the graph.
+  verifyExternalGatesFire();
 }
 
 main();

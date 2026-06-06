@@ -19,6 +19,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'no-duplicate-packages': ['📦', 'No Duplicate Packages'],
   'node-version-consistency': ['📦', 'Node Version Consistency'],
   'project-readme-existence': ['📝', 'Project README Existence'],
+  'release-gate-parity': ['🚦', 'Release Gate Parity'],
   'restrict-raw-db-access': ['🗄️', 'Restrict Raw DB Access'],
   'stale-build-artifacts': ['🏚️', 'Stale Build Artifacts'],
 })
