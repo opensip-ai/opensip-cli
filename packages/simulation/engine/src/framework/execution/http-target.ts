@@ -44,8 +44,12 @@ export function httpTarget(opts: HttpTargetOptions): Target {
       body: opts.body,
       signal: ctx.signal,
     })
-    // Drain the body so the socket is freed even when we ignore the payload.
-    await res.arrayBuffer().catch(() => undefined)
+    // Drain the body so the socket is freed even though we ignore the payload.
+    try {
+      await res.arrayBuffer()
+    } catch {
+      // body already consumed or the request was aborted — nothing to drain.
+    }
     if (!isOk(res.status)) {
       throw new Error(`httpTarget: ${opts.url} returned ${res.status}`)
     }

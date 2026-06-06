@@ -9,12 +9,11 @@
 import type { Target } from '../../framework/execution/target.js'
 
 /** A target that always succeeds immediately. */
-export const noopTarget: Target = async () => {}
+export const noopTarget: Target = () => Promise.resolve()
 
 /** A target that always fails (throws) immediately. */
-export const failingTarget: Target = async () => {
-  throw new Error('test-target: forced failure')
-}
+export const failingTarget: Target = () =>
+  Promise.reject(new Error('test-target: forced failure'))
 
 /** A counting target plus its observed call/concurrency stats. */
 export interface CountingTarget {

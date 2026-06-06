@@ -11,9 +11,9 @@
 import { enterScope } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { noopTarget } from '../../__tests__/test-utils/targets.js';
 import { makeSimTestScope } from '../../__tests__/test-utils/with-sim-scope.js';
 import { ASSERTIONS } from '../../framework/assertions.js';
-import { noopTarget } from '../../__tests__/test-utils/targets.js';
 import { fault } from '../../framework/execution/fault-builders.js';
 import { clearScenarioRegistry, currentScenarioRegistry } from '../../framework/registry.js';
 import { defineChaosScenario } from '../../kinds/chaos/define.js';

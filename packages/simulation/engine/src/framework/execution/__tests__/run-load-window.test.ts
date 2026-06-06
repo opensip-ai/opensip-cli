@@ -4,9 +4,9 @@
  * honours abort.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { countingTarget, failingTarget, noopTarget } from '../../../__tests__/test-utils/targets.js'
+import { countingTarget, failingTarget } from '../../../__tests__/test-utils/targets.js'
 import { runLoadWindow } from '../run-load-window.js'
 
 import type { ScenarioExecutionContext } from '../../../types/framework-types.js'
@@ -15,7 +15,7 @@ const ctx = (signal: AbortSignal): ScenarioExecutionContext => ({
   scenarioId: 't',
   correlationId: 'c',
   abortSignal: signal,
-  logger: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 })
 
 describe('runLoadWindow', () => {

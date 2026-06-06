@@ -18,7 +18,7 @@ import { defineLoadScenario } from '../kinds/load/define.js';
 
 import { makeSimTestScope } from './test-utils/with-sim-scope.js';
 
-const noopTarget = async (): Promise<void> => {};
+const noopTarget = (): Promise<void> => Promise.resolve();
 
 beforeEach(() => {
   // Item 1: scenarioRegistry is per-RunScope. Enter a fresh scope.

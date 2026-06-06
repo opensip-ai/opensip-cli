@@ -65,19 +65,18 @@ function validateFault(config: ChaosScenarioConfig, errors: ScenarioValidationEr
       message: 'fault.probability must be in [0, 1]',
     })
   }
-  if (!Array.isArray(config.fault.faults) || config.fault.faults.length === 0) {
+  if (config.fault.faults.length === 0) {
     errors.push({ field: 'fault.faults', message: 'fault.faults must be a non-empty array' })
     return
   }
-  for (let i = 0; i < config.fault.faults.length; i++) {
-    const f = config.fault.faults[i]
-    if (!f || !VALID_FAULT_KINDS.has(f.kind)) {
+  for (const [i, f] of config.fault.faults.entries()) {
+    if (!VALID_FAULT_KINDS.has(f.kind)) {
       errors.push({
         field: `fault.faults[${i}].kind`,
         message: "fault kind must be one of 'latency' | 'abort' | 'drop'",
       })
     }
-    if (f?.kind === 'latency' && (typeof f.ms !== 'number' || f.ms < 0)) {
+    if (f.kind === 'latency' && (typeof f.ms !== 'number' || f.ms < 0)) {
       errors.push({
         field: `fault.faults[${i}].ms`,
         message: 'latency fault requires a non-negative ms',

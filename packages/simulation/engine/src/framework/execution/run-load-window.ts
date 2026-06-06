@@ -83,6 +83,46 @@ function sleepTick(intervalMs: number, signal: AbortSignal): Promise<void> {
   })
 }
 
+/** State the dispatch loop threads through to each in-flight request. */
+interface DispatchState {
+  readonly target: Target
+  readonly context: ScenarioExecutionContext
+  readonly metrics: SimulationMetrics
+  readonly latencyTracker: LatencyTracker
+  readonly inFlight: Set<Promise<void>>
+}
+
+/** Issue one request: time it, classify resolve/throw, track it in-flight. */
+function dispatchRequest(state: DispatchState): void {
+  const { target, context, metrics, latencyTracker, inFlight } = state
+  const t0 = Date.now()
+  metrics.totalRequests++
+  const run = (async (): Promise<void> => {
+    try {
+      await target({ signal: context.abortSignal, correlationId: context.correlationId })
+      metrics.successfulRequests++
+    } catch {
+      metrics.failedRequests++
+      metrics.errorsGenerated++
+    } finally {
+      latencyTracker.record(Date.now() - t0)
+    }
+  })()
+  inFlight.add(run)
+  void run.finally(() => inFlight.delete(run))
+}
+
+/** Block until fewer than `cap` requests are in flight (or the run aborts). */
+async function awaitBelowCap(
+  inFlight: Set<Promise<void>>,
+  cap: number,
+  signal: AbortSignal,
+): Promise<void> {
+  while (inFlight.size >= cap && !signal.aborted) {
+    await Promise.race(inFlight)
+  }
+}
+
 /**
  * Run a single load-style window against a real `Target`.
  *
@@ -102,56 +142,29 @@ export async function runLoadWindow(
   const maxInFlight = resolveConcurrency(workload)
   const metrics = createMetrics()
   const latencyTracker = new LatencyTracker()
+  const inFlight = new Set<Promise<void>>()
+  const state: DispatchState = { target: options.target, context, metrics, latencyTracker, inFlight }
   const start = Date.now()
   const rampUpMs = (workload.rampUp ?? 0) * 1000
-  const inFlight = new Set<Promise<void>>()
 
-  const dispatchOne = (): void => {
-    const t0 = Date.now()
-    metrics.totalRequests++
-    const run = (async (): Promise<void> => {
-      try {
-        await options.target({
-          signal: context.abortSignal,
-          correlationId: context.correlationId,
-        })
-        metrics.successfulRequests++
-      } catch {
-        metrics.failedRequests++
-        metrics.errorsGenerated++
-      } finally {
-        latencyTracker.record(Date.now() - t0)
-      }
-    })()
-    inFlight.add(run)
-    void run.finally(() => inFlight.delete(run))
-  }
-
-  while (Date.now() - start < options.windowMs) {
-    if (context.abortSignal.aborted) break
-
+  while (Date.now() - start < options.windowMs && !context.abortSignal.aborted) {
     const elapsed = Date.now() - start
     const rampUpProgress = rampUpMs > 0 ? Math.min(1, elapsed / rampUpMs) : 1
-    const currentRps = targetRps * rampUpProgress
-    const requestsThisTick = Math.floor(currentRps / (1000 / TICK_INTERVAL_MS))
+    const requestsThisTick = Math.floor((targetRps * rampUpProgress) / (1000 / TICK_INTERVAL_MS))
 
     for (let i = 0; i < requestsThisTick; i++) {
+      // Backpressure: block until below the in-flight cap, which paces RPS
+      // toward what latency + concurrency actually allow.
+      await awaitBelowCap(inFlight, maxInFlight, context.abortSignal)
       if (context.abortSignal.aborted) break
-      // Backpressure: never exceed the in-flight concurrency cap. Awaiting a
-      // settling request naturally paces RPS toward what latency + concurrency
-      // allow.
-      while (inFlight.size >= maxInFlight && !context.abortSignal.aborted) {
-        await Promise.race([...inFlight])
-      }
-      if (context.abortSignal.aborted) break
-      dispatchOne()
+      dispatchRequest(state)
     }
 
     await sleepTick(TICK_INTERVAL_MS, context.abortSignal)
   }
 
   // Drain any still-in-flight requests so the latency snapshot covers them.
-  await Promise.allSettled([...inFlight])
+  await Promise.allSettled(inFlight)
 
   const snapshot = latencyTracker.getLatencySnapshot()
   metrics.avgLatencyMs = snapshot.avgLatencyMs

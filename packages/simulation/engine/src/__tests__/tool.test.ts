@@ -17,10 +17,11 @@ import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
-import { noopTarget } from './test-utils/targets.js';
 import { clearScenarioRegistry, currentScenarioRegistry } from '../framework/registry.js';
 import { defineLoadScenario } from '../kinds/load/define.js';
 import { simulationTool } from '../tool.js';
+
+import { noopTarget } from './test-utils/targets.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
 

@@ -25,8 +25,8 @@ import { render } from 'ink-testing-library';
 import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { ASSERTIONS } from '../../framework/assertions.js';
 import { noopTarget } from '../../__tests__/test-utils/targets.js';
+import { ASSERTIONS } from '../../framework/assertions.js';
 import { clearScenarioRegistry, currentScenarioRegistry } from '../../framework/registry.js';
 import { defineLoadScenario } from '../../kinds/load/define.js';
 import { simulationTool } from '../../tool.js';

@@ -32,7 +32,7 @@ afterEach(() => {
   clearScenarioRegistry()
 })
 
-const noopTarget = async (): Promise<void> => {}
+const noopTarget = (): Promise<void> => Promise.resolve()
 
 function defineOneOfEachKind(): void {
   currentScenarioRegistry().register(

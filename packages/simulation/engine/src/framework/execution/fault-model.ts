@@ -9,7 +9,7 @@
  *                 runs; the added latency shows up in the measured snapshot).
  *   - `abort`   — abort the in-flight request, so it fails as a timeout /
  *                 cancellation. Enforced even for targets that ignore the
- *                 abort signal (we race the call against an abort rejection).
+ *                 abort signal (we await the aborted call, then throw).
  *   - `drop`    — skip the call entirely and throw, so the driver counts a
  *                 real client-observed failure.
  *
@@ -19,8 +19,8 @@
  * deterministic without consuming extra RNG draws.
  */
 
-import type { Target, TargetContext } from './target.js'
 import type { Fault, FaultKind, FaultSpec } from './fault-spec.js'
+import type { Target, TargetContext } from './target.js'
 
 /** A fault occurrence recorded for diagnostics (→ `ChaosEvent`). */
 export interface FiredFault {
@@ -95,11 +95,13 @@ export function createFaultModel(spec: FaultSpec, deps: FaultModelDeps = {}): Fa
           typeof AbortSignal.any === 'function'
             ? AbortSignal.any([ctx.signal, controller.signal])
             : controller.signal
-        // Fire the call so a signal-aware target observes the abort; ignore how
-        // it settles — this request is counted as a failure either way.
-        void Promise.resolve(target({ signal, correlationId: ctx.correlationId })).catch(
-          () => undefined,
-        )
+        // Let a signal-aware target observe the abort, but guarantee a failure:
+        // whether it rejects on the signal or ignores it and resolves, we throw.
+        try {
+          await target({ signal, correlationId: ctx.correlationId })
+        } catch {
+          // target observed the abort (or otherwise failed) — the request fails.
+        }
         throw new Error('fault:abort')
       }
       case 'drop': {
