@@ -24,11 +24,15 @@
 // tarball via npm `overrides`, so the test exercises exactly what will
 // be published.
 //
-// Why `--version` is sufficient: tool registration runs at CLI startup,
-// before argument parsing, and transitively imports every tool module
-// (fitness/simulation/graph) and the shared cli-ui primitives. So merely
-// loading the binary walks the whole import graph — which is precisely
-// where the 2.0.0 crash occurred.
+// What runs after install: a command-level scenario set
+// (`smoke-pack-scenarios.mjs`) driven through the shared, dependency-free
+// CLI acceptance core (`lib/cli-acceptance-core.mjs`) against the installed
+// bin — the same core the in-repo Vitest harness uses, so scenario semantics
+// are identical in both lanes. `--version` alone already walks the whole
+// import graph (tool registration runs at CLI startup, before argument
+// parsing, transitively importing every tool module + cli-ui — precisely
+// where the 2.0.0 crash occurred); the broader scenario set additionally
+// exercises init/fit/graph/dashboard/sessions and both plugin-install paths.
 //
 // Usage:
 //   node scripts/smoke-pack.mjs                                  # /tmp/tarballs, version from packages/core
@@ -41,6 +45,9 @@ import { promises as fs, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { runScenarios } from './lib/cli-acceptance-core.mjs';
+import { buildPackedSmokeScenarios } from './smoke-pack-scenarios.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const SCOPE = '@opensip-tools/';
@@ -142,23 +149,24 @@ await fs.writeFile(
   `${JSON.stringify(consumerPkg, null, 2)}\n`,
 );
 
-// Run the installed CLI and surface its own stderr on failure. We catch
-// rather than let execFileSync throw raw, so an import/ABI break shows up
-// as a clean smoke-pack diagnostic (with the child's error) instead of a
-// node stack trace — which is what a release engineer needs to read.
-const runCli = (bin, cliArgs, label) => {
+// Pack a fixture plugin dir (under packages/cli/.../fixtures/) into a .tgz in
+// the work dir and return the absolute tarball path. `npm pack` prints the
+// produced filename on its last stdout line; we resolve it against the
+// destination. Used to exercise the third-party plugin-install paths
+// (kind:"tool" + kind:"fit-pack") with real packed bytes.
+const packFixture = (fixtureDir, label) => {
+  let out;
   try {
-    // Capture stderr (don't forward to our stderr) so a failure is
-    // reported once, through fail(), rather than also dumped live.
-    return execFileSync(bin, cliArgs, {
-      cwd: workDir,
+    out = execFileSync('npm', ['pack', '--pack-destination', workDir, fixtureDir], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (error) {
     const childErr = (error.stderr || error.stdout || error.message || '').toString().trim();
-    fail(`${label} failed — the packed artifacts do not load together:\n${childErr}`);
+    fail(`failed to pack ${label} fixture (${fixtureDir}):\n${childErr}`);
   }
+  const tarballName = out.trim().split('\n').pop().trim();
+  return join(workDir, tarballName);
 };
 
 try {
@@ -178,21 +186,53 @@ try {
     fail(`installed CLI bin not found at ${bin} — the cli package did not install correctly`);
   }
 
-  // 1. --version: loads the full module graph (tool registration imports
-  //    every tool + cli-ui at startup). This is exactly where 2.0.0 died.
-  const version = runCli(bin, ['--version'], 'CLI --version').trim();
-  if (version !== expectedVersion) {
-    fail(`CLI --version reported "${version}", expected "${expectedVersion}"`);
+  // Pack the two third-party plugin fixtures so the plugin-install scenarios
+  // exercise real packed bytes (not a workspace symlink).
+  const fixturesDir = join(REPO_ROOT, 'packages', 'cli', 'src', '__tests__', 'fixtures');
+  const toolPluginTarball = packFixture(join(fixturesDir, 'tool-plugin'), 'tool-plugin');
+  const fitPackTarball = packFixture(join(fixturesDir, 'fit-pack-plugin'), 'fit-pack-plugin');
+
+  info('running command-level smoke scenarios against the installed bin…');
+  const descriptor = { kind: 'installed-bin', bin };
+  const scenarios = buildPackedSmokeScenarios({
+    expectedVersion,
+    consumerCwd: workDir,
+    toolPluginTarball,
+    fitPackTarball,
+  });
+  const { results } = runScenarios(descriptor, scenarios);
+
+  // Strict version assertion (the scenario set only substring-matches the
+  // version; the legacy gate demanded exact equality on the packed bytes).
+  const versionResult = results.find((r) => r.name.startsWith('--version'));
+  if (versionResult) {
+    const reported = versionResult.result.stdout.trim();
+    if (reported !== expectedVersion) {
+      versionResult.ok = false;
+      versionResult.failures = [
+        ...versionResult.failures,
+        `--version reported "${reported}", expected exactly "${expectedVersion}"`,
+      ];
+    }
   }
-  info(`✓ CLI loads and reports ${version}`);
 
-  // 2. --help: forces Commander to mount every tool's subcommands, a
-  //    second, broader exercise of the same import graph. Exit 0 = the
-  //    whole command tree assembled without an unresolved export.
-  runCli(bin, ['--help'], 'CLI --help');
-  info('✓ CLI --help mounts the full command tree');
+  const hardFailures = results.filter((r) => !r.ok);
+  const passed = results.length - hardFailures.length;
+  for (const r of results) {
+    info(`${r.ok ? '✓' : '✗'} ${r.name}`);
+  }
 
-  info('all packed-artifact smoke checks passed — safe to publish.');
+  if (hardFailures.length > 0) {
+    for (const r of hardFailures) {
+      const childErr = (r.result.stderr || '').toString().trim();
+      console.error(`[smoke-pack] ✗ ${r.name}`);
+      for (const f of r.failures) console.error(`[smoke-pack]     - ${f}`);
+      if (childErr) console.error(`[smoke-pack]     child stderr:\n${childErr}`);
+    }
+    fail(`${hardFailures.length}/${results.length} packed-smoke scenario(s) failed — the packed artifacts do not behave correctly together.`);
+  }
+
+  info(`all ${passed}/${results.length} packed-artifact smoke scenarios passed — safe to publish.`);
 } finally {
   await fs.rm(workDir, { recursive: true, force: true });
 }
