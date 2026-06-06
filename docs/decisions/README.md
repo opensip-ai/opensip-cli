@@ -124,6 +124,12 @@ distinct from:
   check packs ship no opinionated wrappers, the pattern is taught in
   `docs/public/50-extend` and this public repo is the living dogfooded example
   (dependency-cruiser keeps a standalone bootstrap carve-out)
+- [ADR-0020](./ADR-0020-dogfood-gate-hard-fail.md) — The dogfood gate hard-fails
+  the CI step on error-level findings: `fit --gate-save` now returns the
+  `failOnErrors`/`failOnWarnings` exit code (mirroring live/JSON mode) instead of
+  exiting 0 and trusting only the external Code Scanning net-new ratchet + branch
+  protection (the weakness ADR-0017 rejected). The ratchet is retained for PR
+  annotations and backlog adopters; graph's gate is the tracked follow-up
 
 ### Superseded
 

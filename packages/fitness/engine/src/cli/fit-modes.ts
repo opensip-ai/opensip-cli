@@ -203,10 +203,21 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
           `  ${envelope.units.length} check(s), ${envelope.signals.length} finding(s)`,
         ],
       });
-      // Effectful egress at the root (cloud + `--report-to`). gate-save itself
-      // never fails the run; only a `--report-to` upload failure can (exit 4),
-      // which `deliverSignals` owns. runFailed=false here.
-      await deliverFitSignals(cli, envelope, args, false);
+      // ADR-0020: gate-save records the baseline AND hard-fails the step on a
+      // fail-threshold breach (`failOnErrors`/`failOnWarnings`), mirroring live
+      // and JSON mode. The CI step is therefore the honest pass/fail signal —
+      // it no longer exits 0 while error-level findings exist, so enforcement
+      // does not rely solely on the downstream Code Scanning net-new ratchet +
+      // branch protection (external config the release-gate ADR-0017 explicitly
+      // declined to trust). The SARIF export runs in a separate `if: always()`
+      // CI step, so the baseline + net-new PR annotations survive a failed gate.
+      // `runFailed` dominates a `--report-to` upload failure (exit 4) so a
+      // report failure never masks the gate verdict (same rule as gate-compare).
+      const runFailed = fitResult.result.shouldFail === true;
+      if (runFailed) {
+        cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+      }
+      await deliverFitSignals(cli, envelope, args, runFailed);
       return;
     }
     const result = compareToBaseline(envelope, repo);

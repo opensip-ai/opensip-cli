@@ -68,11 +68,12 @@ jobs:
       - name: Test (with coverage thresholds)
         run: pnpm test:coverage
 
-      # Dogfood: run opensip-tools fit against this repo. The CI step
-      # fails on any error-level finding (failOnErrors: 1 in
-      # opensip-tools.config.yml). See docs/plans/ready/dogfood-fit-against-self/
-      # for the full design. See CLAUDE.md "Dogfood Gate" for the
-      # contributor workflow.
+      # Dogfood: run opensip-tools fit against this repo. The CI step itself
+      # hard-fails on any error-level finding: `fit --gate-save` returns the
+      # `failOnErrors`/`failOnWarnings` exit code (ADR-0020), so enforcement does
+      # not depend solely on the downstream Code Scanning net-new ratchet. The
+      # baseline + SARIF still export below under `if: always()`, surviving a
+      # failed gate. See CLAUDE.md "Dogfood Gate" for the contributor workflow.
       - name: Fit (dogfood)
         id: fit
         run: pnpm fit:ci
