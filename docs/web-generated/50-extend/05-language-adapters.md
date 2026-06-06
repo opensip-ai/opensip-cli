@@ -50,7 +50,7 @@ That's the load-bearing part. Adapters also expose a richer query API (functions
 interface LanguageAdapter<TTree = unknown, TNode = unknown> {
   readonly id: string;                                // 'typescript', 'rust', 'python', …
   readonly fileExtensions: readonly string[];          // ['.ts', '.tsx']
-  readonly aliases?: readonly string[];                // ['ts'] for legacy matching
+  readonly aliases?: readonly string[];                // ['c'] → canonicalized to this id
 
   parse(content: string, filePath: string): TTree | null;
   stripStrings(content: string): string;
@@ -129,7 +129,7 @@ langs.has('rust');            // → boolean
 langs.list();                 // → readonly LanguageAdapter[]
 ```
 
-`LanguageAdapter` carries an `aliases` field on the type, but the registry today does not consult it during lookup — only the canonical `id` and the registered `extensions[]` are indexed. Treat aliases as forward-compatible metadata.
+`LanguageAdapter` carries an optional `aliases` field. The registry indexes each alias into an `aliasIndex` (alias → canonical id) alongside the id and extension indices, and exposes `canonicalize(idOrAlias)` to resolve an alias like `'c'`, `'rs'`, `'py'`, or `'golang'` back to its canonical adapter id (`'cpp'`, `'rust'`, `'python'`, `'go'`). Scope-matching and target-language resolution call `canonicalize` (via the scope's `languages.canonicalize`) so a target written with `languages: ['c']` matches a check scoped to `cpp`. An alias that collides with another adapter's canonical id, or one already claimed by an earlier adapter, is ignored with a structured warning (canonical id wins; first claimant wins).
 
 The CLI registers all six bundled adapters in `bootstrapCli()` before any Tool's `register()` runs. See [`packages/cli/src/bootstrap/register-language-adapters.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/bootstrap/register-language-adapters.ts).
 

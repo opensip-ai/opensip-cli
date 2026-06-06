@@ -31,7 +31,7 @@ export function registerSessions(program: Command, ctx: CliCommandsContext): voi
 
   const purgeCmd = sessionsCmd
     .command('purge')
-    .description('Delete session data from opensip-tools/.runtime/sessions/')
+    .description('Delete session rows from the project-local SQLite store (opensip-tools/.runtime/datastore.sqlite)')
     .option('--older-than <days>', 'Only delete sessions older than N days', (v: string) => {
       const n = Number.parseInt(v, 10);
       if (Number.isNaN(n) || n < 0) throw new Error(`Invalid --older-than value: '${v}'. Must be a non-negative integer.`);

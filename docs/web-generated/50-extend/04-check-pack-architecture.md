@@ -37,25 +37,20 @@ A check pack is an npm package that contributes one or more `Check` objects. Sev
 
 ## The pack contract
 
-A check pack's main entry exports three symbols:
+A check pack's main entry implements the `FitPluginExports` contract — one required export and two optional ones:
 
 ```ts
 // packages/fitness/checks-universal/src/index.ts
-import type { CheckDisplayEntry } from '@opensip-tools/core';
-import type { Check } from '@opensip-tools/fitness';
+import type { Check, CheckDisplayEntry, FitnessRecipe } from '@opensip-tools/fitness';
 
-export const checks: readonly Check[];
-export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>>;
-export const metadata: {
-  name: string;
-  version: string;
-  description: string;
-};
+export const checks: readonly Check[];                                     // required
+export const checkDisplay?: Readonly<Record<string, CheckDisplayEntry>>;   // optional
+export const recipes?: readonly FitnessRecipe[];                           // optional
 ```
 
-`Check` lives in `@opensip-tools/fitness` — the kernel doesn't know about checks. `CheckDisplayEntry` lives in `@opensip-tools/core` because the kernel does own display registries (a future `audit` tool would also have display entries).
+`Check`, `CheckDisplayEntry`, and `FitnessRecipe` all live in `@opensip-tools/fitness` — the kernel doesn't know about checks or fitness display vocabulary. `CheckDisplayEntry` was moved out of the kernel and is owned by fitness (ADR-0009); check packs import it from `@opensip-tools/fitness`.
 
-`checks` is the flat list of every `defineCheck()` result the pack provides. `checkDisplay` is a map from slug → `[icon, displayName]` that the CLI uses for table rendering and dashboard grouping. `metadata` carries the pack's name, version, and one-line description.
+`checks` is the flat list of every `defineCheck()` result the pack provides (the only required export). `checkDisplay` is an optional map from slug → `[icon, displayName]` that the CLI uses for table rendering and dashboard grouping; slugs without an entry fall back to kebab-to-title-case. `recipes` is an optional list of `defineRecipe()` results the pack bundles. There is **no** `metadata` export — package name and version come from the pack's `package.json`.
 
 Plus a discoverable package.json shape:
 
@@ -205,7 +200,7 @@ The chain:
 2. The CLI's `plugin add` command runs `npm install` into `<project>/opensip-tools/.runtime/plugins/fit/` and appends `@my-co/checks-internal` to `plugins.fit:` in `opensip-tools.config.yml`.
 3. On the next `opensip-tools fit` run, the fitness Tool's `ensureChecksLoaded()` calls into the discoverer.
 4. The discoverer reads `plugins.fit:`, walks `.runtime/plugins/fit/node_modules/`, finds `@my-co/checks-internal/`, and dynamically imports its main entry.
-5. The pack's `checks` export is registered into the in-memory check registry; its `checkDisplay` is merged into the display registry.
+5. The pack's `checks` export is registered into the in-memory check registry; its optional `checkDisplay` is merged into the display registry and its optional `recipes` into the recipe registry.
 6. Recipes that select these checks (by tag, slug, or `all`) now run them.
 
 No CLI restart, no kernel change. The whole shape is a marketplace.
@@ -219,7 +214,7 @@ Minimum viable pack:
 ```
 @my-co/checks-internal/
 ├── package.json                # opensipTools.kind: 'fit-pack' (or pinned in config)
-├── dist/index.js               # exports: checks, checkDisplay, metadata
+├── dist/index.js               # exports: checks (+ optional checkDisplay, recipes)
 └── README.md                   # author affordance
 ```
 
@@ -238,12 +233,9 @@ const noTodoBeforeDeploy = defineCheck({
 
 export const checks = [noTodoBeforeDeploy];
 export const checkDisplay = { 'no-todo-before-deploy': ['⏰', 'No TODO before deploy'] };
-export const metadata = {
-  name: '@my-co/checks-internal',
-  version: '0.1.0',
-  description: 'Internal checks for the my-co monorepo',
-};
 ```
+
+Package name and version come from the pack's `package.json` — there is no `metadata` export to maintain in lockstep.
 
 Peer-depend on `@opensip-tools/fitness` and `@opensip-tools/core` so a project at any compatible major version can install your pack:
 

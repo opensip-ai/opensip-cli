@@ -126,9 +126,9 @@ The `opensip-tools plugin` command surface (`add`/`remove`/`list`/`sync`) manage
 
 ## Session
 
-A **session** is one run of `opensip-tools fit`, `sim`, or `graph`. Each session writes a JSON artifact under `<project>/opensip-tools/.runtime/sessions/`, plus a structured log under `.runtime/logs/`, plus a rendered HTML report under `.runtime/reports/`.
+A **session** is one run of `opensip-tools fit`, `sim`, or `graph`. Each session is persisted as a row in the project-local SQLite datastore (`<project>/opensip-tools/.runtime/datastore.sqlite`) via `SessionRepo`, alongside a structured log under `.runtime/logs/` and a rendered HTML report under `.runtime/reports/`.
 
-Each session record is keyed by a UUID (`session.id`, generated via `randomUUID()`); the on-disk filename is `{timestamp}-{tool}-{recipe?}.json` (timestamp-prefixed so newest sorts last). The logger uses a separate per-process correlation id of the form `RUN_<ulid>` (`generatePrefixedId('run')`); it appears in every log entry as `runId`. The `sessions list` command browses past sessions; `sessions purge` deletes them.
+Each session record is keyed by a UUID (`session.id`, generated via `randomUUID()`) and ordered by its `timestamp` column (newest first). The persisted row carries only the columns every tool shares; per-session detail rides in a companion `session_tool_payload` row as a tool-owned opaque JSON blob. The logger uses a separate per-process correlation id of the form `RUN_<ulid>` (`generatePrefixedId('run')`); it appears in every log entry as `runId`. The `sessions list` command browses past sessions; `sessions purge` deletes the rows.
 
 The runtime dir is gitignored — sessions are local artifacts, not source. The path resolver lives in [`packages/core/src/lib/paths.ts`](../../../packages/core/src/lib/paths.ts).
 

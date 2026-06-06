@@ -221,7 +221,7 @@ are available wherever any tab JS runs.
 <project>/opensip-tools/.runtime/reports/latest.html
 ```
 
-Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the session store (`.runtime/sessions/`); the Sessions panel inlines the **most recent 20 sessions** (`loadSessions(20)` in [`packages/fitness/engine/src/cli/dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/cli/dashboard.ts)) so historical runs are browsable inside the HTML up to that bound. The session store's auto-pruning cap (`MAX_SESSIONS = 100`) means the directory itself rarely holds much more than that.
+Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the SQLite session store (`.runtime/datastore.sqlite`, read via `SessionRepo`); the Sessions panel inlines the **most recent 20 sessions** (`new SessionRepo(datastore).list({ limit: 20 })` in [`packages/cli/src/dashboard-compose.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/dashboard-compose.ts)) so historical runs are browsable inside the HTML up to that bound. Older sessions stay in the store until you run `sessions purge`.
 
 The HTML file is fully self-contained — no asset directory, no CDN, no fetches. Email a stakeholder the file and they can open it on their machine without opensip-tools installed. Useful for: post-incident reports, security review handoffs, compliance audits.
 
@@ -244,7 +244,7 @@ A few common mis-expectations, listed once:
 
 For `acme-api` after the nightly CI run:
 
-- The session record at `<project>/opensip-tools/.runtime/sessions/2026-05-17T03-15-22-123Z-fit-default.json` carries the full result.
+- The session row persisted in `<project>/opensip-tools/.runtime/datastore.sqlite` (tool `fit`, recipe `default`, timestamped `2026-05-17T03:15:22.123Z`) carries the full result in its companion `session_tool_payload` row.
 - The HTML report at `<project>/opensip-tools/.runtime/reports/latest.html` is regenerated. The Sessions panel inside the HTML inlines the most recent 20 session records, so a developer opening it later sees the new run alongside its 19 immediate predecessors.
 - A developer running `opensip-tools dashboard` locally opens the file in their browser. The Sessions panel shows the run; the Overview panel shows the score trend.
 

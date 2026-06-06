@@ -247,7 +247,7 @@ The exit code is set by the fitness Tool via `cli.setExitCode(code)`:
 
 The CLI process exits when Node's event loop drains, which happens after Ink unmounts and the dashboard launcher returns.
 
-> **Where the example lands:** stdout shows a table with two failed checks (`no-console-log: 2 violations`, plus one other failure from a different check). The exit code is `1`. The dashboard does not auto-open because the example invocation was non-interactive (CI). The session record is written to `acme-api/opensip-tools/.runtime/sessions/{timestamp}-fit-default.json`.
+> **Where the example lands:** stdout shows a table with two failed checks (`no-console-log: 2 violations`, plus one other failure from a different check). The exit code is `1`. The dashboard does not auto-open because the example invocation was non-interactive (CI). The session record is persisted as a row in `acme-api/opensip-tools/.runtime/datastore.sqlite` (tool `fit`, recipe `default`) via `SessionRepo`.
 
 ---
 

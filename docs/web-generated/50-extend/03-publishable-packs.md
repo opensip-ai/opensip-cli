@@ -120,8 +120,7 @@ Peer-depend on `@opensip-tools/fitness` and `@opensip-tools/core` — the consum
 ## `src/index.ts`
 
 ```ts
-import type { CheckDisplayEntry } from '@opensip-tools/core';
-import type { Check, FitnessRecipe } from '@opensip-tools/fitness';
+import type { Check, CheckDisplayEntry, FitnessRecipe } from '@opensip-tools/fitness';
 
 import { noFixme } from './checks/no-fixme.js';
 import { infraMustHaveTags } from './checks/infra-must-have-tags.js';

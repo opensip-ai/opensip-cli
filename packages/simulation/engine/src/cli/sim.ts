@@ -11,11 +11,10 @@
  *
  * Scenario loading lifecycle (mirrors fitness's `ensureChecksLoaded`):
  *
- *   1. Pre-load hook (CLI-injected, e.g. project-plugin auto-sync).
- *   2. .mjs plugin discovery via `loadAllSimPlugins(projectDir)`.
- *   3. npm package discovery: `@opensip-tools/scenarios-*` packages
+ *   1. .mjs plugin discovery via `loadAllSimPlugins(projectDir)`.
+ *   2. npm package discovery: `@opensip-tools/scenarios-*` packages
  *      (or anything under `plugins.scenarioPackages` / customer scopes).
- *   4. No-scenarios guard: `executeSim` fails the run closed with a
+ *   3. No-scenarios guard: `executeSim` fails the run closed with a
  *      CONFIGURATION_ERROR (exit 2) when zero scenarios would run,
  *      because a silent green run simulating nothing is the failure mode
  *      the CLI exists to prevent. (The loader only structured-logs the

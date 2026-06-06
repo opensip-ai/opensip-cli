@@ -531,7 +531,7 @@ The user-level config is shared across every project on the machine. `opensip-to
 
 ## `sessions list` and `sessions purge` — manage session records
 
-CLI-owned. Walks `<project>/opensip-tools/.runtime/sessions/`.
+CLI-owned. Reads and deletes session rows in the project-local SQLite datastore (`<project>/opensip-tools/.runtime/datastore.sqlite`) via `SessionRepo`. `list` is a `SELECT`; `purge` is a row-level `DELETE` (the FK cascade drops each session's tool-payload row), not file removal.
 
 ```
 opensip-tools sessions list

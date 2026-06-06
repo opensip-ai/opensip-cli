@@ -159,7 +159,7 @@ flowchart LR
   subgraph Sim["sim"]
     S1["load config"] --> S2["load scenarios<br/>and recipes"]
     S2 --> S3["select recipe"]
-    S3 --> S4["run load, chaos,<br/>invariant, or fix-eval executors"]
+    S3 --> S4["run load or<br/>chaos executors"]
     S4 --> S5["signals"]
   end
 

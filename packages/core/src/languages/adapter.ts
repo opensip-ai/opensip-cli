@@ -43,7 +43,13 @@ export interface LanguageAdapter<TTree = unknown, TNode = unknown> {
   /** Optional generic query layer for cross-language checks. */
   readonly query?: LanguageQueryAPI<TTree, TNode>
 
-  /** Optional async warmup (e.g. for tree-sitter WASM init). Called by CLI bootstrap. */
+  /**
+   * Optional async warmup (e.g. for tree-sitter WASM init). Reserved on the
+   * contract for adapters that need a one-time async init pass. No bundled
+   * adapter declares it today and the CLI bootstrap does NOT invoke it yet —
+   * treat it as forward-compatible: a future adapter can opt in without a
+   * contract change.
+   */
   warmup?(): Promise<void>
 
   /**

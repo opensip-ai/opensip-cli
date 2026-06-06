@@ -109,7 +109,7 @@ Gitignored (`opensip-tools init` adds the entry to `.gitignore` for you):
 ```
 <project>/opensip-tools/.runtime/
 ├── datastore.sqlite                              ← single SQLite store for tool-produced data
-│       │                                            (sessions, session_checks, session_findings,
+│       │                                            (sessions, session_tool_payload,
 │       │                                             fit_baseline, graph_catalog,
 │       │                                             graph_baseline_signals, graph_baseline_meta)
 │       └── datastore.sqlite-wal / .sqlite-shm    ← WAL sidecar files (auto-managed by SQLite)
