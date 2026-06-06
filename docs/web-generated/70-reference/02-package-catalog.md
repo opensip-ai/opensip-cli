@@ -29,7 +29,7 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 |---|---|---|---|
 | `@opensip-tools/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, per-invocation execution scope | `Tool`, `ToolRegistry`, `LanguageAdapter`, `LanguageRegistry`, `RunScope`, `runWithScope`, `currentScope`, `Registry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `logger`, `ToolError`, `ValidationError` |
 
-## Layer 2 — datastore, contracts, session-store, and output
+## Layer 2 — datastore, contracts, session-store, output, and tree-sitter
 
 `@opensip-tools/datastore` is the SQLite + Drizzle persistence kernel; it sits between `core` and the rest of this layer and depends only on `core`. Tools and `session-store` own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness). Adding a new tool means adding a new schema module — datastore is paradigm-agnostic infrastructure.
 
@@ -37,12 +37,15 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 
 `@opensip-tools/session-store` owns session persistence (the `SessionRepo` runtime and the sessions schema). `@opensip-tools/output` (renamed from `@opensip-tools/reporting`, ADR-0011) owns all machine output: pure `(envelope) => string` formatters under `format/` (json, sarif, table) and effectful delivery `sink/`s (cloud egress, entitlement). Both are Layer 2 siblings consumed by the tools above — though tools no longer import the formatters/sinks directly (the composition root does; see the dep-cruiser rules in [`80-implementation/05-layer-policy.md`](/docs/opensip-tools/80-implementation/05-layer-policy/)).
 
+`@opensip-tools/tree-sitter` is the grammar-agnostic tree-sitter substrate (ADR-0010): the `web-tree-sitter` lifecycle (parser init/load) plus grammar-agnostic node accessors. Like `datastore` it imports `core` only (plus `web-tree-sitter`) and sits below the adapters that consume it — the fitness `lang-*` adapters and the four tree-sitter `graph-*` adapters (via `graph-adapter-common`) share it so the WASM lifecycle and node-walking helpers live in exactly one place. A dependency-cruiser rule (`tree-sitter-imports-core-only`) pins it to that substrate position.
+
 | Package | Path | Role | Key exports |
 |---|---|---|---|
 | `@opensip-tools/datastore` | `packages/datastore/` | SQLite + Drizzle persistence kernel — `DataStore` interface, factory, in-memory + on-disk backends, workspace migration store under `migrations/` | `DataStore`, `DataStoreFactory`, `DataStoreOpenOptions`, `DataStoreMigrationError` |
 | `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — the `SignalEnvelope`/`CommandResult` shapes, exit codes, the cross-tool `StoredSession` type, `GraphCatalog` surface | `SignalEnvelope`, `RunVerdict`, `UnitResult`, `buildSignalEnvelope`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `StoredSession`, `GraphCatalog` |
-| `@opensip-tools/session-store` | `packages/session-store/` | Session persistence — `SessionRepo` runtime, `sessions`/`session_checks`/`session_findings` schema, session-id helpers. Depends on `core`, `datastore`, `contracts` | `SessionRepo`, `SessionListOptions`, `sessions`, `generateSessionId`, `sanitizeForFilename` |
+| `@opensip-tools/session-store` | `packages/session-store/` | Session persistence — `SessionRepo` runtime over the (package-internal) `sessions`/`session_checks`/`session_findings` schema, session-id helpers. Depends on `core`, `datastore`, `contracts` | `SessionRepo`, `SessionListOptions`, `generateSessionId`, `sanitizeForFilename` |
 | `@opensip-tools/output` | `packages/output/` | Machine output layer (renamed from `@opensip-tools/reporting`, ADR-0011): pure `format/` formatters + effectful `sink/` delivery. Depends on `core`, `contracts` | `formatSignalJson`, `formatSignalSarif`, `buildOpenSipSarif`, `formatSignalTableRows`, `formatSignalTableSummary`, `Formatter`, `postChunked`, `createCloudSignalSink`, `resolveSignalSink`, `resolveRepoIdentity`, `checkEntitlement` |
+| `@opensip-tools/tree-sitter` | `packages/tree-sitter/` | Grammar-agnostic `web-tree-sitter` substrate (ADR-0010) — WASM parser lifecycle + node accessors, shared by the fitness `lang-*` and graph tree-sitter adapters. Depends on `web-tree-sitter` (and `core`) only | `createParser`, `parseToTree`, `walkNodes`, `findEnclosing`, `nameOf`, `childrenOf`, `namedChildrenOf`, `nodeText` |
 
 ## Layer 3 — tools, shared libraries, and language adapters
 
@@ -52,9 +55,9 @@ Peer packages at the same layer. Tools implement the `Tool` contract; shared lib
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate. Returns a `SignalEnvelope`; SARIF/cloud egress is owned by the composition root (ADR-0011) | `defineCheck`, `defineRecipe`, `FitnessRecipeService`, `defaultRecipeRegistry`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `openDashboard` |
+| `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate. Returns a `SignalEnvelope`; SARIF/cloud egress is owned by the composition root (ADR-0011). The engine, recipe service, registries, gate/baseline primitives, and CLI handlers are package-internal (curated barrel, ADR-0013) — locked by `public-api.test.ts` | `defineCheck`, `defineRecipe`, `getCheckConfig`, `fitnessTool` (+ the AST/text authoring helpers: `isTestFile`, `stripStringsAndComments`, `extractSnippet`, …) |
 | `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, four scenario kinds | `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario`, `defineSimulationRecipe`, `simulationTool`, `currentSimulationRecipeRegistry`, `SCENARIO_KINDS` |
-| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Seven-stage staged pipeline (discover → inventory → edges → indexes → features → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below) and register through `registerAdapter`. Returns a `SignalEnvelope` (assembled in `cli/build-envelope.ts`); the shared `formatSignalSarif` formatter and all egress are owned by the composition root (ADR-0011). Depends on `@opensip-tools/contracts`, not fitness or `@opensip-tools/output` | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `GraphLanguageAdapter`, `registerAdapter`, `pickAdapter` |
+| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Seven-stage staged pipeline (discover → inventory → edges → indexes → features → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below); the CLI discovers them at startup and hands them to the per-run scope via `setDiscoveredAdapters`. Returns a `SignalEnvelope` (assembled in `cli/build-envelope.ts`); the shared `formatSignalSarif` formatter and all egress are owned by the composition root (ADR-0011). Depends on `@opensip-tools/contracts`, not fitness or `@opensip-tools/output` | `graphTool`, `GraphLanguageAdapter` (type), `pickAdapter`, `setDiscoveredAdapters`, `defineGraphRecipe`, `defineRule`, `Catalog`/`Rule` (types) |
 
 ### Shared libraries
 
@@ -80,7 +83,7 @@ Implement `LanguageAdapter`. Used by fitness checks and any future tool that nee
 
 ### Graph language adapters (five languages + shared scaffolding)
 
-Distinct from the fitness language adapters above — these implement the graph engine's `GraphLanguageAdapter` contract (catalog inventory, edge extraction). Each is a publishable npm package marked with `opensipTools.kind: "graph-adapter"` and registered via `registerAdapter` when imported.
+Distinct from the fitness language adapters above — these implement the graph engine's `GraphLanguageAdapter` contract (catalog inventory, edge extraction). Each is a publishable npm package marked with `opensipTools.kind: "graph-adapter"`; the CLI discovers them at startup and registers them into each run's scope via `setDiscoveredAdapters`.
 
 The four tree-sitter adapters (Python, Rust, Go, Java) are backed by **`web-tree-sitter`** (the WASM build — no native tree-sitter binding) and share `@opensip-tools/graph-adapter-common`, the tree-sitter scaffolding package (discover/parse/walk/cache-key factories). It sits downstream of the engine and upstream of the four tree-sitter adapters. The TypeScript adapter is the exception — it resolves its call graph through the TS compiler API, not tree-sitter.
 

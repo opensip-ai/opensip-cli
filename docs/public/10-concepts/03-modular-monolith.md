@@ -53,7 +53,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 2  ┌──────────────────────┴───────────────────────────┐    │
-│           │  datastore   contracts   session-store   output    │   │
+│           │ datastore  contracts  session-store  output  tree-sitter │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 1  ┌──────────────────────┴───────────────────────────┐    │
@@ -66,12 +66,13 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 1 — `@opensip-tools/core`.** The kernel. Ships types, errors, IDs, the logger, the path resolver, the language-adapter contract, the plugin discovery mechanics (including the generic marker-discovery walker), and the Tool registry. No knowledge of fitness, simulation, or any other tool. No dependency on Commander, Ink, or any UI library.
 
-**Layer 2 — `@opensip-tools/datastore`, `@opensip-tools/contracts`, `@opensip-tools/session-store`, and `@opensip-tools/output`.** Four packages above the kernel, each depending only on `core` and (where noted) on lower siblings within this layer — never on a tool.
+**Layer 2 — `@opensip-tools/datastore`, `@opensip-tools/contracts`, `@opensip-tools/session-store`, `@opensip-tools/output`, and `@opensip-tools/tree-sitter`.** Five packages above the kernel, each depending only on `core` and (where noted) on lower siblings within this layer — never on a tool.
 
 - **`@opensip-tools/datastore`** is the persistence kernel — the `DataStore` interface, the SQLite + Drizzle implementation, the in-memory backend for tests, the workspace migration store under `migrations/`. Paradigm-agnostic infrastructure: tools and session-store own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness) and register them with the datastore at open time. Depends on `core` only.
 - **`@opensip-tools/contracts`** is the shared contract layer between Tools and the runner: the `SignalEnvelope` shape every tool returns (with its `verdict`/`units[]`/`signals[]`), the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the cross-tool `StoredSession` type, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. A types-and-constants surface — the `SessionRepo` runtime and sessions schema live in `session-store`, not here. Imports `core` only. Does not import any tool.
 - **`@opensip-tools/session-store`** owns session persistence: the `SessionRepo` runtime, the `sessions`/`session_checks`/`session_findings` schema, and the `generateSessionId`/`sanitizeForFilename` helpers. Depends on `core`, `datastore`, and `contracts` (for the `StoredSession` shape it round-trips).
 - **`@opensip-tools/output`** (renamed from `@opensip-tools/reporting`, ADR-0011) owns all machine output: pure `(envelope) => string` formatters under `format/` (json, sarif, table) and effectful `sink/` delivery (cloud egress, entitlement). The CLI composition root composes a formatter with a sink per the run's flags; tool engines no longer import it. Depends on `core` and `contracts` only.
+- **`@opensip-tools/tree-sitter`** (ADR-0010) is the grammar-agnostic `web-tree-sitter` substrate: the WASM parser lifecycle and grammar-neutral node accessors (`createParser`, `walkNodes`, `findEnclosing`, …). Like `datastore`, it imports `core` only (plus `web-tree-sitter`) and is consumed from above — by the fitness `lang-*` adapters and the four tree-sitter `graph-*` adapters (through `graph-adapter-common`) — so the WASM lifecycle lives in exactly one place. A dedicated dependency-cruiser rule (`tree-sitter-imports-core-only`) holds it at this substrate position.
 
 **Layer 3 — Tools, shared libraries, and language adapters.** Peer packages, all depending on `contracts`, `datastore`, and `core`. Three groups at this layer:
 

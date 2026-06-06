@@ -26,12 +26,12 @@ export { graphTool, graphTool as tool } from './tool.js';
 // the CLI drives graph via `graphTool.register`, not these symbols, and
 // the parent-repo contract spawns the `catalog-export` subcommand rather
 // than importing the orchestrator. See ./internal.ts.
-// Graph catalog persistence — exposed so consumers (e.g. fitness's
-// dashboard command) can read the catalog via a typed repo instead of
-// raw SQL against the graph_catalog table (audit 2026-05-29, H1).
-// Intentionally public per the Finding-3 audit even though the only
-// in-repo consumer today is graph's own tool.ts dashboard contribution.
-export { CatalogRepo } from './persistence/catalog-repo.js';
+// `CatalogRepo` (graph catalog persistence) was previously public — exposed so
+// fitness's dashboard command could read the catalog. That coupling is gone
+// (the dashboard is CLI-composed and graph contributes via `collectDashboardData`,
+// which uses CatalogRepo internally). With no external consumer, a concrete
+// SQLite/Drizzle repo does not belong on the module contract, so it moved to
+// `@opensip-tools/graph/internal` (boundary audit 2026-06-05).
 export type {
   Catalog,
   FunctionOccurrence,
