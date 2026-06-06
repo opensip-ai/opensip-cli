@@ -526,12 +526,14 @@ export async function dispatchGraphResult(
  * (`cli.emitEnvelope`). The default/`--verbose` path hands a `graph-done`
  * result to the render seam (Ink on TTY, plain text in pipes/CI): graph's
  * report is richer than the neutral per-unit table — it carries the verbose
- * catalog/findings/entry-point body (`reportLines`), a fast-tier caveat
- * (`resolutionBanner`), the one-line PASS/FAIL `summary`, and next-step
- * `footerHints`. The summary counts are derived from the envelope's verdict so
- * `--json` and the human report agree; the envelope itself is NOT carried on
- * the result (it would route to the neutral unit table and drop graph's body),
- * but IS returned for the composition root's cloud + `--report-to` delivery.
+ * catalog/findings/entry-point body as `verboseDetail` ({kind:'lines'},
+ * ADR-0021), a fast-tier caveat (`resolutionBanner`), and the one-line
+ * PASS/FAIL `summary`; the non-verbose footer hints are emitted by the shared
+ * seam (`graphDoneView`). The summary counts are derived from the envelope's
+ * verdict so `--json` and the human report agree; the envelope itself is NOT
+ * carried on the result (it would route to the neutral unit table and drop
+ * graph's body), but IS returned for the composition root's cloud +
+ * `--report-to` delivery.
  */
 async function renderGraphResult(
   opts: GraphCommandOptions,
