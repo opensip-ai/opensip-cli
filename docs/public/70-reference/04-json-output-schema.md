@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v3.0.0
+release: v2.7.0
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
 purpose: "The SignalEnvelope shape every tool emits on --json. Every field, every type, every presence rule, plus the v1→v2 mapping."

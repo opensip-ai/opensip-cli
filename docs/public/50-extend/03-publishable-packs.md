@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-05-27
-release: v3.0.0
+release: v2.7.0
 title: "Publishable packs"
 audience: [plugin-authors]
 purpose: "Author and publish a fit-pack or sim-pack: workspace package skeleton, the marker contract, four discovery paths, and the migration recipe from loose .mjs files."

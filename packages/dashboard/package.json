@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/dashboard",
-  "version": "3.0.0",
+  "version": "2.7.0",
   "license": "MIT",
   "description": "Self-contained HTML dashboard generator for OpenSIP Tools — renders the fit/sim/graph report from session data and graph catalogs",
   "keywords": [

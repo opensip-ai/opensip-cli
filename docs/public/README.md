@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-05
-release: v3.0.0
+release: v2.7.0
 owner: opensip-tools
 indexable: true
 title: "opensip-tools Architecture"
@@ -154,4 +154,4 @@ See [`./80-implementation/06-doc-conventions.md`](./80-implementation/06-doc-con
 
 ## Status
 
-Doc set authored 2026-05-15 against opensip-tools v1.0.0; re-verified against v3.0.0 at 2026-06-05. The current docs reflect the stable SignalEnvelope output contract, the `@opensip-tools/output` package rename, marker-based plugin discovery, publishable graph adapters, the architecture overview map, and the current package count, layer rules, and command surface.
+Doc set authored 2026-05-15 against opensip-tools v1.0.0; re-verified against v2.7.0 at 2026-06-06. The current docs reflect the stable SignalEnvelope output contract, the `@opensip-tools/output` package rename, marker-based plugin discovery, publishable graph adapters, the architecture overview map, and the current package count, layer rules, and command surface.

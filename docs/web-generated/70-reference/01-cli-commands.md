@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v3.0.0
+release: v2.7.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for every CLI command, its flags, and when to use each."
@@ -22,7 +22,7 @@ related-docs:
 
 Every command, alphabetized by command name. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `dashboard`, `fit-list`, `fit-recipes`) come from each Tool's `register()` call. CLI-owned commands (everything else) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `dashboard`, `fit-list`, `fit-recipes`) come from each Tool's `register()` call. CLI-owned commands (everything else) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/cli/src/commands/).
 
 ---
 
@@ -103,7 +103,7 @@ This is distinct from `--report-to`: that path explicitly POSTs **SARIF** to
 
 ## `fit` — run fitness checks
 
-Tool-owned: [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/tool.ts).
+Tool-owned: [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/fitness/engine/src/tool.ts).
 
 ```
 opensip-tools fit
@@ -124,7 +124,7 @@ opensip-tools fit --gate-compare
 | `--recipes` | bool | `false` | List available recipes instead of running. |
 | `--json` | bool | `false` | Emit the `SignalEnvelope` JSON on stdout instead of the table renderer. |
 | `-v, --verbose` | bool | `false` | Show the detailed report body (per-check findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
-| `--findings` | bool | `false` | **Deprecated** — alias of `--verbose`; will be removed a release after v3. |
+| `--findings` | bool | `false` | **Deprecated** — alias of `--verbose`; will be removed in a future 2.x release. |
 | `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
 | `--gate-save` | bool | `false` | Save current findings as architecture baseline. The baseline is stored as a row in the project's SQLite store (`fit_baseline` table at `opensip-tools/.runtime/datastore.sqlite`). |
@@ -145,7 +145,7 @@ opensip-tools fit --gate-compare
 
 ## `sim` — run simulation scenarios
 
-Tool-owned: [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/simulation/engine/src/tool.ts). Marked **experimental** in `--help`.
+Tool-owned: [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/simulation/engine/src/tool.ts). Marked **experimental** in `--help`.
 
 ```
 opensip-tools sim
@@ -172,7 +172,7 @@ opensip-tools sim --recipe <name>
 
 ## `graph` — static call-graph + dead-end analysis
 
-Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-graph/01-stages-and-catalog.md`](/docs/opensip-tools/40-graph/01-stages-and-catalog/); perf-plan history is recoverable from `git -P log -- packages/graph`.
+Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-graph/01-stages-and-catalog.md`](/docs/opensip-tools/40-graph/01-stages-and-catalog/); perf-plan history is recoverable from `git -P log -- packages/graph`.
 
 ```
 # Whole project (language auto-detected)
@@ -447,7 +447,7 @@ The dogfood CI uses this command to write `fit.sarif` after a `fit --gate-save` 
 
 ## `init` — scaffold the project layout
 
-CLI-owned: [`packages/cli/src/commands/init.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/init.ts).
+CLI-owned: [`packages/cli/src/commands/init.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/cli/src/commands/init.ts).
 
 ```
 opensip-tools init
@@ -524,7 +524,7 @@ Ambiguous detection (multiple markers, no `--language`) exits 2 with a prompt to
 
 ## `configure` — manage user-level settings
 
-CLI-owned: [`packages/cli/src/commands/configure.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/configure.ts). Interactive — sets up the OpenSIP Cloud API key in `~/.opensip-tools/config.yml`.
+CLI-owned: [`packages/cli/src/commands/configure.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/cli/src/commands/configure.ts). Interactive — sets up the OpenSIP Cloud API key in `~/.opensip-tools/config.yml`.
 
 ```
 opensip-tools configure
@@ -564,7 +564,7 @@ opensip-tools sessions purge -y
 
 ## `plugin add/remove/list/sync` — manage project-pinned plugins
 
-CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/plugin.ts).
+CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/cli/src/commands/plugin.ts).
 
 ```
 opensip-tools plugin list
@@ -594,7 +594,7 @@ There are **two plugin shapes** with different install models:
 
 ## `completion` — print shell completion script
 
-CLI-owned: [`packages/cli/src/commands/completion.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/completion.ts).
+CLI-owned: [`packages/cli/src/commands/completion.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/cli/src/commands/completion.ts).
 
 ```
 opensip-tools completion bash
@@ -617,7 +617,7 @@ The completion catalog is a **static first-party list** (`SUBCOMMANDS` in `packa
 
 ## `uninstall` — remove opensip-tools state
 
-CLI-owned: [`packages/cli/src/commands/uninstall.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/uninstall.ts).
+CLI-owned: [`packages/cli/src/commands/uninstall.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/cli/src/commands/uninstall.ts).
 
 ```
 opensip-tools uninstall                       # remove ~/.opensip-tools/
@@ -646,7 +646,7 @@ Both modes:
 - Refuse to run when no targets exist (`--project` against a directory that contains no opensip-tools state is a no-op, not a destructive accident).
 - Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g opensip-tools`); the project-mode success message points back at the user-mode command for the matching cleanup.
 
-State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/lib/paths.ts), [`logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
+State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/core/src/lib/paths.ts), [`logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
 
 ---
 

@@ -440,10 +440,10 @@ won't need to.
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "peerDependencies": {
-    "@opensip-tools/fitness": "^3.0.0"
+    "@opensip-tools/fitness": "^2.7.0"
   },
   "devDependencies": {
-    "@opensip-tools/fitness": "^3.0.0",
+    "@opensip-tools/fitness": "^2.7.0",
     "typescript": "^5.7.0"
   }
 }

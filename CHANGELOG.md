@@ -4,27 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [3.0.0] — 2026-06-04
+## [2.7.0] — 2026-06-06
 
-**First GA / stable release.** opensip-tools graduates to a stable, semver-governed
-1.x-style contract (declared `3.0.0` per
-[ADR-0012](docs/decisions/ADR-0012-versioning-and-release-policy.md)). The v2.x line
-stabilized the signal-output model behind the scenes; 3.0 makes it the public
-contract.
+**Breaking changes in the pre-GA 2.x line.** This release makes the signal-output
+model the default `--json` contract and lands the `reporting`→`output` split and
+the public-surface tightening. Per
+[ADR-0012](docs/decisions/ADR-0012-versioning-and-release-policy.md) the project
+stays pre-GA on the long-lived 2.x major (breaking changes are batched into 2.x
+minors); **`3.0.0` is reserved for the tool-plugin-parity north star**
+(`docs/plans/tool-plugin-parity-architecture-2026-06-06.md`) and is not this
+release.
 
 > ### ⚠️ BREAKING CHANGES
 >
-> 3.0 carries breaking changes to the machine-readable `--json` shape, the
-> published package set, and the programmatic (importable) API surface. **If you
-> only run the CLI and read its terminal output, nothing changes — upgrade and
-> carry on.** Everyone else: read the
-> **[v2 → v3 migration guide](docs/public/70-reference/07-migrating-v2-to-v3.md)**.
+> This release carries breaking changes to the machine-readable `--json` shape,
+> the published package set, and the programmatic (importable) API surface. **If
+> you only run the CLI and read its terminal output, nothing changes — upgrade
+> and carry on.** Everyone else: read the
+> **[2.7 migration guide](docs/public/70-reference/07-migrating-to-2.7.md)**.
 
 > **Heads-up for plugin authors / `--json` consumers:** the `--json` payload, the
 > `@opensip-tools/contracts` type surface, the `@opensip-tools/reporting` package
 > name, the `RunScope` recipe-config slot, and the `./internal` subpath exports
 > all changed. The
-> [migration guide](docs/public/70-reference/07-migrating-v2-to-v3.md) is the
+> [migration guide](docs/public/70-reference/07-migrating-to-2.7.md) is the
 > step-by-step checklist.
 
 ### Added
@@ -43,7 +46,7 @@ contract.
   `restrict-raw-db-access`, plus new dependency-cruiser tool-output gates — they
   enforce that tools emit signals (not stdout) and never touch the raw DB
   directly (ADR-0009 / ADR-0011).
-- **[v2 → v3 migration guide](docs/public/70-reference/07-migrating-v2-to-v3.md)**
+- **[2.7 migration guide](docs/public/70-reference/07-migrating-to-2.7.md)**
   under `70-reference/`.
 
 ### Changed

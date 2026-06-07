@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/datastore",
-  "version": "3.0.0",
+  "version": "2.7.0",
   "license": "MIT",
   "description": "SQLite + Drizzle persistence layer for OpenSIP Tools — DataStore interface, backends, factory, schema migrations",
   "keywords": [

@@ -1,6 +1,6 @@
 {
-  "version": "3.0.0",
-  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-tools/v3.0.0/",
+  "version": "2.7.0",
+  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-tools/v2.7.0/",
   "pages": [
     {
       "file": "docs/web-generated/README.md",
@@ -482,15 +482,15 @@
       "purpose": "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
     },
     {
-      "file": "docs/web-generated/70-reference/07-migrating-v2-to-v3.md",
-      "path": "/docs/opensip-tools/70-reference/07-migrating-v2-to-v3/",
+      "file": "docs/web-generated/70-reference/07-migrating-to-2.7.md",
+      "path": "/docs/opensip-tools/70-reference/07-migrating-to-2.7/",
       "section": "70-reference",
-      "title": "Migrating from v2 to v3",
+      "title": "Migrating to 2.7",
       "audience": [
         "ci-integrators",
         "plugin-authors"
       ],
-      "purpose": "Everything a --json consumer or plugin author must change to move from opensip-tools v2.x to v3.0."
+      "purpose": "Everything a --json consumer or plugin author must change to move to opensip-tools 2.7 (the signal-output + output-package breaking batch in the pre-GA 2.x line)."
     },
     {
       "file": "docs/web-generated/70-reference/08-supply-chain-security.md",
@@ -666,7 +666,7 @@
         "/docs/opensip-tools/70-reference/04-json-output-schema/",
         "/docs/opensip-tools/70-reference/05-checks-index/",
         "/docs/opensip-tools/70-reference/06-dashboard/",
-        "/docs/opensip-tools/70-reference/07-migrating-v2-to-v3/",
+        "/docs/opensip-tools/70-reference/07-migrating-to-2.7/",
         "/docs/opensip-tools/70-reference/08-supply-chain-security/"
       ]
     },
@@ -737,7 +737,7 @@
         "/docs/opensip-tools/70-reference/03-configuration/",
         "/docs/opensip-tools/70-reference/04-json-output-schema/",
         "/docs/opensip-tools/70-reference/05-checks-index/",
-        "/docs/opensip-tools/70-reference/07-migrating-v2-to-v3/",
+        "/docs/opensip-tools/70-reference/07-migrating-to-2.7/",
         "/docs/opensip-tools/70-reference/08-supply-chain-security/",
         "/docs/opensip-tools/80-implementation/02-plugin-loader/"
       ]
@@ -767,7 +767,7 @@
         "/docs/opensip-tools/70-reference/03-configuration/",
         "/docs/opensip-tools/70-reference/04-json-output-schema/",
         "/docs/opensip-tools/70-reference/05-checks-index/",
-        "/docs/opensip-tools/70-reference/07-migrating-v2-to-v3/",
+        "/docs/opensip-tools/70-reference/07-migrating-to-2.7/",
         "/docs/opensip-tools/70-reference/08-supply-chain-security/"
       ]
     },

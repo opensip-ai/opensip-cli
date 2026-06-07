@@ -1,14 +1,23 @@
 ---
 status: active
-last_verified: 2026-06-04
+last_verified: 2026-06-06
 owner: opensip-tools
 ---
 
-# ADR-0012: Versioning & release policy — semver-honest, output contract versioned independently, batch majors; 3.0 is GA
+# ADR-0012: Versioning & release policy — semver-honest, output contract versioned independently, batch majors; stay pre-GA on 2.x, reserve 3.0.0 for the tool-plugin-parity north star
+
+> **Amended 2026-06-06.** The original decision named `3.0.0` as the next tag /
+> first GA. That is reversed: GA is deferred to the **tool-plugin-parity north
+> star** (`docs/plans/tool-plugin-parity-architecture-2026-06-06.md`), which will
+> be `3.0.0`. The project stays pre-GA on the long-lived **2.x** major; the
+> accumulated breaking batch (ADR-0011 + ADR-0009 surface) ships as **`2.7.0`**.
+> The rest of the policy (semver-honest, independent output-contract version,
+> batch majors, deprecate-not-unpublish) is unchanged. Edited in place by
+> maintainer decision rather than via a superseding ADR.
 
 ```yaml
 id: ADR-0012
-title: Versioning & release policy — semver-honest, output contract versioned independently, batch majors; 3.0 is GA
+title: Versioning & release policy — semver-honest, output contract versioned independently, batch majors; pre-GA on 2.x, 3.0.0 reserved for tool-plugin parity
 date: 2026-06-04
 status: active            # active | superseded | deferred
 supersedes: []
@@ -40,13 +49,17 @@ apply it:
    per-change. Within a major, minor/patch stay non-breaking; accumulated
    breaks land together at the next major. Pre-GA, expect **long-lived majors**,
    not a fast-climbing integer.
-3. **The next release is `3.0.0`, declared the first GA / stable release**, on
-   the existing `@opensip-tools/*` + `opensip-tools` names. The "production-ready"
-   signal is the release announcement + this stability policy — **not** the
-   version integer.
+3. **The project stays pre-GA on the long-lived `2.x` major; the accumulated
+   breaking batch ships as `2.7.0`.** GA is **deferred** to the tool-plugin-parity
+   north star (`docs/plans/tool-plugin-parity-architecture-2026-06-06.md`), which
+   will be declared **`3.0.0`**. Expect several more `2.x` releases (breaking
+   changes batched into `2.x` minors) before then, on the existing
+   `@opensip-tools/*` + `opensip-tools` names. The "production-ready" signal is
+   the GA release announcement at the north star — **not** the version integer.
 
-Old pre-3.0 npm versions are retired with **`npm deprecate`** (a steering
-message that keeps them installable), never **`npm unpublish`**.
+When GA (`3.0.0`) is cut, the older pre-GA npm versions are retired with
+**`npm deprecate`** (a steering message that keeps them installable), never
+**`npm unpublish`**. Pre-GA `2.x` releases do not mass-deprecate prior versions.
 
 **Alternatives:**
 
@@ -90,23 +103,31 @@ migration effort") instead of noisy.
 
 **Consequences:**
 
-- **`3.0.0` is the next tag.** It bundles all accumulated breaking changes —
+- **`2.7.0` is the next tag.** It bundles the accumulated breaking changes —
   ADR-0011 (signals as the universal output currency; `CliOutput` retired;
   `reporting`→`output`; `recipeUnitConfig`; 4-level `--json` severity) and the
-  ADR-0009 surface tightening (audit Findings 2–4) — into one deliberate major.
-- Future breaking changes accumulate toward the *next* major; minor/patch within
+  ADR-0009 surface tightening (audit Findings 2–4) — into one deliberate, batched
+  pre-GA `2.x` minor (consistent with how `2.6.0` / `2.3.0` / `2.0.0` shipped
+  their breaks).
+- Pre-GA, breaking changes continue to batch into `2.x` minors toward the GA
+  cutover. **At GA (`3.0.0`, the tool-plugin-parity north star) the strict
+  no-break-within-a-major rule begins**, and from then on minor/patch within
   `3.x` remain non-breaking.
 - Docs instruct machine-output consumers to pin `schemaVersion`, not the package
-  version (see the `--json` reference + the v2→v3 migration guide).
-- **At publish time (not before):** `npm deprecate '@opensip-tools/<pkg>@<3.0.0'`
-  (and the unscoped CLI) with a message pointing at 3.0; do NOT unpublish.
+  version (see the `--json` reference + the 2.7 migration guide,
+  `docs/public/70-reference/07-migrating-to-2.7.md`).
+- **At GA publish time (not before):** `npm deprecate '@opensip-tools/<pkg>@<3.0.0'`
+  (and the unscoped CLI) with a message pointing at the GA; do NOT unpublish.
 - The release gate is unchanged: `scripts/verify-release.mjs` (single-version
   consistency, dated CHANGELOG entry, generated-doc freshness) + the tag-driven
   `release.yml`.
-- GA is declared via the release announcement + CHANGELOG, referencing this ADR.
+- GA is declared via the release announcement + CHANGELOG at `3.0.0`, referencing
+  this ADR.
 
-**Related specs / ADRs:** ADR-0011 (the breaking migration this major ships, and
+**Related specs / ADRs:** ADR-0011 (the breaking migration this batch ships, and
 the source of the independent `SignalEnvelope.schemaVersion`), ADR-0008
 (`SignalBatch.schemaVersion`, the cloud wire-contract version), ADR-0009
-(public-API surface policy — the other breaking changes in 3.0). Release
-mechanics live in `RELEASING.md`; the 3.0.0 change log in `CHANGELOG.md`.
+(public-API surface policy — the other breaking changes in this batch). Release
+mechanics live in `RELEASING.md`; the `2.7.0` change log in `CHANGELOG.md`; the
+deferred-GA north star in
+`docs/plans/tool-plugin-parity-architecture-2026-06-06.md`.

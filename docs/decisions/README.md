@@ -88,9 +88,11 @@ distinct from:
   policy: semver-honest package versions; the machine-output/wire contract is
   versioned independently via `SignalEnvelope.schemaVersion`/`SignalBatch.schemaVersion`;
   breaking changes batch into deliberate major windows (long-lived pre-GA majors,
-  not a fast-climbing integer); **3.0.0 is the first GA/stable release** on the
-  existing names (same-name 1.0 reset is impossible — 1.0.0 is burned on npm;
-  rename rejected); old versions retired via `npm deprecate`, never `unpublish`
+  not a fast-climbing integer); **amended 2026-06-06: stays pre-GA on the 2.x line
+  (accumulated breaking batch ships as `2.7.0`); GA is deferred to the
+  tool-plugin-parity north star, which becomes `3.0.0`**; same-name 1.0 reset is
+  impossible (1.0.0 is burned on npm; rename rejected); old versions retired via
+  `npm deprecate`, never `unpublish`
 - [ADR-0013](./ADR-0013-fitness-curated-export-surface.md) — Curate the
   `@opensip-tools/fitness` public barrel to the check/recipe/plugin authoring
   surface + `fitnessTool`; drop engine internals (registries, recipe service,

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-05
-release: v3.0.0
+release: v2.7.0
 title: "Architecture gate"
 audience: [contributors, ci-integrators]
 purpose: "The baseline-and-compare workflow. Identity hash, line-shift invariance, CI integration patterns."
@@ -35,7 +35,7 @@ opensip-tools fit --gate-save                 # capture today's reality
 opensip-tools fit --gate-compare              # CI gate from now on
 ```
 
-`--gate-save` runs the configured recipe and stores the resulting `SignalEnvelope` into the project's SQLite store (`fit_baseline` table at `<project>/opensip-tools/.runtime/datastore.sqlite`, via [`FitBaselineRepo`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/persistence/baseline-repo.ts)). There is **exactly one baseline per project**.
+`--gate-save` runs the configured recipe and stores the resulting `SignalEnvelope` into the project's SQLite store (`fit_baseline` table at `<project>/opensip-tools/.runtime/datastore.sqlite`, via [`FitBaselineRepo`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/fitness/engine/src/persistence/baseline-repo.ts)). There is **exactly one baseline per project**.
 
 > **Baseline shape (ADR-0011).** The v2 baseline stores the run's `SignalEnvelope` (its `signals`) directly — **not** a SARIF document — mirroring graph's signal-keyed baseline. This keeps fitness off any `@opensip-tools/output` production dependency: the composition root owns all SARIF egress. `fit-baseline-export` reads the stored envelope back and writes a SARIF file via the root `cli.writeSarif` seam, so the on-disk CI artifact stays SARIF.
 
@@ -110,7 +110,7 @@ function hashViolation(filePath: string, ruleId: string, message: string): strin
 }
 ```
 
-[`packages/fitness/engine/src/gate.ts:243`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/gate.ts).
+[`packages/fitness/engine/src/gate.ts:243`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/fitness/engine/src/gate.ts).
 
 Three things stay in the hash:
 
@@ -122,13 +122,13 @@ One thing is **deliberately excluded**: the line number. A regex check that flag
 
 The trade-off is symmetric: if a *different* `console.log` is added at the same file with the exact same message, the hash collides and we treat it as unchanged. In practice this hasn't been a problem — messages are usually specific enough that two distinct violations have different messages, and a duplicate-message-same-file pair is rare and benign.
 
-The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests__/gate.test.ts:222`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/__tests__/gate.test.ts) with explicit cases for the moved-line scenario and the changed-message scenario.
+The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests__/gate.test.ts:222`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/fitness/engine/src/__tests__/gate.test.ts) with explicit cases for the moved-line scenario and the changed-message scenario.
 
 ---
 
 ## What `compareToBaseline` actually does
 
-[`packages/fitness/engine/src/gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/gate.ts):
+[`packages/fitness/engine/src/gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/fitness/engine/src/gate.ts):
 
 ```ts
 export function compareToBaseline(envelope: SignalEnvelope, repo: FitBaselineRepo): GateCompareResult {
@@ -154,7 +154,7 @@ The `degraded` flag is `added.length > 0`. A run can resolve violations *and* ad
 
 ## Tolerant baseline reading
 
-Both the stored baseline envelope and the current run reduce to the same hashed violation list before the diff. `extractViolationsFromStoredBaseline` and `extractViolationsFromEnvelope` ([`packages/fitness/engine/src/gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/gate.ts)) read only the fields the identity hash needs (`filePath`, `ruleId`, `message`) off each `signal` and ignore the rest:
+Both the stored baseline envelope and the current run reduce to the same hashed violation list before the diff. `extractViolationsFromStoredBaseline` and `extractViolationsFromEnvelope` ([`packages/fitness/engine/src/gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.0/packages/fitness/engine/src/gate.ts)) read only the fields the identity hash needs (`filePath`, `ruleId`, `message`) off each `signal` and ignore the rest:
 
 - A signal with no location → `filePath = ''`. The hash still works (line/column aren't in the hash anyway).
 - Extra signal fields (`category`, `provider`, `fixConfidence`, `metadata`, …) are ignored — they don't affect identity.

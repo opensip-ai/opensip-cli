@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-06-04
-release: v3.0.0
-title: "Migrating from v2 to v3"
+last_verified: 2026-06-06
+release: v2.7.0
+title: "Migrating to 2.7"
 audience: [ci-integrators, plugin-authors]
-purpose: "Everything a --json consumer or plugin author must change to move from opensip-tools v2.x to v3.0."
+purpose: "Everything a --json consumer or plugin author must change to move to opensip-tools 2.7 (the signal-output + output-package breaking batch in the pre-GA 2.x line)."
 source-files:
   - packages/contracts/src/signal-envelope.ts
   - packages/core/src/types/signal.ts
@@ -15,13 +15,16 @@ related-docs:
   - ../../decisions/ADR-0011-signal-output-currency-formatter-sink.md
   - ../../decisions/ADR-0012-versioning-and-release-policy.md
 ---
-# Migrating from v2 to v3
+# Migrating to 2.7
 
-**3.0.0 is the first GA / stable release of opensip-tools** (see
-[ADR-0012](../../decisions/ADR-0012-versioning-and-release-policy.md)). It is
-also the first release to carry **breaking changes** under semver: the v2.x
-line stabilized the signal-output model behind the scenes, and 3.0 makes that
-model the public contract.
+**2.7.0 lands a batch of breaking changes in the pre-GA 2.x line.** The project
+stays pre-GA on the long-lived 2.x major (see
+[ADR-0012](../../decisions/ADR-0012-versioning-and-release-policy.md)); breaking
+changes are batched into 2.x minors. This release makes the signal-output model
+the public `--json` contract and completes the `reporting`→`output` split and the
+public-surface tightening. **`3.0.0` is reserved for the future tool-plugin-parity
+north star**, not this release — so this guide covers the move to 2.7, and a
+consumer on any earlier 2.x (≤ 2.6.2) should work through it when upgrading.
 
 This page is the migration checklist. It is organized by *who you are*: most
 readers are either a **`--json` / CI consumer** or a **plugin / library
@@ -39,7 +42,7 @@ author**. Work through the section that applies to you.
 ### 1. `--json` now emits a `SignalEnvelope` (`schemaVersion: 2`)
 
 The old `--json` payload was the fitness-shaped `CliOutput` husk
-(`version: "1.0"`, `checks[]`, `findings[]`). v3 emits the signal-native
+(`version: "1.0"`, `checks[]`, `findings[]`). 2.7 emits the signal-native
 `SignalEnvelope` instead: `signals[]` + `verdict { score, passed, summary }` +
 `units[]`, tagged `schemaVersion: 2`. This is the same shape for `fit`, `sim`,
 and `graph` ([ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md)).
@@ -131,7 +134,7 @@ barrel, not to reach past the boundary.
 
 ### 8. Parse substrate: the `@opensip-tools/tree-sitter` package
 
-v3 introduces `@opensip-tools/tree-sitter` and makes the `lang-*` packages the
+2.7 introduces `@opensip-tools/tree-sitter` and makes the `lang-*` packages the
 canonical tree-sitter parse substrate
 ([ADR-0010](../../decisions/ADR-0010-lang-canonical-parse-substrate.md)).
 Python / Rust / Go / Java now parse through `lang-*`, which parse through
@@ -151,5 +154,6 @@ depend on `@opensip-tools/tree-sitter` directly rather than vendoring
 - [Package catalog](./02-package-catalog.md) — the current 31-package set.
 - [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md) —
   why `Signal` is the universal output currency.
-- [ADR-0012](../../decisions/ADR-0012-versioning-and-release-policy.md) — the GA
-  versioning and release policy.
+- [ADR-0012](../../decisions/ADR-0012-versioning-and-release-policy.md) — the
+  versioning and release policy (pre-GA 2.x line; 3.0.0 reserved for the
+  tool-plugin-parity north star).

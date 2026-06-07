@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v3.0.0
+release: v2.7.0
 title: "Layered package graph"
 audience: [contributors]
 purpose: "The 30-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."

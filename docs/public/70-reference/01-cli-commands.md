@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v3.0.0
+release: v2.7.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for every CLI command, its flags, and when to use each."
@@ -124,7 +124,7 @@ opensip-tools fit --gate-compare
 | `--recipes` | bool | `false` | List available recipes instead of running. |
 | `--json` | bool | `false` | Emit the `SignalEnvelope` JSON on stdout instead of the table renderer. |
 | `-v, --verbose` | bool | `false` | Show the detailed report body (per-check findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
-| `--findings` | bool | `false` | **Deprecated** — alias of `--verbose`; will be removed a release after v3. |
+| `--findings` | bool | `false` | **Deprecated** — alias of `--verbose`; will be removed in a future 2.x release. |
 | `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
 | `--gate-save` | bool | `false` | Save current findings as architecture baseline. The baseline is stored as a row in the project's SQLite store (`fit_baseline` table at `opensip-tools/.runtime/datastore.sqlite`). |

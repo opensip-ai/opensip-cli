@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v3.0.0
+release: v2.7.0
 title: "What is opensip-tools?"
 audience: [getting-started, contributors]
 purpose: "The front door — what problem opensip-tools solves, what it does, what it isn't, and how to try it."

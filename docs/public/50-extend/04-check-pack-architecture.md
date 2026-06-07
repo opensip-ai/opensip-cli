@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v3.0.0
+release: v2.7.0
 title: "Check pack architecture"
 audience: [contributors, plugin-authors]
 purpose: "How check packs are structured, the bundled seven, scope filters, parameterization, and the marketplace shape."
