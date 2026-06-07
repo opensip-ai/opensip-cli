@@ -1,6 +1,6 @@
 /**
- * @fileoverview Static manifest reader (release 2.8.0, identity &
- * compatibility — Phase 2, Task 2.1).
+ * @fileoverview Static manifest reader + the single admission gate
+ * (release 2.8.0, identity & compatibility — Phase 2).
  *
  * `loadToolManifest` reads a tool's static front matter **before**
  * importing its runtime `Tool` module:
@@ -18,21 +18,30 @@
  * and returns `undefined` (with a structured logger diagnostic) on a
  * malformed or missing manifest. It NEVER imports the tool module.
  *
- * The admission gate (`admitTool`) that consumes this manifest is Task 2.2.
+ * `admitTool` is the single gate the bundled and external paths share: it
+ * records `ToolProvenance` (incl. a `manifestHash` over the canonical
+ * manifest JSON) and runs `checkCompatibility(manifest.apiVersion)`:
+ *   - compatible                       → `admit`
+ *   - incompatible + not requested     → `skip` (with diagnostic)
+ *   - incompatible + explicitly asked  → `fail-closed` (with diagnostic)
+ * It emits exactly one structured logger evt per decision.
  *
- * Pure over real filesystem reads of package.json / the sidecar — no
- * tool-module import, no module singletons. Stays in core (the kernel) and
- * imports nothing from contracts/cli/tools-runtime.
+ * Both functions are pure over real filesystem reads of package.json /
+ * the sidecar — no tool-module import, no module singletons. They stay in
+ * core (the kernel) and import nothing from contracts/cli/tools-runtime.
  */
 
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { logger } from '../lib/logger.js';
+import { checkCompatibility, type CompatibilityVerdict } from '../tools/compatibility.js';
 
 import type {
   ToolCommandManifest,
   ToolPluginManifest,
+  ToolProvenance,
   ToolSource,
 } from '../tools/manifest.js';
 
@@ -73,10 +82,115 @@ export function loadToolManifest(
 
   const manifest = validateManifest(raw.block, raw.name, raw.version);
   if (manifest === undefined) {
-    diagnose(dir, source, 'manifest failed identity validation');
+    diagnose(dir, source, raw.reason ?? 'manifest failed identity validation');
     return undefined;
   }
   return manifest;
+}
+
+/**
+ * The outcome of the single admission gate — the decision plus the
+ * `ToolProvenance` recorded regardless of verdict (so an incompatible
+ * tool can still be surfaced) and the underlying `CompatibilityVerdict`.
+ *
+ *   - `admit`        — compatible; the host may import + register the tool.
+ *   - `skip`         — incompatible but not explicitly requested: dropped
+ *                      silently from the user's perspective (diagnostic only).
+ *   - `fail-closed`  — incompatible AND explicitly requested: the host must
+ *                      fail with the Phase-0 incompatible exit code.
+ */
+export interface AdmissionResult {
+  readonly decision: 'admit' | 'skip' | 'fail-closed';
+  readonly provenance: ToolProvenance;
+  readonly verdict: CompatibilityVerdict;
+  readonly diagnostic?: string;
+}
+
+/**
+ * Run the single compatibility gate over a manifest and produce an
+ * {@link AdmissionResult}. Records `ToolProvenance` (source + identity +
+ * `manifestHash`) regardless of verdict, then maps the
+ * `checkCompatibility` outcome to a decision:
+ *
+ *   - compatible                          → `admit`
+ *   - incompatible + `!explicitlyRequested` → `skip`
+ *   - incompatible + `explicitlyRequested`  → `fail-closed`
+ *
+ * Emits exactly one structured logger evt per decision
+ * (`plugin.manifest.loaded` / `plugin.incompatible.skipped` /
+ * `plugin.incompatible.failed`). Never throws, never imports the tool.
+ *
+ * @param args.manifest The validated manifest (from {@link loadToolManifest}).
+ * @param args.source Where the tool came from.
+ * @param args.dir The tool's resolved directory (recorded as `resolvedPath`).
+ * @param args.packageName npm package name, when known (bundled/installed).
+ * @param args.explicitlyRequested Whether the user named this tool directly
+ *   (e.g. via a plugin pin) — promotes an incompatible `skip` to `fail-closed`.
+ */
+export function admitTool(args: {
+  readonly manifest: ToolPluginManifest;
+  readonly source: ToolSource;
+  readonly dir: string;
+  readonly packageName?: string;
+  readonly explicitlyRequested: boolean;
+}): AdmissionResult {
+  const { manifest, source, dir, packageName, explicitlyRequested } = args;
+
+  const manifestHash = hashManifest(manifest);
+  const provenance: ToolProvenance = {
+    source,
+    id: manifest.id,
+    version: manifest.version,
+    ...(packageName === undefined ? {} : { packageName }),
+    resolvedPath: dir,
+    manifestHash,
+  };
+
+  const verdict = checkCompatibility(manifest.apiVersion);
+
+  if (verdict.kind === 'compatible') {
+    logger.info({
+      evt: 'plugin.manifest.loaded',
+      module: 'core:plugins',
+      id: manifest.id,
+      source,
+      apiVersion: manifest.apiVersion,
+      engine: undefined,
+      manifestHash,
+      decision: 'admit',
+    });
+    return { decision: 'admit', provenance, verdict };
+  }
+
+  // incompatible
+  const diagnostic = verdict.reason;
+  if (explicitlyRequested) {
+    logger.error({
+      evt: 'plugin.incompatible.failed',
+      module: 'core:plugins',
+      id: manifest.id,
+      source,
+      apiVersion: verdict.declared,
+      engine: verdict.engine,
+      manifestHash,
+      decision: 'fail-closed',
+      diagnostic,
+    });
+    return { decision: 'fail-closed', provenance, verdict, diagnostic };
+  }
+
+  logger.warn({
+    evt: 'plugin.incompatible.skipped',
+    module: 'core:plugins',
+    id: manifest.id,
+    source,
+    apiVersion: verdict.declared,
+    engine: verdict.engine,
+    manifestHash,
+    decision: 'skip',
+    diagnostic,
+  });
+  return { decision: 'skip', provenance, verdict, diagnostic };
 }
 
 // ── Internals ────────────────────────────────────────────────────────────
@@ -86,6 +200,7 @@ interface RawManifest {
   readonly block: Record<string, unknown>;
   readonly name: unknown;
   readonly version: unknown;
+  readonly reason?: string;
 }
 
 /**
@@ -115,8 +230,8 @@ function readSidecar(dir: string): RawManifest | undefined {
 /**
  * Validate the identity subset of a manifest block and assemble a typed
  * `ToolPluginManifest`. `name`/`version` come from the package.json's own
- * fields (bundled/installed) or inline (sidecar). Returns `undefined` on
- * any identity violation.
+ * fields (bundled/installed) or inline (sidecar). Returns `undefined` (with
+ * a `reason` is reported by the caller) on any identity violation.
  */
 function validateManifest(
   block: Record<string, unknown>,
@@ -170,6 +285,28 @@ function normalizeCommands(value: unknown): readonly ToolCommandManifest[] | und
 /** Type guard: a value is a `readonly string[]`. */
 function isStringArray(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.every((a) => typeof a === 'string');
+}
+
+/**
+ * SHA-256 over the canonical JSON of the manifest's identity subset.
+ * Keys are emitted in a fixed order (and commands canonicalized) so the
+ * hash is stable across object-key ordering and absent optional fields —
+ * a deterministic identity/tamper fingerprint for provenance.
+ */
+function hashManifest(manifest: ToolPluginManifest): string {
+  const canonical = JSON.stringify({
+    kind: manifest.kind,
+    id: manifest.id,
+    name: manifest.name,
+    version: manifest.version,
+    apiVersion: manifest.apiVersion ?? null,
+    commands: manifest.commands.map((c) => ({
+      name: c.name,
+      description: c.description,
+      aliases: c.aliases ?? null,
+    })),
+  });
+  return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
 /**

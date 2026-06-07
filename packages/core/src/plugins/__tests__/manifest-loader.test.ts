@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { PLUGIN_API_VERSION } from '../../tools/manifest.js';
 import {
+  admitTool,
   loadToolManifest,
   PROJECT_LOCAL_MANIFEST_FILE,
 } from '../manifest-loader.js';
@@ -184,5 +186,127 @@ describe('loadToolManifest', () => {
     void expect(import(join(THROW_ON_IMPORT_DIR, 'index.mjs'))).rejects.toThrow(
       /read-before-import violated/,
     );
+  });
+});
+
+function manifest(overrides: Partial<{ apiVersion: number | undefined; id: string }> = {}) {
+  return {
+    kind: 'tool' as const,
+    id: overrides.id ?? 'audit',
+    name: 'Audit',
+    version: '1.2.3',
+    apiVersion: 'apiVersion' in overrides ? overrides.apiVersion : PLUGIN_API_VERSION,
+    commands: [{ name: 'audit', description: 'Run an audit' }],
+  };
+}
+
+describe('admitTool', () => {
+  it('admits a tool at the current epoch', () => {
+    const result = admitTool({
+      manifest: manifest({ apiVersion: PLUGIN_API_VERSION }),
+      source: 'bundled',
+      dir: '/tools/audit',
+      packageName: '@my-co/audit',
+      explicitlyRequested: false,
+    });
+    expect(result.decision).toBe('admit');
+    expect(result.verdict.kind).toBe('compatible');
+    expect(result.diagnostic).toBeUndefined();
+    expect(result.provenance).toMatchObject({
+      source: 'bundled',
+      id: 'audit',
+      version: '1.2.3',
+      packageName: '@my-co/audit',
+      resolvedPath: '/tools/audit',
+    });
+    expect(result.provenance.manifestHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('admits a tool with a missing apiVersion (grace window)', () => {
+    const result = admitTool({
+      manifest: manifest({ apiVersion: undefined }),
+      source: 'project-local',
+      dir: '/p',
+      explicitlyRequested: false,
+    });
+    expect(result.decision).toBe('admit');
+    // No packageName supplied → omitted from provenance.
+    expect(result.provenance.packageName).toBeUndefined();
+  });
+
+  it('skips a future-epoch tool that was NOT explicitly requested', () => {
+    const result = admitTool({
+      manifest: manifest({ apiVersion: 999 }),
+      source: 'installed',
+      dir: '/tools/future',
+      explicitlyRequested: false,
+    });
+    expect(result.decision).toBe('skip');
+    expect(result.verdict.kind).toBe('incompatible');
+    expect(result.diagnostic).toBeTruthy();
+    // Provenance still recorded for a skipped tool.
+    expect(result.provenance.id).toBe('audit');
+  });
+
+  it('fails closed for a future-epoch tool that WAS explicitly requested', () => {
+    const result = admitTool({
+      manifest: manifest({ apiVersion: 999 }),
+      source: 'installed',
+      dir: '/tools/future',
+      explicitlyRequested: true,
+    });
+    expect(result.decision).toBe('fail-closed');
+    expect(result.verdict.kind).toBe('incompatible');
+    expect(result.diagnostic).toBeTruthy();
+  });
+
+  it('produces a deterministic manifestHash, independent of key order', () => {
+    const a = admitTool({
+      manifest: {
+        kind: 'tool',
+        id: 'audit',
+        name: 'Audit',
+        version: '1.2.3',
+        apiVersion: 1,
+        commands: [{ name: 'audit', description: 'Run an audit' }],
+      },
+      source: 'bundled',
+      dir: '/a',
+      explicitlyRequested: false,
+    });
+    // Same identity, different declaration order + a different resolvedPath.
+    const b = admitTool({
+      manifest: {
+        commands: [{ description: 'Run an audit', name: 'audit' }],
+        apiVersion: 1,
+        version: '1.2.3',
+        name: 'Audit',
+        id: 'audit',
+        kind: 'tool',
+      },
+      source: 'bundled',
+      dir: '/b-different-path',
+      explicitlyRequested: false,
+    });
+    expect(a.provenance.manifestHash).toBe(b.provenance.manifestHash);
+  });
+
+  it('a different command set yields a different manifestHash', () => {
+    const a = admitTool({
+      manifest: manifest(),
+      source: 'bundled',
+      dir: '/a',
+      explicitlyRequested: false,
+    });
+    const b = admitTool({
+      manifest: {
+        ...manifest(),
+        commands: [{ name: 'audit', description: 'CHANGED' }],
+      },
+      source: 'bundled',
+      dir: '/a',
+      explicitlyRequested: false,
+    });
+    expect(a.provenance.manifestHash).not.toBe(b.provenance.manifestHash);
   });
 });

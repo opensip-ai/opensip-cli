@@ -52,9 +52,11 @@ export {
   resolveScopes,
   VALID_NPM_SCOPE_REGEX,
   loadToolManifest,
+  admitTool,
   PROJECT_LOCAL_MANIFEST_FILE,
 } from './plugins/index.js';
 export type {
+  AdmissionResult,
   PluginLayout,
   DiscoveredPlugin,
   LoadedPlugin,
