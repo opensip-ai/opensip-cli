@@ -311,6 +311,9 @@ function assembleCatalog(
     version: '3.0',
     tool: 'graph',
     language: adapter.id,
+    // `builtAt` is the SOLE intentionally-nondeterministic catalog field (a
+    // wall-clock stamp), excluded from structural determinism/equivalence
+    // comparisons. Mirrors the sharded path (cross-shard-resolve.ts).
     builtAt: new Date().toISOString(),
     cacheKey: stampEngineVersion(
       adapter.cacheKey({
