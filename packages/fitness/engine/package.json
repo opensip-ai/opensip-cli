@@ -28,6 +28,9 @@
     ".": "./dist/index.js",
     "./internal": "./dist/internal.js"
   },
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "exports": {
       ".": "./dist/index.js"

@@ -30,6 +30,9 @@
   "exports": {
     ".": "./dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run --passWithNoTests",

@@ -25,6 +25,9 @@
   "exports": {
     ".": "./dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "opensipTools": {
     "kind": "tool"
   },

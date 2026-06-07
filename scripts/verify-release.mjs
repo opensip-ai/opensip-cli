@@ -89,6 +89,7 @@ async function findScopedPackages() {
       path: pkgPath,
       name,
       version: pkg.version,
+      files: pkg.files,
       dependencies: pkg.dependencies ?? {},
       devDependencies: pkg.devDependencies ?? {},
     });
@@ -250,6 +251,24 @@ try {
       lines.push(`    in release order but NOT in workspace (remove/rename in scripts/release-package-order.mjs): ${inOrderNotWorkspace.join(', ')}`);
     }
     fail(10, `publishable set disagrees with release-package-order.mjs:\n${lines.join('\n')}`);
+  }
+}
+
+// 11 — Every publishable package declares a `files` allowlist that ships `dist`.
+// Without `files`, npm has no .npmignore here to fall back on, so the published
+// tarball includes `src/`, `coverage/`, `.turbo/` build logs, etc. — bloat and
+// internal-artifact leakage (e.g. core shipped 167 junk files before 2.7.0).
+// The allowlist must contain `dist` (compiled output); wasm-bearing packages add
+// `wasm`. This is the regression guard for that class of packaging bug.
+{
+  const missing = pkgs.filter((p) => !Array.isArray(p.files) || !p.files.includes('dist'));
+  if (missing.length === 0) {
+    pass(11, `all ${pkgs.length} packages declare a \`files\` allowlist that ships \`dist\`.`);
+  } else {
+    const lines = missing.map(
+      (p) => `    ${p.name}: files=${JSON.stringify(p.files)} (add \`"files": ["dist"]\` so the tarball ships only built output)`,
+    );
+    fail(11, `package(s) missing a \`files\` allowlist — npm would publish src/coverage/.turbo junk:\n${lines.join('\n')}`);
   }
 }
 

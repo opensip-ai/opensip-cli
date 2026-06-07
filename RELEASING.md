@@ -86,7 +86,7 @@ their `dependencies`.
    pnpm test:coverage             # per-package coverage thresholds (matches release CI)
    pnpm fit:ci && pnpm graph:ci   # dogfood gates now block release too (ADR-0017)
    pnpm docs:build                                # regenerate docs/web-generated/ at the new version pin
-   pnpm verify-release --expected-version vX.Y.Z  # version + CHANGELOG + docs + cross-pkg deps + package-set (check #10)
+   pnpm verify-release --expected-version vX.Y.Z  # version + CHANGELOG + docs + cross-pkg deps + package-set + files-allowlist (11 checks)
    ```
 
    `pnpm lint` runs both ESLint and dependency-cruiser. Both must be

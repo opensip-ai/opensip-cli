@@ -33,6 +33,9 @@
     "./languages/parse-cache.js": "./dist/languages/parse-cache.js",
     "./test-utils/with-scope.js": "./dist/test-utils/with-scope.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
