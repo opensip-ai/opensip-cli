@@ -20,6 +20,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'no-direct-stdout-in-tool-engine': ['📤', 'No Direct Stdout In Tool Engine'],
   'no-duplicate-packages': ['📦', 'No Duplicate Packages'],
   'node-version-consistency': ['📦', 'Node Version Consistency'],
+  'one-config-document': ['📄', 'One Config Document'],
   'project-readme-existence': ['📝', 'Project README Existence'],
   'release-gate-parity': ['🚦', 'Release Gate Parity'],
   'restrict-raw-db-access': ['🗄️', 'Restrict Raw DB Access'],
