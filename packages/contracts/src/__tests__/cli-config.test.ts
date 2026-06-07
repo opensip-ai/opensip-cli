@@ -95,6 +95,7 @@ describe('loadCliDefaults', () => {
     - 7
 `);
     const out = loadCliDefaults(testDir);
+    // eslint-disable-next-line sonarjs/deprecation -- exercising the deprecated cli.recipe parser (ADR-0022); the loader must still read it.
     expect(out.recipe).toBeUndefined();
     expect(out.verbose).toBeUndefined();
     expect(out.exclude).toBeUndefined();
@@ -108,6 +109,7 @@ describe('loadCliDefaults', () => {
       const customPath = join(customDir, 'custom.yml');
       writeFileSync(customPath, 'cli:\n  recipe: from-custom\n');
       const out = loadCliDefaults(testDir, customPath);
+      // eslint-disable-next-line sonarjs/deprecation -- exercising the deprecated cli.recipe parser (ADR-0022); the loader must still read it.
       expect(out.recipe).toBe('from-custom');
     } finally {
       rmSync(customDir, { recursive: true, force: true });

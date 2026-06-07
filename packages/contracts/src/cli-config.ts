@@ -100,6 +100,7 @@ function asStringArray(value: unknown): readonly string[] | undefined {
 /** Project an arbitrary YAML object into the typed `CliDefaults` shape. */
 function projectCliDefaults(raw: Record<string, unknown>): CliDefaults {
   const out: { -readonly [K in keyof CliDefaults]: CliDefaults[K] } = {};
+  // eslint-disable-next-line sonarjs/deprecation -- this loader is the canonical parser of the (deprecated, ADR-0022) cli.recipe fallback; it must still populate the field so resolveToolRecipeName can rank it last.
   if (typeof raw.recipe === 'string') out.recipe = raw.recipe;
   const exclude = asStringArray(raw.exclude);
   if (exclude) out.exclude = exclude;
