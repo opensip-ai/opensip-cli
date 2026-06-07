@@ -35,7 +35,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*"
+    "@opensip-tools/core": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",

@@ -6,7 +6,8 @@ export default mergeConfig(vitestBase, defineConfig({
     include: ['src/**/*.test.ts'],
     coverage: {
       include: ['src/**'],
-      // Pure re-export barrel (no logic until Phase 1 lands the composer).
+      // Exclude tests and the re-export barrel; the composer/precedence/
+      // json-schema logic itself is covered to the thresholds below.
       exclude: ['src/**/*.test.ts', 'src/**/__tests__/**', 'src/**/index.ts'],
       thresholds: {
         statements: 95,
