@@ -147,6 +147,13 @@ distinct from:
   config-sourced unknown recipe falls back to the tool's `default` (warn); an
   explicit `--recipe` typo still hard-fails. Fixes a fit recipe default leaking
   into `graph`/`sim`; `cli-recipe-deprecated` check drives migration
+- [ADR-0023](./ADR-0023-config-package-and-schema-registry.md) — A dedicated
+  `@opensip-tools/config` package owns the config composer (namespaced Zod
+  schemas → one validated whole-document schema, strict, with JSON-Schema
+  generation) and the tool-agnostic document blocks; tools contribute their own
+  namespaced schema. Composer core lands in 2.10.0; the migration of scattered
+  config (`cli-config` out of `contracts`, shared targeting out of `fitness`,
+  user-global I/O, path resolution, template) lands in a 2.10.1 follow-up
 
 ### Superseded
 
