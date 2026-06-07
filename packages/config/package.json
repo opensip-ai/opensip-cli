@@ -1,0 +1,45 @@
+{
+  "name": "@opensip-tools/config",
+  "version": "2.8.0",
+  "license": "MIT",
+  "description": "Configuration layer for OpenSIP Tools — the capability-configuration composer and schema registry",
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "config",
+    "schema"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "directory": "packages/config"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-tools/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.7"
+  }
+}
