@@ -19,6 +19,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'no-custom-event-emitter': ['📨', 'No Custom Event Emitter'],
   'no-direct-stdout-in-tool-engine': ['📤', 'No Direct Stdout In Tool Engine'],
   'no-duplicate-packages': ['📦', 'No Duplicate Packages'],
+  'no-module-singleton': ['🔒', 'No Module Singleton'],
   'node-version-consistency': ['📦', 'Node Version Consistency'],
   'one-config-document': ['📄', 'One Config Document'],
   'project-readme-existence': ['📝', 'Project README Existence'],
