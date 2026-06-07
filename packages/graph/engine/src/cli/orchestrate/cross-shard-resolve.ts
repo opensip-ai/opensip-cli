@@ -85,19 +85,75 @@ export function mergeShardFragments(
   const seen = new Set<string>();
   for (const frag of fragments) addFragmentOccurrences(frag, functions, seen);
 
+  // Canonicalize: shards complete in nondeterministic order, so the merged
+  // function-name keys, occurrence buckets, and each occurrence's `calls` are
+  // all sorted by a stable key here. This makes the merged catalog a pure
+  // function of the fragment SET — independent of shard completion order — so
+  // cold, warm-all-cached, and warm-partial-rebuild produce a byte-identical
+  // catalog (Phase 3).
+  const canonicalFunctions = canonicalizeFunctions(functions);
+
   const first = fragments[0];
   return {
     version: '3.0',
     tool: 'graph',
     language: first?.language ?? 'typescript',
+    // `builtAt` is the SOLE intentionally-nondeterministic catalog field — a
+    // wall-clock stamp. It is excluded from structural determinism/equivalence
+    // comparisons (Phase 0 determinism test, Phase 4 guardrail). Everything
+    // else in this catalog is a pure function of the fragment set.
     builtAt: new Date().toISOString(),
     // Build-level key derived from the per-shard keys so the merged
     // catalog invalidates when any shard's key changes.
     cacheKey: `sharded-${String(fragments.length)}-${hashKeys(fragments)}`,
     filesFingerprint: computeFilesFingerprint(allFiles),
     resolutionMode: first?.resolutionMode,
-    functions,
+    functions: canonicalFunctions,
   };
+}
+
+/**
+ * Build a canonical copy of a merged function map: function-name keys inserted
+ * in sorted order, each function's occurrence bucket sorted by a stable key
+ * (`filePath`, then `line`, then `bodyHash`), and each occurrence's `calls`
+ * sorted by `(line, column, sorted(to))`. The catalog shape is unchanged —
+ * only the ordering becomes deterministic regardless of the order shards
+ * completed in. (JSON serialization preserves insertion order, so sorting the
+ * top-level keys is what makes the serialized catalog byte-identical.)
+ */
+function canonicalizeFunctions(
+  functions: Record<string, FunctionOccurrence[]>,
+): Record<string, FunctionOccurrence[]> {
+  const out: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
+    string,
+    FunctionOccurrence[]
+  >;
+  for (const name of Object.keys(functions).sort()) {
+    const occs = functions[name];
+    if (!occs) continue;
+    const sorted = [...occs].sort(compareOccurrences);
+    out[name] = sorted.map((occ) => ({ ...occ, calls: sortCalls(occ.calls) }));
+  }
+  return out;
+}
+
+/** Stable occurrence order: filePath, then line, then bodyHash. */
+function compareOccurrences(a: FunctionOccurrence, b: FunctionOccurrence): number {
+  return (
+    a.filePath.localeCompare(b.filePath) ||
+    a.line - b.line ||
+    a.bodyHash.localeCompare(b.bodyHash)
+  );
+}
+
+/** Stable edge order within an occurrence: line, then column, then sorted(to). */
+function sortCalls(calls: readonly CallEdge[]): CallEdge[] {
+  return [...calls].sort(
+    (a, b) =>
+      a.line - b.line ||
+      a.column - b.column ||
+      [...a.to].sort().join(',').localeCompare([...b.to].sort().join(',')),
+  );
 }
 
 /** Append one fragment's occurrences into the merged map, deduping by
@@ -324,7 +380,10 @@ function stitchCrossShardEdges(
       const kept = o.calls.filter(
         (e) => !(e.to.length === 0 && recoveredAt.has(`${String(e.line)}:${String(e.column)}`)),
       );
-      return { ...o, calls: [...kept, ...extra] };
+      // Re-canonicalize the merged edge list — `extra` is in boundary-call
+      // (flat-map) order, which depends on shard completion order; sorting here
+      // keeps the stitched occurrence byte-identical across runs.
+      return { ...o, calls: sortCalls([...kept, ...extra]) };
     });
   }
   return out;

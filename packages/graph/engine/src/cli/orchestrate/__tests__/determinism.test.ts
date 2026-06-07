@@ -114,6 +114,17 @@ function statsTuple(s: ResolutionStats): readonly number[] {
   return [s.totalCallSites, s.resolvedHigh, s.resolvedMedium, s.resolvedLow, s.unresolved];
 }
 
+/**
+ * Serialize a catalog to a byte-comparable string EXCLUDING `builtAt` — the
+ * sole intentionally-nondeterministic (wall-clock) field. After Phase 3's
+ * canonical ordering, two catalogs merged from the same fragment set in
+ * different orders must be byte-identical modulo `builtAt`.
+ */
+function canonicalBytes(catalog: Catalog): string {
+  const { builtAt: _builtAt, ...rest } = catalog;
+  return JSON.stringify(rest);
+}
+
 describe('cross-shard merge determinism (characterization)', () => {
   // Two shards. pkg-a.caller() calls helperB(), exported by pkg-b, imported
   // via a bare workspace specifier — the canonical cross-boundary case.
@@ -160,6 +171,16 @@ describe('cross-shard merge determinism (characterization)', () => {
     // Same per-occurrence edge sets (order-normalized).
     // DRIFT: if this fails, the merge is order-dependent — the Phase-3 fix target.
     expect(structure(forward.catalog)).toEqual(structure(reversed.catalog));
+  });
+
+  it('produces a BYTE-identical catalog (modulo builtAt) regardless of fragment order', () => {
+    const forward = mergeAndResolveShards([shardA, shardB], files, mIndex);
+    const reversed = mergeAndResolveShards([shardB, shardA], files, mIndex);
+
+    // Phase 3 canonical ordering: not just structurally equal, but byte-for-byte
+    // identical once `builtAt` (the sole non-deterministic field) is excluded.
+    // This is the contract the Phase-4 equivalence guardrail relies on.
+    expect(canonicalBytes(forward.catalog)).toBe(canonicalBytes(reversed.catalog));
   });
 
   it('produces identical boundary stats regardless of fragment order', () => {
