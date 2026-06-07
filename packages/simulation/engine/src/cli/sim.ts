@@ -23,7 +23,7 @@
 
 import { pathToFileURL } from 'node:url';
 
-import { buildFindingGroups, buildSignalEnvelope, EXIT_CODES } from '@opensip-tools/contracts';
+import { BUILTIN_DEFAULT_RECIPE, buildFindingGroups, buildSignalEnvelope, EXIT_CODES } from '@opensip-tools/contracts';
 import { currentScope, discoverPackagesByMarker, logger, registerRecipesFromMod } from '@opensip-tools/core';
 
 import { currentScenarioRegistry } from '../framework/registry.js';
@@ -35,6 +35,8 @@ import {
 } from '../plugins/scenario-package-discovery.js';
 import { currentSimulationRecipeRegistry } from '../recipes/registry.js';
 import { SimulationRecipeService } from '../recipes/service.js';
+
+import { resolveSimRecipeSelection } from './sim-config.js';
 
 import type { RunnableScenario } from '../framework/runnable-scenario.js';
 import type { SimPluginExports } from '../plugins/types.js';
@@ -322,8 +324,23 @@ export async function executeSim(
   // registry is read. Idempotent per project dir.
   await ensureScenariosLoaded(args.cwd);
 
-  const recipeName = args.recipe ?? 'default';
-  const recipe = currentSimulationRecipeRegistry().loadRecipe(recipeName);
+  // Tool-scoped recipe resolution (ADR-0022): explicit --recipe > simulation.recipe
+  // > deprecated cli.recipe > built-in default. A config-sourced unknown name
+  // tolerantly falls back to `default`; an explicit --recipe typo hard-fails.
+  const recipeSelection = resolveSimRecipeSelection(args.cwd, args.recipe);
+  let recipeName = recipeSelection.name;
+  let recipe = currentSimulationRecipeRegistry().loadRecipe(recipeName);
+  if (!recipe && recipeSelection.tolerant && recipeName !== BUILTIN_DEFAULT_RECIPE) {
+    logger.warn({
+      evt: 'sim.recipe.unknown_config_default',
+      module: 'cli:sim',
+      requested: recipeName,
+      fallback: BUILTIN_DEFAULT_RECIPE,
+      msg: `Configured sim recipe '${recipeName}' not found; using '${BUILTIN_DEFAULT_RECIPE}'. If '${recipeName}' is a recipe for another tool, move it under that tool's <tool>.recipe key (ADR-0022).`,
+    });
+    recipeName = BUILTIN_DEFAULT_RECIPE;
+    recipe = currentSimulationRecipeRegistry().loadRecipe(recipeName);
+  }
   if (!recipe) {
     return {
       result: {
