@@ -1,3 +1,4 @@
+// @fitness-ignore-file null-safety -- Zod schema builder chains (.strict()/.safeParse()) always return valid objects; `.safeParse` is called on a freshly-built strict schema, never a nullable reference.
 /**
  * graph-config — load the `graph:` block of `opensip-tools.config.yml`
  * into a {@link GraphConfig}.
@@ -9,14 +10,21 @@
  * sections and the CLI seam owns the `cli:` block
  * (`@opensip-tools/contracts` `loadCliDefaults`).
  *
- * The loader is deliberately permissive: a missing config, malformed
- * YAML, or an absent `graph:` key all collapse to `{}` (every rule then
- * uses its in-rule default). Only the field types are projected — strict
- * validation is not this loader's job.
+ * Release 2.10.0 (ADR-0023, Phase 4): the block is now read through graph's
+ * own Zod {@link GraphConfigSchema} (the same schema graph contributes to the
+ * host's composed whole-document validation) instead of the old hand-rolled
+ * `projectGraphConfig`. The composed dispatch-level validation is the STRICT
+ * gate that rejects a typo inside `graph:` before any command runs; this
+ * loader stays permissive at its own call sites — a missing config, malformed
+ * YAML, an absent `graph:` key, or a block that fails the schema all collapse
+ * to `{}` so a rule falls back to its in-rule default and a mid-run read never
+ * throws.
  */
 
 import { loadCliDefaults, resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
 import { logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
+
+import { GraphConfigSchema } from './graph-config-schema.js';
 
 import type { GraphConfig } from '../types.js';
 
@@ -25,85 +33,13 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-/** Coerce a YAML value into a non-negative number if it is one; else drop it. */
-function asNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
-/** Coerce a YAML value into a `string[]` if it is one; otherwise drop it. */
-function asStringArray(value: unknown): readonly string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  if (!value.every((v) => typeof v === 'string')) return undefined;
-  return value;
-}
-
-/**
- * Coerce a YAML value into the `cycleSize2Severity` posture if it is one of
- * the two allowed strings; otherwise drop it. Mirrors `asSeverityOverrides`'s
- * value-narrowing. (Plan A integration note: if a nested band-table override
- * shape later lands, add an `asThresholdTable` projector here and switch the
- * numeric projections to it — Open Question #3. Flat scalars for now.)
- */
-function asThresholdSeverity(value: unknown): 'off' | 'low' | undefined {
-  return value === 'off' || value === 'low' ? value : undefined;
-}
-
-/** Project the `graph.severityOverrides` sub-block into the typed shape. */
-function asSeverityOverrides(
-  value: unknown,
-): Readonly<Record<string, 'error' | 'warning'>> | undefined {
-  if (!isPlainObject(value)) return undefined;
-  const out: Record<string, 'error' | 'warning'> = {};
-  for (const [k, v] of Object.entries(value)) {
-    if (v === 'error' || v === 'warning') out[k] = v;
-  }
-  return Object.keys(out).length > 0 ? out : undefined;
-}
-
-/** Project an arbitrary YAML `graph:` object into the typed `GraphConfig` shape. */
-function projectGraphConfig(raw: Record<string, unknown>): GraphConfig {
-  const out: { -readonly [K in keyof GraphConfig]: GraphConfig[K] } = {};
-  if (typeof raw.recipe === 'string') out.recipe = raw.recipe;
-  const minLines = asNumber(raw.minDuplicateBodyLines);
-  if (minLines !== undefined) out.minDuplicateBodyLines = minLines;
-  const minSize = asNumber(raw.minDuplicateBodySize);
-  if (minSize !== undefined) out.minDuplicateBodySize = minSize;
-  const minPackages = asNumber(raw.minCrossPackageDuplicatePackages);
-  if (minPackages !== undefined) out.minCrossPackageDuplicatePackages = minPackages;
-  const minCrossPkgBodySize = asNumber(raw.minCrossPackageDuplicateBodySize);
-  if (minCrossPkgBodySize !== undefined) out.minCrossPackageDuplicateBodySize = minCrossPkgBodySize;
-  const entryPointHashes = asStringArray(raw.entryPointHashes);
-  if (entryPointHashes) out.entryPointHashes = entryPointHashes;
-  // Structural-rule thresholds (Plan D). Each is permissively projected via
-  // asNumber — missing/malformed values are dropped so the rule falls back to
-  // its in-rule default.
-  const largeWarn = asNumber(raw.largeFunctionWarnLines);
-  if (largeWarn !== undefined) out.largeFunctionWarnLines = largeWarn;
-  const largeError = asNumber(raw.largeFunctionErrorLines);
-  if (largeError !== undefined) out.largeFunctionErrorLines = largeError;
-  const wideWarn = asNumber(raw.wideFunctionWarnParams);
-  if (wideWarn !== undefined) out.wideFunctionWarnParams = wideWarn;
-  const wideError = asNumber(raw.wideFunctionErrorParams);
-  if (wideError !== undefined) out.wideFunctionErrorParams = wideError;
-  const blastWarn = asNumber(raw.highBlastWarnThreshold);
-  if (blastWarn !== undefined) out.highBlastWarnThreshold = blastWarn;
-  const blastError = asNumber(raw.highBlastErrorThreshold);
-  if (blastError !== undefined) out.highBlastErrorThreshold = blastError;
-  const cycleMin = asNumber(raw.cycleMinSize);
-  if (cycleMin !== undefined) out.cycleMinSize = cycleMin;
-  const cycleSize2 = asThresholdSeverity(raw.cycleSize2Severity);
-  if (cycleSize2) out.cycleSize2Severity = cycleSize2;
-  const severityOverrides = asSeverityOverrides(raw.severityOverrides);
-  if (severityOverrides) out.severityOverrides = severityOverrides;
-  return out;
-}
-
 /**
  * Best-effort load of the `graph:` block from `opensip-tools.config.yml`.
  *
- * Returns `{}` when the config is missing, unreadable, malformed, or has
- * no `graph:` section — every rule then falls back to its in-rule
- * default.
+ * Returns `{}` when the config is missing, unreadable, malformed, has no
+ * `graph:` section, or the section fails the graph schema — every rule then
+ * falls back to its in-rule default. The strict typo rejection happens at the
+ * dispatch-level composed validation, not here.
  *
  * @param cwd Project root for config resolution.
  * @param explicitPath Optional `--config <path>` override.
@@ -126,7 +62,22 @@ export function loadGraphConfig(cwd: string, explicitPath?: string): GraphConfig
   if (!isPlainObject(doc)) return {};
   const graphBlock = doc.graph;
   if (!isPlainObject(graphBlock)) return {};
-  return projectGraphConfig(graphBlock);
+  // Parse the block through graph's own Zod schema, made `.strict()` to match
+  // the dispatch-level composed validation (an unknown key inside `graph:` is
+  // rejected, ADR-0023). A schema failure here is NOT fatal at the loader (the
+  // strict dispatch-level gate already surfaced it as a CONFIGURATION_ERROR
+  // before the command ran); fall back to `{}` so the call site keeps its
+  // historical "absent → in-rule default" semantics.
+  const parsed = GraphConfigSchema.strict().safeParse(graphBlock);
+  if (!parsed.success) {
+    logger.debug({
+      evt: 'graph.config.schema_rejected',
+      module: 'graph:config',
+      err: parsed.error.message,
+    });
+    return {};
+  }
+  return parsed.data;
 }
 
 /**

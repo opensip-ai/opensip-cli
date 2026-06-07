@@ -2,12 +2,12 @@
 
 Releases are tag-driven. Pushing a tag matching `v*` triggers
 `.github/workflows/release.yml`, which builds, tests, packs, and
-publishes all 31 packages to npm via OIDC trusted publishing — no
-`NPM_TOKEN` required. (30 are scoped `@opensip-tools/*`; the CLI itself
+publishes all 32 packages to npm via OIDC trusted publishing — no
+`NPM_TOKEN` required. (31 are scoped `@opensip-tools/*`; the CLI itself
 publishes under the unscoped name **`opensip-tools`** — the one package
 end-users install directly, via `npm i -g opensip-tools`.)
 
-## The 31 packages
+## The 32 packages
 
 > **Single source of truth.** This table, the publish order below, the
 > npm-verify loop in step 6, the loops in `.github/workflows/release.yml`
@@ -26,6 +26,7 @@ end-users install directly, via `npm i -g opensip-tools`.)
 | Shared CLI | `@opensip-tools/contracts` | `packages/contracts` |
 | Persistence | `@opensip-tools/session-store` | `packages/session-store` |
 | Output | `@opensip-tools/output` | `packages/output` |
+| Config | `@opensip-tools/config` | `packages/config` |
 | Shared CLI | `@opensip-tools/cli-ui` | `packages/cli-ui` |
 | Languages | `@opensip-tools/tree-sitter` | `packages/tree-sitter` |
 | Languages | `@opensip-tools/lang-typescript` | `packages/languages/lang-typescript` |
@@ -53,7 +54,7 @@ end-users install directly, via `npm i -g opensip-tools`.)
 | Check packs | `@opensip-tools/checks-rust` | `packages/fitness/checks-rust` |
 | CLI | `opensip-tools` (unscoped) | `packages/cli` |
 
-All 31 share the same version. The release workflow publishes them in
+All 32 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
 their `dependencies`.
 
@@ -64,7 +65,7 @@ their `dependencies`.
    pnpm -r --filter '@opensip-tools/*' exec npm version <patch|minor|major> --no-git-tag-version
    ```
 
-   **The `--filter '@opensip-tools/*'` form matches only the 30 scoped
+   **The `--filter '@opensip-tools/*'` form matches only the 31 scoped
    packages — it misses the unscoped `opensip-tools` CLI
    (`packages/cli`) and the root `package.json`.** Bump those two
    explicitly (or run a script that walks every workspace
@@ -111,7 +112,7 @@ their `dependencies`.
 
 6. Verify on npm:
    ```bash
-   for p in core datastore contracts session-store output cli-ui tree-sitter fitness simulation graph dashboard \
+   for p in core datastore contracts session-store output config cli-ui tree-sitter fitness simulation graph dashboard \
             graph-adapter-common graph-typescript graph-python graph-rust graph-go graph-java \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             checks-typescript checks-universal checks-python checks-go checks-java checks-cpp checks-rust; do
@@ -145,6 +146,12 @@ Order:
    (file, cloud) under `sink/` (ADR-0011; renamed from `reporting`).
    Published before fitness / graph, whose findings the composition root
    formats through it.
+5.5 **`@opensip-tools/config`** — the capability-configuration layer: the
+   config composer + schema registry. Depends on core only (errors, yaml;
+   adds Zod for schema validation). Published before the tools + CLI, which
+   resolve their effective configuration through it. **Brand-new npm name**
+   — needs a one-time trusted-publisher bootstrap (see "Bootstrapping a
+   brand-new package").
 6. **`@opensip-tools/cli-ui`** — Ink/React presentational primitives (banner,
    spinner, run header, theme). Leaf package, depends on no
    workspace-internal package; consumed by every tool live view + the
@@ -213,7 +220,7 @@ Order:
 ## Prerequisites (one-time setup)
 
 - **npm Trusted Publishers** must be configured per-package on
-  npmjs.com → package settings → Publishing access. Each of the 31
+  npmjs.com → package settings → Publishing access. Each of the 32
   packages needs an entry pointing to:
   - Organization: `opensip-ai`
   - Repository: `opensip-tools`
@@ -235,7 +242,14 @@ auth through the trusted publisher entry; with no entry registered for
 the package name, npm responds 404. The release workflow's preflight
 step warns about this case before publishing starts.
 
-> **Current brand-new packages (for the v2.7.0 release):**
+> **Current brand-new package (for the v2.10.0 release):**
+> `@opensip-tools/config` — the new capability-configuration layer (ADR-0023).
+> Genuinely new, so its name will be MISSING on npm and the OIDC release will
+> 404 on it until its trusted publisher exists. Run the bootstrap path below
+> once to create the name, then register its trusted publisher. This is a USER
+> action at release time.
+
+> **Historical brand-new packages (for the v2.7.0 release):**
 > `@opensip-tools/output` and `@opensip-tools/tree-sitter` — verified MISSING on
 > npm (`npm view` → 404), while the other 29 names already exist at 2.6.2.
 > `output` is the new name for the renamed `@opensip-tools/reporting`;
@@ -257,7 +271,7 @@ To unblock:
    ```
 
    The script is **namespace-creation only** and **idempotent**. It
-   iterates the 31 packages in dependency order, skips any whose NAME
+   iterates the 32 packages in dependency order, skips any whose NAME
    already exists on npm (those get v`X.Y.Z` via the OIDC tagged
    release, with provenance), packs and publishes only the brand-new
    names using the token, and at the end prints a list of newly-created

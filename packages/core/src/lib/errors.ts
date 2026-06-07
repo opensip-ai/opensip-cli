@@ -22,6 +22,7 @@ export type ToolErrorCode =
   | 'TIMEOUT'
   | 'NETWORK_ERROR'
   | 'CONFIGURATION_ERROR'
+  | 'PLUGIN_INCOMPATIBLE'
   | 'UNKNOWN_LIVE_VIEW';
 
 /** Constructor options for {@link ToolError}: `code` plus arbitrary diagnostic metadata. */
@@ -100,6 +101,85 @@ export class ConfigurationError extends ToolError {
   constructor(message: string, options?: ToolErrorOptions) {
     super(message, options?.code ?? 'CONFIGURATION_ERROR', options);
     this.name = 'ConfigurationError';
+  }
+}
+
+/**
+ * Thrown when a tool plugin is rejected by the compatibility/trust gate
+ * (release 2.8.0) and the rejection must fail the run rather than skip
+ * silently — i.e. the tool was explicitly requested but is incompatible,
+ * or a project-local executable tool was not allowlisted (deny-by-default).
+ *
+ * Mapped to `EXIT_CODES.PLUGIN_INCOMPATIBLE` (exit 5) by
+ * `mapToolErrorToExitCode` so an incompatible/untrusted plugin is
+ * diagnosable from the exit code alone. Carries the structured
+ * `diagnostic` the admission gate produced (compatibility reason or the
+ * trust-policy message) for surfacing through the CLI error boundary.
+ */
+export class PluginIncompatibleError extends ToolError {
+  /** The admission diagnostic (compatibility reason or trust-policy message). */
+  readonly diagnostic?: string;
+
+  constructor(message: string, options?: ToolErrorOptions & { diagnostic?: string }) {
+    super(message, options?.code ?? 'PLUGIN_INCOMPATIBLE', options);
+    this.name = 'PluginIncompatibleError';
+    this.diagnostic = options?.diagnostic;
+  }
+}
+
+/**
+ * Thrown when a contribution is routed to a capability domain that no tool
+ * has declared (release 2.10.0, §5.3). A subclass of {@link NotFoundError}
+ * (so existing not-found handling still catches it) that additionally
+ * carries the structured diagnostic the capability registry produced: the
+ * unknown `domainId` and the set of `knownDomains`. Code defaults to
+ * `'CAPABILITY.DOMAIN.UNKNOWN'`.
+ */
+export class UnknownCapabilityDomainError extends NotFoundError {
+  /** The domain id that was routed to but not declared. */
+  readonly domainId: string;
+  /** The domain ids that ARE declared on the registry (for diagnostics). */
+  readonly knownDomains: readonly string[];
+
+  constructor(
+    message: string,
+    options: ToolErrorOptions & { domainId: string; knownDomains: readonly string[] },
+  ) {
+    super(message, { ...options, code: options.code ?? 'CAPABILITY.DOMAIN.UNKNOWN' });
+    this.name = 'UnknownCapabilityDomainError';
+    this.domainId = options.domainId;
+    this.knownDomains = options.knownDomains;
+  }
+}
+
+/**
+ * Thrown when a contribution fails the schema check of the capability
+ * domain it targets (release 2.10.0, §5.3). A subclass of
+ * {@link ValidationError} that carries the structured diagnostic: the
+ * `domainId`, the owning tool's `ownerToolId`, and a human-readable
+ * `diagnostic` reason. Code defaults to
+ * `'CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH'`.
+ */
+export class CapabilitySchemaMismatchError extends ValidationError {
+  /** The domain id whose schema the contribution failed. */
+  readonly domainId: string;
+  /** The tool that owns the targeted domain. */
+  readonly ownerToolId: string;
+  /** Human-readable reason the contribution failed the schema. */
+  readonly diagnostic: string;
+
+  constructor(
+    message: string,
+    options: ToolErrorOptions & { domainId: string; ownerToolId: string; diagnostic: string },
+  ) {
+    super(message, {
+      ...options,
+      code: options.code ?? 'CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH',
+    });
+    this.name = 'CapabilitySchemaMismatchError';
+    this.domainId = options.domainId;
+    this.ownerToolId = options.ownerToolId;
+    this.diagnostic = options.diagnostic;
   }
 }
 

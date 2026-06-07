@@ -12,8 +12,7 @@
  * `DashboardInput`. This decouples fitness from graph entirely.
  */
 
-import { defaultRegistry } from '../framework/registry.js';
-import { defaultRecipeRegistry } from '../recipes/registry.js';
+import { currentCheckRegistry, currentRecipeRegistry } from '../framework/scope-registry.js';
 import { loadSignalersConfig } from '../signalers/index.js';
 
 import { ensureChecksLoaded, getDisplayName, getIcon } from './fit.js';
@@ -106,8 +105,9 @@ export async function collectFitnessDashboardData(
   const projectDir = scope.projectContext?.projectRoot;
   await ensureChecksLoaded(projectDir);
 
-  const checkCatalog: CheckCatalogEntry[] = defaultRegistry.list().map(check => {
-    const namespace = defaultRegistry.getNamespace(check.config.slug);
+  const checkRegistry = currentCheckRegistry();
+  const checkCatalog: CheckCatalogEntry[] = checkRegistry.list().map(check => {
+    const namespace = checkRegistry.getNamespace(check.config.slug);
     return {
       slug: check.config.slug,
       name: getDisplayName(check.config.slug),
@@ -120,7 +120,7 @@ export async function collectFitnessDashboardData(
     };
   });
 
-  const recipeCatalog: RecipeCatalogEntry[] = [...defaultRecipeRegistry.getAllRecipes()].map(r => ({
+  const recipeCatalog: RecipeCatalogEntry[] = [...currentRecipeRegistry().getAllRecipes()].map(r => ({
     name: r.name,
     displayName: r.displayName,
     description: r.description,

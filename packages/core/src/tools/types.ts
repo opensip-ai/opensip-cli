@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- the canonical Tool plugin contract: one cohesive interface (metadata, commands, register, initialize, contributeScope, collectDashboardData, config, capabilityRegistrars) whose every member carries load-bearing JSDoc. The slots are the contract surface; splitting the single interface across files would fragment the one type tools implement. Grew past the 400-line soft limit with the 2.10.0 config + capability slots (ADR-0023 / §5.3).
 /**
  * Tool plugin contract.
  *
@@ -26,6 +27,7 @@
 
 import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 
+import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
 import type { Logger } from '../lib/logger.js';
 import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
 import type { PluginLayout } from '../plugins/types.js';
@@ -388,6 +390,27 @@ export interface Tool {
   readonly collectDashboardData?: (
     scope: ToolScope,
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
+  /**
+   * Optional namespaced config contribution (release 2.10.0, ADR-0023). A
+   * tool owning a top-level block (`graph:`/`fitness:`/`simulation:`) declares
+   * its Zod schema here as a `ToolConfigDeclaration` (from
+   * `@opensip-tools/config`). The composition root composes every tool's
+   * `config` into one strict whole-document schema, validates the config file
+   * once before dispatch, and exposes the resolved config back via the scope.
+   * Kernel-side {@link ToolConfigContribution} carrier (core carries no Zod);
+   * the CLI narrows it. Undefined ⇒ no config block.
+   */
+  readonly config?: ToolConfigContribution;
+  /**
+   * Optional capability-domain registrars (release 2.10.0, §5.3), keyed by
+   * domain id. A tool that DECLARES domains in its manifest
+   * (`ToolPluginManifest.capabilities`) supplies the REAL registrar for each
+   * here. The host registers each manifest domain with a deferred placeholder,
+   * then replaces it via `CapabilityRegistry.setRegistrar` once this module
+   * loads. The registrar registers a routed contribution into the tool's own
+   * registry. Undefined ⇒ no declared domains.
+   */
+  readonly capabilityRegistrars?: Readonly<Record<string, CapabilityRegistrar>>;
 }
 
 /**

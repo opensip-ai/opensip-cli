@@ -137,7 +137,4 @@ export class CheckRegistry {
   }
 }
 
-/** Default global registry — checks auto-register here on import */
-export const defaultRegistry = new CheckRegistry();
-
 export { type Check } from './check-types.js';

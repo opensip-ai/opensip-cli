@@ -93,6 +93,3 @@ export class FitnessRecipeRegistry extends RecipeRegistry<FitnessRecipe> {
     })
   }
 }
-
-/** Shared singleton recipe registry with built-in recipes pre-loaded */
-export const defaultRecipeRegistry = new FitnessRecipeRegistry()

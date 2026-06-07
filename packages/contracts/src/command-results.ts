@@ -12,6 +12,7 @@
 
 import type { StoredSession } from './session-types.js';
 import type { SignalEnvelope } from './signal-envelope.js';
+import type { ToolProvenance } from '@opensip-tools/core';
 
 // --- Verbose detail currency (ADR-0021) -------------------------------------
 //
@@ -348,7 +349,19 @@ export interface SyncEntry {
  * surfaces at compile time.
  */
 export type PluginResult =
-  | { type: 'plugin-list'; plugins: readonly PluginInfo[]; totalCount: number }
+  | {
+      type: 'plugin-list';
+      plugins: readonly PluginInfo[];
+      totalCount: number;
+      /**
+       * Provenance of the tools admitted through the 2.8.0 compatibility
+       * gate this run (source + identity + `manifestHash`). Additive — a
+       * parallel section to the discovered-plugin list, sourced from the
+       * per-run provenance holder, not from a disk re-scan. Empty array
+       * when no bootstrap ran (e.g. isolated unit tests).
+       */
+      toolProvenance: readonly ToolProvenance[];
+    }
   | { type: 'plugin-add'; packageName: string; success: boolean; error?: string }
   | { type: 'plugin-remove'; packageName: string; success: boolean; error?: string }
   | {

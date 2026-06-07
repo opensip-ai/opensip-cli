@@ -41,6 +41,7 @@ import {
   currentScope,
   runWithScope,
 } from '@opensip-tools/core';
+import { fitnessTool } from '@opensip-tools/fitness';
 import { executeFit } from '@opensip-tools/fitness/internal';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -106,12 +107,21 @@ function makeArgs(cwd: string): FitOptions {
   };
 }
 
-/** Build a fresh scope per project, with its own registries and parse cache. */
+/**
+ * Build a fresh scope per project, with its own registries and parse cache,
+ * plus fitness's contributed subscope (`scope.fitness.{checks,recipes,load}`)
+ * — the production wiring the CLI pre-action-hook performs. `executeFit` reads
+ * the scope-owned check/recipe registries and the per-run load state, so two
+ * independently-contributed scopes are exactly what proves there is no
+ * cross-scope crossover.
+ */
 function makeScope(): RunScope {
-  return new RunScope({
+  const scope = new RunScope({
     tools: new ToolRegistry(),
     languages: new LanguageRegistry(),
   });
+  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  return scope;
 }
 
 describe('SaaS-mode concurrent scopes', () => {

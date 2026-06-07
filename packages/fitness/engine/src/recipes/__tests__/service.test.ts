@@ -13,10 +13,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { enterScope, RunScope } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { defineCheck } from '../../framework/define-check.js';
 import { CheckRegistry } from '../../framework/registry.js';
+import { fitnessTool } from '../../tool.js';
 import { FitnessRecipeRegistry } from '../registry.js';
 import { FitnessRecipeService } from '../service.js';
 
@@ -37,7 +39,14 @@ function writeFixture(relPath: string, content: string): string {
 }
 
 beforeEach(() => {
-   
+  // Enter a fresh RunScope with fitness's contributed registries so the
+  // FitnessRecipeService constructor's default-registry path
+  // (`currentCheckRegistry()` / `currentRecipeRegistry()`) resolves — the
+  // production behaviour (a fit run always executes inside a scope). Tests that
+  // pass explicit registries override these and are unaffected.
+  const scope = new RunScope();
+  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  enterScope(scope);
   testDir = mkdtempSync(join(tmpdir(), 'opensip-recipe-svc-'));
 });
 

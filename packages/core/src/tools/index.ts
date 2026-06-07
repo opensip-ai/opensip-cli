@@ -15,6 +15,36 @@ export type {
 } from './types.js';
 export { UnknownLiveViewError } from './types.js';
 export { ToolRegistry } from './registry.js';
+// Static tool-plugin manifest + the plugin-API epoch + provenance types
+// (release 2.8.0). No runtime consumers yet — Phase 1+ wire these.
+export { PLUGIN_API_VERSION } from './manifest.js';
+export type {
+  ToolPluginManifest,
+  ToolCommandManifest,
+  ToolProvenance,
+  ToolSource,
+} from './manifest.js';
+// Capability domain model (release 2.10.0, §5.3): the data shape a tool
+// uses to declare an extension point it owns. The runtime registry lives
+// in `plugins/capability-registry.ts`.
+export {
+  isCapabilityValidator,
+  isStructuralContributionSchema,
+} from './capability.js';
+export type {
+  CapabilityDomainSpec,
+  CapabilityContributionKind,
+  CapabilityValidator,
+  StructuralContributionSchema,
+  ToolCapabilityDeclaration,
+  ToolConfigContribution,
+} from './capability.js';
+// The single pure compatibility gate shared by the bundled + external
+// admission paths (release 2.8.0).
+export { checkCompatibility } from './compatibility.js';
+export type { CompatibilityVerdict } from './compatibility.js';
+// Load-time manifest⇔Tool drift guard (release 2.8.0, Phase 1).
+export { assertManifestMatchesTool } from './manifest-assert.js';
 export {
   TOOL_LONG_IDS,
   TOOL_LONG_TO_SHORT,

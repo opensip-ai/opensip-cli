@@ -29,6 +29,7 @@ import { ConfigurationError, logger, readPackageVersion, ValidationError } from 
 // gone.
 import { exportGraphBaseline } from './cli/baseline-export.js';
 import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/dashboard-data.js';
+import { graphConfigDeclaration } from './cli/graph-config-schema.js';
 import { runCatalogJsonMode } from './cli/graph-modes.js';
 import { renderGraphLive } from './cli/graph-runner.js';
 import { executeGraph, handleGraphError } from './cli/graph.js';
@@ -40,7 +41,7 @@ import { loadGraphConfig, resolveGraphRecipeSelection, runGraph } from './cli/or
 import { runSarifExportMode } from './cli/sarif-export.js';
 import { executeShardWorker } from './cli/shard-worker.js';
 import { executeSymbolIndex } from './cli/symbol-index.js';
-import { createAdapterRegistry, getDiscoveredAdapters } from './lang-adapter/registry.js';
+import { createAdapterRegistry, currentAdapterRegistry, getDiscoveredAdapters } from './lang-adapter/registry.js';
 import { CatalogRepo } from './persistence/catalog-repo.js';
 import { createRecipeRegistry } from './recipes/registry.js';
 import { resolveRecipeToRules } from './recipes/resolve.js';
@@ -49,8 +50,9 @@ import { createRulesRegistry } from './rules/registry.js';
 // loaded so `scope.graph` is correctly-typed here.
 import './scope-augmentation.js';
 
+import type { GraphLanguageAdapter } from './lang-adapter/types.js';
 import type { GraphConfig, ResolutionMode, Rule } from './types.js';
-import type { ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor, ToolScope } from '@opensip-tools/core';
+import type { CapabilityRegistrar, ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor, ToolScope } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 /**
@@ -612,6 +614,19 @@ function registerGraphRecipesCommand(program: CliProgram, cli: ToolCliContext): 
 }
 
 /**
+ * The graph tool's REAL registrar for its `graph-adapter` capability domain
+ * (§5.3 / Phase 4). The host registers the domain from graph's manifest with a
+ * deferred placeholder, then swaps in this registrar once graph's module is
+ * loaded. A routed contribution (already shape-checked against the domain's
+ * `requiredKeys: ['id']` schema by the host) is registered into THIS run's
+ * scope-owned adapter registry — graph owns the registration semantics, the
+ * host only routes.
+ */
+const registerGraphAdapter: CapabilityRegistrar = (contribution) => {
+  currentAdapterRegistry().register(contribution as GraphLanguageAdapter);
+};
+
+/**
  * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
  * after constructing the scope and before entering it; the kernel installs
  * the returned `graph` slot. Fresh adapter + rule registries per run so
@@ -692,4 +707,13 @@ export const graphTool: Tool = {
   register,
   contributeScope,
   collectDashboardData,
+  // ADR-0023 Phase 4: graph contributes its namespaced `graph:` Zod schema so
+  // the host composes + strict-validates the whole config document before
+  // dispatch. The schema-bearing `ToolConfigDeclaration` narrows to the
+  // kernel-side `ToolConfigContribution` carrier (core carries no Zod).
+  config: graphConfigDeclaration,
+  // §5.3 Phase 4: graph owns the `graph-adapter` capability domain (declared in
+  // its manifest). It supplies the REAL registrar so the host can replace the
+  // manifest-time deferred placeholder once graph's module loads.
+  capabilityRegistrars: { 'graph-adapter': registerGraphAdapter },
 };

@@ -13,31 +13,32 @@
  *      out of dependency-based discovery (e.g. when running in an
  *      environment with unrelated @opensip-tools packages installed).
  *
- *   3. Otherwise (default), scan node_modules for any package whose
- *      name matches `@opensip-tools/graph-*` (anchored on the hyphen
- *      so the engine itself, `@opensip-tools/graph`, is excluded) AND
- *      that declares `opensipTools.kind: "graph-adapter"` — so shared
- *      scaffolding libraries under the same prefix (e.g.
- *      `@opensip-tools/graph-adapter-common`, which exports no `adapter`)
- *      are not mistaken for adapters. Return the list.
+ *   3. Otherwise (default), discover every package that declares
+ *      `opensipTools.kind: "graph-adapter"` via the ONE shared marker
+ *      substrate (`discoverPackagesByMarker`, core). The marker is the
+ *      authoritative gate: shared scaffolding libraries under the same
+ *      prefix (e.g. `@opensip-tools/graph-adapter-common`, which carries
+ *      no marker) are NOT adapters and never surface. Return the list.
  *
- * Modeled byte-for-byte on
- * `packages/fitness/engine/src/plugins/check-package-discovery.ts`.
- * Three-rule resolution sequence is identical; only the prefix and
- * config keys differ. The walker handles pnpm's nested node_modules
- * layout: it looks at the project's direct node_modules, then walks
- * up to ancestor node_modules (matching Node's resolution algorithm).
+ * Rule 3 used to carry a bespoke ancestor-walk that re-implemented the
+ * marker substrate's node_modules traversal plus a redundant
+ * `@opensip-tools/graph-*` prefix anchor. The walk is now delegated to
+ * `discoverPackagesByMarker({ kind: 'graph-adapter' })`; this file keeps
+ * only the graph-domain POLICY (the three-rule resolution + the explicit
+ * `plugins.graphAdapters` / `autoDiscoverGraphAdapters` config reads).
  */
 
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { logger, readMarkerKind, readYamlFile, resolvePackageEntryPoint } from '@opensip-tools/core';
+import {
+  discoverPackagesByMarker,
+  logger,
+  readYamlFile,
+  resolvePackageEntryPoint,
+} from '@opensip-tools/core';
 
 const CONFIG_FILENAME = 'opensip-tools.config.yml';
-
-const SCOPE = '@opensip-tools';
-const ADAPTER_PREFIX = 'graph-';
 
 export interface GraphAdapterDiscoveryOptions {
   /** Absolute path to the project root (where opensip-tools.config.yml lives). */
@@ -93,55 +94,29 @@ export function discoverGraphAdapterPackages(
     return [];
   }
 
-  // Rule 3: auto-discover
+  // Rule 3: auto-discover via the ONE shared marker substrate
   return autoDiscoverAdapters(projectDir);
 }
 
 /**
- * Walk up the directory tree from `projectDir` looking for the first
- * `node_modules/@opensip-tools/` directory and return all `graph-*`
- * package directories found there. Mirrors Node's module resolution
- * (any ancestor node_modules counts), which handles pnpm hoisting and
- * monorepo layouts where the scope may live in the workspace root.
+ * Discover every `opensipTools.kind: "graph-adapter"` package through the
+ * shared core marker substrate (`discoverPackagesByMarker`) — the same
+ * ancestor-walking node_modules traversal + nearest-ancestor dedup that
+ * tool / fit-pack / sim-pack discovery use. This is the thin graph-domain
+ * wrapper: it adapts the substrate's `DiscoveredMarkerPackage`
+ * (`{ name, packageDir, kind }`) to the graph-local
+ * `DiscoveredGraphAdapterPackage` (`{ name, packageDir }`).
  *
- * The hyphen anchor on `graph-` ensures `@opensip-tools/graph` itself
- * (the engine package) does not match — only adapter packs with names
- * like `graph-typescript`, `graph-python`, `graph-rust`.
+ * Scaffolding libraries that share the `graph-` name prefix but carry no
+ * marker — e.g. `@opensip-tools/graph-adapter-common` — and the engine
+ * itself (`@opensip-tools/graph`) declare no `graph-adapter` kind, so the
+ * substrate never returns them. The redundant prefix anchor the prior
+ * bespoke walker carried is therefore unnecessary.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- ancestor-walk discovery: walks node_modules trees up the directory tree until the filesystem root
 function autoDiscoverAdapters(projectDir: string): DiscoveredGraphAdapterPackage[] {
-  const seen = new Set<string>();
-  const out: DiscoveredGraphAdapterPackage[] = [];
-  let dir = projectDir;
-  let prev = '';
-  while (dir !== prev) {
-    const scopeDir = join(dir, 'node_modules', SCOPE);
-    if (existsSync(scopeDir)) {
-      for (const entry of safeReaddir(scopeDir)) {
-        if (!entry.startsWith(ADAPTER_PREFIX)) continue;
-        // Defense in depth: the prefix is `graph-` (with trailing hyphen),
-        // so the bare engine name `graph` cannot match. Belt-and-braces.
-        if (entry === 'graph') continue;
-        const name = `${SCOPE}/${entry}`;
-        if (seen.has(name)) continue;
-        const packageDir = join(scopeDir, entry);
-        if (!hasPackageJson(packageDir)) continue;
-        // Auto-discovery only picks up packages that declare themselves graph
-        // adapters (`opensipTools.kind: "graph-adapter"`), read through core's
-        // canonical marker reader. Scaffolding libraries that share the
-        // `graph-` prefix but carry no marker — e.g.
-        // `@opensip-tools/graph-adapter-common` — are NOT adapters and are
-        // skipped silently (mirrors tool discovery's `kind === 'tool'` gate;
-        // otherwise the CLI warns about their missing `adapter` export).
-        if (readMarkerKind(packageDir) !== 'graph-adapter') continue;
-        seen.add(name);
-        out.push({ name, packageDir });
-      }
-    }
-    prev = dir;
-    dir = dirname(dir);
-  }
-  return out;
+  return discoverPackagesByMarker({ projectDir, kind: 'graph-adapter' }).map(
+    ({ name, packageDir }) => ({ name, packageDir }),
+  );
 }
 
 function resolvePackageDir(projectDir: string, name: string): string | undefined {
@@ -159,15 +134,6 @@ function resolvePackageDir(projectDir: string, name: string): string | undefined
 function hasPackageJson(packageDir: string): boolean {
   if (!existsSync(packageDir)) return false;
   return existsSync(join(packageDir, 'package.json'));
-}
-
-function safeReaddir(dir: string): string[] {
-  try {
-    return readdirSync(dir);
-  } catch {
-    // @fitness-ignore-next-line error-handling-quality -- filesystem probe; exception → empty array is the function's contract (missing directory or permission denied returns "no entries", same as a genuinely empty dir).
-    return [];
-  }
 }
 
 /**

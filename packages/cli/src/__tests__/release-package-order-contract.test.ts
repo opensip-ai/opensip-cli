@@ -18,7 +18,7 @@
  *      asserts no literal hand-listed `for pkg in …` package list remains.
  *   5. `scripts/bootstrap-publish.sh` — DERIVED (`--print names`); asserts the
  *      literal `PACKAGES=( … )` array is gone.
- *   6. `RELEASING.md` — still authored as prose; its "The 31 packages" table,
+ *   6. `RELEASING.md` — still authored as prose; its "The 32 packages" table,
  *      its stated count, and its npm-verify `for p in …` loop are parsed and
  *      asserted to equal the reference set/count.
  *
@@ -193,7 +193,7 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
 
   const releasingMd = read('RELEASING.md');
 
-  it('RELEASING.md "The 31 packages" table names == the reference set', () => {
+  it('RELEASING.md "The 32 packages" table names == the reference set', () => {
     // Table rows look like: `| Layer | `@opensip-tools/<name>` | `packages/…` |`
     // plus the unscoped CLI row: `| CLI | `opensip-tools` (unscoped) | … |`.
     const tableNames = new Set<string>();
@@ -220,7 +220,7 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
   });
 
   it('RELEASING.md stated package count == the reference length', () => {
-    // The runbook says "all 31 packages" / "The 31 packages" in several spots.
+    // The runbook says "all 32 packages" / "The 32 packages" in several spots.
     // Assert the count matches RELEASE_PACKAGE_ORDER.length so a package add/
     // remove forces a prose update too.
     const count = RELEASE_PACKAGE_ORDER.length;
@@ -233,7 +233,7 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
   });
 
   it('RELEASING.md npm-verify `for p in …` loop names == the scoped reference set', () => {
-    // The verify loop iterates the 30 SCOPED packages (the unscoped CLI is
+    // The verify loop iterates the 31 SCOPED packages (the unscoped CLI is
     // checked on a separate line). Extract the `for p in … ; do` body without a
     // backtracking regex: slice between the `for p in` keyword and the closing
     // `; do`, then split on whitespace.

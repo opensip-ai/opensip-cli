@@ -2,6 +2,7 @@ import {
   ConfigurationError,
   NetworkError,
   NotFoundError,
+  PluginIncompatibleError,
   TimeoutError,
   ValidationError,
   type ToolError,
@@ -13,6 +14,14 @@ export const EXIT_CODES = {
   CONFIGURATION_ERROR: 2,
   CHECK_NOT_FOUND: 3,
   REPORT_FAILED: 4,
+  /**
+   * A plugin was rejected by the compatibility gate (release 2.8.0) — its
+   * declared `apiVersion` is out of range and it was explicitly requested
+   * (fail-closed; the skip path is silent). Dedicated rather than reusing
+   * `CONFIGURATION_ERROR` so an incompatible plugin is diagnosable from the
+   * exit code alone. Read by the CLI fail-closed admission path (Phase 3).
+   */
+  PLUGIN_INCOMPATIBLE: 5,
 } as const;
 
 /**
@@ -28,15 +37,17 @@ export const EXIT_CODES = {
  *   - `NotFoundError`       → `CHECK_NOT_FOUND` (exit 3)
  *   - `ConfigurationError`  → `CONFIGURATION_ERROR` (exit 2)
  *   - `ValidationError`     → `CONFIGURATION_ERROR` (exit 2)
- *   - `NetworkError`        → `REPORT_FAILED` (exit 4)
- *   - `TimeoutError`        → `RUNTIME_ERROR` (exit 1)
- *   - any other `ToolError` → `RUNTIME_ERROR` (exit 1)
+ *   - `NetworkError`           → `REPORT_FAILED` (exit 4)
+ *   - `PluginIncompatibleError`→ `PLUGIN_INCOMPATIBLE` (exit 5)
+ *   - `TimeoutError`           → `RUNTIME_ERROR` (exit 1)
+ *   - any other `ToolError`    → `RUNTIME_ERROR` (exit 1)
  */
 export function mapToolErrorToExitCode(error: ToolError): number {
   if (error instanceof NotFoundError) return EXIT_CODES.CHECK_NOT_FOUND;
   if (error instanceof ConfigurationError) return EXIT_CODES.CONFIGURATION_ERROR;
   if (error instanceof ValidationError) return EXIT_CODES.CONFIGURATION_ERROR;
   if (error instanceof NetworkError) return EXIT_CODES.REPORT_FAILED;
+  if (error instanceof PluginIncompatibleError) return EXIT_CODES.PLUGIN_INCOMPATIBLE;
   if (error instanceof TimeoutError) return EXIT_CODES.RUNTIME_ERROR;
   return EXIT_CODES.RUNTIME_ERROR;
 }

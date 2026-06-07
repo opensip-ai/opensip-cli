@@ -7,6 +7,13 @@
  * `metadata.id` string (used for dedupe + listing) and the two
  * required members (`register` function, `commands` array).
  * `initialize` and `contributeScope` stay optional per the Tool interface.
+ *
+ * Ordering vs. the 2.8.0 admission gate: this shape check runs AFTER a
+ * tool's module is imported. The compatibility gate (`admitTool`) and the
+ * project-local TRUST gate (`admitProjectLocalTool`, deny-by-default) run
+ * on the STATIC manifest *before* import — so a project-local executable
+ * tool that is not allowlisted is fail-closed without its code ever running,
+ * and never reaches `isValidTool`.
  */
 
 import type { Tool } from '@opensip-tools/core';

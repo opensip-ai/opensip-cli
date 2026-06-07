@@ -1,0 +1,13 @@
+{
+  "name": "@example/conformant-tool",
+  "version": "1.0.0",
+  "opensipTools": {
+    "kind": "tool",
+    "id": "conformant",
+    "apiVersion": 1,
+    "commands": [
+      { "name": "conformant", "description": "A fully conformant tool command" },
+      { "name": "conformant-list", "description": "List things", "aliases": ["cl"] }
+    ]
+  }
+}

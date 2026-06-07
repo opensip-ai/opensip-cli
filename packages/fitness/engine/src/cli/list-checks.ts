@@ -3,7 +3,7 @@
  */
 
 
-import { defaultRegistry } from '../framework/registry.js';
+import { currentCheckRegistry } from '../framework/scope-registry.js';
 
 import { ensureChecksLoaded } from './fit.js';
 
@@ -16,7 +16,7 @@ import type { ListChecksResult } from '@opensip-tools/contracts';
 /** Returns metadata for every enabled check in the project's check registry. */
 export async function listChecks(projectDir?: string): Promise<ListChecksResult> {
   await ensureChecksLoaded(projectDir);
-  const checks = defaultRegistry.listEnabled();
+  const checks = currentCheckRegistry().listEnabled();
 
   const entries = checks.map((check) => ({
     slug: check.config.slug,

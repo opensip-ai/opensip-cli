@@ -29,7 +29,20 @@
     "dist"
   ],
   "opensipTools": {
-    "kind": "tool"
+    "kind": "tool",
+    "id": "simulation",
+    "apiVersion": 1,
+    "commands": [
+      { "name": "sim", "description": "Run simulation scenarios [experimental]" }
+    ],
+    "capabilities": [
+      {
+        "id": "sim-pack",
+        "apiVersion": 1,
+        "contributionKind": "module-export",
+        "contributionSchema": { "requiredKeys": ["id"] }
+      }
+    ]
   },
   "scripts": {
     "build": "tsc",
@@ -39,11 +52,13 @@
   },
   "dependencies": {
     "@opensip-tools/cli-ui": "workspace:*",
+    "@opensip-tools/config": "workspace:*",
     "@opensip-tools/contracts": "workspace:*",
     "@opensip-tools/core": "workspace:*",
     "commander": "^14.0.3",
     "ink": "^7.0.4",
-    "react": "^19.2.6"
+    "react": "^19.2.6",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",

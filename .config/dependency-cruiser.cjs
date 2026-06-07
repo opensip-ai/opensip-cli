@@ -12,6 +12,7 @@
  *   2. @opensip-tools/cli-ui         — shared Ink/React presentational primitives
  *   3. @opensip-tools/session-store  — session persistence over datastore/contracts
  *   3. @opensip-tools/output         — signal-envelope formatters + sinks
+ *   3. @opensip-tools/config         — capability-configuration composer + schema registry (depends on core)
  *   3. @opensip-tools/lang-*         — language adapters
  *   3. @opensip-tools/dashboard      — HTML report generator (core + contracts)
  *   4. @opensip-tools/fitness        — fitness engine + cli/* commands
@@ -180,13 +181,15 @@ module.exports = {
       name: 'core-imports-nothing-workspace',
       severity: 'error',
       comment:
-        'core is the kernel. It must not depend on datastore, contracts, cli, ' +
-        'fitness, simulation, lang-*, or checks-*. Anything else inverts the layering.',
+        'core is the kernel. It must not depend on datastore, contracts, config, ' +
+        'cli, fitness, simulation, lang-*, or checks-*. Anything else inverts the ' +
+        'layering.',
       from: { path: '^packages/core/src/' },
       to: {
         path: [
           '^packages/datastore/',
           '^packages/contracts/',
+          '^packages/config/',
           '^packages/cli/',
           '^packages/fitness/engine/',
           '^packages/simulation/engine/',
@@ -216,6 +219,7 @@ module.exports = {
         path: [
           '^packages/datastore/',
           '^packages/contracts/',
+          '^packages/config/',
           '^packages/cli/',
           '^packages/fitness/',
           '^packages/simulation/',
@@ -240,6 +244,7 @@ module.exports = {
       to: {
         path: [
           '^packages/contracts/',
+          '^packages/config/',
           '^packages/cli/',
           '^packages/fitness/engine/',
           '^packages/simulation/engine/',
@@ -264,6 +269,7 @@ module.exports = {
       from: { path: '^packages/session-store/src/' },
       to: {
         path: [
+          '^packages/config/',
           '^packages/cli/',
           '^packages/fitness/engine/',
           '^packages/simulation/engine/',
@@ -289,12 +295,47 @@ module.exports = {
       to: {
         path: [
           '^packages/datastore/',
+          '^packages/config/',
           '^packages/cli/',
           '^packages/fitness/engine/',
           '^packages/simulation/engine/',
           '^packages/graph/',
           '^packages/languages/lang-',
           '^packages/fitness/checks-',
+        ],
+      },
+    },
+
+    // -------------------------------------------------------------------
+    // Layer enforcement — config depends on core (+ contracts) only.
+    //
+    // @opensip-tools/config is the capability-configuration layer (ADR-0023):
+    // the config composer + schema registry. It sits at Layer 2/3 beside
+    // output — it may import core (errors, yaml) and contracts (a re-exported
+    // config type), and tools + the CLI may import it. It must NEVER reach UP
+    // into datastore, a tool engine, the CLI, language packs, check packs, or
+    // the output layer. core must not import config (pinned by
+    // `core-imports-nothing-workspace` above).
+    // -------------------------------------------------------------------
+    {
+      name: 'config-imports-core-contracts-only',
+      severity: 'error',
+      comment:
+        'config hosts the capability-configuration composer + schema registry ' +
+        '(ADR-0023). It depends on core (errors, yaml) and may re-export a ' +
+        'contracts config type — nothing else. It must not import datastore, a ' +
+        'tool engine, cli, lang, check pack, graph, simulation, or output.',
+      from: { path: '^packages/config/src/' },
+      to: {
+        path: [
+          '^packages/datastore/',
+          '^packages/cli/',
+          '^packages/fitness/engine/',
+          '^packages/simulation/engine/',
+          '^packages/graph/',
+          '^packages/languages/lang-',
+          '^packages/fitness/checks-',
+          '^packages/output/',
         ],
       },
     },
@@ -423,6 +464,7 @@ module.exports = {
           '^packages/datastore/',
           '^packages/session-store/',
           '^packages/output/',
+          '^packages/config/',
           '^packages/languages/lang-',
           '^packages/fitness/checks-',
         ],
@@ -445,6 +487,7 @@ module.exports = {
       to: {
         path: [
           '^packages/cli/',
+          '^packages/config/',
           '^packages/fitness/engine/',
           '^packages/simulation/engine/',
           '^packages/graph/',
@@ -575,6 +618,7 @@ module.exports = {
         path: [
           '^packages/cli/',
           '^packages/contracts/',
+          '^packages/config/',
           '^packages/fitness/checks-',
         ],
       },

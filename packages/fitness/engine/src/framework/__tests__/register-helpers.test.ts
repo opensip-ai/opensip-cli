@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { enterScope, RunScope } from '@opensip-tools/core';
+import { beforeEach, describe, expect, it } from 'vitest';
 
+import { fitnessTool } from '../../tool.js';
 import { defineCheck } from '../define-check.js';
 import { registerChecks } from '../register-helpers.js';
-import { CheckRegistry, defaultRegistry } from '../registry.js';
+import { CheckRegistry } from '../registry.js';
+import { currentCheckRegistry } from '../scope-registry.js';
+
 
 import type { Check } from '../check-types.js';
 
@@ -22,15 +26,21 @@ function stub(slug: string): Check {
   });
 }
 
-// The registry has no public clear method — silently drops duplicates.
-// Use unique slugs per test against the shared default registry.
+// `registerChecks` writes into the current scope's check registry. Each test
+// enters a fresh RunScope with fitness's contributed subscope so the registry
+// starts empty and is isolated from sibling tests.
+beforeEach(() => {
+  const scope = new RunScope();
+  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  enterScope(scope);
+});
 
 describe('registerChecks', () => {
   it('registers each check and returns the count', () => {
-    const sizeBefore = defaultRegistry.size;
+    const sizeBefore = currentCheckRegistry().size;
     const count = registerChecks([stub('rc-a'), stub('rc-b')], 'test-ns-a');
     expect(count).toBe(2);
-    expect(defaultRegistry.size).toBe(sizeBefore + 2);
+    expect(currentCheckRegistry().size).toBe(sizeBefore + 2);
   });
 
   it('returns 0 for an empty list', () => {
@@ -39,7 +49,7 @@ describe('registerChecks', () => {
 
   it('namespaces checks under the given namespace', () => {
     registerChecks([stub('rc-hello')], 'test-ns-c');
-    expect(defaultRegistry.getBySlug('test-ns-c:rc-hello')).toBeDefined();
+    expect(currentCheckRegistry().getBySlug('test-ns-c:rc-hello')).toBeDefined();
   });
 
   it('CheckRegistry can be instantiated standalone', () => {

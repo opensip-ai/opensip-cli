@@ -1,22 +1,19 @@
-// @fitness-ignore-file detached-promises -- rebuildDisplayLookups, defaultRegistry.register, and mergeCheckDisplay are synchronous mutators flagged by heuristic
+// @fitness-ignore-file detached-promises -- rebuildDisplayLookups, register, and mergeCheckDisplay are synchronous mutators flagged by heuristic
 /**
  * Plugin/check discovery + registration for the `fit` command.
  *
- * Owns ALL fit-lifecycle singletons (`checksLoadedFor`,
- * `pluginLoadErrors`, `loadWarnings`) — they are a
- * single unit of state, written exactly once per process by
- * `ensureChecksLoaded()` and read by the phase helpers downstream (`buildFitEnvelope`,
- * `buildFitDoneResult`) plus the public `getPluginLoadErrors()` /
- * `getDisplayName()` / `getIcon()` accessors that `FitView` and
- * `dashboard.ts` consume.
+ * Owns the fit-lifecycle state (`loadedFor`, `pluginLoadErrors`,
+ * `loadWarnings`) — a single unit of state, written exactly once per RUN
+ * by `ensureChecksLoaded()` and read by the phase helpers downstream
+ * (`buildFitEnvelope`, `buildFitDoneResult`) plus the public
+ * `getPluginLoadErrors()` / `getDisplayName()` / `getIcon()` accessors
+ * that `FitView` and `dashboard.ts` consume.
  *
- * They are NOT threaded through a `FitContext` parameter today because
- * two external consumers (`FitView` in `opensip-tools`,
- * `dashboard.ts` in this package) reach for the accessors directly —
- * wiring everything through a context object would either break those
- * imports or maintain a dual access path. Audit 2026-05-23 F6 documents
- * the trade-off; revisit when multi-instance fitness in one process
- * becomes a contract decision (prior Finding #10).
+ * As of the scope-owned-registries refactor (2.10.0) this state lives on
+ * the RunScope (`scope.fitness.load`), NOT module singletons — two
+ * concurrent fit runs (different scopes) carry independent load state.
+ * The accessors read the current scope's slot via
+ * `currentFitnessLoadState()`.
  *
  * Invariant: each binding is set by `ensureChecksLoaded()` and read by
  * the phase helpers; `executeFit`'s phase ordering is sequenced so the
@@ -34,56 +31,30 @@ import {
 } from '@opensip-tools/core';
 
 import { isCheck } from '../../framework/check-types.js';
-import { defaultRegistry } from '../../framework/registry.js';
+import {
+  currentCheckRegistry,
+  currentFitnessLoadState,
+  currentRecipeRegistry,
+} from '../../framework/scope-registry.js';
 import {
   discoverCheckPackages,
   readCheckPackageMetadata,
   readCheckPackagePreferences,
 } from '../../plugins/check-package-discovery.js';
 import { loadAllPlugins } from '../../plugins/loader.js';
-import { defaultRecipeRegistry } from '../../recipes/registry.js';
 
 import { mergeCheckDisplay, rebuildDisplayLookups } from './display-registry.js';
 
 // ---------------------------------------------------------------------------
-// Lifecycle singletons (see file header for rationale)
-// ---------------------------------------------------------------------------
-
-/** Project directory for which `ensureChecksLoaded` has run to completion.
- * Keyed on the directory so a second invocation against a different
- * project (long-lived host, tests, programmatic API) re-loads plugins
- * and check packages anchored at the new directory. `null` when no
- * projectDir was supplied; `''` is reserved as the "loaded" sentinel
- * for the no-project case. */
-let checksLoadedFor: string | null = null;
-
-/** Plugin load failures from the most recent `ensureChecksLoaded` call —
- * read by `buildFitEnvelope` and `buildFitDoneResult` to fail the run. */
-let pluginLoadErrors: readonly string[] = [];
-
-/**
- * Non-fatal user-facing warnings collected during the most recent
- * `ensureChecksLoaded` call (missing check package metadata, packages
- * without a `checks` array, package load failures, plugin load errors,
- * zero-packages-loaded).
- *
- * Replaces direct `process.stderr.write` calls that broke Ink's live-view
- * frame tracking when emitted mid-render. `executeFit` reads these via
- * `getLoadWarnings()` and surfaces them through `FitDoneResult.warnings`,
- * which the renderer displays in the summary block and the JSON/gate
- * paths emit at their own boundary.
- */
-let loadWarnings: string[] = [];
-
-// ---------------------------------------------------------------------------
-// Public accessors
+// Public accessors — all read the current RunScope's fitness load state
+// (`scope.fitness.load`), set once per run by `ensureChecksLoaded()`.
 // ---------------------------------------------------------------------------
 
 /** Warnings collected during the most recent ensureChecksLoaded() call.
  * Returned alongside plugin errors and run-time validation warnings via
  * executeFit's result so the live renderer and JSON output both see them. */
 export function getLoadWarnings(): readonly string[] {
-  return loadWarnings;
+  return currentFitnessLoadState().loadWarnings;
 }
 
 /**
@@ -93,26 +64,30 @@ export function getLoadWarnings(): readonly string[] {
  * CLI exits 0, masking a compliance failure or a supply-chain compromise.
  */
 export function getPluginLoadErrors(): readonly string[] {
-  return pluginLoadErrors;
+  return currentFitnessLoadState().pluginLoadErrors;
 }
 
 /** Get the number of enabled checks (available after ensureChecksLoaded). */
 export function getEnabledCheckCount(): number {
-  return defaultRegistry.listEnabled().length;
+  return currentCheckRegistry().listEnabled().length;
 }
 
 // ---------------------------------------------------------------------------
 // Lazy-load fitness checks
 // ---------------------------------------------------------------------------
 
-/** Lazily discovers and registers all check packs for the given project (idempotent per project). */
+/** Lazily discovers and registers all check packs for the given project
+ * (idempotent per project, scoped to the current RunScope). */
 export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   const key = projectDir ?? '';
-  if (checksLoadedFor === key) return;
+  // Per-run lifecycle state lives on the scope (`scope.fitness.load`), so
+  // two concurrent fit runs (different scopes) load independently.
+  const load = currentFitnessLoadState();
+  if (load.loadedFor === key) return;
 
-  // Reset per-run warning buffer. Singleton lifetime mirrors checksLoadedFor —
+  // Reset per-run warning buffer. Its lifetime mirrors loadedFor —
   // a fresh load (new projectDir or first call) starts with no warnings.
-  loadWarnings = [];
+  load.loadWarnings = [];
 
   // 1. Load fit plugins — discovers .mjs files in
   //    <projectDir>/opensip-tools/fit/{checks,recipes}/ and any
@@ -124,13 +99,13 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   //    and there's no project-local 'lang' plugin discovery path
   //    (the lang adapter set is fixed and shipped with the CLI).
   const pluginResult = await loadAllPlugins('fit', projectDir);
-  pluginLoadErrors = pluginResult.errors;
+  load.pluginLoadErrors = pluginResult.errors;
   if (pluginResult.errors.length > 0) {
     // Plugin load errors go to loadWarnings (rendered via the result) and
     // logger.warn (structured logs). Direct stderr writes are forbidden
     // during live-view runs — they desync Ink's frame tracking.
     for (const err of pluginResult.errors) {
-      loadWarnings.push(`plugin failed to load — ${err}`);
+      load.loadWarnings.push(`plugin failed to load — ${err}`);
       logger.warn({ evt: 'cli.plugin.warning', module: 'cli:fit', message: err });
     }
   }
@@ -146,7 +121,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   const discoveryAnchor = projectDir ?? cliInstallDir();
   const { totalRegistered: checksRegistered, warnings: packWarnings, coreMismatchSkips } =
     await loadDiscoveredCheckPackages(discoveryAnchor);
-  for (const w of packWarnings) loadWarnings.push(w);
+  for (const w of packWarnings) load.loadWarnings.push(w);
 
   // 4. No-checks-loaded guard. Silent zero-checks would let a misconfig
   //    or missing dep produce a green run that scanned nothing — the
@@ -158,7 +133,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
     // fit-pack package" guidance would be actively misleading there (the packs
     // ARE installed), so only emit it when nothing was skipped for a mismatch.
     if (coreMismatchSkips.length === 0) {
-      loadWarnings.push(
+      load.loadWarnings.push(
         'no check packages were loaded. ' +
           'Install at least one package declaring opensipTools.kind: "fit-pack", ' +
           'or declare plugins.checkPackages in opensip-tools.config.yml.',
@@ -176,7 +151,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   }
 
   rebuildDisplayLookups();
-  checksLoadedFor = key;
+  load.loadedFor = key;
 }
 
 /**
@@ -186,6 +161,11 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
  * Any other name is a consumer-owned custom pack, resolved from the project.
  */
 const BUILTIN_PACK_SCOPE = '@opensip-tools/';
+
+/** A pack name is built-in (CLI-owned) when it lives under the `@opensip-tools/` scope. */
+function isBuiltin(name: string): boolean {
+  return name.startsWith(BUILTIN_PACK_SCOPE);
+}
 
 /**
  * Resolve the directory the CLI was installed into. Built-in check packs
@@ -339,6 +319,8 @@ export async function loadDiscoveredCheckPackages(
   projectDir: string,
   opts: LoadDiscoveredOptions = {},
 ): Promise<LoadDiscoveredResult> {
+  const checkRegistry = currentCheckRegistry();
+  const recipeRegistry = currentRecipeRegistry();
   const prefs = readCheckPackagePreferences(projectDir);
 
   // Pack ownership has two origins, resolved against two different anchors:
@@ -355,7 +337,6 @@ export async function loadDiscoveredCheckPackages(
   //     name) resolves from the project tree exactly as before, and is never
   //     touched.
   const cliDir = opts.cliDir ?? cliInstallDir();
-  const isBuiltin = (name: string): boolean => name.startsWith(BUILTIN_PACK_SCOPE);
 
   // Explicit `plugins.checkPackages`, split by ownership so each name resolves
   // against its correct anchor (built-in scope → CLI install; otherwise →
@@ -425,13 +406,13 @@ export async function loadDiscoveredCheckPackages(
       let registered = 0;
       for (const check of checks) {
         if (isCheck(check)) {
-          defaultRegistry.register(check, pkg.name);
+          checkRegistry.register(check, pkg.name);
           registered++;
         }
       }
       totalRegistered += registered;
       mergeCheckDisplay(pkg.name, mod.checkDisplay);
-      const { recipesRegistered } = registerRecipesFromMod(mod, defaultRecipeRegistry, {
+      const { recipesRegistered } = registerRecipesFromMod(mod, recipeRegistry, {
         namespace: pkg.name,
         onWarn: (evt, message, extra) => {
           logger.warn({

@@ -28,7 +28,7 @@ function writeConfig(body: string): void {
 }
 
 describe('loadGraphConfig', () => {
-  it('reads the graph rule knobs from the graph: block', () => {
+  it('reads the graph rule knobs from a valid graph: block (strict, ADR-0023)', () => {
     writeConfig(
       [
         'graph:',
@@ -41,7 +41,6 @@ describe('loadGraphConfig', () => {
         '    - def',
         '  severityOverrides:',
         '    graph:orphan-subtree: error',
-        '    graph:bogus: nonsense',
       ].join('\n'),
     );
     const config = loadGraphConfig(workDir);
@@ -50,7 +49,6 @@ describe('loadGraphConfig', () => {
     expect(config.minCrossPackageDuplicatePackages).toBe(2);
     expect(config.minCrossPackageDuplicateBodySize).toBe(150);
     expect(config.entryPointHashes).toEqual(['abc', 'def']);
-    // Only valid 'error'/'warning' values survive the projection.
     expect(config.severityOverrides).toEqual({ 'graph:orphan-subtree': 'error' });
   });
 
@@ -63,7 +61,13 @@ describe('loadGraphConfig', () => {
     expect(loadGraphConfig(workDir)).toEqual({});
   });
 
-  it('drops non-numeric / non-array fields permissively', () => {
+  // ADR-0023: strict-within-namespace. The graph schema rejects the whole
+  // block on any malformed field (a wrong-typed knob, an unknown
+  // severityOverrides value). The loader stays non-throwing — it falls back
+  // to {} so a mid-run read uses the in-rule defaults; the strict rejection
+  // surfaces as a CONFIGURATION_ERROR at the dispatch-level composed
+  // validation (covered in the cli compose-validate tests), not here.
+  it('returns {} when a field is malformed (schema rejects the block)', () => {
     writeConfig(
       [
         'graph:',
@@ -72,6 +76,22 @@ describe('loadGraphConfig', () => {
         '  severityOverrides: []',
       ].join('\n'),
     );
+    expect(loadGraphConfig(workDir)).toEqual({});
+  });
+
+  it('returns {} when a severityOverrides value is not error/warning (strict enum)', () => {
+    writeConfig(
+      [
+        'graph:',
+        '  severityOverrides:',
+        '    graph:bogus: nonsense',
+      ].join('\n'),
+    );
+    expect(loadGraphConfig(workDir)).toEqual({});
+  });
+
+  it('returns {} when an unknown key is present in the graph: block (strict)', () => {
+    writeConfig('graph:\n  minCrossPackageDuplicatePackges: 2\n');
     expect(loadGraphConfig(workDir)).toEqual({});
   });
 

@@ -8,6 +8,7 @@ import {
   TimeoutError,
   NetworkError,
   ConfigurationError,
+  PluginIncompatibleError,
   ok,
   err,
   tryCatch,
@@ -174,6 +175,25 @@ describe('ConfigurationError', () => {
 
   it('is an instance of ToolError', () => {
     expect(new ConfigurationError('x')).toBeInstanceOf(ToolError);
+  });
+});
+
+describe('PluginIncompatibleError (release 2.8.0)', () => {
+  it('defaults code to PLUGIN_INCOMPATIBLE and carries the diagnostic', () => {
+    const e = new PluginIncompatibleError('tool x is incompatible', {
+      diagnostic: 'epoch mismatch',
+    });
+    expect(e.code).toBe('PLUGIN_INCOMPATIBLE');
+    expect(e.name).toBe('PluginIncompatibleError');
+    expect(e.diagnostic).toBe('epoch mismatch');
+  });
+
+  it('is an instance of ToolError (so the exit-code map can route it)', () => {
+    expect(new PluginIncompatibleError('x')).toBeInstanceOf(ToolError);
+  });
+
+  it('diagnostic is undefined when not supplied', () => {
+    expect(new PluginIncompatibleError('x').diagnostic).toBeUndefined();
   });
 });
 

@@ -20,10 +20,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { enterScope, RunScope } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import { defaultRegistry } from '../../framework/registry.js';
-import { defaultRecipeRegistry } from '../../recipes/registry.js';
+import { currentCheckRegistry, currentRecipeRegistry } from '../../framework/scope-registry.js';
+import { fitnessTool } from '../../tool.js';
 import { loadDiscoveredCheckPackages } from '../fit.js';
 
 let testDir: string;
@@ -31,6 +32,12 @@ let cliDir: string;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 
 beforeEach(() => {
+  // Fresh RunScope per test carrying fitness's contributed registries, so the
+  // loader writes into an empty, isolated check + recipe registry each time
+  // (replaces the prior shared-singleton + afterEach reset).
+  const scope = new RunScope();
+  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  enterScope(scope);
   testDir = mkdtempSync(join(tmpdir(), 'opensip-fit-loader-'));
   // Isolated, EMPTY CLI install dir. Built-in (@opensip-tools/*) discovery is
   // anchored here instead of the real CLI install, so the actual bundled
@@ -45,7 +52,6 @@ beforeEach(() => {
 afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
   rmSync(cliDir, { recursive: true, force: true });
-  defaultRecipeRegistry.reset();
   stderrSpy.mockRestore();
 });
 
@@ -137,8 +143,8 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
-    expect(defaultRecipeRegistry.has(recipeId)).toBe(true);
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
+    expect(currentRecipeRegistry().has(recipeId)).toBe(true);
   });
 
   it('does not load a prefix-only package without the fit-pack marker', async () => {
@@ -150,7 +156,7 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(0);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeUndefined();
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeUndefined();
   });
 
   it('loads a non-marker package when explicitly listed in plugins.checkPackages', async () => {
@@ -169,8 +175,8 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
-    expect(defaultRecipeRegistry.has(recipeId)).toBe(true);
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
+    expect(currentRecipeRegistry().has(recipeId)).toBe(true);
   });
 
   it('loads a checks-prefixed pack when it declares the fit-pack marker', async () => {
@@ -183,8 +189,8 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
-    expect(defaultRecipeRegistry.has(recipeId)).toBe(true);
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
+    expect(currentRecipeRegistry().has(recipeId)).toBe(true);
   });
 
   it('loads a pack that exports `checks` but no `recipes` (recipesRegistered=0)', async () => {
@@ -198,7 +204,7 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
   });
 
   it('emits plugin.recipe.invalid_item warning for malformed recipes; still registers valid checks', async () => {
@@ -219,11 +225,11 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
     // Valid recipe still landed:
-    expect(defaultRecipeRegistry.has(recipeIdValid)).toBe(true);
+    expect(currentRecipeRegistry().has(recipeIdValid)).toBe(true);
     // Malformed one was skipped:
-    expect(defaultRecipeRegistry.has('missing-name')).toBe(false);
+    expect(currentRecipeRegistry().has('missing-name')).toBe(false);
   });
 
   it('skips a marker-discovered pack that fails to export a `checks` array (records a load warning)', async () => {
@@ -286,8 +292,8 @@ describe('loadDiscoveredCheckPackages', () => {
     });
 
     expect(totalRegistered).toBe(0);
-    expect(defaultRegistry.getBySlug(a.checkSlug)).toBeUndefined();
-    expect(defaultRegistry.getBySlug(b.checkSlug)).toBeUndefined();
+    expect(currentCheckRegistry().getBySlug(a.checkSlug)).toBeUndefined();
+    expect(currentCheckRegistry().getBySlug(b.checkSlug)).toBeUndefined();
     // Both packs reported via the structured skip list…
     expect([...coreMismatchSkips].sort()).toEqual([
       '@acme/checks-foreigncore-a',
@@ -314,7 +320,7 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered, coreMismatchSkips } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(totalRegistered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
     expect(coreMismatchSkips).toEqual([]);
   });
 
@@ -330,7 +336,7 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(totalRegistered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
   });
 
   it('drops a project-vendored @opensip-tools/* pack — it cannot shadow the bundled built-in', async () => {
@@ -353,8 +359,8 @@ describe('loadDiscoveredCheckPackages', () => {
 
     // Exactly one copy loaded — the CLI's — and it is the CLI's check, not the shadow's.
     expect(totalRegistered).toBe(1);
-    expect(defaultRegistry.getBySlug(builtin.checkSlug)).toBeDefined();
-    expect(defaultRegistry.getBySlug(shadow.checkSlug)).toBeUndefined();
+    expect(currentCheckRegistry().getBySlug(builtin.checkSlug)).toBeDefined();
+    expect(currentCheckRegistry().getBySlug(shadow.checkSlug)).toBeUndefined();
   });
 
   it('still discovers a CUSTOM pack from the project while built-ins come from the CLI', async () => {
@@ -374,7 +380,7 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(totalRegistered).toBe(2);
-    expect(defaultRegistry.getBySlug(builtin.checkSlug)).toBeDefined();
-    expect(defaultRegistry.getBySlug(custom.checkSlug)).toBeDefined();
+    expect(currentCheckRegistry().getBySlug(builtin.checkSlug)).toBeDefined();
+    expect(currentCheckRegistry().getBySlug(custom.checkSlug)).toBeDefined();
   });
 });

@@ -54,6 +54,8 @@ import {
   type PluginLayout,
 } from '@opensip-tools/core';
 
+import { getToolProvenanceForRun } from '../cli-context.js';
+
 import {
   addToConfigPluginList,
   editPluginList,
@@ -185,10 +187,18 @@ export async function pluginList(
     }
   }
 
+  // Additive provenance section (release 2.8.0): the tools admitted through
+  // the compatibility gate this run, read from the per-run holder set at
+  // bootstrap — NOT a disk re-scan. Surfaces source/identity/manifestHash
+  // for bundled/installed/project-local tools alongside the discovered
+  // fit/sim/tool plugin list above.
+  const toolProvenance = getToolProvenanceForRun();
+
   return {
     type: 'plugin-list',
     plugins,
     totalCount: plugins.length,
+    toolProvenance,
   };
 }
 

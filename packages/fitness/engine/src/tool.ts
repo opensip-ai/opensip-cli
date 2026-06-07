@@ -64,9 +64,22 @@ import {
 import { renderFitLive } from './cli/fit-runner.js';
 import { listChecks } from './cli/list-checks.js';
 import { listRecipes } from './cli/list-recipes.js';
+import { fitnessConfigDeclaration } from './config/fitness-config-schema.js';
+import {
+  createCheckRegistry,
+  createFitnessLoadState,
+  createRecipeRegistry,
+  currentCheckRegistry,
+} from './framework/scope-registry.js';
 import { FIT_PLUGIN_LAYOUT } from './plugins/loader.js';
+// Side-effect import: ensures the RunScope.fitness augmentation is loaded so
+// `scope.fitness` is the correctly-typed slot here.
+import './scope-augmentation.js';
 
+import type { Check } from './framework/check-types.js';
 import type {
+  CapabilityRegistrar,
+  ScopeContribution,
   Tool,
   ToolCliContext,
   ToolCommandDescriptor,
@@ -261,6 +274,35 @@ function registerBaselineExportCommand(program: CliProgram, cli: ToolCliContext)
     });
 }
 
+/**
+ * The fitness tool's REAL registrar for its `fit-pack` capability domain
+ * (§5.3 / Phase 4). The host registers the domain from fitness's manifest with
+ * a deferred placeholder, then swaps in this registrar once fitness's module
+ * loads. A routed contribution (already shape-checked against the domain's
+ * `requiredKeys: ['slug']` schema by the host) is registered into THIS run's
+ * scope-owned check registry — fitness owns the registration semantics.
+ */
+const registerFitCheck: CapabilityRegistrar = (contribution) => {
+  currentCheckRegistry().register(contribution as Check);
+};
+
+/**
+ * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
+ * after constructing the scope and before entering it; the kernel installs
+ * the returned `fitness` slot. Fresh check + recipe registries (and an empty
+ * `ensureChecksLoaded` lifecycle slot) per run so concurrent scopes carry
+ * independent fitness state.
+ */
+function contributeScope(): ScopeContribution {
+  return {
+    fitness: {
+      checks: createCheckRegistry(),
+      recipes: createRecipeRegistry(),
+      load: createFitnessLoadState(),
+    },
+  };
+}
+
 // =============================================================================
 // EXPORT
 // =============================================================================
@@ -274,7 +316,18 @@ export const fitnessTool: Tool = {
   commands: [FIT, FIT_LIST, FIT_RECIPES, FIT_BASELINE_EXPORT],
   pluginLayout: FIT_PLUGIN_LAYOUT,
   register,
+  contributeScope,
   collectDashboardData: collectFitnessDashboardData,
+  // ADR-0023 Phase 4: fitness contributes its namespaced `fitness:` Zod schema
+  // (gate thresholds, disabledChecks, recipe) so the host composes +
+  // strict-validates the whole config document before dispatch. Shared
+  // targeting (targets/globalExcludes/checkOverrides) stays with
+  // SignalersConfigSchema until 2.10.1.
+  config: fitnessConfigDeclaration,
+  // §5.3 Phase 4: fitness owns the `fit-pack` capability domain (declared in
+  // its manifest). It supplies the REAL registrar so the host can replace the
+  // manifest-time deferred placeholder once fitness's module loads.
+  capabilityRegistrars: { 'fit-pack': registerFitCheck },
   initialize: async (): Promise<void> => {
     // ensureChecksLoaded() is called inside the executeFit / listChecks
     // / listRecipes paths, so a separate initialize() pass is not

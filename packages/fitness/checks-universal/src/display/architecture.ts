@@ -6,6 +6,7 @@ import type { CheckDisplayEntry } from './types.js'
 
 /** Architecture check display entries (UNIVERSAL only) */
 export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
+  'capability-by-manifest': ['🧩', 'Capability By Manifest'],
   'cli-recipe-deprecated': ['♻️', 'CLI Recipe Deprecated'],
   'cross-tool-flag-parity': ['🚩', 'Cross-Tool Flag Parity'],
   'docker-best-practices': ['🐳', 'Docker Best Practices'],
@@ -19,11 +20,14 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'no-custom-event-emitter': ['📨', 'No Custom Event Emitter'],
   'no-direct-stdout-in-tool-engine': ['📤', 'No Direct Stdout In Tool Engine'],
   'no-duplicate-packages': ['📦', 'No Duplicate Packages'],
+  'no-module-singleton': ['🔒', 'No Module Singleton'],
   'node-version-consistency': ['📦', 'Node Version Consistency'],
+  'one-config-document': ['📄', 'One Config Document'],
   'project-readme-existence': ['📝', 'Project README Existence'],
   'release-gate-parity': ['🚦', 'Release Gate Parity'],
   'restrict-raw-db-access': ['🗄️', 'Restrict Raw DB Access'],
   'stale-build-artifacts': ['🏚️', 'Stale Build Artifacts'],
+  'tool-has-manifest': ['🪪', 'Tool Has Manifest'],
   'vitest-config-extends-base': ['🧪', 'Vitest Config Extends Base'],
   'vitest-config-required-with-tests': ['🧪', 'Vitest Config Required With Tests'],
 })

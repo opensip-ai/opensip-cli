@@ -3,7 +3,7 @@
  */
 
 
-import { defaultRecipeRegistry } from '../recipes/registry.js';
+import { currentRecipeRegistry } from '../framework/scope-registry.js';
 
 import { ensureChecksLoaded } from './fit.js';
 
@@ -18,7 +18,7 @@ export async function listRecipes(projectDir?: string): Promise<ListRecipesResul
   // Load plugins so user-defined recipes (e.g. ~/.opensip-tools/fit/*.mjs) appear.
   await ensureChecksLoaded(projectDir);
 
-  const recipes = defaultRecipeRegistry.getAllRecipes().map((recipe) => {
+  const recipes = currentRecipeRegistry().getAllRecipes().map((recipe) => {
     const selector = recipe.checks;
     let checkCount: string;
     if (selector.type === 'all') {

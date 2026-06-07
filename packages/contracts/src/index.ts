@@ -76,6 +76,24 @@ export { passRate } from './score.js';
 export { EXIT_CODES, getErrorSuggestion, mapToolErrorToExitCode } from './exit-codes.js';
 export type { ErrorSuggestion } from './exit-codes.js';
 
+// Static tool-plugin manifest + the plugin-API epoch + provenance types +
+// the pure compatibility gate (release 2.8.0, identity & compatibility).
+// DEFINED in @opensip-tools/core (next to the Tool contract; core cannot
+// import contracts); re-exported here for the public Tool↔runner surface.
+export { PLUGIN_API_VERSION, checkCompatibility } from '@opensip-tools/core';
+export type {
+  ToolPluginManifest,
+  ToolCommandManifest,
+  ToolProvenance,
+  ToolSource,
+  CompatibilityVerdict,
+  // Capability domain model (release 2.10.0, §5.3) — the shape a tool's
+  // manifest `capabilities` slot now carries, plus the runtime domain spec.
+  CapabilityDomainSpec,
+  ToolCapabilityDeclaration,
+  CapabilityContributionKind,
+} from '@opensip-tools/core';
+
 // CLI defaults loader (`cli:` block of opensip-tools.config.yml).
 // Lives in contracts because the CLI-pre-action seam is tool-agnostic;
 // see ./cli-config.ts for the rationale.

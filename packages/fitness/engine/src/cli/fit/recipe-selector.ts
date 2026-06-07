@@ -1,8 +1,8 @@
 /**
  * Recipe-pick + recipe-run helpers for the `fit` command.
  *
- * `selectRecipe()` decides between a named recipe (looked up in
- * `defaultRecipeRegistry`) and an ad-hoc recipe constructed from
+ * `selectRecipe()` decides between a named recipe (looked up in the
+ * current scope's recipe registry) and an ad-hoc recipe constructed from
  * `--check` / `--tags`. `runRecipeOrAdHoc()` then executes the chosen
  * shape via `FitnessRecipeService`.
  */
@@ -10,7 +10,7 @@
 import { BUILTIN_DEFAULT_RECIPE, EXIT_CODES, resolveToolRecipeName } from '@opensip-tools/contracts';
 import { logger } from '@opensip-tools/core';
 
-import { defaultRecipeRegistry } from '../../recipes/registry.js';
+import { currentRecipeRegistry } from '../../framework/scope-registry.js';
 import { FitnessRecipeService } from '../../recipes/service.js';
 
 import type { FitnessRecipeResult } from '../../recipes/types.js';
@@ -36,8 +36,8 @@ export interface FitRecipeDefaults {
  *
  * **Precondition:** must run *after* `ensureChecksLoaded` so that any
  * user-defined recipes (loaded as `.mjs` plugins under
- * `<cwd>/opensip-tools/fit/recipes/`) are present in
- * `defaultRecipeRegistry` by the time the lookup runs. Inverting the two
+ * `<cwd>/opensip-tools/fit/recipes/`) are present in the scope's recipe
+ * registry by the time the lookup runs. Inverting the two
  * lines silently breaks recipe lookup for plugin-provided recipes.
  */
 export function selectRecipe(
@@ -61,7 +61,7 @@ export function selectRecipe(
     });
   }
 
-  if (!defaultRecipeRegistry.has(resolved.name)) {
+  if (!currentRecipeRegistry().has(resolved.name)) {
     // Config-sourced unknown name → fall back to the built-in default rather
     // than abort (it may be a shared/cross-tool default targeting another tool).
     if (resolved.tolerant && resolved.name !== BUILTIN_DEFAULT_RECIPE) {

@@ -64,6 +64,27 @@ export type {
   DiscoveredMarkerPackage,
 } from './marker-discovery.js'
 export {
+  loadToolManifest,
+  admitTool,
+  PROJECT_LOCAL_MANIFEST_FILE,
+} from './manifest-loader.js'
+export type {
+  AdmissionResult,
+} from './manifest-loader.js'
+// Scope-owned capability registry (release 2.10.0, §5.3): the host-side
+// runtime that registers manifest-declared capability domains and routes
+// contributions to their owning tool's registrar. Per-RunScope — mirrors
+// the simulation scenario-registry template.
+export {
+  CapabilityRegistry,
+  createCapabilityRegistry,
+  currentCapabilityRegistry,
+  registerCapabilityDomainsFromManifest,
+} from './capability-registry.js'
+export type {
+  CapabilityRegistrar,
+} from './capability-registry.js'
+export {
   registerRecipesFromMod,
 } from './recipe-loader.js'
 export type {
