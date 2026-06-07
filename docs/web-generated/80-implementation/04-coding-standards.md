@@ -32,7 +32,7 @@ The workspace's quality gates are: TypeScript strict mode, ESLint with type-awar
 
 ## TypeScript
 
-The workspace root [`tsconfig.json`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/tsconfig.json) sets `target: ES2022`, `module: Node16`, `moduleResolution: Node16`, and `strict: true`. Each package has its own `tsconfig.json` that extends those settings.
+The workspace root [`tsconfig.json`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/tsconfig.json) sets `target: ES2022`, `module: Node16`, `moduleResolution: Node16`, and `strict: true`. Each package has its own `tsconfig.json` that extends those settings.
 
 Notable settings:
 
@@ -47,7 +47,7 @@ Notable settings:
 
 ## ESLint
 
-Flat config at [`.config/eslint.config.mjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/.config/eslint.config.mjs). The base layers:
+Flat config at [`.config/eslint.config.mjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/.config/eslint.config.mjs). The base layers:
 
 - `@eslint/js` recommended.
 - `typescript-eslint` `recommendedTypeChecked` + `stylisticTypeChecked`.
@@ -79,7 +79,7 @@ The `@fitness-ignore-file` directives are opensip-tools' own (eaten by the fitne
 
 ## Errors
 
-[`packages/core/src/lib/errors.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/core/src/lib/errors.ts) defines the workspace's error hierarchy:
+[`packages/core/src/lib/errors.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/core/src/lib/errors.ts) defines the workspace's error hierarchy:
 
 ```ts
 interface ToolErrorOptions extends ErrorOptions { code?: string; [key: string]: unknown }
@@ -110,7 +110,7 @@ Plus the `Result<T, E>` pattern with `ok(value)` / `err(error)` / `tryCatch(fn)`
 
 Each error subclass ships with a sensible default: `VALIDATION_ERROR`, `NOT_FOUND`, `SYSTEM_ERROR`, `TIMEOUT`, `NETWORK_ERROR`, `CONFIGURATION_ERROR`. Call sites that want a more specific code pass `{ code: '...' }` as the second argument, e.g. `new ValidationError('bad', { code: 'SCHEMA_FAIL' })`. Most production throws today use the defaults; the shape is in place for future scoped codes.
 
-Errors are mapped to user-facing suggestions by [`getErrorSuggestion`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/contracts/src/exit-codes.ts):
+Errors are mapped to user-facing suggestions by [`getErrorSuggestion`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/contracts/src/exit-codes.ts):
 
 ```ts
 export interface ErrorSuggestion {
@@ -131,7 +131,7 @@ The CLI calls `getErrorSuggestion(error)` and threads the returned `{ message, a
 
 ## Exit codes
 
-Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/contracts/src/exit-codes.ts):
+Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/contracts/src/exit-codes.ts):
 
 ```ts
 export const EXIT_CODES = {
@@ -151,7 +151,7 @@ Adding a new exit code is a major-version change — see [`10-concepts/04-contra
 
 ## Logging
 
-The structured logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/core/src/lib/logger.ts). Every log entry carries:
+The structured logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/core/src/lib/logger.ts). Every log entry carries:
 
 - `evt` — dot-separated event name (`cli.fit.run.start`, `plugin.loader.discover`, `gate.compare.complete`).
 - `module` — the module that emitted it (`cli:fit`, `core:plugins`, `cli:gate`).

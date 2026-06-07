@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/contracts",
-  "version": "2.7.1",
+  "version": "2.8.0",
   "license": "MIT",
   "description": "Shared contract types for OpenSIP Tools — SignalEnvelope / CommandResult shapes, exit codes, session persistence",
   "keywords": [

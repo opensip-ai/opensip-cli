@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/checks-rust",
-  "version": "2.7.1",
+  "version": "2.8.0",
   "license": "MIT",
   "description": "Rust fitness checks for opensip-tools",
   "keywords": [

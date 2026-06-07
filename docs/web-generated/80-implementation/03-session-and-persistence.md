@@ -53,7 +53,7 @@ A run produces three kinds of on-disk artifacts: the SQLite database, structured
     └── sim/node_modules/
 ```
 
-Source of truth: [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/core/src/lib/paths.ts). Every consumer reads paths through `resolveProjectPaths(cwd)`. The directory is created lazily by whichever consumer needs a subpath first; `mkdirSync(..., { recursive: true })` is the standard idiom.
+Source of truth: [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/core/src/lib/paths.ts). Every consumer reads paths through `resolveProjectPaths(cwd)`. The directory is created lazily by whichever consumer needs a subpath first; `mkdirSync(..., { recursive: true })` is the standard idiom.
 
 The WAL/SHM sidecar files are SQLite implementation details (Write-Ahead Log mode, enabled at open time so concurrent reads — e.g. from `graph --workspace` child processes — don't block writes). They may be empty or absent after a clean shutdown depending on SQLite's WAL checkpoint timing; both states are normal.
 
@@ -61,9 +61,9 @@ The WAL/SHM sidecar files are SQLite implementation details (Write-Ahead Log mod
 
 ## The DataStore
 
-[`packages/datastore`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/datastore) hosts the persistence kernel: a `DataStore` interface, a SQLite-backed implementation, an in-memory implementation for tests, and the workspace-wide migration store under `migrations/`. The CLI bootstrap opens one `DataStore` per invocation in the `preAction` hook ([`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/cli/src/index.ts)) and closes it on `process.exit`. Every tool's command receives the handle via `ToolCliContext.datastore`.
+[`packages/datastore`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/datastore) hosts the persistence kernel: a `DataStore` interface, a SQLite-backed implementation, an in-memory implementation for tests, and the workspace-wide migration store under `migrations/`. The CLI bootstrap opens one `DataStore` per invocation in the `preAction` hook ([`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/cli/src/index.ts)) and closes it on `process.exit`. Every tool's command receives the handle via `ToolCliContext.datastore`.
 
-Schemas are owned by the package that produces the data — datastore is paradigm-agnostic infrastructure. Adding a new tool means adding a new schema module under that package's `src/persistence/schema.ts` and registering it in [`packages/datastore/drizzle.config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/datastore/drizzle.config.ts). Three packages register schemas today:
+Schemas are owned by the package that produces the data — datastore is paradigm-agnostic infrastructure. Adding a new tool means adding a new schema module under that package's `src/persistence/schema.ts` and registering it in [`packages/datastore/drizzle.config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/datastore/drizzle.config.ts). Three packages register schemas today:
 
 | Owner | Schema file | Tables |
 |---|---|---|
@@ -106,7 +106,7 @@ SQLite + Drizzle were chosen because the runtime store is local, project-scoped,
 
 ## Sessions
 
-A session is one record per `fit`, `sim`, or `graph` run. The persistence layer holds **zero tool-specific vocabulary** (audit 2026-05-29, session split): the `sessions` table carries only the columns every tool shares, and per-session detail lives in a separate `session_tool_payload` row as an **opaque JSON blob** whose shape is owned and validated by the writing tool. The `StoredSession` interface in [`packages/contracts/src/session-types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/contracts/src/session-types.ts) is what `SessionRepo` round-trips:
+A session is one record per `fit`, `sim`, or `graph` run. The persistence layer holds **zero tool-specific vocabulary** (audit 2026-05-29, session split): the `sessions` table carries only the columns every tool shares, and per-session detail lives in a separate `session_tool_payload` row as an **opaque JSON blob** whose shape is owned and validated by the writing tool. The `StoredSession` interface in [`packages/contracts/src/session-types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/contracts/src/session-types.ts) is what `SessionRepo` round-trips:
 
 ```ts
 interface StoredSession {
@@ -124,7 +124,7 @@ interface StoredSession {
 
 The old per-check / per-finding columns (`session_checks`, `session_findings`) are gone — that detail now rides inside `payload` (checks, findings, summaries, etc. for `fit`; whatever shape each tool defines). `contracts` treats `payload` as `unknown`; the dashboard, as presentation owner, reads and renders it — the same producer/consumer split used for `GraphCatalog`.
 
-The session is written via [`SessionRepo.save()`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/session-store/src/session-repo.ts) inside a single transaction (the `sessions` row plus, when `payload` is present, one `session_tool_payload` row), so even a run that crashes mid-render leaves a complete or no record — never a partial one.
+The session is written via [`SessionRepo.save()`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/session-store/src/session-repo.ts) inside a single transaction (the `sessions` row plus, when `payload` is present, one `session_tool_payload` row), so even a run that crashes mid-render leaves a complete or no record — never a partial one.
 
 ### The `sessions` command
 
@@ -143,11 +143,11 @@ The dashboard reads the same store to populate its run-history view.
 
 ## The graph catalog
 
-`@opensip-tools/graph` builds a call-graph catalog (functions, occurrences, calls) and persists it via [`CatalogRepo`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/graph/engine/src/persistence/catalog-repo.ts). v2 stores the whole catalog as a single SQLite row; metadata fields (language, cache key, files fingerprint) are lifted into typed columns so the orchestrator can fingerprint-mismatch without parsing the payload.
+`@opensip-tools/graph` builds a call-graph catalog (functions, occurrences, calls) and persists it via [`CatalogRepo`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/graph/engine/src/persistence/catalog-repo.ts). v2 stores the whole catalog as a single SQLite row; metadata fields (language, cache key, files fingerprint) are lifted into typed columns so the orchestrator can fingerprint-mismatch without parsing the payload.
 
 ### The derived `features` surface (ADR-0006)
 
-The persisted catalog document carries an optional **`features`** layer — derived columns the engine computes from the raw catalog: per-function `bodyLines` / `blast` (direct + transitive blast radius) / reachability flags, per-package coupling degrees, SCC membership, and directed package-coupling edges. The contract shape is [`GraphFeatures`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/contracts/src/graph-catalog.ts) (structurally mirrored from the engine's `PersistedFeatures` so the decoupled dashboard reads features without importing `@opensip-tools/graph`).
+The persisted catalog document carries an optional **`features`** layer — derived columns the engine computes from the raw catalog: per-function `bodyLines` / `blast` (direct + transitive blast radius) / reachability flags, per-package coupling degrees, SCC membership, and directed package-coupling edges. The contract shape is [`GraphFeatures`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/contracts/src/graph-catalog.ts) (structurally mirrored from the engine's `PersistedFeatures` so the decoupled dashboard reads features without importing `@opensip-tools/graph`).
 
 The persistence policy is **materialize only when forced** (ADR-0006): features are a *plain view* recomputed on demand for in-engine rules, and **materialized into the catalog JSON only for the columns the decoupled dashboard renders** (blast, SCC, package coupling). The `features` field is therefore present only on catalogs produced by a dashboard-bound run; the dashboard falls back to a no-data state when it's absent. Everything else (callers/callees indexes) is recomputed cheaply on every load and never stored.
 
@@ -166,7 +166,7 @@ Two baselines live in the SQLite store:
 
 ### v1 → v2: the `--baseline <path>` flag is gone
 
-v1 wrote baselines as JSON/SARIF files (`baseline.sarif`, `cache/graph/baseline.json`) and let users override the path with `--baseline`. v2 stores exactly one baseline per project, in the SQLite database. **Drop `--baseline path/to/file.sarif` from CI invocations**; the flag has no equivalent. Teams that committed `baseline.sarif` to git for cross-CI-run gate comparisons should re-run `--gate-save` once the new code lands. See the v2.0.0 entry in [`CHANGELOG.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/CHANGELOG.md) for the full break.
+v1 wrote baselines as JSON/SARIF files (`baseline.sarif`, `cache/graph/baseline.json`) and let users override the path with `--baseline`. v2 stores exactly one baseline per project, in the SQLite database. **Drop `--baseline path/to/file.sarif` from CI invocations**; the flag has no equivalent. Teams that committed `baseline.sarif` to git for cross-CI-run gate comparisons should re-run `--gate-save` once the new code lands. See the v2.0.0 entry in [`CHANGELOG.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/CHANGELOG.md) for the full break.
 
 ---
 
@@ -177,7 +177,7 @@ Structured JSON Lines, one event per line. Written to two destinations simultane
 1. **stderr** — for live observation (`opensip-tools fit 2>&1 | jq`).
 2. **`<project>/opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl`** — one file per local day; every run on the same day appends to the same file. Filter with `jq` on the `runId` field to isolate a specific run.
 
-The logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/core/src/lib/logger.ts). Every log entry carries:
+The logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/core/src/lib/logger.ts). Every log entry carries:
 
 - `evt` — the event name (`cli.fit.run.start`, `session.save.complete`, etc.).
 - `module` — the module that emitted it (`cli:fit`, `contracts:session-repo`, …).
@@ -194,7 +194,7 @@ The log file persists until manually deleted. There's no rotation; that's the us
 
 The HTML dashboard writes a single self-contained file at `<project>/opensip-tools/.runtime/reports/latest.html`. Each generation overwrites the previous file — the dashboard is "always show the most recent state", not a per-run archive.
 
-Composition is owned by the **CLI** ([`packages/cli/src/dashboard-compose.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/cli/src/dashboard-compose.ts)), the cross-tool composition root. It reads sessions via `SessionRepo.list({ limit: 20 })`, then walks every registered tool's optional `collectDashboardData(scope)` seam and merges the keyed contributions into one `DashboardInput` — graph returns its `graphCatalog` (via `CatalogRepo.loadCatalogContract()`), fitness returns its catalogs, neither reaching into the other (this is what the `fitness-no-graph` / `graph-no-fitness` layer rules enforce). The merged input is handed to `generateDashboardHtml` ([`@opensip-tools/dashboard`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/dashboard/src/generator.ts)), which assembles the inlined HTML (JS via `<script type="module">`, CSS via `<style>`, session/catalog data via `<script type="application/json">`). The output is one self-contained file you can email — no CDN, no asset bundle, no server.
+Composition is owned by the **CLI** ([`packages/cli/src/dashboard-compose.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/cli/src/dashboard-compose.ts)), the cross-tool composition root. It reads sessions via `SessionRepo.list({ limit: 20 })`, then walks every registered tool's optional `collectDashboardData(scope)` seam and merges the keyed contributions into one `DashboardInput` — graph returns its `graphCatalog` (via `CatalogRepo.loadCatalogContract()`), fitness returns its catalogs, neither reaching into the other (this is what the `fitness-no-graph` / `graph-no-fitness` layer rules enforce). The merged input is handed to `generateDashboardHtml` ([`@opensip-tools/dashboard`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/dashboard/src/generator.ts)), which assembles the inlined HTML (JS via `<script type="module">`, CSS via `<style>`, session/catalog data via `<script type="application/json">`). The output is one self-contained file you can email — no CDN, no asset bundle, no server.
 
 The dashboard auto-open hook fires after a run if (a) `--open` was requested or auto-open is configured, (b) output isn't `--json`, and (c) stdout is a TTY.
 

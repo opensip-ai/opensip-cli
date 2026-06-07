@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/graph-adapter-common",
-  "version": "2.7.1",
+  "version": "2.8.0",
   "license": "MIT",
   "description": "Shared scaffolding for the tree-sitter graph language adapters (go, java, python, rust)",
   "keywords": [

@@ -4,6 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.8.0] — 2026-06-07
+
+Recipe defaults become **tool-scoped** ([ADR-0022](docs/decisions/ADR-0022-tool-scoped-recipe-defaults.md)).
+Per the pre-GA 2.x policy ([ADR-0012](docs/decisions/ADR-0012-versioning-and-release-policy.md))
+this is a minor on the long-lived 2.x line. **`cli.recipe` keeps working** as a
+tolerant cross-tool fallback, so most projects upgrade with no change; projects
+that relied on `cli.recipe` reaching `graph`/`sim` should migrate to the
+per-tool keys (see below).
+
+### Added
+
+- **Per-tool recipe defaults: `fitness.recipe`, `graph.recipe`, `simulation.recipe`.**
+  Each tool reads its own default recipe from its own config block, because
+  recipe namespaces are disjoint across tools. Resolution precedence per tool is
+  `--recipe` flag > `<tool>.recipe` > deprecated `cli.recipe` > built-in `default`.
+- **`cli-recipe-deprecated`** fitness check (checks-universal, `warning`) — flags
+  a `cli.recipe` key and points at the per-tool replacement, driving migration.
+
+### Changed
+
+- **`cli.recipe` is deprecated and no longer applied to every tool.** Previously
+  the tool-agnostic `cli.recipe` was merged onto every tool's `--recipe`, so a
+  recipe meant for one tool leaked into the others. It is now read only as a
+  **tolerant fallback**: a tool that lacks the named recipe falls back to its own
+  built-in `default` (with a warning) instead of aborting. An explicit
+  `--recipe <name>` typo still hard-fails (exit 2) — that guardrail is unchanged.
+
+### Fixed
+
+- **`opensip-tools graph` (and `sim`) no longer abort with `Unknown graph
+  recipe '<name>'`** when a project sets a `fit` recipe as the (formerly
+  tool-agnostic) `cli.recipe` default. Each tool now resolves its own recipe and
+  tolerates a config default it doesn't recognize.
+
+### Migration
+
+Move any `cli.recipe` default under the owning tool's block:
+
+```yaml
+# before
+cli:
+  recipe: my-fit-recipe
+# after
+fitness:
+  recipe: my-fit-recipe
+```
+
+`cli.recipe` continues to work until removed; the `cli-recipe-deprecated` check
+will remind you.
+
 ## [2.7.1] — 2026-06-06
 
 A correctness and reliability patch for the `graph` tool. **No breaking

@@ -20,7 +20,7 @@ The five-layer package graph (core → datastore/contracts → tools/libraries/a
 
 For the conceptual layer narrative, see [`../10-concepts/03-modular-monolith.md`](/docs/opensip-tools/10-concepts/03-modular-monolith/).
 
-The literal rules are at [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/.config/dependency-cruiser.cjs).
+The literal rules are at [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/.config/dependency-cruiser.cjs).
 
 ---
 
@@ -194,11 +194,11 @@ The lang layer is below check packs in the implicit ordering, even though both s
 }
 ```
 
-A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typescript → fitness` exception (`@opensip-tools/lang-typescript` re-exporting `filterContent`, `clearFilterCache`, `FilteredContent`) was paid down by moving those symbols into the adapter package itself — they now live in [`packages/languages/lang-typescript/src/filter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/languages/lang-typescript/src/filter.ts) alongside the rest of the TS-aware string/comment stripping. With that, the rule simplified from the named carve-out (`lang-no-fitness-except-typescript`) to the unconditional form above.
+A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typescript → fitness` exception (`@opensip-tools/lang-typescript` re-exporting `filterContent`, `clearFilterCache`, `FilteredContent`) was paid down by moving those symbols into the adapter package itself — they now live in [`packages/languages/lang-typescript/src/filter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/languages/lang-typescript/src/filter.ts) alongside the rest of the TS-aware string/comment stripping. With that, the rule simplified from the named carve-out (`lang-no-fitness-except-typescript`) to the unconditional form above.
 
 ### Output-boundary rules (ADR-0011)
 
-[ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md) makes the `SignalEnvelope` the single output currency: a tool engine *returns* an envelope and **never renders or delivers its own output**. The CLI composition root maps flags → (formatter × sink). Four guards keep that honest — three dependency-cruiser rules plus one fitness check, because the contract has both an *import* shape and a *call* shape:
+[ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md) makes the `SignalEnvelope` the single output currency: a tool engine *returns* an envelope and **never renders or delivers its own output**. The CLI composition root maps flags → (formatter × sink). Four guards keep that honest — three dependency-cruiser rules plus one fitness check, because the contract has both an *import* shape and a *call* shape:
 
 - **`tool-engines-no-output-formatters`** — a tool engine (`packages/{fitness,graph,simulation}/engine/src/`) must not import an `@opensip-tools/output` formatter (`output/src/format/`). Rendering belongs to the composition root.
 - **`tool-engines-no-output-sinks`** — a tool engine must not import an `@opensip-tools/output` sink (`output/src/sink/`). Cloud/file egress is resolved only at the root.
@@ -206,7 +206,7 @@ A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typesc
 
   All three are production-source-only — test files are globally excluded, so graph's relocated golden SARIF test may import `formatSignalSarif` from the barrel.
 
-- **`no-direct-stdout-in-tool-engine`** (a fitness check, slug `no-direct-stdout-in-tool-engine`, [`packages/fitness/checks-universal/src/checks/architecture/`](https://github.com/opensip-ai/opensip-tools/blob/v2.7.1/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts)) — catches the call shape no import can catch: a tool engine writing run output straight to **stdout** (`process.stdout.write`, `console.log`/`.info`/`.debug`). Scope is **stdout only** — `console.error`/`.warn` are deliberately absent because stderr is the legitimate diagnostics channel (error messages, warnings, failure notices are not run output). The check fires only inside the three tool engines. Legitimate direct stdout (subprocess IPC, machine `--json` paths that deliberately bypass the render seam, auxiliary-subcommand status lines) is exempted per-file via `@fitness-ignore-file no-direct-stdout-in-tool-engine` with a justification.
+- **`no-direct-stdout-in-tool-engine`** (a fitness check, slug `no-direct-stdout-in-tool-engine`, [`packages/fitness/checks-universal/src/checks/architecture/`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts)) — catches the call shape no import can catch: a tool engine writing run output straight to **stdout** (`process.stdout.write`, `console.log`/`.info`/`.debug`). Scope is **stdout only** — `console.error`/`.warn` are deliberately absent because stderr is the legitimate diagnostics channel (error messages, warnings, failure notices are not run output). The check fires only inside the three tool engines. Legitimate direct stdout (subprocess IPC, machine `--json` paths that deliberately bypass the render seam, auxiliary-subcommand status lines) is exempted per-file via `@fitness-ignore-file no-direct-stdout-in-tool-engine` with a justification.
 
   The complementary positive contract is the `CommandResult` return type: a tool returns its envelope and routes any output through the `ToolCliContext` seam (`cli.render` / `cli.emitEnvelope` / `cli.deliverSignals` / `cli.writeSarif`).
 
