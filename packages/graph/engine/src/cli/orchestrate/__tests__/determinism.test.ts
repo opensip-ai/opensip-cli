@@ -121,8 +121,7 @@ function statsTuple(s: ResolutionStats): readonly number[] {
  * different orders must be byte-identical modulo `builtAt`.
  */
 function canonicalBytes(catalog: Catalog): string {
-  const { builtAt: _builtAt, ...rest } = catalog;
-  return JSON.stringify(rest);
+  return JSON.stringify({ ...catalog, builtAt: 'EXCLUDED' });
 }
 
 describe('cross-shard merge determinism (characterization)', () => {
