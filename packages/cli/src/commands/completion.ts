@@ -19,7 +19,17 @@
  * at completion time.
  */
 
+import { commonFlags, type CommonFlagKey } from '@opensip-tools/contracts'
+
 export type Shell = 'bash' | 'zsh' | 'fish'
+
+/** The long `--flag` form of a registry flag spec (drops the short alias + arg
+ *  placeholder), so completion's flag lists derive from the one ADR-0021
+ *  registry rather than re-listing flag names that can drift. */
+function longFlag(key: CommonFlagKey): string {
+  const match = /--[a-z][a-z-]*/.exec(commonFlags[key].flags)
+  return match ? match[0] : commonFlags[key].flags
+}
 
 /**
  * Subcommands surfaced by completion. Kept in sync with the live
@@ -47,35 +57,42 @@ export const SUBCOMMANDS: readonly string[] = [
   'help',
 ]
 
-/** Flags common to most commands — completed when the user types a dash. */
+/** Flags common to most commands — completed when the user types a dash.
+ *  Derived from the ADR-0021 registry (plus Commander's built-in
+ *  `--help`/`--version`) so it can't drift from the real flag names. */
 const COMMON_FLAGS: readonly string[] = [
-  '--cwd',
-  '--json',
-  '--verbose',
-  '--quiet',
-  '--debug',
+  longFlag('cwd'),
+  longFlag('json'),
+  longFlag('verbose'),
+  longFlag('quiet'),
+  longFlag('debug'),
   '--help',
   '--version',
 ]
 
+/** Cloud-egress flags every run command shares (registry-sourced). */
+const EGRESS_FLAGS: readonly string[] = [longFlag('reportTo'), longFlag('apiKey')]
+
 /** Flags specific to `fit`. */
 const FIT_FLAGS: readonly string[] = [
   ...COMMON_FLAGS,
+  ...EGRESS_FLAGS,
   '--recipe',
   '--check',
   '--tags',
   '--list',
   '--recipes',
   '--findings',
-  '--report-to',
-  '--api-key',
   '--exclude',
-  '--open',
+  '--config',
+  longFlag('open'),
 ]
 
 const SIM_FLAGS: readonly string[] = [
   ...COMMON_FLAGS,
-  '--open',
+  ...EGRESS_FLAGS,
+  '--recipe',
+  longFlag('open'),
 ]
 
 const UNINSTALL_FLAGS: readonly string[] = [

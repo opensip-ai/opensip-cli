@@ -8,14 +8,18 @@
  * (e.g. a `--quiet` shorthand) is a one-line change.
  */
 
+import { commonFlags } from '@opensip-tools/contracts';
+
 import type { CommandResult } from '@opensip-tools/contracts';
 import type { PluginLayout } from '@opensip-tools/core';
 
-/** Commander spec for the shared `--cwd <path>` option. */
-export const CWD_OPTION_SPEC = '--cwd <path>';
+/** Commander spec for the shared `--cwd <path>` option — sourced from the
+ *  ADR-0021 common-flag registry so CLI-owned commands match the tools. */
+export const CWD_OPTION_SPEC = commonFlags.cwd.flags;
 
-/** Help text for the shared `--json` flag — every CLI-owned subcommand uses this string verbatim. */
-export const JSON_DESC = 'Output structured JSON';
+/** Help text for the shared `--json` flag — the one registry string, used by
+ *  every CLI-owned subcommand. */
+export const JSON_DESC = commonFlags.json.description;
 
 /**
  * Context the orchestrator (`registerCliCommands`) hands to every
