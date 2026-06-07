@@ -112,21 +112,91 @@ describe('buildFeatures — blast (golden)', () => {
 });
 
 describe('buildFeatures — scc (golden + determinism)', () => {
-  it('returns the 2-cycle and 3-cycle with sorted members, sccSize, crossesPackages, stable id', () => {
+  it('returns the 2-cycle and 3-cycle with sorted occId members, sccSize, crossesPackages, stable id', () => {
     const { catalog, indexes } = makeFixture();
     const f = buildFeatures(catalog, indexes, CONFIG, ['scc']);
-    const twoCycle = f.scc.find((s) => s.members.includes('c2a'));
+    // Members are occIds (`${filePath}:${line}:${column}`), NOT bodyHashes.
+    // The fixture's occs all sit at line 1, column 0 with distinct filePaths.
+    const c2aId = 'packages/core/src/c2a.ts:1:0';
+    const c2bId = 'packages/core/src/c2b.ts:1:0';
+    const twoCycle = f.scc.find((s) => s.members.includes(c2aId));
     expect(twoCycle).toBeDefined();
-    expect(twoCycle?.members).toEqual(['c2a', 'c2b']);
+    expect(twoCycle?.members).toEqual([c2aId, c2bId]);
     expect(twoCycle?.sccSize).toBe(2);
     expect(twoCycle?.crossesPackages).toBe(false); // both in 'core'
-    expect(twoCycle?.id).toBe('scc:c2a');
+    expect(twoCycle?.id).toBe(`scc:${c2aId}`);
 
-    const threeCycle = f.scc.find((s) => s.members.includes('c3a'));
-    expect(threeCycle?.members).toEqual(['c3a', 'c3b', 'c3c']);
+    const c3aId = 'packages/core/src/c3a.ts:1:0';
+    const c3bId = 'packages/core/src/c3b.ts:1:0';
+    const c3cId = 'packages/cli/src/c3c.ts:1:0';
+    const threeCycle = f.scc.find((s) => s.members.includes(c3aId));
+    // Sorted occIds: 'packages/cli/...' < 'packages/core/...'.
+    expect(threeCycle?.members).toEqual([c3cId, c3aId, c3bId].sort());
     expect(threeCycle?.sccSize).toBe(3);
     expect(threeCycle?.crossesPackages).toBe(true); // c3c is in 'cli'
-    expect(threeCycle?.id).toBe('scc:c3a');
+    expect(threeCycle?.id).toBe(`scc:${[c3cId, c3aId, c3bId].sort()[0]}`);
+  });
+
+  it('does NOT merge body-hash twins across packages into a cross-package SCC (Phase 8 regression)', () => {
+    // Two occurrences with an IDENTICAL body (same bodyHash 'CANON') in
+    // different packages — the audit/compliance `canonicalize` collision class
+    // on opensip. Each sits in its OWN intra-package 2-cycle:
+    //   audit:      canonicalize ⇄ helperA   (both in 'audit')
+    //   compliance: canonicalize ⇄ helperB   (both in 'compliance')
+    // A bodyHash-keyed Tarjan collapses both `canonicalize` occurrences into one
+    // node and bolts the two cycles together into a false cross-package SCC.
+    // The occId-keyed graph + resolveCallee disambiguation must keep them as TWO
+    // separate intra-package SCCs (crossesPackages: false).
+    const auditCanon = occ({
+      bodyHash: 'CANON', simpleName: 'canonicalize', package: 'audit',
+      filePath: 'packages/audit/src/canonicalize.ts', calls: [call('hA')],
+    });
+    const helperA = occ({
+      bodyHash: 'hA', simpleName: 'helperA', package: 'audit',
+      filePath: 'packages/audit/src/helperA.ts', calls: [call('CANON')],
+    });
+    const complianceCanon = occ({
+      bodyHash: 'CANON', simpleName: 'canonicalize', package: 'compliance',
+      filePath: 'packages/compliance/src/canonicalize.ts', calls: [call('hB')],
+    });
+    const helperB = occ({
+      bodyHash: 'hB', simpleName: 'helperB', package: 'compliance',
+      filePath: 'packages/compliance/src/helperB.ts', calls: [call('CANON')],
+    });
+    // Both canonicalize occurrences share the simpleName bucket (collision-real).
+    const catalog = catalogOf({
+      canonicalize: [auditCanon, complianceCanon],
+      helperA: [helperA],
+      helperB: [helperB],
+    });
+    const indexes = buildIndexes(catalog);
+    const f = buildFeatures(catalog, indexes, CONFIG, ['scc']);
+
+    // No SCC may cross packages — the phantom is absent.
+    const crossPkg = f.scc.filter((s) => s.crossesPackages);
+    expect(crossPkg).toEqual([]);
+
+    // Exactly two non-trivial (size-2) cycles, one per package, each intra-pkg.
+    const cycles = f.scc.filter((s) => s.sccSize >= 2);
+    expect(cycles).toHaveLength(2);
+
+    const auditCycle = cycles.find((s) =>
+      s.members.includes('packages/audit/src/canonicalize.ts:1:0'),
+    );
+    expect(auditCycle?.crossesPackages).toBe(false);
+    expect(auditCycle?.members).toEqual([
+      'packages/audit/src/canonicalize.ts:1:0',
+      'packages/audit/src/helperA.ts:1:0',
+    ]);
+
+    const complianceCycle = cycles.find((s) =>
+      s.members.includes('packages/compliance/src/canonicalize.ts:1:0'),
+    );
+    expect(complianceCycle?.crossesPackages).toBe(false);
+    expect(complianceCycle?.members).toEqual([
+      'packages/compliance/src/canonicalize.ts:1:0',
+      'packages/compliance/src/helperB.ts:1:0',
+    ]);
   });
 
   it('is deterministic across runs (stable id + order)', () => {
@@ -331,7 +401,12 @@ describe('buildFeatures — parity vs prior dashboard outputs', () => {
   it('scc member sets equal the reference findSccs (normalized)', () => {
     const { catalog, indexes } = makeFixture();
     const f = buildFeatures(catalog, indexes, CONFIG, ['scc']);
-    const engine = normSccMembers(f.scc.map((s) => [...s.members]));
+    // The engine keys members by occId; the reference (a bodyHash-node Tarjan)
+    // keys by bodyHash. The fixture has NO body-twins, so occId ↔ bodyHash is
+    // 1:1 — map engine occIds back to bodyHashes via byOccId for comparison.
+    const engine = normSccMembers(
+      f.scc.map((s) => s.members.map((id) => indexes.byOccId.get(id)?.bodyHash ?? id)),
+    );
     const reference = normSccMembers(referenceSccs(indexes));
     expect(engine).toEqual(reference);
   });

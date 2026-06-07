@@ -29,7 +29,12 @@ export type GraphCallResolution =
   | 'dynamic-string'
   /** Fast-mode (syntactic) edge: resolved from name + import graph, no
    *  type checker. Always approximate — carries capped confidence. */
-  | 'syntactic';
+  | 'syntactic'
+  /** Cross-shard boundary edge recovered by the semantic linker: the import
+   *  specifier + callee name resolved to a UNIQUE exported occurrence in the
+   *  imported package (the type checker's conclusion). High-confidence; the
+   *  linker declines on ambiguity rather than guessing. */
+  | 'semantic';
 
 export type GraphCallConfidence = 'high' | 'medium' | 'low';
 

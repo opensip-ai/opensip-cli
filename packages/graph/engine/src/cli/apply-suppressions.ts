@@ -32,8 +32,14 @@ export interface GraphSuppressionOutcome {
 
 /**
  * Apply `@graph-ignore` waivers to a run's signals. `projectRoot` resolves the
- * project-relative `code.file` paths the signals carry; an unreadable file
- * degrades to "no directives" (the core primitive never throws on a read).
+ * project-relative `code.file` paths the signals carry.
+ *
+ * Read-failure posture (ADR-0014 + fail-loud Phase 5): the core primitive is
+ * fail-loud. A genuinely-removed (`ENOENT`) directive file is non-fatal but
+ * attributed (the primitive logs `signals.suppress.directive-file-missing`);
+ * ANY other read failure PROPAGATES. This function deliberately does NOT
+ * catch it — the error reaches the CLI error boundary, which classifies it and
+ * exits, rather than letting a dropped waiver leak a signal as a finding.
  */
 export async function applyGraphSuppressions(
   signals: readonly Signal[],

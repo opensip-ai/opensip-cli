@@ -57,6 +57,14 @@ export type FunctionKind =
  * name plus the file's import graph WITHOUT the type checker. It is always
  * approximate — fast-mode edges carry capped confidence (never `'high'`) so
  * consumers can distinguish them from semantic (`exact`-mode) edges.
+ *
+ * `'semantic'` is the cross-shard linker tag: the edge was recovered by the
+ * Phase-2 boundary resolver, which links a bare/workspace import specifier +
+ * callee name to a UNIQUE exported occurrence in the imported package's export
+ * symbol table — exactly what the type checker would conclude. It is a resolved
+ * edge (high confidence) and is NOT import-constrained downstream (the linker
+ * already proved reachability by construction). The resolver declines (emits no
+ * edge) on any ambiguity, so a `'semantic'` edge is never a name-only guess.
  */
 export type CallResolution =
   | 'static'
@@ -65,7 +73,8 @@ export type CallResolution =
   | 'constructor'
   | 'unknown'
   | 'dynamic-string'
-  | 'syntactic';
+  | 'syntactic'
+  | 'semantic';
 
 /** Resolver confidence in a call edge: high (one body), medium (few), low (many or partial). */
 export type CallConfidence = 'high' | 'medium' | 'low';
@@ -109,11 +118,13 @@ export interface CallEdge {
   /**
    * True when this edge was recovered by the cross-shard boundary pass
    * (a sharded build) rather than resolved within a single shard. A
-   * `crossShard` edge is therefore `resolution: 'syntactic'` regardless
-   * of the build's resolution mode — the ASTs were gone by the time it
-   * was resolved, so only the callee name + import specifier were
-   * available. Lets consumers reason about boundary edges (e.g. "my
-   * low-confidence edges are the cross-package ones, which is expected").
+   * recovered `crossShard` edge is `resolution: 'semantic'` — the boundary
+   * linker proved the import specifier + callee name resolve to a UNIQUE
+   * exported occurrence in the imported package (the same conclusion the type
+   * checker reaches), so it is a high-confidence resolved edge. The linker
+   * DECLINES on ambiguity rather than guessing, so a `crossShard` edge is never
+   * a name-only match. Lets consumers reason about boundary edges (e.g. "the
+   * cross-package edges came from the linker, not a single shard").
    * Omitted/false for intra-shard edges; optional for forward-compat.
    */
   readonly crossShard?: boolean;
@@ -294,6 +305,15 @@ export interface Catalog {
 export interface Indexes {
   readonly byBodyHash: ReadonlyMap<string, FunctionOccurrence>;
   /**
+   * Per-occurrence id (`${filePath}:${line}:${column}`) → the occurrence at that
+   * source location. Unlike `byBodyHash` (a CONTENT hash that collapses
+   * body-twins across packages into one node), an occId is unique per
+   * occurrence, so the SCC/cycle feature can key its graph by occurrence and
+   * never collapse two distinct functions with identical bodies. Consumed by
+   * `computeSccs` (node identity) and `rules/cycle.ts` (member resolution).
+   */
+  readonly byOccId: ReadonlyMap<string, FunctionOccurrence>;
+  /**
    * bodyHash → ALL occurrences sharing that body. Unlike `byBodyHash`
    * (one occurrence per hash, content-dedup), this preserves every
    * occurrence so a callee whose body is duplicated across packages can be
@@ -382,16 +402,23 @@ export interface PackageFeatures {
 }
 
 /**
- * One strongly-connected component of the call graph (Tarjan over `callees`).
- * Singletons are included by the algorithm. `id` is member-derived and stable
- * across runs so Plan D predicates and the dashboard cycle-grouping read a
- * deterministic key. Populated only when `'scc'` was requested.
+ * One strongly-connected component of the call graph (Tarjan over an
+ * OCCURRENCE-level adjacency — nodes are occIds, edges `resolveCallee`-
+ * disambiguated). Singletons are included by the algorithm. `id` is
+ * member-derived and stable across runs so Plan D predicates and the dashboard
+ * cycle-grouping read a deterministic key. Populated only when `'scc'` was
+ * requested.
+ *
+ * Members are occIds (`${filePath}:${line}:${column}`), NOT bodyHashes:
+ * occurrence identity is package-unique, so two functions with identical bodies
+ * in different packages stay distinct nodes (no false cross-package phantom).
+ * Resolve a member to its occurrence via `Indexes.byOccId`.
  */
 export interface SccFeatures {
   /** `scc:${sortedMembers[0]}` — stable, member-derived (resolves the spec
    *  Open Question on the SCC id scheme). */
   readonly id: string;
-  /** Member `bodyHash`es, sorted (determinism). */
+  /** Member occIds (`${filePath}:${line}:${column}`), sorted (determinism). */
   readonly members: readonly string[];
   /** `members.length`. */
   readonly sccSize: number;

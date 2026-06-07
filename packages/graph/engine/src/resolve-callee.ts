@@ -37,6 +37,18 @@ export function pkgOf(occ: Pick<FunctionOccurrence, 'package' | 'filePath'>): st
   return occ.package ?? packageOf(occ.filePath);
 }
 
+/**
+ * A package-unique, collision-free id for a single occurrence — its source
+ * location `${filePath}:${line}:${column}`. Unlike `bodyHash` (a CONTENT hash
+ * that two functions with identical bodies in different packages share), every
+ * occurrence has a unique declaration site, so occId never collapses distinct
+ * functions. Used as the SCC/cycle graph's node identity (the body-hash
+ * cross-package phantom fix) and keyed into `Indexes.byOccId`.
+ */
+export function occId(occ: Pick<FunctionOccurrence, 'filePath' | 'line' | 'column'>): string {
+  return `${occ.filePath}:${String(occ.line)}:${String(occ.column)}`;
+}
+
 /** The package groups the caller's module imports (empty in fast mode). */
 export function callerImportedPackages(
   callerOcc: FunctionOccurrence,

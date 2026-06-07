@@ -78,9 +78,10 @@ describe('cycleRule memberLocations', () => {
     const b = occ({ bodyHash: 'B', simpleName: 'b', filePath: 'src/b.ts', line: 7 });
     const c = occ({ bodyHash: 'C', simpleName: 'c', filePath: 'src/c.ts', line: 11 });
     const catalog = catalogOf([a, b, c]);
+    // Members are occIds (`${filePath}:${line}:${column}`), resolved via byOccId.
     const scc: SccFeatures = {
-      id: 'scc:A',
-      members: ['A', 'B', 'C'],
+      id: 'scc:src/a.ts:3:0',
+      members: ['src/a.ts:3:0', 'src/b.ts:7:0', 'src/c.ts:11:0'],
       sccSize: 3,
       crossesPackages: false,
     };

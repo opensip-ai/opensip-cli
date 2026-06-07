@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
+import { logger } from '../lib/logger.js';
 import { createSignal } from '../types/signal.js';
 
 import { filterSignalsBySuppressions, type SuppressionKeywords } from './suppress.js';
@@ -26,12 +27,27 @@ function sig(ruleId: string, file: string, line: number): Signal {
   });
 }
 
-/** A reader backed by an in-memory file map; rejects for unknown files. */
+/** An `ENOENT` rejection shaped like Node's `fs` errors. */
+function enoent(p: string): NodeJS.ErrnoException {
+  const error: NodeJS.ErrnoException = new Error(`ENOENT: no such file or directory, open '${p}'`);
+  error.code = 'ENOENT';
+  return error;
+}
+
+/**
+ * A reader backed by an in-memory file map. Unknown files reject with an
+ * `ENOENT` (the genuinely-removed-file case) so the happy-path tests exercise
+ * the conservative degrade path rather than the fail-loud one.
+ */
 function readerFor(files: Record<string, string>): (p: string) => Promise<string> {
-  return (p) => (p in files ? Promise.resolve(files[p]) : Promise.reject(new Error(`no ${p}`)));
+  return (p) => (p in files ? Promise.resolve(files[p]) : Promise.reject(enoent(p)));
 }
 
 describe('filterSignalsBySuppressions', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('suppresses via a next-line directive on the preceding line', async () => {
     const content = ['// @graph-ignore-next-line graph:cycle -- intentional recursion', 'function visit() {}'].join('\n');
     const res = await filterSignalsBySuppressions({
@@ -119,14 +135,77 @@ describe('filterSignalsBySuppressions', () => {
     expect(res.kept).toHaveLength(1);
   });
 
-  it('degrades gracefully when readFile rejects (no throw, not suppressed)', async () => {
+  it('throws (fails loud) when readFile rejects with a non-ENOENT error', async () => {
+    // An unexpected read failure (EACCES, EMFILE, decode, …) must abort the run
+    // rather than silently drop the file's waivers and leak the signal.
+    const eacces: NodeJS.ErrnoException = new Error('EACCES: permission denied');
+    eacces.code = 'EACCES';
+    await expect(
+      filterSignalsBySuppressions({
+        signals: [sig('graph:cycle', 'locked.ts', 2)],
+        keywords: GRAPH_KEYWORDS,
+        readFile: () => Promise.reject(eacces),
+      }),
+    ).rejects.toThrow(/EACCES/);
+  });
+
+  it('also throws on a generic (non-ErrnoException) read rejection', async () => {
+    await expect(
+      filterSignalsBySuppressions({
+        signals: [sig('graph:cycle', 'weird.ts', 2)],
+        keywords: GRAPH_KEYWORDS,
+        readFile: () => Promise.reject(new Error('decode boom')),
+      }),
+    ).rejects.toThrow(/decode boom/);
+  });
+
+  it('on ENOENT: logs the missing-file evt and conservatively keeps the signal (not suppressed)', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const res = await filterSignalsBySuppressions({
       signals: [sig('graph:cycle', 'missing.ts', 2)],
       keywords: GRAPH_KEYWORDS,
-      readFile: readerFor({}),
+      readFile: readerFor({}), // unknown file → ENOENT
     });
+
+    // Conservative: a waiver that cannot be evaluated does NOT suppress.
     expect(res.kept).toHaveLength(1);
     expect(res.suppressed).toHaveLength(0);
+
+    // Attributed: the leaked-waiver risk is surfaced with { file, ruleId }.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [, data] = warnSpy.mock.calls[0];
+    expect(data).toMatchObject({
+      evt: 'signals.suppress.directive-file-missing',
+      file: 'missing.ts',
+      ruleId: 'graph:cycle',
+    });
+  });
+
+  it('on ENOENT under a ruleIdOf override: attributes the resolved ruleId', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    await filterSignalsBySuppressions({
+      signals: [sig('some-other-rule-id', 'gone.ts', 2)],
+      keywords: FITNESS_KEYWORDS,
+      readFile: readerFor({}),
+      ruleIdOf: () => 'my-check',
+    });
+    const [, data] = warnSpy.mock.calls[0];
+    expect(data).toMatchObject({
+      evt: 'signals.suppress.directive-file-missing',
+      file: 'gone.ts',
+      ruleId: 'my-check',
+    });
+  });
+
+  it('does NOT log the missing-file evt on the happy path (present files)', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const content = ['// @graph-ignore-next-line graph:cycle -- ok', 'function visit() {}'].join('\n');
+    await filterSignalsBySuppressions({
+      signals: [sig('graph:cycle', 'a.ts', 2)],
+      keywords: GRAPH_KEYWORDS,
+      readFile: readerFor({ 'a.ts': content }),
+    });
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('is keyword-agnostic — same logic under fitness keywords', async () => {

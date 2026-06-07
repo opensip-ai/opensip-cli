@@ -1,32 +1,41 @@
 /**
- * Cross-shard merge & boundary resolution (plan #2, Phase 2).
+ * Cross-shard merge & semantic boundary linking (plan #2, Phase 2).
  *
  * After the shard workers return per-shard fragments + cross-boundary
  * call descriptors, this module:
  *   1. merges the fragments into one unified catalog (union of occurrences,
  *      each keeping its already-resolved intra-shard edges);
- *   2. resolves the boundary calls against that GLOBAL catalog + import
- *      graph — syntactically, since the ASTs are gone — and stitches the
- *      recovered edges onto their owner occurrences, labeled
- *      `resolution: 'syntactic'`, `crossShard: true`, capped confidence.
+ *   2. LINKS the boundary calls semantically against the export symbol table
+ *      ({@link ExportIndex}) + package manifest index ({@link PackageManifestIndex})
+ *      built from the merged catalog and the resolved shard set, then stitches
+ *      the recovered edges onto their owner occurrences as
+ *      `resolution: 'semantic'`, `crossShard: true`, `confidence: 'high'`.
  *
- * This replaces the old fan-out behavior where cross-partition calls
- * "became unresolved." Intra-shard edges retain their original (semantic,
- * in exact mode) fidelity; only the genuinely cross-package edges are
- * approximate, and they are labeled as such.
+ * The linker emits a cross-package edge ONLY when the import specifier + callee
+ * name resolve to a UNIQUE exported occurrence in the imported package — exactly
+ * what the TypeScript type checker would conclude. On ANY ambiguity (a name with
+ * multiple matching exports the subpath can't disambiguate, a name the package
+ * does not export, a specifier pointing at an external npm package) it DECLINES
+ * and emits an unresolved (`to: []`) edge. A missing edge is safe; a phantom
+ * cross-package edge would fail the gate. This replaces the old name-only
+ * syntactic fallback, which fabricated impossible coupling edges by matching a
+ * globally-unique simple name into a package the caller never imported.
  *
- * Engine-layer and language-agnostic: it operates on plain catalog data +
- * the descriptors' callee names / import specifiers. Specifier pinning is
- * generic path math (strip extension, resolve relative against the owner's
- * file) — no parser, no TypeScript assumptions.
+ * Intra-shard edges retain their original (semantic, in exact mode) fidelity;
+ * relative imports are still path-pinned (already exact for same-package
+ * imports). Engine-layer and language-agnostic: it operates on plain catalog
+ * data + the descriptors' callee names / import specifiers + each package's
+ * `package.json` — no parser, no TypeScript assumptions.
  */
 
 import { posix } from 'node:path';
 
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
 import { appendEdge, createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
-import { packageOf } from '../../resolve-callee.js';
 
+import { buildExportIndex, resolveSpecifierToPackage } from './export-index.js';
+
+import type { ExportIndex, PackageManifestIndex } from './export-index.js';
 import type { ShardBuildResult } from './shard-model.js';
 import type {
   CallEdge,
@@ -49,10 +58,11 @@ export interface CrossShardOutput {
 export function mergeAndResolveShards(
   fragments: readonly ShardBuildResult[],
   allFiles: readonly string[],
+  manifestIndex: PackageManifestIndex,
 ): CrossShardOutput {
   const merged = mergeShardFragments(fragments.map((f) => f.fragment), allFiles);
   const boundaryCalls = fragments.flatMap((f) => f.boundaryCalls);
-  return resolveCrossBoundaryCalls(merged, boundaryCalls);
+  return resolveCrossBoundaryCalls(merged, boundaryCalls, manifestIndex);
 }
 
 // ── Task 2.1: merge fragments ─────────────────────────────────────
@@ -75,19 +85,75 @@ export function mergeShardFragments(
   const seen = new Set<string>();
   for (const frag of fragments) addFragmentOccurrences(frag, functions, seen);
 
+  // Canonicalize: shards complete in nondeterministic order, so the merged
+  // function-name keys, occurrence buckets, and each occurrence's `calls` are
+  // all sorted by a stable key here. This makes the merged catalog a pure
+  // function of the fragment SET — independent of shard completion order — so
+  // cold, warm-all-cached, and warm-partial-rebuild produce a byte-identical
+  // catalog (Phase 3).
+  const canonicalFunctions = canonicalizeFunctions(functions);
+
   const first = fragments[0];
   return {
     version: '3.0',
     tool: 'graph',
     language: first?.language ?? 'typescript',
+    // `builtAt` is the SOLE intentionally-nondeterministic catalog field — a
+    // wall-clock stamp. It is excluded from structural determinism/equivalence
+    // comparisons (Phase 0 determinism test, Phase 4 guardrail). Everything
+    // else in this catalog is a pure function of the fragment set.
     builtAt: new Date().toISOString(),
     // Build-level key derived from the per-shard keys so the merged
     // catalog invalidates when any shard's key changes.
     cacheKey: `sharded-${String(fragments.length)}-${hashKeys(fragments)}`,
     filesFingerprint: computeFilesFingerprint(allFiles),
     resolutionMode: first?.resolutionMode,
-    functions,
+    functions: canonicalFunctions,
   };
+}
+
+/**
+ * Build a canonical copy of a merged function map: function-name keys inserted
+ * in sorted order, each function's occurrence bucket sorted by a stable key
+ * (`filePath`, then `line`, then `bodyHash`), and each occurrence's `calls`
+ * sorted by `(line, column, sorted(to))`. The catalog shape is unchanged —
+ * only the ordering becomes deterministic regardless of the order shards
+ * completed in. (JSON serialization preserves insertion order, so sorting the
+ * top-level keys is what makes the serialized catalog byte-identical.)
+ */
+function canonicalizeFunctions(
+  functions: Record<string, FunctionOccurrence[]>,
+): Record<string, FunctionOccurrence[]> {
+  const out: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
+    string,
+    FunctionOccurrence[]
+  >;
+  for (const name of Object.keys(functions).sort()) {
+    const occs = functions[name];
+    if (!occs) continue;
+    const sorted = [...occs].sort(compareOccurrences);
+    out[name] = sorted.map((occ) => ({ ...occ, calls: sortCalls(occ.calls) }));
+  }
+  return out;
+}
+
+/** Stable occurrence order: filePath, then line, then bodyHash. */
+function compareOccurrences(a: FunctionOccurrence, b: FunctionOccurrence): number {
+  return (
+    a.filePath.localeCompare(b.filePath) ||
+    a.line - b.line ||
+    a.bodyHash.localeCompare(b.bodyHash)
+  );
+}
+
+/** Stable edge order within an occurrence: line, then column, then sorted(to). */
+function sortCalls(calls: readonly CallEdge[]): CallEdge[] {
+  return [...calls].sort(
+    (a, b) =>
+      a.line - b.line ||
+      a.column - b.column ||
+      [...a.to].sort().join(',').localeCompare([...b.to].sort().join(',')),
+  );
 }
 
 /** Append one fragment's occurrences into the merged map, deduping by
@@ -120,25 +186,29 @@ function hashKeys(fragments: readonly Catalog[]): string {
 
 /**
  * Resolve each cross-boundary call against the merged global catalog and
- * stitch the recovered edge onto its owner. Edges are `'syntactic'`,
- * `crossShard: true`, with confidence capped at `'medium'` (when the
- * import specifier pinned the target file) or `'low'` (name-only).
- * Unresolvable boundary calls stay unresolved but are counted (attributable).
+ * stitch the recovered edge onto its owner. A recovered edge is `'semantic'`,
+ * `crossShard: true`, `confidence: 'high'` — the import specifier + callee name
+ * linked to a UNIQUE target occurrence (relative imports pin by path; bare /
+ * workspace imports pin by the imported package's export symbol table). On any
+ * ambiguity the resolver DECLINES (`to: []`) — a missing edge is safe, a phantom
+ * cross-package edge is not. Declined / external boundary calls stay unresolved
+ * but are counted (attributable).
  */
 export function resolveCrossBoundaryCalls(
   merged: Catalog,
   boundaryCalls: readonly CrossBoundaryCall[],
+  manifestIndex: PackageManifestIndex,
 ): CrossShardOutput {
+  const exportIndex = buildExportIndex(merged);
   const nameIndex = buildNameIndex(merged);
   const fileByHash = buildFileByHash(merged);
   const knownFiles = new Set<string>(Object.values(merged.functions).flat().map((o) => o.filePath));
-  const importedByFile = buildImportedPackagesByFile(merged, fileByHash);
 
   const edgesByOwner = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
 
   for (const bc of boundaryCalls) {
-    const edge = resolveOne(bc, nameIndex, fileByHash, knownFiles, importedByFile);
+    const edge = resolveOne(bc, { exportIndex, manifestIndex, nameIndex, fileByHash, knownFiles });
     stats.totalCallSites++;
     appendEdge(edgesByOwner, bc.ownerHash, edge);
     stats.apply(edge);
@@ -148,115 +218,90 @@ export function resolveCrossBoundaryCalls(
   return { catalog: { ...merged, functions }, boundaryStats: stats };
 }
 
-function resolveOne(
-  bc: CrossBoundaryCall,
-  nameIndex: ReadonlyMap<string, readonly FunctionOccurrence[]>,
-  fileByHash: ReadonlyMap<string, string>,
-  knownFiles: ReadonlySet<string>,
-  importedByFile: ReadonlyMap<string, ReadonlySet<string>>,
-): CallEdge {
+/** Indexes the boundary resolver links each call against. */
+interface ResolveContext {
+  /** Per-package export symbol table (the bare/workspace-specifier linker). */
+  readonly exportIndex: ExportIndex;
+  /** Package `name` → manifest, turning a specifier into a package group. */
+  readonly manifestIndex: PackageManifestIndex;
+  /** name → all occurrences with that name (the relative-import pin candidates). */
+  readonly nameIndex: ReadonlyMap<string, readonly FunctionOccurrence[]>;
+  readonly fileByHash: ReadonlyMap<string, string>;
+  readonly knownFiles: ReadonlySet<string>;
+}
+
+/**
+ * Resolve one cross-boundary call to a recovered edge — semantically, by
+ * linking the import specifier + callee name to a UNIQUE target occurrence, or
+ * DECLINING (`to: []`) when the link is absent or ambiguous. Three branches:
+ *
+ *  (a) RELATIVE specifier (`./x`) → pin by path against the owner's directory
+ *      (an intra-package import; already exact). Emit when ≥1 occurrence in the
+ *      resolved file matches the callee name.
+ *  (b) BARE / workspace specifier that resolves to a known workspace package P →
+ *      look the callee name up in P's export bucket: exactly 1 export → emit;
+ *      >1 → narrow by a single subpath-pinned file if possible, else decline;
+ *      0 → decline (not exported / re-export chain we don't follow).
+ *  (c) Specifier maps to no known workspace package (external npm) → unresolved.
+ *
+ * A recovered edge is `'semantic'`, `crossShard: true`, `confidence: 'high'`.
+ */
+function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
   const base = {
     line: bc.line,
     column: bc.column,
-    resolution: 'syntactic' as const,
+    resolution: 'semantic' as const,
     text: truncateForCallEdge(bc.text),
     discarded: bc.discarded ?? false,
     crossShard: true as const,
+    confidence: 'high' as const,
   };
-  const candidates = nameIndex.get(bc.calleeName) ?? [];
-  if (candidates.length === 0) {
-    // Genuinely external (e.g. an npm package) — unresolved, but counted.
-    return { ...base, to: [], confidence: 'low' };
+  const spec = bc.importSpecifier;
+
+  // (a) Relative import → path-pin (intra-package, already exact).
+  if (spec?.startsWith('.')) {
+    const candidates = ctx.nameIndex.get(bc.calleeName) ?? [];
+    const pinned = pinBySpecifier(bc, candidates, ctx.fileByHash, ctx.knownFiles);
+    return pinned.length > 0
+      ? { ...base, to: pinned.map((o) => o.bodyHash) }
+      : { ...base, to: [] };
   }
-  // Constrain to occurrences the caller can actually reach: its own package
-  // or a package its module imports. This is what stops a globally-unique
-  // name from resolving into a package the caller never imported (the source
-  // of impossible coupling edges). Falls back to all candidates only when the
-  // caller's file is unknown (cannot constrain).
-  const reachable = reachableCandidates(bc, candidates, fileByHash, importedByFile);
-  const pinned = pinBySpecifier(bc, reachable, fileByHash, knownFiles);
-  if (pinned.length > 0) {
-    return { ...base, to: pinned.map((o) => o.bodyHash), confidence: 'medium' };
+
+  // (b)/(c) Bare or workspace specifier → resolve to a package and link by export.
+  if (spec === undefined || spec.length === 0) return { ...base, to: [] };
+  const resolved = resolveSpecifierToPackage(spec, ctx.manifestIndex);
+  if (resolved === undefined) {
+    // No known workspace package (external npm, or unmappable subpath) — decline.
+    return { ...base, to: [] };
   }
-  const chosen = chooseReachable(bc, reachable, fileByHash);
-  if (chosen) {
-    return { ...base, to: [chosen.bodyHash], confidence: 'low' };
-  }
-  // No reachable target, or ambiguous after constraint — decline rather than
-  // emit a wrong (cross-package) target.
-  return { ...base, to: [], confidence: 'low' };
+  const exported = ctx.exportIndex.get(resolved.packageGroup)?.get(bc.calleeName) ?? [];
+  const linked = linkExported(exported, resolved.subpath);
+  return linked === undefined ? { ...base, to: [] } : { ...base, to: [linked.bodyHash] };
 }
 
-/** Candidates in the caller's own package or a package its module imports. */
-function reachableCandidates(
-  bc: CrossBoundaryCall,
-  candidates: readonly FunctionOccurrence[],
-  fileByHash: ReadonlyMap<string, string>,
-  importedByFile: ReadonlyMap<string, ReadonlySet<string>>,
-): readonly FunctionOccurrence[] {
-  const ownerFile = fileByHash.get(bc.ownerHash);
-  if (ownerFile === undefined) return candidates; // cannot constrain
-  const callerPkg = packageOf(ownerFile);
-  const imported = importedByFile.get(ownerFile) ?? EMPTY_PKG_SET;
-  return candidates.filter((c) => {
-    const p = packageOf(c.filePath);
-    return p === callerPkg || imported.has(p);
-  });
-}
-
-/** Pick a single reachable target: unique → it; else same-package unique → it; else decline. */
-function chooseReachable(
-  bc: CrossBoundaryCall,
-  reachable: readonly FunctionOccurrence[],
-  fileByHash: ReadonlyMap<string, string>,
+/**
+ * Choose the single exported occurrence the specifier + name link to, or
+ * `undefined` to decline. Exactly one export → it. More than one (same simple
+ * name exported from multiple files in the package) → narrow to the lone export
+ * whose project-relative file path ends with the addressed subpath; if that
+ * does not collapse the set to exactly one, DECLINE rather than guess. Zero
+ * exports → decline (name not exported by this package — e.g. a re-export chain
+ * the V1 linker does not follow).
+ */
+function linkExported(
+  exported: readonly FunctionOccurrence[],
+  subpath: string | undefined,
 ): FunctionOccurrence | undefined {
-  if (reachable.length === 0) return undefined;
-  if (reachable.length === 1) return reachable[0];
-  const ownerFile = fileByHash.get(bc.ownerHash);
-  const callerPkg = ownerFile === undefined ? '<unknown>' : packageOf(ownerFile);
-  const samePkg = reachable.filter((c) => packageOf(c.filePath) === callerPkg);
-  return samePkg.length === 1 ? samePkg[0] : undefined;
-}
-
-const EMPTY_PKG_SET: ReadonlySet<string> = new Set<string>();
-
-/** filePath → imported package groups, from module-init `dependencies[]`. */
-function buildImportedPackagesByFile(
-  merged: Catalog,
-  fileByHash: ReadonlyMap<string, string>,
-): Map<string, Set<string>> {
-  const out = new Map<string, Set<string>>();
-  for (const occs of Object.values(merged.functions)) {
-    for (const occ of occs) {
-      const pkgs = importedPackagesOf(occ, fileByHash);
-      if (pkgs.size > 0) mergeSet(out, occ.filePath, pkgs);
-    }
-  }
-  return out;
-}
-
-function mergeSet(map: Map<string, Set<string>>, key: string, values: ReadonlySet<string>): void {
-  const existing = map.get(key);
-  if (existing) {
-    for (const v of values) existing.add(v);
-    return;
-  }
-  map.set(key, new Set(values));
-}
-
-/** Package groups one module-init occurrence imports (via resolved dependencies[].to). */
-function importedPackagesOf(
-  occ: FunctionOccurrence,
-  fileByHash: ReadonlyMap<string, string>,
-): Set<string> {
-  const set = new Set<string>();
-  for (const dep of occ.dependencies ?? []) {
-    for (const targetHash of dep.to) {
-      const targetFile = fileByHash.get(targetHash);
-      if (targetFile !== undefined) set.add(packageOf(targetFile));
-    }
-  }
-  return set;
+  if (exported.length === 1) return exported[0];
+  if (exported.length === 0 || subpath === undefined) return undefined;
+  // Subpath is `./rest` addressing a file within the imported package; keep only
+  // exports whose file path matches that subpath stem (extension-insensitive).
+  const stem = stripExt(subpath.replace(/^\.\//, ''));
+  const narrowed = exported.filter((o) => {
+    const fp = stripExt(o.filePath);
+    return fp === stem || fp.endsWith(`/${stem}`) || fp.endsWith(`/${stem}/index`);
+  });
+  return narrowed.length === 1 ? narrowed[0] : undefined;
 }
 
 /**
@@ -335,7 +380,10 @@ function stitchCrossShardEdges(
       const kept = o.calls.filter(
         (e) => !(e.to.length === 0 && recoveredAt.has(`${String(e.line)}:${String(e.column)}`)),
       );
-      return { ...o, calls: [...kept, ...extra] };
+      // Re-canonicalize the merged edge list — `extra` is in boundary-call
+      // (flat-map) order, which depends on shard completion order; sorting here
+      // keeps the stitched occurrence byte-identical across runs.
+      return { ...o, calls: sortCalls([...kept, ...extra]) };
     });
   }
   return out;
@@ -344,20 +392,37 @@ function stitchCrossShardEdges(
 // ── Task 2.3: correctness diff helper (test/validation) ───────────
 
 export interface CatalogEdgeDiff {
-  /** Intra-shard edges that differ between the two catalogs. MUST be empty
-   *  for a correct sharded build vs whole-project build. */
+  /** Intra-shard edges whose target differs between the two catalogs. MUST be
+   *  empty for a correct sharded build vs single-program build. */
   readonly intraMismatches: readonly string[];
-  /** Cross-shard edges present in one catalog but not the other (the
-   *  expected fidelity difference: recovered-but-syntactic). */
+  /**
+   * Cross-package (boundary-linked) edges whose target differs between the two
+   * catalogs. MUST ALSO be empty.
+   *
+   * With semantic linking (Phase 2), the sharded build's cross-package edges
+   * are no longer an approximation of the single-program build's — they are the
+   * SAME edges, recovered by linking each import specifier + callee name to the
+   * UNIQUE exported occurrence the type checker would pick. A non-empty
+   * `crossDifferences` is therefore a correctness REGRESSION (e.g. a name-only
+   * fallback fabricating a phantom edge into a package the caller never
+   * imported, or the linker declining an edge the single program resolves), NOT
+   * an accepted fidelity gap. The Phase 4 equivalence guardrail asserts this
+   * partition empty.
+   */
   readonly crossDifferences: readonly string[];
 }
 
 /**
- * Diff two catalogs by edge, partitioned into intra-shard mismatches
- * (expected empty) vs cross-shard differences (expected). An edge is keyed
- * by `ownerHash@line:col → sorted(to)`. Used by Phase 5 tests / Phase 6
- * validation to assert the sharded build matches the whole-project build
- * on intra-package edges.
+ * Diff two catalogs by edge, partitioned into intra-shard mismatches and
+ * cross-package (boundary-linked) differences. An edge is keyed by
+ * `ownerHash@line:col → sorted(to)`; a key is a difference when the two
+ * catalogs disagree on its target set. Both partitions MUST be empty for a
+ * correct sharded build vs single-program build: intra-package edges are exact
+ * in both, and semantic boundary linking reproduces the single-program build's
+ * cross-package edges verbatim (Phase 2). The partition only records WHICH side
+ * a difference falls on (cross when either edge is `crossShard`), so a
+ * regression is attributable to the linker vs a local resolver. The Phase 4
+ * equivalence guardrail (`__tests__/equivalence.test.ts`) is the live gate.
  */
 export function diffCatalogsByEdge(a: Catalog, b: Catalog): CatalogEdgeDiff {
   const ea = indexEdges(a);

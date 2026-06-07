@@ -132,6 +132,24 @@ describe('runShardedGraph', () => {
     expect(out.resolutionStats.totalCallSites).toBe(0);
   });
 
+  it('throws (fails loud) when two shards share an id', async () => {
+    // Duplicate ids collide on the fragment-cache primary key and silently
+    // corrupt the warm-build cache → non-determinism. The orchestrator must
+    // refuse to build rather than return a quietly-wrong graph.
+    await expect(
+      runShardedGraph({
+        shards: [shard('engine'), shard('engine')],
+        projectRoot: dir,
+        cliScript,
+        adapter,
+        resolutionMode: 'exact',
+        useCache: false,
+        catalogRepo: null,
+        rules: [],
+      }),
+    ).rejects.toThrow(/Duplicate shard id\(s\) \[engine\]/);
+  });
+
   it('records a failed shard id while still building the rest of the catalog', async () => {
     const out = await runShardedGraph({
       shards: [shard('pkg:a'), shard('fail:b')],

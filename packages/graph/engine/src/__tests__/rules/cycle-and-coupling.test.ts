@@ -38,46 +38,50 @@ function sccFixture(members: readonly string[], crossesPackages: boolean): SccFe
 }
 
 describe('graph:cycle bands', () => {
-  // One occurrence per member hash so the rule can anchor a location.
+  // One occurrence per member, each at a distinct source location so its occId
+  // (`${filePath}:${line}:${column}`) is unique. SCC members are occIds.
   const catalog = makeCatalog([
-    occ({ bodyHash: 'm1', simpleName: 'a', qualifiedName: 'a' }),
-    occ({ bodyHash: 'm2', simpleName: 'b', qualifiedName: 'b' }),
-    occ({ bodyHash: 'm3', simpleName: 'c', qualifiedName: 'c' }),
+    occ({ bodyHash: 'm1', simpleName: 'a', qualifiedName: 'a', filePath: 'src/a.ts', line: 1 }),
+    occ({ bodyHash: 'm2', simpleName: 'b', qualifiedName: 'b', filePath: 'src/b.ts', line: 1 }),
+    occ({ bodyHash: 'm3', simpleName: 'c', qualifiedName: 'c', filePath: 'src/c.ts', line: 1 }),
   ]);
   const indexes = buildIndexes(catalog);
+  const m1 = 'src/a.ts:1:0';
+  const m2 = 'src/b.ts:1:0';
+  const m3 = 'src/c.ts:1:0';
 
   function run(scc: SccFeatures, config: GraphConfig = EMPTY) {
     return cycleRule.evaluate(catalog, indexes, config, undefined, featureTable({ scc: [scc] }));
   }
 
   it('emits nothing for sccSize === 1', () => {
-    expect(run(sccFixture(['m1'], false))).toEqual([]);
+    expect(run(sccFixture([m1], false))).toEqual([]);
   });
 
   it('emits nothing for sccSize === 2 with default (off) posture', () => {
-    expect(run(sccFixture(['m1', 'm2'], false))).toEqual([]);
+    expect(run(sccFixture([m1, m2], false))).toEqual([]);
   });
 
   it('emits low for sccSize === 2 when cycleSize2Severity is low', () => {
-    const signals = run(sccFixture(['m1', 'm2'], false), { cycleSize2Severity: 'low' });
+    const signals = run(sccFixture([m1, m2], false), { cycleSize2Severity: 'low' });
     expect(signals).toHaveLength(1);
     expect(signals[0]?.severity).toBe('low');
   });
 
   it('emits medium for sccSize >= 3 (intra-package)', () => {
-    const signals = run(sccFixture(['m1', 'm2', 'm3'], false));
+    const signals = run(sccFixture([m1, m2, m3], false));
     expect(signals).toHaveLength(1);
     expect(signals[0]?.severity).toBe('medium');
     expect(signals[0]?.metadata.sccSize).toBe(3);
   });
 
   it('emits high when crossesPackages (regardless of size)', () => {
-    expect(run(sccFixture(['m1', 'm2'], true))[0]?.severity).toBe('high');
-    expect(run(sccFixture(['m1', 'm2', 'm3'], true))[0]?.severity).toBe('high');
+    expect(run(sccFixture([m1, m2], true))[0]?.severity).toBe('high');
+    expect(run(sccFixture([m1, m2, m3], true))[0]?.severity).toBe('high');
   });
 
   it('emits one signal PER SCC, anchored on the lowest-qualifiedName member', () => {
-    const signals = run(sccFixture(['m3', 'm1', 'm2'], false));
+    const signals = run(sccFixture([m3, m1, m2], false));
     expect(signals).toHaveLength(1);
     expect(signals[0]?.metadata.qualifiedName).toBe('a'); // m1 → 'a' is lowest
   });
@@ -97,15 +101,20 @@ describe('graph:cycle test-file exclusion', () => {
     occ({ bodyHash: 'p1', simpleName: 'p1', qualifiedName: 'p1', filePath: 'src/p.ts', inTestFile: false }),
   ]);
   const indexes = buildIndexes(catalog);
+  // SCC members are occIds (`${filePath}:${line}:${column}`).
+  const t1 = 'src/a.test.ts:1:0';
+  const t2 = 'src/b.test.ts:1:0';
+  const t3 = 'src/c.test.ts:1:0';
+  const p1 = 'src/p.ts:1:0';
   const run = (scc: SccFeatures) =>
     cycleRule.evaluate(catalog, indexes, EMPTY, undefined, featureTable({ scc: [scc] }));
 
   it('emits nothing for a cycle whose members are ALL in test files', () => {
-    expect(run(sccFixture(['t1', 't2', 't3'], false))).toEqual([]);
+    expect(run(sccFixture([t1, t2, t3], false))).toEqual([]);
   });
 
   it('still emits for a cycle that includes a production member', () => {
-    const signals = run(sccFixture(['t1', 't2', 'p1'], false));
+    const signals = run(sccFixture([t1, t2, p1], false));
     expect(signals).toHaveLength(1);
     expect(signals[0]?.metadata.sccSize).toBe(3);
   });
@@ -179,7 +188,8 @@ describe('graph:cycle ↔ graph:unexpected-coupling non-overlap', () => {
     const catalog = makeCatalog([fnA, fnB]);
     const indexes = buildIndexes(catalog);
 
-    const scc = sccFixture(['fa', 'fb'], true);
+    // SCC members are occIds (`${filePath}:${line}:${column}`).
+    const scc = sccFixture(['packages/a/src/x.ts:1:0', 'packages/b/src/y.ts:1:0'], true);
     const edges: PackageEdgeFeature[] = [
       { callerPackage: 'pkg-a', calleePackage: 'pkg-b', count: 1 },
       { callerPackage: 'pkg-b', calleePackage: 'pkg-a', count: 1 },

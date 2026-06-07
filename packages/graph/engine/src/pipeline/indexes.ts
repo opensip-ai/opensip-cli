@@ -8,37 +8,43 @@
 
 import { logger } from '@opensip-tools/core';
 
-import { pkgOf } from '../resolve-callee.js';
+import { occId, pkgOf } from '../resolve-callee.js';
 
 import type { Catalog, FunctionOccurrence, Indexes } from '../types.js';
 
-/** The three content-keyed maps a single linear scan of the catalog produces. */
+/** The content-keyed maps a single linear scan of the catalog produces. */
 export interface HashMaps {
   readonly byBodyHash: Map<string, FunctionOccurrence>;
   readonly occurrencesByHash: Map<string, FunctionOccurrence[]>;
   readonly bySimpleName: Map<string, string[]>;
+  /** `${filePath}:${line}:${column}` → occurrence (package-unique node id). */
+  readonly byOccId: Map<string, FunctionOccurrence>;
 }
 
 /**
  * One linear pass over `catalog.functions` producing the content-keyed maps:
  * `byBodyHash` (last-writer-wins, content-dedup), `occurrencesByHash` (all
- * occurrences per hash — collision-preserving), and `bySimpleName`. Shared by
+ * occurrences per hash — collision-preserving), `bySimpleName`, and `byOccId`
+ * (per-occurrence location id — the SCC/cycle node identity). Shared by
  * `buildIndexes` and the cross-package edge-constraint pass so both derive
  * package identity from the same scan.
  */
 export function buildHashMaps(catalog: Catalog): HashMaps {
-  const byBodyHash = new Map<string, FunctionOccurrence>();
-  const occurrencesByHash = new Map<string, FunctionOccurrence[]>();
-  const bySimpleName = new Map<string, string[]>();
+  const maps: HashMaps = {
+    byBodyHash: new Map<string, FunctionOccurrence>(),
+    occurrencesByHash: new Map<string, FunctionOccurrence[]>(),
+    bySimpleName: new Map<string, string[]>(),
+    byOccId: new Map<string, FunctionOccurrence>(),
+  };
   for (const name of Object.keys(catalog.functions)) {
-    indexNameBucket(catalog, name, byBodyHash, occurrencesByHash, bySimpleName);
+    indexNameBucket(catalog, name, maps);
   }
-  return { byBodyHash, occurrencesByHash, bySimpleName };
+  return maps;
 }
 
-/** Builds query-side indexes (by-body-hash, by-simple-name, adjacency) over the catalog. */
+/** Builds query-side indexes (by-body-hash, by-occ-id, by-simple-name, adjacency) over the catalog. */
 export function buildIndexes(catalog: Catalog): Indexes {
-  const { byBodyHash, occurrencesByHash, bySimpleName } = buildHashMaps(catalog);
+  const { byBodyHash, occurrencesByHash, bySimpleName, byOccId } = buildHashMaps(catalog);
   const { callees, callers } = buildAdjacency(occurrencesByHash, byBodyHash);
   const importedPackagesByFile = buildImportedPackagesByFile(occurrencesByHash, byBodyHash);
 
@@ -49,7 +55,15 @@ export function buildIndexes(catalog: Catalog): Indexes {
     edges: [...callees.values()].reduce((n, arr) => n + arr.length, 0),
   });
 
-  return { byBodyHash, occurrencesByHash, importedPackagesByFile, bySimpleName, callees, callers };
+  return {
+    byBodyHash,
+    byOccId,
+    occurrencesByHash,
+    importedPackagesByFile,
+    bySimpleName,
+    callees,
+    callers,
+  };
 }
 
 /**
@@ -96,20 +110,15 @@ function unionInto(map: Map<string, Set<string>>, key: string, values: ReadonlyS
   for (const v of values) set.add(v);
 }
 
-function indexNameBucket(
-  catalog: Catalog,
-  name: string,
-  byBodyHash: Map<string, FunctionOccurrence>,
-  occurrencesByHash: Map<string, FunctionOccurrence[]>,
-  bySimpleName: Map<string, string[]>,
-): void {
+function indexNameBucket(catalog: Catalog, name: string, maps: HashMaps): void {
   const occs: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
   /* v8 ignore next */
   if (!occs) return;
   for (const o of occs) {
-    byBodyHash.set(o.bodyHash, o);
-    pushTo(occurrencesByHash, o.bodyHash, o);
-    pushTo(bySimpleName, name, o.bodyHash);
+    maps.byBodyHash.set(o.bodyHash, o);
+    pushTo(maps.occurrencesByHash, o.bodyHash, o);
+    pushTo(maps.bySimpleName, name, o.bodyHash);
+    maps.byOccId.set(occId(o), o);
   }
 }
 
