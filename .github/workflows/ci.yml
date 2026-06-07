@@ -42,33 +42,6 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # TEMPORARY DIAGNOSTIC (remove after diagnosing the Linux-only fit:ci
-      # finding explosion that does not reproduce on macOS). Non-gating: prints
-      # which checks fire and on which files, so we can tell whether fit is
-      # scanning an unintended file set (node_modules/dist/coverage) on Linux.
-      - name: "[diagnostic] fit findings by check (non-gating)"
-        if: always()
-        run: |
-          node packages/cli/dist/index.js fit --json > /tmp/fit-diag.json 2>/tmp/fit-diag.err || true
-          echo "----- stderr (first 20 lines) -----"; head -20 /tmp/fit-diag.err || true
-          echo "----- findings grouped by check -----"
-          node -e '
-            let e; try { e = require("/tmp/fit-diag.json"); } catch (err) { console.log("JSON parse failed:", String(err)); process.exit(0); }
-            const signals = e.signals || [];
-            console.log("total signals:", signals.length, "| units:", (e.units||[]).length);
-            const bySrc = {};
-            for (const s of signals) bySrc[s.source] = (bySrc[s.source] || 0) + 1;
-            const rows = Object.entries(bySrc).sort((a,b) => b[1]-a[1]);
-            for (const [src,n] of rows.slice(0,40)) console.log("  " + String(n).padStart(5) + "  " + src);
-            const top = rows[0] && rows[0][0];
-            if (top) {
-              console.log("sample files for top check (" + top + "):");
-              for (const s of signals.filter(x => x.source === top).slice(0,12)) {
-                console.log("   " + s.filePath + ":" + (s.line ?? "") + "  " + String(s.message||"").slice(0,80));
-              }
-            }
-          ' || true
-
       - name: Typecheck
         run: pnpm typecheck
 
