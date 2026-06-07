@@ -2,6 +2,7 @@ import {
   ConfigurationError,
   NetworkError,
   NotFoundError,
+  PluginIncompatibleError,
   SystemError,
   TimeoutError,
   ToolError,
@@ -216,6 +217,14 @@ describe('mapToolErrorToExitCode (Tool error contract — audit-round-2 Finding 
     expect(mapToolErrorToExitCode(new NetworkError('connection refused'))).toBe(
       EXIT_CODES.REPORT_FAILED,
     );
+  });
+
+  it('PluginIncompatibleError → PLUGIN_INCOMPATIBLE (release 2.8.0 fail-closed)', () => {
+    expect(
+      mapToolErrorToExitCode(
+        new PluginIncompatibleError('tool x is incompatible', { diagnostic: 'epoch mismatch' }),
+      ),
+    ).toBe(EXIT_CODES.PLUGIN_INCOMPATIBLE);
   });
 
   it('TimeoutError → RUNTIME_ERROR', () => {

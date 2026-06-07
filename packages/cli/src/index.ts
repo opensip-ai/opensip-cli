@@ -26,7 +26,7 @@ import {
   mountAllToolCommands,
   renderResult,
 } from './bootstrap/index.js';
-import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore, setCliRegistriesForRun } from './cli-context.js';
+import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore, setCliRegistriesForRun, setToolProvenanceForRun } from './cli-context.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';
@@ -59,13 +59,16 @@ async function main(): Promise<void> {
   // v2 persistence: datastore is opened LAZILY in cli-context.ts on
   // first access via getOrOpenDatastore. bootstrapCli just registers
   // tools and adapters; no SQLite file is created here.
-  await bootstrapCli({
+  const { provenance } = await bootstrapCli({
     langRegistry,
     toolRegistry,
     projectDir: dirname(dirname(fileURLToPath(import.meta.url))),
     cwd: process.cwd(),
     cliEntryUrl: import.meta.url,
   });
+  // Make the compatibility-gate provenance reachable by `plugin list`
+  // (Phase 4) via the cli-context per-run holder.
+  setToolProvenanceForRun(provenance);
 
   const { ctx } = buildToolCliContext({
     program, render: renderResult, liveViews: createLiveViewRegistry(logger),

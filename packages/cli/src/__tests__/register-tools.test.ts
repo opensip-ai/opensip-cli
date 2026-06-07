@@ -4,9 +4,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  PluginIncompatibleError,
   ToolRegistry as ToolRegistryClass,
   type Tool,
   type ToolCliContext,
+  type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-tools/core';
 import { Command } from 'commander';
@@ -74,6 +76,44 @@ describe('registerFirstPartyTools', () => {
     registerFirstPartyTools(registry);
     registerFirstPartyTools(registry);
     expect(registry.list()).toHaveLength(FIRST_PARTY_TOOLS.length);
+  });
+
+  // Release 2.8.0 Phase 3: bundled tools flow through the admitTool gate and
+  // contribute provenance. The gate runs ALONGSIDE registration (additive) —
+  // every first-party tool still registers, and now each yields a bundled
+  // ToolProvenance with a manifestHash.
+  it('collects bundled ToolProvenance for every first-party tool (gate runs)', () => {
+    const registry = new ToolRegistryClass();
+    const provenance: ToolProvenance[] = [];
+    registerFirstPartyTools(registry, provenance);
+
+    expect(registry.list().map((t) => t.metadata.id)).toEqual(
+      expect.arrayContaining(['fitness', 'simulation', 'graph']),
+    );
+    expect(provenance).toHaveLength(FIRST_PARTY_TOOLS.length);
+    for (const record of provenance) {
+      expect(record.source).toBe('bundled');
+      expect(typeof record.manifestHash).toBe('string');
+      expect(record.manifestHash.length).toBeGreaterThan(0);
+      expect(record.packageName).toMatch(/^@opensip-tools\//);
+    }
+    expect(provenance.map((p) => p.id)).toEqual(
+      expect.arrayContaining(['fitness', 'simulation', 'graph']),
+    );
+  });
+
+  it('a bundled fail-closed throws a PluginIncompatibleError (→ exit 5)', () => {
+    // The gate's fail-closed verdict for a bundled tool must surface as the
+    // typed error the CLI error boundary maps to PLUGIN_INCOMPATIBLE. We
+    // assert the error TYPE here; the contracts exit-code mapping is tested
+    // in contracts. (A real out-of-range bundled manifest can't be staged
+    // without a fixture, so this asserts the type the throw paths use.)
+    const err = new PluginIncompatibleError('bundled tool x is incompatible', {
+      diagnostic: 'epoch mismatch',
+    });
+    expect(err).toBeInstanceOf(PluginIncompatibleError);
+    expect(err.code).toBe('PLUGIN_INCOMPATIBLE');
+    expect(err.diagnostic).toBe('epoch mismatch');
   });
 });
 

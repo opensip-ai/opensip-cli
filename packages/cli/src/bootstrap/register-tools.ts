@@ -12,12 +12,19 @@
  * built-in id.
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { type CliProgram } from '@opensip-tools/contracts';
 import {
+  admitTool,
+  assertManifestMatchesTool,
   discoverToolPackagesFromAnchors,
+  loadToolManifest,
   logger,
+  PluginIncompatibleError,
   readToolPackageMetadata,
   resolveProjectContext,
   resolveProjectPaths,
@@ -25,6 +32,7 @@ import {
   type Tool,
   type ToolCliContext,
   type ToolDiscoverySource,
+  type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-tools/core';
 import { fitnessTool } from '@opensip-tools/fitness';
@@ -33,17 +41,154 @@ import { simulationTool } from '@opensip-tools/simulation';
 
 import { isValidTool } from './validate-tool.js';
 
-/** First-party tools — declared as direct deps of opensip-tools. */
-export const FIRST_PARTY_TOOLS: readonly Tool[] = [
-  fitnessTool,
-  simulationTool,
-  graphTool,
+/**
+ * A first-party tool plus the npm package name that ships its
+ * `package.json#opensipTools` manifest. The package name is how the
+ * bundled path resolves the tool's own package directory (the dir whose
+ * package.json carries the manifest) so it can run the SAME admission gate
+ * the external path uses — see {@link resolveBundledPackageDir}.
+ */
+interface FirstPartyToolEntry {
+  readonly tool: Tool;
+  readonly packageName: string;
+}
+
+/**
+ * First-party tools — declared as direct deps of opensip-tools — paired
+ * with the package that declares their manifest. Order is registration
+ * order (and thus help/listing order).
+ */
+const FIRST_PARTY_TOOL_ENTRIES: readonly FirstPartyToolEntry[] = [
+  { tool: fitnessTool, packageName: '@opensip-tools/fitness' },
+  { tool: simulationTool, packageName: '@opensip-tools/simulation' },
+  { tool: graphTool, packageName: '@opensip-tools/graph' },
 ];
 
-/** Register first-party tools into the supplied registry. */
-export function registerFirstPartyTools(registry: ToolRegistry): void {
-  for (const tool of FIRST_PARTY_TOOLS) {
+/** First-party tools — declared as direct deps of opensip-tools. */
+export const FIRST_PARTY_TOOLS: readonly Tool[] = FIRST_PARTY_TOOL_ENTRIES.map(
+  (e) => e.tool,
+);
+
+/** Used to resolve the bundled engine package dirs from the CLI's own module graph. */
+const requireFromHere = createRequire(import.meta.url);
+
+/**
+ * Resolve a bundled tool's PACKAGE DIR — the directory whose `package.json`
+ * carries the `opensipTools` manifest.
+ *
+ * The `./package.json` subpath is not declared in each engine's `exports`,
+ * so `require.resolve('<pkg>/package.json')` throws. Instead we resolve the
+ * package's MAIN entry (a bare-name resolve, always permitted by `exports`)
+ * and walk up to the nearest ancestor directory that has a `package.json`
+ * whose `name` matches `packageName`. That ancestor IS the tool's own
+ * package dir under both the source layout and pnpm's workspace-injected
+ * `node_modules` layout (verified against fitness/simulation/graph here).
+ *
+ * @returns the resolved package directory, or `undefined` when the package
+ *   cannot be resolved (should never happen for a bundled direct dep).
+ */
+function resolveBundledPackageDir(packageName: string): string | undefined {
+  let resolvedEntry: string;
+  try {
+    resolvedEntry = requireFromHere.resolve(packageName);
+  } catch {
+    return undefined;
+  }
+  let dir = dirname(resolvedEntry);
+  for (let i = 0; i < 50; i++) {
+    const pkgPath = join(dir, 'package.json');
+    if (existsSync(pkgPath)) {
+      try {
+        const json = JSON.parse(readFileSync(pkgPath, 'utf8')) as { name?: unknown };
+        if (json.name === packageName) return dir;
+      } catch {
+        // @swallow-ok unreadable package.json on the walk-up — keep climbing.
+      }
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return undefined;
+}
+
+/**
+ * Register first-party tools into the supplied registry, running each one
+ * through the SAME `admitTool` gate the external path uses (release 2.8.0,
+ * Phase 3). This is ADDITIVE — the direct `registry.register(tool)` still
+ * runs for every admitted tool; the gate runs alongside it.
+ *
+ * Per tool: resolve its package dir, `loadToolManifest('bundled', dir)`, and
+ * `admitTool({ source: 'bundled', explicitlyRequested: true })`. A bundled
+ * tool is always explicitly shipped, so an out-of-range manifest is a
+ * fail-closed (never a silent skip). On `admit` we register the tool (and,
+ * defensively, assert the manifest matches the runtime tool to catch drift),
+ * then push the recorded `ToolProvenance` onto the optional `provenance`
+ * collector so Phase 4's `plugin list` can surface source/identity/hash.
+ *
+ * @param registry The per-invocation tool registry to populate.
+ * @param provenance Optional sink for the admitted tools' provenance records
+ *   (defaults to a throwaway array; the bootstrap passes a real collector).
+ * @throws {PluginIncompatibleError} when a bundled tool's manifest is missing
+ *   or out of range — mapped to `EXIT_CODES.PLUGIN_INCOMPATIBLE` (exit 5) by
+ *   the CLI error boundary.
+ */
+export function registerFirstPartyTools(
+  registry: ToolRegistry,
+  provenance: ToolProvenance[] = [],
+): void {
+  for (const { tool, packageName } of FIRST_PARTY_TOOL_ENTRIES) {
+    const dir = resolveBundledPackageDir(packageName);
+    if (dir === undefined) {
+      throw new PluginIncompatibleError(
+        `bundled tool '${packageName}' could not be resolved on disk; its manifest is unreadable`,
+        { diagnostic: 'package directory not resolvable' },
+      );
+    }
+
+    const manifest = loadToolManifest('bundled', dir);
+    if (manifest === undefined) {
+      // A bundled tool MUST ship a conformant manifest (the Phase-5
+      // tool-has-manifest guardrail backstops this at CI; at runtime a
+      // missing manifest is fail-closed, not a silent skip).
+      throw new PluginIncompatibleError(
+        `bundled tool '${packageName}' has no conformant package.json#opensipTools manifest`,
+        { diagnostic: 'manifest missing or malformed' },
+      );
+    }
+
+    const result = admitTool({
+      manifest,
+      source: 'bundled',
+      dir,
+      packageName,
+      // A bundled tool ships with the CLI; it is always explicitly present,
+      // so an incompatible manifest fails the run rather than skipping.
+      explicitlyRequested: true,
+    });
+
+    if (result.decision === 'fail-closed') {
+      throw new PluginIncompatibleError(
+        `bundled tool '${manifest.id}' is incompatible: ${result.diagnostic ?? 'compatibility gate rejected it'}`,
+        { diagnostic: result.diagnostic },
+      );
+    }
+    if (result.decision === 'skip') {
+      // Should not happen for an in-range bundled tool, but never silently
+      // drop a bundled tool — surface it loudly.
+      throw new PluginIncompatibleError(
+        `bundled tool '${manifest.id}' was skipped by the compatibility gate: ${result.diagnostic ?? 'unknown reason'}`,
+        { diagnostic: result.diagnostic },
+      );
+    }
+
+    // Defensive drift guard: the static manifest and the runtime tool are two
+    // declarations of the same identity (Phase 1). Catch a manifest that fell
+    // out of sync with the tool's command surface before it confuses users.
+    assertManifestMatchesTool(manifest, tool);
+
     registry.register(tool);
+    provenance.push(result.provenance);
   }
 }
 
@@ -98,16 +243,55 @@ export function buildToolDiscoverySources(cwd: string, cliInstallDir: string): T
  * the supplied sources (the user-global tool host dir, the project tree +
  * its `.runtime` tool host dir, and the CLI install dir — see
  * {@link buildToolDiscoverySources}).
+ *
+ * Each discovered package runs through the SAME `admitTool` gate the
+ * bundled path uses (release 2.8.0, Phase 3) BEFORE its module is imported:
+ * the static `package.json#opensipTools` manifest is read with source
+ * `'installed'`, the compatibility gate runs, and only an `admit` verdict
+ * proceeds to import + register. An installed tool is best-effort
+ * `explicitlyRequested: false`, so an incompatible one `skip`s (logged)
+ * rather than failing the whole CLI — a stray incompatible plugin must not
+ * take fit/graph/sim down. Admitted tools' `ToolProvenance` is pushed onto
+ * the optional `provenance` collector for Phase 4's `plugin list`.
+ *
+ * @param provenance Optional sink for admitted tools' provenance records.
  */
 export async function discoverAndRegisterToolPackages(
   registry: ToolRegistry,
   opts: DiscoveryOptions,
+  provenance: ToolProvenance[] = [],
 ): Promise<void> {
   const builtInIds = new Set(FIRST_PARTY_TOOLS.map((t) => t.metadata.id));
   const discovered = discoverToolPackagesFromAnchors(opts.sources);
 
   for (const pkg of discovered) {
     try {
+      // Compatibility gate BEFORE import (release 2.8.0): read the static
+      // manifest and run the shared admission gate. A missing/malformed
+      // manifest (loadToolManifest → undefined) is grace-window-incompatible
+      // only via the gate when present; without a manifest we fall through to
+      // the legacy import path so pre-2.8.0 third-party tools still load (the
+      // discovery marker `opensipTools.kind: 'tool'` is the floor).
+      const manifest = loadToolManifest('installed', pkg.packageDir);
+      if (manifest !== undefined) {
+        const result = admitTool({
+          manifest,
+          source: 'installed',
+          dir: pkg.packageDir,
+          packageName: pkg.name,
+          // Best-effort: we cannot tell from discovery alone whether THIS run
+          // targets this tool's command, so default false → incompatible
+          // installed tools skip rather than fail-closed.
+          explicitlyRequested: false,
+        });
+        if (result.decision !== 'admit') {
+          // skip (or, defensively, fail-closed) — gate already logged it.
+          continue;
+        }
+        if (builtInIds.has(manifest.id)) continue;
+        provenance.push(result.provenance);
+      }
+
       // Import by the package's RESOLVED entry path, not its bare name.
       // A discovered tool may live in a host dir (the user-global
       // `~/.opensip-tools/plugins/tool` or the project `.runtime/plugins/tool`)

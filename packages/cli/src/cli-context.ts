@@ -47,6 +47,7 @@ import {
   type Logger,
   type ProjectContext,
   type ToolCliContext,
+  type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
@@ -77,6 +78,12 @@ import type { Command } from 'commander';
 let currentLanguageRegistry: LanguageRegistry | undefined;
 let currentToolRegistry: ToolRegistry | undefined;
 let currentRunScope: RunScope | undefined;
+// Provenance for the tools admitted through the 2.8.0 compatibility gate
+// (bundled + installed). Set once per invocation by main() from the
+// bootstrap result; read by `plugin list` (Phase 4). Same per-run-holder
+// pattern as the registries above — needed before the RunScope is built,
+// so it can't hang off the scope.
+let currentToolProvenance: readonly ToolProvenance[] = [];
 
 /**
  * Called by `main()` after constructing the per-invocation registries so
@@ -111,6 +118,25 @@ export function getCurrentRegistriesForScope(): {
     );
   }
   return { languages: currentLanguageRegistry, tools: currentToolRegistry };
+}
+
+/**
+ * Record the provenance for the tools admitted through the 2.8.0
+ * compatibility gate. Called by `main()` once per invocation from the
+ * `bootstrapCli` result, BEFORE Commander dispatch. Read by `plugin list`
+ * (Phase 4) via {@link getToolProvenanceForRun}.
+ */
+export function setToolProvenanceForRun(records: readonly ToolProvenance[]): void {
+  currentToolProvenance = records;
+}
+
+/**
+ * Read the admitted-tool provenance recorded by
+ * {@link setToolProvenanceForRun}. Empty until bootstrap has run (e.g. in
+ * isolated unit tests that never bootstrap).
+ */
+export function getToolProvenanceForRun(): readonly ToolProvenance[] {
+  return currentToolProvenance;
 }
 
 /**

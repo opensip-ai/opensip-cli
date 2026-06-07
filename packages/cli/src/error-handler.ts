@@ -29,6 +29,7 @@ import {
   ConfigurationError,
   NetworkError,
   NotFoundError,
+  PluginIncompatibleError,
   ToolError,
 } from '@opensip-tools/core';
 
@@ -52,6 +53,11 @@ const ACTION_HINTS: readonly {
   {
     is: (e) => e instanceof NetworkError,
     action: 'Check the --report-to URL and your network connection.',
+  },
+  {
+    is: (e) => e instanceof PluginIncompatibleError,
+    action:
+      'Upgrade opensip-tools (or the tool), or allowlist a project-local tool via OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS.',
   },
 ];
 
@@ -105,11 +111,17 @@ export async function handleParseError(
 /**
  * Top-level fatal-error handler for failures BEFORE Commander's parse
  * loop runs (bootstrap registration, dynamic plugin imports, preflight
- * I/O). Sets `process.exitCode = 1` (not `process.exit(N)` — the latter
+ * I/O). Sets `process.exitCode` (not `process.exit(N)` — the latter
  * skips the pending stderr flush, and any structured-logging hook on
  * bootstrap failure has nowhere to attach), writes the error line to
  * stderr, and emits a `cli.bootstrap.failed` log event so observability
  * pipelines see the failure. Audit 2026-05-23 G1.
+ *
+ * Exit code: a typed `ToolError` (e.g. the `PluginIncompatibleError` the
+ * Phase-3 fail-closed admission path throws) routes through the canonical
+ * `mapToolErrorToExitCode` policy so a fail-closed plugin yields exit 5
+ * (`PLUGIN_INCOMPATIBLE`) even when it surfaces from bootstrap rather than
+ * Commander's parse loop. Untyped errors keep the historical exit 1.
  *
  * Synchronous because every step here is sync — stderr write,
  * structured-log call, exit-code set. The top-level caller doesn't
@@ -122,12 +134,15 @@ export function handleFatalBootstrapError(
   log: { error: (entry: Record<string, unknown>) => void },
 ): void {
   const message = error instanceof Error ? error.message : String(error);
+  const exitCode =
+    error instanceof ToolError ? mapToolErrorToExitCode(error) : EXIT_CODES.RUNTIME_ERROR;
   process.stderr.write(`opensip-tools: fatal error: ${message}\n`);
   log.error({
     evt: 'cli.bootstrap.failed',
     module: 'cli:bootstrap',
     error: message,
+    exitCode,
     stack: error instanceof Error ? error.stack : undefined,
   });
-  process.exitCode = EXIT_CODES.RUNTIME_ERROR;
+  process.exitCode = exitCode;
 }
