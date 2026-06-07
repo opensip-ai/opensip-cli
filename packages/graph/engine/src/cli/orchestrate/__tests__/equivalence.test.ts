@@ -534,4 +534,72 @@ describe('exact-sharding equivalence guardrail', () => {
     )?.calls;
     expect(selfCalls?.some((e) => e.to.includes(FOUNDATION_CANON))).toBe(true);
   });
+
+  // ── the gate has teeth (regression-detector guard) ──────────────
+  //
+  // The two assertions above prove the SHIPPING semantic linker agrees with the
+  // single-program oracle (crossDifferences empty) and declines the phantom.
+  // This pair proves the gate would actually FAIL if the linker regressed — that
+  // the empty `crossDifferences` is a real signal, not a vacuous pass. We do NOT
+  // revert production code (CLAUDE.md / Phase 4): instead we synthesize the two
+  // canonical regressions on a COPY of the real sharded catalog and assert
+  // `diffCatalogsByEdge` lands them in `crossDifferences`.
+
+  it('FAILS the gate if the linker degrades to a name-only phantom (b.canonicalize)', async () => {
+    const singleProgram = await buildSingleProgram();
+    const sharded = await buildSharded();
+
+    // Sanity: the honest sharded build matches the oracle (the gate's green case).
+    expect(diffCatalogsByEdge(sharded, singleProgram).crossDifferences).toEqual([]);
+
+    // Simulate the OLD name-only fallback: at main's genuine cross-package edge,
+    // swap the target from foundation.canonicalize → b.canonicalize (the phantom
+    // a name-only resolver fabricates by matching the globally-unique-ish simple
+    // name into a package pkg-a never imported).
+    const degraded = rewriteCrossEdgeTarget(sharded, FOUNDATION_CANON, B_CANON);
+    expect(targetsOf(degraded)).toContain(B_CANON); // the phantom is now present
+
+    const diff = diffCatalogsByEdge(degraded, singleProgram);
+    expect(diff.crossDifferences.length).toBeGreaterThan(0); // gate catches it
+  });
+
+  it('FAILS the gate if the linker DROPS the genuine cross-package edge', async () => {
+    const singleProgram = await buildSingleProgram();
+    const sharded = await buildSharded();
+
+    // The other regression direction: the linker declines an edge the single
+    // program resolves (e.g. it stopped following the bare-specifier export
+    // link). Clear main's cross-package target → an empty `to` at that site.
+    const dropped = rewriteCrossEdgeTarget(sharded, FOUNDATION_CANON, undefined);
+    expect(targetsOf(dropped)).not.toContain(FOUNDATION_CANON);
+
+    const diff = diffCatalogsByEdge(dropped, singleProgram);
+    expect(diff.crossDifferences.length).toBeGreaterThan(0); // gate catches it
+  });
 });
+
+/**
+ * Return a COPY of `catalog` in which every cross-shard edge whose target set
+ * contains `from` has it replaced by `to` (or removed when `to === undefined`).
+ * Used ONLY by the regression-detector guards to synthesize a degraded linker
+ * output without touching production resolution code.
+ */
+function rewriteCrossEdgeTarget(
+  catalog: Catalog,
+  from: string,
+  to: string | undefined,
+): Catalog {
+  const functions: Record<string, FunctionOccurrence[]> = {};
+  for (const [name, occs] of Object.entries(catalog.functions)) {
+    if (!occs) continue;
+    functions[name] = occs.map((o) => ({
+      ...o,
+      calls: o.calls.map((e) =>
+        e.crossShard && e.to.includes(from)
+          ? { ...e, to: to === undefined ? [] : e.to.map((t) => (t === from ? to : t)) }
+          : e,
+      ),
+    }));
+  }
+  return { ...catalog, functions };
+}
