@@ -27,7 +27,9 @@ import {
 
 function makeStubContext(): ToolCliContext {
   return {
-    program: {},
+    // Minimal Commander-like program: mountAllToolCommands applies the shared
+    // help configuration (ADR-0021) by walking commands after registration.
+    program: { configureHelp: vi.fn(), addHelpText: vi.fn(), commands: [] },
     project: {
       cwd: '/test',
       cwdExplicit: false,

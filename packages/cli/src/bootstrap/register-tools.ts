@@ -14,6 +14,7 @@
 
 import { pathToFileURL } from 'node:url';
 
+import { type CliProgram } from '@opensip-tools/contracts';
 import {
   discoverToolPackagesFromAnchors,
   logger,
@@ -175,4 +176,24 @@ export function mountAllToolCommands(registry: ToolRegistry, ctx: ToolCliContext
       });
     }
   }
+  // ADR-0021: one shared help shape across every mounted command — uniform
+  // option/subcommand ordering and a docs footer — applied here (the single
+  // place that has walked every tool's commands) rather than per tool.
+  applySharedHelpConfiguration(ctx.program as CliProgram);
+}
+
+const DOCS_HELP_FOOTER = '\nDocs: https://opensip.ai/docs/opensip-tools';
+
+/**
+ * Apply one help configuration to the root program and every (sub)command:
+ * options + subcommands sort alphabetically so the help reads the same across
+ * `fit`/`graph`/`sim`, and the root help ends with a docs pointer (ADR-0021).
+ */
+function applySharedHelpConfiguration(program: CliProgram): void {
+  const configure = (cmd: CliProgram): void => {
+    cmd.configureHelp({ sortOptions: true, sortSubcommands: true });
+    for (const sub of cmd.commands) configure(sub);
+  };
+  configure(program);
+  program.addHelpText('after', DOCS_HELP_FOOTER);
 }
