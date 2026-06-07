@@ -37,6 +37,16 @@ import { readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
  * can read the block without dragging fitness into the bootstrap path.
  */
 export interface CliDefaults {
+  /**
+   * @deprecated (ADR-0022) Recipe defaults are tool-scoped — set
+   * `fit.recipe` / `graph.recipe` / `sim.recipe` instead. A `cli.recipe`
+   * value is still honoured as a cross-tool FALLBACK (applied tolerantly: a
+   * tool that lacks the named recipe falls back to its own `default` rather
+   * than erroring), but it predates the per-tool keys and is flagged by the
+   * `cli-recipe-deprecated` fitness check. It is no longer merged onto
+   * `opts.recipe` in the generic pre-action hook; each tool reads it via
+   * `resolveToolRecipeName`.
+   */
   readonly recipe?: string;
   readonly exclude?: readonly string[];
   readonly verbose?: boolean;

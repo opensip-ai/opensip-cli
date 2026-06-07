@@ -82,6 +82,12 @@ export type { ErrorSuggestion } from './exit-codes.js';
 export { loadCliDefaults } from './cli-config.js';
 export type { CliDefaults } from './cli-config.js';
 
+// Tool-scoped recipe-default resolution (ADR-0022). The pure resolver every
+// tool uses to pick its recipe name from --recipe / <tool>.recipe / the
+// deprecated cli.recipe fallback.
+export { resolveToolRecipeName, BUILTIN_DEFAULT_RECIPE } from './recipe-default.js';
+export type { ResolvedRecipe, RecipeSource } from './recipe-default.js';
+
 // Cross-tool common-flag registry (ADR-0021). One source of truth for the flags
 // every tool's run command shares; tools apply them via applyCommonFlags rather
 // than re-declaring `--json`/`--cwd`/`--report-to`/… per tool.
