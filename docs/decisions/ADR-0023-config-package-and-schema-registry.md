@@ -87,3 +87,60 @@ the 2.10.1 consolidation plan. Part of the tool-plugin-parity roadmap
 flag-currency guardrail template), ADR-0012 (pre-GA versioning that licenses the
 strict-validation break), ADR-0011 (output currency — the inner/outer split this
 mirrors for config).
+
+---
+
+## Amendment — 2026-06-07 (2.10.1 planning): config-resolution stays in core
+
+The decision and consequences above are unchanged. This amendment records three
+boundary refinements surfaced while planning the 2.10.1 migration
+(`docs/plans/ready/release-2.10.1-config-consolidation/`). They are clarifications
+of *where the layer falls*, not a reversal — the package still owns the
+cross-cutting config machinery and the document blocks.
+
+The governing distinction the migration revealed: a config document has **two
+separable concerns** — *locating + version-gating* it (preconditions that run
+before validation; kernel-level, no Zod) versus *validating + shaping* its
+content (the `@opensip-tools/config` layer). The boundary is therefore **locate +
+version-gate = `core`; validate + shape = `config`.**
+
+1. **`config-resolution.ts` STAYS in `core` — diverges from the Consequences
+   "2.10.1" bullet.** That bullet lists `config-resolution.ts` among the surfaces
+   migrating into the package. Planning found `resolveProjectConfigPath` /
+   `PROJECT_CONFIG_FILENAME` are consumed *inside* the kernel
+   (`core/src/plugins/discover.ts`, `core/src/lib/project-context.ts`), so moving
+   them to `config` would invert the `core → config` layer the ADR itself
+   mandates. They are filesystem **path primitives** (locate the file by ancestor
+   walk; no document knowledge) — the same category as `lib/yaml.ts`, which the
+   ADR already keeps in core. **Resolution:** they stay in `core`, and every
+   consumer — including the config package — imports them **from `core`**. **No
+   re-export from `config`:** everything already depends on `core`, so a
+   re-export would be pure aliasing (a second public name for one symbol) with no
+   dependency-graph benefit. _Supersedes the `config-resolution.ts` entry in the
+   2.10.1 Consequences bullet only; every other surface in that bullet still
+   migrates._
+
+2. **`dashboard` is a host document-level declaration (clarification).** The
+   `dashboard:` block (`editor` protocol) rides in fitness's whole-document schema
+   today but is owned by neither fitness nor any Tool plugin — `dashboard` is a
+   CLI-owned composition-root command. It is therefore a **host declaration** in
+   `config`, structurally identical to `cli`, registered beside it. This completes
+   "the tool-agnostic document blocks" the Decision names (it was simply not
+   enumerated); it is not a new scope.
+
+3. **`schemaVersion` — core keeps version-compat; the composed schema claims it
+   (clarification).** `schemaVersion` is read by `core`'s
+   `readConfigSchemaVersion` + `checkSchemaCompat` in the pre-action gate, *before*
+   strict validation — a versioning precondition (ADR-0012 territory), not content
+   validation. **Resolution:** compat logic stays in `core`; the composed
+   document schema **claims** `schemaVersion` as a permissive top-level `number`
+   (rather than leaning on the document-level `.catchall`), keeping the invariant
+   "every top-level key is claimed" honest without pulling the pre-flight gate
+   into the config layer.
+
+**Enforcement note:** the `no-config-loader-outside-config` guardrail (2.10.1)
+must exempt the `core` path primitive (`resolveProjectConfigPath`) and the generic
+`lib/yaml.ts` reader — they are the allowed *locate/read* primitives, not config
+projection. The guardrail forbids projecting a *document block* into a config
+object outside `@opensip-tools/config`, which is the boundary this amendment
+sharpens.
