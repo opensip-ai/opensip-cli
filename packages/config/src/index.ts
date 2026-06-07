@@ -24,3 +24,5 @@ export type {
   EnvBindingType,
   ToolConfigDeclaration,
 } from './declaration.js';
+export { resolveConfig } from './precedence.js';
+export type { ResolveConfigInput, ResolvedConfig } from './precedence.js';
