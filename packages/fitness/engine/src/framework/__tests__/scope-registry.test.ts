@@ -8,6 +8,7 @@
 import { RunScope, runWithScope } from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
+import { defineRecipe } from '../../recipes/types.js';
 import { fitnessTool } from '../../tool.js';
 import { defineCheck } from '../define-check.js';
 import {
@@ -31,6 +32,16 @@ function stubCheck(slug: string): Check {
     description: slug,
     tags: ['demo'],
     analyze: () => [],
+  });
+}
+
+/** Minimal user recipe for isolation assertions. */
+function stubRecipe(name: string) {
+  return defineRecipe({
+    name,
+    displayName: name,
+    description: name,
+    checks: { type: 'all' },
   });
 }
 
@@ -125,6 +136,33 @@ describe('fitness scope-registry — scope isolation', () => {
     await runWithScope(scopeB, () => {
       expect(currentCheckRegistry().getBySlug('b:only-in-b')).toBeDefined();
       expect(currentCheckRegistry().getBySlug('a:only-in-a')).toBeUndefined();
+      return Promise.resolve();
+    });
+  });
+
+  it('two scopes carry INDEPENDENT recipe registries', async () => {
+    const scopeA = fitnessScope();
+    const scopeB = fitnessScope();
+
+    await runWithScope(scopeA, () => {
+      currentRecipeRegistry().register(stubRecipe('only-in-a'));
+      return Promise.resolve();
+    });
+    await runWithScope(scopeB, () => {
+      currentRecipeRegistry().register(stubRecipe('only-in-b'));
+      return Promise.resolve();
+    });
+
+    await runWithScope(scopeA, () => {
+      // A's user recipe is visible in A; B's is not. Built-ins stay shared-by-value.
+      expect(currentRecipeRegistry().has('only-in-a')).toBe(true);
+      expect(currentRecipeRegistry().has('only-in-b')).toBe(false);
+      expect(currentRecipeRegistry().has('default')).toBe(true);
+      return Promise.resolve();
+    });
+    await runWithScope(scopeB, () => {
+      expect(currentRecipeRegistry().has('only-in-b')).toBe(true);
+      expect(currentRecipeRegistry().has('only-in-a')).toBe(false);
       return Promise.resolve();
     });
   });
