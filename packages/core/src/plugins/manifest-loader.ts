@@ -320,7 +320,16 @@ function readJson(path: string): Record<string, unknown> | undefined {
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
     return isRecord(parsed) ? parsed : undefined;
-  } catch {
+  } catch (error) {
+    // Best-effort read (mirrors marker-discovery.ts): a malformed/unreadable
+    // manifest file is a skip, not a crash — but we surface WHY at debug so a
+    // genuinely broken file is diagnosable rather than silently invisible.
+    logger.debug({
+      evt: 'plugin.manifest.read_failed',
+      module: 'core:plugins',
+      path,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return undefined;
   }
 }
