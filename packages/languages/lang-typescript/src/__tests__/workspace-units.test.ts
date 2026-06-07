@@ -70,6 +70,29 @@ describe('discoverTypescriptWorkspaceUnits', () => {
     expect(units[1]?.id).toBe('b')
   })
 
+  it('gives nested packages a root-relative POSIX id', async () => {
+    mkdirSync(join(root, 'packages', 'fitness', 'engine'), { recursive: true })
+    writeFileSync(join(root, 'packages', 'fitness', 'engine', 'tsconfig.json'), '{}')
+    const units = await discoverTypescriptWorkspaceUnits(root)
+    expect(units).toHaveLength(1)
+    expect(units[0]?.id).toBe('fitness/engine')
+  })
+
+  it('gives same-basename packages DISTINCT ids (no shard-id collision)', async () => {
+    // This monorepo has three packages all named `engine`. A bare basename id
+    // would collapse them onto one shard id and silently overwrite the
+    // fragment-cache PK rows. The root-relative id keeps them distinct.
+    for (const dir of ['fitness/engine', 'graph/engine', 'simulation/engine']) {
+      mkdirSync(join(root, 'packages', ...dir.split('/')), { recursive: true })
+      writeFileSync(join(root, 'packages', ...dir.split('/'), 'tsconfig.json'), '{}')
+    }
+    const units = await discoverTypescriptWorkspaceUnits(root)
+    const ids = units.map((u) => u.id)
+    expect(ids).toEqual(['fitness/engine', 'graph/engine', 'simulation/engine'])
+    // Crucially: all distinct.
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
   it('finds the repo workspace units when run against this repo', async () => {
     // resolve to repo root: src/__tests__/x.test.ts -> ../../../../..
     const here = fileURLToPath(import.meta.url)

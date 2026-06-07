@@ -1,7 +1,7 @@
 // @fitness-ignore-file error-handling-quality -- safeIsDir/walk helpers for the workspace-units scan: statSync exception → "not a directory", readdirSync exception → "unreadable subdir, skip"; failure IS the function contract in each catch (already marked v8-ignore at each site as defensive/unreachable on real input).
 // @fitness-ignore-file detached-promises -- `walk` is a synchronous filesystem walk function (declared with `function`, returns void); heuristic flags it because it's invoked inside an async-returning enclosing function.
 import { existsSync, readdirSync, statSync } from 'node:fs'
-import { basename, join, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 
 import type { WorkspaceUnit } from '@opensip-tools/core'
 
@@ -14,6 +14,15 @@ const SEARCH_MAX_DEPTH = 3
  * `discoverWorkspacePackages` in graph's scope.ts which this replaces.
  *
  * Returns absolute paths, sorted lexicographically.
+ *
+ * The unit `id` is the unit's path RELATIVE to <rootDir>/packages, in POSIX
+ * form (e.g. `fitness/engine`, `graph/engine`, `core`). It must be unique and
+ * stable: a bare `basename(dir)` collapses nested packages that share a leaf
+ * name (this monorepo has `fitness/engine`, `graph/engine`, and
+ * `simulation/engine` — three distinct packages all named `engine`). The id is
+ * the shard id (graph's per-shard fragment-cache PRIMARY KEY), so a collision
+ * silently overwrites cache rows and breaks build determinism. The
+ * root-relative path restores a 1:1 id↔unit mapping.
  */
 // eslint-disable-next-line @typescript-eslint/require-await
 export async function discoverTypescriptWorkspaceUnits(
@@ -31,7 +40,7 @@ export async function discoverTypescriptWorkspaceUnits(
     const tsconfigPath = join(dir, 'tsconfig.json')
     if (existsSync(tsconfigPath)) {
       out.push({
-        id: basename(dir),
+        id: unitId(root, dir),
         rootDir: dir,
         configPath: tsconfigPath,
       })
@@ -51,6 +60,15 @@ export async function discoverTypescriptWorkspaceUnits(
       walk(sub, depth + 1)
     }
   }
+}
+
+/**
+ * Derive a unique, stable unit id: the directory's path relative to the
+ * packages root, normalized to POSIX separators (so ids are identical on
+ * Windows and POSIX). E.g. `<root>/packages/fitness/engine` → `fitness/engine`.
+ */
+function unitId(packagesRoot: string, dir: string): string {
+  return relative(packagesRoot, dir).split(sep).join('/')
 }
 
 function safeIsDir(p: string): boolean {

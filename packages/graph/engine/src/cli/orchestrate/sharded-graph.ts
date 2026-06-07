@@ -12,7 +12,7 @@
  * by the boundary pass and labeled `crossShard: true` / `'syntactic'`.
  */
 
-import { logger, withSpanAsync, type Signal, type Span } from '@opensip-tools/core';
+import { logger, ValidationError, withSpanAsync, type Signal, type Span } from '@opensip-tools/core';
 
 import { assignPackages } from '../../pipeline/assign-packages.js';
 import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
@@ -107,6 +107,16 @@ export async function runShardedGraph(input: RunShardedInput): Promise<RunSharde
 
 async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<RunShardedResult> {
   const { shards, projectRoot, cliScript, adapter, resolutionMode, useCache, catalogRepo } = input;
+
+  // 0. Fail loud on duplicate shard ids. The shard id is the per-shard
+  //    fragment-cache PRIMARY KEY (`graph_shard_fragment.shard_id`); two shards
+  //    sharing an id silently overwrite each other's cache row, so the warm
+  //    build never reaches a stable all-cached state and the function/entry-
+  //    point counts drift run-to-run. A duplicate id is a discovery bug (e.g. a
+  //    workspace-unit id derived by bare basename collapsing nested packages),
+  //    never a recoverable runtime condition — so we throw rather than return a
+  //    quietly-wrong graph.
+  assertUniqueShardIds(shards);
 
   // 1. Decide which shards can be reused from cache vs must be rebuilt.
   const plan = planShardWork(shards, catalogRepo, adapter, resolutionMode, useCache);
@@ -203,4 +213,28 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     failedShardIds: built.failures.map((f) => f.shardId),
     features,
   };
+}
+
+/**
+ * Throw if any two shards share an id. The shard id is the per-shard
+ * fragment-cache primary key, so a collision corrupts the warm-build cache and
+ * makes the graph non-deterministic — a class of bug that must fail loud, never
+ * silently return a wrong graph. Lists the offending ids in the error.
+ */
+function assertUniqueShardIds(shards: readonly Shard[]): void {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const shard of shards) {
+    if (seen.has(shard.id)) duplicates.add(shard.id);
+    seen.add(shard.id);
+  }
+  if (duplicates.size > 0) {
+    const ids = [...duplicates].sort().join(', ');
+    throw new ValidationError(
+      `Duplicate shard id(s) [${ids}] in the sharded build — shard ids must be ` +
+        `unique (they are the per-shard fragment-cache primary key). This is a ` +
+        `workspace-unit discovery bug (e.g. ids derived by bare basename ` +
+        `collapsing nested packages); fix id derivation to be root-relative.`,
+    );
+  }
 }
