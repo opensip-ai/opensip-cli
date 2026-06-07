@@ -85,7 +85,7 @@ const PKG_FILES: Record<keyof typeof PKG_DIRS, readonly string[]> = {
 
 const ALL_FILES: readonly string[] = Object.values(PKG_FILES).flat();
 
-function toProjectRel(absFile: string): string {
+function toFixtureProjectRel(absFile: string): string {
   const rel = relative(FIXTURE_ROOT, absFile);
   return sep === '/' ? rel : rel.split(sep).join('/');
 }
@@ -158,7 +158,7 @@ function extractQuoted(s: string): string | undefined {
 
 /** Parse one fixture file into the occurrence / call / import model. */
 function parseFixtureFile(absFile: string): ParsedFile {
-  const projectRel = toProjectRel(absFile);
+  const projectRel = toFixtureProjectRel(absFile);
   const text = readFileSync(absFile, 'utf8');
   const lines = text.split('\n');
 

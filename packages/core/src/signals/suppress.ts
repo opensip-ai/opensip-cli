@@ -315,6 +315,7 @@ export async function filterSignalsBySuppressions(
     }),
   );
 
+  // @fitness-ignore-next-line detached-promises -- attributeMissingFiles is synchronous (returns void; only emits logger.warn) — there is no promise to await.
   attributeMissingFiles(missingFiles, request);
 
   const kept: Signal[] = [];

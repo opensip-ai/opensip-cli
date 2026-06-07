@@ -116,6 +116,7 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   //    workspace-unit id derived by bare basename collapsing nested packages),
   //    never a recoverable runtime condition — so we throw rather than return a
   //    quietly-wrong graph.
+  // @fitness-ignore-next-line detached-promises -- assertUniqueShardIds is a synchronous void assertion (throws on a duplicate id); there is no promise to await.
   assertUniqueShardIds(shards);
 
   // 1. Decide which shards can be reused from cache vs must be rebuilt.
