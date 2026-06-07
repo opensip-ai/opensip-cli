@@ -27,6 +27,7 @@ import type {
   FunctionOccurrence,
   ResolutionStats,
 } from '../../../types.js';
+import type { PackageManifestIndex } from '../export-index.js';
 import type { ShardBuildResult } from '../shard-model.js';
 
 function occ(
@@ -114,14 +115,14 @@ function statsTuple(s: ResolutionStats): readonly number[] {
 }
 
 describe('cross-shard merge determinism (characterization)', () => {
-  // Two shards. pkgA.caller() calls helperB(), exported by pkgB, imported
+  // Two shards. pkg-a.caller() calls helperB(), exported by pkg-b, imported
   // via a bare workspace specifier — the canonical cross-boundary case.
   const shardA = shard(
     'pkg:a',
     fragment(
       'typescript',
       'key-a',
-      occ('caller', 'pkgA/index.ts', 'A', [
+      occ('caller', 'packages/pkg-a/index.ts', 'A', [
         // Unresolved placeholder the local pass left at the boundary site.
         { to: [], line: 2, column: 9, resolution: 'unknown', confidence: 'low', text: 'helperB()' },
       ]),
@@ -139,13 +140,17 @@ describe('cross-shard merge determinism (characterization)', () => {
   );
   const shardB = shard(
     'pkg:b',
-    fragment('typescript', 'key-b', occ('helperB', 'pkgB/index.ts', 'B')),
+    fragment('typescript', 'key-b', occ('helperB', 'packages/pkg-b/index.ts', 'B')),
   );
-  const files = ['pkgA/index.ts', 'pkgB/index.ts'];
+  const files = ['packages/pkg-a/index.ts', 'packages/pkg-b/index.ts'];
+  // Maps the bare specifier `@scope/pkgb` → the pkg-b export bucket.
+  const mIndex: PackageManifestIndex = new Map([
+    ['@scope/pkgb', { name: '@scope/pkgb', dir: 'packages/pkg-b' }],
+  ]);
 
   it('produces a structurally identical catalog regardless of fragment order', () => {
-    const forward = mergeAndResolveShards([shardA, shardB], files);
-    const reversed = mergeAndResolveShards([shardB, shardA], files);
+    const forward = mergeAndResolveShards([shardA, shardB], files, mIndex);
+    const reversed = mergeAndResolveShards([shardB, shardA], files, mIndex);
 
     // Same function keys.
     expect(Object.keys(forward.catalog.functions).sort()).toEqual(
@@ -158,8 +163,8 @@ describe('cross-shard merge determinism (characterization)', () => {
   });
 
   it('produces identical boundary stats regardless of fragment order', () => {
-    const forward = mergeAndResolveShards([shardA, shardB], files);
-    const reversed = mergeAndResolveShards([shardB, shardA], files);
+    const forward = mergeAndResolveShards([shardA, shardB], files, mIndex);
+    const reversed = mergeAndResolveShards([shardB, shardA], files, mIndex);
 
     // DRIFT: unequal stats would mean a boundary call resolved differently
     // depending on which shard merged first.
@@ -167,8 +172,8 @@ describe('cross-shard merge determinism (characterization)', () => {
   });
 
   it('produces an order-independent merged cacheKey', () => {
-    const forward = mergeAndResolveShards([shardA, shardB], files);
-    const reversed = mergeAndResolveShards([shardB, shardA], files);
+    const forward = mergeAndResolveShards([shardA, shardB], files, mIndex);
+    const reversed = mergeAndResolveShards([shardB, shardA], files, mIndex);
 
     // The build-level cacheKey is hashed from the SET of shard keys
     // (sorted), so it must not depend on completion order.
@@ -177,8 +182,8 @@ describe('cross-shard merge determinism (characterization)', () => {
   });
 
   it('keeps the same merged language for either order', () => {
-    const forward = mergeAndResolveShards([shardA, shardB], files);
-    const reversed = mergeAndResolveShards([shardB, shardA], files);
+    const forward = mergeAndResolveShards([shardA, shardB], files, mIndex);
+    const reversed = mergeAndResolveShards([shardB, shardA], files, mIndex);
     expect(forward.catalog.language).toBe(reversed.catalog.language);
   });
 });

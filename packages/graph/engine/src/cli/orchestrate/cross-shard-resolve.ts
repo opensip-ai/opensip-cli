@@ -25,8 +25,10 @@ import { posix } from 'node:path';
 
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
 import { appendEdge, createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
-import { packageOf } from '../../resolve-callee.js';
 
+import { buildExportIndex, resolveSpecifierToPackage } from './export-index.js';
+
+import type { ExportIndex, PackageManifestIndex } from './export-index.js';
 import type { ShardBuildResult } from './shard-model.js';
 import type {
   CallEdge,
@@ -49,10 +51,11 @@ export interface CrossShardOutput {
 export function mergeAndResolveShards(
   fragments: readonly ShardBuildResult[],
   allFiles: readonly string[],
+  manifestIndex: PackageManifestIndex,
 ): CrossShardOutput {
   const merged = mergeShardFragments(fragments.map((f) => f.fragment), allFiles);
   const boundaryCalls = fragments.flatMap((f) => f.boundaryCalls);
-  return resolveCrossBoundaryCalls(merged, boundaryCalls);
+  return resolveCrossBoundaryCalls(merged, boundaryCalls, manifestIndex);
 }
 
 // ── Task 2.1: merge fragments ─────────────────────────────────────
@@ -120,25 +123,29 @@ function hashKeys(fragments: readonly Catalog[]): string {
 
 /**
  * Resolve each cross-boundary call against the merged global catalog and
- * stitch the recovered edge onto its owner. Edges are `'syntactic'`,
- * `crossShard: true`, with confidence capped at `'medium'` (when the
- * import specifier pinned the target file) or `'low'` (name-only).
- * Unresolvable boundary calls stay unresolved but are counted (attributable).
+ * stitch the recovered edge onto its owner. A recovered edge is `'semantic'`,
+ * `crossShard: true`, `confidence: 'high'` — the import specifier + callee name
+ * linked to a UNIQUE target occurrence (relative imports pin by path; bare /
+ * workspace imports pin by the imported package's export symbol table). On any
+ * ambiguity the resolver DECLINES (`to: []`) — a missing edge is safe, a phantom
+ * cross-package edge is not. Declined / external boundary calls stay unresolved
+ * but are counted (attributable).
  */
 export function resolveCrossBoundaryCalls(
   merged: Catalog,
   boundaryCalls: readonly CrossBoundaryCall[],
+  manifestIndex: PackageManifestIndex,
 ): CrossShardOutput {
+  const exportIndex = buildExportIndex(merged);
   const nameIndex = buildNameIndex(merged);
   const fileByHash = buildFileByHash(merged);
   const knownFiles = new Set<string>(Object.values(merged.functions).flat().map((o) => o.filePath));
-  const importedByFile = buildImportedPackagesByFile(merged, fileByHash);
 
   const edgesByOwner = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
 
   for (const bc of boundaryCalls) {
-    const edge = resolveOne(bc, nameIndex, fileByHash, knownFiles, importedByFile);
+    const edge = resolveOne(bc, { exportIndex, manifestIndex, nameIndex, fileByHash, knownFiles });
     stats.totalCallSites++;
     appendEdge(edgesByOwner, bc.ownerHash, edge);
     stats.apply(edge);
@@ -148,115 +155,90 @@ export function resolveCrossBoundaryCalls(
   return { catalog: { ...merged, functions }, boundaryStats: stats };
 }
 
-function resolveOne(
-  bc: CrossBoundaryCall,
-  nameIndex: ReadonlyMap<string, readonly FunctionOccurrence[]>,
-  fileByHash: ReadonlyMap<string, string>,
-  knownFiles: ReadonlySet<string>,
-  importedByFile: ReadonlyMap<string, ReadonlySet<string>>,
-): CallEdge {
+/** Indexes the boundary resolver links each call against. */
+interface ResolveContext {
+  /** Per-package export symbol table (the bare/workspace-specifier linker). */
+  readonly exportIndex: ExportIndex;
+  /** Package `name` → manifest, turning a specifier into a package group. */
+  readonly manifestIndex: PackageManifestIndex;
+  /** name → all occurrences with that name (the relative-import pin candidates). */
+  readonly nameIndex: ReadonlyMap<string, readonly FunctionOccurrence[]>;
+  readonly fileByHash: ReadonlyMap<string, string>;
+  readonly knownFiles: ReadonlySet<string>;
+}
+
+/**
+ * Resolve one cross-boundary call to a recovered edge — semantically, by
+ * linking the import specifier + callee name to a UNIQUE target occurrence, or
+ * DECLINING (`to: []`) when the link is absent or ambiguous. Three branches:
+ *
+ *  (a) RELATIVE specifier (`./x`) → pin by path against the owner's directory
+ *      (an intra-package import; already exact). Emit when ≥1 occurrence in the
+ *      resolved file matches the callee name.
+ *  (b) BARE / workspace specifier that resolves to a known workspace package P →
+ *      look the callee name up in P's export bucket: exactly 1 export → emit;
+ *      >1 → narrow by a single subpath-pinned file if possible, else decline;
+ *      0 → decline (not exported / re-export chain we don't follow).
+ *  (c) Specifier maps to no known workspace package (external npm) → unresolved.
+ *
+ * A recovered edge is `'semantic'`, `crossShard: true`, `confidence: 'high'`.
+ */
+function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
   const base = {
     line: bc.line,
     column: bc.column,
-    resolution: 'syntactic' as const,
+    resolution: 'semantic' as const,
     text: truncateForCallEdge(bc.text),
     discarded: bc.discarded ?? false,
     crossShard: true as const,
+    confidence: 'high' as const,
   };
-  const candidates = nameIndex.get(bc.calleeName) ?? [];
-  if (candidates.length === 0) {
-    // Genuinely external (e.g. an npm package) — unresolved, but counted.
-    return { ...base, to: [], confidence: 'low' };
+  const spec = bc.importSpecifier;
+
+  // (a) Relative import → path-pin (intra-package, already exact).
+  if (spec?.startsWith('.')) {
+    const candidates = ctx.nameIndex.get(bc.calleeName) ?? [];
+    const pinned = pinBySpecifier(bc, candidates, ctx.fileByHash, ctx.knownFiles);
+    return pinned.length > 0
+      ? { ...base, to: pinned.map((o) => o.bodyHash) }
+      : { ...base, to: [] };
   }
-  // Constrain to occurrences the caller can actually reach: its own package
-  // or a package its module imports. This is what stops a globally-unique
-  // name from resolving into a package the caller never imported (the source
-  // of impossible coupling edges). Falls back to all candidates only when the
-  // caller's file is unknown (cannot constrain).
-  const reachable = reachableCandidates(bc, candidates, fileByHash, importedByFile);
-  const pinned = pinBySpecifier(bc, reachable, fileByHash, knownFiles);
-  if (pinned.length > 0) {
-    return { ...base, to: pinned.map((o) => o.bodyHash), confidence: 'medium' };
+
+  // (b)/(c) Bare or workspace specifier → resolve to a package and link by export.
+  if (spec === undefined || spec.length === 0) return { ...base, to: [] };
+  const resolved = resolveSpecifierToPackage(spec, ctx.manifestIndex);
+  if (resolved === undefined) {
+    // No known workspace package (external npm, or unmappable subpath) — decline.
+    return { ...base, to: [] };
   }
-  const chosen = chooseReachable(bc, reachable, fileByHash);
-  if (chosen) {
-    return { ...base, to: [chosen.bodyHash], confidence: 'low' };
-  }
-  // No reachable target, or ambiguous after constraint — decline rather than
-  // emit a wrong (cross-package) target.
-  return { ...base, to: [], confidence: 'low' };
+  const exported = ctx.exportIndex.get(resolved.packageGroup)?.get(bc.calleeName) ?? [];
+  const linked = linkExported(exported, resolved.subpath);
+  return linked === undefined ? { ...base, to: [] } : { ...base, to: [linked.bodyHash] };
 }
 
-/** Candidates in the caller's own package or a package its module imports. */
-function reachableCandidates(
-  bc: CrossBoundaryCall,
-  candidates: readonly FunctionOccurrence[],
-  fileByHash: ReadonlyMap<string, string>,
-  importedByFile: ReadonlyMap<string, ReadonlySet<string>>,
-): readonly FunctionOccurrence[] {
-  const ownerFile = fileByHash.get(bc.ownerHash);
-  if (ownerFile === undefined) return candidates; // cannot constrain
-  const callerPkg = packageOf(ownerFile);
-  const imported = importedByFile.get(ownerFile) ?? EMPTY_PKG_SET;
-  return candidates.filter((c) => {
-    const p = packageOf(c.filePath);
-    return p === callerPkg || imported.has(p);
-  });
-}
-
-/** Pick a single reachable target: unique → it; else same-package unique → it; else decline. */
-function chooseReachable(
-  bc: CrossBoundaryCall,
-  reachable: readonly FunctionOccurrence[],
-  fileByHash: ReadonlyMap<string, string>,
+/**
+ * Choose the single exported occurrence the specifier + name link to, or
+ * `undefined` to decline. Exactly one export → it. More than one (same simple
+ * name exported from multiple files in the package) → narrow to the lone export
+ * whose project-relative file path ends with the addressed subpath; if that
+ * does not collapse the set to exactly one, DECLINE rather than guess. Zero
+ * exports → decline (name not exported by this package — e.g. a re-export chain
+ * the V1 linker does not follow).
+ */
+function linkExported(
+  exported: readonly FunctionOccurrence[],
+  subpath: string | undefined,
 ): FunctionOccurrence | undefined {
-  if (reachable.length === 0) return undefined;
-  if (reachable.length === 1) return reachable[0];
-  const ownerFile = fileByHash.get(bc.ownerHash);
-  const callerPkg = ownerFile === undefined ? '<unknown>' : packageOf(ownerFile);
-  const samePkg = reachable.filter((c) => packageOf(c.filePath) === callerPkg);
-  return samePkg.length === 1 ? samePkg[0] : undefined;
-}
-
-const EMPTY_PKG_SET: ReadonlySet<string> = new Set<string>();
-
-/** filePath → imported package groups, from module-init `dependencies[]`. */
-function buildImportedPackagesByFile(
-  merged: Catalog,
-  fileByHash: ReadonlyMap<string, string>,
-): Map<string, Set<string>> {
-  const out = new Map<string, Set<string>>();
-  for (const occs of Object.values(merged.functions)) {
-    for (const occ of occs) {
-      const pkgs = importedPackagesOf(occ, fileByHash);
-      if (pkgs.size > 0) mergeSet(out, occ.filePath, pkgs);
-    }
-  }
-  return out;
-}
-
-function mergeSet(map: Map<string, Set<string>>, key: string, values: ReadonlySet<string>): void {
-  const existing = map.get(key);
-  if (existing) {
-    for (const v of values) existing.add(v);
-    return;
-  }
-  map.set(key, new Set(values));
-}
-
-/** Package groups one module-init occurrence imports (via resolved dependencies[].to). */
-function importedPackagesOf(
-  occ: FunctionOccurrence,
-  fileByHash: ReadonlyMap<string, string>,
-): Set<string> {
-  const set = new Set<string>();
-  for (const dep of occ.dependencies ?? []) {
-    for (const targetHash of dep.to) {
-      const targetFile = fileByHash.get(targetHash);
-      if (targetFile !== undefined) set.add(packageOf(targetFile));
-    }
-  }
-  return set;
+  if (exported.length === 1) return exported[0];
+  if (exported.length === 0 || subpath === undefined) return undefined;
+  // Subpath is `./rest` addressing a file within the imported package; keep only
+  // exports whose file path matches that subpath stem (extension-insensitive).
+  const stem = stripExt(subpath.replace(/^\.\//, ''));
+  const narrowed = exported.filter((o) => {
+    const fp = stripExt(o.filePath);
+    return fp === stem || fp.endsWith(`/${stem}`) || fp.endsWith(`/${stem}/index`);
+  });
+  return narrowed.length === 1 ? narrowed[0] : undefined;
 }
 
 /**

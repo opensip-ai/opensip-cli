@@ -27,6 +27,7 @@ import { currentRules } from '../../rules/registry.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
 
 import { mergeAndResolveShards } from './cross-shard-resolve.js';
+import { buildPackageManifestIndex } from './export-index.js';
 import { planShardWork, runShardsInParallel } from './shard-runner.js';
 
 import type { Shard } from './shard-model.js';
@@ -131,7 +132,11 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   // 3. Merge cached + freshly-built fragments and recover cross-package edges.
   const fragments = [...plan.cached, ...built.fragments];
   const allFiles = shards.flatMap((s) => s.files);
-  const { catalog: merged, boundaryStats } = mergeAndResolveShards(fragments, allFiles);
+  // The export linker keys packages by name; build the manifest index once from
+  // the resolved shard set (each shard.rootDir holds a package.json) so the
+  // boundary resolver can turn a bare specifier into a target package group.
+  const manifestIndex = buildPackageManifestIndex(shards, projectRoot);
+  const { catalog: merged, boundaryStats } = mergeAndResolveShards(fragments, allFiles, manifestIndex);
   // Stamp each occurrence's package, then drop name-guessed cross-package edges
   // that contradict the import graph — the same correction applied to the
   // single-program path, so the persisted catalog (and the coupling grid) is
