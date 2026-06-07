@@ -94,6 +94,7 @@ export type {
   Tool,
   ToolMetadata,
   ToolCommandDescriptor,
+  ToolConfigContribution,
   ToolCliContext,
   ToolPluginExports,
   LiveViewRenderer,
@@ -200,6 +201,7 @@ export type {
   DataStoreThunk,
   ToolScope,
   ScopeContribution,
+  ResolvedToolConfig,
 } from './lib/scope-types.js';
 
 // Lib — errors + Result pattern

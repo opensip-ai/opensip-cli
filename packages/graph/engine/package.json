@@ -49,6 +49,14 @@
       { "name": "catalog-export", "description": "Run graph analysis and write the CatalogExport JSON document (symbols + edges + provenance) to a file" },
       { "name": "sarif-export", "description": "Run graph analysis and write OpenSIP-convention SARIF v2.1.0 findings to a file" },
       { "name": "graph-recipes", "description": "List available graph recipes", "aliases": ["list-graph-recipes"] }
+    ],
+    "capabilities": [
+      {
+        "id": "graph-adapter",
+        "apiVersion": 1,
+        "contributionKind": "module-export",
+        "contributionSchema": { "requiredKeys": ["id"] }
+      }
     ]
   },
   "scripts": {

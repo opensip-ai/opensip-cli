@@ -59,6 +59,38 @@ describe('CapabilityRegistry', () => {
     });
   });
 
+  describe('setRegistrar (Phase 4 — real registrar replaces deferred placeholder)', () => {
+    it('replaces the registrar for a declared domain so routeContribution reaches the real one', () => {
+      const reg = new CapabilityRegistry();
+      const placeholder = vi.fn(() => {
+        throw new Error('deferred placeholder must not run');
+      });
+      const real = vi.fn();
+      reg.registerDomain(domain(), placeholder);
+
+      // Swap the placeholder for the real registrar, then route.
+      reg.setRegistrar('audit-rule', real);
+      reg.routeContribution('audit-rule', { id: 'x', name: 'X' });
+
+      expect(placeholder).not.toHaveBeenCalled();
+      expect(real).toHaveBeenCalledOnce();
+      expect(real).toHaveBeenCalledWith({ id: 'x', name: 'X' });
+    });
+
+    it('keeps the manifest-declared spec verbatim when the registrar is swapped', () => {
+      const reg = new CapabilityRegistry();
+      const spec = domain();
+      reg.registerDomain(spec, noopRegistrar);
+      reg.setRegistrar('audit-rule', vi.fn());
+      expect(reg.getDomain('audit-rule')).toEqual(spec);
+    });
+
+    it('throws UnknownCapabilityDomainError for an undeclared domain', () => {
+      const reg = new CapabilityRegistry();
+      expect(() => reg.setRegistrar('not-declared', vi.fn())).toThrow(UnknownCapabilityDomainError);
+    });
+  });
+
   describe('routeContribution', () => {
     it('routes a schema-valid contribution to the owner registrar without interpreting it', () => {
       const reg = new CapabilityRegistry();

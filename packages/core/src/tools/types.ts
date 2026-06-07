@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- the canonical Tool plugin contract: one cohesive interface (metadata, commands, register, initialize, contributeScope, collectDashboardData, config, capabilityRegistrars) whose every member carries load-bearing JSDoc. The slots are the contract surface; splitting the single interface across files would fragment the one type tools implement. Grew past the 400-line soft limit with the 2.10.0 config + capability slots (ADR-0023 / §5.3).
 /**
  * Tool plugin contract.
  *
@@ -26,8 +27,8 @@
 
 import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 
+import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
 import type { Logger } from '../lib/logger.js';
-import type { CapabilityRegistrar } from '../plugins/capability-registry.js';
 import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
 import type { PluginLayout } from '../plugins/types.js';
 
@@ -38,31 +39,6 @@ import type { PluginLayout } from '../plugins/types.js';
 // `tools/types.ts → lib/run-scope.ts` edge — the former RunScope⟷Tool
 // type cycle is gone (audit 2026-05-29, M4). A plain top-level
 // `import type` is safe: scope-types is a leaf with no edge back here.
-
-/**
- * A tool's namespaced configuration contribution, as the kernel sees it
- * (release 2.10.0, ADR-0023, Phase 4). The concrete schema-bearing type —
- * `ToolConfigDeclaration` — lives in `@opensip-tools/config` (which carries
- * Zod); core must not depend on config or Zod, so the kernel-side carrier
- * keeps `schema` (and `defaults`/`env`) `unknown`. The composition root (the
- * CLI, which DOES import `@opensip-tools/config`) narrows a tool's
- * `config` slot back to the concrete `ToolConfigDeclaration` when it gathers
- * the declarations to compose + validate the whole document.
- *
- * The shape is the structural intersection of `ToolConfigDeclaration`: any
- * `ToolConfigDeclaration` is assignable to this carrier (a `ZodType` is
- * assignable to `unknown`), so a tool sets `config: myDeclaration` directly.
- */
-export interface ToolConfigContribution {
-  /** Top-level config key owned by this tool (e.g. `graph`, `fitness`). */
-  readonly namespace: string;
-  /** The tool's namespace schema — a Zod schema at the config layer, `unknown` here. */
-  readonly schema: unknown;
-  /** Optional defaults for the namespace (lowest-precedence source). */
-  readonly defaults?: unknown;
-  /** Optional environment-variable bindings for keys in this namespace. */
-  readonly env?: unknown;
-}
 
 /** Static descriptor for a tool plugin: id, semver, and one-line description. */
 export interface ToolMetadata {
@@ -415,33 +391,24 @@ export interface Tool {
     scope: ToolScope,
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
   /**
-   * Optional namespaced configuration contribution (release 2.10.0, ADR-0023,
-   * Phase 4). A tool that owns a top-level config block (`graph:`, `fitness:`,
-   * `simulation:`) declares its Zod schema here as a `ToolConfigDeclaration`
-   * (from `@opensip-tools/config`). The composition root gathers every
-   * registered tool's `config`, composes them into ONE strict whole-document
-   * schema, validates the parsed `opensip-tools.config.yml` once before
-   * dispatch, and exposes the resolved config back to the tool.
-   *
-   * Typed as the kernel-side {@link ToolConfigContribution} carrier so core
-   * carries no Zod; the CLI narrows it to `ToolConfigDeclaration`. Tools with
-   * no config block leave this undefined.
+   * Optional namespaced config contribution (release 2.10.0, ADR-0023). A
+   * tool owning a top-level block (`graph:`/`fitness:`/`simulation:`) declares
+   * its Zod schema here as a `ToolConfigDeclaration` (from
+   * `@opensip-tools/config`). The composition root composes every tool's
+   * `config` into one strict whole-document schema, validates the config file
+   * once before dispatch, and exposes the resolved config back via the scope.
+   * Kernel-side {@link ToolConfigContribution} carrier (core carries no Zod);
+   * the CLI narrows it. Undefined ⇒ no config block.
    */
   readonly config?: ToolConfigContribution;
   /**
-   * Optional capability-domain registrars (release 2.10.0, §5.3, Phase 4).
-   * A tool that DECLARES capability domains in its manifest
+   * Optional capability-domain registrars (release 2.10.0, §5.3), keyed by
+   * domain id. A tool that DECLARES domains in its manifest
    * (`ToolPluginManifest.capabilities`) supplies the REAL registrar for each
-   * domain it owns here, keyed by domain id. The host registers each declared
-   * domain from the manifest with a deferred placeholder registrar (which
-   * throws until wired), then replaces the placeholder with the tool's real
-   * registrar via `CapabilityRegistry.setRegistrar(domainId, registrar)` once
-   * the tool's runtime module is loaded.
-   *
-   * The tool OWNS its domains' registrars: a registrar performs the actual
-   * registration of a routed contribution into the tool's own registry (a
-   * `CheckRegistry`, scenario `Registry`, graph-adapter registry, …). Tools
-   * that declare no capability domains leave this undefined.
+   * here. The host registers each manifest domain with a deferred placeholder,
+   * then replaces it via `CapabilityRegistry.setRegistrar` once this module
+   * loads. The registrar registers a routed contribution into the tool's own
+   * registry. Undefined ⇒ no declared domains.
    */
   readonly capabilityRegistrars?: Readonly<Record<string, CapabilityRegistrar>>;
 }

@@ -40,19 +40,15 @@ import {
   isCapabilityValidator,
   isStructuralContributionSchema,
   type CapabilityDomainSpec,
+  type CapabilityRegistrar,
 } from '../tools/capability.js';
 
 import type { ToolPluginManifest } from '../tools/manifest.js';
 
-/**
- * The owner-supplied callback the host invokes once a contribution has
- * passed the domain's schema check. The host hands the validated
- * contribution straight through — it never inspects the contribution's
- * domain-specific meaning. The registrar performs the actual registration
- * into the owning tool's own registry (a `CheckRegistry`, scenario
- * `Registry`, graph-adapter registry, …).
- */
-export type CapabilityRegistrar = (contribution: unknown) => void;
+// `CapabilityRegistrar` now lives in the leaf `tools/capability.ts` so the
+// `Tool` contract can name it without an import cycle through this host
+// module. Re-export it here for back-compat with the prior import path.
+export type { CapabilityRegistrar } from '../tools/capability.js';
 
 /** A registered domain: its spec plus the owner's registrar. */
 interface RegisteredDomain {
@@ -102,6 +98,46 @@ export class CapabilityRegistry {
       ownerToolId: spec.ownerToolId,
       apiVersion: spec.apiVersion,
       contributionKind: spec.contributionKind,
+    });
+  }
+
+  /**
+   * Replace the registrar for an ALREADY-REGISTERED domain (Phase 4). The
+   * manifest-read path ({@link registerCapabilityDomainsFromManifest})
+   * registers each declared domain with a DEFERRED placeholder registrar that
+   * throws on any contribution; once the owning tool's runtime module loads,
+   * the host calls this to swap in the tool's REAL registrar.
+   *
+   * This is the deliberate complement to {@link registerDomain}'s
+   * first-writer-wins: a domain's REGISTRAR is owner-replaceable (the owner
+   * supplies it late), but its SPEC is not — the spec stays exactly as the
+   * manifest declared it, so identity/epoch/schema cannot be overwritten by a
+   * late registrar wiring. Only the owning tool should call this (the host
+   * routes by `ownerToolId`); the spec is left untouched.
+   *
+   * @param domainId The domain whose registrar to replace.
+   * @param registrar The owner's real registrar.
+   * @throws {NotFoundError} (`CAPABILITY.DOMAIN.UNKNOWN`) when no domain
+   *   `domainId` is registered — a registrar cannot be wired for a domain the
+   *   host never declared (a manifest/tool-id mismatch).
+   */
+  setRegistrar(domainId: string, registrar: CapabilityRegistrar): void {
+    const entry = this.domains.get(domainId);
+    if (entry === undefined) {
+      const known = [...this.domains.keys()];
+      throw new UnknownCapabilityDomainError(
+        `capability: cannot wire a registrar for undeclared domain '${domainId}'` +
+          (known.length > 0 ? ` (known domains: ${known.join(', ')})` : ' (no domains declared)'),
+        { domainId, knownDomains: known },
+      );
+    }
+    // Replace the registrar; keep the manifest-declared spec verbatim.
+    this.domains.set(domainId, { spec: entry.spec, registrar });
+    this.logger.debug({
+      evt: 'capability.domain.registrar_wired',
+      module: 'core:plugins',
+      domainId,
+      ownerToolId: entry.spec.ownerToolId,
     });
   }
 

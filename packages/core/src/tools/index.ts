@@ -37,6 +37,7 @@ export type {
   CapabilityValidator,
   StructuralContributionSchema,
   ToolCapabilityDeclaration,
+  ToolConfigContribution,
 } from './capability.js';
 // The single pure compatibility gate shared by the bundled + external
 // admission paths (release 2.8.0).

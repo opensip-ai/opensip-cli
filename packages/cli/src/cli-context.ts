@@ -47,6 +47,7 @@ import {
   type Logger,
   type ProjectContext,
   type ToolCliContext,
+  type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-tools/core';
@@ -84,6 +85,13 @@ let currentRunScope: RunScope | undefined;
 // pattern as the registries above — needed before the RunScope is built,
 // so it can't hang off the scope.
 let currentToolProvenance: readonly ToolProvenance[] = [];
+// Manifests for the tools admitted this invocation (release 2.10.0, §5.3).
+// Set once per invocation by main() from the bootstrap result; read by the
+// pre-action-hook to register each tool's manifest-declared capability domains
+// into the per-run capability registry. Same per-run-holder pattern as the
+// registries/provenance above — the manifests are read at bootstrap (before
+// any scope exists) but consumed when the scope is built.
+let currentToolManifests: readonly ToolPluginManifest[] = [];
 
 /**
  * Called by `main()` after constructing the per-invocation registries so
@@ -137,6 +145,27 @@ export function setToolProvenanceForRun(records: readonly ToolProvenance[]): voi
  */
 export function getToolProvenanceForRun(): readonly ToolProvenance[] {
   return currentToolProvenance;
+}
+
+/**
+ * Record the manifests for the tools admitted this invocation (release
+ * 2.10.0, §5.3). Called by `main()` once per invocation from the bootstrap
+ * result, BEFORE Commander dispatch. Read by the pre-action-hook to register
+ * each tool's manifest-declared capability domains into the per-run
+ * capability registry (the deferred placeholder is then replaced by the
+ * tool's real registrar).
+ */
+export function setToolManifestsForRun(manifests: readonly ToolPluginManifest[]): void {
+  currentToolManifests = manifests;
+}
+
+/**
+ * Read the admitted-tool manifests recorded by {@link setToolManifestsForRun}.
+ * Empty until bootstrap has run (e.g. in isolated unit tests that never
+ * bootstrap) — the pre-action-hook then registers no manifest domains.
+ */
+export function getToolManifestsForRun(): readonly ToolPluginManifest[] {
+  return currentToolManifests;
 }
 
 /**

@@ -44,7 +44,7 @@ import {
   buildToolDiscoverySources,
 } from './register-tools.js';
 
-import type { LanguageRegistry, ToolProvenance, ToolRegistry } from '@opensip-tools/core';
+import type { LanguageRegistry, ToolPluginManifest, ToolProvenance, ToolRegistry } from '@opensip-tools/core';
 
 // Re-export only the symbols the CLI composition root (`index.ts`) consumes.
 export { mountAllToolCommands } from './register-tools.js';
@@ -103,14 +103,19 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   // module singleton — handed back to the composition root so Phase 4's
   // `plugin list` can surface source / identity / manifestHash.
   const provenance: ToolProvenance[] = [];
-  registerFirstPartyTools(opts.toolRegistry, provenance);
+  // §5.3 (2.10.0): collect the admitted tools' manifests alongside provenance
+  // so the composition root can seed the per-run capability registry with each
+  // manifest's declared domains.
+  const manifests: ToolPluginManifest[] = [];
+  registerFirstPartyTools(opts.toolRegistry, provenance, manifests);
   await discoverAndRegisterToolPackages(
     opts.toolRegistry,
     { sources: buildToolDiscoverySources(opts.cwd, opts.projectDir) },
     provenance,
+    manifests,
   );
   await discoverAndRegisterGraphAdapterPackages({ projectDir: opts.projectDir });
-  return { provenance };
+  return { provenance, manifests };
 }
 
 /** What {@link bootstrapCli} hands back to the composition root. */
@@ -121,4 +126,11 @@ export interface BootstrapResult {
    * list` (Phase 4) via the cli-context per-run holder.
    */
   readonly provenance: readonly ToolProvenance[];
+  /**
+   * Manifests for every tool admitted through the compatibility gate
+   * (bundled + installed), in registration order. The composition root
+   * seeds the per-run capability registry from these (§5.3) via the
+   * cli-context per-run holder.
+   */
+  readonly manifests: readonly ToolPluginManifest[];
 }

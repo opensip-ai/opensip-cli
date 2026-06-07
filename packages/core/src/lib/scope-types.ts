@@ -39,6 +39,20 @@ export interface RecipeUnitConfigSlot {
 }
 
 /**
+ * The resolved, validated tool configuration for this run (release 2.10.0,
+ * ADR-0023, Phase 4). `namespace -> { key -> value }`, where each top-level
+ * key is a tool's namespace (`graph`/`fitness`/`simulation`) after the host
+ * composed every tool's contributed schema, validated the document STRICT,
+ * and resolved precedence (flag > env > file > defaults).
+ *
+ * Structurally identical to `@opensip-tools/config`'s `ResolvedConfig`, kept
+ * Zod-free here so the kernel carries no config-layer dependency — the CLI
+ * (which DOES import `@opensip-tools/config`) writes it, and tools read their
+ * own namespace via `currentScope()?.toolConfig?.<namespace>`.
+ */
+export type ResolvedToolConfig = Record<string, Record<string, unknown>>;
+
+/**
  * Opaque accessor that lazily opens the datastore on first read.
  * Returns `undefined` when no datastore is configured for this scope.
  */
@@ -75,4 +89,13 @@ export interface ToolScope extends ScopeContribution {
   readonly runId: string;
   /** Cloud signal sink for this run (ADR-0008); `noopSignalSink` unless cloud sync is on. */
   readonly signalSink: SignalSink;
+  /**
+   * The resolved, strict-validated tool configuration for this run (ADR-0023,
+   * Phase 4). Seeded by the CLI's pre-action-hook after composing every
+   * registered tool's contributed schema and validating the config document;
+   * absent on a scope built without a config document (e.g. a project-agnostic
+   * command, or a config-less project). A tool reads its own namespace
+   * (`scope.toolConfig?.graph`, `?.fitness`, `?.simulation`).
+   */
+  readonly toolConfig?: ResolvedToolConfig;
 }

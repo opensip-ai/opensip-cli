@@ -97,6 +97,48 @@ export interface ToolCapabilityDeclaration {
 }
 
 /**
+ * The owner-supplied callback the host invokes once a contribution has passed
+ * the domain's schema check. The host hands the validated contribution
+ * straight through — it never inspects the contribution's domain-specific
+ * meaning. The registrar performs the actual registration into the owning
+ * tool's own registry (a `CheckRegistry`, scenario `Registry`, graph-adapter
+ * registry, …).
+ *
+ * Defined HERE (the leaf domain model) rather than in the host-side
+ * `capability-registry.ts` so the `Tool` contract (`tools/types.ts`) can name
+ * it without importing the host registry — which would pull in
+ * `lib/run-scope.ts` and reintroduce the `run-scope → … → tools/types`
+ * import cycle. `capability-registry.ts` re-exports it for back-compat.
+ */
+export type CapabilityRegistrar = (contribution: unknown) => void;
+
+/**
+ * A tool's namespaced configuration contribution, as the kernel sees it
+ * (release 2.10.0, ADR-0023, Phase 4). The concrete schema-bearing type —
+ * `ToolConfigDeclaration` — lives in `@opensip-tools/config` (which carries
+ * Zod); core must not depend on config or Zod, so this kernel-side carrier
+ * keeps `schema` (and `defaults`/`env`) `unknown`. The composition root (the
+ * CLI, which DOES import `@opensip-tools/config`) narrows a tool's `config`
+ * slot back to the concrete `ToolConfigDeclaration` when it gathers the
+ * declarations to compose + validate the whole document.
+ *
+ * Any `ToolConfigDeclaration` is structurally assignable to this carrier (a
+ * `ZodType` is assignable to `unknown`), so a tool sets `config: myDeclaration`
+ * directly. Defined here (not in the host registry) so the leaf `Tool`
+ * contract can name it without an import cycle.
+ */
+export interface ToolConfigContribution {
+  /** Top-level config key owned by this tool (e.g. `graph`, `fitness`). */
+  readonly namespace: string;
+  /** The tool's namespace schema — a Zod schema at the config layer, `unknown` here. */
+  readonly schema: unknown;
+  /** Optional defaults for the namespace (lowest-precedence source). */
+  readonly defaults?: unknown;
+  /** Optional environment-variable bindings for keys in this namespace. */
+  readonly env?: unknown;
+}
+
+/**
  * An owner-supplied validator: returns `true` when `contribution` satisfies
  * the domain's contract, or a string explaining why it does not. A domain
  * whose `contributionSchema` is a function is validated by CALLING it; this

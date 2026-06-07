@@ -34,6 +34,7 @@ import {
   type Tool,
   type ToolCliContext,
   type ToolDiscoverySource,
+  type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-tools/core';
@@ -144,6 +145,8 @@ function resolveBundledPackageDir(packageName: string): string | undefined {
  * @param registry The per-invocation tool registry to populate.
  * @param provenance Optional sink for the admitted tools' provenance records
  *   (defaults to a throwaway array; the bootstrap passes a real collector).
+ * @param manifests Optional sink for the admitted tools' manifests (§5.3 —
+ *   the pre-action-hook registers each manifest's capability domains).
  * @throws {PluginIncompatibleError} when a bundled tool's manifest is missing
  *   or out of range — mapped to `EXIT_CODES.PLUGIN_INCOMPATIBLE` (exit 5) by
  *   the CLI error boundary.
@@ -151,6 +154,7 @@ function resolveBundledPackageDir(packageName: string): string | undefined {
 export function registerFirstPartyTools(
   registry: ToolRegistry,
   provenance: ToolProvenance[] = [],
+  manifests: ToolPluginManifest[] = [],
 ): void {
   for (const { tool, packageName } of FIRST_PARTY_TOOL_ENTRIES) {
     const dir = resolveBundledPackageDir(packageName);
@@ -204,6 +208,10 @@ export function registerFirstPartyTools(
 
     registry.register(tool);
     provenance.push(result.provenance);
+    // Record the manifest so the pre-action-hook can register this tool's
+    // declared capability domains into the per-run capability registry
+    // (release 2.10.0, §5.3).
+    manifests.push(manifest);
   }
 }
 
@@ -273,6 +281,7 @@ function admitInstalledTool(
   pkg: { readonly name: string; readonly packageDir: string },
   builtInIds: ReadonlySet<string>,
   provenance: ToolProvenance[],
+  manifests: ToolPluginManifest[],
 ): 'reject' | 'proceed' {
   const manifest = loadToolManifest('installed', pkg.packageDir);
   if (manifest === undefined) return 'proceed'; // grace window — legacy import path
@@ -289,6 +298,9 @@ function admitInstalledTool(
   });
   if (result.decision !== 'admit') return 'reject';
   provenance.push(result.provenance);
+  // Record the admitted manifest so the pre-action-hook can register an
+  // installed tool's declared capability domains too (§5.3).
+  manifests.push(manifest);
   return 'proceed';
 }
 
@@ -316,6 +328,7 @@ export async function discoverAndRegisterToolPackages(
   registry: ToolRegistry,
   opts: DiscoveryOptions,
   provenance: ToolProvenance[] = [],
+  manifests: ToolPluginManifest[] = [],
 ): Promise<void> {
   const builtInIds = new Set(FIRST_PARTY_TOOLS.map((t) => t.metadata.id));
   const discovered = discoverToolPackagesFromAnchors(opts.sources);
@@ -325,7 +338,7 @@ export async function discoverAndRegisterToolPackages(
       // Compatibility gate BEFORE import (release 2.8.0). `'reject'` means the
       // gate skipped it (or it's a built-in id); `'proceed'` means import +
       // register as before (manifest absent → grace window, or admitted).
-      if (admitInstalledTool(pkg, builtInIds, provenance) === 'reject') continue;
+      if (admitInstalledTool(pkg, builtInIds, provenance, manifests) === 'reject') continue;
 
       // Import by the package's RESOLVED entry path, not its bare name.
       // A discovered tool may live in a host dir (the user-global

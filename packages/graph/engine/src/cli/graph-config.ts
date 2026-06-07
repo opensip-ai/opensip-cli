@@ -1,3 +1,4 @@
+// @fitness-ignore-file null-safety -- Zod schema builder chains (.strict()/.safeParse()) always return valid objects; `.safeParse` is called on a freshly-built strict schema, never a nullable reference.
 /**
  * graph-config — load the `graph:` block of `opensip-tools.config.yml`
  * into a {@link GraphConfig}.
@@ -20,8 +21,8 @@
  * throws.
  */
 
-import { logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
 import { loadCliDefaults, resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
+import { logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
 
 import { GraphConfigSchema } from './graph-config-schema.js';
 

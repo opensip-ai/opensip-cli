@@ -34,6 +34,7 @@ import {
   RunScope,
   checkSchemaCompat,
   configureLogger,
+  createCapabilityRegistry,
   detectPhantomRuntimes,
   enterScope,
   generatePrefixedId,
@@ -51,11 +52,13 @@ import { resolveSignalSink } from '@opensip-tools/output';
 import {
   buildDatastoreThunk,
   getCurrentRegistriesForScope,
+  getToolManifestsForRun,
   setCurrentRunScope,
 } from '../cli-context.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
+import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
 import { resolveEffectiveCloudConfig } from './global-config.js';
 import { formatCliTooOldMessage, formatNoProjectFoundMessage } from './pre-action-messages.js';
 
@@ -339,16 +342,22 @@ export function installPreActionHook(program: Command, version: string): void {
     });
 
     const { languages, tools } = getCurrentRegistriesForScope();
+    // ADR-0023 Phase 4: compose + STRICT-validate config before building the
+    // scope (a typo in any tool namespace → CONFIGURATION_ERROR); resolved
+    // config rides the scope (tools read scope.toolConfig.<namespace>).
+    const toolConfig = composeAndValidateToolConfig({
+      tools,
+      configPath: project.scope === 'project' ? project.configPath : undefined,
+      env: process.env,
+    });
     const scope = new RunScope({
       logger,
       projectContext: project,
       languages,
       tools,
       signalSink,
-      // Item 2 — runId moves off the logger singleton onto RunScope as
-      // a flat kernel field (per D7). The logger's runId provider,
-      // bound at module init in run-scope.ts, reads it back via
-      // `currentScope()?.runId` for event-stamping.
+      // Item 2 — runId is a flat kernel field on RunScope (per D7); the
+      // logger's runId provider reads it back via `currentScope()?.runId`.
       runId,
       // Closure-based lazy datastore. SQLite is materialised only on
       // first access. The thunk captures `project` so non-action paths
@@ -364,16 +373,23 @@ export function installPreActionHook(program: Command, version: string): void {
       // shows it inline, other sizes get the stderr nag emitted below.
       ui: { bannerSize, version, update },
     });
-    // D7: each registered tool contributes its tool-specific subscope
-    // (e.g. `scope.simulation`, `scope.graph`) BEFORE the scope is
-    // entered. Inversion of control (M4): the tool RETURNS its slot via
-    // `contributeScope()`; the kernel installs it with `Object.assign`.
-    // The kernel doesn't know about tool-specific namespaces. Run in
-    // tool registration order; a tool with no hook is silently skipped.
+    // D7: each registered tool contributes its tool-specific subscope (e.g.
+    // `scope.simulation`, `scope.graph`) BEFORE the scope is entered. IoC (M4):
+    // the tool RETURNS its slot via `contributeScope()`; the kernel installs it
+    // with `Object.assign` (registration order; a tool with no hook is skipped).
     for (const tool of tools.list()) {
       const contribution = tool.contributeScope?.();
       if (contribution) Object.assign(scope, contribution);
     }
+
+    // §5.3 Phase 4: per-run capability registry (manifest domains → real registrars).
+    const capabilities = wireCapabilityRegistry({
+      tools,
+      manifests: getToolManifestsForRun(),
+      registry: createCapabilityRegistry(logger),
+    });
+    Object.assign(scope, { capabilities, toolConfig });
+
     enterScope(scope);
     setCurrentRunScope(scope);
 

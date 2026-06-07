@@ -25,8 +25,8 @@
 
 import { z } from 'zod';
 
-import type { ToolConfigDeclaration } from '@opensip-tools/config';
 import type { GraphConfig } from '../types.js';
+import type { ToolConfigDeclaration } from '@opensip-tools/config';
 
 /** Severity posture for the size-2 cycle band — `off` or `low` (GraphConfig). */
 const cycleSize2Severity = z.enum(['off', 'low']);
@@ -62,16 +62,18 @@ export const GraphConfigSchema = z.object({
 
 /**
  * Compile-time proof that {@link GraphConfigSchema} stays in lock-step with
- * {@link GraphConfig}: the inferred output type must be assignable to
- * `GraphConfig` (and vice-versa). If a field is added to `GraphConfig`
- * without a matching schema entry — or a schema field drifts from the type —
- * one of these assignments fails to compile.
+ * {@link GraphConfig}: the inferred output type must be MUTUALLY assignable to
+ * `GraphConfig`. If a field is added to `GraphConfig` without a matching
+ * schema entry — or a schema field drifts from the type — `AssertMutual`
+ * resolves to `never` and the `declare const` below fails to compile.
+ *
+ * This is a PURE type-level check: a `declare const` emits NO runtime value
+ * (no `{} as T` empty-object stub) and is not an export (so it cannot read as
+ * dead code). The const is the single consumption site of the proof type.
  */
 type SchemaOut = z.infer<typeof GraphConfigSchema>;
-const _schemaMatchesType: GraphConfig = {} as SchemaOut;
-const _typeMatchesSchema: SchemaOut = {} as GraphConfig;
-void _schemaMatchesType;
-void _typeMatchesSchema;
+type AssertMutual<A, B> = A extends B ? (B extends A ? true : never) : never;
+declare const _graphConfigLockstep: AssertMutual<SchemaOut, GraphConfig>;
 
 /**
  * The graph tool's contribution to the composed configuration document

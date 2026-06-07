@@ -47,6 +47,7 @@
     "@opensip-tools/checks-typescript": "workspace:*",
     "@opensip-tools/checks-universal": "workspace:*",
     "@opensip-tools/cli-ui": "workspace:*",
+    "@opensip-tools/config": "workspace:*",
     "@opensip-tools/contracts": "workspace:*",
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/dashboard": "workspace:*",
@@ -87,6 +88,7 @@
     "@types/update-notifier": "^6.0.8",
     "ink-testing-library": "^4.0.0",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "zod": "^4.4.3"
   }
 }

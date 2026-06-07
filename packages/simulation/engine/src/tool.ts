@@ -12,14 +12,15 @@ import { readPackageVersion } from '@opensip-tools/core';
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { renderSimLive } from './cli/sim-runner.js';
 import { executeSim } from './cli/sim.js';
-import { createScenarioRegistry } from './framework/registry.js';
+import { createScenarioRegistry, currentScenarioRegistry } from './framework/registry.js';
 import { SIM_PLUGIN_LAYOUT } from './plugins/loader.js';
 import { createSimulationRecipeRegistry } from './recipes/registry.js';
 // Side-effect import: ensures the RunScope.simulation augmentation is
 // loaded so `scope.simulation` is the correctly-typed slot here.
 import './scope-augmentation.js';
 
-import type { ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
+import type { RunnableScenario } from './framework/runnable-scenario.js';
+import type { CapabilityRegistrar, ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
 
 
 const SIM: ToolCommandDescriptor = {
@@ -126,6 +127,17 @@ function register(cli: ToolCliContext): void {
 }
 
 /**
+ * The simulation tool's REAL registrar for its `sim-pack` capability domain
+ * (§5.3 / Phase 4). The host registers the domain from sim's manifest with a
+ * deferred placeholder, then swaps in this registrar once sim's module loads.
+ * A routed contribution (host-checked against `requiredKeys: ['id']`) is
+ * registered into THIS run's scope-owned scenario registry.
+ */
+const registerSimScenario: CapabilityRegistrar = (contribution) => {
+  currentScenarioRegistry().register(contribution as RunnableScenario);
+};
+
+/**
  * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
  * after constructing the scope and before entering it; the kernel installs
  * the returned `simulation` slot. Fresh scenario + recipe registries per
@@ -154,4 +166,8 @@ export const simulationTool: Tool = {
   // schema so the host composes + strict-validates the whole config document
   // before dispatch.
   config: simulationConfigDeclaration,
+  // §5.3 Phase 4: simulation owns the `sim-pack` capability domain (declared in
+  // its manifest). It supplies the REAL registrar so the host can replace the
+  // manifest-time deferred placeholder once sim's module loads.
+  capabilityRegistrars: { 'sim-pack': registerSimScenario },
 };
