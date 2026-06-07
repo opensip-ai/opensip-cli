@@ -1,3 +1,4 @@
+// @fitness-ignore-file no-deprecated-tags -- the `@deprecated` on CliDefaults.recipe is a DELIBERATE, ADR-0022 graceful deprecation with a migration path (cli.recipe stays as a tolerant cross-tool fallback; the cli-recipe-deprecated check drives migration), not lingering dead code to delete.
 /**
  * cli-config — tool-agnostic loader for the `cli:` block of
  * `opensip-tools.config.yml`.

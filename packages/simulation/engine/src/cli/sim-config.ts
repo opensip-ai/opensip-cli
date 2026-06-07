@@ -25,7 +25,15 @@ function readSimulationRecipe(cwd: string, explicitPath?: string): string | unde
   let filePath: string;
   try {
     filePath = resolveProjectConfigPath(cwd, explicitPath);
-  } catch {
+  } catch (error) {
+    // No config file found — expected on a config-less project; sim then uses
+    // the cli.recipe fallback or the built-in default. Debug-only so it never
+    // adds noise. Mirrors loadGraphConfig's not-found path.
+    logger.debug({
+      evt: 'sim.config.not_found',
+      module: 'cli:sim',
+      err: error instanceof Error ? error.message : String(error),
+    });
     return undefined;
   }
   const doc = readYamlFile(filePath);

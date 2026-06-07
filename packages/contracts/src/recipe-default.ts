@@ -27,6 +27,12 @@ export type RecipeSource = 'flag' | 'tool-config' | 'cli-config' | 'builtin';
 /** Built-in recipe name every tool registers (all rules / all checks). */
 export const BUILTIN_DEFAULT_RECIPE = 'default';
 
+/**
+ * The outcome of {@link resolveToolRecipeName}: the chosen recipe `name`, which
+ * input it came from (`source`), whether an unknown `name` should be tolerated
+ * (fall back to the built-in default) or hard-fail, and whether the deprecated
+ * `cli.recipe` fallback supplied it.
+ */
 export interface ResolvedRecipe {
   /** The recipe name the tool should look up in its registry. */
   readonly name: string;
