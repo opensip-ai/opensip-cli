@@ -235,10 +235,16 @@ auth through the trusted publisher entry; with no entry registered for
 the package name, npm responds 404. The release workflow's preflight
 step warns about this case before publishing starts.
 
-> **Current brand-new package:** `@opensip-tools/graph-adapter-common`
-> (added with the tree-sitter adapter scaffolding extraction). The first
-> release after that change lands will 404 on this name until its trusted
-> publisher exists — run the bootstrap path below once to create it.
+> **Current brand-new packages (for the v2.7.0 release):**
+> `@opensip-tools/output` and `@opensip-tools/tree-sitter` — verified MISSING on
+> npm (`npm view` → 404), while the other 29 names already exist at 2.6.2.
+> `output` is the new name for the renamed `@opensip-tools/reporting`;
+> `tree-sitter` is genuinely new (ADR-0010). The v2.7.0 OIDC release will 404 on
+> both names until their trusted publishers exist — run the bootstrap path below
+> once to create them. (`@opensip-tools/graph-adapter-common`, the prior
+> brand-new package, is now published at 2.6.2 and no longer needs
+> bootstrapping.) Separately, the abandoned `@opensip-tools/reporting` should be
+> `npm deprecate`d to steer consumers to `@opensip-tools/output`.
 
 To unblock:
 
