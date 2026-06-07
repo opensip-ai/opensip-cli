@@ -243,7 +243,10 @@ export function scanSuppressionDirectives(
 
 const defaultLocate = (signal: Signal): readonly SuppressionLocation[] => {
   const file = signal.code?.file;
-  if (file === undefined) return [];
+  // An absent OR empty file path is not a real candidate location — it can
+  // carry no directive and (post-Phase-5) must never be handed to `readFile`,
+  // where it would resolve to a directory and fail loud spuriously.
+  if (file === undefined || file === '') return [];
   return [{ file, line: signal.code?.line }];
 };
 
@@ -257,8 +260,14 @@ const defaultLocate = (signal: Signal): readonly SuppressionLocation[] => {
  * location's line. A location pointing AT a directive line is never suppressed
  * by a next-line directive (anti-recursion); file-level still applies.
  *
- * A `readFile` rejection degrades to "no directives" for that file (never
- * throws) — matching the established graceful-degrade posture.
+ * Read-failure posture (fail-loud; Phase 5): the injected `readFile` reads
+ * project SOURCE files the analyzers already loaded, so a read failure is
+ * UNEXPECTED. An `ENOENT` (the file was genuinely removed) is non-fatal but
+ * ATTRIBUTED — it is surfaced via a warning-level `signals.suppress.directive-
+ * file-missing` log (so a potentially-dropped waiver is diagnosable) and that
+ * file contributes no directives. ANY other read failure (`EACCES`, `EMFILE`,
+ * decode error, …) is propagated (THROWS) — the run aborts loudly rather than
+ * silently dropping a waiver and leaking the waived signal as a finding.
  */
 export async function filterSignalsBySuppressions(
   request: SuppressionRequest,
@@ -276,19 +285,35 @@ export async function filterSignalsBySuppressions(
     for (const loc of locations) uniqueFiles.add(loc.file);
   }
 
-  // Scan each unique file once, in parallel.
+  // Scan each unique file once, in parallel. A read failure is UNEXPECTED
+  // (these are project SOURCE files the analyzers already loaded), so it must
+  // not silently degrade a file to "no directives" and leak its waivers: an
+  // `ENOENT` is non-fatal but attributed (logged + recorded below), any other
+  // error propagates and aborts the run.
   const scanByFile = new Map<string, SuppressionScan>();
+  const missingFiles = new Set<string>();
   await Promise.all(
     [...uniqueFiles].map(async (filePath) => {
       try {
         // @fitness-ignore-next-line unbounded-memory -- `readFile` is the injected reader (the kernel does no real I/O); callers read project SOURCE files the analyzers already loaded — inherently bounded, not attacker-controlled blobs.
         const content = await readFile(filePath);
         scanByFile.set(filePath, scanSuppressionDirectives(content, keywords));
-      } catch {
-        // Unreadable file → no directives. Graceful-degrade, never throw.
+      } catch (error) {
+        if (!isEnoent(error)) {
+          // Unexpected read failure (EACCES, EMFILE, decode, …) — fail loud
+          // rather than drop a waiver and leak the waived signal as a finding.
+          throw error;
+        }
+        // ENOENT: the file was genuinely removed. A removed source file yields
+        // no occurrences, so its signals should not exist — but we surface it
+        // (attribution below) instead of silently treating it as "no
+        // directives", so a leaked waiver is always diagnosable.
+        missingFiles.add(filePath);
       }
     }),
   );
+
+  attributeMissingFiles(missingFiles, request);
 
   const kept: Signal[] = [];
   const suppressed: SuppressionMatch[] = [];
@@ -304,6 +329,27 @@ export async function filterSignalsBySuppressions(
   }
 
   return { kept, suppressed };
+}
+
+/** True when `error` is a Node `ENOENT` (file genuinely absent). */
+function isEnoent(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === 'ENOENT'
+  );
+}
+
+/**
+ * Hook for surfacing `ENOENT`-absent directive files. Task 5.1 establishes the
+ * conservative non-fatal path (the signal is kept, never silently treated as
+ * "no directives" without a record); Task 5.2 wires the attributed log here.
+ */
+function attributeMissingFiles(
+  _missingFiles: ReadonlySet<string>,
+  _request: SuppressionRequest,
+): void {
+  // Attribution log wired in Task 5.2.
 }
 
 /** The first candidate location that suppresses `id`, or `null`. */

@@ -26,9 +26,20 @@ function sig(ruleId: string, file: string, line: number): Signal {
   });
 }
 
-/** A reader backed by an in-memory file map; rejects for unknown files. */
+/** An `ENOENT` rejection shaped like Node's `fs` errors. */
+function enoent(p: string): NodeJS.ErrnoException {
+  const error: NodeJS.ErrnoException = new Error(`ENOENT: no such file or directory, open '${p}'`);
+  error.code = 'ENOENT';
+  return error;
+}
+
+/**
+ * A reader backed by an in-memory file map. Unknown files reject with an
+ * `ENOENT` (the genuinely-removed-file case) so the happy-path tests exercise
+ * the conservative degrade path rather than the fail-loud one.
+ */
 function readerFor(files: Record<string, string>): (p: string) => Promise<string> {
-  return (p) => (p in files ? Promise.resolve(files[p]) : Promise.reject(new Error(`no ${p}`)));
+  return (p) => (p in files ? Promise.resolve(files[p]) : Promise.reject(enoent(p)));
 }
 
 describe('filterSignalsBySuppressions', () => {
@@ -119,11 +130,37 @@ describe('filterSignalsBySuppressions', () => {
     expect(res.kept).toHaveLength(1);
   });
 
-  it('degrades gracefully when readFile rejects (no throw, not suppressed)', async () => {
+  it('throws (fails loud) when readFile rejects with a non-ENOENT error', async () => {
+    // An unexpected read failure (EACCES, EMFILE, decode, …) must abort the run
+    // rather than silently drop the file's waivers and leak the signal.
+    const eacces: NodeJS.ErrnoException = new Error('EACCES: permission denied');
+    eacces.code = 'EACCES';
+    await expect(
+      filterSignalsBySuppressions({
+        signals: [sig('graph:cycle', 'locked.ts', 2)],
+        keywords: GRAPH_KEYWORDS,
+        readFile: () => Promise.reject(eacces),
+      }),
+    ).rejects.toThrow(/EACCES/);
+  });
+
+  it('also throws on a generic (non-ErrnoException) read rejection', async () => {
+    await expect(
+      filterSignalsBySuppressions({
+        signals: [sig('graph:cycle', 'weird.ts', 2)],
+        keywords: GRAPH_KEYWORDS,
+        readFile: () => Promise.reject(new Error('decode boom')),
+      }),
+    ).rejects.toThrow(/decode boom/);
+  });
+
+  it('on ENOENT: conservatively keeps the signal (non-fatal, not suppressed)', async () => {
+    // A genuinely-removed file is non-fatal — but the waiver cannot be
+    // evaluated, so the signal is kept (never silently treated as suppressed).
     const res = await filterSignalsBySuppressions({
       signals: [sig('graph:cycle', 'missing.ts', 2)],
       keywords: GRAPH_KEYWORDS,
-      readFile: readerFor({}),
+      readFile: readerFor({}), // unknown file → ENOENT
     });
     expect(res.kept).toHaveLength(1);
     expect(res.suppressed).toHaveLength(0);
