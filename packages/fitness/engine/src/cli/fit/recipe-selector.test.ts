@@ -1,9 +1,10 @@
 import { enterScope, RunScope } from '@opensip-tools/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { fitnessTool } from '../../tool.js';
+
 import { selectRecipe } from './recipe-selector.js';
 
-import { fitnessTool } from '../../tool.js';
 
 import type { FitOptions } from '@opensip-tools/contracts';
 

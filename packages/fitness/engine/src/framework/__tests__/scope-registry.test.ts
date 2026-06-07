@@ -8,6 +8,7 @@
 import { RunScope, runWithScope } from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
+import { fitnessTool } from '../../tool.js';
 import { defineCheck } from '../define-check.js';
 import {
   createCheckRegistry,
@@ -18,7 +19,6 @@ import {
   currentRecipeRegistry,
 } from '../scope-registry.js';
 
-import { fitnessTool } from '../../tool.js';
 
 import type { Check } from '../check-types.js';
 

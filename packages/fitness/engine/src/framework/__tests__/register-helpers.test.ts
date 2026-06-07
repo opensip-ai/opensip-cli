@@ -1,12 +1,12 @@
 import { enterScope, RunScope } from '@opensip-tools/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { fitnessTool } from '../../tool.js';
 import { defineCheck } from '../define-check.js';
 import { registerChecks } from '../register-helpers.js';
 import { CheckRegistry } from '../registry.js';
 import { currentCheckRegistry } from '../scope-registry.js';
 
-import { fitnessTool } from '../../tool.js';
 
 import type { Check } from '../check-types.js';
 

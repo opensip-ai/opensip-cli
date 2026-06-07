@@ -13,9 +13,9 @@ import { enterScope } from '@opensip-tools/core';
 import { makeTestScope } from '@opensip-tools/core/test-utils/with-scope.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { fitnessTool } from '../../tool.js';
 import { collectFitnessDashboardData } from '../dashboard.js';
 
-import { fitnessTool } from '../../tool.js';
 
 import type {
   CheckCatalogEntry,

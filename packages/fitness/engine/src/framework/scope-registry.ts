@@ -22,9 +22,10 @@
 
 import { currentScope } from '@opensip-tools/core';
 
+import { FitnessRecipeRegistry } from '../recipes/registry.js';
+
 import { CheckRegistry } from './registry.js';
 
-import { FitnessRecipeRegistry } from '../recipes/registry.js';
 
 import type { FitnessLoadState, FitnessSubscope } from '../scope-augmentation.js';
 
