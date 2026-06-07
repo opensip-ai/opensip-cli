@@ -4,12 +4,12 @@
  * global-config — read/write the user-level (`~/.opensip-tools/config.yml`)
  * config that holds the cloud API key and per-user defaults.
  *
- * Lives in `bootstrap/` because the pre-action hook reads it on every
- * invocation: `mergeConfigDefaults` falls back to the saved API key when
- * neither `--api-key` nor `OPENSIP_API_KEY` is present. Previously the
- * bootstrap path imported this from `commands/configure.ts`, inverting
- * the startup → command direction; the prompt+UX wrapper still lives
- * there but reads I/O through this module (audit 2026-05-23 M3).
+ * User-scoped config I/O is tool-agnostic, so it lives in the config layer
+ * (relocated here from the CLI's `bootstrap/` in 2.10.1, ADR-0023). The CLI's
+ * pre-action hook reads it on every invocation (`mergeConfigDefaults` falls back
+ * to the saved API key when neither `--api-key` nor `OPENSIP_API_KEY` is
+ * present), and the `configure` command's prompt+UX wrapper — which stays in
+ * `cli/commands` — reads/writes I/O through this module.
  *
  * The file is YAML and is `chmod 0o600` on write — it stores a secret.
  * Reads are tolerant of any failure (missing dir, malformed YAML); the

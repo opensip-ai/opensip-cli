@@ -15,10 +15,8 @@
  * types-only). Audit 2026-05-23 G2.
  */
 
-import { loadCliDefaults as loadCliDefaultsFromConfig } from '@opensip-tools/config';
+import { loadCliDefaults as loadCliDefaultsFromConfig, resolveApiKey } from '@opensip-tools/config';
 import { logger } from '@opensip-tools/core';
-
-import { resolveApiKey } from './global-config.js';
 
 import type { CliDefaults } from '@opensip-tools/config';
 

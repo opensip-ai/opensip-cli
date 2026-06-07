@@ -29,9 +29,9 @@
  * Barrel surface: only the symbols `index.ts` actually consumes are
  * re-exported from this barrel. Internal helpers (`mergeConfigDefaults`,
  * `loadCliDefaults`, `registerFirstPartyTools`, `FIRST_PARTY_TOOLS`,
- * `registerLanguageAdapters`, the global-config primitives) stay in
- * their files; bootstrap siblings and tests import them directly. Audit
- * 2026-05-23 M1.
+ * `registerLanguageAdapters`) stay in their files; bootstrap siblings and
+ * tests import them directly. (User-global config I/O moved to
+ * `@opensip-tools/config` in 2.10.1.) Audit 2026-05-23 M1.
  */
 
 import { initTelemetry } from '../telemetry/sdk-init.js';

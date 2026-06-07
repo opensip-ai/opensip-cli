@@ -34,7 +34,7 @@ vi.mock('node:os', async () => {
 
 // Dynamic import after the mock is set up so the module captures our homedir.
 async function loadModule() {
-  return await import('../bootstrap/global-config.js');
+  return await import('../global-config.js');
 }
 
 beforeEach(() => {

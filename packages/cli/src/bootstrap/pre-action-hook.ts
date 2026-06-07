@@ -30,6 +30,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { resolveEffectiveCloudConfig } from '@opensip-tools/config';
 import {
   RunScope,
   checkSchemaCompat,
@@ -59,7 +60,6 @@ import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
-import { resolveEffectiveCloudConfig } from './global-config.js';
 import { formatCliTooOldMessage, formatNoProjectFoundMessage } from './pre-action-messages.js';
 
 import type { Command } from 'commander';

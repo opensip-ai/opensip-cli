@@ -7,29 +7,28 @@
  *
  * The actual config I/O (read/write `~/.opensip-tools/config.yml`,
  * resolve the API key from flag → env → config) lives in
- * `bootstrap/global-config.ts` so the pre-action hook can call it
- * without inverting the startup → command direction. This file is the
- * prompt+UX wrapper around those primitives. Audit 2026-05-23 M3.
+ * `@opensip-tools/config` (relocated there in 2.10.1, ADR-0023) so the
+ * pre-action hook and this command both read it through the config
+ * layer. This file is the prompt+UX wrapper around those primitives.
+ * Audit 2026-05-23 M3.
  */
 
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-import { resolveUserPaths } from '@opensip-tools/core';
-import { checkEntitlement, DEFAULT_CLOUD_ENDPOINT } from '@opensip-tools/output';
-
 import {
   GLOBAL_CONFIG_PATH,
   readGlobalConfig,
   writeGlobalConfig,
-} from '../bootstrap/global-config.js';
+} from '@opensip-tools/config';
+import { resolveUserPaths } from '@opensip-tools/core';
+import { checkEntitlement, DEFAULT_CLOUD_ENDPOINT } from '@opensip-tools/output';
 
 import type { ConfigureDoneResult } from '@opensip-tools/contracts';
 
-// Re-export `resolveApiKey` from the bootstrap module so existing
-// command-side imports (and tests) can continue to consume it through
-// the same name without reaching into bootstrap directly.
-export { resolveApiKey } from '../bootstrap/global-config.js';
+// Re-export `resolveApiKey` from the config layer so existing command-side
+// imports (and tests) can continue to consume it through the same name.
+export { resolveApiKey } from '@opensip-tools/config';
 
 // ---------------------------------------------------------------------------
 // Interactive prompt

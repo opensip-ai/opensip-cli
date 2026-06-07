@@ -47,4 +47,12 @@ export type {
   PluginsConfig,
   TargetsConfig,
 } from './document/targeting.js';
+export {
+  GLOBAL_CONFIG_PATH,
+  readGlobalConfig,
+  writeGlobalConfig,
+  resolveApiKey,
+  resolveEffectiveCloudConfig,
+} from './document/global-config.js';
+export type { GlobalConfig } from './document/global-config.js';
 export { hostConfigDeclarations } from './document/host-declarations.js';
