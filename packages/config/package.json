@@ -1,15 +1,9 @@
 {
   "name": "@opensip-tools/config",
-  "version": "2.8.0",
+  "version": "2.10.0",
   "license": "MIT",
   "description": "Configuration layer for OpenSIP Tools — the capability-configuration composer and schema registry",
-  "keywords": [
-    "opensip-tools",
-    "static-analysis",
-    "code-quality",
-    "config",
-    "schema"
-  ],
+  "keywords": ["opensip-tools", "static-analysis", "code-quality"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

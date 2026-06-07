@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/simulation",
-  "version": "2.8.0",
+  "version": "2.10.0",
   "license": "MIT",
   "description": "Simulation scenarios for OpenSIP Tools",
   "keywords": [
@@ -33,14 +33,21 @@
     "id": "simulation",
     "apiVersion": 1,
     "commands": [
-      { "name": "sim", "description": "Run simulation scenarios [experimental]" }
+      {
+        "name": "sim",
+        "description": "Run simulation scenarios [experimental]"
+      }
     ],
     "capabilities": [
       {
         "id": "sim-pack",
         "apiVersion": 1,
         "contributionKind": "module-export",
-        "contributionSchema": { "requiredKeys": ["id"] }
+        "contributionSchema": {
+          "requiredKeys": [
+            "id"
+          ]
+        }
       }
     ]
   },

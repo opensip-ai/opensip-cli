@@ -4,6 +4,64 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.10.0] — 2026-06-07
+
+The first two tool-plugin-parity building blocks land together: **Identity &
+Compatibility** and **Capability & Configuration**. (The Identity work was
+planned as 2.9.0; it merged alongside the Capability work, so both ship in this
+release — there is no separate 2.9.0.) See
+[ADR-0023](docs/decisions/ADR-0023-config-package-and-schema-registry.md).
+
+> ### ⚠️ Behaviour change (pre-GA)
+>
+> **Config validation is now strict.** Each tool's namespace in
+> `opensip-tools.config.yml` (`graph:`, `fitness:`, `simulation:`) is validated
+> against a composed schema before a command runs; an **unknown key inside a tool
+> block now fails** (e.g. a typo'd knob) instead of silently defaulting. Unknown
+> *top-level* blocks (`cli:`, `targets:`, …) still pass through — they migrate in
+> 2.10.1. CLI commands, flags, and `--json` output are otherwise unchanged.
+
+### Added
+
+- **Tool plugin manifest + compatibility epoch.** A static `ToolPluginManifest`
+  (in `package.json#opensipTools`) the host inspects **before importing tool
+  code**, with a coarse `PLUGIN_API_VERSION` gate (missing `apiVersion` is a
+  grace-window v1). Bundled and external tools flow through **one** manifest
+  loader + compatibility gate. Incompatible tools are skipped with a structured
+  diagnostic; an explicitly-requested incompatible tool fails closed.
+- **Tool trust & provenance.** Each tool's source (bundled / installed /
+  project-local), identity, and manifest hash are recorded and surfaced in
+  `plugin list` (human + `--json`). Project-local executable tools are
+  deny-by-default (allowlist via `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`).
+- **New `@opensip-tools/config` package (32nd publishable package).** A
+  config-schema composer: each tool contributes a namespaced Zod schema; the host
+  composes one whole-document schema, validates it strictly before dispatch
+  (precedence: flag > env > file > defaults), and generates a JSON Schema for
+  editors. (ADR-0023.)
+- **Capability model.** Tools **declare** the capability domains they own in their
+  manifest; the host registers them and routes contributions to the owner's
+  registrar without being compiled to understand the domain. `MARKER_KINDS`
+  becomes a bootstrap default that manifests extend.
+- **Four new enforcement checks** (parity guardrails): `tool-has-manifest`,
+  `one-config-document`, `no-module-singleton`, `capability-by-manifest`.
+
+### Changed
+
+- **Tool config is schema-validated.** `graph`/`fitness`/`simulation` contribute
+  namespaced Zod schemas; graph's hand-projection (`projectGraphConfig`) is
+  removed in favour of the composed, strict-validated schema.
+- **Fitness registries are per-run (scope-owned).** The check + recipe registries
+  move onto `RunScope` (matching simulation), so two concurrent runs share no
+  mutable registry state. **Programmatic-API break (invisible to CLI users):** the
+  `defaultRegistry` / `defaultRecipeRegistry` module singletons are removed — code
+  importing them must read the scope registry instead.
+
+### Fixed
+
+- **`no-eval` no longer flags member calls.** `redis.eval(luaScript)` /
+  `sequelize` Lua `EVAL` are no longer mistaken for JavaScript `eval()`; only a
+  bare/global `eval(` is flagged.
+
 ## [2.8.0] — 2026-06-07
 
 Recipe defaults become **tool-scoped** ([ADR-0022](docs/decisions/ADR-0022-tool-scoped-recipe-defaults.md)).

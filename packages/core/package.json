@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/core",
-  "version": "2.8.0",
+  "version": "2.10.0",
   "license": "MIT",
   "description": "Core kernel for OpenSIP Tools — language adapters, plugin loader, errors, logger, IDs, retry, project config",
   "keywords": [

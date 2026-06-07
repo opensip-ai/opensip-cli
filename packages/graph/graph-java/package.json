@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/graph-java",
-  "version": "2.8.0",
+  "version": "2.10.0",
   "license": "MIT",
   "description": "Java language adapter for the opensip-tools graph engine",
   "keywords": [

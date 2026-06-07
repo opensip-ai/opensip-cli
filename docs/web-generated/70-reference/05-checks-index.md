@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v2.8.x
+release: v2.10.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."
@@ -20,20 +20,21 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **155+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **159+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(98 checks)*
+## Universal  *(102 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(18)*
+### Architecture  *(22)*
 
 | Slug | Description |
 |---|---|
+| [`capability-by-manifest`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/capability-by-manifest.ts) | A capability domain must be declared in a tool manifest and registered via registerCapabilityDomainsFromManifest, not host-compiled (ADR-0023, §5.3) |
 | [`cli-recipe-deprecated`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/cli-recipe-deprecated.ts) | Flag the deprecated tool-agnostic cli.recipe default; recipes are tool-scoped (ADR-0022) |
 | [`cross-tool-flag-parity`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/cross-tool-flag-parity.ts) | Cross-tool common CLI flags must come from the shared registry, not be hand-declared (ADR-0021) |
 | [`docker-ignore-validation`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-ignore-validation.ts) | Validate .dockerignore files exist alongside Dockerfiles with required patterns |
@@ -45,11 +46,14 @@ Language-agnostic; runs against every project.
 | [`no-custom-event-emitter`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-custom-event-emitter.ts) | Detects direct EventEmitter usage that should use infrastructure/events |
 | [`no-direct-stdout-in-tool-engine`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts) | Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011) |
 | [`no-duplicate-packages`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/dependencies/no-duplicate-packages.ts) | Detects packages that serve the same purpose |
+| [`no-module-singleton`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-module-singleton.ts) | No module-level mutable registry/loaded-state singleton; per-run state lives on RunScope via a factory (ADR-0023). fileCache/memoryProfiler are exempt. |
 | [`node-version-consistency`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/node-version-consistency.ts) | Validate Node.js version consistency across configs |
+| [`one-config-document`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/one-config-document.ts) | A tool must validate its config block through a composed Zod schema, not hand-project its own opensip-tools.config.yml namespace (ADR-0023) |
 | [`project-readme-existence`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/project-readme-existence.ts) | Ensures every package has a README.md file |
 | [`release-gate-parity`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/release-gate-parity.ts) | Ensure release.yml re-runs every PR-quality gate (lint, test:coverage, fit:ci, graph:ci) before pack/publish (ADR-0017) |
 | [`restrict-raw-db-access`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/restrict-raw-db-access.ts) | Confine the raw Drizzle handle (DataStore.db) to the persistence ownership boundary (ADR-0009) |
 | [`stale-build-artifacts`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/stale-build-artifacts.ts) | Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/ |
+| [`tool-has-manifest`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-has-manifest.ts) | Every first-party tool package must declare a conformant opensipTools manifest (kind/id/apiVersion/commands) the host can read before import (release 2.8.0) |
 | [`vitest-config-extends-base`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-extends-base.ts) | Per-package vitest configs must extend the shared .config/vitest.base (when one exists) |
 | [`vitest-config-required-with-tests`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-required-with-tests.ts) | Ensures packages with tests have a vitest.config at the package root |
 
