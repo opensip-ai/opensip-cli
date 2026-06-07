@@ -101,11 +101,25 @@ describe('composeAndValidateToolConfig', () => {
     expect(result?.fitness).toEqual({ failOnErrors: 3 });
   });
 
-  it('tolerates unclaimed top-level keys (cli/targets ride the catchall)', () => {
-    const configPath = writeConfig('cli:\n  recipe: example\ntargets:\n  app:\n    include: ["src/**"]\n');
+  it('validates the claimed host blocks (cli/targets) and still tolerates genuinely-unknown keys', () => {
+    // 2.10.1: cli + a well-formed target are now CLAIMED host declarations and
+    // validate through the composed schema; a truly-unclaimed top-level key
+    // still rides the document `.catchall`.
+    const configPath = writeConfig(
+      'cli:\n  recipe: example\ntargets:\n  app:\n    description: App\n    include: ["src/**"]\nfutureThing:\n  whatever: 1\n',
+    );
     expect(() =>
       composeAndValidateToolConfig({ tools: registryWith([graphTool, fitnessTool]), configPath, env: {} }),
     ).not.toThrow();
+  });
+
+  it('strict-rejects a malformed claimed host block (a target missing its description)', () => {
+    // Previously `targets` rode the catchall untouched; 2.10.1 claims it, so a
+    // target missing the required `description` now fails the composed gate.
+    const configPath = writeConfig('targets:\n  app:\n    include: ["src/**"]\n');
+    expect(() =>
+      composeAndValidateToolConfig({ tools: registryWith([graphTool, fitnessTool]), configPath, env: {} }),
+    ).toThrow(ConfigurationError);
   });
 
   it('throws ConfigurationError on a typo inside any tool namespace', () => {

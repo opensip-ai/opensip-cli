@@ -6,7 +6,13 @@
  * definitions in opensip-tools.config.yml.
  */
 
-import { cliConfigSchema, dashboardConfigSchema } from '@opensip-tools/config'
+import {
+  checkOverridesSchema,
+  cliConfigSchema,
+  dashboardConfigSchema,
+  globalExcludesSchema,
+  targetsRecordSchema,
+} from '@opensip-tools/config'
 import { z } from 'zod'
 
 // Inline defaults
@@ -17,17 +23,15 @@ const DEFAULTS = {
 } as const;
 
 // =============================================================================
-// Target Definition Schema
+// Target Definition Schema — owned by @opensip-tools/config (2.10.1, ADR-0023)
 // =============================================================================
 
-const TargetDefinitionSchema = z.object({
-  description: z.string().min(1, 'description is required'),
-  include: z.array(z.string()).min(1, 'at least one include pattern is required'),
-  exclude: z.array(z.string()).optional(),
-  tags: z.array(z.string()).optional(),
-  languages: z.array(z.string()).optional(),
-  concerns: z.array(z.string()).optional(),
-})
+// `targets` / `globalExcludes` / `checkOverrides` are the shared two-layer scope
+// model; their schemas moved to the config layer and the host registers them as
+// document-level declarations. This whole-document schema still validates them
+// (so `loadSignalersConfig` keeps reading targeting) until fitness reads
+// targeting off the composed scope config (Phase 4) — it imports the schemas
+// rather than re-defining them, so there is one definition.
 
 // =============================================================================
 // Producer Schemas (copied from config/schema.ts — removed from there in Phase 2)
@@ -56,15 +60,6 @@ const SimulationSchema = z.object({
   // explicit `--recipe` typo still hard-fails.
   recipe: z.string().min(1).max(128).optional(),
 })
-
-// =============================================================================
-// Check Overrides
-// =============================================================================
-
-const CheckTargetValueSchema = z.union([
-  z.string(),
-  z.array(z.string()).min(1),
-])
 
 // =============================================================================
 // CLI Defaults + Dashboard — now owned by @opensip-tools/config (2.10.1)
@@ -101,12 +96,9 @@ export const SignalersConfigSchema = z.object({
   // strict loader runs. Default 1 keeps existing configs (written before
   // the field existed) valid.
   schemaVersion: z.number().int().min(1).default(1),
-  globalExcludes: z.array(z.string()).default([]),
-  targets: z.record(
-    z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'target name must be kebab-case'),
-    TargetDefinitionSchema,
-  ).default({}),
-  checkOverrides: z.record(z.string(), CheckTargetValueSchema).optional(),
+  globalExcludes: globalExcludesSchema.default([]),
+  targets: targetsRecordSchema.default({}),
+  checkOverrides: checkOverridesSchema.optional(),
   fitness:    section(FitnessSchema),
   simulation: section(SimulationSchema),
   cli:        section(CliDefaultsSchema),

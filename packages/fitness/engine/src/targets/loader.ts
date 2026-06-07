@@ -6,6 +6,11 @@
  * Validates with Zod and populates a TargetRegistry.
  */
 
+import {
+  checkOverridesSchema,
+  globalExcludesSchema,
+  targetsRecordSchema,
+} from '@opensip-tools/config'
 import { PROJECT_CONFIG_FILENAME, ValidationError, readYamlFileOrThrow, resolveProjectConfigPath } from '@opensip-tools/core'
 import { z } from 'zod'
 
@@ -21,20 +26,11 @@ const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**']
 // YAML schemas
 // =============================================================================
 
-const TargetEntrySchema = z.object({
-  description: z.string().min(1, 'description is required'),
-  include: z.array(z.string()).min(1, 'at least one include pattern is required'),
-  exclude: z.array(z.string()).optional(),
-  tags: z.array(z.string()).optional(),
-  languages: z.array(z.string()).optional(),
-  concerns: z.array(z.string()).optional(),
-})
-
-const CheckTargetValueSchema = z.union([
-  z.string(),
-  z.array(z.string()).min(1),
-])
-
+// The targets / globalExcludes / checkOverrides shapes are owned by
+// @opensip-tools/config (2.10.1, ADR-0023) — the same schemas the host
+// registers as document-level declarations. This loader composes them with the
+// fitness-local `plugins` block (a discovery concern, out of the targeting
+// migration) and adds the registry build + cross-validation runtime below.
 const PluginsSchema = z.object({
   fit: z.array(z.string()).optional(),
   sim: z.array(z.string()).optional(),
@@ -44,12 +40,9 @@ const PluginsSchema = z.object({
 }).optional()
 
 const TargetsFileSchema = z.object({
-  targets: z.record(
-    z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'target name must be kebab-case'),
-    TargetEntrySchema,
-  ),
-  globalExcludes: z.array(z.string()).optional(),
-  checkOverrides: z.record(z.string(), CheckTargetValueSchema).optional(),
+  targets: targetsRecordSchema,
+  globalExcludes: globalExcludesSchema.optional(),
+  checkOverrides: checkOverridesSchema.optional(),
   plugins: PluginsSchema,
 })
 

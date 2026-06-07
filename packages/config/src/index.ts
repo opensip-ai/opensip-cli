@@ -33,4 +33,18 @@ export type { JsonSchema } from './json-schema.js';
 export { loadCliDefaults, cliConfigSchema } from './document/cli-config.js';
 export type { CliDefaults } from './document/cli-config.js';
 export { dashboardConfigSchema } from './document/dashboard.js';
+export {
+  targetDefinitionSchema,
+  checkTargetValueSchema,
+  targetsRecordSchema,
+  globalExcludesSchema,
+  checkOverridesSchema,
+} from './document/targeting.js';
+export type {
+  TargetConfig,
+  Target,
+  CheckTargetMap,
+  PluginsConfig,
+  TargetsConfig,
+} from './document/targeting.js';
 export { hostConfigDeclarations } from './document/host-declarations.js';

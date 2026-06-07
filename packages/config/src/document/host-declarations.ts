@@ -21,6 +21,11 @@ import { z } from 'zod';
 
 import { cliConfigSchema } from './cli-config.js';
 import { dashboardConfigSchema } from './dashboard.js';
+import {
+  checkOverridesSchema,
+  globalExcludesSchema,
+  targetsRecordSchema,
+} from './targeting.js';
 
 import type { ToolConfigDeclaration } from '../declaration.js';
 
@@ -37,5 +42,11 @@ export function hostConfigDeclarations(): readonly ToolConfigDeclaration[] {
     // Permissive: core owns version-compat; the schema only ensures a present
     // value is a positive integer, never rejecting an absent one.
     { namespace: 'schemaVersion', schema: z.number().int().min(1) },
+    // Shared two-layer scope model (2.10.1) — three top-level keys, registered
+    // separately so the composed document matches the existing YAML exactly (no
+    // `targeting:` wrapper key; no rename).
+    { namespace: 'targets', schema: targetsRecordSchema },
+    { namespace: 'globalExcludes', schema: globalExcludesSchema },
+    { namespace: 'checkOverrides', schema: checkOverridesSchema },
   ];
 }
