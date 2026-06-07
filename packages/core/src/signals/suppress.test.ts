@@ -160,7 +160,7 @@ describe('filterSignalsBySuppressions', () => {
   });
 
   it('on ENOENT: logs the missing-file evt and conservatively keeps the signal (not suppressed)', async () => {
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const res = await filterSignalsBySuppressions({
       signals: [sig('graph:cycle', 'missing.ts', 2)],
       keywords: GRAPH_KEYWORDS,
@@ -182,7 +182,7 @@ describe('filterSignalsBySuppressions', () => {
   });
 
   it('on ENOENT under a ruleIdOf override: attributes the resolved ruleId', async () => {
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     await filterSignalsBySuppressions({
       signals: [sig('some-other-rule-id', 'gone.ts', 2)],
       keywords: FITNESS_KEYWORDS,
@@ -198,7 +198,7 @@ describe('filterSignalsBySuppressions', () => {
   });
 
   it('does NOT log the missing-file evt on the happy path (present files)', async () => {
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const content = ['// @graph-ignore-next-line graph:cycle -- ok', 'function visit() {}'].join('\n');
     await filterSignalsBySuppressions({
       signals: [sig('graph:cycle', 'a.ts', 2)],
