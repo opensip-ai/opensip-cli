@@ -1,4 +1,5 @@
 // @fitness-ignore-file performance-anti-patterns -- sequential await across discovered tool packages preserves load order for plugin-conflict detection; bounded by installed plugin count
+// @fitness-ignore-file file-length-limit -- bootstrap composition root: one cohesive tool-admission lifecycle (resolve bundled dir → loadToolManifest → admitTool, across bundled / installed / project-local sources) plus discovery-source ordering and command mounting; splitting fragments the unified admission dispatch (cf. graph.ts's identical waiver for its subcommand-dispatch surface).
 /**
  * register-tools — populate the kernel `ToolRegistry` with first-party
  * tools (fitness / simulation / graph) plus any third-party tool

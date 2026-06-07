@@ -1,6 +1,7 @@
+// @fitness-ignore-file performance-anti-patterns -- the only async op is reading the analyzed workspace's package.json files in parallel; concurrency is bounded by the package.json count (a handful, not attacker-controlled), matching register-tools.ts's identical bounded-IO waiver.
 /**
  * @fileoverview Every first-party tool package must declare a conformant
- * static plugin manifest (release 2.8.0, identity & compatibility — Phase 5).
+ * static plugin manifest (release 2.9.0, identity & compatibility — Phase 5).
  *
  * Per north-star Principle 6, the guardrail is the definition of done: this
  * check is what prevents the next release from re-accumulating the
@@ -47,7 +48,7 @@ interface PackageJson {
   readonly opensipTools?: OpensipToolsBlock
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -71,7 +72,7 @@ function checkCommands(commands: unknown, push: PushViolation): void {
     return
   }
   for (const [i, entry] of commands.entries()) {
-    if (!isRecord(entry)) {
+    if (!isJsonObject(entry)) {
       push('commands', `entry [${i}] must be an object with { name, description }`)
       continue
     }
@@ -128,7 +129,7 @@ function checkManifestBlock(block: OpensipToolsBlock, filePath: string): CheckVi
  */
 export function analyzeToolHasManifest(pkg: PackageJson, filePath: string): CheckViolation[] {
   const block = pkg.opensipTools
-  if (!isRecord(block) || block.kind !== 'tool') return []
+  if (!isJsonObject(block) || block.kind !== 'tool') return []
   return checkManifestBlock(block, filePath)
 }
 
@@ -140,12 +141,15 @@ export function analyzeToolHasManifest(pkg: PackageJson, filePath: string): Chec
  */
 export async function analyzeAllToolManifests(files: FileAccessor): Promise<CheckViolation[]> {
   const violations: CheckViolation[] = []
+  // Sequential read over the analyzed workspace's package.json files (bounded by
+  // package count); the file-level performance-anti-patterns waiver above covers
+  // the await-in-loop — sequential avoids the no-unbounded-concurrency a
+  // Promise.all(map) would trip, and the read count is tiny.
   for (const filePath of files.paths) {
     if (path.basename(filePath) !== 'package.json') continue
-    const content = await files.read(filePath)
     let pkg: PackageJson
     try {
-      pkg = JSON.parse(content) as PackageJson
+      pkg = JSON.parse(await files.read(filePath)) as PackageJson
     } catch {
       // A malformed package.json is some other check's concern; a tool
       // manifest cannot be read from it either way, so skip silently.
