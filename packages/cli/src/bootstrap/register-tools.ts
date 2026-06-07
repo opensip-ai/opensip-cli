@@ -25,6 +25,7 @@ import {
   loadToolManifest,
   logger,
   PluginIncompatibleError,
+  PROJECT_LOCAL_MANIFEST_FILE,
   readToolPackageMetadata,
   resolveProjectContext,
   resolveProjectPaths,
@@ -39,6 +40,7 @@ import { fitnessTool } from '@opensip-tools/fitness';
 import { graphTool } from '@opensip-tools/graph';
 import { simulationTool } from '@opensip-tools/simulation';
 
+import { isProjectLocalToolTrusted } from './tool-trust.js';
 import { isValidTool } from './validate-tool.js';
 
 /**
@@ -337,6 +339,67 @@ export async function discoverAndRegisterToolPackages(
       });
     }
   }
+}
+
+/**
+ * Admit (or reject) a single PROJECT-LOCAL executable tool under the
+ * deny-by-default trust policy (release 2.8.0, Phase 3 Task 3.2).
+ *
+ * A project-local tool is authored code under `<project>/opensip-tools/…`
+ * declaring its identity via a JSON sidecar (`opensip-tool.manifest.json`).
+ * It is read + gated WITHOUT importing its module:
+ *
+ *   1. `loadToolManifest('project-local', dir)` — identity only, no code run.
+ *   2. Trust check — {@link isProjectLocalToolTrusted}. Not allowlisted ⇒
+ *      throw {@link PluginIncompatibleError} (fail-closed, exit 5) before any
+ *      import. Allowlisted ⇒ run the compatibility gate; an incompatible
+ *      explicitly-trusted tool is likewise fail-closed.
+ *
+ * Returns the admitted tool's `ToolProvenance` on success. Full
+ * project-local tool DISCOVERY (walking the authored tree) is intentionally
+ * light in 2.8.0; this is the reusable admission policy a discovery caller
+ * routes each candidate through — the trust decision always precedes import.
+ *
+ * @throws {PluginIncompatibleError} when the tool has no conformant sidecar
+ *   manifest, is not allowlisted, or is compatibility-incompatible.
+ */
+export function admitProjectLocalTool(args: {
+  readonly dir: string;
+  readonly env?: NodeJS.ProcessEnv;
+}): ToolProvenance {
+  const manifest = loadToolManifest('project-local', args.dir);
+  if (manifest === undefined) {
+    throw new PluginIncompatibleError(
+      `project-local tool at '${args.dir}' has no conformant ${PROJECT_LOCAL_MANIFEST_FILE} sidecar`,
+      { diagnostic: 'manifest missing or malformed' },
+    );
+  }
+
+  // Trust decision FIRST — deny-by-default, before any compatibility maths
+  // and (critically) before the tool's module could ever be imported.
+  if (!isProjectLocalToolTrusted(manifest.id, args.env)) {
+    throw new PluginIncompatibleError(
+      `project-local tool '${manifest.id}' is not trusted to load (deny-by-default). ` +
+        `Allowlist it via OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS='${manifest.id}' to admit it.`,
+      { diagnostic: 'project-local tool not allowlisted (deny-by-default)' },
+    );
+  }
+
+  const result = admitTool({
+    manifest,
+    source: 'project-local',
+    dir: args.dir,
+    // An allowlisted project-local tool was explicitly trusted by the user,
+    // so an incompatible one fails the run rather than skipping silently.
+    explicitlyRequested: true,
+  });
+  if (result.decision !== 'admit') {
+    throw new PluginIncompatibleError(
+      `project-local tool '${manifest.id}' is incompatible: ${result.diagnostic ?? 'compatibility gate rejected it'}`,
+      { diagnostic: result.diagnostic },
+    );
+  }
+  return result.provenance;
 }
 
 /**
