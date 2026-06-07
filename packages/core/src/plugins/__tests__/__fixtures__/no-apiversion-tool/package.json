@@ -1,0 +1,9 @@
+{
+  "name": "@example/no-apiversion-tool",
+  "version": "1.0.0",
+  "opensipTools": {
+    "kind": "tool",
+    "id": "graceful",
+    "commands": [{ "name": "graceful", "description": "A tool that predates the apiVersion epoch (grace window)" }]
+  }
+}

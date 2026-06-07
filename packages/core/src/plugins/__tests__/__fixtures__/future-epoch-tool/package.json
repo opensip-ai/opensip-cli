@@ -1,0 +1,10 @@
+{
+  "name": "@example/future-epoch-tool",
+  "version": "9.9.9",
+  "opensipTools": {
+    "kind": "tool",
+    "id": "future",
+    "apiVersion": 999,
+    "commands": [{ "name": "future", "description": "A tool from a later plugin-API epoch" }]
+  }
+}
