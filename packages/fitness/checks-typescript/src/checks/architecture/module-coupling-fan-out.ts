@@ -57,13 +57,13 @@ function isBarrelFile(content: string): boolean {
   }
   if (buffer) logicalLines.push(buffer)
 
-  /* v8 ignore next -- defensive AST/type guard */
-  if (logicalLines.length === 0) return false
-
-  // Every logical line must be a re-export. Anything else (import,
-  // declaration, side-effect call) disqualifies.
+  // Every logical line must be a re-export, and an empty file is not a re-export
+  // barrel. Anything else (import, declaration, side-effect call) disqualifies.
+  // Single boolean expression — no early `return false` (which the
+  // silent-early-returns check would flag as a swallowed failure path).
   const reExportRe = /^export\s+(?:type\s+)?[*{]/
-  return logicalLines.every((line) => reExportRe.test(line))
+  /* v8 ignore next -- empty-input branch is a defensive guard, not hit by fixtures */
+  return logicalLines.length > 0 && logicalLines.every((line) => reExportRe.test(line))
 }
 
 export const moduleCouplingFanOut = defineCheck({

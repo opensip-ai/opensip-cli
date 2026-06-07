@@ -20,6 +20,24 @@ import type { LanguageAdapter } from './adapter.js'
 const AUTO_CLEAR_MS = 10 * 60 * 1000
 
 /**
+ * Fast content fingerprint for the parse-cache key (FNV-1a 32-bit over the FULL
+ * content + length). Distinguishes raw source from same-length filtered variants
+ * (`filterContent` blanks string/comment regions to spaces, preserving length),
+ * so an AST check that needs raw source never receives a strings-stripped tree.
+ * O(n) but far cheaper than the parse it gates; the trailing length guards
+ * against the (astronomically unlikely) per-file hash collision across the
+ * handful of content variants seen for one path.
+ */
+export function fingerprintContent(content: string): string {
+  let hash = 0x81_1C_9D_C5
+  for (let i = 0; i < content.length; i += 1) {
+    hash ^= content.codePointAt(i) ?? 0
+    hash = Math.imul(hash, 0x01_00_01_93)
+  }
+  return `${(hash >>> 0).toString(36)}:${String(content.length)}`
+}
+
+/**
  * Per-instance parse cache. Each instance owns its own parse-tree
  * `Map`, a sibling `filteredContent` `Map` (for language-specific
  * filtered-content caching keyed by raw content), and (optionally) an
@@ -67,12 +85,15 @@ export class LanguageParseCache {
     filePath: string,
     content: string,
   ): TTree | null {
-    // Cache key uses a fast content fingerprint to differentiate between raw
-    // content and code-only filtered content. content.length alone is insufficient
-    // because filterContent preserves length (replaces chars with same-length spaces).
-    // Using the first 64 chars + length provides practical uniqueness.
-    const fingerprint = content.slice(0, 64).replaceAll(/\s/g, '') + ':' + content.length
-    const key = `${adapter.id}:${filePath}:${fingerprint}`
+    // Cache key fingerprints the FULL content so raw and code-only-filtered
+    // variants of the same file never collide. `filterContent` replaces stripped
+    // regions (string/comment text) with same-length spaces, so neither
+    // `content.length` nor a first-N-chars sample distinguishes them when the
+    // divergence is later in the file — a sampled key let an AST check that
+    // needs raw source receive a strings-stripped tree (blanked module
+    // specifiers), nondeterministically by check order. A full-content hash is
+    // cheap relative to parsing and removes that cross-contamination.
+    const key = `${adapter.id}:${filePath}:${fingerprintContent(content)}`
     const cached = this.cache.get(key) as TTree | undefined
     if (cached !== undefined) return cached
 

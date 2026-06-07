@@ -205,4 +205,36 @@ describe('language-aware parse cache', () => {
       expect(() => cache.dispose()).not.toThrow()
     })
   })
+
+  describe('content fingerprint — raw vs filtered must not collide', () => {
+    it('returns distinct trees for same-length raw vs filtered content diverging past char 64', () => {
+      // Regression: the cache key once sampled only the first 64 chars (whitespace
+      // removed) + length. `filterContent` blanks string/comment regions to
+      // same-length spaces, so when the first 64 chars are identical (no stripped
+      // content there) and the divergence is a later string literal, raw and
+      // filtered content produced the SAME key — an AST check needing raw source
+      // got the strings-stripped tree (module specifiers blanked to whitespace),
+      // nondeterministically by check order. The full-content fingerprint fixes it.
+      const cache = new LanguageParseCache()
+      const adapter = makeAdapter('ts', ['.ts'])
+
+      const prefix = '// a sufficiently long identical leading comment to exceed sixty-four chars\n'
+      expect(prefix.length).toBeGreaterThan(64)
+      const raw = `${prefix}const m = 'REALMODULE';\n`
+      const filtered = `${prefix}const m = '          ';\n` // 'REALMODULE' (10) -> 10 spaces
+      expect(filtered.length).toBe(raw.length) // same length (filterContent preserves it)
+
+      const rawTree = cache.getOrParse(adapter, 'x.ts', raw)
+      const filteredTree = cache.getOrParse(adapter, 'x.ts', filtered)
+
+      // The filtered request must NOT receive the cached raw tree.
+      expect(rawTree?.content).toBe(raw)
+      expect(filteredTree?.content).toBe(filtered)
+      expect(filteredTree?.id).not.toBe(rawTree?.id)
+
+      // Caching still works: re-requesting the raw content hits the same tree.
+      expect(cache.getOrParse(adapter, 'x.ts', raw)?.id).toBe(rawTree?.id)
+      cache.dispose()
+    })
+  })
 })
