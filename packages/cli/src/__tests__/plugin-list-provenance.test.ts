@@ -53,7 +53,9 @@ describe('plugin list — tool provenance', () => {
     const result = await pluginList('/no/such/project', []);
     // Round-trip through the exact serializer `mountResultCommand`'s --json
     // branch uses, then re-parse, to assert the wire shape a machine sees.
-    const json = JSON.parse(JSON.stringify(result, null, 2)) as typeof result; // eslint-disable-line unicorn/prefer-structured-clone -- intentionally exercises the JSON.stringify --json path, not a deep clone
+    // NB: intentionally exercises the JSON.stringify --json path, not a deep
+    // clone — this is the exact bytes a machine consumer sees.
+    const json = JSON.parse(JSON.stringify(result, null, 2)) as typeof result;
 
     if (json.type !== 'plugin-list') throw new Error('unreachable');
     expect(json.toolProvenance).toHaveLength(2);
