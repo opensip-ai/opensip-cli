@@ -63,6 +63,50 @@ describe('resultToView', () => {
     expect(out).toContain('1 Passed, 1 Failed (2 Errors, 1 Warnings) | Duration 8ms');
   });
 
+  it('renders the fit-done verbose findings body and suppresses the hint (ADR-0021)', () => {
+    const out = textOf({
+      type: 'fit-done',
+      label: 'fit',
+      cwd: '/x',
+      envelope: buildSignalEnvelope({
+        tool: 'fit',
+        runId: 'r',
+        createdAt: '2026-06-04T00:00:00.000Z',
+        units: [{ slug: 'no-console', passed: false, durationMs: 5 }],
+        signals: [fitSignal({ source: 'no-console', severity: 'high', message: 'console.log', filePath: 'a.ts', line: 3 })],
+      }),
+      verboseDetail: {
+        kind: 'findings',
+        groups: [
+          { title: 'No Console', errorCount: 1, warningCount: 0, findings: [{ severity: 'error', message: 'console.log', location: 'a.ts:3' }] },
+        ],
+      },
+    });
+    expect(out).toContain('Findings');
+    expect(out).toContain('No Console');
+    expect(out).toContain('console.log');
+    expect(out).toContain('a.ts:3');
+    // Verbose run: no "Use --verbose…" hint.
+    expect(out).not.toContain('Use --verbose for detailed results');
+  });
+
+  it('shows the shared "Use --verbose…" hint on a non-verbose fit-done run (ADR-0021)', () => {
+    const out = textOf({
+      type: 'fit-done',
+      label: 'fit',
+      cwd: '/x',
+      envelope: buildSignalEnvelope({
+        tool: 'fit',
+        runId: 'r',
+        createdAt: '2026-06-04T00:00:00.000Z',
+        units: [{ slug: 'naming', passed: true, durationMs: 3 }],
+        signals: [],
+      }),
+    });
+    expect(out).toContain('Use --verbose for detailed results');
+    expect(out).toContain('opensip-tools dashboard for HTML report');
+  });
+
   it('renders fit-done errored/clean units: ERROR status, blank validated cell', () => {
     const out = textOf({
       type: 'fit-done',

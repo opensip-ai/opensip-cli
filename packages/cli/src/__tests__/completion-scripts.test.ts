@@ -12,6 +12,19 @@ describe('buildCompletionScript', () => {
     expect(s).toContain('fit');
   });
 
+  it('derives common flags from the registry — sim advertises --verbose (ADR-0021)', () => {
+    // Regression: before ADR-0021 completion's COMMON_FLAGS listed --verbose but
+    // sim did not implement it. Now sim implements it AND completion derives the
+    // list from the registry, so the two cannot disagree.
+    const s = buildCompletionScript('bash');
+    expect(s).toContain('--verbose');
+    expect(s).toContain('--report-to');
+    // The fish per-subcommand lines should attach a verbose completion to sim
+    // (fish renders long flags without the leading `--`).
+    const fish = buildCompletionScript('fish');
+    expect(fish).toContain('__fish_seen_subcommand_from sim" -l "verbose"');
+  });
+
   it('emits a zsh completion script with #compdef and _values', () => {
     const s = buildCompletionScript('zsh');
     expect(s).toContain('#compdef opensip-tools');
