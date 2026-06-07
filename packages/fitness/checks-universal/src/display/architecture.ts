@@ -6,6 +6,7 @@ import type { CheckDisplayEntry } from './types.js'
 
 /** Architecture check display entries (UNIVERSAL only) */
 export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
+  'capability-by-manifest': ['🧩', 'Capability By Manifest'],
   'cli-recipe-deprecated': ['♻️', 'CLI Recipe Deprecated'],
   'cross-tool-flag-parity': ['🚩', 'Cross-Tool Flag Parity'],
   'docker-best-practices': ['🐳', 'Docker Best Practices'],
