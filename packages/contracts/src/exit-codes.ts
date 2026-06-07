@@ -13,6 +13,14 @@ export const EXIT_CODES = {
   CONFIGURATION_ERROR: 2,
   CHECK_NOT_FOUND: 3,
   REPORT_FAILED: 4,
+  /**
+   * A plugin was rejected by the compatibility gate (release 2.8.0) — its
+   * declared `apiVersion` is out of range and it was explicitly requested
+   * (fail-closed; the skip path is silent). Dedicated rather than reusing
+   * `CONFIGURATION_ERROR` so an incompatible plugin is diagnosable from the
+   * exit code alone. Read by the CLI fail-closed admission path (Phase 3).
+   */
+  PLUGIN_INCOMPATIBLE: 5,
 } as const;
 
 /**
