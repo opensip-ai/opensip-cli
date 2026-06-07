@@ -392,20 +392,37 @@ function stitchCrossShardEdges(
 // ── Task 2.3: correctness diff helper (test/validation) ───────────
 
 export interface CatalogEdgeDiff {
-  /** Intra-shard edges that differ between the two catalogs. MUST be empty
-   *  for a correct sharded build vs whole-project build. */
+  /** Intra-shard edges whose target differs between the two catalogs. MUST be
+   *  empty for a correct sharded build vs single-program build. */
   readonly intraMismatches: readonly string[];
-  /** Cross-shard edges present in one catalog but not the other (the
-   *  expected difference: edges only the semantic boundary linker recovers). */
+  /**
+   * Cross-package (boundary-linked) edges whose target differs between the two
+   * catalogs. MUST ALSO be empty.
+   *
+   * With semantic linking (Phase 2), the sharded build's cross-package edges
+   * are no longer an approximation of the single-program build's — they are the
+   * SAME edges, recovered by linking each import specifier + callee name to the
+   * UNIQUE exported occurrence the type checker would pick. A non-empty
+   * `crossDifferences` is therefore a correctness REGRESSION (e.g. a name-only
+   * fallback fabricating a phantom edge into a package the caller never
+   * imported, or the linker declining an edge the single program resolves), NOT
+   * an accepted fidelity gap. The Phase 4 equivalence guardrail asserts this
+   * partition empty.
+   */
   readonly crossDifferences: readonly string[];
 }
 
 /**
- * Diff two catalogs by edge, partitioned into intra-shard mismatches
- * (expected empty) vs cross-shard differences (expected). An edge is keyed
- * by `ownerHash@line:col → sorted(to)`. Used by Phase 5 tests / Phase 6
- * validation to assert the sharded build matches the whole-project build
- * on intra-package edges.
+ * Diff two catalogs by edge, partitioned into intra-shard mismatches and
+ * cross-package (boundary-linked) differences. An edge is keyed by
+ * `ownerHash@line:col → sorted(to)`; a key is a difference when the two
+ * catalogs disagree on its target set. Both partitions MUST be empty for a
+ * correct sharded build vs single-program build: intra-package edges are exact
+ * in both, and semantic boundary linking reproduces the single-program build's
+ * cross-package edges verbatim (Phase 2). The partition only records WHICH side
+ * a difference falls on (cross when either edge is `crossShard`), so a
+ * regression is attributable to the linker vs a local resolver. The Phase 4
+ * equivalence guardrail (`__tests__/equivalence.test.ts`) is the live gate.
  */
 export function diffCatalogsByEdge(a: Catalog, b: Catalog): CatalogEdgeDiff {
   const ea = indexEdges(a);

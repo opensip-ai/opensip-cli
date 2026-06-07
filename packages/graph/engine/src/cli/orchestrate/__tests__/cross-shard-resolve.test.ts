@@ -298,7 +298,13 @@ describe('diffCatalogsByEdge', () => {
     expect(diff.crossDifferences).toEqual([]);
   });
 
-  it('reports zero intra mismatches and the cross-shard difference', () => {
+  it('partitions a cross-package edge difference into crossDifferences (not intraMismatches)', () => {
+    // This exercises the PARTITIONING mechanism, not an accepted divergence: we
+    // diff a DEGENERATE "whole" catalog that deliberately omits the cross-package
+    // edge against a sharded catalog that recovered it, and assert the lone
+    // difference lands in `crossDifferences`. In a real equivalence check both
+    // partitions must be empty (the whole-project build resolves the same edge);
+    // the Phase 4 guardrail (`equivalence.test.ts`) asserts that.
     const whole = mergeShardFragments(
       [fragment('typescript', occ('mainA', 'packages/pkg-a/index.ts', 'A'))],
       ['packages/pkg-a/index.ts'],
