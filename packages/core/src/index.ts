@@ -99,6 +99,10 @@ export type {
   ToolProvenance,
   ToolSource,
 } from './tools/index.js';
+// The single pure compatibility gate shared by the bundled + external
+// admission paths (release 2.8.0). Re-exported by @opensip-tools/contracts.
+export { checkCompatibility } from './tools/index.js';
+export type { CompatibilityVerdict } from './tools/index.js';
 export {
   TOOL_LONG_IDS,
   TOOL_LONG_TO_SHORT,

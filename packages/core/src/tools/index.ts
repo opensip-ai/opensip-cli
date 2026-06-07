@@ -24,6 +24,10 @@ export type {
   ToolProvenance,
   ToolSource,
 } from './manifest.js';
+// The single pure compatibility gate shared by the bundled + external
+// admission paths (release 2.8.0).
+export { checkCompatibility } from './compatibility.js';
+export type { CompatibilityVerdict } from './compatibility.js';
 export {
   TOOL_LONG_IDS,
   TOOL_LONG_TO_SHORT,
