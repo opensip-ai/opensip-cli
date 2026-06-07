@@ -180,11 +180,21 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
 }
 
 /**
- * Resolve the directory the CLI was installed into, used as a discovery
- * fallback when no projectDir is supplied. Walks up from this module's
- * URL to the opensip-tools package root so node_modules lookup
- * sees the CLI's own dependency tree (which now contains checks-builtin
- * and any other check packages declared in cli/package.json).
+ * npm scope under which all CLI-bundled (built-in) check packs live. Packs
+ * whose name starts with this scope are owned by the CLI and version-locked
+ * to it; they resolve from {@link cliInstallDir}, never the consumer project.
+ * Any other name is a consumer-owned custom pack, resolved from the project.
+ */
+const BUILTIN_PACK_SCOPE = '@opensip-tools/';
+
+/**
+ * Resolve the directory the CLI was installed into. Built-in check packs
+ * (the @opensip-tools/* fit-packs declared as deps in cli/package.json) always
+ * resolve from here, so a globally-installed CLI runs ITS OWN bundled checks at
+ * its own version — a project pinning an older @opensip-tools/checks-* cannot
+ * shadow them. Also the discovery fallback when no projectDir is supplied.
+ * Walks up from this module's URL to the opensip-tools package root so
+ * node_modules lookup sees the CLI's own dependency tree.
  */
 function cliInstallDir(): string {
   // import.meta.url points at this file inside the CLI's dist/. The CLI
@@ -299,6 +309,17 @@ export interface LoadDiscoveredResult {
   readonly coreMismatchSkips: readonly string[];
 }
 
+/** Options for {@link loadDiscoveredCheckPackages}. */
+export interface LoadDiscoveredOptions {
+  /**
+   * Override the anchor from which BUILT-IN (@opensip-tools/*) packs are
+   * resolved. Defaults to {@link cliInstallDir} (the CLI's own install tree).
+   * Tests inject a controlled directory to isolate the real bundled built-ins
+   * (or to plant fixture built-ins) — production never sets this.
+   */
+  readonly cliDir?: string;
+}
+
 /**
  * Load every marker-discovered or explicitly listed check package. Each
  * package's main entry should follow the FitPluginExports contract:
@@ -314,21 +335,62 @@ export interface LoadDiscoveredResult {
  * anything (a silent green run scanning nothing is the failure mode
  * we want to make impossible).
  */
-export async function loadDiscoveredCheckPackages(projectDir: string): Promise<LoadDiscoveredResult> {
+export async function loadDiscoveredCheckPackages(
+  projectDir: string,
+  opts: LoadDiscoveredOptions = {},
+): Promise<LoadDiscoveredResult> {
   const prefs = readCheckPackagePreferences(projectDir);
-  const discovered = discoverCheckPackages({
-    projectDir,
-    explicitPackages: prefs.checkPackages,
-  });
-  // Marker-based discovery is the automatic path: any package declaring
-  // opensipTools.kind: "fit-pack" is discovered regardless of npm scope. Exact
-  // `plugins.checkPackages` entries load alongside it for packages that do not
-  // declare the marker yet. Dedupe by package name; explicit config wins.
-  const markerDiscovered = discoverPackagesByMarker({ projectDir, kind: 'fit-pack' });
-  const seenNames = new Set(discovered.map((p) => p.name));
+
+  // Pack ownership has two origins, resolved against two different anchors:
+  //
+  //   - BUILT-IN content (the @opensip-tools/* fit-packs the CLI ships:
+  //     checks-typescript, checks-universal, …) is OWNED BY THE CLI and
+  //     version-locked to it. It always resolves from the CLI's own install
+  //     tree (`cliInstallDir()`), NEVER the consumer project. This is what
+  //     guarantees that on CLI 2.x the built-in checks ARE 2.x — a project that
+  //     pins @opensip-tools/checks-*@1.x in its own package.json can no longer
+  //     shadow the bundled copy (the project tree is never consulted for
+  //     built-in content, and any @opensip-tools/* found there is dropped).
+  //   - CUSTOM content (a consumer's own fit-packs, any non-@opensip-tools/*
+  //     name) resolves from the project tree exactly as before, and is never
+  //     touched.
+  const cliDir = opts.cliDir ?? cliInstallDir();
+  const isBuiltin = (name: string): boolean => name.startsWith(BUILTIN_PACK_SCOPE);
+
+  // Explicit `plugins.checkPackages`, split by ownership so each name resolves
+  // against its correct anchor (built-in scope → CLI install; otherwise →
+  // project). Built-ins normally arrive via the marker path; this split only
+  // matters if a consumer lists an @opensip-tools/* pack explicitly.
+  const explicitNames = prefs.checkPackages ?? [];
+  const explicit = [
+    ...discoverCheckPackages({
+      projectDir: cliDir,
+      explicitPackages: explicitNames.filter(isBuiltin),
+    }),
+    ...discoverCheckPackages({
+      projectDir,
+      explicitPackages: explicitNames.filter((n) => !isBuiltin(n)),
+    }),
+  ];
+
+  // Marker-based discovery (opensipTools.kind: "fit-pack"), partitioned by
+  // ownership and anchor: built-ins from the CLI install tree, customs from the
+  // project tree. A project-installed @opensip-tools/* pack is a shadow of a
+  // built-in and is dropped — built-ins come from the CLI, period.
+  const builtinMarker = discoverPackagesByMarker({ projectDir: cliDir, kind: 'fit-pack' }).filter(
+    (p) => isBuiltin(p.name),
+  );
+  const customMarker = discoverPackagesByMarker({ projectDir, kind: 'fit-pack' }).filter(
+    (p) => !isBuiltin(p.name),
+  );
+
+  // Dedupe by package name; explicit config wins over marker discovery
+  // (preserves the prior precedence). Built-in and custom names never collide
+  // by construction (disjoint scope partition).
+  const seenNames = new Set(explicit.map((p) => p.name));
   const allPacks: readonly { name: string; packageDir: string }[] = [
-    ...discovered,
-    ...markerDiscovered
+    ...explicit,
+    ...[...builtinMarker, ...customMarker]
       .filter((p) => !seenNames.has(p.name))
       .map((p) => ({ name: p.name, packageDir: p.packageDir })),
   ];

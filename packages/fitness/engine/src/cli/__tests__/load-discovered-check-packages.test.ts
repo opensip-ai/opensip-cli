@@ -5,7 +5,14 @@
  * registers checks + recipes from packages discovered via the marker walk
  * (`opensipTools.kind: "fit-pack"`) or exact `plugins.checkPackages` entries.
  *
- * Phase 7.4 of the marker-based-discovery plan.
+ * Pack ownership is partitioned by npm scope:
+ *   - BUILT-IN (`@opensip-tools/*`) packs resolve from the CLI install tree
+ *     (the injected `cliDir`), never the project — a project pin cannot shadow
+ *     the bundled copy.
+ *   - CUSTOM (any other scope, e.g. `@acme/*`) packs resolve from the project.
+ *
+ * Phase 7.4 of the marker-based-discovery plan; built-in/custom partition added
+ * by the pack-resolution fix.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -20,10 +27,16 @@ import { defaultRecipeRegistry } from '../../recipes/registry.js';
 import { loadDiscoveredCheckPackages } from '../fit.js';
 
 let testDir: string;
+let cliDir: string;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'opensip-fit-loader-'));
+  // Isolated, EMPTY CLI install dir. Built-in (@opensip-tools/*) discovery is
+  // anchored here instead of the real CLI install, so the actual bundled
+  // built-ins never leak into these fixture-scoped count assertions. Tests that
+  // exercise built-in resolution plant fixtures under this dir explicitly.
+  cliDir = mkdtempSync(join(tmpdir(), 'opensip-fit-cli-'));
   // Suppress stderr "no readable package.json" / "no checks array" noise in
   // expected-error cases; tests inspect the spy when they care.
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
@@ -31,19 +44,20 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
+  rmSync(cliDir, { recursive: true, force: true });
   defaultRecipeRegistry.reset();
   stderrSpy.mockRestore();
 });
 
 /**
- * Drop a fixture check package into the tmpdir's node_modules. The
- * fixture's index.mjs exports `checks` and (optionally) `recipes` arrays
- * matching the minimal shapes the loader gates on (`isCheck` and the
- * `id + name` recipe shape check). Returns the unique IDs the fixture
- * exposed so tests can query the registries by them.
+ * Drop a fixture check package into a node_modules tree. The fixture's
+ * index.mjs exports `checks` and (optionally) `recipes` arrays matching the
+ * minimal shapes the loader gates on (`isCheck` and the `id + name` recipe
+ * shape check). Returns the unique IDs the fixture exposed so tests can query
+ * the registries by them.
  */
 function writeFixturePack(opts: {
-  packageDir: string;            // absolute path under testDir/node_modules
+  packageDir: string;            // absolute path under a node_modules tree
   packageName: string;
   marker?: 'fit-pack' | 'sim-pack' | 'tool';
   recipesFragment?: string;      // raw JS literal for `export const recipes = ...`
@@ -120,7 +134,7 @@ describe('loadDiscoveredCheckPackages', () => {
       marker: 'fit-pack',
     });
 
-    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
@@ -129,11 +143,11 @@ describe('loadDiscoveredCheckPackages', () => {
 
   it('does not load a prefix-only package without the fit-pack marker', async () => {
     const { checkSlug } = writeFixturePack({
-      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-fixture'),
-      packageName: '@opensip-tools/checks-fixture',
+      packageDir: join(testDir, 'node_modules', '@acme', 'checks-fixture'),
+      packageName: '@acme/checks-fixture',
     });
 
-    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(0);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeUndefined();
@@ -141,18 +155,18 @@ describe('loadDiscoveredCheckPackages', () => {
 
   it('loads a non-marker package when explicitly listed in plugins.checkPackages', async () => {
     const { checkSlug, recipeId } = writeFixturePack({
-      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-fixture'),
-      packageName: '@opensip-tools/checks-fixture',
+      packageDir: join(testDir, 'node_modules', '@acme', 'checks-fixture'),
+      packageName: '@acme/checks-fixture',
     });
     writeFileSync(
       join(testDir, 'opensip-tools.config.yml'),
       `plugins:
   checkPackages:
-    - "@opensip-tools/checks-fixture"
+    - "@acme/checks-fixture"
 `,
     );
 
-    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
@@ -161,12 +175,12 @@ describe('loadDiscoveredCheckPackages', () => {
 
   it('loads a checks-prefixed pack when it declares the fit-pack marker', async () => {
     const { checkSlug, recipeId } = writeFixturePack({
-      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-dual'),
-      packageName: '@opensip-tools/checks-dual',
+      packageDir: join(testDir, 'node_modules', '@acme', 'checks-dual'),
+      packageName: '@acme/checks-dual',
       marker: 'fit-pack',
     });
 
-    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
@@ -181,7 +195,7 @@ describe('loadDiscoveredCheckPackages', () => {
       recipesFragment: 'undefined',
     });
 
-    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
@@ -202,7 +216,7 @@ describe('loadDiscoveredCheckPackages', () => {
       recipesFragment: malformedFragment,
     });
 
-    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
@@ -220,7 +234,7 @@ describe('loadDiscoveredCheckPackages', () => {
       omitChecks: true,
     });
 
-    const { totalRegistered, warnings } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered, warnings } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(totalRegistered).toBe(0);
     // Warning now returned from loadDiscoveredCheckPackages rather than written
@@ -236,67 +250,131 @@ describe('loadDiscoveredCheckPackages', () => {
       marker: 'sim-pack',
     });
 
-    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(registered).toBe(0);
   });
 
   it('returns 0 when no packages are discoverable', async () => {
-    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
     expect(registered).toBe(0);
   });
 
-  it('refuses packs that resolve a DIFFERENT @opensip-tools/core, in ONE consolidated warning (single-core guard, B)', async () => {
-    // Packs that ship their own nested @opensip-tools/core resolve a second
-    // core instance. Loading them would split the run scope (AsyncLocalStorage),
-    // silently degrading content filters to raw and producing false positives.
-    // The guard refuses them at load time — and reports all skips in a single
-    // warning that lists each pack, rather than a verbose paragraph per pack.
+  it('refuses CUSTOM packs that resolve a DIFFERENT @opensip-tools/core, in ONE consolidated warning (single-core guard, B)', async () => {
+    // Custom packs that ship their own nested @opensip-tools/core resolve a
+    // second core instance. Loading them would split the run scope
+    // (AsyncLocalStorage), silently degrading content filters to raw and
+    // producing false positives. The guard refuses them at load time — and
+    // reports all skips in a single warning that lists each pack, rather than a
+    // verbose paragraph per pack. (Project-vendored @opensip-tools/* packs no
+    // longer reach this guard — they're dropped earlier as built-in shadows.)
     const a = writeFixturePack({
-      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-foreigncore-a'),
-      packageName: '@opensip-tools/checks-foreigncore-a',
+      packageDir: join(testDir, 'node_modules', '@acme', 'checks-foreigncore-a'),
+      packageName: '@acme/checks-foreigncore-a',
       marker: 'fit-pack',
       withForeignCore: true,
     });
     const b = writeFixturePack({
-      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-foreigncore-b'),
-      packageName: '@opensip-tools/checks-foreigncore-b',
+      packageDir: join(testDir, 'node_modules', '@acme', 'checks-foreigncore-b'),
+      packageName: '@acme/checks-foreigncore-b',
       marker: 'fit-pack',
       withForeignCore: true,
     });
 
-    const { totalRegistered, warnings, coreMismatchSkips } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered, warnings, coreMismatchSkips } = await loadDiscoveredCheckPackages(testDir, {
+      cliDir,
+    });
 
     expect(totalRegistered).toBe(0);
     expect(defaultRegistry.getBySlug(a.checkSlug)).toBeUndefined();
     expect(defaultRegistry.getBySlug(b.checkSlug)).toBeUndefined();
     // Both packs reported via the structured skip list…
     expect([...coreMismatchSkips].sort()).toEqual([
-      '@opensip-tools/checks-foreigncore-a',
-      '@opensip-tools/checks-foreigncore-b',
+      '@acme/checks-foreigncore-a',
+      '@acme/checks-foreigncore-b',
     ]);
     // …and surfaced in exactly ONE consolidated warning naming both.
     const mismatchWarnings = warnings.filter((m) => m.includes('different @opensip-tools/core'));
     expect(mismatchWarnings).toHaveLength(1);
-    expect(mismatchWarnings[0]).toContain('@opensip-tools/checks-foreigncore-a');
-    expect(mismatchWarnings[0]).toContain('@opensip-tools/checks-foreigncore-b');
+    expect(mismatchWarnings[0]).toContain('@acme/checks-foreigncore-a');
+    expect(mismatchWarnings[0]).toContain('@acme/checks-foreigncore-b');
     expect(mismatchWarnings[0]).toContain('pnpm fit');
   });
 
-  it('still loads a same-core pack that does NOT vendor its own core (no false skip)', async () => {
+  it('still loads a same-core CUSTOM pack that does NOT vendor its own core (no false skip)', async () => {
     // Sibling of the guard test: a pack with no nested core resolves the
     // engine's own core (or none), so it must load normally — proving the
     // guard does not over-skip.
     const { checkSlug } = writeFixturePack({
-      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-samecore'),
-      packageName: '@opensip-tools/checks-samecore',
+      packageDir: join(testDir, 'node_modules', '@acme', 'checks-samecore'),
+      packageName: '@acme/checks-samecore',
       marker: 'fit-pack',
     });
 
-    const { totalRegistered, coreMismatchSkips } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered, coreMismatchSkips } = await loadDiscoveredCheckPackages(testDir, { cliDir });
 
     expect(totalRegistered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
     expect(coreMismatchSkips).toEqual([]);
+  });
+
+  // ── Built-in vs custom partition (the pack-resolution fix) ────────────────
+
+  it('loads a built-in @opensip-tools/* pack from the CLI install dir, not the project', async () => {
+    const { checkSlug } = writeFixturePack({
+      packageDir: join(cliDir, 'node_modules', '@opensip-tools', 'checks-builtin'),
+      packageName: '@opensip-tools/checks-builtin',
+      marker: 'fit-pack',
+    });
+
+    const { totalRegistered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
+
+    expect(totalRegistered).toBe(1);
+    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
+  });
+
+  it('drops a project-vendored @opensip-tools/* pack — it cannot shadow the bundled built-in', async () => {
+    // The SAME built-in name exists in BOTH the CLI install (the real bundled
+    // copy) and the project tree (a stale version a consumer pinned). Only the
+    // CLI copy may win; the project shadow is ignored entirely — this is the
+    // core guarantee: on CLI 2.x the built-in IS 2.x, regardless of project pins.
+    const builtin = writeFixturePack({
+      packageDir: join(cliDir, 'node_modules', '@opensip-tools', 'checks-typescript'),
+      packageName: '@opensip-tools/checks-typescript',
+      marker: 'fit-pack',
+    });
+    const shadow = writeFixturePack({
+      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-typescript'),
+      packageName: '@opensip-tools/checks-typescript',
+      marker: 'fit-pack',
+    });
+
+    const { totalRegistered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
+
+    // Exactly one copy loaded — the CLI's — and it is the CLI's check, not the shadow's.
+    expect(totalRegistered).toBe(1);
+    expect(defaultRegistry.getBySlug(builtin.checkSlug)).toBeDefined();
+    expect(defaultRegistry.getBySlug(shadow.checkSlug)).toBeUndefined();
+  });
+
+  it('still discovers a CUSTOM pack from the project while built-ins come from the CLI', async () => {
+    // Both origins active at once: a bundled built-in in the CLI dir AND a
+    // consumer custom pack in the project. Both load; neither is dropped.
+    const builtin = writeFixturePack({
+      packageDir: join(cliDir, 'node_modules', '@opensip-tools', 'checks-universal'),
+      packageName: '@opensip-tools/checks-universal',
+      marker: 'fit-pack',
+    });
+    const custom = writeFixturePack({
+      packageDir: join(testDir, 'node_modules', '@acme', 'fit'),
+      packageName: '@acme/fit',
+      marker: 'fit-pack',
+    });
+
+    const { totalRegistered } = await loadDiscoveredCheckPackages(testDir, { cliDir });
+
+    expect(totalRegistered).toBe(2);
+    expect(defaultRegistry.getBySlug(builtin.checkSlug)).toBeDefined();
+    expect(defaultRegistry.getBySlug(custom.checkSlug)).toBeDefined();
   });
 });
