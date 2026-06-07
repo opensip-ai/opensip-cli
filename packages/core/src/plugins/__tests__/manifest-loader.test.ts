@@ -3,8 +3,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { logger } from '../../lib/logger.js';
 import { PLUGIN_API_VERSION } from '../../tools/manifest.js';
 import {
   admitTool,
@@ -308,5 +309,79 @@ describe('admitTool', () => {
       explicitlyRequested: false,
     });
     expect(a.provenance.manifestHash).not.toBe(b.provenance.manifestHash);
+  });
+});
+
+describe('admitTool — structured admission diagnostics (Phase 4.2)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('emits exactly one `plugin.manifest.loaded` evt on admit', () => {
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+
+    admitTool({
+      manifest: manifest({ apiVersion: PLUGIN_API_VERSION }),
+      source: 'bundled',
+      dir: '/tools/audit',
+      packageName: '@my-co/audit',
+      explicitlyRequested: false,
+    });
+
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(info.mock.calls[0]?.[0]).toMatchObject({
+      evt: 'plugin.manifest.loaded',
+      id: 'audit',
+      source: 'bundled',
+      apiVersion: PLUGIN_API_VERSION,
+      decision: 'admit',
+    });
+    expect((info.mock.calls[0]?.[0] as { manifestHash: string }).manifestHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('emits one `plugin.incompatible.skipped` warn evt with the decision fields on skip', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    admitTool({
+      manifest: manifest({ apiVersion: 999 }),
+      source: 'installed',
+      dir: '/tools/future',
+      explicitlyRequested: false,
+    });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toMatchObject({
+      evt: 'plugin.incompatible.skipped',
+      id: 'audit',
+      source: 'installed',
+      apiVersion: 999,
+      engine: PLUGIN_API_VERSION,
+      decision: 'skip',
+    });
+    // Suggestion-bearing diagnostic: declared vs engine epoch.
+    const evt = warn.mock.calls[0]?.[0] as { diagnostic: string };
+    expect(evt.diagnostic).toContain('999');
+    expect(evt.diagnostic).toContain(String(PLUGIN_API_VERSION));
+  });
+
+  it('emits one `plugin.incompatible.failed` error evt on fail-closed', () => {
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+    admitTool({
+      manifest: manifest({ apiVersion: 999 }),
+      source: 'installed',
+      dir: '/tools/future',
+      explicitlyRequested: true,
+    });
+
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0]?.[0]).toMatchObject({
+      evt: 'plugin.incompatible.failed',
+      id: 'audit',
+      source: 'installed',
+      apiVersion: 999,
+      engine: PLUGIN_API_VERSION,
+      decision: 'fail-closed',
+    });
   });
 });
