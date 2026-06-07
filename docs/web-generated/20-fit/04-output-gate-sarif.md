@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-04
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Output, gate, SARIF"
 audience: [contributors, ci-integrators]
 purpose: "What happens to the signals a check produces — formatter/sink routing, JSON output, SARIF, the gate, cloud reporting."
@@ -106,7 +106,7 @@ fitnessTool.action()
 
 The renderer is in [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-tools/blob/v2.8.0/packages/cli/src/ui/) and depends on Ink + React. It's the only consumer of those libraries; nothing in `core`, `fitness`, or any check pack imports them. This is why a future GUI front-end could replace the renderer without touching a Tool — the Tool calls `cli.renderLive('fit', args)` and the CLI maps that to whatever rendering layer is in place.
 
-`-v` / `--verbose` adds inline finding details to the table. `--findings` adds a per-check finding listing after the table. `--quiet` suppresses the banner and shows only the pass/fail summary line.
+`-v` / `--verbose` adds inline finding details to the table. `--findings` is a deprecated alias for `--verbose`, kept for older scripts during the 2.x line. `--quiet` suppresses the banner and shows only the pass/fail summary line.
 
 The exit code is set by the Tool action via `cli.setExitCode(code)`:
 

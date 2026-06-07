@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-04
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Rules and gating (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The ten graph rules, what each one detects, and how the save/compare gate flow integrates with CI."

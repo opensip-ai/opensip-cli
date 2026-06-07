@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-05
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The system's public edges. Every contract opensip-tools makes with the outside world, and what changing each one would cost."
@@ -55,7 +55,7 @@ opensip-tools
 │   ├── --check <slug>
 │   ├── --tags <list>
 │   ├── --json
-│   ├── --findings
+│   ├── --verbose
 │   ├── --gate-save        (writes baseline row into .runtime/datastore.sqlite)
 │   ├── --gate-compare
 │   └── … (see fit-list, fit-recipes for catalogs)

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-03
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Write your first check"
 audience: [getting-started, plugin-authors]
 purpose: "Task-led walkthrough: from `opensip-tools init` to a passing CI gate, with one custom check you authored, in ~15 minutes."
@@ -121,10 +121,10 @@ Output:
 1
 ```
 
-Add `--findings` to see each violation's file + line:
+Add `--verbose` to see each violation's file + line:
 
 ```bash
-opensip-tools fit --check no-fixme-comments --findings
+opensip-tools fit --check no-fixme-comments --verbose
 ```
 
 If you wanted to *clean up* the violations first and gate on *new* ones only, this is where the baseline flow kicks in — see [wire into CI](/docs/opensip-tools/60-guides/03-wire-into-ci/) and [adopt in a monorepo](/docs/opensip-tools/60-guides/04-adopt-in-a-monorepo/).

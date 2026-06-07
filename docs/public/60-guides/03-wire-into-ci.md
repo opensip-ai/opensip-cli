@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-03
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Wire into CI"
 audience: [ci-integrators, getting-started]
 purpose: "Task-led: add opensip-tools to your CI pipeline with PR annotations and baseline gating. GitHub Actions and GitLab examples."
@@ -147,7 +147,7 @@ Typical timings on the opensip-tools self-graph (~300 files, ~145 checks):
 
 If `fit` is slow on a large repo, the usual culprits:
 
-- A specific check has an `O(n²)` scan. Run `--findings --verbose` to see per-check timing.
+- A specific check has an `O(n²)` scan. Run with `--verbose` locally to see per-check timing.
 - Targets globs are too broad. The `targets:` block in `opensip-tools.config.yml` scopes which files each check matches; widening it from `src/**/*.ts` to `**/*.ts` will include `node_modules/` if you're not careful.
 - A regex-shaped check has a catastrophic backtracking pattern. Switch to AST-driven analysis.
 

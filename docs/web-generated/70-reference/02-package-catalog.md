@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-04
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-concepts/03-modular-monolith.md."
@@ -65,7 +65,7 @@ Used by Tools but not Tools themselves — no `Tool` contract, no CLI subcommand
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/dashboard` | `packages/dashboard/` | Self-contained HTML dashboard generator — renders the fit/sim/graph report from session data + graph catalogs. Consumed by fitness's `dashboard` command and the auto-open hook. | `generateDashboardHtml` |
+| `@opensip-tools/dashboard` | `packages/dashboard/` | Self-contained HTML dashboard generator — renders the fit/sim/graph report from session data + graph catalogs. Consumed by the CLI-owned `dashboard` command and each tool's auto-open hook. | `generateDashboardHtml` |
 | `@opensip-tools/cli-ui` | `packages/cli-ui/` | Shared Ink/React presentational primitives — Banner, Spinner, RunHeader, theme. Extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher. | `Banner`, `Spinner`, `RunHeader`, `theme` |
 
 ### Language adapters (fitness — six languages)
@@ -140,9 +140,9 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v2.7.0 against:
+Last verified at v2.8.0 against:
 
-- `packages/` directory listing — **31 publishable packages** total (all at `2.7.0`):
+- `packages/` directory listing — **31 publishable packages** total (all at `2.8.0`):
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + session-store + output + tree-sitter): 5 — `datastore`, `contracts`, `session-store`, `output`, `tree-sitter`
   - Layer 3 Tools: 3 — `fitness`, `simulation`, `graph`

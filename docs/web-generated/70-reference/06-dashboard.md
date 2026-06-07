@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-03
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Dashboard"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."

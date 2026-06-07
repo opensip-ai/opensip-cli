@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-06
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Supply-chain security"
 audience: [getting-started, ci-integrators, plugin-authors, contributors]
 purpose: "How opensip-tools reduces npm-family install risk for customers and how teams can use the package-supply-chain-policy check."
@@ -84,7 +84,7 @@ For highly sensitive environments, prefer a pinned version and install through
 an internal mirror or vetted cache:
 
 ```bash
-npm install -g opensip-tools@2.7.0
+npm install -g opensip-tools@2.8.0
 ```
 
 Customers who globally disable npm lifecycle scripts should test the CLI in

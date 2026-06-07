@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-04
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for every CLI command, its flags, and when to use each."
@@ -14,6 +14,7 @@ source-files:
   - packages/cli/src/commands/completion.ts
   - packages/fitness/engine/src/tool.ts
   - packages/simulation/engine/src/tool.ts
+  - packages/graph/engine/src/tool.ts
 related-docs:
   - ../80-implementation/01-cli-dispatch.md
   - ../70-reference/03-configuration.md
@@ -22,7 +23,7 @@ related-docs:
 
 Every command, alphabetized by command name. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `dashboard`, `fit-list`, `fit-recipes`) come from each Tool's `register()` call. CLI-owned commands (everything else) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `fit-list`, `fit-recipes`, graph helper commands) come from each Tool's `register()` call. CLI-owned commands (`init`, `dashboard`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
 
 ---
 
@@ -394,7 +395,7 @@ JSON shape:
 {
   "type": "list-checks",
   "checks": [{ "slug": "...", "description": "...", "tags": ["..."] }],
-  "totalCount": 115
+  "totalCount": 155
 }
 ```
 
@@ -526,18 +527,18 @@ Ambiguous detection (multiple markers, no `--language`) exits 2 with a prompt to
 
 ## `configure` — manage user-level settings
 
-CLI-owned: [`packages/cli/src/commands/configure.ts`](../../../packages/cli/src/commands/configure.ts). Interactive — sets up the OpenSIP Cloud API key in `~/.opensip-tools/config.yml`.
+CLI-owned: [`packages/cli/src/commands/configure.ts`](../../../packages/cli/src/commands/configure.ts). Interactive — writes the OpenSIP Cloud API key to `~/.opensip-tools/config.yml` and verifies it best-effort against the cloud entitlement endpoint.
 
 ```
 opensip-tools configure
 ```
 
 Prompts:
-1. Have an API key already?
-2. If yes, paste it.
-3. If no, walk through `https://opensip.ai` signup.
-4. Test the key against the cloud's auth endpoint.
-5. Write `~/.opensip-tools/config.yml` with the key.
+1. If a key is already configured, show its masked value.
+2. Ask for a new OpenSIP Cloud API key.
+3. If the prompt is blank, cancel without changing the file.
+4. Save the key to `~/.opensip-tools/config.yml`.
+5. Test the key against the cloud entitlement endpoint. Verification is best-effort; the key stays saved if the endpoint is unreachable so offline setup still works.
 
 The user-level config is shared across every project on the machine. `opensip-tools fit --report-to <url>` uses the configured key by default unless `--api-key` overrides it.
 
@@ -579,7 +580,7 @@ opensip-tools plugin sync
 
 | Flag | Subcommands | Effect |
 |---|---|---|
-| `--domain <fit\|sim\|tool>` | `add`, `remove`, `sync` | Override the inferred domain (`add`/`remove`) or scope a sync to one domain (`sync`). `tool` selects the full-Tool-plugin path. |
+| `--domain <fit\|sim\|tool>` | `add`, `remove`; `fit\|sim` only for `sync` | Override the inferred domain (`add`/`remove`) or scope a sync to one fit/sim domain (`sync`). `tool` selects the full-Tool-plugin path and is not syncable because tool plugins are discovered by marker, not config. |
 | `--project` | `add`, `remove` | For a **tool** plugin, target the project-local host dir (`.runtime/plugins/tool/`) instead of the user-global default. No effect on fit/sim packs (always project-local). |
 | `--cwd <path>` | all | Project root. Default: `process.cwd()`. |
 
@@ -623,8 +624,9 @@ CLI-owned: [`packages/cli/src/commands/uninstall.ts`](../../../packages/cli/src/
 
 ```
 opensip-tools uninstall                       # remove ~/.opensip-tools/
-opensip-tools uninstall --project             # remove project state at cwd
-opensip-tools uninstall --project /path/repo  # remove project state at <path>
+opensip-tools uninstall --project             # remove project runtime state at cwd
+opensip-tools uninstall --project /path/repo  # remove project runtime state at <path>
+opensip-tools uninstall --project --purge     # also remove authored content + config
 opensip-tools uninstall --dry-run             # print targets, take no action
 opensip-tools uninstall --yes                 # skip confirmation prompt
 ```
@@ -634,18 +636,20 @@ Two modes:
 | Mode | Targets removed | When to use |
 |---|---|---|
 | Default | `~/.opensip-tools/` (user-level config dir) | Removing the cloud API key + per-user defaults; cleaning legacy cruft from earlier versions. |
-| `--project [path]` | `<path>/opensip-tools/` and `<path>/opensip-tools.config.yml` | Disengaging from opensip-tools in one repo. Removes user-authored checks/recipes alongside generated `.runtime/` state. |
+| `--project [path]` | `<path>/opensip-tools/.runtime/` by default | Remove rebuildable session/cache/log/baseline state for one repo while preserving authored checks, recipes, scenarios, and config. |
+| `--project [path] --purge` | `<path>/opensip-tools/` (authored content included) and `<path>/opensip-tools.config.yml` | Fully disengage from opensip-tools in one repo. Destructive if custom checks/recipes are not committed. |
 
 | Flag | Effect |
 |---|---|
 | `--project [path]` | Switch to project mode. Path defaults to cwd. |
+| `--purge` | In project mode, also remove user-authored content under `opensip-tools/` and `opensip-tools.config.yml`. |
 | `--yes`, `-y` | Skip the `[y/N]` confirmation prompt. |
 | `--dry-run` | Enumerate targets and total size; make no changes. |
 
 Both modes:
 
 - Print every target path and its size before acting.
-- Refuse to run when no targets exist (`--project` against a directory that contains no opensip-tools state is a no-op, not a destructive accident).
+- Refuse to run when no targets exist (`--project` against a directory that contains no opensip-tools state is a no-op, not a destructive accident). In project mode without `--purge`, a repo that has only authored content and no `.runtime/` also becomes a no-op and tells you what it kept.
 - Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g opensip-tools`); the project-mode success message points back at the user-mode command for the matching cleanup.
 
 State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`paths.ts`](../../../packages/core/src/lib/paths.ts), [`logger.ts`](../../../packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.

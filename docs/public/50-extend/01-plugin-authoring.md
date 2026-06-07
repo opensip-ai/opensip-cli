@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-27
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Plugin authoring"
 audience: [plugin-authors]
 purpose: "Overview of the five ways to extend opensip-tools — from a dropped .mjs file to a full Tool plugin. Routes you to the right deep-dive."
@@ -54,5 +54,5 @@ That's by design. The whole point of the platform is that adding a new tool or p
 ## Where to go next
 
 - **Authoring your first thing** → [Write your first check](../60-guides/01-write-your-first-check.md). Hands-on walkthrough with `init`, a custom check, a recipe, and a CI gate.
-- **Reference for every check that ships** → [Checks reference](../70-reference/05-checks-index.md). Browse all 145+ built-in checks with descriptions and links to source.
+- **Reference for every check that ships** → [Checks reference](../70-reference/05-checks-index.md). Browse all 155 built-in checks with descriptions and links to source.
 - **Deep dive on what a "Tool" is architecturally** → [The tool-plugin model](../10-concepts/02-tool-plugin-model.md).

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-04
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Layer policy"
 audience: [contributors]
 purpose: "The dependency-cruiser rules that enforce the five-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-06
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Migrating to 2.7"
 audience: [ci-integrators, plugin-authors]
 purpose: "Everything a --json consumer or plugin author must change to move to opensip-tools 2.7 (the signal-output + output-package breaking batch in the pre-GA 2.x line)."

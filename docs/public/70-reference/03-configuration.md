@@ -1,13 +1,16 @@
 ---
 status: current
-last_verified: 2026-06-04
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-tools.config.yml schema, every field, defaults, and where each is read."
 source-files:
   - packages/fitness/engine/src/signalers/schema.ts
+  - packages/contracts/src/cli-config.ts
   - packages/core/src/config-resolution.ts
+  - packages/core/src/lib/config-version.ts
+  - packages/cli/src/bootstrap/global-config.ts
   - packages/cli/src/commands/init.ts
   - packages/graph/engine/src/cli/graph-config.ts
   - packages/graph/engine/src/types.ts
@@ -23,13 +26,14 @@ opensip-tools reads two config files:
 | File | Scope | Holds |
 |---|---|---|
 | `<project>/opensip-tools.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
-| `~/.opensip-tools/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key |
+| `~/.opensip-tools/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key and machine-wide cloud-sync controls |
 
-The Zod schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](../../../packages/fitness/engine/src/signalers/schema.ts).
+The strict project-config schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](../../../packages/fitness/engine/src/signalers/schema.ts). A few sections also have permissive readers in their owning package so tool-agnostic commands can read only the fields they need.
 
 ## Top-level shape
 
 ```yaml
+schemaVersion: 1            # project config schema version
 globalExcludes: []        # readonly string[] — repo-wide glob excludes
 targets: {}               # name → TargetDefinition (kebab-case keys)
 checkOverrides: {}        # check-slug → target-name(s)
@@ -37,13 +41,15 @@ fitness: {}               # FitnessConfig
 simulation: {}            # SimulationConfig
 cli: {}                   # CliDefaults
 plugins: {}               # per-domain pin lists (read out-of-band — see below)
-dashboard: {}             # dashboard.editor (read out-of-band — see below)
+dashboard: {}             # dashboard.editor
 graph: {}                 # graph rule knobs (read out-of-band — see below)
 ```
 
 Every section is optional; a missing section becomes `{}`.
 
-The validated schema (`SignalersConfigSchema`) covers `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, and `cli`. **`plugins:`, `dashboard:`, and `graph:` are read out-of-band** by separate parsers ([`readProjectPluginsList`](../../../packages/core/src/plugins/discover.ts), `extractDashboardEditor` in [`dashboard.ts`](../../../packages/fitness/engine/src/cli/dashboard.ts), and `loadGraphConfig` in [`graph-config.ts`](../../../packages/graph/engine/src/cli/graph-config.ts)) so each can evolve independently of the fitness schema. The `graph:` loader is deliberately permissive — a missing config, malformed YAML, or absent `graph:` key all collapse to `{}`, and every rule then falls back to its in-rule default.
+The validated schema (`SignalersConfigSchema`) covers `schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, `cli`, and `dashboard`. **`plugins:` and `graph:` are read out-of-band** by separate parsers ([plugin discovery](../../../packages/core/src/plugins/discover.ts) and [`loadGraphConfig`](../../../packages/graph/engine/src/cli/graph-config.ts)) so each can evolve with its owner. The `cli:` block also has a permissive mirror reader in [`packages/contracts/src/cli-config.ts`](../../../packages/contracts/src/cli-config.ts), used by the CLI pre-action hook before fitness code is involved.
+
+`schemaVersion` defaults to `1`. The pre-action hook reads it before the strict loader runs; if a project config declares a schema newer than the installed CLI understands, the CLI exits 2 with an "upgrade your CLI" message rather than misreading the file.
 
 ---
 
@@ -141,17 +147,22 @@ CLI-wide defaults that act as flag pre-fills. Each project's `cli` section is eq
 | `recipe` | string | **Deprecated (ADR-0022).** Recipe defaults are tool-scoped — set `fitness.recipe` / `graph.recipe` / `simulation.recipe` instead. Still honoured as a cross-tool fallback (applied tolerantly: a tool that lacks the named recipe falls back to its own `default` rather than erroring), and flagged by the `cli-recipe-deprecated` check. |
 | `exclude` | string[] | Default exclusions. |
 | `verbose` / `json` | bool | Defaults for `--verbose` / `--json`. |
+| `debug` | bool | Default for `--debug`. |
 | `reportTo` | URL | Default for `--report-to`. |
 | `apiKey` | string | Literal API key. **No `${VAR}` interpolation** — use the env-var or user-level config instead. |
 | `fileTypes` | string[] | Restrict the run to these extensions. |
 | `ignore` | string[] | Additional exclude patterns. |
 | `ui.banner` | `'mini' \| 'lg' \| 'md' \| 'sm'` | Banner art above each command. Default `mini` — a compact boxed card (amber cup + version + tagline + `www.opensip.ai` + project path). Set `lg`/`md`/`sm` for the full ASCII wordmark. **No CLI flag** — persistent preference. |
+| `cloud.sync` | bool | Project-level opt-out for automatic OpenSIP Cloud signal sync. `false` disables sync even when a user-level config enables it. |
+| `cloud.endpoint` | URL | HTTPS override for the built-in OpenSIP Cloud endpoint. User-level endpoint takes precedence when both are set. |
 
 ```yaml
 cli:
   reportTo: 'https://opensip.ai/api'
   ui:
     banner: mini   # mini | lg | md | sm
+  cloud:
+    sync: false    # optional project-level cloud signal-sync opt-out
 # Recipe defaults are tool-scoped (ADR-0022) — set them per tool:
 fitness:
   recipe: backend
@@ -159,7 +170,7 @@ graph:
   recipe: default
 ```
 
-**API key resolution precedence**: `--api-key` flag > `cli.apiKey` > `OPENSIP_API_KEY` env > `~/.opensip-tools/config.yml`. Project-level wins over the env var, so a committed-into-repo key takes effect even if the env var is set.
+**API key resolution precedence**: `--api-key` flag > `cli.apiKey` > `OPENSIP_API_KEY` env > `~/.opensip-tools/config.yml`. Prefer the flag, env var, or user-level config for real secrets; `cli.apiKey` exists for controlled environments and still wins over the env var if set.
 
 CLI flags always override config — `--no-json` overrides a `cli.json: true` setting.
 
@@ -195,7 +206,7 @@ dashboard:
   editor: vscode
 ```
 
-Read out-of-band like `plugins:`.
+Validated by the project-config schema and read by the dashboard data path. Unknown dashboard fields are rejected by the strict loader.
 
 ## `graph`
 
@@ -277,6 +288,8 @@ either place wins). Use `opensip-tools configure` to write the key;
 
 ```yaml
 # acme-api/opensip-tools.config.yml
+
+schemaVersion: 1
 
 globalExcludes:
   - '**/dist/**'

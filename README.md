@@ -85,7 +85,7 @@ opensip-tools fit --report-to https://your-opensip-instance/api/ingest --api-key
 
 Findings are posted in SARIF 2.1.0 format with automatic retry on network failures.
 
-API key resolution: `--api-key` flag > `OPENSIP_API_KEY` env var > `~/.opensip-tools/config.yml`.
+API key resolution: `--api-key` flag > `cli.apiKey` in project config > `OPENSIP_API_KEY` env var > `~/.opensip-tools/config.yml`.
 
 ## What `init` writes
 
@@ -133,7 +133,7 @@ config change required.
 
 ```bash
 opensip-tools fit                 # runs the default recipe (all enabled checks)
-opensip-tools fit --findings      # + detailed per-violation output
+opensip-tools fit --verbose       # + detailed per-violation output
 opensip-tools fit --list          # browse the check catalog
 ```
 
@@ -149,8 +149,7 @@ opensip-tools fit                   # run all checks (default recipe)
 opensip-tools fit --recipe <name>   # use a named recipe (e.g. quick-smoke, backend)
 opensip-tools fit --check <slug>    # run a single check
 opensip-tools fit --tags <tags>     # filter by tag (comma-separated)
-opensip-tools fit --findings        # show per-violation detail
-opensip-tools fit --verbose         # full results table
+opensip-tools fit --verbose         # show per-violation detail
 opensip-tools fit --json            # structured JSON (for CI)
 opensip-tools fit --list            # list available checks
 opensip-tools fit --recipes         # list available recipes
@@ -243,7 +242,7 @@ Run `opensip-tools fit` to scan your codebase. Default output is a compact summa
 120 Passed, 10 Failed (423 Errors, 227 Warnings) | Duration 8.1s
 ```
 
-Use `--verbose` for the full results table, or `--findings` for detailed violation output.
+Use `--verbose` for detailed violation output. `--findings` remains as a deprecated alias for older scripts.
 
 ### Options
 
@@ -407,8 +406,9 @@ opensip-tools plugin sync                           # reinstall after a fresh cl
 
 `plugin add` updates the `plugins.<domain>` list in
 `opensip-tools.config.yml` so the install is reproducible across
-machines. Only packages explicitly listed there are loaded — transitive
-deps that happen to land in the runtime tree do not auto-load.
+machines. Marker-based discovery also runs for packages that declare
+`opensipTools.kind`; transitive dependencies that lack an opensip-tools
+marker do not auto-load.
 
 ```yaml
 # opensip-tools.config.yml
@@ -440,10 +440,10 @@ won't need to.
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "peerDependencies": {
-    "@opensip-tools/fitness": "^2.7.0"
+    "@opensip-tools/fitness": "^2.8.0"
   },
   "devDependencies": {
-    "@opensip-tools/fitness": "^2.7.0",
+    "@opensip-tools/fitness": "^2.8.0",
     "typescript": "^5.7.0"
   }
 }
@@ -579,38 +579,52 @@ the same way under `opensip-tools/sim/recipes/` and run via
 
 ```json
 {
-  "version": "1.0",
+  "schemaVersion": 2,
   "tool": "fit",
-  "timestamp": "2026-04-02T18:00:00.000Z",
   "recipe": "default",
-  "score": 92,
-  "passed": true,
-  "summary": {
-    "total": 124,
-    "passed": 120,
-    "failed": 4,
-    "errors": 12,
-    "warnings": 45
+  "runId": "RUN_01JZ8Q0Z7R8V8R4N4Y8QXJ0X9H",
+  "createdAt": "2026-06-07T18:00:00.000Z",
+  "verdict": {
+    "score": 92,
+    "passed": false,
+    "summary": {
+      "total": 124,
+      "passed": 120,
+      "failed": 4,
+      "errors": 12,
+      "warnings": 45
+    }
   },
-  "checks": [
+  "units": [
     {
-      "checkSlug": "no-console-log",
+      "slug": "no-console-log",
       "passed": false,
-      "findings": [
-        {
-          "ruleId": "no-console-log",
-          "message": "console.log found in production code",
-          "severity": "error",
-          "filePath": "src/utils.ts",
-          "line": 42
-        }
-      ],
+      "violationCount": 1,
+      "filesValidated": 312,
+      "itemType": "files",
       "durationMs": 150
     }
   ],
-  "durationMs": 8100
+  "signals": [
+    {
+      "id": "sig_a3f9c204e1b2",
+      "source": "no-console-log",
+      "provider": "opensip-tools",
+      "severity": "high",
+      "category": "quality",
+      "ruleId": "fit:no-console-log",
+      "message": "console.log found in production code",
+      "suggestion": "Replace with a structured logger",
+      "filePath": "src/utils.ts",
+      "line": 42,
+      "metadata": {},
+      "createdAt": "2026-06-07T18:00:00.000Z"
+    }
+  ]
 }
 ```
+
+Every tool emits this `SignalEnvelope` shape on `--json`. The stable CI fields are `verdict.passed`, `verdict.score`, `verdict.summary`, `units[]`, and the flat `signals[]` list. See [JSON output schema](./docs/public/70-reference/04-json-output-schema.md) for the full field table and v1-to-v2 migration notes.
 
 ## Dashboard
 
@@ -665,7 +679,7 @@ Removal is split into three independent steps so each can be done in
 isolation — most users only need the first.
 
 ```bash
-# 1. Project state — `opensip-tools/` and `opensip-tools.config.yml` in a repo
+# 1. Project runtime state — sessions, cache, logs, and baselines in one repo
 opensip-tools uninstall --project                 # cwd
 opensip-tools uninstall --project /path/to/repo   # explicit path
 
@@ -708,8 +722,9 @@ rather than a destructive accident.
 Every CLI invocation generates a `runId` (prefixed ULID — `RUN_<26char>`)
 for log correlation. Structured JSON logs are written to
 `<project>/opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl` (gitignored).
-Sessions and HTML reports live alongside in `.runtime/sessions/` and
-`.runtime/reports/`.
+Sessions live in the project SQLite store at
+`<project>/opensip-tools/.runtime/datastore.sqlite`. HTML reports are written to
+`<project>/opensip-tools/.runtime/reports/latest.html`.
 
 ```bash
 opensip-tools fit --debug    # Show structured log events on stderr
@@ -745,7 +760,7 @@ packages/
   cli/                     # opensip-tools — generic tool dispatcher
 
   fitness/                 # @opensip-tools/fitness namespace
-    engine/                # @opensip-tools/fitness — fit/dashboard/list-checks
+    engine/                # @opensip-tools/fitness — fit/list-checks/list-recipes/gate
                            #   commands, recipe service, gate, SARIF
     checks-typescript/     # @opensip-tools/checks-typescript — TS-AST checks
     checks-universal/      # @opensip-tools/checks-universal — text/regex/glob checks

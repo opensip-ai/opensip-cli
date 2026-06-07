@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-27
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Publishable packs"
 audience: [plugin-authors]
 purpose: "Author and publish a fit-pack or sim-pack: workspace package skeleton, the marker contract, four discovery paths, and the migration recipe from loose .mjs files."
@@ -195,7 +195,7 @@ If you don't have a monorepo, publish your pack to a private npm registry under 
 
 A step-by-step you can follow when you've decided to graduate:
 
-1. **Pick the pack name and location.** For a workspace-only pack, `@your-scope/fit` works. For a publishable pack, use your own scope and pick one of the [four discovery paths](#four-discovery-paths) above.
+1. **Pick the pack name and location.** For a workspace-only pack, `@your-scope/fit` works. For a publishable pack, use your own scope and pick one of the [discovery paths](#discovery-paths) above.
 2. **Add the directory as a workspace member.** Append `opensip-tools/*` to your `pnpm-workspace.yaml` (or yarn/npm equivalent).
 3. **Write `package.json`** with `opensipTools.kind: "fit-pack"` (or `"sim-pack"`), `main: "./dist/index.js"`, peer-dep on `@opensip-tools/fitness` and `@opensip-tools/core`.
 4. **Convert each `.mjs` to a TypeScript module.** One `<slug>.ts` per check under `src/checks/`, each exporting a `defineCheck(...)` object. **Keep the same slug values** as the loose files used — recipes select by tag/slug, and `--check <slug>` invocations keep working across the move.
@@ -255,4 +255,4 @@ For a tighter unit test, call the analyzer directly — `defineCheck` keeps the 
 | Understand the platform side: pack contract, scope filters, discovery internals | [Check pack architecture](./04-check-pack-architecture.md) |
 | Author a Tool with its own subcommand | [Full Tool plugins](./06-full-tool-plugins.md) |
 | Walk the monorepo adoption flow end-to-end | [Adopt in a monorepo](../60-guides/04-adopt-in-a-monorepo.md) |
-| Browse all 145+ built-in checks for inspiration | [Checks reference](../70-reference/05-checks-index.md) |
+| Browse all 155 built-in checks for inspiration | [Checks reference](../70-reference/05-checks-index.md) |

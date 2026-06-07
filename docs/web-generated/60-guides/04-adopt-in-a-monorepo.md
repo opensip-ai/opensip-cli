@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-03
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Adopt in a monorepo"
 audience: [plugin-authors, ci-integrators]
 purpose: "Task-led: introduce opensip-tools to a large polyglot monorepo. Workspace-package graduation, per-package targets, scoped baselines."
@@ -61,7 +61,7 @@ export const recipes = [{
 }];
 ```
 
-Run `opensip-tools fit --recipe quality --findings` locally. Fix anything obvious. The rest stays in the baseline.
+Run `opensip-tools fit --recipe quality --verbose` locally. Fix anything obvious. The rest stays in the baseline.
 
 ## Day 7+: lock in the baseline + CI
 

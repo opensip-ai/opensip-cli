@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-03
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "What is opensip-tools?"
 audience: [getting-started, contributors]
 purpose: "The front door — what problem opensip-tools solves, what it does, what it isn't, and how to try it."
@@ -28,7 +28,7 @@ You write the rules. The runner discovers them, runs them across TypeScript / Py
 ```text
 > opensip-tools fit
   Fitness Checks
-  Recipe: default   Checks: 145   Project: ~/work/my-app
+  Recipe: default   Checks: 155   Project: ~/work/my-app
 
   Scanning your codebase for quality, security, and architecture issues.
   ────────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ You write the rules. The runner discovers them, runs them across TypeScript / Py
   ✓ no-hardcoded-secrets        312 files,   0 violations
   ...
 
-  157 Passed, 1 Failed (4 Errors, 0 Warnings) | Duration 8.1s
+  154 Passed, 1 Failed (4 Errors, 0 Warnings) | Duration 8.1s
 ```
 
 Exit code is `0` when nothing broke the bar, non-zero when something did. That's all CI needs.
@@ -50,7 +50,7 @@ Exit code is `0` when nothing broke the bar, non-zero when something did. That's
 ## What it does well
 
 - **Architectural rules.** "No module under `packages/cli/` may import from `packages/fitness/checks-*`." Linters can't say this; opensip-tools can, in 15 lines.
-- **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 145+ checks ship in the box; 90 are language-agnostic, the rest target a specific language.
+- **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 155 checks ship in the box; 98 are language-agnostic, and the rest target a specific language.
 - **CI surfacing.** Outputs SARIF for GitHub PR annotations. Baselines for "fail only on *new* violations" so you can adopt incrementally without rewriting the codebase first.
 
 ## What it deliberately isn't

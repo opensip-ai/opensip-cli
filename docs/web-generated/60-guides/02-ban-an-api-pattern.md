@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-03
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Ban an API pattern"
 audience: [plugin-authors, getting-started]
 purpose: "Task-led: write a check that flags every use of a specific API — covering the regex shape, the AST shape, and the trade-offs between them."
@@ -67,7 +67,7 @@ Three things worth noting:
 Run it:
 
 ```bash
-opensip-tools fit --check no-create-cipher --findings
+opensip-tools fit --check no-create-cipher --verbose
 ```
 
 ## When regex isn't enough

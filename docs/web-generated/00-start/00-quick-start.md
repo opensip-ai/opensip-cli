@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-03
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Quick start"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
 purpose: "Four commands from zero to a passing fitness run. Hands-on before the conceptual material."
@@ -33,14 +33,14 @@ opensip-tools auto-detects your project's language(s) from filesystem markers an
 
 | Language | Detection marker | Language-specific checks | Universal checks |
 |---|---|---|---|
-| **TypeScript** / JS / TSX | `tsconfig.json` (or `package.json` alone) | 50 (TS-specific) | ✓ |
-| **Python** | `pyproject.toml`, `setup.py` | yes | ✓ |
-| **Java** | `pom.xml`, `build.gradle` | yes | ✓ |
-| **Go** | `go.mod` | yes | ✓ |
-| **C / C++** | `CMakeLists.txt` | yes (via clang-tidy) | ✓ |
-| **Rust** | `Cargo.toml` | — | ✓ |
+| **TypeScript** / JS / TSX | `tsconfig.json` (or `package.json` alone) | 51 | ✓ |
+| **Python** | `pyproject.toml`, `setup.py` | 2 | ✓ |
+| **Java** | `pom.xml`, `build.gradle` | 1 | ✓ |
+| **Go** | `go.mod` | 1 | ✓ |
+| **C / C++** | `CMakeLists.txt` | 1 (clang-tidy backed) | ✓ |
+| **Rust** | `Cargo.toml` | 1 | ✓ |
 
-All six get the **90 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment through 50 TypeScript-specific checks for typed-inject, drizzle-orm, React patterns, package.json exports, and tsconfig posture.
+All six get the **98 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment through 51 TypeScript-specific checks for typed-inject, drizzle-orm, React patterns, package.json exports, and tsconfig posture.
 
 For the full per-language breakdown, see [`../70-reference/02-package-catalog.md`](/docs/opensip-tools/70-reference/02-package-catalog/).
 
@@ -133,7 +133,7 @@ opensip-tools fit
 opensip-tools fit --list
 
 # Get a per-violation breakdown instead of the summary line
-opensip-tools fit --findings
+opensip-tools fit --verbose
 
 # Emit structured JSON for CI
 opensip-tools fit --json

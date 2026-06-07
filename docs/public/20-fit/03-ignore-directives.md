@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-04
-release: v2.7.0
+last_verified: 2026-06-07
+release: v2.8.0
 title: "Ignore directives"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Inline source-level suppression — how `@fitness-ignore-next-line` and `@fitness-ignore-file` work, when to use them, and where they fit in the run."
@@ -146,7 +146,7 @@ A directive becomes a problem when:
 - **It's repeated more than ~3 times in one file.** That's a baseline shape. Move it to the file level (`@fitness-ignore-file`) or to the gate baseline.
 - **It's repeated more than ~10 times in the project.** That's a check shape. Either the check is wrong (the author should refine the rule) or the team's policy is wrong (the rule should be retired).
 
-The dashboard's per-tool Catalog subtab and the CLI's `--findings` view both surface directive counts; a check with hundreds of suppressions across the repo deserves a second look. (There is no separate top-level "Ignored" tab today — the suppressions are inlined into the same panels that show findings.)
+The dashboard's per-tool Catalog subtab and the CLI's `--verbose` detail view both surface directive counts; a check with hundreds of suppressions across the repo deserves a second look. (There is no separate top-level "Ignored" tab today — the suppressions are inlined into the same panels that show findings.)
 
 ---
 
@@ -160,7 +160,7 @@ The `DirectiveEntry` shape ([`packages/fitness/engine/src/framework/directive-in
 - The kind (`'next-line'` | `'file'`).
 - Whether the directive matched any actual violation (i.e. did this directive *do* anything?).
 
-The CLI's `--findings` output groups violations by check and the table renderer surfaces an `ignored` count per row (`SignalTableRow.ignored` in [`packages/output/src/format/signal-table.ts`](../../../packages/output/src/format/signal-table.ts), derived from `envelope.units[].ignoredCount`). The dashboard reads the same session record. The contract-stable JSON output (the `SignalEnvelope`) carries the per-unit suppression count as `units[].ignoredCount` (fitness-only), so a CI consumer can read it off `--json` directly; the full `appliedDirectives` detail (which directive matched which line) still lives only in the internal session record on disk.
+The CLI's `--verbose` output groups violations by check and the table renderer surfaces an `ignored` count per row (`SignalTableRow.ignored` in [`packages/output/src/format/signal-table.ts`](../../../packages/output/src/format/signal-table.ts), derived from `envelope.units[].ignoredCount`). The dashboard reads the same session record. The contract-stable JSON output (the `SignalEnvelope`) carries the per-unit suppression count as `units[].ignoredCount` (fitness-only), so a CI consumer can read it off `--json` directly; the full `appliedDirectives` detail (which directive matched which line) still lives only in the internal session record on disk.
 
 A directive that didn't match any violation (e.g. the targeted check no longer fires there) is *also* tracked internally. This is how you find stale suppressions: the directive exists in the source, and the framework reports zero violations matched it. A separate housekeeping pass can flag those for cleanup.
 
