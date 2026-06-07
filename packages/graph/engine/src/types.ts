@@ -305,6 +305,15 @@ export interface Catalog {
 export interface Indexes {
   readonly byBodyHash: ReadonlyMap<string, FunctionOccurrence>;
   /**
+   * Per-occurrence id (`${filePath}:${line}:${column}`) → the occurrence at that
+   * source location. Unlike `byBodyHash` (a CONTENT hash that collapses
+   * body-twins across packages into one node), an occId is unique per
+   * occurrence, so the SCC/cycle feature can key its graph by occurrence and
+   * never collapse two distinct functions with identical bodies. Consumed by
+   * `computeSccs` (node identity) and `rules/cycle.ts` (member resolution).
+   */
+  readonly byOccId: ReadonlyMap<string, FunctionOccurrence>;
+  /**
    * bodyHash → ALL occurrences sharing that body. Unlike `byBodyHash`
    * (one occurrence per hash, content-dedup), this preserves every
    * occurrence so a callee whose body is duplicated across packages can be
@@ -393,16 +402,23 @@ export interface PackageFeatures {
 }
 
 /**
- * One strongly-connected component of the call graph (Tarjan over `callees`).
- * Singletons are included by the algorithm. `id` is member-derived and stable
- * across runs so Plan D predicates and the dashboard cycle-grouping read a
- * deterministic key. Populated only when `'scc'` was requested.
+ * One strongly-connected component of the call graph (Tarjan over an
+ * OCCURRENCE-level adjacency — nodes are occIds, edges `resolveCallee`-
+ * disambiguated). Singletons are included by the algorithm. `id` is
+ * member-derived and stable across runs so Plan D predicates and the dashboard
+ * cycle-grouping read a deterministic key. Populated only when `'scc'` was
+ * requested.
+ *
+ * Members are occIds (`${filePath}:${line}:${column}`), NOT bodyHashes:
+ * occurrence identity is package-unique, so two functions with identical bodies
+ * in different packages stay distinct nodes (no false cross-package phantom).
+ * Resolve a member to its occurrence via `Indexes.byOccId`.
  */
 export interface SccFeatures {
   /** `scc:${sortedMembers[0]}` — stable, member-derived (resolves the spec
    *  Open Question on the SCC id scheme). */
   readonly id: string;
-  /** Member `bodyHash`es, sorted (determinism). */
+  /** Member occIds (`${filePath}:${line}:${column}`), sorted (determinism). */
   readonly members: readonly string[];
   /** `members.length`. */
   readonly sccSize: number;

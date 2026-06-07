@@ -120,13 +120,13 @@ function bandFor(
 /**
  * The lowest-`qualifiedName` member occurrence of the SCC — the stable anchor
  * for the one-per-SCC signal (mirrors duplicated-function-body's
- * `lowestByQualifiedName`). Members are body hashes; resolve each via
- * `byBodyHash`.
+ * `lowestByQualifiedName`). Members are occIds
+ * (`${filePath}:${line}:${column}`); resolve each via `byOccId`.
  */
 function anchorOccurrence(scc: SccFeatures, indexes: Indexes): FunctionOccurrence | undefined {
   let anchor: FunctionOccurrence | undefined;
-  for (const hash of scc.members) {
-    const occ = indexes.byBodyHash.get(hash);
+  for (const id of scc.members) {
+    const occ = indexes.byOccId.get(id);
     if (!occ) continue;
     if (!anchor || occ.qualifiedName < anchor.qualifiedName) anchor = occ;
   }
@@ -140,8 +140,8 @@ function anchorOccurrence(scc: SccFeatures, indexes: Indexes): FunctionOccurrenc
  */
 function isTestOnlyScc(scc: SccFeatures, indexes: Indexes): boolean {
   let sawMember = false;
-  for (const hash of scc.members) {
-    const occ = indexes.byBodyHash.get(hash);
+  for (const id of scc.members) {
+    const occ = indexes.byOccId.get(id);
     if (!occ) continue;
     sawMember = true;
     if (!occ.inTestFile) return false;
@@ -152,8 +152,8 @@ function isTestOnlyScc(scc: SccFeatures, indexes: Indexes): boolean {
 /** The sorted distinct packages an SCC's resolvable members belong to. */
 function packagesOf(scc: SccFeatures, indexes: Indexes): readonly string[] {
   const packages = new Set<string>();
-  for (const hash of scc.members) {
-    const occ = indexes.byBodyHash.get(hash);
+  for (const id of scc.members) {
+    const occ = indexes.byOccId.get(id);
     if (occ) packages.add(pkgOf(occ));
   }
   return [...packages].sort();
@@ -169,8 +169,8 @@ function memberLocations(
   indexes: Indexes,
 ): readonly { readonly file: string; readonly line: number }[] {
   const locations: { file: string; line: number }[] = [];
-  for (const hash of scc.members) {
-    const occ = indexes.byBodyHash.get(hash);
+  for (const id of scc.members) {
+    const occ = indexes.byOccId.get(id);
     if (occ?.filePath) locations.push({ file: occ.filePath, line: occ.line });
   }
   return locations;

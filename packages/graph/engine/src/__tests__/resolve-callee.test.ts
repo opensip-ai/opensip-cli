@@ -38,6 +38,7 @@ function indexesOf(
   }
   return {
     byBodyHash,
+    byOccId: new Map(),
     occurrencesByHash,
     importedPackagesByFile,
     bySimpleName: new Map(),

@@ -126,6 +126,7 @@ const FIXTURE_INDEXES: Indexes = {
     ['hash_greet', GREET_OCCURRENCE],
     ['hash_format_name', FORMAT_NAME_OCCURRENCE],
   ]),
+  byOccId: new Map(),
   occurrencesByHash: new Map([
     ['hash_greet', [GREET_OCCURRENCE]],
     ['hash_format_name', [FORMAT_NAME_OCCURRENCE]],
@@ -418,6 +419,7 @@ const FIXTURE_INDEXES_WITH_DEPS: Indexes = {
     ['hash_module_init_format', FORMAT_MODULE_INIT],
     ['hash_module_init_greet', GREET_MODULE_INIT],
   ]),
+  byOccId: new Map(),
   occurrencesByHash: new Map([
     ['hash_module_init_format', [FORMAT_MODULE_INIT]],
     ['hash_module_init_greet', [GREET_MODULE_INIT]],

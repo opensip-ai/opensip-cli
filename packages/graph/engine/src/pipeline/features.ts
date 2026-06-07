@@ -20,7 +20,7 @@
 
 import { logger } from '@opensip-tools/core';
 
-import { pkgOf, resolveCallee } from '../resolve-callee.js';
+import { occId, pkgOf, resolveCallee } from '../resolve-callee.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
 
 import type {
@@ -29,6 +29,7 @@ import type {
   FeatureColumn,
   FeatureTable,
   FunctionFeatures,
+  FunctionOccurrence,
   GraphConfig,
   Indexes,
   PackageEdgeFeature,
@@ -270,7 +271,7 @@ function bfsForward(seeds: ReadonlySet<string>, indexes: Indexes): Set<string> {
   return visited;
 }
 
-// ── Tarjan SCC (verbatim port of dashboard code-paths/scc.ts) ──────
+// ── Tarjan SCC over an OCCURRENCE-level graph ──────────────────────
 
 interface TarjanFrame {
   readonly v: string;
@@ -278,27 +279,74 @@ interface TarjanFrame {
 }
 
 /**
- * Iterative Tarjan over `callees`. Nodes from `byBodyHash`; singletons
+ * The occurrence-level node graph the SCC Tarjan runs over.
+ *  - `nodes` — every occurrence's occId (package-unique node identity).
+ *  - `byOccId` — occId → its occurrence (for package + member resolution).
+ *  - `adj` — occId → deduped neighbor occIds, each call edge's target
+ *    `resolveCallee`-disambiguated to the occurrence the caller can reach.
+ *
+ * Keying nodes by occId (NOT bodyHash) is the whole point of this stage: a
+ * CONTENT hash collapses two functions with identical bodies in different
+ * packages into one node, manufacturing a false cross-package SCC (the
+ * `canonicalize` phantom). occId is per-occurrence, so they stay distinct.
+ * The adjacency mirrors `computePackageCoupling`'s occurrence-level
+ * `resolveCallee` pass; it does NOT reuse the twin-aware `indexes.callees`
+ * (ADR-0003), which is intentionally body-hash-keyed for reachability rules.
+ */
+interface OccGraph {
+  readonly nodes: readonly string[];
+  readonly byOccId: ReadonlyMap<string, FunctionOccurrence>;
+  readonly adj: ReadonlyMap<string, readonly string[]>;
+}
+
+/**
+ * Build the occurrence-level node graph: every occurrence is a node keyed by
+ * occId; each call edge's targets are resolved via `resolveCallee` to the
+ * occurrence the caller actually reaches, then mapped to that callee's occId.
+ * Neighbors are deduped (a Set per node) so the Tarjan adjacency stays tight.
+ */
+function buildOccGraph(indexes: Indexes): OccGraph {
+  const byOccId = new Map<string, FunctionOccurrence>();
+  const adj = new Map<string, readonly string[]>();
+  for (const occs of indexes.occurrencesByHash.values()) {
+    for (const occ of occs) {
+      const id = occId(occ);
+      byOccId.set(id, occ);
+      const neighbors = new Set<string>();
+      for (const callEdge of occ.calls) {
+        for (const target of callEdge.to) {
+          const callee = resolveCallee(target, occ, indexes);
+          if (callee) neighbors.add(occId(callee));
+        }
+      }
+      adj.set(id, [...neighbors]);
+    }
+  }
+  return { nodes: [...byOccId.keys()], byOccId, adj };
+}
+
+/**
+ * Iterative Tarjan over the occurrence-level graph (`buildOccGraph`). Singletons
  * included by the algorithm; each component's members sorted; result ordering
  * preserved (push-on-root-close). Each component is mapped to an `SccFeatures`
- * with a stable member-derived id and `crossesPackages` over the members'
- * resolved packages. Irreducible iterative Tarjan (no recursion, to survive
- * deep call graphs); a verbatim port of the dashboard's former client
- * `scc.ts` — splitting it would obscure the well-known algorithm.
+ * whose members are occIds, with a stable member-derived id and
+ * `crossesPackages` over the members' resolved packages. Irreducible iterative
+ * Tarjan (no recursion, to survive deep call graphs) — splitting it would
+ * obscure the well-known algorithm.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- ported iterative Tarjan, see above
+// eslint-disable-next-line sonarjs/cognitive-complexity -- iterative Tarjan, see above
 function computeSccs(indexes: Indexes): SccFeatures[] {
+  const graph = buildOccGraph(indexes);
   const result: SccFeatures[] = [];
-  const nodes = [...indexes.byBodyHash.keys()];
   const index = new Map<string, number>();
   const lowlink = new Map<string, number>();
   const onStack = new Set<string>();
   const stack: string[] = [];
   let nextIndex = 0;
 
-  const adj = (v: string): readonly string[] => indexes.callees.get(v) ?? [];
+  const adj = (v: string): readonly string[] => graph.adj.get(v) ?? [];
 
-  for (const start of nodes) {
+  for (const start of graph.nodes) {
     if (index.has(start)) continue;
     const work: TarjanFrame[] = [{ v: start, ai: 0 }];
     while (work.length > 0) {
@@ -334,7 +382,7 @@ function computeSccs(indexes: Indexes): SccFeatures[] {
           if (w === v) break;
         }
         members.sort();
-        result.push(toSccFeatures(members, indexes));
+        result.push(toSccFeatures(members, graph.byOccId));
       }
       work.pop();
       if (work.length > 0) {
@@ -348,11 +396,14 @@ function computeSccs(indexes: Indexes): SccFeatures[] {
   return result;
 }
 
-/** Build an `SccFeatures` row from sorted member hashes. */
-function toSccFeatures(members: readonly string[], indexes: Indexes): SccFeatures {
+/** Build an `SccFeatures` row from sorted member occIds. */
+function toSccFeatures(
+  members: readonly string[],
+  byOccId: ReadonlyMap<string, FunctionOccurrence>,
+): SccFeatures {
   const packages = new Set<string>();
-  for (const h of members) {
-    const occ = indexes.byBodyHash.get(h);
+  for (const id of members) {
+    const occ = byOccId.get(id);
     if (occ) packages.add(pkgOf(occ));
   }
   return {

@@ -169,6 +169,7 @@ function sig(over: { ruleId: string; message: string; filePath: string; line?: n
 function makeIndexes(): Indexes {
   return {
     byBodyHash: new Map(),
+    byOccId: new Map(),
     occurrencesByHash: new Map(),
     importedPackagesByFile: new Map(),
     bySimpleName: new Map(),
