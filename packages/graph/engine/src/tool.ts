@@ -19,7 +19,7 @@
  * the single `graph` invocation.
  */
 
-import { applyCommonFlags, type CliProgram } from '@opensip-tools/contracts';
+import { applyCommonFlags, commonFlags, type CliProgram } from '@opensip-tools/contracts';
 import { ConfigurationError, logger, readPackageVersion, ValidationError } from '@opensip-tools/core';
 
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: the
@@ -112,11 +112,12 @@ const GRAPH_RECIPES: ToolCommandDescriptor = {
   aliases: ['list-graph-recipes'],
 };
 
-// Shared --cwd option flag + description (the `graph`, symbol-index,
-// baseline-export, and the two export subcommands all target a directory).
-// Deduped to one literal each.
-const OPT_CWD = '--cwd <path>';
-const OPT_DESC_CWD = 'Target directory';
+// Shared --cwd option flag + description for the auxiliary subcommands
+// (symbol-index, baseline-export, the two export subcommands). Sourced from the
+// ADR-0021 common-flag registry so the string matches the run command's --cwd
+// and cannot drift.
+const OPT_CWD = commonFlags.cwd.flags;
+const OPT_DESC_CWD = commonFlags.cwd.description;
 
 // Live-view key graph contributes to the CLI's renderer registry. Owned
 // by this package — the CLI dispatcher does NOT key off this literal;
@@ -365,14 +366,14 @@ function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
 
 /** Mount `graph-lookup` — look up function occurrences by simple name. */
 function registerGraphLookupCommand(program: CliProgram, cli: ToolCliContext): void {
-  program
+  const lookupCmd = program
     .command(GRAPH_LOOKUP.name)
     .description(GRAPH_LOOKUP.description)
-    .argument('<name>', 'Function simple name to look up (e.g. "saveBaseline")')
-    .option('--json', 'Output structured JSON', false)
-    .action(async (name: string, opts: { json?: boolean }) => {
-      await executeLookup({ name, json: opts.json }, cli);
-    });
+    .argument('<name>', 'Function simple name to look up (e.g. "saveBaseline")');
+  applyCommonFlags(lookupCmd, ['json']);
+  lookupCmd.action(async (name: string, opts: { json?: boolean }) => {
+    await executeLookup({ name, json: opts.json }, cli);
+  });
 }
 
 /** Mount `graph-shard-worker` — [internal] build one shard from a spec file. */
@@ -400,13 +401,12 @@ function registerGraphSymbolIndexCommand(program: CliProgram, cli: ToolCliContex
 
 /** Mount `graph-baseline-export` — export the graph gate baseline (JSON). */
 function registerGraphBaselineExportCommand(program: CliProgram, cli: ToolCliContext): void {
-  program
+  const baselineCmd = program
     .command(GRAPH_BASELINE_EXPORT.name)
     .description(GRAPH_BASELINE_EXPORT.description)
-    .requiredOption('--out <path>', 'Output file path for the JSON baseline')
-    .option(OPT_CWD, OPT_DESC_CWD, process.cwd())
-    .option('--json', 'Output structured JSON', false)
-    .action((opts: { cwd: string; out: string; json?: boolean }) => {
+    .requiredOption('--out <path>', 'Output file path for the JSON baseline');
+  applyCommonFlags(baselineCmd, ['cwd', 'json'], { cwd: process.cwd() });
+  baselineCmd.action((opts: { cwd: string; out: string; json?: boolean }) => {
       const datastore = cli.scope.datastore() as DataStore;
       const result = exportGraphBaseline(datastore, opts.out);
       if (result.type === 'error') {
@@ -581,8 +581,8 @@ function registerGraphRecipesCommand(program: CliProgram, cli: ToolCliContext): 
     .command(GRAPH_RECIPES.name)
     .description(GRAPH_RECIPES.description);
   for (const alias of GRAPH_RECIPES.aliases ?? []) graphRecipesCmd.alias(alias);
+  applyCommonFlags(graphRecipesCmd, ['json']);
   graphRecipesCmd
-    .option('--json', 'Output structured JSON', false)
     .action(async (opts: { json?: boolean }) => {
       const result = await listGraphRecipes();
       if (opts.json === true) {
