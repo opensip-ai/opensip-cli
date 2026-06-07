@@ -29,6 +29,7 @@ import { ConfigurationError, logger, readPackageVersion, ValidationError } from 
 // gone.
 import { exportGraphBaseline } from './cli/baseline-export.js';
 import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/dashboard-data.js';
+import { graphConfigDeclaration } from './cli/graph-config-schema.js';
 import { runCatalogJsonMode } from './cli/graph-modes.js';
 import { renderGraphLive } from './cli/graph-runner.js';
 import { executeGraph, handleGraphError } from './cli/graph.js';
@@ -692,4 +693,9 @@ export const graphTool: Tool = {
   register,
   contributeScope,
   collectDashboardData,
+  // ADR-0023 Phase 4: graph contributes its namespaced `graph:` Zod schema so
+  // the host composes + strict-validates the whole config document before
+  // dispatch. The schema-bearing `ToolConfigDeclaration` narrows to the
+  // kernel-side `ToolConfigContribution` carrier (core carries no Zod).
+  config: graphConfigDeclaration,
 };

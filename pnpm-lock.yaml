@@ -562,6 +562,9 @@ importers:
       '@opensip-tools/cli-ui':
         specifier: workspace:*
         version: link:../../cli-ui
+      '@opensip-tools/config':
+        specifier: workspace:*
+        version: link:../../config
       '@opensip-tools/contracts':
         specifier: workspace:*
         version: link:../../contracts
@@ -592,6 +595,9 @@ importers:
       react:
         specifier: ^19.2.6
         version: 19.2.6
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@opensip-tools/output':
         specifier: workspace:*
