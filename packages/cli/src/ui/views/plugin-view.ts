@@ -5,9 +5,39 @@
 
 import { line, group, type Span, type ViewNode } from '@opensip-tools/cli-ui';
 
-import type { PluginInfo, PluginResult } from '@opensip-tools/contracts';
+import type { PluginInfo, PluginResult, ToolProvenance } from '@opensip-tools/contracts';
 
 const DOMAINS = ['fit', 'sim'] as const;
+
+/** A short, stable prefix of the manifest hash — full hash stays in `--json`. */
+function shortHash(manifestHash: string): string {
+  return manifestHash.slice(0, 12);
+}
+
+function provenanceLine(p: ToolProvenance): ViewNode {
+  const spans: Span[] = [
+    { text: `    🔧 ${p.id}`, tone: 'brand' },
+    { text: ` ${p.version}`, dim: true },
+    { text: `  [${p.source}]`, dim: true },
+    { text: `  ${shortHash(p.manifestHash)}`, dim: true },
+  ];
+  if (p.packageName !== undefined) spans.push({ text: `  ${p.packageName}`, dim: true });
+  return line(spans);
+}
+
+/**
+ * Render the admitted-tool provenance recorded this run (release 2.8.0).
+ * Additive section below the discovered-plugin list — empty/omitted when
+ * no tools were admitted (e.g. no bootstrap, isolated tests).
+ */
+function provenanceSection(records: readonly ToolProvenance[]): ViewNode[] {
+  if (records.length === 0) return [];
+  return [
+    { kind: 'spacer' },
+    line([{ text: 'Tools (provenance)', bold: true }]),
+    ...records.map(provenanceLine),
+  ];
+}
 
 function pluginLine(p: PluginInfo): ViewNode {
   const icon = p.pluginType === 'package' ? '📦' : '📄';
@@ -25,7 +55,11 @@ function domainSection(domain: string, plugins: readonly PluginInfo[]): ViewNode
   ];
 }
 
-function listView(plugins: readonly PluginInfo[], totalCount: number): ViewNode {
+function listView(
+  plugins: readonly PluginInfo[],
+  totalCount: number,
+  toolProvenance: readonly ToolProvenance[],
+): ViewNode {
   const children: ViewNode[] = [
     line([{ text: 'Installed Plugins', bold: true }]),
     { kind: 'spacer' },
@@ -37,6 +71,7 @@ function listView(plugins: readonly PluginInfo[], totalCount: number): ViewNode 
       line([{ text: '  No plugins installed. Run opensip-tools plugin add <package> to get started.', dim: true }]),
     );
   }
+  children.push(...provenanceSection(toolProvenance));
   return group(children);
 }
 
@@ -86,7 +121,7 @@ function syncView(
 export function viewPlugin(result: PluginResult): ViewNode {
   switch (result.type) {
     case 'plugin-list': {
-      return listView(result.plugins, result.totalCount);
+      return listView(result.plugins, result.totalCount, result.toolProvenance);
     }
     case 'plugin-add': {
       return addRemoveView('Installed', 'install', result.packageName, result.success, result.error);
