@@ -60,6 +60,8 @@ export const RELEASE_PACKAGE_ORDER = [
   // Layer 2 — session-store + output (extracted from contracts in the 2.1.0 split)
   { unscoped: 'session-store',        name: '@opensip-tools/session-store',        dir: 'packages/session-store',                 filter: '@opensip-tools/session-store' },
   { unscoped: 'output',               name: '@opensip-tools/output',               dir: 'packages/output',                        filter: '@opensip-tools/output' },
+  // Layer 2 — capability-configuration layer (config composer + schema registry; depends on core)
+  { unscoped: 'config',               name: '@opensip-tools/config',               dir: 'packages/config',                        filter: '@opensip-tools/config' },
   // Layer 3 — shared Ink/React UI primitives
   { unscoped: 'cli-ui',               name: '@opensip-tools/cli-ui',               dir: 'packages/cli-ui',                        filter: '@opensip-tools/cli-ui' },
   // Layer 3 — tree-sitter parse substrate (ADR-0010)
