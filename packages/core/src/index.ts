@@ -51,6 +51,8 @@ export {
   loadAllPlugins,
   resolveScopes,
   VALID_NPM_SCOPE_REGEX,
+  loadToolManifest,
+  PROJECT_LOCAL_MANIFEST_FILE,
 } from './plugins/index.js';
 export type {
   PluginLayout,

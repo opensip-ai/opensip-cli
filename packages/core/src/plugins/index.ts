@@ -64,6 +64,10 @@ export type {
   DiscoveredMarkerPackage,
 } from './marker-discovery.js'
 export {
+  loadToolManifest,
+  PROJECT_LOCAL_MANIFEST_FILE,
+} from './manifest-loader.js'
+export {
   registerRecipesFromMod,
 } from './recipe-loader.js'
 export type {
