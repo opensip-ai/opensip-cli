@@ -66,14 +66,17 @@ describe('loadCliDefaults', () => {
 });
 
 describe('mergeConfigDefaults', () => {
-  it('applies recipe default when flag is undefined', async () => {
+  // ADR-0022: recipe is no longer merged generically — it is tool-scoped and
+  // each tool resolves its own default via resolveToolRecipeName. The generic
+  // merge must leave `opts.recipe` untouched (explicit flag only).
+  it('does NOT merge cli.recipe onto opts (tool-scoped per ADR-0022)', async () => {
     const { mergeConfigDefaults } = await loadModule();
     const opts: Record<string, unknown> = { recipe: undefined, verbose: false, json: false, exclude: [], apiKey: undefined };
     mergeConfigDefaults(opts, { recipe: 'x' });
-    expect(opts.recipe).toBe('x');
+    expect(opts.recipe).toBeUndefined();
   });
 
-  it('does not overwrite recipe when explicitly set', async () => {
+  it('leaves an explicit --recipe untouched', async () => {
     const { mergeConfigDefaults } = await loadModule();
     const opts: Record<string, unknown> = { recipe: 'explicit', verbose: false, json: false, exclude: [], apiKey: undefined };
     mergeConfigDefaults(opts, { recipe: 'from-config' });

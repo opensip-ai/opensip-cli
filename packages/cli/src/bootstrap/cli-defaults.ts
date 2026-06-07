@@ -54,7 +54,13 @@ export function loadCliDefaults(cwd: string, explicitConfigPath?: string): CliDe
  * Commander's expectation that opts are the post-merge truth.
  */
 export function mergeConfigDefaults(opts: Record<string, unknown>, config: CliDefaults): void {
-  if (config.recipe && opts.recipe === undefined) opts.recipe = config.recipe;
+  // NOTE (ADR-0022): `recipe` is deliberately NOT merged here. Recipe defaults
+  // are tool-scoped — `fit`/`graph`/`sim` own disjoint recipe namespaces, so a
+  // single tool-agnostic default leaked a fit recipe into graph/sim and aborted
+  // them (`Unknown graph recipe '<fit-recipe>'`). Each tool now resolves its own
+  // default via `resolveToolRecipeName` (its `<tool>.recipe` block + the
+  // deprecated `cli.recipe` fallback). After this change `opts.recipe` reflects
+  // only the explicit `--recipe` flag.
   if (config.verbose && opts.verbose === false) opts.verbose = config.verbose;
   if (config.json && opts.json === false) opts.json = config.json;
   if (config.reportTo && opts.reportTo === undefined) opts.reportTo = config.reportTo;
