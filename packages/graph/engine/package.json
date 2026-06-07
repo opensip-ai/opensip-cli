@@ -37,7 +37,19 @@
     }
   },
   "opensipTools": {
-    "kind": "tool"
+    "kind": "tool",
+    "id": "graph",
+    "apiVersion": 1,
+    "commands": [
+      { "name": "graph", "description": "Run static call-graph analysis (rules, entry points, catalog summary in one report)" },
+      { "name": "graph-lookup", "description": "Look up function occurrences by simple name from the persisted catalog" },
+      { "name": "graph-symbol-index", "description": "Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog" },
+      { "name": "graph-baseline-export", "description": "Export the graph gate baseline (JSON) from the datastore to a file" },
+      { "name": "graph-shard-worker", "description": "[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)" },
+      { "name": "catalog-export", "description": "Run graph analysis and write the CatalogExport JSON document (symbols + edges + provenance) to a file" },
+      { "name": "sarif-export", "description": "Run graph analysis and write OpenSIP-convention SARIF v2.1.0 findings to a file" },
+      { "name": "graph-recipes", "description": "List available graph recipes", "aliases": ["list-graph-recipes"] }
+    ]
   },
   "scripts": {
     "build": "tsc",

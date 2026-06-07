@@ -29,7 +29,12 @@
     "dist"
   ],
   "opensipTools": {
-    "kind": "tool"
+    "kind": "tool",
+    "id": "simulation",
+    "apiVersion": 1,
+    "commands": [
+      { "name": "sim", "description": "Run simulation scenarios [experimental]" }
+    ]
   },
   "scripts": {
     "build": "tsc",

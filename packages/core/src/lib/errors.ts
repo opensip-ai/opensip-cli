@@ -22,6 +22,7 @@ export type ToolErrorCode =
   | 'TIMEOUT'
   | 'NETWORK_ERROR'
   | 'CONFIGURATION_ERROR'
+  | 'PLUGIN_INCOMPATIBLE'
   | 'UNKNOWN_LIVE_VIEW';
 
 /** Constructor options for {@link ToolError}: `code` plus arbitrary diagnostic metadata. */
@@ -100,6 +101,29 @@ export class ConfigurationError extends ToolError {
   constructor(message: string, options?: ToolErrorOptions) {
     super(message, options?.code ?? 'CONFIGURATION_ERROR', options);
     this.name = 'ConfigurationError';
+  }
+}
+
+/**
+ * Thrown when a tool plugin is rejected by the compatibility/trust gate
+ * (release 2.8.0) and the rejection must fail the run rather than skip
+ * silently — i.e. the tool was explicitly requested but is incompatible,
+ * or a project-local executable tool was not allowlisted (deny-by-default).
+ *
+ * Mapped to `EXIT_CODES.PLUGIN_INCOMPATIBLE` (exit 5) by
+ * `mapToolErrorToExitCode` so an incompatible/untrusted plugin is
+ * diagnosable from the exit code alone. Carries the structured
+ * `diagnostic` the admission gate produced (compatibility reason or the
+ * trust-policy message) for surfacing through the CLI error boundary.
+ */
+export class PluginIncompatibleError extends ToolError {
+  /** The admission diagnostic (compatibility reason or trust-policy message). */
+  readonly diagnostic?: string;
+
+  constructor(message: string, options?: ToolErrorOptions & { diagnostic?: string }) {
+    super(message, options?.code ?? 'PLUGIN_INCOMPATIBLE', options);
+    this.name = 'PluginIncompatibleError';
+    this.diagnostic = options?.diagnostic;
   }
 }
 

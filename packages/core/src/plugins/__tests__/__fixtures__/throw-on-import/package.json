@@ -1,0 +1,14 @@
+{
+  "name": "@fixture/throw-on-import-tool",
+  "version": "9.9.9",
+  "type": "module",
+  "main": "./index.mjs",
+  "opensipTools": {
+    "kind": "tool",
+    "id": "throw-on-import",
+    "apiVersion": 1,
+    "commands": [
+      { "name": "boom", "description": "A command from a tool that explodes on import" }
+    ]
+  }
+}

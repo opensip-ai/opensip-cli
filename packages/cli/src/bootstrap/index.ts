@@ -44,7 +44,7 @@ import {
   buildToolDiscoverySources,
 } from './register-tools.js';
 
-import type { LanguageRegistry, ToolRegistry } from '@opensip-tools/core';
+import type { LanguageRegistry, ToolProvenance, ToolRegistry } from '@opensip-tools/core';
 
 // Re-export only the symbols the CLI composition root (`index.ts`) consumes.
 export { mountAllToolCommands } from './register-tools.js';
@@ -89,16 +89,36 @@ export interface BootstrapOptions {
  * `pickAdapter()` lands during a real run. PR 1a of plan
  * docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
  */
-export async function bootstrapCli(opts: BootstrapOptions): Promise<void> {
+export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapResult> {
   // Telemetry first — before any tool runs — so provider registration happens
   // once per process ahead of the first stage span. Hard no-op unless the OTLP
   // endpoint env var is set (see telemetry/sdk-init.ts), so standalone startup
   // is byte-for-byte unaffected.
   initTelemetry(opts.cliEntryUrl);
   registerLanguageAdapters(opts.langRegistry);
-  registerFirstPartyTools(opts.toolRegistry);
-  await discoverAndRegisterToolPackages(opts.toolRegistry, {
-    sources: buildToolDiscoverySources(opts.cwd, opts.projectDir),
-  });
+
+  // Release 2.8.0: bundled + installed tools both flow through the shared
+  // `admitTool` gate (register-tools.ts) and contribute a `ToolProvenance`
+  // record into this collector. It's a plain array threaded by value — no
+  // module singleton — handed back to the composition root so Phase 4's
+  // `plugin list` can surface source / identity / manifestHash.
+  const provenance: ToolProvenance[] = [];
+  registerFirstPartyTools(opts.toolRegistry, provenance);
+  await discoverAndRegisterToolPackages(
+    opts.toolRegistry,
+    { sources: buildToolDiscoverySources(opts.cwd, opts.projectDir) },
+    provenance,
+  );
   await discoverAndRegisterGraphAdapterPackages({ projectDir: opts.projectDir });
+  return { provenance };
+}
+
+/** What {@link bootstrapCli} hands back to the composition root. */
+export interface BootstrapResult {
+  /**
+   * Provenance for every tool admitted through the compatibility gate
+   * (bundled + installed), in registration order. Reachable by `plugin
+   * list` (Phase 4) via the cli-context per-run holder.
+   */
+  readonly provenance: readonly ToolProvenance[];
 }

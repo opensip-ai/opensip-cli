@@ -143,6 +143,7 @@ describe('plugin view', () => {
       type: 'plugin-list',
       totalCount: 1,
       plugins: [{ domain: 'fit', namespace: 'acme', pluginType: 'package' }],
+      toolProvenance: [],
     });
     expect(out).toContain('Installed Plugins');
     expect(out).toContain('fit/');
@@ -151,7 +152,32 @@ describe('plugin view', () => {
   });
 
   it('list: totally empty shows the get-started hint', () => {
-    expect(text({ type: 'plugin-list', totalCount: 0, plugins: [] })).toContain('No plugins installed');
+    expect(text({ type: 'plugin-list', totalCount: 0, plugins: [], toolProvenance: [] })).toContain(
+      'No plugins installed',
+    );
+  });
+
+  it('list: renders the tool-provenance section (source + short manifestHash)', () => {
+    const out = text({
+      type: 'plugin-list',
+      totalCount: 0,
+      plugins: [],
+      toolProvenance: [
+        {
+          source: 'bundled',
+          id: 'fit',
+          version: '2.8.0',
+          packageName: '@opensip-tools/fitness',
+          resolvedPath: '/pkgs/fitness',
+          manifestHash: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+        },
+      ],
+    });
+    expect(out).toContain('Tools (provenance)');
+    expect(out).toContain('fit');
+    expect(out).toContain('[bundled]');
+    expect(out).toContain('abcdef012345'); // 12-char short hash
+    expect(out).toContain('@opensip-tools/fitness');
   });
 
   it('add / remove success and failure', () => {

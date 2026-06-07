@@ -1,0 +1,60 @@
+/**
+ * tool-trust — the project-local executable-tool trust policy (release
+ * 2.8.0, Phase 3 Task 3.2).
+ *
+ * A `project-local` tool is authored code under `<project>/opensip-tools/…`
+ * that changes with the repo (§5.2.1). Running it imports arbitrary code
+ * from the working tree, so the host MUST make the trust decision explicit
+ * rather than load-by-presence.
+ *
+ * Policy for 2.8.0 (signed off): **deny-by-default for non-interactive
+ * runs; admit-with-allowlist when configured.** No interactive prompt UX
+ * in this release. The allowlist is a comma/whitespace-separated list of
+ * tool ids in the `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS` environment variable
+ * — a minimal, documented opt-in:
+ *
+ *   OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS="my-audit, my-lint"   # admit by id
+ *   OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS="*"                    # admit all
+ *
+ * The decision is made BEFORE the tool's module is imported: a disallowed
+ * project-local tool is fail-closed (exit 5) without its code ever running.
+ */
+
+/**
+ * Environment variable carrying the project-local tool allowlist. Read
+ * once per decision (cheap), never cached, so a test can set/unset it
+ * around a single call.
+ */
+export const PROJECT_TOOL_ALLOWLIST_ENV = 'OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS';
+
+/**
+ * Parse the allowlist env var into a set of permitted tool ids. Empty/
+ * unset ⇒ empty set (deny-by-default). The wildcard `'*'` admits all
+ * (surfaced via {@link isProjectLocalToolTrusted}).
+ */
+function parseAllowlist(raw: string | undefined): ReadonlySet<string> {
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(/[\s,]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+  );
+}
+
+/**
+ * Decide whether a project-local executable tool with the given `id` is
+ * trusted to load, under the deny-by-default + allowlist-opt-in policy.
+ *
+ * @param id The tool's stable id (from its sidecar manifest).
+ * @param env The environment to read the allowlist from (defaults to
+ *   `process.env`; injectable for tests).
+ * @returns `true` iff the allowlist contains `id` or the wildcard `'*'`.
+ */
+export function isProjectLocalToolTrusted(
+  id: string,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const allow = parseAllowlist(env[PROJECT_TOOL_ALLOWLIST_ENV]);
+  return allow.has('*') || allow.has(id);
+}
