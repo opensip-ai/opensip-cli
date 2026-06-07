@@ -239,6 +239,47 @@ export function buildToolDiscoverySources(cwd: string, cliInstallDir: string): T
 }
 
 /**
+ * Run the 2.8.0 admission gate over a discovered INSTALLED tool package
+ * before its module is imported. Reads the static
+ * `package.json#opensipTools` manifest and runs the shared `admitTool` gate
+ * (source `'installed'`, best-effort `explicitlyRequested: false` so an
+ * incompatible installed tool skips rather than failing the whole CLI).
+ *
+ * Returns:
+ *   - `'reject'`  — skip this package (gate skipped it, or its id collides
+ *                   with a built-in). The gate already logged the reason.
+ *   - `'proceed'` — continue to import + register. This covers both an
+ *                   admitted manifest AND a manifest-less package (grace
+ *                   window: pre-2.8.0 third-party tools keep loading off the
+ *                   `kind: 'tool'` discovery marker alone).
+ *
+ * On `'proceed'` for an admitted manifest, the tool's `ToolProvenance` is
+ * pushed onto `provenance` for Phase 4's `plugin list`.
+ */
+function admitInstalledTool(
+  pkg: { readonly name: string; readonly packageDir: string },
+  builtInIds: ReadonlySet<string>,
+  provenance: ToolProvenance[],
+): 'reject' | 'proceed' {
+  const manifest = loadToolManifest('installed', pkg.packageDir);
+  if (manifest === undefined) return 'proceed'; // grace window — legacy import path
+  if (builtInIds.has(manifest.id)) return 'reject';
+
+  const result = admitTool({
+    manifest,
+    source: 'installed',
+    dir: pkg.packageDir,
+    packageName: pkg.name,
+    // Best-effort: discovery alone can't tell whether THIS run targets this
+    // tool's command, so default false → incompatible installed tools skip.
+    explicitlyRequested: false,
+  });
+  if (result.decision !== 'admit') return 'reject';
+  provenance.push(result.provenance);
+  return 'proceed';
+}
+
+/**
  * Discover and register third-party tool packages from npm — any
  * `package.json` declaring `opensipTools.kind === 'tool'`. Built-in
  * ids are skipped to avoid double-registration warnings. Discovery spans
@@ -268,31 +309,10 @@ export async function discoverAndRegisterToolPackages(
 
   for (const pkg of discovered) {
     try {
-      // Compatibility gate BEFORE import (release 2.8.0): read the static
-      // manifest and run the shared admission gate. A missing/malformed
-      // manifest (loadToolManifest → undefined) is grace-window-incompatible
-      // only via the gate when present; without a manifest we fall through to
-      // the legacy import path so pre-2.8.0 third-party tools still load (the
-      // discovery marker `opensipTools.kind: 'tool'` is the floor).
-      const manifest = loadToolManifest('installed', pkg.packageDir);
-      if (manifest !== undefined) {
-        const result = admitTool({
-          manifest,
-          source: 'installed',
-          dir: pkg.packageDir,
-          packageName: pkg.name,
-          // Best-effort: we cannot tell from discovery alone whether THIS run
-          // targets this tool's command, so default false → incompatible
-          // installed tools skip rather than fail-closed.
-          explicitlyRequested: false,
-        });
-        if (result.decision !== 'admit') {
-          // skip (or, defensively, fail-closed) — gate already logged it.
-          continue;
-        }
-        if (builtInIds.has(manifest.id)) continue;
-        provenance.push(result.provenance);
-      }
+      // Compatibility gate BEFORE import (release 2.8.0). `'reject'` means the
+      // gate skipped it (or it's a built-in id); `'proceed'` means import +
+      // register as before (manifest absent → grace window, or admitted).
+      if (admitInstalledTool(pkg, builtInIds, provenance) === 'reject') continue;
 
       // Import by the package's RESOLVED entry path, not its bare name.
       // A discovered tool may live in a host dir (the user-global
