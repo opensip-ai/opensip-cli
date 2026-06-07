@@ -19,6 +19,8 @@
  * here.
  */
 
+import { logger } from '../lib/logger.js';
+
 import { COMMENT_OPENERS } from './comment-openers.js';
 
 import type { Signal } from '../types/signal.js';
@@ -341,15 +343,47 @@ function isEnoent(error: unknown): boolean {
 }
 
 /**
- * Hook for surfacing `ENOENT`-absent directive files. Task 5.1 establishes the
- * conservative non-fatal path (the signal is kept, never silently treated as
- * "no directives" without a record); Task 5.2 wires the attributed log here.
+ * Surface every `ENOENT`-absent directive file as a warning-level structured
+ * log, one `evt` per `(file, ruleId)` pair so a potentially-dropped waiver
+ * names both the unreadable file AND the signal whose suppression could not be
+ * evaluated. Emitting per-ruleId (rather than per-file) is what makes a leaked
+ * waiver a 1-minute find. The `logger` singleton stamps `runId` from the
+ * current scope, so no logger injection is threaded through the pure scan.
  */
 function attributeMissingFiles(
-  _missingFiles: ReadonlySet<string>,
-  _request: SuppressionRequest,
+  missingFiles: ReadonlySet<string>,
+  request: SuppressionRequest,
 ): void {
-  // Attribution log wired in Task 5.2.
+  if (missingFiles.size === 0) return;
+
+  const locate = request.locate ?? defaultLocate;
+  const ruleIdOf = request.ruleIdOf ?? ((s: Signal) => s.ruleId);
+
+  // ruleIds whose candidate locations reference each missing file.
+  const ruleIdsByFile = new Map<string, Set<string>>();
+  for (const signal of request.signals) {
+    const id = ruleIdOf(signal);
+    for (const loc of locate(signal)) {
+      if (!missingFiles.has(loc.file)) continue;
+      let ids = ruleIdsByFile.get(loc.file);
+      if (!ids) {
+        ids = new Set();
+        ruleIdsByFile.set(loc.file, ids);
+      }
+      ids.add(id);
+    }
+  }
+
+  for (const file of missingFiles) {
+    for (const ruleId of ruleIdsByFile.get(file) ?? []) {
+      logger.warn('Suppression directive file is missing; a waiver may not be applied', {
+        evt: 'signals.suppress.directive-file-missing',
+        module: 'core:signals:suppress',
+        file,
+        ruleId,
+      });
+    }
+  }
 }
 
 /** The first candidate location that suppresses `id`, or `null`. */

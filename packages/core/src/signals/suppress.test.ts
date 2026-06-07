@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
+import { logger } from '../lib/logger.js';
 import { createSignal } from '../types/signal.js';
 
 import { filterSignalsBySuppressions, type SuppressionKeywords } from './suppress.js';
@@ -43,6 +44,10 @@ function readerFor(files: Record<string, string>): (p: string) => Promise<string
 }
 
 describe('filterSignalsBySuppressions', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('suppresses via a next-line directive on the preceding line', async () => {
     const content = ['// @graph-ignore-next-line graph:cycle -- intentional recursion', 'function visit() {}'].join('\n');
     const res = await filterSignalsBySuppressions({
@@ -154,16 +159,53 @@ describe('filterSignalsBySuppressions', () => {
     ).rejects.toThrow(/decode boom/);
   });
 
-  it('on ENOENT: conservatively keeps the signal (non-fatal, not suppressed)', async () => {
-    // A genuinely-removed file is non-fatal — but the waiver cannot be
-    // evaluated, so the signal is kept (never silently treated as suppressed).
+  it('on ENOENT: logs the missing-file evt and conservatively keeps the signal (not suppressed)', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     const res = await filterSignalsBySuppressions({
       signals: [sig('graph:cycle', 'missing.ts', 2)],
       keywords: GRAPH_KEYWORDS,
       readFile: readerFor({}), // unknown file → ENOENT
     });
+
+    // Conservative: a waiver that cannot be evaluated does NOT suppress.
     expect(res.kept).toHaveLength(1);
     expect(res.suppressed).toHaveLength(0);
+
+    // Attributed: the leaked-waiver risk is surfaced with { file, ruleId }.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [, data] = warnSpy.mock.calls[0];
+    expect(data).toMatchObject({
+      evt: 'signals.suppress.directive-file-missing',
+      file: 'missing.ts',
+      ruleId: 'graph:cycle',
+    });
+  });
+
+  it('on ENOENT under a ruleIdOf override: attributes the resolved ruleId', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    await filterSignalsBySuppressions({
+      signals: [sig('some-other-rule-id', 'gone.ts', 2)],
+      keywords: FITNESS_KEYWORDS,
+      readFile: readerFor({}),
+      ruleIdOf: () => 'my-check',
+    });
+    const [, data] = warnSpy.mock.calls[0];
+    expect(data).toMatchObject({
+      evt: 'signals.suppress.directive-file-missing',
+      file: 'gone.ts',
+      ruleId: 'my-check',
+    });
+  });
+
+  it('does NOT log the missing-file evt on the happy path (present files)', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const content = ['// @graph-ignore-next-line graph:cycle -- ok', 'function visit() {}'].join('\n');
+    await filterSignalsBySuppressions({
+      signals: [sig('graph:cycle', 'a.ts', 2)],
+      keywords: GRAPH_KEYWORDS,
+      readFile: readerFor({ 'a.ts': content }),
+    });
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('is keyword-agnostic — same logic under fitness keywords', async () => {
