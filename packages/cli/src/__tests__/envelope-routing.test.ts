@@ -195,9 +195,21 @@ describe('root cloud egress (deliverEnvelope → scope.signalSink)', () => {
     expect(out.cloudAccepted).toBe(2);
   });
 
-  it('never throws and reports 0 accepted when the sink fails', async () => {
+  it('never throws and reports 0 accepted when the sink reports zero', async () => {
     const sink: SignalSink = {
       emit: () => Promise.resolve({ accepted: 0, authRejected: false }),
+    };
+    const out = await runWithScope(makeScope(sink), () =>
+      deliverEnvelope(ENVELOPE, { cwd: process.cwd(), repo: {} }),
+    );
+    expect(out.cloudAccepted).toBe(0);
+  });
+
+  it('swallows a sink that THROWS and reports 0 accepted (best-effort egress)', async () => {
+    // Exercises the cloud-egress catch path: a rejecting sink must never crash
+    // the run — egress is best-effort and the local run already succeeded.
+    const sink: SignalSink = {
+      emit: () => Promise.reject(new Error('network down')),
     };
     const out = await runWithScope(makeScope(sink), () =>
       deliverEnvelope(ENVELOPE, { cwd: process.cwd(), repo: {} }),
