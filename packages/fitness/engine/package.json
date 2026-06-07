@@ -37,7 +37,15 @@
     }
   },
   "opensipTools": {
-    "kind": "tool"
+    "kind": "tool",
+    "id": "fitness",
+    "apiVersion": 1,
+    "commands": [
+      { "name": "fit", "description": "Run fitness checks" },
+      { "name": "fit-list", "description": "List available fitness checks", "aliases": ["list-checks"] },
+      { "name": "fit-recipes", "description": "List available fitness recipes", "aliases": ["list-recipes"] },
+      { "name": "fit-baseline-export", "description": "Export the fit gate baseline (SARIF) from the datastore to a file" }
+    ]
   },
   "scripts": {
     "build": "tsc",
