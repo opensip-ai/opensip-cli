@@ -63,9 +63,9 @@ export interface FitnessRecipeServiceConfig {
   callbacks?: FitnessRecipeServiceCallbacks
   /** Per-check pre-resolved file paths from target overrides. Map of check slug → absolute file paths. */
   checkTargetFiles?: ReadonlyMap<string, readonly string[]>
-  /** Optional check registry (defaults to defaultRegistry). */
+  /** Optional check registry (defaults to the current scope's check registry). */
   checkRegistry?: CheckRegistry
-  /** Optional recipe registry (defaults to defaultRecipeRegistry). */
+  /** Optional recipe registry (defaults to the current scope's recipe registry). */
   recipeRegistry?: FitnessRecipeRegistry
   /** Check slugs disabled via opensip.config.yml — these checks are skipped unless force-included by a recipe. */
   disabledChecks?: readonly string[]

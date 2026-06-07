@@ -64,9 +64,18 @@ import {
 import { renderFitLive } from './cli/fit-runner.js';
 import { listChecks } from './cli/list-checks.js';
 import { listRecipes } from './cli/list-recipes.js';
+import {
+  createCheckRegistry,
+  createFitnessLoadState,
+  createRecipeRegistry,
+} from './framework/scope-registry.js';
 import { FIT_PLUGIN_LAYOUT } from './plugins/loader.js';
+// Side-effect import: ensures the RunScope.fitness augmentation is loaded so
+// `scope.fitness` is the correctly-typed slot here.
+import './scope-augmentation.js';
 
 import type {
+  ScopeContribution,
   Tool,
   ToolCliContext,
   ToolCommandDescriptor,
@@ -261,6 +270,23 @@ function registerBaselineExportCommand(program: CliProgram, cli: ToolCliContext)
     });
 }
 
+/**
+ * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
+ * after constructing the scope and before entering it; the kernel installs
+ * the returned `fitness` slot. Fresh check + recipe registries (and an empty
+ * `ensureChecksLoaded` lifecycle slot) per run so concurrent scopes carry
+ * independent fitness state.
+ */
+function contributeScope(): ScopeContribution {
+  return {
+    fitness: {
+      checks: createCheckRegistry(),
+      recipes: createRecipeRegistry(),
+      load: createFitnessLoadState(),
+    },
+  };
+}
+
 // =============================================================================
 // EXPORT
 // =============================================================================
@@ -274,6 +300,7 @@ export const fitnessTool: Tool = {
   commands: [FIT, FIT_LIST, FIT_RECIPES, FIT_BASELINE_EXPORT],
   pluginLayout: FIT_PLUGIN_LAYOUT,
   register,
+  contributeScope,
   collectDashboardData: collectFitnessDashboardData,
   initialize: async (): Promise<void> => {
     // ensureChecksLoaded() is called inside the executeFit / listChecks

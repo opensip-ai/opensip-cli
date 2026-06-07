@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { enterScope, RunScope } from '@opensip-tools/core'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
+import { fitnessTool } from '../../tool.js'
 import { loadPlugin, loadAllPlugins } from '../loader.js'
 
 import type { DiscoveredPlugin } from '@opensip-tools/core'
@@ -22,6 +24,12 @@ const FITNESS_URL = pathToFileURL(require.resolve('@opensip-tools/fitness')).hre
 let testDir: string
 
 beforeEach(() => {
+  // The fit plugin loader registers checks/recipes into the current scope's
+  // registries (`currentCheckRegistry()` / `currentRecipeRegistry()`), so each
+  // test runs inside a fresh RunScope carrying fitness's contributed subscope.
+  const scope = new RunScope()
+  Object.assign(scope, fitnessTool.contributeScope?.() ?? {})
+  enterScope(scope)
   testDir = mkdtempSync(join(tmpdir(), 'opensip-loader-test-'))
 })
 

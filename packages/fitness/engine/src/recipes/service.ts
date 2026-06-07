@@ -12,12 +12,13 @@ import { passRate } from '@opensip-tools/contracts'
 import { logger , NotFoundError, SystemError , generateId , initParseCache, clearParseCache, RunScope, currentScope, runWithScope } from '@opensip-tools/core'
 
 import { fileCache, DEFAULT_PREWARM_PATTERNS } from '../framework/file-cache.js'
-import { defaultRegistry, type Check, type CheckRegistry } from '../framework/registry.js'
+import { type Check, type CheckRegistry } from '../framework/registry.js'
+import { currentCheckRegistry, currentRecipeRegistry } from '../framework/scope-registry.js'
 
 import { setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } from './check-config.js'
 import { resolveChecks, validateCheckReferences } from './check-resolution.js'
 import { executeParallel, type ExecutionOptions, type ExecutionServiceContext } from './parallel-execution.js'
-import { defaultRecipeRegistry, type FitnessRecipeRegistry } from './registry.js'
+import { type FitnessRecipeRegistry } from './registry.js'
 import { executeSequential } from './sequential-execution.js'
 import {
   DEFAULT_MAX_PARALLEL,
@@ -70,8 +71,12 @@ export class FitnessRecipeService {
 
   constructor(config?: FitnessRecipeServiceConfig) {
     this.config = config ?? {}
-    this.checkRegistry = config?.checkRegistry ?? defaultRegistry
-    this.recipeRegistry = config?.recipeRegistry ?? defaultRecipeRegistry
+    // Default to the current scope's registries (the production path: a fit
+    // run executes inside the pre-action-hook's RunScope). An explicit
+    // `checkRegistry`/`recipeRegistry` in config overrides — tests and
+    // programmatic callers can inject their own without a scope.
+    this.checkRegistry = config?.checkRegistry ?? currentCheckRegistry()
+    this.recipeRegistry = config?.recipeRegistry ?? currentRecipeRegistry()
   }
 
   private get session(): FitnessRecipeSession {

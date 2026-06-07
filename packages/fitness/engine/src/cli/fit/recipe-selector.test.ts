@@ -1,17 +1,26 @@
-import { describe, expect, it } from 'vitest';
+import { enterScope, RunScope } from '@opensip-tools/core';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { selectRecipe } from './recipe-selector.js';
+
+import { fitnessTool } from '../../tool.js';
 
 import type { FitOptions } from '@opensip-tools/contracts';
 
 /**
  * `selectRecipe` resolves the fit recipe with tool-scoped precedence (ADR-0022)
- * against the module-singleton `defaultRecipeRegistry`, whose built-ins include
+ * against the current scope's recipe registry, whose built-ins include
  * `default` and `backend` but NOT `opensip` (a project-private fit recipe in the
- * parent repo). These tests exercise the precedence + tolerance contract without
- * standing up a scope.
+ * parent repo). These tests exercise the precedence + tolerance contract; each
+ * enters a fresh RunScope carrying fitness's contributed recipe registry.
  */
 const base: FitOptions = { cwd: '/tmp' } as FitOptions;
+
+beforeEach(() => {
+  const scope = new RunScope();
+  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  enterScope(scope);
+});
 
 describe('selectRecipe (ADR-0022 tool-scoped + tolerant)', () => {
   it('explicit --recipe wins and resolves a real recipe', () => {

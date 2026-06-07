@@ -9,17 +9,37 @@
  * composition root's job now.
  */
 
+import { enterScope } from '@opensip-tools/core';
 import { makeTestScope } from '@opensip-tools/core/test-utils/with-scope.js';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { collectFitnessDashboardData } from '../dashboard.js';
+
+import { fitnessTool } from '../../tool.js';
 
 import type {
   CheckCatalogEntry,
   RecipeCatalogEntry,
 } from '../dashboard.js';
 
+/**
+ * Build + enter a RunScope carrying fitness's contributed subscope. The
+ * collector reads the check/recipe registries and the `ensureChecksLoaded`
+ * lifecycle slot off the AMBIENT current scope (not its `scope` argument), so
+ * the scope must be entered, not merely constructed.
+ */
+function enterFitnessScope(): ReturnType<typeof makeTestScope> {
+  const scope = makeTestScope();
+  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  enterScope(scope);
+  return scope;
+}
+
 describe('collectFitnessDashboardData', () => {
+  beforeEach(() => {
+    enterFitnessScope();
+  });
+
   it('returns only the fitness-owned dashboard keys', async () => {
     const scope = makeTestScope();
     const result = await collectFitnessDashboardData(scope);

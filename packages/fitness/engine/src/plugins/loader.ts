@@ -20,8 +20,7 @@ import {
 } from '@opensip-tools/core'
 
 import { isCheck } from '../framework/check-types.js'
-import { defaultRegistry } from '../framework/registry.js'
-import { defaultRecipeRegistry } from '../recipes/registry.js'
+import { currentCheckRegistry, currentRecipeRegistry } from '../framework/scope-registry.js'
 
 import type { FitPluginExports } from './types.js'
 import type {
@@ -69,6 +68,7 @@ function registerFitExports(
   ctx: RegisterCtx,
 ): RegisteredCounts {
   const fit = mod as FitPluginExports
+  const checkRegistry = currentCheckRegistry()
   const registeredIds = new Set<string>()
   let checksRegistered = 0
   let recipesRegistered = 0
@@ -79,7 +79,7 @@ function registerFitExports(
       for (const [index, check] of fit.checks.entries()) {
         if (isCheck(check)) {
           if (!registeredIds.has(check.config.id)) {
-            defaultRegistry.register(check, ctx.plugin.namespace)
+            checkRegistry.register(check, ctx.plugin.namespace)
             registeredIds.add(check.config.id)
             checksRegistered++
           }
@@ -109,7 +109,7 @@ function registerFitExports(
       exportName === 'checkDisplay'
     ) continue
     if (isCheck(value) && !registeredIds.has(value.config.id)) {
-      defaultRegistry.register(value, ctx.plugin.namespace)
+      checkRegistry.register(value, ctx.plugin.namespace)
       registeredIds.add(value.config.id)
       checksRegistered++
     }
@@ -118,7 +118,7 @@ function registerFitExports(
   // Default export: a single Check instance
   const defaultExport = mod.default
   if (isCheck(defaultExport) && !registeredIds.has(defaultExport.config.id)) {
-    defaultRegistry.register(defaultExport, ctx.plugin.namespace)
+    checkRegistry.register(defaultExport, ctx.plugin.namespace)
     registeredIds.add(defaultExport.config.id)
     checksRegistered++
   }
@@ -128,7 +128,7 @@ function registerFitExports(
   // duplicates rather than the dead try/catch this block used to wrap.
   const { recipesRegistered: helperRecipesRegistered } = registerRecipesFromMod(
     fit,
-    defaultRecipeRegistry,
+    currentRecipeRegistry(),
     {
       namespace: ctx.plugin.namespace,
       onWarn: (evt, message, extra) => ctx.warn(evt, message, extra),

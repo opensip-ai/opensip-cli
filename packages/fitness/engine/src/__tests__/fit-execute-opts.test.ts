@@ -24,6 +24,7 @@ import { SessionRepo } from '@opensip-tools/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { executeFit } from '../cli/fit.js';
+import { fitnessTool } from '../tool.js';
 
 import type { FitOptions } from '@opensip-tools/contracts';
 
@@ -73,9 +74,13 @@ function makeArgs(cwd: string): FitOptions {
 }
 
 function withFitScope<T>(fn: () => Promise<T>): Promise<T> {
-  // executeFit reads `currentScope()?.languages` — wrap each call in a
-  // fresh scope so the validation step finds an (empty) registry.
-  return runWithScope(new RunScope({ languages: new LanguageRegistry() }), fn);
+  // executeFit reads `currentScope()?.languages` and the fitness subscope
+  // (`scope.fitness.{checks,recipes,load}`) — wrap each call in a fresh scope
+  // carrying both an (empty) language registry and fitness's contributed
+  // registries so check loading + recipe selection resolve.
+  const scope = new RunScope({ languages: new LanguageRegistry() });
+  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  return runWithScope(scope, fn);
 }
 
 describe('executeFit — opts threading (v2 persistence)', () => {

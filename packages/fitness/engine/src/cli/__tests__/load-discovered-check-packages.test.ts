@@ -13,16 +13,23 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { enterScope, RunScope } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import { defaultRegistry } from '../../framework/registry.js';
-import { defaultRecipeRegistry } from '../../recipes/registry.js';
+import { currentCheckRegistry, currentRecipeRegistry } from '../../framework/scope-registry.js';
+import { fitnessTool } from '../../tool.js';
 import { loadDiscoveredCheckPackages } from '../fit.js';
 
 let testDir: string;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 
 beforeEach(() => {
+  // Fresh RunScope per test carrying fitness's contributed registries, so the
+  // loader writes into an empty, isolated check + recipe registry each time
+  // (replaces the prior shared-singleton + afterEach reset).
+  const scope = new RunScope();
+  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  enterScope(scope);
   testDir = mkdtempSync(join(tmpdir(), 'opensip-fit-loader-'));
   // Suppress stderr "no readable package.json" / "no checks array" noise in
   // expected-error cases; tests inspect the spy when they care.
@@ -31,7 +38,6 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
-  defaultRecipeRegistry.reset();
   stderrSpy.mockRestore();
 });
 
@@ -123,8 +129,8 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
-    expect(defaultRecipeRegistry.has(recipeId)).toBe(true);
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
+    expect(currentRecipeRegistry().has(recipeId)).toBe(true);
   });
 
   it('does not load a prefix-only package without the fit-pack marker', async () => {
@@ -136,7 +142,7 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(0);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeUndefined();
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeUndefined();
   });
 
   it('loads a non-marker package when explicitly listed in plugins.checkPackages', async () => {
@@ -155,8 +161,8 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
-    expect(defaultRecipeRegistry.has(recipeId)).toBe(true);
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
+    expect(currentRecipeRegistry().has(recipeId)).toBe(true);
   });
 
   it('loads a checks-prefixed pack when it declares the fit-pack marker', async () => {
@@ -169,8 +175,8 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
-    expect(defaultRecipeRegistry.has(recipeId)).toBe(true);
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
+    expect(currentRecipeRegistry().has(recipeId)).toBe(true);
   });
 
   it('loads a pack that exports `checks` but no `recipes` (recipesRegistered=0)', async () => {
@@ -184,7 +190,7 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
   });
 
   it('emits plugin.recipe.invalid_item warning for malformed recipes; still registers valid checks', async () => {
@@ -205,11 +211,11 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
     // Valid recipe still landed:
-    expect(defaultRecipeRegistry.has(recipeIdValid)).toBe(true);
+    expect(currentRecipeRegistry().has(recipeIdValid)).toBe(true);
     // Malformed one was skipped:
-    expect(defaultRecipeRegistry.has('missing-name')).toBe(false);
+    expect(currentRecipeRegistry().has('missing-name')).toBe(false);
   });
 
   it('skips a marker-discovered pack that fails to export a `checks` array (records a load warning)', async () => {
@@ -268,8 +274,8 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered, warnings, coreMismatchSkips } = await loadDiscoveredCheckPackages(testDir);
 
     expect(totalRegistered).toBe(0);
-    expect(defaultRegistry.getBySlug(a.checkSlug)).toBeUndefined();
-    expect(defaultRegistry.getBySlug(b.checkSlug)).toBeUndefined();
+    expect(currentCheckRegistry().getBySlug(a.checkSlug)).toBeUndefined();
+    expect(currentCheckRegistry().getBySlug(b.checkSlug)).toBeUndefined();
     // Both packs reported via the structured skip list…
     expect([...coreMismatchSkips].sort()).toEqual([
       '@opensip-tools/checks-foreigncore-a',
@@ -296,7 +302,7 @@ describe('loadDiscoveredCheckPackages', () => {
     const { totalRegistered, coreMismatchSkips } = await loadDiscoveredCheckPackages(testDir);
 
     expect(totalRegistered).toBe(1);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
+    expect(currentCheckRegistry().getBySlug(checkSlug)).toBeDefined();
     expect(coreMismatchSkips).toEqual([]);
   });
 });

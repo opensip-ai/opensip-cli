@@ -25,7 +25,7 @@
 
 import { logger } from '@opensip-tools/core';
 
-import { defaultRegistry } from '../framework/registry.js';
+import { currentCheckRegistry } from '../framework/scope-registry.js';
 import { buildScopeBasedFileMap } from '../framework/scope-resolver.js';
 import { FitnessRecipeService } from '../recipes/service.js';
 
@@ -94,22 +94,23 @@ export interface ExecuteFitOptions {
  * package in a fixed order:
  *
  *   1. `ensureChecksLoaded` — loads check packs and fit-domain plugins
- *      (must run first; populates `defaultRegistry` and
- *      `defaultRecipeRegistry` for downstream phases).
+ *      (must run first; populates the scope's check + recipe registries
+ *      for downstream phases).
  *   2. `loadFitConfig` — resolves `signalersConfig` + `targetsConfig`
  *      from `opensip-tools.config.yml`. Sequenced before `selectRecipe`
  *      so a missing/invalid config surfaces before recipe-name
  *      validation — the config tells the user what recipes exist, so
  *      the config error is the more useful message of the two.
- *   3. `selectRecipe` — looks up the requested recipe in
- *      `defaultRecipeRegistry` (populated by step 1). Has a hard
+ *   3. `selectRecipe` — looks up the requested recipe in the scope's
+ *      recipe registry (populated by step 1). Has a hard
  *      precondition on `ensureChecksLoaded`; see its JSDoc.
  *   4. `validateLanguagesAgainstAdapters` — warns on unknown languages.
  *   5. Build scope-based file map → run recipe → build outputs.
  *
- * The phase helpers read from module-singleton state set by step 1
- * (see the lifecycle singletons block in `./fit/check-loader.ts`). The
- * ordering here is the contract that lets those reads be safe.
+ * The phase helpers read from per-run scope state set by step 1
+ * (`scope.fitness.load`; see the accessors block in
+ * `./fit/check-loader.ts`). The ordering here is the contract that lets
+ * those reads be safe.
  */
 export async function executeFit(
   args: FitOptions,
@@ -117,7 +118,8 @@ export async function executeFit(
 ): Promise<{ result: FitDoneResult; envelope: SignalEnvelope } | { result: ErrorResult; envelope?: undefined }> {
   logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
-  logger.info({ evt: 'cli.checks.loaded', module: 'cli:fit', checkCount: defaultRegistry.listEnabled().length });
+  const checkRegistry = currentCheckRegistry();
+  logger.info({ evt: 'cli.checks.loaded', module: 'cli:fit', checkCount: checkRegistry.listEnabled().length });
 
   const configResult = loadFitConfig(args);
   if ('error' in configResult) return { result: configResult.error };
@@ -135,8 +137,8 @@ export async function executeFit(
 
   const validationWarnings = await validateLanguagesAgainstAdapters(targetRegistry);
 
-  const allChecks = defaultRegistry.listSlugs().map((key) => {
-    const check = defaultRegistry.getBySlug(key);
+  const allChecks = checkRegistry.listSlugs().map((key) => {
+    const check = checkRegistry.getBySlug(key);
     return { slug: check?.config.slug ?? key, scope: check?.config.checkScope };
   });
   const scopeMap = buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd);
