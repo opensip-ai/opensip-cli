@@ -6,7 +6,7 @@ import {
   UnknownCapabilityDomainError,
   ValidationError,
 } from '../../lib/errors.js';
-import { RunScope, runWithScope } from '../../lib/run-scope.js';
+import { RunScope, runWithScopeSync } from '../../lib/run-scope.js';
 import {
   isCapabilityValidator,
   isStructuralContributionSchema,
@@ -17,6 +17,9 @@ import {
   createCapabilityRegistry,
   currentCapabilityRegistry,
 } from '../capability-registry.js';
+
+/** A no-op registrar for tests that only assert registration/lookup. */
+const noopRegistrar = (): void => undefined;
 
 function domain(overrides: Partial<CapabilityDomainSpec> = {}): CapabilityDomainSpec {
   return {
@@ -34,7 +37,7 @@ describe('CapabilityRegistry', () => {
     it('registers a domain and surfaces it via getDomain/hasDomain/listDomains', () => {
       const reg = new CapabilityRegistry();
       const spec = domain();
-      reg.registerDomain(spec, () => {});
+      reg.registerDomain(spec, noopRegistrar);
 
       expect(reg.hasDomain('audit-rule')).toBe(true);
       expect(reg.getDomain('audit-rule')).toEqual(spec);
@@ -70,13 +73,13 @@ describe('CapabilityRegistry', () => {
 
     it('throws NotFoundError (CAPABILITY.DOMAIN.UNKNOWN) for an unknown domain', () => {
       const reg = new CapabilityRegistry();
-      reg.registerDomain(domain(), () => {});
+      reg.registerDomain(domain(), noopRegistrar);
 
       let caught: unknown;
       try {
         reg.routeContribution('does-not-exist', { id: 'x', name: 'X' });
-      } catch (e) {
-        caught = e;
+      } catch (error) {
+        caught = error;
       }
       expect(caught).toBeInstanceOf(UnknownCapabilityDomainError);
       expect(caught).toBeInstanceOf(NotFoundError); // subclass — existing handling still catches it
@@ -94,8 +97,8 @@ describe('CapabilityRegistry', () => {
       let caught: unknown;
       try {
         reg.routeContribution('audit-rule', { id: 'only-id' }); // missing `name`
-      } catch (e) {
-        caught = e;
+      } catch (error) {
+        caught = error;
       }
       expect(caught).toBeInstanceOf(CapabilitySchemaMismatchError);
       expect(caught).toBeInstanceOf(ValidationError); // subclass — existing handling still catches it
@@ -109,7 +112,7 @@ describe('CapabilityRegistry', () => {
 
     it('rejects a non-object contribution against a structural schema', () => {
       const reg = new CapabilityRegistry();
-      reg.registerDomain(domain(), () => {});
+      reg.registerDomain(domain(), noopRegistrar);
       expect(() => reg.routeContribution('audit-rule', 'nope')).toThrow(ValidationError);
     });
 
@@ -141,28 +144,28 @@ describe('CapabilityRegistry', () => {
 });
 
 describe('scope-owned reader (per-RunScope, no module singleton)', () => {
-  it('currentCapabilityRegistry returns the scope-bound instance', async () => {
+  it('currentCapabilityRegistry returns the scope-bound instance', () => {
     const scope = new RunScope();
     const reg = createCapabilityRegistry();
     scope.capabilities = reg;
-    await runWithScope(scope, async () => {
+    runWithScopeSync(scope, () => {
       expect(currentCapabilityRegistry()).toBe(reg);
     });
   });
 
-  it('isolates two concurrent scopes', async () => {
+  it('isolates two concurrent scopes', () => {
     const scopeA = new RunScope();
     const scopeB = new RunScope();
     scopeA.capabilities = createCapabilityRegistry();
     scopeB.capabilities = createCapabilityRegistry();
-    scopeA.capabilities.registerDomain(domain({ id: 'a-domain' }), () => {});
-    scopeB.capabilities.registerDomain(domain({ id: 'b-domain' }), () => {});
+    scopeA.capabilities.registerDomain(domain({ id: 'a-domain' }), noopRegistrar);
+    scopeB.capabilities.registerDomain(domain({ id: 'b-domain' }), noopRegistrar);
 
-    await runWithScope(scopeA, async () => {
+    runWithScopeSync(scopeA, () => {
       expect(currentCapabilityRegistry().hasDomain('a-domain')).toBe(true);
       expect(currentCapabilityRegistry().hasDomain('b-domain')).toBe(false);
     });
-    await runWithScope(scopeB, async () => {
+    runWithScopeSync(scopeB, () => {
       expect(currentCapabilityRegistry().hasDomain('b-domain')).toBe(true);
       expect(currentCapabilityRegistry().hasDomain('a-domain')).toBe(false);
     });
@@ -172,9 +175,9 @@ describe('scope-owned reader (per-RunScope, no module singleton)', () => {
     expect(() => currentCapabilityRegistry()).toThrow(/outside a RunScope/);
   });
 
-  it('throws when the scope has no capability registry attached', async () => {
+  it('throws when the scope has no capability registry attached', () => {
     const scope = new RunScope();
-    await runWithScope(scope, async () => {
+    runWithScopeSync(scope, () => {
       expect(() => currentCapabilityRegistry()).toThrow(/scope\.capabilities is missing/);
     });
   });

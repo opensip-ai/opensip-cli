@@ -53,10 +53,15 @@ export {
   VALID_NPM_SCOPE_REGEX,
   loadToolManifest,
   admitTool,
+  registerCapabilityDomainsFromManifest,
   PROJECT_LOCAL_MANIFEST_FILE,
+  CapabilityRegistry,
+  createCapabilityRegistry,
+  currentCapabilityRegistry,
 } from './plugins/index.js';
 export type {
   AdmissionResult,
+  CapabilityRegistrar,
   PluginLayout,
   DiscoveredPlugin,
   LoadedPlugin,
@@ -102,6 +107,21 @@ export type {
   ToolCommandManifest,
   ToolProvenance,
   ToolSource,
+} from './tools/index.js';
+// Capability domain model (release 2.10.0, §5.3): the data shape a tool
+// uses to declare an extension point it owns. The scope-owned runtime
+// registry is exported from ./plugins/index.js below. Re-exported by
+// @opensip-tools/contracts for the public surface.
+export {
+  isCapabilityValidator,
+  isStructuralContributionSchema,
+} from './tools/index.js';
+export type {
+  CapabilityDomainSpec,
+  CapabilityContributionKind,
+  CapabilityValidator,
+  StructuralContributionSchema,
+  ToolCapabilityDeclaration,
 } from './tools/index.js';
 // The single pure compatibility gate shared by the bundled + external
 // admission paths (release 2.8.0). Re-exported by @opensip-tools/contracts.

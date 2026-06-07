@@ -38,6 +38,12 @@ import { join } from 'node:path';
 import { logger } from '../lib/logger.js';
 import { checkCompatibility, type CompatibilityVerdict } from '../tools/compatibility.js';
 
+import type { CapabilityRegistry } from './capability-registry.js';
+import type {
+  CapabilityContributionKind,
+  CapabilityDomainSpec,
+  ToolCapabilityDeclaration,
+} from '../tools/capability.js';
 import type {
   ToolCommandManifest,
   ToolPluginManifest,
@@ -53,6 +59,9 @@ import type {
  * `.mjs`, so the host reads identity without running tool code).
  */
 export const PROJECT_LOCAL_MANIFEST_FILE = 'opensip-tool.manifest.json';
+
+/** `module` field stamped on every structured log event from this file. */
+const LOADER_MODULE = 'core:plugins';
 
 /**
  * Read + validate a tool's static `ToolPluginManifest` for the given
@@ -151,7 +160,7 @@ export function admitTool(args: {
   if (verdict.kind === 'compatible') {
     logger.info({
       evt: 'plugin.manifest.loaded',
-      module: 'core:plugins',
+      module: LOADER_MODULE,
       id: manifest.id,
       source,
       apiVersion: manifest.apiVersion,
@@ -167,7 +176,7 @@ export function admitTool(args: {
   if (explicitlyRequested) {
     logger.error({
       evt: 'plugin.incompatible.failed',
-      module: 'core:plugins',
+      module: LOADER_MODULE,
       id: manifest.id,
       source,
       apiVersion: verdict.declared,
@@ -181,7 +190,7 @@ export function admitTool(args: {
 
   logger.warn({
     evt: 'plugin.incompatible.skipped',
-    module: 'core:plugins',
+    module: LOADER_MODULE,
     id: manifest.id,
     source,
     apiVersion: verdict.declared,
@@ -249,6 +258,17 @@ function validateManifest(
   const apiVersion = block.apiVersion;
   if (apiVersion !== undefined && typeof apiVersion !== 'number') return undefined;
 
+  // §5.3 (2.10.0): the `capabilities` slot, now concrete. Omitted ⇒ no
+  // declared domains (additive). Present-but-malformed ⇒ manifest fails
+  // validation, mirroring the strict `commands` parse above. The absent
+  // case is handled HERE (not inside the normalizer) so the normalizer has
+  // a single return type — `undefined` from it means INVALID.
+  let capabilities: readonly ToolCapabilityDeclaration[] | undefined;
+  if (block.capabilities !== undefined) {
+    capabilities = normalizeCapabilities(block.capabilities);
+    if (capabilities === undefined) return undefined; // present but malformed
+  }
+
   return {
     kind: 'tool',
     id: block.id,
@@ -256,6 +276,120 @@ function validateManifest(
     version,
     ...(apiVersion === undefined ? {} : { apiVersion }),
     commands,
+    ...(capabilities === undefined ? {} : { capabilities }),
+  };
+}
+
+/** Closed set of valid `contributionKind` values for a capability declaration. */
+const CONTRIBUTION_KINDS: readonly CapabilityContributionKind[] = [
+  'module-export',
+  'manifest-entry',
+  'file',
+];
+
+/**
+ * Validate + normalize a PRESENT `capabilities` array to
+ * `ToolCapabilityDeclaration[]`. Each entry needs a non-empty string `id`,
+ * a numeric `apiVersion`, and a `contributionKind` in the closed set;
+ * `contributionSchema` is `unknown` (the kernel carries no Zod) and is
+ * passed through verbatim. Returns the declarations on success, or
+ * `undefined` when the slot is malformed (the caller fails the manifest,
+ * mirroring `normalizeCommands`). The absent case is handled by the caller.
+ */
+function normalizeCapabilities(
+  value: unknown,
+): readonly ToolCapabilityDeclaration[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: ToolCapabilityDeclaration[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) return undefined;
+    if (typeof entry.id !== 'string' || entry.id === '') return undefined;
+    if (typeof entry.apiVersion !== 'number') return undefined;
+    const kind = entry.contributionKind;
+    if (!isContributionKind(kind)) return undefined;
+    out.push({
+      id: entry.id,
+      apiVersion: entry.apiVersion,
+      // `contributionSchema` is unknown by contract — pass through as-is
+      // (may legitimately be absent for a domain that validates inside its
+      // own registrar).
+      contributionSchema: entry.contributionSchema,
+      contributionKind: kind,
+    });
+  }
+  return out;
+}
+
+/** Type guard for the closed `CapabilityContributionKind` union. */
+function isContributionKind(value: unknown): value is CapabilityContributionKind {
+  return typeof value === 'string' && (CONTRIBUTION_KINDS as readonly string[]).includes(value);
+}
+
+/**
+ * Register every capability domain a manifest declares into the per-run
+ * {@link CapabilityRegistry}, stamping `ownerToolId = manifest.id` on each
+ * (§5.3 / Task 2.2). This is how `MARKER_KINDS` becomes a BOOTSTRAP DEFAULT:
+ * the marker enum still seeds the discovery vocabulary, and a
+ * manifest-declared domain EXTENDS that set — registered here without any
+ * host-enum edit. Additive: a manifest with no `capabilities` registers
+ * nothing.
+ *
+ * The owner-supplied registrar is NOT known at manifest-read time (the
+ * tool's runtime module hasn't been imported), so this registers the
+ * domain with a deferred-registrar placeholder that THROWS if a
+ * contribution is routed before the owning tool wires its real registrar
+ * (Phase 4). The host knows the domain EXISTS and who owns it; the owner
+ * supplies the actual registrar when its module loads.
+ *
+ * Emits one structured `capability.domain.from_manifest` evt per domain so
+ * a manifest-sourced domain is observable in structured logs (Task 2.2.3).
+ *
+ * @param manifest The validated manifest carrying the declarations.
+ * @param registry The per-run capability registry to populate.
+ * @returns The {@link CapabilityDomainSpec}s registered (owner-stamped).
+ */
+export function registerCapabilityDomainsFromManifest(
+  manifest: ToolPluginManifest,
+  registry: CapabilityRegistry,
+): readonly CapabilityDomainSpec[] {
+  const declarations = manifest.capabilities ?? [];
+  const registered: CapabilityDomainSpec[] = [];
+  for (const decl of declarations) {
+    const spec: CapabilityDomainSpec = {
+      id: decl.id,
+      ownerToolId: manifest.id,
+      apiVersion: decl.apiVersion,
+      contributionSchema: decl.contributionSchema,
+      contributionKind: decl.contributionKind,
+    };
+    registry.registerDomain(spec, makeDeferredRegistrar(spec));
+    logger.info({
+      evt: 'capability.domain.from_manifest',
+      module: LOADER_MODULE,
+      domainId: spec.id,
+      ownerToolId: spec.ownerToolId,
+      apiVersion: spec.apiVersion,
+      contributionKind: spec.contributionKind,
+    });
+    registered.push(spec);
+  }
+  return registered;
+}
+
+/**
+ * A placeholder registrar for a manifest-declared domain whose owning tool
+ * has not yet wired its real registrar (Phase 4). Routing a contribution
+ * before then is a programming error — the host knows the domain exists,
+ * but no one can yet accept a contribution to it — so it throws a clear
+ * diagnostic rather than silently dropping the contribution.
+ */
+function makeDeferredRegistrar(spec: CapabilityDomainSpec): (contribution: unknown) => void {
+  return () => {
+    throw new Error(
+      `capability: domain '${spec.id}' (owner '${spec.ownerToolId}') was declared in a ` +
+        `manifest but its owning tool has not registered a runtime registrar yet ` +
+        `(Phase 4 wires real registrars). Cannot accept a contribution.`,
+    );
   };
 }
 
@@ -326,7 +460,7 @@ function readJson(path: string): Record<string, unknown> | undefined {
     // genuinely broken file is diagnosable rather than silently invisible.
     logger.debug({
       evt: 'plugin.manifest.read_failed',
-      module: 'core:plugins',
+      module: LOADER_MODULE,
       path,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -342,7 +476,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function diagnose(dir: string, source: ToolSource, reason: string): void {
   logger.debug({
     evt: 'plugin.manifest.read_failed',
-    module: 'core:plugins',
+    module: LOADER_MODULE,
     dir,
     source,
     reason,

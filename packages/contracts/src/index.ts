@@ -87,6 +87,11 @@ export type {
   ToolProvenance,
   ToolSource,
   CompatibilityVerdict,
+  // Capability domain model (release 2.10.0, §5.3) — the shape a tool's
+  // manifest `capabilities` slot now carries, plus the runtime domain spec.
+  CapabilityDomainSpec,
+  ToolCapabilityDeclaration,
+  CapabilityContributionKind,
 } from '@opensip-tools/core';
 
 // CLI defaults loader (`cli:` block of opensip-tools.config.yml).

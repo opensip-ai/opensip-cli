@@ -23,6 +23,8 @@
  * re-exports them for the public surface; core cannot import contracts.
  */
 
+import type { ToolCapabilityDeclaration } from './capability.js';
+
 /**
  * The plugin-API epoch the running engine implements.
  *
@@ -66,6 +68,12 @@ export interface ToolCommandManifest {
  * fields are typed-but-not-consumed placeholders for later releases so a
  * manifest authored today is forward-shaped; they are deliberately
  * `unknown`-shaped until a release gives them concrete semantics.
+ *
+ * Release 2.10.0 (§5.3) gives `capabilities` its concrete shape — an
+ * array of {@link ToolCapabilityDeclaration} (the capability domains the
+ * tool OWNS). It stays OPTIONAL and additive: a manifest with no
+ * `capabilities` declares no domains, and `MARKER_KINDS` remains the
+ * bootstrap-default domain vocabulary. The other slots stay `unknown`.
  */
 export interface ToolPluginManifest {
   /** Discriminator — always `'tool'` (matches `opensipTools.kind`). */
@@ -88,8 +96,14 @@ export interface ToolPluginManifest {
   // These keep a 2.8.0-authored manifest forward-shaped. They are
   // `unknown` (not concrete) on purpose: the release that consumes each
   // one defines its shape; declaring a shape now would over-commit.
-  /** §5.3 → 2.9.0: declared capability tokens. */
-  readonly capabilities?: readonly unknown[];
+  /**
+   * §5.3 → 2.10.0: the capability domains this tool OWNS. Each entry is a
+   * {@link ToolCapabilityDeclaration} (id + contribution epoch + schema +
+   * kind); the host stamps `ownerToolId = this.id` and registers each into
+   * the per-run capability registry, EXTENDING the `MARKER_KINDS` bootstrap
+   * vocabulary without a host-enum edit. Optional + additive.
+   */
+  readonly capabilities?: readonly ToolCapabilityDeclaration[];
   /** §5.7 → 2.9.0: tool-owned config schema descriptor. */
   readonly config?: unknown;
   /** Later: dashboard-contribution descriptor. */

@@ -66,6 +66,7 @@ export type {
 export {
   loadToolManifest,
   admitTool,
+  registerCapabilityDomainsFromManifest,
   PROJECT_LOCAL_MANIFEST_FILE,
 } from './manifest-loader.js'
 export type {
