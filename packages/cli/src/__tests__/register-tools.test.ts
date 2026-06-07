@@ -304,6 +304,49 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     expect(registry.list()).toHaveLength(0);
   });
 
+  it('skips an installed package whose manifest is a FUTURE epoch (skip, not fail)', async () => {
+    // Release 2.8.0: a discovered installed tool runs through admitTool with
+    // explicitlyRequested:false, so an out-of-range (future-epoch) manifest
+    // SKIPS — it must not fail the whole CLI. The fixture also throws on import,
+    // so reaching the (resolved, non-throwing) call additionally proves the
+    // gate rejected it on the static manifest BEFORE its module was imported.
+    staged.push(
+      stageFixture('future-epoch', {
+        packageJson: {
+          name: '@opensip-tools-fixture/future-epoch',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: {
+            kind: 'tool',
+            id: 'fixture-future',
+            apiVersion: 999,
+            commands: [{ name: 'fixture-future', description: 'a tool from the future' }],
+          },
+        },
+        indexJs: "throw new Error('future-epoch tool must never be imported');",
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    const provenance: ToolProvenance[] = [];
+    const restore = silenceStderr();
+    try {
+      // Whole-CLI must NOT fail — the incompatible installed tool is skipped.
+      await expect(
+        discoverAndRegisterToolPackages(
+          registry,
+          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          provenance,
+        ),
+      ).resolves.toBeUndefined();
+    } finally {
+      restore();
+    }
+    // Skipped ⇒ not registered, and no provenance recorded for it.
+    expect(registry.get('fixture-future')).toBeUndefined();
+    expect(provenance.some((p) => p.id === 'fixture-future')).toBe(false);
+  });
+
   it('isolates a package whose module throws on import', async () => {
     staged.push(
       stageFixture('throws-on-load', {
