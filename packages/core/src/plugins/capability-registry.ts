@@ -31,6 +31,7 @@
 
 import {
   CapabilitySchemaMismatchError,
+  SystemError,
   UnknownCapabilityDomainError,
 } from '../lib/errors.js';
 import { logger as defaultLogger, type Logger } from '../lib/logger.js';
@@ -40,6 +41,8 @@ import {
   isStructuralContributionSchema,
   type CapabilityDomainSpec,
 } from '../tools/capability.js';
+
+import type { ToolPluginManifest } from '../tools/manifest.js';
 
 /**
  * The owner-supplied callback the host invokes once a contribution has
@@ -241,4 +244,81 @@ export function currentCapabilityRegistry(): CapabilityRegistry {
     );
   }
   return scope.capabilities;
+}
+
+/**
+ * Register every capability domain a manifest declares into the per-run
+ * {@link CapabilityRegistry}, stamping `ownerToolId = manifest.id` on each
+ * (§5.3 / Task 2.2). This is how `MARKER_KINDS` becomes a BOOTSTRAP DEFAULT:
+ * the marker enum still seeds the discovery vocabulary, and a
+ * manifest-declared domain EXTENDS that set — registered here without any
+ * host-enum edit. Additive: a manifest with no `capabilities` registers
+ * nothing.
+ *
+ * The owner-supplied registrar is NOT known at manifest-read time (the
+ * tool's runtime module hasn't been imported), so this registers the
+ * domain with a deferred-registrar placeholder that THROWS if a
+ * contribution is routed before the owning tool wires its real registrar
+ * (Phase 4). The host knows the domain EXISTS and who owns it; the owner
+ * supplies the actual registrar when its module loads.
+ *
+ * Emits one structured `capability.domain.from_manifest` evt per domain so
+ * a manifest-sourced domain is observable in structured logs (Task 2.2.3).
+ *
+ * @param manifest The validated manifest carrying the declarations.
+ * @param registry The per-run capability registry to populate.
+ * @returns The {@link CapabilityDomainSpec}s registered (owner-stamped).
+ */
+export function registerCapabilityDomainsFromManifest(
+  manifest: ToolPluginManifest,
+  registry: CapabilityRegistry,
+): readonly CapabilityDomainSpec[] {
+  const declarations = manifest.capabilities ?? [];
+  const registered: CapabilityDomainSpec[] = [];
+  for (const decl of declarations) {
+    const spec: CapabilityDomainSpec = {
+      id: decl.id,
+      ownerToolId: manifest.id,
+      apiVersion: decl.apiVersion,
+      contributionSchema: decl.contributionSchema,
+      contributionKind: decl.contributionKind,
+    };
+    registry.registerDomain(spec, makeDeferredRegistrar(spec));
+    defaultLogger.info({
+      evt: 'capability.domain.from_manifest',
+      module: 'core:plugins',
+      domainId: spec.id,
+      ownerToolId: spec.ownerToolId,
+      apiVersion: spec.apiVersion,
+      contributionKind: spec.contributionKind,
+    });
+    registered.push(spec);
+  }
+  return registered;
+}
+
+/**
+ * A placeholder registrar for a manifest-declared domain whose owning tool
+ * has not yet wired its real registrar (Phase 4). Routing a contribution
+ * before then is a programming error — the host knows the domain exists,
+ * but no one can yet accept a contribution to it — so it throws a clear
+ * diagnostic rather than silently dropping the contribution.
+ *
+ * @param spec The domain being registered with this placeholder.
+ * @returns A {@link CapabilityRegistrar} that throws a {@link SystemError} on
+ *   any invocation, until Phase 4 replaces it with the owning tool's real
+ *   registrar.
+ */
+function makeDeferredRegistrar(spec: CapabilityDomainSpec): CapabilityRegistrar {
+  return () => {
+    // A SystemError (internal invariant violation): the domain exists but its
+    // owning tool has not wired a real registrar yet, so a contribution arrived
+    // before anyone can accept it. Self-documenting typed error — the throw is
+    // intentional (placeholder until Phase 4 wires real registrars).
+    throw new SystemError(
+      `capability: domain '${spec.id}' (owner '${spec.ownerToolId}') was declared in a ` +
+        `manifest but its owning tool has not registered a runtime registrar yet ` +
+        `(Phase 4 wires real registrars). Cannot accept a contribution.`,
+    );
+  };
 }

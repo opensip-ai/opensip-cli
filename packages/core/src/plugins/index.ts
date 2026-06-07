@@ -66,7 +66,6 @@ export type {
 export {
   loadToolManifest,
   admitTool,
-  registerCapabilityDomainsFromManifest,
   PROJECT_LOCAL_MANIFEST_FILE,
 } from './manifest-loader.js'
 export type {
@@ -80,6 +79,7 @@ export {
   CapabilityRegistry,
   createCapabilityRegistry,
   currentCapabilityRegistry,
+  registerCapabilityDomainsFromManifest,
 } from './capability-registry.js'
 export type {
   CapabilityRegistrar,

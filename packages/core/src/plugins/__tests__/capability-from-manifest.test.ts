@@ -5,11 +5,11 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { logger } from '../../lib/logger.js';
-import { CapabilityRegistry } from '../capability-registry.js';
 import {
-  loadToolManifest,
+  CapabilityRegistry,
   registerCapabilityDomainsFromManifest,
-} from '../manifest-loader.js';
+} from '../capability-registry.js';
+import { loadToolManifest } from '../manifest-loader.js';
 import { MARKER_KINDS } from '../marker-discovery.js';
 
 let testDir: string;

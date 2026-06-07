@@ -87,7 +87,7 @@ function readEnvBindings(
 }
 
 /** A plain object check that treats arrays and null as non-objects. */
-function isRecord(v: unknown): v is Record<string, unknown> {
+function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
@@ -110,17 +110,17 @@ export function resolveConfig(input: ResolveConfigInput): ResolvedConfig {
     const merged: Record<string, unknown> = {};
 
     // 1. defaults (lowest)
-    if (isRecord(decl.defaults)) {
+    if (isPlainObject(decl.defaults)) {
       Object.assign(merged, decl.defaults);
     }
     // 2. file
-    if (isRecord(file[ns])) {
+    if (isPlainObject(file[ns])) {
       Object.assign(merged, file[ns]);
     }
     // 3. env bindings
     Object.assign(merged, readEnvBindings(decl.env, env));
     // 4. flags (highest)
-    if (isRecord(flags[ns])) {
+    if (isPlainObject(flags[ns])) {
       Object.assign(merged, flags[ns]);
     }
 
