@@ -174,7 +174,7 @@ Subcommands available out of the box:
 - `opensip-tools graph` — Build the static call graph
 - `opensip-tools graph-lookup` — Look up a symbol's callers/callees in the graph
 - `opensip-tools graph-symbol-index` — Build/query the symbol index
-- `opensip-tools graph-baseline-export` — Export the graph baseline to SARIF
+- `opensip-tools graph-baseline-export` — Export the graph gate fingerprint baseline to JSON (git-trackable enforcement). For SARIF, use `graph --sarif <path>`.
 - `opensip-tools sim` — Run simulation scenarios [experimental]
 - `opensip-tools init` — Generate `opensip-tools.config.yml`
 - `opensip-tools sessions list|purge` — Manage stored sessions
@@ -373,10 +373,17 @@ in your PR. Updating the gate (e.g., via `disabledChecks` in
 `opensip-tools.config.yml`) requires PR-description justification
 and reviewer sign-off — it is not a default contributor option.
 
-The **graph** tool is dogfooded the same way: CI runs `pnpm graph:ci`
-(`graph --gate-save`) → `graph-baseline-export --out graph.sarif` →
-upload to Code Scanning under category `opensip-tools-graph`. Same
-ratchet: only net-new graph findings surface on PRs. The graph rules
+The **graph** tool is dogfooded the same way: CI runs `graph
+--gate-save --sarif graph.sarif` (one run: the gate hard-fails on
+error-level findings AND emits SARIF 2.1.0 via the shared
+`cli.writeSarif` envelope→SARIF seam, the same path `fit` uses) →
+upload to Code Scanning under category `opensip-tools-graph`. The
+`--sarif` write happens after the gate exit code is set, so the file
+lands even when the gate fails (upload runs under `if: always()`).
+Same ratchet: only net-new graph findings surface on PRs.
+(`graph-baseline-export` is a separate command — it exports the gate
+**fingerprint** baseline JSON for git-trackable enforcement, not
+SARIF.) The graph rules
 (large-function, wide-function, high-blast-untested, cycle,
 duplicated-function-body) skip test-file occurrences — they gate
 production code only — and `large-function` skips the synthetic

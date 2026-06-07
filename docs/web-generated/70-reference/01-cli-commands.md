@@ -200,6 +200,7 @@ opensip-tools graph --json
 opensip-tools graph --no-cache
 opensip-tools graph --gate-save
 opensip-tools graph --gate-compare
+opensip-tools graph --gate-save --sarif graph.sarif   # gate + SARIF 2.1.0 for Code Scanning
 opensip-tools graph --report-to <url>
 
 # Scope to a named recipe (a subset of graph rules; default = all rules)
@@ -227,6 +228,7 @@ opensip-tools graph --list-files --workspace  # the per-unit fan-out set
 | `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph-recipes`. |
 | `--gate-save` | bool | `false` | Save the current Signal fingerprint set to the project's SQLite store (`graph_baseline_signals` table). Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression. |
+| `--sarif <path>` | path | — | Also write this run's findings as a SARIF 2.1.0 file (for GitHub Code Scanning) via the shared `cli.writeSarif` envelope→SARIF seam — the same producer `fit --report-to`/`fit-baseline-export` use. Composes with `--gate-save`: the SARIF is written in the action body after the gate sets its exit code, so the file lands even when the gate fails. Relative paths resolve against `--cwd`. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
 | `-v, --verbose` | bool | `false` | Expand the done view to show the detailed catalog, findings-by-rule, and entry-point sections (default: one-line summary only). Renders identically in a TTY and a pipe (ADR-0021). |

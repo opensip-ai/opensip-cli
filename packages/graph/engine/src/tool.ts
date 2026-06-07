@@ -212,6 +212,10 @@ function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
       '--list-files',
       'List the source files graph would discover for this scope and exit (no build; honors [paths...], --workspace, --language, --json)',
       false,
+    )
+    .option(
+      '--sarif <path>',
+      'Also write this run’s findings as a SARIF 2.1.0 file (for GitHub Code Scanning). Composes with --gate-save; written even when the gate fails.',
     );
   // Common cross-tool flags from the single registry (ADR-0021): --cwd, --json,
   // --quiet, --verbose, --debug, --report-to, --api-key. graph-specific flags
@@ -239,6 +243,7 @@ function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
       quiet?: boolean;
       resolution?: string;
       listFiles?: boolean;
+      sarif?: string;
     }) => {
       // Validate --resolution at the boundary so a typo fails loudly
       // rather than silently falling back to exact. Covers every
@@ -343,6 +348,16 @@ function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
         },
         cli,
       );
+
+      // `--sarif <path>`: write this run's findings as a SARIF 2.1.0 file via the
+      // root `cli.writeSarif` seam (the one place that formats an envelope to
+      // SARIF; the engine never imports @opensip-tools/output). Composes with
+      // --gate-save: executeGraph has already set the gate exit code, but the
+      // action body still runs, so the SARIF lands even when the gate fails —
+      // GitHub Code Scanning then surfaces net-new graph findings on PRs.
+      if (opts.sarif !== undefined && opts.sarif !== '' && envelope !== undefined) {
+        await cli.writeSarif(envelope, opts.sarif);
+      }
 
       // Effectful egress lives at the composition root (ADR-0011 / ADR-0008):
       // cloud sync + `--report-to` (which owns exit 4). `executeGraph` returns
