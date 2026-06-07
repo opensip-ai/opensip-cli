@@ -137,6 +137,68 @@ describe('buildFeatures — scc (golden + determinism)', () => {
     expect(threeCycle?.id).toBe(`scc:${[c3cId, c3aId, c3bId].sort()[0]}`);
   });
 
+  it('does NOT merge body-hash twins across packages into a cross-package SCC (Phase 8 regression)', () => {
+    // Two occurrences with an IDENTICAL body (same bodyHash 'CANON') in
+    // different packages — the audit/compliance `canonicalize` collision class
+    // on opensip. Each sits in its OWN intra-package 2-cycle:
+    //   audit:      canonicalize ⇄ helperA   (both in 'audit')
+    //   compliance: canonicalize ⇄ helperB   (both in 'compliance')
+    // A bodyHash-keyed Tarjan collapses both `canonicalize` occurrences into one
+    // node and bolts the two cycles together into a false cross-package SCC.
+    // The occId-keyed graph + resolveCallee disambiguation must keep them as TWO
+    // separate intra-package SCCs (crossesPackages: false).
+    const auditCanon = occ({
+      bodyHash: 'CANON', simpleName: 'canonicalize', package: 'audit',
+      filePath: 'packages/audit/src/canonicalize.ts', calls: [call('hA')],
+    });
+    const helperA = occ({
+      bodyHash: 'hA', simpleName: 'helperA', package: 'audit',
+      filePath: 'packages/audit/src/helperA.ts', calls: [call('CANON')],
+    });
+    const complianceCanon = occ({
+      bodyHash: 'CANON', simpleName: 'canonicalize', package: 'compliance',
+      filePath: 'packages/compliance/src/canonicalize.ts', calls: [call('hB')],
+    });
+    const helperB = occ({
+      bodyHash: 'hB', simpleName: 'helperB', package: 'compliance',
+      filePath: 'packages/compliance/src/helperB.ts', calls: [call('CANON')],
+    });
+    // Both canonicalize occurrences share the simpleName bucket (collision-real).
+    const catalog = catalogOf({
+      canonicalize: [auditCanon, complianceCanon],
+      helperA: [helperA],
+      helperB: [helperB],
+    });
+    const indexes = buildIndexes(catalog);
+    const f = buildFeatures(catalog, indexes, CONFIG, ['scc']);
+
+    // No SCC may cross packages — the phantom is absent.
+    const crossPkg = f.scc.filter((s) => s.crossesPackages);
+    expect(crossPkg).toEqual([]);
+
+    // Exactly two non-trivial (size-2) cycles, one per package, each intra-pkg.
+    const cycles = f.scc.filter((s) => s.sccSize >= 2);
+    expect(cycles).toHaveLength(2);
+
+    const auditCycle = cycles.find((s) =>
+      s.members.includes('packages/audit/src/canonicalize.ts:1:0'),
+    );
+    expect(auditCycle?.crossesPackages).toBe(false);
+    expect(auditCycle?.members).toEqual([
+      'packages/audit/src/canonicalize.ts:1:0',
+      'packages/audit/src/helperA.ts:1:0',
+    ]);
+
+    const complianceCycle = cycles.find((s) =>
+      s.members.includes('packages/compliance/src/canonicalize.ts:1:0'),
+    );
+    expect(complianceCycle?.crossesPackages).toBe(false);
+    expect(complianceCycle?.members).toEqual([
+      'packages/compliance/src/canonicalize.ts:1:0',
+      'packages/compliance/src/helperB.ts:1:0',
+    ]);
+  });
+
   it('is deterministic across runs (stable id + order)', () => {
     const { catalog, indexes } = makeFixture();
     const a = buildFeatures(catalog, indexes, CONFIG, ['scc']);
