@@ -60,10 +60,13 @@ const EXPECTED: Record<string, string[]> = {
   graph: [
     // ADR-0011 (Phase 5): graph gained --api-key for --report-to cloud egress.
     // ADR-0021: graph gained -q/--quiet for cross-tool flag parity.
+    // Post-2.7.0: graph gained --sarif (real SARIF 2.1.0 for Code Scanning via
+    // the shared cli.writeSarif seam, replacing the broken graph-baseline-export
+    // → upload path).
     '--api-key', '--changed-file', '--concurrency', '--cwd', '--debug',
     '--gate-compare', '--gate-save', '--json', '--language', '--list-files',
     '--mode', '--no-cache', '--out', '--profile', '--quiet', '--recipe', '--report-to',
-    '--resolution', '--run-id', '--verbose', '--workspace',
+    '--resolution', '--run-id', '--sarif', '--verbose', '--workspace',
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
   // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).
