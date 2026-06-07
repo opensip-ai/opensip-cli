@@ -89,6 +89,16 @@ export type {
   ToolPluginExports,
   LiveViewRenderer,
 } from './tools/index.js';
+// Static tool-plugin manifest + the plugin-API epoch + provenance types
+// (release 2.8.0, identity & compatibility). Re-exported by @opensip-tools/
+// contracts for the public surface; no runtime consumers until Phase 1+.
+export { PLUGIN_API_VERSION } from './tools/index.js';
+export type {
+  ToolPluginManifest,
+  ToolCommandManifest,
+  ToolProvenance,
+  ToolSource,
+} from './tools/index.js';
 export {
   TOOL_LONG_IDS,
   TOOL_LONG_TO_SHORT,
