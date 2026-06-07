@@ -1,41 +1,34 @@
 // @fitness-ignore-file no-deprecated-tags -- the `@deprecated` on CliDefaults.recipe is a DELIBERATE, ADR-0022 graceful deprecation with a migration path (cli.recipe stays as a tolerant cross-tool fallback; the cli-recipe-deprecated check drives migration), not lingering dead code to delete.
 /**
- * cli-config — tool-agnostic loader for the `cli:` block of
- * `opensip-tools.config.yml`.
+ * cli-config — the tool-agnostic `cli:` block of `opensip-tools.config.yml`.
  *
- * The CLI's pre-action hook merges a small set of project-wide defaults
- * (`recipe`, `--report-to`, `--json`, `--exclude`, `--api-key`,
- * `verbose`, `debug`) into Commander-parsed opts on every invocation.
- * That merge is the composition root's concern: it gates logger
- * silence/debug for every tool, supplies the global `--report-to`
- * destination, and resolves the cloud API key. None of those settings
- * are owned by any single tool.
+ * Owns three things, all relocated here in 2.10.1 (ADR-0023 §Amendment):
+ *   - {@link CliDefaults} — the structural type the CLI pre-action hook reads.
+ *   - {@link loadCliDefaults} — the permissive loader the hook calls to merge
+ *     project-wide defaults (`--report-to`, `--exclude`, `--json`, `--api-key`,
+ *     `verbose`, `debug`, the `cli.cloud` sync block) into Commander opts.
+ *   - {@link cliConfigSchema} — the Zod schema the host registers as the `cli`
+ *     document-level declaration so the composed whole-document validation
+ *     STRICT-rejects a typo in `cli:` before dispatch.
  *
- * Lives in contracts (not core, not fitness) because:
- *   - core is the kernel: no YAML, no project-level config schemas.
- *   - fitness owns the *fitness* sections of the same file (targets,
- *     check overrides, fail thresholds). Reaching back into fitness for
- *     the `cli:` block inverts the layering — a project shipping only
- *     `simulation` would still need fitness installed just to read its
- *     own CLI defaults.
- *   - contracts already owns the CLI↔tool seam (`CommandResult`,
- *     `EXIT_CODES`, `CliProgram`); the `cli:` config block is the same
- *     seam, one layer lower.
+ * Previously this lived in `@opensip-tools/contracts` (`cli-config.ts`) — a
+ * runtime YAML projection in a types-only package (the standing charter
+ * violation ADR-0023 names). It now lives in the config layer, beside the rest
+ * of the document blocks. The generic `readYamlFile` / `resolveProjectConfigPath`
+ * primitives stay in `core` (path/read primitives — the config-resolution
+ * decision in the ADR amendment); this module imports them from core.
  *
- * The loader is deliberately permissive — missing config, malformed
- * YAML, or an absent `cli:` key all return `{}`. Strict validation
- * belongs to the section's owner (fitness's `loadSignalersConfig`
- * still validates the full document including `cli:`); this loader
- * only needs the field types right enough for the merge.
+ * The loader is deliberately permissive — missing config, malformed YAML, or an
+ * absent `cli:` key all return `{}`. Strict validation is the composed
+ * document's job (the `cli` host declaration), not this reader's.
  */
 
 import { readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
+import { z } from 'zod';
 
 /**
- * Shape of the `cli:` block in `opensip-tools.config.yml` as the CLI
- * pre-action hook reads it. A subset / mirror of the Zod schema that
- * fitness owns end-to-end — kept here as a structural type so the CLI
- * can read the block without dragging fitness into the bootstrap path.
+ * Shape of the `cli:` block in `opensip-tools.config.yml` as the CLI pre-action
+ * hook reads it. The structural mirror of {@link cliConfigSchema}.
  */
 export interface CliDefaults {
   /**
@@ -79,6 +72,33 @@ export interface CliDefaults {
     readonly endpoint?: string;
   };
 }
+
+/**
+ * The Zod schema for the `cli:` document-level block. A superset of the legacy
+ * fitness `CliDefaultsSchema` (it additionally claims `debug` and the
+ * `cli.cloud` sub-block the permissive loader always read) so the composed
+ * STRICT validation never rejects a key the loader honours. Strictness is
+ * applied at the document level by the composer (`.strict()` on the namespace),
+ * so nested `ui`/`cloud` objects stay lenient — matching prior behaviour.
+ */
+export const cliConfigSchema = z.object({
+  recipe:    z.string().min(1).max(128).optional(),
+  exclude:   z.array(z.string()).optional(),
+  verbose:   z.boolean().optional(),
+  json:      z.boolean().optional(),
+  reportTo:  z.url().optional(),
+  apiKey:    z.string().min(1).optional(),
+  fileTypes: z.array(z.string()).optional(),
+  ignore:    z.array(z.string()).optional(),
+  debug:     z.boolean().optional(),
+  ui:        z.object({
+    banner: z.enum(['lg', 'md', 'sm', 'mini']).optional(),
+  }).optional(),
+  cloud:     z.object({
+    sync:     z.boolean().optional(),
+    endpoint: z.string().optional(),
+  }).optional(),
+});
 
 /** Valid `ui.banner` values; anything else is dropped (→ default applies). */
 const BANNER_VALUES: ReadonlySet<string> = new Set(['lg', 'md', 'sm', 'mini']);
@@ -140,13 +160,12 @@ function projectUiDefaults(raw: unknown): CliDefaults['ui'] | undefined {
 }
 
 /**
- * Best-effort load of the `cli:` block from
- * `opensip-tools.config.yml`. Resolves the file via the same
- * `resolveProjectConfigPath` helper the rest of the toolchain uses.
+ * Best-effort load of the `cli:` block from `opensip-tools.config.yml`.
+ * Resolves the file via the core `resolveProjectConfigPath` primitive.
  *
- * Returns `{}` when the config is missing, unreadable, malformed, or
- * has no `cli:` section — the merge step treats absence and
- * "everything default" the same.
+ * Returns `{}` when the config is missing, unreadable, malformed, or has no
+ * `cli:` section — the merge step treats absence and "everything default" the
+ * same.
  *
  * @param cwd Project root for config resolution.
  * @param explicitPath Optional `--config <path>` override.

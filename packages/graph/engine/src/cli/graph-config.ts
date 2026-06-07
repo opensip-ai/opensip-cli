@@ -21,7 +21,8 @@
  * throws.
  */
 
-import { loadCliDefaults, resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
+import { loadCliDefaults } from '@opensip-tools/config';
+import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
 import { logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
 
 import { GraphConfigSchema } from './graph-config-schema.js';

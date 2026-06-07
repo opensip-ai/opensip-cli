@@ -27,6 +27,7 @@
 
 import {
   composeConfigSchema,
+  hostConfigDeclarations,
   resolveConfig,
   validateConfigDocument,
   type ToolConfigDeclaration,
@@ -106,8 +107,22 @@ export function composeAndValidateToolConfig(args: {
   readonly env: Readonly<Record<string, string | undefined>>;
 }): ResolvedToolConfig | undefined {
   const { tools, configPath, env } = args;
-  const declarations = collectDeclarations(tools);
-  if (declarations.length === 0) return undefined;
+  const toolDeclarations = collectDeclarations(tools);
+  // A run with no tools that declare config (e.g. a project-agnostic context)
+  // carries no toolConfig — tools fall back to their in-tool defaults. The host
+  // document-level blocks (cli/dashboard/schemaVersion) only need composing when
+  // there is a tool dispatch to validate the document for; the real CLI always
+  // registers fit/graph/sim, so they are always composed in practice.
+  if (toolDeclarations.length === 0) return undefined;
+
+  // Compose the host document-level declarations (cli/dashboard/schemaVersion,
+  // and from Phase 1 the targeting blocks) BESIDE the tool declarations, so the
+  // whole document — not just the tool namespaces — validates STRICT through the
+  // one composed schema (ADR-0023, the 2.10.1 seam).
+  const declarations: readonly ToolConfigDeclaration[] = [
+    ...hostConfigDeclarations(),
+    ...toolDeclarations,
+  ];
 
   // No config document → nothing to strict-validate. Resolve defaults + env so
   // a flagless/fileless run still gets the declared defaults on the scope.

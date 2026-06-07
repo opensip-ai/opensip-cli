@@ -28,3 +28,9 @@ export { resolveConfig } from './precedence.js';
 export type { ResolveConfigInput, ResolvedConfig } from './precedence.js';
 export { toJsonSchema } from './json-schema.js';
 export type { JsonSchema } from './json-schema.js';
+
+// Document-level config blocks (the tool-agnostic surface — 2.10.1, ADR-0023).
+export { loadCliDefaults, cliConfigSchema } from './document/cli-config.js';
+export type { CliDefaults } from './document/cli-config.js';
+export { dashboardConfigSchema } from './document/dashboard.js';
+export { hostConfigDeclarations } from './document/host-declarations.js';

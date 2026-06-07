@@ -8,7 +8,8 @@
  * strict Zod config schema, so it parses its own slice of the document.
  */
 
-import { loadCliDefaults, resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
+import { loadCliDefaults } from '@opensip-tools/config';
+import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
 import { logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
 
 /** Accept anything that looks like a plain object; everything else → undefined. */

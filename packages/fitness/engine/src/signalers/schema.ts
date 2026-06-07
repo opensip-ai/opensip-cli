@@ -6,6 +6,7 @@
  * definitions in opensip-tools.config.yml.
  */
 
+import { cliConfigSchema, dashboardConfigSchema } from '@opensip-tools/config'
 import { z } from 'zod'
 
 // Inline defaults
@@ -66,46 +67,18 @@ const CheckTargetValueSchema = z.union([
 ])
 
 // =============================================================================
-// CLI Defaults
+// CLI Defaults + Dashboard — now owned by @opensip-tools/config (2.10.1)
 // =============================================================================
 
-/**
- * Defaults applied to every `opensip-tools` CLI invocation in the project.
- * Equivalent to flags on the command line (`--recipe`, `--exclude`, …) but
- * declared once in the project config so every contributor and CI run agrees.
- *
- * Lives alongside targets so a project can ship a single config file.
- */
-const CliDefaultsSchema = z.object({
-  recipe:    z.string().min(1).max(128).optional(),
-  exclude:   z.array(z.string()).optional(),
-  verbose:   z.boolean().optional(),
-  json:      z.boolean().optional(),
-  reportTo:  z.url().optional(),
-  apiKey:    z.string().min(1).optional(),
-  fileTypes: z.array(z.string()).optional(),
-  ignore:    z.array(z.string()).optional(),
-  // Presentation settings. `banner` selects the header art shown above each
-  // command: mini (default) | lg | md | sm. Read at render time off
-  // RunScope.ui — it deliberately has no `--banner` flag.
-  ui:        z.object({
-    banner: z.enum(['lg', 'md', 'sm', 'mini']).optional(),
-  }).optional(),
-})
-
-// =============================================================================
-// Dashboard
-// =============================================================================
-
-/**
- * Dashboard-specific settings. Currently just the editor protocol used
- * by the Code Paths panel to build vscode://, cursor://, etc. deep
- * links. Lifted out of the dashboard's hand-rolled YAML walker so the
- * value flows through the same schema as the rest of the config.
- */
-const DashboardSchema = z.object({
-  editor: z.string().min(1).max(64).optional(),
-})
+// The `cli:` and `dashboard:` blocks are tool-agnostic document-level config;
+// their schemas moved to `@opensip-tools/config` in 2.10.1 (ADR-0023) and the
+// host registers them as document-level declarations for the composed STRICT
+// validation. This loader still reads them off the whole document (so
+// `signalersConfig.cli.recipe` / `.dashboard.editor` keep resolving) until
+// fitness is repointed to the composed scope config (Phase 4) — it imports the
+// schemas rather than re-defining them, so there is one definition of each.
+const CliDefaultsSchema = cliConfigSchema
+const DashboardSchema = dashboardConfigSchema
 
 // =============================================================================
 // Root Schema

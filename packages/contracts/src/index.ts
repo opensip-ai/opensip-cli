@@ -94,11 +94,11 @@ export type {
   CapabilityContributionKind,
 } from '@opensip-tools/core';
 
-// CLI defaults loader (`cli:` block of opensip-tools.config.yml).
-// Lives in contracts because the CLI-pre-action seam is tool-agnostic;
-// see ./cli-config.ts for the rationale.
-export { loadCliDefaults } from './cli-config.js';
-export type { CliDefaults } from './cli-config.js';
+// The `cli:` block loader (`loadCliDefaults` / `CliDefaults`) moved to
+// `@opensip-tools/config` in 2.10.1 (ADR-0023) — its runtime YAML projection
+// was the standing "contracts is types-only" charter violation. Importers now
+// take it from the config layer. (`RecipeSource` below still names a
+// `'cli-config'` provenance string — that is a label, not an import.)
 
 // Tool-scoped recipe-default resolution (ADR-0022). The pure resolver every
 // tool uses to pick its recipe name from --recipe / <tool>.recipe / the

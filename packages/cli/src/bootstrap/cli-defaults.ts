@@ -7,22 +7,24 @@
  * load → merge → derive (silent/debug) so flag-driven log mode reflects
  * the merged opts (F10).
  *
- * The schema + loader live in `@opensip-tools/contracts`
- * (`loadCliDefaults`) — the `cli:` block is tool-agnostic and a project
- * shipping only `simulation` shouldn't need fitness installed just to
- * read its own CLI defaults. Audit 2026-05-23 G2.
+ * The schema + loader live in `@opensip-tools/config`
+ * (`loadCliDefaults`, `cliConfigSchema`) — the `cli:` block is
+ * tool-agnostic and a project shipping only `simulation` shouldn't need
+ * fitness installed just to read its own CLI defaults. Relocated out of
+ * `@opensip-tools/contracts` in 2.10.1 (ADR-0023; restores contracts
+ * types-only). Audit 2026-05-23 G2.
  */
 
-import { loadCliDefaults as loadCliDefaultsFromContracts } from '@opensip-tools/contracts';
+import { loadCliDefaults as loadCliDefaultsFromConfig } from '@opensip-tools/config';
 import { logger } from '@opensip-tools/core';
 
 import { resolveApiKey } from './global-config.js';
 
-import type { CliDefaults } from '@opensip-tools/contracts';
+import type { CliDefaults } from '@opensip-tools/config';
 
 // Re-export the type at the same name the rest of the bootstrap path
 // already imports — internal bootstrap call sites stay stable.
-export type { CliDefaults } from '@opensip-tools/contracts';
+export type { CliDefaults } from '@opensip-tools/config';
 
 /**
  * Best-effort load of the `cli:` block. Falls back to `{}` when the
@@ -35,7 +37,7 @@ export type { CliDefaults } from '@opensip-tools/contracts';
  */
 export function loadCliDefaults(cwd: string, explicitConfigPath?: string): CliDefaults {
   try {
-    return loadCliDefaultsFromContracts(cwd, explicitConfigPath);
+    return loadCliDefaultsFromConfig(cwd, explicitConfigPath);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.debug({
