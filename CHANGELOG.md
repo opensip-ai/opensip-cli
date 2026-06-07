@@ -4,6 +4,50 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.7.1] — 2026-06-06
+
+A correctness and reliability patch for the `graph` tool. **No breaking
+changes** — if you run the CLI and read its output, upgrade and carry on.
+
+### Added
+
+- **`graph --sarif`** emits real SARIF 2.1.0 for GitHub Code Scanning, so graph
+  findings surface inline on PRs the same way `fit` findings do.
+- **Cross-package edge equivalence guardrail.** A CI test asserts the sharded
+  build produces byte-identical edges to the single-program build on a fixture,
+  so cross-package resolution can never silently regress.
+
+### Changed
+
+- **Graph cross-package edges are now resolved semantically.** The sharded
+  engine links a cross-package call to the exact exported function via a
+  per-package export-symbol table (like a linker), replacing the previous
+  syntactic name-matching. Ambiguous cases **decline** (emit no edge) rather
+  than guess — eliminating phantom coupling/cycle edges.
+- **Inline suppression is fail-loud.** An unexpected failure reading a
+  `@graph-ignore` / `@fitness-ignore` directive file now aborts the run instead
+  of silently dropping the waiver (which could leak a waived finding).
+  Genuinely-absent files are attributed via a structured log.
+
+### Fixed
+
+- **Deterministic sharded graph builds.** Workspace shard ids are now
+  root-relative (`fitness/engine`, `graph/engine`) instead of a bare basename
+  that collapsed nested packages to a single `engine` id and overwrote each
+  other's fragment-cache row. Cold, warm, and partially-cached runs now produce
+  an identical catalog (same function / entry-point counts).
+- **No more false cross-package cycle errors.** Call-graph SCC nodes are now
+  identified per occurrence (via `resolveCallee`) instead of by raw body-content
+  hash, so two functions with identical bodies in different packages no longer
+  collapse into one node and manufacture an impossible cross-package cycle.
+- **Linux-only AST-check corruption** from parse-cache key collisions — the
+  parse cache is now keyed by a full-content hash.
+
+### Internal
+
+- Vitest timeouts centralized in a shared base config, with a fitness check
+  (`vitest-config-extends-base`) enforcing adoption.
+
 ## [2.7.0] — 2026-06-06
 
 **Breaking changes in the pre-GA 2.x line.** This release makes the signal-output

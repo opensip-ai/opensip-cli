@@ -1,6 +1,6 @@
 {
   "name": "opensip-tools",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "license": "MIT",
   "description": "OpenSIP Tools — codebase analysis from the command line (the CLI; `npm i -g opensip-tools`)",
   "keywords": [
