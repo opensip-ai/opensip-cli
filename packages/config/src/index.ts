@@ -26,3 +26,5 @@ export type {
 } from './declaration.js';
 export { resolveConfig } from './precedence.js';
 export type { ResolveConfigInput, ResolvedConfig } from './precedence.js';
+export { toJsonSchema } from './json-schema.js';
+export type { JsonSchema } from './json-schema.js';
