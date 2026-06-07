@@ -43,6 +43,9 @@ import { simulationTool } from '@opensip-tools/simulation';
 import { isProjectLocalToolTrusted } from './tool-trust.js';
 import { isValidTool } from './validate-tool.js';
 
+/** `module` field on every structured log event emitted from this file. */
+const BOOTSTRAP_MODULE = 'cli:bootstrap';
+
 /**
  * A first-party tool plus the npm package name that ships its
  * `package.json#opensipTools` manifest. The package name is how the
@@ -93,7 +96,16 @@ function resolveBundledPackageDir(packageName: string): string | undefined {
   let resolvedEntry: string;
   try {
     resolvedEntry = requireFromHere.resolve(packageName);
-  } catch {
+  } catch (error) {
+    // A bundled direct dep failing to resolve is a packaging fault — log it
+    // so the subsequent fail-closed throw is diagnosable, then signal the
+    // unresolved state to the caller (which raises PluginIncompatibleError).
+    logger.debug({
+      evt: 'cli.tool.bundled_unresolved',
+      module: BOOTSTRAP_MODULE,
+      packageName,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return undefined;
   }
   let dir = dirname(resolvedEntry);
@@ -325,7 +337,7 @@ export async function discoverAndRegisterToolPackages(
         process.stderr.write(
           `opensip-tools: tool package ${pkg.name} has no resolvable entry point — skipping\n`,
         );
-        logger.warn({ evt: 'cli.tool.no_entry', module: 'cli:bootstrap', name: pkg.name });
+        logger.warn({ evt: 'cli.tool.no_entry', module: BOOTSTRAP_MODULE, name: pkg.name });
         continue;
       }
       const mod = (await import(pathToFileURL(meta.mainEntry).href)) as { tool?: unknown };
@@ -341,7 +353,7 @@ export async function discoverAndRegisterToolPackages(
         );
         logger.warn({
           evt: 'cli.tool.invalid_shape',
-          module: 'cli:bootstrap',
+          module: BOOTSTRAP_MODULE,
           name: pkg.name,
         });
         continue;
@@ -353,7 +365,7 @@ export async function discoverAndRegisterToolPackages(
       process.stderr.write(`opensip-tools: failed to load tool ${pkg.name}: ${msg}\n`);
       logger.warn({
         evt: 'cli.tool.load_failed',
-        module: 'cli:bootstrap',
+        module: BOOTSTRAP_MODULE,
         name: pkg.name,
         error: msg,
       });
@@ -437,7 +449,7 @@ export function mountAllToolCommands(registry: ToolRegistry, ctx: ToolCliContext
       process.stderr.write(`opensip-tools: tool ${tool.metadata.id} failed to register: ${msg}\n`);
       logger.warn({
         evt: 'cli.tool.register_failed',
-        module: 'cli:bootstrap',
+        module: BOOTSTRAP_MODULE,
         toolId: tool.metadata.id,
         error: msg,
       });
