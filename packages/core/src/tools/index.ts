@@ -24,6 +24,20 @@ export type {
   ToolProvenance,
   ToolSource,
 } from './manifest.js';
+// Capability domain model (release 2.10.0, §5.3): the data shape a tool
+// uses to declare an extension point it owns. The runtime registry lives
+// in `plugins/capability-registry.ts`.
+export {
+  isCapabilityValidator,
+  isStructuralContributionSchema,
+} from './capability.js';
+export type {
+  CapabilityDomainSpec,
+  CapabilityContributionKind,
+  CapabilityValidator,
+  StructuralContributionSchema,
+  ToolCapabilityDeclaration,
+} from './capability.js';
 // The single pure compatibility gate shared by the bundled + external
 // admission paths (release 2.8.0).
 export { checkCompatibility } from './compatibility.js';

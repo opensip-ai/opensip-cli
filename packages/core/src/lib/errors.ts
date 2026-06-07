@@ -127,6 +127,62 @@ export class PluginIncompatibleError extends ToolError {
   }
 }
 
+/**
+ * Thrown when a contribution is routed to a capability domain that no tool
+ * has declared (release 2.10.0, §5.3). A subclass of {@link NotFoundError}
+ * (so existing not-found handling still catches it) that additionally
+ * carries the structured diagnostic the capability registry produced: the
+ * unknown `domainId` and the set of `knownDomains`. Code defaults to
+ * `'CAPABILITY.DOMAIN.UNKNOWN'`.
+ */
+export class UnknownCapabilityDomainError extends NotFoundError {
+  /** The domain id that was routed to but not declared. */
+  readonly domainId: string;
+  /** The domain ids that ARE declared on the registry (for diagnostics). */
+  readonly knownDomains: readonly string[];
+
+  constructor(
+    message: string,
+    options: ToolErrorOptions & { domainId: string; knownDomains: readonly string[] },
+  ) {
+    super(message, { ...options, code: options.code ?? 'CAPABILITY.DOMAIN.UNKNOWN' });
+    this.name = 'UnknownCapabilityDomainError';
+    this.domainId = options.domainId;
+    this.knownDomains = options.knownDomains;
+  }
+}
+
+/**
+ * Thrown when a contribution fails the schema check of the capability
+ * domain it targets (release 2.10.0, §5.3). A subclass of
+ * {@link ValidationError} that carries the structured diagnostic: the
+ * `domainId`, the owning tool's `ownerToolId`, and a human-readable
+ * `diagnostic` reason. Code defaults to
+ * `'CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH'`.
+ */
+export class CapabilitySchemaMismatchError extends ValidationError {
+  /** The domain id whose schema the contribution failed. */
+  readonly domainId: string;
+  /** The tool that owns the targeted domain. */
+  readonly ownerToolId: string;
+  /** Human-readable reason the contribution failed the schema. */
+  readonly diagnostic: string;
+
+  constructor(
+    message: string,
+    options: ToolErrorOptions & { domainId: string; ownerToolId: string; diagnostic: string },
+  ) {
+    super(message, {
+      ...options,
+      code: options.code ?? 'CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH',
+    });
+    this.name = 'CapabilitySchemaMismatchError';
+    this.domainId = options.domainId;
+    this.ownerToolId = options.ownerToolId;
+    this.diagnostic = options.diagnostic;
+  }
+}
+
 // =============================================================================
 // RESULT PATTERN
 // =============================================================================

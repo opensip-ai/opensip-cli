@@ -183,7 +183,7 @@ export type {
 } from './lib/scope-types.js';
 
 // Lib — errors + Result pattern
-export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError, PluginIncompatibleError } from './lib/errors.js';
+export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError, PluginIncompatibleError, UnknownCapabilityDomainError, CapabilitySchemaMismatchError } from './lib/errors.js';
 export { ok, err, tryCatchAsync, tryCatch } from './lib/errors.js';
 export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 
