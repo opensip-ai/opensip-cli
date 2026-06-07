@@ -55,6 +55,7 @@
   },
   "dependencies": {
     "@opensip-tools/cli-ui": "workspace:*",
+    "@opensip-tools/config": "workspace:*",
     "@opensip-tools/contracts": "workspace:*",
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/datastore": "workspace:*",

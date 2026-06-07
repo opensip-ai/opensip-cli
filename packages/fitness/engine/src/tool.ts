@@ -54,6 +54,7 @@ import { readPackageVersion } from '@opensip-tools/core';
 
 import { exportFitBaseline } from './cli/baseline-export.js';
 import { collectFitnessDashboardData } from './cli/dashboard.js';
+import { fitnessConfigDeclaration } from './config/fitness-config-schema.js';
 import {
   runGateMode,
   runJsonMode,
@@ -302,6 +303,12 @@ export const fitnessTool: Tool = {
   register,
   contributeScope,
   collectDashboardData: collectFitnessDashboardData,
+  // ADR-0023 Phase 4: fitness contributes its namespaced `fitness:` Zod schema
+  // (gate thresholds, disabledChecks, recipe) so the host composes +
+  // strict-validates the whole config document before dispatch. Shared
+  // targeting (targets/globalExcludes/checkOverrides) stays with
+  // SignalersConfigSchema until 2.10.1.
+  config: fitnessConfigDeclaration,
   initialize: async (): Promise<void> => {
     // ensureChecksLoaded() is called inside the executeFit / listChecks
     // / listRecipes paths, so a separate initialize() pass is not

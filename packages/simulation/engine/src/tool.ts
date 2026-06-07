@@ -9,6 +9,7 @@
 import { applyCommonFlags, EXIT_CODES, type CliProgram, type ToolOptions } from '@opensip-tools/contracts';
 import { readPackageVersion } from '@opensip-tools/core';
 
+import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { renderSimLive } from './cli/sim-runner.js';
 import { executeSim } from './cli/sim.js';
 import { createScenarioRegistry } from './framework/registry.js';
@@ -149,4 +150,8 @@ export const simulationTool: Tool = {
   pluginLayout: SIM_PLUGIN_LAYOUT,
   register,
   contributeScope,
+  // ADR-0023 Phase 4: simulation contributes its namespaced `simulation:` Zod
+  // schema so the host composes + strict-validates the whole config document
+  // before dispatch.
+  config: simulationConfigDeclaration,
 };
