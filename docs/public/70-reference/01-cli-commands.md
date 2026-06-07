@@ -35,7 +35,14 @@ opensip-tools --help                     # print full help, exit
 opensip-tools <command> --help           # per-command help
 ```
 
-Per-command flags that appear on most subcommands (registered individually by each Tool / each top-level command). The only `program`-level Commander options are `--version` and `--no-cloud`:
+Per-command flags that appear on most subcommands. The flags shared across the
+tool run commands (`fit`/`sim`/`graph`) — `--json`, `--cwd`, `-q/--quiet`,
+`-v/--verbose`, `--debug`, `--report-to`, `--api-key`, `--open` — are declared
+**once** in a common-flag registry and applied via `applyCommonFlags`, so their
+names, short aliases, descriptions, and defaults are identical across every tool
+and cannot drift (ADR-0021). `-v/--verbose` is a uniform "show the detailed
+report body" flag whose output is identical in a TTY and a pipe. The only
+`program`-level Commander options are `--version` and `--no-cloud`:
 
 | Flag | Effect |
 |---|---|
@@ -116,9 +123,9 @@ opensip-tools fit --gate-compare
 | `--list` | bool | `false` | List available checks instead of running. |
 | `--recipes` | bool | `false` | List available recipes instead of running. |
 | `--json` | bool | `false` | Emit the `SignalEnvelope` JSON on stdout instead of the table renderer. |
-| `--findings` | bool | `false` | Append a per-check finding listing after the table. |
-| `-v, --verbose` | bool | `false` | Inline finding details + findings summary. |
-| `--report-to <url>` | URL | — | POST findings to a URL (OpenSIP Cloud or compatible). |
+| `-v, --verbose` | bool | `false` | Show the detailed report body (per-check findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
+| `--findings` | bool | `false` | **Deprecated** — alias of `--verbose`; will be removed a release after v3. |
+| `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
 | `--gate-save` | bool | `false` | Save current findings as architecture baseline. The baseline is stored as a row in the project's SQLite store (`fit_baseline` table at `opensip-tools/.runtime/datastore.sqlite`). |
 | `--gate-compare` | bool | `false` | Compare current findings against baseline; exit 1 on regression. |
@@ -150,8 +157,11 @@ opensip-tools sim --recipe <name>
 | `--recipe <name>` | string | built-in `default` | Run a named sim recipe. |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
 | `--json` | bool | `false` | Emit the `SignalEnvelope` JSON on stdout instead of the table renderer. |
+| `-v, --verbose` | bool | `false` | Show the detailed report body (per-scenario findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
 | `--open` | bool | `false` | Launch dashboard after run. |
+| `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
+| `--api-key <key>` | string | — | API key for `--report-to`. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
 
 **Exit codes:** 0 (all scenarios passed), 1 (any scenario failed), 2 (config/runtime error, **including a run that selected zero scenarios** — an empty run fails closed rather than reporting a false pass: no scenario packages installed, or the recipe selector matched none). Exit 0 therefore always means at least one scenario ran and passed.
@@ -217,8 +227,10 @@ opensip-tools graph --list-files --workspace  # the per-unit fan-out set
 | `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph-recipes`. |
 | `--gate-save` | bool | `false` | Save the current Signal fingerprint set to the project's SQLite store (`graph_baseline_signals` table). Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression. |
-| `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible SARIF endpoint. |
-| `-v, --verbose` | bool | `false` | Expand the done view to show the detailed catalog, findings-by-rule, and entry-point sections (default: one-line summary only). |
+| `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
+| `--api-key <key>` | string | — | API key for `--report-to`. |
+| `-v, --verbose` | bool | `false` | Expand the done view to show the detailed catalog, findings-by-rule, and entry-point sections (default: one-line summary only). Renders identically in a TTY and a pipe (ADR-0021). |
+| `-q, --quiet` | bool | `false` | Suppress banner / boxes; print only the pass-fail summary line. |
 | `--list-files` | bool | `false` | Discovery-only: resolve and print the source-file set this scope would analyze (whole project, positional subtrees, or `--workspace` fan-out) and exit — no catalog build. Reuses the adapter's stage-0 discovery, so the list is faithful to a real run (`.d.ts` excluded, TypeScript extension-priority collisions collapsed, per-tsconfig `include`/`exclude` honored). Composes with `[paths...]`, `--workspace`, and `--language`; `--json` emits `{ count, files }`. |
 | `--debug` | bool | `false` | Enable debug-mode structured log output. |
 
