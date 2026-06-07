@@ -46,7 +46,12 @@ export const noEval = defineRegexListCheck({
     {
       id: 'a48c7e1a-2acb-4be6-9f97-71f95dee9eef',
       slug: 'eval-call',
-      regex: /\beval\s*\(/,
+      // Match only the global/bare `eval(` — NOT a member call `x.eval(`
+      // (e.g. ioredis / Sequelize `redis.eval(luaScript, …)` is a Redis
+      // server-side Lua EVAL, not JavaScript eval) nor an identifier that
+      // merely ends in `eval` (`retrieval(`, `myEval(`). The negative
+      // lookbehind rejects a preceding `.`, word char, or `$`.
+      regex: /(?<![.\w$])eval\s*\(/,
       message: 'eval() usage detected - use JSON.parse or other safe alternatives',
       severity: 'error',
       suggestion:
