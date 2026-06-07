@@ -71,19 +71,23 @@ describe('discoverGraphAdapterPackages — auto-discovery (default)', () => {
   });
 
   it('does NOT match @opensip-tools/graph itself (engine package)', () => {
-    // The hyphen anchor on `graph-` ensures the bare engine package
-    // name `graph` is excluded from discovery. Without this, the
+    // Discovery keys on the `opensipTools.kind: "graph-adapter"` marker (the
+    // shared core marker substrate), so the engine package — which declares
+    // `kind: "tool"`, not `graph-adapter` — is excluded. Without this, the
     // engine would attempt to load itself as an adapter pack.
-    makeNodeModulesPackage(testDir, '@opensip-tools/graph');
+    makeNodeModulesPackage(testDir, '@opensip-tools/graph', { opensipTools: { kind: 'tool' } });
     makeNodeModulesPackage(testDir, '@opensip-tools/graph-python');
     const result = discoverGraphAdapterPackages({ projectDir: testDir });
     expect(result.map((p) => p.name)).toEqual(['@opensip-tools/graph-python']);
   });
 
   it('ignores @opensip-tools packages that are not graph adapter packs', () => {
-    makeNodeModulesPackage(testDir, '@opensip-tools/checks-python');
-    makeNodeModulesPackage(testDir, '@opensip-tools/lang-python');
-    makeNodeModulesPackage(testDir, '@opensip-tools/core');
+    // Discovery is marker-driven: only `kind: "graph-adapter"` packages match.
+    // A fit-pack, a marker-less lang adapter, and core (a kernel, no marker)
+    // must all be skipped.
+    makeNodeModulesPackage(testDir, '@opensip-tools/checks-python', { opensipTools: { kind: 'fit-pack' } });
+    makeNodeModulesPackage(testDir, '@opensip-tools/lang-python', { opensipTools: undefined });
+    makeNodeModulesPackage(testDir, '@opensip-tools/core', { opensipTools: undefined });
     const result = discoverGraphAdapterPackages({ projectDir: testDir });
     expect(result).toHaveLength(0);
   });
