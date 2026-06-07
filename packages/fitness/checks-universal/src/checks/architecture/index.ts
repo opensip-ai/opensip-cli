@@ -1,3 +1,4 @@
+export * from './cli-recipe-deprecated.js'
 export * from './cross-tool-flag-parity.js'
 export * from './dependencies/index.js'
 export * from './docker-best-practices.js'

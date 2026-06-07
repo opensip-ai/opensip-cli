@@ -20,20 +20,21 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **154+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **155+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(97 checks)*
+## Universal  *(98 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(17)*
+### Architecture  *(18)*
 
 | Slug | Description |
 |---|---|
+| [`cli-recipe-deprecated`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/cli-recipe-deprecated.ts) | Flag the deprecated tool-agnostic cli.recipe default; recipes are tool-scoped (ADR-0022) |
 | [`cross-tool-flag-parity`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/cross-tool-flag-parity.ts) | Cross-tool common CLI flags must come from the shared registry, not be hand-declared (ADR-0021) |
 | [`docker-ignore-validation`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-ignore-validation.ts) | Validate .dockerignore files exist alongside Dockerfiles with required patterns |
 | [`docker-version-sync`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-version-sync.ts) | Validate Docker Node/pnpm versions match package.json |

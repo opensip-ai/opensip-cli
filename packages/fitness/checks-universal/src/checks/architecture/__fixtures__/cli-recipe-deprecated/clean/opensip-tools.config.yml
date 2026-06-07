@@ -1,0 +1,15 @@
+# Clean: recipe defaults are tool-scoped (ADR-0022). No cli.recipe.
+schemaVersion: 1
+
+cli:
+  verbose: false
+  reportTo: https://cloud.example.com/ingest
+
+fitness:
+  recipe: backend
+
+graph:
+  recipe: default
+
+simulation:
+  recipe: default
