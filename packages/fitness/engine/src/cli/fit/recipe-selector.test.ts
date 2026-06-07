@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest';
+
+import { selectRecipe } from './recipe-selector.js';
+
+import type { FitOptions } from '@opensip-tools/contracts';
+
+/**
+ * `selectRecipe` resolves the fit recipe with tool-scoped precedence (ADR-0022)
+ * against the module-singleton `defaultRecipeRegistry`, whose built-ins include
+ * `default` and `backend` but NOT `opensip` (a project-private fit recipe in the
+ * parent repo). These tests exercise the precedence + tolerance contract without
+ * standing up a scope.
+ */
+const base: FitOptions = { cwd: '/tmp' } as FitOptions;
+
+describe('selectRecipe (ADR-0022 tool-scoped + tolerant)', () => {
+  it('explicit --recipe wins and resolves a real recipe', () => {
+    expect(selectRecipe({ ...base, recipe: 'backend' }, { toolRecipe: 'default', cliRecipe: 'opensip' })).toEqual({
+      recipeName: 'backend',
+    });
+  });
+
+  it('explicit unknown --recipe hard-fails (typo protection)', () => {
+    const r = selectRecipe({ ...base, recipe: 'bogus-typo' }, { cliRecipe: 'opensip' });
+    expect('error' in r && r.error.message).toContain("Unknown recipe 'bogus-typo'");
+  });
+
+  it('uses fitness.recipe when no flag', () => {
+    expect(selectRecipe(base, { toolRecipe: 'backend' })).toEqual({ recipeName: 'backend' });
+  });
+
+  it('a known cli.recipe fallback resolves (deprecated but honored)', () => {
+    expect(selectRecipe(base, { cliRecipe: 'backend' })).toEqual({ recipeName: 'backend' });
+  });
+
+  it('a config-sourced UNKNOWN recipe tolerantly falls back to default (the leak fix)', () => {
+    // cli.recipe: opensip is a fit recipe in the parent repo, but for a project
+    // whose registry lacks it, fit must not abort — it falls back to default.
+    expect(selectRecipe(base, { cliRecipe: 'opensip' })).toEqual({ recipeName: 'default' });
+    expect(selectRecipe(base, { toolRecipe: 'also-missing' })).toEqual({ recipeName: 'default' });
+  });
+
+  it('--check / --tags force an ad-hoc recipe (recipeName undefined), ignoring config', () => {
+    expect(selectRecipe({ ...base, check: 'some-check' }, { toolRecipe: 'backend' })).toEqual({
+      recipeName: undefined,
+    });
+    expect(selectRecipe({ ...base, tags: 'quality' }, { cliRecipe: 'opensip' })).toEqual({
+      recipeName: undefined,
+    });
+  });
+
+  it('no flag and no config → built-in default', () => {
+    expect(selectRecipe(base)).toEqual({ recipeName: 'default' });
+  });
+});

@@ -123,7 +123,13 @@ export async function executeFit(
   if ('error' in configResult) return { result: configResult.error };
   const { signalersConfig, targetsConfig, targetRegistry } = configResult;
 
-  const recipePick = selectRecipe(args);
+  // Tool-scoped recipe resolution (ADR-0022): explicit --recipe > fitness.recipe
+  // > deprecated cli.recipe > built-in default. The config defaults come from the
+  // already-loaded signalersConfig (no extra file read).
+  const recipePick = selectRecipe(args, {
+    toolRecipe: signalersConfig.fitness.recipe,
+    cliRecipe: signalersConfig.cli.recipe,
+  });
   if ('error' in recipePick) return { result: recipePick.error };
   const { recipeName } = recipePick;
 

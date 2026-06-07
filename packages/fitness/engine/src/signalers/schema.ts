@@ -40,10 +40,21 @@ const FitnessSchema = z.object({
   failOnErrors: z.number().int().min(0).default(DEFAULTS.signals.fitness.failOnErrors),
   failOnWarnings: z.number().int().min(0).default(DEFAULTS.signals.fitness.failOnWarnings),
   disabledChecks: z.array(z.string().min(1).max(255)).optional().default([]),
+  // Default recipe for `fit` runs when no `--recipe` flag is given (ADR-0022).
+  // Tool-scoped: distinct from `graph.recipe` / `simulation.recipe`. An unknown
+  // name here tolerantly falls back to the built-in `default` recipe; an
+  // explicit `--recipe` typo still hard-fails.
+  recipe: z.string().min(1).max(128).optional(),
 })
 
-/** Schema for simulation engine configuration. Currently has no fields. */
-const SimulationSchema = z.object({})
+/** Schema for simulation engine configuration. */
+const SimulationSchema = z.object({
+  // Default recipe for `sim` runs when no `--recipe` flag is given (ADR-0022).
+  // Tool-scoped: distinct from `fitness.recipe` / `graph.recipe`. An unknown
+  // name here tolerantly falls back to the built-in `default` recipe; an
+  // explicit `--recipe` typo still hard-fails.
+  recipe: z.string().min(1).max(128).optional(),
+})
 
 // =============================================================================
 // Check Overrides
