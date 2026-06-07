@@ -103,6 +103,8 @@ export type {
 // admission paths (release 2.8.0). Re-exported by @opensip-tools/contracts.
 export { checkCompatibility } from './tools/index.js';
 export type { CompatibilityVerdict } from './tools/index.js';
+// Load-time manifest⇔Tool drift guard (release 2.8.0, Phase 1).
+export { assertManifestMatchesTool } from './tools/index.js';
 export {
   TOOL_LONG_IDS,
   TOOL_LONG_TO_SHORT,
