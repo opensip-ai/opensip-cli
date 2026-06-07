@@ -52,7 +52,7 @@ import {
   partitionFlatRepo,
   selectStrategyForLayout,
 } from './orchestrate/flat-monorepo-strategy.js';
-import { loadGraphConfig, runGraph, runShardedGraph } from './orchestrate.js';
+import { loadGraphConfig, resolveGraphRecipeSelection, runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
 import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
@@ -105,13 +105,23 @@ export async function executeGraph(
   const profile = createProfileBuilder(opts, startedAt);
   try {
     validateMutuallyExclusiveFlags(opts);
-    // Resolve `--recipe` once at the top of the run (CLI layer owns
-    // selection; the engine stays recipe-agnostic). Threaded into every
-    // build path as `RunGraphInput.rules`. An unknown name throws a
-    // ConfigurationError here, caught below by handleGraphError. For the
-    // `--workspace` path the parent resolves only to validate the name
-    // (fail-fast); children re-resolve `--recipe` in their own scope.
-    const rules = resolveRecipeToRules(opts.recipe);
+    // Resolve the recipe once at the top of the run (CLI layer owns selection;
+    // the engine stays recipe-agnostic). Tool-scoped (ADR-0022): precedence is
+    // `--recipe` flag > `graph.recipe` > deprecated `cli.recipe` > `default`.
+    // Threaded into every build path as `RunGraphInput.rules`. An explicit
+    // unknown name throws a ConfigurationError here (caught by handleGraphError);
+    // a config-sourced unknown name falls back to `default` with a warning. For
+    // the `--workspace` path the parent resolves only to validate the name
+    // (fail-fast); children re-resolve in their own scope.
+    const recipeSelection = resolveGraphRecipeSelection(opts.cwd, opts.recipe);
+    const rules = resolveRecipeToRules(recipeSelection.name, { tolerant: recipeSelection.tolerant });
+    // Normalize opts.recipe to the RESOLVED name so the envelope/run-header,
+    // dashboard sessions, and any `--workspace` children report what actually
+    // ran. Pre-ADR-0022 the generic `mergeConfigDefaults` set opts.recipe from
+    // config; that responsibility now lives here, tool-scoped — opts is the
+    // request-scoped parsed-options bag the pre-action hook already augments, so
+    // this is the single point that owns graph's recipe normalization.
+    (opts as { recipe?: string }).recipe = recipeSelection.name;
     if (opts.workspace === true) {
       await executeWorkspaceGraph(opts, cli, profile);
       writeProfileIfRequested(opts, profile);

@@ -36,7 +36,7 @@ import { runHeapPreflight } from './cli/heap-preflight.js';
 import { executeListFiles } from './cli/list-files.js';
 import { listGraphRecipes } from './cli/list-graph-recipes.js';
 import { executeLookup } from './cli/lookup.js';
-import { loadGraphConfig, runGraph } from './cli/orchestrate.js';
+import { loadGraphConfig, resolveGraphRecipeSelection, runGraph } from './cli/orchestrate.js';
 import { runSarifExportMode } from './cli/sarif-export.js';
 import { executeShardWorker } from './cli/shard-worker.js';
 import { executeSymbolIndex } from './cli/symbol-index.js';
@@ -306,18 +306,21 @@ function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
       // `graph-done` result is dual-rendered through the seam (`renderToText`)
       // — the same report content, consistent with the TTY final frame.
       if (isInteractiveDefault && process.stdout.isTTY === true) {
+        // Resolve the recipe here (the action runs inside the entered RunScope
+        // via the pre-action hook) for parity with `executeGraph`: tool-scoped
+        // precedence (`--recipe` > `graph.recipe` > deprecated `cli.recipe` >
+        // `default`, ADR-0022), with config-sourced unknown names tolerantly
+        // falling back to `default` and explicit-flag typos still hard-failing.
+        const recipeSelection = resolveGraphRecipeSelection(opts.cwd, opts.recipe);
         await cli.renderLive(GRAPH_LIVE_VIEW_KEY, {
           cwd: opts.cwd,
           noCache: opts.cache === false,
           verbose: opts.verbose === true,
           quiet: opts.quiet === true,
           resolution,
-          // Resolve `--recipe` here (the action runs inside the entered
-          // RunScope via the pre-action hook) and pass the rule subset into
-          // the live path for parity with `executeGraph`. Avoids a second
-          // scope read inside the React tree. An unknown name throws a
-          // ConfigurationError, caught by the dispatcher.
-          rules: resolveRecipeToRules(opts.recipe),
+          // Pass the resolved rule subset into the live path. Avoids a second
+          // scope read inside the React tree.
+          rules: resolveRecipeToRules(recipeSelection.name, { tolerant: recipeSelection.tolerant }),
           // Honor the project's `graph:` config block in the interactive
           // path too — parity with `executeGraph` (graph.ts), which loads
           // it via the same helper. Loading here (not inside the React

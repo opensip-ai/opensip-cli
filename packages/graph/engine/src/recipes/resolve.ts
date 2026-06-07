@@ -12,7 +12,8 @@
  * `RunGraphInput.rules`.
  */
 
-import { ConfigurationError, currentScope, resolveSelector, setCurrentRecipeUnitConfig } from '@opensip-tools/core';
+import { BUILTIN_DEFAULT_RECIPE } from '@opensip-tools/contracts';
+import { ConfigurationError, currentScope, logger, resolveSelector, setCurrentRecipeUnitConfig } from '@opensip-tools/core';
 
 import { currentRules } from '../rules/registry.js';
 
@@ -32,13 +33,33 @@ interface RuleView {
 
 /**
  * Resolve a recipe name to its ordered rule subset. `undefined` resolves the
- * built-in `default` recipe (all rules). An unknown name throws a
- * `ConfigurationError` so the CLI's `handleGraphError` maps it to
- * `EXIT_CODES.CONFIGURATION_ERROR`.
+ * built-in `default` recipe (all rules).
+ *
+ * Tolerance (ADR-0022): when `opts.tolerant` is true (the name came from
+ * config — `graph.recipe` or the deprecated `cli.recipe` — not an explicit
+ * `--recipe` flag) an unknown name falls back to the built-in `default` recipe
+ * with a warning instead of aborting, because a shared/cross-tool default may
+ * legitimately target another tool. When `opts.tolerant` is false (the default
+ * — an explicit flag) an unknown name throws a `ConfigurationError` so the
+ * CLI's `handleGraphError` maps it to `EXIT_CODES.CONFIGURATION_ERROR` (typo
+ * protection).
  */
-export function resolveRecipeToRules(name = 'default'): readonly Rule[] {
+export function resolveRecipeToRules(
+  name = BUILTIN_DEFAULT_RECIPE,
+  opts: { readonly tolerant?: boolean } = {},
+): readonly Rule[] {
   const recipes = currentGraphRecipes();
-  const recipe = recipes.loadRecipe(name);
+  let recipe = recipes.loadRecipe(name);
+  if (!recipe && opts.tolerant === true && name !== BUILTIN_DEFAULT_RECIPE) {
+    logger.warn({
+      evt: 'graph.recipe.unknown_config_default',
+      module: 'graph:recipes',
+      requested: name,
+      fallback: BUILTIN_DEFAULT_RECIPE,
+      msg: `Configured graph recipe '${name}' not found; using '${BUILTIN_DEFAULT_RECIPE}'. If '${name}' is a recipe for another tool, move it under that tool's <tool>.recipe key (ADR-0022).`,
+    });
+    recipe = recipes.loadRecipe(BUILTIN_DEFAULT_RECIPE);
+  }
   if (!recipe) {
     // @fitness-ignore-next-line result-pattern-consistency -- user config error surfaced as a thrown ConfigurationError, mapped to an exit code by handleGraphError
     throw new ConfigurationError(

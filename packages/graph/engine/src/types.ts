@@ -515,6 +515,14 @@ export interface GraphConfig {
    * predates `bodySize` skip this check. Default: 80.
    */
   readonly minCrossPackageDuplicateBodySize?: number;
+  /**
+   * Default recipe for `graph` runs when no `--recipe` flag is given (ADR-0022).
+   * Tool-scoped: this is the graph tool's recipe namespace, distinct from
+   * `fit.recipe` / `sim.recipe`. An unknown name here falls back to the built-in
+   * `default` recipe with a warning (config-sourced names are tolerant); an
+   * explicit `--recipe` typo still hard-fails.
+   */
+  readonly recipe?: string;
   /** Override the inferred entry-point list. */
   readonly entryPointHashes?: readonly string[];
   /**
