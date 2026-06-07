@@ -1,24 +1,31 @@
 /**
- * Cross-shard merge & boundary resolution (plan #2, Phase 2).
+ * Cross-shard merge & semantic boundary linking (plan #2, Phase 2).
  *
  * After the shard workers return per-shard fragments + cross-boundary
  * call descriptors, this module:
  *   1. merges the fragments into one unified catalog (union of occurrences,
  *      each keeping its already-resolved intra-shard edges);
- *   2. resolves the boundary calls against that GLOBAL catalog + import
- *      graph — syntactically, since the ASTs are gone — and stitches the
- *      recovered edges onto their owner occurrences, labeled
- *      `resolution: 'syntactic'`, `crossShard: true`, capped confidence.
+ *   2. LINKS the boundary calls semantically against the export symbol table
+ *      ({@link ExportIndex}) + package manifest index ({@link PackageManifestIndex})
+ *      built from the merged catalog and the resolved shard set, then stitches
+ *      the recovered edges onto their owner occurrences as
+ *      `resolution: 'semantic'`, `crossShard: true`, `confidence: 'high'`.
  *
- * This replaces the old fan-out behavior where cross-partition calls
- * "became unresolved." Intra-shard edges retain their original (semantic,
- * in exact mode) fidelity; only the genuinely cross-package edges are
- * approximate, and they are labeled as such.
+ * The linker emits a cross-package edge ONLY when the import specifier + callee
+ * name resolve to a UNIQUE exported occurrence in the imported package — exactly
+ * what the TypeScript type checker would conclude. On ANY ambiguity (a name with
+ * multiple matching exports the subpath can't disambiguate, a name the package
+ * does not export, a specifier pointing at an external npm package) it DECLINES
+ * and emits an unresolved (`to: []`) edge. A missing edge is safe; a phantom
+ * cross-package edge would fail the gate. This replaces the old name-only
+ * syntactic fallback, which fabricated impossible coupling edges by matching a
+ * globally-unique simple name into a package the caller never imported.
  *
- * Engine-layer and language-agnostic: it operates on plain catalog data +
- * the descriptors' callee names / import specifiers. Specifier pinning is
- * generic path math (strip extension, resolve relative against the owner's
- * file) — no parser, no TypeScript assumptions.
+ * Intra-shard edges retain their original (semantic, in exact mode) fidelity;
+ * relative imports are still path-pinned (already exact for same-package
+ * imports). Engine-layer and language-agnostic: it operates on plain catalog
+ * data + the descriptors' callee names / import specifiers + each package's
+ * `package.json` — no parser, no TypeScript assumptions.
  */
 
 import { posix } from 'node:path';
@@ -330,7 +337,7 @@ export interface CatalogEdgeDiff {
    *  for a correct sharded build vs whole-project build. */
   readonly intraMismatches: readonly string[];
   /** Cross-shard edges present in one catalog but not the other (the
-   *  expected fidelity difference: recovered-but-syntactic). */
+   *  expected difference: edges only the semantic boundary linker recovers). */
   readonly crossDifferences: readonly string[];
 }
 
