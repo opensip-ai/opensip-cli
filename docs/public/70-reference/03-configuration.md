@@ -105,6 +105,7 @@ Value is a single target name (string) or a non-empty list.
 | `failOnErrors` | int ≥ 0 | `1` | Threshold for `shouldFail`. `0` = never fail; `1` = fail on first error. |
 | `failOnWarnings` | int ≥ 0 | `0` | Threshold for warnings. `0` = ignore warnings entirely. |
 | `disabledChecks` | string[] | `[]` | Slugs to skip (a recipe's `includeDisabled` can opt back in). |
+| `recipe` | string | — | Default recipe for `fit` when `--recipe` is not passed (ADR-0022). Tool-scoped — distinct from `graph.recipe` / `simulation.recipe`. An unknown name here falls back to the built-in `default` recipe with a warning; an explicit `--recipe` typo still hard-fails. |
 | `schedules` | object[] | `[]` | Reserved for cloud-side scheduled runs. **Ignored locally** — the CLI config schema does not parse, validate, or act on this field (unknown keys are silently dropped). No local scheduler exists. |
 
 ```yaml
@@ -113,13 +114,23 @@ fitness:
   timeout: 30000
   failOnErrors: 1
   disabledChecks: ['experimental-check']
+  recipe: backend            # default recipe for `fit` (tool-scoped, ADR-0022)
 ```
 
 Setting `failOnErrors: 5` lets a run pass with fewer than 5 errors — useful during debt burn-down, though `--gate-compare` is the more principled alternative.
 
 ## `simulation`
 
-Currently only `schedules: []`, reserved for cloud-side scheduling — and **ignored by the local CLI** (not parsed, validated, or acted on; there is no local scheduler). The simulation engine reads no other fields from this section; future versions may add `defaultRecipe`, `maxParallel`, etc.
+| Field | Type | Default | Effect |
+|---|---|---|---|
+| `recipe` | string | — | Default recipe for `sim` when `--recipe` is not passed (ADR-0022). Tool-scoped — distinct from `fitness.recipe` / `graph.recipe`. An unknown name here falls back to the built-in `default` recipe with a warning; an explicit `--recipe` typo still hard-fails. |
+
+```yaml
+simulation:
+  recipe: default            # default recipe for `sim` (tool-scoped, ADR-0022)
+```
+
+`schedules: []` is reserved for cloud-side scheduling — and **ignored by the local CLI** (not parsed, validated, or acted on; there is no local scheduler).
 
 ## `cli`
 
@@ -127,7 +138,7 @@ CLI-wide defaults that act as flag pre-fills. Each project's `cli` section is eq
 
 | Field | Type | Effect |
 |---|---|---|
-| `recipe` | string | Default recipe if `--recipe` not passed. |
+| `recipe` | string | **Deprecated (ADR-0022).** Recipe defaults are tool-scoped — set `fitness.recipe` / `graph.recipe` / `simulation.recipe` instead. Still honoured as a cross-tool fallback (applied tolerantly: a tool that lacks the named recipe falls back to its own `default` rather than erroring), and flagged by the `cli-recipe-deprecated` check. |
 | `exclude` | string[] | Default exclusions. |
 | `verbose` / `json` | bool | Defaults for `--verbose` / `--json`. |
 | `reportTo` | URL | Default for `--report-to`. |
@@ -138,10 +149,14 @@ CLI-wide defaults that act as flag pre-fills. Each project's `cli` section is eq
 
 ```yaml
 cli:
-  recipe: default
   reportTo: 'https://opensip.ai/api'
   ui:
     banner: mini   # mini | lg | md | sm
+# Recipe defaults are tool-scoped (ADR-0022) — set them per tool:
+fitness:
+  recipe: backend
+graph:
+  recipe: default
 ```
 
 **API key resolution precedence**: `--api-key` flag > `cli.apiKey` > `OPENSIP_API_KEY` env > `~/.opensip-tools/config.yml`. Project-level wins over the env var, so a committed-into-repo key takes effect even if the env var is set.
@@ -221,6 +236,7 @@ Two-band (warn / error) thresholds for the structural rules. A value between the
 
 | Field | Type | Default | Effect |
 |---|---|---|---|
+| `recipe` | string | — | Default recipe for `graph` when `--recipe` is not passed (ADR-0022). Tool-scoped — distinct from `fitness.recipe` / `simulation.recipe`. An unknown name here falls back to the built-in `default` recipe with a warning; an explicit `--recipe` typo still hard-fails. |
 | `entryPointHashes` | string[] | — | Override the inferred entry-point list with explicit body hashes. |
 | `severityOverrides` | map (rule-slug → `'error' \| 'warning'`) | `{}` | Per-rule severity clamp. An applied opt-in: a listed rule's emitted signals are clamped to the named severity. Only `'error'` / `'warning'` values are accepted; other values are dropped. |
 
@@ -284,9 +300,12 @@ fitness:
   maxParallel: 8
   failOnErrors: 1
   disabledChecks: ['experimental-check']
+  recipe: backend            # default recipe for `fit` (tool-scoped, ADR-0022)
+
+graph:
+  recipe: default            # default recipe for `graph` (tool-scoped, ADR-0022)
 
 cli:
-  recipe: default
   reportTo: 'https://opensip.ai/api'
   # apiKey is read from OPENSIP_API_KEY env or ~/.opensip-tools/config.yml — avoid committing a literal key.
 
