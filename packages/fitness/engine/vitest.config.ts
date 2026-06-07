@@ -1,5 +1,7 @@
-import { defineConfig } from 'vitest/config';
-export default defineConfig({
+import { defineConfig, mergeConfig } from 'vitest/config';
+
+import { vitestBase } from '../../../.config/vitest.base.js';
+export default mergeConfig(vitestBase, defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     // Loader tests dynamic-import .mjs fixtures that themselves import
@@ -8,7 +10,6 @@ export default defineConfig({
     // enough to absorb cold-cache import overhead without masking
     // genuinely hung tests (a real hang at 30s is the same CI problem
     // as one at 5s).
-    testTimeout: 30_000,
     coverage: {
       include: ['src/**'],
       exclude: [
@@ -36,4 +37,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

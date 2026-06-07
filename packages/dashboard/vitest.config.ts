@@ -1,5 +1,7 @@
-import { defineConfig } from 'vitest/config';
-export default defineConfig({
+import { defineConfig, mergeConfig } from 'vitest/config';
+
+import { vitestBase } from '../../.config/vitest.base.js';
+export default mergeConfig(vitestBase, defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     passWithNoTests: true,
@@ -7,7 +9,6 @@ export default defineConfig({
     // (large vendored document). vitest 4 + vite 7's slower jsdom warm
     // pushed two of these past the 5s default. 20s is generous enough
     // to absorb cold-cache jsdom bootstrap without masking real hangs.
-    testTimeout: 20_000,
     coverage: {
       include: ['src/**'],
       exclude: [
@@ -32,4 +33,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
