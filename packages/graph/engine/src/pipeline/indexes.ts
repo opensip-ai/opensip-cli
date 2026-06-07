@@ -30,14 +30,16 @@ export interface HashMaps {
  * package identity from the same scan.
  */
 export function buildHashMaps(catalog: Catalog): HashMaps {
-  const byBodyHash = new Map<string, FunctionOccurrence>();
-  const occurrencesByHash = new Map<string, FunctionOccurrence[]>();
-  const bySimpleName = new Map<string, string[]>();
-  const byOccId = new Map<string, FunctionOccurrence>();
+  const maps: HashMaps = {
+    byBodyHash: new Map<string, FunctionOccurrence>(),
+    occurrencesByHash: new Map<string, FunctionOccurrence[]>(),
+    bySimpleName: new Map<string, string[]>(),
+    byOccId: new Map<string, FunctionOccurrence>(),
+  };
   for (const name of Object.keys(catalog.functions)) {
-    indexNameBucket(catalog, name, byBodyHash, occurrencesByHash, bySimpleName, byOccId);
+    indexNameBucket(catalog, name, maps);
   }
-  return { byBodyHash, occurrencesByHash, bySimpleName, byOccId };
+  return maps;
 }
 
 /** Builds query-side indexes (by-body-hash, by-occ-id, by-simple-name, adjacency) over the catalog. */
@@ -108,22 +110,15 @@ function unionInto(map: Map<string, Set<string>>, key: string, values: ReadonlyS
   for (const v of values) set.add(v);
 }
 
-function indexNameBucket(
-  catalog: Catalog,
-  name: string,
-  byBodyHash: Map<string, FunctionOccurrence>,
-  occurrencesByHash: Map<string, FunctionOccurrence[]>,
-  bySimpleName: Map<string, string[]>,
-  byOccId: Map<string, FunctionOccurrence>,
-): void {
+function indexNameBucket(catalog: Catalog, name: string, maps: HashMaps): void {
   const occs: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
   /* v8 ignore next */
   if (!occs) return;
   for (const o of occs) {
-    byBodyHash.set(o.bodyHash, o);
-    pushTo(occurrencesByHash, o.bodyHash, o);
-    pushTo(bySimpleName, name, o.bodyHash);
-    byOccId.set(occId(o), o);
+    maps.byBodyHash.set(o.bodyHash, o);
+    pushTo(maps.occurrencesByHash, o.bodyHash, o);
+    pushTo(maps.bySimpleName, name, o.bodyHash);
+    maps.byOccId.set(occId(o), o);
   }
 }
 
