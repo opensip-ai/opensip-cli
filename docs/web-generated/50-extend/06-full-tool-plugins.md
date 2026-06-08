@@ -53,9 +53,15 @@ The `kind: "tool"` marker is what makes the CLI discover your package. Peer-dep 
 
 ## `src/index.ts`
 
+A tool **declares** its commands as typed `CommandSpec`s and the host mounts them —
+owning the common flags (`--cwd`, `--json`, …), parsing, help, completion, output
+dispatch, and exit policy. You write a handler and a declaration; everything else
+arrives for free, identically to a bundled tool. You never touch Commander, never
+add `--json` yourself, and never write to stdout — the host renders your result and
+wraps `--json` in a `CommandOutcome`.
+
 ```ts
-import type { Tool, ToolCliContext } from '@opensip-tools/core';
-import type { CliProgram } from '@opensip-tools/contracts';
+import { defineCommand, type Tool, type ToolCliContext } from '@opensip-tools/core';
 import { runAudit } from './audit.js';
 
 export const tool: Tool = {
@@ -64,24 +70,23 @@ export const tool: Tool = {
     version: '0.1.0',
     description: 'Lightweight security audit',
   },
-  commands: [{ name: 'audit-sec', description: 'Run the security audit' }],
-  register(cli: ToolCliContext) {
-    const program = cli.program as CliProgram;
-    program
-      .command('audit-sec')
-      .description('Run the security audit')
-      .option('--cwd <path>', 'Target directory', process.cwd())
-      .option('--json', 'Output structured JSON', false)
-      .action(async (opts) => {
+  commandSpecs: [
+    defineCommand<{ cwd: string }, ToolCliContext>({
+      name: 'audit-sec',
+      description: 'Run the security audit',
+      // Cross-tool flags from the shared registry — `--cwd` and `--json` arrive
+      // for free; you do NOT declare `--json` or render it yourself.
+      commonFlags: ['cwd', 'json'],
+      scope: 'project',
+      // The host renders the result and serializes `--json` as a CommandOutcome.
+      output: 'command-result',
+      handler: async (opts, cli) => {
         const result = await runAudit(opts.cwd);
-        if (opts.json) {
-          process.stdout.write(JSON.stringify(result) + '\n');
-        } else {
-          await cli.render(result);
-        }
         cli.setExitCode(result.passed ? 0 : 1);
-      });
-  },
+        return result; // return your domain result — the host owns rendering / --json / exit
+      },
+    }),
+  ],
 };
 ```
 

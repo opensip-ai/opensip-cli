@@ -23,9 +23,7 @@
  * reachability are NOT cheaply recomputable in-rule, so there is no fallback.
  */
 
-import { createSignal } from '@opensip-tools/core';
-
-import { applySeverityOverride } from './_severity-override.js';
+import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { Signal } from '@opensip-tools/core';
@@ -64,11 +62,9 @@ export const highBlastUntestedRule = defineRule({
       if (score < warn) continue;
       const base = score >= error ? 'high' : 'medium';
       signals.push(
-        createSignal({
-          source: 'graph',
-          severity: applySeverityOverride(base, 'graph:high-blast-untested', config),
+        createGraphSignal('graph:high-blast-untested', config, {
+          severity: base,
           category: 'testing',
-          ruleId: 'graph:high-blast-untested',
           message: `${occ.simpleName} has a high blast radius (score ${String(score)}) but is not reached by any test.`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion: 'Add a test that exercises this high-reach function.',

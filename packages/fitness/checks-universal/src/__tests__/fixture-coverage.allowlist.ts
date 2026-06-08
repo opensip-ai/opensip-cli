@@ -34,7 +34,14 @@ export const COMMAND_EXEMPTIONS: CommandExemptions = {
 // inside a string literal — was moved to checks-typescript and rewritten on the
 // TypeScript AST (a string literal is never an ImportDeclaration), where it is
 // fully fixtured.
-export const KNOWN_UNFIXTURABLE: CommandExemptions = {}
+export const KNOWN_UNFIXTURABLE: CommandExemptions = {
+  // analyzeAll self-reads docs/public/50-extend from process.cwd() (the extend-docs
+  // are excluded from the code-scan targets), so an on-disk __fixtures__ file is
+  // never the thing it reads. Its teeth are proven by the analyzeBlessedSeam unit
+  // test + the live dogfood run over the real extend-docs.
+  'docs-teach-blessed-seam':
+    "analyzeAll self-reads docs/public/50-extend from cwd; exercised by its unit test + the dogfood",
+}
 
 export const FILENAME_OVERRIDES: FilenameOverrides = {
   // env-secret-exposure declares languages [json, typescript, yaml] but fileTypes

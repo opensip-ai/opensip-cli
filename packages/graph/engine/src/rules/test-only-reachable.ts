@@ -5,11 +5,9 @@
  * should live in __tests__/, not in the production tree.
  */
 
-import { createSignal } from '@opensip-tools/core';
-
 import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
-import { applySeverityOverride } from './_severity-override.js';
+import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { Indexes, Rule } from '../types.js';
@@ -44,11 +42,9 @@ export const testOnlyReachableRule = defineRule({
       if (occ.visibility === 'exported') continue;
       const callers = indexes.callers.get(occ.bodyHash) ?? [];
       signals.push(
-        createSignal({
-          source: 'graph',
-          severity: applySeverityOverride('low', 'graph:test-only-reachable', config),
+        createGraphSignal('graph:test-only-reachable', config, {
+          severity: 'low',
           category: 'testing',
-          ruleId: 'graph:test-only-reachable',
           message: `${occ.simpleName} is reached only from test files.${caveat}`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion: 'Move this function to a __tests__/ helper or co-locate it with its tests.',

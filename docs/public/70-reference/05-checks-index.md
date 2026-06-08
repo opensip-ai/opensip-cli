@@ -20,17 +20,17 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **164+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **167+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(107 checks)*
+## Universal  *(110 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(27)*
+### Architecture  *(30)*
 
 | Slug | Description |
 |---|---|
@@ -40,9 +40,11 @@ Language-agnostic; runs against every project.
 | [`cross-tool-flag-parity`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/cross-tool-flag-parity.ts) | Cross-tool common CLI flags must come from the shared registry, not be hand-declared (ADR-0021) |
 | [`docker-ignore-validation`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-ignore-validation.ts) | Validate .dockerignore files exist alongside Dockerfiles with required patterns |
 | [`docker-version-sync`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-version-sync.ts) | Validate Docker Node/pnpm versions match package.json |
+| [`docs-teach-blessed-seam`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/docs-teach-blessed-seam.ts) | Extension docs must teach the blessed CommandSpec seam, not hand-rolled --json / stdout (§4.8) |
 | [`empty-package-detection`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/modules/empty-package-detection.ts) | Detects packages with empty or commented-out exports |
 | [`env-var-validation`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/env-var-validation.ts) | Detects environment variable access without proper validation |
 | [`env-via-registry`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/env-via-registry.ts) | Environment reads must flow through the EnvRegistry, not raw process.env (§5.12) |
+| [`graph-signal-stamped`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/graph-signal-stamped.ts) | Graph rules must stamp identity via createGraphSignal, not hand-assemble source/ruleId/severity (§5.9) |
 | [`heavy-import-detection`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/heavy-import-detection.ts) | Detects heavy/deprecated library imports and excessive named imports that bloat bundle size |
 | [`interface-implementation-consistency`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/modules/interface-implementation-consistency.ts) | Verifies interfaces match their implementations |
 | [`no-config-loader-outside-config`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-config-loader-outside-config.ts) | A tool-agnostic config block (cli/targets/globalExcludes/checkOverrides/dashboard) must be parsed only in @opensip-tools/config, not hand-rolled elsewhere (ADR-0023) |
@@ -57,6 +59,7 @@ Language-agnostic; runs against every project.
 | [`project-readme-existence`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/project-readme-existence.ts) | Ensures every package has a README.md file |
 | [`release-gate-parity`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/release-gate-parity.ts) | Ensure release.yml re-runs every PR-quality gate (lint, test:coverage, fit:ci, graph:ci) before pack/publish (ADR-0017) |
 | [`restrict-raw-db-access`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/restrict-raw-db-access.ts) | Confine the raw Drizzle handle (DataStore.db) to the persistence ownership boundary (ADR-0009) |
+| [`same-recipe-semantics`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/same-recipe-semantics.ts) | Recipe execution must run on the shared substrate; no per-tool scheduler reimplementation (§5.8/§4.3) |
 | [`stale-build-artifacts`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/stale-build-artifacts.ts) | Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/ |
 | [`tool-has-manifest`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-has-manifest.ts) | Every first-party tool package must declare a conformant opensipTools manifest (kind/id/apiVersion/commands) the host can read before import (release 2.8.0) |
 | [`vitest-config-extends-base`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-extends-base.ts) | Per-package vitest configs must extend the shared .config/vitest.base (when one exists) |
