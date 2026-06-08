@@ -13,6 +13,11 @@ bar, and the tool-plugin spine is proven with a real externalization
 
 ### Fixed
 
+- **`graph` no longer flags functions in `__fixtures__/` as findings.** The
+  TypeScript adapter now treats `__fixtures__/` directories as test scaffolding
+  (alongside `__tests__/` and `*.test.*`), so a synthetic fixture (e.g. the
+  orchestrator's `__fixtures__/multi-pkg/` mini-repo) no longer over-triggers
+  `graph:orphan-subtree` on a full single-process build.
 - **`sim`'s `execution.timeout` now aborts a runaway scenario.** It was declared
   but silently dead (`runSingle` ran against a signal nothing ever aborted).
   Simulation now runs on the shared execution substrate, so `timeout` /
