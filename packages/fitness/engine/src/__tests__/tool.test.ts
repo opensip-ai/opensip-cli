@@ -1,4 +1,3 @@
-/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
  * Tool contract conformance test for fitnessTool.
  *
@@ -50,7 +49,24 @@ describe('fitnessTool contract conformance', () => {
     expect(typeof fitnessTool.collectDashboardData).toBe('function');
   });
 
-  it('register is callable', () => {
-    expect(typeof fitnessTool.register).toBe('function');
+  it('declares its command surface via commandSpecs (Phase 4), not register()', () => {
+    // eslint-disable-next-line sonarjs/deprecation -- asserting the deprecated register() seam is GONE after the Phase 4 cutover is the whole point of this test.
+    expect(fitnessTool.register).toBeUndefined();
+    expect(Array.isArray(fitnessTool.commandSpecs)).toBe(true);
+    const specNames = (fitnessTool.commandSpecs ?? []).map((s) => s.name);
+    expect(specNames).toEqual([
+      'fit',
+      'fit-list',
+      'fit-recipes',
+      'fit-baseline-export',
+    ]);
+  });
+
+  it('fit-list / fit-recipes carry their legacy aliases on the spec', () => {
+    const byName = new Map(
+      (fitnessTool.commandSpecs ?? []).map((s) => [s.name, s]),
+    );
+    expect(byName.get('fit-list')?.aliases).toEqual(['list-checks']);
+    expect(byName.get('fit-recipes')?.aliases).toEqual(['list-recipes']);
   });
 });

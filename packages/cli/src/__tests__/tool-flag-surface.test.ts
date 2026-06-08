@@ -88,9 +88,16 @@ function recordToolFlags(tool: Tool): string[] {
 // subcommands). Adding/removing a flag is a deliberate edit here.
 const EXPECTED: Record<string, string[]> = {
   fitness: [
+    // release 2.11.0 Phase 4: fitness migrated to commandSpecs, so this set is
+    // now derived via recordSpecFlags. That surfaces `--out` (the
+    // `fit-baseline-export --out <path>` required flag), which the old
+    // register()-recorder missed: it only trapped `.option(...)` calls and
+    // `--out` was declared via `.requiredOption(...)`. The flag was always part
+    // of the real surface; the spec-based recorder records it faithfully.
     '--api-key', '--check', '--config', '--cwd', '--debug', '--exclude',
     '--findings', '--gate-compare', '--gate-save', '--json', '--list', '--open',
-    '--quiet', '--recipe', '--recipes', '--report-to', '--tags', '--verbose',
+    '--out', '--quiet', '--recipe', '--recipes', '--report-to', '--tags',
+    '--verbose',
   ],
   graph: [
     // ADR-0011 (Phase 5): graph gained --api-key for --report-to cloud egress.
