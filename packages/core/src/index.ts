@@ -283,6 +283,29 @@ export { generateId, generatePrefixedId, extractTimestamp, generateUUID } from '
 export { withRetry } from './lib/retry.js';
 export type { RetryOptions } from './lib/retry.js';
 
+// Lib — execution substrate (north-star §5.8, release 2.13.0). One bounded
+// scheduler + per-unit timeout/retry that fit + sim recipes run on, so
+// timeout/maxParallel/stopOnFirstFailure mean the same thing in every domain
+// (and a declared `timeout` actually aborts — the §4.3 sim fix). Plus the shared
+// `deriveRecipeId` (one `<prefix>_<name>` scheme across domains).
+export {
+  scheduleUnits,
+  runWithTimeout,
+  runWithRetry,
+  executePipeline,
+} from './lib/execution/index.js';
+export type {
+  ScheduleUnitsOptions,
+  UnitRunOutcome,
+  RunWithTimeoutOptions,
+  PipelineRetryOptions,
+  PipelineRetryOutcome,
+  ExecutePipelineOptions,
+  WorkflowExecutionOptions,
+  WorkflowRetryOptions,
+} from './lib/execution/index.js';
+export { deriveRecipeId } from './lib/recipe-id.js';
+
 // Lib — package-version reader (used by first-party Tools to set
 // metadata.version without duplicating the literal in source).
 export { readPackageVersion } from './lib/package-version.js';
