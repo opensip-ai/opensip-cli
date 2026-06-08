@@ -26,7 +26,7 @@ bar, and the tool-plugin spine is proven with a real externalization
   `executePipeline`) + a unified `WorkflowExecutionOptions` + `deriveRecipeId`,
   hoisted from fitness's proven scheduler. Fitness runs on it byte-identically; sim
   adopts it (the timeout fix). Graph stays selection-only — an intentional,
-  ADR-documented difference (ADR-0025).
+  ADR-documented difference (ADR-0026).
 - **Severity & Signal policy.** A central `SeverityPolicy` (author→wire mapping +
   the override clamp + the gate's error/warning predicate, one source of truth) and
   identity-stamping factories `createSignalFromViolation` (core) and

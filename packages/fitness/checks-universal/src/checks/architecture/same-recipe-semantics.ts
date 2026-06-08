@@ -11,12 +11,12 @@
  *
  * This check flags a raw `setTimeout(` inside the fitness/simulation recipe-execution
  * sources — the per-unit timeout MUST come from the substrate's `runWithTimeout`.
- * Graph is exempt by ADR-0025 (selection-only execution — it has no `execution`
+ * Graph is exempt by ADR-0026 (selection-only execution — it has no `execution`
  * block to schedule). `strip-strings-and-comments`; tests are exempt.
  */
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
-/** Fitness + simulation recipe-execution sources (graph is selection-only, ADR-0025). */
+/** Fitness + simulation recipe-execution sources (graph is selection-only, ADR-0026). */
 const RECIPE_EXEC_PATH = /packages\/(?:fitness|simulation)\/engine\/src\/recipes\//
 
 const TEST_PATH = /\.test\.tsx?$|\/__tests__\//
@@ -39,7 +39,7 @@ export function analyzeSameRecipeSemantics(content: string): CheckViolation[] {
         suggestion:
           'Route the unit run through runWithTimeout / scheduleUnits / executePipeline ' +
           '(@opensip-tools/core), or — for a deliberate per-domain difference — document it ' +
-          'in an ADR (the same-recipe-semantics exception, e.g. ADR-0025 for graph).',
+          'in an ADR (the same-recipe-semantics exception, e.g. ADR-0026 for graph).',
       })
     }
   }

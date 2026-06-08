@@ -4,10 +4,10 @@ last_verified: 2026-06-08
 owner: opensip-tools
 ---
 
-# ADR-0025: Graph recipes are selection-only (no execution substrate)
+# ADR-0026: Graph recipes are selection-only (no execution substrate)
 
 ```yaml
-id: ADR-0025
+id: ADR-0026
 title: Graph recipes are selection-only (no execution substrate)
 date: 2026-06-08
 status: active

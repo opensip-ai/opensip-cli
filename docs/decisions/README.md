@@ -164,6 +164,10 @@ distinct from:
   (`decodeSessionPayload` in `session-store`) plus a per-tool `sessionReplay`
   projection (new `Tool` contract member); surfaced as `sessions show` / `--show`
   and routed through the `CommandOutcome` seam
+- [ADR-0026](./ADR-0026-graph-selection-only-execution.md) — Graph recipes are
+  selection-only (no `execution` block): rule evaluation is one catalog pass, not
+  a per-unit scheduled workflow, so graph does not adopt the 2.13.0 execution
+  substrate — the intentional, ADR-documented `same-recipe-semantics` exception
 
 ### Superseded
 
