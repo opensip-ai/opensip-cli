@@ -15,13 +15,27 @@ related-docs:
 ---
 # JSON output schema
 
-`opensip-tools fit --json`, `opensip-tools sim --json`, and `opensip-tools graph --json` all emit **the same structured JSON on stdout** — the `SignalEnvelope`. This is the contract surface for CI integrations.
+`opensip-tools fit --json`, `opensip-tools sim --json`, and `opensip-tools graph --json` all emit **one `CommandOutcome` wrapper on stdout** (release 2.12.0, [ADR-0024](../../decisions/ADR-0024-command-outcome-and-observability.md)). The **byte-identical `SignalEnvelope` rides under `.envelope`**; list/dashboard commands carry their result under `.data`; a failure carries structured `errors`. This is the contract surface for CI integrations.
 
-The shape lives in [`packages/contracts/src/signal-envelope.ts`](../../../packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope. The pretty-printed JSON is produced by the single shared `formatSignalJson` formatter ([`packages/output/src/format/signal-json.ts`](../../../packages/output/src/format/signal-json.ts)) — the envelope *is* the wire shape, with no transform.
+> **2.12.0 breaking change.** Before 2.12.0, `--json` emitted the bare `SignalEnvelope` at the top level. It is now nested under `.envelope` of a `CommandOutcome`. Read `.envelope.verdict.passed` where you previously read `.verdict.passed` (and `.data` for list/dashboard, `.errors` for failures). The inner envelope is unchanged. See [Migrating to 2.12](./09-migrating-to-2.12.md).
+
+```jsonc
+{
+  "kind": "fit.run",          // '<tool>.run' (envelope) | '<result.type>' (data) | 'bootstrap.error'
+  "status": "ok",             // 'ok' | 'error' | 'partial'
+  "exitCode": 0,
+  "envelope": { /* the SignalEnvelope, unchanged — see below */ },
+  "diagnostics": { /* RunDiagnostics — lifecycle events, JSON-emittable */ }
+}
+```
+
+`CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](../../../packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/dashboard command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload.
+
+The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](../../../packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope.
 
 > **Stability:** the `schemaVersion: 2` field on the envelope is the output-contract version (independent of any package version). Adding optional fields is a minor change; removing or changing types is a major change.
 
-> **Migrating from the old shape?** This is a breaking change from the v1 `CliOutput` JSON (`version: "1.0"`, `checks[]`, `findings[]`, `error|warning` severity). Jump to the [v1 → v2 mapping](#v1--v2-mapping) below.
+> **Migrating from the old shape?** The v1 `CliOutput` JSON (`version: "1.0"`, `checks[]`, `findings[]`) became the v2 envelope in 2.7.0 — jump to the [v1 → v2 mapping](#v1--v2-mapping). The 2.12.0 `CommandOutcome` wrapper is covered in [Migrating to 2.12](./09-migrating-to-2.12.md).
 
 ---
 

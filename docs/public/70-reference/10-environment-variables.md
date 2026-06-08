@@ -1,0 +1,64 @@
+---
+status: current
+last_verified: 2026-06-08
+release: v2.12.0
+title: "Environment variables"
+audience: [ci-integrators, operators]
+purpose: "Every environment variable the opensip-tools CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
+source-files:
+  - packages/cli/src/env/host-env-specs.ts
+  - packages/config/src/document/global-config.ts
+  - packages/graph/engine/src/cli/pressure-monitor.ts
+related-docs:
+  - ./04-json-output-schema.md
+  - ../../decisions/ADR-0024-command-outcome-and-observability.md
+---
+# Environment variables
+
+Every environment variable the CLI reads is declared as an `EnvVarSpec` and read
+through a single `EnvRegistry` (release 2.12.0, [ADR-0024](../../decisions/ADR-0024-command-outcome-and-observability.md)),
+so the surface is governed, coerced, and documented. The source of truth is
+`describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](../../../packages/cli/src/env/host-env-specs.ts);
+the `env-via-registry` fitness check fails CI on any raw `process.env` read that
+bypasses the registry.
+
+## Configuration
+
+| Variable | Effect |
+|---|---|
+| `OPENSIP_API_KEY` | OpenSIP Cloud API key. Overrides the `apiKey` stored in `~/.opensip-tools/config.yml`. |
+
+## Observability (OpenTelemetry)
+
+| Variable | Effect |
+|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP endpoint. When set, the CLI enables OpenTelemetry tracing; unset is a hard no-op (standalone runs pay nothing). |
+| `TRACEPARENT` | W3C traceparent of a parent trace (read only when telemetry is on); run spans nest under it. |
+
+## Update notifier
+
+| Variable | Effect |
+|---|---|
+| `OPENSIP_NO_UPDATE` | Set to any non-empty value to skip the CLI update check. |
+| `NO_UPDATE_NOTIFIER` | npm-convention update-notifier opt-out; honoured as an equivalent of `OPENSIP_NO_UPDATE`. |
+
+## Graph engine
+
+| Variable | Effect |
+|---|---|
+| `OPENSIP_HEAP_NO_MONITOR` | Set to `1` to disable the V8 heap-pressure monitor (REPL embedding / custom allocators). |
+
+## Terminal / pre-scope
+
+These are read before any run scope exists (terminal colour resolution and the
+graph heap-preflight relaunch), so they are read directly at their sites and
+documented here for completeness.
+
+| Variable | Effect |
+|---|---|
+| `NO_COLOR` | Disable ANSI colours (https://no-color.org). |
+| `FORCE_COLOR` | Force ANSI colours even when the stream is not a TTY. |
+| `COLORTERM` | Terminal colour-capability hint (e.g. `truecolor`). |
+| `TERM` | Terminal type; consulted for colour support. |
+| `TERM_PROGRAM` | Terminal program (e.g. `iTerm.app`); consulted for colour support. |
+| `NODE_OPTIONS` | Node flags; the graph heap-preflight reads/extends this before relaunch (pre-module). |
