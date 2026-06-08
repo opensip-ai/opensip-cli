@@ -155,20 +155,18 @@ describe('Tool.initialize() wiring (preAction)', () => {
 
   it('fails the run closed (exit 1) when initialize() throws, without running the action', async () => {
     const events: string[] = [];
-    const exitSpy = vi
-      .spyOn(process, 'exit')
-      .mockImplementation(((code?: number) => {
-        throw new Error(`process.exit:${String(code)}`);
-      }) as never);
     const program = buildProgram(
       makeFixtureTool('boom-tool', 'boom-cmd', events, { throwOnInit: true }),
     );
 
+    // 2.12.0 (§4.7): a tool-init failure THROWS a typed BootstrapError (exit 1)
+    // for the top-level boundary to render — it no longer calls process.exit
+    // itself. The throw propagates out of parseAsync here (this bare test program
+    // installs no catch boundary).
     await expect(
       program.parseAsync(['node', 'cli', 'boom-cmd', '--cwd', FIXTURE], { from: 'node' }),
-    ).rejects.toThrow('process.exit:1');
+    ).rejects.toMatchObject({ name: 'BootstrapError', exitCode: 1, message: expect.stringContaining('failed to initialize') });
 
-    expect(exitSpy).toHaveBeenCalledWith(1);
     // initialize attempted, but the action never ran.
     expect(events).toEqual(['initialize:boom-tool']);
   });

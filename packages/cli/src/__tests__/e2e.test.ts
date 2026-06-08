@@ -146,8 +146,10 @@ describe('CLI e2e', () => {
       try {
         const { stdout, exitCode } = cli.run(['fit', '--json'], { cwd: tempDir });
         expect(exitCode).toBe(2);
-        const output = JSON.parse(stdout);
-        expect(output.error).toContain('No opensip-tools.config.yml found');
+        // 2.12.0 (§4.7): no-project --json is a structured bootstrap.error outcome.
+        const outcome = JSON.parse(stdout);
+        expect(outcome.kind).toBe('bootstrap.error');
+        expect(outcome.errors[0].message).toContain('No opensip-tools.config.yml found');
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
       }

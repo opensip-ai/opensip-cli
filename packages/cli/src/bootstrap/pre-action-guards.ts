@@ -18,6 +18,7 @@ import {
   type ProjectContext,
 } from '@opensip-tools/core';
 
+import { BootstrapError } from './bootstrap-error.js';
 import { formatCliTooOldMessage, formatNoProjectFoundMessage } from './pre-action-messages.js';
 
 const MODULE_TAG = 'cli:bootstrap';
@@ -42,10 +43,15 @@ const PROJECT_AGNOSTIC_COMMANDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Schema-version bailout. Exits 2 with the "upgrade your CLI" message
- * when the project config declares a schema newer than this CLI knows.
- * Direction-correct: `migrate` would go the other way (old → new); when
- * the CLI itself is behind, the user must upgrade it.
+ * Schema-version bailout. THROWS a {@link BootstrapError} (exit 2) with the
+ * "upgrade your CLI" message when the project config declares a schema newer than
+ * this CLI knows. Direction-correct: `migrate` would go the other way (old → new);
+ * when the CLI itself is behind, the user must upgrade it. The top-level boundary
+ * renders it (human stderr / structured `--json`); this guard no longer writes or
+ * exits (§4.7).
+ *
+ * @throws {BootstrapError} (exit 2) when the project config's schema is newer than
+ *   this CLI supports — the boundary renders the "upgrade your CLI" message.
  */
 export function checkSchemaVersionAndBailout(project: ProjectContext, runId: string): void {
   if (project.scope !== 'project' || project.configPath === undefined) return;
@@ -57,7 +63,6 @@ export function checkSchemaVersionAndBailout(project: ProjectContext, runId: str
       configVersion: compat.configVersion,
       cliVersion: compat.cliVersion,
     });
-    process.stderr.write(`${msg}\n`);
     logger.warn({
       evt: 'cli.config.schema.cli-too-old',
       module: MODULE_TAG,
@@ -66,7 +71,12 @@ export function checkSchemaVersionAndBailout(project: ProjectContext, runId: str
       configVersion: compat.configVersion,
       cliVersion: compat.cliVersion,
     });
-    process.exit(2);
+    throw new BootstrapError({
+      message: `This project's opensip-tools.config.yml uses a newer schema (v${compat.configVersion}) than this CLI supports (v${compat.cliVersion}).`,
+      humanMessage: msg,
+      suggestion: 'Update your CLI: npm install -g opensip-tools@latest',
+      exitCode: 2,
+    });
   }
   if (compat.kind === 'older') {
     logger.info({
@@ -81,20 +91,22 @@ export function checkSchemaVersionAndBailout(project: ProjectContext, runId: str
 }
 
 /**
- * No-project-found bailout. Exits 2 with the actionable error message
- * for project-scoped commands when discovery resolved scope === 'none'.
+ * No-project-found bailout. THROWS a {@link BootstrapError} (exit 2) for
+ * project-scoped commands when discovery resolved scope === 'none'. The top-level
+ * boundary renders it: human mode writes the unchanged multi-line explainer to
+ * stderr; `--json` emits a structured `bootstrap.error` outcome (§4.7). The guard
+ * no longer branches on json or writes a stream itself.
+ *
+ * @throws {BootstrapError} (exit 2) when a project-scoped command runs with no
+ *   discoverable opensip-tools project (scope === 'none').
  */
 export function checkNoProjectAndBailout(
   project: ProjectContext,
   cwd: string,
   cmdName: string,
-  jsonOutput: boolean,
   runId: string,
 ): void {
   if (project.scope !== 'none' || PROJECT_AGNOSTIC_COMMANDS.has(cmdName)) return;
-  const msg = formatNoProjectFoundMessage(cwd, jsonOutput);
-  const stream = jsonOutput ? process.stdout : process.stderr;
-  stream.write(`${msg}\n`);
   logger.warn({
     evt: 'cli.project.not-found',
     module: MODULE_TAG,
@@ -102,7 +114,12 @@ export function checkNoProjectAndBailout(
     cwd,
     command: cmdName,
   });
-  process.exit(2);
+  throw new BootstrapError({
+    message: `No opensip-tools.config.yml found. Searched from ${cwd} upward.`,
+    humanMessage: formatNoProjectFoundMessage(cwd),
+    suggestion: 'Run opensip-tools init to get started.',
+    exitCode: 2,
+  });
 }
 
 /**

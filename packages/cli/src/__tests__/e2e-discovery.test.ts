@@ -98,11 +98,15 @@ describe('no project found', () => {
     expect(stderr).toContain('opensip-tools init');
   });
 
-  it('project-scoped --json emits the error as JSON on stdout', () => {
+  it('project-scoped --json emits a structured bootstrap.error outcome on stdout', () => {
     const { stdout, exitCode } = runCli(['fit-list', '--json'], testDir);
     expect(exitCode).toBe(2);
-    const parsed = JSON.parse(stdout) as { error: string };
-    expect(parsed.error).toContain('No opensip-tools.config.yml found');
+    // 2.12.0 (§4.7): a pre-handler no-project failure is a structured
+    // CommandOutcome (kind 'bootstrap.error'), not a bare `{ error }`.
+    const outcome = JSON.parse(stdout) as { kind: string; status: string; errors: { message: string }[] };
+    expect(outcome.kind).toBe('bootstrap.error');
+    expect(outcome.status).toBe('error');
+    expect(outcome.errors[0].message).toContain('No opensip-tools.config.yml found');
   });
 });
 

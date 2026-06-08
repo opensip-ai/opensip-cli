@@ -26,16 +26,11 @@ describe('formatCliTooOldMessage', () => {
 });
 
 describe('formatNoProjectFoundMessage', () => {
-  it('renders a single-field JSON error when jsonOutput is true', () => {
-    const out = formatNoProjectFoundMessage('/some/dir', true);
-    const parsed = JSON.parse(out) as { error: string };
-    expect(parsed.error).toContain('No opensip-tools.config.yml found');
-    expect(parsed.error).toContain('/some/dir');
-    expect(parsed.error).toContain('opensip-tools init');
-  });
-
-  it('renders the human walked-up explainer with the init hint when jsonOutput is false', () => {
-    const out = formatNoProjectFoundMessage('/some/dir', false);
+  // 2.12.0 (§4.7): the --json shape is no longer rendered here — a no-project
+  // failure is a BootstrapError the top-level boundary turns into a structured
+  // bootstrap.error CommandOutcome. This formatter is the human path only.
+  it('renders the human walked-up explainer with the init hint', () => {
+    const out = formatNoProjectFoundMessage('/some/dir');
     expect(out).toContain('No opensip-tools project found');
     expect(out).toContain('Searched from: /some/dir');
     expect(out).toContain('Walked up to: /');

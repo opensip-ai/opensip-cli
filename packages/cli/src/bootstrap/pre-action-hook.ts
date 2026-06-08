@@ -55,6 +55,7 @@ import {
 } from '../cli-context.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
+import { BootstrapError } from './bootstrap-error.js';
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
 import {
@@ -99,11 +100,14 @@ export function resolveOwningTool(tools: ToolRegistry, cmdName: string): Tool | 
  * after the scope is entered and immediately before the action body. Tools
  * not invoked this run pay nothing; `--help`/welcome run no initialize().
  *
- * Fail-fast: a throwing initialize() exits non-zero rather than letting a
+ * Fail-fast: a throwing initialize() fails the run closed rather than letting a
  * half-initialised tool run its command and silently appear to work. The
  * id is recorded only on success, so a transient failure can retry in a
  * long-lived host. Extracted from the hook body to keep its complexity
  * within budget.
+ *
+ * @throws {BootstrapError} (exit 1) when the owning tool's initialize() throws —
+ *   the top-level boundary renders it (human stderr / structured `--json`).
  */
 async function maybeInitializeOwningTool(
   tools: ToolRegistry,
@@ -117,7 +121,6 @@ async function maybeInitializeOwningTool(
     initializedToolIds.add(owningTool.metadata.id);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`✗ Tool '${owningTool.metadata.id}' failed to initialize: ${msg}\n`);
     logger.error({
       evt: 'cli.tool.initialize_failed',
       module: MODULE_TAG,
@@ -125,7 +128,14 @@ async function maybeInitializeOwningTool(
       toolId: owningTool.metadata.id,
       error: msg,
     });
-    process.exit(1);
+    // §4.7: a tool-init failure becomes a typed BootstrapError (exit 1) the
+    // top-level boundary renders, instead of an inline stderr write + exit.
+    throw new BootstrapError({
+      message: `Tool '${owningTool.metadata.id}' failed to initialize: ${msg}`,
+      humanMessage: `✗ Tool '${owningTool.metadata.id}' failed to initialize: ${msg}`,
+      suggestion: undefined,
+      exitCode: 1,
+    });
   }
 }
 
@@ -176,9 +186,16 @@ export function installPreActionHook(program: Command, version: string): void {
         explicitConfigPath: opts.config as string | undefined,
       });
     } catch (error) {
+      // §4.7: a config-resolve failure (e.g. strict --config miss) becomes a typed
+      // BootstrapError the top-level boundary renders — human stderr / structured
+      // --json — instead of an inline stderr write + process.exit.
       const msg = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`✗ ${msg}\n`);
-      process.exit(2);
+      throw new BootstrapError({
+        message: msg,
+        humanMessage: `✗ ${msg}`,
+        suggestion: 'Check opensip-tools.config.yml (or your --config path).',
+        exitCode: 2,
+      });
     }
 
     // 3. Stash the context on opts under the COLLISION-FREE name.
@@ -192,10 +209,11 @@ export function installPreActionHook(program: Command, version: string): void {
     // byte-identical to the former register-init computation.
     (opts as Record<string, unknown>).cwdExplicit = cwdExplicit;
 
-    // 4. Bailout window — each may process.exit(2) before any side
-    //    effects. Phantom warn is non-fatal; warns then continues.
+    // 4. Bailout window — each may THROW a BootstrapError (rendered by the
+    //    top-level boundary) before any side effects. Phantom warn is non-fatal;
+    //    warns then continues.
     checkSchemaVersionAndBailout(project, runId);
-    checkNoProjectAndBailout(project, cwd, actionCommand.name(), Boolean(opts.json), runId);
+    checkNoProjectAndBailout(project, cwd, actionCommand.name(), runId);
     warnAboutPhantomRuntimes(project, opts.json === true);
 
     // 5. Side-effect setup, gated on a real project being present.
