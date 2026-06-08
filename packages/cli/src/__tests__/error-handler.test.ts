@@ -16,6 +16,7 @@ import {
   NotFoundError,
   ValidationError,
 } from '@opensip-tools/core';
+import { CommanderError } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
 import { handleFatalBootstrapError, handleParseError } from '../error-handler.js';
@@ -124,6 +125,49 @@ describe('handleParseError', () => {
     expect(errorLog).toHaveBeenCalledWith(
       expect.objectContaining({ error: 'plain string', stack: undefined }),
     );
+  });
+
+  // ── Commander exitOverride errors (2.11.0 command plane) ──────────────────
+  // The root program calls `.exitOverride()` so Commander's parse failures
+  // surface here instead of `process.exit(N)`. Invalid-argument-value codes
+  // (declarative `choices` rejection — e.g. `graph --resolution bogus`, whose
+  // validation moved out of the handler's `ValidationError`) must re-map to
+  // CONFIGURATION_ERROR (2); every other Commander code keeps its own exit code.
+  // In all cases Commander already wrote its own line, so the handler renders
+  // nothing (no duplicate output).
+  it('re-maps commander.invalidArgument to CONFIGURATION_ERROR (2) and renders nothing', async () => {
+    const opts = makeOpts();
+    const err = new CommanderError(
+      1,
+      'commander.invalidArgument',
+      "error: option '--resolution <mode>' argument 'bogus' is invalid. Allowed choices are exact, fast.",
+    );
+    await handleParseError(err, opts);
+    expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(opts.render).not.toHaveBeenCalled();
+  });
+
+  it('re-maps commander.invalidOptionArgument to CONFIGURATION_ERROR (2)', async () => {
+    const opts = makeOpts();
+    const err = new CommanderError(1, 'commander.invalidOptionArgument', 'bad value');
+    await handleParseError(err, opts);
+    expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(opts.render).not.toHaveBeenCalled();
+  });
+
+  it('preserves commander exit code for unknown-command (1) and renders nothing', async () => {
+    const opts = makeOpts();
+    const err = new CommanderError(1, 'commander.unknownCommand', "error: unknown command 'nope'");
+    await handleParseError(err, opts);
+    expect(opts.setExitCode).toHaveBeenCalledWith(1);
+    expect(opts.render).not.toHaveBeenCalled();
+  });
+
+  it('preserves commander exit code for --help / --version display (0)', async () => {
+    const opts = makeOpts();
+    await handleParseError(new CommanderError(0, 'commander.helpDisplayed', '(outputHelp)'), opts);
+    expect(opts.setExitCode).toHaveBeenCalledWith(0);
+    expect(opts.render).not.toHaveBeenCalled();
   });
 
   it('typed errors take priority over substring suggestions', async () => {

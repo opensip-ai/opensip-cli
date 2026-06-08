@@ -1,0 +1,274 @@
+/**
+ * host-command-specs — the CLI-owned (host) commands expressed as declarative
+ * {@link CommandSpec}s, mounted through the SAME `mountCommandSpec` plane the
+ * tools use (release 2.11.0 Phase 6).
+ *
+ * Host commands (`init` / `configure` / `sessions` / `plugin` / `dashboard` /
+ * `completion` / `uninstall`) are NOT tool plugins — they don't ride on a
+ * `Tool.commandSpecs` and aren't discovered. But making them mount via the same
+ * `mountCommandSpec` means the Phase 7 `command-surface-parity` guardrail sees
+ * ONE uniform command surface: there is no second, more-privileged
+ * raw-Commander path for "blessed" CLI-owned commands.
+ *
+ * Each spec's handler closes over the per-invocation {@link CliCommandsContext}
+ * (render / setExitCode / datastore thunk / pluginLayouts) — the same data the
+ * former `register-*.ts` registrars threaded in. The handler signature's `TCtx`
+ * is `CliCommandsContext`; the mount layer only reaches for `render` /
+ * `setExitCode` (the `command-result` + thrown-`ToolError` arms) — the
+ * `signal-envelope` / `live-view` arms are never exercised by a host command, so
+ * `CliCommandsContext` is a valid (leaner) `CommandMountContext`.
+ *
+ * The two action-less subcommand GROUPS (`sessions`, `plugin`) and their leaf
+ * specs live in `host-subcommand-groups.ts` (a leaf module that lets
+ * `completion.ts` source its sub-subcommand names without a module cycle). This
+ * module assembles the TOP-LEVEL specs and mounts the whole surface.
+ *
+ * Specs are built per-invocation (inside the builders below, not at module
+ * load) so the `--cwd` defaults that resolve to `process.cwd()` are evaluated
+ * fresh each run — byte-identical to the former
+ * `.option(spec, desc, process.cwd())` registrars.
+ */
+
+import { EXIT_CODES } from '@opensip-tools/contracts';
+import { defineCommand, type ProjectContext } from '@opensip-tools/core';
+
+import { composeAndWriteDashboard } from '../dashboard-compose.js';
+
+import { printCompletionScript, type Shell } from './completion.js';
+import { executeConfigure } from './configure.js';
+import { buildHostSubcommandGroups, type HostSpec } from './host-subcommand-groups.js';
+import { executeInit } from './init.js';
+import { mountCommandSpec } from './mount-command-spec.js';
+import { executeUninstall } from './uninstall.js';
+
+import type { CliCommandsContext } from './shared.js';
+import type { CliProgram, InitOptions } from '@opensip-tools/contracts';
+
+// ---------------------------------------------------------------------------
+// init
+// ---------------------------------------------------------------------------
+
+interface InitOpts extends InitOptions {
+  projectContext?: ProjectContext;
+  /** Stashed by the pre-action hook from `getOptionValueSource('cwd') === 'cli'`. */
+  cwdExplicit?: boolean;
+}
+
+function buildInitSpec(ctx: CliCommandsContext): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'init',
+    description:
+      'Scaffold opensip-tools.config.yml + example checks/scenarios for your project',
+    // `--cwd` here matches the registry text ("Target directory"); `--json` /
+    // `--debug` match the registry too, so they ride the common-flag path.
+    commonFlags: ['cwd', 'json', 'debug'],
+    options: [
+      {
+        flag: '--language',
+        value: '<list>',
+        description:
+          'Comma-separated language list (typescript|rust|python|go|java|cpp). Default: detect from filesystem markers.',
+      },
+      {
+        flag: '--keep',
+        description: 'Re-scaffold example files. Preserve any custom files in opensip-tools/.',
+        default: false,
+      },
+      {
+        flag: '--remove',
+        description: 'Delete opensip-tools/ entirely, then scaffold fresh.',
+        default: false,
+      },
+    ],
+    scope: 'project',
+    output: 'command-result',
+    handler: (rawOpts) => {
+      const opts = rawOpts as InitOpts;
+      // `cwdExplicit` is stashed on opts by the pre-action hook (the single
+      // source for "was --cwd typed on the CLI?"); the former register-init
+      // recomputed `cmd.getOptionValueSource('cwd') === 'cli'` on its own
+      // Commander command — identical, since the hook's actionCommand IS init.
+      const result = executeInit({ ...opts, cwdExplicit: opts.cwdExplicit === true });
+      // Exit 2 for any non-success path the user can act on: ambiguous-language
+      // detection, partial-state refusal, mutex flag error, inside-existing-
+      // project refusal.
+      if (
+        result.ambiguousLanguageError ||
+        result.partialStateError ||
+        result.insideExistingProject
+      ) {
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+      }
+      return result;
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// configure
+// ---------------------------------------------------------------------------
+
+function buildConfigureSpec(): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'configure',
+    description: 'Set up OpenSIP Cloud API key',
+    commonFlags: ['json', 'debug'],
+    scope: 'none',
+    output: 'command-result',
+    handler: () => executeConfigure(),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// dashboard (CLI-owned composition root)
+// ---------------------------------------------------------------------------
+
+function buildDashboardSpec(): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'dashboard',
+    description: 'Generate the cross-tool HTML report and open it in your browser',
+    commonFlags: ['json'],
+    options: [
+      {
+        flag: '--no-open',
+        description: 'Write the report but do not launch a browser',
+        negatable: true,
+      },
+    ],
+    scope: 'project',
+    output: 'command-result',
+    handler: (rawOpts) => {
+      const opts = rawOpts as { open: boolean; json: boolean };
+      // Commander stores `--no-open` as `opts.open === false`; default true.
+      // In `--json` mode we never launch a browser (machine-output contract).
+      // The aggregation/compose logic is unchanged — only the option
+      // DECLARATIONS moved into this spec.
+      return composeAndWriteDashboard({ open: opts.open && !opts.json });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// completion
+// ---------------------------------------------------------------------------
+
+function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'completion',
+    description: 'Print a shell-completion script (bash | zsh | fish)',
+    commonFlags: [],
+    // Empty description: the former `.command('completion <shell>')` declared
+    // the positional inline with no help text — no "Arguments:" block. Keeping
+    // it empty preserves the byte-identical --help.
+    args: [{ name: 'shell', description: '' }],
+    scope: 'none',
+    // The handler writes the completion script straight to stdout (no Ink) and
+    // owns its own exit-code decision — the documented raw-stream exception.
+    output: 'raw-stream',
+    handler: (rawOpts) => {
+      const opts = rawOpts as { _args: string[] };
+      const shell = opts._args[0];
+      const normalized = shell.toLowerCase();
+      if (normalized !== 'bash' && normalized !== 'zsh' && normalized !== 'fish') {
+        process.stderr.write(
+          `Unsupported shell: ${shell}. Expected one of: bash, zsh, fish.\n`,
+        );
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        return;
+      }
+      printCompletionScript(normalized satisfies Shell);
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// uninstall
+// ---------------------------------------------------------------------------
+
+interface UninstallOpts {
+  yes?: boolean;
+  dryRun?: boolean;
+  project?: string | boolean;
+  purge?: boolean;
+  json?: boolean;
+  projectContext?: ProjectContext;
+}
+
+function buildUninstallSpec(): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'uninstall',
+    description:
+      'Remove user-level config at ~/.opensip-tools/ (cloud API key, defaults). Use --project to remove project-local state instead.',
+    commonFlags: [],
+    options: [
+      { flag: '-y, --yes', description: 'Skip confirmation prompt', default: false },
+      { flag: '--dry-run', description: 'Print what would be removed; take no action', default: false },
+      {
+        flag: '--project',
+        value: '[path]',
+        description:
+          'Remove project-local runtime state at [path] (defaults to cwd). User content + config preserved unless --purge.',
+      },
+      {
+        flag: '--purge',
+        description:
+          'With --project, also remove user-authored content and opensip-tools.config.yml (DESTRUCTIVE)',
+        default: false,
+      },
+      { flag: '--json', description: 'Output structured JSON', default: false },
+    ],
+    scope: 'project',
+    output: 'command-result',
+    handler: (rawOpts) => {
+      const opts = rawOpts as UninstallOpts;
+      // Commander passes `true` when the flag is present without a value, a
+      // string when given a value, or undefined when omitted.
+      let project: string | true | undefined;
+      if (opts.project === true) project = true;
+      else if (typeof opts.project === 'string') project = opts.project;
+      return executeUninstall({
+        yes: opts.yes,
+        dryRun: opts.dryRun,
+        project,
+        purge: opts.purge,
+        projectContext: opts.projectContext,
+      });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Assembly + mount
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the top-level (non-grouped) host command specs. Exported so tests can
+ * inspect the host command surface that the host mounts (single source).
+ */
+export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSpec[] {
+  return [
+    buildInitSpec(ctx),
+    buildDashboardSpec(),
+    buildConfigureSpec(),
+    buildCompletionSpec(ctx),
+    buildUninstallSpec(),
+  ];
+}
+
+/**
+ * Mount every host command onto `program` through the shared `mountCommandSpec`
+ * plane. Top-level specs mount directly; each subcommand group becomes a raw
+ * action-less parent (the documented exception) onto which its leaf specs mount
+ * via the same `mountCommandSpec`.
+ */
+export function mountHostCommands(program: CliProgram, ctx: CliCommandsContext): void {
+  for (const spec of buildTopLevelHostSpecs(ctx)) {
+    mountCommandSpec(program, spec, ctx);
+  }
+  for (const group of buildHostSubcommandGroups(ctx)) {
+    const parent = program.command(group.name).description(group.description);
+    for (const leaf of group.leaves) {
+      mountCommandSpec(parent, leaf, ctx);
+    }
+  }
+}

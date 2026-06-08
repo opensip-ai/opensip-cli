@@ -84,10 +84,30 @@ async function emit<TOpts>(
   opts: MountResultCommandOptions<TOpts>,
   parsedOpts: TOpts,
 ): Promise<void> {
-  const jsonOut = opts.jsonFlag?.(parsedOpts) ?? false;
-  if (jsonOut) {
+  await emitCommandResult(result, {
+    render: opts.ctx.render,
+    jsonRequested: opts.jsonFlag?.(parsedOpts) ?? false,
+  });
+}
+
+/**
+ * The shared `command-result` dispatch seam, extracted so the declarative
+ * `mountCommandSpec` (Phase 1, the `output: 'command-result'` arm of
+ * `dispatchOutput`) and the imperative `mountResultCommand` route a
+ * `CommandResult` through ONE point instead of duplicating the
+ * json-short-circuit / `render` decision.
+ *
+ * When `jsonRequested`, emit the result as JSON to stdout and bail before Ink
+ * starts — machine consumers must never see ANSI escapes or Ink's whitespace
+ * adjustments. Otherwise render through the supplied renderer.
+ */
+export async function emitCommandResult(
+  result: CommandResult,
+  opts: { readonly render: (result: CommandResult) => Promise<void>; readonly jsonRequested: boolean },
+): Promise<void> {
+  if (opts.jsonRequested) {
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     return;
   }
-  await opts.ctx.render(result);
+  await opts.render(result);
 }

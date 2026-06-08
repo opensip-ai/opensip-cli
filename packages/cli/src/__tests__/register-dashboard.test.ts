@@ -1,7 +1,8 @@
 /**
- * Coverage for register-dashboard's Commander wiring AND its action body.
+ * Coverage for the `dashboard` host command spec's wiring AND its action body
+ * (release 2.11.0 Phase 6 — `host-command-specs.ts`).
  *
- * register-commands.test.ts deliberately never runs action bodies; here we
+ * `register-commands.test.ts` deliberately never runs action bodies; here we
  * drive the `dashboard` action through `parseAsync` so the
  * `composeAndWriteDashboard({ open })` delegation (and the `--no-open` /
  * `--json` open-suppression logic) is exercised. `composeAndWriteDashboard`
@@ -37,17 +38,24 @@ function makeCtx() {
         rendered.push(r);
         return Promise.resolve();
       },
+      pluginLayouts: [],
+      datastore: () => undefined,
     } as never,
     rendered,
   };
 }
 
-describe('registerDashboard', () => {
+async function mount(ctx: never): Promise<Command> {
+  const { mountHostCommands } = await import('../commands/host-command-specs.js');
+  const program = new Command('opensip-tools');
+  mountHostCommands(program, ctx);
+  return program;
+}
+
+describe('dashboard spec', () => {
   it('mounts `dashboard` with --no-open and --json flags', async () => {
-    const { registerDashboard } = await import('../commands/register-dashboard.js');
-    const program = new Command('opensip-tools');
     const { ctx } = makeCtx();
-    registerDashboard(program, ctx);
+    const program = await mount(ctx);
     const cmd = program.commands.find((c) => c.name() === 'dashboard');
     expect(cmd).toBeDefined();
     const flags = cmd!.options.map((o) => o.long);
@@ -55,10 +63,8 @@ describe('registerDashboard', () => {
   });
 
   it('composes with open=true by default and renders the result', async () => {
-    const { registerDashboard } = await import('../commands/register-dashboard.js');
-    const program = new Command('opensip-tools');
     const { ctx, rendered } = makeCtx();
-    registerDashboard(program, ctx);
+    const program = await mount(ctx);
 
     await program.parseAsync(['node', 'cli', 'dashboard']);
 
@@ -67,10 +73,8 @@ describe('registerDashboard', () => {
   });
 
   it('suppresses browser-open when --no-open is passed', async () => {
-    const { registerDashboard } = await import('../commands/register-dashboard.js');
-    const program = new Command('opensip-tools');
     const { ctx } = makeCtx();
-    registerDashboard(program, ctx);
+    const program = await mount(ctx);
 
     await program.parseAsync(['node', 'cli', 'dashboard', '--no-open']);
 
@@ -78,10 +82,8 @@ describe('registerDashboard', () => {
   });
 
   it('never opens a browser in --json mode and writes JSON to stdout instead of rendering', async () => {
-    const { registerDashboard } = await import('../commands/register-dashboard.js');
-    const program = new Command('opensip-tools');
     const { ctx, rendered } = makeCtx();
-    registerDashboard(program, ctx);
+    const program = await mount(ctx);
 
     const out: string[] = [];
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {

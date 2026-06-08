@@ -23,8 +23,8 @@ export { graphTool, graphTool as tool } from './tool.js';
 // their I/O types) are NOT public API — they are consumed only by the
 // engine itself and the cross-package adapter/telemetry test suites.
 // They moved to `@opensip-tools/graph/internal` per ADR-0009 (Finding 3):
-// the CLI drives graph via `graphTool.register`, not these symbols, and
-// the parent-repo contract spawns the `catalog-export` subcommand rather
+// the CLI drives graph via `graphTool.commandSpecs` (host-mounted), not
+// these symbols, and the parent-repo contract spawns the `catalog-export` subcommand rather
 // than importing the orchestrator. See ./internal.ts.
 // `CatalogRepo` (graph catalog persistence) was previously public — exposed so
 // fitness's dashboard command could read the catalog. That coupling is gone

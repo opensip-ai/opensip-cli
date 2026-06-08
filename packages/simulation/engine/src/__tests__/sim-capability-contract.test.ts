@@ -7,6 +7,7 @@
  * (so a narrowed-out scenario never runs). Scoped to the non-cloud sim domain.
  */
 
+import { commonFlags } from '@opensip-tools/contracts';
 import { enterScope } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -18,38 +19,30 @@ import { simulationTool } from '../tool.js';
 import { makeSimTestScope } from './test-utils/with-sim-scope.js';
 
 import type { RunnableScenario } from '../framework/runnable-scenario.js';
-import type { ToolCliContext } from '@opensip-tools/core';
 
 // ---------------------------------------------------------------------------
 // 1. Flag-surface lock
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal stand-in for commander's `Command`, capturing the option flags the
- * sim tool registers. register() only ever touches
- * `program.command(...).description(...).option(...).action(...)`, so a chain
- * recorder is enough — no commander dependency, no action invocation.
+ * Derive the `--long` flag set sim declares from its `CommandSpec` (release
+ * 2.11.0 Phase 3): the ADR-0021 `commonFlags` keys mapped to their registry
+ * `--long` strings, plus each tool-specific `OptionSpec.flag`. This locks the
+ * exported command surface — adding/removing a flag must be a deliberate edit
+ * to the expected list below, so nothing ships undocumented or vanishes silently.
  */
-/** No-op stand-in for ToolCliContext methods the flag recorder doesn't exercise. */
-function noop(): void {
-  /* intentional no-op for test mocks */
-}
-
 function recordRegisteredFlags(): string[] {
+  const spec = simulationTool.commandSpecs?.[0];
+  if (spec === undefined) throw new Error('simulationTool exposes no commandSpecs');
   const flags: string[] = [];
-  const sub = {
-    description: () => sub,
-    option: (spec: string) => {
-      const match = /--[a-z][a-z-]*/.exec(spec);
-      if (match) flags.push(match[0]);
-      return sub;
-    },
-    action: () => sub,
-  };
-  const program = { command: () => sub };
-  // register() now also contributes a live view (ADR-0016); the recorder only
-  // cares about flags, so registerLiveView is a no-op here.
-  simulationTool.register({ program, registerLiveView: noop } as unknown as ToolCliContext);
+  for (const key of spec.commonFlags) {
+    const match = /--[a-z][a-z-]*/.exec(commonFlags[key].flags);
+    if (match) flags.push(match[0]);
+  }
+  for (const opt of spec.options ?? []) {
+    const match = /--[a-z][a-z-]*/.exec(opt.flag);
+    if (match) flags.push(match[0]);
+  }
   return flags.sort();
 }
 

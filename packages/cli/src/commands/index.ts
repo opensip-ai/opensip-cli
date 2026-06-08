@@ -1,5 +1,5 @@
 /**
- * commands — orchestrator for the CLI-owned subcommands.
+ * commands — orchestrator for the CLI-owned (host) subcommands.
  *
  * Cross-tool housekeeping that doesn't belong to any single tool:
  *
@@ -11,22 +11,20 @@
  *   - `completion`   — print a shell-completion script
  *   - `uninstall`    — remove user-level / project-local state
  *
- * Each subcommand's option declarations + dispatch live in their own
- * `register-*.ts` file (audit 2026-05-23 M2). This file is a 30-line
- * orchestrator that wires them onto the supplied Commander program.
+ * Release 2.11.0 Phase 6: every host command is now a declarative
+ * `CommandSpec` mounted through the SAME `mountCommandSpec` plane the tools
+ * use (`host-command-specs.ts`). The former per-command `register-*.ts`
+ * registrars (hand-rolled `.command().option().action()` bodies) are gone —
+ * host and tool commands share ONE mounting path, so the Phase 7
+ * `command-surface-parity` guardrail sees a single uniform surface with no
+ * two-tier privilege.
  *
- * Tool-owned subcommands (`fit`, `sim`, `graph`, …) are mounted
- * separately by walking the CLI-managed tool registry and calling each tool's
- * `register(cli)`.
+ * Tool-owned subcommands (`fit`, `sim`, `graph`, …) are mounted separately by
+ * walking the CLI-managed tool registry (`mountToolCommands`), which mounts
+ * each tool's `commandSpecs` via the same `mountCommandSpec`.
  */
 
-import { registerCompletion } from './register-completion.js';
-import { registerConfigure } from './register-configure.js';
-import { registerDashboard } from './register-dashboard.js';
-import { registerInit } from './register-init.js';
-import { registerPlugins } from './register-plugins.js';
-import { registerSessions } from './register-sessions.js';
-import { registerUninstall } from './register-uninstall.js';
+import { mountHostCommands } from './host-command-specs.js';
 
 import type { CliCommandsContext } from './shared.js';
 import type { Command } from 'commander';
@@ -34,17 +32,11 @@ import type { Command } from 'commander';
 export type { CliCommandsContext } from './shared.js';
 
 /**
- * Mount the CLI-owned commands onto the supplied Commander program.
- * Pure function — no module-level side effects, no closure over
- * globals — so tests can register commands against a fresh `Command`
- * instance and inspect the resulting subcommand tree.
+ * Mount the CLI-owned host commands onto the supplied Commander program.
+ * Pure function — no module-level side effects, no closure over globals — so
+ * tests can register commands against a fresh `Command` instance and inspect
+ * the resulting subcommand tree.
  */
 export function registerCliCommands(program: Command, ctx: CliCommandsContext): void {
-  registerInit(program, ctx);
-  registerDashboard(program, ctx);
-  registerSessions(program, ctx);
-  registerConfigure(program, ctx);
-  registerPlugins(program, ctx);
-  registerCompletion(program, ctx);
-  registerUninstall(program, ctx);
+  mountHostCommands(program, ctx);
 }

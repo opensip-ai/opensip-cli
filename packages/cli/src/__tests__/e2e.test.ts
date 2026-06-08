@@ -210,6 +210,22 @@ describe('CLI e2e', () => {
     });
   });
 
+  describe('graph', () => {
+    it('rejects an invalid --resolution value with CONFIGURATION_ERROR (exit 2)', () => {
+      // Regression for the 2.11.0 command-plane migration: `--resolution`'s
+      // value validation moved from an in-handler `ValidationError` (→ exit 2)
+      // to a declarative Commander `choices`. Commander's default choices
+      // failure exits 1, silently dropping the documented usage-error code.
+      // The root program's `.exitOverride()` + `handleParseError` re-map
+      // invalid-argument-value to CONFIGURATION_ERROR (2), restoring 2.10.0
+      // parity. Asserting `=== 2` end-to-end closes that loop. The error line
+      // is Commander's (the one sanctioned surface delta).
+      const { exitCode, stderr } = cli.run(['graph', '--resolution', 'bogus'], { cwd: FIXTURE });
+      expect(exitCode).toBe(2);
+      expect(stderr).toContain("argument 'bogus' is invalid");
+    });
+  });
+
   describe('sessions list', () => {
     it('runs without crashing', () => {
       const { exitCode } = cli.run(['sessions', 'list'], { cwd: FIXTURE });

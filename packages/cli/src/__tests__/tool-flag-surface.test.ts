@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
  * Capability guard (Tier-2): lock the registered flag surface of every
  * first-party tool. A flag added or removed from any command — across all of
@@ -9,6 +10,7 @@
  * no commander dependency and never invokes a command action.
  */
 
+import { commonFlags } from '@opensip-tools/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { FIRST_PARTY_TOOLS } from '../bootstrap/register-tools.js';
@@ -16,12 +18,33 @@ import { FIRST_PARTY_TOOLS } from '../bootstrap/register-tools.js';
 import type { Tool, ToolCliContext } from '@opensip-tools/core';
 
 /**
+ * Derive a spec-mounted tool's long-flag set from its `CommandSpec`s (release
+ * 2.11.0): the ADR-0021 `commonFlags` keys mapped to their registry `--long`
+ * strings, plus each tool-specific `OptionSpec.flag`. Used for migrated tools
+ * (sim today; fit/graph after Phases 4-5) that no longer expose `register()`.
+ */
+function recordSpecFlags(tool: Tool): string[] {
+  const flags = new Set<string>();
+  for (const spec of tool.commandSpecs ?? []) {
+    for (const key of spec.commonFlags) {
+      const match = /--[a-z][a-z-]*/.exec(commonFlags[key].flags);
+      if (match) flags.add(match[0]);
+    }
+    for (const opt of spec.options ?? []) {
+      const match = /--[a-z][a-z-]*/.exec(opt.flag);
+      if (match) flags.add(match[0]);
+    }
+  }
+  return [...flags].sort();
+}
+
+/**
  * Run a tool's `register()` against a recorder that captures every long flag.
  * The recorder answers any method/property with itself (so chained
  * `.command(...).description(...).option(...).action(...)` etc. all work) and
  * records the `--flag` from each `.option(spec)` call.
  */
-function recordToolFlags(tool: Tool): string[] {
+function recordRegisterFlags(tool: Tool): string[] {
   const flags = new Set<string>();
    
   // Self-referential proxy: the traps return `recorder`, so it must be declared
@@ -45,17 +68,36 @@ function recordToolFlags(tool: Tool): string[] {
     {},
     { get: (_t, prop) => (prop === 'program' ? recorder : () => undefined) },
   ) as unknown as ToolCliContext;
-  tool.register(cli);
+  tool.register!(cli);
   return [...flags].sort();
+}
+
+/**
+ * Record a tool's long-flag surface via whichever mount path it declares:
+ * the declarative `commandSpecs` (preferred — sim, then fit/graph) or the
+ * deprecated `register()` fallback (fit/graph until their Phase 4-5 cutover).
+ */
+function recordToolFlags(tool: Tool): string[] {
+  if (tool.commandSpecs !== undefined && tool.commandSpecs.length > 0) {
+    return recordSpecFlags(tool);
+  }
+  return recordRegisterFlags(tool);
 }
 
 // The locked flag surface per tool (union across all of each tool's
 // subcommands). Adding/removing a flag is a deliberate edit here.
 const EXPECTED: Record<string, string[]> = {
   fitness: [
+    // release 2.11.0 Phase 4: fitness migrated to commandSpecs, so this set is
+    // now derived via recordSpecFlags. That surfaces `--out` (the
+    // `fit-baseline-export --out <path>` required flag), which the old
+    // register()-recorder missed: it only trapped `.option(...)` calls and
+    // `--out` was declared via `.requiredOption(...)`. The flag was always part
+    // of the real surface; the spec-based recorder records it faithfully.
     '--api-key', '--check', '--config', '--cwd', '--debug', '--exclude',
     '--findings', '--gate-compare', '--gate-save', '--json', '--list', '--open',
-    '--quiet', '--recipe', '--recipes', '--report-to', '--tags', '--verbose',
+    '--out', '--quiet', '--recipe', '--recipes', '--report-to', '--tags',
+    '--verbose',
   ],
   graph: [
     // ADR-0011 (Phase 5): graph gained --api-key for --report-to cloud egress.
@@ -63,10 +105,21 @@ const EXPECTED: Record<string, string[]> = {
     // Post-2.7.0: graph gained --sarif (real SARIF 2.1.0 for Code Scanning via
     // the shared cli.writeSarif seam, replacing the broken graph-baseline-export
     // → upload path).
-    '--api-key', '--changed-file', '--concurrency', '--cwd', '--debug',
-    '--gate-compare', '--gate-save', '--json', '--language', '--list-files',
-    '--mode', '--no-cache', '--out', '--profile', '--quiet', '--recipe', '--report-to',
-    '--resolution', '--run-id', '--sarif', '--verbose', '--workspace',
+    //
+    // release 2.11.0 Phase 5: graph migrated to commandSpecs, so this set is now
+    // derived via recordSpecFlags. That surfaces the catalog-export/sarif-export
+    // REQUIRED flags — `--catalog-output`, `--git-sha`, `--output-sarif`,
+    // `--repo-id`, `--tenant-id` — which the old register()-recorder missed: it
+    // only trapped `.option(...)` calls and these were declared via
+    // `.requiredOption(...)`. They were always part of the real surface (the
+    // opensip EngineSubprocessPort contracts depend on them); the spec-based
+    // recorder records them faithfully.
+    '--api-key', '--catalog-output', '--changed-file', '--concurrency', '--cwd',
+    '--debug', '--gate-compare', '--gate-save', '--git-sha', '--json',
+    '--language', '--list-files', '--mode', '--no-cache', '--out',
+    '--output-sarif', '--profile', '--quiet', '--recipe', '--repo-id',
+    '--report-to', '--resolution', '--run-id', '--sarif', '--tenant-id',
+    '--verbose', '--workspace',
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
   // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).

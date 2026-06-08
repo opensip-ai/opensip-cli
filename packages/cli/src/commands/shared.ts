@@ -1,25 +1,17 @@
 /**
- * shared — Commander option specs + the registrar context type used by
- * every CLI-owned command.
+ * shared — the registrar context type used by every CLI-owned (host) command.
  *
- * Split out of `commands/index.ts` (audit 2026-05-23 M2) so each
- * register-*.ts file can import the constants without re-stating them.
- * Keeping these in a single module also means adding a new shared flag
- * (e.g. a `--quiet` shorthand) is a one-line change.
+ * Release 2.11.0 Phase 6 moved the host commands onto the declarative
+ * `CommandSpec` plane (`host-command-specs.ts` / `host-subcommand-groups.ts`),
+ * which sources `--cwd` / `--json` from the ADR-0021 common-flag registry
+ * directly (via `commonFlags: ['cwd', 'json']`). The former
+ * `CWD_OPTION_SPEC` / `JSON_DESC` re-export constants — used only by the
+ * deleted `register-*.ts` registrars — are gone; this module now carries just
+ * the shared context type.
  */
-
-import { commonFlags } from '@opensip-tools/contracts';
 
 import type { CommandResult } from '@opensip-tools/contracts';
 import type { PluginLayout } from '@opensip-tools/core';
-
-/** Commander spec for the shared `--cwd <path>` option — sourced from the
- *  ADR-0021 common-flag registry so CLI-owned commands match the tools. */
-export const CWD_OPTION_SPEC = commonFlags.cwd.flags;
-
-/** Help text for the shared `--json` flag — the one registry string, used by
- *  every CLI-owned subcommand. */
-export const JSON_DESC = commonFlags.json.description;
 
 /**
  * Context the orchestrator (`registerCliCommands`) hands to every

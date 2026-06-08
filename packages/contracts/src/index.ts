@@ -100,6 +100,23 @@ export type {
 // take it from the config layer. (`RecipeSource` below still names a
 // `'cli-config'` provenance string — that is a label, not an import.)
 
+// Command-plane types (release 2.11.0, §5.4) — the declarative CommandSpec a
+// tool exports for the host to mount, replacing raw-Commander access. DEFINED in
+// @opensip-tools/core (beside the Tool contract; core cannot import contracts);
+// re-exported here for the public Tool↔runner surface. `CommonFlagKey` is also
+// re-exported from ./cli-flags (which now sources it from core) — both paths
+// resolve to the same kernel type.
+export { defineCommand, COMMON_FLAG_KEYS } from '@opensip-tools/core';
+export type {
+  CommandSpec,
+  OptionSpec,
+  ArgSpec,
+  CommandHandler,
+  CommandContext,
+  CommandOutputMode,
+  CommandScopeRequirement,
+} from '@opensip-tools/core';
+
 // Tool-scoped recipe-default resolution (ADR-0022). The pure resolver every
 // tool uses to pick its recipe name from --recipe / <tool>.recipe / the
 // deprecated cli.recipe fallback.

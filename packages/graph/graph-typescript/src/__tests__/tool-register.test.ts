@@ -1,5 +1,16 @@
 /**
- * Tests for the Commander wiring inside graphTool.register().
+ * Integration tests for graph's command surface against the real TypeScript
+ * adapter.
+ *
+ * Since release 2.11.0 Phase 5 graph mounts via declarative `commandSpecs`, not
+ * the deprecated `register()` hook. The Commander parsing layer (flag wiring,
+ * `_args` positionals, choices/required enforcement) is unit-covered in
+ * `cli/src/__tests__/mount-command-spec.test.ts`; here we drive the primary
+ * `graph` spec's handler directly (exactly what the host invokes post-parse)
+ * with the real typescript adapter registered, so the executeGraph / renderLive
+ * pipeline runs end-to-end. Positionals ride on the parsed-opts object under the
+ * `_args` key (the host convention); graph's sole variadic `[paths...]` is
+ * `_args[0]`.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -8,29 +19,35 @@ import { join } from 'node:path';
 
 import { enterScope, RunScope } from '@opensip-tools/core';
 import { currentAdapterRegistry, graphTool } from '@opensip-tools/graph';
-import { Command } from 'commander';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 
 import { typescriptGraphAdapter } from '../index.js';
 
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { CommandHandler, CommandSpec, ToolCliContext } from '@opensip-tools/core';
+
+/** Resolve a graph command-spec by name (the host mounts these). */
+function graphSpec(name: string): CommandSpec<unknown, ToolCliContext> {
+  const spec = (graphTool.commandSpecs ?? []).find((s) => s.name === name);
+  if (spec === undefined) throw new Error(`graphTool exposes no command spec '${name}'`);
+  return spec;
+}
+
+/** The primary `graph` command handler (host invokes `handler(opts, ctx)`). */
+function graphHandler(): CommandHandler<unknown, ToolCliContext> {
+  return graphSpec('graph').handler;
+}
 
 beforeEach(() => {
-  // Item 1: graph registries are per-RunScope. Construct a scope with
-  // graph subscope and register the typescript adapter into it so the
-  // graphTool.register() tests reach pickAdapter() through a live
-  // scope.
+  // Item 1: graph registries are per-RunScope. Construct a scope with the graph
+  // subscope and register the typescript adapter into it so the handler reaches
+  // pickAdapter() through a live scope.
   const scope = new RunScope();
   Object.assign(scope, graphTool.contributeScope?.() ?? {});
   enterScope(scope);
   currentAdapterRegistry().register(typescriptGraphAdapter);
 });
 
-function makeCli(program: Command): ToolCliContext {
-  // Layer 5 Phase 3 (audit 2026-05-23 F3): tools own their renderers.
-  // The graph tool registers `renderGraphLive` directly via
-  // `cli.registerLiveView` — no `builtinLiveViews` map lookup.
+function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
   const project = {
     cwd: '/test',
     cwdExplicit: false,
@@ -40,85 +57,55 @@ function makeCli(program: Command): ToolCliContext {
     scope: 'none' as const,
   };
   return {
-    program,
     scope: new RunScope({ projectContext: project }),
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
-    logger: {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    },
+    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
     emitEnvelope: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),
     writeSarif: vi.fn(() => Promise.resolve()),
-  };
+    ...overrides,
+  } as unknown as ToolCliContext;
 }
 
-describe('graphTool.register', () => {
-  it('mounts a `graph` subcommand on the supplied Commander program', () => {
-    const program = new Command();
-    program.exitOverride();
-    graphTool.register(makeCli(program));
-    const sub = program.commands.find((c) => c.name() === 'graph');
-    expect(sub).toBeDefined();
-    expect(sub?.description()).toContain('static call-graph');
+describe('graph command spec', () => {
+  it('declares a `graph` command described as static call-graph analysis', () => {
+    const spec = graphSpec('graph');
+    expect(spec.name).toBe('graph');
+    expect(spec.description).toContain('static call-graph');
+    // The handler owns its full output surface (TTY-vs-static + egress).
+    expect(spec.output).toBe('raw-stream');
   });
 
-  it('registers the documented option set on the graph subcommand', () => {
-    const program = new Command();
-    program.exitOverride();
-    graphTool.register(makeCli(program));
-    const sub = program.commands.find((c) => c.name() === 'graph');
-    const flags = sub?.options.map((o) => o.long) ?? [];
-    expect(flags).toContain('--cwd');
-    expect(flags).toContain('--json');
-    expect(flags).toContain('--no-cache');
-    expect(flags).toContain('--gate-save');
-    expect(flags).toContain('--gate-compare');
-    expect(flags).toContain('--report-to');
-    expect(flags).toContain('--debug');
+  it('declares the documented option set on the graph command', () => {
+    const spec = graphSpec('graph');
+    // Common flags from the ADR-0021 registry (the CommonFlagKey form).
+    expect([...spec.commonFlags]).toEqual(
+      expect.arrayContaining(['cwd', 'json', 'reportTo', 'debug']),
+    );
+    // Tool-specific options.
+    const optionFlags = (spec.options ?? []).map((o) => o.flag);
+    expect(optionFlags).toContain('--no-cache');
+    expect(optionFlags).toContain('--gate-save');
+    expect(optionFlags).toContain('--gate-compare');
     // --baseline was removed (audit P1.2): it was mounted + documented but had
-    // zero readers (runGateMode is datastore-backed). Guard against re-adding
-    // a vestigial no-op flag.
-    expect(flags).not.toContain('--baseline');
+    // zero readers. Guard against re-adding a vestigial no-op flag.
+    expect(optionFlags).not.toContain('--baseline');
   });
 
-  it('action calls the registered handler with the parsed options (smoke)', async () => {
-    // Wire a fake program; intercept the action so we capture it without
-    // actually running the pipeline (which requires a real fixture).
-    const program = new Command();
-    program.exitOverride();
-    graphTool.register(makeCli(program));
-    const sub = program.commands.find((c) => c.name() === 'graph');
-    expect(sub).toBeDefined();
-    const spy = vi.fn();
-    if (sub) {
-      // Commander passes (positionalPaths, opts, command) to the
-      // action callback now that `.argument('[paths...]')` is declared.
-      sub.action((paths: readonly string[], opts: unknown) => {
-        spy(paths, opts);
-      });
-      await sub.parseAsync(['--cwd', '/tmp', '--json'], { from: 'user' });
-      expect(spy).toHaveBeenCalledOnce();
-      const call = spy.mock.calls[0] as [readonly string[], { cwd: string; json: boolean }];
-      expect(call[0]).toEqual([]);
-      expect(call[1].cwd).toBe('/tmp');
-      expect(call[1].json).toBe(true);
-    }
+  it('--concurrency parses as a number via the declared parse reducer', () => {
+    const spec = graphSpec('graph');
+    const concurrency = (spec.options ?? []).find((o) => o.flag === '--concurrency');
+    expect(concurrency?.parse).toBeTypeOf('function');
+    expect(concurrency?.parse?.('4', undefined)).toBe(4);
   });
 });
 
-describe('graphTool action handler — end-to-end via Commander', () => {
-  // The default handler isn't replaced; we hit the actual path that
-  // calls executeGraph (or renderLive for the interactive default).
-  // Use a tiny TS fixture so the run completes quickly.
-
+describe('graph handler — end-to-end via the real typescript adapter', () => {
   it('runs --json against a real fixture and exits with code 0', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'graph-tool-action-'));
     try {
@@ -147,45 +134,19 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         stdout += typeof chunk === 'string' ? chunk : String(chunk);
         return true;
       });
-
-      const program = new Command();
-      program.exitOverride();
       const setExitCode = vi.fn();
-      const project = {
-        cwd: '/test',
-        cwdExplicit: false,
-        projectRoot: '/test',
-        configPath: undefined,
-        walkedUp: 0,
-        scope: 'none' as const,
-      };
-      const cli: ToolCliContext = {
-        program,
-        scope: new RunScope({ projectContext: project }),
-        render: vi.fn(() => Promise.resolve()),
-        renderLive: vi.fn(() => Promise.resolve()),
-        maybeOpenDashboard: vi.fn(() => Promise.resolve()),
-        logger: {
-          info: vi.fn(),
-          warn: vi.fn(),
-          error: vi.fn(),
-          debug: vi.fn(),
-        },
+      const cli = makeCli({
         setExitCode,
-        emitJson: vi.fn(),
         // Mirror the composition root's `emitEnvelope` seam (JSON to stdout).
         emitEnvelope: vi.fn((envelope: unknown) => {
           process.stdout.write(`${JSON.stringify(envelope)}\n`);
         }),
-        deliverSignals: vi.fn(() => Promise.resolve()),
-        writeSarif: vi.fn(() => Promise.resolve()),
-        registerLiveView: vi.fn(),
-      };
-      graphTool.register(cli);
+      });
       try {
-        // With a positional path, the heap preflight is skipped —
-        // important because preflight could re-exec the test process.
-        await program.parseAsync(['graph', '--cwd', dir, '--json', dir], { from: 'user' });
+        // With a positional path, the heap preflight is skipped — important
+        // because preflight could re-exec the test process. The variadic
+        // positional rides on `_args[0]`.
+        await graphHandler()({ cwd: dir, json: true, _args: [[dir]] }, cli);
       } finally {
         stdoutSpy.mockRestore();
       }
@@ -199,7 +160,7 @@ describe('graphTool action handler — end-to-end via Commander', () => {
   });
 
   it('interactive default path delegates to cli.renderLive', async () => {
-    // Default mode (no other flags) calls cli.renderLive. The fixture
+    // Default mode (no other flags) calls cli.renderLive on a TTY. The fixture
     // is tiny so the heap preflight no-ops (file count < 1000).
     const dir = mkdtempSync(join(tmpdir(), 'graph-tool-action-live-'));
     try {
@@ -214,45 +175,16 @@ describe('graphTool action handler — end-to-end via Commander', () => {
       );
       writeFileSync(join(dir, 'index.ts'), 'export function x(): number { return 1; }\n', 'utf8');
 
-      const program = new Command();
-      program.exitOverride();
       const renderLive = vi.fn(() => Promise.resolve());
-      const project2 = {
-        cwd: '/test',
-        cwdExplicit: false,
-        projectRoot: '/test',
-        configPath: undefined,
-        walkedUp: 0,
-        scope: 'none' as const,
-      };
-      const cli: ToolCliContext = {
-        program,
-        scope: new RunScope({ projectContext: project2 }),
-        render: vi.fn(() => Promise.resolve()),
-        renderLive,
-        maybeOpenDashboard: vi.fn(() => Promise.resolve()),
-        logger: {
-          info: vi.fn(),
-          warn: vi.fn(),
-          error: vi.fn(),
-          debug: vi.fn(),
-        },
-        setExitCode: vi.fn(),
-        emitJson: vi.fn(),
-        emitEnvelope: vi.fn(),
-        deliverSignals: vi.fn(() => Promise.resolve()),
-        writeSarif: vi.fn(() => Promise.resolve()),
-        registerLiveView: vi.fn(),
-      };
-      graphTool.register(cli);
-      // No --json/--gate-*/--report-to/--package: this is the interactive
+      const cli = makeCli({ renderLive });
+      // No --json/--gate-*/--report-to/positional: this is the interactive
       // default path, which delegates to renderLive — but only on a TTY (a
       // non-TTY run falls back to the static render seam). vitest's stdout is
       // not a TTY, so force it for this assertion.
       const prevTTY = process.stdout.isTTY;
       Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
       try {
-        await program.parseAsync(['graph', '--cwd', dir], { from: 'user' });
+        await graphHandler()({ cwd: dir, _args: [[]] }, cli);
       } finally {
         Object.defineProperty(process.stdout, 'isTTY', { value: prevTTY, configurable: true });
       }
@@ -260,24 +192,6 @@ describe('graphTool action handler — end-to-end via Commander', () => {
       expect(renderLive).toHaveBeenCalledWith('graph', expect.objectContaining({ cwd: dir }));
     } finally {
       rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('--concurrency parses as a number', async () => {
-    // Exercise the parse function for --concurrency.
-    const program = new Command();
-    program.exitOverride();
-    graphTool.register(makeCli(program));
-    const sub = program.commands.find((c) => c.name() === 'graph');
-    expect(sub).toBeDefined();
-    const spy = vi.fn();
-    if (sub) {
-      sub.action((paths: readonly string[], opts: unknown) => {
-        spy(paths, opts);
-      });
-      await sub.parseAsync(['--cwd', '/tmp', '--concurrency', '4'], { from: 'user' });
-      const call = spy.mock.calls[0] as [readonly string[], { concurrency: number }];
-      expect(call[1].concurrency).toBe(4);
     }
   });
 });

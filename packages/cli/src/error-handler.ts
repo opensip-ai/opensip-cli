@@ -32,6 +32,35 @@ import {
   PluginIncompatibleError,
   ToolError,
 } from '@opensip-tools/core';
+import { CommanderError } from 'commander';
+
+/**
+ * Commander error codes that denote an INVALID ARGUMENT VALUE — a declared
+ * `choices` rejection or a custom `argParser` that threw `InvalidArgumentError`
+ * (e.g. graph's `--resolution` once its value validation moved from an
+ * in-handler `ValidationError` to a declarative `choices` in the 2.11.0 command
+ * plane). These are usage errors and must exit `CONFIGURATION_ERROR` (2) — the
+ * same code `mapToolErrorToExitCode(ValidationError)` yields — preserving the
+ * pre-command-plane contract. Every OTHER Commander code (unknown command /
+ * option, missing argument, help/version display) keeps Commander's own
+ * `exitCode`, which already matched 2.10.0.
+ */
+const COMMANDER_INVALID_ARGUMENT_CODES: ReadonlySet<string> = new Set([
+  'commander.invalidArgument',
+  'commander.invalidOptionArgument',
+]);
+
+/**
+ * Map a Commander `exitOverride` error to an exit code, re-mapping only the
+ * invalid-argument-value codes to `CONFIGURATION_ERROR` (2) to match the typed
+ * `ValidationError` semantics the declarative `choices` replaced. All other
+ * Commander conditions retain Commander's own `exitCode`.
+ */
+function commanderExitCode(error: CommanderError): number {
+  return COMMANDER_INVALID_ARGUMENT_CODES.has(error.code)
+    ? EXIT_CODES.CONFIGURATION_ERROR
+    : error.exitCode;
+}
 
 /**
  * Per-class action hints. Adding a new ToolError subclass with a
@@ -85,6 +114,18 @@ export async function handleParseError(
   error: unknown,
   opts: HandleParseErrorOptions,
 ): Promise<void> {
+  // Commander's own parse failures (surfaced because the root program calls
+  // `.exitOverride()`). Commander has ALREADY written its error/usage line to
+  // stderr (or the help text to stdout), so we set the exit code and render
+  // nothing — re-rendering would duplicate Commander's output and regress the
+  // 2.10.0-identical stderr for unknown-command/option/missing-arg cases. Only
+  // the invalid-argument-value codes are re-mapped to exit 2 (ValidationError
+  // parity); every other code keeps Commander's exit code.
+  if (error instanceof CommanderError) {
+    opts.setExitCode(commanderExitCode(error));
+    return;
+  }
+
   const typed = suggestionFromTypedError(error);
   const suggestion = typed ?? getErrorSuggestion(error);
 

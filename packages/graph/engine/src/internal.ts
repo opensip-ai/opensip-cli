@@ -27,8 +27,8 @@ export { orphanSubtreeRule } from './rules/orphan-subtree.js';
 // ── Orchestration / CLI-handler surface (ADR-0009, Finding 3) ──────
 //
 // These drive the six-stage pipeline and the `graph` CLI command. The
-// production path reaches them via `graphTool.register` (and the parent
-// repo via the `catalog-export` subcommand), never by importing these
+// production path reaches them via `graphTool.commandSpecs` (host-mounted,
+// and the parent repo via the `catalog-export` subcommand), never by importing these
 // symbols — so they are private. Only the cross-package adapter and CLI
 // telemetry test suites import them, exercising the orchestrator end to
 // end without going through Commander.

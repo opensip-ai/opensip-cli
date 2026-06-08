@@ -69,7 +69,7 @@ import type { Command } from 'commander';
 // The `currentRunScope` holder mirrors the entered AsyncLocalStorage scope.
 // It's strictly redundant with `currentScope()` for tools (which always
 // read via ALS), but the CLI's non-action paths — `maybeOpenDashboard`,
-// `register-sessions.ts` — call `getCurrentProjectRoot()` /
+// the host `sessions` command — call `getCurrentProjectRoot()` /
 // `getOrOpenDatastore()` from outside the ALS-tracked async chain in
 // rare cases (post-action handlers, error printers). The holder lets
 // those callers reach the scope without each one having to thread
@@ -247,8 +247,8 @@ export function buildDatastoreThunk(
 /**
  * Open (or return cached) project-local SQLite DataStore via the
  * scope's datastore thunk. Shared between tool action bodies and
- * CLI-only commands (`register-sessions.ts`, etc.) so both paths are
- * equally lazy.
+ * the host commands (e.g. `sessions`, in `host-subcommand-groups.ts`) so
+ * both paths are equally lazy.
  *
  * Throws when called outside a project scope — see
  * `buildDatastoreThunk`'s contract.

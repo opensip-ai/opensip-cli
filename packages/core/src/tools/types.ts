@@ -1,4 +1,5 @@
 // @fitness-ignore-file file-length-limit -- the canonical Tool plugin contract: one cohesive interface (metadata, commands, register, initialize, contributeScope, collectDashboardData, config, capabilityRegistrars) whose every member carries load-bearing JSDoc. The slots are the contract surface; splitting the single interface across files would fragment the one type tools implement. Grew past the 400-line soft limit with the 2.10.0 config + capability slots (ADR-0023 / §5.3).
+// @fitness-ignore-file no-deprecated-tags -- the `@deprecated` on Tool.register is a DELIBERATE, plan-backed staged deprecation with a migration path (release 2.11.0 §5.4: register() is retained through 2.x and removed in 3.0.0; commandSpecs is the replacement; the cli.tool.register_deprecated event + cross-tool-flag-parity drive migration as fit/graph/sim cut over in Phases 3-5), NOT lingering dead code to delete in this PR. Mirrors the same exemption on contracts/src/cli-config.ts for the ADR-0022 cli.recipe deprecation.
 /**
  * Tool plugin contract.
  *
@@ -28,6 +29,7 @@
 import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 
 import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
+import type { CommandSpec } from './command-spec.js';
 import type { Logger } from '../lib/logger.js';
 import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
 import type { PluginLayout } from '../plugins/types.js';
@@ -320,11 +322,38 @@ export interface Tool {
    */
   readonly pluginLayout?: PluginLayout;
   /**
+   * Declarative command surface (release 2.11.0, north-star §5.4). The
+   * PREFERRED way a tool contributes commands: it returns one
+   * {@link CommandSpec} per subcommand and the host's `mountCommandSpec`
+   * (cli, Phase 1) translates each into a wired Commander command — the tool
+   * never touches Commander. Specs are typed against the concrete host
+   * {@link ToolCliContext} (the kernel's default `CommandContext` marker isn't
+   * assignable to it), so a tool authors them via
+   * `defineCommand<TOpts, ToolCliContext>(...)`.
+   *
+   * When a tool declares `commandSpecs`, the host mounts via the spec path and
+   * SKIPS {@link register}. When absent, the host falls back to `register()`
+   * (and emits a `cli.tool.register_deprecated` event). fit/graph/sim migrate
+   * to `commandSpecs` in release 2.11.0 Phases 3-5; until then they mount via
+   * the fallback.
+   *
+   * Typed `CommandSpec<unknown, ToolCliContext>` (the kernel cannot name the
+   * per-spec `TOpts`); the host's `mountCommandSpec` narrows each spec.
+   */
+  readonly commandSpecs?: readonly CommandSpec<unknown, ToolCliContext>[];
+  /**
    * Mount this tool's subcommands onto the CLI's Commander program.
    * Called once at CLI startup, before argv parsing. Use the supplied
    * context to render results and trigger dashboard auto-open.
+   *
+   * @deprecated Prefer {@link commandSpecs} — the declarative command surface
+   *   (release 2.11.0, §5.4). `register()` is the legacy raw-Commander path; a
+   *   tool that relies on it triggers a `cli.tool.register_deprecated` event at
+   *   mount. `register()` is REMOVED in 3.0.0 (the "one command surface"
+   *   invariant). Optional since 2.11.0 — a tool that declares `commandSpecs`
+   *   may omit `register()` entirely.
    */
-  readonly register: (cli: ToolCliContext) => void;
+  readonly register?: (cli: ToolCliContext) => void;
   /**
    * Optional one-time initialization. Called by the CLI before any of
    * the tool's commands run. Use it to register sub-packages (check

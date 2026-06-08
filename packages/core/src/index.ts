@@ -109,6 +109,21 @@ export type {
   ToolProvenance,
   ToolSource,
 } from './tools/index.js';
+// Command-plane types (release 2.11.0, §5.4): the declarative CommandSpec a tool
+// exports for the host to mount, plus the pure CommonFlagKey key type. The
+// Commander-touching applyCommonFlags runtime stays in @opensip-tools/contracts,
+// which re-exports CommonFlagKey from here. Re-exported by contracts.
+export { defineCommand, COMMON_FLAG_KEYS } from './tools/index.js';
+export type {
+  CommandSpec,
+  OptionSpec,
+  ArgSpec,
+  CommandHandler,
+  CommandContext,
+  CommandOutputMode,
+  CommandScopeRequirement,
+  CommonFlagKey,
+} from './tools/index.js';
 // Capability domain model (release 2.10.0, §5.3): the data shape a tool
 // uses to declare an extension point it owns. The scope-owned runtime
 // registry is exported from ./plugins/index.js below. Re-exported by

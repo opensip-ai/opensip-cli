@@ -9,6 +9,8 @@
  *    `graph-symbol-index`) added alongside the codeindex-parity work.
  *    Orphans and entry-points were folded into the unified `graph`
  *    output — they remain output sections, not separate commands.
+ *  - Since release 2.11.0 Phase 5 graph mounts via declarative
+ *    `commandSpecs`, not the deprecated `register()` hook.
  *  - graphTool does NOT import from opensip-tools (compile-time
  *    via TypeScript imports — if it did, package wouldn't build)
  */
@@ -49,7 +51,20 @@ describe('graphTool contract conformance (AC-2)', () => {
     ]);
   });
 
-  it('register is callable', () => {
-    expect(typeof graphTool.register).toBe('function');
+  it('mounts via commandSpecs, not the deprecated register() hook', () => {
+    // eslint-disable-next-line sonarjs/deprecation -- asserting the deprecated hook is ABSENT after the Phase 5 migration.
+    expect(graphTool.register).toBeUndefined();
+    // One spec per declared command, in declaration order.
+    const specNames = (graphTool.commandSpecs ?? []).map((s) => s.name);
+    expect(specNames).toEqual([
+      'graph',
+      'graph-lookup',
+      'graph-shard-worker',
+      'graph-symbol-index',
+      'graph-baseline-export',
+      'catalog-export',
+      'sarif-export',
+      'graph-recipes',
+    ]);
   });
 });
