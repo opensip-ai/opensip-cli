@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/output",
-  "version": "2.13.0",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "Output layer for OpenSIP Tools — pure signal-envelope formatters (json/sarif/table) and effectful sinks (file/cloud)",
   "keywords": [

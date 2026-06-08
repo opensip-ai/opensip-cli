@@ -4,6 +4,52 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.0.0] — 2026-06-08
+
+**GA — the tool-plugin parity cutover.** The platform's single acceptance test
+(north-star §1) now answers **yes**: a first-party tool loads through the plugin
+path with behaviour identical to the bundled build. The privileged first-party
+paths the 2.x ladder built *alongside* the parity planes are removed, so the only
+thing distinguishing a bundled tool from an installed or project-local one is its
+**source of installation, never its lifecycle** (ADR-0027, realizing ADR-0012's
+3.0.0 reservation). All nine §8 completion invariants are live guardrails
+(`docs/internal/parity-invariant-index.md`).
+
+> **CLI users: nothing changes.** Every command, flag, `--json` shape (the 2.12.0
+> `CommandOutcome`), config file, and exit code is byte-identical to 2.13.0. The
+> breaking changes below are **author-facing only** — see
+> [Migrating to 3.0](docs/public/70-reference/11-migrating-to-3.0.md).
+
+### Removed (BREAKING — plugin authors)
+
+- **`Tool.register()` and the raw-Commander `program` handle** are gone from the
+  tool contract. A tool declares typed `commandSpecs` and the host mounts them —
+  the one command surface. A tool that mounted via `register()` must migrate to
+  `commandSpecs`; a handler can no longer reach raw Commander (it is gone from the
+  type).
+- **The `apiVersion` grace window.** A tool declaring no `apiVersion` is no longer
+  admitted off the `kind:'tool'` marker alone — it fail-closes (explicitly run) or
+  is skipped with a diagnostic (discovered). Declare `apiVersion` in the manifest.
+
+### Changed
+
+- **One unified tool loader.** Bundled tools load by package name through the same
+  `loadToolManifest → admitTool → dynamic import → register` path an installed or
+  project-local tool travels — the host holds no static `import { fitnessTool }`.
+  Install-source independence is now structural, not merely tested.
+
+### Added
+
+- **The acceptance test as CI** — `fit` (the strongest tool) loaded through the
+  plugin path is asserted identical to the bundled mount across all four commands.
+- **`no-bootstrap-tool-import`** guardrail (the host must not statically import a
+  tool runtime; 139 → 140 checks) + the **completion-invariant index** with a CI
+  assertion that every §8 invariant maps to a live check.
+
+The project leaves the long-lived pre-GA 2.x major for the **3.x GA line**. Future
+tools (`audit`/`lint`/`bench`) slot in by shipping a manifest + `commandSpecs`,
+inheriting every host-owned plane, with zero CLI change.
+
 ## [2.13.0] — 2026-06-08
 
 **Execution · Severity · the sim proof slice.** "Same words mean same semantics"

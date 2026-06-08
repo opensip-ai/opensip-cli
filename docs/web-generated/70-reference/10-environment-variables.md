@@ -16,9 +16,9 @@ related-docs:
 # Environment variables
 
 Every environment variable the CLI reads is declared as an `EnvVarSpec` and read
-through a single `EnvRegistry` (release 2.12.0, [ADR-0024](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/docs/decisions/ADR-0024-command-outcome-and-observability.md)),
+through a single `EnvRegistry` (release 2.12.0, [ADR-0024](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0024-command-outcome-and-observability.md)),
 so the surface is governed, coerced, and documented. The source of truth is
-`describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/packages/cli/src/env/host-env-specs.ts);
+`describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/env/host-env-specs.ts);
 the `env-via-registry` fitness check fails CI on any raw `process.env` read that
 bypasses the registry.
 

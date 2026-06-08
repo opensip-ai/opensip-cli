@@ -18,7 +18,7 @@ related-docs:
 **3.0.0 is the tool-plugin parity cutover.** The privileged first-party paths the
 2.x ladder built *alongside* the parity planes are removed, so a tool behaves
 identically whether it ships bundled, is installed from npm, or lives in a project
-([ADR-0027](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/docs/decisions/ADR-0027-ga-parity-cutover.md)). The breaking changes
+([ADR-0027](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0027-ga-parity-cutover.md)). The breaking changes
 are **author-facing only**.
 
 > **CLI users: nothing changes.** Every command, flag, `--json` shape

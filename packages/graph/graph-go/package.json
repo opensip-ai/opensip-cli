@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/graph-go",
-  "version": "2.13.0",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "Go language adapter for the opensip-tools graph engine",
   "keywords": [

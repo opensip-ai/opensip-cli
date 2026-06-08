@@ -17,7 +17,7 @@ related-docs:
 
 **2.12.0 lands one breaking change in the pre-GA 2.x line:** `--json` now emits a
 `CommandOutcome` wrapper instead of the bare result. The project stays pre-GA on
-the long-lived 2.x major ([ADR-0012](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/docs/decisions/ADR-0012-versioning-and-release-policy.md));
+the long-lived 2.x major ([ADR-0012](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0012-versioning-and-release-policy.md));
 breaking changes batch into 2.x minors, exactly as the 2.7.0 `--json` change did.
 Everything else in this release — a diagnostics bus, a governed environment
 surface — is additive.

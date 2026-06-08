@@ -15,7 +15,7 @@ related-docs:
 ---
 # JSON output schema
 
-`opensip-tools fit --json`, `opensip-tools sim --json`, and `opensip-tools graph --json` all emit **one `CommandOutcome` wrapper on stdout** (release 2.12.0, [ADR-0024](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/docs/decisions/ADR-0024-command-outcome-and-observability.md)). The **byte-identical `SignalEnvelope` rides under `.envelope`**; list/dashboard commands carry their result under `.data`; a failure carries structured `errors`. This is the contract surface for CI integrations.
+`opensip-tools fit --json`, `opensip-tools sim --json`, and `opensip-tools graph --json` all emit **one `CommandOutcome` wrapper on stdout** (release 2.12.0, [ADR-0024](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0024-command-outcome-and-observability.md)). The **byte-identical `SignalEnvelope` rides under `.envelope`**; list/dashboard commands carry their result under `.data`; a failure carries structured `errors`. This is the contract surface for CI integrations.
 
 > **2.12.0 breaking change.** Before 2.12.0, `--json` emitted the bare `SignalEnvelope` at the top level. It is now nested under `.envelope` of a `CommandOutcome`. Read `.envelope.verdict.passed` where you previously read `.verdict.passed` (and `.data` for list/dashboard, `.errors` for failures). The inner envelope is unchanged. See [Migrating to 2.12](/docs/opensip-tools/70-reference/09-migrating-to-2.12/).
 
@@ -29,9 +29,9 @@ related-docs:
 }
 ```
 
-`CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/dashboard command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload.
+`CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/dashboard command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload.
 
-The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope.
+The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope.
 
 > **Stability:** the `schemaVersion: 2` field on the envelope is the output-contract version (independent of any package version). Adding optional fields is a minor change; removing or changing types is a major change.
 
@@ -133,7 +133,7 @@ A **unit** is the neutral umbrella over a fit check, a graph rule, and a sim sce
 
 ### `Signal`
 
-Each entry in `signals[]` is a `Signal` ([`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/packages/core/src/types/signal.ts)). This is the richer shape that replaced the lossy `FindingOutput`: it carries 4-level severity, a `category`, a `provider`, a `fingerprint`, and a fix hint with confidence.
+Each entry in `signals[]` is a `Signal` ([`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/types/signal.ts)). This is the richer shape that replaced the lossy `FindingOutput`: it carries 4-level severity, a `category`, a `provider`, a `fingerprint`, and a fix hint with confidence.
 
 ```jsonc
 {
@@ -186,7 +186,7 @@ The line and column are **1-based** to match SARIF and most editor conventions. 
 All three tools emit the **same envelope**; the differences are confined to a few fields:
 
 - **`fit`** — `tool: "fit"`; each unit is a check (`slug` = check slug); signal `ruleId` is `fit:<slug>`. Units carry the fitness-only `filesValidated` / `itemType` / `ignoredCount`.
-- **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/packages/graph/engine/src/cli/build-envelope.ts).
+- **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/cli/build-envelope.ts).
 - **`sim`** — `tool: "sim"`; each unit is a scenario (`slug` = scenario id, `error` set when a scenario errored). `sim --json` now emits this envelope too — the old bespoke `sim-done` JSON shape is retired.
 
 > **Per-kind sim detail** (load p99, chaos recovery time) is **not** in the envelope. It lives in the session's `session_tool_payload` row persisted to the project-local SQLite store (`<project>/opensip-tools/.runtime/datastore.sqlite`) via `SessionRepo`. The dashboard reads the session record for the deeper view.
