@@ -28,9 +28,7 @@
  * gracefully when an adapter omits a given hint.
  */
 
-import { createSignal } from '@opensip-tools/core';
-
-import { applySeverityOverride } from './_severity-override.js';
+import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { FeatureTable, FunctionOccurrence, Indexes, RuleHints } from '../types.js';
@@ -84,11 +82,9 @@ export const noSideEffectPathRule = defineRule({
       if (anyEffecting) continue;
       if (!hasDiscardedCaller(occ, indexes)) continue;
       signals.push(
-        createSignal({
-          source: 'graph',
-          severity: applySeverityOverride('low', 'graph:no-side-effect-path', config),
+        createGraphSignal('graph:no-side-effect-path', config, {
+          severity: 'low',
           category: 'quality',
-          ruleId: 'graph:no-side-effect-path',
           message: `${occ.simpleName} is pure but at least one caller discards its return value, so the call has no observable effect.`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion: 'Either consume the return value at the call site, or remove the call.',

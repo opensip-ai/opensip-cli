@@ -8,11 +8,9 @@
  * the graph (their module-init is its own entry by name-match).
  */
 
-import { createSignal } from '@opensip-tools/core';
-
 import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
-import { applySeverityOverride } from './_severity-override.js';
+import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { Catalog, FeatureTable, GraphConfig, Indexes } from '../types.js';
@@ -48,12 +46,9 @@ export const orphanSubtreeRule = defineRule({
       // commands), not called by name — a missing caller edge is expected.
       if (occ.decorators.length > 0) continue;
       orphans.push(
-        createSignal({
-          source: 'graph',
-          provider: 'opensip-tools',
-          severity: applySeverityOverride('medium', 'graph:orphan-subtree', config),
+        createGraphSignal('graph:orphan-subtree', config, {
+          severity: 'medium',
           category: 'quality',
-          ruleId: 'graph:orphan-subtree',
           message: `${occ.simpleName} is not reachable from any inferred entry point.${caveat}`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion: 'Either delete the function, mark it as an entry point in opensip-tools.config.yml, or add a caller.',

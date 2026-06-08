@@ -26,11 +26,9 @@
  * (ADR-0005).
  */
 
-import { createSignal } from '@opensip-tools/core';
-
 import { pkgOf } from '../resolve-callee.js';
 
-import { applySeverityOverride } from './_severity-override.js';
+import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { FunctionOccurrence, Indexes, SccFeatures } from '../types.js';
@@ -66,11 +64,9 @@ export const cycleRule = defineRule({
       // meaningful (more than one package) when the SCC crosses packages.
       const spannedPackages = scc.crossesPackages ? packagesOf(scc, indexes) : undefined;
       signals.push(
-        createSignal({
-          source: 'graph',
-          severity: applySeverityOverride(base, 'graph:cycle', config),
+        createGraphSignal('graph:cycle', config, {
+          severity: base,
           category: 'architecture',
-          ruleId: 'graph:cycle',
           message: `${anchor.simpleName} is part of a ${String(scc.sccSize)}-function call cycle${scc.crossesPackages ? ' spanning multiple packages' : ''}.`,
           code: { file: anchor.filePath, line: anchor.line, column: anchor.column },
           suggestion: 'Break the cycle: invert one dependency or extract the shared piece.',

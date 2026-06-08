@@ -5,7 +5,7 @@
  * applySeverityOverride(...) })` shape (modulo the generated id/timestamp).
  */
 
-import { createSignal } from '@opensip-tools/core';
+import { createSignal, type Signal } from '@opensip-tools/core';
 import { describe, it, expect } from 'vitest';
 
 import { applySeverityOverride } from '../_severity-override.js';
@@ -24,8 +24,8 @@ const BODY = {
 };
 
 /** Strip the non-deterministic fields (generated id + timestamp) for comparison. */
-function stable(signal: Record<string, unknown>): Record<string, unknown> {
-  const copy = { ...signal };
+function stable(signal: Signal): Record<string, unknown> {
+  const copy: Record<string, unknown> = { ...signal };
   delete copy.id;
   delete copy.createdAt;
   return copy;

@@ -37,11 +37,9 @@
  *      targets, while keeping genuinely-small shared utilities visible.
  */
 
-import { createSignal } from '@opensip-tools/core';
-
 import { pkgOf } from '../resolve-callee.js';
 
-import { applySeverityOverride } from './_severity-override.js';
+import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { Catalog, FeatureTable, FunctionOccurrence, GraphConfig } from '../types.js';
@@ -92,11 +90,9 @@ export const duplicatedFunctionBodyRule = defineRule({
       // signals so a single duplicate group never double-reports.
       suppressedHashes.add(bodyHash);
       signals.push(
-        createSignal({
-          source: 'graph',
-          severity: applySeverityOverride('low', SLUG, config),
+        createGraphSignal(SLUG, config, {
+          severity: 'low',
           category: 'quality',
-          ruleId: SLUG,
           message: `This body is duplicated across ${String(packages.length)} packages (${packages.join(', ')}) in ${String(occs.length)} occurrences — hoist it into a shared package.`,
           code: { file: anchor.filePath, line: anchor.line, column: anchor.column },
           suggestion:
@@ -141,11 +137,9 @@ function emitPerInstanceSignals(
       /* v8 ignore next */
       if (!occ) continue;
       signals.push(
-        createSignal({
-          source: 'graph',
-          severity: applySeverityOverride('low', SLUG, config),
+        createGraphSignal(SLUG, config, {
+          severity: 'low',
           category: 'quality',
-          ruleId: SLUG,
           message: `${occ.simpleName} has the same body as ${primary.qualifiedName} (${primary.filePath}:${String(primary.line)}).`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion:

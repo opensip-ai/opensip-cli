@@ -19,9 +19,7 @@
  * (ADR-0005). Language-agnostic: every adapter emits `endLine`.
  */
 
-import { createSignal } from '@opensip-tools/core';
-
-import { applySeverityOverride } from './_severity-override.js';
+import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { FeatureTable, FunctionOccurrence } from '../types.js';
@@ -53,11 +51,9 @@ export const largeFunctionRule = defineRule({
       if (bodyLines <= warn) continue;
       const base = bodyLines > error ? 'high' : 'medium';
       signals.push(
-        createSignal({
-          source: 'graph',
-          severity: applySeverityOverride(base, 'graph:large-function', config),
+        createGraphSignal('graph:large-function', config, {
+          severity: base,
           category: 'quality',
-          ruleId: 'graph:large-function',
           message: `${occ.simpleName} is ${String(bodyLines)} lines long.`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion: 'Split this function into smaller units.',

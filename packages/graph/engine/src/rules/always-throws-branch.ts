@@ -23,9 +23,7 @@
  * v0.3.
  */
 
-import { createSignal } from '@opensip-tools/core';
-
-import { applySeverityOverride } from './_severity-override.js';
+import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { Signal } from '@opensip-tools/core';
@@ -52,11 +50,9 @@ export const alwaysThrowsBranchRule = defineRule({
       const everyCallIsThrow = occ.calls.every((e) => throwRegex.test(e.text));
       if (!everyCallIsThrow) continue;
       signals.push(
-        createSignal({
-          source: 'graph',
-          severity: applySeverityOverride('low', 'graph:always-throws-branch', config),
+        createGraphSignal('graph:always-throws-branch', config, {
+          severity: 'low',
           category: 'quality',
-          ruleId: 'graph:always-throws-branch',
           message: `${occ.simpleName} appears to always throw.`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion: 'Inline the throw at every caller, or document the precondition this function enforces.',

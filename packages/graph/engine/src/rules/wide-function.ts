@@ -15,9 +15,7 @@
  * (ADR-0005). Language-agnostic: every adapter emits `params`.
  */
 
-import { createSignal } from '@opensip-tools/core';
-
-import { applySeverityOverride } from './_severity-override.js';
+import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { Signal } from '@opensip-tools/core';
@@ -45,11 +43,9 @@ export const wideFunctionRule = defineRule({
       if (n <= warn) continue;
       const base = n > error ? 'high' : 'medium';
       signals.push(
-        createSignal({
-          source: 'graph',
-          severity: applySeverityOverride(base, 'graph:wide-function', config),
+        createGraphSignal('graph:wide-function', config, {
+          severity: base,
           category: 'quality',
-          ruleId: 'graph:wide-function',
           message: `${occ.simpleName} takes ${String(n)} parameters.`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion:
