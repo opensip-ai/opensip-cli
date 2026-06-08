@@ -67,6 +67,30 @@ export type {
   FindingLine,
 } from './command-results.js';
 
+// Command outcome — the OUTER currency wrapping every result and error (§5.5,
+// release 2.12.0). `CommandOutcome<T>` nests the unchanged `SignalEnvelope` under
+// `.envelope` (run) / the `CommandResult` under `.data` (list/dashboard) / errors
+// under `.errors` (incl. the pre-handler bootstrap path). The host ASSEMBLES it;
+// no tool chooses its own error JSON or success carrier. ADR-0024.
+export type {
+  CommandOutcome,
+  CommandOutcomeStatus,
+  ErrorDetail,
+  WarningDetail,
+  RenderHints,
+} from './command-outcome.js';
+
+// Run diagnostics — the shared, JSON-emittable diagnostics stream carried on a
+// `CommandOutcome` (§5.10). One event vocabulary across the uniform tool
+// lifecycle (discover → … → persist); produced by the scope-owned diagnostics
+// bus in @opensip-tools/core and attached by the host assembler.
+export type {
+  RunDiagnostics,
+  DiagnosticEvent,
+  DiagnosticPhase,
+  DiagnosticLevel,
+} from './run-diagnostics.js';
+
 // Canonical pass-rate (`score`) computation — shared by every tool that
 // builds a signal envelope so the dashboard "PASS RATE" stays consistent
 // across fit/graph and cannot drift back into per-tool formulas.
