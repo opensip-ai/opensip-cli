@@ -29,6 +29,8 @@
  */
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
+import { yamlDocBindings } from './_yaml-doc-bindings.js'
+
 /** First-party paths that read the opensip-tools config document (config pkg excluded). */
 const CONFIG_READER_PATH = /packages\/(?:cli|fitness|graph|simulation)\/(?:engine\/)?src\//
 
@@ -40,19 +42,6 @@ interface BlockBinding {
   readonly key: string
   readonly fields: Set<string>
   parsed: boolean
-}
-
-/**
- * Identifiers bound to a parsed YAML document in this file — `const <id> =
- * readYamlFile(...)` (or a sibling reader). Only a document-level block read OFF
- * one of these counts; a read off a request object, scope, etc. is ignored.
- */
-function yamlDocBindings(content: string): Set<string> {
-  const docs = new Set<string>()
-  const re =
-    /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:await\s+)?(?:readYamlFile|readYamlFileOrThrow|parseYaml|loadYaml)\s*\(/g
-  for (const m of content.matchAll(re)) docs.add(m[1])
-  return docs
 }
 
 /**
