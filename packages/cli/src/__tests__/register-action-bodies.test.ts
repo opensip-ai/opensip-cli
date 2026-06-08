@@ -1,14 +1,19 @@
 /**
- * Tests that exercise the action-body lambdas in each `register-*.ts`
- * Commander wiring file.
+ * Tests that exercise the action-body handlers of the host command specs
+ * (release 2.11.0 Phase 6 — `host-command-specs.ts`).
  *
- * `register-commands.test.ts` already confirms each registrar mounts the
- * correct subcommand + flags. The lambdas inside `mountResultCommand`
- * (the `handler` closure + the `jsonFlag` reader + small helpers like
- * `effectiveCwd`) only execute when Commander actually dispatches the
- * action, which the wiring tests never do. These tests fire each action
- * through `parseAsync` with a stub `ctx`, against mocked I/O functions,
- * so coverage attributes the lambda bodies back to the source files.
+ * `commands.test.ts` confirms `registerCliCommands` mounts the correct
+ * subcommands + flags. The handler closures (the `executeX` delegation + the
+ * `effectiveCwd` / `--json` short-circuit / exit-code logic) only execute when
+ * Commander dispatches the action. These tests fire each action through
+ * `parseAsync` with a stub `ctx`, against mocked I/O functions, so the handler
+ * bodies are covered.
+ *
+ * Host commands mount through the SAME `mountCommandSpec` plane the tools use.
+ * The specs are built+mounted by `mountHostCommands`; `init`'s former
+ * `getOptionValueSource('cwd')` recompute now reads `opts.cwdExplicit`, which
+ * the pre-action hook stashes in the real CLI — these tests set it directly to
+ * simulate the hook (the same way they set `projectContext`).
  */
 
 import { Command } from 'commander';
@@ -73,13 +78,9 @@ vi.mock('../commands/uninstall.js', () => ({
 import { executeClear } from '../commands/clear.js';
 import { executeConfigure } from '../commands/configure.js';
 import { showHistory } from '../commands/history.js';
+import { mountHostCommands } from '../commands/host-command-specs.js';
 import { executeInit } from '../commands/init.js';
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from '../commands/plugin.js';
-import { registerConfigure } from '../commands/register-configure.js';
-import { registerInit } from '../commands/register-init.js';
-import { registerPlugins } from '../commands/register-plugins.js';
-import { registerSessions } from '../commands/register-sessions.js';
-import { registerUninstall } from '../commands/register-uninstall.js';
 import { executeUninstall } from '../commands/uninstall.js';
 
 import type { CliCommandsContext } from '../commands/shared.js';
@@ -111,23 +112,41 @@ function makeCtx(): MakeCtxResult {
   return { ctx, rendered, setExitCode, datastore };
 }
 
+/** Mount the host commands and return the freshly-built program. */
+function mount(ctx: CliCommandsContext): Command {
+  const program = new Command('opensip-tools');
+  mountHostCommands(program, ctx);
+  return program;
+}
+
+/** Find a top-level command. */
+function topCmd(program: Command, name: string): Command {
+  const cmd = program.commands.find((c) => c.name() === name);
+  if (!cmd) throw new Error(`no command '${name}'`);
+  return cmd;
+}
+
+/** Find a sub-subcommand under a group. */
+function subCmd(program: Command, group: string, leaf: string): Command {
+  const child = topCmd(program, group).commands.find((c) => c.name() === leaf);
+  if (!child) throw new Error(`no '${group} ${leaf}'`);
+  return child;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// --- register-plugins ---------------------------------------------------------
+// --- plugin -------------------------------------------------------------------
 
-describe('registerPlugins — action bodies', () => {
+describe('plugin spec — action bodies', () => {
   it('plugin list: invokes pluginList with effectiveCwd (projectContext wins)', async () => {
-    const program = new Command('opensip-tools');
     const { ctx, rendered } = makeCtx();
-    registerPlugins(program, ctx);
+    const program = mount(ctx);
 
     // Attach a projectContext on the listCmd to simulate the pre-action
     // hook's mutation — effectiveCwd should prefer it over --cwd.
-    const pluginCmd = program.commands.find((c) => c.name() === 'plugin');
-    const listCmd = pluginCmd?.commands.find((c) => c.name() === 'list');
-    listCmd?.setOptionValue('projectContext', {
+    subCmd(program, 'plugin', 'list').setOptionValue('projectContext', {
       projectRoot: '/discovered/root',
       scope: 'project',
       walkedUp: 0,
@@ -140,9 +159,8 @@ describe('registerPlugins — action bodies', () => {
   });
 
   it('plugin list --json: short-circuits render and uses effectiveCwd with --cwd fallback', async () => {
-    const program = new Command('opensip-tools');
     const { ctx, rendered } = makeCtx();
-    registerPlugins(program, ctx);
+    const program = mount(ctx);
 
     const writes: string[] = [];
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation((c) => {
@@ -160,40 +178,36 @@ describe('registerPlugins — action bodies', () => {
   });
 
   it('plugin add: forwards the positional arg, --domain, and effectiveCwd', async () => {
-    const program = new Command('opensip-tools');
     const { ctx } = makeCtx();
-    registerPlugins(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['plugin', 'add', '@my-co/foo', '--cwd', '/p', '--domain', 'fit'], { from: 'user' });
     expect(pluginAdd).toHaveBeenCalledWith('@my-co/foo', '/p', 'fit', ctx.pluginLayouts, { project: false });
   });
 
   it('plugin remove: forwards the positional arg, --domain, and effectiveCwd', async () => {
-    const program = new Command('opensip-tools');
     const { ctx } = makeCtx();
-    registerPlugins(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['plugin', 'remove', '@my-co/foo', '--cwd', '/p', '--domain', 'sim'], { from: 'user' });
     expect(pluginRemove).toHaveBeenCalledWith('@my-co/foo', '/p', 'sim', ctx.pluginLayouts, { project: false });
   });
 
   it('plugin sync: forwards --domain and effectiveCwd', async () => {
-    const program = new Command('opensip-tools');
     const { ctx } = makeCtx();
-    registerPlugins(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['plugin', 'sync', '--cwd', '/p'], { from: 'user' });
     expect(pluginSync).toHaveBeenCalledWith('/p', undefined, ctx.pluginLayouts);
   });
 });
 
-// --- register-sessions --------------------------------------------------------
+// --- sessions -----------------------------------------------------------------
 
-describe('registerSessions — action bodies', () => {
+describe('sessions spec — action bodies', () => {
   it('sessions list: invokes showHistory with the datastore', async () => {
-    const program = new Command('opensip-tools');
     const { ctx, rendered, datastore } = makeCtx();
-    registerSessions(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['sessions', 'list'], { from: 'user' });
 
@@ -203,9 +217,8 @@ describe('registerSessions — action bodies', () => {
   });
 
   it('sessions purge: invokes executeClear with the parsed flags', async () => {
-    const program = new Command('opensip-tools');
     const { ctx } = makeCtx();
-    registerSessions(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['sessions', 'purge', '--older-than', '7', '--yes'], { from: 'user' });
 
@@ -215,9 +228,8 @@ describe('registerSessions — action bodies', () => {
   });
 
   it('sessions purge --json: emits JSON and skips render', async () => {
-    const program = new Command('opensip-tools');
     const { ctx, rendered } = makeCtx();
-    registerSessions(program, ctx);
+    const program = mount(ctx);
 
     const writes: string[] = [];
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation((c) => {
@@ -234,13 +246,12 @@ describe('registerSessions — action bodies', () => {
   });
 });
 
-// --- register-configure -------------------------------------------------------
+// --- configure ----------------------------------------------------------------
 
-describe('registerConfigure — action body', () => {
+describe('configure spec — action body', () => {
   it('configure: invokes executeConfigure and renders the result', async () => {
-    const program = new Command('opensip-tools');
     const { ctx, rendered } = makeCtx();
-    registerConfigure(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['configure'], { from: 'user' });
     expect(executeConfigure).toHaveBeenCalled();
@@ -248,9 +259,8 @@ describe('registerConfigure — action body', () => {
   });
 
   it('configure --json: short-circuits render', async () => {
-    const program = new Command('opensip-tools');
     const { ctx, rendered } = makeCtx();
-    registerConfigure(program, ctx);
+    const program = mount(ctx);
 
     const writes: string[] = [];
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation((c) => {
@@ -267,13 +277,12 @@ describe('registerConfigure — action body', () => {
   });
 });
 
-// --- register-init ------------------------------------------------------------
+// --- init ---------------------------------------------------------------------
 
-describe('registerInit — action body', () => {
+describe('init spec — action body', () => {
   it('init: invokes executeInit with parsed flags + cwdExplicit=false when default', async () => {
-    const program = new Command('opensip-tools');
     const { ctx, rendered } = makeCtx();
-    registerInit(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['init'], { from: 'user' });
     expect(executeInit).toHaveBeenCalledTimes(1);
@@ -285,10 +294,13 @@ describe('registerInit — action body', () => {
     expect(rendered).toHaveLength(1);
   });
 
-  it('init: cwdExplicit=true when --cwd is supplied on the CLI', async () => {
-    const program = new Command('opensip-tools');
+  it('init: cwdExplicit=true when the pre-action hook stashed it (—cwd typed on the CLI)', async () => {
     const { ctx } = makeCtx();
-    registerInit(program, ctx);
+    const program = mount(ctx);
+
+    // Simulate the pre-action hook: it stashes `cwdExplicit` on opts after
+    // computing `getOptionValueSource('cwd') === 'cli'`.
+    topCmd(program, 'init').setOptionValue('cwdExplicit', true);
 
     await program.parseAsync(['init', '--cwd', '/explicit'], { from: 'user' });
     const callArgs = vi.mocked(executeInit).mock.calls.at(-1)?.[0] as {
@@ -308,9 +320,8 @@ describe('registerInit — action body', () => {
       ambiguousLanguageError: { detected: [], message: 'ambiguous' },
     } as never);
 
-    const program = new Command('opensip-tools');
     const { ctx, setExitCode } = makeCtx();
-    registerInit(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['init'], { from: 'user' });
     expect(setExitCode).toHaveBeenCalledWith(2);
@@ -326,9 +337,8 @@ describe('registerInit — action body', () => {
       partialStateError: { state: 'fully-initialized', preExistingFiles: [], message: 'm' },
     } as never);
 
-    const program = new Command('opensip-tools');
     const { ctx, setExitCode } = makeCtx();
-    registerInit(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['init'], { from: 'user' });
     expect(setExitCode).toHaveBeenCalledWith(2);
@@ -344,18 +354,16 @@ describe('registerInit — action body', () => {
       insideExistingProject: { discoveredRoot: '/r', message: 'm' },
     } as never);
 
-    const program = new Command('opensip-tools');
     const { ctx, setExitCode } = makeCtx();
-    registerInit(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['init'], { from: 'user' });
     expect(setExitCode).toHaveBeenCalledWith(2);
   });
 
   it('init --json: short-circuits render and emits JSON', async () => {
-    const program = new Command('opensip-tools');
     const { ctx, rendered } = makeCtx();
-    registerInit(program, ctx);
+    const program = mount(ctx);
 
     const writes: string[] = [];
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation((c) => {
@@ -372,13 +380,12 @@ describe('registerInit — action body', () => {
   });
 });
 
-// --- register-uninstall -------------------------------------------------------
+// --- uninstall ----------------------------------------------------------------
 
-describe('registerUninstall — action body', () => {
+describe('uninstall spec — action body', () => {
   it('uninstall: forwards --yes / --dry-run to executeUninstall (user mode by default)', async () => {
-    const program = new Command('opensip-tools');
     const { ctx } = makeCtx();
-    registerUninstall(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['uninstall', '--yes', '--dry-run'], { from: 'user' });
     expect(executeUninstall).toHaveBeenCalledWith(
@@ -387,9 +394,8 @@ describe('registerUninstall — action body', () => {
   });
 
   it('uninstall --project (no value): forwards project=true', async () => {
-    const program = new Command('opensip-tools');
     const { ctx } = makeCtx();
-    registerUninstall(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['uninstall', '--project', '--yes'], { from: 'user' });
     expect(executeUninstall).toHaveBeenCalledWith(
@@ -398,9 +404,8 @@ describe('registerUninstall — action body', () => {
   });
 
   it('uninstall --project <path>: forwards project=<path>', async () => {
-    const program = new Command('opensip-tools');
     const { ctx } = makeCtx();
-    registerUninstall(program, ctx);
+    const program = mount(ctx);
 
     await program.parseAsync(['uninstall', '--project', '/var/opt/some-proj', '--yes'], { from: 'user' });
     expect(executeUninstall).toHaveBeenCalledWith(
@@ -409,9 +414,8 @@ describe('registerUninstall — action body', () => {
   });
 
   it('uninstall --json: short-circuits render', async () => {
-    const program = new Command('opensip-tools');
     const { ctx, rendered } = makeCtx();
-    registerUninstall(program, ctx);
+    const program = mount(ctx);
 
     const writes: string[] = [];
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation((c) => {

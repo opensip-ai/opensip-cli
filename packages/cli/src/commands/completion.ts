@@ -21,7 +21,22 @@
 
 import { commonFlags, type CommonFlagKey } from '@opensip-tools/contracts'
 
+import { buildHostCommandInventory } from './host-subcommand-groups.js'
+
 export type Shell = 'bash' | 'zsh' | 'fish'
+
+/** Subcommand-group sub-subcommand names, sourced from the live host
+ *  `CommandSpec`s (single source — release 2.11.0 Phase 6) rather than a second
+ *  hand-maintained list. Resolved lazily (inside the script builders) so this
+ *  module and `host-command-specs.ts` can import each other without a
+ *  load-order hazard. */
+function pluginSubcommands(): string {
+  return (buildHostCommandInventory().groupSubcommands.plugin ?? []).join(' ')
+}
+
+function sessionsSubcommands(): string {
+  return (buildHostCommandInventory().groupSubcommands.sessions ?? []).join(' ')
+}
 
 /** Long `--flag` form of each registry spec (short alias + arg placeholder
  *  stripped). Precomputed by mapping the registry entries, so completion's flag
@@ -114,6 +129,8 @@ function bashScript(): string {
   const simFlags = SIM_FLAGS.join(' ')
   const uninstFlags = UNINSTALL_FLAGS.join(' ')
   const commonFlags = COMMON_FLAGS.join(' ')
+  const pluginSubs = pluginSubcommands()
+  const sessionsSubs = sessionsSubcommands()
   return `# bash completion for opensip-tools
 # Source this file from ~/.bashrc or /etc/bash_completion.d/
 
@@ -134,8 +151,8 @@ _opensip_tools() {
     fit)       COMPREPLY=($(compgen -W "${fitFlags}" -- "\${cur}")) ;;
     sim)       COMPREPLY=($(compgen -W "${simFlags}" -- "\${cur}")) ;;
     uninstall) COMPREPLY=($(compgen -W "${uninstFlags}" -- "\${cur}")) ;;
-    plugin)    COMPREPLY=($(compgen -W "list add remove sync" -- "\${cur}")) ;;
-    sessions)  COMPREPLY=($(compgen -W "list purge" -- "\${cur}")) ;;
+    plugin)    COMPREPLY=($(compgen -W "${pluginSubs}" -- "\${cur}")) ;;
+    sessions)  COMPREPLY=($(compgen -W "${sessionsSubs}" -- "\${cur}")) ;;
     *)         COMPREPLY=($(compgen -W "${commonFlags}" -- "\${cur}")) ;;
   esac
   return 0
@@ -155,6 +172,8 @@ function zshScript(): string {
   const simFlags = SIM_FLAGS.join(' ')
   const uninstFlags = UNINSTALL_FLAGS.join(' ')
   const commonFlags = COMMON_FLAGS.join(' ')
+  const pluginSubs = pluginSubcommands()
+  const sessionsSubs = sessionsSubcommands()
   return `#compdef opensip-tools
 # zsh completion for opensip-tools
 # Source this file from your fpath (e.g. ~/.zsh/completions/_opensip-tools).
@@ -172,8 +191,8 @@ _opensip_tools() {
     fit)       _values 'flag' ${fitFlags} ;;
     sim)       _values 'flag' ${simFlags} ;;
     uninstall) _values 'flag' ${uninstFlags} ;;
-    plugin)    _values 'plugin subcommand' list add remove sync ;;
-    sessions)  _values 'sessions subcommand' list purge ;;
+    plugin)    _values 'plugin subcommand' ${pluginSubs} ;;
+    sessions)  _values 'sessions subcommand' ${sessionsSubs} ;;
     *)         _values 'flag' ${commonFlags} ;;
   esac
 }

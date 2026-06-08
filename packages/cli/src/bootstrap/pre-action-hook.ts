@@ -289,6 +289,12 @@ export function installPreActionHook(program: Command, version: string): void {
     //    `opts.project` is reserved for Commander's --project [path] flag
     //    in uninstall.ts; we never use that name here.
     (opts as Record<string, unknown>).projectContext = project;
+    // Stash the resolved "was --cwd typed on the CLI?" signal alongside it,
+    // so the `init` command-spec handler (release 2.11.0 Phase 6) reads ONE
+    // source instead of recomputing `getOptionValueSource('cwd')` on its own
+    // Commander command. `actionCommand` IS the init command here, so this is
+    // byte-identical to the former register-init computation.
+    (opts as Record<string, unknown>).cwdExplicit = cwdExplicit;
 
     // 4. Bailout window — each may process.exit(2) before any side
     //    effects. Phantom warn is non-fatal; warns then continues.

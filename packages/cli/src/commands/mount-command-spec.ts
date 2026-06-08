@@ -48,6 +48,33 @@ import type {
 export type HostCommandSpec<TOpts = Record<string, unknown>> = CommandSpec<TOpts, ToolCliContext>;
 
 /**
+ * The minimal context surface {@link mountCommandSpec} / {@link dispatchOutput}
+ * actually touch — the mount layer's structural dependency, decoupled from the
+ * full handler-facing context.
+ *
+ * `render` + `setExitCode` are used by EVERY command (the `command-result`
+ * dispatch arm and the thrown-`ToolError` exit-code path). `emitEnvelope` /
+ * `renderLive` are used ONLY by the `signal-envelope` / `live-view` arms, so
+ * they are optional here: a context that mounts only `command-result` /
+ * `raw-stream` commands (the CLI-owned HOST commands) need not provide them.
+ * `dispatchOutput` guards those arms and throws if the mode is requested without
+ * the corresponding emitter — a mis-declared host spec fails loudly rather than
+ * silently no-op'ing.
+ *
+ * `ToolCliContext` (which provides all four as required members) is structurally
+ * assignable to this — so the existing tool-mount call sites pass unchanged. The
+ * generic `mountCommandSpec` lets host commands mount with a leaner context
+ * (`CliCommandsContext`) through the SAME plane, satisfying the 2.11.0 "one
+ * command surface" invariant (no two-tier privilege).
+ */
+export interface CommandMountContext {
+  readonly render: (result: CommandResult) => Promise<void>;
+  readonly setExitCode: (code: number) => void;
+  readonly emitEnvelope?: (envelope: unknown) => void;
+  readonly renderLive?: (key: string, args: unknown) => Promise<void>;
+}
+
+/**
  * Mount a declarative {@link CommandSpec} onto `program` as a fully wired
  * Commander command.
  *
@@ -68,10 +95,10 @@ export type HostCommandSpec<TOpts = Record<string, unknown>> = CommandSpec<TOpts
  * @param ctx     The per-invocation host context (render/envelope/live-view
  *                emitters, exit-code setter) — today's `ToolCliContext`.
  */
-export function mountCommandSpec(
+export function mountCommandSpec<TCtx extends CommandMountContext>(
   program: CliProgram,
-  spec: HostCommandSpec,
-  ctx: ToolCliContext,
+  spec: CommandSpec<unknown, TCtx>,
+  ctx: TCtx,
 ): void {
   const cmd = program.command(spec.name).description(spec.description);
   if (spec.aliases !== undefined && spec.aliases.length > 0) {
@@ -143,12 +170,12 @@ export function mountCommandSpec(
  *   - `live-view`       — the interactive Ink path: `ctx.renderLive(key, args)`
  *                         against the tool's registered renderer.
  */
-export async function dispatchOutput(
+export async function dispatchOutput<TCtx extends CommandMountContext>(
   result: unknown,
-  spec: HostCommandSpec,
+  spec: CommandSpec<unknown, TCtx>,
   opts: Record<string, unknown>,
   positionals: readonly unknown[],
-  ctx: ToolCliContext,
+  ctx: TCtx,
 ): Promise<void> {
   const jsonRequested = opts.json === true;
   switch (spec.output) {
@@ -161,9 +188,16 @@ export async function dispatchOutput(
     }
     case 'signal-envelope': {
       if (jsonRequested) {
+        if (ctx.emitEnvelope === undefined) {
+          throw new Error(
+            `mountCommandSpec: command '${spec.name}' declares output 'signal-envelope' ` +
+              'but the mount context provides no emitEnvelope (host commands are ' +
+              "'command-result' / 'raw-stream' only).",
+          );
+        }
         ctx.emitEnvelope(result);
       } else {
-        await ctx.render(result);
+        await ctx.render(result as CommandResult);
       }
       return;
     }
@@ -179,6 +213,13 @@ export async function dispatchOutput(
       // hook — sim under 'sim', graph under 'graph'). The host forwards the
       // parsed opts + trailing positionals as the args payload; the handler's
       // return value is unused for this mode (the Ink app owns rendering).
+      if (ctx.renderLive === undefined) {
+        throw new Error(
+          `mountCommandSpec: command '${spec.name}' declares output 'live-view' ` +
+            'but the mount context provides no renderLive (host commands are ' +
+            "'command-result' / 'raw-stream' only).",
+        );
+      }
       await ctx.renderLive(spec.name, { ...opts, _args: positionals });
       return;
     }

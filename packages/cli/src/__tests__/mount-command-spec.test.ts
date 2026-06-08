@@ -22,8 +22,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
-import type { HostCommandSpec } from '../commands/mount-command-spec.js';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { CommandMountContext, HostCommandSpec } from '../commands/mount-command-spec.js';
+import type { CommandResult } from '@opensip-tools/contracts';
+import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
 
 /** A Commander argParser reducer that accumulates repeated flag values into an array. */
 function accumulateReducer(raw: string, previous: unknown): string[] {
@@ -345,5 +346,111 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
     mountCommandSpec(program, spec, ctx);
 
     await expect(program.parseAsync(['bug'], { from: 'user' })).rejects.toThrow('unexpected');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Leaner CommandMountContext — the HOST-command path (release 2.11.0 Phase 6).
+// Host commands mount with a context that provides only `render` + `setExitCode`
+// (no `emitEnvelope` / `renderLive`); the generic mounter accepts it, the
+// command-result + raw-stream arms work, and the signal-envelope / live-view
+// arms throw loudly rather than silently no-op'ing.
+// ---------------------------------------------------------------------------
+
+interface LeanCtx {
+  ctx: CommandMountContext;
+  rendered: CommandResult[];
+  exitCodes: number[];
+}
+
+/** A context with ONLY the always-used mount members — the host-command shape. */
+function makeLeanCtx(): LeanCtx {
+  const rendered: CommandResult[] = [];
+  const exitCodes: number[] = [];
+  const ctx: CommandMountContext = {
+    render: (result: CommandResult) => {
+      rendered.push(result);
+      return Promise.resolve();
+    },
+    setExitCode: (code: number) => {
+      exitCodes.push(code);
+    },
+  };
+  return { ctx, rendered, exitCodes };
+}
+
+describe('mountCommandSpec — leaner host CommandMountContext', () => {
+  it('command-result: renders through a context with no emitEnvelope/renderLive', async () => {
+    const { ctx, rendered } = makeLeanCtx();
+    const program = new Command();
+    const spec: CommandSpec<unknown, CommandMountContext> = defineCommand({
+      name: 'hostlike',
+      description: 'host-style command',
+      commonFlags: ['json'],
+      scope: 'none',
+      output: 'command-result',
+      handler: () => ({ type: 'help' }),
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await program.parseAsync(['hostlike'], { from: 'user' });
+    expect(rendered).toEqual([{ type: 'help' }]);
+  });
+
+  it('raw-stream: the host renders nothing (handler owns IO), lean context fine', async () => {
+    const { ctx, rendered } = makeLeanCtx();
+    const program = new Command();
+    let ran = false;
+    const spec: CommandSpec<unknown, CommandMountContext> = defineCommand({
+      name: 'rawhost',
+      description: 'raw host command',
+      commonFlags: [],
+      scope: 'none',
+      output: 'raw-stream',
+      handler: () => {
+        ran = true;
+      },
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await program.parseAsync(['rawhost'], { from: 'user' });
+    expect(ran).toBe(true);
+    expect(rendered).toHaveLength(0);
+  });
+
+  it('signal-envelope under --json throws when the lean context lacks emitEnvelope', async () => {
+    const { ctx } = makeLeanCtx();
+    const program = new Command();
+    const spec: CommandSpec<unknown, CommandMountContext> = defineCommand({
+      name: 'envhost',
+      description: 'envelope host command',
+      commonFlags: ['json'],
+      scope: 'none',
+      output: 'signal-envelope',
+      handler: () => ({ ok: true }),
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await expect(
+      program.parseAsync(['envhost', '--json'], { from: 'user' }),
+    ).rejects.toThrow(/no emitEnvelope/);
+  });
+
+  it('live-view throws when the lean context lacks renderLive', async () => {
+    const { ctx } = makeLeanCtx();
+    const program = new Command();
+    const spec: CommandSpec<unknown, CommandMountContext> = defineCommand({
+      name: 'livehost',
+      description: 'live host command',
+      commonFlags: [],
+      scope: 'none',
+      output: 'live-view',
+      handler: () => undefined,
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await expect(
+      program.parseAsync(['livehost'], { from: 'user' }),
+    ).rejects.toThrow(/no renderLive/);
   });
 });
