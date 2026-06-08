@@ -34,6 +34,15 @@ import { join } from 'node:path'
 import { expectEnvelope } from './cli-acceptance-core.mjs'
 
 /**
+ * 2.12.0 (§5.5): `--json` is a `CommandOutcome` wrapper. Non-run command results
+ * (init / list / dashboard / plugin / sessions) ride under `.data`; run-command
+ * envelopes ride under `.envelope`. These unwrap the inner payload, tolerating a
+ * bare shape too (forward/backward robustness — matches `expectEnvelope`).
+ */
+const cmdData = (parsed) => parsed?.data ?? parsed
+const cmdEnvelope = (parsed) => parsed?.envelope ?? parsed
+
+/**
  * Build the ordered packed-smoke scenario list.
  *
  * @param {object} opts
@@ -84,10 +93,11 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
         exitCode: 0,
         json: (parsed) => {
           const failures = []
-          if (parsed?.type !== 'init') failures.push(`init.type: expected "init", got ${JSON.stringify(parsed?.type)}`)
-          if (parsed?.created !== true) failures.push(`init.created: expected true, got ${JSON.stringify(parsed?.created)}`)
-          if (typeof parsed?.path !== 'string' || !parsed.path.endsWith('opensip-tools.config.yml')) {
-            failures.push(`init.path: expected a path ending in opensip-tools.config.yml, got ${JSON.stringify(parsed?.path)}`)
+          const data = cmdData(parsed)
+          if (data?.type !== 'init') failures.push(`init.type: expected "init", got ${JSON.stringify(data?.type)}`)
+          if (data?.created !== true) failures.push(`init.created: expected true, got ${JSON.stringify(data?.created)}`)
+          if (typeof data?.path !== 'string' || !data.path.endsWith('opensip-tools.config.yml')) {
+            failures.push(`init.path: expected a path ending in opensip-tools.config.yml, got ${JSON.stringify(data?.path)}`)
           }
           return failures
         },
@@ -116,9 +126,10 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
         exitCode: 1,
         json: (parsed) => {
           const failures = expectEnvelope({ tool: 'fit' })(parsed)
-          const total = parsed?.verdict?.summary?.total
+          const env = cmdEnvelope(parsed)
+          const total = env?.verdict?.summary?.total
           if (total !== 1) failures.push(`fit verdict.summary.total: expected 1, got ${JSON.stringify(total)}`)
-          const signals = Array.isArray(parsed?.signals) ? parsed.signals : []
+          const signals = Array.isArray(env?.signals) ? env.signals : []
           if (!signals.some((s) => s?.source === 'no-console-log')) {
             failures.push('fit signals: expected a no-console-log signal')
           }
@@ -134,11 +145,12 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
         exitCode: 0,
         json: (parsed) => {
           const failures = []
-          if (parsed?.type !== 'list-checks') {
-            failures.push(`list-checks.type: expected "list-checks", got ${JSON.stringify(parsed?.type)}`)
+          const data = cmdData(parsed)
+          if (data?.type !== 'list-checks') {
+            failures.push(`list-checks.type: expected "list-checks", got ${JSON.stringify(data?.type)}`)
           }
-          if (typeof parsed?.totalCount !== 'number' || parsed.totalCount <= 0) {
-            failures.push(`list-checks.totalCount: expected > 0, got ${JSON.stringify(parsed?.totalCount)}`)
+          if (typeof data?.totalCount !== 'number' || data.totalCount <= 0) {
+            failures.push(`list-checks.totalCount: expected > 0, got ${JSON.stringify(data?.totalCount)}`)
           }
           // Guardrail (P1-1): a packed `opensip-tools` install must bundle every
           // language check pack it advertises (README/FAQ/CLAUDE/checks-index all
@@ -148,7 +160,7 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
           // pack so a pack dropped from cli/package.json fails the release gate
           // instead of silently shipping a TS-only CLI.
           const slugs = new Set(
-            Array.isArray(parsed?.checks) ? parsed.checks.map((c) => c?.slug) : [],
+            Array.isArray(data?.checks) ? data.checks.map((c) => c?.slug) : [],
           )
           const requiredByPack = {
             'checks-python': 'python-no-bare-except',
@@ -185,10 +197,11 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
         exitCode: 0,
         json: (parsed) => {
           const failures = []
-          if (parsed?.type !== 'dashboard') {
-            failures.push(`dashboard.type: expected "dashboard", got ${JSON.stringify(parsed?.type)}`)
+          const data = cmdData(parsed)
+          if (data?.type !== 'dashboard') {
+            failures.push(`dashboard.type: expected "dashboard", got ${JSON.stringify(data?.type)}`)
           }
-          if (parsed?.opened !== false) failures.push(`dashboard.opened: expected false, got ${JSON.stringify(parsed?.opened)}`)
+          if (data?.opened !== false) failures.push(`dashboard.opened: expected false, got ${JSON.stringify(data?.opened)}`)
           return failures
         },
       },
@@ -209,7 +222,7 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
       timeout: 120_000,
       expect: {
         exitCode: 0,
-        json: (parsed) => (parsed?.success === true ? [] : [`plugin-add.success: expected true, got ${JSON.stringify(parsed?.success)} (${JSON.stringify(parsed?.error)})`]),
+        json: (parsed) => { const data = cmdData(parsed); return data?.success === true ? [] : [`plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`] },
       },
     },
     {
@@ -236,7 +249,7 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
       },
       expect: {
         exitCode: 0,
-        json: (parsed) => (parsed?.success === true ? [] : [`plugin-add.success: expected true, got ${JSON.stringify(parsed?.success)} (${JSON.stringify(parsed?.error)})`]),
+        json: (parsed) => { const data = cmdData(parsed); return data?.success === true ? [] : [`plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`] },
       },
     },
     {
@@ -248,9 +261,10 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
         exitCode: 1,
         json: (parsed) => {
           const failures = expectEnvelope({ tool: 'fit' })(parsed)
-          const total = parsed?.verdict?.summary?.total
+          const env = cmdEnvelope(parsed)
+          const total = env?.verdict?.summary?.total
           if (total !== 1) failures.push(`fit verdict.summary.total: expected 1, got ${JSON.stringify(total)}`)
-          const signals = Array.isArray(parsed?.signals) ? parsed.signals : []
+          const signals = Array.isArray(env?.signals) ? env.signals : []
           if (!signals.some((s) => s?.source === 'fit-pack-fixture-marker')) {
             failures.push('fit signals: expected a fit-pack-fixture-marker signal')
           }
