@@ -461,7 +461,7 @@ describe('buildHostCommandInventory', () => {
     // and reads each leaf's `name` — the single source the completion script
     // consumes for the `sessions` / `plugin` sub-subcommand lists (Phase 6 6.2).
     const inventory = buildHostCommandInventory();
-    expect(inventory.groupSubcommands.sessions).toEqual(['list', 'purge']);
+    expect(inventory.groupSubcommands.sessions).toEqual(['list', 'show', 'purge']);
     expect(inventory.groupSubcommands.plugin).toEqual(['list', 'add', 'remove', 'sync']);
     // Exactly the two documented action-less groups — no drift.
     expect(Object.keys(inventory.groupSubcommands).sort()).toEqual(['plugin', 'sessions']);

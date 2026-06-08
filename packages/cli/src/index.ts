@@ -29,6 +29,7 @@ import {
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore, setCliRegistriesForRun, setToolManifestsForRun, setToolProvenanceForRun } from './cli-context.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
+import { SessionReplayRegistry } from './session-replay-registry.js';
 import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';
 import { printWelcome } from './welcome.js';
 
@@ -101,11 +102,15 @@ async function main(): Promise<void> {
     .list()
     .map((t) => t.pluginLayout)
     .filter((l): l is NonNullable<typeof l> => l !== undefined);
+  const sessionReplayRegistry = SessionReplayRegistry.fromTools(toolRegistry);
   registerCliCommands(program, {
     setExitCode: ctx.setExitCode,
     render: renderResult,
+    emitJson: ctx.emitJson,
+    emitError: ctx.emitError,
     datastore: () => getOrOpenDatastore(logger),
     pluginLayouts,
+    sessionReplayRegistry,
   });
 
   // Bare `opensip-tools` → welcome screen. The update check is owned by the

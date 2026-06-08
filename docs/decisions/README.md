@@ -154,6 +154,16 @@ distinct from:
   namespaced schema. Composer core lands in 2.10.0; the migration of scattered
   config (`cli-config` out of `contracts`, shared targeting out of `fitness`,
   user-global I/O, path resolution, template) lands in a 2.10.1 follow-up
+- [ADR-0024](./ADR-0024-command-outcome-and-observability.md) — Every `--json`
+  result and error is wrapped in one outer `CommandOutcome` (envelope under
+  `.envelope`, command result under `.data`, structured `.errors`), assembled by
+  the host through a single `renderOutcome` seam; adds the scope-owned
+  `RunDiagnostics` bus, a governed `EnvRegistry`, and the `cli.emitError` seam
+- [ADR-0025](./ADR-0025-session-replay-contract.md) — A stored session is
+  replayed (not re-executed) via one shared structural decoder
+  (`decodeSessionPayload` in `session-store`) plus a per-tool `sessionReplay`
+  projection (new `Tool` contract member); surfaced as `sessions show` / `--show`
+  and routed through the `CommandOutcome` seam
 
 ### Superseded
 

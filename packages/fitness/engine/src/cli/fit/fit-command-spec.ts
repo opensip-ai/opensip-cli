@@ -22,6 +22,7 @@ import {
   runListMode,
   runLiveMode,
   runRecipesMode,
+  runShowMode,
 } from '../fit-modes.js';
 
 import type { FitOptions } from '@opensip-tools/contracts';
@@ -56,6 +57,10 @@ async function runFit(
   // drives the detail body. The deprecation note surfaces through the run's
   // warnings channel (not a raw stderr write — ADR-0011).
   if (opts.findings === true) opts.verbose = true;
+  if (opts.show !== undefined && opts.show.length > 0) {
+    await runShowMode(opts, cli);
+    return;
+  }
   if (opts.gateSave === true || opts.gateCompare === true) {
     await runGateMode(opts, cli);
     return;
@@ -117,6 +122,11 @@ export function buildFitCommandSpec(
         flag: '--config',
         value: '<path>',
         description: 'Path to opensip-tools.config.yml (overrides package.json pointer and default)',
+      },
+      {
+        flag: '--show',
+        value: '<session>',
+        description: 'Replay a stored fit session by id, or latest for the latest fit session',
       },
       {
         flag: '--gate-save',

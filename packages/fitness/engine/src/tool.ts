@@ -65,6 +65,7 @@ import {
   createRecipeRegistry,
   currentCheckRegistry,
 } from './framework/scope-registry.js';
+import { fitReplayFromSession } from './persistence/session-replay.js';
 import { FIT_PLUGIN_LAYOUT } from './plugins/loader.js';
 // Side-effect import: ensures the RunScope.fitness augmentation is loaded so
 // `scope.fitness` is the correctly-typed slot here.
@@ -208,6 +209,10 @@ export const fitnessTool: Tool = {
   commandSpecs: fitCommandSpecs,
   contributeScope,
   collectDashboardData: collectFitnessDashboardData,
+  sessionReplay: {
+    tool: 'fit',
+    replaySession: fitReplayFromSession,
+  },
   // ADR-0023 Phase 4: fitness contributes its namespaced `fitness:` Zod schema
   // (gate thresholds, disabledChecks, recipe) so the host composes +
   // strict-validates the whole config document before dispatch. Shared

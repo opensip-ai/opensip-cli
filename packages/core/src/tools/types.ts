@@ -30,6 +30,7 @@ import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 
 import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
 import type { CommandSpec } from './command-spec.js';
+import type { ToolShortId } from './ids.js';
 import type { Logger } from '../lib/logger.js';
 import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
 import type { PluginLayout } from '../plugins/types.js';
@@ -60,6 +61,30 @@ export interface ToolCommandDescriptor {
   readonly name: string;
   readonly description: string;
   readonly aliases?: readonly string[];
+}
+
+/** Generic stored-session shape accepted by tool replay hooks.
+ *
+ * This mirrors `@opensip-tools/contracts` `StoredSession` structurally without
+ * importing contracts into core. The CLI passes hydrated session-store rows;
+ * tools narrow their opaque payloads inside their own replay builders.
+ */
+export interface ToolSessionRecord {
+  readonly id: string;
+  readonly tool: ToolShortId;
+  readonly timestamp: string;
+  readonly cwd: string;
+  readonly recipe?: string;
+  readonly score: number;
+  readonly passed: boolean;
+  readonly durationMs: number;
+  readonly payload?: unknown;
+}
+
+/** Optional tool contribution for host-owned `sessions show` replay. */
+export interface ToolSessionReplayContribution {
+  readonly tool: ToolShortId;
+  readonly replaySession: (stored: ToolSessionRecord) => unknown;
 }
 
 /**
@@ -230,6 +255,13 @@ export interface ToolCliContext {
     readonly message: string;
     readonly exitCode: number;
     readonly suggestion?: string;
+    /**
+     * Optional machine-readable error category (e.g. `'not-found'`,
+     * `'decode-error'`). The host surfaces it as the structured
+     * `ErrorDetail.code` so machine consumers can branch on the failure kind
+     * without parsing `message`.
+     */
+    readonly code?: string;
   }) => void;
   /**
    * Deliver a tool-run **signal envelope** to the effectful sinks the
@@ -436,6 +468,16 @@ export interface Tool {
   readonly collectDashboardData?: (
     scope: ToolScope,
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
+  /**
+   * Optional session replay contribution. The CLI owns the generic
+   * `sessions show` command, while each tool owns decoding its opaque
+   * `StoredSession.payload` projection into renderable replay data.
+   *
+   * Core keeps the hook structural (`unknown` return) so it does not depend on
+   * `@opensip-tools/contracts`; the CLI narrows the returned value at the
+   * composition boundary.
+   */
+  readonly sessionReplay?: ToolSessionReplayContribution;
   /**
    * Optional namespaced config contribution (release 2.10.0, ADR-0023). A
    * tool owning a top-level block (`graph:`/`fitness:`/`simulation:`) declares

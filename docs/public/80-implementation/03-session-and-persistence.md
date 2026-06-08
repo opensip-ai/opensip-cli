@@ -130,6 +130,7 @@ The session is written via [`SessionRepo.save()`](../../../packages/session-stor
 
 ```bash
 opensip-tools sessions list                       # SELECT * FROM sessions ORDER BY timestamp DESC
+opensip-tools sessions show <id>                  # replay a stored session (or `latest --tool <fit|graph|sim>`)
 opensip-tools sessions purge                      # DELETE FROM sessions (prompts for confirm)
 opensip-tools sessions purge --older-than 7       # DELETE FROM sessions WHERE timestamp < cutoff
 opensip-tools sessions purge -y                   # skip the confirmation prompt
@@ -138,6 +139,8 @@ opensip-tools sessions purge -y                   # skip the confirmation prompt
 `purge` is **row-level data deletion**, not file removal. The FK cascade from `sessions` → `session_tool_payload` (`onDelete: 'cascade'`) ensures that purging a session drops its opaque payload row in one shot.
 
 The dashboard reads the same store to populate its run-history view.
+
+**Session replay (2.12.0).** `sessions show` (and the per-run `--show <session>` shorthand on `fit`/`graph`/`sim`) reconstructs a past run's output from its stored payload. The opaque payload is decoded back into its structural shape by the shared `decodeSessionPayload` in [`@opensip-tools/session-store`](../../../packages/session-store/src/session-payload-decode.ts) — persistence owns the structural decode but still holds **zero tool vocabulary**. Each tool then projects that structure into a `SignalEnvelope` via its `sessionReplay` contribution (`fit`/`graph`/`sim`), tagging the result `fidelity: 'projection'` (rebuilt from persisted findings, not re-executed). Failures (`not-found`, `wrong-tool`, `ambiguous-latest`, `decode-error`) surface as a structured `CommandOutcome` error with exit 2.
 
 ---
 

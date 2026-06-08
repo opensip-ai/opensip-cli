@@ -73,6 +73,18 @@ chooses its own error JSON or success carrier.
 - **`cli.emitError` seam** for tool handlers, retiring the bare `emitJson({ error })`.
 - **Three guardrails:** `one-outcome-shape`, `no-local-exit-or-stdout`,
   `env-via-registry` (133 → 136 checks).
+- **Session replay.** `opensip-tools sessions show <ref>` reconstructs a past
+  run's output from the stored session payload — `sessions show latest --tool fit`
+  (or an explicit id, optionally `--json`). Each run command also takes an inline
+  `--show <session>` shorthand (`fit --show latest`, `graph --show <id>`,
+  `sim --show latest`). Each tool contributes a `sessionReplay` projection that
+  decodes the opaque payload back into a `SignalEnvelope` (`fidelity: 'projection'`
+  — rebuilt from persisted findings, not re-executed). The shared structural
+  decoder lives in `@opensip-tools/session-store` (`decodeSessionPayload`); the
+  per-tool severity/category/id projection stays in each engine. A missing
+  session, wrong tool, or undecodable payload returns a structured `CommandOutcome`
+  error (`reason`/`code`: `not-found` / `wrong-tool` / `ambiguous-latest` /
+  `decode-error`) and exit 2.
 
 ## [2.11.0] — 2026-06-07
 

@@ -41,11 +41,15 @@ describe('history view', () => {
     const out = text({
       type: 'history',
       sessions: [
-        { id: '1', timestamp: '2026-01-01T00:00:00.000Z', score: 95, passed: true, durationMs: 1500, recipe: 'example', payload: { summary: { passed: 9, total: 10 } } } as never,
-        { id: '2', timestamp: '2026-01-02T00:00:00.000Z', score: 40, passed: false, durationMs: 500, payload: {} } as never,
+        { id: 'FIT_1', tool: 'fit', timestamp: '2026-01-01T00:00:00.000Z', score: 95, passed: true, durationMs: 1500, recipe: 'example', payload: { summary: { passed: 9, total: 10 } }, showCommand: 'opensip-tools sessions show FIT_1 --json' } as never,
+        { id: 'GRAPH_2', tool: 'graph', timestamp: '2026-01-02T00:00:00.000Z', score: 40, passed: false, durationMs: 500, payload: {}, showCommand: 'opensip-tools sessions show GRAPH_2 --json' } as never,
       ],
     });
     expect(out).toContain('Run History (2 sessions)');
+    expect(out).toContain('FIT_1');
+    expect(out).toContain('fit');
+    expect(out).toContain('GRAPH_2');
+    expect(out).toContain('graph');
     expect(out).toContain('95%');
     expect(out).toContain('PASS');
     expect(out).toContain('9/10 checks');

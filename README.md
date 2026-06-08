@@ -166,6 +166,7 @@ opensip-tools init --remove         # re-init, blow away opensip-tools/ first
 opensip-tools configure             # set up OpenSIP Cloud API key (interactive)
 opensip-tools dashboard             # HTML report — opens in browser
 opensip-tools sessions list         # run history
+opensip-tools sessions show latest --tool fit   # replay a stored run
 opensip-tools sessions purge        # delete session data (prompts for confirm)
 ```
 
@@ -648,6 +649,7 @@ The dashboard shows:
 
 ```bash
 opensip-tools sessions list                  # Show run history
+opensip-tools sessions show <id>             # Replay a stored session (or `latest --tool fit`)
 opensip-tools sessions purge                 # Delete all sessions (prompts y/n)
 opensip-tools sessions purge --older-than 7  # Delete sessions older than 7 days
 opensip-tools sessions purge --yes           # Skip confirmation

@@ -377,6 +377,7 @@ export function buildToolCliContext(
           message: detail.message,
           exitCode: detail.exitCode,
           ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
+          ...(detail.code === undefined ? {} : { code: detail.code }),
         }),
         { jsonRequested: true, render: opts.render },
       );

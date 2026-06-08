@@ -118,12 +118,20 @@ export function outcomeFromErrorMessage(opts: {
   readonly message: string;
   readonly exitCode: number;
   readonly suggestion?: string;
+  /** Optional machine-readable error category, surfaced as `ErrorDetail.code`. */
+  readonly code?: string;
   readonly kind?: string;
 }): CommandOutcome {
   return withDiagnostics({
     kind: opts.kind ?? 'command.error',
     status: 'error',
     exitCode: opts.exitCode,
-    errors: [{ message: opts.message, ...(opts.suggestion ? { suggestion: opts.suggestion } : {}) }],
+    errors: [
+      {
+        message: opts.message,
+        ...(opts.suggestion ? { suggestion: opts.suggestion } : {}),
+        ...(opts.code ? { code: opts.code } : {}),
+      },
+    ],
   });
 }

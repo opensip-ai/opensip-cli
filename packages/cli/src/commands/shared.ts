@@ -10,6 +10,7 @@
  * the shared context type.
  */
 
+import type { SessionReplayRegistry } from '../session-replay-registry.js';
 import type { CommandResult } from '@opensip-tools/contracts';
 import type { PluginLayout } from '@opensip-tools/core';
 
@@ -23,6 +24,27 @@ export interface CliCommandsContext {
   readonly setExitCode: (code: number) => void;
   readonly render: (result: CommandResult) => Promise<void>;
   /**
+   * Success machine-output seam — wraps the value in a `CommandOutcome` via the
+   * single `renderOutcome` seam (2.12.0, §5.5). Always supplied by the host
+   * (sourced from {@link ToolCliContext.emitJson}); required so raw-stream host
+   * commands (`sessions show`) never fall back to a direct `process.stdout.write`.
+   */
+  readonly emitJson: (value: unknown) => void;
+  /**
+   * Structured-error machine-output seam (2.12.0, §5.5) — the host-command
+   * mirror of {@link ToolCliContext.emitError}. A failed `--json` host command
+   * (e.g. `sessions show`) emits its diagnosed failure through here so it rides
+   * the single `renderOutcome` seam as a `status:'error'` `CommandOutcome`,
+   * never a bare `emitJson({ error })`. Sourced from the same context closure as
+   * the tool seam, so exit code and reported outcome stay in agreement.
+   */
+  readonly emitError: (detail: {
+    readonly message: string;
+    readonly exitCode: number;
+    readonly suggestion?: string;
+    readonly code?: string;
+  }) => void;
+  /**
    * Project-local plugin layouts contributed by the registered tools
    * (each tool's `Tool.pluginLayout`). The `plugin` command reads these
    * to know which domains support project-local plugins instead of
@@ -30,6 +52,7 @@ export interface CliCommandsContext {
    * tools remain the single source of truth (ADR-0009 corollary 1).
    */
   readonly pluginLayouts: readonly PluginLayout[];
+  readonly sessionReplayRegistry?: SessionReplayRegistry;
   /**
    * v2 persistence accessor (thunk). Calling this returns the project-local
    * DataStore, opening it lazily on first access. Commands that don't read

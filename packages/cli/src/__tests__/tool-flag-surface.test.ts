@@ -96,7 +96,7 @@ const EXPECTED: Record<string, string[]> = {
     // of the real surface; the spec-based recorder records it faithfully.
     '--api-key', '--check', '--config', '--cwd', '--debug', '--exclude',
     '--findings', '--gate-compare', '--gate-save', '--json', '--list', '--open',
-    '--out', '--quiet', '--recipe', '--recipes', '--report-to', '--tags',
+    '--out', '--quiet', '--recipe', '--recipes', '--report-to', '--show', '--tags',
     '--verbose',
   ],
   graph: [
@@ -118,12 +118,12 @@ const EXPECTED: Record<string, string[]> = {
     '--debug', '--gate-compare', '--gate-save', '--git-sha', '--json',
     '--language', '--list-files', '--mode', '--no-cache', '--out',
     '--output-sarif', '--profile', '--quiet', '--recipe', '--repo-id',
-    '--report-to', '--resolution', '--run-id', '--sarif', '--tenant-id',
+    '--report-to', '--resolution', '--run-id', '--sarif', '--show', '--tenant-id',
     '--verbose', '--workspace',
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
   // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).
-  simulation: ['--api-key', '--cwd', '--debug', '--json', '--open', '--quiet', '--recipe', '--report-to', '--verbose'],
+  simulation: ['--api-key', '--cwd', '--debug', '--json', '--open', '--quiet', '--recipe', '--report-to', '--show', '--verbose'],
 };
 
 describe('first-party tool flag-surface contract', () => {

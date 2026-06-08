@@ -209,9 +209,20 @@ export interface ListRecipesResult {
   recipes: { name: string; description: string; checkCount: string }[];
 }
 
+export interface HistorySession extends StoredSession {
+  readonly summary?: {
+    readonly total: number;
+    readonly passed: number;
+    readonly failed: number;
+    readonly errors: number;
+    readonly warnings: number;
+  };
+  readonly showCommand: string;
+}
+
 export interface HistoryResult {
   type: 'history';
-  sessions: StoredSession[];
+  sessions: HistorySession[];
 }
 
 export interface DashboardResult {

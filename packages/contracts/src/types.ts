@@ -23,6 +23,8 @@ export interface FitOptions {
   quiet?: boolean;
   /** Open the HTML dashboard in the default browser after a successful run. */
   open?: boolean;
+  /** Replay a stored fit session by id, or `latest` for the latest fit session. */
+  show?: string;
   /** Architecture-gate: save the current run's findings as a baseline. Mutually exclusive with --gate-compare. */
   gateSave?: boolean;
   /** Architecture-gate: compare current findings against a saved baseline; exit 1 if regressions found. Mutually exclusive with --gate-save. */
@@ -69,4 +71,6 @@ export interface ToolOptions {
   reportTo?: string;
   /** `--api-key <key>` — auth for `--report-to`. */
   apiKey?: string;
+  /** Replay a stored tool session by id, or `latest` for the latest session for this tool. */
+  show?: string;
 }

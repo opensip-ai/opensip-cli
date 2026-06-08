@@ -41,6 +41,7 @@ import { graphCommandSpec } from './cli/graph/graph-command-spec.js';
 import { graphConfigDeclaration } from './cli/graph-config-schema.js';
 import { createAdapterRegistry, currentAdapterRegistry, getDiscoveredAdapters } from './lang-adapter/registry.js';
 import { CatalogRepo } from './persistence/catalog-repo.js';
+import { graphReplayFromSession } from './persistence/session-replay.js';
 import { createRecipeRegistry } from './recipes/registry.js';
 import { createRulesRegistry } from './rules/registry.js';
 // Side-effect import: ensures the RunScope.graph augmentation is
@@ -229,6 +230,10 @@ export const graphTool: Tool = {
   commandSpecs: graphCommandSpecs,
   contributeScope,
   collectDashboardData,
+  sessionReplay: {
+    tool: 'graph',
+    replaySession: graphReplayFromSession,
+  },
   // ADR-0023 Phase 4: graph contributes its namespaced `graph:` Zod schema so
   // the host composes + strict-validates the whole config document before
   // dispatch. The schema-bearing `ToolConfigDeclaration` narrows to the

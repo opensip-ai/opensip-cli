@@ -46,6 +46,8 @@ import React, { useEffect, useState } from 'react';
 
 import { executeSim } from './sim.js';
 
+import type { DataStore } from '@opensip-tools/datastore';
+
 const SIM_TOOL_TITLE = 'Simulation Scenarios';
 const SIM_TOOL_DESCRIPTION = 'Running simulation scenarios against your codebase.';
 const SIM_RUNNING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Running scenarios...' };
@@ -80,11 +82,13 @@ const NO_PROGRESS: (cb: (event: ProgressEvent) => void) => void = () => {
 function executeSimWithProgress(
   args: SimLiveArgs,
   emit: (event: ProgressEvent) => void,
+  datastore?: DataStore,
 ): ReturnType<typeof executeSim> {
   emit({ type: 'stage-start', stage: 'scenarios', label: 'Running scenarios...' });
   return executeSim(args, {
     onProgress: (completed, total) =>
       emit({ type: 'stage-progress', stage: 'scenarios', completed, total }),
+    ...(datastore === undefined ? {} : { datastore }),
   });
 }
 
@@ -95,11 +99,12 @@ export interface SimRunnerProps {
   readonly args: SimLiveArgs;
   readonly setExitCode?: (code: number) => void;
   readonly onEnvelope?: (envelope: SignalEnvelope) => void;
+  readonly datastore?: DataStore;
 }
 
 /** The sim live-view component (loading → running → done/error). Exported for
  *  testing; production renders it through {@link renderSimLive}. */
-export function SimRunner({ args, setExitCode, onEnvelope }: SimRunnerProps): React.ReactElement {
+export function SimRunner({ args, setExitCode, onEnvelope, datastore }: SimRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<SimState>({ phase: 'loading' });
 
@@ -110,7 +115,7 @@ export function SimRunner({ args, setExitCode, onEnvelope }: SimRunnerProps): Re
     // 'running' state carries the subscribe fn, set once the run starts.
     const transport = createInProcessTransport();
     const run = transport.run<ProgressEvent, Awaited<ReturnType<typeof executeSim>>>(
-      (emit) => executeSimWithProgress(args, emit),
+      (emit) => executeSimWithProgress(args, emit, datastore),
     );
     setState({ phase: 'running', subscribe: run.onProgress });
 
@@ -218,6 +223,7 @@ export function SimRunner({ args, setExitCode, onEnvelope }: SimRunnerProps): Re
 
 export interface RenderSimLiveOptions {
   readonly setExitCode?: (code: number) => void;
+  readonly datastore?: DataStore;
 }
 
 /**
@@ -237,6 +243,7 @@ export async function renderSimLive(
           args={args}
           setExitCode={options?.setExitCode}
           onEnvelope={(e) => { envelope = e; }}
+          datastore={options?.datastore}
         />
       </ClockProvider>
     </ThemeProvider>,
