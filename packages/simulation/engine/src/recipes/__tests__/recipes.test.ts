@@ -112,6 +112,45 @@ describe('SimulationRecipeService — parallel concurrency', () => {
 });
 
 // =============================================================================
+// SimulationRecipeService — execution.timeout (release 2.13.0, §4.3 fix)
+// =============================================================================
+
+describe('SimulationRecipeService — execution.timeout', () => {
+  it('ABORTS a runaway scenario via execution.timeout and reports it failed', async () => {
+    // A scenario that never resolves on its own — only the substrate's timeout
+    // abort can end it. Before 2.13.0 `execution.timeout` was silently ignored
+    // and this would hang forever.
+    const runaway: RunnableScenario = {
+      id: 'runaway',
+      name: 'runaway',
+      description: 'never resolves on its own',
+      kind: 'load',
+      tags: [],
+      run: (signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    };
+    currentScenarioRegistry().register(runaway);
+    const recipe = defineSimulationRecipe({
+      id: 'URCP_timeout',
+      name: 'timeout',
+      displayName: 'Timeout',
+      description: 'enforces a short timeout',
+      scenarios: { type: 'all' },
+      execution: { mode: 'sequential', timeout: 50 },
+    });
+
+    const result = await new SimulationRecipeService().runRecipe(recipe);
+
+    expect(result.totalScenarios).toBe(1);
+    expect(result.failedScenarios).toBe(1);
+    expect(result.scenarios[0]?.passed).toBe(false);
+    expect(result.scenarios[0]?.error).toContain('timed out after 50ms');
+  });
+});
+
+// =============================================================================
 // defineSimulationRecipe — shape validation
 // =============================================================================
 

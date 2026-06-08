@@ -14,7 +14,13 @@
  * RunnableScenario; recipes layer above that.
  */
 
-import { logger, resolveSelector as resolveSelectorCore, type ResolveSelectorOptions } from '@opensip-tools/core';
+import {
+  logger,
+  resolveSelector as resolveSelectorCore,
+  runWithTimeout,
+  scheduleUnits,
+  type ResolveSelectorOptions,
+} from '@opensip-tools/core';
 
 import { currentScenarioRegistry } from '../framework/registry.js';
 
@@ -95,9 +101,7 @@ export class SimulationRecipeService {
         }
       : undefined;
 
-    const results = recipe.execution.mode === 'parallel'
-      ? await runParallel(selected, recipe, this.config.abortSignal, onComplete)
-      : await runSequential(selected, recipe, this.config.abortSignal, onComplete);
+    const results = await runScenarios(selected, recipe, this.config.abortSignal, onComplete);
 
     const passedCount = results.filter((r) => r.passed).length;
     const out: SimulationRecipeResult = {
@@ -176,94 +180,98 @@ function resolveSelector(selector: ScenarioSelector): readonly RunnableScenario[
 }
 
 // =============================================================================
-// EXECUTION MODES
+// EXECUTION (on the shared substrate, release 2.13.0 §5.8)
 // =============================================================================
 
-async function runSingle(
+/**
+ * Sentinel timeout (the max `setTimeout` delay, ~24.8 days) used when a recipe
+ * declares no `execution.timeout` — preserving sim's historical "no timeout"
+ * behaviour while routing through the same substrate. A DECLARED timeout is
+ * enforced and aborts a runaway scenario (the §4.3 fix; previously the field was
+ * silently ignored).
+ */
+const NO_TIMEOUT_MS = 2_147_483_647;
+
+/** Effective concurrency: a positive bound below the set size, else run all at once. */
+function effectiveMaxParallel(recipe: SimulationRecipe, count: number): number {
+  const limit = recipe.execution.maxParallel;
+  return limit !== undefined && limit > 0 && limit < count ? limit : count;
+}
+
+/**
+ * Run one scenario on the substrate: a declared `timeout` aborts a runaway run,
+ * and the timeout's signal is combined with the service-level abort so external
+ * cancellation still reaches an in-flight scenario. Maps the classified outcome to
+ * a `SimulationScenarioResult` — a timed-out scenario fails (it did not pass),
+ * exactly as a thrown error does.
+ */
+async function runScenarioUnit(
   scenario: RunnableScenario,
+  timeoutMs: number,
   abortSignal?: AbortSignal,
 ): Promise<SimulationScenarioResult> {
-  const started = Date.now();
-  const signal = abortSignal ?? new AbortController().signal;
-  try {
-    const result = await scenario.run(signal);
-    return {
-      scenarioId: scenario.id,
-      scenarioName: scenario.name,
-      kind: scenario.kind,
-      // Propagate the executor's pass/fail verdict (computed from
-      // assertions or kind-specific predicates). A scenario whose run
-      // completed without throwing can still have failing assertions.
-      passed: result.passed,
-      durationMs: Date.now() - started,
-      result,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.warn({
-      evt: 'simulation.scenario.failed',
-      module: 'simulation:recipes',
-      scenarioId: scenario.id,
-      error: message,
-    });
-    return {
-      scenarioId: scenario.id,
-      scenarioName: scenario.name,
-      kind: scenario.kind,
-      passed: false,
-      durationMs: Date.now() - started,
-      error: message,
-    };
+  const outcome = await runWithTimeout({
+    run: (timeoutSignal) =>
+      scenario.run(abortSignal ? AbortSignal.any([timeoutSignal, abortSignal]) : timeoutSignal),
+    timeoutMs,
+  });
+
+  const base = {
+    scenarioId: scenario.id,
+    scenarioName: scenario.name,
+    kind: scenario.kind,
+    durationMs: outcome.durationMs,
+  };
+
+  if (outcome.status === 'ok') {
+    // Propagate the executor's pass/fail verdict (assertions / kind predicates):
+    // a run that completed without throwing can still have failing assertions.
+    return { ...base, passed: outcome.result.passed, result: outcome.result };
   }
+
+  let message: string;
+  if (outcome.status === 'timeout') {
+    message = `Scenario timed out after ${outcome.timeoutMs}ms`;
+  } else {
+    message = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
+  }
+  logger.warn({
+    evt: 'simulation.scenario.failed',
+    module: 'simulation:recipes',
+    scenarioId: scenario.id,
+    error: message,
+    timedOut: outcome.status === 'timeout',
+  });
+  return { ...base, passed: false, error: message };
 }
 
-async function runSequential(
+/**
+ * Run the selected scenarios through the shared scheduler (one loop for both
+ * modes). `maxParallel`/`stopOnFirstFailure` now mean the same thing they do in
+ * fitness — parallel mode honours `stopOnFirstFailure` (it previously ignored it).
+ * Results are written by array index so order is preserved across both modes.
+ */
+async function runScenarios(
   scenarios: readonly RunnableScenario[],
   recipe: SimulationRecipe,
   abortSignal?: AbortSignal,
   onComplete?: () => void,
 ): Promise<readonly SimulationScenarioResult[]> {
-  const out: SimulationScenarioResult[] = [];
-  for (const scenario of scenarios) {
-    if (abortSignal?.aborted) break;
-    const result = await runSingle(scenario, abortSignal);
-    out.push(result);
-    onComplete?.();
-    if (!result.passed && recipe.execution.stopOnFirstFailure === true) break;
-  }
-  return out;
-}
+  const timeoutMs = recipe.execution.timeout ?? NO_TIMEOUT_MS;
+  const results: (SimulationScenarioResult | undefined)[] = [];
 
-async function runParallel(
-  scenarios: readonly RunnableScenario[],
-  recipe: SimulationRecipe,
-  abortSignal?: AbortSignal,
-  onComplete?: () => void,
-): Promise<readonly SimulationScenarioResult[]> {
-  const limit = recipe.execution.maxParallel;
-  const runOne = async (s: RunnableScenario): Promise<SimulationScenarioResult> => {
-    const result = await runSingle(s, abortSignal);
-    onComplete?.();
-    return result;
-  };
-  // No bound configured (or a bound at/above the set size) → run them all at
-  // once, the historical behavior. A positive `maxParallel` caps the number of
-  // scenarios in flight via a fixed worker pool, honoring the recipe's
-  // declared concurrency ceiling (previously this option was ignored).
-  if (limit === undefined || limit <= 0 || limit >= scenarios.length) {
-    // @fitness-ignore-next-line no-unbounded-concurrency -- intentional run-all-at-once when no maxParallel is configured (the documented historical behavior); the bounded worker pool below is the capped path
-    return Promise.all(scenarios.map((s) => runOne(s)));
-  }
+  await scheduleUnits<RunnableScenario>({
+    units: scenarios,
+    mode: recipe.execution.mode,
+    maxParallel: effectiveMaxParallel(recipe, scenarios.length),
+    shouldAbort: () => abortSignal?.aborted === true,
+    runUnit: async (scenario, index) => {
+      const result = await runScenarioUnit(scenario, timeoutMs, abortSignal);
+      results[index] = result;
+      onComplete?.();
+      return { shouldStop: !result.passed && recipe.execution.stopOnFirstFailure === true };
+    },
+  });
 
-  const results: SimulationScenarioResult[] = [];
-  let next = 0;
-  // `next++` is atomic in single-threaded JS, so each worker claims a distinct
-  // index; results are written by index to preserve scenario order.
-  const worker = async (): Promise<void> => {
-    for (let i = next++; i < scenarios.length; i = next++) {
-      results[i] = await runOne(scenarios[i]);
-    }
-  };
-  await Promise.all(Array.from({ length: limit }, () => worker()));
-  return results;
+  return results.filter((r): r is SimulationScenarioResult => r !== undefined);
 }
