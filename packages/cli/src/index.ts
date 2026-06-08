@@ -41,7 +41,19 @@ const program = new Command('opensip-tools')
   // ADR-0008: per-run opt-out of OpenSIP Cloud signal sync. `--no-cloud` sets
   // `cloud` to false; the pre-action hook reads it via optsWithGlobals().
   .option('--no-cloud', 'Disable OpenSIP Cloud signal sync for this run')
-  .version(cliVersion);
+  .version(cliVersion)
+  // Route Commander's own parse failures through `parseAsync().catch` →
+  // `handleParseError` instead of letting Commander call `process.exit(N)`
+  // directly. This restores the project's typed-error → exit-code contract for
+  // declarative `choices`/argument validation: a bad `--resolution`/option
+  // value is a usage error that must exit `CONFIGURATION_ERROR` (2) — the same
+  // code the pre-command-plane in-handler `ValidationError` produced — not
+  // Commander's default `1`. `handleParseError` preserves Commander's own
+  // exit code for every OTHER Commander condition (unknown command/option →
+  // 1, --help/--version → 0), so only the invalid-argument case is re-mapped.
+  // Commander still writes its own error line to stderr before throwing, so the
+  // handler renders nothing extra for a CommanderError (no duplicate output).
+  .exitOverride();
 
 installPreActionHook(program, cliVersion);
 
