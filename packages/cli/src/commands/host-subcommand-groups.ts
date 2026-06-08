@@ -29,8 +29,10 @@ import {
 import { executeClear } from './clear.js';
 import { showHistory } from './history.js';
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from './plugin.js';
+import { executeSessionShow } from './session-show.js';
 
 import type { CliCommandsContext } from './shared.js';
+import type { ToolShortId } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 /** A host command spec — handler receives the {@link CliCommandsContext}. */
@@ -42,6 +44,8 @@ const PROJECT_SCOPE: CommandScopeRequirement = 'project';
 
 /** The `command-result` output mode, named once (the leaves all share it). */
 const COMMAND_RESULT: CommandSpec['output'] = 'command-result';
+
+const RAW_STREAM: CommandSpec['output'] = 'raw-stream';
 
 /** Prefer the discovered project root; fall back to literal cwd; finally process.cwd(). */
 export function effectiveCwd(opts: { cwd?: string; projectContext?: ProjectContext }): string {
@@ -57,10 +61,71 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
     name: 'list',
     description: 'List stored sessions',
     commonFlags: ['json'],
+    options: [
+      {
+        flag: '--tool',
+        value: '<name>',
+        description: 'Filter to one tool',
+        choices: ['fit', 'graph', 'sim'],
+      },
+      {
+        flag: '--limit',
+        value: '<n>',
+        description: 'Maximum sessions to return',
+        parse: parsePositiveInt,
+      },
+    ],
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
-    handler: () => showHistory(ctx.datastore() as DataStore),
+    handler: (rawOpts) => {
+      const opts = rawOpts as { tool?: ToolShortId; limit?: number };
+      return showHistory(ctx.datastore() as DataStore, {
+        tool: opts.tool,
+        limit: opts.limit,
+      });
+    },
   });
+}
+
+function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'show',
+    description: 'Display a stored session result',
+    commonFlags: ['json'],
+    args: [{ name: 'ref', description: 'Session id, or latest with --tool' }],
+    options: [
+      {
+        flag: '--tool',
+        value: '<name>',
+        description: 'Tool for latest, or an optional id sanity check',
+        choices: ['fit', 'graph', 'sim'],
+      },
+    ],
+    scope: PROJECT_SCOPE,
+    output: RAW_STREAM,
+    handler: async (rawOpts) => {
+      const opts = rawOpts as { _args: string[]; tool?: ToolShortId; json?: boolean };
+      const ref = opts._args[0];
+      await executeSessionShow({
+        datastore: ctx.datastore() as DataStore,
+        replayRegistry: ctx.sessionReplayRegistry,
+        ref,
+        tool: opts.tool,
+        json: opts.json,
+        render: ctx.render,
+        emitJson: ctx.emitJson,
+        setExitCode: ctx.setExitCode,
+      });
+    },
+  });
+}
+
+function parsePositiveInt(raw: string): number {
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n) || n <= 0) {
+    throw new Error(`Invalid --limit value: '${raw}'. Must be a positive integer.`);
+  }
+  return n;
 }
 
 /**
@@ -262,7 +327,7 @@ export function buildHostSubcommandGroups(ctx: CliCommandsContext): readonly Hos
     {
       name: 'sessions',
       description: 'Manage session data',
-      leaves: [buildSessionsListSpec(ctx), buildSessionsPurgeSpec(ctx)],
+      leaves: [buildSessionsListSpec(ctx), buildSessionsShowSpec(ctx), buildSessionsPurgeSpec(ctx)],
     },
     {
       name: 'plugin',

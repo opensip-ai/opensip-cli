@@ -18,7 +18,9 @@ import {
   mapToolErrorToExitCode,
   type FitOptions,
   type SignalEnvelope,
+  type StoredSession,
 } from '@opensip-tools/contracts';
+import { resolveSession } from '@opensip-tools/session-store';
 
 import {
   saveBaseline,
@@ -28,6 +30,7 @@ import {
   GateBaselineInvalidError,
 } from '../gate.js';
 import { FitBaselineRepo } from '../persistence/baseline-repo.js';
+import { fitReplayFromSession } from '../persistence/session-replay.js';
 
 import { executeFit } from './fit.js';
 import { listChecks } from './list-checks.js';
@@ -81,6 +84,35 @@ export async function runRecipesMode(args: FitOptions, cli: ToolCliContext): Pro
   const result = await listRecipes(args.cwd);
   if (args.json) { cli.emitJson(result); return; }
   await cli.render(result);
+}
+
+export async function runShowMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
+  const datastore = cli.scope.datastore() as DataStore | undefined;
+  if (datastore === undefined) {
+    await emitShowError(args, cli, 'datastore-unavailable', 'session replay requires a datastore');
+    return;
+  }
+  const resolved = resolveSession(datastore, { ref: args.show ?? 'latest', tool: 'fit' });
+  if (!resolved.ok) {
+    await emitShowError(args, cli, resolved.reason, resolved.detail);
+    return;
+  }
+
+  try {
+    const replay = fitReplayFromSession(resolved.session);
+    if (args.json) {
+      cli.emitJson(sessionShowJson(resolved.session, replay));
+      return;
+    }
+    await cli.render(replay.result);
+  } catch (error) {
+    await emitShowError(
+      args,
+      cli,
+      'decode-error',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 }
 
 /**
@@ -250,4 +282,42 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
     }
     throw error;
   }
+}
+
+async function emitShowError(
+  args: Pick<FitOptions, 'json'>,
+  cli: ToolCliContext,
+  reason: string,
+  detail: string,
+): Promise<void> {
+  cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+  if (args.json) {
+    cli.emitJson({ error: detail, reason });
+    return;
+  }
+  await cli.render({
+    type: 'error',
+    message: detail,
+    exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+  });
+}
+
+function sessionShowJson(
+  session: StoredSession,
+  replay: ReturnType<typeof fitReplayFromSession>,
+): unknown {
+  return {
+    session: {
+      id: session.id,
+      tool: session.tool,
+      timestamp: session.timestamp,
+      recipe: session.recipe,
+      cwd: session.cwd,
+      score: session.score,
+      passed: session.passed,
+      durationMs: session.durationMs,
+    },
+    fidelity: replay.fidelity,
+    envelope: replay.envelope,
+  };
 }

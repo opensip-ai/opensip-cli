@@ -52,6 +52,7 @@ export type {
   GraphStatusResult,
   ListChecksResult,
   ListRecipesResult,
+  HistorySession,
   HistoryResult,
   DashboardResult,
   InitResult,
@@ -138,7 +139,7 @@ export type { FindingGroupUnit } from './verbose-detail.js';
 // as the contract surface; SessionRepo + the sessions schema +
 // generateSessionId/sanitizeForFilename moved to @opensip-tools/session-store
 // (audit 2026-05-29, contracts split).
-export type { StoredSession } from './session-types.js';
+export type { StoredSession, ToolSessionReplay } from './session-types.js';
 
 // Graph catalog type surface. This is the contract surface between the
 // graph tool (which writes catalog.json) and the dashboard package

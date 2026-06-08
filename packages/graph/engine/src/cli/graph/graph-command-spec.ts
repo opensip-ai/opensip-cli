@@ -24,7 +24,9 @@
  * before the handler runs), so the handler trusts the parsed value.
  */
 
+import { EXIT_CODES, type StoredSession } from '@opensip-tools/contracts';
 import { defineCommand } from '@opensip-tools/core';
+import { resolveSession } from '@opensip-tools/session-store';
 
 import { resolveRecipeToRules } from '../../recipes/resolve.js';
 import { renderGraphLive } from '../graph-runner.js';
@@ -32,6 +34,7 @@ import { executeGraph } from '../graph.js';
 import { runHeapPreflight } from '../heap-preflight.js';
 import { executeListFiles } from '../list-files.js';
 import { loadGraphConfig, resolveGraphRecipeSelection } from '../orchestrate.js';
+import { graphReplayFromSession } from '../../persistence/session-replay.js';
 
 import type { GraphConfig, ResolutionMode, Rule } from '../../types.js';
 import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
@@ -69,6 +72,7 @@ interface GraphCommandOptions {
   resolution?: string;
   listFiles?: boolean;
   sarif?: string;
+  show?: string;
 }
 
 /**
@@ -125,6 +129,10 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
   // (a single empty array), so `?? []` covers the absent case too.
   const positionals = (opts as unknown as { _args?: readonly unknown[] })._args ?? [];
   const paths = (positionals[0] ?? []) as readonly string[];
+  if (opts.show !== undefined && opts.show.length > 0) {
+    await runGraphShowMode(opts, cli);
+    return;
+  }
   if (opts.listFiles === true) {
     await executeListFiles(
       {
@@ -254,6 +262,73 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
   }
 }
 
+async function runGraphShowMode(opts: GraphCommandOptions, cli: ToolCliContext): Promise<void> {
+  const datastore = cli.scope.datastore() as DataStore | undefined;
+  if (datastore === undefined) {
+    await emitGraphShowError(opts, cli, 'datastore-unavailable', 'session replay requires a datastore');
+    return;
+  }
+  const resolved = resolveSession(datastore, { ref: opts.show ?? 'latest', tool: 'graph' });
+  if (!resolved.ok) {
+    await emitGraphShowError(opts, cli, resolved.reason, resolved.detail);
+    return;
+  }
+
+  try {
+    const replay = graphReplayFromSession(resolved.session);
+    if (opts.json === true) {
+      cli.emitJson(sessionShowJson(resolved.session, replay));
+      return;
+    }
+    await cli.render(replay.result);
+  } catch (error) {
+    await emitGraphShowError(
+      opts,
+      cli,
+      'decode-error',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
+async function emitGraphShowError(
+  opts: Pick<GraphCommandOptions, 'json'>,
+  cli: ToolCliContext,
+  reason: string,
+  detail: string,
+): Promise<void> {
+  cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+  if (opts.json === true) {
+    cli.emitJson({ error: detail, reason });
+    return;
+  }
+  await cli.render({
+    type: 'error',
+    message: detail,
+    exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+  });
+}
+
+function sessionShowJson(
+  session: StoredSession,
+  replay: ReturnType<typeof graphReplayFromSession>,
+): unknown {
+  return {
+    session: {
+      id: session.id,
+      tool: session.tool,
+      timestamp: session.timestamp,
+      recipe: session.recipe,
+      cwd: session.cwd,
+      score: session.score,
+      passed: session.passed,
+      durationMs: session.durationMs,
+    },
+    fidelity: replay.fidelity,
+    envelope: replay.envelope,
+  };
+}
+
 /**
  * The declarative primary `graph` command (release 2.11.0 Phase 5 Task 5.1).
  * The host mounts this spec, applies the ADR-0021 common flags + graph's options
@@ -280,6 +355,11 @@ export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineComm
       flag: '--recipe',
       value: '<name>',
       description: 'Run a named recipe (a subset of graph rules). Default: all rules',
+    },
+    {
+      flag: '--show',
+      value: '<session>',
+      description: 'Replay a stored graph session by id, or latest for the latest graph session',
     },
     { flag: '--gate-save', description: 'Save current Signal set as the gate baseline', default: false },
     { flag: '--gate-compare', description: 'Compare current Signals to the gate baseline', default: false },

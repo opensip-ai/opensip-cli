@@ -12,6 +12,7 @@
 
 import type { CommandResult } from '@opensip-tools/contracts';
 import type { PluginLayout } from '@opensip-tools/core';
+import type { SessionReplayRegistry } from '../session-replay-registry.js';
 
 /**
  * Context the orchestrator (`registerCliCommands`) hands to every
@@ -22,6 +23,7 @@ import type { PluginLayout } from '@opensip-tools/core';
 export interface CliCommandsContext {
   readonly setExitCode: (code: number) => void;
   readonly render: (result: CommandResult) => Promise<void>;
+  readonly emitJson?: (value: unknown) => void;
   /**
    * Project-local plugin layouts contributed by the registered tools
    * (each tool's `Tool.pluginLayout`). The `plugin` command reads these
@@ -30,6 +32,7 @@ export interface CliCommandsContext {
    * tools remain the single source of truth (ADR-0009 corollary 1).
    */
   readonly pluginLayouts: readonly PluginLayout[];
+  readonly sessionReplayRegistry?: SessionReplayRegistry;
   /**
    * v2 persistence accessor (thunk). Calling this returns the project-local
    * DataStore, opening it lazily on first access. Commands that don't read

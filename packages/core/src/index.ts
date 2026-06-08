@@ -97,6 +97,8 @@ export type {
   ToolConfigContribution,
   ToolCliContext,
   ToolPluginExports,
+  ToolSessionRecord,
+  ToolSessionReplayContribution,
   LiveViewRenderer,
 } from './tools/index.js';
 // Static tool-plugin manifest + the plugin-API epoch + provenance types

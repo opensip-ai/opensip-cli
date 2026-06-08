@@ -154,6 +154,14 @@ describe('SessionRepo — latest', () => {
     repo.save(makeSession({ id: 'newer', timestamp: '2026-05-15T00:00:00.000Z' }));
     expect(repo.latest()?.id).toBe('newer');
   });
+
+  it('returns the most recent session scoped to a tool', () => {
+    repo.save(makeSession({ id: 'fit-old', tool: 'fit', timestamp: '2026-05-01T00:00:00.000Z' }));
+    repo.save(makeSession({ id: 'fit-new', tool: 'fit', timestamp: '2026-05-02T00:00:00.000Z' }));
+    repo.save(makeSession({ id: 'graph-newer', tool: 'graph', timestamp: '2026-05-03T00:00:00.000Z' }));
+    expect(repo.latest({ tool: 'fit' })?.id).toBe('fit-new');
+    expect(repo.latest()?.id).toBe('graph-newer');
+  });
 });
 
 describe('SessionRepo — error paths', () => {

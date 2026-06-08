@@ -934,6 +934,12 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
+      '@opensip-tools/datastore':
+        specifier: workspace:*
+        version: link:../../datastore
+      '@opensip-tools/session-store':
+        specifier: workspace:*
+        version: link:../../session-store
       commander:
         specifier: ^14.0.3
         version: 14.0.3
