@@ -1,16 +1,19 @@
 /**
  * @fileoverview Sequential execution scheduler for fitness recipe checks
  *
- * Runs fitness checks one at a time. Per-check semantics (timeout,
- * abort, retry, success/error dispatch) live in `runOneCheck`; this
- * file owns only the `for-of` loop and the abort-controller check
- * between iterations.
+ * Runs fitness checks one at a time. Release 2.13.0 (§5.8): the loop + the
+ * between-iteration abort check now live in the shared execution substrate
+ * (`scheduleUnits`); this file keeps only the fitness setup + the per-check
+ * `runOneCheck` body.
  */
+
+import { scheduleUnits } from '@opensip-tools/core'
 
 import { runOneCheck } from './run-one-check.js'
 
 import type { ProcessorContext } from './check-result-processor.js'
 import type { ExecutionOptions, ExecutionServiceContext } from './parallel-execution.js'
+import type { Check } from '../framework/check-types.js'
 
 // =============================================================================
 // SEQUENTIAL EXECUTION
@@ -30,21 +33,22 @@ export async function executeSequential(ctx: ExecutionServiceContext, opts: Exec
     includeViolations: ctx.includeViolations ?? false,
   }
 
-  for (const [i, check] of checks.entries()) {
-    if (abortController?.signal.aborted) break
-    if (!check) continue
-
-    const outcome = await runOneCheck(check, {
-      cwd,
-      checkIndex: i + 1,
-      totalChecks,
-      recipeTimeoutMs: recipeTimeout,
-      retryEnabled: recipe.execution.retryOnFailure ?? false,
-      maxRetries: recipe.execution.maxRetries ?? 2,
-      ...(checkTargetFiles ? { checkTargetFiles } : {}),
-      ...(globalExcludes ? { globalExcludes } : {}),
-    }, processorCtx)
-
-    if (outcome.shouldStop) break
-  }
+  await scheduleUnits<Check>({
+    units: checks,
+    mode: 'sequential',
+    shouldAbort: () => abortController?.signal.aborted === true,
+    runUnit: async (check, index) => {
+      const outcome = await runOneCheck(check, {
+        cwd,
+        checkIndex: index + 1,
+        totalChecks,
+        recipeTimeoutMs: recipeTimeout,
+        retryEnabled: recipe.execution.retryOnFailure ?? false,
+        maxRetries: recipe.execution.maxRetries ?? 2,
+        ...(checkTargetFiles ? { checkTargetFiles } : {}),
+        ...(globalExcludes ? { globalExcludes } : {}),
+      }, processorCtx)
+      return { shouldStop: outcome.shouldStop }
+    },
+  })
 }

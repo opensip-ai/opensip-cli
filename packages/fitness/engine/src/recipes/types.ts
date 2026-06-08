@@ -8,6 +8,8 @@
 
 import os from 'node:os'
 
+import { deriveRecipeId } from '@opensip-tools/core'
+
 import type { DirectiveEntry } from '../framework/directive-inventory.js'
 import type { RecipeUnitConfigMap } from '@opensip-tools/core'
 
@@ -218,7 +220,8 @@ const DEFAULT_REPORTING_OPTIONS: FitnessReportingOptions = {
 
 /** Create a frozen FitnessRecipe from a definition, applying defaults for missing options */
 export function defineRecipe(definition: FitnessRecipeDefinition): FitnessRecipe {
-  const id = `RCP_${definition.name}`
+  // Release 2.13.0 (§5.8): one shared `<prefix>_<name>` derivation (id unchanged).
+  const id = deriveRecipeId('RCP', definition.name)
 
   const recipe: FitnessRecipe = {
     id,

@@ -1,13 +1,16 @@
-// @fitness-ignore-file error-handling-suite -- catch blocks delegate errors through established patterns
 /**
- * @fileoverview Retry logic for fitness check execution
+ * @fileoverview Retry logic for fitness check execution.
  *
- * Provides exponential backoff retry wrapper for transient check failures.
+ * Release 2.13.0: the retry implementation was hoisted into the shared execution
+ * substrate (`runWithRetry`, `@opensip-tools/core`). This module is now a thin
+ * fitness-flavoured wrapper that pins the abort-aware predicate (a
+ * `CheckAbortedError` is never retried) and preserves the historical return shape,
+ * so call sites and tests are unchanged.
  */
 
-import { CheckAbortedError } from '../framework/execution-context.js'
+import { runWithRetry } from '@opensip-tools/core'
 
-const BACKOFF_DELAYS_MS = [1000, 2000] as const
+import { CheckAbortedError } from '../framework/execution-context.js'
 
 /** Configuration for retry behavior */
 export interface RetryOptions {
@@ -25,45 +28,17 @@ export interface RetryResult<T> {
   readonly wasRetried: boolean
 }
 
-function backoff(attempt: number): Promise<void> {
-  const delay = BACKOFF_DELAYS_MS[attempt] ?? BACKOFF_DELAYS_MS.at(-1) ?? 2000
-  return new Promise((resolve) => setTimeout(resolve, delay))
-}
-
 /**
- * Execute a function with retry logic.
+ * Execute a function with retry logic via the shared substrate.
  * Only retries when the function throws. CheckAbortedError is never retried.
  */
 export async function executeWithRetry<T>(
   fn: () => Promise<T>,
   options: RetryOptions,
 ): Promise<RetryResult<T>> {
-  try {
-    const result = await fn()
-    return { result, lastError: undefined, retryCount: 0, wasRetried: false }
-  } catch (firstError) {
-    if (firstError instanceof CheckAbortedError) {
-      return { result: undefined, lastError: firstError, retryCount: 0, wasRetried: false }
-    }
-
-    if (!options.enabled || options.maxRetries <= 0) {
-      return { result: undefined, lastError: firstError, retryCount: 0, wasRetried: false }
-    }
-
-    let lastError: unknown = firstError
-
-    for (let attempt = 0; attempt < options.maxRetries; attempt++) {
-      // @fitness-ignore-next-line performance-anti-patterns -- sequential retry with backoff is inherently serial
-      await backoff(attempt)
-
-      try {
-        const result = await fn()
-        return { result, lastError: undefined, retryCount: attempt + 1, wasRetried: true }
-      } catch (retryError) {
-        lastError = retryError
-      }
-    }
-
-    return { result: undefined, lastError, retryCount: options.maxRetries, wasRetried: true }
-  }
+  return runWithRetry(fn, {
+    enabled: options.enabled,
+    maxRetries: options.maxRetries,
+    shouldNotRetry: (error) => error instanceof CheckAbortedError,
+  })
 }

@@ -19,8 +19,9 @@
  * signal as a timeout.
  */
 
-import { TimeoutError, logger } from '@opensip-tools/core'
+import { TimeoutError, logger, runWithTimeout } from '@opensip-tools/core'
 
+import { CheckAbortedError } from '../framework/execution-context.js'
 import { memoryProfiler } from '../framework/memory-profiler.js'
 
 import {
@@ -29,7 +30,6 @@ import {
   type ProcessorContext,
   type ProcessResultOutput,
 } from './check-result-processor.js'
-import { executeWithRetry } from './retry.js'
 
 import type { Check } from '../framework/check-types.js'
 
@@ -98,44 +98,36 @@ export async function runOneCheck(
     timeoutMs: checkTimeout,
   })
 
-  // Per-check abort controller. Invariant: the only abort pathway into
-  // this controller is the local `setTimeout` below — we do NOT propagate
-  // any external signal into it (the recipe service's own
-  // `abortController` is wired separately and observed by the scheduler,
-  // not by `check.run`). That single-source guarantee is what lets the
-  // post-retry `signal.aborted` check below be interpreted as a
-  // timeout. Adding any other abort source here without reworking the
-  // detection (e.g. tagged abort reasons via `controller.abort(reason)`)
-  // would silently misreport non-timeout aborts as timeouts.
-  // Pinned by `runOneCheck.test.ts` (audit 2026-05-23 F7).
-  const checkAbortController = new AbortController()
-  const startTime = Date.now()
-  const timeoutId = setTimeout(() => checkAbortController.abort(), checkTimeout)
-
   const targetFiles = opts.checkTargetFiles?.get(checkSlug)
 
+  // Run on the shared execution substrate (release 2.13.0, §5.8): per-check
+  // timeout/abort + retry. The single-source abort invariant is preserved by
+  // `runWithTimeout` — the controller is aborted ONLY by the timeout — so a
+  // `timeout` outcome IS a real timeout, exactly as the former inline
+  // AbortController+setTimeout body computed it. `CheckAbortedError` is never
+  // retried (the timeout abort surfaces as a `timeout` outcome, not a retry).
+  const outcome = await runWithTimeout({
+    run: (signal) => check.run(opts.cwd, {
+      signal,
+      ...(targetFiles ? { targetFiles } : {}),
+      ...(opts.globalExcludes ? { globalExcludes: opts.globalExcludes } : {}),
+    }),
+    timeoutMs: checkTimeout,
+    retry: {
+      enabled: opts.retryEnabled,
+      maxRetries: opts.maxRetries,
+      shouldNotRetry: (error) => error instanceof CheckAbortedError,
+    },
+  })
+  const { durationMs } = outcome
+
+  // The result PROCESSING (which fires user callbacks like onCheckComplete) is
+  // wrapped so a throw from a callback is recovered into a non-timeout error
+  // result — the same recovery the former inline try/catch provided (pinned by
+  // run-one-check.test.ts). The unit RUN itself is already classified by
+  // `runWithTimeout` above and never throws here.
   try {
-    const retryResult = await executeWithRetry(
-      () => check.run(opts.cwd, {
-        signal: checkAbortController.signal,
-        ...(targetFiles ? { targetFiles } : {}),
-        ...(opts.globalExcludes ? { globalExcludes: opts.globalExcludes } : {}),
-      }),
-      {
-        enabled: opts.retryEnabled,
-        maxRetries: opts.maxRetries,
-        checkId,
-        checkSlug,
-      },
-    )
-    clearTimeout(timeoutId)
-
-    const durationMs = Date.now() - startTime
-
-    // Canonical timeout detection: the per-check AbortController is
-    // ONLY aborted by the setTimeout above, so any aborted signal at
-    // this point means the timeout fired.
-    if (checkAbortController.signal.aborted) {
+    if (outcome.status === 'timeout') {
       logger.info({
         evt: 'fitness.check.timeout',
         module: MODULE_TAG,
@@ -157,23 +149,21 @@ export async function runOneCheck(
       return { shouldStop: processOutput.shouldStop, processOutput }
     }
 
-    if (retryResult.result === undefined) {
+    if (outcome.status === 'error') {
       logger.info({
         evt: 'fitness.check.error',
         module: MODULE_TAG,
         checkSlug,
         durationMs,
         timedOut: false,
-        error: retryResult.lastError instanceof Error
-          ? retryResult.lastError.message
-          : String(retryResult.lastError),
+        error: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
       })
       const processOutput = processErrorResult(ctx, {
         checkId,
         checkSlug,
         checkIndex: opts.checkIndex,
         totalChecks: opts.totalChecks,
-        error: retryResult.lastError,
+        error: outcome.error,
         durationMs,
         memoryBeforeMB,
         timedOut: false,
@@ -186,7 +176,7 @@ export async function runOneCheck(
       module: MODULE_TAG,
       checkSlug,
       durationMs,
-      signals: retryResult.result.signals.length,
+      signals: outcome.result.signals.length,
     })
     const processOutput = processSuccessResult(ctx, {
       checkId,
@@ -194,15 +184,15 @@ export async function runOneCheck(
       tags: check.config.tags ?? [],
       checkIndex: opts.checkIndex,
       totalChecks: opts.totalChecks,
-      result: retryResult.result,
+      result: outcome.result,
       durationMs,
       memoryBeforeMB,
     })
     return { shouldStop: processOutput.shouldStop, processOutput }
   } catch (error) {
-    clearTimeout(timeoutId)
-    const durationMs = Date.now() - startTime
-    const isTimeout = checkAbortController.signal.aborted
+    // A user callback inside the result processing threw. Recover it into an
+    // error result — non-timeout unless the unit itself timed out.
+    const isTimeout = outcome.status === 'timeout'
     logger.info({
       evt: 'fitness.check.error',
       module: MODULE_TAG,

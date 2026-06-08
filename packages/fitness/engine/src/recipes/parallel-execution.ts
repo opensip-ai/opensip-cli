@@ -7,6 +7,8 @@
  * shape.
  */
 
+import { scheduleUnits } from '@opensip-tools/core'
+
 import { runOneCheck } from './run-one-check.js'
 import { getEffectiveMaxParallel } from './types.js'
 
@@ -63,16 +65,21 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
     includeViolations: ctx.includeViolations ?? false,
   }
 
-  let nextCheckIndex = 0
-  let activeCount = 0
-  let shouldStopExecution = false
-
-  await new Promise<void>((resolve) => {
-    const launch = (check: Check, displayIndex: number): void => {
-      activeCount++
-      void runOneCheck(check, {
+  // Release 2.13.0 (§5.8): the sliding-window scheduling shape now lives in the
+  // shared substrate (`scheduleUnits`). This file keeps only the fitness setup +
+  // the per-check `runOneCheck` body; the loop/concurrency/stop/abort policy is
+  // host-owned. Byte-identical: scheduleUnits launches units in array order
+  // (1-based `index + 1` = the former `displayIndex`), refills up to `maxParallel`
+  // unless stopping/aborted, and resolves when drained.
+  await scheduleUnits<Check>({
+    units: checks,
+    mode: 'parallel',
+    maxParallel,
+    shouldAbort: () => abortController?.signal.aborted === true,
+    runUnit: async (check, index) => {
+      const outcome = await runOneCheck(check, {
         cwd,
-        checkIndex: displayIndex,
+        checkIndex: index + 1,
         totalChecks,
         recipeTimeoutMs: recipeTimeout,
         retryEnabled: recipe.execution.retryOnFailure ?? false,
@@ -80,34 +87,7 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
         ...(checkTargetFiles ? { checkTargetFiles } : {}),
         ...(globalExcludes ? { globalExcludes } : {}),
       }, processorCtx)
-        .then((outcome) => {
-          if (outcome.shouldStop) shouldStopExecution = true
-        })
-        .finally(() => {
-          activeCount--
-
-          if (!shouldStopExecution && nextCheckIndex < checks.length && !abortController?.signal.aborted) {
-            const nextCheck = checks[nextCheckIndex]
-            if (nextCheck) {
-              const idx = nextCheckIndex
-              nextCheckIndex++
-              launch(nextCheck, idx + 1)
-            }
-          }
-
-          if (activeCount === 0 && (nextCheckIndex >= checks.length || shouldStopExecution)) {
-            resolve()
-          }
-        })
-    }
-
-    const initialBatchSize = Math.min(maxParallel, checks.length)
-    for (let i = 0; i < initialBatchSize; i++) {
-      const check = checks[i]
-      if (check) {
-        nextCheckIndex = i + 1
-        launch(check, i + 1)
-      }
-    }
+      return { shouldStop: outcome.shouldStop }
+    },
   })
 }
