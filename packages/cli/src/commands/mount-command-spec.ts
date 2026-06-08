@@ -28,7 +28,7 @@ import {
   type CliProgram,
   type CommandResult,
 } from '@opensip-tools/contracts';
-import { ToolError } from '@opensip-tools/core';
+import { ToolError, currentScope } from '@opensip-tools/core';
 import { Option } from 'commander';
 
 import { emitCommandResult } from './mount-result-command.js';
@@ -134,11 +134,18 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
   cmd.action(async (...actionArgs: unknown[]) => {
     const { opts, positionals } = splitActionArgs(actionArgs);
     const optsWithArgs = { ...opts, _args: positionals };
+    // Lifecycle diagnostics (§5.10): bracket the handler with `execute` events so
+    // every CommandOutcome carries a record that this command ran. Scope-bound via
+    // the pre-action hook's enterScope; a no-op when no scope is present (tests).
+    const diagnostics = currentScope()?.diagnostics;
+    diagnostics?.event('execute', 'debug', `command '${spec.name}' started`);
     try {
       const result = await spec.handler(optsWithArgs, ctx);
+      diagnostics?.event('execute', 'debug', `command '${spec.name}' completed`);
       await dispatchOutput(result, spec, optsWithArgs, positionals, ctx);
     } catch (error) {
       if (error instanceof ToolError) {
+        diagnostics?.event('execute', 'error', `command '${spec.name}' failed: ${error.message}`);
         ctx.setExitCode(mapToolErrorToExitCode(error));
         return;
       }

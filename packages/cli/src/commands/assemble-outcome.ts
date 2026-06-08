@@ -6,13 +6,14 @@
  * handler stays pure domain.** A tool handler returns (or hands the host) its
  * `SignalEnvelope` / `CommandResult` / a bare JSON document / an error message;
  * THIS module turns that into the one outer currency by deriving `kind`,
- * `status`, `exitCode`, and the structured `errors`. The handler never constructs
- * a `CommandOutcome` (it cannot — `diagnostics` is scope-collected, attached in
- * Phase 2). This keeps every tool, first-party or external, off the privilege of
- * choosing its own error JSON or success carrier.
+ * `status`, `exitCode`, the structured `errors`, AND stamping the scope-owned
+ * `diagnostics` snapshot. The handler never constructs a `CommandOutcome` (it
+ * cannot — the diagnostics bus is scope-collected). This keeps every tool,
+ * first-party or external, off the privilege of choosing its own error JSON or
+ * success carrier.
  *
- * These are pure builders: no IO, no stdout. {@link renderOutcome} (the sibling)
- * is the one place an outcome reaches a stream.
+ * No stdout here — the builders only read the current scope's diagnostics bus.
+ * {@link renderOutcome} (the sibling) is the one place an outcome reaches a stream.
  */
 
 import {
@@ -24,7 +25,20 @@ import {
   type ErrorResult,
   type SignalEnvelope,
 } from '@opensip-tools/contracts';
-import { ToolError } from '@opensip-tools/core';
+import { ToolError, currentScope } from '@opensip-tools/core';
+
+/**
+ * Attach the scope-owned diagnostics snapshot (north-star §5.10) to a freshly
+ * built outcome. The host stamps it here — a handler never assembles diagnostics
+ * (it cannot: the bus is scope-collected). Omitted entirely when no scope is
+ * bound (isolated unit tests) or the bus is empty-and-untraced, keeping the
+ * outcome shape minimal.
+ */
+function withDiagnostics(outcome: CommandOutcome): CommandOutcome {
+  const diagnostics = currentScope()?.diagnostics?.snapshot();
+  if (diagnostics === undefined) return outcome;
+  return { ...outcome, diagnostics };
+}
 
 /** Derive a run outcome's `kind` from the envelope's tool id: `'<tool>.run'`. */
 export function kindFromEnvelope(envelope: SignalEnvelope): string {
@@ -49,7 +63,7 @@ export function kindFromResult(value: unknown): string {
  * and the gate verdict is read from `.envelope.verdict`, not the outer status.
  */
 export function outcomeFromEnvelope(envelope: SignalEnvelope, exitCode: number): CommandOutcome {
-  return { kind: kindFromEnvelope(envelope), status: 'ok', exitCode, envelope };
+  return withDiagnostics({ kind: kindFromEnvelope(envelope), status: 'ok', exitCode, envelope });
 }
 
 /**
@@ -61,15 +75,15 @@ export function outcomeFromEnvelope(envelope: SignalEnvelope, exitCode: number):
 export function outcomeFromResult(value: unknown, exitCode: number): CommandOutcome {
   if ((value as { readonly type?: unknown } | null)?.type === 'error') {
     const err = value as ErrorResult;
-    return {
+    return withDiagnostics({
       kind: 'error',
       status: 'error',
       exitCode: err.exitCode,
       data: value,
       errors: [{ message: err.message, ...(err.suggestion ? { suggestion: err.suggestion } : {}) }],
-    };
+    });
   }
-  return { kind: kindFromResult(value), status: 'ok', exitCode, data: value };
+  return withDiagnostics({ kind: kindFromResult(value), status: 'ok', exitCode, data: value });
 }
 
 /**
@@ -92,7 +106,7 @@ export function outcomeFromError(error: unknown, opts: { readonly kind?: string 
     ...(error instanceof ToolError ? { code: error.code } : {}),
   };
   const exitCode = error instanceof ToolError ? mapToolErrorToExitCode(error) : EXIT_CODES.RUNTIME_ERROR;
-  return { kind: opts.kind ?? 'command.error', status: 'error', exitCode, errors: [detail] };
+  return withDiagnostics({ kind: opts.kind ?? 'command.error', status: 'error', exitCode, errors: [detail] });
 }
 
 /**
@@ -106,10 +120,10 @@ export function outcomeFromErrorMessage(opts: {
   readonly suggestion?: string;
   readonly kind?: string;
 }): CommandOutcome {
-  return {
+  return withDiagnostics({
     kind: opts.kind ?? 'command.error',
     status: 'error',
     exitCode: opts.exitCode,
     errors: [{ message: opts.message, ...(opts.suggestion ? { suggestion: opts.suggestion } : {}) }],
-  };
+  });
 }

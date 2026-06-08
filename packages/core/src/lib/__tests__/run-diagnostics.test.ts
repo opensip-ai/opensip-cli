@@ -12,7 +12,7 @@ import type {
   RunDiagnostics,
   DiagnosticEvent,
   DiagnosticPhase,
-} from './run-diagnostics.js';
+} from '../run-diagnostics.js';
 
 const ALL_PHASES: readonly DiagnosticPhase[] = [
   'discover',

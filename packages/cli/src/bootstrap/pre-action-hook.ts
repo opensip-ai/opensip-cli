@@ -295,6 +295,14 @@ export function installPreActionHook(program: Command, version: string): void {
     enterScope(scope);
     setCurrentRunScope(scope);
 
+    // Lifecycle diagnostics (§5.10): record plugin-load + config-validate facts on
+    // the per-run bus now that the scope is bound. These pre-handler events ride on
+    // the CommandOutcome the handler later produces, so `--json` consumers see
+    // capability health (how many tools loaded; the resolved project scope).
+    scope.diagnostics.event('load', 'debug', `${tools.list().length} tool(s) loaded`);
+    scope.diagnostics.counter('tools.loaded', tools.list().length);
+    scope.diagnostics.event('validate', 'debug', `project config resolved (scope: ${project.scope})`);
+
     // The `ℹ Project:` location line is rendered once, under the banner,
     // by cli-ui's ProjectHeader — mounted by the App shell (static
     // commands, via render.ts reading currentScope().project) and by each

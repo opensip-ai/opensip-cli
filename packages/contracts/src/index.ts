@@ -82,14 +82,15 @@ export type {
 
 // Run diagnostics — the shared, JSON-emittable diagnostics stream carried on a
 // `CommandOutcome` (§5.10). One event vocabulary across the uniform tool
-// lifecycle (discover → … → persist); produced by the scope-owned diagnostics
-// bus in @opensip-tools/core and attached by the host assembler.
+// lifecycle (discover → … → persist). DEFINED in @opensip-tools/core (beside the
+// scope-owned diagnostics bus that PRODUCES it; core cannot import contracts);
+// re-exported here so `CommandOutcome` (and machine consumers) can name it.
 export type {
   RunDiagnostics,
   DiagnosticEvent,
   DiagnosticPhase,
   DiagnosticLevel,
-} from './run-diagnostics.js';
+} from '@opensip-tools/core';
 
 // Canonical pass-rate (`score`) computation — shared by every tool that
 // builds a signal envelope so the dashboard "PASS RATE" stays consistent

@@ -254,6 +254,18 @@ export type { Span, Attributes, Tracer } from '@opentelemetry/api';
 export { EnvRegistry } from './lib/env-registry.js';
 export type { EnvVarSpec, EnvDeprecation, EnvReadResult } from './lib/env-registry.js';
 
+// Lib — run diagnostics (north-star §5.10, release 2.12.0). The shared,
+// JSON-emittable diagnostics vocabulary carried on a `CommandOutcome`, produced
+// by the scope-owned `DiagnosticsBus`. Types DEFINED here (the bus that produces
+// them is here; contracts re-exports the types for `CommandOutcome`).
+export { DiagnosticsBus } from './lib/diagnostics-bus.js';
+export type {
+  RunDiagnostics,
+  DiagnosticEvent,
+  DiagnosticPhase,
+  DiagnosticLevel,
+} from './lib/run-diagnostics.js';
+
 // Lib — permissive YAML reader (returns undefined on missing/malformed
 // files). Used by plugin-discovery sites that need to peek at a single
 // field of opensip-tools.config.yml without dragging in a Zod schema.

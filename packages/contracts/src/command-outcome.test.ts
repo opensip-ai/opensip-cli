@@ -12,7 +12,8 @@ import { describe, it, expect } from 'vitest';
 import { buildSignalEnvelope } from './signal-envelope.js';
 
 import type { CommandOutcome } from './command-outcome.js';
-import type { RunDiagnostics } from './run-diagnostics.js';
+import type { RunDiagnostics } from '@opensip-tools/core';
+
 
 const DIAGNOSTICS: RunDiagnostics = { runId: 'run_1', events: [] };
 
