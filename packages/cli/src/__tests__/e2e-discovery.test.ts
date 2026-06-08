@@ -200,7 +200,8 @@ describe('full Tool-plugin install path (audit P1b)', () => {
     try {
       const add = runCli(['plugin', 'add', FIXTURE_TOOL, '--json'], testDir, env);
       expect(add.exitCode).toBe(0);
-      expect((JSON.parse(add.stdout) as { success?: boolean }).success).toBe(true);
+      // 2.12.0: the PluginResult rides under `.data` of the outcome wrapper.
+      expect((JSON.parse(add.stdout) as { data: { success?: boolean } }).data.success).toBe(true);
       // Landed in the user-global tool host dir, NOT a fit/sim domain dir,
       // and NO config entry was written (tools auto-discover by marker).
       expect(existsSync(join(home, '.opensip-tools', 'plugins', 'tool', 'node_modules', TOOL_PKG))).toBe(true);
@@ -243,7 +244,7 @@ describe('full Tool-plugin install path (audit P1b)', () => {
       runCli(['plugin', 'add', FIXTURE_TOOL, '--json'], testDir, env);
       const list = runCli(['plugin', 'list', '--json'], testDir, env);
       expect(list.exitCode).toBe(0);
-      const plugins = (JSON.parse(list.stdout) as { plugins: { domain: string; namespace: string }[] }).plugins;
+      const plugins = (JSON.parse(list.stdout) as { data: { plugins: { domain: string; namespace: string }[] } }).data.plugins;
       expect(plugins.some((p) => p.domain === 'tool' && p.namespace.includes('tool-demo'))).toBe(true);
     } finally {
       rmSync(home, { recursive: true, force: true });

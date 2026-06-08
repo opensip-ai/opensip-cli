@@ -13,11 +13,13 @@
  * pipeline. Tools never touch Commander; they export specs and the host mounts
  * them (release 2.11.0, north-star §5.4 Command contract).
  *
- * The single output-dispatch seam — {@link dispatchOutput} — is the **2.12.0
- * `CommandOutcome` hinge**: today the handler returns a `CommandResult` /
- * `SignalEnvelope`, dispatched here; 2.12.0 swaps "render `CommandResult`" for
- * "wrap+render `CommandOutcome`" at this one point, without changing the
- * handler contract or the mounter.
+ * The single output-dispatch seam — {@link dispatchOutput} — was the **2.12.0
+ * `CommandOutcome` hinge**, now landed: every machine output is wrapped in a
+ * `CommandOutcome` and serialized through the one `renderOutcome` seam. The wrap
+ * lives in the host emit seams this function delegates to (`emitCommandResult`,
+ * `ctx.emitEnvelope`), so the handler contract and the mounter stayed
+ * byte-identical — all the outer-shape change landed in those seams (release
+ * 2.12.0, north-star §5.5).
  */
 
 import {
@@ -146,16 +148,12 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
 }
 
 /**
- * The SINGLE output-dispatch seam — the 2.12.0 `CommandOutcome` swap point.
- *
- * ┌─────────────────────────────────────────────────────────────────────────┐
- * │ 2.12.0 SWAP POINT. The handler today returns a `CommandResult` /          │
- * │ `SignalEnvelope`; 2.12.0 changes it to return a `CommandOutcome` and      │
- * │ this function unwraps+renders that envelope. The handler contract and     │
- * │ the mounter above stay byte-identical — ALL the render-shape change lands │
- * │ here, by design (north-star §5.4 / the Phase-1 plan's "single dispatch    │
- * │ seam designed for the 2.12.0 swap").                                      │
- * └─────────────────────────────────────────────────────────────────────────┘
+ * The SINGLE output-dispatch seam. The 2.12.0 `CommandOutcome` wrap is LANDED:
+ * the host emit seams this delegates to (`emitCommandResult`, `ctx.emitEnvelope`)
+ * now build a `CommandOutcome` and serialize it through the one `renderOutcome`
+ * seam. The handler contract and the mounter above stayed byte-identical — all
+ * the outer-shape change landed in those seams (north-star §5.5), so the handler
+ * keeps returning its pure-domain `CommandResult` / `SignalEnvelope`.
  *
  * Routes the handler's return value by the command's declared
  * {@link CommandSpec.output} mode:

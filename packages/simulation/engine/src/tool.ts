@@ -107,10 +107,11 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   const { result } = await executeSim(opts);
 
   if (result.type === 'error') {
-    cli.setExitCode(result.exitCode);
     if (opts.json) {
-      cli.emitJson({ error: result.message });
+      // 2.12.0 (§5.5): structured error outcome (host wraps + sets exit code).
+      cli.emitError({ message: result.message, exitCode: result.exitCode });
     } else {
+      cli.setExitCode(result.exitCode);
       await cli.render(result);
     }
     return;

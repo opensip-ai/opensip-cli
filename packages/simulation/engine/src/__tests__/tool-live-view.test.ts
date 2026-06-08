@@ -91,6 +91,7 @@ function makeCtx(program: Command): Captured {
     setExitCode: (code: number) => exitCodes.push(code),
     emitJson: vi.fn(),
     emitEnvelope: vi.fn(),
+    emitError: vi.fn(),
     deliverSignals: vi.fn((envelope: SignalEnvelope, opts: unknown) => {
       delivered.push({ envelope, opts });
       return Promise.resolve();

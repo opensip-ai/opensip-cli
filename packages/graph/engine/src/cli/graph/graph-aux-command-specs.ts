@@ -119,11 +119,12 @@ export const graphBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext
     const datastore = cli.scope.datastore() as DataStore;
     const result = exportGraphBaseline(datastore, opts.out);
     if (result.type === 'error') {
-      cli.setExitCode(result.exitCode);
       if (opts.json === true) {
-        cli.emitJson({ error: result.message });
+        // 2.12.0 (§5.5): structured error outcome (host wraps + sets exit code).
+        cli.emitError({ message: result.message, exitCode: result.exitCode });
         return;
       }
+      cli.setExitCode(result.exitCode);
       process.stderr.write(`Error: ${result.message}\n`);
       return;
     }

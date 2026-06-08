@@ -53,6 +53,7 @@ function mockCli(): ToolCliContext {
   return {
     setExitCode: vi.fn(),
     emitEnvelope: vi.fn(),
+    emitError: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
     logger: console,
     scope: { signalSink: { emit: vi.fn() }, datastore: () => undefined },

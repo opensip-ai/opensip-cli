@@ -52,9 +52,14 @@ import {
   type ToolRegistry,
 } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { formatSignalJson } from '@opensip-tools/output';
 
 import { deliverEnvelope, writeEnvelopeSarif } from './bootstrap/deliver-envelope.js';
+import {
+  outcomeFromEnvelope,
+  outcomeFromErrorMessage,
+  outcomeFromResult,
+} from './commands/assemble-outcome.js';
+import { renderOutcome } from './commands/render-outcome.js';
 
 import type { CommandResult, SignalEnvelope } from '@opensip-tools/contracts';
 import type { Command } from 'commander';
@@ -341,16 +346,40 @@ export function buildToolCliContext(
     maybeOpenDashboard: opts.maybeOpenDashboard,
     logger: log,
     setExitCode,
+    // 2.12.0 (§5.5): every machine output the host emits is wrapped in a
+    // `CommandOutcome` through the single `renderOutcome` seam — `emitJson`
+    // (general-purpose `.data`), `emitEnvelope` (run `.envelope`), and
+    // `emitError` (`status:'error'` `.errors`). The host STAMPS the outer
+    // currency; the tool only hands over its pure-domain payload. `--json` is
+    // implicit here: these seams are only ever called on the `--json` path, so
+    // they always serialize the outcome (the `render` arg is inert).
     emitJson: (value) => {
-      process.stdout.write(JSON.stringify(value, null, 2) + '\n');
+      void renderOutcome(outcomeFromResult(value, exitCode ?? 0), {
+        jsonRequested: true,
+        render: opts.render,
+      });
     },
-    // The single `--json` contract for the signal era (ADR-0011): the
-    // envelope IS the wire shape, formatted through the one shared
-    // `formatSignalJson` formatter (no per-tool re-stringification). The
-    // composition root narrows the contract-typed payload here, the one
-    // place that legitimately imports `@opensip-tools/output`.
     emitEnvelope: (envelope) => {
-      process.stdout.write(formatSignalJson(envelope as SignalEnvelope) + '\n');
+      void renderOutcome(outcomeFromEnvelope(envelope as SignalEnvelope, exitCode ?? 0), {
+        jsonRequested: true,
+        render: opts.render,
+      });
+    },
+    // Structured error machine-output (retires the bare `emitJson({ error })`
+    // shape the `one-outcome-shape` guardrail forbids). The handler hands a
+    // diagnosed failure (message + exit code, optional suggestion); the host
+    // wraps it as a `status:'error'` outcome. `exitCode` is also threaded to
+    // `setExitCode` so the process exit and the reported outcome agree.
+    emitError: (detail) => {
+      setExitCode(detail.exitCode);
+      void renderOutcome(
+        outcomeFromErrorMessage({
+          message: detail.message,
+          exitCode: detail.exitCode,
+          ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
+        }),
+        { jsonRequested: true, render: opts.render },
+      );
     },
     // The root owns all effectful egress (ADR-0011 / ADR-0008): cloud sync via
     // the run's signal sink + `--report-to` SARIF upload. Tools call this once

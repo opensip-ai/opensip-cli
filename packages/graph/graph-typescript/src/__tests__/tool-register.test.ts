@@ -66,6 +66,7 @@ function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
     emitEnvelope: vi.fn(),
+    emitError: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),
     writeSarif: vi.fn(() => Promise.resolve()),
     ...overrides,
@@ -138,6 +139,7 @@ describe('graph handler — end-to-end via the real typescript adapter', () => {
       const cli = makeCli({
         setExitCode,
         // Mirror the composition root's `emitEnvelope` seam (JSON to stdout).
+        emitError: vi.fn(),
         emitEnvelope: vi.fn((envelope: unknown) => {
           process.stdout.write(`${JSON.stringify(envelope)}\n`);
         }),

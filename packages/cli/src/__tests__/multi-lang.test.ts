@@ -32,9 +32,10 @@ describe('CLI multi-language', () => {
     // fit and checking it doesn't throw on any of the language targets.
     const result = cli.run(['fit', '--json'], { cwd: FIXTURE })
     expect([0, 1]).toContain(result.exitCode) // 0 if all pass, 1 if some fail (acceptable in fixture)
-    const output: unknown = JSON.parse(result.stdout)
-    expect(typeof output).toBe('object')
-    expect((output as { schemaVersion: number }).schemaVersion).toBe(2)
+    // 2.12.0: --json wraps the envelope in a CommandOutcome (`.envelope`).
+    const outcome = JSON.parse(result.stdout) as { envelope: { schemaVersion: number } }
+    expect(typeof outcome).toBe('object')
+    expect(outcome.envelope.schemaVersion).toBe(2)
   })
 
   it('produces no plugin-load errors for the fixture', () => {
@@ -76,7 +77,7 @@ describe('CLI multi-language', () => {
     expect(result.stderr).toContain('klingon')
     // CLI should still complete (exit 0 since no errors fired) and
     // produce valid JSON on stdout.
-    const output = JSON.parse(result.stdout) as { schemaVersion: number }
+    const output = (JSON.parse(result.stdout) as { envelope: { schemaVersion: number } }).envelope
     expect(output.schemaVersion).toBe(2)
   })
 })

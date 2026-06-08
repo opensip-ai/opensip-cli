@@ -89,11 +89,12 @@ export const fitBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext> 
     const datastore = cli.scope.datastore() as DataStore;
     const result = await exportFitBaseline(datastore, opts.out, cli);
     if (result.type === 'error') {
-      cli.setExitCode(result.exitCode);
       if (opts.json) {
-        cli.emitJson({ error: result.message });
+        // 2.12.0 (§5.5): structured error outcome (host wraps + sets exit code).
+        cli.emitError({ message: result.message, exitCode: result.exitCode });
         return;
       }
+      cli.setExitCode(result.exitCode);
       process.stderr.write(`Error: ${result.message}\n`);
       return;
     }

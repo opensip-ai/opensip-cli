@@ -25,6 +25,9 @@
  * bypasses).
  */
 
+import { outcomeFromResult } from './assemble-outcome.js';
+import { renderOutcome } from './render-outcome.js';
+
 import type { CliCommandsContext } from './shared.js';
 import type { CommandResult } from '@opensip-tools/contracts';
 import type { Command } from 'commander';
@@ -92,22 +95,23 @@ async function emit<TOpts>(
 
 /**
  * The shared `command-result` dispatch seam, extracted so the declarative
- * `mountCommandSpec` (Phase 1, the `output: 'command-result'` arm of
- * `dispatchOutput`) and the imperative `mountResultCommand` route a
- * `CommandResult` through ONE point instead of duplicating the
- * json-short-circuit / `render` decision.
+ * `mountCommandSpec` (the `output: 'command-result'` arm of `dispatchOutput`) and
+ * the imperative `mountResultCommand` route a `CommandResult` through ONE point
+ * instead of duplicating the json-short-circuit / `render` decision.
  *
- * When `jsonRequested`, emit the result as JSON to stdout and bail before Ink
- * starts — machine consumers must never see ANSI escapes or Ink's whitespace
- * adjustments. Otherwise render through the supplied renderer.
+ * 2.12.0 (§5.5): the result is wrapped in a `CommandOutcome` (`.data`, or
+ * `.errors` for an `ErrorResult`) and serialized through the single
+ * `renderOutcome` seam. `--json` emits the whole outcome; human mode renders the
+ * inner result through the supplied renderer — byte-identical to the prior human
+ * output. Machine consumers must never see ANSI escapes, so the JSON path never
+ * renders.
  */
 export async function emitCommandResult(
   result: CommandResult,
   opts: { readonly render: (result: CommandResult) => Promise<void>; readonly jsonRequested: boolean },
 ): Promise<void> {
-  if (opts.jsonRequested) {
-    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    return;
-  }
-  await opts.render(result);
+  await renderOutcome(outcomeFromResult(result, 0), {
+    jsonRequested: opts.jsonRequested,
+    render: opts.render,
+  });
 }

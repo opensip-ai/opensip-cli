@@ -51,8 +51,12 @@ describe('CLI e2e', () => {
   describe('fit', () => {
     it('runs successfully with --json', () => {
       const { stdout, exitCode } = cli.run(['fit', '--json'], { cwd: FIXTURE });
-      // Parse as JSON — should not throw. ADR-0011: --json is the signal envelope.
-      const output = JSON.parse(stdout);
+      // 2.12.0 (§5.5): --json is a CommandOutcome wrapper; the (unchanged) signal
+      // envelope rides under `.envelope`. Consumers read `.envelope` not the top level.
+      const outcome = JSON.parse(stdout);
+      expect(outcome.kind).toBe('fit.run');
+      expect(outcome.status).toBe('ok');
+      const output = outcome.envelope;
       expect(output.schemaVersion).toBe(2);
       expect(output.tool).toBe('fit');
       expect(output.verdict).toBeDefined();
@@ -79,7 +83,8 @@ describe('CLI e2e', () => {
     it('--list --json outputs valid JSON', () => {
       const { stdout, exitCode } = cli.run(['fit', '--list', '--json'], { cwd: FIXTURE });
       expect(exitCode).toBe(0);
-      const output = JSON.parse(stdout);
+      // 2.12.0: a CommandResult rides under `.data` of the outcome wrapper.
+      const output = JSON.parse(stdout).data;
       expect(output.type).toBe('list-checks');
       expect(Array.isArray(output.checks)).toBe(true);
       expect(output.totalCount).toBeGreaterThan(0);
@@ -88,14 +93,14 @@ describe('CLI e2e', () => {
     it('--recipes --json outputs valid JSON', () => {
       const { stdout, exitCode } = cli.run(['fit', '--recipes', '--json'], { cwd: FIXTURE });
       expect(exitCode).toBe(0);
-      const output = JSON.parse(stdout);
+      const output = JSON.parse(stdout).data;
       expect(output.type).toBe('list-recipes');
       expect(Array.isArray(output.recipes)).toBe(true);
     });
 
     it('--check runs a single check', () => {
       const { stdout } = cli.run(['fit', '--json', '--check', 'no-console-log'], { cwd: FIXTURE });
-      const output = JSON.parse(stdout);
+      const output = JSON.parse(stdout).envelope;
       expect(output.tool).toBe('fit');
       expect(output.verdict).toBeDefined();
       // --check must narrow to exactly one check (unit), not the full default recipe.
@@ -106,7 +111,7 @@ describe('CLI e2e', () => {
 
     it('--recipe quick-smoke runs without error', () => {
       const { stdout } = cli.run(['fit', '--json', '--recipe', 'quick-smoke'], { cwd: FIXTURE });
-      const output = JSON.parse(stdout);
+      const output = JSON.parse(stdout).envelope;
       expect(output.tool).toBe('fit');
       expect(output.verdict).toBeDefined();
       expect(output.verdict.summary.total).toBeGreaterThan(0);
@@ -114,7 +119,7 @@ describe('CLI e2e', () => {
 
     it('--json summary fields have expected types', () => {
       const { stdout } = cli.run(['fit', '--json', '--recipe', 'quick-smoke'], { cwd: FIXTURE });
-      const output = JSON.parse(stdout);
+      const output = JSON.parse(stdout).envelope;
       expect(typeof output.createdAt).toBe('string');
       expect(typeof output.verdict.score).toBe('number');
       expect(typeof output.verdict.passed).toBe('boolean');
@@ -128,9 +133,11 @@ describe('CLI e2e', () => {
       // (vs. `not.toBe(0)`) closes the loop on that fix end-to-end.
       const { stdout, exitCode } = cli.run(['fit', '--json', '--recipe', 'nonexistent-recipe'], { cwd: FIXTURE });
       expect(exitCode).toBe(2);
-      const output = JSON.parse(stdout);
-      expect(output.error).toBeDefined();
-      expect(output.error).toContain('nonexistent-recipe');
+      // 2.12.0 (§5.5): a failed --json run is a status:'error' outcome carrying a
+      // structured `errors[].message` (retires the bare `{ error }` shape).
+      const outcome = JSON.parse(stdout);
+      expect(outcome.status).toBe('error');
+      expect(outcome.errors[0].message).toContain('nonexistent-recipe');
     });
 
     it('fails with exit 2 when no config is found', () => {
@@ -159,7 +166,7 @@ describe('CLI e2e', () => {
 
         const { stdout, exitCode } = cli.run(['fit', '--json', '--check', 'no-console-log', '--config', 'nested/custom.yml'], { cwd: tempDir });
         expect(exitCode).toBe(0);
-        const output = JSON.parse(stdout);
+        const output = JSON.parse(stdout).envelope;
         expect(output.tool).toBe('fit');
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
@@ -184,7 +191,7 @@ describe('CLI e2e', () => {
 
         const { stdout, exitCode } = cli.run(['fit', '--json', '--check', 'no-console-log'], { cwd: tempDir });
         expect(exitCode).toBe(0);
-        const output = JSON.parse(stdout);
+        const output = JSON.parse(stdout).envelope;
         expect(output.tool).toBe('fit');
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
@@ -274,7 +281,8 @@ describe('CLI e2e', () => {
       // pointing at --keep / --remove.
       const { stdout, exitCode } = cli.run(['init', '--language', 'typescript', '--json'], { cwd: tempDir });
       expect(exitCode).toBe(2);
-      const output = JSON.parse(stdout);
+      // 2.12.0: the InitResult rides under `.data` of the outcome wrapper.
+      const output = JSON.parse(stdout).data;
       expect(output.created).toBe(false);
       expect(output.state).toBe('fully-initialized');
       expect(output.partialStateError?.state).toBe('fully-initialized');
