@@ -1,6 +1,15 @@
 // Types — internal signal (shared across tools)
 export type { Signal, SignalSeverity, SignalCategory, CreateSignalInput, FixHint } from './types/signal.js';
 export { createSignal, isErrorSeverity, isErrorSignal } from './types/signal.js';
+
+// Severity & Signal policy (north-star §5.9, release 2.13.0). One home for
+// author→wire severity mapping + the override clamp + the gate's error/warning
+// predicate, plus the generic identity-stamping factory `createSignalFromViolation`
+// (so tools stamp source/ruleId/severity instead of retyping them).
+export { SeverityPolicy } from './lib/severity-policy.js';
+export type { AuthorSeverity } from './lib/severity-policy.js';
+export { createSignalFromViolation } from './signals/create-signal-from-violation.js';
+export type { ViolationInput } from './signals/create-signal-from-violation.js';
 // Cloud signal egress envelope (ADR-0008)
 export type { SignalBatch, RepoIdentity, BuildSignalBatchInput } from './types/signal-batch.js';
 export { buildSignalBatch, MAX_SIGNALS_PER_BATCH } from './types/signal-batch.js';

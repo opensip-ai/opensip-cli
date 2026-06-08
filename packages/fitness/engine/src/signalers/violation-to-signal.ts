@@ -22,39 +22,29 @@
  * the gate, verdict, and dashboard all agree.
  */
 
-import { createSignal } from '@opensip-tools/core';
+import { createSignalFromViolation } from '@opensip-tools/core';
 
 import type { RecipeCheckResult } from '../recipes/types.js';
-import type { Signal, SignalSeverity } from '@opensip-tools/core';
+import type { Signal } from '@opensip-tools/core';
 
 /** A single fitness violation, as carried on {@link RecipeCheckResult.violations}. */
 type RecipeViolation = NonNullable<RecipeCheckResult['violations']>[number];
 
 /**
- * Map a fitness check's 2-level `error|warning` severity UP to the 4-level
- * {@link SignalSeverity}. `error → high`, `warning → medium` — chosen so the
- * envelope's error-rung (`critical|high`) / warning-rung (`medium|low`)
- * bucketing reproduces the old per-check error/warning counts exactly.
- */
-function liftSeverity(severity: RecipeViolation['severity']): SignalSeverity {
-  return severity === 'error' ? 'high' : 'medium';
-}
-
-/**
  * Map a single check violation to a core {@link Signal}.
  *
- * `source`/`ruleId` both carry `checkSlug` (the fitness unit slug). The
- * file/line/column ride on `code` (and are mirrored to `filePath`/`line`/
- * `column` by {@link createSignal}). `category` defaults to `quality` — the
- * neutral fitness category.
+ * Release 2.13.0 (§5.9): delegates to the shared `createSignalFromViolation`, which
+ * STAMPS identity — `source`/`ruleId` both carry `checkSlug` (the fitness unit
+ * slug) and the wire `severity` is lifted by `SeverityPolicy` (`error → high`,
+ * `warning → medium`). Byte-identical to the former hand-mapping.
  */
 export function violationToSignal(checkSlug: string, violation: RecipeViolation): Signal {
-  return createSignal({
-    source: checkSlug,
-    severity: liftSeverity(violation.severity),
-    ruleId: checkSlug,
+  return createSignalFromViolation(checkSlug, checkSlug, {
     message: violation.message,
+    severity: violation.severity,
     suggestion: violation.suggestion,
-    code: { file: violation.file, line: violation.line, column: violation.column },
+    file: violation.file,
+    line: violation.line,
+    column: violation.column,
   });
 }

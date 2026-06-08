@@ -16,11 +16,16 @@
  * `_entry-points.ts`) — no new layer crossing.
  */
 
+import { SeverityPolicy } from '@opensip-tools/core';
+
 import type { GraphConfig } from '../types.js';
 import type { SignalSeverity } from '@opensip-tools/core';
 
 /**
- * Clamp a rule's base severity per the opt-in override channel.
+ * Clamp a rule's base severity per the opt-in override channel. Release 2.13.0
+ * (§5.9): delegates the clamp to the central `SeverityPolicy.applyOverride`
+ * (byte-identical — base unchanged with no override, `error → high`,
+ * `warning → medium` when set); this stays as the graph-config lookup seam.
  *
  * @param base   The severity the rule's predicate chose for this signal.
  * @param slug   The rule's `graph:<slug>` id (the override key).
@@ -32,7 +37,5 @@ export function applySeverityOverride(
   slug: string,
   config: GraphConfig,
 ): SignalSeverity {
-  const override = config.severityOverrides?.[slug];
-  if (override === undefined) return base;
-  return override === 'error' ? 'high' : 'medium';
+  return SeverityPolicy.applyOverride(base, config.severityOverrides?.[slug]);
 }

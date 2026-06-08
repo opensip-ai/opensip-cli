@@ -6,25 +6,19 @@
  * to SignalCategory. Used by defineCheck and PatternDetector.
  */
 
-import { logger } from '@opensip-tools/core'
+import { SeverityPolicy, logger } from '@opensip-tools/core'
 
 import type { FindingSeverity } from '../types/findings.js'
 import type { SignalSeverity, SignalCategory } from '@opensip-tools/core'
 
 
-/** Map FindingSeverity to SignalSeverity */
+/**
+ * Map FindingSeverity to SignalSeverity. Release 2.13.0 (§5.9): delegates to the
+ * central `SeverityPolicy` (one author→wire home), byte-identical
+ * (`error → high`, `warning → medium`).
+ */
 export function mapFindingSeverity(severity: FindingSeverity): SignalSeverity {
-  switch (severity) {
-    case 'error': {
-      return 'high'
-    }
-    case 'warning': {
-      return 'medium'
-    }
-    default: {
-      return 'medium'
-    }
-  }
+  return SeverityPolicy.liftAuthorSeverity(severity)
 }
 
 /**

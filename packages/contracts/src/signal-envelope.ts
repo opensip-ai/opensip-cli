@@ -18,6 +18,8 @@
  * version. It is `2`, succeeding the implicit `CliOutput` "1.0" husk this
  * envelope replaces.
  */
+import { SeverityPolicy } from '@opensip-tools/core';
+
 import { passRate } from './score.js';
 
 import type { Signal, ToolShortId } from '@opensip-tools/core';
@@ -119,7 +121,9 @@ export function buildSignalEnvelope(input: BuildEnvelopeInput): SignalEnvelope {
   let errors = 0;
   let warnings = 0;
   for (const signal of input.signals) {
-    if (signal.severity === 'critical' || signal.severity === 'high') errors += 1;
+    // The gate's error/warning split is the central policy predicate (§5.9), one
+    // source of truth shared with the verdict / terminal table / SARIF level.
+    if (SeverityPolicy.isError(signal.severity)) errors += 1;
     else warnings += 1;
   }
 
