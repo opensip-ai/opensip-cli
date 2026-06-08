@@ -90,7 +90,7 @@ That's it. Five layers, thirty packages.
 
 ## How the layer rule is enforced
 
-The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v2.11.0/.config/dependency-cruiser.cjs) at lint time. The relevant rules:
+The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v2.12.0/.config/dependency-cruiser.cjs) at lint time. The relevant rules:
 
 ```js
 // core imports nothing else from the workspace.
@@ -122,7 +122,7 @@ The build runs `pnpm depcruise` as part of the standard `pnpm lint` flow. A forb
 
 ## Two cruiser passes — no standing layer exception
 
-Real codebases have edge cases. Two earlier cross-layer exceptions once lived in [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.11.0/.config/dependency-cruiser.cjs); both have since been **paid down** and deleted:
+Real codebases have edge cases. Two earlier cross-layer exceptions once lived in [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.12.0/.config/dependency-cruiser.cjs); both have since been **paid down** and deleted:
 
 - **`lang-typescript` → `fitness`** (the `filterContent` back-edge): `filterContent` / `clearFilterCache` / `FilteredContent` now live in `@opensip-tools/lang-typescript` itself, so no lang pack reaches up into a tool. The `lang-no-fitness-except-typescript` rule is gone.
 - **`graph` → `fitness`** (SARIF reuse): SARIF is now the single shared `formatSignalSarif` formatter in `@opensip-tools/output`, applied at the composition root (ADR-0011) — `graph` returns a `SignalEnvelope` and imports neither fitness nor `@opensip-tools/output`. The `graph-may-import-fitness-sarif` info-exception is gone.
@@ -131,9 +131,9 @@ What remains is not an exception but a *second lens*. The layer ruleset runs twi
 
 ### Type-only edges are caught by the type-aware pass
 
-The **runtime pass** ([`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.11.0/.config/dependency-cruiser.cjs)) sets `tsPreCompilationDeps: false`, so type-only imports (`import type { ... }`) don't count as edges. It models what actually runs: two files that only `import type` from each other form no runtime cycle, and TypeScript erases those imports, so flagging them would be a false positive.
+The **runtime pass** ([`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.12.0/.config/dependency-cruiser.cjs)) sets `tsPreCompilationDeps: false`, so type-only imports (`import type { ... }`) don't count as edges. It models what actually runs: two files that only `import type` from each other form no runtime cycle, and TypeScript erases those imports, so flagging them would be a false positive.
 
-That leaves a blind spot — a type-only *layer inversion* or *cycle* would be invisible to the runtime pass. The **type-aware pass** ([`.config/dependency-cruiser.types.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.11.0/.config/dependency-cruiser.types.cjs)) closes it: it flips `tsPreCompilationDeps: true` and re-runs the **same** `forbidden` ruleset over the type-inclusive graph. Every directional layer rule — and `no-circular` — therefore also fires on type-only edges.
+That leaves a blind spot — a type-only *layer inversion* or *cycle* would be invisible to the runtime pass. The **type-aware pass** ([`.config/dependency-cruiser.types.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.12.0/.config/dependency-cruiser.types.cjs)) closes it: it flips `tsPreCompilationDeps: true` and re-runs the **same** `forbidden` ruleset over the type-inclusive graph. Every directional layer rule — and `no-circular` — therefore also fires on type-only edges.
 
 The upshot: there is **no** standing "you may `import type` upward" allowance. A type-only import from a lower layer into a higher one trips the type-aware pass exactly as a runtime import trips the runtime pass. (The historical type-only cycles that predated this pass were paid down before it was promoted from visibility-only to gating.)
 

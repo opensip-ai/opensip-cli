@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.12.0] — 2026-06-08
+
+**Output & Observability planes.** Every command result and error — including the
+pre-handler bootstrap failures where `--json` matters most — now has one outer
+`CommandOutcome` shape (north-star §5.5/§5.10/§4.7/§5.12, ADR-0024). The host
+**assembles** the outcome from each tool's unchanged domain return; no tool
+chooses its own error JSON or success carrier.
+
+### Breaking
+
+- **`--json` now emits a `CommandOutcome` wrapper.** The byte-identical
+  `SignalEnvelope` rides under `.envelope` (run commands `fit`/`graph`/`sim`); a
+  `CommandResult` rides under `.data` (list/dashboard/`init`/`sessions`/`plugin`);
+  a failure carries structured `.errors[]`. Read `.envelope.verdict.passed` where
+  you previously read `.verdict.passed`. The inner envelope and all human output
+  are unchanged. Migration guide: `docs/public/70-reference/09-migrating-to-2.12.md`
+  (ships as a 2.x minor break, like the 2.7.0 `--json` change).
+
+### Added
+
+- **Structured bootstrap errors.** No-project / schema-too-old / config-resolve /
+  tool-init failures are now a `bootstrap.error` `CommandOutcome` — `fit --json` in
+  a directory with no project returns a structured, suggestion-bearing error and
+  exit 2 (previously: nothing structured). Human output byte-identical.
+- **`RunDiagnostics` bus.** Every outcome carries a JSON-emittable `diagnostics`
+  stream of lifecycle events (plugins loaded, project resolved, command executed),
+  bridged to the existing OpenTelemetry trace context. Scope-owned; additive.
+- **Governed environment surface.** Every env read flows through one `EnvRegistry`;
+  the env surface is documented in `docs/public/70-reference/10-environment-variables.md`.
+- **`cli.emitError` seam** for tool handlers, retiring the bare `emitJson({ error })`.
+- **Three guardrails:** `one-outcome-shape`, `no-local-exit-or-stdout`,
+  `env-via-registry` (133 → 136 checks).
+
 ## [2.11.0] — 2026-06-07
 
 **Command plane (the spine).** The largest first-party privilege — raw Commander
