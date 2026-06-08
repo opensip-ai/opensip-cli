@@ -8,6 +8,7 @@ import type { CheckDisplayEntry } from './types.js'
 export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
   'capability-by-manifest': ['🧩', 'Capability By Manifest'],
   'cli-recipe-deprecated': ['♻️', 'CLI Recipe Deprecated'],
+  'command-surface-parity': ['🛡️', 'Command Surface Parity'],
   'cross-tool-flag-parity': ['🚩', 'Cross-Tool Flag Parity'],
   'docker-best-practices': ['🐳', 'Docker Best Practices'],
   'docker-ignore-validation': ['🐳', 'Docker Ignore Validation'],
