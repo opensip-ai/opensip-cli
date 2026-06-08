@@ -107,8 +107,8 @@ export class SessionRepo {
     return row ? this.hydrateSession(row) : null;
   }
 
-  latest(): StoredSession | null {
-    const rows = this.list({ limit: 1 });
+  latest(opts: { tool?: ToolShortId } = {}): StoredSession | null {
+    const rows = this.list({ ...opts, limit: 1 });
     return rows[0] ?? null;
   }
 
@@ -188,4 +188,3 @@ export class SessionRepo {
     };
   }
 }
-

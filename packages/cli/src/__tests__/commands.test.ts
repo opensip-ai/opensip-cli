@@ -58,7 +58,7 @@ describe('registerCliCommands', () => {
   it('mounts the documented sessions subcommands', () => {
     const program = new Command('opensip-tools');
     registerCliCommands(program, makeContext());
-    expect(subcommandNames(program, 'sessions')).toEqual(['list', 'purge']);
+    expect(subcommandNames(program, 'sessions')).toEqual(['list', 'purge', 'show']);
   });
 
   it('mounts the documented plugin subcommands', () => {

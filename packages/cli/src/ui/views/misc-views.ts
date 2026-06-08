@@ -95,6 +95,10 @@ function historyRow(s: StoredSession): ViewNode {
   const counts = payloadCounts(s.payload);
   const spans: Span[] = [
     { text: '  ' },
+    { text: s.id, dim: true },
+    { text: '  ' },
+    { text: s.tool, tone: 'brand', bold: true },
+    { text: '  ' },
     { text: date, dim: true },
     { text: '  ' },
     { text: `${s.score}%`, tone: scoreTone(s.score) },

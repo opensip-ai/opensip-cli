@@ -24,9 +24,11 @@
 import { pathToFileURL } from 'node:url';
 
 import { BUILTIN_DEFAULT_RECIPE, buildFindingGroups, buildSignalEnvelope, EXIT_CODES } from '@opensip-tools/contracts';
-import { currentScope, discoverPackagesByMarker, logger, registerRecipesFromMod } from '@opensip-tools/core';
+import { currentScope, discoverPackagesByMarker, generatePrefixedId, logger, registerRecipesFromMod } from '@opensip-tools/core';
+import { SessionRepo } from '@opensip-tools/session-store';
 
 import { currentScenarioRegistry } from '../framework/registry.js';
+import { buildSimulationSessionPayload } from '../persistence/session-payload.js';
 import { loadAllSimPlugins } from '../plugins/loader.js';
 import {
   discoverScenarioPackages,
@@ -43,6 +45,7 @@ import type { SimPluginExports } from '../plugins/types.js';
 import type { SimulationScenarioResult } from '../recipes/service.js';
 import type { ErrorResult, SimDoneResult, ToolOptions, UnitResult, VerboseDetail } from '@opensip-tools/contracts';
 import type { Signal } from '@opensip-tools/core';
+import type { DataStore } from '@opensip-tools/datastore';
 
 // ---------------------------------------------------------------------------
 // Lazy-load simulation scenarios
@@ -310,6 +313,7 @@ export interface ExecuteSimOptions {
    * non-interactive callers (json / non-TTY) omit it.
    */
   readonly onProgress?: (completed: number, total: number) => void;
+  readonly datastore?: DataStore;
 }
 
 /**
@@ -421,15 +425,42 @@ export async function executeSim(
       ? { kind: 'findings', groups: buildFindingGroups(units, signals) }
       : undefined;
 
-  return {
-    result: {
-      type: 'sim-done',
-      recipeName,
-      cwd: args.cwd,
-      durationMs: recipeResult.durationMs,
-      shouldFail: failed > 0,
-      envelope,
-      ...(verboseDetail === undefined ? {} : { verboseDetail }),
-    },
+  const result: SimDoneResult = {
+    type: 'sim-done',
+    recipeName,
+    cwd: args.cwd,
+    durationMs: recipeResult.durationMs,
+    shouldFail: failed > 0,
+    envelope,
+    ...(verboseDetail === undefined ? {} : { verboseDetail }),
   };
+  if (opts.datastore !== undefined) {
+    persistSimSession(opts.datastore, result);
+  }
+
+  return { result };
+}
+
+function persistSimSession(datastore: DataStore, result: SimDoneResult): void {
+  try {
+    const repo = new SessionRepo(datastore);
+    repo.save({
+      id: generatePrefixedId('sim'),
+      tool: 'sim',
+      timestamp: result.envelope.createdAt,
+      cwd: result.cwd,
+      recipe: result.recipeName,
+      score: result.envelope.verdict.score,
+      passed: result.envelope.verdict.passed,
+      durationMs: result.durationMs,
+      payload: buildSimulationSessionPayload(result.envelope),
+    });
+  } catch (error) {
+    logger.warn({
+      evt: 'cli.sim.session.save_failed',
+      module: 'cli:sim',
+      msg: 'Failed to persist sim session — continuing without history write',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

@@ -8,6 +8,7 @@
  * split).
  */
 
+import type { SignalEnvelope } from './signal-envelope.js';
 import type { ToolShortId } from '@opensip-tools/core';
 
 /**
@@ -35,4 +36,17 @@ export interface StoredSession {
    * its shape. Absent for tools that persist no detail.
    */
   readonly payload?: unknown;
+}
+
+/** A tool-owned replay of a stored session projection. */
+export interface ToolSessionReplay<R = unknown> {
+  /** Human-renderable result for the shared CLI render seam. */
+  readonly result: R;
+  /** Machine-readable reconstructed envelope emitted by `sessions show --json`. */
+  readonly envelope: SignalEnvelope;
+  /**
+   * Stored sessions currently persist dashboard/detail projections, not the full
+   * live run envelope. This marker makes that explicit for machine consumers.
+   */
+  readonly fidelity: 'projection';
 }

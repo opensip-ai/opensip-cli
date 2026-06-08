@@ -11,13 +11,15 @@
  * old `register()` action body did (byte-identical behaviour).
  */
 
-import { EXIT_CODES, type ToolOptions } from '@opensip-tools/contracts';
+import { EXIT_CODES, type StoredSession, type ToolOptions } from '@opensip-tools/contracts';
 import { defineCommand, readPackageVersion } from '@opensip-tools/core';
+import { resolveSession } from '@opensip-tools/session-store';
 
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { renderSimLive } from './cli/sim-runner.js';
 import { executeSim } from './cli/sim.js';
 import { createScenarioRegistry, currentScenarioRegistry } from './framework/registry.js';
+import { simReplayFromSession } from './persistence/session-replay.js';
 import { SIM_PLUGIN_LAYOUT } from './plugins/loader.js';
 import { createSimulationRecipeRegistry } from './recipes/registry.js';
 // Side-effect import: ensures the RunScope.simulation augmentation is
@@ -33,6 +35,7 @@ import type {
   ToolCliContext,
   ToolCommandDescriptor,
 } from '@opensip-tools/core';
+import type { DataStore } from '@opensip-tools/datastore';
 
 
 const SIM: ToolCommandDescriptor = {
@@ -70,7 +73,10 @@ type SimOptions = ToolOptions & {
 function setUpSimLiveView(cli: ToolCliContext): void {
   cli.registerLiveView(SIM_LIVE_VIEW_KEY, async (args) => {
     const simArgs = args as ToolOptions;
-    const envelope = await renderSimLive(simArgs, { setExitCode: cli.setExitCode });
+    const envelope = await renderSimLive(simArgs, {
+      setExitCode: cli.setExitCode,
+      datastore: cli.scope.datastore() as DataStore | undefined,
+    });
     if (envelope !== undefined) {
       await cli.deliverSignals(envelope, {
         cwd: simArgs.cwd,
@@ -91,6 +97,11 @@ function setUpSimLiveView(cli: ToolCliContext): void {
  */
 async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   const opts = rawOpts as SimOptions;
+  if (opts.show !== undefined && opts.show.length > 0) {
+    await runSimShowMode(opts, cli);
+    return;
+  }
+
   // Interactive TTY (non-json): the animated live view. Egress + exit code
   // are handled inside the registerLiveView callback / renderSimLive after
   // the Ink app exits.
@@ -104,7 +115,9 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   // json / non-TTY (pipe / CI): run the engine and render statically — the
   // animated Ink view is a TTY-only affordance. Output is byte-for-byte the
   // pre-live-view behavior.
-  const { result } = await executeSim(opts);
+  const { result } = await executeSim(opts, {
+    datastore: cli.scope.datastore() as DataStore | undefined,
+  });
 
   if (result.type === 'error') {
     if (opts.json) {
@@ -143,6 +156,73 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   });
 }
 
+async function runSimShowMode(opts: SimOptions, cli: ToolCliContext): Promise<void> {
+  const datastore = cli.scope.datastore() as DataStore | undefined;
+  if (datastore === undefined) {
+    await emitSimShowError(opts, cli, 'datastore-unavailable', 'session replay requires a datastore');
+    return;
+  }
+  const resolved = resolveSession(datastore, { ref: opts.show ?? 'latest', tool: 'sim' });
+  if (!resolved.ok) {
+    await emitSimShowError(opts, cli, resolved.reason, resolved.detail);
+    return;
+  }
+
+  try {
+    const replay = simReplayFromSession(resolved.session);
+    if (opts.json === true) {
+      cli.emitJson(sessionShowJson(resolved.session, replay));
+      return;
+    }
+    await cli.render(replay.result);
+  } catch (error) {
+    await emitSimShowError(
+      opts,
+      cli,
+      'decode-error',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
+async function emitSimShowError(
+  opts: Pick<SimOptions, 'json'>,
+  cli: ToolCliContext,
+  reason: string,
+  detail: string,
+): Promise<void> {
+  cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+  if (opts.json === true) {
+    cli.emitJson({ error: detail, reason });
+    return;
+  }
+  await cli.render({
+    type: 'error',
+    message: detail,
+    exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+  });
+}
+
+function sessionShowJson(
+  session: StoredSession,
+  replay: ReturnType<typeof simReplayFromSession>,
+): unknown {
+  return {
+    session: {
+      id: session.id,
+      tool: session.tool,
+      timestamp: session.timestamp,
+      recipe: session.recipe,
+      cwd: session.cwd,
+      score: session.score,
+      passed: session.passed,
+      durationMs: session.durationMs,
+    },
+    fidelity: replay.fidelity,
+    envelope: replay.envelope,
+  };
+}
+
 /**
  * The declarative `sim` command (release 2.11.0 Phase 3 — the reference
  * migration). Replaces the hand-rolled `register()` body: the host mounts this
@@ -166,6 +246,11 @@ const simCommand: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, 
   commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
   options: [
     { flag: '--recipe', value: '<name>', description: 'Run a named sim recipe (default: built-in `default`)' },
+    {
+      flag: '--show',
+      value: '<session>',
+      description: 'Replay a stored sim session by id, or latest for the latest sim session',
+    },
   ],
   scope: 'project',
   output: 'raw-stream',
@@ -211,6 +296,10 @@ export const simulationTool: Tool = {
   // `register()` fallback is gone — sim no longer touches Commander.
   commandSpecs: [simCommand],
   contributeScope,
+  sessionReplay: {
+    tool: 'sim',
+    replaySession: simReplayFromSession,
+  },
   // ADR-0023 Phase 4: simulation contributes its namespaced `simulation:` Zod
   // schema so the host composes + strict-validates the whole config document
   // before dispatch.
