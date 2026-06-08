@@ -7,17 +7,12 @@
  * that drive stale-scaffolded detection.
  */
 
+import { renderDocumentHeader, type TargetTemplateInput } from '@opensip-tools/config';
 import { CLI_SUPPORTED_SCHEMA_VERSION } from '@opensip-tools/core';
 
 import type { SupportedLanguage } from './language-detection.js';
 
-interface TargetTemplate {
-  readonly name: string;
-  readonly description: string;
-  readonly languages: readonly string[];
-  readonly include: readonly string[];
-  readonly exclude: readonly string[];
-}
+type TargetTemplate = TargetTemplateInput;
 
 function targetTemplate(lang: SupportedLanguage): TargetTemplate {
   switch (lang) {
@@ -79,42 +74,18 @@ function targetTemplate(lang: SupportedLanguage): TargetTemplate {
 }
 
 export function generateConfig(languages: readonly SupportedLanguage[]): string {
-  const templates = languages.map(targetTemplate);
+  // The document-level skeleton (header, schemaVersion, globalExcludes, targets)
+  // is rendered by @opensip-tools/config — the package that also OWNS + validates
+  // those blocks (2.10.1, ADR-0023), so the scaffold cannot drift from what the
+  // composed schema accepts (asserted by a round-trip test). The CLI supplies the
+  // per-language target content and appends the tool-owned `fitness:` block.
+  const header = renderDocumentHeader({
+    schemaVersion: CLI_SUPPORTED_SCHEMA_VERSION,
+    targets: languages.map(targetTemplate),
+  });
 
-  const lines: string[] = [
-    '# OpenSIP Tools — project configuration',
-    '#',
-    '# Defines named target file sets for fitness checks. Each fitness',
-    '# check declares a `scope` (languages + concerns); discovery',
-    '# matches it against these targets to determine which files the',
-    '# check runs against.',
-    '#',
-    '# Docs: https://github.com/opensip-ai/opensip-tools#configuration',
+  const fitnessBlock = [
     '',
-    `schemaVersion: ${CLI_SUPPORTED_SCHEMA_VERSION}`,
-    '',
-    'globalExcludes:',
-    '  - "**/node_modules/**"',
-    '  - "**/dist/**"',
-    '',
-    'targets:',
-  ];
-
-  for (const t of templates) {
-    lines.push(
-      `  ${t.name}:`,
-      `    description: ${t.description}`,
-      `    languages: [${t.languages.join(', ')}]`,
-      '    concerns: [backend]',
-      '    include:',
-      ...t.include.map((p) => `      - "${p}"`),
-      '    exclude:',
-      ...t.exclude.map((p) => `      - "${p}"`),
-      '',
-    );
-  }
-
-  lines.push(
     '# =============================================================================',
     '# Fitness configuration',
     '# =============================================================================',
@@ -124,9 +95,9 @@ export function generateConfig(languages: readonly SupportedLanguage[]): string 
     '  failOnWarnings: 0   # fail if total warnings >= this (0 = warnings are informational)',
     '  disabledChecks: []',
     '',
-  );
+  ].join('\n');
 
-  return lines.join('\n');
+  return `${header}\n${fitnessBlock}`;
 }
 
 // Stable UUIDs for the scaffolded example checks. Hard-coded (rather

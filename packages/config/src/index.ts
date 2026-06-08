@@ -55,4 +55,6 @@ export {
   resolveEffectiveCloudConfig,
 } from './document/global-config.js';
 export type { GlobalConfig } from './document/global-config.js';
+export { renderDocumentHeader } from './document/template.js';
+export type { DocumentHeaderInput, TargetTemplateInput } from './document/template.js';
 export { hostConfigDeclarations } from './document/host-declarations.js';
