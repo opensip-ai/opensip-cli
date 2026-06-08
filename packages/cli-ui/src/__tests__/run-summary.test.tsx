@@ -30,13 +30,22 @@ describe('RunSummary', () => {
     expect(lastFrame() ?? '').toContain('999ms');
   });
 
-  it('formats durations of one second or more in seconds with one decimal', () => {
+  it('formats durations from one second up to one minute in seconds with one decimal', () => {
     const { lastFrame } = render(
       <ThemeProvider>
         <RunSummary passed={1} failed={0} errors={0} warnings={0} durationMs={1500} />
       </ThemeProvider>,
     );
     expect(lastFrame() ?? '').toContain('1.5s');
+  });
+
+  it('formats durations of one minute or more in minutes and seconds', () => {
+    const { lastFrame } = render(
+      <ThemeProvider>
+        <RunSummary passed={1} failed={0} errors={0} warnings={0} durationMs={1_471_600} />
+      </ThemeProvider>,
+    );
+    expect(lastFrame() ?? '').toContain('24m 31.6s');
   });
 
   it('plain-text form matches the legacy writeRunSummaryPlain string (byte parity)', () => {

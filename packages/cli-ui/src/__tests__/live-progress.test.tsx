@@ -87,6 +87,17 @@ describe('<LiveProgress> — phases mode', () => {
     unmount();
   });
 
+  it('formats minute-scale stage durations in minutes and seconds', async () => {
+    const { subscribe, emit } = controllable();
+    const { lastFrame, unmount } = mount(PHASES, subscribe);
+    await waitForFrame(lastFrame, 'Discover files');
+
+    emit({ type: 'stage-done', stage: 'rules', durationMs: 1_471_600, detail: '318541 call site(s)' });
+    await waitForFrame(lastFrame, '318541 call site(s) (24m 31.6s)');
+    expect(lastFrame()).toContain('✓ Evaluate rules');
+    unmount();
+  });
+
   it('renders a cache hit as (cached)', async () => {
     const { subscribe, emit } = controllable();
     const { lastFrame, unmount } = mount(PHASES, subscribe);

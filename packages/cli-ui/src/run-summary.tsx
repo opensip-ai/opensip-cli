@@ -2,7 +2,7 @@
  * RunSummary — shared one-line PASS/FAIL summary used by every Ink live
  * view in the suite (fitness, graph, sim).
  *
- * The format is fixed: `{P} Passed, {F} Failed ({E} Errors, {W} Warnings) | Duration {ms}`
+ * The format is fixed: `{P} Passed, {F} Failed ({E} Errors, {W} Warnings) | Duration {dur}`
  * with per-segment colors driven by the active theme. Counts are rendered
  * with semantically meaningful colors — error for nonzero errors, warning
  * for nonzero warnings, muted when zero — so the eye anchors on the bad

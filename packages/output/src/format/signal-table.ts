@@ -35,7 +35,7 @@ export interface SignalTableRow {
   readonly errors: number;
   /** Count of this unit's `medium`/`low` signals. */
   readonly warnings: number;
-  /** Pretty duration (`"450ms"` / `"1.5s"`). */
+  /** Pretty duration (`"450ms"` / `"1.5s"` / `"24m 31.6s"`). */
   readonly duration: string;
   /** Raw duration in milliseconds (for sorting / re-formatting). */
   readonly durationMs: number;
