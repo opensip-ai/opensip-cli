@@ -28,7 +28,7 @@ opensip-tools reads two config files:
 | `<project>/opensip-tools.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
 | `~/.opensip-tools/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key and machine-wide cloud-sync controls |
 
-The strict project-config schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.12.0/packages/fitness/engine/src/signalers/schema.ts). A few sections also have permissive readers in their owning package so tool-agnostic commands can read only the fields they need.
+The strict project-config schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/packages/fitness/engine/src/signalers/schema.ts). A few sections also have permissive readers in their owning package so tool-agnostic commands can read only the fields they need.
 
 ## Top-level shape
 
@@ -47,7 +47,7 @@ graph: {}                 # graph rule knobs (read out-of-band — see below)
 
 Every section is optional; a missing section becomes `{}`.
 
-The validated schema (`SignalersConfigSchema`) covers `schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, `cli`, and `dashboard`. **`plugins:` and `graph:` are read out-of-band** by separate parsers ([plugin discovery](https://github.com/opensip-ai/opensip-tools/blob/v2.12.0/packages/core/src/plugins/discover.ts) and [`loadGraphConfig`](https://github.com/opensip-ai/opensip-tools/blob/v2.12.0/packages/graph/engine/src/cli/graph-config.ts)) so each can evolve with its owner. The `cli:` block also has a permissive mirror reader in [`packages/contracts/src/cli-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.12.0/packages/contracts/src/cli-config.ts), used by the CLI pre-action hook before fitness code is involved.
+The validated schema (`SignalersConfigSchema`) covers `schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, `cli`, and `dashboard`. **`plugins:` and `graph:` are read out-of-band** by separate parsers ([plugin discovery](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/packages/core/src/plugins/discover.ts) and [`loadGraphConfig`](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/packages/graph/engine/src/cli/graph-config.ts)) so each can evolve with its owner. The `cli:` block also has a permissive mirror reader in [`packages/contracts/src/cli-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/packages/contracts/src/cli-config.ts), used by the CLI pre-action hook before fitness code is involved.
 
 `schemaVersion` defaults to `1`. The pre-action hook reads it before the strict loader runs; if a project config declares a schema newer than the installed CLI understands, the CLI exits 2 with an "upgrade your CLI" message rather than misreading the file.
 
@@ -210,7 +210,7 @@ Validated by the project-config schema and read by the dashboard data path. Unkn
 
 ## `graph`
 
-Per-rule knobs for the `graph` tool. Read out-of-band by `loadGraphConfig` ([`graph-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.12.0/packages/graph/engine/src/cli/graph-config.ts)), not by the fitness Zod schema. Every field is optional; an omitted field uses the rule's in-rule default. The loader projects only the field types — it does not strictly validate, so a malformed value is dropped (the rule then uses its default).
+Per-rule knobs for the `graph` tool. Read out-of-band by `loadGraphConfig` ([`graph-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.13.0/packages/graph/engine/src/cli/graph-config.ts)), not by the fitness Zod schema. Every field is optional; an omitted field uses the rule's in-rule default. The loader projects only the field types — it does not strictly validate, so a malformed value is dropped (the rule then uses its default).
 
 ### Duplicated-function-body (`graph:duplicated-function-body`)
 

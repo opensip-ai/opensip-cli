@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.13.0] — 2026-06-08
+
+**Execution · Severity · the sim proof slice.** "Same words mean same semantics"
+becomes true across tools, graph-rule authors are shielded to the check-authoring
+bar, and the tool-plugin spine is proven with a real externalization
+(north-star §5.8/§5.9/§8/§4.8). Additive — no `--json`/CLI break.
+
+### Fixed
+
+- **`sim`'s `execution.timeout` now aborts a runaway scenario.** It was declared
+  but silently dead (`runSingle` ran against a signal nothing ever aborted).
+  Simulation now runs on the shared execution substrate, so `timeout` /
+  `maxParallel` / `stopOnFirstFailure` mean the same thing they do in fitness
+  (parallel mode now honours `stopOnFirstFailure` too).
+
+### Added
+
+- **Execution substrate (`@opensip-tools/core`).** One bounded scheduler +
+  per-unit timeout/retry (`scheduleUnits`, `runWithTimeout`, `runWithRetry`,
+  `executePipeline`) + a unified `WorkflowExecutionOptions` + `deriveRecipeId`,
+  hoisted from fitness's proven scheduler. Fitness runs on it byte-identically; sim
+  adopts it (the timeout fix). Graph stays selection-only — an intentional,
+  ADR-documented difference (ADR-0025).
+- **Severity & Signal policy.** A central `SeverityPolicy` (author→wire mapping +
+  the override clamp + the gate's error/warning predicate, one source of truth) and
+  identity-stamping factories `createSignalFromViolation` (core) and
+  `createGraphSignal` (graph). Every graph rule now stamps `source`/`ruleId`/
+  `severity` via the factory instead of retyping it — closing the SARIF-fingerprint
+  drift risk; signal output byte-identical.
+- **Sim externalization proof slice.** A test loads the real `sim` package through
+  the external plugin loader (manifest + admission gate + dynamic import +
+  `mountCommandSpec`), asserting an identical command surface — de-risking the
+  3.0.0 `fit` proof.
+- **Three guardrails:** `same-recipe-semantics`, `graph-signal-stamped`,
+  `docs-teach-blessed-seam` (136 → 139 checks); the extend-docs now teach the
+  blessed `CommandSpec` seam.
+
 ## [2.12.0] — 2026-06-08
 
 **Output & Observability planes.** Every command result and error — including the
