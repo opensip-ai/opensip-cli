@@ -50,9 +50,8 @@ import type { ToolCliContext } from '@opensip-tools/core';
  * only READS each spec's static declarations (name/aliases/options/args) — no
  * handler runs — so the render/datastore members are inert stubs.
  */
-function makeStubToolContext(program: Command): ToolCliContext {
+function makeStubToolContext(): ToolCliContext {
   return {
-    program,
     project: { scope: 'project', projectRoot: '/x', walkedUp: 0 },
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
@@ -82,7 +81,7 @@ function buildFullProgram(): Command {
     // specs (the same path index.ts drives at step 8 of the tool lifecycle).
     const registry = new ToolRegistry();
     for (const tool of BUNDLED_TOOLS) registry.register(tool);
-    mountAllToolCommands(registry, makeStubToolContext(program));
+    mountAllToolCommands(registry, program, makeStubToolContext());
 
     // Host-owned commands (init/dashboard/sessions/configure/plugin/completion/
     // uninstall), mounted via the same command plane.

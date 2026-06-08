@@ -88,14 +88,15 @@ async function main(): Promise<void> {
   setToolManifestsForRun(manifests);
 
   const { ctx } = buildToolCliContext({
-    program, render: renderResult, liveViews: createLiveViewRegistry(logger),
+    render: renderResult, liveViews: createLiveViewRegistry(logger),
     maybeOpenDashboard, logger,
   });
 
   // Step 8 of the tool lifecycle (§5.4): mount each registered tool's commands
-  // through the named sequencer seam (declarative commandSpecs / deprecated
-  // register() fallback, per-tool failure isolation).
-  mountToolCommands(toolRegistry, ctx);
+  // through the named sequencer seam. The host owns `program` and passes it in
+  // (3.0.0 — the tool context no longer carries a raw-Commander handle, §8); the
+  // one command surface is each tool's declarative commandSpecs.
+  mountToolCommands(toolRegistry, program, ctx);
   // Source the plugin-supporting domains from the registered tools'
   // declared layouts — the kernel never enumerates them (ADR-0009).
   const pluginLayouts = toolRegistry

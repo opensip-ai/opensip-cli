@@ -11,12 +11,19 @@ export const tool = {
   commands: [
     { name: 'audit-demo', description: 'Demo audit command contributed by a tool plugin' },
   ],
-  register(cli) {
-    cli.program
-      .command('audit-demo')
-      .description('Demo audit command contributed by a tool plugin')
-      .action(() => {
+  // 3.0.0: the one command surface is the declarative commandSpec the host mounts
+  // (register() was removed). `raw-stream` output = the handler owns its stdout.
+  commandSpecs: [
+    {
+      name: 'audit-demo',
+      description: 'Demo audit command contributed by a tool plugin',
+      commonFlags: [],
+      scope: 'project',
+      output: 'raw-stream',
+      handler() {
         process.stdout.write('audit-demo ran\n');
-      });
-  },
+        return {};
+      },
+    },
+  ],
 };

@@ -22,12 +22,11 @@ import {
 import { buildCompletionScript, SUBCOMMANDS } from '../commands/completion.js';
 import { registerCliCommands } from '../commands/index.js';
 
-function makeStubContext(program: Command): ToolCliContext {
+function makeStubContext(): ToolCliContext {
   // Layer 5 Phase 3 (audit 2026-05-23 F3): tools own their renderers
   // and register them directly via `cli.registerLiveView`. The CLI no
   // longer hands out bundled renderers via a `builtinLiveViews` map.
   return {
-    program,
     project: {
       cwd: '/test',
       cwdExplicit: false,
@@ -63,8 +62,8 @@ describe('SUBCOMMANDS drift test', () => {
     // `defaultToolRegistry` module singleton was removed in T1 cleanup.
     const registry = new ToolRegistry();
     await registerFirstPartyTools(registry);
-    const ctx = makeStubContext(program);
-    mountAllToolCommands(registry, ctx);
+    const ctx = makeStubContext();
+    mountAllToolCommands(registry, program, ctx);
     registerCliCommands(program, {
       setExitCode: ctx.setExitCode,
       render: (result) => ctx.render(result),
@@ -110,8 +109,8 @@ describe('SUBCOMMANDS drift test', () => {
     const program = new Command('opensip-tools');
     const registry = new ToolRegistry();
     await registerFirstPartyTools(registry);
-    const ctx = makeStubContext(program);
-    mountAllToolCommands(registry, ctx);
+    const ctx = makeStubContext();
+    mountAllToolCommands(registry, program, ctx);
     registerCliCommands(program, {
       setExitCode: ctx.setExitCode,
       render: (result) => ctx.render(result),

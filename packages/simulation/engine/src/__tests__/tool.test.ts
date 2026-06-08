@@ -17,7 +17,6 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { enterScope, RunScope } from '@opensip-tools/core';
-import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
@@ -55,7 +54,7 @@ function simSpec(): CommandSpec<unknown, ToolCliContext> {
   return spec;
 }
 
-function makeFakeContext(program: Command): {
+function makeFakeContext(): {
   ctx: ToolCliContext;
   rendered: unknown[];
   exitCodes: number[];
@@ -78,7 +77,6 @@ function makeFakeContext(program: Command): {
   const ctxScope = new RunScope({ projectContext: project });
   Object.assign(ctxScope, simulationTool.contributeScope?.() ?? {});
   const ctx: ToolCliContext = {
-    program,
     scope: ctxScope,
     render: vi.fn((result: unknown) => {
       rendered.push(result);
@@ -147,10 +145,10 @@ describe('simulationTool metadata', () => {
 });
 
 describe('simulationTool command surface (Phase 3 — CommandSpec migration)', () => {
-  it('mounts via commandSpecs, not the deprecated register() hook', () => {
-    // eslint-disable-next-line sonarjs/deprecation -- asserting the deprecated hook is ABSENT after migration.
-    expect(simulationTool.register).toBeUndefined();
+  it('mounts via commandSpecs — the one command surface (register() removed in 3.0.0)', () => {
     expect(simulationTool.commandSpecs).toHaveLength(1);
+    // `register` is no longer a Tool member (3.0.0) — its absence is structural,
+    // enforced by the type system, not asserted at runtime.
   });
 
   it('declares the sim command name/description/output/scope', () => {
@@ -178,8 +176,7 @@ describe('simulationTool command surface (Phase 3 — CommandSpec migration)', (
 
 describe('sim command handler', () => {
   it('runs against the default recipe and renders the result', async () => {
-    const program = new Command();
-    const { ctx, rendered } = makeFakeContext(program);
+    const { ctx, rendered } = makeFakeContext();
     registerProbeScenario();
 
     // Non-TTY/non-json path: the handler runs the engine and renders statically.
@@ -192,8 +189,7 @@ describe('sim command handler', () => {
   });
 
   it('emits the signal envelope through cli.emitEnvelope when --json is passed', async () => {
-    const program = new Command();
-    const { ctx, emitted } = makeFakeContext(program);
+    const { ctx, emitted } = makeFakeContext();
     registerProbeScenario();
 
     await simSpec().handler({ cwd: process.cwd(), json: true }, ctx);
@@ -207,8 +203,7 @@ describe('sim command handler', () => {
   });
 
   it('returns exit code 2 in JSON mode when the recipe is unknown', async () => {
-    const program = new Command();
-    const { ctx, exitCodes, emitted } = makeFakeContext(program);
+    const { ctx, exitCodes, emitted } = makeFakeContext();
 
     await simSpec().handler({ cwd: process.cwd(), json: true, recipe: 'nope' }, ctx);
 
@@ -221,8 +216,7 @@ describe('sim command handler', () => {
   });
 
   it('returns exit code 2 in non-JSON mode for unknown recipe', async () => {
-    const program = new Command();
-    const { ctx, exitCodes, rendered } = makeFakeContext(program);
+    const { ctx, exitCodes, rendered } = makeFakeContext();
 
     await simSpec().handler({ cwd: process.cwd(), recipe: 'still-nope' }, ctx);
 

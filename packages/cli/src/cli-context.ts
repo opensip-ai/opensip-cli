@@ -62,7 +62,6 @@ import {
 import { renderOutcome } from './commands/render-outcome.js';
 
 import type { CommandResult, SignalEnvelope } from '@opensip-tools/contracts';
-import type { Command } from 'commander';
 
 // ---------------------------------------------------------------------------
 // Per-invocation holders.
@@ -303,7 +302,6 @@ export function createLiveViewRegistry(
 }
 
 export interface BuildToolCliContextOptions {
-  readonly program: Command;
   readonly render: (result: CommandResult) => Promise<void>;
   readonly liveViews: LiveViewRegistry;
   readonly maybeOpenDashboard: (opts: {
@@ -330,7 +328,6 @@ export function buildToolCliContext(
   };
 
   const ctx: ToolCliContext = {
-    program: opts.program,
     get scope(): RunScope {
       // The pre-action-hook constructs a RunScope and calls `enterScope`
       // (AsyncLocalStorage.enterWith) so the scope is bound for the

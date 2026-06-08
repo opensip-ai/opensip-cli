@@ -8,7 +8,6 @@ import type { Tool } from '../types.js';
 const stub = (id: string, version = '0.0.0'): Tool => ({
   metadata: { id, version, description: `${id} stub` },
   commands: [{ name: id, description: `${id} command` }],
-  register: () => undefined,
 });
 
 describe('ToolRegistry', () => {

@@ -1,4 +1,3 @@
-/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
  * Tool.initialize() lifecycle test (audit P1a).
  *
@@ -28,14 +27,14 @@ import { Command } from 'commander';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { installPreActionHook, resolveOwningTool } from '../bootstrap/pre-action-hook.js';
+import { mountAllToolCommands } from '../bootstrap/register-tools.js';
 import { setCliRegistriesForRun } from '../cli-context.js';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/sample-project');
 
-/** Minimal ToolCliContext — the fixture's register() only touches program. */
-function stubCtx(program: Command): ToolCliContext {
+/** Minimal handler-facing ToolCliContext (no Commander program — 3.0.0). */
+function stubCtx(): ToolCliContext {
   return {
-    program,
     project: {
       cwd: FIXTURE,
       cwdExplicit: false,
@@ -79,18 +78,26 @@ function makeFixtureTool(
         ? Promise.reject(new Error('init boom'))
         : Promise.resolve();
     },
-    register: (cli: ToolCliContext) => {
-      cli.program
-        .command(cmdName)
-        .option('--cwd <path>', 'dir')
-        .action(() => {
+    // 3.0.0: the command surface is the declarative commandSpec (register() gone).
+    // The handler records the action; the host mounts it + the `--cwd` common flag.
+    commandSpecs: [
+      {
+        name: cmdName,
+        description: 'fixture command',
+        aliases: opts.aliases ? [...opts.aliases] : undefined,
+        commonFlags: ['cwd'],
+        scope: 'project',
+        output: 'command-result',
+        handler: () => {
           events.push(`action:${cmdName}`);
-        });
-    },
+          return { type: 'ok' };
+        },
+      },
+    ] as never,
   };
 }
 
-/** Wire a program with the preAction hook + a registered/mounted fixture tool. */
+/** Wire a program with the preAction hook + the fixture tool's mounted command. */
 function buildProgram(tool: Tool): Command {
   const tools = new ToolRegistry();
   tools.register(tool);
@@ -98,7 +105,7 @@ function buildProgram(tool: Tool): Command {
   const program = new Command();
   program.exitOverride();
   installPreActionHook(program, 'test');
-  tool.register!(stubCtx(program));
+  mountAllToolCommands(tools, program, stubCtx());
   return program;
 }
 

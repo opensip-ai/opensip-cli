@@ -10,7 +10,6 @@
 import { enterScope, RunScope } from '@opensip-tools/core';
 import { DataStoreFactory } from '@opensip-tools/datastore';
 import { SessionRepo } from '@opensip-tools/session-store';
-import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { simulationTool } from '../tool.js';
@@ -54,7 +53,6 @@ function makeContext(datastore: DataStore | undefined): {
   const scope = new RunScope({ datastore: () => datastore });
   Object.assign(scope, simulationTool.contributeScope?.() ?? {});
   const ctx: ToolCliContext = {
-    program: new Command(),
     scope,
     render: vi.fn((result: unknown) => { rendered.push(result); return Promise.resolve(); }),
     registerLiveView: vi.fn(),

@@ -1,15 +1,17 @@
 /**
- * Phase 2 (release 2.11.0, §5.4) — Tool.commandSpecs mounting + the named
- * 10-step tool lifecycle.
+ * The command plane (north-star §5.4) + the named 10-step tool lifecycle.
  *
- * Asserts:
+ * 3.0.0 GA: there is ONE command surface — a tool's declared `commandSpecs`,
+ * mounted by the host. `register()` and the raw-Commander `program` handle were
+ * removed. Asserts:
  *   1. a tool with `commandSpecs` mounts via the declarative spec path (the
- *      command lands on the program) and its `register()` is NOT called;
- *   2. a tool with only `register()` mounts via the deprecated fallback AND
- *      emits a structured `cli.tool.register_deprecated` event;
+ *      command lands on the host-owned program);
+ *   2. a tool with no `commandSpecs` is a mis-declaration → a structured
+ *      `cli.tool.no_command_surface` event (no fallback);
  *   3. the lifecycle step ordinals are the documented canonical sequence and
- *      `mountToolCommands` drives step 8 over every registered (bundled) tool;
- *   4. a mount failure is isolated per tool — the rest still mount.
+ *      `mountToolCommands` drives step 8 over every registered tool;
+ *   4. a mount failure is isolated per tool — the rest still mount;
+ *   5. `isValidTool` requires a non-empty `commandSpecs` (no register surface).
  */
 
 import {
@@ -26,10 +28,9 @@ import { mountAllToolCommands } from '../bootstrap/register-tools.js';
 import { TOOL_LIFECYCLE_STEPS, mountToolCommands } from '../bootstrap/tool-lifecycle.js';
 import { isValidTool } from '../bootstrap/validate-tool.js';
 
-/** A throwaway `ToolCliContext` whose `program` is a real Commander root. */
-function makeStubContext(program: Command = new Command('opensip-tools')): ToolCliContext {
+/** A throwaway handler-facing `ToolCliContext` (no Commander program — 3.0.0). */
+function makeStubContext(): ToolCliContext {
   return {
-    program,
     scope: {},
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
@@ -66,66 +67,31 @@ function makeSpec(name: string): CommandSpec<unknown, ToolCliContext> {
   };
 }
 
+/** A tool that mounts one command via the declarative commandSpecs path. */
+function specTool(id: string, commandName: string): Tool {
+  return {
+    metadata: { id, version: '0.0.0', description: id },
+    commands: [{ name: commandName, description: `${commandName} cmd` }],
+    commandSpecs: [makeSpec(commandName)],
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('mountAllToolCommands — declarative commandSpecs path', () => {
-  it('mounts a tool via its commandSpecs and does NOT call register()', () => {
+describe('mountAllToolCommands — declarative commandSpecs path (the one surface)', () => {
+  it('mounts a tool via its commandSpecs onto the host-owned program', () => {
     const registry = new ToolRegistryClass();
-    const register = vi.fn();
-    const tool: Tool = {
-      metadata: { id: 'spec-tool', version: '0.0.0', description: 'spec tool' },
-      commands: [{ name: 'speccmd', description: 'spec cmd' }],
-      commandSpecs: [makeSpec('speccmd')],
-      // A tool may declare BOTH during migration; the spec path must win and
-      // register() must be skipped entirely.
-      register,
-    };
-    registry.register(tool);
+    registry.register(specTool('spec-tool', 'speccmd'));
 
     const program = new Command('opensip-tools');
-    const ctx = makeStubContext(program);
-    const warnSpy = vi.spyOn(logger, 'warn');
+    mountAllToolCommands(registry, program, makeStubContext());
 
-    mountAllToolCommands(registry, ctx);
-
-    // The declarative command is wired onto the Commander program.
     expect(program.commands.map((c) => c.name())).toContain('speccmd');
-    // The deprecated register() path was NOT taken.
-    expect(register).not.toHaveBeenCalled();
-    expect(warnSpy).not.toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.tool.register_deprecated' }),
-    );
-  });
-});
-
-describe('mountAllToolCommands — deprecated register() fallback', () => {
-  it('falls back to register() and emits cli.tool.register_deprecated', () => {
-    const registry = new ToolRegistryClass();
-    const register = vi.fn();
-    const tool: Tool = {
-      metadata: { id: 'legacy-tool', version: '0.0.0', description: 'legacy tool' },
-      commands: [{ name: 'legacycmd', description: 'legacy cmd' }],
-      register,
-    };
-    registry.register(tool);
-
-    const ctx = makeStubContext();
-    const warnSpy = vi.spyOn(logger, 'warn');
-
-    mountAllToolCommands(registry, ctx);
-
-    expect(register).toHaveBeenCalledWith(ctx);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        evt: 'cli.tool.register_deprecated',
-        toolId: 'legacy-tool',
-      }),
-    );
   });
 
-  it('warns cli.tool.no_command_surface for a tool with neither path', () => {
+  it('warns cli.tool.no_command_surface for a tool with no commandSpecs (no fallback)', () => {
     const registry = new ToolRegistryClass();
     const tool = {
       metadata: { id: 'empty-tool', version: '0.0.0', description: 'empty' },
@@ -133,47 +99,45 @@ describe('mountAllToolCommands — deprecated register() fallback', () => {
     } as unknown as Tool;
     registry.register(tool);
 
-    const ctx = makeStubContext();
+    const program = new Command('opensip-tools');
     const warnSpy = vi.spyOn(logger, 'warn');
-
-    mountAllToolCommands(registry, ctx);
+    mountAllToolCommands(registry, program, makeStubContext());
 
     expect(warnSpy).toHaveBeenCalledWith(
       expect.objectContaining({ evt: 'cli.tool.no_command_surface', toolId: 'empty-tool' }),
     );
+    expect(program.commands.map((c) => c.name())).not.toContain('empty-tool');
   });
 });
 
 describe('mountAllToolCommands — per-tool failure isolation', () => {
-  it("a failing mount does not stop the other tools from mounting", () => {
+  it('a failing mount does not stop the other tools from mounting', () => {
     const registry = new ToolRegistryClass();
-    const okRegister = vi.fn();
-    const badRegister = vi.fn(() => {
-      throw new Error('mount boom');
-    });
-    registry.register({
+    // A malformed spec (a boolean flag marked required) throws inside mountCommandSpec.
+    const bad: Tool = {
       metadata: { id: 'bad-tool', version: '0.0.0', description: 'bad' },
       commands: [{ name: 'badcmd', description: 'bad' }],
-      register: badRegister,
-    });
-    registry.register({
-      metadata: { id: 'ok-tool', version: '0.0.0', description: 'ok' },
-      commands: [{ name: 'okcmd', description: 'ok' }],
-      register: okRegister,
-    });
+      commandSpecs: [
+        {
+          ...makeSpec('badcmd'),
+          options: [{ flag: '--flag', description: 'boolean but required', required: true }],
+        },
+      ],
+    };
+    registry.register(bad);
+    registry.register(specTool('ok-tool', 'okcmd'));
 
-    const ctx = makeStubContext();
+    const program = new Command('opensip-tools');
     const warnSpy = vi.spyOn(logger, 'warn');
     const restore = silenceStderr();
     try {
-      expect(() => mountAllToolCommands(registry, ctx)).not.toThrow();
+      expect(() => mountAllToolCommands(registry, program, makeStubContext())).not.toThrow();
     } finally {
       restore();
     }
 
-    // Both were attempted; the failing one was isolated + logged.
-    expect(badRegister).toHaveBeenCalledOnce();
-    expect(okRegister).toHaveBeenCalledOnce();
+    // The good tool mounted despite the bad tool throwing; the failure was logged.
+    expect(program.commands.map((c) => c.name())).toContain('okcmd');
     expect(warnSpy).toHaveBeenCalledWith(
       expect.objectContaining({ evt: 'cli.tool.register_failed', toolId: 'bad-tool' }),
     );
@@ -203,44 +167,30 @@ describe('tool lifecycle — canonical 10-step ordering', () => {
 
   it('mountToolCommands (step 8) mounts every registered tool in registration order', () => {
     const registry = new ToolRegistryClass();
-    const order: string[] = [];
-    registry.register({
-      metadata: { id: 'first', version: '0.0.0', description: 'first' },
-      commands: [],
-      register: () => order.push('first'),
-    });
-    registry.register({
-      metadata: { id: 'second', version: '0.0.0', description: 'second' },
-      commands: [],
-      register: () => order.push('second'),
-    });
+    registry.register(specTool('first', 'firstcmd'));
+    registry.register(specTool('second', 'secondcmd'));
 
-    const ctx = makeStubContext();
-    vi.spyOn(logger, 'warn');
-    mountToolCommands(registry, ctx);
+    const program = new Command('opensip-tools');
+    mountToolCommands(registry, program, makeStubContext());
 
-    // Step 8 drives the mount over every registered tool, in registration
-    // (== help/listing) order — provenance no longer matters at this step.
-    expect(order).toEqual(['first', 'second']);
+    // Step 8 mounts every registered tool's command, in registration (== help/
+    // listing) order — provenance no longer matters at this step.
+    expect(program.commands.map((c) => c.name())).toEqual(['firstcmd', 'secondcmd']);
   });
 });
 
 describe('isValidTool — command-surface requirement', () => {
   const base = { metadata: { id: 'x' }, commands: [] };
 
-  it('accepts a tool with only register()', () => {
-    expect(isValidTool({ ...base, register: vi.fn() })).toBe(true);
-  });
-
-  it('accepts a tool with only commandSpecs', () => {
+  it('accepts a tool with a non-empty commandSpecs', () => {
     expect(isValidTool({ ...base, commandSpecs: [makeSpec('c')] })).toBe(true);
   });
 
-  it('rejects a tool with NEITHER command surface', () => {
+  it('rejects a tool with no command surface', () => {
     expect(isValidTool({ ...base })).toBe(false);
   });
 
-  it('rejects an empty commandSpecs array with no register()', () => {
+  it('rejects an empty commandSpecs array', () => {
     expect(isValidTool({ ...base, commandSpecs: [] })).toBe(false);
   });
 });

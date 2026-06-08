@@ -19,7 +19,6 @@ import {
   type SignalBatch,
   type SignalSink,
 } from '@opensip-tools/core';
-import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deliverEnvelope } from '../bootstrap/deliver-envelope.js';
@@ -100,9 +99,11 @@ function urlString(url: Parameters<typeof fetch>[0]): string {
 let stdout: string[];
 let stdoutSpy: ReturnType<typeof vi.spyOn>;
 let stderrSpy: ReturnType<typeof vi.spyOn>;
+let originalExitCode: typeof process.exitCode;
 
 beforeEach(() => {
   stdout = [];
+  originalExitCode = process.exitCode;
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
     stdout.push(String(chunk));
     return true;
@@ -113,13 +114,41 @@ beforeEach(() => {
 afterEach(() => {
   stdoutSpy.mockRestore();
   stderrSpy.mockRestore();
+  // The real `emitError` seam threads exit codes to `process.exitCode`; restore
+  // it so a test's error exit code does not leak to the runner.
+  process.exitCode = originalExitCode;
   vi.restoreAllMocks();
+});
+
+describe('root --json error path (emitError)', () => {
+  function buildCtx() {
+    return buildToolCliContext({
+      render: renderResult,
+      liveViews: createLiveViewRegistry(),
+      maybeOpenDashboard: () => Promise.resolve(),
+    }).ctx;
+  }
+
+  it('emits a status:error CommandOutcome with the suggestion + code (2.12.0 seam)', () => {
+    buildCtx().emitError({ message: 'bad input', exitCode: 2, suggestion: 'fix it', code: 'CONFIG' });
+    expect(stdout).toHaveLength(1);
+    const outcome = JSON.parse(stdout[0]) as CommandOutcome;
+    expect(outcome.status).toBe('error');
+    expect(outcome.exitCode).toBe(2);
+    expect(process.exitCode).toBe(2); // threaded to the process exit
+  });
+
+  it('emits a status:error CommandOutcome for a bare message (no suggestion/code)', () => {
+    buildCtx().emitError({ message: 'bare error', exitCode: 1 });
+    const outcome = JSON.parse(stdout[0]) as CommandOutcome;
+    expect(outcome.status).toBe('error');
+    expect(outcome.exitCode).toBe(1);
+  });
 });
 
 describe('root --json path (emitEnvelope)', () => {
   it('wraps the (unchanged) envelope in a CommandOutcome under .envelope (2.12.0)', () => {
     const { ctx } = buildToolCliContext({
-      program: new Command(),
       render: renderResult,
       liveViews: createLiveViewRegistry(),
       maybeOpenDashboard: () => Promise.resolve(),

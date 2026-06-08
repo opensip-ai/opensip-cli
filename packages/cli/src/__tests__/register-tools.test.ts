@@ -41,7 +41,6 @@ function makeRegistry(): ToolRegistry {
 
 function makeStubContext(): ToolCliContext {
   return {
-    program: new Command('opensip-tools'),
     project: { scope: 'project', projectRoot: '/x', walkedUp: 0 } as never,
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
@@ -152,7 +151,7 @@ describe('registerFirstPartyTools', () => {
     );
     writeFileSync(
       join(dir, 'index.js'),
-      "export const tool = { metadata: { id: 'no-manifest', name: 'NM', version: '0.0.0' }, commands: [], register() {} };",
+      "export const tool = { metadata: { id: 'no-manifest', name: 'NM', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
       'utf8',
     );
     const registry = new ToolRegistryClass();
@@ -205,71 +204,90 @@ describe('registerFirstPartyTools', () => {
   });
 });
 
-describe('mountAllToolCommands', () => {
-  it('calls register(ctx) on every tool', () => {
-    const registry = makeRegistry();
-    const registerA = vi.fn();
-    const registerB = vi.fn();
-    registry.register({
-      metadata: { id: 'tool-a', name: 'A' },
-      register: registerA,
-    } as never);
-    registry.register({
-      metadata: { id: 'tool-b', name: 'B' },
-      register: registerB,
-    } as never);
-    const ctx = makeStubContext();
-
-    mountAllToolCommands(registry, ctx);
-
-    expect(registerA).toHaveBeenCalledWith(ctx);
-    expect(registerB).toHaveBeenCalledWith(ctx);
-  });
-
-  it('isolates a failing register so the rest still mount', () => {
-    const registry = makeRegistry();
-    const registerOk = vi.fn();
-    const registerBad = vi.fn(() => {
-      throw new Error('boom');
-    });
-    registry.register({
-      metadata: { id: 'tool-good', name: 'good' },
-      register: registerOk,
-    } as never);
-    registry.register({
-      metadata: { id: 'tool-bad', name: 'bad' },
-      register: registerBad,
-    } as never);
-    const ctx = makeStubContext();
-
-    const origWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = (() => true);
-    try {
-      mountAllToolCommands(registry, ctx);
-    } finally {
-      process.stderr.write = origWrite;
-    }
-    expect(registerOk).toHaveBeenCalledOnce();
-    expect(registerBad).toHaveBeenCalledOnce();
-  });
-
-  it('isolates a non-Error throw too', () => {
-    const registry = makeRegistry();
-    registry.register({
-      metadata: { id: 'tool-throws-string', name: 'x' },
-      register: () => {
-        const nonError: unknown = 'plain string';
-        throw nonError;
+/** A minimal tool that mounts one command via the declarative commandSpecs path. */
+function specTool(id: string, commandName: string): Tool {
+  return {
+    metadata: { id, name: id, version: '0.0.0', description: id },
+    commands: [{ name: commandName, description: `${commandName} cmd` }],
+    commandSpecs: [
+      {
+        name: commandName,
+        description: `${commandName} cmd`,
+        commonFlags: [],
+        scope: 'project',
+        output: 'command-result',
+        handler: () => Promise.resolve({ type: 'noop' }),
       },
+    ] as never,
+  };
+}
+
+describe('mountAllToolCommands', () => {
+  it('mounts every tool via its commandSpecs (the one command surface, 3.0.0)', () => {
+    const registry = makeRegistry();
+    registry.register(specTool('tool-a', 'a'));
+    registry.register(specTool('tool-b', 'b'));
+    const program = new Command('opensip-tools');
+
+    mountAllToolCommands(registry, program, makeStubContext());
+
+    const names = program.commands.map((c) => c.name());
+    expect(names).toContain('a');
+    expect(names).toContain('b');
+  });
+
+  it('surfaces a tool with no commandSpecs (mounts nothing, no throw)', () => {
+    const registry = makeRegistry();
+    // A tool with neither commandSpecs nor any mount surface — a mis-declaration.
+    registry.register({
+      metadata: { id: 'tool-empty', name: 'empty', version: '0.0.0', description: 'empty' },
+      commands: [],
     } as never);
-    const ctx = makeStubContext();
+    registry.register(specTool('tool-ok', 'ok'));
+    const program = new Command('opensip-tools');
+
     const origWrite = process.stderr.write.bind(process.stderr);
     process.stderr.write = (() => true);
     try {
-      expect(() => mountAllToolCommands(registry, ctx)).not.toThrow();
+      mountAllToolCommands(registry, program, makeStubContext());
     } finally {
       process.stderr.write = origWrite;
     }
+    // The valid tool still mounts; the empty one contributes nothing.
+    expect(program.commands.map((c) => c.name())).toContain('ok');
+    expect(program.commands.map((c) => c.name())).not.toContain('tool-empty');
+  });
+
+  it('isolates a tool whose spec fails to mount so the rest still mount', () => {
+    const registry = makeRegistry();
+    // A malformed spec (a required boolean flag) throws inside mountCommandSpec.
+    registry.register({
+      metadata: { id: 'tool-bad', name: 'bad', version: '0.0.0', description: 'bad' },
+      commands: [{ name: 'bad', description: 'bad' }],
+      commandSpecs: [
+        {
+          name: 'bad',
+          description: 'bad',
+          commonFlags: [],
+          scope: 'project',
+          output: 'command-result',
+          options: [{ flag: '--flag', description: 'boolean but required', required: true }],
+          handler: () => Promise.resolve({ type: 'noop' }),
+        },
+      ] as never,
+    } as never);
+    registry.register(specTool('tool-good', 'good'));
+    const program = new Command('opensip-tools');
+
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (() => true);
+    try {
+      expect(() => mountAllToolCommands(registry, program, makeStubContext())).not.toThrow();
+    } finally {
+      process.stderr.write = origWrite;
+    }
+    // The good tool mounted despite the bad tool throwing.
+    expect(program.commands.map((c) => c.name())).toContain('good');
   });
 });
 
@@ -341,7 +359,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           opensipTools: { kind: 'tool' },
         },
         indexJs:
-          "export const tool = { metadata: { id: 'fixture-valid', name: 'Fixture', version: '0.0.0' }, commands: [], register() {} };",
+          "export const tool = { metadata: { id: 'fixture-valid', name: 'Fixture', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();
@@ -410,7 +428,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           opensipTools: { kind: 'tool' },
         },
         indexJs:
-          "export const tool = { metadata: { id: 'fitness', name: 'Shadow', version: '0.0.0' }, commands: [], register() {} };",
+          "export const tool = { metadata: { id: 'fitness', name: 'Shadow', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();

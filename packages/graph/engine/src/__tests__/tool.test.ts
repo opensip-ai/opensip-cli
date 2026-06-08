@@ -52,8 +52,6 @@ describe('graphTool contract conformance (AC-2)', () => {
   });
 
   it('mounts via commandSpecs, not the deprecated register() hook', () => {
-    // eslint-disable-next-line sonarjs/deprecation -- asserting the deprecated hook is ABSENT after the Phase 5 migration.
-    expect(graphTool.register).toBeUndefined();
     // One spec per declared command, in declaration order.
     const specNames = (graphTool.commandSpecs ?? []).map((s) => s.name);
     expect(specNames).toEqual([

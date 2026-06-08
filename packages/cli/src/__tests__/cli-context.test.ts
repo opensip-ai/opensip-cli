@@ -7,7 +7,6 @@ import {
   type LiveViewRenderer,
   type Logger,
 } from '@opensip-tools/core';
-import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildToolCliContext, createLiveViewRegistry } from '../cli-context.js';
@@ -90,7 +89,6 @@ describe('createLiveViewRegistry', () => {
 });
 
 function makeBuildOpts(): {
-  program: Command;
   render: ReturnType<typeof vi.fn>;
   liveViews: ReturnType<typeof createLiveViewRegistry>;
   maybeOpenDashboard: ReturnType<typeof vi.fn>;
@@ -99,7 +97,6 @@ function makeBuildOpts(): {
   const { log } = makeLogger();
   const liveViews = createLiveViewRegistry(log);
   return {
-    program: new Command('test'),
     render: vi.fn(() => Promise.resolve()),
     liveViews,
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
@@ -172,8 +169,7 @@ describe('buildToolCliContext', () => {
 
   it('uses defaultLogger when no logger is supplied', () => {
     const { ctx } = buildToolCliContext({
-      program: new Command('test'),
-      render: vi.fn(() => Promise.resolve()),
+        render: vi.fn(() => Promise.resolve()),
       liveViews: createLiveViewRegistry(),
       maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     });

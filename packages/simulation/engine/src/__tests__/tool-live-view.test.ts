@@ -18,7 +18,6 @@
  */
 
 import { enterScope, RunScope } from '@opensip-tools/core';
-import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { simulationTool } from '../tool.js';
@@ -66,14 +65,13 @@ interface Captured {
   exitCodes: number[];
 }
 
-function makeCtx(program: Command): Captured {
+function makeCtx(): Captured {
   const liveViews = new Map<string, (args: unknown) => Promise<void>>();
   const delivered: Captured['delivered'] = [];
   const renderLiveCalls: Captured['renderLiveCalls'] = [];
   const dashboardCalls: unknown[] = [];
   const exitCodes: number[] = [];
   const ctx = {
-    program,
     scope: new RunScope(),
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn((key: string, cb: (args: unknown) => Promise<void>) => {
@@ -109,8 +107,7 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
 
   it('registers a live view under the `sim` key and delivers the rendered envelope', async () => {
     process.stdout.isTTY = true;
-    const program = new Command();
-    const cap = makeCtx(program);
+    const cap = makeCtx();
 
     // The interactive branch registers the live view, so run the handler once
     // to install it, then exercise the registered callback directly.
@@ -145,8 +142,7 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     // only the directly-invoked callback below does, returning undefined.
     (renderSimLive as unknown as { mockResolvedValueOnce: (v: unknown) => void })
       .mockResolvedValueOnce(undefined);
-    const program = new Command();
-    const cap = makeCtx(program);
+    const cap = makeCtx();
     await simHandler()({ cwd: '/proj' }, cap.ctx);
 
     await cap.liveViews.get('sim')?.({ cwd: '/proj' });
@@ -164,8 +160,7 @@ describe('simulationTool action — interactive TTY branch', () => {
 
   it('routes to renderLive + maybeOpenDashboard when stdout is a TTY (non-json)', async () => {
     process.stdout.isTTY = true;
-    const program = new Command();
-    const cap = makeCtx(program);
+    const cap = makeCtx();
 
     await simHandler()({ open: true }, cap.ctx);
 

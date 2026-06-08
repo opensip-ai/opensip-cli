@@ -16,6 +16,7 @@ import {
   type Tool,
   type ToolCliContext,
 } from '@opensip-tools/core';
+import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
 import { registerLanguageAdapters } from '../bootstrap/register-language-adapters.js';
@@ -28,9 +29,6 @@ import { BUNDLED_TOOLS } from './test-utils/bundled-tools.js';
 
 function makeStubContext(): ToolCliContext {
   return {
-    // Minimal Commander-like program: mountAllToolCommands applies the shared
-    // help configuration (ADR-0021) by walking commands after registration.
-    program: { configureHelp: vi.fn(), addHelpText: vi.fn(), commands: [] },
     project: {
       cwd: '/test',
       cwdExplicit: false,
@@ -87,56 +85,64 @@ describe('registerFirstPartyTools', () => {
   });
 });
 
+/** A tool that mounts one command via the declarative commandSpecs path. */
+function specTool(id: string, commandName: string): Tool {
+  return {
+    metadata: { id, name: id, version: '0.0.0', description: id },
+    commands: [{ name: commandName, description: `${commandName} cmd` }],
+    commandSpecs: [
+      {
+        name: commandName,
+        description: `${commandName} cmd`,
+        commonFlags: [],
+        scope: 'project',
+        output: 'command-result',
+        handler: () => Promise.resolve({ type: 'noop' }),
+      },
+    ] as never,
+  };
+}
+
 describe('mountAllToolCommands', () => {
-  it('calls register(ctx) on every tool in the registry', () => {
+  it('mounts every tool via its commandSpecs onto the program (3.0.0 — one command surface)', () => {
     const registry = new ToolRegistry();
-    const reg1 = vi.fn();
-    const reg2 = vi.fn();
-    const tool1: Tool = {
-      metadata: { id: 'fake-1', name: 'Fake 1', version: '0.0.0', description: '' },
-      commands: [],
-      register: reg1,
-    };
-    const tool2: Tool = {
-      metadata: { id: 'fake-2', name: 'Fake 2', version: '0.0.0', description: '' },
-      commands: [],
-      register: reg2,
-    };
-    registry.register(tool1);
-    registry.register(tool2);
+    registry.register(specTool('fake-1', 'fake1'));
+    registry.register(specTool('fake-2', 'fake2'));
+    const program = new Command('opensip-tools');
 
-    const ctx = makeStubContext();
-    mountAllToolCommands(registry, ctx);
+    mountAllToolCommands(registry, program, makeStubContext());
 
-    expect(reg1).toHaveBeenCalledOnce();
-    expect(reg2).toHaveBeenCalledOnce();
-    expect(reg1).toHaveBeenCalledWith(ctx);
-    expect(reg2).toHaveBeenCalledWith(ctx);
+    const names = program.commands.map((c) => c.name());
+    expect(names).toContain('fake1');
+    expect(names).toContain('fake2');
   });
 
-  it('isolates failing tools — one throw does not stop subsequent registrations', () => {
+  it('isolates failing tools — one spec that throws does not stop subsequent mounts', () => {
     const registry = new ToolRegistry();
-    const reg2 = vi.fn();
-    const tool1: Tool = {
+    // A malformed spec (a boolean flag marked required) throws inside mountCommandSpec.
+    const broken: Tool = {
       metadata: { id: 'broken', name: 'Broken', version: '0.0.0', description: '' },
-      commands: [],
-      register: () => {
-        throw new Error('boom');
-      },
+      commands: [{ name: 'broken', description: 'broken' }],
+      commandSpecs: [
+        {
+          name: 'broken',
+          description: 'broken',
+          commonFlags: [],
+          scope: 'project',
+          output: 'command-result',
+          options: [{ flag: '--flag', description: 'boolean but required', required: true }],
+          handler: () => Promise.resolve({ type: 'noop' }),
+        },
+      ] as never,
     };
-    const tool2: Tool = {
-      metadata: { id: 'works', name: 'Works', version: '0.0.0', description: '' },
-      commands: [],
-      register: reg2,
-    };
-    registry.register(tool1);
-    registry.register(tool2);
+    registry.register(broken);
+    registry.register(specTool('works', 'works'));
+    const program = new Command('opensip-tools');
 
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const ctx = makeStubContext();
-    mountAllToolCommands(registry, ctx);
+    mountAllToolCommands(registry, program, makeStubContext());
 
-    expect(reg2).toHaveBeenCalledOnce();
+    expect(program.commands.map((c) => c.name())).toContain('works');
     expect(stderr).toHaveBeenCalled();
     stderr.mockRestore();
   });

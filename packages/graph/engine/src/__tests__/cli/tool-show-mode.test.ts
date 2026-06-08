@@ -9,7 +9,6 @@
 
 import { DataStoreFactory } from '@opensip-tools/datastore';
 import { SessionRepo } from '@opensip-tools/session-store';
-import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { graphCommandSpec } from '../../cli/graph/graph-command-spec.js';
@@ -53,7 +52,6 @@ function makeContext(datastore: DataStore | undefined): {
   const emitted: unknown[] = [];
   const exitCodes: number[] = [];
   const ctx = {
-    program: new Command(),
     scope: { datastore: () => datastore },
     render: vi.fn((result: unknown) => { rendered.push(result); return Promise.resolve(); }),
     registerLiveView: vi.fn(),

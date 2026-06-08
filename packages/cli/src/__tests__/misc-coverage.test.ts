@@ -46,7 +46,7 @@ describe('isValidTool', () => {
     expect(
       isValidTool({
         metadata: { id: 'fake' },
-        register: () => undefined,
+        commandSpecs: [{ name: 'fake', description: 'fake', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }],
         commands: [],
       }),
     ).toBe(true);

@@ -70,7 +70,7 @@ function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
     deliverSignals: vi.fn(() => Promise.resolve()),
     writeSarif: vi.fn(() => Promise.resolve()),
     ...overrides,
-  } as unknown as ToolCliContext;
+  };
 }
 
 describe('graph command spec', () => {

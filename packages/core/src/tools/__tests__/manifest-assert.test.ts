@@ -18,9 +18,6 @@ function makeTool(
   return {
     metadata: { id, version: '0.0.0', description: 'test tool' },
     commands: commandNames.map((name) => ({ name, description: `${name} desc` })),
-    register: () => {
-      // no-op: the guard never invokes register(); a stub satisfies the Tool shape.
-    },
   };
 }
 

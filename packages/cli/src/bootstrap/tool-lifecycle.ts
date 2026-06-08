@@ -53,6 +53,7 @@
 
 import { mountAllToolCommands } from './register-tools.js';
 
+import type { CliProgram } from '@opensip-tools/contracts';
 import type { ToolCliContext, ToolRegistry } from '@opensip-tools/core';
 
 /**
@@ -94,14 +95,20 @@ export const TOOL_LIFECYCLE_STEPS = {
  * `mountAllToolCommands(...)` call so the lifecycle has one named seam.
  *
  * Kept THIN deliberately: it delegates straight to
- * {@link mountAllToolCommands}, which owns the per-tool mount-path choice
- * (declarative `commandSpecs` vs deprecated `register()`) and the per-tool
- * failure isolation. The naming + ordering is the value here, not new logic.
+ * {@link mountAllToolCommands}, which mounts each tool's declared `commandSpecs`
+ * (the one command surface, 3.0.0) with per-tool failure isolation. The naming +
+ * ordering is the value here, not new logic.
  *
  * @param registry The per-invocation tool registry, already populated by
  *   steps 1-4.
- * @param ctx The per-invocation host context handed to each mounted command.
+ * @param program The root Commander program (host-owned; passed in since the tool
+ *   context no longer carries it, §8).
+ * @param ctx The per-invocation handler context handed to each mounted command.
  */
-export function mountToolCommands(registry: ToolRegistry, ctx: ToolCliContext): void {
-  mountAllToolCommands(registry, ctx);
+export function mountToolCommands(
+  registry: ToolRegistry,
+  program: CliProgram,
+  ctx: ToolCliContext,
+): void {
+  mountAllToolCommands(registry, program, ctx);
 }

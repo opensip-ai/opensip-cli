@@ -1,12 +1,11 @@
-// @fitness-ignore-file file-length-limit -- the canonical Tool plugin contract: one cohesive interface (metadata, commands, register, initialize, contributeScope, collectDashboardData, config, capabilityRegistrars) whose every member carries load-bearing JSDoc. The slots are the contract surface; splitting the single interface across files would fragment the one type tools implement. Grew past the 400-line soft limit with the 2.10.0 config + capability slots (ADR-0023 / §5.3).
-// @fitness-ignore-file no-deprecated-tags -- the `@deprecated` on Tool.register is a DELIBERATE, plan-backed staged deprecation with a migration path (release 2.11.0 §5.4: register() is retained through 2.x and removed in 3.0.0; commandSpecs is the replacement; the cli.tool.register_deprecated event + cross-tool-flag-parity drive migration as fit/graph/sim cut over in Phases 3-5), NOT lingering dead code to delete in this PR. Mirrors the same exemption on contracts/src/cli-config.ts for the ADR-0022 cli.recipe deprecation.
+// @fitness-ignore-file file-length-limit -- the canonical Tool plugin contract: one cohesive interface (metadata, commands, commandSpecs, initialize, contributeScope, collectDashboardData, config, capabilityRegistrars, sessionReplay) whose every member carries load-bearing JSDoc. The slots are the contract surface; splitting the single interface across files would fragment the one type tools implement. Grew past the 400-line soft limit with the 2.10.0 config + capability slots (ADR-0023 / §5.3).
 /**
  * Tool plugin contract.
  *
  * A Tool is a self-contained capability (fitness, simulation, future
  * audit/lint/etc.) that contributes one or more CLI subcommands. The
  * CLI is a generic dispatcher that walks the registered tool list and
- * delegates command definition to each tool's `register(cli)` method.
+ * mounts each tool's declared `commandSpecs`.
  *
  * Tools are first-party (declared as a direct dep of opensip-tools)
  * or third-party (any npm package whose package.json declares
@@ -14,16 +13,16 @@
  *
  * Contract:
  *   - `commands[]` carries metadata only (name + description, used for
- *     `--help` listings).
- *   - The actual subcommand wiring is done by each tool's
- *     `register(cli)` method, which receives a `ToolCliContext` with
- *     the Commander program + shared UX helpers (Ink renderer,
- *     dashboard auto-open, logger).
+ *     `--help` listings and conflict detection).
+ *   - The actual subcommand wiring is host-owned: the tool declares typed
+ *     `commandSpecs` and the host's `mountCommandSpec` mounts each one
+ *     (3.0.0 GA — `register()` and the raw-Commander `program` handle were
+ *     removed; "one command surface", §8).
  *
- * The two-method shape (commands[] for metadata; register() for wiring)
- * keeps `--help` discovery cheap (no per-tool Commander invocation
- * required to enumerate available commands) while letting each tool
- * own the full option-parsing surface for its commands.
+ * The two-field shape (commands[] for metadata; commandSpecs for the typed
+ * command surface) keeps `--help` discovery cheap (no per-tool Commander
+ * invocation required to enumerate available commands) while the host owns
+ * the full option-parsing / output / error pipeline for every command.
  */
 
 import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
@@ -54,7 +53,7 @@ export interface ToolMetadata {
 /**
  * Identity of a command a tool contributes — used for --help, plugin
  * listings, and conflict detection across tools. The actual handler is
- * wired up by Tool.register().
+ * wired up by the tool's `commandSpecs` (mounted by the host).
  */
 export interface ToolCommandDescriptor {
   /** CLI subcommand name — 'fit', 'sim', 'fit-list', etc. */
@@ -114,7 +113,7 @@ export class UnknownLiveViewError extends ToolError {
 
   constructor(viewKey: string, options?: ToolErrorOptions) {
     super(
-      `No live view registered for key '${viewKey}'. The tool that owns '${viewKey}' must call cli.registerLiveView('${viewKey}', renderer) inside its register(cli) hook.`,
+      `No live view registered for key '${viewKey}'. The tool that owns '${viewKey}' must call cli.registerLiveView('${viewKey}', renderer) before its first live render (e.g. in a lazy setup hook).`,
       options?.code ?? 'UNKNOWN_LIVE_VIEW',
       options,
     );
@@ -124,23 +123,18 @@ export class UnknownLiveViewError extends ToolError {
 }
 
 /**
- * Context the CLI hands to each tool when it asks the tool to wire
- * its commands. Tool.register() uses this to mount Commander commands
- * and to call back into shared CLI behavior (Ink rendering, dashboard
- * auto-open, structured logging) without depending on the CLI package
- * directly.
+ * Context the host hands to each command handler (and the tool's optional
+ * lifecycle hooks): the shared CLI behaviour a handler calls back into — Ink
+ * rendering, machine-output emit seams, dashboard auto-open, structured logging,
+ * per-run scope — without depending on the CLI package directly.
  *
- * Typed loosely on `program` so the contract doesn't pin every tool to
- * a specific Commander major version. Tools cast to their preferred
- * commander API; mismatches surface at register() time, not at
- * link/build time.
+ * 3.0.0 GA: this context carries NO Commander `program`. Tools declare
+ * `commandSpecs` and the host mounts them (`mountCommandSpec`); a handler has no
+ * raw-Commander handle to reach, so the "one command surface" invariant (§8) is
+ * structural, not merely guarded. The host owns the program internally and passes
+ * it to its own mount step (`mountAllToolCommands(registry, program, ctx)`).
  */
 export interface ToolCliContext {
-  /**
-   * The root Commander program. Tools call `program.command('fit')...`
-   * to mount their subcommands.
-   */
-  readonly program: unknown;
   /**
    * Per-run resources (logger, parseCache, registries, datastore,
    * recipeUnitConfig, projectContext). Constructed once per CLI
@@ -162,8 +156,8 @@ export interface ToolCliContext {
   readonly render: (result: unknown) => Promise<void>;
   /**
    * Register a renderer for a live, stateful view keyed by `key`. Tools
-   * call this from their `register(cli)` hook to contribute their own
-   * Ink view (spinner → results transition); the CLI then dispatches
+   * call this (lazily, from a setup hook on first live render) to contribute
+   * their own Ink view (spinner → results transition); the CLI then dispatches
    * to the registered renderer when `renderLive(key, args)` is invoked.
    *
    * Registration is first-writer-wins, matching the policy used by
@@ -380,29 +374,15 @@ export interface Tool {
    * assignable to it), so a tool authors them via
    * `defineCommand<TOpts, ToolCliContext>(...)`.
    *
-   * When a tool declares `commandSpecs`, the host mounts via the spec path and
-   * SKIPS {@link register}. When absent, the host falls back to `register()`
-   * (and emits a `cli.tool.register_deprecated` event). fit/graph/sim migrate
-   * to `commandSpecs` in release 2.11.0 Phases 3-5; until then they mount via
-   * the fallback.
+   * The host mounts each spec via `mountCommandSpec` (the ONLY command surface
+   * as of 3.0.0 — `register()` was removed). A tool that declares no
+   * `commandSpecs` contributes no commands (a mis-declaration the host surfaces
+   * loudly via `cli.tool.no_command_surface`).
    *
    * Typed `CommandSpec<unknown, ToolCliContext>` (the kernel cannot name the
    * per-spec `TOpts`); the host's `mountCommandSpec` narrows each spec.
    */
   readonly commandSpecs?: readonly CommandSpec<unknown, ToolCliContext>[];
-  /**
-   * Mount this tool's subcommands onto the CLI's Commander program.
-   * Called once at CLI startup, before argv parsing. Use the supplied
-   * context to render results and trigger dashboard auto-open.
-   *
-   * @deprecated Prefer {@link commandSpecs} — the declarative command surface
-   *   (release 2.11.0, §5.4). `register()` is the legacy raw-Commander path; a
-   *   tool that relies on it triggers a `cli.tool.register_deprecated` event at
-   *   mount. `register()` is REMOVED in 3.0.0 (the "one command surface"
-   *   invariant). Optional since 2.11.0 — a tool that declares `commandSpecs`
-   *   may omit `register()` entirely.
-   */
-  readonly register?: (cli: ToolCliContext) => void;
   /**
    * Optional one-time initialization. Called by the CLI before any of
    * the tool's commands run. Use it to register sub-packages (check
@@ -411,7 +391,7 @@ export interface Tool {
    * The CLI calls initialize() at most once per process. Tools that
    * need lazy init (e.g. fitness, where ensureChecksLoaded is wired
    * deep into command handlers) can leave this undefined and run
-   * setup inside their register()'d handlers instead.
+   * setup inside their command handlers instead.
    */
   readonly initialize?: () => Promise<void>;
   /**

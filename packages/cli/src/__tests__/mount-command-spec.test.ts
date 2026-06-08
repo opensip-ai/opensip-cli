@@ -46,7 +46,6 @@ function makeCtx(): CapturedCtx {
   const liveViews: { key: string; args: unknown }[] = [];
   const exitCodes: number[] = [];
   const ctx: ToolCliContext = {
-    program: new Command(),
     scope: {} as ToolCliContext['scope'],
     render: vi.fn((result: unknown) => {
       rendered.push(result);

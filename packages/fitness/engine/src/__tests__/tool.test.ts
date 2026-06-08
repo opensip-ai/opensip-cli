@@ -50,8 +50,6 @@ describe('fitnessTool contract conformance', () => {
   });
 
   it('declares its command surface via commandSpecs (Phase 4), not register()', () => {
-    // eslint-disable-next-line sonarjs/deprecation -- asserting the deprecated register() seam is GONE after the Phase 4 cutover is the whole point of this test.
-    expect(fitnessTool.register).toBeUndefined();
     expect(Array.isArray(fitnessTool.commandSpecs)).toBe(true);
     const specNames = (fitnessTool.commandSpecs ?? []).map((s) => s.name);
     expect(specNames).toEqual([

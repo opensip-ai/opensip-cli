@@ -1,4 +1,4 @@
-/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
+ 
 /**
  * Capability guard (Tier-2): lock the registered flag surface of every
  * first-party tool. A flag added or removed from any command — across all of

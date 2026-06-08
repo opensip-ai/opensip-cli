@@ -77,7 +77,6 @@ function makeCli(): CapturedCli {
   // can call `discoverWorkspaceUnits`.
   languages.register(typescriptAdapter);
   const cli: ToolCliContext = {
-    program: {},
     scope: new RunScope({
       projectContext: project,
       datastore: () => datastore,
@@ -438,8 +437,7 @@ describe('executeGraph', () => {
       scope: 'none' as const,
     };
     const cli: ToolCliContext = {
-      program: {},
-      scope: new RunScope({ projectContext: projectNoStore }),
+        scope: new RunScope({ projectContext: projectNoStore }),
       render: vi.fn(() => Promise.resolve()),
       renderLive: vi.fn(() => Promise.resolve()),
       maybeOpenDashboard: vi.fn(() => Promise.resolve()),
