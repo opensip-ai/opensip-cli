@@ -23,7 +23,7 @@ import {
   bootstrapCli,
   installPreActionHook,
   maybeOpenDashboard,
-  mountAllToolCommands,
+  mountToolCommands,
   renderResult,
 } from './bootstrap/index.js';
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore, setCliRegistriesForRun, setToolManifestsForRun, setToolProvenanceForRun } from './cli-context.js';
@@ -79,7 +79,10 @@ async function main(): Promise<void> {
     maybeOpenDashboard, logger,
   });
 
-  mountAllToolCommands(toolRegistry, ctx);
+  // Step 8 of the tool lifecycle (§5.4): mount each registered tool's commands
+  // through the named sequencer seam (declarative commandSpecs / deprecated
+  // register() fallback, per-tool failure isolation).
+  mountToolCommands(toolRegistry, ctx);
   // Source the plugin-supporting domains from the registered tools'
   // declared layouts — the kernel never enumerates them (ADR-0009).
   const pluginLayouts = toolRegistry
