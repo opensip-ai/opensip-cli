@@ -1,10 +1,18 @@
-/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
- * graphTool — branch coverage for the option-parsing and scope hooks the
- * primary tool-register suite doesn't reach: --resolution validation
- * (fast + invalid), the graph-shard-worker action, catalog-export's
- * incremental + changed-file advisory branch, the error handler on a
- * pipeline throw, and the contributeScope / collectDashboardData hooks.
+ * graphTool — branch coverage for the spec-handler paths the primary
+ * tool-register suite doesn't reach: the `--resolution` choices declaration
+ * (+ the `fast` path), the graph-shard-worker handler, catalog-export's
+ * incremental + changed-file advisory branch, the error handler on a pipeline
+ * throw, and the contributeScope / collectDashboardData hooks.
+ *
+ * Since release 2.11.0 Phase 5 graph mounts via `commandSpecs`; we drive each
+ * spec's handler directly (the host invokes it post-parse), threading
+ * positionals on the parsed-opts object under `_args`. `--resolution` is now
+ * validated declaratively (`choices: ['exact','fast']`) by the host's mount
+ * layer — its rejection of an out-of-set value is covered in
+ * `cli/src/__tests__/mount-command-spec.test.ts`; here we assert the spec
+ * DECLARES the choices (the source of truth) and that the `fast` value flows
+ * through.
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -13,7 +21,6 @@ import { join } from 'node:path';
 
 import { enterScope, LanguageRegistry } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
@@ -29,7 +36,19 @@ import type {
   ResolveOutput,
   WalkOutput,
 } from '../lang-adapter/types.js';
-import type { ToolCliContext, ToolScope } from '@opensip-tools/core';
+import type { CommandHandler, CommandSpec, ToolCliContext, ToolScope } from '@opensip-tools/core';
+
+/** Resolve a graph command-spec by name. */
+function specFor(name: string): CommandSpec<unknown, ToolCliContext> {
+  const spec = (graphTool.commandSpecs ?? []).find((s) => s.name === name);
+  if (spec === undefined) throw new Error(`graphTool exposes no command spec '${name}'`);
+  return spec;
+}
+
+/** Resolve a graph command-spec handler by name (the host invokes `handler(opts, ctx)`). */
+function handlerFor(name: string): CommandHandler<unknown, ToolCliContext> {
+  return specFor(name).handler;
+}
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
   return {
@@ -54,21 +73,16 @@ function fakeAdapter(projectDir: string): GraphLanguageAdapter {
 
 interface MockCliBag {
   readonly cli: ToolCliContext;
-  readonly program: Command;
   readonly setExitCode: MockInstance;
   readonly renderLive: MockInstance;
   readonly render: MockInstance;
 }
 
 function makeMockCli(datastore?: DataStore): MockCliBag {
-  const program = new Command();
-  // Don't let commander call process.exit when an action throws a parse error.
-  program.exitOverride();
   const setExitCode = vi.fn();
   const renderLive = vi.fn().mockResolvedValue(undefined);
   const render = vi.fn().mockResolvedValue(undefined);
   const cli = {
-    program,
     registerLiveView: vi.fn(),
     renderLive,
     render,
@@ -80,7 +94,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
   } as unknown as ToolCliContext;
-  return { cli, program, setExitCode, renderLive, render };
+  return { cli, setExitCode, renderLive, render };
 }
 
 /** Force `process.stdout.isTTY` for one test, restoring the prior value after. */
@@ -112,40 +126,35 @@ afterEach(() => {
   rmSync(workDir, { recursive: true, force: true });
 });
 
-describe('--resolution validation', () => {
-  it('rejects an invalid --resolution value with a ValidationError', async () => {
-    currentAdapterRegistry().register(fakeAdapter(workDir));
-    const { cli, program } = makeMockCli();
-    graphTool.register!(cli);
-    await expect(
-      program.parseAsync(
-        ['graph', '--json', '--resolution', 'bogus', join(workDir, 'sub')],
-        { from: 'user' },
-      ),
-    ).rejects.toThrow(/--resolution must be 'exact' or 'fast'/);
+describe('--resolution declaration', () => {
+  it('declares choices exact|fast on every --resolution-bearing command', () => {
+    for (const name of ['graph', 'catalog-export', 'sarif-export']) {
+      const option = (specFor(name).options ?? []).find((o) => o.flag === '--resolution');
+      expect(option?.choices).toEqual(['exact', 'fast']);
+      expect(option?.default).toBe('exact');
+    }
   });
 
   it('accepts --resolution fast on the sarif-export path', async () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const outPath = join(workDir, 'out.sarif');
-    const { cli, program, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    graphTool.register!(cli);
-    await program.parseAsync(
-      [
-        'sarif-export',
-        '--output-sarif', outPath,
-        '--tenant-id', 't',
-        '--repo-id', 'r',
-        '--cwd', workDir,
-        '--resolution', 'fast',
-      ],
-      { from: 'user' },
+    const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
+    await handlerFor('sarif-export')(
+      {
+        outputSarif: outPath,
+        tenantId: 't',
+        repoId: 'r',
+        cwd: workDir,
+        resolution: 'fast',
+        _args: [],
+      },
+      cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(0);
   });
 });
 
-describe('interactive default path honors graph config', () => {
+describe('graph interactive default path honors graph config', () => {
   it('loads opensip-tools.config.yml graph block and forwards it to renderLive (TTY)', async () => {
     // Regression: the interactive live-view path (bare `graph`) used to
     // call runGraph with no config, silently ignoring the project's
@@ -156,11 +165,10 @@ describe('interactive default path honors graph config', () => {
       'graph:\n  minCrossPackageDuplicatePackages: 2\n',
       'utf8',
     );
-    const { cli, program, renderLive } = makeMockCli();
-    graphTool.register!(cli);
+    const { cli, renderLive } = makeMockCli();
 
     // The animated live view is taken only on a TTY.
-    await withTTY(true, () => program.parseAsync(['graph', '--cwd', workDir], { from: 'user' }));
+    await withTTY(true, () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>);
 
     expect(renderLive).toHaveBeenCalledTimes(1);
     const [, args] = renderLive.mock.calls[0] as [string, { config?: { minCrossPackageDuplicatePackages?: number } }];
@@ -172,12 +180,9 @@ describe('interactive default path honors graph config', () => {
     // `graph` run must route through executeGraph and emit its result through
     // the render seam (dual-rendered as plain text), never renderLive.
     currentAdapterRegistry().register(fakeAdapter(workDir));
-    const { cli, program, renderLive, render } = makeMockCli(
-      DataStoreFactory.open({ backend: 'memory' }),
-    );
-    graphTool.register!(cli);
+    const { cli, renderLive, render } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
 
-    await withTTY(false, () => program.parseAsync(['graph', '--cwd', workDir], { from: 'user' }));
+    await withTTY(false, () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>);
 
     expect(renderLive).not.toHaveBeenCalled();
     expect(render).toHaveBeenCalledTimes(1);
@@ -186,8 +191,8 @@ describe('interactive default path honors graph config', () => {
   });
 });
 
-describe('graph-shard-worker action', () => {
-  it('routes the specPath argument to executeShardWorker (exit 0 on a valid spec)', async () => {
+describe('graph-shard-worker handler', () => {
+  it('routes the specPath positional to executeShardWorker (exit 0 on a valid spec)', async () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const specPath = join(workDir, 'spec.json');
     const spec: ShardWorkerSpec = {
@@ -196,9 +201,8 @@ describe('graph-shard-worker action', () => {
       resolutionMode: 'exact',
     };
     writeFileSync(specPath, JSON.stringify(spec), 'utf8');
-    const { cli, program, setExitCode } = makeMockCli();
-    graphTool.register!(cli);
-    await program.parseAsync(['graph-shard-worker', specPath], { from: 'user' });
+    const { cli, setExitCode } = makeMockCli();
+    await handlerFor('graph-shard-worker')({ _args: [specPath] }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
     const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
     const result = JSON.parse(out) as ShardBuildResult;
@@ -206,45 +210,44 @@ describe('graph-shard-worker action', () => {
   });
 });
 
-describe('catalog-export action branches', () => {
+describe('catalog-export handler branches', () => {
   it('logs the changed-file advisory on the incremental path and still writes the export', async () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const outPath = join(workDir, 'catalog.json');
-    const { cli, program, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    graphTool.register!(cli);
-    await program.parseAsync(
-      [
-        'catalog-export',
-        '--catalog-output', outPath,
-        '--tenant-id', 't',
-        '--repo-id', 'r',
-        '--git-sha', 'sha1',
-        '--mode', 'incremental',
-        '--changed-file', 'src/a.ts',
-        '--changed-file', 'src/b.ts',
-        '--cwd', workDir,
-      ],
-      { from: 'user' },
+    const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
+    await handlerFor('catalog-export')(
+      {
+        catalogOutput: outPath,
+        tenantId: 't',
+        repoId: 'r',
+        gitSha: 'sha1',
+        mode: 'incremental',
+        changedFile: ['src/a.ts', 'src/b.ts'],
+        cwd: workDir,
+        resolution: 'exact',
+        _args: [],
+      },
+      cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(0);
   });
 
   it('routes a pipeline failure through handleGraphError (no adapter registered)', async () => {
     // No adapter registered → runGraph throws a ConfigurationError, which
-    // the action's catch hands to handleGraphError.
+    // the handler's catch hands to handleGraphError.
     const outPath = join(workDir, 'catalog.json');
-    const { cli, program, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    graphTool.register!(cli);
-    await program.parseAsync(
-      [
-        'catalog-export',
-        '--catalog-output', outPath,
-        '--tenant-id', 't',
-        '--repo-id', 'r',
-        '--git-sha', 'sha1',
-        '--cwd', workDir,
-      ],
-      { from: 'user' },
+    const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
+    await handlerFor('catalog-export')(
+      {
+        catalogOutput: outPath,
+        tenantId: 't',
+        repoId: 'r',
+        gitSha: 'sha1',
+        cwd: workDir,
+        resolution: 'exact',
+        _args: [],
+      },
+      cli,
     );
     // handleGraphError sets a non-zero exit code.
     const codes = setExitCode.mock.calls.map((c) => c[0]);

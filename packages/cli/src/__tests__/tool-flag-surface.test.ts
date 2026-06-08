@@ -105,10 +105,21 @@ const EXPECTED: Record<string, string[]> = {
     // Post-2.7.0: graph gained --sarif (real SARIF 2.1.0 for Code Scanning via
     // the shared cli.writeSarif seam, replacing the broken graph-baseline-export
     // → upload path).
-    '--api-key', '--changed-file', '--concurrency', '--cwd', '--debug',
-    '--gate-compare', '--gate-save', '--json', '--language', '--list-files',
-    '--mode', '--no-cache', '--out', '--profile', '--quiet', '--recipe', '--report-to',
-    '--resolution', '--run-id', '--sarif', '--verbose', '--workspace',
+    //
+    // release 2.11.0 Phase 5: graph migrated to commandSpecs, so this set is now
+    // derived via recordSpecFlags. That surfaces the catalog-export/sarif-export
+    // REQUIRED flags — `--catalog-output`, `--git-sha`, `--output-sarif`,
+    // `--repo-id`, `--tenant-id` — which the old register()-recorder missed: it
+    // only trapped `.option(...)` calls and these were declared via
+    // `.requiredOption(...)`. They were always part of the real surface (the
+    // opensip EngineSubprocessPort contracts depend on them); the spec-based
+    // recorder records them faithfully.
+    '--api-key', '--catalog-output', '--changed-file', '--concurrency', '--cwd',
+    '--debug', '--gate-compare', '--gate-save', '--git-sha', '--json',
+    '--language', '--list-files', '--mode', '--no-cache', '--out',
+    '--output-sarif', '--profile', '--quiet', '--recipe', '--repo-id',
+    '--report-to', '--resolution', '--run-id', '--sarif', '--tenant-id',
+    '--verbose', '--workspace',
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
   // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).

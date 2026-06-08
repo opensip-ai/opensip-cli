@@ -50,7 +50,6 @@
     "@opensip-tools/graph-python": "workspace:*",
     "@opensip-tools/graph-rust": "workspace:*",
     "@types/node": "^22.19.19",
-    "commander": "^14.0.3",
     "vitest": "^4.1.7"
   }
 }

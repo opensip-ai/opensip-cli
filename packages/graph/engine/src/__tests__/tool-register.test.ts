@@ -1,9 +1,16 @@
-/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
- * Tests for `graphTool.register(cli)` — verifies that the Commander
- * subcommands wire up and the action handlers do the right thing
- * when invoked. We drive register() with a real `commander.Command`
- * instance so the option-parsing layer is exercised end-to-end.
+ * Tests for graph's command-spec handlers — verifies that each declarative
+ * `CommandSpec` handler does the right thing when the host invokes it after
+ * parsing.
+ *
+ * Since release 2.11.0 Phase 5 graph mounts via `commandSpecs`, not the
+ * deprecated `register()` hook. The host-owned mount path (Commander wiring,
+ * `_args` positional convention, output dispatch) is covered in
+ * `cli/src/__tests__/mount-command-spec.test.ts`; here we drive each spec's
+ * handler directly with a fake ToolCliContext (the handler is exactly what the
+ * host invokes post-parse). Positional arguments are threaded the way the host
+ * threads them: on the parsed-opts object under the `_args` key. For graph's
+ * sole variadic positional (`[paths...]`), `_args[0]` is the paths array.
  */
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -13,7 +20,6 @@ import { dirname, join } from 'node:path';
 import { enterScope, LanguageRegistry } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { formatSignalSarif } from '@opensip-tools/output';
-import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { saveBaseline } from '../gate.js';
@@ -32,7 +38,17 @@ import type {
   WalkOutput,
 } from '../lang-adapter/types.js';
 import type { Catalog, FunctionOccurrence } from '../types.js';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { CommandHandler, ToolCliContext } from '@opensip-tools/core';
+
+/**
+ * Resolve a graph command-spec handler by command name. Mirrors how the host
+ * invokes a handler: `handler(opts, ctx)`, where positionals ride on `opts._args`.
+ */
+function handlerFor(name: string): CommandHandler<unknown, ToolCliContext> {
+  const spec = (graphTool.commandSpecs ?? []).find((s) => s.name === name);
+  if (spec === undefined) throw new Error(`graphTool exposes no command spec '${name}'`);
+  return spec.handler;
+}
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
   return {
@@ -109,7 +125,6 @@ function seedCatalog(datastore: DataStore, occs: readonly FunctionOccurrence[]):
 
 interface MockCliBag {
   readonly cli: ToolCliContext;
-  readonly program: Command;
   readonly setExitCode: MockInstance;
   readonly emitJson: MockInstance;
   readonly registerLiveView: MockInstance;
@@ -118,14 +133,12 @@ interface MockCliBag {
 }
 
 function makeMockCli(datastore?: DataStore): MockCliBag {
-  const program = new Command();
   const setExitCode = vi.fn();
   const emitJson = vi.fn();
   const registerLiveView = vi.fn();
   const renderLive = vi.fn().mockResolvedValue(undefined);
   const render = vi.fn().mockResolvedValue(undefined);
   const cli = {
-    program,
     project: { scope: 'none' },
     render,
     registerLiveView,
@@ -146,7 +159,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
   } as unknown as ToolCliContext;
-  return { cli, program, setExitCode, emitJson, registerLiveView, renderLive, render };
+  return { cli, setExitCode, emitJson, registerLiveView, renderLive, render };
 }
 
 /** Concatenated text of every lines-bearing result handed to cli.render(). */
@@ -175,11 +188,9 @@ afterEach(() => {
   rmSync(workDir, { recursive: true, force: true });
 });
 
-describe('graphTool.register', () => {
-  it('mounts all subcommands on the program', () => {
-    const { cli, program } = makeMockCli();
-    graphTool.register!(cli);
-    const names = program.commands.map((c) => c.name());
+describe('graphTool command surface', () => {
+  it('declares one spec per command, in mount order', () => {
+    const names = (graphTool.commandSpecs ?? []).map((s) => s.name);
     expect(names).toEqual([
       'graph',
       'graph-lookup',
@@ -192,25 +203,16 @@ describe('graphTool.register', () => {
     ]);
   });
 
-  it('registers a live-view renderer under the "graph" key', () => {
-    const { cli, registerLiveView } = makeMockCli();
-    graphTool.register!(cli);
-    const calls = registerLiveView.mock.calls;
-    expect(calls.length).toBe(1);
-    expect(calls[0]?.[0]).toBe('graph');
-    expect(typeof calls[0]?.[1]).toBe('function');
-  });
-
-  describe('graph subcommand action', () => {
+  describe('graph handler', () => {
     it('positional path bypasses the live view and routes through executeGraph', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         currentAdapterRegistry().register(fakeAdapter(workDir));
-        const { cli, program, renderLive, setExitCode } = makeMockCli(datastore);
-        graphTool.register!(cli);
-        await program.parseAsync(
-          ['graph', '--json', join(workDir, 'missing')],
-          { from: 'user' },
+        const { cli, renderLive, setExitCode } = makeMockCli(datastore);
+        // `_args[0]` carries the variadic [paths...] array (host convention).
+        await handlerFor('graph')(
+          { cwd: workDir, json: true, _args: [[join(workDir, 'missing')]] },
+          cli,
         );
         // Positional path skips heap-preflight and routes to executeGraph
         // (not the Ink live view).
@@ -222,12 +224,11 @@ describe('graphTool.register', () => {
       }
     });
 
-    it('default interactive path routes through cli.renderLive', async () => {
+    it('default interactive path registers + routes through cli.renderLive', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         currentAdapterRegistry().register(fakeAdapter(workDir));
-        const { cli, program, renderLive } = makeMockCli(datastore);
-        graphTool.register!(cli);
+        const { cli, renderLive, registerLiveView } = makeMockCli(datastore);
         // Set the sentinel so heap-preflight short-circuits without
         // touching the file system.
         const prev = process.env.OPENSIP_HEAP_ELEVATED;
@@ -237,12 +238,16 @@ describe('graphTool.register', () => {
         const prevTTY = process.stdout.isTTY;
         Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
         try {
-          await program.parseAsync(['graph'], { from: 'user' });
+          // No positionals: `_args` carries the empty variadic array.
+          await handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli);
         } finally {
           if (prev === undefined) delete process.env.OPENSIP_HEAP_ELEVATED;
           else process.env.OPENSIP_HEAP_ELEVATED = prev;
           Object.defineProperty(process.stdout, 'isTTY', { value: prevTTY, configurable: true });
         }
+        // Spec-mounted world: the renderer is set up lazily on the interactive
+        // path before the renderLive lookup.
+        expect(registerLiveView.mock.calls[0]?.[0]).toBe('graph');
         expect(renderLive.mock.calls.length).toBe(1);
         expect(renderLive.mock.calls[0]?.[0]).toBe('graph');
       } finally {
@@ -251,14 +256,13 @@ describe('graphTool.register', () => {
     });
   });
 
-  describe('graph-lookup subcommand action', () => {
+  describe('graph-lookup handler', () => {
     it('routes to executeLookup with the given name', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         seedCatalog(datastore, [makeOcc({ simpleName: 'saveBaseline', bodyHash: 'h1' })]);
-        const { cli, program, setExitCode, render } = makeMockCli(datastore);
-        graphTool.register!(cli);
-        await program.parseAsync(['graph-lookup', 'saveBaseline'], { from: 'user' });
+        const { cli, setExitCode, render } = makeMockCli(datastore);
+        await handlerFor('graph-lookup')({ _args: ['saveBaseline'] }, cli);
         expect(setExitCode).toHaveBeenCalledWith(0);
         // Human lookup output flows through the render seam, not stdout.
         expect(renderedLines(render)).toContain('saveBaseline');
@@ -268,17 +272,13 @@ describe('graphTool.register', () => {
     });
   });
 
-  describe('graph-symbol-index subcommand action', () => {
+  describe('graph-symbol-index handler', () => {
     it('routes to executeSymbolIndex with cwd + out flags', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         seedCatalog(datastore, [makeOcc({ simpleName: 'fn', bodyHash: 'h1' })]);
-        const { cli, program, setExitCode } = makeMockCli(datastore);
-        graphTool.register!(cli);
-        await program.parseAsync(
-          ['graph-symbol-index', '--cwd', workDir, '--out', 'idx.json'],
-          { from: 'user' },
-        );
+        const { cli, setExitCode } = makeMockCli(datastore);
+        await handlerFor('graph-symbol-index')({ cwd: workDir, out: 'idx.json', _args: [] }, cli);
         expect(setExitCode).toHaveBeenCalledWith(0);
       } finally {
         datastore.close();
@@ -286,18 +286,14 @@ describe('graphTool.register', () => {
     });
   });
 
-  describe('graph-baseline-export subcommand action', () => {
+  describe('graph-baseline-export handler', () => {
     it('exports baseline to disk on success', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         saveBaseline([], new GraphBaselineRepo(datastore));
         const outPath = join(workDir, 'baseline.json');
-        const { cli, program } = makeMockCli(datastore);
-        graphTool.register!(cli);
-        await program.parseAsync(
-          ['graph-baseline-export', '--out', outPath],
-          { from: 'user' },
-        );
+        const { cli } = makeMockCli(datastore);
+        await handlerFor('graph-baseline-export')({ out: outPath, _args: [] }, cli);
         const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
         expect(out).toContain('Exported graph baseline');
       } finally {
@@ -310,12 +306,8 @@ describe('graphTool.register', () => {
       try {
         saveBaseline([], new GraphBaselineRepo(datastore));
         const outPath = join(workDir, 'baseline.json');
-        const { cli, program, emitJson } = makeMockCli(datastore);
-        graphTool.register!(cli);
-        await program.parseAsync(
-          ['graph-baseline-export', '--out', outPath, '--json'],
-          { from: 'user' },
-        );
+        const { cli, emitJson } = makeMockCli(datastore);
+        await handlerFor('graph-baseline-export')({ out: outPath, json: true, _args: [] }, cli);
         expect(emitJson.mock.calls.length).toBe(1);
         const payload = emitJson.mock.calls[0]?.[0] as { type?: string };
         expect(payload?.type).toBe('graph-baseline-export');
@@ -328,12 +320,8 @@ describe('graphTool.register', () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         const outPath = join(workDir, 'baseline.json');
-        const { cli, program, setExitCode } = makeMockCli(datastore);
-        graphTool.register!(cli);
-        await program.parseAsync(
-          ['graph-baseline-export', '--out', outPath],
-          { from: 'user' },
-        );
+        const { cli, setExitCode } = makeMockCli(datastore);
+        await handlerFor('graph-baseline-export')({ out: outPath, _args: [] }, cli);
         expect(setExitCode).toHaveBeenCalledWith(2);
         const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
         expect(err).toContain('Error');
@@ -346,12 +334,8 @@ describe('graphTool.register', () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         const outPath = join(workDir, 'baseline.json');
-        const { cli, program, emitJson, setExitCode } = makeMockCli(datastore);
-        graphTool.register!(cli);
-        await program.parseAsync(
-          ['graph-baseline-export', '--out', outPath, '--json'],
-          { from: 'user' },
-        );
+        const { cli, emitJson, setExitCode } = makeMockCli(datastore);
+        await handlerFor('graph-baseline-export')({ out: outPath, json: true, _args: [] }, cli);
         expect(setExitCode).toHaveBeenCalledWith(2);
         expect(emitJson.mock.calls.length).toBe(1);
         const payload = emitJson.mock.calls[0]?.[0] as { error?: string };
@@ -362,25 +346,26 @@ describe('graphTool.register', () => {
     });
   });
 
-  describe('catalog-export subcommand action', () => {
+  describe('catalog-export handler', () => {
     it('runs the pipeline and routes through runCatalogJsonMode', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         currentAdapterRegistry().register(fakeAdapter(workDir));
         const outPath = join(workDir, 'catalog.json');
-        const { cli, program, setExitCode } = makeMockCli(datastore);
-        graphTool.register!(cli);
-        await program.parseAsync(
-          [
-            'catalog-export',
-            '--catalog-output', outPath,
-            '--tenant-id', 't1',
-            '--repo-id', 'r1',
-            '--git-sha', 'abc123',
-            '--run-id', 'run-1',
-            '--cwd', workDir,
-          ],
-          { from: 'user' },
+        const { cli, setExitCode } = makeMockCli(datastore);
+        await handlerFor('catalog-export')(
+          {
+            catalogOutput: outPath,
+            tenantId: 't1',
+            repoId: 'r1',
+            gitSha: 'abc123',
+            runId: 'run-1',
+            cwd: workDir,
+            mode: 'initial',
+            resolution: 'exact',
+            _args: [],
+          },
+          cli,
         );
         expect(setExitCode).toHaveBeenCalledWith(0);
         expect(existsSync(outPath)).toBe(true);
@@ -398,23 +383,23 @@ describe('graphTool.register', () => {
     });
   });
 
-  describe('sarif-export subcommand action', () => {
+  describe('sarif-export handler', () => {
     it('runs the pipeline and writes a SARIF v2.1.0 document to the output path', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         currentAdapterRegistry().register(fakeAdapter(workDir));
         const outPath = join(workDir, 'out.sarif');
-        const { cli, program, setExitCode } = makeMockCli(datastore);
-        graphTool.register!(cli);
-        await program.parseAsync(
-          [
-            'sarif-export',
-            '--output-sarif', outPath,
-            '--tenant-id', 't1',
-            '--repo-id', 'r1',
-            '--cwd', workDir,
-          ],
-          { from: 'user' },
+        const { cli, setExitCode } = makeMockCli(datastore);
+        await handlerFor('sarif-export')(
+          {
+            outputSarif: outPath,
+            tenantId: 't1',
+            repoId: 'r1',
+            cwd: workDir,
+            resolution: 'exact',
+            _args: [],
+          },
+          cli,
         );
         expect(setExitCode).toHaveBeenCalledWith(0);
         expect(existsSync(outPath)).toBe(true);
