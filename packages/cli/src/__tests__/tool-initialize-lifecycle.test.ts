@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
  * Tool.initialize() lifecycle test (audit P1a).
  *
@@ -96,7 +97,7 @@ function buildProgram(tool: Tool): Command {
   const program = new Command();
   program.exitOverride();
   installPreActionHook(program, 'test');
-  tool.register(stubCtx(program));
+  tool.register!(stubCtx(program));
   return program;
 }
 

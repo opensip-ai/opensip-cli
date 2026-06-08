@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
  * @fileoverview Tests for simulationTool's live-view wiring (ADR-0016) — the
  * paths the static-render tool.test.ts can't reach:
@@ -94,7 +95,7 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     program.exitOverride();
     const cap = makeCtx(program);
 
-    simulationTool.register(cap.ctx);
+    simulationTool.register!(cap.ctx);
 
     const callback = cap.liveViews.get('sim');
     expect(callback).toBeDefined();
@@ -122,7 +123,7 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     const program = new Command();
     program.exitOverride();
     const cap = makeCtx(program);
-    simulationTool.register(cap.ctx);
+    simulationTool.register!(cap.ctx);
 
     await cap.liveViews.get('sim')?.({ cwd: '/proj' });
 
@@ -143,7 +144,7 @@ describe('simulationTool action — interactive TTY branch', () => {
     program.exitOverride();
     const cap = makeCtx(program);
 
-    simulationTool.register(cap.ctx);
+    simulationTool.register!(cap.ctx);
     await program.parseAsync(['node', 'cli', 'sim', '--open'], { from: 'node' });
 
     // Interactive path: the static executeSim render is bypassed in favour of

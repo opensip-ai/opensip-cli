@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
  * Capability contract for the `sim` tool.
  *
@@ -49,7 +50,7 @@ function recordRegisteredFlags(): string[] {
   const program = { command: () => sub };
   // register() now also contributes a live view (ADR-0016); the recorder only
   // cares about flags, so registerLiveView is a no-op here.
-  simulationTool.register({ program, registerLiveView: noop } as unknown as ToolCliContext);
+  simulationTool.register!({ program, registerLiveView: noop } as unknown as ToolCliContext);
   return flags.sort();
 }
 

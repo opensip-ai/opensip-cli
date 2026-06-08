@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
  * graphTool — branch coverage for the option-parsing and scope hooks the
  * primary tool-register suite doesn't reach: --resolution validation
@@ -115,7 +116,7 @@ describe('--resolution validation', () => {
   it('rejects an invalid --resolution value with a ValidationError', async () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const { cli, program } = makeMockCli();
-    graphTool.register(cli);
+    graphTool.register!(cli);
     await expect(
       program.parseAsync(
         ['graph', '--json', '--resolution', 'bogus', join(workDir, 'sub')],
@@ -128,7 +129,7 @@ describe('--resolution validation', () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const outPath = join(workDir, 'out.sarif');
     const { cli, program, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    graphTool.register(cli);
+    graphTool.register!(cli);
     await program.parseAsync(
       [
         'sarif-export',
@@ -156,7 +157,7 @@ describe('interactive default path honors graph config', () => {
       'utf8',
     );
     const { cli, program, renderLive } = makeMockCli();
-    graphTool.register(cli);
+    graphTool.register!(cli);
 
     // The animated live view is taken only on a TTY.
     await withTTY(true, () => program.parseAsync(['graph', '--cwd', workDir], { from: 'user' }));
@@ -174,7 +175,7 @@ describe('interactive default path honors graph config', () => {
     const { cli, program, renderLive, render } = makeMockCli(
       DataStoreFactory.open({ backend: 'memory' }),
     );
-    graphTool.register(cli);
+    graphTool.register!(cli);
 
     await withTTY(false, () => program.parseAsync(['graph', '--cwd', workDir], { from: 'user' }));
 
@@ -196,7 +197,7 @@ describe('graph-shard-worker action', () => {
     };
     writeFileSync(specPath, JSON.stringify(spec), 'utf8');
     const { cli, program, setExitCode } = makeMockCli();
-    graphTool.register(cli);
+    graphTool.register!(cli);
     await program.parseAsync(['graph-shard-worker', specPath], { from: 'user' });
     expect(setExitCode).toHaveBeenCalledWith(0);
     const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
@@ -210,7 +211,7 @@ describe('catalog-export action branches', () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const outPath = join(workDir, 'catalog.json');
     const { cli, program, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    graphTool.register(cli);
+    graphTool.register!(cli);
     await program.parseAsync(
       [
         'catalog-export',
@@ -233,7 +234,7 @@ describe('catalog-export action branches', () => {
     // the action's catch hands to handleGraphError.
     const outPath = join(workDir, 'catalog.json');
     const { cli, program, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    graphTool.register(cli);
+    graphTool.register!(cli);
     await program.parseAsync(
       [
         'catalog-export',

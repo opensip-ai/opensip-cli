@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
  * @fileoverview Smoke tests for simulationTool — the Tool plugin
  * descriptor wired into the CLI dispatcher.
@@ -135,7 +136,7 @@ describe('simulationTool.register', () => {
     program.exitOverride();
     const { ctx } = makeFakeContext(program);
 
-    simulationTool.register(ctx);
+    simulationTool.register!(ctx);
 
     const subcommands = program.commands.map((c) => c.name());
     expect(subcommands).toContain('sim');
@@ -146,7 +147,7 @@ describe('simulationTool.register', () => {
     program.exitOverride();
     const { ctx } = makeFakeContext(program);
 
-    simulationTool.register(ctx);
+    simulationTool.register!(ctx);
 
     const sim = program.commands.find((c) => c.name() === 'sim');
     expect(sim).toBeDefined();
@@ -165,7 +166,7 @@ describe('simulationTool.register', () => {
     const { ctx, rendered } = makeFakeContext(program);
     registerProbeScenario();
 
-    simulationTool.register(ctx);
+    simulationTool.register!(ctx);
 
     await program.parseAsync(['node', 'cli', 'sim'], { from: 'node' });
 
@@ -181,7 +182,7 @@ describe('simulationTool.register', () => {
     const { ctx, emitted } = makeFakeContext(program);
     registerProbeScenario();
 
-    simulationTool.register(ctx);
+    simulationTool.register!(ctx);
 
     await program.parseAsync(['node', 'cli', 'sim', '--json'], { from: 'node' });
 
@@ -198,7 +199,7 @@ describe('simulationTool.register', () => {
     program.exitOverride();
     const { ctx, exitCodes, emitted } = makeFakeContext(program);
 
-    simulationTool.register(ctx);
+    simulationTool.register!(ctx);
 
     await program.parseAsync(['node', 'cli', 'sim', '--json', '--recipe', 'nope'], { from: 'node' });
 
@@ -213,7 +214,7 @@ describe('simulationTool.register', () => {
     program.exitOverride();
     const { ctx, exitCodes, rendered } = makeFakeContext(program);
 
-    simulationTool.register(ctx);
+    simulationTool.register!(ctx);
 
     await program.parseAsync(['node', 'cli', 'sim', '--recipe', 'still-nope'], { from: 'node' });
 

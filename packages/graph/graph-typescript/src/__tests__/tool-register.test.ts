@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
  * Tests for the Commander wiring inside graphTool.register().
  */
@@ -64,7 +65,7 @@ describe('graphTool.register', () => {
   it('mounts a `graph` subcommand on the supplied Commander program', () => {
     const program = new Command();
     program.exitOverride();
-    graphTool.register(makeCli(program));
+    graphTool.register!(makeCli(program));
     const sub = program.commands.find((c) => c.name() === 'graph');
     expect(sub).toBeDefined();
     expect(sub?.description()).toContain('static call-graph');
@@ -73,7 +74,7 @@ describe('graphTool.register', () => {
   it('registers the documented option set on the graph subcommand', () => {
     const program = new Command();
     program.exitOverride();
-    graphTool.register(makeCli(program));
+    graphTool.register!(makeCli(program));
     const sub = program.commands.find((c) => c.name() === 'graph');
     const flags = sub?.options.map((o) => o.long) ?? [];
     expect(flags).toContain('--cwd');
@@ -94,7 +95,7 @@ describe('graphTool.register', () => {
     // actually running the pipeline (which requires a real fixture).
     const program = new Command();
     program.exitOverride();
-    graphTool.register(makeCli(program));
+    graphTool.register!(makeCli(program));
     const sub = program.commands.find((c) => c.name() === 'graph');
     expect(sub).toBeDefined();
     const spy = vi.fn();
@@ -181,7 +182,7 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         writeSarif: vi.fn(() => Promise.resolve()),
         registerLiveView: vi.fn(),
       };
-      graphTool.register(cli);
+      graphTool.register!(cli);
       try {
         // With a positional path, the heap preflight is skipped —
         // important because preflight could re-exec the test process.
@@ -244,7 +245,7 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         writeSarif: vi.fn(() => Promise.resolve()),
         registerLiveView: vi.fn(),
       };
-      graphTool.register(cli);
+      graphTool.register!(cli);
       // No --json/--gate-*/--report-to/--package: this is the interactive
       // default path, which delegates to renderLive — but only on a TTY (a
       // non-TTY run falls back to the static render seam). vitest's stdout is
@@ -267,7 +268,7 @@ describe('graphTool action handler — end-to-end via Commander', () => {
     // Exercise the parse function for --concurrency.
     const program = new Command();
     program.exitOverride();
-    graphTool.register(makeCli(program));
+    graphTool.register!(makeCli(program));
     const sub = program.commands.find((c) => c.name() === 'graph');
     expect(sub).toBeDefined();
     const spy = vi.fn();

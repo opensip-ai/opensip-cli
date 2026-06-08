@@ -42,6 +42,8 @@ import { fitnessTool } from '@opensip-tools/fitness';
 import { graphTool } from '@opensip-tools/graph';
 import { simulationTool } from '@opensip-tools/simulation';
 
+import { mountCommandSpec } from '../commands/mount-command-spec.js';
+
 import { isProjectLocalToolTrusted } from './tool-trust.js';
 import { isValidTool } from './validate-tool.js';
 
@@ -449,15 +451,31 @@ export function admitProjectLocalTool(args: {
 }
 
 /**
- * Walk the registry and ask each tool to mount its Commander
- * subcommands via `tool.register(cli)`. Failures are isolated so one
- * misbehaving tool doesn't take the whole CLI down — the failure is
- * logged and stderr-warned, then we continue.
+ * Walk the registry and mount each tool's Commander subcommands. This is
+ * **step 8** of the tool lifecycle (release 2.11.0, §5.4) — see
+ * {@link runToolLifecycle}.
+ *
+ * Two mount paths, by tool shape:
+ *
+ *   - **Declarative (preferred)** — the tool declares `commandSpecs`; the host
+ *     mounts each spec via `mountCommandSpec(program, spec, ctx)` (Phase 1) and
+ *     SKIPS `register()`. The tool never touches Commander.
+ *   - **Legacy fallback** — the tool has no `commandSpecs`; the host calls
+ *     `tool.register(cli)` and emits a structured `cli.tool.register_deprecated`
+ *     event (the raw-Commander path is removed in 3.0.0). fit/graph/sim mount
+ *     via this fallback until their Phase 3-5 migration.
+ *
+ * Failures are isolated per tool — one misbehaving tool (whether its
+ * `register()` throws or a spec fails to mount) must not take the whole CLI
+ * down. The failure is logged and stderr-warned, then we continue with the
+ * next tool. A tool with NEITHER `commandSpecs` nor `register()` is a
+ * mis-declared plugin: logged via `cli.tool.no_command_surface` and skipped.
  */
 export function mountAllToolCommands(registry: ToolRegistry, ctx: ToolCliContext): void {
+  const program = ctx.program as CliProgram;
   for (const tool of registry.list()) {
     try {
-      tool.register(ctx);
+      mountOneTool(program, tool, ctx);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       process.stderr.write(`opensip-tools: tool ${tool.metadata.id} failed to register: ${msg}\n`);
@@ -472,7 +490,54 @@ export function mountAllToolCommands(registry: ToolRegistry, ctx: ToolCliContext
   // ADR-0021: one shared help shape across every mounted command — uniform
   // option/subcommand ordering and a docs footer — applied here (the single
   // place that has walked every tool's commands) rather than per tool.
-  applySharedHelpConfiguration(ctx.program as CliProgram);
+  applySharedHelpConfiguration(program);
+}
+
+/**
+ * Mount ONE tool's commands, choosing the declarative spec path when the tool
+ * provides `commandSpecs` and falling back to the deprecated `register()`
+ * otherwise. Extracted so {@link mountAllToolCommands} keeps its per-tool
+ * failure isolation around a single call.
+ */
+function mountOneTool(program: CliProgram, tool: Tool, ctx: ToolCliContext): void {
+  if (tool.commandSpecs !== undefined && tool.commandSpecs.length > 0) {
+    for (const spec of tool.commandSpecs) {
+      // `Tool.commandSpecs` is `CommandSpec<unknown, ToolCliContext>[]`, which
+      // is assignable to the mounter's `HostCommandSpec` (handler contravariance
+      // — an `unknown`-opts handler accepts a `Record`-opts call). No cast.
+      mountCommandSpec(program, spec, ctx);
+    }
+    return;
+  }
+  // The two `tool.register` reads below ARE the deliberate deprecated-register()
+  // fallback consumer (release 2.11.0 Phase 2). register() is sanctioned through
+  // 2.x; reading it here is the whole point — the structured
+  // `cli.tool.register_deprecated` event drives migration, and fit/graph/sim
+  // mount via this path until their Phase 3-5 commandSpecs cutover.
+  // eslint-disable-next-line sonarjs/deprecation -- deliberate fallback (see above).
+  if (tool.register !== undefined) {
+    // Legacy raw-Commander path — sanctioned through 2.x, removed in 3.0.0.
+    // Emit a structured deprecation event so adopters (and our own dogfood)
+    // can see which tools still mount the old way before the 3.0.0 cutover.
+    logger.warn({
+      evt: 'cli.tool.register_deprecated',
+      module: BOOTSTRAP_MODULE,
+      toolId: tool.metadata.id,
+      detail: "tool mounts via deprecated register(); prefer commandSpecs (removed in 3.0.0)",
+    });
+    // eslint-disable-next-line sonarjs/deprecation -- deliberate fallback call (see above).
+    tool.register(ctx);
+    return;
+  }
+  // Neither a declarative command surface nor a legacy register() — a
+  // mis-declared tool contributes no commands. Surface it rather than
+  // silently mounting nothing.
+  logger.warn({
+    evt: 'cli.tool.no_command_surface',
+    module: BOOTSTRAP_MODULE,
+    toolId: tool.metadata.id,
+    detail: 'tool declares neither commandSpecs nor register(); no commands mounted',
+  });
 }
 
 const DOCS_HELP_FOOTER = '\nDocs: https://opensip.ai/docs/opensip-tools';

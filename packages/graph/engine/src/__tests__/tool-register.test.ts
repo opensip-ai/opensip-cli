@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
  * Tests for `graphTool.register(cli)` — verifies that the Commander
  * subcommands wire up and the action handlers do the right thing
@@ -177,7 +178,7 @@ afterEach(() => {
 describe('graphTool.register', () => {
   it('mounts all subcommands on the program', () => {
     const { cli, program } = makeMockCli();
-    graphTool.register(cli);
+    graphTool.register!(cli);
     const names = program.commands.map((c) => c.name());
     expect(names).toEqual([
       'graph',
@@ -193,7 +194,7 @@ describe('graphTool.register', () => {
 
   it('registers a live-view renderer under the "graph" key', () => {
     const { cli, registerLiveView } = makeMockCli();
-    graphTool.register(cli);
+    graphTool.register!(cli);
     const calls = registerLiveView.mock.calls;
     expect(calls.length).toBe(1);
     expect(calls[0]?.[0]).toBe('graph');
@@ -206,7 +207,7 @@ describe('graphTool.register', () => {
       try {
         currentAdapterRegistry().register(fakeAdapter(workDir));
         const { cli, program, renderLive, setExitCode } = makeMockCli(datastore);
-        graphTool.register(cli);
+        graphTool.register!(cli);
         await program.parseAsync(
           ['graph', '--json', join(workDir, 'missing')],
           { from: 'user' },
@@ -226,7 +227,7 @@ describe('graphTool.register', () => {
       try {
         currentAdapterRegistry().register(fakeAdapter(workDir));
         const { cli, program, renderLive } = makeMockCli(datastore);
-        graphTool.register(cli);
+        graphTool.register!(cli);
         // Set the sentinel so heap-preflight short-circuits without
         // touching the file system.
         const prev = process.env.OPENSIP_HEAP_ELEVATED;
@@ -256,7 +257,7 @@ describe('graphTool.register', () => {
       try {
         seedCatalog(datastore, [makeOcc({ simpleName: 'saveBaseline', bodyHash: 'h1' })]);
         const { cli, program, setExitCode, render } = makeMockCli(datastore);
-        graphTool.register(cli);
+        graphTool.register!(cli);
         await program.parseAsync(['graph-lookup', 'saveBaseline'], { from: 'user' });
         expect(setExitCode).toHaveBeenCalledWith(0);
         // Human lookup output flows through the render seam, not stdout.
@@ -273,7 +274,7 @@ describe('graphTool.register', () => {
       try {
         seedCatalog(datastore, [makeOcc({ simpleName: 'fn', bodyHash: 'h1' })]);
         const { cli, program, setExitCode } = makeMockCli(datastore);
-        graphTool.register(cli);
+        graphTool.register!(cli);
         await program.parseAsync(
           ['graph-symbol-index', '--cwd', workDir, '--out', 'idx.json'],
           { from: 'user' },
@@ -292,7 +293,7 @@ describe('graphTool.register', () => {
         saveBaseline([], new GraphBaselineRepo(datastore));
         const outPath = join(workDir, 'baseline.json');
         const { cli, program } = makeMockCli(datastore);
-        graphTool.register(cli);
+        graphTool.register!(cli);
         await program.parseAsync(
           ['graph-baseline-export', '--out', outPath],
           { from: 'user' },
@@ -310,7 +311,7 @@ describe('graphTool.register', () => {
         saveBaseline([], new GraphBaselineRepo(datastore));
         const outPath = join(workDir, 'baseline.json');
         const { cli, program, emitJson } = makeMockCli(datastore);
-        graphTool.register(cli);
+        graphTool.register!(cli);
         await program.parseAsync(
           ['graph-baseline-export', '--out', outPath, '--json'],
           { from: 'user' },
@@ -328,7 +329,7 @@ describe('graphTool.register', () => {
       try {
         const outPath = join(workDir, 'baseline.json');
         const { cli, program, setExitCode } = makeMockCli(datastore);
-        graphTool.register(cli);
+        graphTool.register!(cli);
         await program.parseAsync(
           ['graph-baseline-export', '--out', outPath],
           { from: 'user' },
@@ -346,7 +347,7 @@ describe('graphTool.register', () => {
       try {
         const outPath = join(workDir, 'baseline.json');
         const { cli, program, emitJson, setExitCode } = makeMockCli(datastore);
-        graphTool.register(cli);
+        graphTool.register!(cli);
         await program.parseAsync(
           ['graph-baseline-export', '--out', outPath, '--json'],
           { from: 'user' },
@@ -368,7 +369,7 @@ describe('graphTool.register', () => {
         currentAdapterRegistry().register(fakeAdapter(workDir));
         const outPath = join(workDir, 'catalog.json');
         const { cli, program, setExitCode } = makeMockCli(datastore);
-        graphTool.register(cli);
+        graphTool.register!(cli);
         await program.parseAsync(
           [
             'catalog-export',
@@ -404,7 +405,7 @@ describe('graphTool.register', () => {
         currentAdapterRegistry().register(fakeAdapter(workDir));
         const outPath = join(workDir, 'out.sarif');
         const { cli, program, setExitCode } = makeMockCli(datastore);
-        graphTool.register(cli);
+        graphTool.register!(cli);
         await program.parseAsync(
           [
             'sarif-export',
