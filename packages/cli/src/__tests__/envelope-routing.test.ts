@@ -120,17 +120,17 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('root --json error path (emitError)', () => {
-  function buildCtx() {
-    return buildToolCliContext({
-      render: renderResult,
-      liveViews: createLiveViewRegistry(),
-      maybeOpenDashboard: () => Promise.resolve(),
-    }).ctx;
-  }
+function buildEmitErrorCtx() {
+  return buildToolCliContext({
+    render: renderResult,
+    liveViews: createLiveViewRegistry(),
+    maybeOpenDashboard: () => Promise.resolve(),
+  }).ctx;
+}
 
+describe('root --json error path (emitError)', () => {
   it('emits a status:error CommandOutcome with the suggestion + code (2.12.0 seam)', () => {
-    buildCtx().emitError({ message: 'bad input', exitCode: 2, suggestion: 'fix it', code: 'CONFIG' });
+    buildEmitErrorCtx().emitError({ message: 'bad input', exitCode: 2, suggestion: 'fix it', code: 'CONFIG' });
     expect(stdout).toHaveLength(1);
     const outcome = JSON.parse(stdout[0]) as CommandOutcome;
     expect(outcome.status).toBe('error');
@@ -139,7 +139,7 @@ describe('root --json error path (emitError)', () => {
   });
 
   it('emits a status:error CommandOutcome for a bare message (no suggestion/code)', () => {
-    buildCtx().emitError({ message: 'bare error', exitCode: 1 });
+    buildEmitErrorCtx().emitError({ message: 'bare error', exitCode: 1 });
     const outcome = JSON.parse(stdout[0]) as CommandOutcome;
     expect(outcome.status).toBe('error');
     expect(outcome.exitCode).toBe(1);

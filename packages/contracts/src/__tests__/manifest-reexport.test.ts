@@ -18,7 +18,8 @@ import {
 describe('contracts manifest re-export', () => {
   it('re-exports the epoch + compatibility gate as runtime values', () => {
     expect(PLUGIN_API_VERSION).toBe(1);
-    expect(checkCompatibility(undefined)).toEqual({ kind: 'compatible' });
+    // 3.0.0: a missing apiVersion is incompatible (the grace window ended).
+    expect(checkCompatibility(undefined).kind).toBe('incompatible');
     expect(checkCompatibility(PLUGIN_API_VERSION)).toEqual({ kind: 'compatible' });
     expect(checkCompatibility(PLUGIN_API_VERSION + 1).kind).toBe('incompatible');
   });

@@ -356,7 +356,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           version: '0.0.0',
           type: 'module',
           main: './index.js',
-          opensipTools: { kind: 'tool' },
+          opensipTools: { kind: 'tool', id: 'fixture-valid', apiVersion: 1, commands: [{ name: 'fixture-valid', description: 'x' }] },
         },
         indexJs:
           "export const tool = { metadata: { id: 'fixture-valid', name: 'Fixture', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
@@ -375,7 +375,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           version: '0.0.0',
           type: 'module',
           main: './index.js',
-          opensipTools: { kind: 'tool' },
+          opensipTools: { kind: 'tool', id: 'fixture-bad', apiVersion: 1, commands: [{ name: 'fixture-bad', description: 'x' }] },
         },
         indexJs: "export const tool = { not: 'a tool' };",
       }),
@@ -402,7 +402,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
         name: '@opensip-tools-fixture/no-entry',
         version: '0.0.0',
         type: 'module',
-        opensipTools: { kind: 'tool' },
+        opensipTools: { kind: 'tool', id: 'fixture-no-entry', apiVersion: 1, commands: [{ name: 'fixture-no-entry', description: 'x' }] },
       }),
       'utf8',
     );
@@ -425,7 +425,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           version: '0.0.0',
           type: 'module',
           main: './index.js',
-          opensipTools: { kind: 'tool' },
+          opensipTools: { kind: 'tool', id: 'fitness', apiVersion: 1, commands: [{ name: 'fitness', description: 'x' }] },
         },
         indexJs:
           "export const tool = { metadata: { id: 'fitness', name: 'Shadow', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
@@ -480,6 +480,42 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     expect(provenance.some((p) => p.id === 'fixture-future')).toBe(false);
   });
 
+  it('skips a discovered tool that declares NO apiVersion (3.0.0 — grace window ended)', async () => {
+    // 3.0.0: a `kind:'tool'` package with a conformant manifest but no
+    // `apiVersion` is no longer admitted off the marker alone — admitTool returns
+    // 'skip' (not explicitly requested), so it never registers. The fixture also
+    // throws on import, proving the gate rejected it BEFORE its module was loaded.
+    staged.push(
+      stageFixture('no-apiversion', {
+        packageJson: {
+          name: '@opensip-tools-fixture/no-apiversion',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: {
+            kind: 'tool',
+            id: 'fixture-no-apiv',
+            commands: [{ name: 'fixture-no-apiv', description: 'a tool with no declared apiVersion' }],
+          },
+        },
+        indexJs: "throw new Error('no-apiversion tool must never be imported');",
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    const restore = silenceStderr();
+    try {
+      await expect(
+        discoverAndRegisterToolPackages(
+          registry,
+          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS,
+        ),
+      ).resolves.toBeUndefined();
+    } finally {
+      restore();
+    }
+    expect(registry.get('fixture-no-apiv')).toBeUndefined();
+  });
+
   it('isolates a package whose module throws on import', async () => {
     staged.push(
       stageFixture('throws-on-load', {
@@ -488,7 +524,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           version: '0.0.0',
           type: 'module',
           main: './index.js',
-          opensipTools: { kind: 'tool' },
+          opensipTools: { kind: 'tool', id: 'fixture-throws', apiVersion: 1, commands: [{ name: 'fixture-throws', description: 'x' }] },
         },
         indexJs: "throw new Error('boom on import');",
       }),

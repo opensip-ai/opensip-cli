@@ -314,15 +314,17 @@ export function buildToolDiscoverySources(cwd: string, cliInstallDir: string): T
  * incompatible installed tool skips rather than failing the whole CLI).
  *
  * Returns:
- *   - `'reject'`  — skip this package (gate skipped it, or its id collides
- *                   with a built-in). The gate already logged the reason.
- *   - `'proceed'` — continue to import + register. This covers both an
- *                   admitted manifest AND a manifest-less package (grace
- *                   window: pre-2.8.0 third-party tools keep loading off the
- *                   `kind: 'tool'` discovery marker alone).
+ *   - `'reject'`  — skip this package (no conformant manifest, gate skipped it,
+ *                   or its id collides with a built-in). The reason is logged.
+ *   - `'proceed'` — the manifest is conformant + compatible; continue to import
+ *                   + register.
  *
- * On `'proceed'` for an admitted manifest, the tool's `ToolProvenance` is
- * pushed onto `provenance` for Phase 4's `plugin list`.
+ * 3.0.0 GA: the grace window ended. A discovered `kind:'tool'` package whose
+ * manifest is missing/malformed (`loadToolManifest` → undefined) or declares no
+ * `apiVersion` (`admitTool` → skip via {@link checkCompatibility}) is no longer
+ * admitted off the marker alone — it is rejected with a diagnostic. On
+ * `'proceed'` the tool's `ToolProvenance` is pushed onto `provenance` for `plugin
+ * list`.
  */
 function admitInstalledTool(
   pkg: { readonly name: string; readonly packageDir: string },
@@ -331,7 +333,15 @@ function admitInstalledTool(
   manifests: ToolPluginManifest[],
 ): 'reject' | 'proceed' {
   const manifest = loadToolManifest('installed', pkg.packageDir);
-  if (manifest === undefined) return 'proceed'; // grace window — legacy import path
+  if (manifest === undefined) {
+    // 3.0.0: a discovered tool with no conformant manifest is no longer admitted
+    // off the `kind:'tool'` marker alone (the grace window ended) — skip it.
+    process.stderr.write(
+      `opensip-tools: tool package ${pkg.name} has no conformant package.json#opensipTools manifest — skipping\n`,
+    );
+    logger.warn({ evt: 'cli.tool.manifest_invalid', module: BOOTSTRAP_MODULE, name: pkg.name });
+    return 'reject';
+  }
   if (builtInIds.has(manifest.id)) return 'reject';
 
   const result = admitTool({

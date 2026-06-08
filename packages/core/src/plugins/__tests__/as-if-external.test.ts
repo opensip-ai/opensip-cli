@@ -159,7 +159,7 @@ describe('as-if-external gate — the gate fires on incompatibility', () => {
     expect(result.diagnostic).toBeTruthy();
   });
 
-  it('(d) admits a tool with NO apiVersion (grace window)', () => {
+  it('(d) fail-closes an explicitly-requested tool with NO apiVersion (3.0.0 — grace window ended)', () => {
     const manifest = loadToolManifest('installed', NO_APIVERSION_DIR);
     expect(manifest).toBeDefined();
     if (manifest === undefined) return;
@@ -170,11 +170,11 @@ describe('as-if-external gate — the gate fires on incompatibility', () => {
       manifest,
       source: 'installed',
       dir: NO_APIVERSION_DIR,
-      explicitlyRequested: true, // even when requested, grace admits.
+      explicitlyRequested: true, // 3.0.0: a missing apiVersion + explicit request → fail-closed.
     });
 
-    expect(result.decision).toBe('admit');
-    expect(result.verdict.kind).toBe('compatible');
-    expect(result.diagnostic).toBeUndefined();
+    expect(result.decision).toBe('fail-closed');
+    expect(result.verdict.kind).toBe('incompatible');
+    expect(result.diagnostic).toBeDefined();
   });
 });

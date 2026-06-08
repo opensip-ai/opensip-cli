@@ -8,9 +8,10 @@
  * The loader (Phase 2) and CLI (Phase 3) act on the verdict; this module
  * never logs, never exits, never touches the filesystem.
  *
- * Policy:
- *   - `apiVersion` omitted ⇒ **compatible** (the grace window — a tool
- *     that predates the epoch is admitted as if current).
+ * Policy (3.0.0 GA — the grace window ended):
+ *   - `apiVersion` omitted ⇒ **incompatible**. A tool MUST declare the epoch
+ *     it was compiled against; an unversioned plugin input is no longer admitted
+ *     (north-star Principle 5 — version the inputs).
  *   - `apiVersion === engine` ⇒ compatible.
  *   - otherwise ⇒ incompatible, carrying both integers + a human reason
  *     (future vs. past epoch).
@@ -38,8 +39,8 @@ export type CompatibilityVerdict =
  * Decide whether a tool declaring `apiVersion` is compatible with the
  * engine epoch.
  *
- * @param apiVersion The epoch the tool was compiled against, or
- *   `undefined` (grace window — treated as compatible).
+ * @param apiVersion The epoch the tool was compiled against, or `undefined`
+ *   (3.0.0 — a missing epoch is now INCOMPATIBLE; the grace window ended).
  * @param engine The epoch the running engine implements. Defaults to
  *   `PLUGIN_API_VERSION`; overridable for tests / as-if-external probes.
  * @returns A `CompatibilityVerdict` — never throws.
@@ -48,10 +49,15 @@ export function checkCompatibility(
   apiVersion: number | undefined,
   engine: number = PLUGIN_API_VERSION,
 ): CompatibilityVerdict {
-  // Grace window: a tool that predates the epoch (no declared apiVersion)
-  // is admitted as if it targets the current engine.
+  // 3.0.0 GA: a tool that declares no `apiVersion` is incompatible — an
+  // unversioned plugin input is no longer admitted off the marker alone.
   if (apiVersion === undefined) {
-    return { kind: 'compatible' };
+    return {
+      kind: 'incompatible',
+      declared: Number.NaN,
+      engine,
+      reason: `tool declares no plugin apiVersion; declare \`apiVersion: ${engine}\` in its manifest (the grace window ended at 3.0.0)`,
+    };
   }
 
   if (apiVersion === engine) {

@@ -223,14 +223,15 @@ describe('admitTool', () => {
     expect(result.provenance.manifestHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('admits a tool with a missing apiVersion (grace window)', () => {
+  it('skips a not-explicitly-requested tool with a missing apiVersion (3.0.0 — grace window ended)', () => {
     const result = admitTool({
       manifest: manifest({ apiVersion: undefined }),
       source: 'project-local',
       dir: '/p',
       explicitlyRequested: false,
     });
-    expect(result.decision).toBe('admit');
+    // 3.0.0: a missing apiVersion is incompatible; not explicitly requested → skip.
+    expect(result.decision).toBe('skip');
     // No packageName supplied → omitted from provenance.
     expect(result.provenance.packageName).toBeUndefined();
   });

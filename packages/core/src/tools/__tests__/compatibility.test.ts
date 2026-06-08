@@ -12,8 +12,12 @@ describe('checkCompatibility', () => {
     expect(checkCompatibility(PLUGIN_API_VERSION)).toEqual({ kind: 'compatible' });
   });
 
-  it('admits a tool with no declared apiVersion (grace window)', () => {
-    expect(checkCompatibility(undefined)).toEqual({ kind: 'compatible' });
+  it('rejects a tool with no declared apiVersion (3.0.0 — grace window ended)', () => {
+    const verdict = checkCompatibility(undefined);
+    expect(verdict.kind).toBe('incompatible');
+    if (verdict.kind === 'incompatible') {
+      expect(verdict.reason).toContain('no plugin apiVersion');
+    }
   });
 
   it('rejects a future epoch with the declared + engine integers and a reason', () => {
