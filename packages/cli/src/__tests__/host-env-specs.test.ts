@@ -4,9 +4,10 @@
  * CLI infra reads coerce as the migrated sites expect.
  */
 
+import { GRAPH_ENV_SPECS } from '@opensip-tools/graph';
 import { afterEach, describe, it, expect } from 'vitest';
 
-import { CLI_ENV_SPECS, PRE_SCOPE_ENV_SPECS, describeHostEnv, hostEnv } from '../env/host-env-specs.js';
+import { BUNDLED_TOOL_ENV_SPECS, CLI_ENV_SPECS, PRE_SCOPE_ENV_SPECS, describeHostEnv, hostEnv } from '../env/host-env-specs.js';
 
 const TOUCHED = ['OPENSIP_NO_UPDATE', 'NO_UPDATE_NOTIFIER', 'OTEL_EXPORTER_OTLP_ENDPOINT'];
 
@@ -15,11 +16,11 @@ afterEach(() => {
 });
 
 describe('describeHostEnv', () => {
-  it('aggregates every layer (config + graph + cli + pre-scope) with no duplicate canonical names', () => {
+  it('aggregates every layer (config + bundled-tool + cli + pre-scope) with no duplicate canonical names', () => {
     const canonicals = describeHostEnv().map((s) => s.canonical);
     // One representative from each contributing layer.
     expect(canonicals).toContain('OPENSIP_API_KEY'); // config
-    expect(canonicals).toContain('OPENSIP_HEAP_NO_MONITOR'); // graph
+    expect(canonicals).toContain('OPENSIP_HEAP_NO_MONITOR'); // bundled tool (graph)
     expect(canonicals).toContain('OTEL_EXPORTER_OTLP_ENDPOINT'); // cli
     expect(canonicals).toContain('NO_COLOR'); // pre-scope (cli-ui)
     expect(canonicals).toContain('NODE_OPTIONS'); // pre-scope (graph heap-preflight)
@@ -27,6 +28,20 @@ describe('describeHostEnv', () => {
     expect(new Set(canonicals).size).toBe(canonicals.length);
     // Every spec carries docs (the reference is generated from these).
     expect(describeHostEnv().every((s) => s.docs.length > 0)).toBe(true);
+  });
+
+  it('documents every bundled-tool env var (drift guard vs graph GRAPH_ENV_SPECS)', () => {
+    // 3.0.0: the host documents bundled tools' env vars WITHOUT importing the
+    // tool runtime (the `no-bootstrap-tool-import` guardrail). This test (test
+    // code is exempt) keeps BUNDLED_TOOL_ENV_SPECS a superset of graph's actual
+    // registry specs — graph adding an env var fails CI until it's documented.
+    const documented = new Set(BUNDLED_TOOL_ENV_SPECS.map((s) => s.canonical));
+    for (const spec of GRAPH_ENV_SPECS) {
+      expect(
+        documented.has(spec.canonical),
+        `graph env var '${spec.canonical}' must be documented in BUNDLED_TOOL_ENV_SPECS (host-env-specs.ts)`,
+      ).toBe(true);
+    }
   });
 
   it('declares the pre-scope allowance vars (theme colours + NODE_OPTIONS)', () => {

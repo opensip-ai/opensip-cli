@@ -21,7 +21,6 @@
 
 import { CONFIG_ENV_SPECS } from '@opensip-tools/config';
 import { EnvRegistry, type EnvVarSpec } from '@opensip-tools/core';
-import { GRAPH_ENV_SPECS } from '@opensip-tools/graph';
 
 /** CLI-layer infra variables: OpenTelemetry + the update-notifier opt-outs. */
 export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
@@ -52,6 +51,27 @@ export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
 export const hostEnv = new EnvRegistry(CLI_ENV_SPECS);
 
 /**
+ * Env vars a BUNDLED TOOL reads through its own `EnvRegistry`, documented here
+ * at the composition root for the env-surface reference.
+ *
+ * 3.0.0 GA: the host no longer statically imports a tool package (e.g.
+ * `GRAPH_ENV_SPECS` from `@opensip-tools/graph`) — that would couple the host to
+ * a tool runtime and break the install-source-independence the `no-bootstrap-tool-import`
+ * guardrail enforces. The tool keeps OWNING the runtime read (its registry, its
+ * coercion); the composition root names the variable for documentation only, the
+ * same way it already documents the graph-related `NODE_OPTIONS` below. The
+ * `host-env-specs` drift test asserts this list stays a superset of each bundled
+ * tool's actual specs (e.g. graph's `GRAPH_ENV_SPECS`), so a tool adding an env
+ * var fails CI until it is documented here.
+ */
+export const BUNDLED_TOOL_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
+  {
+    canonical: 'OPENSIP_HEAP_NO_MONITOR',
+    docs: 'Set to 1 to disable the graph V8 heap-pressure monitor (REPL embedding / custom allocators).',
+  },
+];
+
+/**
  * Pre-scope variables read raw at their sites (documented `env-via-registry`
  * allowance), declared here so the env-surface reference is complete.
  */
@@ -69,5 +89,5 @@ export const PRE_SCOPE_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
  * of truth for the generated env-surface reference (Phase 6).
  */
 export function describeHostEnv(): readonly EnvVarSpec<unknown>[] {
-  return [...CONFIG_ENV_SPECS, ...GRAPH_ENV_SPECS, ...CLI_ENV_SPECS, ...PRE_SCOPE_ENV_SPECS];
+  return [...CONFIG_ENV_SPECS, ...BUNDLED_TOOL_ENV_SPECS, ...CLI_ENV_SPECS, ...PRE_SCOPE_ENV_SPECS];
 }
