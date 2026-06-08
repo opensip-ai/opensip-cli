@@ -1,13 +1,18 @@
 /**
  * simulationTool — simulation as a Tool plugin.
  *
- * Owns the `sim` subcommand's Commander wiring. The CLI calls
- * register() once at startup; this file owns the option-parsing
- * surface, JSON/Ink dispatch, and dashboard auto-open hook.
+ * Owns the `sim` subcommand. Since release 2.11.0 (Phase 3, the reference
+ * migration) the Commander wiring is no longer hand-rolled: the tool exports a
+ * declarative {@link CommandSpec} (`simCommand`) and the host's
+ * `mountCommandSpec` mounts it (name/description/aliases, the ADR-0021 common
+ * flags, the `--recipe` option) and owns the parse→handler→error→exit pipeline.
+ * This file owns only the sim runner — the `runSim` handler below — which keeps
+ * the JSON/Ink dispatch, cloud egress, and dashboard auto-open exactly as the
+ * old `register()` action body did (byte-identical behaviour).
  */
 
-import { applyCommonFlags, EXIT_CODES, type CliProgram, type ToolOptions } from '@opensip-tools/contracts';
-import { readPackageVersion } from '@opensip-tools/core';
+import { EXIT_CODES, type ToolOptions } from '@opensip-tools/contracts';
+import { defineCommand, readPackageVersion } from '@opensip-tools/core';
 
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { renderSimLive } from './cli/sim-runner.js';
@@ -20,7 +25,14 @@ import { createSimulationRecipeRegistry } from './recipes/registry.js';
 import './scope-augmentation.js';
 
 import type { RunnableScenario } from './framework/runnable-scenario.js';
-import type { CapabilityRegistrar, ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
+import type {
+  CapabilityRegistrar,
+  CommandSpec,
+  ScopeContribution,
+  Tool,
+  ToolCliContext,
+  ToolCommandDescriptor,
+} from '@opensip-tools/core';
 
 
 const SIM: ToolCommandDescriptor = {
@@ -34,16 +46,28 @@ const SIM: ToolCommandDescriptor = {
 // for json / non-TTY runs.
 const SIM_LIVE_VIEW_KEY = 'sim';
 
-function register(cli: ToolCliContext): void {
-  // `CliProgram` is contracts' alias for commander's `Command` —
-  // contracts already declares commander as an optional peer dep.
-  // Audit 2026-05-23 G6.
-  const program = cli.program as CliProgram;
+/** Parsed `sim` options — the ADR-0021 common flags plus sim's `--recipe`. */
+type SimOptions = ToolOptions & {
+  recipe?: string;
+  quiet?: boolean;
+  open?: boolean;
+  verbose?: boolean;
+};
 
-  // Contribute sim's live view (ADR-0016). Effectful egress (cloud +
-  // `--report-to`) lives at the composition root: renderSimLive returns the
-  // run's envelope and this callback delivers it once the Ink app exits — the
-  // same contract fit uses.
+/**
+ * Set sim's live view (ADR-0016) up on the host context — a synchronous,
+ * void-returning map write (named with the `set` prefix to signal that). Its
+ * effectful egress (cloud + `--report-to`) lives at the composition root:
+ * renderSimLive returns the run's envelope and this callback delivers it once
+ * the Ink app exits — the same contract fit uses.
+ *
+ * In the spec-mounted world there is no `register()` mount hook, so the handler
+ * sets the renderer up lazily at the top of its body (before any
+ * `cli.renderLive` lookup). `registerLiveView` is an idempotent map write, so
+ * doing this once per run — only on the interactive path that needs it — is
+ * equivalent to the old mount-time registration.
+ */
+function setUpSimLiveView(cli: ToolCliContext): void {
   cli.registerLiveView(SIM_LIVE_VIEW_KEY, async (args) => {
     const simArgs = args as ToolOptions;
     const envelope = await renderSimLive(simArgs, { setExitCode: cli.setExitCode });
@@ -56,75 +80,96 @@ function register(cli: ToolCliContext): void {
       });
     }
   });
-
-  const simCmd = program
-    .command(SIM.name)
-    .description(SIM.description)
-    .option('--recipe <name>', 'Run a named sim recipe (default: built-in `default`)');
-  // Common cross-tool flags from the single registry (ADR-0021): --cwd, --json,
-  // --quiet, --verbose, --debug, --report-to, --api-key, --open. sim gained
-  // -v/--verbose here (per-scenario detail).
-  applyCommonFlags(
-    simCmd,
-    ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
-    { cwd: process.cwd() },
-  );
-  simCmd
-    .action(
-      async (
-        opts: ToolOptions & { recipe?: string; quiet?: boolean; open?: boolean; verbose?: boolean },
-      ) => {
-        // Interactive TTY (non-json): the animated live view. Egress + exit code
-        // are handled inside the registerLiveView callback / renderSimLive after
-        // the Ink app exits.
-        if (opts.json !== true && process.stdout.isTTY === true) {
-          await cli.renderLive(SIM_LIVE_VIEW_KEY, opts);
-          await cli.maybeOpenDashboard({ openRequested: Boolean(opts.open), jsonOutput: false });
-          return;
-        }
-
-        // json / non-TTY (pipe / CI): run the engine and render statically — the
-        // animated Ink view is a TTY-only affordance. Output is byte-for-byte the
-        // pre-live-view behavior.
-        const { result } = await executeSim(opts);
-
-        if (result.type === 'error') {
-          cli.setExitCode(result.exitCode);
-          if (opts.json) {
-            cli.emitJson({ error: result.message });
-          } else {
-            await cli.render(result);
-          }
-          return;
-        }
-
-        if (result.shouldFail === true) cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-
-        // ADR-0011: one render path per mode. `--json` emits the envelope
-        // through the shared formatSignalJson; default renders the envelope-
-        // derived per-scenario table.
-        if (opts.json) {
-          cli.emitEnvelope(result.envelope);
-        } else {
-          await cli.render(result);
-        }
-
-        // Effectful egress lives at the root (cloud sink + `--report-to`,
-        // which owns exit 4). Called once per run, after rendering.
-        await cli.deliverSignals(result.envelope, {
-          cwd: process.cwd(),
-          reportTo: opts.reportTo,
-          apiKey: opts.apiKey,
-          runFailed: result.shouldFail,
-        });
-
-        await cli.maybeOpenDashboard({
-          openRequested: Boolean(opts.open),
-          jsonOutput: Boolean(opts.json),
-        });
-      },
-    );
 }
+
+/**
+ * The `sim` command handler — the former `register()` action body, lifted to a
+ * spec handler. `output: 'raw-stream'` (handler owns its own IO): the host runs
+ * this and renders nothing further, so the handler keeps full ownership of the
+ * TTY-vs-static branch, the JSON/Ink dispatch, the cloud egress, the exit-code
+ * decision, and the dashboard auto-open — byte-identical to 2.10.0.
+ */
+async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
+  const opts = rawOpts as SimOptions;
+  // Interactive TTY (non-json): the animated live view. Egress + exit code
+  // are handled inside the registerLiveView callback / renderSimLive after
+  // the Ink app exits.
+  if (opts.json !== true && process.stdout.isTTY === true) {
+    setUpSimLiveView(cli);
+    await cli.renderLive(SIM_LIVE_VIEW_KEY, opts);
+    await cli.maybeOpenDashboard({ openRequested: Boolean(opts.open), jsonOutput: false });
+    return;
+  }
+
+  // json / non-TTY (pipe / CI): run the engine and render statically — the
+  // animated Ink view is a TTY-only affordance. Output is byte-for-byte the
+  // pre-live-view behavior.
+  const { result } = await executeSim(opts);
+
+  if (result.type === 'error') {
+    cli.setExitCode(result.exitCode);
+    if (opts.json) {
+      cli.emitJson({ error: result.message });
+    } else {
+      await cli.render(result);
+    }
+    return;
+  }
+
+  if (result.shouldFail === true) cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+
+  // ADR-0011: one render path per mode. `--json` emits the envelope
+  // through the shared formatSignalJson; default renders the envelope-
+  // derived per-scenario table.
+  if (opts.json) {
+    cli.emitEnvelope(result.envelope);
+  } else {
+    await cli.render(result);
+  }
+
+  // Effectful egress lives at the root (cloud sink + `--report-to`,
+  // which owns exit 4). Called once per run, after rendering.
+  await cli.deliverSignals(result.envelope, {
+    cwd: process.cwd(),
+    reportTo: opts.reportTo,
+    apiKey: opts.apiKey,
+    runFailed: result.shouldFail,
+  });
+
+  await cli.maybeOpenDashboard({
+    openRequested: Boolean(opts.open),
+    jsonOutput: Boolean(opts.json),
+  });
+}
+
+/**
+ * The declarative `sim` command (release 2.11.0 Phase 3 — the reference
+ * migration). Replaces the hand-rolled `register()` body: the host mounts this
+ * spec, applies the ADR-0021 common flags + the `--recipe` option, and invokes
+ * `runSim`.
+ *
+ * `output: 'raw-stream'` because sim's handler owns its entire output surface —
+ * it dispatches between the interactive Ink live view and the static
+ * render/JSON path at runtime (TTY-dependent) and performs cloud egress, the
+ * dashboard auto-open, and the exit-code decision itself. None of those are
+ * expressible through the `signal-envelope` dispatch arm (which only does
+ * `emitEnvelope`/`render`), so the host renders nothing and the handler stays
+ * authoritative — byte-identical to the former action body.
+ */
+const simCommand: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+  name: SIM.name,
+  description: SIM.description,
+  // ADR-0021 cross-tool flags from the single registry: --cwd, --json, --quiet,
+  // --verbose, --debug, --report-to, --api-key, --open. sim carries -v/--verbose
+  // (per-scenario detail). `cwd` is seeded with process.cwd() by the mounter.
+  commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
+  options: [
+    { flag: '--recipe', value: '<name>', description: 'Run a named sim recipe (default: built-in `default`)' },
+  ],
+  scope: 'project',
+  output: 'raw-stream',
+  handler: runSim,
+});
 
 /**
  * The simulation tool's REAL registrar for its `sim-pack` capability domain
@@ -160,7 +205,10 @@ export const simulationTool: Tool = {
   },
   commands: [SIM],
   pluginLayout: SIM_PLUGIN_LAYOUT,
-  register,
+  // Release 2.11.0 Phase 3 (reference migration): sim declares its command
+  // surface; the host mounts it via mountCommandSpec. The deprecated
+  // `register()` fallback is gone — sim no longer touches Commander.
+  commandSpecs: [simCommand],
   contributeScope,
   // ADR-0023 Phase 4: simulation contributes its namespaced `simulation:` Zod
   // schema so the host composes + strict-validates the whole config document

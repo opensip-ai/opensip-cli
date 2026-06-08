@@ -1,12 +1,15 @@
-/* eslint-disable sonarjs/deprecation -- exercises the deprecated-but-supported Tool.register() contract through 2.x (removed in 3.0.0; fit/graph/sim migrate to commandSpecs in release 2.11.0 Phases 3-5). The register() path is sanctioned until then, so these tests must access it. */
 /**
  * @fileoverview Smoke tests for simulationTool — the Tool plugin
  * descriptor wired into the CLI dispatcher.
  *
- * The tool itself is mostly Commander wiring; the executeSim entry
- * point gets dedicated tests in cli/__tests__/sim.test.ts. This file
- * exercises the descriptor metadata and the register() function with
- * a fake ToolCliContext so we can verify the subcommand surface.
+ * Since release 2.11.0 Phase 3 (the reference migration) sim mounts via a
+ * declarative `CommandSpec` (`simulationTool.commandSpecs`) rather than the
+ * deprecated `register()` hook. The host-owned mount path
+ * (`mountCommandSpec` → parse → handler → dispatch) is covered in
+ * `cli/src/__tests__/mount-command-spec.test.ts`; this file exercises the
+ * descriptor metadata, the declared command surface, and the command
+ * handler directly with a fake ToolCliContext (the handler is what the host
+ * invokes after parsing).
  */
 
 import { readFileSync } from 'node:fs';
@@ -24,7 +27,7 @@ import { simulationTool } from '../tool.js';
 
 import { noopTarget } from './test-utils/targets.js';
 
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = JSON.parse(
@@ -34,8 +37,8 @@ const PKG = JSON.parse(
 beforeEach(() => {
   // Item 1: scenarioRegistry and recipe registry are per-RunScope.
   // Construct a fresh scope (with simulation extended) and enter it via
-  // AsyncLocalStorage so the tool's action body resolves them through
-  // currentScope() while the test's program.parseAsync runs.
+  // AsyncLocalStorage so the handler resolves them through currentScope()
+  // while it runs.
   const scope = new RunScope();
   Object.assign(scope, simulationTool.contributeScope?.() ?? {});
   enterScope(scope);
@@ -44,6 +47,13 @@ beforeEach(() => {
 afterEach(() => {
   clearScenarioRegistry();
 });
+
+/** The single declarative `sim` command sim now exports. */
+function simSpec(): CommandSpec<unknown, ToolCliContext> {
+  const spec = simulationTool.commandSpecs?.[0];
+  if (spec === undefined) throw new Error('simulationTool exposes no commandSpecs');
+  return spec;
+}
 
 function makeFakeContext(program: Command): {
   ctx: ToolCliContext;
@@ -62,9 +72,9 @@ function makeFakeContext(program: Command): {
     walkedUp: 0,
     scope: 'none' as const,
   };
-  // The action body uses currentScope() (set by enterScope in
-  // beforeEach), not cli.scope, but ToolCliContext requires a scope
-  // value; mirror project into a throwaway scope here.
+  // The handler uses currentScope() (set by enterScope in beforeEach), not
+  // cli.scope, but ToolCliContext requires a scope value; mirror project
+  // into a throwaway scope here.
   const ctxScope = new RunScope({ projectContext: project });
   Object.assign(ctxScope, simulationTool.contributeScope?.() ?? {});
   const ctx: ToolCliContext = {
@@ -130,45 +140,44 @@ describe('simulationTool metadata', () => {
   });
 });
 
-describe('simulationTool.register', () => {
-  it('mounts the sim subcommand on the Commander program', () => {
-    const program = new Command();
-    program.exitOverride();
-    const { ctx } = makeFakeContext(program);
-
-    simulationTool.register!(ctx);
-
-    const subcommands = program.commands.map((c) => c.name());
-    expect(subcommands).toContain('sim');
+describe('simulationTool command surface (Phase 3 — CommandSpec migration)', () => {
+  it('mounts via commandSpecs, not the deprecated register() hook', () => {
+    // eslint-disable-next-line sonarjs/deprecation -- asserting the deprecated hook is ABSENT after migration.
+    expect(simulationTool.register).toBeUndefined();
+    expect(simulationTool.commandSpecs).toHaveLength(1);
   });
 
-  it('declares the documented options on the sim subcommand', () => {
-    const program = new Command();
-    program.exitOverride();
-    const { ctx } = makeFakeContext(program);
+  it('declares the sim command name/description/output/scope', () => {
+    const spec = simSpec();
+    expect(spec.name).toBe('sim');
+    expect(spec.description).toBe('Run simulation scenarios [experimental]');
+    // The handler owns its full output surface (TTY-vs-static branch + egress).
+    expect(spec.output).toBe('raw-stream');
+    expect(spec.scope).toBe('project');
+    expect(typeof spec.handler).toBe('function');
+  });
 
-    simulationTool.register!(ctx);
-
-    const sim = program.commands.find((c) => c.name() === 'sim');
-    expect(sim).toBeDefined();
-    const optionNames = (sim?.options ?? []).map((o) => o.long ?? o.short);
-    expect(optionNames).toEqual(
-      expect.arrayContaining(['--recipe', '--cwd', '--json', '--debug', '--open']),
+  it('declares the ADR-0021 common flags and the --recipe option', () => {
+    const spec = simSpec();
+    // Cross-tool flags from the single registry (ADR-0021).
+    expect([...spec.commonFlags]).toEqual(
+      expect.arrayContaining(['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open']),
     );
-    expect(optionNames).toEqual(expect.arrayContaining(['--quiet']));
-    // ADR-0011 (Phase 4): sim gains cloud egress via the root's deliverSignals.
-    expect(optionNames).toEqual(expect.arrayContaining(['--report-to', '--api-key']));
+    const optionFlags = (spec.options ?? []).map((o) => o.flag);
+    expect(optionFlags).toContain('--recipe');
+    const recipe = (spec.options ?? []).find((o) => o.flag === '--recipe');
+    expect(recipe?.value).toBe('<name>');
   });
+});
 
-  it('runs the action against the default recipe and renders the result', async () => {
+describe('sim command handler', () => {
+  it('runs against the default recipe and renders the result', async () => {
     const program = new Command();
-    program.exitOverride();
     const { ctx, rendered } = makeFakeContext(program);
     registerProbeScenario();
 
-    simulationTool.register!(ctx);
-
-    await program.parseAsync(['node', 'cli', 'sim'], { from: 'node' });
+    // Non-TTY/non-json path: the handler runs the engine and renders statically.
+    await simSpec().handler({ cwd: process.cwd() }, ctx);
 
     expect(rendered).toHaveLength(1);
     const result = rendered[0] as { type: string; recipeName?: string };
@@ -178,13 +187,10 @@ describe('simulationTool.register', () => {
 
   it('emits the signal envelope through cli.emitEnvelope when --json is passed', async () => {
     const program = new Command();
-    program.exitOverride();
     const { ctx, emitted } = makeFakeContext(program);
     registerProbeScenario();
 
-    simulationTool.register!(ctx);
-
-    await program.parseAsync(['node', 'cli', 'sim', '--json'], { from: 'node' });
+    await simSpec().handler({ cwd: process.cwd(), json: true }, ctx);
 
     // ADR-0011 (Phase 4): --json routes the SignalEnvelope (not the bespoke
     // SimDoneResult) through the root's emitEnvelope → formatSignalJson.
@@ -196,12 +202,9 @@ describe('simulationTool.register', () => {
 
   it('returns exit code 2 in JSON mode when the recipe is unknown', async () => {
     const program = new Command();
-    program.exitOverride();
     const { ctx, exitCodes, emitted } = makeFakeContext(program);
 
-    simulationTool.register!(ctx);
-
-    await program.parseAsync(['node', 'cli', 'sim', '--json', '--recipe', 'nope'], { from: 'node' });
+    await simSpec().handler({ cwd: process.cwd(), json: true, recipe: 'nope' }, ctx);
 
     expect(exitCodes).toContain(2);
     expect(emitted).toHaveLength(1);
@@ -211,12 +214,9 @@ describe('simulationTool.register', () => {
 
   it('returns exit code 2 in non-JSON mode for unknown recipe', async () => {
     const program = new Command();
-    program.exitOverride();
     const { ctx, exitCodes, rendered } = makeFakeContext(program);
 
-    simulationTool.register!(ctx);
-
-    await program.parseAsync(['node', 'cli', 'sim', '--recipe', 'still-nope'], { from: 'node' });
+    await simSpec().handler({ cwd: process.cwd(), recipe: 'still-nope' }, ctx);
 
     expect(exitCodes).toContain(2);
     const errResult = rendered[0] as { type: string; message?: string };

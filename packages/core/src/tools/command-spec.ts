@@ -134,11 +134,20 @@ export interface ArgSpec {
  * dispatch seam (Phase 1). The 2.12.0 `CommandOutcome` swap happens at this seam
  * without changing the handler contract.
  *
- * - `signal-envelope` — handler yields a `SignalEnvelope` (fit/graph/sim runs).
+ * - `signal-envelope` — handler yields a `SignalEnvelope` (fit/graph runs); the
+ *   host renders it (`--json` → emitEnvelope, else render).
  * - `command-result` — handler yields a `CommandResult` variant (list/export/host).
- * - `raw-stream` — handler writes directly to stdout (e.g. completion script,
- *   shard-worker); the host does not render.
- * - `live-view` — interactive Ink view path (graph/fit live default on a TTY).
+ * - `raw-stream` — the host renders NOTHING; the handler owns its entire output
+ *   surface. Covers two cases: (a) a handler that writes directly to stdout/a
+ *   file (completion script, SARIF/baseline export, shard-worker); and (b) a
+ *   handler that owns a runtime-conditional render+egress flow no single static
+ *   mode captures — e.g. `sim`, which branches between an interactive Ink live
+ *   view and a static render/JSON path depending on the TTY, then performs its
+ *   own cloud egress, dashboard auto-open, and exit-code decision. In both cases
+ *   the handler returns `void` and the host does not touch the stream.
+ * - `live-view` — interactive Ink view path (graph/fit live default on a TTY)
+ *   where the command is UNCONDITIONALLY a live view; the host dispatches to the
+ *   tool's registered renderer via `renderLive(name, …)`.
  */
 export type CommandOutputMode =
   | 'signal-envelope'
