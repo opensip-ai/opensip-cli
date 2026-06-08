@@ -528,6 +528,17 @@
       "purpose": "Every environment variable the opensip-tools CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
     },
     {
+      "file": "docs/web-generated/70-reference/11-migrating-to-3.0.md",
+      "path": "/docs/opensip-tools/70-reference/11-migrating-to-3.0/",
+      "section": "70-reference",
+      "title": "Migrating to 3.0 (GA)",
+      "audience": [
+        "plugin-authors",
+        "tool-authors"
+      ],
+      "purpose": "What a tool/plugin author must change for the 3.0.0 GA cutover: register() is removed (declare commandSpecs), apiVersion is mandatory. CLI users need no changes."
+    },
+    {
       "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",
       "path": "/docs/opensip-tools/80-implementation/01-cli-dispatch/",
       "section": "80-implementation",
@@ -691,7 +702,8 @@
         "/docs/opensip-tools/70-reference/07-migrating-to-2.7/",
         "/docs/opensip-tools/70-reference/08-supply-chain-security/",
         "/docs/opensip-tools/70-reference/09-migrating-to-2.12/",
-        "/docs/opensip-tools/70-reference/10-environment-variables/"
+        "/docs/opensip-tools/70-reference/10-environment-variables/",
+        "/docs/opensip-tools/70-reference/11-migrating-to-3.0/"
       ]
     },
     {
@@ -764,6 +776,7 @@
         "/docs/opensip-tools/70-reference/07-migrating-to-2.7/",
         "/docs/opensip-tools/70-reference/08-supply-chain-security/",
         "/docs/opensip-tools/70-reference/09-migrating-to-2.12/",
+        "/docs/opensip-tools/70-reference/11-migrating-to-3.0/",
         "/docs/opensip-tools/80-implementation/02-plugin-loader/"
       ]
     },

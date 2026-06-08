@@ -478,14 +478,22 @@ npm's self-replacement and pnpm's lack of OIDC support.
 
 ## Project Status
 
-**v2.7.0 (pre-GA)** — opensip-tools is a tool-plugin platform: `core` is a
+**v3.0.0 (GA)** — opensip-tools is a tool-plugin platform: `core` is a
 strict kernel, and `fitness`, `graph`, and `simulation` are peer
 tools implementing a shared Tool contract, with `cli` as a generic
-dispatcher. Adding a new tool requires zero CLI changes. The project stays
-pre-GA on the long-lived 2.x major (ADR-0012); **`3.0.0` is reserved for the
-tool-plugin-parity north star** described in
-`docs/plans/tool-plugin-parity-architecture-2026-06-06.md` — many 2.x releases
-are expected before then.
+dispatcher. Adding a new tool requires zero CLI changes. **3.0.0 is the
+tool-plugin-parity GA cutover** (ADR-0027, realizing ADR-0012's reservation):
+the privileged first-party paths are gone — bundled tools load through the same
+dynamic-import plugin path as installed ones (no static `import { fitnessTool }`),
+`Tool.register()` + the raw-Commander `program` handle are removed (a tool
+declares `commandSpecs`, the only command surface), and `apiVersion` is mandatory
+(the grace window ended). The acceptance test — `fit` loaded externally behaves
+identically to the bundled build — passes, and all nine completion invariants
+(north-star §8) are live guardrails indexed at
+`docs/internal/parity-invariant-index.md`. The only thing distinguishing a
+bundled tool from an installed or project-local one is its source of
+installation, never its lifecycle. Future tools (`audit`/`lint`/`bench`) slot in
+by shipping a manifest + `commandSpecs`, inheriting every host-owned plane.
 
 The new-customer flow is three commands: `init` (language detection
 + scaffolded layout) → `fit --recipe example` → `sim --recipe

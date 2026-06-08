@@ -168,6 +168,12 @@ distinct from:
   selection-only (no `execution` block): rule evaluation is one catalog pass, not
   a per-unit scheduled workflow, so graph does not adopt the 2.13.0 execution
   substrate — the intentional, ADR-documented `same-recipe-semantics` exception
+- [ADR-0027](./ADR-0027-ga-parity-cutover.md) — GA (3.0.0): remove the privileged
+  first-party paths — unify the loader (bundled tools load by dynamic import, no
+  static `import { fitnessTool }`), remove `Tool.register()` + the raw-Commander
+  `program` handle (commandSpecs is the one command surface), and end the
+  `apiVersion` grace window. The acceptance test (`fit` loaded externally ≡
+  bundled) passes; all nine §8 completion invariants are live guardrails
 
 ### Superseded
 

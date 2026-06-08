@@ -47,7 +47,7 @@ opensip-tools is extensible across five shapes, listed in increasing order of ef
 
 ## The big mental model
 
-Every shape above plugs into the same kernel. The CLI is a generic dispatcher; it discovers your package (by marker, exact pin, or the sim `scenarios-*` naming pattern), calls a known entry point (`tool.register()` for Tools, or reads `checks` / `recipes` / `scenarios` arrays for packs), and routes the rest. There are no hooks, no middleware, no event buses — just a registry walk at startup.
+Every shape above plugs into the same kernel. The CLI is a generic dispatcher; it discovers your package (by marker, exact pin, or the sim `scenarios-*` naming pattern), reads a known declaration (a Tool's `commandSpecs` that the host mounts, or the `checks` / `recipes` / `scenarios` arrays for packs), and routes the rest. There are no hooks, no middleware, no event buses — just a registry walk at startup.
 
 That's by design. The whole point of the platform is that adding a new tool or pack requires zero CLI changes. For the architecture: [the tool-plugin model](/docs/opensip-tools/10-concepts/02-tool-plugin-model/) walks through it end-to-end.
 

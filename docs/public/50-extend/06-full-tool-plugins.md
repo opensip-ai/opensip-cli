@@ -124,7 +124,7 @@ Each built-in command has its own options interface in `@opensip-tools/contracts
 
 New flags are additive on the relevant interface. There is no shared cross-command union — each command's shape stands on its own.
 
-For your own Tool plugin you don't reuse any of these: your `register(cli)` defines its own Commander options and your action handler receives them as the first argument. Use a typed `CliProgram` (re-exported from `@opensip-tools/contracts`) if you want a lint-clean `cli.program as CliProgram` cast without taking a direct `commander` dependency in your package.
+For your own Tool plugin you don't reuse any of these: you declare each command's options as `OptionSpec`s on its `commandSpec`, and the host wires Commander and passes the parsed options to your handler as the first argument. You never touch Commander or take a `commander` dependency — the host owns the program (3.0.0; the old `register(cli)` + raw `cli.program` path was removed).
 
 ## Tips that come up
 
