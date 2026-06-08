@@ -163,7 +163,10 @@ export async function executeGraph(
         });
     profileRun?.finish(result);
     enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
-    const envelope = await dispatchGraphResult(opts, result, cli, startedAt);
+    // `runCwd` (= positionalPaths[0] ?? opts.cwd) is the build root the signals
+    // are relative to — the correct base for resolving `@graph-ignore` directive
+    // files. For the sharded build it equals `projectRoot` passed above.
+    const envelope = await dispatchGraphResult(opts, result, cli, startedAt, runCwd);
     writeProfileIfRequested(opts, profile);
     return envelope;
   } catch (error) {
@@ -402,6 +405,7 @@ async function executeMultiPathGraph(
   const { opts, cli, rules, startedAt, profile } = ctx;
   const allSignals: Signal[] = [];
   let combinedFiles = 0;
+  let totalSuppressed = 0;
   let lastResult: Awaited<ReturnType<typeof runGraph>> | null = null;
   const config = loadGraphConfig(opts.cwd);
   for (const p of paths) {
@@ -423,7 +427,13 @@ async function executeMultiPathGraph(
     });
     profileRun?.finish(r);
     lastResult = r;
-    allSignals.push(...r.signals);
+    // Each path's signals are relative to THAT path's root — so waive them
+    // against `p` here, before aggregating. A single post-aggregation pass
+    // (the old shape) could only use one base and would leak waivers for every
+    // path but one. Mirrors the single-path `dispatchGraphResult` contract.
+    const { kept, suppressedCount } = await applyGraphSuppressions(r.signals, p);
+    totalSuppressed += suppressedCount;
+    allSignals.push(...kept);
     if (r.catalog !== null) combinedFiles += countFiles(r.catalog);
   }
   // D14: count files across every analyzed path. Zero files + a
@@ -447,7 +457,10 @@ async function executeMultiPathGraph(
     cacheHit: lastResult.cacheHit,
     features: lastResult.features,
   };
-  return await dispatchGraphResult(opts, combined, cli, startedAt);
+  // `allSignals` is already waived per-path (each against its own root), so
+  // deliver directly — a second suppression pass would have no single correct
+  // root and risk re-resolving paths under the wrong base.
+  return await deliverGraphResult(opts, combined, cli, startedAt, totalSuppressed);
 }
 
 /**
@@ -484,15 +497,41 @@ export async function dispatchGraphResult(
   rawResult: Awaited<ReturnType<typeof runGraph>>,
   cli: ToolCliContext,
   startedAt: string,
+  suppressionRoot: string,
 ): Promise<SignalEnvelope | undefined> {
-  const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
   // ADR-0014: apply the inline graph-ignore waivers BEFORE any mode consumes
   // the signals — the gate baseline, catalog, render, and session persistence
   // all see the post-waiver set. `--workspace` is covered transitively: each
   // child runs `graph --json` through this function, so the parent aggregates
   // already-waived signals.
-  const { kept, suppressedCount } = await applyGraphSuppressions(rawResult.signals, opts.cwd);
-  const result = { ...rawResult, signals: kept };
+  //
+  // `suppressionRoot` is the build root the signals' `code.file` paths are
+  // RELATIVE TO — i.e. the positional subtree / sharded-child / workspace-unit
+  // root, NOT necessarily `opts.cwd`. A `graph <subdir>` run (and every
+  // `--workspace` child, which runs `graph <unitRoot> --json`) builds against
+  // `runCwd = positionalPaths[0]`, so its signal paths and directive files
+  // resolve under that root. Resolving against `opts.cwd` instead made every
+  // `@graph-ignore` directive file unreadable (ENOENT), silently leaking the
+  // waiver — the bug this parameter closes.
+  const { kept, suppressedCount } = await applyGraphSuppressions(rawResult.signals, suppressionRoot);
+  return deliverGraphResult(opts, { ...rawResult, signals: kept }, cli, startedAt, suppressedCount);
+}
+
+/**
+ * Deliver an already-waived run to its output mode (gate / catalog-json /
+ * render) and persist session history. Split out of {@link dispatchGraphResult}
+ * so the multi-path path — which must waive each path's signals against ITS
+ * OWN root before aggregating (the roots differ) — can aggregate the kept
+ * signals and deliver once, without a second (wrong-root) suppression pass.
+ */
+async function deliverGraphResult(
+  opts: GraphCommandOptions,
+  result: Awaited<ReturnType<typeof runGraph>>,
+  cli: ToolCliContext,
+  startedAt: string,
+  suppressedCount: number,
+): Promise<SignalEnvelope | undefined> {
+  const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
   if (opts.gateSave === true || opts.gateCompare === true) {
     await runGateMode(opts, result.signals, cli, result.catalog?.resolutionMode);
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI, suppressed: suppressedCount });
