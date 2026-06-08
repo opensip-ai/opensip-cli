@@ -1,3 +1,7 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -157,6 +161,45 @@ describe('ArgSpec corpus coverage', () => {
     const arg: ArgSpec = { name: 'name', description: 'Function name to look up' };
     expect(arg.variadic).toBeUndefined();
     expect(arg.optional).toBeUndefined();
+  });
+});
+
+describe('core stays Commander-free (Phase 0 layering invariant)', () => {
+  // The command-plane TYPES live in core, but the Commander-touching mounting
+  // runtime lives in cli and the `applyCommonFlags` runtime in contracts. core
+  // must NOT depend on or import `commander` — the kernel is a pure data layer.
+  // This asserts the invariant directly (the dependency-cruiser layer gate
+  // forbids the cross-package edge; this complements it at the kernel root).
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  // __tests__ → tools → src → core
+  const CORE_ROOT = resolve(HERE, '../../..');
+
+  it('declares no `commander` dependency in package.json', () => {
+    const pkg = JSON.parse(readFileSync(join(CORE_ROOT, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    expect(pkg.dependencies ?? {}).not.toHaveProperty('commander');
+    expect(pkg.peerDependencies ?? {}).not.toHaveProperty('commander');
+    expect(pkg.devDependencies ?? {}).not.toHaveProperty('commander');
+  });
+
+  it('no source file under packages/core/src imports commander', () => {
+    const offenders: string[] = [];
+    const COMMANDER_IMPORT = /from\s+['"]commander['"]|require\(\s*['"]commander['"]/;
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+        } else if (entry.name.endsWith('.ts') && COMMANDER_IMPORT.test(readFileSync(full, 'utf8'))) {
+          offenders.push(full);
+        }
+      }
+    };
+    walk(join(CORE_ROOT, 'src'));
+    expect(offenders).toEqual([]);
   });
 });
 

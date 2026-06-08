@@ -79,6 +79,7 @@ import { executeClear } from '../commands/clear.js';
 import { executeConfigure } from '../commands/configure.js';
 import { showHistory } from '../commands/history.js';
 import { mountHostCommands } from '../commands/host-command-specs.js';
+import { buildHostCommandInventory } from '../commands/host-subcommand-groups.js';
 import { executeInit } from '../commands/init.js';
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from '../commands/plugin.js';
 import { executeUninstall } from '../commands/uninstall.js';
@@ -225,6 +226,26 @@ describe('sessions spec — action bodies', () => {
     expect(executeClear).toHaveBeenCalledWith(
       expect.objectContaining({ olderThan: 7, yes: true }),
     );
+  });
+
+  it('sessions purge --older-than rejects a non-integer value via the spec parser', async () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+    program.exitOverride();
+
+    // The `--older-than` OptionSpec carries a pure validating `parse`
+    // (parseOlderThanDays); a non-numeric value throws at parse time, before the
+    // handler runs, so executeClear is never reached.
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (() => true);
+    try {
+      await expect(
+        program.parseAsync(['sessions', 'purge', '--older-than', 'soon', '--yes'], { from: 'user' }),
+      ).rejects.toThrow(/Invalid --older-than/);
+    } finally {
+      process.stderr.write = origWrite;
+    }
+    expect(executeClear).not.toHaveBeenCalled();
   });
 
   it('sessions purge --json: emits JSON and skips render', async () => {
@@ -429,5 +450,20 @@ describe('uninstall spec — action body', () => {
     }
     expect(rendered).toHaveLength(0);
     expect(writes.join('')).toContain('"type": "uninstall-done"');
+  });
+});
+
+// --- host subcommand-group inventory (single source for completion) -----------
+
+describe('buildHostCommandInventory', () => {
+  it('derives the sub-subcommand names from the live leaf specs', () => {
+    // Builds the group leaves against the inert INVENTORY_CTX (no handler runs)
+    // and reads each leaf's `name` — the single source the completion script
+    // consumes for the `sessions` / `plugin` sub-subcommand lists (Phase 6 6.2).
+    const inventory = buildHostCommandInventory();
+    expect(inventory.groupSubcommands.sessions).toEqual(['list', 'purge']);
+    expect(inventory.groupSubcommands.plugin).toEqual(['list', 'add', 'remove', 'sync']);
+    // Exactly the two documented action-less groups — no drift.
+    expect(Object.keys(inventory.groupSubcommands).sort()).toEqual(['plugin', 'sessions']);
   });
 });

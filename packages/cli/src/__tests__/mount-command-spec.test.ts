@@ -210,6 +210,50 @@ describe('mountCommandSpec — wiring', () => {
 
     await expect(program.parseAsync(['needs'], { from: 'user' })).rejects.toThrow();
   });
+
+  it('injects the variadic ellipsis into a value placeholder (<slug> → <slug...>)', async () => {
+    const { ctx } = makeCtx();
+    const program = new Command();
+    const handler = vi.fn(() => ({ type: 'help' }) as const);
+    const spec: HostCommandSpec = defineCommand({
+      name: 'many',
+      description: 'variadic option',
+      commonFlags: [],
+      // A variadic VALUE option (not a positional arg) — exercises
+      // `resolveValuePlaceholder`'s `<slug>` → `<slug...>` rewrite.
+      options: [{ flag: '--tag', value: '<slug>', description: 'tags', variadic: true }],
+      scope: 'none',
+      output: 'command-result',
+      handler,
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    const cmd = program.commands.find((c) => c.name() === 'many');
+    // The mounted option renders the variadic ellipsis inside the bracket pair.
+    expect(cmd?.options.map((o) => o.flags)).toContain('--tag <slug...>');
+
+    await program.parseAsync(['many', '--tag', 'a', 'b'], { from: 'user' });
+    // Commander collects a variadic option's values into an array.
+    expect((handler.mock.calls[0]?.[0] as Record<string, unknown>).tag).toEqual(['a', 'b']);
+  });
+
+  it('throws at mount when a valueless (boolean) option is marked required', () => {
+    const { ctx } = makeCtx();
+    const program = new Command();
+    const spec: HostCommandSpec = defineCommand({
+      name: 'badreq',
+      description: 'boolean cannot be required',
+      commonFlags: [],
+      // A boolean option (no `value`) marked `required` is an authoring error:
+      // only value options can be made mandatory. The mounter throws.
+      options: [{ flag: '--force', description: 'force it', required: true }],
+      scope: 'none',
+      output: 'raw-stream',
+      handler: () => undefined,
+    });
+
+    expect(() => mountCommandSpec(program, spec, ctx)).toThrow(/only value options can be required/);
+  });
 });
 
 describe('mountCommandSpec — dispatchOutput modes', () => {
