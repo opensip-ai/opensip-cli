@@ -13,7 +13,7 @@
 import { commonFlags } from '@opensip-tools/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { FIRST_PARTY_TOOLS } from '../bootstrap/register-tools.js';
+import { BUNDLED_TOOLS } from './test-utils/bundled-tools.js';
 
 import type { Tool, ToolCliContext } from '@opensip-tools/core';
 
@@ -127,7 +127,7 @@ const EXPECTED: Record<string, string[]> = {
 };
 
 describe('first-party tool flag-surface contract', () => {
-  for (const tool of FIRST_PARTY_TOOLS) {
+  for (const tool of BUNDLED_TOOLS) {
     it(`${tool.metadata.id}: registers exactly its documented flag set`, () => {
       const expected = EXPECTED[tool.metadata.id];
       expect(expected, `no expected flag set for tool '${tool.metadata.id}'`).toBeDefined();

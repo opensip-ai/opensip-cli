@@ -15,11 +15,16 @@ import { Command } from 'commander';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import {
-  FIRST_PARTY_TOOLS,
   discoverAndRegisterToolPackages,
   mountAllToolCommands,
   registerFirstPartyTools,
 } from '../bootstrap/register-tools.js';
+
+import { BUNDLED_TOOLS, BUNDLED_TOOL_IDS } from './test-utils/bundled-tools.js';
+
+/** The bundled-tool ids discovery skips on a name collision (3.0.0: passed
+ *  explicitly; production derives it from the loaded bundled manifests). */
+const BUILTIN_IDS = new Set(BUNDLED_TOOL_IDS);
 
 function makeRegistry(): ToolRegistry {
   const map = new Map<string, Tool>();
@@ -58,40 +63,40 @@ function makeStubContext(): ToolCliContext {
   };
 }
 
-describe('FIRST_PARTY_TOOLS', () => {
+describe('BUNDLED_TOOLS', () => {
   it('contains fitness, simulation, and graph', () => {
-    const ids = FIRST_PARTY_TOOLS.map((t) => t.metadata.id);
+    const ids = BUNDLED_TOOLS.map((t) => t.metadata.id);
     expect(ids).toEqual(expect.arrayContaining(['fitness', 'simulation', 'graph']));
   });
 });
 
 describe('registerFirstPartyTools', () => {
-  it('registers every first-party tool into the supplied registry', () => {
+  it('registers every bundled tool into the supplied registry (via dynamic import)', async () => {
     const registry = makeRegistry();
-    registerFirstPartyTools(registry);
-    expect(registry.list()).toHaveLength(FIRST_PARTY_TOOLS.length);
+    await registerFirstPartyTools(registry);
+    expect(registry.list()).toHaveLength(BUNDLED_TOOLS.length);
   });
 
-  it('is idempotent when called twice (first-writer-wins via id check)', () => {
+  it('is idempotent when called twice (first-writer-wins via id check)', async () => {
     const registry = makeRegistry();
-    registerFirstPartyTools(registry);
-    registerFirstPartyTools(registry);
-    expect(registry.list()).toHaveLength(FIRST_PARTY_TOOLS.length);
+    await registerFirstPartyTools(registry);
+    await registerFirstPartyTools(registry);
+    expect(registry.list()).toHaveLength(BUNDLED_TOOLS.length);
   });
 
-  // Release 2.8.0 Phase 3: bundled tools flow through the admitTool gate and
-  // contribute provenance. The gate runs ALONGSIDE registration (additive) —
-  // every first-party tool still registers, and now each yields a bundled
-  // ToolProvenance with a manifestHash.
-  it('collects bundled ToolProvenance for every first-party tool (gate runs)', () => {
+  // Release 2.8.0 Phase 3 / 3.0.0 GA: bundled tools flow through the admitTool
+  // gate and contribute provenance. In 3.0.0 the runtime is loaded by DYNAMIC
+  // IMPORT through the same path installed tools use — every bundled tool still
+  // registers, and each yields a bundled ToolProvenance with a manifestHash.
+  it('collects bundled ToolProvenance for every bundled tool (gate runs)', async () => {
     const registry = new ToolRegistryClass();
     const provenance: ToolProvenance[] = [];
-    registerFirstPartyTools(registry, provenance);
+    await registerFirstPartyTools(registry, provenance);
 
     expect(registry.list().map((t) => t.metadata.id)).toEqual(
       expect.arrayContaining(['fitness', 'simulation', 'graph']),
     );
-    expect(provenance).toHaveLength(FIRST_PARTY_TOOLS.length);
+    expect(provenance).toHaveLength(BUNDLED_TOOLS.length);
     for (const record of provenance) {
       expect(record.source).toBe('bundled');
       expect(typeof record.manifestHash).toBe('string');
@@ -115,6 +120,88 @@ describe('registerFirstPartyTools', () => {
     expect(err).toBeInstanceOf(PluginIncompatibleError);
     expect(err.code).toBe('PLUGIN_INCOMPATIBLE');
     expect(err.diagnostic).toBe('epoch mismatch');
+  });
+
+  // 3.0.0: bundled tools load through the dynamic-import path, so the bundled
+  // fail-closed branches are now reachable with a fixture package name (the
+  // `packages` param is injectable for exactly this). A bundled tool ships with
+  // the CLI, so any load failure is fail-closed — never a silent skip.
+  it('fails closed (throws) when a bundled package cannot be resolved on disk', async () => {
+    const registry = new ToolRegistryClass();
+    await expect(
+      registerFirstPartyTools(registry, [], [], ['@opensip-tools/__definitely-not-a-real-package__']),
+    ).rejects.toBeInstanceOf(PluginIncompatibleError);
+    expect(registry.list()).toHaveLength(0);
+  });
+
+  it('fails closed (throws) when a bundled package ships no conformant manifest', async () => {
+    // The package resolves on disk but has no `opensipTools` block, so
+    // `loadToolManifest` → undefined → the bundled path fail-closes (a bundled
+    // tool MUST ship a manifest; tool-has-manifest backstops this at CI).
+    const dir = join(FIXTURE_SCOPE, 'no-manifest-bundled');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: '@opensip-tools-fixture/no-manifest-bundled',
+        version: '0.0.0',
+        type: 'module',
+        main: './index.js',
+      }),
+      'utf8',
+    );
+    writeFileSync(
+      join(dir, 'index.js'),
+      "export const tool = { metadata: { id: 'no-manifest', name: 'NM', version: '0.0.0' }, commands: [], register() {} };",
+      'utf8',
+    );
+    const registry = new ToolRegistryClass();
+    try {
+      await expect(
+        registerFirstPartyTools(registry, [], [], ['@opensip-tools-fixture/no-manifest-bundled']),
+      ).rejects.toBeInstanceOf(PluginIncompatibleError);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(FIXTURE_SCOPE, { recursive: true, force: true });
+    }
+    expect(registry.list()).toHaveLength(0);
+  });
+
+  it('fails closed (throws) when a bundled tool runtime fails to load', async () => {
+    // A bundled fixture with a valid manifest (so it resolves + admits) whose
+    // entry throws on import → `importToolRuntime` 'import-failed' → the bundled
+    // path fail-closes rather than skipping.
+    const dir = join(FIXTURE_SCOPE, 'broken-bundled');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: '@opensip-tools-fixture/broken-bundled',
+        version: '0.0.0',
+        type: 'module',
+        main: './index.js',
+        opensipTools: {
+          kind: 'tool',
+          id: 'broken-bundled',
+          apiVersion: 1,
+          commands: [{ name: 'broken-bundled', description: 'a tool that throws on import' }],
+        },
+      }),
+      'utf8',
+    );
+    writeFileSync(join(dir, 'index.js'), "throw new Error('boom on bundled import');", 'utf8');
+    const registry = new ToolRegistryClass();
+    const restore = silenceStderr();
+    try {
+      await expect(
+        registerFirstPartyTools(registry, [], [], ['@opensip-tools-fixture/broken-bundled']),
+      ).rejects.toBeInstanceOf(PluginIncompatibleError);
+    } finally {
+      restore();
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(FIXTURE_SCOPE, { recursive: true, force: true });
+    }
+    expect(registry.list()).toHaveLength(0);
   });
 });
 
@@ -194,7 +281,7 @@ describe('discoverAndRegisterToolPackages', () => {
     const empty = mkdtempSync(join(tmpdir(), 'opensip-discover-test-'));
     try {
       await expect(
-        discoverAndRegisterToolPackages(registry, { sources: [{ dir: empty, mode: 'walkUp' }] }),
+        discoverAndRegisterToolPackages(registry, { sources: [{ dir: empty, mode: 'walkUp' }] }, new Set()),
       ).resolves.toBeUndefined();
     } finally {
       rmSync(empty, { recursive: true, force: true });
@@ -258,7 +345,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       }),
     );
     const registry = new ToolRegistryClass();
-    await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] });
+    await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS);
     expect(registry.get('fixture-valid')).toBeDefined();
   });
 
@@ -278,7 +365,34 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const registry = new ToolRegistryClass();
     const restore = silenceStderr();
     try {
-      await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] });
+      await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS);
+    } finally {
+      restore();
+    }
+    expect(registry.list()).toHaveLength(0);
+  });
+
+  it('skips a discovered package with no resolvable entry point (no-entry)', async () => {
+    // A package.json that declares a tool but ships no main/exports and no
+    // index.js: `resolvePackageEntryPoint` → undefined, so `importToolRuntime`
+    // returns the 'no-entry' reason and the loader skips it (3.0.0 shared path).
+    const dir = join(FIXTURE_SCOPE, 'no-entry');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: '@opensip-tools-fixture/no-entry',
+        version: '0.0.0',
+        type: 'module',
+        opensipTools: { kind: 'tool' },
+      }),
+      'utf8',
+    );
+    staged.push({ name: '@opensip-tools-fixture/no-entry', dir });
+    const registry = new ToolRegistryClass();
+    const restore = silenceStderr();
+    try {
+      await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS);
     } finally {
       restore();
     }
@@ -300,7 +414,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       }),
     );
     const registry = new ToolRegistryClass();
-    await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] });
+    await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS);
     // The built-in id is skipped before registration ⇒ nothing added.
     expect(registry.list()).toHaveLength(0);
   });
@@ -336,7 +450,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       await expect(
         discoverAndRegisterToolPackages(
           registry,
-          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS,
           provenance,
         ),
       ).resolves.toBeUndefined();
@@ -365,7 +479,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const restore = silenceStderr();
     try {
       await expect(
-        discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }),
+        discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS),
       ).resolves.toBeUndefined();
     } finally {
       restore();

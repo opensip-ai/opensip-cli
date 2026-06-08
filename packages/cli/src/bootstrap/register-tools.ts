@@ -38,9 +38,6 @@ import {
   type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-tools/core';
-import { fitnessTool } from '@opensip-tools/fitness';
-import { graphTool } from '@opensip-tools/graph';
-import { simulationTool } from '@opensip-tools/simulation';
 
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
@@ -51,32 +48,23 @@ import { isValidTool } from './validate-tool.js';
 const BOOTSTRAP_MODULE = 'cli:bootstrap';
 
 /**
- * A first-party tool plus the npm package name that ships its
- * `package.json#opensipTools` manifest. The package name is how the
- * bundled path resolves the tool's own package directory (the dir whose
- * package.json carries the manifest) so it can run the SAME admission gate
- * the external path uses — see {@link resolveBundledPackageDir}.
+ * Bundled first-party tool PACKAGES — declared as direct deps of
+ * opensip-tools. Order is registration order (and thus help/listing order).
+ *
+ * 3.0.0 GA cutover: these are package NAMES, not imported tool runtimes. The
+ * host no longer statically `import`s `fitnessTool`/`graphTool`/`simulationTool`
+ * — bundled tools are resolved on disk and loaded by DYNAMIC IMPORT through the
+ * exact same manifest → `admitTool` → import → register path an installed or
+ * project-local tool travels (north-star §2.1, Figure 7). "Bundled" is now a
+ * provenance/trust posture, not a privileged load path: install-source
+ * independence is structural, not merely tested (`no-bootstrap-tool-import`
+ * guards this file against a static tool-runtime import creeping back).
  */
-interface FirstPartyToolEntry {
-  readonly tool: Tool;
-  readonly packageName: string;
-}
-
-/**
- * First-party tools — declared as direct deps of opensip-tools — paired
- * with the package that declares their manifest. Order is registration
- * order (and thus help/listing order).
- */
-const FIRST_PARTY_TOOL_ENTRIES: readonly FirstPartyToolEntry[] = [
-  { tool: fitnessTool, packageName: '@opensip-tools/fitness' },
-  { tool: simulationTool, packageName: '@opensip-tools/simulation' },
-  { tool: graphTool, packageName: '@opensip-tools/graph' },
+export const BUNDLED_TOOL_PACKAGES: readonly string[] = [
+  '@opensip-tools/fitness',
+  '@opensip-tools/simulation',
+  '@opensip-tools/graph',
 ];
-
-/** First-party tools — declared as direct deps of opensip-tools. */
-export const FIRST_PARTY_TOOLS: readonly Tool[] = FIRST_PARTY_TOOL_ENTRIES.map(
-  (e) => e.tool,
-);
 
 /** Used to resolve the bundled engine package dirs from the CLI's own module graph. */
 const requireFromHere = createRequire(import.meta.url);
@@ -131,34 +119,79 @@ function resolveBundledPackageDir(packageName: string): string | undefined {
 }
 
 /**
- * Register first-party tools into the supplied registry, running each one
- * through the SAME `admitTool` gate the external path uses (release 2.8.0,
- * Phase 3). This is ADDITIVE — the direct `registry.register(tool)` still
- * runs for every admitted tool; the gate runs alongside it.
+ * The outcome of importing a tool package's runtime module. A discriminated
+ * result (never throws) so each caller maps it to its own policy — bundled
+ * fails closed, installed skips-with-diagnostic.
+ */
+type ToolRuntimeLoad =
+  | { readonly ok: true; readonly tool: Tool }
+  | {
+      readonly ok: false;
+      readonly reason: 'no-entry' | 'invalid-shape' | 'import-failed';
+      readonly detail?: string;
+    };
+
+/**
+ * Resolve a tool package's entry, DYNAMIC-IMPORT it, and validate the exported
+ * `tool` shape. This is the ONE runtime-load path every installation source
+ * travels (3.0.0 GA, north-star Figure 7): no static `import` of a tool runtime
+ * survives in the host — a bundled tool is imported by its resolved entry path
+ * exactly as an installed one is. Import is by `pathToFileURL(meta.mainEntry)`,
+ * not the bare package name, so a tool living in a host dir off the CLI's own
+ * module-resolution path still loads. A third-party tool is an untrusted
+ * boundary, so `isValidTool` gates the exported symbol before it is touched.
  *
- * Per tool: resolve its package dir, `loadToolManifest('bundled', dir)`, and
- * `admitTool({ source: 'bundled', explicitlyRequested: true })`. A bundled
- * tool is always explicitly shipped, so an out-of-range manifest is a
- * fail-closed (never a silent skip). On `admit` we register the tool (and,
- * defensively, assert the manifest matches the runtime tool to catch drift),
- * then push the recorded `ToolProvenance` onto the optional `provenance`
- * collector so Phase 4's `plugin list` can surface source/identity/hash.
+ * Never throws: returns a discriminated result the caller acts on.
+ */
+async function importToolRuntime(dir: string): Promise<ToolRuntimeLoad> {
+  const meta = readToolPackageMetadata(dir);
+  if (!meta) return { ok: false, reason: 'no-entry' };
+  let mod: { tool?: unknown };
+  try {
+    mod = (await import(pathToFileURL(meta.mainEntry).href)) as { tool?: unknown };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'import-failed',
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+  if (!isValidTool(mod.tool)) return { ok: false, reason: 'invalid-shape' };
+  return { ok: true, tool: mod.tool };
+}
+
+/**
+ * Register the bundled first-party tools into the supplied registry, each one
+ * flowing through the SAME admit → dynamic-import → register path the external
+ * path uses (3.0.0 GA cutover — replaces the 2.8.0 static-import + gate path).
+ *
+ * Per package name: `resolveBundledPackageDir` → `loadToolManifest('bundled')`
+ * → `admitTool({ source: 'bundled', explicitlyRequested: true })` →
+ * `importToolRuntime` (dynamic import + shape validation) → drift guard →
+ * `registry.register`. A bundled tool ships with the CLI, so it is always
+ * explicitly present: a missing/incompatible manifest or a runtime that fails
+ * to load is FAIL-CLOSED (never a silent skip). The recorded `ToolProvenance`
+ * (source `'bundled'`, trusted-by-shipping) and manifest are pushed onto the
+ * optional collectors so the composition root can surface provenance
+ * (`plugin list`) and seed the per-run capability registry (§5.3).
  *
  * @param registry The per-invocation tool registry to populate.
- * @param provenance Optional sink for the admitted tools' provenance records
- *   (defaults to a throwaway array; the bootstrap passes a real collector).
- * @param manifests Optional sink for the admitted tools' manifests (§5.3 —
- *   the pre-action-hook registers each manifest's capability domains).
- * @throws {PluginIncompatibleError} when a bundled tool's manifest is missing
- *   or out of range — mapped to `EXIT_CODES.PLUGIN_INCOMPATIBLE` (exit 5) by
- *   the CLI error boundary.
+ * @param provenance Optional sink for the admitted tools' provenance records.
+ * @param manifests Optional sink for the admitted tools' manifests (§5.3).
+ * @param packages The bundled package names to load (defaults to
+ *   {@link BUNDLED_TOOL_PACKAGES}; injectable so the fail-closed paths are
+ *   testable with fixture packages).
+ * @throws {PluginIncompatibleError} when a bundled tool cannot be resolved,
+ *   has no conformant manifest, is out of range, or its runtime fails to load
+ *   — mapped to `EXIT_CODES.PLUGIN_INCOMPATIBLE` (exit 5) by the CLI boundary.
  */
-export function registerFirstPartyTools(
+export async function registerFirstPartyTools(
   registry: ToolRegistry,
   provenance: ToolProvenance[] = [],
   manifests: ToolPluginManifest[] = [],
-): void {
-  for (const { tool, packageName } of FIRST_PARTY_TOOL_ENTRIES) {
+  packages: readonly string[] = BUNDLED_TOOL_PACKAGES,
+): Promise<void> {
+  for (const packageName of packages) {
     const dir = resolveBundledPackageDir(packageName);
     if (dir === undefined) {
       throw new PluginIncompatibleError(
@@ -169,9 +202,9 @@ export function registerFirstPartyTools(
 
     const manifest = loadToolManifest('bundled', dir);
     if (manifest === undefined) {
-      // A bundled tool MUST ship a conformant manifest (the Phase-5
-      // tool-has-manifest guardrail backstops this at CI; at runtime a
-      // missing manifest is fail-closed, not a silent skip).
+      // A bundled tool MUST ship a conformant manifest (the tool-has-manifest
+      // guardrail backstops this at CI; at runtime a missing manifest is
+      // fail-closed, not a silent skip).
       throw new PluginIncompatibleError(
         `bundled tool '${packageName}' has no conformant package.json#opensipTools manifest`,
         { diagnostic: 'manifest missing or malformed' },
@@ -203,12 +236,24 @@ export function registerFirstPartyTools(
       );
     }
 
-    // Defensive drift guard: the static manifest and the runtime tool are two
-    // declarations of the same identity (Phase 1). Catch a manifest that fell
-    // out of sync with the tool's command surface before it confuses users.
-    assertManifestMatchesTool(manifest, tool);
+    // Load the runtime by DYNAMIC IMPORT — the same path installed tools use.
+    // The host holds no static reference to fit/graph/sim (3.0.0). A bundled
+    // tool that fails to load is a packaging fault → fail-closed.
+    const load = await importToolRuntime(dir);
+    if (!load.ok) {
+      const detailSuffix = load.detail ? `: ${load.detail}` : '';
+      throw new PluginIncompatibleError(
+        `bundled tool '${manifest.id}' failed to load via the plugin path (${load.reason}${detailSuffix})`,
+        { diagnostic: `bundled tool runtime load failed: ${load.reason}` },
+      );
+    }
 
-    registry.register(tool);
+    // Defensive drift guard: the static manifest and the runtime tool are two
+    // declarations of the same identity. Catch a manifest that fell out of sync
+    // with the tool's command surface before it confuses users.
+    assertManifestMatchesTool(manifest, load.tool);
+
+    registry.register(load.tool);
     provenance.push(result.provenance);
     // Record the manifest so the pre-action-hook can register this tool's
     // declared capability domains into the per-run capability registry
@@ -326,13 +371,41 @@ function admitInstalledTool(
  *
  * @param provenance Optional sink for admitted tools' provenance records.
  */
+/**
+ * Emit the best-effort stderr line + structured warning for a discovered
+ * INSTALLED tool whose runtime failed to load. Each `ToolRuntimeLoad` failure
+ * reason maps to its own message + event (preserving the 2.8.0 diagnostics) —
+ * an installed tool's load failure skips it, never crashing the CLI.
+ */
+function emitInstalledLoadFailure(
+  name: string,
+  load: Extract<ToolRuntimeLoad, { ok: false }>,
+): void {
+  if (load.reason === 'no-entry') {
+    process.stderr.write(`opensip-tools: tool package ${name} has no resolvable entry point — skipping\n`);
+    logger.warn({ evt: 'cli.tool.no_entry', module: BOOTSTRAP_MODULE, name });
+    return;
+  }
+  if (load.reason === 'invalid-shape') {
+    process.stderr.write(`opensip-tools: tool package ${name} does not export a valid \`tool\` — skipping\n`);
+    logger.warn({ evt: 'cli.tool.invalid_shape', module: BOOTSTRAP_MODULE, name });
+    return;
+  }
+  process.stderr.write(`opensip-tools: failed to load tool ${name}: ${load.detail ?? 'import failed'}\n`);
+  logger.warn({ evt: 'cli.tool.load_failed', module: BOOTSTRAP_MODULE, name, error: load.detail });
+}
+
 export async function discoverAndRegisterToolPackages(
   registry: ToolRegistry,
   opts: DiscoveryOptions,
+  builtInIds: ReadonlySet<string>,
   provenance: ToolProvenance[] = [],
   manifests: ToolPluginManifest[] = [],
 ): Promise<void> {
-  const builtInIds = new Set(FIRST_PARTY_TOOLS.map((t) => t.metadata.id));
+  // `builtInIds` is the set of already-registered bundled-tool ids to skip on
+  // a name collision (3.0.0 — passed explicitly by the composition root, which
+  // derives it from the bundled MANIFESTS it just loaded; the host holds no
+  // imported tool runtime to read `tool.metadata.id` from).
   const discovered = discoverToolPackagesFromAnchors(opts.sources);
 
   for (const pkg of discovered) {
@@ -342,40 +415,19 @@ export async function discoverAndRegisterToolPackages(
       // register as before (manifest absent → grace window, or admitted).
       if (admitInstalledTool(pkg, builtInIds, provenance, manifests) === 'reject') continue;
 
-      // Import by the package's RESOLVED entry path, not its bare name.
-      // A discovered tool may live in a host dir (the user-global
-      // `~/.opensip-tools/plugins/tool` or the project `.runtime/plugins/tool`)
-      // that is NOT on the CLI's own module-resolution path, so `import(name)`
-      // would throw MODULE_NOT_FOUND. Resolving the entry from `packageDir`
-      // (as the fitness check-loader does) loads it regardless of location.
-      const meta = readToolPackageMetadata(pkg.packageDir);
-      if (!meta) {
-        process.stderr.write(
-          `opensip-tools: tool package ${pkg.name} has no resolvable entry point — skipping\n`,
-        );
-        logger.warn({ evt: 'cli.tool.no_entry', module: BOOTSTRAP_MODULE, name: pkg.name });
+      // Load the runtime through the SHARED dynamic-import path (3.0.0) — the
+      // same `importToolRuntime` the bundled path uses. Resolves the entry
+      // from `packageDir` so a tool living in a host dir off the CLI's own
+      // module-resolution path still loads. An installed tool is best-effort:
+      // any load failure skips-with-diagnostic (it must not take fit/graph/sim
+      // down), in contrast to the bundled path's fail-closed.
+      const load = await importToolRuntime(pkg.packageDir);
+      if (!load.ok) {
+        emitInstalledLoadFailure(pkg.name, load);
         continue;
       }
-      const mod = (await import(pathToFileURL(meta.mainEntry).href)) as { tool?: unknown };
-      // Runtime shape validation: a third-party tool is an untrusted
-      // boundary. Validate the exported `tool` symbol's shape before
-      // touching it, matching the pattern used by
-      // `register-graph-adapters.ts`. A malformed package gets a clear
-      // stderr line + structured warning and is skipped — better than
-      // a TypeError mid-registration or a silently-broken Tool slot.
-      if (!isValidTool(mod.tool)) {
-        process.stderr.write(
-          `opensip-tools: tool package ${pkg.name} does not export a valid \`tool\` — skipping\n`,
-        );
-        logger.warn({
-          evt: 'cli.tool.invalid_shape',
-          module: BOOTSTRAP_MODULE,
-          name: pkg.name,
-        });
-        continue;
-      }
-      if (builtInIds.has(mod.tool.metadata.id)) continue;
-      registry.register(mod.tool, { sourcePackage: pkg.name });
+      if (builtInIds.has(load.tool.metadata.id)) continue;
+      registry.register(load.tool, { sourcePackage: pkg.name });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       process.stderr.write(`opensip-tools: failed to load tool ${pkg.name}: ${msg}\n`);

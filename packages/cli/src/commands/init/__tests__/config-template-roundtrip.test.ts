@@ -16,8 +16,8 @@ import { join } from 'node:path';
 import { ToolRegistry } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { BUNDLED_TOOLS } from '../../../__tests__/test-utils/bundled-tools.js';
 import { composeAndValidateToolConfig } from '../../../bootstrap/config-and-capabilities.js';
-import { FIRST_PARTY_TOOLS } from '../../../bootstrap/register-tools.js';
 import { generateConfig } from '../config-templates.js';
 
 import type { SupportedLanguage } from '../language-detection.js';
@@ -26,7 +26,7 @@ const LANGUAGES: readonly SupportedLanguage[] = ['typescript', 'rust', 'python',
 
 function realRegistry(): ToolRegistry {
   const reg = new ToolRegistry();
-  for (const tool of FIRST_PARTY_TOOLS) reg.register(tool);
+  for (const tool of BUNDLED_TOOLS) reg.register(tool);
   return reg;
 }
 

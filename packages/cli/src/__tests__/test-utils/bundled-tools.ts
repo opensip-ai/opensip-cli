@@ -1,0 +1,27 @@
+/**
+ * Test-only helper: the bundled tool RUNTIMES, in registration order.
+ *
+ * 3.0.0 GA: production no longer statically imports fit/graph/sim — the host
+ * loads them by DYNAMIC IMPORT through `BUNDLED_TOOL_PACKAGES`
+ * (`bootstrap/register-tools.ts`), so install-source independence is structural.
+ * White-box tests that need the actual tool instances (command-surface
+ * snapshots, flag-parity sweeps, ordering assertions) import them directly here
+ * — legitimate because this file lives under `__tests__/`, which the
+ * `no-bootstrap-tool-import` guardrail exempts (the regression it guards is a
+ * static tool-runtime import in *host* code, not test code).
+ *
+ * Not a test file (no `.test.` suffix) — vitest's test-glob matches only
+ * `.test.ts`, so it skips this; the cli tsconfig + coverage both exclude
+ * `__tests__`; and `test-file-naming` skips the `test-utils` directory.
+ */
+import { fitnessTool } from '@opensip-tools/fitness';
+import { graphTool } from '@opensip-tools/graph';
+import { simulationTool } from '@opensip-tools/simulation';
+
+import type { Tool } from '@opensip-tools/core';
+
+/** The bundled tool runtimes, in registration (and thus help/listing) order. */
+export const BUNDLED_TOOLS: readonly Tool[] = [fitnessTool, simulationTool, graphTool];
+
+/** The bundled tool ids, in registration order — the discovery skip-set. */
+export const BUNDLED_TOOL_IDS: readonly string[] = ['fitness', 'simulation', 'graph'];

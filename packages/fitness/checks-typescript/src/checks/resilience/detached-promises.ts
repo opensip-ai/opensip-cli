@@ -295,6 +295,9 @@ const KNOWN_SYNC_PREFIXES = [
   'should',
   'was',
   'will',
+  // Assertions — `assert*` functions (Node `assert`, TS assertion signatures,
+  // test-framework asserts) throw or return void synchronously by convention.
+  'assert',
   // EventEmitter-style
   'emit',
   'on',

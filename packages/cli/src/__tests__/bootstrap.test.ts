@@ -20,10 +20,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { registerLanguageAdapters } from '../bootstrap/register-language-adapters.js';
 import {
-  FIRST_PARTY_TOOLS,
   mountAllToolCommands,
   registerFirstPartyTools,
 } from '../bootstrap/register-tools.js';
+
+import { BUNDLED_TOOLS } from './test-utils/bundled-tools.js';
 
 function makeStubContext(): ToolCliContext {
   return {
@@ -74,15 +75,15 @@ describe('registerLanguageAdapters', () => {
 });
 
 describe('registerFirstPartyTools', () => {
-  it('registers fitness, simulation, and graph in the documented order', () => {
+  it('registers fitness, simulation, and graph in the documented order', async () => {
     const registry = new ToolRegistry();
-    registerFirstPartyTools(registry);
+    await registerFirstPartyTools(registry);
     const ids = registry.list().map((t) => t.metadata.id);
-    expect(ids).toEqual(FIRST_PARTY_TOOLS.map((t) => t.metadata.id));
+    expect(ids).toEqual(BUNDLED_TOOLS.map((t) => t.metadata.id));
   });
 
-  it('produces a deterministic ordering matching FIRST_PARTY_TOOLS', () => {
-    expect(FIRST_PARTY_TOOLS.map((t) => t.metadata.id)).toEqual(['fitness', 'simulation', 'graph']);
+  it('produces a deterministic ordering matching BUNDLED_TOOLS', () => {
+    expect(BUNDLED_TOOLS.map((t) => t.metadata.id)).toEqual(['fitness', 'simulation', 'graph']);
   });
 });
 

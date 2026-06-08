@@ -57,12 +57,12 @@ function makeStubContext(program: Command): ToolCliContext {
 }
 
 describe('SUBCOMMANDS drift test', () => {
-  it('matches the live Commander program (tool subcommands plus CLI-owned)', () => {
+  it('matches the live Commander program (tool subcommands plus CLI-owned)', async () => {
     const program = new Command('opensip-tools');
     // Fresh per-test ToolRegistry — the previously-exported
     // `defaultToolRegistry` module singleton was removed in T1 cleanup.
     const registry = new ToolRegistry();
-    registerFirstPartyTools(registry);
+    await registerFirstPartyTools(registry);
     const ctx = makeStubContext(program);
     mountAllToolCommands(registry, ctx);
     registerCliCommands(program, {
@@ -106,10 +106,10 @@ describe('SUBCOMMANDS drift test', () => {
     }
   });
 
-  it('emitted bash/zsh scripts list the live plugin subcommands (no install/add drift)', () => {
+  it('emitted bash/zsh scripts list the live plugin subcommands (no install/add drift)', async () => {
     const program = new Command('opensip-tools');
     const registry = new ToolRegistry();
-    registerFirstPartyTools(registry);
+    await registerFirstPartyTools(registry);
     const ctx = makeStubContext(program);
     mountAllToolCommands(registry, ctx);
     registerCliCommands(program, {

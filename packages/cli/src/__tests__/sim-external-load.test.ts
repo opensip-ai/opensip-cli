@@ -4,9 +4,10 @@
  * Loads the REAL `sim` package through the components of the EXTERNAL tool-plugin
  * path — the static manifest loader (`loadToolManifest`), the compatibility
  * admission gate (`admitTool`), a dynamic `import()` of the built module, and the
- * host `mountCommandSpec` — NOT the `FIRST_PARTY_TOOL_ENTRIES` direct import. It
- * asserts the resulting command surface (name / flags / output) is identical to
- * the bundled mount.
+ * host `mountCommandSpec`. It asserts the resulting command surface (name /
+ * flags / output) is identical to the bundled mount. (3.0.0 note: the bundled
+ * path now travels this SAME admit→dynamic-import path via `BUNDLED_TOOL_PACKAGES`
+ * — see the `fit-external-load` acceptance test for the full packed-install proof.)
  *
  * This de-risks the 3.0.0 `fit` proof: it shows a first-party tool's manifest +
  * runtime export + CommandSpec all travel through the plugin loader intact, with no

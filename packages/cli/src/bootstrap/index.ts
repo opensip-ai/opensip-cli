@@ -1,4 +1,4 @@
-// @fitness-ignore-file detached-promises -- bootstrap calls synchronous registration helpers (registerLanguageAdapters, registerFirstPartyTools) that the heuristic flags
+// @fitness-ignore-file detached-promises -- bootstrap calls the synchronous registerLanguageAdapters and awaits the async tool registration helpers (registerFirstPartyTools, discoverAndRegisterToolPackages) that the heuristic flags
 /**
  * bootstrap — composition-root for the CLI.
  *
@@ -28,7 +28,7 @@
  *
  * Barrel surface: only the symbols `index.ts` actually consumes are
  * re-exported from this barrel. Internal helpers (`mergeConfigDefaults`,
- * `loadCliDefaults`, `registerFirstPartyTools`, `FIRST_PARTY_TOOLS`,
+ * `loadCliDefaults`, `registerFirstPartyTools`, `BUNDLED_TOOL_PACKAGES`,
  * `registerLanguageAdapters`) stay in their files; bootstrap siblings and
  * tests import them directly. (User-global config I/O moved to
  * `@opensip-tools/config` in 2.10.1.) Audit 2026-05-23 M1.
@@ -111,10 +111,18 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   // so the composition root can seed the per-run capability registry with each
   // manifest's declared domains.
   const manifests: ToolPluginManifest[] = [];
-  registerFirstPartyTools(opts.toolRegistry, provenance, manifests);
+  // 3.0.0: bundled tools load through the same dynamic-import path as installed
+  // tools, so registration is async — awaited before discovery so the bundled
+  // manifests are loaded before we derive the built-in skip-set from them.
+  await registerFirstPartyTools(opts.toolRegistry, provenance, manifests);
+  // The bundled-tool ids discovery must skip on a name collision, derived from
+  // the manifests just loaded (not from an imported tool runtime — the host
+  // holds none in 3.0.0).
+  const builtInIds = new Set(manifests.map((m) => m.id));
   await discoverAndRegisterToolPackages(
     opts.toolRegistry,
     { sources: buildToolDiscoverySources(opts.cwd, opts.projectDir) },
+    builtInIds,
     provenance,
     manifests,
   );

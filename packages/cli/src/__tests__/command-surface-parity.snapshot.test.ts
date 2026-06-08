@@ -38,8 +38,10 @@ import {
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FIRST_PARTY_TOOLS, mountAllToolCommands } from '../bootstrap/register-tools.js';
+import { mountAllToolCommands } from '../bootstrap/register-tools.js';
 import { registerCliCommands } from '../commands/index.js';
+
+import { BUNDLED_TOOLS } from './test-utils/bundled-tools.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
 
@@ -79,7 +81,7 @@ function buildFullProgram(): Command {
     // Register the bundled tools into a fresh registry and mount their command
     // specs (the same path index.ts drives at step 8 of the tool lifecycle).
     const registry = new ToolRegistry();
-    for (const tool of FIRST_PARTY_TOOLS) registry.register(tool);
+    for (const tool of BUNDLED_TOOLS) registry.register(tool);
     mountAllToolCommands(registry, makeStubToolContext(program));
 
     // Host-owned commands (init/dashboard/sessions/configure/plugin/completion/
