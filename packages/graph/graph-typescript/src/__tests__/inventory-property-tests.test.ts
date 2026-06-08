@@ -501,6 +501,21 @@ describe('Property 8 — inTestFile flag is correct for test path patterns', () 
     }
   });
 
+  it('files under __fixtures__/ are flagged inTestFile=true (test scaffolding)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'graph-prop8b2-'));
+    try {
+      const catalog = buildCatalog(dir, {
+        'src/orchestrate/__fixtures__/multi-pkg/foundation/canonicalize.ts':
+          `export function canonicalize() { return 1; }\n`,
+      });
+      const occ = allOccurrences(catalog).find((o) => o.simpleName === 'canonicalize');
+      expect(occ).toBeDefined();
+      expect(occ!.inTestFile).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('production files (no test pattern) are inTestFile=false', () => {
     const dir = mkdtempSync(join(tmpdir(), 'graph-prop8c-'));
     try {
