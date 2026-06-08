@@ -191,11 +191,12 @@ async function emitSimShowError(
   reason: string,
   detail: string,
 ): Promise<void> {
-  cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
   if (opts.json === true) {
-    cli.emitJson({ error: detail, reason });
+    // emitError sets the exit code itself (process exit == reported outcome).
+    cli.emitError({ message: detail, exitCode: EXIT_CODES.CONFIGURATION_ERROR, code: reason });
     return;
   }
+  cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
   await cli.render({
     type: 'error',
     message: detail,

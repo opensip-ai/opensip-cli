@@ -28,13 +28,13 @@ import { EXIT_CODES, type StoredSession } from '@opensip-tools/contracts';
 import { defineCommand } from '@opensip-tools/core';
 import { resolveSession } from '@opensip-tools/session-store';
 
+import { graphReplayFromSession } from '../../persistence/session-replay.js';
 import { resolveRecipeToRules } from '../../recipes/resolve.js';
 import { renderGraphLive } from '../graph-runner.js';
 import { executeGraph } from '../graph.js';
 import { runHeapPreflight } from '../heap-preflight.js';
 import { executeListFiles } from '../list-files.js';
 import { loadGraphConfig, resolveGraphRecipeSelection } from '../orchestrate.js';
-import { graphReplayFromSession } from '../../persistence/session-replay.js';
 
 import type { GraphConfig, ResolutionMode, Rule } from '../../types.js';
 import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
@@ -297,11 +297,12 @@ async function emitGraphShowError(
   reason: string,
   detail: string,
 ): Promise<void> {
-  cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
   if (opts.json === true) {
-    cli.emitJson({ error: detail, reason });
+    // emitError sets the exit code itself (process exit == reported outcome).
+    cli.emitError({ message: detail, exitCode: EXIT_CODES.CONFIGURATION_ERROR, code: reason });
     return;
   }
+  cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
   await cli.render({
     type: 'error',
     message: detail,

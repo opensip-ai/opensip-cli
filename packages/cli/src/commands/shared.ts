@@ -10,9 +10,9 @@
  * the shared context type.
  */
 
+import type { SessionReplayRegistry } from '../session-replay-registry.js';
 import type { CommandResult } from '@opensip-tools/contracts';
 import type { PluginLayout } from '@opensip-tools/core';
-import type { SessionReplayRegistry } from '../session-replay-registry.js';
 
 /**
  * Context the orchestrator (`registerCliCommands`) hands to every
@@ -23,7 +23,27 @@ import type { SessionReplayRegistry } from '../session-replay-registry.js';
 export interface CliCommandsContext {
   readonly setExitCode: (code: number) => void;
   readonly render: (result: CommandResult) => Promise<void>;
-  readonly emitJson?: (value: unknown) => void;
+  /**
+   * Success machine-output seam — wraps the value in a `CommandOutcome` via the
+   * single `renderOutcome` seam (2.12.0, §5.5). Always supplied by the host
+   * (sourced from {@link ToolCliContext.emitJson}); required so raw-stream host
+   * commands (`sessions show`) never fall back to a direct `process.stdout.write`.
+   */
+  readonly emitJson: (value: unknown) => void;
+  /**
+   * Structured-error machine-output seam (2.12.0, §5.5) — the host-command
+   * mirror of {@link ToolCliContext.emitError}. A failed `--json` host command
+   * (e.g. `sessions show`) emits its diagnosed failure through here so it rides
+   * the single `renderOutcome` seam as a `status:'error'` `CommandOutcome`,
+   * never a bare `emitJson({ error })`. Sourced from the same context closure as
+   * the tool seam, so exit code and reported outcome stay in agreement.
+   */
+  readonly emitError: (detail: {
+    readonly message: string;
+    readonly exitCode: number;
+    readonly suggestion?: string;
+    readonly code?: string;
+  }) => void;
   /**
    * Project-local plugin layouts contributed by the registered tools
    * (each tool's `Tool.pluginLayout`). The `plugin` command reads these

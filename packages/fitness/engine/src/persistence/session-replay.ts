@@ -1,3 +1,5 @@
+import { decodeSessionPayload, type DecodedSessionFinding } from '@opensip-tools/session-store';
+
 import type {
   FitDoneResult,
   SignalEnvelope,
@@ -7,33 +9,21 @@ import type {
 } from '@opensip-tools/contracts';
 import type { Signal } from '@opensip-tools/core';
 
-interface StoredFitnessFinding {
-  readonly ruleId: string;
-  readonly message: string;
-  readonly severity: 'error' | 'warning';
-  readonly filePath?: string;
-  readonly line?: number;
-  readonly column?: number;
-  readonly suggestion?: string;
-}
-
-interface StoredFitnessCheck {
-  readonly checkSlug: string;
-  readonly passed: boolean;
-  readonly violationCount?: number;
-  readonly findings: readonly StoredFitnessFinding[];
-  readonly durationMs: number;
-}
-
-interface StoredFitnessPayload {
-  readonly summary: SignalEnvelope['verdict']['summary'];
-  readonly checks: readonly StoredFitnessCheck[];
-}
-
+/**
+ * Project a stored fit session back into a {@link SignalEnvelope}/{@link FitDoneResult}.
+ *
+ * The structural decode of the opaque payload is shared across tools
+ * (`decodeSessionPayload`); this function owns only fit's projection — the
+ * envelope vocabulary (`tool: 'fit'`, recipe label) and the per-finding signal
+ * shape (`category: 'quality'`, severity mapping, id prefix).
+ *
+ * @throws {Error | TypeError} when the stored payload is not the expected shape
+ *   (propagated from `decodeSessionPayload`).
+ */
 export function fitReplayFromSession(
   stored: StoredSession,
 ): ToolSessionReplay<FitDoneResult> {
-  const payload = parseFitnessPayload(stored.payload);
+  const payload = decodeSessionPayload(stored.payload, { tool: 'fit' });
   const units: UnitResult[] = payload.checks.map((check) => ({
     slug: check.checkSlug,
     passed: check.passed,
@@ -72,84 +62,10 @@ export function fitReplayFromSession(
   };
 }
 
-function parseFitnessPayload(payload: unknown): StoredFitnessPayload {
-  if (payload === null || typeof payload !== 'object') {
-    throw new Error('fit session has no replay payload');
-  }
-  const candidate = payload as { summary?: unknown; checks?: unknown };
-  const summary = parseSummary(candidate.summary, 'fit session summary');
-  if (!Array.isArray(candidate.checks)) {
-    throw new Error('fit session payload is missing checks[]');
-  }
-  return {
-    summary,
-    checks: candidate.checks.map(parseCheck),
-  };
-}
-
-function parseSummary(value: unknown, label: string): SignalEnvelope['verdict']['summary'] {
-  if (value === null || typeof value !== 'object') {
-    throw new Error(`${label} is missing`);
-  }
-  const summary = value as Record<string, unknown>;
-  const total = numberField(summary, 'total', label);
-  const passed = numberField(summary, 'passed', label);
-  const failed = numberField(summary, 'failed', label);
-  const errors = numberField(summary, 'errors', label);
-  const warnings = numberField(summary, 'warnings', label);
-  return { total, passed, failed, errors, warnings };
-}
-
-function parseCheck(value: unknown): StoredFitnessCheck {
-  if (value === null || typeof value !== 'object') {
-    throw new Error('fit session check row is invalid');
-  }
-  const check = value as Record<string, unknown>;
-  const checkSlug = stringField(check, 'checkSlug', 'fit session check');
-  const passed = booleanField(check, 'passed', 'fit session check');
-  const durationMs = numberField(check, 'durationMs', 'fit session check');
-  const violationCount =
-    typeof check.violationCount === 'number' ? check.violationCount : undefined;
-  if (!Array.isArray(check.findings)) {
-    throw new Error(`fit session check ${checkSlug} is missing findings[]`);
-  }
-  return {
-    checkSlug,
-    passed,
-    violationCount,
-    durationMs,
-    findings: check.findings.map(parseFinding),
-  };
-}
-
-function parseFinding(value: unknown): StoredFitnessFinding {
-  if (value === null || typeof value !== 'object') {
-    throw new Error('fit session finding is invalid');
-  }
-  const finding = value as Record<string, unknown>;
-  const severity = finding.severity;
-  if (severity !== 'error' && severity !== 'warning') {
-    throw new Error('fit session finding has invalid severity');
-  }
-  const filePath = optionalString(finding.filePath);
-  const line = optionalNumber(finding.line);
-  const column = optionalNumber(finding.column);
-  const suggestion = optionalString(finding.suggestion);
-  return {
-    ruleId: stringField(finding, 'ruleId', 'fit session finding'),
-    message: stringField(finding, 'message', 'fit session finding'),
-    severity,
-    ...(filePath === undefined ? {} : { filePath }),
-    ...(line === undefined ? {} : { line }),
-    ...(column === undefined ? {} : { column }),
-    ...(suggestion === undefined ? {} : { suggestion }),
-  };
-}
-
 function replaySignal(
   stored: StoredSession,
   source: string,
-  finding: StoredFitnessFinding,
+  finding: DecodedSessionFinding,
   checkIndex: number,
   findingIndex: number,
 ): Signal {
@@ -175,30 +91,4 @@ function replaySignal(
     metadata: {},
     createdAt: stored.timestamp,
   };
-}
-
-function numberField(source: Record<string, unknown>, field: string, label: string): number {
-  const value = source[field];
-  if (typeof value !== 'number') throw new Error(`${label}.${field} must be a number`);
-  return value;
-}
-
-function stringField(source: Record<string, unknown>, field: string, label: string): string {
-  const value = source[field];
-  if (typeof value !== 'string') throw new Error(`${label}.${field} must be a string`);
-  return value;
-}
-
-function booleanField(source: Record<string, unknown>, field: string, label: string): boolean {
-  const value = source[field];
-  if (typeof value !== 'boolean') throw new Error(`${label}.${field} must be a boolean`);
-  return value;
-}
-
-function optionalString(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-function optionalNumber(value: unknown): number | undefined {
-  return typeof value === 'number' ? value : undefined;
 }

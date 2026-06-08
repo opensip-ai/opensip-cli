@@ -15,7 +15,10 @@ export interface ExecuteSessionShowOptions {
   readonly tool?: ToolShortId;
   readonly json?: boolean;
   readonly render: CliCommandsContext['render'];
-  readonly emitJson?: CliCommandsContext['emitJson'];
+  /** Success machine-output seam — wraps the value in a `CommandOutcome`. */
+  readonly emitJson: (value: unknown) => void;
+  /** Structured-error machine-output seam (2.12.0, §5.5). */
+  readonly emitError: CliCommandsContext['emitError'];
   readonly setExitCode: CliCommandsContext['setExitCode'];
 }
 
@@ -42,6 +45,8 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
   try {
     replay = contribution.replaySession(resolved.session);
   } catch (error) {
+    // @handles — a corrupt/legacy stored payload is surfaced to the caller as a
+    // structured `decode-error` outcome (not swallowed); see emitSessionShowError.
     await emitSessionShowError(
       opts,
       'decode-error',
@@ -51,7 +56,7 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
   }
 
   if (opts.json === true) {
-    emitJson(opts, sessionShowJson(resolved.session, replay));
+    opts.emitJson(sessionShowJson(resolved.session, replay));
     return;
   }
   await opts.render(replay.result);
@@ -82,22 +87,15 @@ async function emitSessionShowError(
   reason: string,
   detail: string,
 ): Promise<void> {
-  opts.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
   if (opts.json === true) {
-    emitJson(opts, { error: detail, reason });
+    // emitError sets the exit code itself (process exit == reported outcome).
+    opts.emitError({ message: detail, exitCode: EXIT_CODES.CONFIGURATION_ERROR, code: reason });
     return;
   }
+  opts.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
   await opts.render({
     type: 'error',
     message: detail,
     exitCode: EXIT_CODES.CONFIGURATION_ERROR,
   });
-}
-
-function emitJson(opts: Pick<ExecuteSessionShowOptions, 'emitJson'>, value: unknown): void {
-  if (opts.emitJson !== undefined) {
-    opts.emitJson(value);
-    return;
-  }
-  process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }

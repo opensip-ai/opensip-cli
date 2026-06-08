@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates the bounded per-run signal set grouped by source (signals emitted by a single sim run), matching the graph session-payload precedent.
 import { isErrorSignal } from '@opensip-tools/core';
 
 import type { SignalEnvelope, UnitResult } from '@opensip-tools/contracts';

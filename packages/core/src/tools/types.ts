@@ -255,6 +255,13 @@ export interface ToolCliContext {
     readonly message: string;
     readonly exitCode: number;
     readonly suggestion?: string;
+    /**
+     * Optional machine-readable error category (e.g. `'not-found'`,
+     * `'decode-error'`). The host surfaces it as the structured
+     * `ErrorDetail.code` so machine consumers can branch on the failure kind
+     * without parsing `message`.
+     */
+    readonly code?: string;
   }) => void;
   /**
    * Deliver a tool-run **signal envelope** to the effectful sinks the

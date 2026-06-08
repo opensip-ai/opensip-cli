@@ -107,6 +107,7 @@ async function main(): Promise<void> {
     setExitCode: ctx.setExitCode,
     render: renderResult,
     emitJson: ctx.emitJson,
+    emitError: ctx.emitError,
     datastore: () => getOrOpenDatastore(logger),
     pluginLayouts,
     sessionReplayRegistry,

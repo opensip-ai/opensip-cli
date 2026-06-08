@@ -4,10 +4,18 @@ import type { StoredSession } from '@opensip-tools/contracts';
 import type { ToolShortId } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
+/**
+ * A reference to one stored session: an explicit `ref` id, or the sentinel
+ * `'latest'` (which requires a `tool` to disambiguate across tools).
+ */
 export type SessionReference =
   | { readonly ref: 'latest'; readonly tool?: ToolShortId }
   | { readonly ref: string; readonly tool?: ToolShortId };
 
+/**
+ * The outcome of {@link resolveSession}: either the resolved `session`, or a
+ * failure carrying a machine-readable `reason` and a human `detail`.
+ */
 export type SessionResolveResult =
   | { readonly ok: true; readonly session: StoredSession }
   | {
@@ -16,6 +24,12 @@ export type SessionResolveResult =
       readonly detail: string;
     };
 
+/**
+ * Resolve a {@link SessionReference} against the datastore. `'latest'` returns
+ * the most recent session for the given `tool` (and is ambiguous without one);
+ * an explicit id is looked up directly and optionally tool-checked. Never
+ * throws — every failure is a `{ ok: false, reason, detail }` result.
+ */
 export function resolveSession(
   datastore: DataStore,
   reference: SessionReference,

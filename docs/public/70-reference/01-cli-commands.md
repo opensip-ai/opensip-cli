@@ -123,6 +123,7 @@ opensip-tools fit --gate-compare
 | `--exclude <slug>` | repeatable | `[]` | Exclude check by slug. Can be passed multiple times. |
 | `--list` | bool | `false` | List available checks instead of running. |
 | `--recipes` | bool | `false` | List available recipes instead of running. |
+| `--show <session>` | string | — | Replay a stored fit session (by id, or `latest`) instead of running — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
 | `--json` | bool | `false` | Emit the `SignalEnvelope` JSON on stdout instead of the table renderer. |
 | `-v, --verbose` | bool | `false` | Show the detailed report body (per-check findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
 | `--findings` | bool | `false` | **Deprecated** — alias of `--verbose`; will be removed in a future 2.x release. |
@@ -156,6 +157,7 @@ opensip-tools sim --recipe <name>
 | Flag | Type | Default | Effect |
 |---|---|---|---|
 | `--recipe <name>` | string | built-in `default` | Run a named sim recipe. |
+| `--show <session>` | string | — | Replay a stored sim session (by id, or `latest`) instead of running — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
 | `--json` | bool | `false` | Emit the `SignalEnvelope` JSON on stdout instead of the table renderer. |
 | `-v, --verbose` | bool | `false` | Show the detailed report body (per-scenario findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
@@ -227,6 +229,7 @@ opensip-tools graph --list-files --workspace  # the per-unit fan-out set
 | `--resolution <mode>` | string | `exact` | Edge resolution tier: `exact` (semantic, uses the type checker) or `fast` (syntactic, no type checker — ~2× faster cold builds at lower edge fidelity). Invalid values fail loudly at the boundary. |
 | `--profile <path>` | path | — | Write a graph performance profile JSON artifact with stage timings, run mode, cache verdict, file/function counts, and resolution stats. Relative paths resolve against `--cwd`. |
 | `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph-recipes`. |
+| `--show <session>` | string | — | Replay a stored graph session (by id, or `latest`) instead of building — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
 | `--gate-save` | bool | `false` | Save the current Signal fingerprint set to the project's SQLite store (`graph_baseline_signals` table). Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression. |
 | `--sarif <path>` | path | — | Also write this run's findings as a SARIF 2.1.0 file (for GitHub Code Scanning) via the shared `cli.writeSarif` envelope→SARIF seam — the same producer `fit --report-to`/`fit-baseline-export` use. Composes with `--gate-save`: the SARIF is written in the action body after the gate sets its exit code, so the file lands even when the gate fails. Relative paths resolve against `--cwd`. |
@@ -544,12 +547,15 @@ The user-level config is shared across every project on the machine. `opensip-to
 
 ---
 
-## `sessions list` and `sessions purge` — manage session records
+## `sessions list`, `sessions show`, and `sessions purge` — manage session records
 
-CLI-owned. Reads and deletes session rows in the project-local SQLite datastore (`<project>/opensip-tools/.runtime/datastore.sqlite`) via `SessionRepo`. `list` is a `SELECT`; `purge` is a row-level `DELETE` (the FK cascade drops each session's tool-payload row), not file removal.
+CLI-owned. Reads, replays, and deletes session rows in the project-local SQLite datastore (`<project>/opensip-tools/.runtime/datastore.sqlite`) via `SessionRepo`. `list` and `show` are `SELECT`s; `purge` is a row-level `DELETE` (the FK cascade drops each session's tool-payload row), not file removal.
 
 ```
 opensip-tools sessions list
+opensip-tools sessions show <session-id>
+opensip-tools sessions show latest --tool fit
+opensip-tools sessions show latest --tool graph --json
 opensip-tools sessions purge
 opensip-tools sessions purge --older-than 7
 opensip-tools sessions purge -y
@@ -558,8 +564,13 @@ opensip-tools sessions purge -y
 | Subcommand | Flag | Effect |
 |---|---|---|
 | `list` | (none) | List every stored session, newest first. |
+| `show` | `<ref>` (positional) | Replay a stored session by id, or `latest` (requires `--tool`). |
+| `show` | `--tool <fit\|graph\|sim>` | Required for `latest`; an optional sanity check for an explicit id. |
+| `show` | `--json` | Emit the replayed session as a `CommandOutcome` JSON wrapper (the projected `SignalEnvelope` under `.envelope`). |
 | `purge` | `--older-than <days>` | Only delete sessions older than N days. Default: delete all. |
 | `purge` | `-y, --yes` | Skip the confirmation prompt. |
+
+**Session replay (2.12.0).** `sessions show` reconstructs a past run's output from the stored payload: each tool contributes a `sessionReplay` projection (`fit`/`graph`/`sim`) that decodes the opaque payload back into a `SignalEnvelope`. The replay `fidelity` is `projection` — it is rebuilt from persisted findings, not a re-execution. Each run command also accepts an inline `--show <session>` flag (`fit --show latest`, `graph --show <id>`, `sim --show latest`) as a shorthand for the same replay scoped to that tool. A missing session, wrong tool, or undecodable payload returns a structured error (`reason`/`code`: `not-found`, `wrong-tool`, `ambiguous-latest`, `decode-error`) and exit 2.
 
 **See also:** [`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md).
 

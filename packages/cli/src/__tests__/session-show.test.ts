@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { ToolRegistry } from '@opensip-tools/core';
 import { DataStoreFactory } from '@opensip-tools/datastore';
 import { SessionRepo } from '@opensip-tools/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -17,7 +18,6 @@ import type {
   ToolSessionReplay,
 } from '@opensip-tools/contracts';
 import type { Tool, ToolSessionRecord } from '@opensip-tools/core';
-import { ToolRegistry } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 let tmp: string;
@@ -91,12 +91,34 @@ function replayFitSession(stored: ToolSessionRecord): ToolSessionReplay<CommandR
   return { fidelity: 'projection', envelope, result };
 }
 
+/** Capture the host emit seams so each test can assert what reached stdout. */
+function makeSinks() {
+  const emitted: unknown[] = [];
+  const errors: { message: string; exitCode: number; code?: string }[] = [];
+  const rendered: CommandResult[] = [];
+  const exitCodes: number[] = [];
+  return {
+    emitted,
+    errors,
+    rendered,
+    exitCodes,
+    emitJson: (value: unknown) => { emitted.push(value); },
+    emitError: (detail: { message: string; exitCode: number; code?: string }) => {
+      // Mirror the host seam: emitError sets the exit code itself.
+      exitCodes.push(detail.exitCode);
+      errors.push(detail);
+    },
+    render: (result: CommandResult) => { rendered.push(result); return Promise.resolve(); },
+    setExitCode: (code: number) => { exitCodes.push(code); },
+  };
+}
+
 describe('executeSessionShow', () => {
   it('emits a replay JSON wrapper for latest scoped by tool', async () => {
     const repo = new SessionRepo(ds);
     repo.save(makeSession('FIT_1', Date.now()));
     repo.save(makeSession('FIT_2', Date.now() + 1));
-    const emitted: unknown[] = [];
+    const s = makeSinks();
 
     await executeSessionShow({
       datastore: ds,
@@ -104,37 +126,171 @@ describe('executeSessionShow', () => {
       ref: 'latest',
       tool: 'fit',
       json: true,
-      render: async () => {},
-      emitJson: (value) => { emitted.push(value); },
-      setExitCode: () => {},
+      render: s.render,
+      emitJson: s.emitJson,
+      emitError: s.emitError,
+      setExitCode: s.setExitCode,
     });
 
-    expect(emitted).toHaveLength(1);
-    expect(emitted[0]).toMatchObject({
+    expect(s.emitted).toHaveLength(1);
+    expect(s.emitted[0]).toMatchObject({
       session: { id: 'FIT_2', tool: 'fit' },
       fidelity: 'projection',
       envelope: { runId: 'FIT_2', tool: 'fit' },
     });
   });
 
-  it('reports ambiguous latest without a tool', async () => {
-    const emitted: unknown[] = [];
-    let exitCode = 0;
+  it('reports ambiguous latest without a tool as a structured error', async () => {
+    const s = makeSinks();
 
     await executeSessionShow({
       datastore: ds,
       replayRegistry: makeReplayRegistry(),
       ref: 'latest',
       json: true,
-      render: async () => {},
-      emitJson: (value) => { emitted.push(value); },
-      setExitCode: (code) => { exitCode = code; },
+      render: s.render,
+      emitJson: s.emitJson,
+      emitError: s.emitError,
+      setExitCode: s.setExitCode,
     });
 
-    expect(exitCode).toBe(2);
-    expect(emitted[0]).toEqual({
-      error: 'latest requires --tool fit|graph|sim',
-      reason: 'ambiguous-latest',
+    expect(s.exitCodes).toContain(2);
+    expect(s.errors[0]).toEqual({
+      message: 'latest requires --tool fit|graph|sim',
+      exitCode: 2,
+      code: 'ambiguous-latest',
     });
+  });
+
+  it('renders the replayed result (non-JSON happy path)', async () => {
+    const repo = new SessionRepo(ds);
+    repo.save(makeSession('FIT_1'));
+    const s = makeSinks();
+
+    await executeSessionShow({
+      datastore: ds,
+      replayRegistry: makeReplayRegistry(),
+      ref: 'FIT_1',
+      render: s.render,
+      emitJson: s.emitJson,
+      emitError: s.emitError,
+      setExitCode: s.setExitCode,
+    });
+
+    expect(s.rendered).toHaveLength(1);
+    expect(s.rendered[0]).toMatchObject({ type: 'fit-done' });
+  });
+
+  it('renders a structured error result when the session cannot be found (non-JSON)', async () => {
+    const s = makeSinks();
+
+    await executeSessionShow({
+      datastore: ds,
+      replayRegistry: makeReplayRegistry(),
+      ref: 'NOPE',
+      render: s.render,
+      emitJson: s.emitJson,
+      emitError: s.emitError,
+      setExitCode: s.setExitCode,
+    });
+
+    expect(s.exitCodes).toContain(2);
+    expect(s.rendered[0]).toMatchObject({ type: 'error' });
+    expect(s.errors).toHaveLength(0);
+  });
+
+  it('surfaces a decode-error through emitError when the tool replay throws', async () => {
+    const repo = new SessionRepo(ds);
+    repo.save(makeSession('FIT_1'));
+    const registry = new ToolRegistry();
+    registry.register({
+      metadata: { id: 'fit-throw', version: '0.0.0', description: 'test' },
+      commands: [],
+      sessionReplay: {
+        tool: 'fit',
+        replaySession: () => { throw new Error('corrupt payload'); },
+      },
+    } satisfies Tool);
+    const s = makeSinks();
+
+    await executeSessionShow({
+      datastore: ds,
+      replayRegistry: SessionReplayRegistry.fromTools(registry),
+      ref: 'FIT_1',
+      json: true,
+      render: s.render,
+      emitJson: s.emitJson,
+      emitError: s.emitError,
+      setExitCode: s.setExitCode,
+    });
+
+    expect(s.errors[0]).toEqual({ message: 'corrupt payload', exitCode: 2, code: 'decode-error' });
+  });
+
+  it('reports replay-unavailable through emitError when no tool contributes a replay', async () => {
+    const repo = new SessionRepo(ds);
+    repo.save(makeSession('FIT_1'));
+    const s = makeSinks();
+
+    await executeSessionShow({
+      datastore: ds,
+      replayRegistry: SessionReplayRegistry.empty(),
+      ref: 'FIT_1',
+      json: true,
+      render: s.render,
+      emitJson: s.emitJson,
+      emitError: s.emitError,
+      setExitCode: s.setExitCode,
+    });
+
+    expect(s.errors[0]).toMatchObject({ code: 'replay-unavailable' });
+  });
+
+  it('defaults to an empty replay registry when none is supplied', async () => {
+    const repo = new SessionRepo(ds);
+    repo.save(makeSession('FIT_1'));
+    const s = makeSinks();
+
+    // replayRegistry omitted entirely → the `?? empty()` fallback path.
+    await executeSessionShow({
+      datastore: ds,
+      ref: 'FIT_1',
+      json: true,
+      render: s.render,
+      emitJson: s.emitJson,
+      emitError: s.emitError,
+      setExitCode: s.setExitCode,
+    });
+
+    expect(s.errors[0]).toMatchObject({ code: 'replay-unavailable' });
+  });
+
+  it('stringifies a non-Error thrown during decode', async () => {
+    const repo = new SessionRepo(ds);
+    repo.save(makeSession('FIT_1'));
+    const registry = new ToolRegistry();
+    registry.register({
+      metadata: { id: 'fit-throw-str', version: '0.0.0', description: 'test' },
+      commands: [],
+      sessionReplay: {
+        tool: 'fit',
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercising the non-Error decode branch.
+        replaySession: () => { throw 'boom-string'; },
+      },
+    } satisfies Tool);
+    const s = makeSinks();
+
+    await executeSessionShow({
+      datastore: ds,
+      replayRegistry: SessionReplayRegistry.fromTools(registry),
+      ref: 'FIT_1',
+      json: true,
+      render: s.render,
+      emitJson: s.emitJson,
+      emitError: s.emitError,
+      setExitCode: s.setExitCode,
+    });
+
+    expect(s.errors[0]).toEqual({ message: 'boom-string', exitCode: 2, code: 'decode-error' });
   });
 });

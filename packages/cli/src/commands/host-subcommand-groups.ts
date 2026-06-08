@@ -23,7 +23,7 @@ import {
   defineCommand,
   type CommandScopeRequirement,
   type CommandSpec,
-  type ProjectContext,
+  type ProjectContext, type ToolShortId 
 } from '@opensip-tools/core';
 
 import { executeClear } from './clear.js';
@@ -32,7 +32,6 @@ import { pluginAdd, pluginList, pluginRemove, pluginSync } from './plugin.js';
 import { executeSessionShow } from './session-show.js';
 
 import type { CliCommandsContext } from './shared.js';
-import type { ToolShortId } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 /** A host command spec — handler receives the {@link CliCommandsContext}. */
@@ -114,12 +113,18 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
         json: opts.json,
         render: ctx.render,
         emitJson: ctx.emitJson,
+        emitError: ctx.emitError,
         setExitCode: ctx.setExitCode,
       });
     },
   });
 }
 
+/**
+ * Validating coercion for `sessions list --limit <n>`.
+ *
+ * @throws {Error} When the raw value is not a positive integer.
+ */
 function parsePositiveInt(raw: string): number {
   const n = Number.parseInt(raw, 10);
   if (Number.isNaN(n) || n <= 0) {
@@ -353,6 +358,12 @@ const INVENTORY_CTX: CliCommandsContext = {
     /* inert — inventory builds never dispatch a handler */
   },
   render: () => Promise.resolve(),
+  emitJson: () => {
+    /* inert — inventory builds never dispatch a handler */
+  },
+  emitError: () => {
+    /* inert — inventory builds never dispatch a handler */
+  },
   pluginLayouts: [],
   // eslint-disable-next-line unicorn/no-useless-undefined -- explicit no-store sentinel matching the `datastore` thunk contract (returns `unknown`; consumers cast to `DataStore | undefined`).
   datastore: () => undefined,
