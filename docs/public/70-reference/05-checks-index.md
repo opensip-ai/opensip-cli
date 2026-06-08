@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-08
-release: v2.10.x
+release: v2.11.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."
@@ -20,22 +20,23 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **160+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **161+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(103 checks)*
+## Universal  *(104 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(23)*
+### Architecture  *(24)*
 
 | Slug | Description |
 |---|---|
 | [`capability-by-manifest`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/capability-by-manifest.ts) | A capability domain must be declared in a tool manifest and registered via registerCapabilityDomainsFromManifest, not host-compiled (ADR-0023, §5.3) |
 | [`cli-recipe-deprecated`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/cli-recipe-deprecated.ts) | Flag the deprecated tool-agnostic cli.recipe default; recipes are tool-scoped (ADR-0022) |
+| [`command-surface-parity`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/command-surface-parity.ts) | Every tool command resolves to a typed CommandSpec; no raw Commander access from a tool (release 2.11.0 command plane, Principle 6) |
 | [`cross-tool-flag-parity`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/cross-tool-flag-parity.ts) | Cross-tool common CLI flags must come from the shared registry, not be hand-declared (ADR-0021) |
 | [`docker-ignore-validation`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-ignore-validation.ts) | Validate .dockerignore files exist alongside Dockerfiles with required patterns |
 | [`docker-version-sync`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-version-sync.ts) | Validate Docker Node/pnpm versions match package.json |

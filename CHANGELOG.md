@@ -4,6 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.11.0] — 2026-06-07
+
+**Command plane (the spine).** The largest first-party privilege — raw Commander
+access — is collapsed. Tools no longer mutate the CLI via `register(cli)`; they
+**declare** typed `CommandSpec`s that the host mounts, owning flags, parsing,
+help, completion, output dispatch, error mapping, and exit codes. This is the
+spine of the tool-plugin-parity architecture (north-star §5.4 Command contract +
+§5.6 Lifecycle hooks): an external tool can now reach the same command surface
+`fit`/`graph`/`sim` use, because that surface is host-owned, not Commander-coupled.
+See [ADR-0021](docs/decisions/ADR-0021-cli-flag-currency.md) (flag currency, on
+which the command plane builds).
+
+A mechanism swap, not a UX change — the CLI surface is byte-identical to 2.10.x
+with a single sanctioned exception (below). Output currency stays handler-owned
+(`raw-stream`) in this release; host-owned output unification is 2.12.0
+(`CommandOutcome`), and the single `dispatchOutput` seam is the point it swaps in.
+
+> ### ⚠️ Behaviour change (pre-GA)
+>
+> **`graph --resolution` now lists its choices in `--help`.** Validation of
+> `--resolution` (`exact` | `fast`, default `exact`) moved from inside the handler
+> to the host-owned declared `choices`, so `--help` now renders
+> `(choices: "exact", "fast", default: "exact")`. The runtime contract is
+> unchanged: an invalid value is still rejected with exit code 2.
+
+### Added
+
+- **`command-surface-parity` architecture guardrail.** Fails CI if a tool reaches
+  the raw Commander program (`ToolCliContext.program`, `cli.program as …`,
+  `program.command(...)`/`.option(...)`/`.argument(...)`) or ships a `register()`
+  body without `commandSpecs`. The mechanical enforcement (north-star Principle 6)
+  that keeps the privilege retired; the only documented exceptions are the
+  action-less host subcommand-group parents (`sessions`, `plugin`).
+- **Declarative command API (`@opensip-tools/core`).** `defineCommand` +
+  `CommandSpec` / `OptionSpec` / `ArgSpec` — the typed shape a tool exports for the
+  host to mount. Re-exported from `@opensip-tools/contracts` as part of the public
+  Tool↔runner surface. (`CommonFlagKey` moved to core, beside the `Tool` contract.)
+
+### Changed
+
+- **All first-party commands are now declarative.** `fit` (+ `fit-list`/
+  `fit-recipes`/`fit-baseline-export`), `graph` (+ its 7 aux subcommands), and
+  `sim` migrated from hand-rolled `register()` bodies to `CommandSpec`s; graph's 8
+  `register*Command` helpers (26 raw Commander calls) are gone. Host commands
+  (`init`/`configure`/`sessions`/`plugin`/`dashboard`/`completion`/`uninstall`)
+  mount through the same `mountCommandSpec` plane.
+- **`Tool.register(cli)` is deprecated.** It remains as an additive fallback for
+  external tools through the 2.x grace window; first-party tools no longer use it.
+  Removal of `register()` / `ToolCliContext.program` is the 3.0.0 cutover.
+
 ## [2.10.1] — 2026-06-07
 
 **Config consolidation.** The fast-follow to 2.10.0 relocates the scattered
