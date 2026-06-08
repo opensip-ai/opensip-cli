@@ -169,6 +169,10 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
  *                         wrote its file + line; the host renders nothing.
  *   - `live-view`       — the interactive Ink path: `ctx.renderLive(key, args)`
  *                         against the tool's registered renderer.
+ *
+ * @throws {Error} When a command declares `signal-envelope` / `live-view` output
+ *   but the mount context provides no `emitEnvelope` / `renderLive` emitter — a
+ *   mis-declared host spec fails loudly here rather than silently no-op'ing.
  */
 export async function dispatchOutput<TCtx extends CommandMountContext>(
   result: unknown,

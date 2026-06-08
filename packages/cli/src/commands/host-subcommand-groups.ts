@@ -63,6 +63,21 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
   });
 }
 
+/**
+ * Validating coercion for `sessions purge --older-than <days>` — identical to
+ * the former inline argParser. A named declaration (not an inline lambda) so the
+ * `@throws` contract below is documented.
+ *
+ * @throws {Error} When the raw value is not a non-negative integer.
+ */
+function parseOlderThanDays(raw: string): number {
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n) || n < 0) {
+    throw new Error(`Invalid --older-than value: '${raw}'. Must be a non-negative integer.`);
+  }
+  return n;
+}
+
 function buildSessionsPurgeSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'purge',
@@ -75,15 +90,7 @@ function buildSessionsPurgeSpec(ctx: CliCommandsContext): HostSpec {
         value: '<days>',
         description: 'Only delete sessions older than N days',
         // Pure validating coercion — identical to the former inline argParser.
-        parse: (raw: string) => {
-          const n = Number.parseInt(raw, 10);
-          if (Number.isNaN(n) || n < 0) {
-            throw new Error(
-              `Invalid --older-than value: '${raw}'. Must be a non-negative integer.`,
-            );
-          }
-          return n;
-        },
+        parse: parseOlderThanDays,
       },
       { flag: '-y, --yes', description: 'Skip confirmation prompt', default: false },
     ],
