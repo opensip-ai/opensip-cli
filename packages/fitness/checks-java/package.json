@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/checks-java",
-  "version": "2.10.0",
+  "version": "2.10.1",
   "license": "MIT",
   "description": "Java fitness checks for opensip-tools",
   "keywords": [

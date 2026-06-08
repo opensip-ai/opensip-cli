@@ -4,6 +4,51 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.10.1] — 2026-06-07
+
+**Config consolidation.** The fast-follow to 2.10.0 relocates the scattered
+*tool-agnostic* configuration into `@opensip-tools/config`, so the whole
+`opensip-tools.config.yml` document is defined, validated, and templated from one
+place. Hygiene + consolidation, no new behaviour beyond the strict validation
+2.10.0 introduced. See
+[ADR-0023](docs/decisions/ADR-0023-config-package-and-schema-registry.md) (and its
+§Amendment).
+
+> ### ⚠️ Behaviour change (pre-GA)
+>
+> **The document-level blocks now strict-validate too.** In 2.10.0 the
+> tool-agnostic top-level blocks (`cli:`, `targets:`, `globalExcludes:`,
+> `checkOverrides:`, `dashboard:`) passed through untouched; they are now claimed,
+> strict namespaces in the one composed schema. A typo in those blocks (e.g. a
+> target missing its `description`, or a misspelled `cli` key) now fails before a
+> command runs instead of being silently dropped. Same keys, same precedence —
+> only the strictness completes.
+
+### Added
+
+- **`no-config-loader-outside-config` architecture guardrail.** Fails CI if a
+  package other than `@opensip-tools/config` hand-rolls a loader for a
+  document-level config block (projecting YAML fields without routing through the
+  config-owned Zod schemas). Complements `one-config-document`; together they make
+  "config is parsed only in `@opensip-tools/config`" mechanically true.
+
+### Changed
+
+- **`contracts` is types-only again.** The `cli:` block loader
+  (`loadCliDefaults` / `CliDefaults` / its schema) moved out of
+  `@opensip-tools/contracts` — its runtime YAML projection was a standing
+  violation of the package's types-only charter — into `@opensip-tools/config`.
+- **Shared targeting is no longer owned by `fitness`.** The two-layer scope model
+  (`targets` / `globalExcludes` / `checkOverrides` document shape + schemas) lives
+  in `@opensip-tools/config`; `fitness` consumes it and keeps the file-resolution
+  runtime (`TargetRegistry`).
+- **User-global config I/O** (`~/.opensip-tools/config.yml`) and cloud-config
+  resolution moved into `@opensip-tools/config`; the `configure` command's UX
+  stays in the CLI and reads I/O through the package.
+- **The `init` scaffold derives its document skeleton from the composed schema**
+  (rendered by `@opensip-tools/config`) instead of a second, hand-written template
+  that could drift from what validation accepts.
+
 ## [2.10.0] — 2026-06-07
 
 The first two tool-plugin-parity building blocks land together: **Identity &

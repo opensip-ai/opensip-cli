@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-08
 release: v2.10.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -20,17 +20,17 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **159+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **160+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(102 checks)*
+## Universal  *(103 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(22)*
+### Architecture  *(23)*
 
 | Slug | Description |
 |---|---|
@@ -43,6 +43,7 @@ Language-agnostic; runs against every project.
 | [`env-var-validation`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/env-var-validation.ts) | Detects environment variable access without proper validation |
 | [`heavy-import-detection`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/heavy-import-detection.ts) | Detects heavy/deprecated library imports and excessive named imports that bloat bundle size |
 | [`interface-implementation-consistency`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/modules/interface-implementation-consistency.ts) | Verifies interfaces match their implementations |
+| [`no-config-loader-outside-config`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-config-loader-outside-config.ts) | A tool-agnostic config block (cli/targets/globalExcludes/checkOverrides/dashboard) must be parsed only in @opensip-tools/config, not hand-rolled elsewhere (ADR-0023) |
 | [`no-custom-event-emitter`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-custom-event-emitter.ts) | Detects direct EventEmitter usage that should use infrastructure/events |
 | [`no-direct-stdout-in-tool-engine`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts) | Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011) |
 | [`no-duplicate-packages`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/dependencies/no-duplicate-packages.ts) | Detects packages that serve the same purpose |
