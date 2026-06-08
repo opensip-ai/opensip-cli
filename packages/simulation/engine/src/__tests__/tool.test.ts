@@ -102,6 +102,12 @@ function makeFakeContext(program: Command): {
     emitEnvelope: (value: unknown) => {
       emitted.push(value);
     },
+    // 2.12.0: the structured-error seam. Mirrors the real host seam — it sets
+    // the exit code and emits the error detail (`{ message, exitCode }`).
+    emitError: (detail: { message: string; exitCode: number; suggestion?: string }) => {
+      exitCodes.push(detail.exitCode);
+      emitted.push(detail);
+    },
     deliverSignals: () => Promise.resolve(),
     writeSarif: () => Promise.resolve(),
   };
@@ -208,8 +214,10 @@ describe('sim command handler', () => {
 
     expect(exitCodes).toContain(2);
     expect(emitted).toHaveLength(1);
-    const payload = emitted[0] as { error?: string };
-    expect(payload.error).toContain('Unknown sim recipe');
+    // 2.12.0: a failed --json run emits a structured error detail (`message`),
+    // not a bare `{ error }` (the host wraps it in a status:'error' outcome).
+    const payload = emitted[0] as { message?: string };
+    expect(payload.message).toContain('Unknown sim recipe');
   });
 
   it('returns exit code 2 in non-JSON mode for unknown recipe', async () => {

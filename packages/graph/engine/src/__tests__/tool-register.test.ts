@@ -127,6 +127,7 @@ interface MockCliBag {
   readonly cli: ToolCliContext;
   readonly setExitCode: MockInstance;
   readonly emitJson: MockInstance;
+  readonly emitError: MockInstance;
   readonly registerLiveView: MockInstance;
   readonly renderLive: MockInstance;
   readonly render: MockInstance;
@@ -135,6 +136,8 @@ interface MockCliBag {
 function makeMockCli(datastore?: DataStore): MockCliBag {
   const setExitCode = vi.fn();
   const emitJson = vi.fn();
+  // 2.12.0: the structured-error seam mirrors the host — it sets the exit code.
+  const emitError = vi.fn((detail: { exitCode: number }) => setExitCode(detail.exitCode));
   const registerLiveView = vi.fn();
   const renderLive = vi.fn().mockResolvedValue(undefined);
   const render = vi.fn().mockResolvedValue(undefined);
@@ -148,6 +151,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     setExitCode,
     emitJson,
     emitEnvelope: vi.fn(),
+    emitError,
     deliverSignals: vi.fn().mockResolvedValue(undefined),
     // Root-owned SARIF-file sink (ADR-0011): mirror the composition root —
     // format the envelope through the shared formatter and write it.
@@ -159,7 +163,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
   } as unknown as ToolCliContext;
-  return { cli, setExitCode, emitJson, registerLiveView, renderLive, render };
+  return { cli, setExitCode, emitJson, emitError, registerLiveView, renderLive, render };
 }
 
 /** Concatenated text of every lines-bearing result handed to cli.render(). */
@@ -334,12 +338,16 @@ describe('graphTool command surface', () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         const outPath = join(workDir, 'baseline.json');
-        const { cli, emitJson, setExitCode } = makeMockCli(datastore);
+        const { cli, emitError, setExitCode } = makeMockCli(datastore);
         await handlerFor('graph-baseline-export')({ out: outPath, json: true, _args: [] }, cli);
         expect(setExitCode).toHaveBeenCalledWith(2);
-        expect(emitJson.mock.calls.length).toBe(1);
-        const payload = emitJson.mock.calls[0]?.[0] as { error?: string };
-        expect(payload?.error).toContain('No graph baseline');
+        // 2.12.0 (§5.5): a failed --json run emits a structured error through the
+        // `emitError` seam (host wraps it in a status:'error' CommandOutcome),
+        // not a bare `emitJson({ error })`.
+        expect(emitError.mock.calls.length).toBe(1);
+        const payload = emitError.mock.calls[0]?.[0] as { message?: string; exitCode?: number };
+        expect(payload?.message).toContain('No graph baseline');
+        expect(payload?.exitCode).toBe(2);
       } finally {
         datastore.close();
       }

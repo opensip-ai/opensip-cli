@@ -17,6 +17,9 @@ export type { GraphSubscope } from './scope-augmentation.js';
 // packages uniformly; dedup at register-tools.ts handles the
 // duplicate-id case.
 export { graphTool, graphTool as tool } from './tool.js';
+// Graph-engine environment-variable specs (release 2.12.0, §5.12) — the CLI
+// composition root imports these to aggregate the env-surface reference doc.
+export { GRAPH_ENV_SPECS } from './cli/pressure-monitor.js';
 // Orchestration / CLI-handler / heap-preflight / shard-model / report
 // helpers (runGraph, executeGraph, GRAPH_STAGES, the heap-preflight
 // surface, MemoryPressureError, Shard*, buildUnifiedReportLines, and

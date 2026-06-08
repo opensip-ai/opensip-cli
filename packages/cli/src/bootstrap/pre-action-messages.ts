@@ -38,16 +38,13 @@ export function formatCliTooOldMessage(input: CliTooOldInput): string {
 }
 
 /**
- * Render the "no opensip-tools project found" message. JSON output gets a
- * single-field error object; the human path gets the actionable
- * walked-up-to-root explainer with the `init` hint.
+ * Render the human "no opensip-tools project found" explainer — the actionable
+ * walked-up-to-root message with the `init` hint. The `--json` shape is no longer
+ * rendered here: a no-project failure is a `BootstrapError` the top-level boundary
+ * turns into a structured `bootstrap.error` `CommandOutcome` (release 2.12.0,
+ * §4.7), so this formatter is the human path only.
  */
-export function formatNoProjectFoundMessage(cwd: string, jsonOutput: boolean): string {
-  if (jsonOutput) {
-    return JSON.stringify({
-      error: 'No opensip-tools.config.yml found. Searched from ' + cwd + ' upward. To get started: opensip-tools init',
-    });
-  }
+export function formatNoProjectFoundMessage(cwd: string): string {
   return [
     '✗ No opensip-tools project found.',
     '',

@@ -215,6 +215,23 @@ export interface ToolCliContext {
    */
   readonly emitEnvelope: (envelope: unknown) => void;
   /**
+   * Emit a **structured error** as machine-output (release 2.12.0, §5.5). The
+   * host wraps `{ message, exitCode, suggestion? }` in a `status:'error'`
+   * `CommandOutcome` (`.errors`) through the single `renderOutcome` seam, and
+   * threads `exitCode` to `setExitCode` so the process exit and the reported
+   * outcome agree.
+   *
+   * This RETIRES the bare `emitJson({ error })` shape: a `--json` run that fails
+   * before it can build an envelope (e.g. a config error) calls `emitError`
+   * instead, so machine consumers read one outcome schema for success AND
+   * failure. The `one-outcome-shape` guardrail forbids the bare shape.
+   */
+  readonly emitError: (detail: {
+    readonly message: string;
+    readonly exitCode: number;
+    readonly suggestion?: string;
+  }) => void;
+  /**
    * Deliver a tool-run **signal envelope** to the effectful sinks the
    * composition root owns (ADR-0011 / ADR-0008): best-effort cloud sync via
    * the run's `scope.signalSink`, and — when `--report-to` is set — a SARIF

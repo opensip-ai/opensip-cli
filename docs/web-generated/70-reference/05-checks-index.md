@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-08
-release: v2.11.x
+release: v2.12.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."
@@ -20,17 +20,17 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **161+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **164+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(104 checks)*
+## Universal  *(107 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(24)*
+### Architecture  *(27)*
 
 | Slug | Description |
 |---|---|
@@ -42,15 +42,18 @@ Language-agnostic; runs against every project.
 | [`docker-version-sync`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-version-sync.ts) | Validate Docker Node/pnpm versions match package.json |
 | [`empty-package-detection`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/modules/empty-package-detection.ts) | Detects packages with empty or commented-out exports |
 | [`env-var-validation`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/env-var-validation.ts) | Detects environment variable access without proper validation |
+| [`env-via-registry`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/env-via-registry.ts) | Environment reads must flow through the EnvRegistry, not raw process.env (§5.12) |
 | [`heavy-import-detection`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/heavy-import-detection.ts) | Detects heavy/deprecated library imports and excessive named imports that bloat bundle size |
 | [`interface-implementation-consistency`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/modules/interface-implementation-consistency.ts) | Verifies interfaces match their implementations |
 | [`no-config-loader-outside-config`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-config-loader-outside-config.ts) | A tool-agnostic config block (cli/targets/globalExcludes/checkOverrides/dashboard) must be parsed only in @opensip-tools/config, not hand-rolled elsewhere (ADR-0023) |
 | [`no-custom-event-emitter`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-custom-event-emitter.ts) | Detects direct EventEmitter usage that should use infrastructure/events |
 | [`no-direct-stdout-in-tool-engine`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts) | Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011) |
 | [`no-duplicate-packages`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/dependencies/no-duplicate-packages.ts) | Detects packages that serve the same purpose |
+| [`no-local-exit-or-stdout`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-local-exit-or-stdout.ts) | No local process.exit(); exit codes flow through the one boundary via process.exitCode (§4.7) |
 | [`no-module-singleton`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-module-singleton.ts) | No module-level mutable registry/loaded-state singleton; per-run state lives on RunScope via a factory (ADR-0023). fileCache/memoryProfiler are exempt. |
 | [`node-version-consistency`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/node-version-consistency.ts) | Validate Node.js version consistency across configs |
 | [`one-config-document`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/one-config-document.ts) | A tool must validate its config block through a composed Zod schema, not hand-project its own opensip-tools.config.yml namespace (ADR-0023) |
+| [`one-outcome-shape`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/one-outcome-shape.ts) | Machine output must be a CommandOutcome via renderOutcome, not a bare {error} / raw JSON (§5.5) |
 | [`project-readme-existence`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/project-readme-existence.ts) | Ensures every package has a README.md file |
 | [`release-gate-parity`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/release-gate-parity.ts) | Ensure release.yml re-runs every PR-quality gate (lint, test:coverage, fit:ci, graph:ci) before pack/publish (ADR-0017) |
 | [`restrict-raw-db-access`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/restrict-raw-db-access.ts) | Confine the raw Drizzle handle (DataStore.db) to the persistence ownership boundary (ADR-0009) |

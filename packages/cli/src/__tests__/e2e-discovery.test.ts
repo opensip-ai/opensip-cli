@@ -98,11 +98,15 @@ describe('no project found', () => {
     expect(stderr).toContain('opensip-tools init');
   });
 
-  it('project-scoped --json emits the error as JSON on stdout', () => {
+  it('project-scoped --json emits a structured bootstrap.error outcome on stdout', () => {
     const { stdout, exitCode } = runCli(['fit-list', '--json'], testDir);
     expect(exitCode).toBe(2);
-    const parsed = JSON.parse(stdout) as { error: string };
-    expect(parsed.error).toContain('No opensip-tools.config.yml found');
+    // 2.12.0 (§4.7): a pre-handler no-project failure is a structured
+    // CommandOutcome (kind 'bootstrap.error'), not a bare `{ error }`.
+    const outcome = JSON.parse(stdout) as { kind: string; status: string; errors: { message: string }[] };
+    expect(outcome.kind).toBe('bootstrap.error');
+    expect(outcome.status).toBe('error');
+    expect(outcome.errors[0].message).toContain('No opensip-tools.config.yml found');
   });
 });
 
@@ -200,7 +204,8 @@ describe('full Tool-plugin install path (audit P1b)', () => {
     try {
       const add = runCli(['plugin', 'add', FIXTURE_TOOL, '--json'], testDir, env);
       expect(add.exitCode).toBe(0);
-      expect((JSON.parse(add.stdout) as { success?: boolean }).success).toBe(true);
+      // 2.12.0: the PluginResult rides under `.data` of the outcome wrapper.
+      expect((JSON.parse(add.stdout) as { data: { success?: boolean } }).data.success).toBe(true);
       // Landed in the user-global tool host dir, NOT a fit/sim domain dir,
       // and NO config entry was written (tools auto-discover by marker).
       expect(existsSync(join(home, '.opensip-tools', 'plugins', 'tool', 'node_modules', TOOL_PKG))).toBe(true);
@@ -243,7 +248,7 @@ describe('full Tool-plugin install path (audit P1b)', () => {
       runCli(['plugin', 'add', FIXTURE_TOOL, '--json'], testDir, env);
       const list = runCli(['plugin', 'list', '--json'], testDir, env);
       expect(list.exitCode).toBe(0);
-      const plugins = (JSON.parse(list.stdout) as { plugins: { domain: string; namespace: string }[] }).plugins;
+      const plugins = (JSON.parse(list.stdout) as { data: { plugins: { domain: string; namespace: string }[] } }).data.plugins;
       expect(plugins.some((p) => p.domain === 'tool' && p.namespace.includes('tool-demo'))).toBe(true);
     } finally {
       rmSync(home, { recursive: true, force: true });

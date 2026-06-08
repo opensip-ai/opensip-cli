@@ -9,7 +9,7 @@
  * root instead of by tool-local formatters.
  */
 import { renderToText } from '@opensip-tools/cli-ui';
-import { EXIT_CODES, type FitDoneResult, type SignalEnvelope } from '@opensip-tools/contracts';
+import { EXIT_CODES, type CommandOutcome, type FitDoneResult, type SignalEnvelope } from '@opensip-tools/contracts';
 import {
   LanguageRegistry,
   RunScope,
@@ -117,7 +117,7 @@ afterEach(() => {
 });
 
 describe('root --json path (emitEnvelope)', () => {
-  it('writes the envelope as the formatSignalJson wire contract to stdout', () => {
+  it('wraps the (unchanged) envelope in a CommandOutcome under .envelope (2.12.0)', () => {
     const { ctx } = buildToolCliContext({
       program: new Command(),
       render: renderResult,
@@ -128,12 +128,18 @@ describe('root --json path (emitEnvelope)', () => {
     ctx.emitEnvelope(ENVELOPE);
 
     expect(stdout).toHaveLength(1);
-    const parsed = JSON.parse(stdout[0]) as SignalEnvelope;
+    // 2.12.0 (§5.5): --json now emits a CommandOutcome wrapper; the byte-identical
+    // envelope rides under `.envelope` (consumers read `.envelope` instead of the
+    // top level). kind is derived from the envelope's tool id.
+    const outcome = JSON.parse(stdout[0]) as CommandOutcome;
+    expect(outcome.kind).toBe('fit.run');
+    expect(outcome.status).toBe('ok');
+    const parsed = outcome.envelope!;
     expect(parsed.schemaVersion).toBe(2);
     expect(parsed.verdict.passed).toBe(false);
     expect(parsed.verdict.score).toBe(50);
     expect(parsed.signals).toHaveLength(2);
-    // jq-able verdict — the documented CI ergonomic.
+    // jq-able verdict (now `.envelope.verdict.*`) — the documented CI ergonomic.
     expect(parsed.units.map((u) => u.slug)).toEqual(['no-console', 'no-todo']);
   });
 });

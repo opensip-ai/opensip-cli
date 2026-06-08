@@ -75,7 +75,7 @@ describe.each(LANGS)('language acceptance: $lang', (row) => {
     it('C++ adapter discovers .cpp files (smoke)', () => {
       const res = cli.run(['fit', '--json'], { cwd: cwdFor('cpp') })
       expect(res.exitCode).toBe(0)
-      const parsed = JSON.parse(res.stdout) as { units?: { filesValidated?: number }[] }
+      const parsed = (JSON.parse(res.stdout) as { envelope: { units?: { filesValidated?: number }[] } }).envelope
       const filesSeen = (parsed.units ?? []).reduce((a, u) => a + (u.filesValidated ?? 0), 0)
       expect(filesSeen, 'C++ fixture files should be validated by at least one check').toBeGreaterThan(0)
     })
@@ -85,11 +85,13 @@ describe.each(LANGS)('language acceptance: $lang', (row) => {
   it(`bad file fires ${row.slug}; clean file does not`, () => {
     const res = cli.run(['fit', '--json', '--check', row.slug], { cwd: cwdFor(row.lang) })
     expect(res.exitCode, `stderr: ${res.stderr}`).toBe(0)
-    const env = JSON.parse(res.stdout) as {
-      verdict?: { summary?: { total?: number } }
-      units?: { slug?: string; violationCount?: number; filesValidated?: number }[]
-      signals?: { filePath?: string }[]
-    }
+    const env = (JSON.parse(res.stdout) as {
+      envelope: {
+        verdict?: { summary?: { total?: number } }
+        units?: { slug?: string; violationCount?: number; filesValidated?: number }[]
+        signals?: { filePath?: string }[]
+      }
+    }).envelope
     // The single requested check ran over the discovered fixture files.
     expect(env.verdict?.summary?.total).toBe(1)
     const unit = (env.units ?? []).find((u) => u.slug === row.slug)
@@ -111,9 +113,9 @@ describe.each(LANGS.filter((l) => l.graph))('graph acceptance: $lang', (row) => 
       if (marker === 'adapter') continue // 'adapter' substring is too broad for a hard assert
       expect(res.stderr).not.toContain(marker)
     }
-    const env = JSON.parse(res.stdout) as { units?: unknown; signals?: unknown }
-    expect(expectEnvelope({ tool: 'graph' })(env)).toEqual([])
-    expect(Array.isArray(env.units)).toBe(true)
+    const outcome = JSON.parse(res.stdout) as { envelope: { units?: unknown; signals?: unknown } }
+    expect(expectEnvelope({ tool: 'graph' })(outcome)).toEqual([])
+    expect(Array.isArray(outcome.envelope.units)).toBe(true)
   })
 })
 

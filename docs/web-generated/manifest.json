@@ -1,6 +1,6 @@
 {
-  "version": "2.11.0",
-  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-tools/v2.11.0/",
+  "version": "2.12.0",
+  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-tools/v2.12.0/",
   "pages": [
     {
       "file": "docs/web-generated/README.md",
@@ -506,6 +506,28 @@
       "purpose": "How opensip-tools reduces npm-family install risk for customers and how teams can use the package-supply-chain-policy check."
     },
     {
+      "file": "docs/web-generated/70-reference/09-migrating-to-2.12.md",
+      "path": "/docs/opensip-tools/70-reference/09-migrating-to-2.12/",
+      "section": "70-reference",
+      "title": "Migrating to 2.12",
+      "audience": [
+        "ci-integrators",
+        "plugin-authors"
+      ],
+      "purpose": "Everything a --json consumer must change for the 2.12.0 CommandOutcome wrapper, plus the new structured bootstrap errors and the governed env surface."
+    },
+    {
+      "file": "docs/web-generated/70-reference/10-environment-variables.md",
+      "path": "/docs/opensip-tools/70-reference/10-environment-variables/",
+      "section": "70-reference",
+      "title": "Environment variables",
+      "audience": [
+        "ci-integrators",
+        "operators"
+      ],
+      "purpose": "Every environment variable the opensip-tools CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
+    },
+    {
       "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",
       "path": "/docs/opensip-tools/80-implementation/01-cli-dispatch/",
       "section": "80-implementation",
@@ -667,7 +689,9 @@
         "/docs/opensip-tools/70-reference/05-checks-index/",
         "/docs/opensip-tools/70-reference/06-dashboard/",
         "/docs/opensip-tools/70-reference/07-migrating-to-2.7/",
-        "/docs/opensip-tools/70-reference/08-supply-chain-security/"
+        "/docs/opensip-tools/70-reference/08-supply-chain-security/",
+        "/docs/opensip-tools/70-reference/09-migrating-to-2.12/",
+        "/docs/opensip-tools/70-reference/10-environment-variables/"
       ]
     },
     {
@@ -739,6 +763,7 @@
         "/docs/opensip-tools/70-reference/05-checks-index/",
         "/docs/opensip-tools/70-reference/07-migrating-to-2.7/",
         "/docs/opensip-tools/70-reference/08-supply-chain-security/",
+        "/docs/opensip-tools/70-reference/09-migrating-to-2.12/",
         "/docs/opensip-tools/80-implementation/02-plugin-loader/"
       ]
     },
@@ -768,7 +793,9 @@
         "/docs/opensip-tools/70-reference/04-json-output-schema/",
         "/docs/opensip-tools/70-reference/05-checks-index/",
         "/docs/opensip-tools/70-reference/07-migrating-to-2.7/",
-        "/docs/opensip-tools/70-reference/08-supply-chain-security/"
+        "/docs/opensip-tools/70-reference/08-supply-chain-security/",
+        "/docs/opensip-tools/70-reference/09-migrating-to-2.12/",
+        "/docs/opensip-tools/70-reference/10-environment-variables/"
       ]
     },
     {

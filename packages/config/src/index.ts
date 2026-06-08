@@ -53,6 +53,7 @@ export {
   writeGlobalConfig,
   resolveApiKey,
   resolveEffectiveCloudConfig,
+  CONFIG_ENV_SPECS,
 } from './document/global-config.js';
 export type { GlobalConfig } from './document/global-config.js';
 export { renderDocumentHeader } from './document/template.js';

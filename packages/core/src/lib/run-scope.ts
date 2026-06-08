@@ -25,6 +25,7 @@ import { LanguageRegistry } from '../languages/registry.js';
 import { noopSignalSink } from '../signals/signal-sink.js';
 import { ToolRegistry } from '../tools/registry.js';
 
+import { DiagnosticsBus } from './diagnostics-bus.js';
 import { logger as defaultLogger } from './logger.js';
 
 import type { Logger, LoggerImpl } from './logger.js';
@@ -133,6 +134,13 @@ export class RunScope {
   readonly runId: string;
   /** Cloud signal sink for this invocation; `noopSignalSink` unless cloud sync is on. */
   readonly signalSink: SignalSink;
+  /**
+   * Per-invocation diagnostics collector (north-star §5.10, release 2.12.0).
+   * Library code emits lifecycle events via `currentScope()?.diagnostics`; the
+   * host assembler snapshots it onto every `CommandOutcome`. Scope-owned so
+   * concurrent runs share no diagnostics state (the no-module-singleton rule).
+   */
+  readonly diagnostics: DiagnosticsBus;
 
   constructor(opts: RunScopeOptions = {}) {
     this.logger = opts.logger ?? defaultLogger;
@@ -146,6 +154,7 @@ export class RunScope {
     this.ui = opts.ui;
     this.runId = opts.runId ?? '';
     this.signalSink = opts.signalSink ?? noopSignalSink;
+    this.diagnostics = new DiagnosticsBus(this.runId);
   }
 
   /** Release per-run resources (caches, recipe-config slot). */

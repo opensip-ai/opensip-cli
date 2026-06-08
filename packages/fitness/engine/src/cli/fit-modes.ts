@@ -94,8 +94,9 @@ export async function runRecipesMode(args: FitOptions, cli: ToolCliContext): Pro
 export async function runJsonMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
   const fitResult = await executeFit(args, { datastore: cli.scope.datastore() as DataStore | undefined });
   if (fitResult.envelope === undefined) {
-    cli.setExitCode(fitResult.result.exitCode);
-    cli.emitJson({ error: fitResult.result.message });
+    // 2.12.0 (§5.5): a failed `--json` run emits a structured `status:'error'`
+    // CommandOutcome (the host wraps + sets the exit code), not a bare `{ error }`.
+    cli.emitError({ message: fitResult.result.message, exitCode: fitResult.result.exitCode });
     return;
   }
   const runFailed = fitResult.result.shouldFail === true;

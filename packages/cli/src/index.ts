@@ -123,9 +123,13 @@ async function main(): Promise<void> {
   // run (e.g. graph's per-stage spans) nest under the consumer's TRACEPARENT
   // when one was supplied. A plain pass-through when telemetry is disabled or
   // no parent context was extracted, so standalone runs pay nothing.
+  // `--json` is read from argv here because bootstrap/parse errors fire OUTSIDE a
+  // handler (no parsed opts). It selects the structured `CommandOutcome` error
+  // path (§5.5) over human Ink rendering.
+  const jsonRequested = process.argv.includes('--json');
   await runWithTelemetryContext(() =>
     program.parseAsync().catch((error: unknown) =>
-      handleParseError(error, { setExitCode: ctx.setExitCode, render: renderResult }),
+      handleParseError(error, { setExitCode: ctx.setExitCode, render: renderResult, jsonRequested }),
     ),
   );
 }

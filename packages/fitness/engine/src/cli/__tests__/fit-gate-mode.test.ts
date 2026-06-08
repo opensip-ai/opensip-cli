@@ -45,6 +45,7 @@ function mockCli(): { cli: ToolCliContext; setExitCode: ReturnType<typeof vi.fn>
     deliverSignals,
     render: vi.fn(() => Promise.resolve()),
     emitEnvelope: vi.fn(),
+    emitError: vi.fn(),
     emitJson: vi.fn(),
     logger: console,
     scope: { datastore: () => datastore },

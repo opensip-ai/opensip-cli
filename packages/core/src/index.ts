@@ -244,6 +244,28 @@ export type { Logger, LogLevel, LoggerOptions, RunIdProvider } from './lib/logge
 export { getTracer, withSpan, withSpanAsync, currentTraceparent } from './lib/telemetry.js';
 export type { Span, Attributes, Tracer } from '@opentelemetry/api';
 
+// Lib — environment registry (north-star §5.12, release 2.12.0). The kernel
+// observability primitive that governs the env surface: a tool/host declares an
+// `EnvVarSpec` (canonical name, aliases, coercion, default, docs, deprecation) and
+// every env read flows through `EnvRegistry.get`. Reading `process.env` inside
+// this primitive is the one sanctioned site; the `env-via-registry` guardrail
+// fails CI on raw reads elsewhere. The immutable definition table lets a static
+// instance serve the pre-scope readers (theme, graph heap-preflight).
+export { EnvRegistry } from './lib/env-registry.js';
+export type { EnvVarSpec, EnvDeprecation, EnvReadResult } from './lib/env-registry.js';
+
+// Lib — run diagnostics (north-star §5.10, release 2.12.0). The shared,
+// JSON-emittable diagnostics vocabulary carried on a `CommandOutcome`, produced
+// by the scope-owned `DiagnosticsBus`. Types DEFINED here (the bus that produces
+// them is here; contracts re-exports the types for `CommandOutcome`).
+export { DiagnosticsBus } from './lib/diagnostics-bus.js';
+export type {
+  RunDiagnostics,
+  DiagnosticEvent,
+  DiagnosticPhase,
+  DiagnosticLevel,
+} from './lib/run-diagnostics.js';
+
 // Lib — permissive YAML reader (returns undefined on missing/malformed
 // files). Used by plugin-discovery sites that need to peek at a single
 // field of opensip-tools.config.yml without dragging in a Zod schema.

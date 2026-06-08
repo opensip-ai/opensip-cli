@@ -60,6 +60,7 @@ function makeStubToolContext(program: Command): ToolCliContext {
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
     emitEnvelope: vi.fn(),
+    emitError: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),
     writeSarif: vi.fn(() => Promise.resolve()),
     datastore: undefined,

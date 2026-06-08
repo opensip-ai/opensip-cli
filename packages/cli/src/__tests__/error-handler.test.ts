@@ -19,6 +19,7 @@ import {
 import { CommanderError } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
+import { BootstrapError } from '../bootstrap/bootstrap-error.js';
 import { handleFatalBootstrapError, handleParseError } from '../error-handler.js';
 
 function makeOpts(): {
@@ -180,5 +181,63 @@ describe('handleParseError', () => {
     // substring rule mentions --recipes. We assert the typed-rule
     // suggestion wins.
     expect(opts.rendered[0]?.suggestion).toContain('opensip-tools.config.yml');
+  });
+});
+
+// 2.12.0 (§4.7 / §5.5): BootstrapError + the --json structured-outcome path.
+function spyStreams(): { stdout: string[]; stderr: string[]; restore: () => void } {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const o = vi.spyOn(process.stdout, 'write').mockImplementation((c) => { stdout.push(String(c)); return true; });
+  const e = vi.spyOn(process.stderr, 'write').mockImplementation((c) => { stderr.push(String(c)); return true; });
+  return { stdout, stderr, restore: () => { o.mockRestore(); e.mockRestore(); } };
+}
+
+const bootstrapErr = (): BootstrapError =>
+  new BootstrapError({ message: 'No project found.', humanMessage: '✗ No project found.\n  Run init.', suggestion: 'Run opensip-tools init.', exitCode: 2 });
+
+describe('handleParseError — 2.12.0 outcomes', () => {
+  it('renders a BootstrapError to stderr verbatim (human mode), exit from the error', async () => {
+    const opts = { ...makeOpts(), jsonRequested: false };
+    const s = spyStreams();
+    try {
+      await handleParseError(bootstrapErr(), opts);
+    } finally {
+      s.restore();
+    }
+    expect(opts.setExitCode).toHaveBeenCalledWith(2);
+    expect(s.stderr.join('')).toContain('✗ No project found.');
+    expect(opts.rendered).toHaveLength(0); // no Ink render for bootstrap errors
+  });
+
+  it('emits a structured bootstrap.error CommandOutcome on --json', async () => {
+    const opts = { ...makeOpts(), jsonRequested: true };
+    const s = spyStreams();
+    try {
+      await handleParseError(bootstrapErr(), opts);
+    } finally {
+      s.restore();
+    }
+    expect(opts.setExitCode).toHaveBeenCalledWith(2);
+    const outcome = JSON.parse(s.stdout.join('')) as { kind: string; status: string; errors: { message: string; suggestion?: string }[] };
+    expect(outcome.kind).toBe('bootstrap.error');
+    expect(outcome.status).toBe('error');
+    expect(outcome.errors[0]?.message).toBe('No project found.');
+    expect(outcome.errors[0]?.suggestion).toBe('Run opensip-tools init.');
+  });
+
+  it('emits a structured command.error CommandOutcome for a generic error on --json', async () => {
+    const opts = { ...makeOpts(), jsonRequested: true };
+    const s = spyStreams();
+    try {
+      await handleParseError(new NotFoundError('Check not found: foo'), opts);
+    } finally {
+      s.restore();
+    }
+    expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CHECK_NOT_FOUND);
+    const outcome = JSON.parse(s.stdout.join('')) as { kind: string; status: string; errors: { message: string }[] };
+    expect(outcome.kind).toBe('command.error');
+    expect(outcome.errors[0]?.message).toContain('not found');
+    expect(opts.rendered).toHaveLength(0); // JSON path never renders Ink
   });
 });

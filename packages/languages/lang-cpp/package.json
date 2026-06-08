@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/lang-cpp",
-  "version": "2.11.0",
+  "version": "2.12.0",
   "license": "MIT",
   "description": "C/C++ language adapter for opensip-tools (clang-tidy backed)",
   "keywords": [

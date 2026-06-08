@@ -83,13 +83,18 @@ export function checkScenario(result, expect = {}) {
 /**
  * Shape-assert an opensip-tools `--json` Signal envelope. Returns a predicate
  * over the parsed stdout suitable for a scenario's `expect.json`.
+ *
+ * 2.12.0 (§5.5): `--json` is a `CommandOutcome` wrapper; the (unchanged) signal
+ * envelope rides under `.envelope`. This predicate unwraps it (tolerating a bare
+ * envelope too, for forward/backward robustness) before shape-asserting.
  */
 export function expectEnvelope(opts = {}) {
-  return (parsed) => {
+  return (outcome) => {
     const failures = []
-    if (parsed === null || typeof parsed !== 'object') {
-      return ['envelope is not an object']
+    if (outcome === null || typeof outcome !== 'object') {
+      return ['outcome is not an object']
     }
+    const parsed = outcome.envelope ?? outcome
     if (parsed.schemaVersion !== 2) {
       failures.push(`envelope.schemaVersion: expected 2, got ${JSON.stringify(parsed.schemaVersion)}`)
     }

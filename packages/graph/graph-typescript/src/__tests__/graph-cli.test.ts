@@ -102,6 +102,7 @@ function makeCli(): CapturedCli {
     }),
     // Mirror the composition root's `emitEnvelope` seam: write the envelope as
     // JSON to stdout so the `--json` integration test can parse it.
+    emitError: vi.fn(),
     emitEnvelope: vi.fn((envelope: unknown) => {
       process.stdout.write(`${JSON.stringify(envelope, null, 2)}\n`);
     }),
@@ -451,6 +452,7 @@ describe('executeGraph', () => {
       setExitCode: (c: number) => { exitCodes.push(c); },
       emitJson: vi.fn(),
       emitEnvelope: vi.fn(),
+      emitError: vi.fn(),
       deliverSignals: vi.fn(() => Promise.resolve()),
       writeSarif: vi.fn(() => Promise.resolve()),
       registerLiveView: vi.fn(),

@@ -39,6 +39,7 @@ function makeStubContext(program: Command = new Command('opensip-tools')): ToolC
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
     emitEnvelope: vi.fn(),
+    emitError: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),
     writeSarif: vi.fn(() => Promise.resolve()),
   } as never;

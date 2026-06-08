@@ -30,6 +30,7 @@ interface MockCliBag {
   readonly setExitCode: MockInstance;
   readonly maybeOpenDashboard: MockInstance;
   readonly emitEnvelope: MockInstance;
+  readonly emitError: MockInstance;
   readonly deliverSignals: MockInstance;
 }
 
@@ -40,6 +41,8 @@ function mockCli(): MockCliBag {
   const maybeOpenDashboard = vi.fn().mockResolvedValue(undefined);
   const emitJson = vi.fn();
   const emitEnvelope = vi.fn();
+  // 2.12.0: the structured-error seam. Mirror the host — it sets the exit code.
+  const emitError = vi.fn((detail: { exitCode: number }) => setExitCode(detail.exitCode));
   const deliverSignals = vi.fn().mockResolvedValue(undefined);
   const cli = {
     renderLive,
@@ -48,11 +51,12 @@ function mockCli(): MockCliBag {
     maybeOpenDashboard,
     emitJson,
     emitEnvelope,
+    emitError,
     deliverSignals,
     logger: console,
     scope: { datastore: () => undefined },
   } as unknown as ToolCliContext;
-  return { cli, renderLive, render, setExitCode, maybeOpenDashboard, emitEnvelope, deliverSignals };
+  return { cli, renderLive, render, setExitCode, maybeOpenDashboard, emitEnvelope, emitError, deliverSignals };
 }
 
 const args = { cwd: '/x' } as unknown as Parameters<typeof runLiveMode>[0];
@@ -163,8 +167,11 @@ describe('runJsonMode', () => {
 
   it('emits an error payload and does not deliver on an error result', async () => {
     executeFitMock.mockResolvedValue({ result: { type: 'error', exitCode: 2, message: 'no config' } });
-    const { cli, emitEnvelope, deliverSignals, setExitCode } = mockCli();
+    const { cli, emitEnvelope, emitError, deliverSignals, setExitCode } = mockCli();
     await runJsonMode(args, cli);
+    // 2.12.0 (§5.5): a failed --json run emits a structured error through the
+    // `emitError` seam (host wraps it + sets the exit code), not a bare envelope.
+    expect(emitError).toHaveBeenCalledWith({ message: 'no config', exitCode: 2 });
     expect(setExitCode).toHaveBeenCalledWith(2);
     expect(emitEnvelope).not.toHaveBeenCalled();
     expect(deliverSignals).not.toHaveBeenCalled();

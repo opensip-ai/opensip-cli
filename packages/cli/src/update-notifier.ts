@@ -36,6 +36,7 @@
 
 import updateNotifier, { type UpdateNotifier } from 'update-notifier'
 
+import { hostEnv } from './env/host-env-specs.js'
 import { clearKnownLatest, readKnownLatest, writeKnownLatest } from './update-state.js'
 
 /**
@@ -103,8 +104,10 @@ export function isNewerVersion(latest: string, current: string): boolean {
 }
 
 function shouldSkip(): boolean {
-  if (process.env.OPENSIP_NO_UPDATE) return true
-  if (process.env.NO_UPDATE_NOTIFIER) return true
+  // Either opt-out (read through the registry) skips the check — byte-identical
+  // to the prior two independent truthy `process.env` checks.
+  if (hostEnv.get<boolean>('OPENSIP_NO_UPDATE') === true) return true
+  if (hostEnv.get<boolean>('NO_UPDATE_NOTIFIER') === true) return true
   // The update-notifier package already suppresses in CI and non-TTY,
   // but we short-circuit so we don't even construct the notifier —
   // keeps the startup path minimal.

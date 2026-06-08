@@ -34,6 +34,10 @@ import {
 } from '@opensip-tools/core';
 import { CommanderError } from 'commander';
 
+import { BootstrapError } from './bootstrap/bootstrap-error.js';
+import { outcomeFromError, outcomeFromErrorMessage } from './commands/assemble-outcome.js';
+import { renderOutcome } from './commands/render-outcome.js';
+
 /**
  * Commander error codes that denote an INVALID ARGUMENT VALUE — a declared
  * `choices` rejection or a custom `argParser` that threw `InvalidArgumentError`
@@ -103,12 +107,24 @@ function suggestionFromTypedError(error: unknown): ErrorSuggestion | null {
 export interface HandleParseErrorOptions {
   readonly setExitCode: (code: number) => void;
   readonly render: (result: ErrorResult) => Promise<void>;
+  /**
+   * Whether `--json` was requested (read from argv at the composition root —
+   * these errors fire outside a handler, so no parsed opts are available). When
+   * true, every error becomes a structured `CommandOutcome` on stdout (the
+   * `one-outcome-shape` contract, §5.5); when false, human rendering is
+   * byte-identical to 2.11.0.
+   */
+  readonly jsonRequested: boolean;
 }
 
+/** Inert renderer for the `--json` paths — `renderOutcome` never renders in JSON mode. */
+const NOOP_RENDER = (): Promise<void> => Promise.resolve();
+
 /**
- * The catch handler for `program.parseAsync()`. Maps the thrown error
- * to an `ErrorResult`, routes the exit code through `setExitCode`, and
- * renders the error via the supplied renderer. Never throws.
+ * The catch handler for `program.parseAsync()`. Maps the thrown error to a
+ * `CommandOutcome` (release 2.12.0, §5.5): `--json` emits the structured outcome
+ * on stdout, human mode renders byte-identically to 2.11.0. Routes the exit code
+ * through `setExitCode`. Never throws.
  */
 export async function handleParseError(
   error: unknown,
@@ -126,26 +142,50 @@ export async function handleParseError(
     return;
   }
 
+  // Pre-handler bootstrap failures (§4.7): no-project, schema-too-old,
+  // config-resolve, tool-init. The guard threw a typed BootstrapError carrying its
+  // own exit code, a clean message, and the original multi-line human text. In
+  // human mode we write that text to stderr verbatim — byte-identical to the
+  // pre-2.12.0 guard output; in `--json` we emit a structured `bootstrap.error`.
+  if (error instanceof BootstrapError) {
+    opts.setExitCode(error.exitCode);
+    if (opts.jsonRequested) {
+      await renderOutcome(
+        outcomeFromErrorMessage({
+          message: error.message,
+          exitCode: error.exitCode,
+          kind: 'bootstrap.error',
+          ...(error.suggestion ? { suggestion: error.suggestion } : {}),
+        }),
+        { jsonRequested: true, render: NOOP_RENDER },
+      );
+    } else {
+      process.stderr.write(`${error.humanMessage}\n`);
+    }
+    return;
+  }
+
   const typed = suggestionFromTypedError(error);
   const suggestion = typed ?? getErrorSuggestion(error);
+  const message = error instanceof Error ? error.message : String(error);
+  const exitCode = suggestion?.exitCode ?? EXIT_CODES.RUNTIME_ERROR;
+  opts.setExitCode(exitCode);
 
-  if (suggestion) {
-    opts.setExitCode(suggestion.exitCode);
-    await opts.render({
-      type: 'error',
-      message: suggestion.message,
-      suggestion: suggestion.action,
-      exitCode: suggestion.exitCode,
+  // `--json`: one outcome shape for every error (no Ink to stdout).
+  if (opts.jsonRequested) {
+    await renderOutcome(outcomeFromError(error, { kind: 'command.error' }), {
+      jsonRequested: true,
+      render: NOOP_RENDER,
     });
     return;
   }
 
-  const message = error instanceof Error ? error.message : String(error);
-  opts.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+  // Human: the existing Ink `ErrorResult` render (byte-identical to 2.11.0).
   await opts.render({
     type: 'error',
-    message,
-    exitCode: EXIT_CODES.RUNTIME_ERROR,
+    message: suggestion?.message ?? message,
+    ...(suggestion?.action ? { suggestion: suggestion.action } : {}),
+    exitCode,
   });
 }
 
