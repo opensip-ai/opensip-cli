@@ -1,0 +1,61 @@
+/**
+ * host-env-specs — the composed CLI registry + the aggregate env-surface for the
+ * reference doc. Asserts every layer's variables are present exactly once and the
+ * CLI infra reads coerce as the migrated sites expect.
+ */
+
+import { afterEach, describe, it, expect } from 'vitest';
+
+import { CLI_ENV_SPECS, PRE_SCOPE_ENV_SPECS, describeHostEnv, hostEnv } from '../env/host-env-specs.js';
+
+const TOUCHED = ['OPENSIP_NO_UPDATE', 'NO_UPDATE_NOTIFIER', 'OTEL_EXPORTER_OTLP_ENDPOINT'];
+
+afterEach(() => {
+  for (const key of TOUCHED) delete process.env[key];
+});
+
+describe('describeHostEnv', () => {
+  it('aggregates every layer (config + graph + cli + pre-scope) with no duplicate canonical names', () => {
+    const canonicals = describeHostEnv().map((s) => s.canonical);
+    // One representative from each contributing layer.
+    expect(canonicals).toContain('OPENSIP_API_KEY'); // config
+    expect(canonicals).toContain('OPENSIP_HEAP_NO_MONITOR'); // graph
+    expect(canonicals).toContain('OTEL_EXPORTER_OTLP_ENDPOINT'); // cli
+    expect(canonicals).toContain('NO_COLOR'); // pre-scope (cli-ui)
+    expect(canonicals).toContain('NODE_OPTIONS'); // pre-scope (graph heap-preflight)
+    // No duplicates — each variable is declared once across the whole surface.
+    expect(new Set(canonicals).size).toBe(canonicals.length);
+    // Every spec carries docs (the reference is generated from these).
+    expect(describeHostEnv().every((s) => s.docs.length > 0)).toBe(true);
+  });
+
+  it('declares the pre-scope allowance vars (theme colours + NODE_OPTIONS)', () => {
+    const c = PRE_SCOPE_ENV_SPECS.map((s) => s.canonical);
+    expect(c).toEqual(['NO_COLOR', 'FORCE_COLOR', 'COLORTERM', 'TERM', 'TERM_PROGRAM', 'NODE_OPTIONS']);
+  });
+});
+
+describe('hostEnv reads (CLI infra)', () => {
+  it('coerces the update opt-outs to booleans (non-empty = true)', () => {
+    expect(hostEnv.get<boolean>('OPENSIP_NO_UPDATE')).toBe(false); // unset → default
+    process.env.OPENSIP_NO_UPDATE = '1';
+    expect(hostEnv.get<boolean>('OPENSIP_NO_UPDATE')).toBe(true);
+    process.env.NO_UPDATE_NOTIFIER = 'yes';
+    expect(hostEnv.get<boolean>('NO_UPDATE_NOTIFIER')).toBe(true);
+  });
+
+  it('reads the OTEL endpoint as a raw string (the SDK gate)', () => {
+    expect(hostEnv.get('OTEL_EXPORTER_OTLP_ENDPOINT')).toBeUndefined();
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'https://collector:4318';
+    expect(hostEnv.get('OTEL_EXPORTER_OTLP_ENDPOINT')).toBe('https://collector:4318');
+  });
+
+  it('CLI_ENV_SPECS covers the four infra variables', () => {
+    expect(CLI_ENV_SPECS.map((s) => s.canonical)).toEqual([
+      'OTEL_EXPORTER_OTLP_ENDPOINT',
+      'TRACEPARENT',
+      'OPENSIP_NO_UPDATE',
+      'NO_UPDATE_NOTIFIER',
+    ]);
+  });
+});

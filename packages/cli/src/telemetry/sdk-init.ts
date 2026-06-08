@@ -56,6 +56,8 @@ import { resourceFromAttributes, detectResources, envDetector } from '@opentelem
 import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
+import { hostEnv } from '../env/host-env-specs.js';
+
 /**
  * Hard ceiling (ms) on the final span flush AND on each individual export
  * attempt. A dead/slow collector degrades to "spans dropped," never a hang on
@@ -89,7 +91,7 @@ let parentContext: Context | undefined;
  */
 export function initTelemetry(cliEntryUrl: string): void {
   if (started) return;
-  const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  const endpoint = hostEnv.get<string>('OTEL_EXPORTER_OTLP_ENDPOINT');
   if (!endpoint) return;
 
   // Resource: explicit service identity merged with consumer-supplied
@@ -120,7 +122,7 @@ export function initTelemetry(cliEntryUrl: string): void {
 
   // Parent-trace nesting: extract the W3C traceparent the consumer passed via
   // env so the run's spans attach under the parent trace. Unset ⇒ own trace.
-  const traceparent = process.env.TRACEPARENT;
+  const traceparent = hostEnv.get<string>('TRACEPARENT');
   if (traceparent) {
     parentContext = new W3CTraceContextPropagator().extract(
       ROOT_CONTEXT,

@@ -31,7 +31,22 @@ import {
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import { EnvRegistry, type EnvVarSpec } from '@opensip-tools/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+
+/**
+ * Config-layer environment variables (release 2.12.0, §5.12). Declared as an
+ * immutable spec table read through the {@link EnvRegistry} primitive, so the env
+ * surface is governed and documentable (the `env-via-registry` guardrail forbids
+ * raw `process.env` reads). Re-exported for the generated env-surface doc.
+ */
+export const CONFIG_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
+  {
+    canonical: 'OPENSIP_API_KEY',
+    docs: 'OpenSIP Cloud API key. Overrides the apiKey stored in ~/.opensip-tools/config.yml.',
+  },
+];
+const CONFIG_ENV = new EnvRegistry(CONFIG_ENV_SPECS);
 
 /** User-level OpenSIP root directory. */
 const OPENSIP_DIR = join(homedir(), '.opensip-tools');
@@ -121,7 +136,10 @@ export function writeGlobalConfig(config: GlobalConfig): void {
  */
 export function resolveApiKey(cliFlag?: string): string | undefined {
   if (cliFlag) return cliFlag;
-  if (process.env.OPENSIP_API_KEY) return process.env.OPENSIP_API_KEY;
+  // Env override (read through the registry; truthy so an empty value falls
+  // through to the config file, byte-identical to the prior `process.env` check).
+  const fromEnv = CONFIG_ENV.get<string>('OPENSIP_API_KEY');
+  if (fromEnv) return fromEnv;
   const config = readGlobalConfig();
   return config.apiKey ?? undefined;
 }

@@ -25,6 +25,9 @@ const EXPECTED_VALUE_EXPORTS = [
   'CALL_EDGE_TEXT_MAX',
   'CREATION_EDGE_PREFIX',
   'CREATION_EDGE_TEXT_MAX',
+  // Env-surface specs (release 2.12.0, §5.12) — imported by the CLI to aggregate
+  // the env-surface reference doc.
+  'GRAPH_ENV_SPECS',
   'GraphAdapterRegistry',
   'GraphRecipeRegistry',
   'appendEdge',

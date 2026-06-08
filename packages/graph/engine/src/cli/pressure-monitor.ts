@@ -17,9 +17,24 @@
 
 import v8 from 'node:v8';
 
-import { ToolError } from '@opensip-tools/core';
+import { EnvRegistry, ToolError, type EnvVarSpec, type ToolErrorOptions } from '@opensip-tools/core';
 
-import type { ToolErrorOptions } from '@opensip-tools/core';
+/**
+ * Graph-engine environment variables (release 2.12.0, §5.12). Read through the
+ * {@link EnvRegistry} primitive (immutable spec table) so the env surface is
+ * governed and documentable; the `env-via-registry` guardrail forbids raw
+ * `process.env` reads. (`NODE_OPTIONS`, mutated by the heap-preflight before any
+ * opensip module loads, is a documented pre-scope exception, not registered here.)
+ */
+export const GRAPH_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
+  {
+    canonical: 'OPENSIP_HEAP_NO_MONITOR',
+    coerce: (raw) => raw === '1',
+    default: false,
+    docs: 'Set to 1 to disable the V8 heap-pressure monitor (REPL embedding / custom allocators).',
+  },
+];
+const GRAPH_ENV = new EnvRegistry(GRAPH_ENV_SPECS);
 
 const DEFAULT_THRESHOLD = 0.9;
 const DEFAULT_POLL_INTERVAL_MS = 1000;
@@ -72,7 +87,7 @@ export interface PressureMonitor {
 export function createPressureMonitor(opts: PressureMonitorOptions = {}): PressureMonitor {
   const threshold = opts.threshold ?? DEFAULT_THRESHOLD;
   const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
-  const disabled = process.env.OPENSIP_HEAP_NO_MONITOR === '1';
+  const disabled = GRAPH_ENV.get<boolean>('OPENSIP_HEAP_NO_MONITOR') === true;
   let stage = 'unknown';
   let timerId: NodeJS.Timeout | null = null;
   let lastError: MemoryPressureError | null = null;
