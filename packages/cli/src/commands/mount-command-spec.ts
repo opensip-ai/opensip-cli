@@ -95,11 +95,19 @@ export function mountCommandSpec(
   // passes positional args first, then the parsed-opts object, then the
   // Command. We forward the parsed opts (which carry both common + spec flags)
   // and the trailing positional args to the handler and the dispatch seam.
+  //
+  // Positionals ride on the opts object under the `_args` key — the same
+  // convention the `live-view` dispatch arm already uses (`{ ...opts, _args }`).
+  // This lets a `raw-stream`/`signal-envelope`/`command-result` handler that
+  // declares `args` read its positionals (`opts._args`) without a separate
+  // handler-arity contract: graph's `[paths...]`, `<name>`, `<specPath>` all
+  // flow through here. Commands with no declared `args` get an empty array.
   cmd.action(async (...actionArgs: unknown[]) => {
     const { opts, positionals } = splitActionArgs(actionArgs);
+    const optsWithArgs = { ...opts, _args: positionals };
     try {
-      const result = await spec.handler(opts, ctx);
-      await dispatchOutput(result, spec, opts, positionals, ctx);
+      const result = await spec.handler(optsWithArgs, ctx);
+      await dispatchOutput(result, spec, optsWithArgs, positionals, ctx);
     } catch (error) {
       if (error instanceof ToolError) {
         ctx.setExitCode(mapToolErrorToExitCode(error));

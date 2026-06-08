@@ -125,6 +125,12 @@ describe('mountCommandSpec — wiring', () => {
     expect(opts.cache).toBe(true);
     expect(opts.resolution).toBe('exact');
     expect(typeof opts.cwd).toBe('string');
+    // Positionals ride on the parsed-opts object under `_args` for EVERY output
+    // mode (not just live-view), so a raw-stream/command-result handler that
+    // declares `args` can read them. `demo`'s sole positional is the variadic
+    // `[paths...]`, which Commander hands over as one array argument: `_args`
+    // therefore carries `[['src', 'lib']]` (one variadic slot).
+    expect(opts._args).toEqual([['src', 'lib']]);
   });
 
   it('applies a value default and enforces choices', async () => {
