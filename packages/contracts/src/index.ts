@@ -94,6 +94,23 @@ export type {
   CapabilityContributionKind,
 } from '@opensip-tools/core';
 
+// Command-plane types (release 2.11.0, §5.4) — the declarative CommandSpec a
+// tool exports for the host to mount, replacing raw-Commander access. DEFINED in
+// @opensip-tools/core (beside the Tool contract; core cannot import contracts);
+// re-exported here for the public Tool↔runner surface. `CommonFlagKey` is also
+// re-exported from ./cli-flags (which now sources it from core) — both paths
+// resolve to the same kernel type.
+export { defineCommand, COMMON_FLAG_KEYS } from '@opensip-tools/core';
+export type {
+  CommandSpec,
+  OptionSpec,
+  ArgSpec,
+  CommandHandler,
+  CommandContext,
+  CommandOutputMode,
+  CommandScopeRequirement,
+} from '@opensip-tools/core';
+
 // CLI defaults loader (`cli:` block of opensip-tools.config.yml).
 // Lives in contracts because the CLI-pre-action seam is tool-agnostic;
 // see ./cli-config.ts for the rationale.

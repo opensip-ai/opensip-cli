@@ -18,6 +18,21 @@ export { ToolRegistry } from './registry.js';
 // Static tool-plugin manifest + the plugin-API epoch + provenance types
 // (release 2.8.0). No runtime consumers yet — Phase 1+ wire these.
 export { PLUGIN_API_VERSION } from './manifest.js';
+// Command-plane types (release 2.11.0, §5.4): the declarative command surface a
+// tool exports for the host to mount, plus the CommonFlagKey key type (the pure
+// type lives in core; the Commander-touching applyCommonFlags runtime stays in
+// contracts). Re-exported by @opensip-tools/contracts for the public surface.
+export { defineCommand, COMMON_FLAG_KEYS } from './command-spec.js';
+export type {
+  CommandSpec,
+  OptionSpec,
+  ArgSpec,
+  CommandHandler,
+  CommandContext,
+  CommandOutputMode,
+  CommandScopeRequirement,
+  CommonFlagKey,
+} from './command-spec.js';
 export type {
   ToolPluginManifest,
   ToolCommandManifest,
