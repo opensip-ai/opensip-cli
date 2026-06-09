@@ -42,9 +42,12 @@ automatically, so the CLI grows without ever being rewritten.
   self-contained, server-free report aggregating every tool's findings. Attach it
   to a PR or hand it to a teammate — no SaaS login required.
 
-- **🧩 Make it your quality bar.** Write a custom check in a few lines with
-  `defineCheck()`, bundle checks into named recipes, or ship a whole new tool as a
-  plugin — your extensions are first-class, not bolted on.
+- **📐 Make your ADRs enforceable — and make it your quality bar.** An
+  architecture decision nobody checks is a decision that quietly erodes. Encode
+  the rule behind each ADR as a custom check in a few lines with `defineCheck()`,
+  bundle checks into named recipes, or ship a whole new tool as a plugin — your
+  extensions are first-class, not bolted on. opensip-tools dogfoods this: 20+ of
+  its own bundled checks enforce its documented architecture decisions.
 
 **In ten seconds:** measure your code, map it, and gate it — in any language,
 from one CLI.
@@ -372,6 +375,8 @@ By default, any check error causes exit code 1 (CI fails). Configure thresholds:
 ## Architecture Gate
 
 Catch architectural regressions during code reviews, AI-agent coding sessions, or pre-commit hooks. The gate is a baseline-and-compare workflow: snapshot your current state, then compare future runs against that snapshot.
+
+This is also the natural home for **enforcing your ADRs**: encode the rule each decision establishes as a check, and the gate turns "we agreed not to do that" into a build failure on the PR that does it.
 
 ```bash
 # Before making changes — save a baseline
