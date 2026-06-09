@@ -37,20 +37,21 @@ A check pack is an npm package that contributes one or more `Check` objects. Sev
 
 ## The pack contract
 
-A check pack's main entry implements the `FitPluginExports` contract — one required export and two optional ones:
+A check pack's main entry implements the `FitPluginExports` contract — one required export and one optional one:
 
 ```ts
 // packages/fitness/checks-universal/src/index.ts
-import type { Check, CheckDisplayEntry, FitnessRecipe } from '@opensip-tools/fitness';
+import type { Check, FitnessRecipe } from '@opensip-tools/fitness';
 
-export const checks: readonly Check[];                                     // required
-export const checkDisplay?: Readonly<Record<string, CheckDisplayEntry>>;   // optional
-export const recipes?: readonly FitnessRecipe[];                           // optional
+export const checks: readonly Check[];              // required
+export const recipes?: readonly FitnessRecipe[];    // optional
 ```
 
-`Check`, `CheckDisplayEntry`, and `FitnessRecipe` all live in `@opensip-tools/fitness` — the kernel doesn't know about checks or fitness display vocabulary. `CheckDisplayEntry` was moved out of the kernel and is owned by fitness (ADR-0009); check packs import it from `@opensip-tools/fitness`.
+`Check` and `FitnessRecipe` live in `@opensip-tools/fitness` — the kernel doesn't know about checks or fitness vocabulary.
 
-`checks` is the flat list of every `defineCheck()` result the pack provides (the only required export). `checkDisplay` is an optional map from slug → `[icon, displayName]` that the CLI uses for table rendering and dashboard grouping; slugs without an entry fall back to kebab-to-title-case. `recipes` is an optional list of `defineRecipe()` results the pack bundles. There is **no** `metadata` export — package name and version come from the pack's `package.json`.
+`checks` is the flat list of every `defineCheck()` result the pack provides (the only required export). `recipes` is an optional list of `defineRecipe()` results the pack bundles (co-discovered through the same package walk and routed to fitness's recipe domain). There is **no** `checkDisplay` export and **no** `metadata` export — display travels ON each check, and package name + version come from the pack's `package.json`.
+
+**Display (icon + name) travels on the check (§5.3).** Each check carries optional `config.icon` and `config.displayName`. Set them directly in `defineCheck({ ..., icon: '🔒', displayName: 'No Hardcoded Secrets' })`, or keep a per-pack `CHECK_DISPLAY` authoring map (`slug → [icon, displayName]`) and fold it onto the pack's checks at the barrel with `applyCheckDisplay(checks, CHECK_DISPLAY)` (exported from `@opensip-tools/fitness`). Slugs with no display fall back to kebab-to-title-case + a default icon. There is no merged-display registry; the CLI/dashboard read `check.config.displayName`/`icon` from the per-run check registry.
 
 Plus a discoverable package.json shape:
 
@@ -172,9 +173,9 @@ The recipe service projects the `config:` map into module-level state before exe
 
 ---
 
-## The display map
+## The display map — folded onto the check
 
-The `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](../../../packages/fitness/checks-universal/src/display/index.ts) and analogues) maps a check slug to `[icon, displayName]`:
+A pack keeps an authoring `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](../../../packages/fitness/checks-universal/src/display/index.ts) and analogues) of `slug → [icon, displayName]`:
 
 ```ts
 export const CHECK_DISPLAY: Record<string, CheckDisplayEntry> = {
@@ -184,11 +185,14 @@ export const CHECK_DISPLAY: Record<string, CheckDisplayEntry> = {
 };
 ```
 
-The icon is shown in the results table; the display name is the human-readable label in the dashboard. Without an entry, the renderer falls back to kebab-to-title-case (`'no-console-log' → 'No Console Log'`) — fine, but less pleasant than the curated form.
+…and folds it ONTO its checks at the barrel (§5.3), so display travels with each check rather than as a separate sidecar:
 
-The CLI merges every loaded pack's `checkDisplay` into one registry. Last loader wins on key collision, mirroring the pack-load order. A third-party pack can override a first-party check's display by registering the same slug in its own `checkDisplay`.
+```ts
+import { applyCheckDisplay, collectCheckObjects } from '@opensip-tools/fitness';
+export const checks = applyCheckDisplay(collectCheckObjects(allChecks), CHECK_DISPLAY);
+```
 
-This is *display only* — overriding a slug's display doesn't override the check itself. To replace a built-in check, the third-party pack registers a check with the same slug; the framework's last-writer-wins registry takes over.
+The icon is shown in the results table; the display name is the dashboard label. A check with no entry keeps no display and the renderer falls back to kebab-to-title-case (`'no-console-log' → 'No Console Log'`) + a default icon. There is no merged-display registry and no separate `checkDisplay` export: `getDisplayName`/`getIcon` resolve a slug against the per-run check registry (`check.config.displayName`/`icon`), so two concurrent runs read independent display. To replace a built-in check (display and all), register a check with the same slug — the framework's last-writer-wins registry takes over.
 
 ---
 
@@ -200,7 +204,7 @@ The chain:
 2. The CLI's `plugin add` command runs `npm install` into `<project>/opensip-tools/.runtime/plugins/fit/` and appends `@my-co/checks-internal` to `plugins.fit:` in `opensip-tools.config.yml`.
 3. On the next `opensip-tools fit` run, the fitness Tool's `ensureChecksLoaded()` calls into the discoverer.
 4. The discoverer reads `plugins.fit:`, walks `.runtime/plugins/fit/node_modules/`, finds `@my-co/checks-internal/`, and dynamically imports its main entry.
-5. The pack's `checks` export is registered into the in-memory check registry; its optional `checkDisplay` is merged into the display registry and its optional `recipes` into the recipe registry.
+5. The pack's `checks` export is registered into the per-run check registry (each check carrying its folded-on display); its optional `recipes` export is co-routed to the recipe domain.
 6. Recipes that select these checks (by tag, slug, or `all`) now run them.
 
 No CLI restart, no kernel change. The whole shape is a marketplace.
@@ -214,7 +218,7 @@ Minimum viable pack:
 ```
 @my-co/checks-internal/
 ├── package.json                # opensipTools.kind: 'fit-pack' (or pinned in config)
-├── dist/index.js               # exports: checks (+ optional checkDisplay, recipes)
+├── dist/index.js               # exports: checks (each carrying display) (+ optional recipes)
 └── README.md                   # author affordance
 ```
 
@@ -228,11 +232,12 @@ const noTodoBeforeDeploy = defineCheck({
   description: 'Reject TODOs in files modified after the freeze date',
   tags: ['quality', 'release'],
   scope: { languages: [], concerns: [] },
+  icon: '⏰',
+  displayName: 'No TODO before deploy',
   // ...
 });
 
 export const checks = [noTodoBeforeDeploy];
-export const checkDisplay = { 'no-todo-before-deploy': ['⏰', 'No TODO before deploy'] };
 ```
 
 Package name and version come from the pack's `package.json` — there is no `metadata` export to maintain in lockstep.

@@ -42,16 +42,16 @@ Tag your pack's `package.json` with `opensipTools.kind`:
 }
 ```
 
-Discovery is name-pattern-independent — your pack can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`, anything). The marker is what makes the platform find it. Same pattern for sim packs with `"kind": "sim-pack"`.
+For a **fit pack** the `fit-pack` marker is name-pattern-independent — your pack can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`, anything); the marker is what makes the platform find it. A **sim pack** is discovered by a NAME PATTERN instead — name it `<scope>/scenarios-*` (the `sim-pack` marker is no longer a discovery trigger as of v3.0.0; see below).
 
 ### Discovery paths
 
 Listed in recommendation order:
 
-- **Marker (recommended)** — declare `opensipTools.kind: "fit-pack"` (or `"sim-pack"`) in your pack's `package.json`. Free choice of scope and name. No config entry. Sim packs use `"sim-pack"`.
-- **`plugins.checkPackages` explicit listing** — name individual fit packages from project `node_modules`. Use only for packages that do not declare the marker yet. Parallel key for sim is `plugins.scenarioPackages`.
+- **fit: the `fit-pack` marker (recommended)** — declare `opensipTools.kind: "fit-pack"` in your pack's `package.json`. Free choice of scope and name. No config entry.
+- **sim: the `scenarios-*` name pattern (recommended)** — name your pack `<scope>/scenarios-*` (e.g. `@acme/scenarios-load`). `plugins.packageScopes` extends the scopes scanned beyond `@opensip-tools`. The `sim-pack` marker fallback was retired in v3.0.0 when discovery became descriptor-driven (each domain declares ONE discovery mode).
+- **explicit listing** — name individual packages in `plugins.checkPackages` (fit) or `plugins.scenarioPackages` (sim) from project `node_modules`. For fit, an explicit list is ADDED to marker discovery; for sim it pins the set.
 - **Project-pinned install** — `opensip-tools plugin add --domain fit @scope/pack` or `--domain sim @scope/pack` installs into `.runtime/plugins/<domain>/` and records `plugins.fit:` / `plugins.sim:` so teammates can reproduce it with `plugin sync`.
-- **Sim `scenarios-*` scope scan** — sim packs can also follow `<scope>/scenarios-*`; `plugins.packageScopes` extends the scope list for this sim-only naming convention.
 
 ## When to graduate from loose `.mjs`
 
@@ -72,7 +72,7 @@ If none of those apply, stay with loose `.mjs`. The graduation is worthwhile onl
 ├── package.json                # declares opensipTools.kind: "fit-pack"
 ├── tsconfig.json
 ├── src/
-│   ├── index.ts                # exports: checks, recipes, checkDisplay
+│   ├── index.ts                # exports: checks (display folded on), recipes
 │   ├── checks/
 │   │   ├── architecture/no-cycle.ts
 │   │   ├── architecture/no-cycle.test.ts     # tests colocated
@@ -90,7 +90,7 @@ If none of those apply, stay with loose `.mjs`. The graduation is worthwhile onl
 Two structural details make this scale cleanly past a few dozen checks:
 
 - **`register-checks.ts` is mechanical aggregation.** One `import` line per check, then one big `export const allChecks: readonly Check[] = [...]` array. No logic. It grows linearly with the check count and is easy to skim and diff.
-- **`index.ts` is the thin public surface.** It imports `allChecks` from `register-checks.ts`, imports the recipes, and re-exports the shape the platform consumes (`checks`, `checkDisplay`). It stays small even as the pack grows past hundreds of checks.
+- **`index.ts` is the thin public surface.** It imports `allChecks` from `register-checks.ts`, imports the recipes, folds the per-pack display map onto the checks via `applyCheckDisplay`, and re-exports `checks` (+ optional `recipes`). It stays small even as the pack grows past hundreds of checks.
 - **The split exists because in a single-file model every new check would touch the public surface.** With the split, adding a check touches one file (`register-checks.ts`); `index.ts` is stable.
 
 This pattern works at scale — the opensip codebase uses it for 308 fitness checks and 192 sim scenarios. Small packs (a handful of checks) can keep everything in one `index.ts`; the split only pays off once re-skimming the public surface on every change becomes a tax. Sim packs follow the identical pattern: `src/register-scenarios.ts` instead of `register-checks.ts`, `defineLoadScenario(...)` etc. instead of `defineCheck(...)`.
@@ -120,20 +120,22 @@ Peer-depend on `@opensip-tools/fitness` and `@opensip-tools/core` — the consum
 ## `src/index.ts`
 
 ```ts
-import type { Check, CheckDisplayEntry, FitnessRecipe } from '@opensip-tools/fitness';
+import { applyCheckDisplay, type Check, type CheckDisplayEntry, type FitnessRecipe } from '@opensip-tools/fitness';
 
 import { noFixme } from './checks/no-fixme.js';
 import { infraMustHaveTags } from './checks/infra-must-have-tags.js';
 import { quickSmoke } from './recipes/quick-smoke.js';
 
-export const checks: readonly Check[] = [noFixme, infraMustHaveTags];
-
-export const recipes: readonly FitnessRecipe[] = [quickSmoke];
-
-export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>> = {
+// Display (icon + name) travels ON each check (§5.3): keep an authoring map and
+// fold it onto the checks here. There is no separate `checkDisplay` export.
+const CHECK_DISPLAY: Readonly<Record<string, CheckDisplayEntry>> = {
   'no-fixme-comments': ['📝', 'No FIXME comments'],
   'infra-must-have-tags': ['🏷️', 'Infrastructure tags required'],
 };
+
+export const checks: readonly Check[] = applyCheckDisplay([noFixme, infraMustHaveTags], CHECK_DISPLAY);
+
+export const recipes: readonly FitnessRecipe[] = [quickSmoke];
 ```
 
 Pack metadata (name, version, description) is read from `package.json` by the platform — don't duplicate those fields as a runtime export.
@@ -200,7 +202,7 @@ A step-by-step you can follow when you've decided to graduate:
 3. **Write `package.json`** with `opensipTools.kind: "fit-pack"` (or `"sim-pack"`), `main: "./dist/index.js"`, peer-dep on `@opensip-tools/fitness` and `@opensip-tools/core`.
 4. **Convert each `.mjs` to a TypeScript module.** One `<slug>.ts` per check under `src/checks/`, each exporting a `defineCheck(...)` object. **Keep the same slug values** as the loose files used — recipes select by tag/slug, and `--check <slug>` invocations keep working across the move.
 5. **Create `src/register-checks.ts`** that imports every check and exports `allChecks` as a `readonly Check[]`.
-6. **Create `src/index.ts`** that imports `allChecks` and exports it as `checks`, plus `checkDisplay`.
+6. **Create `src/index.ts`** that folds the per-pack display map onto `allChecks` via `applyCheckDisplay` and exports the result as `checks`.
 7. **Add the pack as a root devDependency.** pnpm will symlink it into `node_modules/` where marker discovery finds it.
 8. **Delete the original loose `.mjs` files** under `opensip-tools/fit/checks/` once the workspace pack is running cleanly and the same slugs are firing.
 

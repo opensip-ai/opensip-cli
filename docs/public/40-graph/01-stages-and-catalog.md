@@ -7,7 +7,7 @@ audience: [contributors, plugin-authors, ci-integrators]
 purpose: "How `graph` builds its picture of the codebase — the seven-stage pipeline, the catalog format, and the content-keyed cache."
 source-files:
   - packages/graph/engine/src/tool.ts
-  - packages/cli/src/bootstrap/register-graph-adapters.ts
+  - packages/cli/src/bootstrap/load-tool-capabilities.ts
   - packages/graph/engine/src/lang-adapter/types.ts
   - packages/graph/engine/src/lang-adapter/registry.ts
   - packages/graph/graph-typescript/src/discover.ts
@@ -106,7 +106,7 @@ Stages 0–2 are language-agnostic over the [`GraphLanguageAdapter`](../../../pa
 
 The stage boundaries are deliberately narrow: each stage communicates through typed outputs instead of reaching into a neighbor's intermediate state. That isolation is the main design guarantee.
 
-> **Adapter layer.** Five first-party adapters ship as publishable npm packages under the `@opensip-tools/graph-*` namespace: TypeScript ([`@opensip-tools/graph-typescript`](../../../packages/graph/graph-typescript/src/index.ts)), Python ([`@opensip-tools/graph-python`](../../../packages/graph/graph-python/src/index.ts)), Rust ([`@opensip-tools/graph-rust`](../../../packages/graph/graph-rust/src/index.ts)), Go ([`@opensip-tools/graph-go`](../../../packages/graph/graph-go/src/index.ts)), and Java ([`@opensip-tools/graph-java`](../../../packages/graph/graph-java/src/index.ts)). Auto-discovery is **name pattern + marker**: the CLI walks `node_modules` for packages whose names match `@opensip-tools/graph-*` and whose `package.json` declares `opensipTools.kind: "graph-adapter"` (see [`discoverGraphAdapterPackages`](../../../packages/graph/engine/src/plugins/graph-adapter-discovery.ts)) — or, if `plugins.graphAdapters` is set in `opensip-tools.config.yml`, exactly that explicit list. The CLI bootstrap path ([`register-graph-adapters.ts`](../../../packages/cli/src/bootstrap/register-graph-adapters.ts)) imports each discovered package and registers its `adapter` export. `pickAdapter(cwd)` chooses by file-extension dominance with a deterministic preference order on ties. Stages 3, 4, and 5 consume the catalog without knowing which adapter built it.
+> **Adapter layer.** Five first-party adapters ship as publishable npm packages under the `@opensip-tools/graph-*` namespace: TypeScript ([`@opensip-tools/graph-typescript`](../../../packages/graph/graph-typescript/src/index.ts)), Python ([`@opensip-tools/graph-python`](../../../packages/graph/graph-python/src/index.ts)), Rust ([`@opensip-tools/graph-rust`](../../../packages/graph/graph-rust/src/index.ts)), Go ([`@opensip-tools/graph-go`](../../../packages/graph/graph-go/src/index.ts)), and Java ([`@opensip-tools/graph-java`](../../../packages/graph/graph-java/src/index.ts)). Auto-discovery is **marker-based** and descriptor-driven (§5.3): the CLI walks `node_modules` for packages declaring `opensipTools.kind: "graph-adapter"` (built-ins resolve from the CLI install tree) — or, if `plugins.graphAdapters` is set in `opensip-tools.config.yml`, exactly that explicit list. The generic capability loader ([`load-tool-capabilities.ts`](../../../packages/cli/src/bootstrap/load-tool-capabilities.ts)) drives discovery per command and routes each package's `adapter` export through graph's registrar. `pickAdapter(cwd)` chooses by file-extension dominance with a deterministic preference order on ties. Stages 3, 4, and 5 consume the catalog without knowing which adapter built it.
 
 ### Stage 0 — Discover
 

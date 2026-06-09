@@ -57,7 +57,7 @@ Peer packages at the same layer. Tools implement the `Tool` contract; shared lib
 |---|---|---|---|
 | `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate. Returns a `SignalEnvelope`; SARIF/cloud egress is owned by the composition root (ADR-0011). The engine, recipe service, registries, gate/baseline primitives, and CLI handlers are package-internal (curated barrel, ADR-0013) — locked by `public-api.test.ts` | `defineCheck`, `defineRecipe`, `getCheckConfig`, `fitnessTool` (+ the AST/text authoring helpers: `isTestFile`, `stripStringsAndComments`, `extractSnippet`, …) |
 | `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, two scenario kinds (load, chaos) | `defineLoadScenario`, `defineChaosScenario`, `defineSimulationRecipe`, `simulationTool`, `currentSimulationRecipeRegistry`, `SCENARIO_KINDS` |
-| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Seven-stage staged pipeline (discover → inventory → edges → indexes → features → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below); the CLI discovers them at startup and hands them to the per-run scope via `setDiscoveredAdapters`. Returns a `SignalEnvelope` (assembled in `cli/build-envelope.ts`); the shared `formatSignalSarif` formatter and all egress are owned by the composition root (ADR-0011). Depends on `@opensip-tools/contracts`, not fitness or `@opensip-tools/output` | `graphTool`, `GraphLanguageAdapter` (type), `pickAdapter`, `setDiscoveredAdapters`, `defineGraphRecipe`, `defineRule`, `Catalog`/`Rule` (types) |
+| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Seven-stage staged pipeline (discover → inventory → edges → indexes → features → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below); the CLI discovers them at startup and discovers them per command through the generic capability loader (`loadCapabilityDomain`). Returns a `SignalEnvelope` (assembled in `cli/build-envelope.ts`); the shared `formatSignalSarif` formatter and all egress are owned by the composition root (ADR-0011). Depends on `@opensip-tools/contracts`, not fitness or `@opensip-tools/output` | `graphTool`, `GraphLanguageAdapter` (type), `pickAdapter`, `defineGraphRecipe`, `defineRule`, `Catalog`/`Rule` (types) |
 
 ### Shared libraries
 
@@ -83,7 +83,7 @@ Implement `LanguageAdapter`. Used by fitness checks and any future tool that nee
 
 ### Graph language adapters (five languages + shared scaffolding)
 
-Distinct from the fitness language adapters above — these implement the graph engine's `GraphLanguageAdapter` contract (catalog inventory, edge extraction). Each is a publishable npm package marked with `opensipTools.kind: "graph-adapter"`; the CLI discovers them at startup and registers them into each run's scope via `setDiscoveredAdapters`.
+Distinct from the fitness language adapters above — these implement the graph engine's `GraphLanguageAdapter` contract (catalog inventory, edge extraction). Each is a publishable npm package marked with `opensipTools.kind: "graph-adapter"`; the CLI discovers them per command through the generic capability loader, which routes each `adapter` export to graph.s registrar.
 
 The four tree-sitter adapters (Python, Rust, Go, Java) are backed by **`web-tree-sitter`** (the WASM build — no native tree-sitter binding) and share `@opensip-tools/graph-adapter-common`, the tree-sitter scaffolding package (discover/parse/walk/cache-key factories). It sits downstream of the engine and upstream of the four tree-sitter adapters. The TypeScript adapter is the exception — it resolves its call graph through the TS compiler API, not tree-sitter.
 
@@ -98,17 +98,17 @@ The four tree-sitter adapters (Python, Rust, Go, Java) are backed by **`web-tree
 
 ## Layer 4 — fitness check packs
 
-Each pack implements the `FitPluginExports` contract: a required `checks: Check[]` plus optional `checkDisplay` and `recipes` (there is no `metadata` export — name and version come from the pack's `package.json`). Discovered via the scope-independent `opensipTools.kind: "fit-pack"` marker, or by exact package name in `plugins.checkPackages:`. See [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/) for the resolution rules.
+Each pack implements the `FitPluginExports` contract: a required `checks: Check[]` (each carrying its own display) plus optional `recipes` (there is no `metadata` export — name and version come from the pack's `package.json`). Discovered via the scope-independent `opensipTools.kind: "fit-pack"` marker, or by exact package name in `plugins.checkPackages:`. See [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/) for the resolution rules.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape) | `checks`, `checkDisplay`, plus per-check named exports |
-| `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript/` | TypeScript/Node.js checks | `checks`, `checkDisplay` |
-| `@opensip-tools/checks-python` | `packages/fitness/checks-python/` | Python checks | `checks`, `checkDisplay` |
-| `@opensip-tools/checks-java` | `packages/fitness/checks-java/` | Java checks | `checks`, `checkDisplay` |
-| `@opensip-tools/checks-go` | `packages/fitness/checks-go/` | Go checks | `checks`, `checkDisplay` |
-| `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp/` | C/C++ checks (clang-tidy backed) | `checks`, `checkDisplay` |
-| `@opensip-tools/checks-rust` | `packages/fitness/checks-rust/` | Rust checks | `checks`, `checkDisplay` |
+| `@opensip-tools/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape) | `checks` (each carrying display), plus per-check named exports |
+| `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript/` | TypeScript/Node.js checks | `checks` (display folded on) |
+| `@opensip-tools/checks-python` | `packages/fitness/checks-python/` | Python checks | `checks` (display folded on) |
+| `@opensip-tools/checks-java` | `packages/fitness/checks-java/` | Java checks | `checks` (display folded on) |
+| `@opensip-tools/checks-go` | `packages/fitness/checks-go/` | Go checks | `checks` (display folded on) |
+| `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp/` | C/C++ checks (clang-tidy backed) | `checks` (display folded on) |
+| `@opensip-tools/checks-rust` | `packages/fitness/checks-rust/` | Rust checks | `checks` (display folded on) |
 
 ## Layer 5 — composition root
 

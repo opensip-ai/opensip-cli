@@ -24,7 +24,7 @@ related-docs:
 opensip-tools loads four kinds of plugins. Each has its own discovery shape, but they share a small, explicit policy: nothing loads silently, nothing loads transitively without opt-in, and the project owns its plugin set.
 
 > **What you'll understand after this:**
-> - The five discovery shapes (Tool marker, fit-pack marker + exact pin, sim-pack marker + scoped scenarios + project-pinned, graph-adapter name-pattern + kind marker + explicit pin, direct import).
+> - The five discovery shapes (Tool marker; fit-pack marker + augmenting pin; sim-pack `scenarios-*` name pattern + pin; graph-adapter marker + explicit pin; language-adapter direct import) — the middle three now flow through the ONE generic capability substrate (§5.3 / ADR-0029).
 > - Why source-file plugins auto-load but project-pinned npm packages require explicit listing.
 > - The on-disk layout the `plugin add/remove/list/sync` commands operate on.
 > - What `plugin sync` does and when CI should run it.
@@ -36,9 +36,9 @@ opensip-tools loads four kinds of plugins. Each has its own discovery shape, but
 | Plugin kind | Discovery shape | Where loaded |
 |---|---|---|
 | **Tools** | `node_modules` walk for `opensipTools.kind === 'tool'` marker | At CLI startup, by `discoverToolPackages()` |
-| **Check packs** | (a) `node_modules` walk for `opensipTools.kind === 'fit-pack'` marker, (b) exact `plugins.checkPackages:` list for non-marker packages. Results merge and dedupe by package name, with explicit config winning. | Inside fitness's `loadDiscoveredCheckPackages()` |
-| **Sim scenario packs** | (a) Project-local source files under `opensip-tools/sim/`, (b) `node_modules` walk for `opensipTools.kind === 'sim-pack'` marker, (c) `node_modules` walk for `<scope>/scenarios-*` under default + configured `plugins.packageScopes`, (d) project-pinned via `plugins.sim:` list under `.runtime/plugins/sim/`. | Inside simulation's `ensureScenariosLoaded()` |
-| **Graph adapters** | (a) Explicit `plugins.graphAdapters:` list in `opensip-tools.config.yml` (when present, replaces the auto-scan entirely), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for any package whose name matches `@opensip-tools/graph-*` **and** declares the `opensipTools.kind: "graph-adapter"` marker (so shared scaffolding under the same prefix — e.g. `@opensip-tools/graph-adapter-common` — is not mistaken for an adapter). | At CLI startup, by `discoverGraphAdapterPackages()` |
+| **Check packs** (`fit-pack`) | (a) `node_modules` walk for the `opensipTools.kind === 'fit-pack'` marker (built-ins resolve from the CLI install tree), (b) exact `plugins.checkPackages:` list ADDED to marker discovery. Co-located `recipes` route to the `fit-recipe` domain. | The GENERIC substrate (`discoverCapabilityContributions` → `loadCapabilityDomain`), driven by fitness's `ensureChecksLoaded()` |
+| **Sim scenario packs** (`sim-pack`) | (a) Project-local source files under `opensip-tools/sim/`, (b) `node_modules` walk for `<scope>/scenarios-*` under default + configured `plugins.packageScopes`, (c) explicit `plugins.scenarioPackages:` pin. (The `sim-pack` marker fallback was retired in v3.0.0 — the descriptor is single-mode `name-pattern`.) Co-located `recipes` route to the `sim-recipe` domain. | The GENERIC substrate, driven by simulation's `ensureScenariosLoaded()` |
+| **Graph adapters** (`graph-adapter`) | (a) Explicit `plugins.graphAdapters:` list (pins the set), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for the `opensipTools.kind: "graph-adapter"` marker (built-ins from the CLI install tree; shared scaffolding like `@opensip-tools/graph-adapter-common` carries no marker and is skipped). | The GENERIC substrate, driven per command by the CLI pre-action hook (`loadOwningToolCapabilities`) |
 | **Language adapters** | Direct CLI imports (no discovery walk) | At CLI bootstrap, before any tool is mounted |
 
 Different kinds, different lifetimes. Tools are global to the binary — once registered, they're available regardless of cwd. Check packs and scenario packs are project-scoped — they load when the relevant Tool actually runs. Language adapters are bundled — they're a CLI dep, not a discoverable plugin, because the framework can't usefully run without them.

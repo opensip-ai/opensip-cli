@@ -15,7 +15,7 @@ source-files:
   - packages/graph/graph-rust/src/index.ts
   - packages/graph/graph-go/src/index.ts
   - packages/graph/graph-java/src/index.ts
-  - packages/cli/src/bootstrap/register-graph-adapters.ts
+  - packages/cli/src/bootstrap/load-tool-capabilities.ts
   - packages/graph/graph-typescript/src/__tests__/lang-adapter-contract.test.ts
 related-docs:
   - ./01-stages-and-catalog.md
@@ -198,7 +198,7 @@ export const cppGraphAdapter: GraphLanguageAdapter<CppParsedProject> = {
 export const adapter = cppGraphAdapter;
 ```
 
-The CLI bootstrap discovery path ([`packages/cli/src/bootstrap/register-graph-adapters.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/bootstrap/register-graph-adapters.ts)) imports discovered packages and calls `registerAdapter(adapter)`. A new adapter is live once it is installed or present in the workspace.
+The generic capability loader ([`packages/cli/src/bootstrap/load-tool-capabilities.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/bootstrap/load-tool-capabilities.ts)) discovers `graph-adapter` packages per command and routes each package's `adapter` export through graph's registrar into the per-run scope. A new adapter is live once it is installed or present in the workspace.
 
 Once two or more adapters are registered, [`pickAdapter(cwd)`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/lang-adapter/registry.ts) chooses by file-extension dominance with a deterministic preference list. Add your language to the preference list in `resolveTie` if you ship a new first-party adapter.
 

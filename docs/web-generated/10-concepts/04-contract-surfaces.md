@@ -227,7 +227,7 @@ The kernel's [`discoverToolPackages`](https://github.com/opensip-ai/opensip-tool
 }
 ```
 
-The canonical contract is the `opensipTools.kind: "fit-pack"` marker ([ADR-0007](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0007-marker-canonical-plugin-discovery.md)). The fitness engine discovers marker-declared packs from project `node_modules`; `plugins.checkPackages:` can additionally name exact packages that do not declare the marker yet. The old `@opensip-tools/checks-*` name-prefix scan has been removed. All first-party `@opensip-tools/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]`, optionally `recipes: FitnessRecipe[]`, and optionally `checkDisplay: Record<string, [icon, name]>`.
+The canonical contract is the `opensipTools.kind: "fit-pack"` marker ([ADR-0007](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0007-marker-canonical-plugin-discovery.md)). The fitness engine discovers marker-declared packs from project `node_modules`; `plugins.checkPackages:` can additionally name exact packages that do not declare the marker yet. The old `@opensip-tools/checks-*` name-prefix scan has been removed. All first-party `@opensip-tools/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]` (each carrying its own `config.icon`/`config.displayName`) and optionally `recipes: FitnessRecipe[]`. There is no separate `checkDisplay` export — display travels on the check (§5.3).
 
 For packs published under your own scope, declare the marker or pin the package explicitly in the project config:
 
