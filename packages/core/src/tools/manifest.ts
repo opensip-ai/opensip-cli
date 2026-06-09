@@ -39,12 +39,24 @@ export const PLUGIN_API_VERSION = 1;
  * Where a tool plugin came from. Drives the trust policy and the
  * provenance record surfaced in structured logs + `plugin list`.
  *
- *   - `bundled`       — a first-party tool shipped with the CLI.
- *   - `installed`     — an npm package discovered via tool-package-discovery.
- *   - `project-local` — a tool authored under the project's
- *                       `opensip-tools/` tree (JSON-sidecar manifest).
+ *   - `bundled`       — a first-party tool shipped with the CLI
+ *                       (trusted-by-shipping).
+ *   - `installed`     — an npm package discovered via tool-package-discovery
+ *                       (incl. `plugin add` / `plugin add --project`). Trusted
+ *                       as an installed dependency.
+ *   - `user-global`   — an authored sidecar under
+ *                       `~/.opensip-tools/tools/<name>/`
+ *                       (`opensip-tool.manifest.json`). The user placed it in
+ *                       their own home dir (the `npm i -g` analogue for
+ *                       authored code) → **trusted-by-default**.
+ *   - `project-local` — an authored sidecar under
+ *                       `<project>/opensip-tools/tools/<name>/`
+ *                       (`opensip-tool.manifest.json`). It rides in with
+ *                       `git clone` → **deny-by-default**; admitted only when
+ *                       its id (or `*`) is allowlisted via
+ *                       `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`.
  */
-export type ToolSource = 'bundled' | 'installed' | 'project-local';
+export type ToolSource = 'bundled' | 'installed' | 'user-global' | 'project-local';
 
 /**
  * Identity of a command a tool contributes, as declared in the static

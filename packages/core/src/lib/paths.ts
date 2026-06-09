@@ -9,6 +9,13 @@
  *     fit/recipes/<*.mjs>                       ← custom fitness recipes
  *     sim/scenarios/<*.mjs>                     ← custom sim scenarios
  *     sim/recipes/<*.mjs>                       ← custom sim recipes
+ *     tools/<name>/opensip-tool.manifest.json   ← TRACKED authored Tool
+ *                                                 (whole subcommand; the
+ *                                                 project-local analogue of
+ *                                                 fit/checks + sim/scenarios —
+ *                                                 lives BESIDE fit/sim, NOT
+ *                                                 under .runtime/;
+ *                                                 deny-by-default)
  *     .runtime/                                 ← GITIGNORED — runtime state
  *       sessions/                               ← run history
  *       reports/                                ← dashboard HTML
@@ -22,6 +29,10 @@
  *     plugins/tool/node_modules/                ← user-global Tool plugins
  *                                                 (whole subcommands;
  *                                                 available in every project)
+ *     tools/<name>/opensip-tool.manifest.json   ← user-global authored Tool
+ *                                                 (trusted-by-default authored
+ *                                                 sidecar; the `npm i -g`
+ *                                                 analogue for authored code)
  *
  * Every consumer (logger, persistence/store, gate, plugin loader,
  * configure command, uninstall command) constructs paths through this
@@ -46,6 +57,13 @@ export interface ProjectPaths {
   readonly configFile: string;
   /** <project>/opensip-tools — user-authored content root. */
   readonly userSourceDir: string;
+  /**
+   * `<project>/opensip-tools/tools` — TRACKED authored Tool sidecars (the
+   * whole-subcommand analogue of fit/checks + sim/scenarios). Each child is
+   * a `<name>/opensip-tool.manifest.json` sidecar. Lives BESIDE `fit/` and
+   * `sim/`, NOT under `.runtime/`; deny-by-default at admission.
+   */
+  readonly authoredToolsDir: string;
   /**
    * `<project>/opensip-tools/<domain>/<kind>` — a tool's user-authored
    * plugin source dir (e.g. `userPluginDir('fit', 'checks')`). Generic
@@ -92,6 +110,7 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
     projectDir,
     configFile: join(projectDir, 'opensip-tools.config.yml'),
     userSourceDir,
+    authoredToolsDir: join(userSourceDir, 'tools'),
     userPluginDir: (domain, kind) => join(userSourceDir, domain, kind),
     runtimeDir,
     sessionsDir: join(runtimeDir, 'sessions'),
@@ -123,6 +142,14 @@ export interface UserPaths {
    */
   readonly pluginsDir: (domain: string) => string;
   /**
+   * `~/.opensip-tools/tools` — global authored Tool sidecars
+   * (trusted-by-default). Each child is a
+   * `<name>/opensip-tool.manifest.json` sidecar. The user placed it in
+   * their own home dir → admitted without an allowlist (the `npm i -g`
+   * analogue for authored code).
+   */
+  readonly authoredToolsDir: string;
+  /**
    * ~/.opensip-tools/update-state.json — tool-generated cache of the
    * last-known newer published version, so the "update available" notice can
    * persist across runs instead of showing once. NOT user-authored: written
@@ -139,6 +166,7 @@ export function resolveUserPaths(): UserPaths {
     userHomeDir,
     configFile: join(userHomeDir, 'config.yml'),
     updateStateFile: join(userHomeDir, 'update-state.json'),
+    authoredToolsDir: join(userHomeDir, 'tools'),
     pluginsDir: (domain) => join(userHomeDir, 'plugins', domain),
   };
 }
