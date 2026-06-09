@@ -21,6 +21,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'graph-signal-stamped': ['🏷️', 'Graph Signal Stamped'],
   'heavy-import-detection': ['📦', 'Heavy Import Detection'],
   'interface-implementation-consistency': ['📋', 'Interface Implementation Consistency'],
+  'live-runs-off-thread': ['🧵', 'Live Runs Off Thread'],
   'no-custom-event-emitter': ['📨', 'No Custom Event Emitter'],
   'no-direct-stdout-in-tool-engine': ['📤', 'No Direct Stdout In Tool Engine'],
   'no-config-loader-outside-config': ['🔐', 'No Config Loader Outside Config'],

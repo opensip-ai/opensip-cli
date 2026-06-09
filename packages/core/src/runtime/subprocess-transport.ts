@@ -18,6 +18,7 @@
 import { fork } from 'node:child_process';
 
 import { EnvRegistry } from '../lib/env-registry.js';
+import { logger } from '../lib/logger.js';
 
 import { createInProcessTransport } from './in-process-transport.js';
 
@@ -131,9 +132,16 @@ export function runOffThreadOrInProcess<TEvent, TResult>(opts: {
   if (preferWorker) {
     try {
       return createSubprocessProgressRun<TEvent, TResult>(opts.descriptor);
-    } catch {
-      // The child could not be forked — fall through to in-process so the run
-      // still completes (the live view may stutter; output is unchanged).
+    } catch (error) {
+      // The child could not be forked — degrade to in-process so the run still
+      // completes (the live view may stutter; output is unchanged). Log the
+      // degradation so it is observable rather than a silent swallow.
+      logger.warn({
+        evt: 'transport.worker.fork_failed',
+        module: 'core:subprocess-transport',
+        command: opts.descriptor.command,
+        err: error instanceof Error ? error.message : String(error),
+      });
     }
   }
   return createInProcessTransport().run<TEvent, TResult>(opts.inProcess);
