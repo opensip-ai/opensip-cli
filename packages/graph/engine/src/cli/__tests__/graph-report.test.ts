@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
-import { buildUnifiedReportLines, resolutionBannerText } from '../graph-report.js';
+import { buildLiveGraphOutput, buildUnifiedReportLines, resolutionBannerText } from '../graph-report.js';
 
 import type { Catalog, FunctionOccurrence } from '../../types.js';
 import type { Signal } from '@opensip-tools/core';
@@ -119,5 +119,24 @@ describe('resolutionBannerText', () => {
     expect(resolutionBannerText('fast')).toContain('Resolution: fast (syntactic)');
     expect(resolutionBannerText('exact')).toBeUndefined();
     expect(resolutionBannerText(undefined)).toBeUndefined();
+  });
+});
+
+describe('buildLiveGraphOutput', () => {
+  it('reduces a build to the slim, serializable { signals, reportLines } payload', () => {
+    const catalog = catalogOf([occ()]);
+    const indexes = buildIndexes(catalog);
+    const signals = [signal()];
+    const out = runWithScopeSync(makeGraphTestScope(), () =>
+      buildLiveGraphOutput({ catalog, indexes, signals, cacheHit: true }),
+    );
+    // The signals pass through verbatim (the parent persists them + derives the verdict).
+    expect(out.signals).toBe(signals);
+    // reportLines are pre-rendered WITHOUT the "== Summary ==" footer — RunSummary
+    // renders that in the live view's place (includeSummary: false).
+    const text = out.reportLines.join('\n');
+    expect(text).toContain('== Catalog ==');
+    expect(text).toContain('== Findings (1) ==');
+    expect(text).not.toContain('== Summary ==');
   });
 });

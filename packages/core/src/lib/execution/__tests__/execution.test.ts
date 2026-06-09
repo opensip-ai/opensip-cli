@@ -118,6 +118,32 @@ describe('scheduleUnits', () => {
     // and flips `aborted`, so unit 2's top-check breaks before it launches.
     expect(seen).toEqual([1]);
   });
+
+  it('yieldBetweenUnits runs every unit in order through the macrotask-yield wrapper (sequential)', async () => {
+    // Exercises the yieldToEventLoop boundary path: each unit resolves after a
+    // setImmediate turn, so a same-thread live-progress timer could paint between
+    // units. Behaviour (order, stop policy) is unchanged from the no-yield path.
+    const seen: number[] = [];
+    await scheduleUnits<number>({
+      units: [1, 2, 3],
+      mode: 'sequential',
+      yieldBetweenUnits: true,
+      runUnit: (u) => { seen.push(u); return Promise.resolve({ shouldStop: false }); },
+    });
+    expect(seen).toEqual([1, 2, 3]);
+  });
+
+  it('yieldBetweenUnits also applies in parallel mode (all units still run)', async () => {
+    const seen: number[] = [];
+    await scheduleUnits<number>({
+      units: [1, 2, 3, 4],
+      mode: 'parallel',
+      maxParallel: 2,
+      yieldBetweenUnits: true,
+      runUnit: (u) => { seen.push(u); return Promise.resolve({ shouldStop: false }); },
+    });
+    expect(seen.toSorted((a, b) => a - b)).toEqual([1, 2, 3, 4]);
+  });
 });
 
 describe('executePipeline (combinator)', () => {
