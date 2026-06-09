@@ -34,6 +34,16 @@
  * `@opensip-tools/config` in 2.10.1.) Audit 2026-05-23 M1.
  */
 
+import {
+  resolveProjectContext,
+  resolveProjectPaths,
+  resolveUserPaths,
+  type LanguageRegistry,
+  type ToolPluginManifest,
+  type ToolProvenance,
+  type ToolRegistry,
+} from '@opensip-tools/core';
+
 import { hostEnv } from '../env/host-env-specs.js';
 import { initTelemetry } from '../telemetry/sdk-init.js';
 
@@ -42,10 +52,9 @@ import {
   BUNDLED_TOOL_PACKAGES,
   registerFirstPartyTools,
   discoverAndRegisterToolPackages,
+  discoverAndRegisterAuthoredTools,
   buildToolDiscoverySources,
 } from './register-tools.js';
-
-import type { LanguageRegistry, ToolPluginManifest, ToolProvenance, ToolRegistry } from '@opensip-tools/core';
 
 // Re-export only the symbols the CLI composition root (`index.ts`) consumes.
 // `mountToolCommands` is the named step-8 seam of the tool lifecycle (release
@@ -133,6 +142,31 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   await discoverAndRegisterToolPackages(
     opts.toolRegistry,
     { sources: buildToolDiscoverySources(opts.cwd, opts.projectDir) },
+    builtInIds,
+    provenance,
+    manifests,
+  );
+  // Authored Tool sidecars (ADR-0027 realization): global trusted-by-default +
+  // project deny-by-default. Resolve the two authored roots — the global root
+  // is always present; the project root is best-effort (an unresolvable
+  // context contributes no project authored leg, mirroring
+  // buildToolDiscoverySources). `builtInIds` stays the BUNDLED set (matching
+  // the installed leg's contract); the registry's first-writer-wins dedupes an
+  // authored-vs-installed same-id collision with a structured warning.
+  const globalAuthoredDir = resolveUserPaths().authoredToolsDir;
+  let projectAuthoredDir: string | undefined;
+  try {
+    const project = resolveProjectContext({ cwd: opts.cwd, cwdExplicit: false });
+    if (project.scope === 'project') {
+      projectAuthoredDir = resolveProjectPaths(project.projectRoot).authoredToolsDir;
+    }
+  } catch {
+    // @swallow-ok no resolvable project context → no project authored leg
+    // (best-effort, same contract as buildToolDiscoverySources).
+  }
+  await discoverAndRegisterAuthoredTools(
+    opts.toolRegistry,
+    { projectAuthoredDir, globalAuthoredDir, env: process.env },
     builtInIds,
     provenance,
     manifests,

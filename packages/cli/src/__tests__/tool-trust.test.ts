@@ -80,13 +80,16 @@ describe('admitProjectLocalTool — trust gate precedes import', () => {
   it('admits an allowlisted, in-range project-local tool with provenance', () => {
     const dir = stageProjectLocalTool('trusted-tool', 1);
     staged.push(dir);
-    const provenance = admitProjectLocalTool({
+    const { provenance, manifest } = admitProjectLocalTool({
       dir,
       env: { [PROJECT_TOOL_ALLOWLIST_ENV]: 'trusted-tool' },
     });
     expect(provenance.source).toBe('project-local');
     expect(provenance.id).toBe('trusted-tool');
     expect(provenance.manifestHash.length).toBeGreaterThan(0);
+    // The admission now returns the loaded manifest so the discovery walk can
+    // run the drift guard + seed capabilities without a second read.
+    expect(manifest.id).toBe('trusted-tool');
   });
 
   it('fail-closes a missing/malformed sidecar manifest', () => {
