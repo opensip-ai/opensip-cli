@@ -79,20 +79,13 @@ export function isMarkerKind(value: unknown): value is MarkerKind {
 export function discoverPackagesByMarker(
   options: MarkerDiscoveryOptions,
 ): DiscoveredMarkerPackage[] {
-  const { projectDir, kind } = options;
-  const seen = new Set<string>();
-  const out: DiscoveredMarkerPackage[] = [];
-  let dir = projectDir;
-  let prev = '';
-  while (dir !== prev) {
-    const nodeModules = join(dir, 'node_modules');
-    if (existsSync(nodeModules)) {
-      collectFromNodeModules(nodeModules, kind, seen, out);
-    }
-    prev = dir;
-    dir = dirname(dir);
-  }
-  return out;
+  // Typed narrowing wrapper over the raw-string walker: the kind passed in is a
+  // MarkerKind, so every result's echoed kind is that same MarkerKind.
+  return discoverPackagesByDeclaredKind(options.projectDir, options.kind).map((p) => ({
+    name: p.name,
+    packageDir: p.packageDir,
+    kind: p.kind as MarkerKind,
+  }));
 }
 
 /**
@@ -106,19 +99,57 @@ export function discoverPackagesInNodeModules(
   nodeModulesDir: string,
   kind: MarkerKind,
 ): DiscoveredMarkerPackage[] {
-  const out: DiscoveredMarkerPackage[] = [];
+  const out: DiscoveredDeclaredPackage[] = [];
   if (existsSync(nodeModulesDir)) {
-    collectFromNodeModules(nodeModulesDir, kind, new Set<string>(), out);
+    collectByDeclaredKind(nodeModulesDir, kind, new Set<string>(), out);
+  }
+  return out.map((p) => ({ name: p.name, packageDir: p.packageDir, kind: p.kind as MarkerKind }));
+}
+
+/**
+ * A package discovered by its declared `opensipTools.kind`, with the kind as a
+ * raw string (NOT narrowed to the closed `MarkerKind` union). This is the shape
+ * the generic capability-discovery substrate consumes — a domain's marker kind
+ * comes from its manifest descriptor, so it cannot be a compile-time union member.
+ */
+export interface DiscoveredDeclaredPackage {
+  readonly name: string;
+  readonly packageDir: string;
+  readonly kind: string;
+}
+
+/**
+ * Walk ancestor `node_modules/` directories from `projectDir`, returning every
+ * package whose `package.json` declares `opensipTools.kind === kind` for the
+ * given raw-string kind. The string-typed generalization of
+ * {@link discoverPackagesByMarker}: the closed-union version is a thin wrapper
+ * over this. Deduplicated; first occurrence walking outward wins.
+ */
+export function discoverPackagesByDeclaredKind(
+  projectDir: string,
+  kind: string,
+): DiscoveredDeclaredPackage[] {
+  const seen = new Set<string>();
+  const out: DiscoveredDeclaredPackage[] = [];
+  let dir = projectDir;
+  let prev = '';
+  while (dir !== prev) {
+    const nodeModules = join(dir, 'node_modules');
+    if (existsSync(nodeModules)) {
+      collectByDeclaredKind(nodeModules, kind, seen, out);
+    }
+    prev = dir;
+    dir = dirname(dir);
   }
   return out;
 }
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- node_modules walker: handles both flat and @scope/* layouts and skips invalid entries inline
-function collectFromNodeModules(
+function collectByDeclaredKind(
   nodeModulesDir: string,
-  kind: MarkerKind,
+  kind: string,
   seen: Set<string>,
-  out: DiscoveredMarkerPackage[],
+  out: DiscoveredDeclaredPackage[],
 ): void {
   for (const entry of safeReaddir(nodeModulesDir)) {
     if (entry.startsWith('.')) continue;
@@ -130,7 +161,7 @@ function collectFromNodeModules(
         const name = `${entry}/${scopedEntry}`;
         if (seen.has(name)) continue;
         const pkgDir = join(entryPath, scopedEntry);
-        if (readMarkerKind(pkgDir) === kind) {
+        if (readDeclaredKind(pkgDir) === kind) {
           seen.add(name);
           out.push({ name, packageDir: pkgDir, kind });
         }
@@ -138,7 +169,7 @@ function collectFromNodeModules(
       continue;
     }
     if (seen.has(entry)) continue;
-    if (readMarkerKind(entryPath) === kind) {
+    if (readDeclaredKind(entryPath) === kind) {
       seen.add(entry);
       out.push({ name: entry, packageDir: entryPath, kind });
     }
@@ -157,6 +188,20 @@ function collectFromNodeModules(
  * function, so there is no second implementation to drift.
  */
 export function readMarkerKind(packageDir: string): MarkerKind | undefined {
+  const kind = readDeclaredKind(packageDir);
+  return isMarkerKind(kind) ? kind : undefined;
+}
+
+/**
+ * Read the RAW `opensipTools.kind` string from a package's package.json — the
+ * string-typed sibling of {@link readMarkerKind}, with no closed-union narrowing.
+ * Returns the string if it parses and is a string; otherwise undefined. Parse
+ * failures are logged at debug (a malformed node_modules package.json is an
+ * entry to skip, not a discovery error). The generic discovery substrate reads
+ * declared kinds through this one function so there is no second implementation
+ * to drift.
+ */
+export function readDeclaredKind(packageDir: string): string | undefined {
   const pkgJsonPath = join(packageDir, 'package.json');
   if (!existsSync(pkgJsonPath)) return undefined;
   try {
@@ -164,7 +209,7 @@ export function readMarkerKind(packageDir: string): MarkerKind | undefined {
       opensipTools?: { kind?: unknown };
     };
     const kind = pkg.opensipTools?.kind;
-    return isMarkerKind(kind) ? kind : undefined;
+    return typeof kind === 'string' ? kind : undefined;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logger.debug({

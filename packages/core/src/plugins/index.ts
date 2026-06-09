@@ -44,11 +44,28 @@ export type {
 } from './tool-package-discovery.js'
 export {
   discoverPackagesByMarker,
+  discoverPackagesByDeclaredKind,
   discoverPackagesInNodeModules,
   isMarkerKind,
   readMarkerKind,
+  readDeclaredKind,
   MARKER_KINDS,
 } from './marker-discovery.js'
+export type {
+  DiscoveredDeclaredPackage,
+} from './marker-discovery.js'
+// The generic capability-contribution discovery substrate (§5.3): one walker
+// over marker + name-pattern modes that the host registry drives, replacing the
+// three bespoke per-tool loaders. Yields raw contributions for routing.
+export {
+  discoverCapabilityContributions,
+} from './capability-discovery.js'
+export type {
+  CapabilityDiscoveryPreferences,
+  RawCapabilityContribution,
+  CapabilityDiscoveryDiagnostic,
+  DiscoverCapabilityContributionsOptions,
+} from './capability-discovery.js'
 export {
   discoverScopedPackages,
   hasPackageJson,
