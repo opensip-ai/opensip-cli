@@ -13,6 +13,8 @@ related-docs:
   - ./03-publishable-packs.md
   - ../10-concepts/02-tool-plugin-model.md
   - ../70-reference/01-cli-commands.md
+  - ../70-reference/10-environment-variables.md
+  - ../../decisions/ADR-0030-authored-tool-discovery.md
 ---
 # Full Tool plugins
 
@@ -116,8 +118,58 @@ The three command declarations — `package.json`'s `opensipTools.commands`, the
 
 That's the whole tool. Install it either way and `opensip-tools audit-sec` works on the next invocation:
 
-- **`opensip-tools plugin add @my-co/audit-sec`** — the CLI detects the `opensipTools.kind: "tool"` marker (reading a local path's `package.json`, or `npm view` for a registry spec) and installs it **user-global** into `~/.opensip-tools/plugins/tool/`, so the subcommand is available in **every** project. Add `--project` to install it project-local under `<project>/opensip-tools/.runtime/plugins/tool/` instead (that copy is gitignored and not shared with teammates). Unlike fit/sim packs, a tool needs **no** `plugins.<domain>` config entry — it auto-discovers by its marker. (If detection can't reach the registry — offline / private — pass `--domain tool` to force the tool path.)
-- Add `@my-co/audit-sec` to your project dependencies — discovery walks the project tree's `node_modules`, so a plain project dependency is picked up too. A user-global tool next to a global `opensip-tools` is found via the CLI's own install tree.
+- **`opensip-tools plugin add @my-co/audit-sec`** — the CLI detects the `opensipTools.kind: "tool"` marker (reading a local path's `package.json`, or `npm view` for a registry spec) and installs it **user-global** into `~/.opensip-tools/plugins/tool/`, so the subcommand is available in **every** project — the cross-project analogue of `npm i -g`. Add `--project` to install it project-local under `<project>/opensip-tools/.runtime/plugins/tool/` instead (that copy is **gitignored and not shared** with teammates, and keeps provenance `installed` — it is still an npm install, not authored content). Unlike fit/sim packs, a tool needs **no** `plugins.<domain>` config entry — it auto-discovers by its marker. (If detection can't reach the registry — offline / private — pass `--domain tool` to force the tool path.)
+- **`npm install @my-co/audit-sec`** in your project — discovery walks the project tree's `node_modules`, so a plain install is picked up too. A global `npm i -g @my-co/audit-sec` next to a global `opensip-tools` is found via the CLI's own install tree.
+
+## Authored Tool sidecars (tracked, no npm install)
+
+The routes above all package your tool as **npm** (provenance `installed`). A
+second mechanism lets you author a Tool as **tracked source** — the
+whole-subcommand analogue of the `opensip-tools/fit/checks/` and
+`opensip-tools/sim/scenarios/` convention — with no `npm install` and no
+`package.json` marker. You declare identity via an `opensip-tool.manifest.json`
+**sidecar** next to the tool's built entry, in one of two locations with
+**different trust postures**:
+
+- `<project>/opensip-tools/tools/<name>/opensip-tool.manifest.json` — **TRACKED**,
+  committed alongside `opensip-tools/fit/` and `opensip-tools/sim/`. It is
+  **deny-by-default**: it rides in with a `git clone` before you've read it, so
+  loading it would run untrusted code. It is admitted **only** when its `id` (or
+  `*`) appears in `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`; otherwise the CLI
+  **fail-closes (exit 5) before importing it**. Provenance is `project-local`.
+- `~/.opensip-tools/tools/<name>/opensip-tool.manifest.json` — **trusted-by-default**:
+  you placed it in your own home dir (the `npm i -g` analogue for authored code),
+  so it loads without an allowlist. Provenance is `user-global`.
+
+The sidecar **is** the manifest block (there is no `package.json` alongside it),
+carrying the same identity fields inline — `kind`, `id`, `name`, `version`,
+`apiVersion`, `commands` — plus the path to the tool's own resolved main entry:
+
+```jsonc
+// <project>/opensip-tools/tools/audit-sec/opensip-tool.manifest.json
+{
+  "kind": "tool",
+  "id": "audit-sec",
+  "name": "Security audit",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "main": "dist/index.js",
+  "commands": [
+    { "name": "audit-sec", "description": "Run the security audit" }
+  ]
+}
+```
+
+The runtime contract is unchanged — the directory's resolved main must export
+`tool: Tool`, and the host runs the same `assertManifestMatchesTool` drift guard.
+Authored discovery, admission, dynamic import, and registration travel the exact
+same path bundled and installed tools do ([ADR-0030](../../decisions/ADR-0030-authored-tool-discovery.md)).
+
+> **Sidecar vs `plugin add --project`.** `plugin add --project` *installs an npm
+> package* into the gitignored `.runtime/plugins/tool/` and keeps provenance
+> `installed`. An authored sidecar is *tracked source* with provenance
+> `project-local` (project) or `user-global` (home). They are different
+> mechanisms; the provenance label in `plugin list` tells them apart.
 
 ## What you don't need
 
@@ -156,6 +208,7 @@ For your own Tool plugin you don't reuse any of these: you declare each command'
 - **Use `--debug` aggressively while authoring.** Your check's log lines (`ctx.log(...)`) appear in stderr; the day-level log file under `<project>/opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl` archives them. Filter by `runId` with `jq` if multiple runs landed in the same file.
 - **Pin your peer-deps to majors, not minors.** Minor opensip-tools releases are non-breaking; pinning to a minor unnecessarily blocks consumers who are already on a newer minor.
 - **Use the right discovery shape for the right export.** A package marked `opensipTools.kind: 'tool'` is treated as a Tool by the discovery walker — it must export `tool: Tool`. A check pack uses `kind: 'fit-pack'` (or `'sim-pack'`) and exports `checks` / `recipes`. Mismatching the two leads to a load failure that's logged but not fatal.
+- **An authored sidecar tool is discovered by file presence, not a marker.** A tool under a `tools/` root (`<project>/opensip-tools/tools/` or `~/.opensip-tools/tools/`) is found by the presence of `opensip-tool.manifest.json`, not by a `node_modules` `opensipTools.kind` marker. Remember the project (`project-local`) location is deny-by-default — allowlist its `id` in `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS` or it fail-closes before import.
 
 ## Where to go next
 

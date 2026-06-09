@@ -181,6 +181,14 @@ distinct from:
   persistence/egress stay on the main process post-run; engine entries are
   persistence-free; `--json`/non-TTY stays in-process; `OPENSIP_TOOLS_NO_WORKER`
   forces the in-process fallback. Exercises the reversibility ADR-0016 reserved
+- [ADR-0030](./ADR-0030-authored-tool-discovery.md) — Authored-Tool discovery
+  realizes the ADR-0027 three-sources-one-path claim for the authored source:
+  an `opensip-tool.manifest.json` sidecar under `~/.opensip-tools/tools/` (new
+  `user-global` source, trusted-by-default) or `<project>/opensip-tools/tools/`
+  (re-scoped `project-local`, deny-by-default — allowlist via
+  `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`, fail-closed exit 5 before import) is
+  discovered, trust-gated, and routed through the same admit → import → register
+  path bundled/installed tools travel. `plugin add --project` stays `installed`
 
 ### Superseded
 
