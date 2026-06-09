@@ -1,56 +1,59 @@
 /**
- * @fileoverview Language-aware parse cache — module-level helpers.
+ * @fileoverview Language-aware parse cache — scope-owned helpers.
  *
  * The `LanguageParseCache` class definition lives in `parse-cache-class.ts`
- * so `RunScope` (which holds a default `LanguageParseCache` field) and
- * this module (which reads `currentScope()`) don't form an import cycle.
- * The helpers in this file operate on a module-level default instance.
+ * so `RunScope` (which holds a `LanguageParseCache` field) and this module
+ * (which reads `currentScope()`) don't form an import cycle.
  *
- * Two access patterns:
+ * The `initParseCache` / `clearParseCache` / `getParseTree` helpers operate on
+ * the CURRENT RunScope's `parseCache` (`currentScope().parseCache`), NOT a
+ * module-level singleton. This is the scope-isolation fix (audit F2): two
+ * concurrent fit runs (different scopes) carry independent parse caches, and no
+ * process-global cache leaks state between runs or survives a run's teardown.
+ * Outside a `RunScope`, `initParseCache`/`clearParseCache` are no-ops and
+ * `getParseTree` falls back to a direct, uncached parse (single-check mode).
  *
- *   1. The exported `initParseCache` / `clearParseCache` / `getParseTree`
- *      helpers operate on a module-level `defaultParseCache` instance.
- *      Production code (FitnessRecipe service, individual checks) uses
- *      these.
- *
- *   2. The exported `LanguageParseCache` class is constructible by tests
- *      (or tools that need an isolated cache). A test that
- *      `new LanguageParseCache(); cache.dispose()` no longer leaves the
- *      module-level setTimeout running, so the test runner's exit
- *      cleanliness check passes.
+ * The `LanguageParseCache` class is still exported for `RunScope` (which
+ * constructs the per-run instance) and for tests/tools that want an isolated
+ * cache.
  */
 
 import { logger } from '../lib/logger.js'
 import { currentScope } from '../lib/run-scope.js'
-
-import { LanguageParseCache } from './parse-cache-class.js'
 
 import type { LanguageAdapter } from './adapter.js'
 
 export { LanguageParseCache } from './parse-cache-class.js'
 
 // =============================================================================
-// MODULE-LEVEL DEFAULT INSTANCE + COMPATIBILITY HELPERS
+// SCOPE-OWNED PARSE-CACHE HELPERS
 // =============================================================================
 
-let activeCache: LanguageParseCache | null = null
-
-/** Called by FitnessRecipeService.start() before check execution. */
+/**
+ * Called by FitnessRecipeService before check execution. Clears any stale
+ * entries on the current scope's parse cache and arms its auto-clear timer.
+ * No-op outside a RunScope.
+ */
 export function initParseCache(): void {
-  activeCache?.dispose()
-  activeCache = new LanguageParseCache()
-  activeCache.startAutoClear()
-}
-
-/** Called by FitnessRecipeService after check execution completes. */
-export function clearParseCache(): void {
-  activeCache?.dispose()
-  activeCache = null
+  const cache = currentScope()?.parseCache
+  if (!cache) return
+  cache.clear()
+  cache.startAutoClear()
 }
 
 /**
- * Get or parse the file under the given adapter. Falls back to a direct
- * parse if no cache is active (single-check mode).
+ * Called by FitnessRecipeService after check execution completes. Clears the
+ * current scope's parse cache and stops its auto-clear timer. No-op outside a
+ * RunScope — the scope itself disposes its cache on teardown.
+ */
+export function clearParseCache(): void {
+  currentScope()?.parseCache.dispose()
+}
+
+/**
+ * Get or parse the file under the given adapter, using the CURRENT scope's
+ * parse cache. Falls back to a direct (uncached) parse when there is no active
+ * scope (single-check mode).
  *
  * Generic over TTree so call sites that already know the language (e.g.
  * lang-typescript callers passing the TS adapter) get back ts.SourceFile
@@ -61,8 +64,9 @@ export function getParseTree<TTree>(
   filePath: string,
   content: string,
 ): TTree | null {
-  if (activeCache) {
-    return activeCache.getOrParse(adapter, filePath, content)
+  const cache = currentScope()?.parseCache
+  if (cache) {
+    return cache.getOrParse(adapter, filePath, content)
   }
   return adapter.parse(content, filePath)
 }

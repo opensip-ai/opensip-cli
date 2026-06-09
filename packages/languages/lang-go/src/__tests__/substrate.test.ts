@@ -1,3 +1,4 @@
+import { RunScope, runWithScopeSync } from '@opensip-tools/core'
 import { initParseCache, clearParseCache } from '@opensip-tools/core/languages/parse-cache.js'
 import { walkNodes } from '@opensip-tools/tree-sitter'
 import { describe, expect, it } from 'vitest'
@@ -59,14 +60,16 @@ describe('go substrate', () => {
   })
 
   it('getSharedTree caches within an active parse cache', () => {
-    initParseCache()
-    try {
-      const a = getSharedTree('x.go', 'package p\nfunc x() {}\n')
-      const b = getSharedTree('x.go', 'package p\nfunc x() {}\n')
-      expect(a).toBe(b)
-    } finally {
-      clearParseCache()
-    }
+    runWithScopeSync(new RunScope(), () => {
+      initParseCache()
+      try {
+        const a = getSharedTree('x.go', 'package p\nfunc x() {}\n')
+        const b = getSharedTree('x.go', 'package p\nfunc x() {}\n')
+        expect(a).toBe(b)
+      } finally {
+        clearParseCache()
+      }
+    })
   })
 
   it('findEnclosingFunction resolves the nearest func/method', () => {

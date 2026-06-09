@@ -1,5 +1,6 @@
-import { initParseCache, clearParseCache } from '@opensip-tools/core/languages/parse-cache.js'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { RunScope, runWithScopeSync } from '@opensip-tools/core'
+import { initParseCache } from '@opensip-tools/core/languages/parse-cache.js'
+import { describe, expect, it } from 'vitest'
 
 import { parsePython } from '../parse.js'
 import { getSharedTree } from '../shared-tree.js'
@@ -27,13 +28,13 @@ describe('getSharedTree', () => {
   })
 
   describe('with an active parse cache', () => {
-    beforeEach(() => initParseCache())
-    afterEach(() => clearParseCache())
-
     it('returns the same cached tree identity on repeat calls', () => {
-      const a = getSharedTree('x.py', 'x = 1\n')
-      const b = getSharedTree('x.py', 'x = 1\n')
-      expect(a).toBe(b)
+      runWithScopeSync(new RunScope(), () => {
+        initParseCache()
+        const a = getSharedTree('x.py', 'x = 1\n')
+        const b = getSharedTree('x.py', 'x = 1\n')
+        expect(a).toBe(b)
+      })
     })
   })
 })

@@ -1,3 +1,4 @@
+import { RunScope, runWithScopeSync } from '@opensip-tools/core'
 import { initParseCache, clearParseCache } from '@opensip-tools/core/languages/parse-cache.js'
 import { nameOf, walkNodes } from '@opensip-tools/tree-sitter'
 import { describe, expect, it } from 'vitest'
@@ -66,14 +67,16 @@ describe('rust substrate', () => {
   })
 
   it('getSharedTree caches within an active parse cache', () => {
-    initParseCache()
-    try {
-      const a = getSharedTree('x.rs', 'fn x() {}')
-      const b = getSharedTree('x.rs', 'fn x() {}')
-      expect(a).toBe(b)
-    } finally {
-      clearParseCache()
-    }
+    runWithScopeSync(new RunScope(), () => {
+      initParseCache()
+      try {
+        const a = getSharedTree('x.rs', 'fn x() {}')
+        const b = getSharedTree('x.rs', 'fn x() {}')
+        expect(a).toBe(b)
+      } finally {
+        clearParseCache()
+      }
+    })
   })
 
   it('findEnclosingFunction resolves the nearest fn', () => {

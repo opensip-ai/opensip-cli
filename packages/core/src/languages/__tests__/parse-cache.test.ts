@@ -44,31 +44,57 @@ describe('language-aware parse cache', () => {
   })
 
   it('returns the same tree object on a second call (cache hit)', () => {
-    initParseCache()
-    const adapter = makeAdapter('rust', ['.rs'])
-    const first = getParseTree(adapter, 'foo.rs', 'fn main() {}')
-    const second = getParseTree(adapter, 'foo.rs', 'fn main() {}')
-    expect(first).not.toBeNull()
-    expect(first).toBe(second)
+    runWithScopeSync(new RunScope({ languages: testRegistry }), () => {
+      initParseCache()
+      const adapter = makeAdapter('rust', ['.rs'])
+      const first = getParseTree(adapter, 'foo.rs', 'fn main() {}')
+      const second = getParseTree(adapter, 'foo.rs', 'fn main() {}')
+      expect(first).not.toBeNull()
+      expect(first).toBe(second)
+    })
   })
 
   it('uses different cache entries for different adapters with the same file', () => {
-    initParseCache()
-    const rustAdapter = makeAdapter('rust', ['.rs'])
-    const otherAdapter = makeAdapter('other', ['.other'])
-    const rustTree = getParseTree(rustAdapter, 'foo', 'content')
-    const otherTree = getParseTree(otherAdapter, 'foo', 'content')
-    expect(rustTree).not.toBe(otherTree)
-    expect(rustTree?.id).toBe(1)
-    expect(otherTree?.id).toBe(2)
+    runWithScopeSync(new RunScope({ languages: testRegistry }), () => {
+      initParseCache()
+      const rustAdapter = makeAdapter('rust', ['.rs'])
+      const otherAdapter = makeAdapter('other', ['.other'])
+      const rustTree = getParseTree(rustAdapter, 'foo', 'content')
+      const otherTree = getParseTree(otherAdapter, 'foo', 'content')
+      expect(rustTree).not.toBe(otherTree)
+      expect(rustTree?.id).toBe(1)
+      expect(otherTree?.id).toBe(2)
+    })
   })
 
   it('different content for the same adapter+file misses', () => {
-    initParseCache()
+    runWithScopeSync(new RunScope({ languages: testRegistry }), () => {
+      initParseCache()
+      const adapter = makeAdapter('rust', ['.rs'])
+      const a = getParseTree(adapter, 'foo.rs', 'fn a() {}')
+      const b = getParseTree(adapter, 'foo.rs', 'fn b() {}')
+      expect(a).not.toBe(b)
+    })
+  })
+
+  it('two concurrent scopes carry independent parse caches (F2 isolation)', () => {
     const adapter = makeAdapter('rust', ['.rs'])
-    const a = getParseTree(adapter, 'foo.rs', 'fn a() {}')
-    const b = getParseTree(adapter, 'foo.rs', 'fn b() {}')
-    expect(a).not.toBe(b)
+    const src = 'fn main() {}'
+
+    const fromA = runWithScopeSync(new RunScope({ languages: testRegistry }), () => {
+      initParseCache()
+      return getParseTree(adapter, 'foo.rs', src)
+    })
+    const fromB = runWithScopeSync(new RunScope({ languages: testRegistry }), () => {
+      initParseCache()
+      return getParseTree(adapter, 'foo.rs', src)
+    })
+
+    // Different scopes → different cache instances → distinct tree objects, no
+    // cross-scope leakage. (A module-global cache would have returned the same one.)
+    expect(fromA).not.toBeNull()
+    expect(fromB).not.toBeNull()
+    expect(fromA).not.toBe(fromB)
   })
 
   it('with no active cache, getParseTree still parses (delegates direct)', () => {
@@ -107,13 +133,15 @@ describe('language-aware parse cache', () => {
   })
 
   it('clearParseCache zeros the cache', () => {
-    initParseCache()
-    const adapter = makeAdapter('rust', ['.rs'])
-    const first = getParseTree(adapter, 'foo.rs', 'fn main() {}')
-    clearParseCache()
-    initParseCache()
-    const second = getParseTree(adapter, 'foo.rs', 'fn main() {}')
-    expect(first).not.toBe(second)
+    runWithScopeSync(new RunScope({ languages: testRegistry }), () => {
+      initParseCache()
+      const adapter = makeAdapter('rust', ['.rs'])
+      const first = getParseTree(adapter, 'foo.rs', 'fn main() {}')
+      clearParseCache()
+      initParseCache()
+      const second = getParseTree(adapter, 'foo.rs', 'fn main() {}')
+      expect(first).not.toBe(second)
+    })
   })
 
   it('returns null when the adapter parse returns null', () => {
@@ -130,20 +158,22 @@ describe('language-aware parse cache', () => {
   })
 
   describe('LanguageParseCache (fresh instance)', () => {
-    it('a fresh instance is isolated from the module-level default cache', () => {
-      // Production: module-level default cache via initParseCache().
-      initParseCache()
-      const adapter = makeAdapter('rust', ['.rs'])
-      const fromDefault = getParseTree(adapter, 'foo.rs', 'fn main() {}')
-      expect(fromDefault?.id).toBe(1)
+    it('a fresh instance is isolated from the scope-owned parse cache', () => {
+      runWithScopeSync(new RunScope({ languages: testRegistry }), () => {
+        // Production path: the current scope's parse cache via initParseCache().
+        initParseCache()
+        const adapter = makeAdapter('rust', ['.rs'])
+        const fromScope = getParseTree(adapter, 'foo.rs', 'fn main() {}')
+        expect(fromScope?.id).toBe(1)
 
-      // Fresh instance — its own Map, no cross-contamination.
-      const isolated = new LanguageParseCache()
-      const fromIsolated = isolated.getOrParse(adapter, 'foo.rs', 'fn main() {}')
-      expect(fromIsolated?.id).toBe(2)
-      expect(fromIsolated).not.toBe(fromDefault)
-      expect(isolated.size).toBe(1)
-      isolated.dispose()
+        // Fresh instance — its own Map, no cross-contamination with the scope cache.
+        const isolated = new LanguageParseCache()
+        const fromIsolated = isolated.getOrParse(adapter, 'foo.rs', 'fn main() {}')
+        expect(fromIsolated?.id).toBe(2)
+        expect(fromIsolated).not.toBe(fromScope)
+        expect(isolated.size).toBe(1)
+        isolated.dispose()
+      })
     })
 
     it('clear() empties the parse-tree map without touching the timer', () => {
