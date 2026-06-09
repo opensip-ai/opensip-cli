@@ -31,7 +31,8 @@ export { COMMENT_OPENERS, stripCommentOpener } from './signals/comment-openers.j
 // Runtime — live-run progress transport seam (ADR-0016). Generic over the event
 // type so the kernel never names cli-ui's concrete ProgressEvent.
 export { createInProcessTransport } from './runtime/in-process-transport.js';
-export type { ProgressTransport, ProgressRun, ProgressJob } from './runtime/progress-transport.js';
+export { createWorkerProgressRun, runOffThreadOrInProcess } from './runtime/worker-transport.js';
+export type { ProgressTransport, ProgressRun, ProgressJob, WorkerJobDescriptor, WorkerMessage } from './runtime/progress-transport.js';
 
 // Languages — cross-language adapter API
 export * from './languages/index.js';

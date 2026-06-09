@@ -38,3 +38,28 @@ export type ProgressJob<TEvent, TResult> = (emit: (event: TEvent) => void) => Pr
 export interface ProgressTransport {
   run<TEvent, TResult>(job: ProgressJob<TEvent, TResult>): ProgressRun<TEvent, TResult>;
 }
+
+/**
+ * A serializable description of off-main-thread work (ADR-0028). The worker
+ * transport cannot ship a closure across the thread boundary (unlike the
+ * in-process job), so the caller names a worker entry module + the
+ * structured-clone-safe input it needs. `workerData` MUST be serializable — no
+ * functions, no live handles (e.g. the datastore); persistence + egress stay on
+ * the main thread after the run returns its result.
+ */
+export interface WorkerJobDescriptor {
+  /** Resolved worker entry module (e.g. `new URL('./x-worker.js', import.meta.url)`). */
+  readonly workerUrl: string | URL;
+  /** Structured-clone-safe input handed to the worker as `workerData`. */
+  readonly workerData: unknown;
+}
+
+/**
+ * The worker→host message protocol. The worker entry posts these via
+ * `parentPort`; the worker {@link ProgressRun} maps `progress` to subscribers,
+ * resolves on `result`, and rejects on `error`. One source of truth for both ends.
+ */
+export type WorkerMessage<TEvent, TResult> =
+  | { readonly kind: 'progress'; readonly event: TEvent }
+  | { readonly kind: 'result'; readonly value: TResult }
+  | { readonly kind: 'error'; readonly message: string; readonly stack?: string };
