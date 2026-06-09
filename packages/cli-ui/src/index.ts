@@ -36,9 +36,11 @@ export {
   type Span,
   type Tone,
   type HintItem,
+  type TableColumnSpec,
   text,
   line,
   group,
+  viewTable,
 } from './view-model.js';
 export {
   viewVerboseLines,

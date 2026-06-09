@@ -65,11 +65,20 @@ export type ViewNode =
       readonly kind: 'keyValues';
       readonly pairs: readonly { readonly label: string; readonly value: string }[];
     }
-  /** A simple column-aligned table. Each row is a list of cell spans. */
+  /**
+   * A column-aligned table. Each row is a list of cell spans — one span per
+   * column (cell N styles column N). Both interpreters pad every cell to its
+   * column's width (the max of the header and all cells in that column), so the
+   * columns line up in a TTY and a pipe alike. `align` is per-column
+   * (`'right'` pads on the left — for numeric/duration columns); default left.
+   */
   | {
       readonly kind: 'table';
       readonly columns: readonly string[];
       readonly rows: readonly (readonly Span[])[];
+      readonly align?: readonly ('left' | 'right')[];
+      /** When false, suppress the header row (a bare aligned grid). Default true. */
+      readonly showHeader?: boolean;
     }
   /** A next-step hint strip, ` | `-joined, with bolded flag substrings. */
   | { readonly kind: 'hints'; readonly items: readonly HintItem[] }
@@ -98,4 +107,53 @@ export function line(spans: readonly Span[] | string, dim?: boolean): ViewNode {
 /** A group node from children, optionally indented. */
 export function group(children: readonly ViewNode[], indent?: number): ViewNode {
   return indent === undefined ? { kind: 'group', children } : { kind: 'group', children, indent };
+}
+
+/**
+ * Per-column display widths for a `table` node — the max of each column's header
+ * and all its cells. Shared by both interpreters so the TTY and pipe forms pad
+ * identically. Pure (no react), so `render-to-text` can use it too.
+ */
+export function tableColumnWidths(
+  columns: readonly string[],
+  rows: readonly (readonly Span[])[],
+): number[] {
+  const colCount = Math.max(columns.length, ...rows.map((r) => r.length), 0);
+  return Array.from({ length: colCount }, (_, i) =>
+    Math.max(columns[i]?.length ?? 0, ...rows.map((r) => r[i]?.text.length ?? 0), 0),
+  );
+}
+
+/** Pad `value` to `width`; `'right'` pads on the left (numeric/duration columns). */
+export function padTableCell(value: string, width: number, align: 'left' | 'right'): string {
+  return align === 'right' ? value.padStart(width) : value.padEnd(width);
+}
+
+/** Per-column spec for {@link viewTable}: a header label and optional alignment. */
+export interface TableColumnSpec {
+  readonly header: string;
+  readonly align?: 'left' | 'right';
+}
+
+/**
+ * Build a column-aligned `table` node. Columns may be plain header strings or
+ * {@link TableColumnSpec}s (to right-align numeric columns). Each row is one
+ * span per column (cell N styles column N); the interpreters pad every cell to
+ * its column width so the grid lines up in a TTY and a pipe. This is the shared,
+ * reusable table primitive — producers (history, session replay, per-unit
+ * results) build one of these instead of hand-padding lines.
+ */
+export function viewTable(
+  columns: readonly (string | TableColumnSpec)[],
+  rows: readonly (readonly Span[])[],
+  opts?: { readonly showHeader?: boolean },
+): ViewNode {
+  const specs = columns.map((c) => (typeof c === 'string' ? { header: c } : c));
+  return {
+    kind: 'table',
+    columns: specs.map((s) => s.header),
+    rows,
+    align: specs.map((s) => s.align ?? 'left'),
+    ...(opts?.showHeader === undefined ? {} : { showHeader: opts.showHeader }),
+  };
 }

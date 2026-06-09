@@ -46,16 +46,27 @@ describe('history view', () => {
       ],
     });
     expect(out).toContain('Run History (2 sessions)');
+    // Aligned table with a header row (the columns line up by construction now).
+    expect(out).toContain('Session');
+    expect(out).toContain('Tool');
+    expect(out).toContain('Status');
+    expect(out).toContain('Recipe');
+    expect(out).toContain('Duration');
     expect(out).toContain('FIT_1');
     expect(out).toContain('fit');
     expect(out).toContain('GRAPH_2');
     expect(out).toContain('graph');
     expect(out).toContain('95%');
     expect(out).toContain('PASS');
-    expect(out).toContain('9/10 checks');
-    expect(out).toContain('(example)');
+    expect(out).toContain('9/10'); // counts column (header carries the word "Checks")
+    expect(out).toContain('example'); // recipe column (no parens)
     expect(out).toContain('40%');
     expect(out).toContain('FAIL');
+    // The Session column header aligns with the id cells beneath it.
+    const lines = out.split('\n');
+    const header = lines.find((l) => l.includes('Session') && l.includes('Tool'))!;
+    const fitRow = lines.find((l) => l.includes('FIT_1'))!;
+    expect(fitRow.indexOf('FIT_1')).toBe(header.indexOf('Session'));
   });
 });
 

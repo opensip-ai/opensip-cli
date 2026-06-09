@@ -13,6 +13,7 @@ import { Box, Text } from 'ink';
 import React from 'react';
 
 import { useTheme, type Theme } from './theme.js';
+import { padTableCell, tableColumnWidths } from './view-model.js';
 
 import type { HintItem, Span, ViewNode } from './view-model.js';
 
@@ -82,13 +83,23 @@ function NodeView({ node }: { readonly node: ViewNode }): React.ReactElement | n
       );
     }
     case 'table': {
+      const widths = tableColumnWidths(node.columns, node.rows);
+      const alignOf = (i: number): 'left' | 'right' => node.align?.[i] ?? 'left';
+      const showHeader = node.showHeader !== false;
       return (
         <Box flexDirection="column">
-          <Text>{node.columns.join('  ')}</Text>
+          {showHeader && (
+            <Text dimColor>
+              {widths.map((w, i) => (i > 0 ? '  ' : '') + padTableCell(node.columns[i] ?? '', w, alignOf(i))).join('')}
+            </Text>
+          )}
           {node.rows.map((cells, r) => (
             <Text key={r}>
-              {cells.map((c, ci) => (
-                <Text key={ci}>{ci > 0 ? '  ' : ''}<SpanText span={c} /></Text>
+              {widths.map((w, ci) => (
+                <Text key={ci}>
+                  {ci > 0 ? '  ' : ''}
+                  <SpanText span={{ ...(cells[ci] ?? { text: '' }), text: padTableCell(cells[ci]?.text ?? '', w, alignOf(ci)) }} />
+                </Text>
               ))}
             </Text>
           ))}

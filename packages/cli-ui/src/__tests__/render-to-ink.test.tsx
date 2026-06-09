@@ -39,14 +39,20 @@ describe('renderToInk — visible text', () => {
     expect(out).toContain('  one');
   });
 
-  it('renders a table header and row cells', () => {
+  it('renders a table with aligned, padded columns', () => {
     const out = frame({
       kind: 'table',
       columns: ['check', 'status'],
+      // 'a' is shorter than the 'check' header → the cell pads to the column
+      // width so 'PASS' aligns under 'status'.
       rows: [[{ text: 'a' }, { text: 'PASS', tone: 'success' }]],
     });
-    expect(out).toContain('check  status');
-    expect(out).toContain('a  PASS');
+    const lines = out.split('\n').filter((l) => l.includes('check') || l.includes('PASS'));
+    const header = lines.find((l) => l.includes('status'))!;
+    const row = lines.find((l) => l.includes('PASS'))!;
+    expect(header).toContain('check  status');
+    // 'PASS' starts at the same column as 'status' (the cell padded to width 5).
+    expect(row.indexOf('PASS')).toBe(header.indexOf('status'));
   });
 
   it('renders key/value pairs one per line', () => {

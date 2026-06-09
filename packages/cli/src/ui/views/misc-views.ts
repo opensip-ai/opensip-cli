@@ -5,7 +5,7 @@
  * output of its retired Ink component as a renderer-agnostic ViewNode.
  */
 
-import { line, group, type Span, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
+import { line, group, viewTable, type Span, type TableColumnSpec, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
 
 import type {
   ClearDoneResult,
@@ -89,28 +89,32 @@ function payloadCounts(payload: unknown): { passed: number; total: number } | nu
   return typeof passed === 'number' && typeof total === 'number' ? { passed, total } : null;
 }
 
-function historyRow(s: StoredSession): ViewNode {
-  const date = new Date(s.timestamp).toLocaleString();
-  const duration = `${(s.durationMs / 1000).toFixed(1)}s`;
+/** One table row (one span per column) for a stored session. */
+function historyRow(s: StoredSession): Span[] {
   const counts = payloadCounts(s.payload);
-  const spans: Span[] = [
-    { text: '  ' },
+  return [
     { text: s.id, dim: true },
-    { text: '  ' },
     { text: s.tool, tone: 'brand', bold: true },
-    { text: '  ' },
-    { text: date, dim: true },
-    { text: '  ' },
+    { text: new Date(s.timestamp).toLocaleString(), dim: true },
     { text: `${s.score}%`, tone: scoreTone(s.score) },
-    { text: '  ' },
     { text: s.passed ? 'PASS' : 'FAIL', tone: s.passed ? 'success' : 'error' },
-    { text: '  ' },
-    { text: counts ? `${counts.passed}/${counts.total} checks` : '' },
+    { text: counts ? `${counts.passed}/${counts.total}` : '—' },
+    { text: s.recipe ?? '', dim: true },
+    { text: `${(s.durationMs / 1000).toFixed(1)}s`, dim: true },
   ];
-  if (s.recipe !== undefined) spans.push({ text: ` (${s.recipe})`, dim: true });
-  spans.push({ text: '  ' }, { text: duration, dim: true });
-  return line(spans);
 }
+
+/** Columns for the run-history table — Score/Checks/Duration right-align. */
+const HISTORY_COLUMNS: readonly (string | TableColumnSpec)[] = [
+  'Session',
+  'Tool',
+  'When',
+  { header: 'Score', align: 'right' },
+  'Status',
+  { header: 'Checks', align: 'right' },
+  'Recipe',
+  { header: 'Duration', align: 'right' },
+];
 
 export function viewHistory(result: HistoryResult): ViewNode {
   if (result.sessions.length === 0) {
@@ -120,7 +124,7 @@ export function viewHistory(result: HistoryResult): ViewNode {
   return group([
     line([{ text: 'Run History', bold: true }, { text: ` (${result.sessions.length} sessions)`, dim: true }]),
     SPACER,
-    ...visible.map(historyRow),
+    group([viewTable(HISTORY_COLUMNS, visible.map(historyRow))], 2),
   ]);
 }
 

@@ -15,6 +15,8 @@
  * final line break, matching how the Ink path appends one.
  */
 
+import { padTableCell, tableColumnWidths } from './view-model.js';
+
 import type { HintItem, Span, ViewNode } from './view-model.js';
 
 const SEPARATOR_WIDTH = 60;
@@ -30,14 +32,23 @@ function hintsToText(items: readonly HintItem[]): string {
 }
 
 /**
- * Minimal table rendering: a header row then cell rows, cells joined by
- * two spaces. Column-width alignment is intentionally not attempted here; the
- * plain-text path only promises stable, ANSI-free content.
+ * Column-aligned table rendering: every cell is padded to its column width
+ * (shared `tableColumnWidths`, so the pipe form lines up exactly as the TTY
+ * form). Trailing whitespace is trimmed to keep the ANSI-free output clean.
  */
-function tableToText(columns: readonly string[], rows: readonly (readonly Span[])[]): string {
-  const header = columns.join('  ');
-  const body = rows.map((cells) => cells.map((c) => c.text).join('  '));
-  return [header, ...body].join('\n');
+function tableToText(
+  columns: readonly string[],
+  rows: readonly (readonly Span[])[],
+  align: readonly ('left' | 'right')[] | undefined,
+  showHeader: boolean,
+): string {
+  const widths = tableColumnWidths(columns, rows);
+  const alignOf = (i: number): 'left' | 'right' => align?.[i] ?? 'left';
+  const renderRow = (cells: readonly { text: string }[]): string =>
+    widths.map((w, i) => padTableCell(cells[i]?.text ?? '', w, alignOf(i))).join('  ').trimEnd();
+  const lines = showHeader ? [renderRow(columns.map((c) => ({ text: c })))] : [];
+  for (const cells of rows) lines.push(renderRow(cells));
+  return lines.join('\n');
 }
 
 function indentLines(block: string, by: number): string {
@@ -66,7 +77,7 @@ export function renderToText(node: ViewNode): string {
       return node.pairs.map((p) => `${p.label}: ${p.value}`).join('\n');
     }
     case 'table': {
-      return tableToText(node.columns, node.rows);
+      return tableToText(node.columns, node.rows, node.align, node.showHeader !== false);
     }
     case 'hints': {
       return hintsToText(node.items);
