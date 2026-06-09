@@ -25,6 +25,7 @@ import {
 } from './marker-discovery.js';
 import { discoverScopedPackages, resolvePackageDir } from './node-modules-walk.js';
 import { resolvePackageEntryPoint } from './package-entry.js';
+import { filterSameCorePackages, selfCore } from './single-core-guard.js';
 
 import type { CapabilityDiscoveryDescriptor } from '../tools/capability.js';
 
@@ -49,6 +50,13 @@ export interface RawCapabilityContribution {
   readonly contribution: unknown;
   /** npm package name the contribution came from, for diagnostics + provenance. */
   readonly sourcePackage: string;
+  /**
+   * The domain this contribution routes to, when it is NOT the primary domain
+   * being discovered — i.e. a co-contribution (§5.3): a `recipes` export read from
+   * a fit-pack package, routed to the `fit-recipe` domain. `undefined` means the
+   * primary domain (`descriptor`'s own domain).
+   */
+  readonly targetDomainId?: string;
 }
 
 /** A structured non-fatal discovery diagnostic (missing package, bad export, import throw). */
@@ -119,33 +127,53 @@ export async function discoverCapabilityContributions(
 }
 
 /**
- * Resolve which packages to load, applying the ordered preference rules:
- *   1. explicit `preferences.packages` list wins (auto-discovery skipped);
- *   2. else `autoDiscover === false` → none;
- *   3. else auto-discover by the descriptor's mode (marker | name-pattern).
+ * Resolve which packages to load, applying the preference rules:
+ *   - explicit `preferences.packages` list resolved (built-ins from `cliDir`);
+ *   - auto-discovery (by the descriptor's mode) runs UNLESS `autoDiscover: false`
+ *     OR (an explicit list is present AND `explicitListMode` is `'replace'`);
+ *   - `'augment'` mode unions explicit + auto-discovered, deduped.
+ * Finally, the single-core guard drops any pack resolving a foreign
+ * `@opensip-tools/core` (a split run scope → false positives).
  */
 function selectPackages(options: DiscoverCapabilityContributionsOptions): SelectedPackage[] {
-  const { descriptor, projectDir, cliDir, preferences = {}, onDiagnostic } = options;
+  const { descriptor, preferences = {}, onDiagnostic } = options;
+  const explicitMode = descriptor.explicitListMode ?? 'replace';
+  const hasExplicit = preferences.packages !== undefined;
 
-  if (preferences.packages !== undefined) {
-    return resolveExplicit(preferences.packages, projectDir, onDiagnostic);
-  }
-  if (preferences.autoDiscover === false) return [];
+  const explicit = hasExplicit ? resolveExplicit(preferences.packages ?? [], options) : [];
+  // 'replace' + an explicit list → skip auto-discovery; otherwise auto-discover
+  // (unless opted out). 'augment' always auto-discovers and adds the explicit list.
+  const includeAuto = preferences.autoDiscover !== false && !(hasExplicit && explicitMode === 'replace');
+  const auto = includeAuto ? autoDiscover(options) : [];
 
+  // Explicit config wins on a name collision (listed first).
+  const merged = dedupeSelected([...explicit, ...auto]);
+  return applySingleCoreGuard(merged, onDiagnostic);
+}
+
+/** Auto-discover packages by the descriptor's mode (marker | name-pattern). */
+function autoDiscover(options: DiscoverCapabilityContributionsOptions): SelectedPackage[] {
+  const { descriptor, projectDir, cliDir, preferences = {} } = options;
   return descriptor.discovery.mode === 'marker'
     ? autoDiscoverByMarker(descriptor, projectDir, cliDir)
     : autoDiscoverByNamePattern(descriptor, projectDir, preferences.scopes);
 }
 
-/** Resolve an explicit package-name list to on-disk dirs; diagnose any not installed. */
+/**
+ * Resolve an explicit package-name list to on-disk dirs. Built-in names (under
+ * `descriptor.builtinScope`) resolve from `cliDir`; the rest from `projectDir` —
+ * the same ownership split auto-discovery applies. Diagnose any not installed.
+ */
 function resolveExplicit(
   names: readonly string[],
-  projectDir: string,
-  onDiagnostic?: (d: CapabilityDiscoveryDiagnostic) => void,
+  options: DiscoverCapabilityContributionsOptions,
 ): SelectedPackage[] {
+  const { descriptor, projectDir, cliDir, onDiagnostic } = options;
+  const scope = descriptor.builtinScope;
   const out: SelectedPackage[] = [];
   for (const name of names) {
-    const packageDir = resolvePackageDir(projectDir, name);
+    const anchor = scope !== undefined && cliDir !== undefined && isUnderScope(name, scope) ? cliDir : projectDir;
+    const packageDir = resolvePackageDir(anchor, name);
     if (packageDir) {
       out.push({ name, packageDir });
     } else {
@@ -218,6 +246,39 @@ function dedupe(packages: readonly DiscoveredDeclaredPackage[]): SelectedPackage
   return out;
 }
 
+/** Dedupe selected packages by name (first occurrence wins). */
+function dedupeSelected(packages: readonly SelectedPackage[]): SelectedPackage[] {
+  const seen = new Set<string>();
+  const out: SelectedPackage[] = [];
+  for (const p of packages) {
+    if (seen.has(p.name)) continue;
+    seen.add(p.name);
+    out.push(p);
+  }
+  return out;
+}
+
+/**
+ * Single-core guard: drop any pack that resolves a DIFFERENT `@opensip-tools/core`
+ * than this runtime (a split run scope → false positives). Delegates to the shared
+ * {@link filterSameCorePackages}; wraps each drop in a discovery diagnostic.
+ * Generic: every domain's packs get the guard, not just fit's.
+ */
+function applySingleCoreGuard(
+  packages: readonly SelectedPackage[],
+  onDiagnostic?: (d: CapabilityDiscoveryDiagnostic) => void,
+): SelectedPackage[] {
+  return filterSameCorePackages(packages, (pkg, foreignCore) => {
+    onDiagnostic?.({
+      evt: 'capability.discovery.foreign_core',
+      packageName: pkg.name,
+      message:
+        `package ${pkg.name} resolves a different @opensip-tools/core (${foreignCore}) than this ` +
+        `runtime (${selfCore() ?? '<unknown>'}) — skipping to avoid a split run scope`,
+    });
+  });
+}
+
 /**
  * Resolve a package's entry, dynamic-import it, and read the declared export.
  * `exportShape: 'array'` spreads the array; `'single'` yields the one value.
@@ -240,7 +301,26 @@ async function loadPackageContributions(
   }
   try {
     const mod = (await import(pathToFileURL(resolved.entry).href)) as Record<string, unknown>;
-    return readExport(mod, descriptor, pkg.name, onDiagnostic);
+    // Primary export (required — a missing/wrong-shape primary is diagnosed).
+    const out = readOneExport(mod, pkg.name, onDiagnostic, {
+      exportName: descriptor.exportName,
+      exportShape: descriptor.exportShape,
+      required: true,
+    });
+    // Co-contributions (§5.3): secondary exports routed to OTHER domains (e.g.
+    // `recipes` → fit-recipe). OPTIONAL — a package that exports no recipes is
+    // fine, so a missing co-export is silent (not diagnosed).
+    for (const co of descriptor.coContributions ?? []) {
+      out.push(
+        ...readOneExport(mod, pkg.name, onDiagnostic, {
+          exportName: co.exportName,
+          exportShape: co.exportShape,
+          targetDomainId: co.domainId,
+          required: false,
+        }),
+      );
+    }
+    return out;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     // Structured log of the substrate's own failure (the caller's onDiagnostic is
@@ -261,32 +341,54 @@ async function loadPackageContributions(
   }
 }
 
-/** Read `mod[exportName]` per the descriptor's `exportShape`, diagnosing a mismatch. */
-function readExport(
+/** Which export to read from a package module, and how. */
+interface ExportSpec {
+  readonly exportName: string;
+  readonly exportShape: 'array' | 'single';
+  /** The domain co-contributions route to; undefined = the primary domain. */
+  readonly targetDomainId?: string;
+  /** When true, a missing/wrong-shape export is diagnosed; when false, silent (optional co-export). */
+  readonly required: boolean;
+}
+
+/**
+ * Read one export (`mod[spec.exportName]`) per `spec.exportShape`, tagging each
+ * contribution with `spec.targetDomainId` (undefined = the primary domain).
+ * `spec.required` governs the missing-export behavior: a missing PRIMARY export
+ * is diagnosed + skipped; a missing co-contribution export is silent.
+ */
+function readOneExport(
   mod: Record<string, unknown>,
-  descriptor: CapabilityDiscoveryDescriptor,
   sourcePackage: string,
-  onDiagnostic?: (d: CapabilityDiscoveryDiagnostic) => void,
+  onDiagnostic: ((d: CapabilityDiscoveryDiagnostic) => void) | undefined,
+  spec: ExportSpec,
 ): RawCapabilityContribution[] {
-  const value = mod[descriptor.exportName];
-  if (descriptor.exportShape === 'array') {
+  const { exportName, exportShape, targetDomainId, required } = spec;
+  const tag = targetDomainId === undefined ? {} : { targetDomainId };
+  const value = mod[exportName];
+  if (exportShape === 'array') {
+    if (value === undefined && !required) return [];
     if (!Array.isArray(value)) {
+      if (required) {
+        onDiagnostic?.({
+          evt: 'capability.discovery.bad_export',
+          packageName: sourcePackage,
+          message: `package ${sourcePackage} does not export a "${exportName}" array — skipping`,
+        });
+      }
+      return [];
+    }
+    return (value as readonly unknown[]).map((contribution) => ({ contribution, sourcePackage, ...tag }));
+  }
+  if (value === undefined) {
+    if (required) {
       onDiagnostic?.({
         evt: 'capability.discovery.bad_export',
         packageName: sourcePackage,
-        message: `package ${sourcePackage} does not export a "${descriptor.exportName}" array — skipping`,
+        message: `package ${sourcePackage} does not export "${exportName}" — skipping`,
       });
-      return [];
     }
-    return (value as readonly unknown[]).map((contribution) => ({ contribution, sourcePackage }));
-  }
-  if (value === undefined) {
-    onDiagnostic?.({
-      evt: 'capability.discovery.bad_export',
-      packageName: sourcePackage,
-      message: `package ${sourcePackage} does not export "${descriptor.exportName}" — skipping`,
-    });
     return [];
   }
-  return [{ contribution: value, sourcePackage }];
+  return [{ contribution: value, sourcePackage, ...tag }];
 }

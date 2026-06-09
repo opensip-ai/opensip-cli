@@ -86,13 +86,16 @@ export async function loadCapabilityDomain(
   });
 
   let routed = 0;
-  for (const { contribution, sourcePackage } of contributions) {
+  for (const { contribution, sourcePackage, targetDomainId } of contributions) {
+    // A co-contribution (§5.3) routes to its OWN domain (e.g. recipes → fit-recipe);
+    // a primary contribution routes to the domain being loaded.
+    const target = targetDomainId ?? domainId;
     try {
-      registry.routeContribution(domainId, contribution);
+      registry.routeContribution(target, contribution);
       routed++;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      errors.push(`${sourcePackage}: ${msg}`);
+      errors.push(`${sourcePackage} → ${target}: ${msg}`);
     }
   }
 

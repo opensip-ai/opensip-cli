@@ -253,6 +253,72 @@ describe('discoverCapabilityContributions — preferences', () => {
   });
 });
 
+describe('discoverCapabilityContributions — co-contributions (§5.3)', () => {
+  it('routes a secondary export to its target domain, tagged', async () => {
+    const dir = join(testDir, 'node_modules/@acme/items-co');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: '@acme/items-co', type: 'module', main: './index.mjs', opensipTools: { kind: 'items-pack' } }),
+    );
+    writeFileSync(join(dir, 'index.mjs'), "export const items = [{ id: 'a' }];\nexport const extras = [{ id: 'x' }, { id: 'y' }];\n");
+
+    const out = await discoverCapabilityContributions({
+      descriptor: { ...MARKER_DESCRIPTOR, coContributions: [{ exportName: 'extras', exportShape: 'array', domainId: 'extras-domain' }] },
+      projectDir: testDir,
+    });
+    expect(out).toEqual([
+      { contribution: { id: 'a' }, sourcePackage: '@acme/items-co' },
+      { contribution: { id: 'x' }, sourcePackage: '@acme/items-co', targetDomainId: 'extras-domain' },
+      { contribution: { id: 'y' }, sourcePackage: '@acme/items-co', targetDomainId: 'extras-domain' },
+    ]);
+  });
+
+  it('a package missing the co-export is silent (the co-export is optional)', async () => {
+    writeFixturePackage({
+      relDir: 'node_modules/@acme/items-only',
+      name: '@acme/items-only',
+      markerKind: 'items-pack',
+      exportName: 'items',
+      exportSource: "[{ id: 'a' }]",
+    });
+    const diags: CapabilityDiscoveryDiagnostic[] = [];
+    const out = await discoverCapabilityContributions({
+      descriptor: { ...MARKER_DESCRIPTOR, coContributions: [{ exportName: 'recipes', exportShape: 'array', domainId: 'r' }] },
+      projectDir: testDir,
+      onDiagnostic: (d) => diags.push(d),
+    });
+    expect(out).toEqual([{ contribution: { id: 'a' }, sourcePackage: '@acme/items-only' }]);
+    expect(diags).toEqual([]);
+  });
+});
+
+describe('discoverCapabilityContributions — explicit list mode', () => {
+  it("augment mode unions explicit + auto-discovered packages", async () => {
+    writeFixturePackage({
+      relDir: 'node_modules/@acme/items-auto',
+      name: '@acme/items-auto',
+      markerKind: 'items-pack',
+      exportName: 'items',
+      exportSource: "[{ id: 'auto' }]",
+    });
+    // no marker — only reachable via the explicit list
+    writeFixturePackage({
+      relDir: 'node_modules/@acme/items-explicit',
+      name: '@acme/items-explicit',
+      exportName: 'items',
+      exportSource: "[{ id: 'explicit' }]",
+    });
+    const out = await discoverCapabilityContributions({
+      descriptor: { ...MARKER_DESCRIPTOR, explicitListMode: 'augment' },
+      projectDir: testDir,
+      preferences: { packages: ['@acme/items-explicit'] },
+    });
+    const ids = out.map((c) => (c.contribution as { id: string }).id).sort();
+    expect(ids).toEqual(['auto', 'explicit']);
+  });
+});
+
 describe('discoverCapabilityContributions — per-package isolation', () => {
   it('skips a package whose array export is the wrong shape, with a diagnostic', async () => {
     writeFixturePackage({

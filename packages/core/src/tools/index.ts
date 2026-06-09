@@ -53,6 +53,7 @@ export type {
   CapabilityContributionKind,
   CapabilityDiscoveryDescriptor,
   CapabilityDiscoveryMode,
+  CapabilityCoContribution,
   CapabilityValidator,
   StructuralContributionSchema,
   ToolCapabilityDeclaration,

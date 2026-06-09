@@ -7,7 +7,11 @@
 
 import { isRecord, isStringArray } from './json-guards.js';
 
-import type { CapabilityDiscoveryDescriptor, CapabilityDiscoveryMode } from '../tools/capability.js';
+import type {
+  CapabilityCoContribution,
+  CapabilityDiscoveryDescriptor,
+  CapabilityDiscoveryMode,
+} from '../tools/capability.js';
 
 /**
  * Tri-state result of parsing a capability's optional `discovery` field:
@@ -35,6 +39,11 @@ export function normalizeDiscovery(value: unknown): DiscoveryParse {
   const configKeys = normalizeConfigKeys(value.configKeys);
   if (configKeys === undefined) return { status: 'invalid' };
   if (value.builtinScope !== undefined && typeof value.builtinScope !== 'string') return { status: 'invalid' };
+  if (value.explicitListMode !== undefined && value.explicitListMode !== 'replace' && value.explicitListMode !== 'augment') {
+    return { status: 'invalid' };
+  }
+  const co = normalizeCoContributions(value.coContributions);
+  if (co.status === 'invalid') return { status: 'invalid' };
   return {
     status: 'ok',
     descriptor: {
@@ -43,8 +52,31 @@ export function normalizeDiscovery(value: unknown): DiscoveryParse {
       exportShape: value.exportShape,
       configKeys,
       ...(value.builtinScope === undefined ? {} : { builtinScope: value.builtinScope }),
+      ...(value.explicitListMode === undefined ? {} : { explicitListMode: value.explicitListMode }),
+      ...(co.status === 'ok' ? { coContributions: co.value } : {}),
     },
   };
+}
+
+/** Tri-state parse of the optional `coContributions` field (absent | invalid | ok). */
+type CoContributionsParse =
+  | { readonly status: 'absent' }
+  | { readonly status: 'invalid' }
+  | { readonly status: 'ok'; readonly value: readonly CapabilityCoContribution[] };
+
+/** Validate the optional `coContributions` array (each: exportName + exportShape + domainId). */
+function normalizeCoContributions(value: unknown): CoContributionsParse {
+  if (value === undefined) return { status: 'absent' };
+  if (!Array.isArray(value)) return { status: 'invalid' };
+  const out: CapabilityCoContribution[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) return { status: 'invalid' };
+    if (typeof entry.exportName !== 'string' || entry.exportName === '') return { status: 'invalid' };
+    if (entry.exportShape !== 'array' && entry.exportShape !== 'single') return { status: 'invalid' };
+    if (typeof entry.domainId !== 'string' || entry.domainId === '') return { status: 'invalid' };
+    out.push({ exportName: entry.exportName, exportShape: entry.exportShape, domainId: entry.domainId });
+  }
+  return { status: 'ok', value: out };
 }
 
 /** Validate the optional, all-string `configKeys` map. Returns `undefined` on any non-string member. */

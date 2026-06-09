@@ -57,6 +57,22 @@ export type CapabilityDiscoveryMode =
   | { readonly mode: 'name-pattern'; readonly prefix: string; readonly defaultScopes: readonly string[] };
 
 /**
+ * A SECONDARY export the same package walk also routes — to a (usually different)
+ * domain. The §5.3 separate-domains fold: a fit-pack/sim-pack package exports both
+ * its primary contributions (`checks`/`scenarios`) AND co-located `recipes`; the
+ * recipes are routed to a `fit-recipe`/`sim-recipe` domain by the SAME discovery
+ * walk, each item still schema-checked against its OWN domain. Tool-agnostic.
+ */
+export interface CapabilityCoContribution {
+  /** The module export holding the secondary contributions (e.g. `recipes`). */
+  readonly exportName: string;
+  /** Whether `exportName` is an array of contributions or a single one. */
+  readonly exportShape: 'array' | 'single';
+  /** The domain id these secondary contributions route to (e.g. `fit-recipe`). */
+  readonly domainId: string;
+}
+
+/**
  * The static descriptor for how a capability domain's contributions are
  * discovered and loaded — declared in the owning tool's manifest
  * (`ToolPluginManifest.capabilities[].discovery`) and read by the generic
@@ -86,6 +102,23 @@ export interface CapabilityDiscoveryDescriptor {
    * splits `@opensip-tools/` built-in check packs from project-local ones.
    */
   readonly builtinScope?: string;
+  /**
+   * How an explicit package list (`configKeys.packages`) interacts with
+   * auto-discovery:
+   *   - `'replace'` (default) — an explicit list WINS; auto-discovery is skipped
+   *     (sim/graph: a pinned list is deterministic).
+   *   - `'augment'` — the explicit list is ADDED to auto-discovery, deduped (fit:
+   *     `checkPackages` names packs that don't declare the marker yet, on top of
+   *     marker discovery).
+   */
+  readonly explicitListMode?: 'replace' | 'augment';
+  /**
+   * Secondary exports the same package walk also routes to OTHER domains (§5.3
+   * separate-domains fold) — e.g. a fit-pack's co-located `recipes` routed to the
+   * `fit-recipe` domain. Each is read from every discovered package alongside the
+   * primary export.
+   */
+  readonly coContributions?: readonly CapabilityCoContribution[];
 }
 
 /**
