@@ -8,9 +8,12 @@
  *   - **bundled** / **installed** — `package.json#opensipTools` in the tool's
  *     own package dir (one read for both; the discovery walker already
  *     touches these package.json files).
- *   - **project-local** — a JSON sidecar (`opensip-tool.manifest.json`) in
- *     the tool's directory, since a project-local tool is authored content,
- *     not an installed npm package with a package.json marker.
+ *   - **project-local** / **user-global** — a JSON sidecar
+ *     (`opensip-tool.manifest.json`) in the tool's directory, since an
+ *     authored tool is authored content, not an installed npm package with a
+ *     package.json marker. Both authored sources read the SAME sidecar; only
+ *     their trust posture differs (deny-by-default vs trusted-by-default),
+ *     which is the admission caller's concern, not the loader's.
  *
  * It validates the identity subset (`kind: 'tool'`, `id`, `commands`),
  * derives `name`/`version` from the package.json's own top-level fields
@@ -68,8 +71,9 @@ const LOADER_MODULE = 'core:plugins';
  *   - `bundled` / `installed` — reads `<dir>/package.json`, taking identity
  *     from the `opensipTools` block and `name`/`version` from the
  *     package.json's own top-level fields.
- *   - `project-local` — reads `<dir>/opensip-tool.manifest.json` (the JSON
- *     sidecar), which carries the full identity inline.
+ *   - `project-local` / `user-global` — reads
+ *     `<dir>/opensip-tool.manifest.json` (the JSON sidecar), which carries the
+ *     full identity inline. Both authored sources share the sidecar branch.
  *
  * @param source Where the tool came from — selects the manifest location.
  * @param dir The tool's package/authoring directory.
@@ -81,7 +85,10 @@ export function loadToolManifest(
   source: ToolSource,
   dir: string,
 ): ToolPluginManifest | undefined {
-  const raw = source === 'project-local' ? readSidecar(dir) : readPackageManifest(dir);
+  // Both authored sources (project-local + user-global) declare identity via
+  // the JSON sidecar; bundled/installed read package.json#opensipTools.
+  const authored = source === 'project-local' || source === 'user-global';
+  const raw = authored ? readSidecar(dir) : readPackageManifest(dir);
   if (raw === undefined) {
     diagnose(dir, source, 'manifest file missing or unreadable');
     return undefined;

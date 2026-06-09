@@ -95,6 +95,15 @@ export {
 export type {
   AdmissionResult,
 } from './manifest-loader.js'
+// Authored-Tool sidecar discovery: a source-agnostic walk over a single
+// authored `tools/` root that returns sidecar-bearing candidate dirs. The
+// host assigns the ToolSource per root (project vs user-global).
+export {
+  discoverAuthoredToolSidecars,
+} from './authored-tool-discovery.js'
+export type {
+  AuthoredToolCandidate,
+} from './authored-tool-discovery.js'
 // Scope-owned capability registry (release 2.10.0, §5.3): the host-side
 // runtime that registers manifest-declared capability domains and routes
 // contributions to their owning tool's registrar. Per-RunScope — mirrors

@@ -68,6 +68,19 @@ export interface ToolDiscoverySource {
  * an earlier source's package shadows a later same-named one (e.g. a
  * project-local pin shadows a user-global install). Mirrors the
  * ToolRegistry's own first-writer-wins on duplicate ids.
+ *
+ * **Provenance contract.** Every anchor yields `source: 'installed'`
+ * provenance regardless of which anchor it came from — the anchor distinction
+ * encodes PRECEDENCE/SHADOWING, NOT source. So the caller
+ * (`admitInstalledTool` in `register-tools.ts`) assigns `source: 'installed'`
+ * UNIFORMLY; a per-anchor source tag here would add no information and is
+ * deliberately NOT threaded. *Authored* provenance (`project-local` /
+ * `user-global`) comes from the separate `discoverAuthoredToolSidecars` walk,
+ * keyed by its calling root — not from this npm-anchor walk.
+ *
+ * Scope flag: if a future release adds a third installed sub-source that needs
+ * distinct provenance, revisit whether the anchors walk should carry a source
+ * enum. Out of scope today.
  */
 export function discoverToolPackagesFromAnchors(
   sources: readonly ToolDiscoverySource[],

@@ -68,6 +68,7 @@ export {
   VALID_NPM_SCOPE_REGEX,
   loadToolManifest,
   admitTool,
+  discoverAuthoredToolSidecars,
   registerCapabilityDomainsFromManifest,
   PROJECT_LOCAL_MANIFEST_FILE,
   CapabilityRegistry,
@@ -77,6 +78,7 @@ export {
 } from './plugins/index.js';
 export type {
   AdmissionResult,
+  AuthoredToolCandidate,
   CapabilityRegistrar,
   LoadCapabilityDomainOptions,
   PluginLayout,
