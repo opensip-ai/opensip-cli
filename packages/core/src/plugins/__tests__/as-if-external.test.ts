@@ -45,7 +45,7 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
   {
     id: 'fitness',
     dir: join(REPO_ROOT, 'packages', 'fitness', 'engine'),
-    commands: ['fit', 'fit-list', 'fit-recipes', 'fit-baseline-export'],
+    commands: ['fit', 'fit-list', 'fit-recipes', 'fit-baseline-export', 'fit-run-worker'],
   },
   {
     id: 'simulation',

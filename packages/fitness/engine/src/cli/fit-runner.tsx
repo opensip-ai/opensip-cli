@@ -22,6 +22,10 @@
  * gone.
  */
 
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import {
   Banner,
   ClockProvider,
@@ -48,7 +52,7 @@ import {
   type FitDoneResult,
   type SignalEnvelope,
 } from '@opensip-tools/contracts';
-import { createInProcessTransport, currentScope } from '@opensip-tools/core';
+import { runOffThreadOrInProcess, currentScope } from '@opensip-tools/core';
 import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
@@ -128,19 +132,29 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
 
       if (cancelled) return;
 
-      // Phase 2: Execute through the in-process transport. The engine reports a
-      // monotonic (completed, total) pair via `buildFitCallbacks`; the runner
-      // translates each into a pool `stage-progress` ProgressEvent that the
-      // shared <LiveProgress> renderer folds into the spinner + counter. fit's
-      // execution yields to the event loop, so the spinner animates in-process.
-      const transport = createInProcessTransport();
-      const run = transport.run<ProgressEvent, Awaited<ReturnType<typeof executeFit>>>(
-        (emit) => executeFitWithProgress(args, emit),
-      );
+      // Execute OFF the main process (ADR-0028): fork the CLI to `fit-run-worker`,
+      // which re-bootstraps the full scope and streams progress + the final result
+      // over IPC, so this process stays free to animate the spinner + 80ms clock.
+      // `runOffThreadOrInProcess` falls back to the in-process closure when forking
+      // is disabled/unavailable (OPENSIP_TOOLS_NO_WORKER) — identical result either
+      // way. The worker reads its run spec (the serializable FitOptions) from a
+      // temp file we clean up after the run settles.
+      const specDir = mkdtempSync(join(tmpdir(), 'fit-worker-'));
+      const specPath = join(specDir, 'spec.json');
+      writeFileSync(specPath, JSON.stringify(args), 'utf8');
+      const run = runOffThreadOrInProcess<ProgressEvent, Awaited<ReturnType<typeof executeFit>>>({
+        descriptor: { command: process.argv[1] ?? '', argv: ['fit-run-worker', specPath] },
+        inProcess: (emit) => executeFitWithProgress(args, emit),
+      });
 
       setState({ phase: 'running', checkCount, subscribe: run.onProgress });
 
-      const fitResult = await run.result;
+      let fitResult: Awaited<ReturnType<typeof executeFit>>;
+      try {
+        fitResult = await run.result;
+      } finally {
+        rmSync(specDir, { recursive: true, force: true });
+      }
 
       if (cancelled) return;
 

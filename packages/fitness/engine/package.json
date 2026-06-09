@@ -62,6 +62,10 @@
       {
         "name": "fit-baseline-export",
         "description": "Export the fit gate baseline (SARIF) from the datastore to a file"
+      },
+      {
+        "name": "fit-run-worker",
+        "description": "[internal] Run fit headless and stream progress + result over IPC (forked by the live view)"
       }
     ],
     "capabilities": [

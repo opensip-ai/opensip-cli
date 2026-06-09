@@ -79,7 +79,8 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
     const mod = (await import(pathToFileURL(join(FIT_DIR, 'dist', 'index.js')).href)) as { tool?: Tool };
     expect(mod.tool, 'the built module must export `tool`').toBeDefined();
     expect(mod.tool?.metadata.id).toBe('fitness');
-    expect(mod.tool?.commandSpecs?.length).toBe(4);
+    // fit, fit-list, fit-recipes, fit-baseline-export, fit-run-worker (internal).
+    expect(mod.tool?.commandSpecs?.length).toBe(5);
   });
 
   it("the externally-loaded fit has a command surface identical to the bundled fit", async () => {

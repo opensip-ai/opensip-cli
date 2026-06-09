@@ -514,6 +514,21 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "aliases": [],
       "args": [
         {
+          "name": "specPath",
+          "required": true,
+          "variadic": false,
+        },
+      ],
+      "name": "fit-run-worker",
+      "options": [],
+      "subcommands": [],
+      "synopsis": "[internal] Run fit headless and stream progress + result over IPC (forked by the live view)",
+      "usage": "[options] <specPath>",
+    },
+    {
+      "aliases": [],
+      "args": [
+        {
           "name": "paths",
           "required": false,
           "variadic": true,
