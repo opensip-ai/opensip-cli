@@ -17,7 +17,7 @@ import { resolveSession } from '@opensip-tools/session-store';
 
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { renderSimLive } from './cli/sim-runner.js';
-import { executeSim } from './cli/sim.js';
+import { executeSim, persistSimSession } from './cli/sim.js';
 import { createScenarioRegistry, currentScenarioRegistry } from './framework/registry.js';
 import { simReplayFromSession } from './persistence/session-replay.js';
 import { SIM_PLUGIN_LAYOUT } from './plugins/loader.js';
@@ -115,9 +115,10 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   // json / non-TTY (pipe / CI): run the engine and render statically — the
   // animated Ink view is a TTY-only affordance. Output is byte-for-byte the
   // pre-live-view behavior.
-  const { result } = await executeSim(opts, {
-    datastore: cli.scope.datastore() as DataStore | undefined,
-  });
+  const datastore = cli.scope.datastore() as DataStore | undefined;
+  const { result } = await executeSim(opts);
+  // Persist on the main thread (ADR-0028 — engine is persistence-free).
+  if (datastore !== undefined && result.type === 'sim-done') persistSimSession(datastore, result);
 
   if (result.type === 'error') {
     if (opts.json) {

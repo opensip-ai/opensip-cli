@@ -1,17 +1,14 @@
 /**
- * executeFit opts threading test.
+ * executeFit boundary test (ADR-0028 — worker-safe, persistence-free engine).
  *
- * Closes the v2 merge follow-up: verifies that when `executeFit` is
- * called with `{ datastore }` it persists a session via `SessionRepo`,
- * and when called with `{ onProgress }` the callback fires at least
- * once. Both opts are optional; the legacy `executeFit(args)` shape
- * still works.
+ * `executeFit` does NOT touch the datastore: it returns the envelope + the run's
+ * `durationMs`, and the CALLER persists via `persistFitSession` on the main
+ * thread (the datastore handle cannot cross the worker boundary). These tests
+ * lock both halves: the engine is pure-compute, and the explicit persist writes
+ * exactly one session. `onProgress` wiring is also covered.
  *
  * Implementation note: the fixture is a minimal tmp project with just
- * `opensip-tools.config.yml`. No check packages are loaded (the test
- * does not need any to fire — only that `executeFit` reaches the
- * post-build SessionRepo.save path with the bootstrap-supplied
- * datastore handle).
+ * `opensip-tools.config.yml`.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -23,6 +20,7 @@ import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { SessionRepo } from '@opensip-tools/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { persistFitSession } from '../cli/fit/result-builders.js';
 import { executeFit } from '../cli/fit.js';
 import { fitnessTool } from '../tool.js';
 
@@ -83,26 +81,31 @@ function withFitScope<T>(fn: () => Promise<T>): Promise<T> {
   return runWithScope(scope, fn);
 }
 
-describe('executeFit — opts threading (v2 persistence)', () => {
-  it('persists a session via SessionRepo when datastore is supplied', async () => {
-    const fitResult = await withFitScope(() => executeFit(makeArgs(projectDir), { datastore }));
+describe('executeFit — persistence-free boundary (ADR-0028)', () => {
+  it('returns an envelope + durationMs and does NOT persist on its own', async () => {
+    const fitResult = await withFitScope(() => executeFit(makeArgs(projectDir)));
     // Sanity — executeFit shouldn't error on a minimal project.
     expect(fitResult.result.type).not.toBe('error');
+    expect(fitResult.envelope).toBeDefined();
+    expect(typeof fitResult.durationMs).toBe('number');
+
+    // The engine is pure-compute now: nothing was written.
+    const sessions = new SessionRepo(datastore).list({ tool: 'fit' });
+    expect(sessions.length).toBe(0);
+  });
+
+  it('persistFitSession (the caller path) writes exactly one session', async () => {
+    const args = makeArgs(projectDir);
+    const fitResult = await withFitScope(() => executeFit(args));
+    expect(fitResult.envelope).toBeDefined();
+    if (fitResult.envelope === undefined || fitResult.durationMs === undefined) throw new Error('expected a fit-done result');
+
+    persistFitSession(datastore, args, fitResult.envelope, fitResult.durationMs);
 
     const sessions = new SessionRepo(datastore).list({ tool: 'fit' });
     expect(sessions.length).toBe(1);
     expect(sessions[0]?.tool).toBe('fit');
     expect(sessions[0]?.cwd).toBe(projectDir);
-  });
-
-  it('does not write a session when datastore is omitted', async () => {
-    const fitResult = await withFitScope(() => executeFit(makeArgs(projectDir)));
-    expect(fitResult.result.type).not.toBe('error');
-
-    // The shared datastore in this test was opened via beforeEach but
-    // never passed in — it must remain empty.
-    const sessions = new SessionRepo(datastore).list({ tool: 'fit' });
-    expect(sessions.length).toBe(0);
   });
 
   it('invokes onProgress when supplied', async () => {

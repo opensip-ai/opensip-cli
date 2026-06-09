@@ -53,6 +53,7 @@ import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
 import { envelopeToFitRows } from './fit/envelope-view.js';
+import { persistFitSession } from './fit/result-builders.js';
 import {
   ResultsTable,
   WarningsBlock,
@@ -87,13 +88,11 @@ const NO_PROGRESS: (cb: ProgressCallback) => void = () => {
  */
 function executeFitWithProgress(
   args: FitOptions,
-  datastore: DataStore | undefined,
   emit: (event: ProgressEvent) => void,
 ): ReturnType<typeof executeFit> {
   emit({ type: 'stage-start', stage: 'checks', label: 'Running checks...' });
   return executeFit(args, {
     onProgress: (completed, total) => emit({ type: 'stage-progress', stage: 'checks', completed, total }),
-    datastore,
   });
 }
 
@@ -136,7 +135,7 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
       // execution yields to the event loop, so the spinner animates in-process.
       const transport = createInProcessTransport();
       const run = transport.run<ProgressEvent, Awaited<ReturnType<typeof executeFit>>>(
-        (emit) => executeFitWithProgress(args, datastore, emit),
+        (emit) => executeFitWithProgress(args, emit),
       );
 
       setState({ phase: 'running', checkCount, subscribe: run.onProgress });
@@ -156,6 +155,12 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
 
       if (result.shouldFail) {
         setExitCode?.(EXIT_CODES.RUNTIME_ERROR);
+      }
+
+      // Persist on the MAIN thread (ADR-0028 — the engine is persistence-free and
+      // worker-safe; the datastore handle never crosses the worker boundary).
+      if (datastore !== undefined && fitResult.durationMs !== undefined) {
+        persistFitSession(datastore, args, result.envelope, fitResult.durationMs);
       }
 
       // Effectful egress (cloud + `--report-to`) lives at the composition root

@@ -44,7 +44,7 @@ import { createInProcessTransport, currentScope } from '@opensip-tools/core';
 import { Box, Static, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
-import { executeSim } from './sim.js';
+import { executeSim, persistSimSession } from './sim.js';
 
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -82,13 +82,11 @@ const NO_PROGRESS: (cb: (event: ProgressEvent) => void) => void = () => {
 function executeSimWithProgress(
   args: SimLiveArgs,
   emit: (event: ProgressEvent) => void,
-  datastore?: DataStore,
 ): ReturnType<typeof executeSim> {
   emit({ type: 'stage-start', stage: 'scenarios', label: 'Running scenarios...' });
   return executeSim(args, {
     onProgress: (completed, total) =>
       emit({ type: 'stage-progress', stage: 'scenarios', completed, total }),
-    ...(datastore === undefined ? {} : { datastore }),
   });
 }
 
@@ -115,7 +113,7 @@ export function SimRunner({ args, setExitCode, onEnvelope, datastore }: SimRunne
     // 'running' state carries the subscribe fn, set once the run starts.
     const transport = createInProcessTransport();
     const run = transport.run<ProgressEvent, Awaited<ReturnType<typeof executeSim>>>(
-      (emit) => executeSimWithProgress(args, emit, datastore),
+      (emit) => executeSimWithProgress(args, emit),
     );
     setState({ phase: 'running', subscribe: run.onProgress });
 
@@ -127,6 +125,8 @@ export function SimRunner({ args, setExitCode, onEnvelope, datastore }: SimRunne
         setExitCode?.(result.exitCode);
       } else {
         if (result.shouldFail === true) setExitCode?.(EXIT_CODES.RUNTIME_ERROR);
+        // Persist on the MAIN thread (ADR-0028 — engine is persistence-free).
+        if (datastore !== undefined) persistSimSession(datastore, result);
         onEnvelope?.(result.envelope);
         setState({
           phase: 'done',
