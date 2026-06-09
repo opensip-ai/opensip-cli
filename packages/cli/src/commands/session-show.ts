@@ -59,7 +59,32 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
     opts.emitJson(sessionShowJson(resolved.session, replay));
     return;
   }
-  await opts.render(replay.result);
+  await opts.render(sessionReplayResult(resolved.session, replay));
+}
+
+/**
+ * Build the tool-agnostic `session-replay` view result from a resolved session +
+ * its replay. Renders uniformly across fit/graph/sim via the shared envelope
+ * table (not each tool's live-run done-view), with no live-run footer.
+ */
+function sessionReplayResult(
+  session: StoredSession,
+  replay: ToolSessionReplay<CommandResult>,
+): CommandResult {
+  return {
+    type: 'session-replay',
+    session: {
+      id: session.id,
+      tool: session.tool,
+      timestamp: session.timestamp,
+      ...(session.recipe === undefined ? {} : { recipe: session.recipe }),
+      score: session.score,
+      passed: session.passed,
+      durationMs: session.durationMs,
+    },
+    envelope: replay.envelope,
+    fidelity: replay.fidelity,
+  };
 }
 
 function sessionShowJson(

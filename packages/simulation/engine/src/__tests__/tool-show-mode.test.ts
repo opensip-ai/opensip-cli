@@ -91,7 +91,12 @@ describe('sim --show (runSimShowMode)', () => {
     await simSpec().handler({ cwd: '/repo', show: 'SIM_1' }, ctx);
 
     expect(rendered).toHaveLength(1);
-    expect(rendered[0]).toMatchObject({ type: 'sim-done' });
+    // Replays render through the tool-agnostic session-replay view, not sim-done.
+    expect(rendered[0]).toMatchObject({
+      type: 'session-replay',
+      session: { id: 'SIM_1', tool: 'sim' },
+      envelope: { tool: 'sim' },
+    });
   });
 
   it('emits a JSON replay wrapper when --json is passed', async () => {

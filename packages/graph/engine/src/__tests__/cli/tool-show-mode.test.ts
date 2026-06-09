@@ -89,7 +89,13 @@ describe('graph --show (runGraphShowMode)', () => {
     await graphCommandSpec.handler({ cwd: '/repo', show: 'GRAPH_1' }, ctx);
 
     expect(rendered).toHaveLength(1);
-    expect(rendered[0]).toMatchObject({ type: 'graph-done' });
+    // Replays render through the tool-agnostic session-replay view (not the live
+    // graph-done view) — uniform across tools, envelope-driven, no live footer.
+    expect(rendered[0]).toMatchObject({
+      type: 'session-replay',
+      session: { id: 'GRAPH_1', tool: 'graph' },
+      envelope: { tool: 'graph' },
+    });
   });
 
   it('emits a JSON replay wrapper when --json is passed', async () => {

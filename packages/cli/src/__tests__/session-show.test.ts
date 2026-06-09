@@ -178,7 +178,32 @@ describe('executeSessionShow', () => {
     });
 
     expect(s.rendered).toHaveLength(1);
-    expect(s.rendered[0]).toMatchObject({ type: 'fit-done' });
+    // Renders through the unified, envelope-driven session-replay view (not the
+    // tool's live fit-done view), so fit/graph/sim replays look the same.
+    expect(s.rendered[0]).toMatchObject({
+      type: 'session-replay',
+      session: { id: 'FIT_1', tool: 'fit' },
+      envelope: { tool: 'fit' },
+      fidelity: 'projection',
+    });
+  });
+
+  it('carries the recipe onto the replay result when the session has one', async () => {
+    const repo = new SessionRepo(ds);
+    repo.save(makeSession('FIT_R', Date.now(), { recipe: 'example' }));
+    const s = makeSinks();
+
+    await executeSessionShow({
+      datastore: ds,
+      replayRegistry: makeReplayRegistry(),
+      ref: 'FIT_R',
+      render: s.render,
+      emitJson: s.emitJson,
+      emitError: s.emitError,
+      setExitCode: s.setExitCode,
+    });
+
+    expect(s.rendered[0]).toMatchObject({ type: 'session-replay', session: { recipe: 'example' } });
   });
 
   it('renders a structured error result when the session cannot be found (non-JSON)', async () => {

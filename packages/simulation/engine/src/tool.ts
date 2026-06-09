@@ -174,7 +174,7 @@ async function runSimShowMode(opts: SimOptions, cli: ToolCliContext): Promise<vo
       cli.emitJson(sessionShowJson(resolved.session, replay));
       return;
     }
-    await cli.render(replay.result);
+    await cli.render(sessionReplayResult(resolved.session, replay));
   } catch (error) {
     await emitSimShowError(
       opts,
@@ -221,6 +221,28 @@ function sessionShowJson(
     },
     fidelity: replay.fidelity,
     envelope: replay.envelope,
+  };
+}
+
+/** The tool-agnostic `session-replay` view result (rendered via the shared
+ *  envelope table; no live-run footer). `cli.render` takes `unknown`. */
+function sessionReplayResult(
+  session: StoredSession,
+  replay: ReturnType<typeof simReplayFromSession>,
+): unknown {
+  return {
+    type: 'session-replay',
+    session: {
+      id: session.id,
+      tool: session.tool,
+      timestamp: session.timestamp,
+      ...(session.recipe === undefined ? {} : { recipe: session.recipe }),
+      score: session.score,
+      passed: session.passed,
+      durationMs: session.durationMs,
+    },
+    envelope: replay.envelope,
+    fidelity: replay.fidelity,
   };
 }
 

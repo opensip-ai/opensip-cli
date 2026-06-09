@@ -1,4 +1,5 @@
 import { renderToText } from '@opensip-tools/cli-ui';
+import { buildSignalEnvelope } from '@opensip-tools/contracts';
 import { describe, it, expect } from 'vitest';
 
 import { resultToView } from '../result-to-view.js';
@@ -67,6 +68,36 @@ describe('history view', () => {
     const header = lines.find((l) => l.includes('Session') && l.includes('Tool'))!;
     const fitRow = lines.find((l) => l.includes('FIT_1'))!;
     expect(fitRow.indexOf('FIT_1')).toBe(header.indexOf('Session'));
+  });
+});
+
+describe('session-replay view', () => {
+  it('renders a header, recipe, FAIL verdict, and the shared envelope table (no live footer)', () => {
+    const envelope = buildSignalEnvelope({
+      tool: 'graph',
+      runId: 'GRAPH_X',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      units: [{ slug: 'graph:cycle', passed: false, violationCount: 2, durationMs: 0 }],
+      signals: [],
+    });
+    const out = text({
+      type: 'session-replay',
+      session: {
+        id: 'GRAPH_X', tool: 'graph', timestamp: '2026-01-01T00:00:00.000Z',
+        recipe: 'strict', score: 60, passed: false, durationMs: 1200,
+      },
+      envelope,
+      fidelity: 'projection',
+    });
+    expect(out).toContain('Session GRAPH_X');
+    expect(out).toContain('graph');
+    expect(out).toContain('recipe strict');     // recipe-present branch
+    expect(out).toContain('FAIL');              // passed:false verdict branch
+    expect(out).toContain('replayed (projection)');
+    expect(out).toContain('graph:cycle');       // the shared envelope table body
+    // The live-run footer must NOT appear on a replay.
+    expect(out).not.toContain('Use --verbose');
+    expect(out).not.toContain('dashboard for HTML report');
   });
 });
 

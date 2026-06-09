@@ -61,6 +61,7 @@ export type {
   PluginResult,
   PluginInfo,
   SyncEntry,
+  SessionReplayResult,
   HelpResult,
   ErrorResult,
   VerboseDetail,

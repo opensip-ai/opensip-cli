@@ -33,7 +33,7 @@ import {
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
 
-import type { CommandResult, ErrorResult, GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-tools/contracts';
+import type { CommandResult, ErrorResult, GraphDoneResult, SessionReplayResult, SignalEnvelope, VerboseDetail } from '@opensip-tools/contracts';
 
 const SPACER: ViewNode = { kind: 'spacer' };
 
@@ -75,6 +75,36 @@ function graphDoneView(result: GraphDoneResult): ViewNode {
     );
   }
   return group(children);
+}
+
+/**
+ * A replayed session (`sessions show` / `--show`). Uniform across tools: a
+ * compact session header + the SAME shared envelope→table view a live run uses
+ * (so a replayed graph session shows its per-rule table too), and deliberately
+ * NO live-run footer ("Use --verbose" / "dashboard") — that is fresh-run guidance,
+ * meaningless for a replay. ADR-0011: the projected envelope is the one currency.
+ */
+function sessionReplayView(result: SessionReplayResult): ViewNode {
+  const s = result.session;
+  const when = new Date(s.timestamp).toLocaleString();
+  const verdictTone: Tone = s.passed ? 'success' : 'error';
+  return group([
+    line([
+      { text: 'Session ', bold: true },
+      { text: s.id },
+      { text: `  ·  ${s.tool}`, tone: 'brand' },
+      { text: `  ·  ${when}`, tone: 'muted' },
+    ]),
+    line([
+      { text: `${s.score}%`, tone: verdictTone },
+      { text: '  ' },
+      { text: s.passed ? 'PASS' : 'FAIL', tone: verdictTone },
+      ...(s.recipe === undefined ? [] : [{ text: `  ·  recipe ${s.recipe}`, tone: 'muted' as Tone }]),
+      { text: `  ·  replayed (${result.fidelity})`, tone: 'muted' },
+    ]),
+    SPACER,
+    envelopeToTableView(result.envelope),
+  ]);
 }
 
 /** Pre-composed lines rendered verbatim through both media (gate output, graph status). */
@@ -264,6 +294,9 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'history': {
       return viewHistory(result);
+    }
+    case 'session-replay': {
+      return sessionReplayView(result);
     }
     case 'dashboard': {
       return viewDashboard(result);
