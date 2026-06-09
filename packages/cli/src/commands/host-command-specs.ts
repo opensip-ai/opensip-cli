@@ -34,7 +34,7 @@ import { defineCommand, type ProjectContext } from '@opensip-tools/core';
 
 import { composeAndWriteDashboard } from '../dashboard-compose.js';
 
-import { printCompletionScript, type Shell } from './completion.js';
+import { assembleCompletionInventory, printCompletionScript, type Shell } from './completion.js';
 import { executeConfigure } from './configure.js';
 import { buildHostSubcommandGroups, type HostSpec } from './host-subcommand-groups.js';
 import { executeInit } from './init.js';
@@ -176,7 +176,16 @@ function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
         return;
       }
-      printCompletionScript(normalized satisfies Shell);
+      // Derive the completion surface from the live specs: the tool commands
+      // (supplied by the composition root via `ctx.toolCommandSpecs`), the
+      // top-level host commands, and the action-less groups. Single source of
+      // truth — the emitted script tracks the real command surface.
+      const inventory = assembleCompletionInventory({
+        toolSpecs: ctx.toolCommandSpecs ?? [],
+        hostSpecs: buildTopLevelHostSpecs(ctx),
+        groups: buildHostSubcommandGroups(ctx),
+      });
+      printCompletionScript(normalized satisfies Shell, inventory);
     },
   });
 }

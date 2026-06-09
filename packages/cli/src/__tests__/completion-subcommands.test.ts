@@ -1,14 +1,14 @@
 /**
- * Drift test for the static `SUBCOMMANDS` list in
- * `commands/completion.ts`. The audit dismissed the static completion
- * list as a non-finding but flagged drift as the failure mode — this
- * test closes that loop.
+ * Parity test for shell completion.
  *
- * The shell-completion script can't introspect the live registry at
- * sourcing time (the user's shell sources it once), so we keep a
- * static list and assert at test time that it matches the live
- * Commander program built from the registered tools plus the
- * CLI-owned commands.
+ * Completion is no longer a hand-maintained flag list: the `completion`
+ * command derives its subcommands + per-command flags from the live
+ * `CommandSpec`s (the same specs the runtime mounts) via
+ * `assembleCompletionInventory`. These tests assert that derivation against the
+ * live Commander program so completion can never drift from the real command
+ * surface — neither a missing subcommand (a new `audit` tool) nor a missing
+ * flag (the historical gap: `fit --gate-save` / `--gate-compare` / `--show`,
+ * `sim --show`, and `graph`'s flags entirely).
  */
 
 import { ToolRegistry, type ToolCliContext } from '@opensip-tools/core';
@@ -19,13 +19,22 @@ import {
   registerFirstPartyTools,
   mountAllToolCommands,
 } from '../bootstrap/register-tools.js';
-import { buildCompletionScript, SUBCOMMANDS } from '../commands/completion.js';
+import {
+  assembleCompletionInventory,
+  buildCompletionScript,
+  specLongFlags,
+  INTERNAL_COMMANDS,
+  type CompletionInventory,
+} from '../commands/completion.js';
+import { buildTopLevelHostSpecs } from '../commands/host-command-specs.js';
+import { buildHostSubcommandGroups } from '../commands/host-subcommand-groups.js';
 import { registerCliCommands } from '../commands/index.js';
 
-function makeStubContext(): ToolCliContext {
+import type { CliCommandsContext } from '../commands/shared.js';
+
+function makeStubToolContext(): ToolCliContext {
   // Layer 5 Phase 3 (audit 2026-05-23 F3): tools own their renderers
-  // and register them directly via `cli.registerLiveView`. The CLI no
-  // longer hands out bundled renderers via a `builtinLiveViews` map.
+  // and register them directly via `cli.registerLiveView`.
   return {
     project: {
       cwd: '/test',
@@ -39,12 +48,7 @@ function makeStubContext(): ToolCliContext {
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
-    logger: {
-      debug: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    },
+    logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
     emitEnvelope: vi.fn(),
@@ -55,87 +59,111 @@ function makeStubContext(): ToolCliContext {
   };
 }
 
-describe('SUBCOMMANDS drift test', () => {
-  it('matches the live Commander program (tool subcommands plus CLI-owned)', async () => {
-    const program = new Command('opensip-tools');
-    // Fresh per-test ToolRegistry — the previously-exported
-    // `defaultToolRegistry` module singleton was removed in T1 cleanup.
-    const registry = new ToolRegistry();
-    await registerFirstPartyTools(registry);
-    const ctx = makeStubContext();
-    mountAllToolCommands(registry, program, ctx);
-    registerCliCommands(program, {
-      setExitCode: ctx.setExitCode,
-      render: (result) => ctx.render(result),
-      datastore: () => undefined,
-    });
+/** A minimal host context for building the host specs we introspect (handlers
+ *  are never invoked here — only the static declarations are read). */
+function makeStubHostContext(): CliCommandsContext {
+  return {
+    setExitCode: vi.fn(),
+    render: vi.fn(() => Promise.resolve()),
+    emitJson: vi.fn(),
+    emitError: vi.fn(),
+    pluginLayouts: [],
+    datastore: () => undefined,
+  };
+}
 
-    const live = program.commands.map((c) => c.name()).sort();
-    // `dashboard` is a CLI-owned command (registerCliCommands) since L2 —
-    // the cross-tool composition root. `help` is a Commander built-in
-    // that the completion script also surfaces. Filter out the `help`
-    // synthetic since
-    // Commander adds it automatically and SUBCOMMANDS lists it
-    // explicitly.
-    const completionList = [...SUBCOMMANDS].sort();
-    // Commander auto-includes 'help' in commands.map() depending on
-    // version; we tolerate either form.
-    const liveSet = new Set(live);
-    for (const sub of completionList) {
-      if (sub === 'help') continue; // synthetic Commander built-in
-      expect(liveSet, `expected '${sub}' to be a registered subcommand`).toContain(sub);
-    }
-    // Conversely — every live tool / CLI subcommand should be in
-    // SUBCOMMANDS so a new `audit` tool would force the completion
-    // script to surface it. Internal, non-user-facing commands are
-    // exempt: they are not offered in shell completion.
-    const INTERNAL = new Set([
-      'help', // optional Commander built-in
-      // Spawned by the sharded build (`graph --json` on a multi-package
-      // repo), never typed by a user — intentionally absent from completion.
-      'graph-shard-worker',
-      // Machine-facing exports spawned by opensip's EngineSubprocessPort
-      // (DEC-498), never typed by a user — intentionally absent from completion.
-      'catalog-export',
-      'sarif-export',
-      // Forked by the fit/sim/graph live views (ADR-0028) to run the engine off
-      // the main process, never typed by a user — intentionally absent from completion.
-      'fit-run-worker',
-      'sim-run-worker',
-      'graph-run-worker',
-    ]);
+/** Build the completion inventory exactly as the `completion` command handler
+ *  does, from the live first-party tool specs + host specs + groups. */
+async function buildLiveInventory(): Promise<{
+  inventory: CompletionInventory;
+  program: Command;
+  registry: ToolRegistry;
+}> {
+  const program = new Command('opensip-tools');
+  const registry = new ToolRegistry();
+  await registerFirstPartyTools(registry);
+  const toolCtx = makeStubToolContext();
+  mountAllToolCommands(registry, program, toolCtx);
+  const hostCtx = makeStubHostContext();
+  registerCliCommands(program, hostCtx);
+
+  const inventory = assembleCompletionInventory({
+    toolSpecs: registry.list().flatMap((t) => t.commandSpecs ?? []),
+    hostSpecs: buildTopLevelHostSpecs(hostCtx),
+    groups: buildHostSubcommandGroups(hostCtx),
+  });
+  return { inventory, program, registry };
+}
+
+describe('completion subcommand parity', () => {
+  it('every live user-facing subcommand is completable', async () => {
+    const { inventory, program } = await buildLiveInventory();
+    const live = program.commands.map((c) => c.name());
     for (const sub of live) {
-      if (INTERNAL.has(sub)) continue;
-      expect(completionList, `expected SUBCOMMANDS to include '${sub}'`).toContain(sub);
+      if (INTERNAL_COMMANDS.has(sub)) continue;
+      if (sub === 'help') continue; // Commander built-in
+      expect(
+        inventory.subcommands,
+        `expected completion to surface live subcommand '${sub}'`,
+      ).toContain(sub);
+    }
+  });
+});
+
+describe('completion flag parity', () => {
+  it('every declared flag of every tool command is completable', async () => {
+    const { inventory, registry } = await buildLiveInventory();
+    const toolSpecs = registry.list().flatMap((t) => t.commandSpecs ?? []);
+    for (const spec of toolSpecs) {
+      if (INTERNAL_COMMANDS.has(spec.name)) continue;
+      const declared = specLongFlags(spec);
+      for (const flag of declared) {
+        expect(
+          inventory.commandFlags[spec.name],
+          `expected completion for '${spec.name}' to include '${flag}'`,
+        ).toContain(flag);
+      }
     }
   });
 
-  it('emitted bash/zsh scripts list the live plugin subcommands (no install/add drift)', async () => {
-    const program = new Command('opensip-tools');
-    const registry = new ToolRegistry();
-    await registerFirstPartyTools(registry);
-    const ctx = makeStubContext();
-    mountAllToolCommands(registry, program, ctx);
-    registerCliCommands(program, {
-      setExitCode: ctx.setExitCode,
-      render: (result) => ctx.render(result),
-      datastore: () => undefined,
-    });
+  it('closes the historical gaps (fit gate/show, sim show, graph present)', async () => {
+    const { inventory } = await buildLiveInventory();
+    // graph was entirely absent from completion before (fell to the generic
+    // `*)` arm). It must now have its own derived flag set.
+    expect(inventory.commandFlags.graph, 'graph must be completable').toBeDefined();
+    // The audit named these specific fit/sim flags as missing. They are now
+    // derived from the live specs — assert they survive into completion.
+    expect(inventory.commandFlags.fit).toEqual(
+      expect.arrayContaining(['--gate-save', '--gate-compare', '--show']),
+    );
+    expect(inventory.commandFlags.sim).toContain('--show');
+  });
 
+  it('emitted bash/zsh scripts carry the derived flags', async () => {
+    const { inventory } = await buildLiveInventory();
+    const bash = buildCompletionScript('bash', inventory);
+    const zsh = buildCompletionScript('zsh', inventory);
+    for (const flag of ['--gate-save', '--gate-compare', '--show']) {
+      expect(bash, `bash completion should carry '${flag}'`).toContain(flag);
+      expect(zsh, `zsh completion should carry '${flag}'`).toContain(flag);
+    }
+  });
+});
+
+describe('completion plugin sub-subcommand parity', () => {
+  it('emitted bash/zsh scripts list the live plugin subcommands (no install/add drift)', async () => {
+    const { inventory, program } = await buildLiveInventory();
     const pluginCmd = program.commands.find((c) => c.name() === 'plugin');
     expect(pluginCmd, 'plugin command should be registered').toBeDefined();
     const liveSubs = (pluginCmd?.commands ?? []).map((c) => c.name()).sort();
 
-    // Bash/zsh completion arms should enumerate every live plugin
-    // sub-subcommand. The historical drift was `install` (canonical
-    // action is `add` post-F7).
-    const bash = buildCompletionScript('bash');
-    const zsh = buildCompletionScript('zsh');
+    const bash = buildCompletionScript('bash', inventory);
+    const zsh = buildCompletionScript('zsh', inventory);
     for (const sub of liveSubs) {
       expect(bash, `bash completion should list plugin '${sub}'`).toContain(sub);
       expect(zsh, `zsh completion should list plugin '${sub}'`).toContain(sub);
     }
-    expect(bash).not.toMatch(/plugin\)\s+COMPREPLY=\(\$\(compgen[^"]*"[^"]*\binstall\b/);
-    expect(zsh).not.toMatch(/plugin\)\s+_values 'plugin subcommand'[^;]*\binstall\b/);
+    // The historical drift was `install` (canonical action is `add` post-F7).
+    expect(inventory.groupSubcommands.plugin).not.toContain('install');
   });
 });

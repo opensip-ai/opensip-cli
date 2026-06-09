@@ -624,7 +624,7 @@ opensip-tools completion zsh > ~/.opensip-tools-completion.zsh
 echo "source ~/.opensip-tools-completion.zsh" >> ~/.zshrc
 ```
 
-The completion catalog is a **static first-party list** (`SUBCOMMANDS` in `packages/cli/src/commands/completion.ts`), kept in sync with the live Commander program by a drift-catch test. It covers the built-in `fit`/`sim`/`graph` command families; **third-party tool subcommands are not included** in generated completion today, even though those tools are discovered and runnable at runtime.
+The emitted script is static (your shell sources it once), but its contents are **derived from the live `CommandSpec`s at generation time** — the same specs the runtime mounts (`assembleCompletionInventory` in `packages/cli/src/commands/completion.ts`). Subcommands and per-command flags come from the populated tool registry plus the host commands, so the script can't drift from the real command surface; a flag-parity test enforces it. Because the inventory is sourced from the runtime registry, **discovered third-party tool subcommands and flags are included too**, not just the built-in `fit`/`sim`/`graph` families.
 
 ---
 

@@ -10,6 +10,7 @@
  * the shared context type.
  */
 
+import type { SpecLike } from './completion.js';
 import type { SessionReplayRegistry } from '../session-replay-registry.js';
 import type { CommandResult } from '@opensip-tools/contracts';
 import type { PluginLayout } from '@opensip-tools/core';
@@ -53,6 +54,17 @@ export interface CliCommandsContext {
    */
   readonly pluginLayouts: readonly PluginLayout[];
   readonly sessionReplayRegistry?: SessionReplayRegistry;
+  /**
+   * The live tool command specs (each registered tool's `commandSpecs`),
+   * supplied by the composition root. The `completion` command derives its
+   * shell-completion subcommands + flags from these — the same source of truth
+   * the runtime mounts — so the emitted script can never drift from the real
+   * tool command surface. Typed structurally ({@link SpecLike}) to keep this
+   * module free of the full `CommandSpec` generic. Optional so test harnesses
+   * that don't exercise completion can omit it (completion then offers the host
+   * surface only).
+   */
+  readonly toolCommandSpecs?: readonly SpecLike[];
   /**
    * v2 persistence accessor (thunk). Calling this returns the project-local
    * DataStore, opening it lazily on first access. Commands that don't read

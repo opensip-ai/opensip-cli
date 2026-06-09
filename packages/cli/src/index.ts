@@ -104,6 +104,10 @@ async function main(): Promise<void> {
     .map((t) => t.pluginLayout)
     .filter((l): l is NonNullable<typeof l> => l !== undefined);
   const sessionReplayRegistry = SessionReplayRegistry.fromTools(toolRegistry);
+  // The live tool command surface, sourced from the populated registry so the
+  // `completion` command derives its flags from the same specs the runtime
+  // mounts (no hand-maintained flag list to drift).
+  const toolCommandSpecs = toolRegistry.list().flatMap((t) => t.commandSpecs ?? []);
   registerCliCommands(program, {
     setExitCode: ctx.setExitCode,
     render: renderResult,
@@ -112,6 +116,7 @@ async function main(): Promise<void> {
     datastore: () => getOrOpenDatastore(logger),
     pluginLayouts,
     sessionReplayRegistry,
+    toolCommandSpecs,
   });
 
   // Bare `opensip-tools` → welcome screen. The update check is owned by the
