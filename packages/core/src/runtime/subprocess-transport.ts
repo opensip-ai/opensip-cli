@@ -74,6 +74,11 @@ export function createSubprocessProgressRun<TEvent, TResult>(
     // stdout ignored (no child render bytes in the parent's live view); stderr
     // inherited (logs surface); ipc channel for the WorkerMessage protocol.
     stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
+    // Structured-clone IPC instead of the default JSON serializer: progress
+    // events and tool results stay safe even if a payload grows a Map/Set/Date
+    // (the JSON serializer would silently drop or mangle those). Workers send
+    // slim, plain-data results today; this keeps the transport robust regardless.
+    serialization: 'advanced',
     ...(descriptor.env === undefined ? {} : { env: { ...process.env, ...descriptor.env } }),
   });
 

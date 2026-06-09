@@ -831,6 +831,21 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
           "variadic": false,
         },
       ],
+      "name": "graph-run-worker",
+      "options": [],
+      "subcommands": [],
+      "synopsis": "[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)",
+      "usage": "[options] <specPath>",
+    },
+    {
+      "aliases": [],
+      "args": [
+        {
+          "name": "specPath",
+          "required": true,
+          "variadic": false,
+        },
+      ],
       "name": "graph-shard-worker",
       "options": [],
       "subcommands": [],

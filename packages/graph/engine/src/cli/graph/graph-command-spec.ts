@@ -95,6 +95,7 @@ function setUpGraphLiveView(cli: ToolCliContext): void {
         quiet?: boolean;
         config?: GraphConfig;
         rules?: readonly Rule[];
+        recipe?: string;
       },
       cli.scope.datastore() as DataStore | undefined,
       { setExitCode: cli.setExitCode },
@@ -199,6 +200,9 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
       verbose: opts.verbose === true,
       quiet: opts.quiet === true,
       resolution,
+      // The recipe NAME (serializable) for the off-process worker, which
+      // re-resolves rules itself (ADR-0028); `rules` below is the in-process path.
+      ...(opts.recipe === undefined ? {} : { recipe: opts.recipe }),
       // Pass the resolved rule subset into the live path. Avoids a second
       // scope read inside the React tree.
       rules: resolveRecipeToRules(recipeSelection.name, { tolerant: recipeSelection.tolerant }),

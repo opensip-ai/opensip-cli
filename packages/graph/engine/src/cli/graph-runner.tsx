@@ -13,15 +13,23 @@
  * `@opensip-tools/cli-ui` (ADR-0016), driven in `phases` mode: graph's
  * 7 fixed pipeline stages map onto the universal `ProgressEvent` stream.
  * The former graph-local StageChecklist/StageLine/RunningStageLine are
- * gone. The transport is the in-process one — graph stays host-agnostic
- * (no subprocess), and the heavy `resolve` stage yields to the event loop
- * cooperatively (ADR-0016, `resolveEdgesFromRecords`), so the live spinner
- * animates and stages reveal progressively instead of freezing for the run.
+ * gone. The build runs OFF the main process (ADR-0028): the runner forks
+ * the CLI to `graph-run-worker` via `runOffThreadOrInProcess`, which
+ * re-bootstraps the scope, runs the heavy build, and streams stage progress
+ * + the slim {@link LiveGraphOutput} back over IPC — so this process stays
+ * free to animate the spinner + 80ms clock instead of freezing under the
+ * type-check. It falls back to the in-process closure when forking is
+ * disabled (`OPENSIP_TOOLS_NO_WORKER`) or the fork fails; both paths reduce
+ * to the same `{ signals, reportLines }` payload.
  *
  * Single exit-code write path: error outcomes route through the
  * supplied `setExitCode` callback (`ToolCliContext.setExitCode`) so the
  * CLI keeps its only `process.exitCode` mutator.
  */
+
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   Banner,
@@ -42,30 +50,21 @@ import {
   type ProgressEvent,
   type ProgressSurface,
 } from '@opensip-tools/cli-ui';
-import { createInProcessTransport, currentScope } from '@opensip-tools/core';
+import { runOffThreadOrInProcess, currentScope } from '@opensip-tools/core';
 import { Box, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
 import { buildGraphEnvelope } from './build-envelope.js';
-import { buildUnifiedReportLines, persistSession } from './graph.js';
+import { STAGE_LABELS, toProgressEvent } from './graph-progress.js';
+import { buildLiveGraphOutput, persistSession, type LiveGraphOutput } from './graph.js';
 import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 
-import type { GraphProgressEvent, GraphStage, RunGraphResult } from './orchestrate.js';
+import type { GraphStage } from './orchestrate.js';
 import type { GraphConfig, ResolutionMode, Rule } from '../types.js';
 import type { DataStore } from '@opensip-tools/datastore';
 
 const GRAPH_TOOL_TITLE = 'Code Graph';
 const GRAPH_TOOL_DESCRIPTION = 'Building call-graph from source';
-
-const STAGE_LABELS: Readonly<Record<GraphStage, string>> = {
-  discover: 'Discover files',
-  parse: 'Parse project',
-  walk: 'Walk catalog',
-  resolve: 'Resolve call sites',
-  index: 'Build indexes',
-  features: 'Derive features',
-  rules: 'Evaluate rules',
-};
 
 const STAGE_RUNNING_DETAIL: Readonly<Record<GraphStage, string>> = {
   discover: 'Scanning source tree...',
@@ -87,17 +86,6 @@ const GRAPH_SURFACE: ProgressSurface = {
     runningDetail: STAGE_RUNNING_DETAIL[id],
   })),
 };
-
-/** Map graph's pipeline event onto the universal progress currency. */
-function toProgressEvent(event: GraphProgressEvent): ProgressEvent {
-  if (event.type === 'stage-start') {
-    return { type: 'stage-start', stage: event.stage, label: STAGE_LABELS[event.stage] };
-  }
-  if (event.type === 'stage-done') {
-    return { type: 'stage-done', stage: event.stage, durationMs: event.durationMs ?? 0, detail: event.detail };
-  }
-  return { type: 'stage-cached', stage: event.stage };
-}
 
 interface RunSummaryShape {
   readonly passed: number;
@@ -147,17 +135,26 @@ interface GraphRunnerArgs {
    * with `executeGraph`. Absent ⇒ `runGraph` falls back to `currentRules()`.
    */
   readonly rules?: readonly Rule[];
+  /**
+   * `--recipe` NAME (serializable), forwarded to the off-process worker so it can
+   * re-resolve the rule set itself (rules are functions — they can't cross the
+   * fork boundary). The in-process fallback uses {@link GraphRunnerArgs.rules}.
+   */
+  readonly recipe?: string;
 }
 
-/** Run the pipeline through the transport, mapping graph events to the shared
- *  progress currency. Hoisted to module scope so the emit translation isn't a
- *  deeply-nested function inside the runner's effect. */
-function runGraphWithProgress(
+/** Run the pipeline through the in-process transport, mapping graph events to the
+ *  shared progress currency and reducing the result to the slim, serializable
+ *  {@link LiveGraphOutput} the done handler consumes — IDENTICAL to what the
+ *  off-process worker streams back, so both paths converge on one payload shape.
+ *  Hoisted to module scope so the emit translation isn't a deeply-nested function
+ *  inside the runner's effect. */
+async function runGraphWithProgress(
   args: GraphRunnerArgs,
   datastore: DataStore | undefined,
   emit: (event: ProgressEvent) => void,
-): Promise<RunGraphResult> {
-  return runGraph({
+): Promise<LiveGraphOutput> {
+  const result = await runGraph({
     cwd: args.cwd,
     noCache: args.noCache,
     resolution: args.resolution,
@@ -166,6 +163,7 @@ function runGraphWithProgress(
     datastore,
     onProgress: (event) => emit(toProgressEvent(event)),
   });
+  return buildLiveGraphOutput(result);
 }
 
 interface GraphRunnerProps {
@@ -182,15 +180,36 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
     let cancelled = false;
     const startedAt = Date.now();
 
-    const transport = createInProcessTransport();
-    const run = transport.run<ProgressEvent, RunGraphResult>(
-      (emit) => runGraphWithProgress(args, datastore, emit),
-    );
+    // Execute the build OFF the main process (ADR-0028): fork the CLI to
+    // `graph-run-worker`, which re-bootstraps the scope, re-resolves config +
+    // rules from the recipe name, runs the build, and streams stage progress +
+    // the slim LiveGraphOutput ({ signals, reportLines }) over IPC — so this
+    // process stays free to animate the checklist + 80ms clock during the (heavy)
+    // type-check. Falls back to the in-process closure (OPENSIP_TOOLS_NO_WORKER /
+    // fork failure), which reduces to the SAME LiveGraphOutput. The worker reads
+    // its serializable spec from a temp file cleaned up after the run.
+    const specDir = mkdtempSync(join(tmpdir(), 'graph-worker-'));
+    const specPath = join(specDir, 'spec.json');
+    writeFileSync(specPath, JSON.stringify({
+      cwd: args.cwd,
+      noCache: args.noCache,
+      resolution: args.resolution,
+      ...(args.recipe === undefined ? {} : { recipe: args.recipe }),
+    }), 'utf8');
+    const run = runOffThreadOrInProcess<ProgressEvent, LiveGraphOutput>({
+      descriptor: { command: process.argv[1] ?? '', argv: ['graph-run-worker', specPath] },
+      inProcess: (emit) => runGraphWithProgress(args, datastore, emit),
+    });
     setState({ phase: 'running', subscribe: run.onProgress });
 
     void (async () => {
       try {
-        const result = await run.result;
+        let result: LiveGraphOutput;
+        try {
+          result = await run.result;
+        } finally {
+          rmSync(specDir, { recursive: true, force: true });
+        }
         if (cancelled) return;
         const durationMs = Date.now() - startedAt;
         // Persist exactly one session — matches the contract the dispatch-path
@@ -211,14 +230,10 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
           warnings: verdictSummary.warnings,
           durationMs,
         };
-        // includeSummary: false — RunSummary takes the place of the text
-        // "== Summary ==" footer buildUnifiedReportLines used to append.
-        const reportLines = buildUnifiedReportLines({
-          catalog: result.catalog,
-          indexes: result.indexes,
-          signals: result.signals,
-          cacheHit: result.cacheHit,
-        }, { includeSummary: false });
+        // The worker (or the in-process fallback) already assembled the report
+        // lines with includeSummary: false — RunSummary renders the verdict
+        // footer in place of the text "== Summary ==" block.
+        const reportLines = result.reportLines;
         setState((prev) => ({
           phase: 'done',
           subscribe: prev.phase === 'running' ? prev.subscribe : run.onProgress,

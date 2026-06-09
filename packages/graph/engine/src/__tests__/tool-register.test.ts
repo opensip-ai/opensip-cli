@@ -199,6 +199,7 @@ describe('graphTool command surface', () => {
       'graph',
       'graph-lookup',
       'graph-shard-worker',
+      'graph-run-worker',
       'graph-symbol-index',
       'graph-baseline-export',
       'catalog-export',
