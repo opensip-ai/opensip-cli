@@ -58,6 +58,7 @@ import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 import { BootstrapError } from './bootstrap-error.js';
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
+import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
 import {
   checkNoProjectAndBailout,
   checkSchemaVersionAndBailout,
@@ -354,5 +355,19 @@ export function installPreActionHook(program: Command, version: string): void {
     //    immediately before Commander invokes the action body. See the
     //    helper for the once-per-process + fail-fast semantics.
     await maybeInitializeOwningTool(tools, actionCommand.name(), runId);
+
+    // 9. §5.3/§4.5: drive the generic capability loader for the invoked tool's
+    //    declared domains (e.g. graph-adapter). Lazy per command — only the
+    //    owning tool's domains load, routed through the host's capability
+    //    registry to each owner's registrar. Replaces the host-coupled,
+    //    eager register-graph-adapters.ts.
+    const driven = await loadOwningToolCapabilities({
+      owningTool: resolveOwningTool(tools, actionCommand.name()),
+      projectDir: project.projectRoot,
+      configPath: project.scope === 'project' ? project.configPath : undefined,
+    });
+    if (driven > 0) {
+      scope.diagnostics.event('load', 'debug', `loaded ${String(driven)} capability domain(s)`);
+    }
   });
 }

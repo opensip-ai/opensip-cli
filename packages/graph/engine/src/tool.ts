@@ -40,7 +40,7 @@ import {
 import { graphCommandSpec } from './cli/graph/graph-command-spec.js';
 import { graphConfigDeclaration } from './cli/graph-config-schema.js';
 import { graphRunWorkerCommandSpec } from './cli/graph-worker.js';
-import { createAdapterRegistry, currentAdapterRegistry, getDiscoveredAdapters } from './lang-adapter/registry.js';
+import { createAdapterRegistry, currentAdapterRegistry } from './lang-adapter/registry.js';
 import { CatalogRepo } from './persistence/catalog-repo.js';
 import { graphReplayFromSession } from './persistence/session-replay.js';
 import { createRecipeRegistry } from './recipes/registry.js';
@@ -159,20 +159,16 @@ const registerGraphAdapter: CapabilityRegistrar = (contribution) => {
  * the returned `graph` slot. Fresh adapter + rule registries per run so
  * concurrent scopes carry independent graph state.
  *
- * Adapter seeding: graph-adapter packages are discovered at CLI startup
- * (before any scope exists) and stashed via `setDiscoveredAdapters`.
- * `contributeScope` reads that list and re-registers each adapter into
- * this run's fresh registry so the orchestrator's `pickAdapter` resolves
- * them.
+ * Adapter seeding: the fresh adapter registry starts EMPTY. The generic
+ * capability loader (§5.3/§4.5) discovers `graph-adapter` packages per run and
+ * routes each through {@link registerGraphAdapter} into this scope's registry
+ * (driven by the CLI pre-action hook), so `pickAdapter` resolves them — no
+ * process-global discovered-adapters holder.
  */
 function contributeScope(): ScopeContribution {
-  const adapters = createAdapterRegistry();
-  for (const adapter of getDiscoveredAdapters()) {
-    adapters.register(adapter);
-  }
   return {
     graph: {
-      adapters,
+      adapters: createAdapterRegistry(),
       rules: createRulesRegistry(),
       recipes: createRecipeRegistry(),
     },

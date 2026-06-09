@@ -191,37 +191,11 @@ export function createAdapterRegistry(): GraphAdapterRegistry {
   return new GraphAdapterRegistry();
 }
 
-// ---------------------------------------------------------------------------
-// Discovered-adapters holder
-//
-// Adapter discovery happens at CLI startup (before any RunScope exists)
-// by walking node_modules for @opensip-tools/graph-* packages. With
-// per-scope registries we can't register the discovered adapters
-// immediately — there's no scope yet. Instead, the CLI calls
-// `setDiscoveredAdapters(adapters)` once after discovery, and the
-// graph tool's `contributeScope` reads `getDiscoveredAdapters()` to seed
-// each new scope's adapter registry.
-//
-// The holder is intentionally module-level (one per process). It is
-// SET-ONCE (or set-many-overwrite) and per-invocation registration is
-// driven through it.
-// ---------------------------------------------------------------------------
-
-let discoveredAdapters: readonly GraphLanguageAdapter[] = [];
-
-/**
- * Stash the list of adapters discovered at CLI startup so the graph
- * tool's `contributeScope` can register them into each new scope's adapter
- * registry. Called once at bootstrap; idempotent.
- */
-export function setDiscoveredAdapters(adapters: readonly GraphLanguageAdapter[]): void {
-  discoveredAdapters = adapters;
-}
-
-/** Read the list set by `setDiscoveredAdapters`. Defaults to empty. */
-export function getDiscoveredAdapters(): readonly GraphLanguageAdapter[] {
-  return discoveredAdapters;
-}
+// Adapter discovery is no longer driven through a module-level holder. The
+// generic capability loader (§5.3/§4.5) discovers graph-adapter packages per
+// run and routes each through the `graph-adapter` registrar into the CURRENT
+// scope's adapter registry (the CLI pre-action hook drives it). There is no
+// process-global discovered-adapters state.
 
 /**
  * Read the current scope's graph adapter registry. Throws when no

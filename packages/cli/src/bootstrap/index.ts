@@ -37,7 +37,6 @@
 import { hostEnv } from '../env/host-env-specs.js';
 import { initTelemetry } from '../telemetry/sdk-init.js';
 
-import { discoverAndRegisterGraphAdapterPackages } from './register-graph-adapters.js';
 import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
   BUNDLED_TOOL_PACKAGES,
@@ -138,7 +137,10 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
     provenance,
     manifests,
   );
-  await discoverAndRegisterGraphAdapterPackages({ projectDir: opts.projectDir });
+  // Graph adapters (and every other tool's capability domains) are no longer
+  // discovered here. The pre-action hook drives the generic capability loader
+  // per command for the invoked tool's declared domains (§5.3/§4.5) — no
+  // host-coupled, eager, per-tool discovery at bootstrap.
   return { provenance, manifests };
 }
 

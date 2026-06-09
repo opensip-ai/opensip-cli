@@ -108,8 +108,6 @@ export {
   pickAdapter,
   createAdapterRegistry,
   currentAdapterRegistry,
-  setDiscoveredAdapters,
-  getDiscoveredAdapters,
   GraphAdapterRegistry,
 } from './lang-adapter/registry.js';
 export {
@@ -141,17 +139,6 @@ export type { EdgePosition, EdgeSink, MutableStats } from './lang-adapter/edge-h
 export { normalizeWhitespace, hashBody } from './lang-adapter/body-digest.js';
 export type { BodyDigest } from './lang-adapter/body-digest.js';
 
-// ── Graph adapter discovery (used by the CLI to load adapter packs) ─
-export {
-  discoverGraphAdapterPackages,
-  readGraphAdapterPackageMetadata,
-  readGraphAdapterPackagePreferences,
-} from './plugins/graph-adapter-discovery.js';
-export type {
-  DiscoveredGraphAdapterPackage,
-  GraphAdapterDiscoveryOptions,
-  GraphAdapterPackageMetadata,
-} from './plugins/graph-adapter-discovery.js';
 
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md:
 // first-party adapters live in their own graph-* packages, so the
