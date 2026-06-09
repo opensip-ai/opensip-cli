@@ -661,6 +661,10 @@ export async function discoverAndRegisterAuthoredTools(
  * guard, register, and record provenance + manifest. Admission (incl. the trust
  * decision) has already happened by the time this is called — so import here
  * never precedes a trust decision.
+ *
+ * @throws {PluginIncompatibleError} when the authored tool's runtime fails to
+ *   load via the plugin path — an authored tool is first-party-intent, so a
+ *   load failure is fail-closed (surfaced), never silently skipped.
  */
 async function admitAndRegisterAuthored(
   registry: ToolRegistry,
