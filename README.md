@@ -12,7 +12,7 @@
 
 > **One CLI to measure, map, and gate the health of any codebase.**
 
-Run ~145 fitness checks across **TypeScript, Python, Go, Java, Rust, and C/C++**,
+Run ~165 fitness checks across **TypeScript, Python, Go, Java, Rust, and C/C++**,
 build a static call graph of your whole repo, and wire both into CI so quality
 only goes up — from a single tool, on your laptop or in your pipeline.
 

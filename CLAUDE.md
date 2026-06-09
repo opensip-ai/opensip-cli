@@ -58,8 +58,8 @@ opensip-tools/
 │   │   ├── engine/              # @opensip-tools/fitness — fitness engine,
 │   │   │                        #   fit/dashboard/list-checks/list-recipes,
 │   │   │                        #   gate, SARIF
-│   │   ├── checks-typescript/   # @opensip-tools/checks-typescript (~50 checks)
-│   │   ├── checks-universal/    # @opensip-tools/checks-universal (~90 checks)
+│   │   ├── checks-typescript/   # @opensip-tools/checks-typescript (~52 checks)
+│   │   ├── checks-universal/    # @opensip-tools/checks-universal (~109 checks)
 │   │   ├── checks-python/       # @opensip-tools/checks-python
 │   │   ├── checks-go/           # @opensip-tools/checks-go
 │   │   ├── checks-java/         # @opensip-tools/checks-java
@@ -183,14 +183,14 @@ Subcommands available out of the box:
 
 ## Fitness Check System
 
-~145 checks across seven check packs (TypeScript, Universal, Python,
+~165 checks across seven check packs (TypeScript, Universal, Python,
 Go, Java, C/C++, Rust). The authoritative per-pack list lives in
 `docs/public/70-reference/05-checks-index.md` (generated) — counts below
 are approximate and drift as checks are added:
 
-- `@opensip-tools/checks-typescript` (~50 checks) — TS-AST-driven checks
+- `@opensip-tools/checks-typescript` (~52 checks) — TS-AST-driven checks
   (drizzle-orm, typed-inject, react, package.json exports, tsconfig).
-- `@opensip-tools/checks-universal` (~90 checks) — text/regex/glob checks
+- `@opensip-tools/checks-universal` (~109 checks) — text/regex/glob checks
   (Docker, .env, Sentry, generic structure, dead-code via knip).
 - `@opensip-tools/checks-python|go|java|cpp|rust` — language-specific checks.
 
