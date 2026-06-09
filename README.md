@@ -209,9 +209,26 @@ opensip-tools plugin remove <pkg>   # uninstall + unpin
 opensip-tools plugin sync           # reinstall pinned plugins after a fresh clone
 ```
 
-### `sim` — simulations *(experimental)*
+### `sim` — resilience scenarios *(experimental · community-driven)*
+
+`sim` is our youngest tool, and we're building it in the open. It lets you
+describe **chaos** and **load** scenarios as code — with personas, invariants,
+and assertions — and run them through a pluggable scenario engine.
+
+**Honest status:** today `sim` executes scenarios *synthetically* (the engine
+models outcomes rather than driving a live system), so it's a sandbox for the
+authoring model and the reporting loop — not yet a production resilience test.
+The next milestone is a **bring-your-own-target harness** that runs the same
+scenarios against a real endpoint.
+
+That gap is exactly why it's here. The scenario contract, the chaos/load kinds,
+and the gate plumbing are real and stable; the live-execution layer is wide
+open. If resilience testing is your thing, this is a tool you can shape from the
+ground floor — **[issues and PRs welcome](https://github.com/opensip-ai/opensip-tools/issues)**.
+
 ```bash
-opensip-tools sim                   # run simulations
+opensip-tools sim                   # run all scenarios (default recipe)
+opensip-tools sim --recipe example  # try the scenario model on the scaffolded demo
 ```
 
 ### `graph` — static call-graph analysis
