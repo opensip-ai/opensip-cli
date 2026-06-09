@@ -16,6 +16,40 @@ The website is **Vite + React + Wouter** on the frontend, **Express + TypeScript
 
 ---
 
+## CLI installer endpoint
+
+The customer-facing install command is:
+
+```bash
+curl -fsSL https://opensip.ai/cli/install.sh | bash
+```
+
+The canonical script lives in this repo at `scripts/install.sh`. The website
+should expose `/cli/install.sh` as a stable branded URL and either redirect or
+proxy to:
+
+```
+https://raw.githubusercontent.com/opensip-ai/opensip-tools/main/scripts/install.sh
+```
+
+For a Replit/Express site, the smallest route is:
+
+```ts
+app.get('/cli/install.sh', (_req, res) => {
+  res.redirect(
+    302,
+    'https://raw.githubusercontent.com/opensip-ai/opensip-tools/main/scripts/install.sh',
+  );
+});
+```
+
+If you prefer to avoid a client-visible redirect, proxy the GitHub response and
+set `Content-Type: text/x-shellscript; charset=utf-8`. In both cases,
+`opensip.ai/cli/install.sh` is the public contract; the GitHub raw URL is only
+the implementation detail.
+
+---
+
 ## The manifest contract
 
 The single entry point is `docs/web-generated/manifest.json`. Fetch it from:

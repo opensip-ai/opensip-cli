@@ -60,7 +60,10 @@ If you don't have a project handy, `git clone https://github.com/opensip-ai/open
 
 ```bash
 # 1. Install the CLI globally
-npm install -g opensip-tools
+curl -fsSL https://opensip.ai/cli/install.sh | bash
+
+# Alternative: install directly from npm
+# npm install -g opensip-tools
 
 # 2. Enter your project
 cd your-project
@@ -86,12 +89,12 @@ opensip-tools publishes through npm trusted publishing/provenance and rejects Op
 >
 > ```bash
 > npm uninstall -g @opensip-tools/cli
-> npm install -g opensip-tools@latest
+> curl -fsSL https://opensip.ai/cli/install.sh | bash
 > ```
 >
 > Nothing else changes — `opensip-tools.config.yml`, the `opensip-tools`
-> command, and every subcommand are identical. From 2.4.0 on, the single
-> `npm install -g opensip-tools@latest` keeps everything current.
+> command, and every subcommand are identical. From 2.4.0 on, the installer
+> keeps the unscoped CLI package current.
 
 ---
 
@@ -150,7 +153,7 @@ The full command tree is at [`../70-reference/01-cli-commands.md`](/docs/opensip
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Behavior doesn't match what these docs describe | Older CLI version than the docs you're reading | Check installed version: `opensip-tools --version` (or `-V`). Latest is on [npm](https://www.npmjs.com/package/opensip-tools). Update with `npm install -g opensip-tools@latest`. |
+| Behavior doesn't match what these docs describe | Older CLI version than the docs you're reading | Check installed version: `opensip-tools --version` (or `-V`). Latest is on [npm](https://www.npmjs.com/package/opensip-tools). Update with `curl -fsSL https://opensip.ai/cli/install.sh \| bash`. |
 | `command not found: opensip-tools` | Global install isn't on `$PATH` | `npm config get prefix` — make sure that path's `bin/` is on `$PATH`, or use `npx opensip-tools` instead |
 | `init` says it detected no language | No supported language marker found (no `package.json`, `Cargo.toml`, etc.) | Pass `--language <name>` explicitly: `opensip-tools init --language typescript` |
 | `fit --recipe example` says "0 checks ran" | Targets in `opensip-tools.config.yml` don't match any files | Open the config; widen `targets.<your-language>-source.include` to cover where your code actually lives |

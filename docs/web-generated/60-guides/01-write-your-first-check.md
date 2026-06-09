@@ -21,7 +21,7 @@ By the end of this page you'll have: an installed CLI, an `opensip-tools.config.
 ## 1. Scaffold a project
 
 ```bash
-npm install -g opensip-tools
+curl -fsSL https://opensip.ai/cli/install.sh | bash
 cd your-project
 opensip-tools init
 ```

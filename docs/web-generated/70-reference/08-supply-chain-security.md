@@ -67,13 +67,15 @@ dependency installs.
 For the global CLI install:
 
 ```bash
-npm install -g opensip-tools
+curl -fsSL https://opensip.ai/cli/install.sh | bash
 ```
 
 OpenSIP's release gate protects customers from OpenSIP package-level install
 hooks and from releases published with long-lived npm tokens. The remaining
 risk is mostly outside the OpenSIP tarballs:
 
+- The installer script is source-controlled at `scripts/install.sh` and runs
+  `npm install -g opensip-tools` with quieter customer-facing output.
 - npm may run lifecycle scripts from third-party dependencies during install.
 - A freshly compromised dependency version could be pulled if the customer asks
   for `latest` before the ecosystem has had time to take it down.

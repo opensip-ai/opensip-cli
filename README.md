@@ -69,8 +69,11 @@ If you depend on the v1 layout (committed `baseline.sarif`, scripts that read
 Four commands from zero to a passing fitness run:
 
 ```bash
-# 1. Install the CLI globally from npm
-npm install -g opensip-tools
+# 1. Install the CLI globally
+curl -fsSL https://opensip.ai/cli/install.sh | bash
+
+# Alternative: install directly from npm
+# npm install -g opensip-tools
 
 # 2. Change into your project's repo
 cd your-project
@@ -730,6 +733,9 @@ opensip-tools sessions purge --yes           # Skip confirmation
 
 ```bash
 # Update to the latest release
+curl -fsSL https://opensip.ai/cli/install.sh | bash
+
+# Alternative: update directly from npm
 npm install -g opensip-tools@latest        # or: pnpm add -g opensip-tools@latest
 
 # Check the installed version
