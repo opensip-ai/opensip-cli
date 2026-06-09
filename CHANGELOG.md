@@ -41,10 +41,17 @@ thing distinguishing a bundled tool from an installed or project-local one is it
 ### Added
 
 - **The acceptance test as CI** — `fit` (the strongest tool) loaded through the
-  plugin path is asserted identical to the bundled mount across all four commands.
+  plugin path is asserted identical to the bundled mount: a component test pins the
+  command surface, and an end-to-end test runs the real binary TWICE on the same
+  project — once bundled, once with `fit` dropped from the bundled set so it loads
+  through the external/installed path — and asserts the check list, `--help`,
+  `fit --json` `CommandOutcome`, and exit code are identical.
+- **`OPENSIP_TOOLS_SKIP_BUNDLED`** — drop a bundled tool (`fitness`/`simulation`/
+  `graph`) from the bundled set so an installed or project-local package of the
+  same id takes over: the install-source-independence escape hatch made real.
 - **`no-bootstrap-tool-import`** guardrail (the host must not statically import a
-  tool runtime; 139 → 140 checks) + the **completion-invariant index** with a CI
-  assertion that every §8 invariant maps to a live check.
+  tool runtime) + the **completion-invariant index** with a CI assertion that every
+  §8 invariant maps to a live check.
 
 ### Performance
 

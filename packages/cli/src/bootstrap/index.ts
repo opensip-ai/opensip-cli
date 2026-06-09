@@ -34,11 +34,13 @@
  * `@opensip-tools/config` in 2.10.1.) Audit 2026-05-23 M1.
  */
 
+import { hostEnv } from '../env/host-env-specs.js';
 import { initTelemetry } from '../telemetry/sdk-init.js';
 
 import { discoverAndRegisterGraphAdapterPackages } from './register-graph-adapters.js';
 import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
+  BUNDLED_TOOL_PACKAGES,
   registerFirstPartyTools,
   discoverAndRegisterToolPackages,
   buildToolDiscoverySources,
@@ -114,7 +116,17 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   // 3.0.0: bundled tools load through the same dynamic-import path as installed
   // tools, so registration is async — awaited before discovery so the bundled
   // manifests are loaded before we derive the built-in skip-set from them.
-  await registerFirstPartyTools(opts.toolRegistry, provenance, manifests);
+  // A bundled tool listed in OPENSIP_TOOLS_SKIP_BUNDLED is NOT loaded as bundled,
+  // so an installed/project-local copy of the same id can take over — the
+  // install-source-independence escape hatch (the bundled tool is one provenance,
+  // not a privilege).
+  // `.get` returns the spec's `default: []` when unset, so the list is always an
+  // array (never undefined).
+  const skipBundled = new Set(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_SKIP_BUNDLED'));
+  const bundledPackages = BUNDLED_TOOL_PACKAGES.filter(
+    (pkg) => !skipBundled.has(pkg.replace('@opensip-tools/', '')),
+  );
+  await registerFirstPartyTools(opts.toolRegistry, provenance, manifests, bundledPackages);
   // The bundled-tool ids discovery must skip on a name collision, derived from
   // the manifests just loaded (not from an imported tool runtime — the host
   // holds none in 3.0.0).

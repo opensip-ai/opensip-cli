@@ -65,12 +65,20 @@ describe('hostEnv reads (CLI infra)', () => {
     expect(hostEnv.get('OTEL_EXPORTER_OTLP_ENDPOINT')).toBe('https://collector:4318');
   });
 
-  it('CLI_ENV_SPECS covers the four infra variables', () => {
+  it('CLI_ENV_SPECS covers the infra variables', () => {
     expect(CLI_ENV_SPECS.map((s) => s.canonical)).toEqual([
       'OTEL_EXPORTER_OTLP_ENDPOINT',
       'TRACEPARENT',
       'OPENSIP_NO_UPDATE',
       'NO_UPDATE_NOTIFIER',
+      'OPENSIP_TOOLS_SKIP_BUNDLED',
     ]);
+  });
+
+  it('OPENSIP_TOOLS_SKIP_BUNDLED coerces to a trimmed id list (default empty)', () => {
+    expect(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_SKIP_BUNDLED')).toEqual([]);
+    process.env.OPENSIP_TOOLS_SKIP_BUNDLED = ' fitness , graph ';
+    expect(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_SKIP_BUNDLED')).toEqual(['fitness', 'graph']);
+    delete process.env.OPENSIP_TOOLS_SKIP_BUNDLED;
   });
 });

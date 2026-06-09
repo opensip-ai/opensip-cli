@@ -44,6 +44,19 @@ export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
     default: false,
     docs: 'npm-convention update-notifier opt-out; honoured as an equivalent of OPENSIP_NO_UPDATE.',
   },
+  {
+    canonical: 'OPENSIP_TOOLS_SKIP_BUNDLED',
+    coerce: (raw) =>
+      raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    default: [] as readonly string[],
+    docs:
+      'Comma-separated bundled-tool ids (fitness/simulation/graph) to NOT load as bundled. ' +
+      'A skipped tool can instead be loaded from an installed/project-local package of the same id ' +
+      '— the install-source-independence escape hatch (3.0.0). Unset = load all bundled tools.',
+  },
 ];
 
 /** The composed CLI-layer registry. Telemetry + update-notifier read through it. */
