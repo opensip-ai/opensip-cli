@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **`env-via-registry` and `no-local-exit-or-stdout` removed from
+  `@opensip-tools/checks-universal`** (relocated to opensip-tools' own
+  project-local dogfood pack). Both were tool-internal SELF-checks that leaked
+  into the universal pack: `env-via-registry` (§5.12) mandates reads through
+  opensip-tools' own `EnvRegistry` primitive and allow-lists opensip-tools-internal
+  files (`host-env-specs.ts`, `theme.ts`); `no-local-exit-or-stdout` (§4.7) encodes
+  opensip-tools' termination convergence (typed `BootstrapError`/`ToolError`,
+  single-boundary `process.exitCode`). Neither is a framework-agnostic invariant — a
+  consumer codebase has no `EnvRegistry` and may use a different, equally valid
+  termination architecture (e.g. a sanctioned process-exit wrapper package), so the
+  checks false-fired across consumer code. They now live in
+  `opensip-tools/fit/checks/*.mjs` (the repo still self-enforces them); the universal
+  pack holds only framework-agnostic checks. Consumers previously recipe-excluding
+  these no longer need to.
+
 ## [3.0.0] — 2026-06-08
 
 **GA — the tool-plugin parity cutover.** The platform's single acceptance test
