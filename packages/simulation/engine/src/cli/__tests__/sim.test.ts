@@ -1,4 +1,6 @@
 import { createSignal, enterScope } from '@opensip-tools/core';
+import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { SessionRepo } from '@opensip-tools/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { noopTarget } from '../../__tests__/test-utils/targets.js';
@@ -6,7 +8,7 @@ import { makeSimTestScope } from '../../__tests__/test-utils/with-sim-scope.js';
 import { ASSERTIONS } from '../../framework/assertions.js';
 import { clearScenarioRegistry, currentScenarioRegistry } from '../../framework/registry.js';
 import { defineLoadScenario } from '../../kinds/load/define.js';
-import { executeSim } from '../sim.js';
+import { executeSim, persistSimSession } from '../sim.js';
 
 import type { ScenarioExecutorResult } from '../../framework/scenario-executor-result.js';
 import type { ToolOptions } from '@opensip-tools/contracts';
@@ -202,5 +204,44 @@ describe('executeSim', () => {
       // passed:true from the executor, but the critical signal flips the unit.
       expect(unit?.passed).toBe(false);
     }
+  });
+});
+
+/** Run a minimal sim and return its SimDoneResult — the caller persists it.
+ *  Hoisted to module scope (called inside the per-test scope from beforeEach). */
+async function simDone(): Promise<Extract<Awaited<ReturnType<typeof executeSim>>['result'], { type: 'sim-done' }>> {
+  currentScenarioRegistry().register(defineLoadScenario({
+    id: 'persist-probe',
+    name: 'persist-probe',
+    description: 'persist-probe',
+    tags: [],
+    target: noopTarget,
+    workload: { rps: 1 },
+    duration: 1,
+    assertions: [ASSERTIONS.lowErrorRate(1)],
+  }));
+  const { result } = await executeSim(args());
+  if (result.type !== 'sim-done') throw new Error(`expected sim-done, got ${result.type}`);
+  return result;
+}
+
+describe('persistSimSession', () => {
+  it('writes exactly one sim session row (the engine no longer persists; the caller does)', async () => {
+    const ds: DataStore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      persistSimSession(ds, await simDone());
+      const sessions = new SessionRepo(ds).list({ tool: 'sim' });
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0]?.recipe).toBe('default');
+    } finally {
+      ds.close?.();
+    }
+  });
+
+  it('is best-effort: a datastore write failure never throws', async () => {
+    const result = await simDone();
+    // A datastore whose handle is unusable makes SessionRepo.save throw; the
+    // best-effort wrapper must swallow + log, not propagate.
+    expect(() => persistSimSession({} as unknown as DataStore, result)).not.toThrow();
   });
 });

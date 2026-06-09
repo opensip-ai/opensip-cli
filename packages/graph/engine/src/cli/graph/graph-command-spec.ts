@@ -95,10 +95,52 @@ function setUpGraphLiveView(cli: ToolCliContext): void {
         quiet?: boolean;
         config?: GraphConfig;
         rules?: readonly Rule[];
+        recipe?: string;
       },
       cli.scope.datastore() as DataStore | undefined,
       { setExitCode: cli.setExitCode },
     );
+  });
+}
+
+/**
+ * Dispatch the interactive (TTY) live `graph` view. Extracted from
+ * `runGraphCommand` so the handler's branching stays under the cognitive-
+ * complexity bound: this owns the lazy renderer setup, the ADR-0022 recipe
+ * resolution, and the live args (including the serializable `--recipe` NAME the
+ * off-process worker re-resolves, ADR-0028).
+ */
+async function dispatchGraphLiveView(
+  opts: GraphCommandOptions,
+  cli: ToolCliContext,
+  resolution: ResolutionMode,
+): Promise<void> {
+  // Spec-mounted world: no `register()` mount hook, so set the renderer up
+  // lazily here (idempotent map write) before the `cli.renderLive` lookup.
+  setUpGraphLiveView(cli);
+  // Resolve the recipe here (the handler runs inside the entered RunScope
+  // via the pre-action hook) for parity with `executeGraph`: tool-scoped
+  // precedence (`--recipe` > `graph.recipe` > deprecated `cli.recipe` >
+  // `default`, ADR-0022), with config-sourced unknown names tolerantly
+  // falling back to `default` and explicit-flag typos still hard-failing.
+  const recipeSelection = resolveGraphRecipeSelection(opts.cwd, opts.recipe);
+  await cli.renderLive(GRAPH_LIVE_VIEW_KEY, {
+    cwd: opts.cwd,
+    noCache: opts.cache === false,
+    verbose: opts.verbose === true,
+    quiet: opts.quiet === true,
+    resolution,
+    // The recipe NAME (serializable) for the off-process worker, which
+    // re-resolves rules itself (ADR-0028); `rules` below is the in-process path.
+    ...(opts.recipe === undefined ? {} : { recipe: opts.recipe }),
+    // Pass the resolved rule subset into the live path. Avoids a second
+    // scope read inside the React tree.
+    rules: resolveRecipeToRules(recipeSelection.name, { tolerant: recipeSelection.tolerant }),
+    // Honor the project's `graph:` config block in the interactive
+    // path too — parity with `executeGraph` (graph.ts), which loads
+    // it via the same helper. Loading here (not inside the React
+    // runner) keeps the fs read on the dispatch seam.
+    config: loadGraphConfig(opts.cwd),
   });
 }
 
@@ -184,30 +226,7 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
   // `graph-done` result is dual-rendered through the seam (`renderToText`)
   // — the same report content, consistent with the TTY final frame.
   if (isInteractiveDefault && process.stdout.isTTY === true) {
-    // Spec-mounted world: no `register()` mount hook, so set the renderer up
-    // lazily here (idempotent map write) before the `cli.renderLive` lookup.
-    setUpGraphLiveView(cli);
-    // Resolve the recipe here (the handler runs inside the entered RunScope
-    // via the pre-action hook) for parity with `executeGraph`: tool-scoped
-    // precedence (`--recipe` > `graph.recipe` > deprecated `cli.recipe` >
-    // `default`, ADR-0022), with config-sourced unknown names tolerantly
-    // falling back to `default` and explicit-flag typos still hard-failing.
-    const recipeSelection = resolveGraphRecipeSelection(opts.cwd, opts.recipe);
-    await cli.renderLive(GRAPH_LIVE_VIEW_KEY, {
-      cwd: opts.cwd,
-      noCache: opts.cache === false,
-      verbose: opts.verbose === true,
-      quiet: opts.quiet === true,
-      resolution,
-      // Pass the resolved rule subset into the live path. Avoids a second
-      // scope read inside the React tree.
-      rules: resolveRecipeToRules(recipeSelection.name, { tolerant: recipeSelection.tolerant }),
-      // Honor the project's `graph:` config block in the interactive
-      // path too — parity with `executeGraph` (graph.ts), which loads
-      // it via the same helper. Loading here (not inside the React
-      // runner) keeps the fs read on the dispatch seam.
-      config: loadGraphConfig(opts.cwd),
-    });
+    await dispatchGraphLiveView(opts, cli, resolution);
     return;
   }
 

@@ -98,6 +98,11 @@ describe('SUBCOMMANDS drift test', () => {
       // (DEC-498), never typed by a user — intentionally absent from completion.
       'catalog-export',
       'sarif-export',
+      // Forked by the fit/sim/graph live views (ADR-0028) to run the engine off
+      // the main process, never typed by a user — intentionally absent from completion.
+      'fit-run-worker',
+      'sim-run-worker',
+      'graph-run-worker',
     ]);
     for (const sub of live) {
       if (INTERNAL.has(sub)) continue;

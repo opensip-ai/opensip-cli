@@ -4,7 +4,7 @@
  * `stopOnFirstFailure` mean the same thing in every domain.
  */
 
-export { scheduleUnits } from './schedule.js';
+export { scheduleUnits, yieldToEventLoop } from './schedule.js';
 export type { ScheduleUnitsOptions } from './schedule.js';
 
 export { runWithTimeout } from './run-with-timeout.js';

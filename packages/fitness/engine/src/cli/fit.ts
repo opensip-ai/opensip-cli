@@ -1,4 +1,3 @@
-// @fitness-ignore-file detached-promises -- persistFitSession is a synchronous best-effort SQLite write; the heuristic flags it because it lives in an async caller
 /**
  * fit command — run fitness checks.
  *
@@ -32,7 +31,7 @@ import { FitnessRecipeService } from '../recipes/service.js';
 import { ensureChecksLoaded, getLoadWarnings } from './fit/check-loader.js';
 import { loadFitConfig, validateLanguagesAgainstAdapters } from './fit/config-loader.js';
 import { runRecipeOrAdHoc, selectRecipe } from './fit/recipe-selector.js';
-import { buildFitEnvelope, buildFitCallbacks, buildFitDoneResult, persistFitSession } from './fit/result-builders.js';
+import { buildFitEnvelope, buildFitCallbacks, buildFitDoneResult } from './fit/result-builders.js';
 
 import type {
   FitOptions,
@@ -40,7 +39,6 @@ import type {
   FitDoneResult,
   ErrorResult,
 } from '@opensip-tools/contracts';
-import type { DataStore } from '@opensip-tools/datastore';
 
 // ---------------------------------------------------------------------------
 // Re-exports — preserve the public surface that external consumers
@@ -77,16 +75,15 @@ export { formatDuration } from '@opensip-tools/core';
  *
  *   - `onProgress` — wired to `FitnessRecipeService` callbacks; FitView
  *     drives the live progress bar from this callback.
- *   - `datastore` — when supplied, the run is persisted via
- *     `SessionRepo.save(...)` after `buildFitEnvelope`. Errors during the
- *     save are best-effort: a failed write logs `cli.fit.session.save_failed`
- *     and is swallowed so a SQLite hiccup never fails an otherwise
- *     successful fitness run — the same best-effort policy the graph
- *     tool's `persistSession` uses.
+ *
+ * Persistence is NOT done here (ADR-0028): the engine is worker-safe — it returns
+ * the envelope + `durationMs` and the CALLER persists via `persistFitSession`
+ * (the datastore handle cannot cross the worker boundary). The non-TTY/`--json`
+ * path persists at its call site; the live runner persists on the main thread
+ * after the worker returns.
  */
 export interface ExecuteFitOptions {
   onProgress?: (completed: number, total: number) => void;
-  datastore?: DataStore;
 }
 
 /**
@@ -115,7 +112,10 @@ export interface ExecuteFitOptions {
 export async function executeFit(
   args: FitOptions,
   opts: ExecuteFitOptions = {},
-): Promise<{ result: FitDoneResult; envelope: SignalEnvelope } | { result: ErrorResult; envelope?: undefined }> {
+): Promise<
+  | { result: FitDoneResult; envelope: SignalEnvelope; durationMs: number }
+  | { result: ErrorResult; envelope?: undefined; durationMs?: undefined }
+> {
   logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
   const checkRegistry = currentCheckRegistry();
@@ -164,16 +164,9 @@ export async function executeFit(
   // `@opensip-tools/output` dependency in Phase 6).
   const envelope = buildFitEnvelope(fitnessResult, recipeName);
 
-  // Persistence: when bootstrap supplied a datastore, write the
-  // session via SessionRepo. Best-effort — a SQLite write failure never
-  // fails an otherwise-successful fitness run (same policy as graph's
-  // persistSession). `buildFitDoneResult` stays a
-  // pure builder; the side effect lives here so every executeFit caller
-  // (FitView, runJsonMode, runGateMode) gets the write for free as long
-  // as they pass `datastore` through.
-  if (opts.datastore) {
-    persistFitSession(opts.datastore, args, envelope, fitnessResult.durationMs);
-  }
+  // Persistence is the CALLER's job (ADR-0028 — worker-safe engine). `executeFit`
+  // returns `durationMs` so the caller can `persistFitSession(datastore, args,
+  // envelope, durationMs)` on the main thread with the exact wall-clock duration.
 
   // Collect warnings from check loading (ensureChecksLoaded → loadWarnings)
   // and from config validation (validateLanguagesAgainstAdapters). Both flow
@@ -185,5 +178,5 @@ export async function executeFit(
 
   logger.info({ evt: 'cli.fit.complete', module: 'cli:fit', score: envelope.verdict.score, passed: fitnessResult.success, totalChecks: fitnessResult.summary.totalChecks, durationMs: fitnessResult.durationMs });
 
-  return { result, envelope };
+  return { result, envelope, durationMs: fitnessResult.durationMs };
 }

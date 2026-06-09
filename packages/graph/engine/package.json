@@ -62,6 +62,10 @@
         "description": "[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)"
       },
       {
+        "name": "graph-run-worker",
+        "description": "[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)"
+      },
+      {
         "name": "catalog-export",
         "description": "Run graph analysis and write the CatalogExport JSON document (symbols + edges + provenance) to a file"
       },

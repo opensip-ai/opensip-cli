@@ -38,3 +38,33 @@ export type ProgressJob<TEvent, TResult> = (emit: (event: TEvent) => void) => Pr
 export interface ProgressTransport {
   run<TEvent, TResult>(job: ProgressJob<TEvent, TResult>): ProgressRun<TEvent, TResult>;
 }
+
+/**
+ * A description of off-main-PROCESS work (ADR-0028). The off-thread variant runs
+ * the engine in a forked child that re-bootstraps the full CLI scope (language +
+ * tool registries, project, config) — a worker *thread* can't, because that
+ * bootstrap is CLI-owned and a partial registry would diverge a polyglot run's
+ * results. So the descriptor names the node module to fork (the CLI entry) + argv
+ * (a worker subcommand + a temp spec path). No closure and no live handle (e.g.
+ * the datastore) crosses the boundary; persistence + egress stay on the main
+ * process after the run returns.
+ */
+export interface SubprocessJobDescriptor {
+  /** Node module to fork — the CLI entry (`process.argv[1]`). */
+  readonly command: string;
+  /** Argv for the fork — typically `[<worker-subcommand>, <specPath>]`. */
+  readonly argv: readonly string[];
+  /** Extra environment for the child (merged over the parent's). */
+  readonly env?: Readonly<Record<string, string>>;
+}
+
+/**
+ * The child→parent IPC message protocol. The forked worker posts these via
+ * `process.send`; the subprocess {@link ProgressRun} maps `progress` to
+ * subscribers, resolves on `result`, and rejects on `error`. One source of truth
+ * for both ends.
+ */
+export type WorkerMessage<TEvent, TResult> =
+  | { readonly kind: 'progress'; readonly event: TEvent }
+  | { readonly kind: 'result'; readonly value: TResult }
+  | { readonly kind: 'error'; readonly message: string; readonly stack?: string };

@@ -313,7 +313,6 @@ export interface ExecuteSimOptions {
    * non-interactive callers (json / non-TTY) omit it.
    */
   readonly onProgress?: (completed: number, total: number) => void;
-  readonly datastore?: DataStore;
 }
 
 /**
@@ -434,14 +433,15 @@ export async function executeSim(
     envelope,
     ...(verboseDetail === undefined ? {} : { verboseDetail }),
   };
-  if (opts.datastore !== undefined) {
-    persistSimSession(opts.datastore, result);
-  }
-
+  // Persistence is the CALLER's job (ADR-0028 — worker-safe engine): the engine
+  // returns the result and the caller persists on the main thread via
+  // `persistSimSession` (the datastore handle cannot cross the worker boundary).
   return { result };
 }
 
-function persistSimSession(datastore: DataStore, result: SimDoneResult): void {
+/** Persist a completed sim run. Best-effort — a SQLite write failure never fails
+ *  an otherwise-successful run. Called by the run-mode callers on the main thread. */
+export function persistSimSession(datastore: DataStore, result: SimDoneResult): void {
   try {
     const repo = new SessionRepo(datastore);
     repo.save({

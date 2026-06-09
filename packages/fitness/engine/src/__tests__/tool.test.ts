@@ -57,6 +57,8 @@ describe('fitnessTool contract conformance', () => {
       'fit-list',
       'fit-recipes',
       'fit-baseline-export',
+      // [internal] headless run forked by the live view (ADR-0028).
+      'fit-run-worker',
     ]);
   });
 

@@ -23,7 +23,7 @@
 import { enterScope, RunScope } from '@opensip-tools/core';
 import { render } from 'ink-testing-library';
 import React from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { noopTarget } from '../../__tests__/test-utils/targets.js';
 import { ASSERTIONS } from '../../framework/assertions.js';
@@ -34,6 +34,18 @@ import { SimRunner } from '../sim-runner.js';
 
 import type { SignalEnvelope, ToolOptions } from '@opensip-tools/contracts';
 import type { RunScopeOptions } from '@opensip-tools/core';
+
+// The live runner forks `sim-run-worker` off the main process (ADR-0028), but in
+// the test runner `process.argv[1]` is vitest, not the CLI — so force the
+// in-process fallback, which exercises the SimRunner state machine directly
+// against the scope each test sets up. (The fork path is covered by a dedicated
+// subprocess harness, not the component unit tests.)
+beforeAll(() => {
+  process.env.OPENSIP_TOOLS_NO_WORKER = '1';
+});
+afterAll(() => {
+  delete process.env.OPENSIP_TOOLS_NO_WORKER;
+});
 
 afterEach(() => {
   // Each test enters its own scope; clear the scenario registry between runs.

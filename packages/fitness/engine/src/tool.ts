@@ -58,6 +58,7 @@ import {
 } from './cli/fit/fit-aux-command-specs.js';
 import { buildFitCommandSpec, FIT_LIVE_VIEW_KEY } from './cli/fit/fit-command-spec.js';
 import { renderFitLive } from './cli/fit-runner.js';
+import { fitRunWorkerCommandSpec } from './cli/fit-worker.js';
 import { fitnessConfigDeclaration } from './config/fitness-config-schema.js';
 import {
   createCheckRegistry,
@@ -107,6 +108,11 @@ const FIT_RECIPES: ToolCommandDescriptor = {
 const FIT_BASELINE_EXPORT: ToolCommandDescriptor = {
   name: 'fit-baseline-export',
   description: 'Export the fit gate baseline (SARIF) from the datastore to a file',
+};
+
+const FIT_RUN_WORKER: ToolCommandDescriptor = {
+  name: 'fit-run-worker',
+  description: '[internal] Run fit headless and stream progress + result over IPC (forked by the live view)',
 };
 
 // =============================================================================
@@ -160,6 +166,7 @@ const fitCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
   fitListCommandSpec,
   fitRecipesCommandSpec,
   fitBaselineExportCommandSpec,
+  fitRunWorkerCommandSpec,
 ];
 
 /**
@@ -201,7 +208,7 @@ export const fitnessTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Run fitness checks against a codebase',
   },
-  commands: [FIT, FIT_LIST, FIT_RECIPES, FIT_BASELINE_EXPORT],
+  commands: [FIT, FIT_LIST, FIT_RECIPES, FIT_BASELINE_EXPORT, FIT_RUN_WORKER],
   pluginLayout: FIT_PLUGIN_LAYOUT,
   // Release 2.11.0 Phase 4: fitness declares its command surface; the host
   // mounts each spec via mountCommandSpec. The deprecated `register()` fallback

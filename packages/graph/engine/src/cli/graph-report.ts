@@ -30,6 +30,31 @@ export interface UnifiedReportInput {
   readonly cacheHit: boolean;
 }
 
+/**
+ * The serializable live-run output the off-process graph worker streams back to
+ * the parent (ADR-0028). A `RunGraphResult` itself can't cross the fork boundary
+ * — it carries class instances with methods (the resolution-stats accumulator) +
+ * Maps — so the worker (which holds the catalog/indexes) pre-computes the two
+ * things the live renderer needs: the run's `signals` (for persistence + the
+ * verdict) and the already-built `reportLines`. Both are plain data.
+ */
+export interface LiveGraphOutput {
+  readonly signals: readonly Signal[];
+  readonly reportLines: readonly string[];
+}
+
+/**
+ * Derive the serializable {@link LiveGraphOutput} from a completed build. Used by
+ * BOTH the off-process worker and the in-process fallback so the live renderer
+ * gets an identical payload regardless of where the build ran.
+ */
+export function buildLiveGraphOutput(input: UnifiedReportInput): LiveGraphOutput {
+  return {
+    signals: input.signals,
+    reportLines: buildUnifiedReportLines(input, { includeSummary: false }),
+  };
+}
+
 export function countFiles(catalog: Catalog): number {
   const files = new Set<string>();
   for (const name of Object.keys(catalog.functions)) {

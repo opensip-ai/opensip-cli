@@ -45,12 +45,12 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
   {
     id: 'fitness',
     dir: join(REPO_ROOT, 'packages', 'fitness', 'engine'),
-    commands: ['fit', 'fit-list', 'fit-recipes', 'fit-baseline-export'],
+    commands: ['fit', 'fit-list', 'fit-recipes', 'fit-baseline-export', 'fit-run-worker'],
   },
   {
     id: 'simulation',
     dir: join(REPO_ROOT, 'packages', 'simulation', 'engine'),
-    commands: ['sim'],
+    commands: ['sim', 'sim-run-worker'],
   },
   {
     id: 'graph',
@@ -61,6 +61,7 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
       'graph-symbol-index',
       'graph-baseline-export',
       'graph-shard-worker',
+      'graph-run-worker',
       'catalog-export',
       'sarif-export',
       'graph-recipes',

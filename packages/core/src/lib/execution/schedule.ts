@@ -16,6 +16,18 @@
  * on stop).
  */
 
+/**
+ * Hand control back to the event loop's macrotask queue. `await runUnit()` only
+ * yields to the MICROtask queue, so a `setInterval` timer (the 80ms live-progress
+ * clock) and Ink's repaint never get a turn between back-to-back synchronous
+ * units. A `setImmediate` boundary lets them run — the interim live-view smoothing
+ * (the durable fix runs the engine off the main thread; ADR-0016/ADR-0028).
+ */
+export const yieldToEventLoop = (): Promise<void> =>
+  new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
+
 export interface ScheduleUnitsOptions<Unit> {
   readonly units: readonly Unit[];
   readonly mode: 'parallel' | 'sequential';
@@ -28,12 +40,33 @@ export interface ScheduleUnitsOptions<Unit> {
   readonly runUnit: (unit: Unit, index: number) => Promise<{ readonly shouldStop: boolean }>;
   /** External abort check (e.g. a service-level AbortController); polled before each launch. */
   readonly shouldAbort?: () => boolean;
+  /**
+   * When true, insert a macrotask boundary ({@link yieldToEventLoop}) after each
+   * unit completes, so a live-progress timer + renderer on the same thread can
+   * paint between units. Opt-in (default off) — only the interactive (TTY) run
+   * paths set it; `--json`/non-TTY callers don't need it.
+   */
+  readonly yieldBetweenUnits?: boolean;
 }
 
 /** Schedule `units` through `runUnit` per the mode/concurrency/stop policy. */
 export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Promise<void> {
-  const { units, mode, runUnit, shouldAbort } = opts;
+  const { units, mode, shouldAbort } = opts;
   if (units.length === 0) return;
+
+  // Each unit's promise resolves AFTER a macrotask yield when requested, so a
+  // same-thread live-progress timer + renderer paint between units. Wrapping
+  // `runUnit` (rather than the scheduling logic) keeps the parallel sliding
+  // window's activeCount/relaunch bookkeeping synchronous and correct in both modes.
+  const runUnit: ScheduleUnitsOptions<Unit>['runUnit'] =
+    opts.yieldBetweenUnits === true
+      ? async (unit, index) => {
+          // @fitness-ignore-next-line async-waterfall-detection -- deliberately sequential: the macrotask yield MUST run AFTER the unit completes (it is the between-units boundary); parallelizing with Promise.all would defeat the purpose.
+          const outcome = await opts.runUnit(unit, index);
+          await yieldToEventLoop();
+          return outcome;
+        }
+      : opts.runUnit;
 
   if (mode === 'sequential') {
     for (const [index, unit] of units.entries()) {

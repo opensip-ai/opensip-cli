@@ -514,6 +514,21 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "aliases": [],
       "args": [
         {
+          "name": "specPath",
+          "required": true,
+          "variadic": false,
+        },
+      ],
+      "name": "fit-run-worker",
+      "options": [],
+      "subcommands": [],
+      "synopsis": "[internal] Run fit headless and stream progress + result over IPC (forked by the live view)",
+      "usage": "[options] <specPath>",
+    },
+    {
+      "aliases": [],
+      "args": [
+        {
           "name": "paths",
           "required": false,
           "variadic": true,
@@ -806,6 +821,21 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "subcommands": [],
       "synopsis": "List available graph recipes",
       "usage": "[options]",
+    },
+    {
+      "aliases": [],
+      "args": [
+        {
+          "name": "specPath",
+          "required": true,
+          "variadic": false,
+        },
+      ],
+      "name": "graph-run-worker",
+      "options": [],
+      "subcommands": [],
+      "synopsis": "[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)",
+      "usage": "[options] <specPath>",
     },
     {
       "aliases": [],
@@ -1440,6 +1470,21 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "subcommands": [],
       "synopsis": "Run simulation scenarios [experimental]",
       "usage": "[options]",
+    },
+    {
+      "aliases": [],
+      "args": [
+        {
+          "name": "specPath",
+          "required": true,
+          "variadic": false,
+        },
+      ],
+      "name": "sim-run-worker",
+      "options": [],
+      "subcommands": [],
+      "synopsis": "[internal] Run sim headless and stream progress + result over IPC (forked by the live view)",
+      "usage": "[options] <specPath>",
     },
     {
       "aliases": [],

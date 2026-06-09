@@ -72,7 +72,7 @@ import type { DataStore } from '@opensip-tools/datastore';
 // Re-exports kept so the package barrel + cli/graph-runner.tsx + tests
 // keep using `cli/graph.js` as a single import site for these shapes.
 export type { GraphCommandOptions } from './graph-options.js';
-export { buildUnifiedReportLines } from './graph-report.js';
+export { buildUnifiedReportLines, buildLiveGraphOutput, type LiveGraphOutput } from './graph-report.js';
 export type { UnifiedReportInput } from './graph-report.js';
 
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';

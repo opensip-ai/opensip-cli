@@ -11,9 +11,15 @@
  * at the composition root: this runner returns the run's SignalEnvelope and the
  * tool's registerLiveView callback delivers it once the Ink app exits.
  *
- * sim's execution already yields to the event loop (awaited scenarios /
- * Promise.all), so the spinner animates in-process — no subprocess needed.
+ * The live run executes OFF the main process (ADR-0028): it forks the CLI to the
+ * internal `sim-run-worker` subcommand and relays progress + result over IPC, so
+ * the spinner + 80ms clock never block on a synchronous chunk. It falls back to
+ * in-process when forking is disabled/unavailable (OPENSIP_TOOLS_NO_WORKER).
  */
+
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   Banner,
@@ -40,11 +46,11 @@ import {
   type ToolOptions,
   type VerboseDetail,
 } from '@opensip-tools/contracts';
-import { createInProcessTransport, currentScope } from '@opensip-tools/core';
+import { runOffThreadOrInProcess, currentScope } from '@opensip-tools/core';
 import { Box, Static, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
-import { executeSim } from './sim.js';
+import { executeSim, persistSimSession } from './sim.js';
 
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -82,13 +88,11 @@ const NO_PROGRESS: (cb: (event: ProgressEvent) => void) => void = () => {
 function executeSimWithProgress(
   args: SimLiveArgs,
   emit: (event: ProgressEvent) => void,
-  datastore?: DataStore,
 ): ReturnType<typeof executeSim> {
   emit({ type: 'stage-start', stage: 'scenarios', label: 'Running scenarios...' });
   return executeSim(args, {
     onProgress: (completed, total) =>
       emit({ type: 'stage-progress', stage: 'scenarios', completed, total }),
-    ...(datastore === undefined ? {} : { datastore }),
   });
 }
 
@@ -111,22 +115,37 @@ export function SimRunner({ args, setExitCode, onEnvelope, datastore }: SimRunne
   useEffect(() => {
     let cancelled = false;
 
-    // Build the transport + run inside the effect (no module-level state): the
-    // 'running' state carries the subscribe fn, set once the run starts.
-    const transport = createInProcessTransport();
-    const run = transport.run<ProgressEvent, Awaited<ReturnType<typeof executeSim>>>(
-      (emit) => executeSimWithProgress(args, emit, datastore),
-    );
+    // Execute OFF the main process (ADR-0028): fork the CLI to `sim-run-worker`,
+    // which re-bootstraps the full scope and streams progress + the final result
+    // over IPC, so this process stays free to animate the spinner + 80ms clock.
+    // Falls back to the in-process closure (OPENSIP_TOOLS_NO_WORKER / fork
+    // failure) — identical result. The worker reads its serializable args spec
+    // from a temp file cleaned up after the run settles.
+    const specDir = mkdtempSync(join(tmpdir(), 'sim-worker-'));
+    const specPath = join(specDir, 'spec.json');
+    writeFileSync(specPath, JSON.stringify(args), 'utf8');
+    const run = runOffThreadOrInProcess<ProgressEvent, Awaited<ReturnType<typeof executeSim>>>({
+      descriptor: { command: process.argv[1] ?? '', argv: ['sim-run-worker', specPath] },
+      inProcess: (emit) => executeSimWithProgress(args, emit),
+    });
     setState({ phase: 'running', subscribe: run.onProgress });
 
     void (async () => {
-      const { result } = await run.result;
+      let simResult: Awaited<ReturnType<typeof executeSim>>;
+      try {
+        simResult = await run.result;
+      } finally {
+        rmSync(specDir, { recursive: true, force: true });
+      }
+      const { result } = simResult;
       if (cancelled) return;
       if (result.type === 'error') {
         setState({ phase: 'error', result });
         setExitCode?.(result.exitCode);
       } else {
         if (result.shouldFail === true) setExitCode?.(EXIT_CODES.RUNTIME_ERROR);
+        // Persist on the MAIN thread (ADR-0028 — engine is persistence-free).
+        if (datastore !== undefined) persistSimSession(datastore, result);
         onEnvelope?.(result.envelope);
         setState({
           phase: 'done',

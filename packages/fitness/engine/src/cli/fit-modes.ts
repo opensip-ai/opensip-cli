@@ -32,12 +32,29 @@ import {
 import { FitBaselineRepo } from '../persistence/baseline-repo.js';
 import { fitReplayFromSession } from '../persistence/session-replay.js';
 
+import { persistFitSession } from './fit/result-builders.js';
 import { executeFit } from './fit.js';
 import { listChecks } from './list-checks.js';
 import { listRecipes } from './list-recipes.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
+
+/**
+ * Persist a completed fit run on the main thread (ADR-0028 — the engine is
+ * persistence-free; the caller owns the write). No-op when there's no datastore
+ * or the run errored before producing an envelope. Best-effort inside
+ * `persistFitSession` (a SQLite hiccup never fails the run).
+ */
+function persistFitRun(
+  datastore: DataStore | undefined,
+  args: FitOptions,
+  fitResult: Awaited<ReturnType<typeof executeFit>>,
+): void {
+  if (datastore !== undefined && fitResult.envelope !== undefined && fitResult.durationMs !== undefined) {
+    persistFitSession(datastore, args, fitResult.envelope, fitResult.durationMs);
+  }
+}
 
 /**
  * Emit any non-fatal warnings collected during the run to stderr. Safe to
@@ -124,7 +141,9 @@ export async function runShowMode(args: FitOptions, cli: ToolCliContext): Promis
  * output is one-shot, no progress UI.
  */
 export async function runJsonMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
-  const fitResult = await executeFit(args, { datastore: cli.scope.datastore() as DataStore | undefined });
+  const datastore = cli.scope.datastore() as DataStore | undefined;
+  const fitResult = await executeFit(args);
+  persistFitRun(datastore, args, fitResult);
   if (fitResult.envelope === undefined) {
     // 2.12.0 (§5.5): a failed `--json` run emits a structured `status:'error'`
     // CommandOutcome (the host wraps + sets the exit code), not a bare `{ error }`.
@@ -169,9 +188,9 @@ export async function runLiveMode(
     // error result carries its own code; a passing run that breached the fail
     // threshold exits RUNTIME_ERROR. Warnings are rendered inline by the
     // fit-done view, so we don't also write them to stderr here.
-    const fitResult = await executeFit(args, {
-      datastore: cli.scope.datastore() as DataStore | undefined,
-    });
+    const datastore = cli.scope.datastore() as DataStore | undefined;
+    const fitResult = await executeFit(args);
+    persistFitRun(datastore, args, fitResult);
     if (fitResult.envelope === undefined) {
       cli.setExitCode(fitResult.result.exitCode);
       await cli.render(fitResult.result);
@@ -206,11 +225,11 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
   }
   const datastore = cli.scope.datastore() as DataStore;
   const repo = new FitBaselineRepo(datastore);
-  // Thread the bootstrap-supplied datastore through executeFit so its
-  // post-call SessionRepo.save uses the same handle the gate baseline
-  // is written against — gate-save / gate-compare runs land in the
-  // session history alongside live-mode runs.
-  const fitResult = await executeFit(args, { datastore });
+  // Persist the run on the main thread (ADR-0028 — engine is persistence-free),
+  // using the same handle the gate baseline is written against, so gate-save /
+  // gate-compare runs land in the session history alongside live-mode runs.
+  const fitResult = await executeFit(args);
+  persistFitRun(datastore, args, fitResult);
   if (fitResult.envelope === undefined) {
     cli.logger.warn({
       evt: 'cli.gate.fit_failed',

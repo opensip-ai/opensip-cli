@@ -17,7 +17,8 @@ import { resolveSession } from '@opensip-tools/session-store';
 
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { renderSimLive } from './cli/sim-runner.js';
-import { executeSim } from './cli/sim.js';
+import { simRunWorkerCommandSpec } from './cli/sim-worker.js';
+import { executeSim, persistSimSession } from './cli/sim.js';
 import { createScenarioRegistry, currentScenarioRegistry } from './framework/registry.js';
 import { simReplayFromSession } from './persistence/session-replay.js';
 import { SIM_PLUGIN_LAYOUT } from './plugins/loader.js';
@@ -41,6 +42,11 @@ import type { DataStore } from '@opensip-tools/datastore';
 const SIM: ToolCommandDescriptor = {
   name: 'sim',
   description: 'Run simulation scenarios [experimental]',
+};
+
+const SIM_RUN_WORKER: ToolCommandDescriptor = {
+  name: 'sim-run-worker',
+  description: '[internal] Run sim headless and stream progress + result over IPC (forked by the live view)',
 };
 
 // Live-view key — matches the `sim` subcommand name so the dispatcher's
@@ -115,9 +121,11 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   // json / non-TTY (pipe / CI): run the engine and render statically — the
   // animated Ink view is a TTY-only affordance. Output is byte-for-byte the
   // pre-live-view behavior.
-  const { result } = await executeSim(opts, {
-    datastore: cli.scope.datastore() as DataStore | undefined,
-  });
+  const datastore = cli.scope.datastore() as DataStore | undefined;
+  const { result } = await executeSim(opts);
+  // Persist on the main thread (ADR-0028 — engine is persistence-free).
+  // @fitness-ignore-next-line detached-promises -- persistSimSession is synchronous (SQLite write; returns void), not a promise
+  if (datastore !== undefined && result.type === 'sim-done') persistSimSession(datastore, result);
 
   if (result.type === 'error') {
     if (opts.json) {
@@ -312,12 +320,12 @@ export const simulationTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Run simulation scenarios against a codebase',
   },
-  commands: [SIM],
+  commands: [SIM, SIM_RUN_WORKER],
   pluginLayout: SIM_PLUGIN_LAYOUT,
   // Release 2.11.0 Phase 3 (reference migration): sim declares its command
   // surface; the host mounts it via mountCommandSpec. The deprecated
   // `register()` fallback is gone — sim no longer touches Commander.
-  commandSpecs: [simCommand],
+  commandSpecs: [simCommand, simRunWorkerCommandSpec],
   contributeScope,
   sessionReplay: {
     tool: 'sim',

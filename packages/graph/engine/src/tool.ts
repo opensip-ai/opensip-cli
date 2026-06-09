@@ -39,6 +39,7 @@ import {
 } from './cli/graph/graph-aux-command-specs.js';
 import { graphCommandSpec } from './cli/graph/graph-command-spec.js';
 import { graphConfigDeclaration } from './cli/graph-config-schema.js';
+import { graphRunWorkerCommandSpec } from './cli/graph-worker.js';
 import { createAdapterRegistry, currentAdapterRegistry, getDiscoveredAdapters } from './lang-adapter/registry.js';
 import { CatalogRepo } from './persistence/catalog-repo.js';
 import { graphReplayFromSession } from './persistence/session-replay.js';
@@ -91,6 +92,11 @@ const GRAPH_SHARD_WORKER: ToolCommandDescriptor = {
     '[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)',
 };
 
+const GRAPH_RUN_WORKER: ToolCommandDescriptor = {
+  name: 'graph-run-worker',
+  description: '[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)',
+};
+
 const GRAPH_CATALOG_EXPORT: ToolCommandDescriptor = {
   name: 'catalog-export',
   description:
@@ -126,6 +132,7 @@ const graphCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
   graphCommandSpec,
   graphLookupCommandSpec,
   graphShardWorkerCommandSpec,
+  graphRunWorkerCommandSpec,
   graphSymbolIndexCommandSpec,
   graphBaselineExportCommandSpec,
   graphCatalogExportCommandSpec,
@@ -223,7 +230,7 @@ export const graphTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },
-  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT, GRAPH_SHARD_WORKER, GRAPH_CATALOG_EXPORT, GRAPH_SARIF_EXPORT, GRAPH_RECIPES],
+  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT, GRAPH_SHARD_WORKER, GRAPH_RUN_WORKER, GRAPH_CATALOG_EXPORT, GRAPH_SARIF_EXPORT, GRAPH_RECIPES],
   // Release 2.11.0 Phase 5: graph declares its command surface; the host mounts
   // each spec via mountCommandSpec. The deprecated `register()` fallback is gone
   // — graph no longer touches Commander.

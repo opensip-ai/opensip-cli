@@ -36,6 +36,10 @@
       {
         "name": "sim",
         "description": "Run simulation scenarios [experimental]"
+      },
+      {
+        "name": "sim-run-worker",
+        "description": "[internal] Run sim headless and stream progress + result over IPC (forked by the live view)"
       }
     ],
     "capabilities": [
