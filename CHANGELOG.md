@@ -53,6 +53,40 @@ thing distinguishing a bundled tool from an installed or project-local one is it
   tool runtime) + the **completion-invariant index** with a CI assertion that every
   §8 invariant maps to a live check.
 
+### Changed — generic capability discovery ([ADR-0029](docs/decisions/ADR-0029-generic-capability-discovery.md))
+
+- **One generic discovery substrate.** Every capability domain — fit's `fit-pack`,
+  sim's `sim-pack`, graph's `graph-adapter`, plus co-located `fit-recipe`/`sim-recipe`
+  — is now discovered and loaded by a single descriptor-driven substrate in
+  `@opensip-tools/core` (`discoverCapabilityContributions` → the scope-owned
+  `loadCapabilityDomain` → `CapabilityRegistry.routeContribution` → the owner's
+  registrar). The three bespoke per-tool loaders are **deleted**, including graph's
+  host-coupled, eager `register-graph-adapters.ts` (which static-imported graph's
+  internals and stashed adapters in a module global — the §4.5 leak). A tool's
+  manifest `discovery` descriptor is the single source of truth for how its packs are
+  found (`marker`/`name-pattern`, the `@opensip-tools` built-in split, explicit-list
+  `replace`/`augment`, recipe co-contributions); the kernel branches on no domain
+  identity. `routeContribution` — wired-but-dead since 2.10.0 — is now the one live
+  conduit. CLI behaviour is unchanged.
+- **`MARKER_KINDS` retired to the host `'tool'` marker.** Domain markers are
+  manifest-declared, not a compiled-in host union; the workspace-invariant test
+  derives valid markers from manifests.
+
+### Fixed — scope isolation (modular-monolith audit F1/F2/F3)
+
+- **F1** — sim's module-level `scenariosLoadedFor`/`pluginLoadErrors` singletons →
+  `scope.simulation.load` (mirrors `scope.fitness.load`). Two concurrent sim runs
+  carry independent load state.
+- **F2** — the language parse cache is scope-owned (`currentScope().parseCache`),
+  not a module-global `activeCache`. Concurrent runs no longer share parse state.
+- **F3** — fitness's `mergedCheckDisplay` singleton is gone: check display
+  (`icon`/`displayName`) travels ON each check (`check.config`), folded from a pack's
+  authoring map at the pack boundary; `getDisplayName`/`getIcon` read the scope's
+  check registry.
+- **`no-module-singleton` tightened** to catch the F1/F2 module-`let` shapes
+  (loaded-state markers, mutable-accumulator-typed bindings) so the class can't
+  regress (141 checks).
+
 ### Performance
 
 - **Live (TTY) runs execute the engine off the main process** ([ADR-0028](docs/decisions/ADR-0028-off-main-thread-execution.md)).
