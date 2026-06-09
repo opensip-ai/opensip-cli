@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-09
+release: v3.0.0
 title: "Plugin loader"
 audience: [contributors, plugin-authors]
 purpose: "How plugins are discovered, loaded, and registered. Source files, npm packages, project pinning, the sync command."
@@ -39,7 +39,7 @@ opensip-tools loads four kinds of plugins. Each has its own discovery shape, but
 | **Check packs** | (a) `node_modules` walk for `opensipTools.kind === 'fit-pack'` marker, (b) exact `plugins.checkPackages:` list for non-marker packages. Results merge and dedupe by package name, with explicit config winning. | Inside fitness's `loadDiscoveredCheckPackages()` |
 | **Sim scenario packs** | (a) Project-local source files under `opensip-tools/sim/`, (b) `node_modules` walk for `opensipTools.kind === 'sim-pack'` marker, (c) `node_modules` walk for `<scope>/scenarios-*` under default + configured `plugins.packageScopes`, (d) project-pinned via `plugins.sim:` list under `.runtime/plugins/sim/`. | Inside simulation's `ensureScenariosLoaded()` |
 | **Graph adapters** | (a) Explicit `plugins.graphAdapters:` list in `opensip-tools.config.yml` (when present, replaces the auto-scan entirely), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for any package whose name matches `@opensip-tools/graph-*` **and** declares the `opensipTools.kind: "graph-adapter"` marker (so shared scaffolding under the same prefix — e.g. `@opensip-tools/graph-adapter-common` — is not mistaken for an adapter). | At CLI startup, by `discoverGraphAdapterPackages()` |
-| **Language adapters** | Direct CLI imports (no discovery walk) | At CLI bootstrap, before any Tool's `register()` runs |
+| **Language adapters** | Direct CLI imports (no discovery walk) | At CLI bootstrap, before any tool is mounted |
 
 Different kinds, different lifetimes. Tools are global to the binary — once registered, they're available regardless of cwd. Check packs and scenario packs are project-scoped — they load when the relevant Tool actually runs. Language adapters are bundled — they're a CLI dep, not a discoverable plugin, because the framework can't usefully run without them.
 
@@ -99,7 +99,7 @@ Discovery is **deduplicated by package name** with nearest-ancestor wins. If a p
 
 Discovery is **synchronous and at startup**. Tools are cheap (each one is a small adapter); the walk completes in single-digit milliseconds. There is no lazy-load path for tools; either the package is installed by argv parse time or it doesn't exist for this run.
 
-Direct CLI deps (`@opensip-tools/fitness`, `@opensip-tools/simulation`) are *also* declared with `opensipTools.kind === 'tool'` in their package.json, but they're imported statically in `packages/cli/src/index.ts` rather than discovered. Static + discovered is fine — the registry is last-writer-wins, so a re-registration is silently idempotent.
+The bundled tools (`@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/graph`) declare the same `opensipTools.kind === 'tool'` marker. Since the **3.0.0 GA cutover** ([ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md)) they are **not** imported statically — `register-tools.ts` lists them by *package name* (`FIRST_PARTY_TOOLS`) and loads each through the same `loadToolManifest → admitTool → dynamic import → register` path a third-party tool travels (the `no-bootstrap-tool-import` check fails the build if a static `import { fitnessTool }` creeps back). The registry is **first-writer-wins**, so the bundled registration is the incumbent and a later same-id discovery is skipped with a warning.
 
 ---
 

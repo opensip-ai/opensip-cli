@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-09
+release: v3.0.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for every CLI command, its flags, and when to use each."
@@ -23,7 +23,7 @@ related-docs:
 
 Every command, alphabetized by command name. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `fit-list`, `fit-recipes`, graph helper commands) come from each Tool's `register()` call. CLI-owned commands (`init`, `dashboard`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `fit-list`, `fit-recipes`, graph helper commands) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `dashboard`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
 
 ---
 

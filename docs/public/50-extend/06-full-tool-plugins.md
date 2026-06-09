@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-08
+release: v3.0.0
 title: "Full Tool plugins"
 audience: [plugin-authors]
 purpose: "Build a Tool plugin — your own opensip-tools subcommand. Use when fit/sim/graph aren't the right shape and you want something fundamentally different."
@@ -41,15 +41,29 @@ This is the heaviest extension shape. Most teams never need it. If you just want
   "version": "0.1.0",
   "main": "dist/index.js",
   "type": "module",
-  "opensipTools": { "kind": "tool" },
+  "opensipTools": {
+    "kind": "tool",
+    "id": "audit-sec",
+    "apiVersion": 1,
+    "commands": [
+      { "name": "audit-sec", "description": "Run the security audit" }
+    ]
+  },
   "peerDependencies": {
-    "@opensip-tools/contracts": "^2.0.0",
-    "@opensip-tools/core": "^2.0.0"
+    "@opensip-tools/contracts": "^3.0.0",
+    "@opensip-tools/core": "^3.0.0"
   }
 }
 ```
 
-The `kind: "tool"` marker is what makes the CLI discover your package. Peer-dep on `@opensip-tools/contracts` and `@opensip-tools/core` — the consumer brings their own version.
+The `opensipTools` block is your tool's **static manifest** — read before your module is imported, so the host knows what it's admitting:
+
+- **`kind: "tool"`** — the marker that makes the CLI discover your package.
+- **`id`** — your tool's stable identity; must equal the runtime `tool.metadata.id`.
+- **`apiVersion`** — the plugin-API epoch you target (currently `1`). **Mandatory since 3.0.0**: a tool that declares no `apiVersion` is not admitted (it fail-closes when run explicitly, or is skipped with a diagnostic when discovered).
+- **`commands`** — the command **names** (with descriptions) your tool mounts. The host asserts this set equals your runtime `tool.commands` at load (`assertManifestMatchesTool`) and throws on drift — the manifest is the cheap, no-import way to enumerate your surface for `--help`/completion, so it must stay in sync with the tool.
+
+Peer-dep on `@opensip-tools/contracts` and `@opensip-tools/core` at `^3.0.0` (the `commandSpecs`-only contract) — the consumer brings their own version.
 
 ## `src/index.ts`
 
@@ -66,10 +80,18 @@ import { runAudit } from './audit.js';
 
 export const tool: Tool = {
   metadata: {
-    id: 'audit-sec',
+    id: 'audit-sec', // must equal opensipTools.id in package.json
     version: '0.1.0',
     description: 'Lightweight security audit',
   },
+  // Command metadata (name + description) — enumerated for --help/completion
+  // without importing your module. Its name SET must match opensipTools.commands
+  // in package.json AND your commandSpecs below (the host asserts all three agree).
+  commands: [
+    { name: 'audit-sec', description: 'Run the security audit' },
+  ],
+  // The typed specs the host mounts (mountCommandSpec): name/description/flags/
+  // args + the handler. This is the one command surface — you never touch Commander.
   commandSpecs: [
     defineCommand<{ cwd: string }, ToolCliContext>({
       name: 'audit-sec',
@@ -90,6 +112,8 @@ export const tool: Tool = {
 };
 ```
 
+The three command declarations — `package.json`'s `opensipTools.commands`, the Tool's `commands` metadata, and the `commandSpecs` — must agree on the command-name set. The host asserts this at load, so a half-renamed command fails fast with a clear error instead of a silent half-mounted surface.
+
 That's the whole tool. Install it either way and `opensip-tools audit-sec` works on the next invocation:
 
 - **`opensip-tools plugin add @my-co/audit-sec`** — the CLI detects the `opensipTools.kind: "tool"` marker (reading a local path's `package.json`, or `npm view` for a registry spec) and installs it **user-global** into `~/.opensip-tools/plugins/tool/`, so the subcommand is available in **every** project — the cross-project analogue of `npm i -g`. Add `--project` to install it project-local under `<project>/opensip-tools/.runtime/plugins/tool/` instead (that copy is gitignored and not shared with teammates). Unlike fit/sim packs, a tool needs **no** `plugins.<domain>` config entry — it auto-discovers by its marker. (If detection can't reach the registry — offline / private — pass `--domain tool` to force the tool path.)
@@ -103,7 +127,7 @@ That's the whole tool. Install it either way and `opensip-tools audit-sec` works
 - A code change in `@opensip-tools/core`.
 - A schema migration.
 
-The Tool contract is the seam. The CLI builds a per-invocation `ToolRegistry`, discovers your package via the `opensipTools.kind: 'tool'` marker, and your Tool's `register()` mounts the command. For the architecture behind this decoupling, see [the tool-plugin model](../10-concepts/02-tool-plugin-model.md).
+The Tool contract is the seam. The CLI builds a per-invocation `ToolRegistry`, discovers your package via the `opensipTools.kind: 'tool'` marker, admits it (manifest + `apiVersion` check), dynamically imports it, and mounts your declared `commandSpecs` via `mountCommandSpec`. (The pre-3.0.0 `register(cli)` hook and the raw `cli.program` Commander handle were removed at the GA cutover — `commandSpecs` is the one command surface.) For the architecture behind this decoupling, see [the tool-plugin model](../10-concepts/02-tool-plugin-model.md).
 
 ## Tools that use the kernel registries
 

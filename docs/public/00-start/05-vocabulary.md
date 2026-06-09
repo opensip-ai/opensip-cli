@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-09
+release: v3.0.0
 title: "Vocabulary"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The terms used everywhere in opensip-tools. Read this once before going deeper."
@@ -34,9 +34,9 @@ If you're skimming for one definition, [Ctrl-F]. If you're reading top-to-bottom
 
 A **Tool** is a kernel-level plugin that contributes one or more CLI subcommands. `fit` is a Tool. `sim` is a Tool. `graph` is a Tool. Anything you write that mounts under the `opensip-tools` binary is a Tool.
 
-The contract lives in [`packages/core/src/tools/types.ts`](../../../packages/core/src/tools/types.ts). Each Tool exports `metadata` (id, version, description), a `commands[]` array (just names + descriptions, used for `--help`), an optional `initialize()` hook, and a `register(cli)` method that wires its actual Commander commands. The CLI is a generic dispatcher — it builds a per-invocation `ToolRegistry`, populates it during bootstrap, and asks each registered Tool to register itself.
+The contract lives in [`packages/core/src/tools/types.ts`](../../../packages/core/src/tools/types.ts). Each Tool exports `metadata` (id, version, description), a `commands[]` array (names + descriptions, used for `--help`), declarative `commandSpecs` (the typed command specs the host mounts), and an optional `initialize()` hook. The CLI is a generic dispatcher — it builds a per-invocation `ToolRegistry`, populates it during bootstrap, and mounts each registered Tool's `commandSpecs`. (3.0.0: the pre-GA `register(cli)` hook and the raw-Commander `program` handle were removed — see [ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md).)
 
-First-party Tools (`fit`, `sim`, `graph`) are imported statically by the CLI. Third-party Tools are discovered by walking `node_modules` for any package whose `package.json` declares `opensipTools.kind === 'tool'`. See [`../10-concepts/02-tool-plugin-model.md`](../10-concepts/02-tool-plugin-model.md).
+First-party Tools (`fit`, `sim`, `graph`) load by package name through the same plugin path as third-party Tools (3.0.0, [ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md)) — the CLI holds no static `import` of a tool runtime. Third-party Tools are discovered by walking `node_modules` for any package whose `package.json` declares `opensipTools.kind === 'tool'`. See [`../10-concepts/02-tool-plugin-model.md`](../10-concepts/02-tool-plugin-model.md).
 
 ## Check
 

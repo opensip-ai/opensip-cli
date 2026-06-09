@@ -125,7 +125,7 @@
         "contributors",
         "plugin-authors"
       ],
-      "purpose": "How the CLI doesn't know what `fit` does. The Tool contract, the registry, the dispatcher, and what it takes to add a third tool."
+      "purpose": "How the CLI doesn't know what `fit` does. The Tool contract, the manifest, the unified loader, and what it takes to add a third tool."
     },
     {
       "file": "docs/web-generated/10-concepts/03-modular-monolith.md",

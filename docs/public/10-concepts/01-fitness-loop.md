@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-09
+release: v3.0.0
 title: "The fitness loop"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "One check, end to end. Definition → loading → recipe selection → scope resolution → execution → signal → render → exit. The spine of the doc set."
@@ -104,10 +104,10 @@ Source: [`packages/cli/src/index.ts`](../../../packages/cli/src/index.ts)
 
 1. Parse global flags (`--debug`, `--quiet`).
 2. Set up the logger and assign a `runId` (`RUN_<ulid>`).
-3. Walk the per-invocation `ToolRegistry` (populated during bootstrap) and call `Tool.register(cli)` on every registered Tool. The fitness Tool sees `cli.program` and mounts its `fit`, `fit-list`, `fit-recipes`, and `fit-baseline-export` Commander commands. The cross-tool `dashboard` command is mounted separately by the CLI because it composes data from every registered Tool.
-4. Hand argv to Commander, which dispatches to `fitnessTool`'s `fit` action handler ([`packages/fitness/engine/src/tool.ts`](../../../packages/fitness/engine/src/tool.ts) — the `program.command(FIT.name).action(...)` block; the `fit-list`, `fit-recipes`, and `fit-baseline-export` action handlers live alongside it).
+3. Walk the per-invocation `ToolRegistry` (populated during bootstrap) and mount each registered Tool's declared `commandSpecs` via the host's `mountCommandSpec`. The fitness Tool declares `fit`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; the host builds the Commander commands, applies the shared cross-tool flags, and owns the parse → handler → render → `--json` → exit pipeline. The cross-tool `dashboard` command is mounted separately by the CLI because it composes data from every registered Tool.
+4. Hand argv to Commander, which dispatches to the `fit` command spec's handler ([`packages/fitness/engine/src/tool.ts`](../../../packages/fitness/engine/src/tool.ts) assembles the `commandSpecs`; the handler bodies live in the `cli/` spec modules alongside it).
 
-The CLI does not know what `fit` does. It knows a Tool exists, it asked the Tool to register, the Tool put a handler on `program.command('fit')`, and Commander now owns the routing. Everything specific to fitness from this point on lives inside `@opensip-tools/fitness`.
+The CLI does not know what `fit` does. It knows a Tool exists, it admitted and imported it, mounted the typed `commandSpecs` the Tool declared, and Commander now owns the routing. Everything specific to fitness from this point on lives inside `@opensip-tools/fitness`. (3.0.0: tools declare `commandSpecs`; the pre-GA `register(cli)` + raw `cli.program` path was removed — see [the tool-plugin model](./02-tool-plugin-model.md).)
 
 > **Where the example lands:** the binary is `opensip-tools`, argv is `['fit']` (defaults applied), the resolved Tool is `fitnessTool` with metadata `{ id: 'fitness', version: <pkg.version>, description: 'Run fitness checks against a codebase' }`. (Version is read at startup from `@opensip-tools/fitness/package.json`.)
 
@@ -134,7 +134,7 @@ Source: [`packages/core/src/plugins/discover.ts`](../../../packages/core/src/plu
 
 Three sources of checks get loaded, in order:
 
-1. **Language adapters.** Registered inside `bootstrapCli()` before any tool's `register()` runs — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` each contribute one `LanguageAdapter` to the per-invocation `LanguageRegistry`. Without this, the framework would treat every file as raw text and a regex check looking for `console.log` would also match the literal string in a comment.
+1. **Language adapters.** Registered inside `bootstrapCli()` before any tool is mounted — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` each contribute one `LanguageAdapter` to the per-invocation `LanguageRegistry`. Without this, the framework would treat every file as raw text and a regex check looking for `console.log` would also match the literal string in a comment.
 2. **npm-package check packs.** The plugin loader walks `node_modules` for packages declaring `opensipTools.kind: "fit-pack"` (the canonical marker form), plus any exact packages listed in `plugins.checkPackages:`. Each one exports a list of `defineCheck()` results. Bundled packs include `@opensip-tools/checks-universal`, `@opensip-tools/checks-typescript`, `@opensip-tools/checks-python`, etc.
 3. **Project-local checks.** `.mjs` files under `<project>/opensip-tools/fit/checks/` are loaded via dynamic `import()`. Each module either exports a single `Check` (the value returned by `defineCheck()`) or an array of them.
 

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-09
+release: v3.0.0
 title: "Publishable packs"
 audience: [plugin-authors]
 purpose: "Author and publish a fit-pack or sim-pack: workspace package skeleton, the marker contract, four discovery paths, and the migration recipe from loose .mjs files."
@@ -105,8 +105,8 @@ This pattern works at scale — the opensip codebase uses it for 308 fitness che
   "type": "module",
   "opensipTools": { "kind": "fit-pack" },
   "peerDependencies": {
-    "@opensip-tools/fitness": "^2.0.0",
-    "@opensip-tools/core": "^2.0.0"
+    "@opensip-tools/fitness": "^3.0.0",
+    "@opensip-tools/core": "^3.0.0"
   },
   "scripts": {
     "build": "tsc"

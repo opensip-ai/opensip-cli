@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-09
+release: v3.0.0
 title: "CLI dispatch"
 audience: [contributors]
 purpose: "How argv becomes a Tool action handler. The CLI bootstrap, registration order, the global flag set, error suggestions."
@@ -100,8 +100,8 @@ The whole thing fits in [`packages/cli/src/index.ts`](https://github.com/opensip
 
 A few of the constraints that pinned the order:
 
-- **Language adapters before any check ever runs.** The fitness tool's content filter dispatches per-file based on the language registry. A check that runs before any adapter is registered would treat every file as raw text and silently miss violations. The adapters are registered first inside `bootstrapCli()`, so they're in place before any tool's `register()` is called.
-- **First-party tools before discovery.** `ToolRegistry.register()` is last-writer-wins. `bootstrapCli()` registers the bundled tools first so a discovered third-party tool with the same id (e.g. a custom `fitness` replacement) can override them. The discovery walk via `discoverToolPackages()` explicitly skips packages whose `metadata.id` matches one of the bundled tools so a non-customized third-party install can't accidentally clobber the built-ins.
+- **Language adapters before any check ever runs.** The fitness tool's content filter dispatches per-file based on the language registry. A check that runs before any adapter is registered would treat every file as raw text and silently miss violations. The adapters are registered first inside `bootstrapCli()`, so they're in place before any tool is admitted and mounted.
+- **First-party tools before discovery.** `ToolRegistry.register()` is **first-writer-wins** (`warn-first-wins`). `bootstrapCli()` admits the bundled tools first, so a same-id third-party package can't clobber a built-in: the first-writer policy keeps the incumbent (and warns), and the discovery walk via `discoverToolPackages()` *also* explicitly skips packages whose `metadata.id` matches a bundled tool. Both guards point the same way — bundled `fit`/`sim`/`graph` win.
 - **Tools mount before CLI-owned commands.** Tool subcommands (`fit`, `sim`, `graph`, `dashboard`, …) get mounted in `mountAllToolCommands()` first. CLI-owned commands (`init`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) are mounted afterwards in `registerCliCommands()`. The order avoids duplicate-name collisions (a tool can't squat a CLI-owned name) and keeps tool subcommands at the top of `--help`.
 - **`parseAsync` last.** Commander parses argv synchronously but action handlers are async. `parseAsync` returns when the action handler resolves, which is what blocks Node's event loop until the run completes.
 
@@ -121,7 +121,7 @@ Some commands belong to the CLI itself, not to any Tool. They live under [`packa
 | `dashboard` | CLI | Generates + opens the HTML report, aggregating each tool's contributed dashboard data (composition root). Cross-tool. |
 | `sessions list/purge` | CLI | Reads the runtime session store. Cross-tool. |
 
-Tool-owned commands are mounted by their Tool's `register()` call. The current first-party set: fitness contributes `fit`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; simulation contributes `sim`; graph contributes `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (graph now has its own `defineRule` + recipes, mirroring fitness — ADR-0005), plus the internal `graph-shard-worker` and the `catalog-export` / `sarif-export` export commands (these two are deliberately unprefixed — the parent `opensip` engine subprocess port spawns `opensip-tools catalog-export` by that exact name, DEC-498). The `dashboard` command is **CLI-owned** (composition root), not a fitness command — it walks every tool's `collectDashboardData`. Third-party tools add their own. The CLI's job is to provide the program; the Tool decides what handlers it gets.
+Tool-owned commands are mounted from each Tool's declared `commandSpecs` (via the host's `mountCommandSpec`; the pre-3.0.0 `register()` hook was removed). The current first-party set: fitness contributes `fit`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; simulation contributes `sim`; graph contributes `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (graph now has its own `defineRule` + recipes, mirroring fitness — ADR-0005), plus the internal `graph-shard-worker`, the off-process live-run workers (`fit-run-worker` / `sim-run-worker` / `graph-run-worker`, ADR-0028), and the `catalog-export` / `sarif-export` export commands (these two are deliberately unprefixed — the parent `opensip` engine subprocess port spawns `opensip-tools catalog-export` by that exact name, DEC-498). The `dashboard` command is **CLI-owned** (composition root), not a fitness command — it walks every tool's `collectDashboardData`. Third-party tools add their own. The host owns the Commander program and mounts each Tool's declared `commandSpecs`; the Tool decides what commands and handlers it declares.
 
 The split is functional, not arbitrary. CLI-owned commands deal with concerns that span every Tool — initialization, plugins, sessions, user config. Tool-owned commands deal with concerns specific to that Tool's domain. A new Tool doesn't need to provide its own `init`; it inherits the CLI's.
 

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-09
+release: v3.0.0
 title: "Check pack architecture"
 audience: [contributors, plugin-authors]
 purpose: "How check packs are structured, the bundled seven, scope filters, parameterization, and the marketplace shape."
@@ -242,8 +242,8 @@ Peer-depend on `@opensip-tools/fitness` and `@opensip-tools/core` so a project a
 ```json
 {
   "peerDependencies": {
-    "@opensip-tools/fitness": "^2.0.0",
-    "@opensip-tools/core": "^2.0.0"
+    "@opensip-tools/fitness": "^3.0.0",
+    "@opensip-tools/core": "^3.0.0"
   }
 }
 ```

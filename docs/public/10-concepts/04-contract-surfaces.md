@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-09
+release: v3.0.0
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The system's public edges. Every contract opensip-tools makes with the outside world, and what changing each one would cost."
@@ -186,12 +186,14 @@ Discussed at length in [`02-tool-plugin-model.md`](./02-tool-plugin-model.md). T
 interface Tool {
   readonly metadata: ToolMetadata;
   readonly commands: readonly ToolCommandDescriptor[];
-  readonly register: (cli: ToolCliContext) => void;
+  readonly commandSpecs?: readonly CommandSpec<unknown, ToolCliContext>[];
   readonly initialize?: () => Promise<void>;
+  // optional contribution slots: contributeScope, collectDashboardData,
+  // config, capabilityRegistrars, sessionReplay
 }
 ```
 
-Plus the `ToolCliContext` injected when the CLI calls `register()`.
+Plus the `ToolCliContext` injected into each command handler the host mounts from `commandSpecs`. **(3.0.0: the `register(cli)` hook and the raw-Commander `program` handle were removed — a tool declares `commandSpecs` and the host mounts them. See [ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md).)**
 
 **Stability rule.** Adding optional fields to `Tool` (like `initialize?`) is a minor change. Adding required fields is a major. Adding methods to `ToolCliContext` is a minor (existing tools won't call them); removing or renaming methods is a major.
 

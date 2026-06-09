@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-09
+release: v3.0.0
 title: "Language adapters (fitness)"
 audience: [contributors, plugin-authors]
 purpose: "What the fitness LanguageAdapter is, the six bundled adapters, and how to author a new one."
@@ -131,7 +131,7 @@ langs.list();                 // → readonly LanguageAdapter[]
 
 `LanguageAdapter` carries an optional `aliases` field. The registry indexes each alias into an `aliasIndex` (alias → canonical id) alongside the id and extension indices, and exposes `canonicalize(idOrAlias)` to resolve an alias like `'c'`, `'rs'`, `'py'`, or `'golang'` back to its canonical adapter id (`'cpp'`, `'rust'`, `'python'`, `'go'`). Scope-matching and target-language resolution call `canonicalize` (via the scope's `languages.canonicalize`) so a target written with `languages: ['c']` matches a check scoped to `cpp`. An alias that collides with another adapter's canonical id, or one already claimed by an earlier adapter, is ignored with a structured warning (canonical id wins; first claimant wins).
 
-The CLI registers all six bundled adapters in `bootstrapCli()` before any Tool's `register()` runs. See [`packages/cli/src/bootstrap/register-language-adapters.ts`](../../../packages/cli/src/bootstrap/register-language-adapters.ts).
+The CLI registers all six bundled adapters in `bootstrapCli()` before any tool is admitted and mounted. See [`packages/cli/src/bootstrap/register-language-adapters.ts`](../../../packages/cli/src/bootstrap/register-language-adapters.ts).
 
 If a file's extension matches no registered adapter, dispatch falls through to "pass content unchanged." This is the fail-safe — a YAML file or a Markdown file goes through every check unmodified, and checks that target text content (TODO scanners, secret scanners) still work. Checks that depend on language-specific filtering and don't have an adapter for the file simply don't filter.
 
