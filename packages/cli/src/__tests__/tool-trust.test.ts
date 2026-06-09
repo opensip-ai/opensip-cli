@@ -16,7 +16,7 @@ import {
 import { PluginIncompatibleError } from '@opensip-tools/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { admitProjectLocalTool } from '../bootstrap/register-tools.js';
+import { admitProjectLocalTool, admitUserGlobalTool } from '../bootstrap/register-tools.js';
 import {
   isProjectLocalToolTrusted,
   PROJECT_TOOL_ALLOWLIST_ENV,
@@ -107,6 +107,41 @@ describe('admitProjectLocalTool — trust gate precedes import', () => {
     staged.push(dir);
     try {
       admitProjectLocalTool({ dir, env: { [PROJECT_TOOL_ALLOWLIST_ENV]: 'future-tool' } });
+      expect.unreachable('expected a PluginIncompatibleError');
+    } catch (error) {
+      expect(error).toBeInstanceOf(PluginIncompatibleError);
+      expect((error as PluginIncompatibleError).diagnostic).toMatch(/plugin API/);
+    }
+  });
+});
+
+describe('admitUserGlobalTool — trusted-by-default (no allowlist gate)', () => {
+  const staged: string[] = [];
+  afterEach(() => {
+    for (const d of staged.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  it('admits a global authored tool WITHOUT an allowlist, provenance user-global', () => {
+    const dir = stageProjectLocalTool('global-tool', 1);
+    staged.push(dir);
+    const { provenance, manifest } = admitUserGlobalTool({ dir });
+    expect(provenance.source).toBe('user-global');
+    expect(provenance.id).toBe('global-tool');
+    expect(provenance.manifestHash.length).toBeGreaterThan(0);
+    expect(manifest.id).toBe('global-tool');
+  });
+
+  it('fail-closes a missing/malformed sidecar (the user explicitly placed it)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'opensip-global-empty-'));
+    staged.push(dir);
+    expect(() => admitUserGlobalTool({ dir })).toThrow(PluginIncompatibleError);
+  });
+
+  it('fail-closes a compatibility-incompatible global tool', () => {
+    const dir = stageProjectLocalTool('future-global', 999);
+    staged.push(dir);
+    try {
+      admitUserGlobalTool({ dir });
       expect.unreachable('expected a PluginIncompatibleError');
     } catch (error) {
       expect(error).toBeInstanceOf(PluginIncompatibleError);

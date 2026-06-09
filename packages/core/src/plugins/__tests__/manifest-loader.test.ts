@@ -103,9 +103,33 @@ describe('loadToolManifest', () => {
     });
   });
 
+  it('reads a user-global manifest from the SAME JSON sidecar (authored source)', () => {
+    // user-global is the trusted-by-default authored sibling of project-local;
+    // both authored sources route through the sidecar reader, differing only in
+    // trust posture (the caller's concern, not the loader's).
+    writeSidecar(testDir, {
+      kind: 'tool',
+      id: 'global-tool',
+      name: 'My Global Tool',
+      version: '2.0.0',
+      apiVersion: 1,
+      commands: [{ name: 'go', description: 'Do the thing' }],
+    });
+
+    const manifest = loadToolManifest('user-global', testDir);
+    expect(manifest).toMatchObject({
+      kind: 'tool',
+      id: 'global-tool',
+      name: 'My Global Tool',
+      version: '2.0.0',
+      apiVersion: 1,
+    });
+  });
+
   it('returns undefined when the manifest file is missing', () => {
     expect(loadToolManifest('bundled', testDir)).toBeUndefined();
     expect(loadToolManifest('project-local', testDir)).toBeUndefined();
+    expect(loadToolManifest('user-global', testDir)).toBeUndefined();
   });
 
   it('returns undefined for malformed JSON', () => {

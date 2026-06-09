@@ -18,8 +18,11 @@
  * with no further wiring.
  */
 
-import { join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 
+import { isRecord } from './json-guards.js';
+import { PROJECT_LOCAL_MANIFEST_FILE } from './manifest-loader.js';
 import { discoverPackagesByMarker, discoverPackagesInNodeModules } from './marker-discovery.js';
 import { resolvePackageEntryPoint } from './package-entry.js';
 
@@ -112,8 +115,46 @@ export interface ToolPackageMetadata {
   readonly mainEntry: string;
 }
 
+/**
+ * Resolve a tool directory's runtime entry.
+ *
+ * An INSTALLED npm tool resolves via `package.json` (`exports['.']` → `main` →
+ * `./index.js`). An AUTHORED tool has no `package.json` — it declares identity
+ * via an `opensip-tool.manifest.json` sidecar, so when the package.json resolver
+ * finds nothing, fall back to the sidecar: its `main` field (or `./index.js`
+ * default), with the directory name as the package name. This keeps the two
+ * discovery surfaces symmetric — one entry resolver serves both the npm and
+ * authored legs.
+ */
 export function readToolPackageMetadata(packageDir: string): ToolPackageMetadata | undefined {
   const resolved = resolvePackageEntryPoint(packageDir);
-  if (!resolved) return undefined;
-  return { name: resolved.name, mainEntry: resolved.entry };
+  if (resolved) return { name: resolved.name, mainEntry: resolved.entry };
+  return readAuthoredSidecarEntry(packageDir);
+}
+
+/**
+ * Resolve an authored tool's entry from its `opensip-tool.manifest.json`
+ * sidecar. Reads the sidecar's `main` (default `./index.js`) and `name`/`id`
+ * for the package name. Returns `undefined` when the sidecar is absent or
+ * unreadable (the caller treats that as "no resolvable entry").
+ */
+function readAuthoredSidecarEntry(dir: string): ToolPackageMetadata | undefined {
+  const sidecarPath = join(dir, PROJECT_LOCAL_MANIFEST_FILE);
+  if (!existsSync(sidecarPath)) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(sidecarPath, 'utf8'));
+  } catch {
+    // @fitness-ignore-next-line error-handling-quality -- malformed sidecar surfaces via undefined return; caller treats as "no resolvable entry" (mirrors resolvePackageEntryPoint's package.json contract).
+    return undefined;
+  }
+  if (!isRecord(parsed)) return undefined;
+  const rawMain = typeof parsed.main === 'string' && parsed.main.length > 0 ? parsed.main : './index.js';
+  // Name from the sidecar's name/id, falling back to the directory name (always
+  // present for a real authored-tool dir).
+  const name =
+    (typeof parsed.name === 'string' && parsed.name) ||
+    (typeof parsed.id === 'string' && parsed.id) ||
+    basename(dir);
+  return { name, mainEntry: join(dir, rawMain) };
 }

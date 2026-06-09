@@ -41,6 +41,14 @@ describe('resolveProjectPaths', () => {
     expect(p.pluginsDir('fit')).toBe(join(p.runtimeDir, 'plugins', 'fit'));
     expect(p.pluginsDir('sim')).toBe(join(p.runtimeDir, 'plugins', 'sim'));
   });
+
+  it('places TRACKED authored Tool sidecars under opensip-tools/tools (beside fit/sim, NOT under .runtime)', () => {
+    const p = resolveProjectPaths(PROJECT);
+    expect(p.authoredToolsDir).toBe(join(PROJECT, 'opensip-tools', 'tools'));
+    // Load-bearing: the authored tools root is the tracked sibling of fit/sim,
+    // never under the gitignored .runtime tree.
+    expect(p.authoredToolsDir.startsWith(p.runtimeDir)).toBe(false);
+  });
 });
 
 describe('resolveUserPaths', () => {
@@ -53,6 +61,11 @@ describe('resolveUserPaths', () => {
   it('places user-global plugins under ~/.opensip-tools/plugins/<domain>', () => {
     const u = resolveUserPaths();
     expect(u.pluginsDir('tool')).toBe(join(u.userHomeDir, 'plugins', 'tool'));
+  });
+
+  it('places global authored Tool sidecars under ~/.opensip-tools/tools (trusted-by-default)', () => {
+    const u = resolveUserPaths();
+    expect(u.authoredToolsDir).toBe(join(u.userHomeDir, 'tools'));
   });
 });
 

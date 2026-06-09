@@ -160,7 +160,7 @@ describe('readToolPackageMetadata', () => {
     mkdirSync(pkgDir, { recursive: true });
   });
 
-  it('returns undefined when package.json is missing', () => {
+  it('returns undefined when neither package.json nor an authored sidecar is present', () => {
     expect(readToolPackageMetadata(pkgDir)).toBeUndefined();
   });
 
@@ -223,5 +223,55 @@ describe('readToolPackageMetadata', () => {
       }),
     );
     expect(readToolPackageMetadata(pkgDir)?.mainEntry).toBe(join(pkgDir, './dist/default.js'));
+  });
+
+  // Authored tools have NO package.json — entry resolves from the sidecar.
+  it("resolves an authored sidecar's `main` when there is no package.json", () => {
+    writeFileSync(
+      join(pkgDir, 'opensip-tool.manifest.json'),
+      JSON.stringify({ kind: 'tool', id: 'audit', name: '@my-co/audit', version: '1.0.0', main: './dist/audit.js', commands: [] }),
+    );
+    expect(readToolPackageMetadata(pkgDir)).toEqual({
+      name: '@my-co/audit',
+      mainEntry: join(pkgDir, './dist/audit.js'),
+    });
+  });
+
+  it('defaults an authored sidecar entry to ./index.js when `main` is absent, naming from id', () => {
+    writeFileSync(
+      join(pkgDir, 'opensip-tool.manifest.json'),
+      JSON.stringify({ kind: 'tool', id: 'bench', version: '1.0.0', commands: [] }),
+    );
+    expect(readToolPackageMetadata(pkgDir)).toEqual({
+      name: 'bench',
+      mainEntry: join(pkgDir, './index.js'),
+    });
+  });
+
+  it('prefers a real package.json over an authored sidecar when both exist', () => {
+    writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ name: 'pkg', main: './dist/pkg.js' }));
+    writeFileSync(
+      join(pkgDir, 'opensip-tool.manifest.json'),
+      JSON.stringify({ kind: 'tool', id: 'audit', main: './dist/sidecar.js', commands: [] }),
+    );
+    expect(readToolPackageMetadata(pkgDir)?.mainEntry).toBe(join(pkgDir, './dist/pkg.js'));
+  });
+
+  it('returns undefined for a malformed authored sidecar (no resolvable entry)', () => {
+    writeFileSync(join(pkgDir, 'opensip-tool.manifest.json'), '{not-json');
+    expect(readToolPackageMetadata(pkgDir)).toBeUndefined();
+  });
+
+  it('returns undefined when the authored sidecar parses to a non-object (e.g. a JSON array)', () => {
+    writeFileSync(join(pkgDir, 'opensip-tool.manifest.json'), JSON.stringify(['not', 'an', 'object']));
+    expect(readToolPackageMetadata(pkgDir)).toBeUndefined();
+  });
+
+  it('falls back to the directory name when the sidecar has neither name nor id', () => {
+    writeFileSync(
+      join(pkgDir, 'opensip-tool.manifest.json'),
+      JSON.stringify({ kind: 'tool', main: './dist/x.js', commands: [] }),
+    );
+    expect(readToolPackageMetadata(pkgDir)?.name).toBe('pkg');
   });
 });
