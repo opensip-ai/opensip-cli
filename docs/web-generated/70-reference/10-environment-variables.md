@@ -44,6 +44,12 @@ bypasses the registry.
 | `NO_UPDATE_NOTIFIER` | npm-convention update-notifier opt-out; honoured as an equivalent of `OPENSIP_NO_UPDATE`. |
 | `OPENSIP_TOOLS_SKIP_BUNDLED` | Comma-separated bundled-tool ids (`fitness`/`simulation`/`graph`) to NOT load as bundled, so an installed or project-local package of the same id can take over instead — the install-source-independence escape hatch (3.0.0). Unset loads all bundled tools. |
 
+## Authored tools
+
+| Variable | Effect |
+|---|---|
+| `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS` | Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default); `*` admits all. A project-authored sidecar Tool under `<project>/opensip-tools/tools/` is NOT loaded unless its id (or `*`) appears here — it rides in with `git clone`, so loading it runs untrusted code (fail-closed, exit 5, before any import). Global-authored Tools under `~/.opensip-tools/tools/` are trusted-by-default and ignore this list. |
+
 ## Graph engine
 
 | Variable | Effect |

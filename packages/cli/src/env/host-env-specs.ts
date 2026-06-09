@@ -57,6 +57,24 @@ export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       'A skipped tool can instead be loaded from an installed/project-local package of the same id ' +
       '— the install-source-independence escape hatch (3.0.0). Unset = load all bundled tools.',
   },
+  {
+    canonical: 'OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS',
+    // Mirror parseAllowlist's split (whitespace AND comma) so the registry value
+    // and tool-trust's set agree exactly — including the `*` token, which passes
+    // through as a plain id the trust check tests for.
+    coerce: (raw) =>
+      raw
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    default: [] as readonly string[],
+    docs:
+      'Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default). ' +
+      "Use '*' to admit all project-authored tools. A project-authored sidecar tool under " +
+      '<project>/opensip-tools/tools/ is NOT loaded unless its id (or *) appears here — it ' +
+      'rides in with git clone, so loading it runs untrusted code. Global-authored tools ' +
+      '(~/.opensip-tools/tools/) are trusted-by-default and ignore this list.',
+  },
 ];
 
 /** The composed CLI-layer registry. Telemetry + update-notifier read through it. */

@@ -46,6 +46,17 @@ function parseAllowlist(raw: string | undefined): ReadonlySet<string> {
  * Decide whether a project-local executable tool with the given `id` is
  * trusted to load, under the deny-by-default + allowlist-opt-in policy.
  *
+ * **Env governance (pre-scope exception).** The allowlist var is declared as a
+ * first-class `EnvVarSpec` in `CLI_ENV_SPECS`
+ * (`OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`, `host-env-specs.ts`) — that declaration
+ * is the documentation home, so it appears in the generated env-surface
+ * reference. The read here stays on the INJECTED `env` param rather than
+ * `hostEnv.get(...)`: this trust check runs at BOOTSTRAP, before any `RunScope`
+ * exists, and the injectable seam is what keeps it unit-testable without
+ * mutating global `process.env` (the same posture the repo takes for
+ * `NODE_OPTIONS`). The `env-via-registry` guardrail is satisfied because this is
+ * an injected-param read (`env[...]`), not a raw `process.env.<NAME>` read.
+ *
  * @param id The tool's stable id (from its sidecar manifest).
  * @param env The environment to read the allowlist from (defaults to
  *   `process.env`; injectable for tests).
