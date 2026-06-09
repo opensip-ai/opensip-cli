@@ -40,24 +40,29 @@ export interface ProgressTransport {
 }
 
 /**
- * A serializable description of off-main-thread work (ADR-0028). The worker
- * transport cannot ship a closure across the thread boundary (unlike the
- * in-process job), so the caller names a worker entry module + the
- * structured-clone-safe input it needs. `workerData` MUST be serializable — no
- * functions, no live handles (e.g. the datastore); persistence + egress stay on
- * the main thread after the run returns its result.
+ * A description of off-main-PROCESS work (ADR-0028). The off-thread variant runs
+ * the engine in a forked child that re-bootstraps the full CLI scope (language +
+ * tool registries, project, config) — a worker *thread* can't, because that
+ * bootstrap is CLI-owned and a partial registry would diverge a polyglot run's
+ * results. So the descriptor names the node module to fork (the CLI entry) + argv
+ * (a worker subcommand + a temp spec path). No closure and no live handle (e.g.
+ * the datastore) crosses the boundary; persistence + egress stay on the main
+ * process after the run returns.
  */
-export interface WorkerJobDescriptor {
-  /** Resolved worker entry module (e.g. `new URL('./x-worker.js', import.meta.url)`). */
-  readonly workerUrl: string | URL;
-  /** Structured-clone-safe input handed to the worker as `workerData`. */
-  readonly workerData: unknown;
+export interface SubprocessJobDescriptor {
+  /** Node module to fork — the CLI entry (`process.argv[1]`). */
+  readonly command: string;
+  /** Argv for the fork — typically `[<worker-subcommand>, <specPath>]`. */
+  readonly argv: readonly string[];
+  /** Extra environment for the child (merged over the parent's). */
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 /**
- * The worker→host message protocol. The worker entry posts these via
- * `parentPort`; the worker {@link ProgressRun} maps `progress` to subscribers,
- * resolves on `result`, and rejects on `error`. One source of truth for both ends.
+ * The child→parent IPC message protocol. The forked worker posts these via
+ * `process.send`; the subprocess {@link ProgressRun} maps `progress` to
+ * subscribers, resolves on `result`, and rejects on `error`. One source of truth
+ * for both ends.
  */
 export type WorkerMessage<TEvent, TResult> =
   | { readonly kind: 'progress'; readonly event: TEvent }
