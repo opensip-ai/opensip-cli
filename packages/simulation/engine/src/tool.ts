@@ -124,6 +124,7 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   const datastore = cli.scope.datastore() as DataStore | undefined;
   const { result } = await executeSim(opts);
   // Persist on the main thread (ADR-0028 — engine is persistence-free).
+  // @fitness-ignore-next-line detached-promises -- persistSimSession is synchronous (SQLite write; returns void), not a promise
   if (datastore !== undefined && result.type === 'sim-done') persistSimSession(datastore, result);
 
   if (result.type === 'error') {

@@ -142,7 +142,7 @@ describe('scheduleUnits', () => {
       yieldBetweenUnits: true,
       runUnit: (u) => { seen.push(u); return Promise.resolve({ shouldStop: false }); },
     });
-    expect(seen.toSorted((a, b) => a - b)).toEqual([1, 2, 3, 4]);
+    expect([...seen].sort((a, b) => a - b)).toEqual([1, 2, 3, 4]);
   });
 });
 

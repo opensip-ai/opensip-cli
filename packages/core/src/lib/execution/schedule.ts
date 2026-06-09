@@ -61,6 +61,7 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
   const runUnit: ScheduleUnitsOptions<Unit>['runUnit'] =
     opts.yieldBetweenUnits === true
       ? async (unit, index) => {
+          // @fitness-ignore-next-line async-waterfall-detection -- deliberately sequential: the macrotask yield MUST run AFTER the unit completes (it is the between-units boundary); parallelizing with Promise.all would defeat the purpose.
           const outcome = await opts.runUnit(unit, index);
           await yieldToEventLoop();
           return outcome;

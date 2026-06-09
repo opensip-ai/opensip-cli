@@ -1,3 +1,4 @@
+// @fitness-ignore-file detached-promises -- this worker's `send()` helper is synchronous (it calls process.send, which returns immediately); the name-based heuristic mistakes the floating send(...) IPC posts for promise-returning calls. The one genuine async call (runGraph) is awaited.
 /**
  * `graph-run-worker <specPath>` — the headless graph build forked by the live
  * view (ADR-0028). The live runner forks `node <cliScript> graph-run-worker

@@ -80,6 +80,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
     // (the JSON serializer would silently drop or mangle those). Workers send
     // slim, plain-data results today; this keeps the transport robust regardless.
     serialization: 'advanced',
+    // @fitness-ignore-next-line env-secret-exposure -- fork() REPLACES the child env wholesale when `env` is set, so the parent env must be spread in to preserve it; this object is passed to fork, never logged.
     ...(descriptor.env === undefined ? {} : { env: { ...process.env, ...descriptor.env } }),
   });
 
