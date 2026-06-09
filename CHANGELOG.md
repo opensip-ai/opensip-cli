@@ -6,8 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Tool config is consumed from the composed `scope.toolConfig`** (ADR-0023,
+  Phase 4). `fit`, `graph`, and `sim` now read their resolved namespace off the
+  host-composed, strict-validated config document via `currentScope()`
+  (scope-first; the legacy per-tool YAML loader is kept only as a no-scope
+  fallback for config-less projects and direct unit tests). This makes the
+  declared environment bindings actually drive runtime behaviour:
+  `OPENSIP_FIT_FAIL_ON_ERRORS` / `OPENSIP_FIT_FAIL_ON_WARNINGS` now change the
+  gate exit code with no config-file edit (previously resolved into scope but
+  ignored by the hot path). Two guardrails keep it honest: the new
+  `no-config-loader-outside-config` check, and `one-config-document` no longer
+  exempts the migrated document-level loaders.
+
+### Removed
+
+- **`fit --findings` removed.** The deprecated alias of `--verbose` (ADR-0021),
+  kept through the 2.x line, is gone as of 3.0.0 — use `--verbose` / `-v`.
+
 ### Fixed
 
+- **Public docs aligned with the 3.0.0 surface.** `--json` examples now show the
+  `CommandOutcome` wrapper (`.envelope` / `.data` / `.errors[]`) instead of the
+  retired bare-envelope / top-level `.verdict` / bare `{ "error" }` shapes; the
+  configuration reference reflects strict whole-document validation (unknown keys
+  in known namespaces are rejected, not silently ignored, and malformed `graph:`
+  values fail before dispatch); sim packs are documented as discovered by
+  `<scope>/scenarios-*` name-pattern (ADR-0029), not a `sim-pack` marker; the
+  CLI-dispatch implementation doc describes the dynamic manifest/`commandSpecs`
+  flow (no `Tool.register()`); and version / six-layer / 32-package /
+  check-count claims match v3.0.0.
 - **`env-via-registry` and `no-local-exit-or-stdout` removed from
   `@opensip-tools/checks-universal`** (relocated to opensip-tools' own
   project-local dogfood pack). Both were tool-internal SELF-checks that leaked

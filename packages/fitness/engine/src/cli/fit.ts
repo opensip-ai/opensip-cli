@@ -31,6 +31,7 @@ import { FitnessRecipeService } from '../recipes/service.js';
 import { ensureChecksLoaded, getLoadWarnings } from './fit/check-loader.js';
 import { loadFitConfig, validateLanguagesAgainstAdapters } from './fit/config-loader.js';
 import { runRecipeOrAdHoc, selectRecipe } from './fit/recipe-selector.js';
+import { resolvedFitnessConfig } from './fit/resolved-fitness-config.js';
 import { buildFitEnvelope, buildFitCallbacks, buildFitDoneResult } from './fit/result-builders.js';
 
 import type {
@@ -123,11 +124,19 @@ export async function executeFit(
   if ('error' in configResult) return { result: configResult.error };
   const { signalersConfig, targetsConfig, targetRegistry } = configResult;
 
+  // ADR-0023, Phase 4: the fitness knobs (recipe + disabledChecks) come from the
+  // host-RESOLVED config block (`scope.toolConfig.fitness`), which already folds
+  // in flag > env > file > defaults. `signalersConfig` is the fallback when no
+  // scope/toolConfig is present (config-less project / unit test). `cli.recipe`
+  // (the deprecated cross-tool fallback) stays sourced from signalersConfig — it
+  // is a document-level block, not the fitness namespace.
+  const fitnessResolved = resolvedFitnessConfig();
+
   // Tool-scoped recipe resolution (ADR-0022): explicit --recipe > fitness.recipe
-  // > deprecated cli.recipe > built-in default. The config defaults come from the
-  // already-loaded signalersConfig (no extra file read).
+  // > deprecated cli.recipe > built-in default. The fitness.recipe default comes
+  // from the resolved scope block; cli.recipe from the loaded signalersConfig.
   const recipePick = selectRecipe(args, {
-    toolRecipe: signalersConfig.fitness.recipe,
+    toolRecipe: fitnessResolved?.recipe ?? signalersConfig.fitness.recipe,
     cliRecipe: signalersConfig.cli.recipe,
   });
   if ('error' in recipePick) return { result: recipePick.error };
@@ -146,7 +155,7 @@ export async function executeFit(
     cwd: args.cwd,
     checkTargetFiles,
     callbacks: buildFitCallbacks(opts.onProgress),
-    disabledChecks: signalersConfig.fitness.disabledChecks,
+    disabledChecks: fitnessResolved?.disabledChecks ?? signalersConfig.fitness.disabledChecks,
     includeViolations: true,
     globalExcludes: targetsConfig.globalExcludes,
   });

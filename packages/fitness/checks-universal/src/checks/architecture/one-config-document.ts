@@ -26,17 +26,20 @@
  * argument) and projects a non-`recipe` field is an unvalidated
  * hand-projection and is flagged.
  *
- * NARROWING — two deliberate exemptions keep this at 0 findings on the
- * compliant tree and inert on the intentionally-deferred (2.10.1) loaders:
+ * NARROWING — ONE deliberate exemption keeps this at 0 findings on the
+ * compliant tree:
  *   1. A block projection that reads ONLY the `recipe` key is the ADR-0022
  *      recipe-NAME resolver (`resolveGraphRecipeSelection` /
  *      `resolveSimRecipeSelection`), which reads a single scalar for
  *      cross-tool recipe precedence — not a config hand-projection. A binding
  *      whose only own-namespace field access is `.recipe` is exempt.
- *   2. The cli/targeting/global loaders (`loadCliDefaults`,
- *      `loadSignalersConfig` targeting, `readSimulationRecipe`) read OTHER
- *      top-level blocks (`cli:`, `targets:`, `signalers:`) — not a tool's
- *      strict namespace — so they never match the own-namespace read.
+ *
+ * The former 2.10.1-deferral carve-out is gone: in Phase 4 the tools read their
+ * OWN resolved namespace off `scope.toolConfig.<ns>` (no own-namespace YAML
+ * projection survives), and the cli/targeting/global loaders read OTHER
+ * top-level blocks (`cli:`, `targets:`, `globalExcludes:`) governed by the
+ * sibling `no-config-loader-outside-config` check — so they never match the
+ * own-namespace read anchor here regardless.
  *
  * SCOPE — opensip-tools' own monorepo. The tool-engine path guard makes the
  * check inert in adopter repos (whose code never matches those paths), so it

@@ -10,7 +10,7 @@
 
 import { loadCliDefaults } from '@opensip-tools/config';
 import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
-import { logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
+import { currentScope, logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
 
 /** Accept anything that looks like a plain object; everything else → undefined. */
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -18,11 +18,23 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
- * Best-effort read of `simulation.recipe` from the project config. Returns
- * `undefined` when the config is missing, unreadable, malformed, or has no
- * `simulation.recipe` string.
+ * Best-effort read of `simulation.recipe` from the project config.
+ *
+ * ADR-0023, Phase 4: the resolved `simulation:` block rides on the per-run scope
+ * (`scope.toolConfig.simulation`) — the host already strict-validated +
+ * precedence-resolved the whole document before dispatch. When a scope is
+ * present (every CLI dispatch path) this reads the SCOPE value and does NOT
+ * re-read YAML. The YAML read below is the fallback for a caller with no scope
+ * (a direct unit-test call); there it stays best-effort: a missing config,
+ * malformed YAML, or no `simulation.recipe` string yields `undefined`.
  */
 function readSimulationRecipe(cwd: string, explicitPath?: string): string | undefined {
+  // Scope-first: the resolved, strict-validated `simulation:` block.
+  const scoped = currentScope()?.toolConfig?.simulation;
+  if (isPlainObject(scoped)) {
+    return typeof scoped.recipe === 'string' ? scoped.recipe : undefined;
+  }
+
   let filePath: string;
   try {
     filePath = resolveProjectConfigPath(cwd, explicitPath);

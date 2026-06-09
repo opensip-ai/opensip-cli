@@ -128,6 +128,48 @@ describe('composeAndValidateToolConfig', () => {
       composeAndValidateToolConfig({ tools: registryWith([graphTool, fitnessTool]), configPath, env: {} }),
     ).toThrow(ConfigurationError);
   });
+
+  // ADR-0023, Phase 4: env bindings are RESOLVED into the scope config, and (with
+  // tools now reading scope.toolConfig at runtime) they are no longer no-ops. A
+  // tool with env bindings mirroring the real fitness declaration proves the
+  // precedence order env > file > defaults at the composition seam.
+  const fitnessWithEnv = makeTool({
+    id: 'fitness',
+    config: {
+      namespace: 'fitness',
+      schema: z.object({
+        failOnErrors: z.number().int().optional(),
+        failOnWarnings: z.number().int().optional(),
+      }),
+      defaults: { failOnErrors: 1, failOnWarnings: 0 },
+      env: [
+        { envVar: 'OPENSIP_FIT_FAIL_ON_ERRORS', key: 'failOnErrors', type: 'number' },
+        { envVar: 'OPENSIP_FIT_FAIL_ON_WARNINGS', key: 'failOnWarnings', type: 'number' },
+      ],
+    },
+  });
+
+  it('OPENSIP_FIT_FAIL_ON_ERRORS env overrides the file value (env > file)', () => {
+    const configPath = writeConfig('fitness:\n  failOnErrors: 5\n');
+    const result = composeAndValidateToolConfig({
+      tools: registryWith([fitnessWithEnv]),
+      configPath,
+      env: { OPENSIP_FIT_FAIL_ON_ERRORS: '0' },
+    });
+    // env (0) beats the file (5) — this is exactly what makes the gate "never
+    // fail on errors" without editing opensip-tools.config.yml.
+    expect(result?.fitness).toMatchObject({ failOnErrors: 0, failOnWarnings: 0 });
+  });
+
+  it('OPENSIP_FIT_FAIL_ON_WARNINGS env overrides the default (env > defaults)', () => {
+    const result = composeAndValidateToolConfig({
+      tools: registryWith([fitnessWithEnv]),
+      configPath: undefined,
+      env: { OPENSIP_FIT_FAIL_ON_WARNINGS: '1' },
+    });
+    // defaults say 0; env (1) wins — fail on any warning.
+    expect(result?.fitness).toMatchObject({ failOnErrors: 1, failOnWarnings: 1 });
+  });
 });
 
 /** A manifest declaring a single capability domain with a structural schema. */

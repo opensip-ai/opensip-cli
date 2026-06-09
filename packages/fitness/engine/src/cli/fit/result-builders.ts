@@ -25,6 +25,7 @@ import { violationToSignal } from '../../signalers/violation-to-signal.js';
 
 import { getPluginLoadErrors } from './check-loader.js';
 import { buildFitVerboseDetail } from './envelope-view.js';
+import { resolvedFitnessConfig } from './resolved-fitness-config.js';
 
 import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../../recipes/service-types.js';
 import type { FitnessRecipeResult, RecipeCheckResult } from '../../recipes/types.js';
@@ -122,11 +123,19 @@ export interface BuildFitDoneArgs {
 export function buildFitDoneResult({ args, fitnessResult, envelope, signalersConfig, recipeName, warnings }: BuildFitDoneArgs): FitDoneResult {
   const { summary } = fitnessResult;
 
-  // Determine exit code from config thresholds.
+  // Determine exit code from the RESOLVED config thresholds (ADR-0023, Phase 4).
+  // The host already merged flag > env > file > defaults into
+  // `scope.toolConfig.fitness`, so reading it here is what makes the declared
+  // env bindings (OPENSIP_FIT_FAIL_ON_ERRORS / OPENSIP_FIT_FAIL_ON_WARNINGS)
+  // actually drive the gate — they were no-ops while this read the re-parsed
+  // `signalersConfig.fitness.*`. Fall back to the file-sourced signalersConfig
+  // (then the historical literal defaults) when no scope/toolConfig is present
+  // (a config-less project, or a unit test not wrapped in runWithScope).
   // failOnErrors: fail if total errors >= this value (default: 1, 0 = never fail on errors)
   // failOnWarnings: fail if total warnings >= this value (default: 0 = never fail on warnings)
-  const failOnErrors = signalersConfig.fitness.failOnErrors ?? 1;
-  const failOnWarnings = signalersConfig.fitness.failOnWarnings ?? 0;
+  const resolved = resolvedFitnessConfig();
+  const failOnErrors = resolved?.failOnErrors ?? signalersConfig.fitness.failOnErrors ?? 1;
+  const failOnWarnings = resolved?.failOnWarnings ?? signalersConfig.fitness.failOnWarnings ?? 0;
   const shouldFail =
     getPluginLoadErrors().length > 0 ||
     (failOnErrors > 0 && summary.totalErrors >= failOnErrors) ||
@@ -136,8 +145,7 @@ export function buildFitDoneResult({ args, fitnessResult, envelope, signalersCon
 
   // ADR-0021: carry the verbose findings body on the result so the shared
   // resultToView seam renders it identically in a TTY and a pipe (the old
-  // TTY-only path left `fit --verbose | cat` empty). `--findings` is the
-  // deprecated alias of `--verbose`.
+  // TTY-only path left `fit --verbose | cat` empty).
   const verboseDetail = buildFitVerboseDetail(envelope, args);
 
   return {

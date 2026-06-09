@@ -10,9 +10,11 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { runWithScopeSync } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadGraphConfig } from '../../cli/graph-config.js';
+import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 let workDir: string;
 
@@ -98,5 +100,42 @@ describe('loadGraphConfig', () => {
   it('returns {} when the graph: value is not an object', () => {
     writeConfig('graph: 3\n');
     expect(loadGraphConfig(workDir)).toEqual({});
+  });
+});
+
+// ADR-0023, Phase 4: when a RunScope is present, loadGraphConfig reads the
+// host-RESOLVED `graph:` block off `scope.toolConfig.graph` and does NOT re-read
+// YAML. These tests prove the value comes from the scope (and that an on-disk
+// file is ignored when the scope is present — i.e. no second YAML read).
+describe('loadGraphConfig reads scope.toolConfig.graph when a scope is present', () => {
+  it('returns the resolved graph block off the scope, not the on-disk file', () => {
+    // The on-disk file says minDuplicateBodyLines: 8 — a second YAML read would
+    // surface this. The scope says 99; loadGraphConfig must return the SCOPE value.
+    writeConfig('graph:\n  minDuplicateBodyLines: 8\n');
+    const scope = makeGraphTestScope();
+    Object.assign(scope, { toolConfig: { graph: { minDuplicateBodyLines: 99 } } });
+
+    const config = runWithScopeSync(scope, () => loadGraphConfig(workDir));
+    expect(config.minDuplicateBodyLines).toBe(99);
+  });
+
+  it('returns {} when the scope toolConfig has an empty graph block (no YAML fallback)', () => {
+    // On-disk file has a populated graph block; an empty scope block must WIN —
+    // proving the YAML read is skipped when the scope carries the resolved value.
+    writeConfig('graph:\n  minDuplicateBodyLines: 8\n');
+    const scope = makeGraphTestScope();
+    Object.assign(scope, { toolConfig: { graph: {} } });
+
+    const config = runWithScopeSync(scope, () => loadGraphConfig(workDir));
+    expect(config).toEqual({});
+  });
+
+  it('falls back to the YAML read when the scope carries no toolConfig', () => {
+    // A scope with no toolConfig (config-less project shape) → YAML fallback.
+    writeConfig('graph:\n  minDuplicateBodyLines: 8\n');
+    const scope = makeGraphTestScope();
+
+    const config = runWithScopeSync(scope, () => loadGraphConfig(workDir));
+    expect(config.minDuplicateBodyLines).toBe(8);
   });
 });

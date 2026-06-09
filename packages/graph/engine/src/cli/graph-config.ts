@@ -23,7 +23,7 @@
 
 import { loadCliDefaults } from '@opensip-tools/config';
 import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
-import { logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
+import { currentScope, logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
 
 import { GraphConfigSchema } from './graph-config-schema.js';
 
@@ -35,17 +35,32 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
- * Best-effort load of the `graph:` block from `opensip-tools.config.yml`.
+ * Best-effort load of the `graph:` block of `opensip-tools.config.yml`.
  *
- * Returns `{}` when the config is missing, unreadable, malformed, has no
- * `graph:` section, or the section fails the graph schema — every rule then
- * falls back to its in-rule default. The strict typo rejection happens at the
- * dispatch-level composed validation, not here.
+ * ADR-0023, Phase 4: the resolved `graph:` block rides on the per-run scope
+ * (`scope.toolConfig.graph`) — the host already strict-validated + precedence-
+ * resolved (flag > env > file > defaults) the whole document before dispatch. So
+ * when a scope is present (every in-process AND forked-worker run goes through
+ * the pre-action hook) this returns the SCOPE value and does NOT re-read YAML.
+ * The YAML read below is the fallback for a caller with no scope (a unit test
+ * driving `loadGraphConfig` directly) — there it stays best-effort: a missing
+ * config, malformed YAML, an absent `graph:` key, or a block that fails the
+ * schema all collapse to `{}` so a rule falls back to its in-rule default.
  *
  * @param cwd Project root for config resolution.
  * @param explicitPath Optional `--config <path>` override.
  */
 export function loadGraphConfig(cwd: string, explicitPath?: string): GraphConfig {
+  // Scope-first: the resolved, strict-validated `graph:` block (with env/flag
+  // precedence already folded in). Present on every CLI dispatch path; absent
+  // only off-CLI (direct unit-test calls), where we fall back to the YAML read.
+  const scoped = currentScope()?.toolConfig?.graph;
+  if (isPlainObject(scoped)) {
+    // Already validated by the composer (graph's namespaced ToolConfigDeclaration
+    // is the same GraphConfigSchema), so this is a pure narrowing read.
+    return scoped;
+  }
+
   let filePath: string;
   try {
     filePath = resolveProjectConfigPath(cwd, explicitPath);
