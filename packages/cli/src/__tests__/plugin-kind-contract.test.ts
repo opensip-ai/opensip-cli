@@ -31,10 +31,29 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { MARKER_KINDS } from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
 const SCOPE = '@opensip-tools';
+
+/**
+ * The valid `opensipTools.kind` markers, DERIVED (not compiled-in): the host
+ * `'tool'` marker PLUS every marker kind a workspace manifest declares in a
+ * marker-mode capability discovery descriptor (§5.3). The host no longer carries
+ * a closed domain-marker vocabulary — `MARKER_KINDS` is `['tool']` now.
+ */
+function deriveValidMarkerKinds(packageJsonPaths: readonly string[]): Set<string> {
+  const kinds = new Set<string>(['tool']);
+  for (const p of packageJsonPaths) {
+    const json = JSON.parse(readFileSync(p, 'utf8')) as {
+      opensipTools?: { capabilities?: { discovery?: { discovery?: { mode?: string; markerKind?: string } } }[] };
+    };
+    for (const cap of json.opensipTools?.capabilities ?? []) {
+      const mode = cap.discovery?.discovery;
+      if (mode?.mode === 'marker' && typeof mode.markerKind === 'string') kinds.add(mode.markerKind);
+    }
+  }
+  return kinds;
+}
 
 /** `graph-*` packages that intentionally are NOT graph adapters. */
 const NON_ADAPTER_GRAPH_PACKAGES = new Set<string>([
@@ -89,13 +108,13 @@ function collectPackageJsonPaths(dir: string, out: string[]): void {
   }
 }
 
+const REPO_ROOT = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
+const PACKAGE_JSON_PATHS: string[] = [];
+collectPackageJsonPaths(join(REPO_ROOT, 'packages'), PACKAGE_JSON_PATHS);
+
 function loadWorkspacePackages(): WorkspacePackage[] {
-  const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
-  const packagesDir = join(repoRoot, 'packages');
-  const paths: string[] = [];
-  collectPackageJsonPaths(packagesDir, paths);
   const pkgs: WorkspacePackage[] = [];
-  for (const p of paths) {
+  for (const p of PACKAGE_JSON_PATHS) {
     const json = JSON.parse(readFileSync(p, 'utf8')) as {
       name?: unknown;
       opensipTools?: { kind?: unknown };
@@ -105,13 +124,14 @@ function loadWorkspacePackages(): WorkspacePackage[] {
     pkgs.push({
       name: json.name,
       kind: typeof kind === 'string' ? kind : undefined,
-      relPath: p.slice(repoRoot.length + 1),
+      relPath: p.slice(REPO_ROOT.length + 1),
     });
   }
   return pkgs;
 }
 
 const PACKAGES = loadWorkspacePackages();
+const VALID_MARKER_KINDS = deriveValidMarkerKinds(PACKAGE_JSON_PATHS);
 
 describe('plugin-kind contract (workspace invariant)', () => {
   it('finds the workspace packages (sanity check on the walker)', () => {
@@ -121,13 +141,12 @@ describe('plugin-kind contract (workspace invariant)', () => {
     expect(PACKAGES.some((p) => p.name === `${SCOPE}/core`)).toBe(true);
   });
 
-  it('every declared kind is in the closed MARKER_KINDS vocabulary', () => {
-    const offenders = PACKAGES.filter(
-      (p) => p.kind !== undefined && !(MARKER_KINDS as readonly string[]).includes(p.kind),
-    );
+  it("every declared kind is 'tool' or a manifest-declared marker (descriptor-driven, not a host union)", () => {
+    const valid = [...VALID_MARKER_KINDS].sort();
+    const offenders = PACKAGES.filter((p) => p.kind !== undefined && !VALID_MARKER_KINDS.has(p.kind));
     expect(
       offenders,
-      `package(s) declare an unknown opensipTools.kind (typo? must be one of ${MARKER_KINDS.join(', ')}):\n` +
+      `package(s) declare an unknown opensipTools.kind (typo? must be one of ${valid.join(', ')}):\n` +
         offenders.map((p) => `  ${p.name} → "${p.kind}" (${p.relPath})`).join('\n'),
     ).toEqual([]);
   });

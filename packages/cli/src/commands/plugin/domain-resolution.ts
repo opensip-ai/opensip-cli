@@ -14,7 +14,7 @@
 import { execFileSync } from 'node:child_process';
 import { isAbsolute, join } from 'node:path';
 
-import { isMarkerKind, readMarkerKind, type MarkerKind, type PluginLayout } from '@opensip-tools/core';
+import { readDeclaredKind, type PluginLayout } from '@opensip-tools/core';
 
 import { extractNameFromSpec } from './host-dir.js';
 
@@ -69,12 +69,14 @@ export function resolveDomain(
  *    call; `plugin add` is already online for the install).
  *
  * Returns undefined when undetectable (offline, private registry, no
- * marker) — the caller then falls back to fit/sim domain inference.
+ * marker) — the caller then falls back to fit/sim domain inference. The raw
+ * declared kind is returned as a string (the only thing the caller checks is
+ * `=== 'tool'`); domain markers are no longer a compiled-in host union.
  */
-function detectPluginKind(spec: string, cwd: string): MarkerKind | undefined {
+function detectPluginKind(spec: string, cwd: string): string | undefined {
   if (spec.startsWith('/') || spec.startsWith('.') || spec.startsWith('file:')) {
     const raw = spec.startsWith('file:') ? spec.slice('file:'.length) : spec;
-    return readMarkerKind(isAbsolute(raw) ? raw : join(cwd, raw));
+    return readDeclaredKind(isAbsolute(raw) ? raw : join(cwd, raw));
   }
   try {
     const name = extractNameFromSpec(spec) ?? spec;
@@ -85,7 +87,7 @@ function detectPluginKind(spec: string, cwd: string): MarkerKind | undefined {
     })
       .toString()
       .trim();
-    return isMarkerKind(out) ? out : undefined;
+    return out === '' ? undefined : out;
   } catch {
     // @fitness-ignore-next-line error-handling-quality -- `npm view` failure (offline, private registry, or no such package) means the kind is undetectable; returning undefined routes the caller to fit/sim domain inference — the documented fallback, not a swallowed error.
     return undefined;

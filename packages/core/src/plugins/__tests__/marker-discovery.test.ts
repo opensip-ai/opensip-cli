@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { discoverPackagesByMarker, isMarkerKind } from '../marker-discovery.js';
+import { discoverPackagesByDeclaredKind, isMarkerKind } from '../marker-discovery.js';
 
 let testDir: string;
 
@@ -22,11 +22,11 @@ afterEach(() => {
 });
 
 describe('isMarkerKind', () => {
-  it.each(['tool', 'fit-pack', 'sim-pack'])('narrows %s', (kind) => {
-    expect(isMarkerKind(kind)).toBe(true);
+  it('narrows the host marker tool', () => {
+    expect(isMarkerKind('tool')).toBe(true);
   });
 
-  it.each(['', 'graph-pack', 'TOOL', 'check-pack', 'tools'])('rejects %s', (kind) => {
+  it.each(['', 'fit-pack', 'sim-pack', 'graph-adapter', 'graph-pack', 'TOOL', 'check-pack', 'tools'])('rejects %s', (kind) => {
     expect(isMarkerKind(kind)).toBe(false);
   });
 
@@ -38,9 +38,9 @@ describe('isMarkerKind', () => {
   });
 });
 
-describe('discoverPackagesByMarker', () => {
+describe('discoverPackagesByDeclaredKind', () => {
   it('returns an empty list when node_modules is missing', () => {
-    expect(discoverPackagesByMarker({ projectDir: testDir, kind: 'fit-pack' })).toEqual([]);
+    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
   });
 
   it('finds a fit-pack package under an unscoped name', () => {
@@ -48,7 +48,7 @@ describe('discoverPackagesByMarker', () => {
       name: 'acme-fit',
       opensipTools: { kind: 'fit-pack' },
     });
-    const out = discoverPackagesByMarker({ projectDir: testDir, kind: 'fit-pack' });
+    const out = discoverPackagesByDeclaredKind(testDir, 'fit-pack');
     expect(out.map((p) => p.name)).toEqual(['acme-fit']);
     expect(out[0]?.kind).toBe('fit-pack');
   });
@@ -58,7 +58,7 @@ describe('discoverPackagesByMarker', () => {
       name: '@acme/fit',
       opensipTools: { kind: 'fit-pack' },
     });
-    const out = discoverPackagesByMarker({ projectDir: testDir, kind: 'fit-pack' });
+    const out = discoverPackagesByDeclaredKind(testDir, 'fit-pack');
     expect(out.map((p) => p.name)).toEqual(['@acme/fit']);
   });
 
@@ -71,7 +71,7 @@ describe('discoverPackagesByMarker', () => {
       name: '@acme/fit',
       opensipTools: { kind: 'fit-pack' },
     });
-    const out = discoverPackagesByMarker({ projectDir: testDir, kind: 'sim-pack' });
+    const out = discoverPackagesByDeclaredKind(testDir, 'sim-pack');
     expect(out.map((p) => p.name)).toEqual(['@acme/sim']);
   });
 
@@ -80,12 +80,12 @@ describe('discoverPackagesByMarker', () => {
       name: '@opensip-tools/fitness',
       opensipTools: { kind: 'tool' },
     });
-    expect(discoverPackagesByMarker({ projectDir: testDir, kind: 'fit-pack' })).toEqual([]);
+    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
   });
 
   it('skips packages with no opensipTools field', () => {
     writePkg(join(testDir, 'node_modules', 'random-pkg'), { name: 'random-pkg' });
-    expect(discoverPackagesByMarker({ projectDir: testDir, kind: 'fit-pack' })).toEqual([]);
+    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
   });
 
   it('skips packages declaring an unknown kind', () => {
@@ -93,7 +93,7 @@ describe('discoverPackagesByMarker', () => {
       name: '@acme/graph',
       opensipTools: { kind: 'graph-pack' },
     });
-    expect(discoverPackagesByMarker({ projectDir: testDir, kind: 'fit-pack' })).toEqual([]);
+    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
   });
 
   it('skips dot-prefixed entries (.bin, .pnpm, etc.)', () => {
@@ -101,14 +101,14 @@ describe('discoverPackagesByMarker', () => {
       name: 'fake-pack',
       opensipTools: { kind: 'fit-pack' },
     });
-    expect(discoverPackagesByMarker({ projectDir: testDir, kind: 'fit-pack' })).toEqual([]);
+    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
   });
 
   it('treats malformed package.json as non-pack (no crash)', () => {
     const dir = join(testDir, 'node_modules', 'broken');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'package.json'), '{not-json');
-    expect(discoverPackagesByMarker({ projectDir: testDir, kind: 'fit-pack' })).toEqual([]);
+    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
   });
 
   it('walks ancestor node_modules and dedupes by package name (nearest wins)', () => {
@@ -124,7 +124,7 @@ describe('discoverPackagesByMarker', () => {
       opensipTools: { kind: 'fit-pack' },
     });
 
-    const out = discoverPackagesByMarker({ projectDir: nested, kind: 'fit-pack' });
+    const out = discoverPackagesByDeclaredKind(nested, 'fit-pack');
     expect(out).toHaveLength(1);
     expect(out[0]?.packageDir).toBe(join(nested, 'node_modules', '@acme', 'fit'));
   });
@@ -138,8 +138,8 @@ describe('discoverPackagesByMarker', () => {
       name: '@acme/sim',
       opensipTools: { kind: 'sim-pack' },
     });
-    const fitPacks = discoverPackagesByMarker({ projectDir: testDir, kind: 'fit-pack' });
-    const simPacks = discoverPackagesByMarker({ projectDir: testDir, kind: 'sim-pack' });
+    const fitPacks = discoverPackagesByDeclaredKind(testDir, 'fit-pack');
+    const simPacks = discoverPackagesByDeclaredKind(testDir, 'sim-pack');
     expect(fitPacks.every((p) => p.kind === 'fit-pack')).toBe(true);
     expect(simPacks.every((p) => p.kind === 'sim-pack')).toBe(true);
   });

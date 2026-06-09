@@ -7,23 +7,18 @@
  * occurrence walking outward wins, matching Node's nearest-ancestor
  * module resolution).
  *
- * Four marker kinds are recognised today: `'tool'`, `'fit-pack'`,
- * `'sim-pack'`, and `'graph-adapter'`. New kinds get added to `MarkerKind`
- * explicitly — keeping the union closed lets the type system catch typos at
- * call sites, and makes `MARKER_KINDS` the single source of truth for the
- * plugin-kind vocabulary (the workspace-invariant test asserts every
- * package.json marker against it).
+ * `MarkerKind` is the closed union of HOST marker kinds — just `'tool'` now
+ * (whole-subcommand Tool plugins, a host concern). The former DOMAIN markers
+ * (`'fit-pack'`, `'sim-pack'`, `'graph-adapter'`) were RETIRED from this union
+ * once discovery became descriptor-driven (§5.3): a tool's manifest declares its
+ * own marker kind, the generic substrate discovers it via the string-typed
+ * {@link discoverPackagesByDeclaredKind}, and nothing in the host compiles in the
+ * domain vocabulary. Use {@link readDeclaredKind} for any kind that is not the
+ * host `'tool'` marker.
  *
- * Why a marker rather than a name pattern: a name-prefix rule (e.g.
- * anything matching `@opensip-tools/*`) breaks down once organisations
- * publish their own scoped packs (`@my-company/checks-acme`). Marker-
- * based discovery decouples publication scope from plugin shape, so
- * customers can ship under any scope they own.
- *
- * Tool plugins, fit packs, and sim packs all share this walker. The
- * domain-typed wrappers (`tool-package-discovery.ts`,
- * fitness `cli/fit.ts`, simulation `cli/sim.ts`) call this with their
- * respective kinds and adapt the return type.
+ * Why a marker rather than a name pattern (for `'tool'`): a name-prefix rule
+ * breaks down once organisations publish their own scoped tool packages. The
+ * marker decouples publication scope from plugin shape.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -34,11 +29,14 @@ import { logger } from '../lib/logger.js';
 import { safeReaddir } from './node-modules-walk.js';
 
 /**
- * The closed vocabulary of `opensipTools.kind` markers. Exported as the
- * single source of truth: discovery wrappers narrow to it, and the
- * workspace-invariant test validates every package.json marker against it.
+ * The closed vocabulary of HOST `opensipTools.kind` markers — `'tool'` only.
+ * Domain markers (fit-pack/sim-pack/graph-adapter) are NOT here anymore: they are
+ * declared per-tool in manifests and discovered via {@link discoverPackagesByDeclaredKind}
+ * (§5.3). The workspace-invariant test validates a package.json marker against
+ * `'tool'` PLUS the marker kinds the bundled manifests declare — descriptor-driven,
+ * not a compiled-in domain list.
  */
-export const MARKER_KINDS = ['tool', 'fit-pack', 'sim-pack', 'graph-adapter'] as const;
+export const MARKER_KINDS = ['tool'] as const;
 
 export type MarkerKind = (typeof MARKER_KINDS)[number];
 
