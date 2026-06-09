@@ -10,13 +10,44 @@
 
 > **opensip-tools is part of [OpenSIP](https://opensip.ai)** — our developer-productivity platform. Visit **[opensip.ai](https://opensip.ai)** for the full picture.
 
-Open-source codebase analysis toolkit. Run fitness checks against TypeScript, Rust, Python, Java, Go, or C/C++ codebases standalone, in CI, or as a regression detector around AI-agent coding sessions.
+> **One CLI to measure, map, and gate the health of any codebase.**
 
-opensip-tools is a **collection of tools**, not a single tool. Today it ships
-with three: `fit` (fitness checks), `graph` (static call-graph analysis), and
-`sim` (simulation scenarios, experimental). Adding a new tool is a plugin
-operation — install a package that implements the
-[Tool contract](#tool-plugin-architecture) and the CLI picks it up automatically.
+Run ~145 fitness checks across **TypeScript, Python, Go, Java, Rust, and C/C++**,
+build a static call graph of your whole repo, and wire both into CI so quality
+only goes up — from a single tool, on your laptop or in your pipeline.
+
+opensip-tools is a **collection of tools, not a single tool**. Today it ships
+with three — `fit` (fitness checks), `graph` (static call-graph analysis), and
+`sim` (simulation scenarios, experimental) — and adding a new one is a plugin
+operation: install a package that implements the
+[Tool contract](#tool-plugin-architecture) and the CLI picks it up
+automatically, so the CLI grows without ever being rewritten.
+
+### Why teams use it
+
+- **🌐 Polyglot quality in one command.** `opensip-tools fit` grades a
+  mixed-language monorepo with one unified report — no per-language linter zoo to
+  assemble and maintain.
+
+- **📈 Adopt on a legacy repo without the wall of red.** Native **GitHub Code
+  Scanning** integration with a net-new ratchet: your existing backlog goes into
+  a baseline, and only *brand-new* violations surface inline on PR diffs.
+
+- **🕸️ See your call graph and blast radius.** `opensip-tools graph` maps
+  function-level dependencies across five languages and flags what bites you in
+  review — oversized functions, untested high-blast-radius code, cycles, and
+  cross-package copy-paste — with an interactive visual dashboard.
+
+- **📄 One shareable HTML report.** `opensip-tools dashboard` emits a
+  self-contained, server-free report aggregating every tool's findings. Attach it
+  to a PR or hand it to a teammate — no SaaS login required.
+
+- **🧩 Make it your quality bar.** Write a custom check in a few lines with
+  `defineCheck()`, bundle checks into named recipes, or ship a whole new tool as a
+  plugin — your extensions are first-class, not bolted on.
+
+**In ten seconds:** measure your code, map it, and gate it — in any language,
+from one CLI.
 
 ## Upgrading from v1.x to v2.x
 
@@ -797,10 +828,10 @@ packages/
 ### Tool plugin architecture
 
 The CLI is a generic dispatcher. Each invocation constructs a fresh
-`ToolRegistry`, registers the first-party tools (fitness, graph, simulation)
-into it, and walks it asking each registered Tool to mount its own
-subcommands. Third-party tools are discovered automatically when their
-`package.json` declares:
+`ToolRegistry` and loads every tool — bundled and installed alike —
+through the same dynamic-import plugin path; there is no privileged
+first-party fast path. Third-party tools are discovered automatically when
+their `package.json` declares:
 
 ```json
 {
@@ -809,12 +840,16 @@ subcommands. Third-party tools are discovered automatically when their
 ```
 
 The `Tool` contract (`@opensip-tools/core/tools`) carries the tool's
-metadata, command descriptors (for `--help` listings), and a `register(cli)`
-method that mounts Commander commands. Tools call back into shared CLI
-infrastructure (Ink rendering, dashboard auto-open, structured logging) via
-the `ToolCliContext` they receive — they never depend on the CLI package
-directly. This keeps the dependency graph acyclic and lets a third-party
-tool ship without touching CLI source.
+metadata, command descriptors (for `--help` listings), and a declarative
+`commandSpecs` array — the tool's only command surface. The host's
+`mountCommandSpec` owns the Commander wiring and the
+parse→handler→error→exit pipeline; tools never touch Commander and never
+depend on the CLI package directly. They reach shared CLI infrastructure
+(Ink rendering, dashboard auto-open, structured logging) through the
+`ToolCliContext` they receive. This keeps the dependency graph acyclic and
+lets a third-party tool ship without touching CLI source. (`apiVersion` is
+mandatory as of the v3.0.0 GA cutover; the legacy `register(cli)` mount hook
+was removed.)
 
 To author a new tool, see the source of `packages/fitness/engine/src/tool.ts`
 or `packages/simulation/engine/src/tool.ts`. The shape is small enough to
