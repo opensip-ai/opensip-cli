@@ -52,7 +52,7 @@ OpenSIP Cloud is a separate product (at [opensip.ai](https://opensip.ai)) that a
 
 ### Can I write checks in TypeScript instead of `.mjs`?
 
-**Yes.** When a check pack outgrows a handful of `.mjs` files, you can promote `opensip-tools/fit/` to a workspace npm package: add a `package.json` declaring `opensipTools.kind: "fit-pack"`, switch the files to TypeScript, add `opensip-tools/*` to your workspace globs, run `pnpm install`. Marker-based discovery picks it up on the next run.
+**Yes.** When a check pack outgrows a handful of `.mjs` files, you can promote `opensip-tools/fit/` to a workspace npm package: add a `package.json` declaring `opensipTools.kind: "fit-pack"`, switch the files to TypeScript, add `opensip-tools/*` to your workspace globs, run `pnpm i`. Marker-based discovery picks it up on the next run.
 
 The graduation path is documented in [plugin authoring](../50-extend/01-plugin-authoring.md). The `.mjs` shape is faster for first-touch; the workspace-package shape is better once coverage grows.
 

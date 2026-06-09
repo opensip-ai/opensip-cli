@@ -94,7 +94,7 @@ The CLI doesn't know what any of these three do internally — they're tools reg
 ## Time to first signal: ~3 minutes
 
 ```bash
-npm install -g opensip-tools
+curl -fsSL https://opensip.ai/cli/install.sh | bash
 cd your-project
 opensip-tools init
 opensip-tools fit --recipe example

@@ -201,7 +201,7 @@ The icon is shown in the results table; the display name is the dashboard label.
 The chain:
 
 1. The user runs `opensip-tools plugin add @my-co/checks-internal`.
-2. The CLI's `plugin add` command runs `npm install` into `<project>/opensip-tools/.runtime/plugins/fit/` and appends `@my-co/checks-internal` to `plugins.fit:` in `opensip-tools.config.yml`.
+2. The CLI's `plugin add` command installs the package into `<project>/opensip-tools/.runtime/plugins/fit/` and appends `@my-co/checks-internal` to `plugins.fit:` in `opensip-tools.config.yml`.
 3. On the next `opensip-tools fit` run, the fitness Tool's `ensureChecksLoaded()` calls into the discoverer.
 4. The discoverer reads `plugins.fit:`, walks `.runtime/plugins/fit/node_modules/`, finds `@my-co/checks-internal/`, and dynamically imports its main entry.
 5. The pack's `checks` export is registered into the per-run check registry (each check carrying its folded-on display); its optional `recipes` export is co-routed to the recipe domain.

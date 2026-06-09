@@ -12,15 +12,13 @@ Part of [**opensip-tools**](https://github.com/opensip-ai/opensip-tools) — an 
 
 ## Install
 
-```bash
-npm install @opensip-tools/datastore
-```
-
-Most users just install the CLI, which bundles the first-party tools:
+Most users install the CLI, which bundles the first-party tools:
 
 ```bash
-npm install -g opensip-tools
+curl -fsSL https://opensip.ai/cli/install.sh | bash
 ```
+
+This package is published for the CLI and advanced plugin authors; most users should not install `@opensip-tools/datastore` directly.
 
 ## Documentation
 

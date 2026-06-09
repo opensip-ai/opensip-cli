@@ -72,9 +72,6 @@ Four commands from zero to a passing fitness run:
 # 1. Install the CLI globally
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 
-# Alternative: install directly from npm
-# npm install -g opensip-tools
-
 # 2. Change into your project's repo
 cd your-project
 
@@ -90,12 +87,11 @@ Both example commands should pass. From there, edit (or delete) the example
 files under `opensip-tools/{fit,sim}/`, write your own checks and scenarios,
 and run `opensip-tools fit` (no recipe flag) to use the default recipe.
 
-**No global install?** `npx opensip-tools fit` works for one-offs.
 **Install from source?**
 
 ```bash
 git clone https://github.com/opensip-ai/opensip-tools.git
-cd opensip-tools && pnpm install && pnpm build
+cd opensip-tools && pnpm i && pnpm build
 node packages/cli/dist/index.js fit
 ```
 
@@ -548,7 +544,7 @@ export const recipes = [{
 
 Any installed npm package declaring `opensipTools.kind: "fit-pack"` is
 auto-discovered by the CLI — no `plugin install` step needed. Run
-`pnpm add @my-org/fitness-checks` (or `npm install`) in your project and the
+Add `@my-org/fitness-checks` to your project dependencies and the
 CLI loads it on the next `fit` run.
 
 For packages that do not declare the marker yet, list them by exact name in
@@ -592,11 +588,10 @@ export const checks = [
 ];
 ```
 
-`@opensip-tools/fitness` resolves from the global install (when the CLI
-is installed via `npm install -g`) or from your project's
+`@opensip-tools/fitness` resolves from the global CLI install or from your project's
 `node_modules` (when installed as a local devDependency). For pure
-single-file plugins with no other npm setup, install the CLI globally
-— that's the supported path.
+single-file plugins with no other package setup, install the CLI globally
+with the curl installer — that's the supported path.
 
 ### Recipes
 
@@ -626,10 +621,10 @@ the same way under `opensip-tools/sim/recipes/` and run via
 
 ```yaml
 - name: Run fitness checks
-  run: npx opensip-tools fit --json > fitness-report.json
+  run: opensip-tools fit --json > fitness-report.json
 
 - name: Upload to OpenSIP
-  run: npx opensip-tools fit --report-to ${{ secrets.OPENSIP_URL }} --api-key ${{ secrets.OPENSIP_KEY }}
+  run: opensip-tools fit --report-to ${{ secrets.OPENSIP_URL }} --api-key ${{ secrets.OPENSIP_KEY }}
 ```
 
 ### JSON Output
@@ -734,9 +729,6 @@ opensip-tools sessions purge --yes           # Skip confirmation
 ```bash
 # Update to the latest release
 curl -fsSL https://opensip.ai/cli/install.sh | bash
-
-# Alternative: update directly from npm
-npm install -g opensip-tools@latest        # or: pnpm add -g opensip-tools@latest
 
 # Check the installed version
 opensip-tools --version

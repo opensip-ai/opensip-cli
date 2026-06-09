@@ -178,7 +178,11 @@ Specifically, it does **not** need:
 - Root or admin privileges.
 - A specific shell — argv-only invocation; the binary works under bash, zsh, fish, PowerShell, and CI runners equally.
 
-The binary is published to npm at `opensip-tools` and installs globally with `npm install -g opensip-tools`. For one-offs, `npx opensip-tools fit` works without any install.
+The binary is published as `opensip-tools` and installs globally with the curl installer:
+
+```bash
+curl -fsSL https://opensip.ai/cli/install.sh | bash
+```
 
 ---
 

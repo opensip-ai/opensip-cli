@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npm install -g opensip-tools
+      - run: curl -fsSL https://opensip.ai/cli/install.sh | bash
       - run: opensip-tools fit
 ```
 
@@ -94,7 +94,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npm install -g opensip-tools
+      - run: curl -fsSL https://opensip.ai/cli/install.sh | bash
 
       # Restore the baseline store produced by the last main-branch build.
       - uses: actions/download-artifact@v4

@@ -26,7 +26,7 @@ layers:
    with npm trusted publishing/provenance.
 2. **The customer's package manager.** npm, pnpm, and Bun can still execute
    dependency lifecycle scripts during install unless the customer disables or
-   allowlists them. That means a normal `npm install -g opensip-tools` is safer
+   allowlists them. That means the curl installer is safer
    after these gates, but it is not a zero-risk operation.
 
 The project intentionally does not rely on a custom chained-checksum system.
@@ -49,8 +49,8 @@ standard controls explicit and fail closed.
   `allowBuilds`, `minimumReleaseAge`, `minimumReleaseAgeStrict`,
   `minimumReleaseAgeIgnoreMissingTime`, `trustPolicy: no-downgrade`,
   `trustLockfile: false`, and `blockExoticSubdeps: true`.
-- GitHub workflows use mutable dependency installs such as `npm install`,
-  `pnpm install` without `--frozen-lockfile`, or `bun install` without
+- GitHub workflows use mutable dependency install commands without lockfile
+  enforcement, such as pnpm without `--frozen-lockfile` or Bun without
   `--frozen-lockfile`.
 - An npm publish workflow lacks `id-token: write`, omits `--provenance`, or
   references long-lived npm publish tokens.
@@ -74,8 +74,8 @@ OpenSIP's release gate protects customers from OpenSIP package-level install
 hooks and from releases published with long-lived npm tokens. The remaining
 risk is mostly outside the OpenSIP tarballs:
 
-- The installer script is source-controlled at `scripts/install.sh` and runs
-  `npm install -g opensip-tools` with quieter customer-facing output.
+- The installer script is source-controlled at `scripts/install.sh` and presents
+  quieter customer-facing output.
 - npm may run lifecycle scripts from third-party dependencies during install.
 - A freshly compromised dependency version could be pulled if the customer asks
   for `latest` before the ecosystem has had time to take it down.
@@ -86,7 +86,7 @@ For highly sensitive environments, prefer a pinned version and install through
 an internal mirror or vetted cache:
 
 ```bash
-npm install -g opensip-tools@2.8.0
+curl -fsSL https://opensip.ai/cli/install.sh | OPENSIP_TOOLS_VERSION=2.8.0 bash
 ```
 
 Customers who globally disable npm lifecycle scripts should test the CLI in

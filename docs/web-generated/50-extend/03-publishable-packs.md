@@ -187,7 +187,7 @@ Add the pack as a root devDependency so the workspace symlink lands in `node_mod
 }
 ```
 
-Then `pnpm install`. Marker-based discovery picks up the workspace symlink on the next `opensip-tools fit` run.
+Then `pnpm i`. Marker-based discovery picks up the workspace symlink on the next `opensip-tools fit` run.
 
 For a TS-based pack you also need to build (`pnpm -F @your-scope/fit build`) so the `main` field resolves to real JS. The runtime doesn't currently load TypeScript directly; it loads the entry point your `package.json#main` points at.
 

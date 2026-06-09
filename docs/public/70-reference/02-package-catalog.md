@@ -120,10 +120,10 @@ Imports every layer below. The published binary.
 
 > **Folder name vs. package name.** The directory is `packages/cli/`, but the
 > published npm package is the **unscoped `opensip-tools`** — the single package
-> end-users install (`npm i -g opensip-tools`). It is the *only* unscoped
+> end-users install with `curl -fsSL https://opensip.ai/cli/install.sh | bash`. It is the *only* unscoped
 > package; every other package is `@opensip-tools/*`. It was renamed from
 > `@opensip-tools/cli` to `opensip-tools` in v2.4.0 so the install command is
-> just `opensip-tools@latest`; the directory deliberately kept its historical
+> just the `opensip-tools` binary; the directory deliberately kept its historical
 > `cli` name to avoid churning every import path, workspace glob, and
 > dependency-cruiser rule for a cosmetic rename. The old `@opensip-tools/cli`
 > name is frozen at `2.3.3` and deprecated on npm with a migration message — see

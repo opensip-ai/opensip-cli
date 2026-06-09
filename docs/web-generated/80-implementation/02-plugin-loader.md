@@ -210,10 +210,10 @@ opensip-tools plugin sync                        # install everything declared i
 
 Two operations in one command:
 
-1. `npm install <pkg>` into `<project>/opensip-tools/.runtime/plugins/<domain>/`. The runtime dir's `package.json` is the install host — its `dependencies` block tracks installed plugins.
+1. Install `<pkg>` into `<project>/opensip-tools/.runtime/plugins/<domain>/`. The runtime dir's `package.json` is the install host — its `dependencies` block tracks installed plugins.
 2. Append `<pkg>` to `plugins.<domain>:` in `opensip-tools.config.yml`. Idempotent — adding the same name twice is a no-op.
 
-The domain is inferred from the package name (`inferDomain` matches `/\bsim\b/` → `sim`, else `fit`) unless `--domain` is passed explicitly. Only `fit` and `sim` are accepted as `--domain` values; anything else is rejected so a caller can't drive path construction outside `opensip-tools/.runtime/`. The shell call to npm is wrapped in `execFileSync` (no shell, no metacharacter expansion) and the package spec is validated to refuse anything starting with `-` — npm would consume that as a flag, which would be an injection vector.
+The domain is inferred from the package name (`inferDomain` matches `/\bsim\b/` → `sim`, else `fit`) unless `--domain` is passed explicitly. Only `fit` and `sim` are accepted as `--domain` values; anything else is rejected so a caller can't drive path construction outside `opensip-tools/.runtime/`. The package-manager call is wrapped in `execFileSync` (no shell, no metacharacter expansion) and the package spec is validated to refuse anything starting with `-` so package-manager flags cannot become an injection vector.
 
 ### `plugin remove <pkg>`
 
@@ -229,7 +229,7 @@ Walks `.runtime/plugins/<domain>/node_modules/` and intersects with the config's
 
 ### `plugin sync`
 
-Reads `plugins.<domain>:` from the config and runs `npm install` for each entry. The bootstrap-after-clone command. CI should run `plugin sync` between checkout and `fit` so PR builds have the same plugin set the author tested against.
+Reads `plugins.<domain>:` from the config and installs each entry. The bootstrap-after-clone command. CI should run `plugin sync` between checkout and `fit` so PR builds have the same plugin set the author tested against.
 
 `plugin sync` is also the right command after switching branches if the new branch added or removed plugins. The runtime dir is gitignored, so plugin state doesn't follow a branch checkout — `sync` is what makes the runtime match the config.
 
@@ -267,7 +267,7 @@ CI's pipeline:
 ```bash
 git clone …
 cd acme-api
-npm install -g opensip-tools@2
+curl -fsSL https://opensip.ai/cli/install.sh | bash
 opensip-tools plugin sync           # bootstrap project-pinned plugins
 opensip-tools fit --gate-compare    # the actual gate
 ```

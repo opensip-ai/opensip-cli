@@ -70,8 +70,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npm ci
-      - run: npm run lint         # ESLint — syntactic, in-file rules
+      - run: pnpm i --frozen-lockfile
+      - run: pnpm lint            # ESLint — syntactic, in-file rules
 
   fit:
     runs-on: ubuntu-latest
@@ -79,7 +79,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npm install -g opensip-tools
+      - run: curl -fsSL https://opensip.ai/cli/install.sh | bash
       - run: opensip-tools fit --gate-compare
       - run: opensip-tools fit-baseline-export --out fit.sarif
         if: always()

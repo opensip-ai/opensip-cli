@@ -100,13 +100,12 @@ function renderReadme(pkg, releaseRef) {
     `toolkit: fitness checks (\`fit\`), static call-graph analysis (\`graph\`), and ` +
     `simulation (\`sim\`).\n\n` +
     `## Install\n\n` +
+    'Most users install the CLI, which bundles the first-party tools:\n\n' +
     '```bash\n' +
-    `npm install ${name}\n` +
+    'curl -fsSL https://opensip.ai/cli/install.sh | bash\n' +
     '```\n\n' +
-    'Most users just install the CLI, which bundles the first-party tools:\n\n' +
-    '```bash\n' +
-    'npm install -g opensip-tools\n' +
-    '```\n\n' +
+    `This package is published for the CLI and advanced plugin authors; most ` +
+    `users should not install \`${name}\` directly.\n\n` +
     `## Documentation\n\n` +
     `- 📚 Project docs: ${DOCS_SITE_URL}\n` +
     `- 🧭 Package catalog (what every package does): ${catalogUrl}\n` +

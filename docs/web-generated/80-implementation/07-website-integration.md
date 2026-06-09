@@ -336,7 +336,7 @@ Dependencies to add: `react-markdown`, `remark-gfm`.
 For markdown body styling, the easiest path with Tailwind is `@tailwindcss/typography`:
 
 ```bash
-npm install -D @tailwindcss/typography
+Add `@tailwindcss/typography` as a dev dependency.
 ```
 
 In `tailwind.config.js`:

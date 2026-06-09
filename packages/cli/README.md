@@ -5,7 +5,7 @@ The `opensip-tools` command — codebase analysis from the command line.
 ## Install
 
 ```bash
-npm install -g opensip-tools
+curl -fsSL https://opensip.ai/cli/install.sh | bash
 ```
 
 ## Quick start

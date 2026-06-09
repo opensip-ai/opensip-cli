@@ -154,7 +154,7 @@ packages:
 }
 ```
 
-Then `pnpm install`. The workspace symlinks `@your-scope/fit` into `node_modules/`. opensip-tools's marker-based discovery finds it via the `opensipTools.kind` field and loads it on the next `fit` run.
+Then `pnpm i`. The workspace symlinks `@your-scope/fit` into `node_modules/`. opensip-tools's marker-based discovery finds it via the `opensipTools.kind` field and loads it on the next `fit` run.
 
 The `kind` marker is what makes discovery work — your pack can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`). The kind tells opensip-tools "this is a fit-pack"; the rest is your naming. Same shape for sim packs with `"kind": "sim-pack"`.
 

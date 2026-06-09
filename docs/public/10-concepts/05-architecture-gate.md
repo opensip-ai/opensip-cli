@@ -199,7 +199,7 @@ jobs:
   baseline:
     steps:
       - uses: actions/checkout@v4
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm i --frozen-lockfile
       - run: opensip-tools fit --gate-save
       - uses: actions/upload-artifact@v4
         with:
@@ -218,7 +218,7 @@ jobs:
           workflow: main.yml
           name: fit-baseline
           path: opensip-tools/.runtime/
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm i --frozen-lockfile
       - run: opensip-tools fit --gate-compare
 ```
 

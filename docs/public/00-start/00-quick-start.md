@@ -50,7 +50,7 @@ For the full per-language breakdown, see [`../70-reference/02-package-catalog.md
 
 - **Node.js 22+** — `node --version` should print `v22.x` or higher.
 - A project directory you don't mind a scaffold landing in.
-- *(Optional)* `pnpm` if you're installing from source. `npm` is fine for global install.
+- *(Optional)* `pnpm` if you're building from source. The curl installer handles global CLI setup.
 
 If you don't have a project handy, `git clone https://github.com/opensip-ai/opensip-tools.git` and run these commands inside the clone — opensip-tools fits checks against its own codebase as the smoke test.
 
@@ -61,9 +61,6 @@ If you don't have a project handy, `git clone https://github.com/opensip-ai/open
 ```bash
 # 1. Install the CLI globally
 curl -fsSL https://opensip.ai/cli/install.sh | bash
-
-# Alternative: install directly from npm
-# npm install -g opensip-tools
 
 # 2. Enter your project
 cd your-project
@@ -121,12 +118,9 @@ For a polyglot project (e.g. Rust + TypeScript), `init` writes one example check
 ## Variations
 
 ```bash
-# No global install — one-off via npx
-npx opensip-tools fit
-
 # Install from source (for contributors)
 git clone https://github.com/opensip-ai/opensip-tools.git
-cd opensip-tools && pnpm install && pnpm build
+cd opensip-tools && pnpm i && pnpm build
 node packages/cli/dist/index.js fit
 
 # Run the default recipe (every enabled check, not just the example)
@@ -154,7 +148,7 @@ The full command tree is at [`../70-reference/01-cli-commands.md`](../70-referen
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Behavior doesn't match what these docs describe | Older CLI version than the docs you're reading | Check installed version: `opensip-tools --version` (or `-V`). Latest is on [npm](https://www.npmjs.com/package/opensip-tools). Update with `curl -fsSL https://opensip.ai/cli/install.sh \| bash`. |
-| `command not found: opensip-tools` | Global install isn't on `$PATH` | `npm config get prefix` — make sure that path's `bin/` is on `$PATH`, or use `npx opensip-tools` instead |
+| `command not found: opensip-tools` | The shell has not picked up the global command yet | Open a new shell and try again; if it still fails, rerun `curl -fsSL https://opensip.ai/cli/install.sh \| bash` |
 | `init` says it detected no language | No supported language marker found (no `package.json`, `Cargo.toml`, etc.) | Pass `--language <name>` explicitly: `opensip-tools init --language typescript` |
 | `fit --recipe example` says "0 checks ran" | Targets in `opensip-tools.config.yml` don't match any files | Open the config; widen `targets.<your-language>-source.include` to cover where your code actually lives |
 | Errors from `Node.js engine` | Node version is below 22 | Upgrade Node — opensip-tools uses ES2022 + Node16 module resolution |
