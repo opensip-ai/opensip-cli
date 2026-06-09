@@ -301,6 +301,7 @@ export type { RetryOptions } from './lib/retry.js';
 // `deriveRecipeId` (one `<prefix>_<name>` scheme across domains).
 export {
   scheduleUnits,
+  yieldToEventLoop,
   runWithTimeout,
   runWithRetry,
   executePipeline,

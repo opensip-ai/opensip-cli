@@ -75,6 +75,10 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
     units: checks,
     mode: 'parallel',
     maxParallel,
+    // Interim live-view smoothing (ADR-0028): a macrotask boundary between checks
+    // lets the in-process live spinner + 80ms clock paint. Superseded for the
+    // live run by off-main-thread execution; harmless on the --json path.
+    yieldBetweenUnits: true,
     shouldAbort: () => abortController?.signal.aborted === true,
     runUnit: async (check, index) => {
       const outcome = await runOneCheck(check, {

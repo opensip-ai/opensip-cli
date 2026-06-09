@@ -36,6 +36,8 @@ export async function executeSequential(ctx: ExecutionServiceContext, opts: Exec
   await scheduleUnits<Check>({
     units: checks,
     mode: 'sequential',
+    // Interim live-view smoothing (ADR-0028) — see parallel-execution.ts.
+    yieldBetweenUnits: true,
     shouldAbort: () => abortController?.signal.aborted === true,
     runUnit: async (check, index) => {
       const outcome = await runOneCheck(check, {

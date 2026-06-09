@@ -264,6 +264,9 @@ async function runScenarios(
     units: scenarios,
     mode: recipe.execution.mode,
     maxParallel: effectiveMaxParallel(recipe, scenarios.length),
+    // Interim live-view smoothing (ADR-0028) — paint between scenarios on the
+    // in-process path; superseded for the live run by off-main-thread execution.
+    yieldBetweenUnits: true,
     shouldAbort: () => abortSignal?.aborted === true,
     runUnit: async (scenario, index) => {
       const result = await runScenarioUnit(scenario, timeoutMs, abortSignal);
