@@ -96,7 +96,6 @@ function makeArgs(cwd: string): FitOptions {
     list: false,
     recipes: false,
     verbose: false,
-    findings: false,
     debug: false,
     quiet: true,
     open: false,

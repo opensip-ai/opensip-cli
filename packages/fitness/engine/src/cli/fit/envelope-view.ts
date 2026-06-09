@@ -90,15 +90,15 @@ export function fitValidatedCell(row: FitTableRow): string {
 
 /**
  * Build the run's verbose detail body (ADR-0021) — `undefined` unless the run
- * asked for it (`--verbose` or the deprecated `--findings`). Delegates the
- * Signal[] → `FindingGroup[]` mapping to the shared contracts
- * `buildFindingGroups` (one source for fit + sim), passing fit's display
- * registry so each block is titled with the check's pretty name.
+ * asked for it (`--verbose`). Delegates the Signal[] → `FindingGroup[]` mapping
+ * to the shared contracts `buildFindingGroups` (one source for fit + sim),
+ * passing fit's display registry so each block is titled with the check's
+ * pretty name.
  */
 export function buildFitVerboseDetail(
   envelope: SignalEnvelope,
-  opts: { readonly verbose?: boolean; readonly findings?: boolean },
+  opts: { readonly verbose?: boolean },
 ): VerboseDetail | undefined {
-  if (opts.verbose !== true && opts.findings !== true) return undefined;
+  if (opts.verbose !== true) return undefined;
   return { kind: 'findings', groups: buildFindingGroups(envelope.units, envelope.signals, getDisplayName) };
 }

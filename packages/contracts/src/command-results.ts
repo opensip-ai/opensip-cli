@@ -134,8 +134,8 @@ export interface FitDoneResult {
   /** Whether an opensip-tools.config.yml was found in the target directory */
   configFound?: boolean;
   /**
-   * Verbose detail body (ADR-0021), present only on `--verbose`/`--findings`
-   * runs. Rendered by the shared `resultToView` seam so the detail is identical
+   * Verbose detail body (ADR-0021), present only on `--verbose` runs.
+   * Rendered by the shared `resultToView` seam so the detail is identical
    * in a TTY and a pipe. Fit populates the `findings` kind.
    */
   readonly verboseDetail?: VerboseDetail;

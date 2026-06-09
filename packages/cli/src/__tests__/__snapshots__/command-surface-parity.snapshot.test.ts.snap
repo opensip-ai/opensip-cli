@@ -274,16 +274,6 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "(deprecated: use --verbose) Show all findings grouped by check after the run",
-          "flags": "--findings",
-          "negate": false,
-          "optional": false,
-          "required": false,
-          "variadic": false,
-        },
-        {
-          "choices": undefined,
-          "defaultValue": false,
           "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
           "flags": "--gate-compare",
           "negate": false,

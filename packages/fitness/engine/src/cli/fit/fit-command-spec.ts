@@ -52,11 +52,6 @@ async function runFit(
   setUpLiveView: (cli: ToolCliContext) => void,
 ): Promise<void> {
   const opts = rawOpts as FitOptions;
-  // --findings is the deprecated alias of --verbose (ADR-0021, ADR-0012
-  // one-release window): fold it into verbose so the single verbose path
-  // drives the detail body. The deprecation note surfaces through the run's
-  // warnings channel (not a raw stderr write — ADR-0011).
-  if (opts.findings === true) opts.verbose = true;
   if (opts.show !== undefined && opts.show.length > 0) {
     await runShowMode(opts, cli);
     return;
@@ -106,11 +101,6 @@ export function buildFitCommandSpec(
       { flag: '--tags', value: '<tags>', description: 'Filter checks by tags (comma-separated)' },
       { flag: '--list', description: 'List available checks', default: false },
       { flag: '--recipes', description: 'List available recipes', default: false },
-      {
-        flag: '--findings',
-        description: '(deprecated: use --verbose) Show all findings grouped by check after the run',
-        default: false,
-      },
       {
         flag: '--exclude',
         value: '<slug>',

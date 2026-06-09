@@ -95,7 +95,7 @@ const EXPECTED: Record<string, string[]> = {
     // `--out` was declared via `.requiredOption(...)`. The flag was always part
     // of the real surface; the spec-based recorder records it faithfully.
     '--api-key', '--check', '--config', '--cwd', '--debug', '--exclude',
-    '--findings', '--gate-compare', '--gate-save', '--json', '--list', '--open',
+    '--gate-compare', '--gate-save', '--json', '--list', '--open',
     '--out', '--quiet', '--recipe', '--recipes', '--report-to', '--show', '--tags',
     '--verbose',
   ],

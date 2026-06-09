@@ -100,7 +100,6 @@ const FIT_FLAGS: readonly string[] = [
   '--tags',
   '--list',
   '--recipes',
-  '--findings',
   '--exclude',
   '--config',
   LONG_FLAGS.open,

@@ -11,7 +11,6 @@ export interface FitOptions {
   recipes: boolean;
   json: boolean;
   verbose: boolean;
-  findings: boolean;
   reportTo?: string;
   apiKey?: string;
   exclude: string[];
