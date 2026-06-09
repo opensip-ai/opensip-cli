@@ -105,8 +105,7 @@ function registerFitExports(
       exportName === 'default' ||
       exportName === 'checks' ||
       exportName === 'recipes' ||
-      exportName === 'metadata' ||
-      exportName === 'checkDisplay'
+      exportName === 'metadata'
     ) continue
     if (isCheck(value) && !registeredIds.has(value.config.id)) {
       checkRegistry.register(value, ctx.plugin.namespace)

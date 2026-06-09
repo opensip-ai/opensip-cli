@@ -220,6 +220,14 @@ interface BaseCheckConfig {
    * Default: 'medium' (applied at runtime, not in schema).
    */
   readonly confidence?: 'high' | 'medium' | 'low'
+  /**
+   * Display icon (emoji) for CLI/dashboard output. Optional — display travels
+   * WITH the check (§5.3 fold), so authors (or a pack's display map applied via
+   * {@link applyCheckDisplay}) set it here rather than in a separate sidecar.
+   */
+  readonly icon?: string
+  /** Human-readable display name for CLI/dashboard output. Optional (slug fallback). */
+  readonly displayName?: string
 }
 
 /**
@@ -252,6 +260,8 @@ const BaseCheckConfigSchema = z.object({
   scope: CheckScopeSchema.optional(),
   contentFilter: z.enum(['raw', 'strip-strings', 'strip-strings-and-comments']).optional(),
   confidence: z.enum(['high', 'medium', 'low']).optional(),
+  icon: z.string().optional(),
+  displayName: z.string().optional(),
 })
 
 // =============================================================================

@@ -13,10 +13,12 @@ import type { FitnessRecipe } from '../recipes/types.js'
 /**
  * Display entry for a fitness check: `[icon, displayName]`.
  *
- * Check packages contribute display metadata for their own checks by exporting
- * a `checkDisplay` map. The CLI merges these from every loaded package; later
- * registrations win on key collision. Slugs without an entry fall back to
- * kebab-to-title-case.
+ * A check pack keeps its checks' display in an authoring `CHECK_DISPLAY` map
+ * (slug → `[icon, displayName]`) and folds it ONTO its checks via
+ * `applyCheckDisplay` at the pack barrel — so display travels on each check's
+ * `config` (§5.3 separate-domains fold). There is no separate `checkDisplay`
+ * plugin export and no merged-display singleton; slugs without an entry fall
+ * back to kebab-to-title-case + a default icon.
  *
  * Owned by fitness (ADR-0009): this is tool-specific vocabulary that used to
  * live in the kernel; check packs import it from `@opensip-tools/fitness`.
@@ -27,10 +29,4 @@ export type CheckDisplayEntry = readonly [icon: string, displayName: string]
 export interface FitPluginExports {
   readonly checks?: readonly Check[]
   readonly recipes?: readonly FitnessRecipe[]
-  /**
-   * Optional display map: check slug → [icon, displayName].
-   * The CLI merges these from every loaded check package and uses
-   * the merged map when rendering tables and dashboard catalog entries.
-   */
-  readonly checkDisplay?: Readonly<Record<string, CheckDisplayEntry>>
 }

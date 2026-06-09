@@ -7,7 +7,30 @@
  * the graph tool's duplicated-function-body rule.
  */
 
+import type { Check } from '../framework/check-types.js'
 import type { CheckDisplayEntry } from '../plugins/types.js'
+
+/**
+ * Fold a pack's `slug -> [icon, displayName]` map ONTO its checks (§5.3 fold):
+ * each check whose slug has an entry gets `icon`/`displayName` set on its
+ * `config`, so display travels WITH the check and there is no separate
+ * per-process display sidecar/singleton. Checks with no entry pass through
+ * unchanged (consumers fall back to a default icon + kebab-to-title-case).
+ *
+ * `check.config` is pure metadata — the check's `run`/`getScope`/`getMatcher`
+ * closures capture the original author config, not `check.config` — so adding
+ * display to `check.config` is execution-safe.
+ */
+export function applyCheckDisplay(
+  checks: readonly Check[],
+  displayMap: Readonly<Record<string, CheckDisplayEntry>>,
+): Check[] {
+  return checks.map((check) => {
+    const entry = displayMap[check.config.slug]
+    if (!entry) return check
+    return { ...check, config: { ...check.config, icon: entry[0], displayName: entry[1] } }
+  })
+}
 
 /** Default fallback icon when a slug isn't in the display map. */
 const DEFAULT_ICON = '🔍'

@@ -1,4 +1,4 @@
-// @fitness-ignore-file detached-promises -- rebuildDisplayLookups, register, and mergeCheckDisplay are synchronous mutators flagged by heuristic
+// @fitness-ignore-file detached-promises -- register is a synchronous mutator flagged by heuristic
 /**
  * Plugin/check discovery + registration for the `fit` command.
  *
@@ -43,7 +43,6 @@ import {
 } from '../../plugins/check-package-discovery.js';
 import { loadAllPlugins } from '../../plugins/loader.js';
 
-import { mergeCheckDisplay, rebuildDisplayLookups } from './display-registry.js';
 
 // ---------------------------------------------------------------------------
 // Public accessors — all read the current RunScope's fitness load state
@@ -150,7 +149,6 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
     });
   }
 
-  rebuildDisplayLookups();
   load.loadedFor = key;
 }
 
@@ -304,8 +302,9 @@ export interface LoadDiscoveredOptions {
  * Load every marker-discovered or explicitly listed check package. Each
  * package's main entry should follow the FitPluginExports contract:
  *
- *   - `checks`: readonly Check[]                (required)
- *   - `checkDisplay`: { [slug]: [icon, name] }  (optional)
+ *   - `checks`: readonly Check[]   (required; each check carries its own
+ *     `config.icon`/`config.displayName` — display travels on the check, §5.3)
+ *   - `recipes`: readonly Recipe[]  (optional)
  *
  * Errors loading any one package don't fail the others — they surface
  * to stderr the same way fit-domain plugin failures do.
@@ -395,7 +394,6 @@ export async function loadDiscoveredCheckPackages(
       const moduleUrl = pathToFileURL(meta.mainEntry).href;
       const mod = (await import(moduleUrl)) as {
         checks?: unknown;
-        checkDisplay?: unknown;
         recipes?: unknown;
       };
       const checks = mod.checks;
@@ -406,12 +404,13 @@ export async function loadDiscoveredCheckPackages(
       let registered = 0;
       for (const check of checks) {
         if (isCheck(check)) {
+          // Display (icon + name) travels ON the check via check.config (§5.3
+          // fold) — no separate checkDisplay map to merge.
           checkRegistry.register(check, pkg.name);
           registered++;
         }
       }
       totalRegistered += registered;
-      mergeCheckDisplay(pkg.name, mod.checkDisplay);
       const { recipesRegistered } = registerRecipesFromMod(mod, recipeRegistry, {
         namespace: pkg.name,
         onWarn: (evt, message, extra) => {

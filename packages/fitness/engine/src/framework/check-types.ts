@@ -36,6 +36,17 @@ export interface CheckConfig {
   readonly fileTypes?: readonly string[] | undefined
   /** Portable scope declaration for marketplace-ready target matching. */
   readonly checkScope?: CheckScope | undefined
+  /**
+   * Display icon (an emoji) for CLI/dashboard output. Travels WITH the check
+   * (§5.3 separate-domains fold) — there is no separate per-process display
+   * sidecar map. Absent → consumers fall back to a default icon.
+   */
+  readonly icon?: string | undefined
+  /**
+   * Human-readable display name for CLI/dashboard output. Absent → consumers
+   * fall back to kebab-to-title-case of the slug.
+   */
+  readonly displayName?: string | undefined
   readonly execute: (ctx: ExecutionContext) => Promise<CheckResult>
 }
 

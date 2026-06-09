@@ -100,6 +100,7 @@ export {
 export {
   isCommentLine,
   isTestFile,
+  applyCheckDisplay,
   getCheckDisplayName,
   getCheckIcon,
   makeDisplayHelpers,

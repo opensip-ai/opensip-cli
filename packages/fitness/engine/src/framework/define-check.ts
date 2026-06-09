@@ -266,6 +266,11 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
       scansFiles: !isCommandConfig(config),
       fileTypes: config.fileTypes ? [...config.fileTypes] : undefined,
       checkScope: config.scope && canonicalLanguages ? { languages: canonicalLanguages, concerns: [...config.scope.concerns] } : undefined,
+      // Display metadata travels WITH the check (§5.3 fold) — no separate
+      // per-process display sidecar/singleton. Authors set these inline, or a
+      // pack's display map is applied via applyCheckDisplay().
+      icon: config.icon,
+      displayName: config.displayName,
       // @fitness-ignore-next-line concurrency-safety -- async arrow delegates to executeUnifiedCheck which is async; needed for type compatibility
       execute: async (ctx) => executeUnifiedCheck(config, ctx),
     },

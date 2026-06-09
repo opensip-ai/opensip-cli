@@ -65,6 +65,11 @@ export class CheckRegistry {
     return this.resolve(slug) !== undefined;
   }
 
+  /** Get a check by slug, or `undefined` if not registered (non-throwing {@link get}). */
+  find(slug: string): Check | undefined {
+    return this.resolve(slug);
+  }
+
   list(): Check[] {
     return this.inner.getAll().map((r) => r.check);
   }
