@@ -71,10 +71,12 @@ export {
   CapabilityRegistry,
   createCapabilityRegistry,
   currentCapabilityRegistry,
+  loadCapabilityDomain,
 } from './plugins/index.js';
 export type {
   AdmissionResult,
   CapabilityRegistrar,
+  LoadCapabilityDomainOptions,
   PluginLayout,
   DiscoveredPlugin,
   LoadedPlugin,

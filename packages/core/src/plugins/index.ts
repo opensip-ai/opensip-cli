@@ -101,6 +101,15 @@ export {
 export type {
   CapabilityRegistrar,
 } from './capability-registry.js'
+// The scope-owned capability loader (§5.3, Phase 2): drives the generic
+// discovery substrate for one domain and routes every contribution through
+// `routeContribution` — the live conduit. Memoized per scope (fixes F1).
+export {
+  loadCapabilityDomain,
+} from './capability-loader.js'
+export type {
+  LoadCapabilityDomainOptions,
+} from './capability-loader.js'
 export {
   registerRecipesFromMod,
 } from './recipe-loader.js'

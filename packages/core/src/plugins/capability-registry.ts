@@ -64,10 +64,35 @@ interface RegisteredDomain {
  */
 export class CapabilityRegistry {
   private readonly domains = new Map<string, RegisteredDomain>();
+  /**
+   * Per-domain discovery load-state, keyed by domain id. This is the per-scope
+   * memoization that the capability loader reads/writes so a domain's
+   * contributions are discovered + routed exactly once per project per scope.
+   * Because the registry is itself per-`RunScope`, this state is per-scope too —
+   * a second run for the same project re-loads into its own fresh registry.
+   * This is the structural fix for the audit's F1 (sim's module-level
+   * `scenariosLoadedFor`): the marker lives on a scope-owned object, not a module.
+   */
+  private readonly loadState = new Map<string, { loadedFor: string; errors: readonly string[] }>();
   private readonly logger: Logger;
 
   constructor(logger: Logger = defaultLogger) {
     this.logger = logger;
+  }
+
+  /** True when domain `domainId` has been discovery-loaded for `projectKey` in this scope. */
+  isDomainLoaded(domainId: string, projectKey: string): boolean {
+    return this.loadState.get(domainId)?.loadedFor === projectKey;
+  }
+
+  /** Record that `domainId` finished discovery-loading for `projectKey`, with any routing errors. */
+  markDomainLoaded(domainId: string, projectKey: string, errors: readonly string[]): void {
+    this.loadState.set(domainId, { loadedFor: projectKey, errors });
+  }
+
+  /** Routing errors recorded during the most recent load of `domainId` (empty if none / never loaded). */
+  domainLoadErrors(domainId: string): readonly string[] {
+    return this.loadState.get(domainId)?.errors ?? [];
   }
 
   /**
@@ -318,6 +343,10 @@ export function registerCapabilityDomainsFromManifest(
       apiVersion: decl.apiVersion,
       contributionSchema: decl.contributionSchema,
       contributionKind: decl.contributionKind,
+      // Carry the discovery descriptor onto the spec so the scope-owned capability
+      // loader can drive the generic substrate for this domain (§5.3). Absent →
+      // the domain auto-discovers nothing.
+      ...(decl.discovery === undefined ? {} : { discovery: decl.discovery }),
     };
     registry.registerDomain(spec, makeDeferredRegistrar(spec));
     defaultLogger.info({
