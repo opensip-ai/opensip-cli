@@ -42,6 +42,13 @@ export type {
   DiscoveredToolPackage,
   ToolPackageMetadata,
 } from './tool-package-discovery.js'
+// Universal JSON-value guards shared by the manifest loader, the discovery
+// normalizer, and the config-layer preference resolver (one definition, no
+// cross-package duplicated bodies).
+export {
+  isRecord,
+  isStringArray,
+} from './json-guards.js'
 export {
   discoverPackagesByMarker,
   discoverPackagesByDeclaredKind,

@@ -57,6 +57,8 @@ export {
   MARKER_KINDS,
   discoverScopedPackages,
   discoverCapabilityContributions,
+  isRecord,
+  isStringArray,
   hasPackageJson,
   resolvePackageDir,
   registerRecipesFromMod,

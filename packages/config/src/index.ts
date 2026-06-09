@@ -26,6 +26,12 @@ export type {
 } from './declaration.js';
 export { resolveConfig } from './precedence.js';
 export type { ResolveConfigInput, ResolvedConfig } from './precedence.js';
+// One descriptor-driven capability-preference resolver (§5.3, Phase 3): reads a
+// domain's explicit-list / auto-discover / scopes from the project config through
+// the keys its discovery descriptor declares — replacing the three bespoke
+// per-tool readers with the documented keys unchanged.
+export { resolveCapabilityPreferences } from './capability-preferences.js';
+export type { CapabilityPreferences } from './capability-preferences.js';
 export { toJsonSchema } from './json-schema.js';
 export type { JsonSchema } from './json-schema.js';
 
