@@ -120,7 +120,7 @@ interface SimDoneResult {
 }
 ```
 
-`SimDoneResult` is the internal `CommandResult` union member the renderer consumes (the `App.tsx` dispatcher in [`packages/cli/src/ui/`](../../../packages/cli/src/ui/) switches on `result.type`); it derives the per-scenario table from `envelope.units` (one unit per scenario — `slug` = scenario id, `passed`, `durationMs`, `error?`). The **`--json` output is the `envelope` itself** (the same `SignalEnvelope` `fit` and `graph` emit, via the shared `formatSignalJson` formatter) — the old bespoke `sim-done` JSON shape is retired. See [`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md).
+`SimDoneResult` is the internal `CommandResult` union member the renderer consumes (the `App.tsx` dispatcher in [`packages/cli/src/ui/`](../../../packages/cli/src/ui/) switches on `result.type`); it derives the per-scenario table from `envelope.units` (one unit per scenario — `slug` = scenario id, `passed`, `durationMs`, `error?`). The **`--json` output wraps the `envelope` in a `CommandOutcome`** (the byte-identical `SignalEnvelope` `fit` and `graph` emit, nested under `.envelope`) — the old bespoke `sim-done` JSON shape is retired. See [`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md).
 
 Per-kind details (the load p99, the chaos recovery time) are *not* in the envelope. They're in the executor result, which rides in the session's `session_tool_payload` row persisted to the project-local SQLite store (`<project>/opensip-tools/.runtime/datastore.sqlite`) via `SessionRepo`. The dashboard reads the session record to show full per-kind detail; the CLI summary stays compact.
 

@@ -124,9 +124,8 @@ opensip-tools fit --gate-compare
 | `--list` | bool | `false` | List available checks instead of running. |
 | `--recipes` | bool | `false` | List available recipes instead of running. |
 | `--show <session>` | string | — | Replay a stored fit session (by id, or `latest`) instead of running — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
-| `--json` | bool | `false` | Emit the `SignalEnvelope` JSON on stdout instead of the table renderer. |
+| `--json` | bool | `false` | Emit the `CommandOutcome` JSON on stdout (envelope under `.envelope`) instead of the table renderer. |
 | `-v, --verbose` | bool | `false` | Show the detailed report body (per-check findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
-| `--findings` | bool | `false` | **Deprecated** — alias of `--verbose`; will be removed in a future 2.x release. |
 | `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
 | `--gate-save` | bool | `false` | Save current findings as architecture baseline. The baseline is stored as a row in the project's SQLite store (`fit_baseline` table at `opensip-tools/.runtime/datastore.sqlite`). |
@@ -159,7 +158,7 @@ opensip-tools sim --recipe <name>
 | `--recipe <name>` | string | built-in `default` | Run a named sim recipe. |
 | `--show <session>` | string | — | Replay a stored sim session (by id, or `latest`) instead of running — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
-| `--json` | bool | `false` | Emit the `SignalEnvelope` JSON on stdout instead of the table renderer. |
+| `--json` | bool | `false` | Emit the `CommandOutcome` JSON on stdout (envelope under `.envelope`) instead of the table renderer. |
 | `-v, --verbose` | bool | `false` | Show the detailed report body (per-scenario findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
 | `--open` | bool | `false` | Launch dashboard after run. |
@@ -224,7 +223,7 @@ opensip-tools graph --list-files --workspace  # the per-unit fan-out set
 | `--workspace` | bool | `false` | Fan the run across every workspace unit returned by each detected adapter's `discoverWorkspaceUnits` hook. Polyglot per D8b: a repo with both a TS pnpm workspace and a Cargo workspace fans out across both adapters' units in one combined run. Memory-isolated (one child process per unit). Mutually exclusive with positional paths. |
 | `--concurrency <n>` | int | `cpus()-1` | Concurrency cap for `--workspace` child processes. |
 | `--language <name>` | string | — | Force a specific language adapter, suppressing marker-based auto-detection. If the discovered file count is zero, exits with code 2 and the message `--language <name> matched 0 files under <paths>; check the flag or paths.` (D14). |
-| `--json` | bool | `false` | Output the `SignalEnvelope` JSON document instead of the unified terminal report. |
+| `--json` | bool | `false` | Output the `CommandOutcome` JSON document (envelope under `.envelope`) instead of the unified terminal report. |
 | `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
 | `--resolution <mode>` | string | `exact` | Edge resolution tier: `exact` (semantic, uses the type checker) or `fast` (syntactic, no type checker — ~2× faster cold builds at lower edge fidelity). Invalid values fail loudly at the boundary. |
 | `--profile <path>` | path | — | Write a graph performance profile JSON artifact with stage timings, run mode, cache verdict, file/function counts, and resolution stats. Relative paths resolve against `--cwd`. |

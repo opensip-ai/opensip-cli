@@ -39,7 +39,8 @@ A fit run takes exactly one of these paths:
 ```
                  ┌─ default      → Ink table on stdout, exit code from result
                  │
-fit run ─ Cli    ├─ --json       → SignalEnvelope JSON on stdout, exit code from result
+fit run ─ Cli    ├─ --json       → CommandOutcome JSON on stdout (envelope under
+                 │                  .envelope), exit code from result
                  │
                  ├─ --gate-save  → envelope stored as baseline (SQLite), exit code 0
                  │  / --gate-    → current envelope compared to baseline, exit = degraded?
@@ -106,7 +107,7 @@ fitnessTool.action()
 
 The renderer is in [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/ui/) and depends on Ink + React. It's the only consumer of those libraries; nothing in `core`, `fitness`, or any check pack imports them. This is why a future GUI front-end could replace the renderer without touching a Tool — the Tool calls `cli.renderLive('fit', args)` and the CLI maps that to whatever rendering layer is in place.
 
-`-v` / `--verbose` adds inline finding details to the table. `--findings` is a deprecated alias for `--verbose`, kept for older scripts during the 2.x line. `--quiet` suppresses the banner and shows only the pass/fail summary line.
+`-v` / `--verbose` adds inline finding details to the table. `--quiet` suppresses the banner and shows only the pass/fail summary line.
 
 The exit code is set by the Tool action via `cli.setExitCode(code)`:
 
@@ -122,19 +123,19 @@ The exit code is set by the Tool action via `cli.setExitCode(code)`:
 opensip-tools fit --json
 ```
 
-Bypasses the Ink renderer entirely. Calls `executeFit(args)`, then routes the returned envelope through the shared `formatSignalJson` formatter and the stdout sink (`cli.emitEnvelope`). The tool never stringifies its own output.
+Bypasses the Ink renderer entirely. Calls `executeFit(args)`, then the host wraps the returned envelope in a `CommandOutcome` and serializes the whole outcome through the single `renderOutcome` seam (`cli.emitEnvelope`). The tool never stringifies its own output. The byte-identical `SignalEnvelope` rides under `.envelope`; the outcome adds `kind`, `status`, and `exitCode` at the top level. See [`70-reference/04-json-output-schema.md`](/docs/opensip-tools/70-reference/04-json-output-schema/) for the full wrapper shape.
 
 This is the path CI integrations should use. Stdout is the JSON; stderr carries logs (also JSON-lines, on a separate stream); the exit code is the gate.
 
 ```bash
-# Capture and pipe to jq:
-opensip-tools fit --json | jq '.verdict.summary'
+# Capture and pipe to jq (envelope is nested under .envelope):
+opensip-tools fit --json | jq '.envelope.verdict.summary'
 
 # Fail CI if score < 90:
-opensip-tools fit --json | jq -e '.verdict.score >= 90' || exit 1
+opensip-tools fit --json | jq -e '.envelope.verdict.score >= 90' || exit 1
 
 # Fail CI on any critical/high signal:
-opensip-tools fit --json | jq -e '.verdict.passed'
+opensip-tools fit --json | jq -e '.envelope.verdict.passed'
 ```
 
 The `schemaVersion: 2` discriminator is part of the contract. New optional fields can be added in minors; required fields and the discriminator are major-version changes.

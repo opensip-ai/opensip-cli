@@ -84,8 +84,8 @@ sequenceDiagram
   CLI->>Bootstrap: register adapters, tools, discovered tools
   Bootstrap->>Core: LanguageRegistry.register(...)
   Bootstrap->>Tools: ToolRegistry.register(...)
-  CLI->>Tools: mountAllToolCommands(ctx)
-  Tools->>Commander: tool.register(ctx)
+  CLI->>Tools: mountAllToolCommands(program, ctx)
+  Tools->>Commander: mountCommandSpec(program, spec, ctx) per commandSpec
   CLI->>Commander: register CLI-owned commands
   Commander->>CLI: preAction()
   CLI->>Core: enter RunScope and open DataStore lazily
@@ -94,7 +94,7 @@ sequenceDiagram
   CLI->>Output: render, deliver, persist, set exit code
 ```
 
-The whole thing fits in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/index.ts) at ~530 lines. Every step is direct — no plugin lifecycle hooks, no startup phases, no DI container. Just static imports and explicit registration calls.
+The whole thing fits in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/index.ts) at ~530 lines. Every step is direct — no DI container, no startup phases. Bundled tools are **not** statically imported (3.0.0 GA cutover): the host lists their package names in `BUNDLED_TOOL_PACKAGES` ([`bootstrap/register-tools.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/bootstrap/register-tools.ts)) and loads each through the *same* manifest → `admitTool` → dynamic-import → register path an installed or project-local tool travels. "Bundled" is a trust posture, not a privileged load path — a guardrail (`no-bootstrap-tool-import`) fails CI if a static `import { fitnessTool }` creeps back in.
 
 ### Why this order
 
@@ -198,9 +198,9 @@ For `acme-api` running `opensip-tools fit --gate-compare` from CI on 2026-05-17:
 1. `main()` constructs fresh `LanguageRegistry` and `ToolRegistry` instances for this invocation.
 2. `bootstrapCli({ langRegistry, toolRegistry, projectDir })`:
    - Registers six bundled language adapters (`typescript`, `rust`, `python`, `java`, `go`, `cpp`) into `langRegistry`.
-   - Registers `fitnessTool`, `simulationTool`, `graphTool` into `toolRegistry`.
+   - Resolves each name in `BUNDLED_TOOL_PACKAGES` (`@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/graph`) on disk, reads its manifest, admits it through `admitTool`, **dynamically imports** the tool runtime, and registers it into `toolRegistry` — the same path an installed tool takes; nothing is statically imported.
    - `discoverToolPackages()` walks `node_modules`. No third-party Tools installed. Returns empty.
-3. `mountAllToolCommands(toolRegistry, ctx)`: `fitnessTool.register(ctx)` mounts `fit`, `fit-list`, `fit-recipes`, `fit-baseline-export`; `simulationTool.register(ctx)` mounts `sim`; `graphTool.register(ctx)` mounts `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (and its internal/export commands).
+3. `mountAllToolCommands(toolRegistry, program, ctx)`: for each registered tool, `mountCommandSpec` mounts every entry in the tool's declared `commandSpecs`. fitness's specs mount `fit`, `fit-list`, `fit-recipes`, `fit-baseline-export`; simulation's mount `sim`; graph's mount `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (and its internal/export commands). There is no `register()` hook — `commandSpecs` is the only command surface (3.0.0 GA).
 4. `registerCliCommands()`: `init`, `dashboard`, `configure`, `uninstall`, `plugin`, `completion`, `sessions` mounted.
 5. `argv = ['node', 'opensip-tools', 'fit', '--gate-compare']` — there's a subcommand, so the welcome banner is skipped.
 6. `parseAsync()` runs. The `preAction` hook enters a fresh `RunScope`, reads the `fit` command's `opts.debug` (false), and leaves the log level at `info`. It also runs the once-per-day update check and records the result on the scope for the banner / stderr nag (no-op when up-to-date or offline; never blocks). A runId like `RUN_01HXYZG9V8K1J7P3M2N0RQS5T6W` is generated (uppercase prefix + ULID); the day-level log file `<project>/opensip-tools/.runtime/logs/2026-05-17.jsonl` is opened on first write. Commander dispatches to `fitnessTool`'s `fit` action handler with `--gate-compare = true`. The Tool runs `executeFit` and the gate diff. Exit code 1 (regression detected).

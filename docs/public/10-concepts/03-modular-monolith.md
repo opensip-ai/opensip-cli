@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-09
+release: v3.0.0
 title: "Layered package graph"
 audience: [contributors]
-purpose: "The 30-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+purpose: "The 32-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
 source-files:
   - .config/dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -20,44 +20,50 @@ related-docs:
 ---
 # Layered package graph
 
-Thirty packages. Five layers. One enforced rule: dependencies flow up only.
+Thirty-two packages. Six layers. One enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md). For the literal dep-cruiser rules, see [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md).
 
 > **What you'll understand after this:**
-> - Why opensip-tools ships as 30 packages instead of one.
-> - The five layers, in order, and what each one is for.
+> - Why opensip-tools ships as 32 packages instead of one.
+> - The six layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
 > - How type-only edges are caught by a second cruiser pass, and the two cross-layer exceptions that were paid down.
 > - Trade-offs: what this shape buys you, what it costs.
 
 ---
 
-## The five layers
+## The six layers
+
+The layer model the dependency-cruiser config enforces ([`.config/dependency-cruiser.cjs`](../../../.config/dependency-cruiser.cjs)):
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│  Layer 5  ┌──────────────────────────────────────────────────┐    │
-│           │                opensip-tools                │    │
+│  Layer 6  ┌──────────────────────────────────────────────────┐    │
+│           │                opensip-tools                       │    │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
-│  Layer 4  ┌──────────────────────┴───────────────────────────┐    │
-│           │  checks-cpp  checks-go  checks-java  checks-python│   │
-│           │  checks-rust  checks-typescript  checks-universal │   │
-│           └──────────────────────────────────────────────────┘    │
-│                                  ▲                                 │
-│  Layer 3  ┌──────────┬───────────┴───────────┬───────────────┐    │
-│           │  fitness   simulation   graph   dashboard  cli-ui  │   │
-│           │  lang-{ts,rust,py,java,go,cpp}                     │   │
+│  Layer 5  ┌──────────────────────┴───────────────────────────┐    │
+│           │  checks-cpp  checks-go  checks-java  checks-python │   │
+│           │  checks-rust  checks-typescript  checks-universal  │   │
 │           │  graph-{typescript,python,rust,go,java}            │   │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
+│  Layer 4  ┌──────────────────────┴───────────────────────────┐    │
+│           │       fitness     simulation     graph            │   │
+│           └──────────────────────────────────────────────────┘    │
+│                                  ▲                                 │
+│  Layer 3  ┌──────────┬───────────┴───────────┬───────────────┐    │
+│           │  session-store  output  config  dashboard          │   │
+│           │  lang-{ts,rust,py,java,go,cpp}                     │   │
+│           └──────────────────────────────────────────────────┘    │
+│                                  ▲                                 │
 │  Layer 2  ┌──────────────────────┴───────────────────────────┐    │
-│           │ datastore  contracts  session-store  output  tree-sitter │
+│           │   datastore   contracts   tree-sitter   cli-ui     │   │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 1  ┌──────────────────────┴───────────────────────────┐    │
-│           │              @opensip-tools/core                 │    │
+│           │              @opensip-tools/core                   │   │
 │           └──────────────────────────────────────────────────┘    │
 │                                                                    │
 │            (arrows mean "depends on" — strictly upward)            │
@@ -66,25 +72,28 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 1 — `@opensip-tools/core`.** The kernel. Ships types, errors, IDs, the logger, the path resolver, the language-adapter contract, the plugin discovery mechanics (including the generic marker-discovery walker), and the Tool registry. No knowledge of fitness, simulation, or any other tool. No dependency on Commander, Ink, or any UI library.
 
-**Layer 2 — `@opensip-tools/datastore`, `@opensip-tools/contracts`, `@opensip-tools/session-store`, `@opensip-tools/output`, and `@opensip-tools/tree-sitter`.** Five packages above the kernel, each depending only on `core` and (where noted) on lower siblings within this layer — never on a tool.
+**Layer 2 — `@opensip-tools/datastore`, `@opensip-tools/contracts`, `@opensip-tools/tree-sitter`, and `@opensip-tools/cli-ui`.** Four substrate packages above the kernel, each depending only on `core` — never on a tool.
 
 - **`@opensip-tools/datastore`** is the persistence kernel — the `DataStore` interface, the SQLite + Drizzle implementation, the in-memory backend for tests, the workspace migration store under `migrations/`. Paradigm-agnostic infrastructure: tools and session-store own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness) and register them with the datastore at open time. Depends on `core` only.
-- **`@opensip-tools/contracts`** is the shared contract layer between Tools and the runner: the `SignalEnvelope` shape every tool returns (with its `verdict`/`units[]`/`signals[]`), the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the cross-tool `StoredSession` type, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. A types-and-constants surface — the `SessionRepo` runtime and sessions schema live in `session-store`, not here. Imports `core` only. Does not import any tool.
+- **`@opensip-tools/contracts`** is the shared contract layer between Tools and the runner: the `SignalEnvelope` shape every tool returns (with its `verdict`/`units[]`/`signals[]`), the `CommandOutcome` wrapper the host stamps on every machine output, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the cross-tool `StoredSession` type, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. A types-and-constants surface — the `SessionRepo` runtime and sessions schema live in `session-store`, not here. Imports `core` only. Does not import any tool.
+- **`@opensip-tools/tree-sitter`** (ADR-0010) is the grammar-agnostic `web-tree-sitter` substrate: the WASM parser lifecycle and grammar-neutral node accessors (`createParser`, `walkNodes`, `findEnclosing`, …). It imports `core` only (plus `web-tree-sitter`) and is consumed from above — by the fitness `lang-*` adapters and the four tree-sitter `graph-*` adapters (through `graph-adapter-common`) — so the WASM lifecycle lives in exactly one place. A dedicated dependency-cruiser rule (`tree-sitter-imports-core-only`) holds it at this substrate position.
+- **`@opensip-tools/cli-ui`** is the Ink/React presentational primitives kit (`Banner`, `Spinner`, `RunHeader`, `theme`) — extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher.
+
+**Layer 3 — persistence/output/config libraries and language adapters.** Packages above the substrate, depending on `core`/`contracts`/`datastore` (and lower siblings within this layer), never on a tool.
+
 - **`@opensip-tools/session-store`** owns session persistence: the `SessionRepo` runtime, the `sessions`/`session_tool_payload` schema, and the `generateSessionId`/`sanitizeForFilename` helpers. Depends on `core`, `datastore`, and `contracts` (for the `StoredSession` shape it round-trips).
 - **`@opensip-tools/output`** (renamed from `@opensip-tools/reporting`, ADR-0011) owns all machine output: pure `(envelope) => string` formatters under `format/` (json, sarif, table) and effectful `sink/` delivery (cloud egress, entitlement). The CLI composition root composes a formatter with a sink per the run's flags; tool engines no longer import it. Depends on `core` and `contracts` only.
-- **`@opensip-tools/tree-sitter`** (ADR-0010) is the grammar-agnostic `web-tree-sitter` substrate: the WASM parser lifecycle and grammar-neutral node accessors (`createParser`, `walkNodes`, `findEnclosing`, …). Like `datastore`, it imports `core` only (plus `web-tree-sitter`) and is consumed from above — by the fitness `lang-*` adapters and the four tree-sitter `graph-*` adapters (through `graph-adapter-common`) — so the WASM lifecycle lives in exactly one place. A dedicated dependency-cruiser rule (`tree-sitter-imports-core-only`) holds it at this substrate position.
+- **`@opensip-tools/config`** is the capability-configuration substrate (ADR-0023): the `composeConfigSchema` composer that folds each tool's namespaced Zod schema into one strict whole-document schema, the resolver, and the `ToolConfigDeclaration` declaration type. The dependency-cruiser rule here is **directional**: `config` must not import a tool. Tools, by contrast, **do** import `@opensip-tools/config` — for the `ToolConfigDeclaration` type they use to declare their config namespace. So the edge runs tool → config, never config → tool. Depends on `core`.
+- **`@opensip-tools/dashboard`** is the self-contained HTML report renderer; consumed by the CLI-owned `dashboard` command and each tool's auto-open hook. It does not implement the `Tool` contract; it is a library the composition root consumes.
+- **Language adapters** — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` implement the `LanguageAdapter` contract used by fitness checks. (The graph engine has its own `GraphLanguageAdapter` contract, implemented by the publishable `graph-*` adapter packs at Layer 5.) See [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md) for the distinction.
 
-**Layer 3 — Tools, shared libraries, and language adapters.** Peer packages, all depending on `contracts`, `datastore`, and `core`. Three groups at this layer:
+**Layer 4 — Tools.** `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/graph`. Each implements the `Tool` contract, declares its config namespace (importing `@opensip-tools/config` for the declaration type), and contributes its own CLI command surface via declarative `commandSpecs`. Peers; none imports another. None imports `cli` (that would create a cycle, enforced by the `*-no-cli` rules).
 
-- **Tools** — `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/graph`. Each implements the `Tool` contract and contributes its own CLI subcommand surface.
-- **Shared libraries** — `@opensip-tools/dashboard` (self-contained HTML report renderer; consumed by the CLI-owned `dashboard` command and each tool's auto-open hook) and `@opensip-tools/cli-ui` (Ink/React presentational primitives — `Banner`, `Spinner`, `RunHeader`, `theme` — extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher). Neither implements the `Tool` contract; they are libraries Tools consume.
-- **Language adapters** — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` implement the `LanguageAdapter` contract used by fitness checks. The graph engine has its own `GraphLanguageAdapter` contract, implemented by five publishable adapter packages: `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java` (the latter four share `graph-adapter-common`, a scaffolding package hosting the tree-sitter discover/parse/walk/cache-key factories). The fitness `lang-*` packages and the graph `graph-*` packages are unrelated siblings at this layer — different contracts, different parser stacks; see [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md) for the distinction.
+**Layer 5 — `@opensip-tools/checks-*` and `@opensip-tools/graph-*`.** Seven fitness check packs (`checks-universal`, `checks-typescript`, `checks-python`, `checks-go`, `checks-java`, `checks-cpp`, `checks-rust`), each depending on `fitness` (for `defineCheck`) and `core`; plus five graph adapter packs (`graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`, the latter four sharing `graph-adapter-common`), each depending on `graph`. These are the marketplace shapes — installable from npm without dragging the CLI in. Check packs do **not** depend on `cli` or `contracts`.
 
-**Layer 4 — `@opensip-tools/checks-*`.** Seven check packs: `checks-universal`, `checks-typescript`, `checks-python`, `checks-go`, `checks-java`, `checks-cpp`, `checks-rust`. Each pack depends on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors, the language adapter type). Check packs do **not** depend on `cli` or `contracts` — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
+**Layer 6 — `opensip-tools`.** The composition root. Discovers every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-**Layer 5 — `opensip-tools`.** The composition root. Imports every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
-
-That's it. Five layers, thirty packages.
+That's it. Six layers, thirty-two packages.
 
 ---
 

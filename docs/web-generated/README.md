@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-09
+release: v3.0.0
 owner: opensip-tools
 indexable: true
 title: "opensip-tools Architecture"
@@ -23,7 +23,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 | If you're … | Read … |
 |---|---|
 | **Evaluating opensip-tools for the first time** | 00 (`01-what-is-opensip-tools` → `02-show-me-the-loops` → `03-vs-other-tools` → `04-faq`). Four short pages, ~10 minutes. Decide if the shape fits before going deeper. |
-| **Looking for a specific check** | 70 (`05-checks-index`) — browsable list of all 155 built-in checks, grouped by pack and tag. |
+| **Looking for a specific check** | 70 (`05-checks-index`) — browsable list of every built-in check (~165+ across seven packs), grouped by pack and tag. |
 | **Brand new and committed to learning** | 00 → 10 → 20 in order. ~13 docs, ~90 minutes. You'll have a working mental model. |
 | **Writing your first check or recipe** | 60 (`01-write-your-first-check`) — task-led walkthrough. Then 50 (`02-project-local-plugins`) for depth. |
 | **Shipping a publishable check pack** | 50 (`03-publishable-packs`) for the authoring path, then (`04-check-pack-architecture`) for the platform internals. |
@@ -158,4 +158,4 @@ See [`./80-implementation/06-doc-conventions.md`](/docs/opensip-tools/80-impleme
 
 ## Status
 
-Doc set authored 2026-05-15 against opensip-tools v1.0.0; navigation and reference claims re-verified against v2.8.0 at 2026-06-07. The current docs reflect the stable SignalEnvelope output contract, the `@opensip-tools/output` package rename, marker-based plugin discovery, publishable graph adapters, the architecture overview map, and the current package count, layer rules, and command surface.
+Doc set authored 2026-05-15 against opensip-tools v1.0.0; navigation and reference claims re-verified against v3.0.0 at 2026-06-09. The current docs reflect the stable SignalEnvelope output contract wrapped in a `CommandOutcome` on `--json`, the `@opensip-tools/output` package rename, generic capability discovery (ADR-0029), publishable graph adapters, the architecture overview map, and the current package count, layer rules, and command surface.

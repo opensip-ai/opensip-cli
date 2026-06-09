@@ -193,17 +193,26 @@ All three tools emit the **same envelope**; the differences are confined to a fe
 
 ---
 
-## Error result — `ErrorResult`
+## Error result — `status: "error"`
 
-When a run fails before producing an envelope (config invalid, plugin failed to load, baseline missing), the JSON output is the error envelope rather than a `SignalEnvelope`:
+When a run fails before producing an envelope (config invalid, plugin failed to load, baseline missing), the `--json` output is still a `CommandOutcome` — `status: "error"` with neither `.envelope` nor `.data`, only a structured `errors[]`:
 
 ```jsonc
 {
-  "error": "Gate baseline not found in the project SQLite store. Run `opensip-tools fit --gate-save` first to create one."
+  "kind": "command.error",
+  "status": "error",
+  "exitCode": 2,
+  "errors": [
+    {
+      "message": "Gate baseline not found in the project SQLite store. Run `opensip-tools fit --gate-save` first to create one.",
+      "suggestion": "Run opensip-tools fit --gate-save.",
+      "code": "CONFIGURATION_ERROR"
+    }
+  ]
 }
 ```
 
-Exit code is 2 (configuration/runtime error) or whatever the throwing code specified.
+Each `ErrorDetail` carries a `message`, an optional actionable `suggestion`, and an optional machine `code`. The `exitCode` is 2 (configuration/runtime error) or whatever the throwing code specified — and it matches the top-level `exitCode` field as well as the process exit code.
 
 ---
 
@@ -240,21 +249,23 @@ The v1 `--json` output was the fitness-shaped `CliOutput` husk (`version: "1.0"`
 
 A few CI patterns:
 
+The envelope is nested under `.envelope` of the `CommandOutcome` wrapper — every path below reflects that.
+
 ```bash
 # Fail on any error-rung (critical/high) signal:
-opensip-tools fit --json | jq -e '.verdict.passed'
+opensip-tools fit --json | jq -e '.envelope.verdict.passed'
 
 # Print only failed units:
-opensip-tools fit --json | jq '.units | map(select(.passed == false))'
+opensip-tools fit --json | jq '.envelope.units | map(select(.passed == false))'
 
 # Count error-rung signals by file:
-opensip-tools fit --json | jq '.signals[] | select(.severity == "critical" or .severity == "high") | .filePath' | sort | uniq -c
+opensip-tools fit --json | jq '.envelope.signals[] | select(.severity == "critical" or .severity == "high") | .filePath' | sort | uniq -c
 
 # All signals for one unit (join on source → slug):
-opensip-tools fit --json | jq '.signals[] | select(.source == "no-console-log")'
+opensip-tools fit --json | jq '.envelope.signals[] | select(.source == "no-console-log")'
 
 # Score gate:
-opensip-tools fit --json | jq -e '.verdict.score >= 90'
+opensip-tools fit --json | jq -e '.envelope.verdict.score >= 90'
 ```
 
 For SARIF (the gate's native shape), use `--gate-save` / `--gate-compare`. The SARIF shape is the SARIF 2.1.0 spec's, not opensip-tools' — see [`10-concepts/05-architecture-gate.md`](/docs/opensip-tools/10-concepts/05-architecture-gate/).

@@ -135,7 +135,7 @@
       "audience": [
         "contributors"
       ],
-      "purpose": "The 30-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+      "purpose": "The 32-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
     },
     {
       "file": "docs/web-generated/10-concepts/04-contract-surfaces.md",

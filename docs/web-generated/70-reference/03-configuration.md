@@ -6,14 +6,13 @@ title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-tools.config.yml schema, every field, defaults, and where each is read."
 source-files:
-  - packages/fitness/engine/src/signalers/schema.ts
-  - packages/contracts/src/cli-config.ts
-  - packages/core/src/config-resolution.ts
-  - packages/core/src/lib/config-version.ts
+  - packages/config/src/composer.ts
+  - packages/cli/src/bootstrap/config-and-capabilities.ts
+  - packages/fitness/engine/src/config/fitness-config-schema.ts
+  - packages/simulation/engine/src/cli/sim-config-schema.ts
+  - packages/graph/engine/src/cli/graph-config-schema.ts
   - packages/cli/src/bootstrap/global-config.ts
   - packages/cli/src/commands/init.ts
-  - packages/graph/engine/src/cli/graph-config.ts
-  - packages/graph/engine/src/types.ts
 related-docs:
   - ../00-start/06-system-context.md
   - ../20-fit/02-targets-and-scope.md
@@ -28,7 +27,7 @@ opensip-tools reads two config files:
 | `<project>/opensip-tools.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
 | `~/.opensip-tools/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key and machine-wide cloud-sync controls |
 
-The strict project-config schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/signalers/schema.ts). A few sections also have permissive readers in their owning package so tool-agnostic commands can read only the fields they need.
+Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated (the catchall seam), so a key no tool owns passes through.
 
 ## Top-level shape
 
@@ -40,14 +39,14 @@ checkOverrides: {}        # check-slug → target-name(s)
 fitness: {}               # FitnessConfig
 simulation: {}            # SimulationConfig
 cli: {}                   # CliDefaults
-plugins: {}               # per-domain pin lists (read out-of-band — see below)
+plugins: {}               # per-domain pin lists
 dashboard: {}             # dashboard.editor
-graph: {}                 # graph rule knobs (read out-of-band — see below)
+graph: {}                 # graph rule knobs (tool-contributed namespace)
 ```
 
 Every section is optional; a missing section becomes `{}`.
 
-The validated schema (`SignalersConfigSchema`) covers `schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, `cli`, and `dashboard`. **`plugins:` and `graph:` are read out-of-band** by separate parsers ([plugin discovery](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/plugins/discover.ts) and [`loadGraphConfig`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/cli/graph-config.ts)) so each can evolve with its owner. The `cli:` block also has a permissive mirror reader in [`packages/contracts/src/cli-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/contracts/src/cli-config.ts), used by the CLI pre-action hook before fitness code is involved.
+The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
 
 `schemaVersion` defaults to `1`. The pre-action hook reads it before the strict loader runs; if a project config declares a schema newer than the installed CLI understands, the CLI exits 2 with an "upgrade your CLI" message rather than misreading the file.
 
@@ -112,7 +111,6 @@ Value is a single target name (string) or a non-empty list.
 | `failOnWarnings` | int ≥ 0 | `0` | Threshold for warnings. `0` = ignore warnings entirely. |
 | `disabledChecks` | string[] | `[]` | Slugs to skip (a recipe's `includeDisabled` can opt back in). |
 | `recipe` | string | — | Default recipe for `fit` when `--recipe` is not passed (ADR-0022). Tool-scoped — distinct from `graph.recipe` / `simulation.recipe`. An unknown name here falls back to the built-in `default` recipe with a warning; an explicit `--recipe` typo still hard-fails. |
-| `schedules` | object[] | `[]` | Reserved for cloud-side scheduled runs. **Ignored locally** — the CLI config schema does not parse, validate, or act on this field (unknown keys are silently dropped). No local scheduler exists. |
 
 ```yaml
 fitness:
@@ -125,6 +123,8 @@ fitness:
 
 Setting `failOnErrors: 5` lets a run pass with fewer than 5 errors — useful during debt burn-down, though `--gate-compare` is the more principled alternative.
 
+> **Roadmap note — `schedules`.** A `fitness.schedules` key for cloud-side scheduled runs is not part of the current schema. The `fitness:` namespace validates **strict**, so a `schedules` key is **rejected** with a `CONFIGURATION_ERROR` by the current CLI — it is not silently ignored. There is no local scheduler. (Historical docs described this field as silently dropped; under strict composed validation it is now a hard error.)
+
 ## `simulation`
 
 | Field | Type | Default | Effect |
@@ -136,7 +136,7 @@ simulation:
   recipe: default            # default recipe for `sim` (tool-scoped, ADR-0022)
 ```
 
-`schedules: []` is reserved for cloud-side scheduling — and **ignored by the local CLI** (not parsed, validated, or acted on; there is no local scheduler).
+> **Roadmap note — `schedules`.** A `simulation.schedules` key for cloud-side scheduling is not part of the current schema. The `simulation:` namespace validates **strict**, so a `schedules` key is **rejected** with a `CONFIGURATION_ERROR` by the current CLI. There is no local scheduler.
 
 ## `cli`
 
@@ -176,16 +176,16 @@ CLI flags always override config — `--no-json` overrides a `cli.json: true` se
 
 ## `plugins`
 
-Plugin lists and discovery preferences. **Read out-of-band** (not in the Zod schema). Marker discovery, scoped sim discovery, and explicit/project-pinned package lists layer:
+Plugin lists and discovery preferences. Scoped name-pattern discovery, explicit/project-pinned package lists, and project-local files layer:
 
 | Field | Effect |
 |---|---|
 | `plugins.fit` | Arbitrary-scope fitness packs pinned into `.runtime/plugins/fit/`. Managed by `plugin add/remove/sync`. |
 | `plugins.sim` | Arbitrary-scope simulation packs pinned into `.runtime/plugins/sim/`. |
 | `plugins.packageScopes` | Additional npm scopes to scan for `<scope>/scenarios-*` simulation packages. `@opensip-tools` is always scanned. |
-| `plugins.checkPackages` | Exact fitness package names to load from project `node_modules` in addition to marker-based `fit-pack` discovery. |
-| `plugins.scenarioPackages` | Exact simulation package names to load from project `node_modules`; when set, replaces the `<scope>/scenarios-*` scan. Marker-based `sim-pack` discovery still runs alongside. |
-| `plugins.autoDiscoverScenarios` | `false` disables the `<scope>/scenarios-*` scan for sim. Default `true`. Ignored when `scenarioPackages` is set. |
+| `plugins.checkPackages` | Exact fitness package names to load from project `node_modules`. |
+| `plugins.scenarioPackages` | Exact simulation package names to load from project `node_modules`; when set, replaces the `<scope>/scenarios-*` name-pattern scan. |
+| `plugins.autoDiscoverScenarios` | `false` disables the `<scope>/scenarios-*` name-pattern scan for sim. Default `true`. Ignored when `scenarioPackages` is set. |
 
 ```yaml
 plugins:
@@ -193,7 +193,7 @@ plugins:
   packageScopes: ['@acme']
 ```
 
-**Marker-based discovery** — packages declaring `opensipTools.kind: "fit-pack"` or `"sim-pack"` in `package.json` — is always on and **not configurable from this file**. The marker is the publication-scope-independent path; this config governs only explicit package lists and the sim `scenarios-*` scope scan. See [plugin loader](/docs/opensip-tools/80-implementation/02-plugin-loader/).
+**Sim-pack discovery is by name-pattern** (ADR-0029): the simulation tool's manifest declares a `name-pattern` discovery mode (`prefix: "scenarios-"`, default scope `@opensip-tools`), so any installed `<scope>/scenarios-*` package is discovered automatically. There is **no** `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. The three layers that contribute scenario packs are: the `<scope>/scenarios-*` name-pattern scan (governed by `packageScopes` / `autoDiscoverScenarios`), explicit `scenarioPackages` pins, and project-local scenario files under `opensip-tools/sim/scenarios/`. See [plugin loader](/docs/opensip-tools/80-implementation/02-plugin-loader/).
 
 ## `dashboard`
 
@@ -210,7 +210,7 @@ Validated by the project-config schema and read by the dashboard data path. Unkn
 
 ## `graph`
 
-Per-rule knobs for the `graph` tool. Read out-of-band by `loadGraphConfig` ([`graph-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/cli/graph-config.ts)), not by the fitness Zod schema. Every field is optional; an omitted field uses the rule's in-rule default. The loader projects only the field types — it does not strictly validate, so a malformed value is dropped (the rule then uses its default).
+Per-rule knobs for the `graph` tool. The `graph:` block is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/cli/graph-config-schema.ts) as part of the composed strict whole-document schema (ADR-0023) — **before dispatch**. Every field is optional; an omitted field uses the rule's in-rule default. A typo'd key (e.g. `minCrossPackageDuplicatePackges`) or a malformed value (e.g. a string where a number is expected, or a `severityOverrides` value outside `'error'`/`'warning'`) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped.
 
 ### Duplicated-function-body (`graph:duplicated-function-body`)
 
@@ -249,7 +249,7 @@ Two-band (warn / error) thresholds for the structural rules. A value between the
 |---|---|---|---|
 | `recipe` | string | — | Default recipe for `graph` when `--recipe` is not passed (ADR-0022). Tool-scoped — distinct from `fitness.recipe` / `simulation.recipe`. An unknown name here falls back to the built-in `default` recipe with a warning; an explicit `--recipe` typo still hard-fails. |
 | `entryPointHashes` | string[] | — | Override the inferred entry-point list with explicit body hashes. |
-| `severityOverrides` | map (rule-slug → `'error' \| 'warning'`) | `{}` | Per-rule severity clamp. An applied opt-in: a listed rule's emitted signals are clamped to the named severity. Only `'error'` / `'warning'` values are accepted; other values are dropped. |
+| `severityOverrides` | map (rule-slug → `'error' \| 'warning'`) | `{}` | Per-rule severity clamp. An applied opt-in: a listed rule's emitted signals are clamped to the named severity. Only `'error'` / `'warning'` values are accepted; any other value is **rejected** by strict validation with a `CONFIGURATION_ERROR`. |
 
 ```yaml
 graph:

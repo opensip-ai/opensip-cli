@@ -206,7 +206,7 @@ Two corrections keep the coupling grid honest — every off-diagonal edge follow
 Per [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md), graph (like every tool) **no longer renders its own machine output**. Stage 5 ends by collapsing the run's `Signal[]` into one `SignalEnvelope` in [`cli/build-envelope.ts`](../../../packages/graph/engine/src/cli/build-envelope.ts) (the same `SignalEnvelope` `fit` and `sim` emit). The graph engine returns that envelope via `CommandResult`; the **CLI composition root** maps flags to a (formatter × sink) pair:
 
 - **Terminal report (default)** — the human/table formatter, derived from `envelope.units` + `envelope.signals`.
-- **`--json`** — the shared `formatSignalJson` formatter (the envelope *is* the JSON).
+- **`--json`** — the host wraps the envelope in a `CommandOutcome` (the byte-identical envelope rides under `.envelope`) and serializes the whole outcome through the single `renderOutcome` seam. See [`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md).
 - **SARIF** (`--gate-save` / `--gate-compare` / `--report-to`) — the shared `formatSignalSarif` formatter.
 
 The old per-tool `render/json.ts` (which built the retired `CliOutput`) was **deleted**; graph keeps only graph-specific render helpers (e.g. `render/table.ts`, the OpenSIP rule-id mapping) under [`render/`](../../../packages/graph/engine/src/render/). The CLI handler [`cli/graph.ts`](../../../packages/graph/engine/src/cli/graph.ts) returns the envelope; the root renders/delivers it.
