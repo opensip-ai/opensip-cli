@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { discoverPackagesByDeclaredKind, isMarkerKind } from '../marker-discovery.js';
+import { discoverPackagesByDeclaredKind, isMarkerKind, readMarkerKind } from '../marker-discovery.js';
 
 let testDir: string;
 
@@ -35,6 +35,23 @@ describe('isMarkerKind', () => {
     expect(isMarkerKind(null)).toBe(false);
     expect(isMarkerKind(42)).toBe(false);
     expect(isMarkerKind({ kind: 'tool' })).toBe(false);
+  });
+});
+
+describe('readMarkerKind', () => {
+  it('returns the declared kind when it matches the closed union', () => {
+    writePkg(testDir, { name: 'host-tool', opensipTools: { kind: 'tool' } });
+    expect(readMarkerKind(testDir)).toBe('tool');
+  });
+
+  it('returns undefined for a declared kind outside the union', () => {
+    writePkg(testDir, { name: 'fit-pack', opensipTools: { kind: 'fit-pack' } });
+    expect(readMarkerKind(testDir)).toBeUndefined();
+  });
+
+  it('returns undefined when no marker is declared', () => {
+    writePkg(testDir, { name: 'plain' });
+    expect(readMarkerKind(testDir)).toBeUndefined();
   });
 });
 

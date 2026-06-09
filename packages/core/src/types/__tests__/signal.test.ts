@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { createSignal } from '../../types/signal.js';
+import { createSignal, isErrorSeverity, isErrorSignal } from '../../types/signal.js';
 
 import type { CreateSignalInput } from '../../types/signal.js';
 
@@ -110,5 +110,24 @@ describe('createSignal', () => {
   it('leaves suggestion undefined when not supplied', () => {
     const signal = createSignal(minimalInput);
     expect(signal.suggestion).toBeUndefined();
+  });
+});
+
+describe('isErrorSeverity', () => {
+  it('treats critical and high as error-rung', () => {
+    expect(isErrorSeverity('critical')).toBe(true);
+    expect(isErrorSeverity('high')).toBe(true);
+  });
+
+  it('treats medium and low as warning-rung', () => {
+    expect(isErrorSeverity('medium')).toBe(false);
+    expect(isErrorSeverity('low')).toBe(false);
+  });
+});
+
+describe('isErrorSignal', () => {
+  it('delegates to the signal severity', () => {
+    expect(isErrorSignal(createSignal({ source: 's', severity: 'high', ruleId: 'r', message: 'm' }))).toBe(true);
+    expect(isErrorSignal(createSignal({ source: 's', severity: 'low', ruleId: 'r', message: 'm' }))).toBe(false);
   });
 });

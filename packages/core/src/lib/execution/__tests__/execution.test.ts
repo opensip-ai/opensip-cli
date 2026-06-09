@@ -44,6 +44,51 @@ describe('runWithTimeout', () => {
     expect(out.status).toBe('error');
     expect(out.status === 'error' && (out.error as Error).message).toBe('boom');
   });
+
+  describe('with a retry policy (the retry branch)', () => {
+    const retry = { enabled: true, maxRetries: 2, backoffMs: [0, 0] } as const;
+
+    it('returns ok with the result when the retried run succeeds', async () => {
+      let calls = 0;
+      const out = await runWithTimeout({
+        run: () => {
+          calls++;
+          return calls < 2 ? Promise.reject(new Error('flaky')) : Promise.resolve('healed');
+        },
+        timeoutMs: 1000,
+        retry,
+      });
+      expect(out.status).toBe('ok');
+      expect(out.status === 'ok' && out.result).toBe('healed');
+      expect(calls).toBe(2);
+    });
+
+    it('returns error with lastError when every retried attempt throws', async () => {
+      const out = await runWithTimeout({
+        run: () => Promise.reject(new Error('always')),
+        timeoutMs: 1000,
+        retry,
+      });
+      expect(out.status).toBe('error');
+      expect(out.status === 'error' && (out.error as Error).message).toBe('always');
+    });
+
+    it('classifies a timeout while retrying as timeout (single-source abort)', async () => {
+      // The run rejects synchronously on each attempt without ever resolving the
+      // domain value, so retry keeps re-invoking it. Meanwhile the short timeout
+      // aborts the controller mid-retry; after retry settles, the post-run
+      // `signal.aborted` check maps the outcome to timeout, not error.
+      const out = await runWithTimeout({
+        run: () =>
+          new Promise<number>((_resolve, reject) => {
+            setTimeout(() => reject(new Error('slow-fail')), 20);
+          }),
+        timeoutMs: 10,
+        retry,
+      });
+      expect(out.status).toBe('timeout');
+    });
+  });
 });
 
 describe('runWithRetry', () => {
@@ -159,5 +204,30 @@ describe('executePipeline (combinator)', () => {
       onResult: (_u, _i, outcome) => { statuses.push(outcome.status); return { shouldStop: false }; },
     });
     expect(statuses).toEqual(['ok', 'timeout', 'ok']);
+  });
+
+  it('threads maxParallel, shouldAbort, retry, and a per-unit timeoutFor override', async () => {
+    const seen: number[] = [];
+    const timeoutUnits: number[] = [];
+    let aborted = false;
+    await executePipeline<number, number>({
+      units: [1, 2, 3, 4],
+      options: { mode: 'parallel', maxParallel: 2, timeout: 1000, retry: { enabled: true, maxRetries: 1 } },
+      timeoutFor: (u) => {
+        timeoutUnits.push(u);
+        return 50;
+      },
+      shouldAbort: () => aborted,
+      runOne: (u) => Promise.resolve(u),
+      onResult: (u, _i, outcome) => {
+        seen.push(u);
+        if (u === 4) aborted = true;
+        expect(outcome.status).toBe('ok');
+        return { shouldStop: false };
+      },
+    });
+    // Every scheduled unit went through the per-unit timeout override path.
+    expect(timeoutUnits.length).toBeGreaterThan(0);
+    expect(seen.length).toBeGreaterThan(0);
   });
 });

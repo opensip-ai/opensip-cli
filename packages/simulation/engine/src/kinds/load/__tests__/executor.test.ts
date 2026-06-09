@@ -71,6 +71,20 @@ describe('validateLoadScenarioConfig', () => {
       validateLoadScenarioConfig(base({ duration: 1, workload: { rps: 1, rampUp: 5 } })),
     ).toThrow(/rampUp/)
   })
+  it('rejects a negative rampUp (non-negative shape check)', () => {
+    expect(() =>
+      validateLoadScenarioConfig(base({ workload: { rps: 1, rampUp: -1 } })),
+    ).toThrow(/rampUp must be a non-negative number/)
+  })
+  it('rejects a non-number rampUp', () => {
+    expect(() =>
+      validateLoadScenarioConfig(base({ workload: { rps: 1, rampUp: 'soon' as never } })),
+    ).toThrow(/rampUp must be a non-negative number/)
+  })
+  it('rejects a non-positive duration', () => {
+    expect(() => validateLoadScenarioConfig(base({ duration: 0 }))).toThrow(/duration/)
+    expect(() => validateLoadScenarioConfig(base({ duration: 'x' as never }))).toThrow(/duration/)
+  })
   it('rejects empty assertions', () => {
     expect(() => validateLoadScenarioConfig(base({ assertions: [] }))).toThrow(/assertion/)
   })

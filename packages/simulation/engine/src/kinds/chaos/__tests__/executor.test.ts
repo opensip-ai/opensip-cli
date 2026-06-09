@@ -108,4 +108,43 @@ describe('validateChaosScenarioConfig', () => {
   it('rejects empty steady-state assertions', () => {
     expect(() => validateChaosScenarioConfig(base({ steadyStateAssertions: [] }))).toThrow(/steady/i)
   })
+  it('rejects empty recovery assertions', () => {
+    expect(() => validateChaosScenarioConfig(base({ recoveryAssertions: [] }))).toThrow(/recovery assertion/i)
+  })
+  it('rejects an invalid recoveryWindow (negative / non-number)', () => {
+    expect(() => validateChaosScenarioConfig(base({ recoveryWindow: -1 }))).toThrow(/recoveryWindow/)
+    expect(() => validateChaosScenarioConfig(base({ recoveryWindow: 'soon' as never }))).toThrow(/recoveryWindow/)
+  })
+  it('rejects a negative rampUp', () => {
+    expect(() =>
+      validateChaosScenarioConfig(base({ workload: { rps: 1, rampUp: -1 } })),
+    ).toThrow(/rampUp must be non-negative/)
+  })
+  it('rejects a non-positive duration', () => {
+    expect(() => validateChaosScenarioConfig(base({ duration: 0 }))).toThrow(/duration/)
+  })
+  it('rejects a missing fault spec', () => {
+    expect(() => validateChaosScenarioConfig(base({ fault: undefined as never }))).toThrow(
+      /fault spec is required/,
+    )
+  })
+  it('rejects an unknown fault kind', () => {
+    expect(() =>
+      validateChaosScenarioConfig(
+        base({ fault: { faults: [{ kind: 'meltdown' as never }], probability: 0.5 } }),
+      ),
+    ).toThrow(/fault kind must be one of/)
+  })
+  it('rejects a latency fault with a missing or negative ms', () => {
+    expect(() =>
+      validateChaosScenarioConfig(
+        base({ fault: { faults: [{ kind: 'latency' } as never], probability: 0.5 } }),
+      ),
+    ).toThrow(/latency fault requires a non-negative ms/)
+    expect(() =>
+      validateChaosScenarioConfig(
+        base({ fault: { faults: [{ kind: 'latency', ms: -5 } as never], probability: 0.5 } }),
+      ),
+    ).toThrow(/latency fault requires a non-negative ms/)
+  })
 })
