@@ -138,15 +138,19 @@ describe('simulationTool metadata', () => {
     expect(simulationTool.metadata.description).toContain('simulation');
   });
 
-  it('declares a single sim subcommand', () => {
-    expect(simulationTool.commands).toHaveLength(1);
-    expect(simulationTool.commands[0]?.name).toBe('sim');
+  it('declares the user-facing sim subcommand (+ the internal worker)', () => {
+    const names = simulationTool.commands.map((c) => c.name);
+    expect(names).toContain('sim');
+    // The internal off-main-process worker (ADR-0028), forked by the live view.
+    expect(names).toContain('sim-run-worker');
+    expect(simulationTool.commands).toHaveLength(2);
   });
 });
 
 describe('simulationTool command surface (Phase 3 — CommandSpec migration)', () => {
   it('mounts via commandSpecs — the one command surface (register() removed in 3.0.0)', () => {
-    expect(simulationTool.commandSpecs).toHaveLength(1);
+    // `sim` + the internal `sim-run-worker` (ADR-0028).
+    expect(simulationTool.commandSpecs).toHaveLength(2);
     // `register` is no longer a Tool member (3.0.0) — its absence is structural,
     // enforced by the type system, not asserted at runtime.
   });

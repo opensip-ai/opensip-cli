@@ -50,7 +50,7 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
   {
     id: 'simulation',
     dir: join(REPO_ROOT, 'packages', 'simulation', 'engine'),
-    commands: ['sim'],
+    commands: ['sim', 'sim-run-worker'],
   },
   {
     id: 'graph',
