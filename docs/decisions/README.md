@@ -174,6 +174,13 @@ distinct from:
   `program` handle (commandSpecs is the one command surface), and end the
   `apiVersion` grace window. The acceptance test (`fit` loaded externally ≡
   bundled) passes; all nine §8 completion invariants are live guardrails
+- [ADR-0028](./ADR-0028-off-main-thread-execution.md) — Off-main-process execution
+  for live runs: interactive (TTY) runs fork the CLI to a per-tool headless worker
+  subcommand (`fit/sim/graph-run-worker`) over the `ProgressTransport` seam, so the
+  main process runs only Ink + the 80 ms clock and the spinner never starves;
+  persistence/egress stay on the main process post-run; engine entries are
+  persistence-free; `--json`/non-TTY stays in-process; `OPENSIP_TOOLS_NO_WORKER`
+  forces the in-process fallback. Exercises the reversibility ADR-0016 reserved
 
 ### Superseded
 
