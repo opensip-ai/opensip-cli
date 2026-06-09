@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-08
-release: v2.12.0
+release: v3.0.0
 title: "Environment variables"
 audience: [ci-integrators, operators]
 purpose: "Every environment variable the opensip-tools CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
@@ -9,6 +9,7 @@ source-files:
   - packages/cli/src/env/host-env-specs.ts
   - packages/config/src/document/global-config.ts
   - packages/graph/engine/src/cli/pressure-monitor.ts
+  - packages/core/src/runtime/subprocess-transport.ts
 related-docs:
   - ./04-json-output-schema.md
   - ../../decisions/ADR-0024-command-outcome-and-observability.md
@@ -47,6 +48,12 @@ bypasses the registry.
 | Variable | Effect |
 |---|---|
 | `OPENSIP_HEAP_NO_MONITOR` | Set to `1` to disable the V8 heap-pressure monitor (REPL embedding / custom allocators). |
+
+## Execution
+
+| Variable | Effect |
+|---|---|
+| `OPENSIP_TOOLS_NO_WORKER` | Set to `1` to run a tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. |
 
 ## Terminal / pre-scope
 

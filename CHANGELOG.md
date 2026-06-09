@@ -46,6 +46,21 @@ thing distinguishing a bundled tool from an installed or project-local one is it
   tool runtime; 139 → 140 checks) + the **completion-invariant index** with a CI
   assertion that every §8 invariant maps to a live check.
 
+### Performance
+
+- **Live (TTY) runs execute the engine off the main process** ([ADR-0028](docs/decisions/ADR-0028-off-main-thread-execution.md)).
+  An interactive `fit`/`sim`/`graph` run forks a headless worker subcommand
+  (`fit`/`sim`/`graph-run-worker`) over the `ProgressTransport` seam, so the render
+  thread runs only Ink + the 80 ms clock — the spinner and elapsed clock no longer
+  stutter or freeze-then-jump under a synchronous CPU blast (the graph TypeScript
+  type-check, fit/sim check/scenario batches). Persistence + cloud egress stay on
+  the parent post-run; the engine entries are persistence-free. `--json`/non-TTY
+  output, exit codes, and persisted sessions are byte/row-identical (the
+  rearchitecture is invisible to consumers). `OPENSIP_TOOLS_NO_WORKER=1` forces the
+  in-process fallback (also taken automatically on a fork failure). A
+  **`live-runs-off-thread`** guardrail (140 → 141 checks) keeps a live runner from
+  regressing to in-process execution and keeps worker entries persistence-free.
+
 The project leaves the long-lived pre-GA 2.x major for the **3.x GA line**. Future
 tools (`audit`/`lint`/`bench`) slot in by shipping a manifest + `commandSpecs`,
 inheriting every host-owned plane, with zero CLI change.
