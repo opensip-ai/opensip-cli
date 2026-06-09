@@ -54,6 +54,7 @@ export function getLoadWarnings(): readonly string[] {
  * malicious or broken plugin could silently suppress its own checks while the
  * CLI exits 0, masking a compliance failure or a supply-chain compromise.
  */
+// @fitness-ignore-next-line duplicate-utility-functions -- intentionally parallel per-tool scope accessor: fit reads scope.fitness.load, sim reads scope.simulation.load; they cannot consolidate (different registries) and mirror getLoadWarnings.
 export function getPluginLoadErrors(): readonly string[] {
   return currentFitnessLoadState().pluginLoadErrors;
 }

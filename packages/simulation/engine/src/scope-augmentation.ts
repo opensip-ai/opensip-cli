@@ -30,16 +30,32 @@ import type { SimulationRecipeRegistry } from './recipes/registry.js';
 import type { Registry } from '@opensip-tools/core';
 
 /**
+ * Per-RunScope `ensureScenariosLoaded` lifecycle state — moved off the `sim.ts`
+ * module singletons (`scenariosLoadedFor` / `pluginLoadErrors`) so two concurrent
+ * sim runs carry independent load state (audit F1). Mutable: written once per run
+ * by `ensureScenariosLoaded`; read by `getPluginLoadErrors`.
+ */
+export interface SimulationLoadState {
+  /** Project directory `ensureScenariosLoaded` has completed for in THIS scope.
+   *  `null` before the first load; `''` is the "loaded" sentinel for no-project. */
+  loadedFor: string | null;
+  /** Plugin load failures from the most recent `ensureScenariosLoaded` call. */
+  pluginLoadErrors: readonly string[];
+}
+
+/**
  * Per-RunScope simulation state. Constructed by the simulation tool's
  * `contributeScope()` hook and attached to `scope.simulation`.
  */
 export interface SimulationSubscope {
-  /** Scenario registry — populated by `loadAllSimPlugins` /
-   *  `loadDiscoveredScenarioPackages` during `ensureScenariosLoaded`. */
+  /** Scenario registry — populated through the generic capability loader
+   *  (`sim-pack` domain) + `loadAllSimPlugins` during `ensureScenariosLoaded`. */
   readonly scenarios: Registry<RunnableScenario>;
   /** Recipe registry — seeded with built-in recipes at construction;
-   *  plugin loader registers user recipes. */
+   *  plugin loader + the sim-recipe domain register user recipes. */
   readonly recipes: SimulationRecipeRegistry;
+  /** `ensureScenariosLoaded` lifecycle state for this run (audit F1). */
+  readonly load: SimulationLoadState;
 }
 
 declare module '@opensip-tools/core' {

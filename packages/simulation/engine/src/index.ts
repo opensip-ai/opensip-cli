@@ -95,16 +95,7 @@ export { ensureScenariosLoaded } from './cli/sim.js'
 // =============================================================================
 
 export type { SimPluginExports } from './plugins/types.js'
-export {
-  discoverScenarioPackages,
-  readScenarioPackageMetadata,
-  readScenarioPackagePreferences,
-} from './plugins/scenario-package-discovery.js'
-export type {
-  DiscoveredScenarioPackage,
-  ScenarioPackageDiscoveryOptions,
-  ScenarioPackageMetadata,
-} from './plugins/scenario-package-discovery.js'
+export { readScenarioPackagePreferences } from './plugins/scenario-package-discovery.js'
 export { loadAllSimPlugins } from './plugins/loader.js'
 
 // =============================================================================

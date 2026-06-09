@@ -26,7 +26,33 @@
 import { Registry, currentScope } from '@opensip-tools/core'
 
 import type { RunnableScenario } from './runnable-scenario.js'
+import type { SimulationLoadState } from '../scope-augmentation.js'
 import type { ScenarioKind } from '../types/kind-types.js'
+
+/** Construct a fresh `ensureScenariosLoaded` lifecycle slot for a single `RunScope` (audit F1). */
+export function createSimulationLoadState(): SimulationLoadState {
+  return { loadedFor: null, pluginLoadErrors: [] }
+}
+
+/**
+ * Read the current scope's simulation load state (`scope.simulation.load`).
+ * Throws when no scope/subscope is active — same contract as
+ * {@link currentScenarioRegistry}.
+ *
+ * @throws {Error} When called outside `runWithScope(...)`, or when the active
+ *   scope has no simulation subscope.
+ */
+export function currentSimulationLoadState(): SimulationLoadState {
+  const scope = currentScope()
+  if (!scope?.simulation) {
+    throw new Error(
+      'simulation: currentSimulationLoadState() requires an active RunScope with a ' +
+        'simulation subscope (production: the pre-action-hook; tests: makeTestScope + ' +
+        'simulationTool.contributeScope()).',
+    )
+  }
+  return scope.simulation.load
+}
 
 /** Construct a fresh scenario registry for a single `RunScope`. */
 export function createScenarioRegistry(): Registry<RunnableScenario> {

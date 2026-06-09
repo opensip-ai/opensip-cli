@@ -66,7 +66,25 @@
             "packages": "scenarioPackages",
             "autoDiscover": "autoDiscoverScenarios",
             "scopes": "packageScopes"
-          }
+          },
+          "coContributions": [
+            {
+              "exportName": "recipes",
+              "exportShape": "array",
+              "domainId": "sim-recipe"
+            }
+          ]
+        }
+      },
+      {
+        "id": "sim-recipe",
+        "apiVersion": 1,
+        "contributionKind": "module-export",
+        "contributionSchema": {
+          "requiredKeys": [
+            "id",
+            "name"
+          ]
         }
       }
     ]

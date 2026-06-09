@@ -21,27 +21,20 @@
  *      empty registry; the fatal decision is the command's.)
  */
 
-import { pathToFileURL } from 'node:url';
 
 import { BUILTIN_DEFAULT_RECIPE, buildFindingGroups, buildSignalEnvelope, EXIT_CODES } from '@opensip-tools/contracts';
-import { currentScope, discoverPackagesByMarker, generatePrefixedId, logger, registerRecipesFromMod } from '@opensip-tools/core';
+import { currentScope, generatePrefixedId, loadCapabilityDomain, logger, resolveScopes } from '@opensip-tools/core';
 import { SessionRepo } from '@opensip-tools/session-store';
 
-import { currentScenarioRegistry } from '../framework/registry.js';
+import { currentScenarioRegistry, currentSimulationLoadState } from '../framework/registry.js';
 import { buildSimulationSessionPayload } from '../persistence/session-payload.js';
 import { loadAllSimPlugins } from '../plugins/loader.js';
-import {
-  discoverScenarioPackages,
-  readScenarioPackageMetadata,
-  readScenarioPackagePreferences,
-} from '../plugins/scenario-package-discovery.js';
+import { readScenarioPackagePreferences } from '../plugins/scenario-package-discovery.js';
 import { currentSimulationRecipeRegistry } from '../recipes/registry.js';
 import { SimulationRecipeService } from '../recipes/service.js';
 
 import { resolveSimRecipeSelection } from './sim-config.js';
 
-import type { RunnableScenario } from '../framework/runnable-scenario.js';
-import type { SimPluginExports } from '../plugins/types.js';
 import type { SimulationScenarioResult } from '../recipes/service.js';
 import type { ErrorResult, SimDoneResult, ToolOptions, UnitResult, VerboseDetail } from '@opensip-tools/contracts';
 import type { Signal } from '@opensip-tools/core';
@@ -51,204 +44,70 @@ import type { DataStore } from '@opensip-tools/datastore';
 // Lazy-load simulation scenarios
 // ---------------------------------------------------------------------------
 
-/** Project directory for which `ensureScenariosLoaded` has run to completion.
- * Keyed on the directory so a second invocation against a different
- * project (long-lived host, tests, programmatic API) re-loads plugins
- * and scenario packages anchored at the new directory. `null` when no
- * projectDir was supplied; `''` is reserved as the "loaded" sentinel
- * for the no-project case. */
-let scenariosLoadedFor: string | null = null;
-/** Plugin load failures from the most recent `ensureScenariosLoaded` call —
- * exposed via `getPluginLoadErrors` for callers that want to fail the run. */
-let pluginLoadErrors: readonly string[] = [];
-
 /**
  * Plugin load errors recorded during the most recent ensureScenariosLoaded()
- * call. Mirrors fitness's `getPluginLoadErrors` — lets the runner fail the
- * run if any plugin failed to import, so a broken plugin can't silently
- * suppress its own scenarios while the CLI exits 0.
+ * call — on `scope.simulation.load` now, NOT a module singleton (audit F1). Read
+ * by the runner to fail the run if a broken plugin silently suppressed its
+ * scenarios while the CLI exits 0.
  */
 export function getPluginLoadErrors(): readonly string[] {
-  return pluginLoadErrors;
+  return currentSimulationLoadState().pluginLoadErrors;
 }
 
 /**
- * Discover and load every sim plugin and scenario package for the
- * project. Idempotent per-projectDir; calling twice with the same
- * directory is a no-op after the first.
+ * Discover and load every sim plugin and scenario package for the project.
+ * Idempotent per-projectDir, memoized on `scope.simulation.load` (audit F1).
  */
 export async function ensureScenariosLoaded(projectDir?: string): Promise<void> {
   const key = projectDir ?? '';
-  if (scenariosLoadedFor === key) return;
+  const load = currentSimulationLoadState();
+  if (load.loadedFor === key) return;
 
-  // 1. Load sim plugins — discovers .mjs files in
-  //    <projectDir>/opensip-tools/sim/{scenarios,recipes}/ and any
-  //    npm packages declared in plugins.sim in the project config.
-  //    Scenarios self-register on import; recipes register through the
-  //    sim loader's registerExports callback.
+  // 1. Load .mjs sim plugins — project-local scenarios/recipes + plugins.sim
+  //    packages. Scenarios self-register on import; recipes via the loader.
   const pluginResult = await loadAllSimPlugins(projectDir);
-  pluginLoadErrors = pluginResult.errors;
-  if (pluginResult.errors.length > 0) {
-    for (const err of pluginResult.errors) {
-      process.stderr.write(`opensip-tools: plugin failed to load — ${err}\n`);
-      logger.warn({ evt: 'cli.plugin.warning', module: 'cli:sim', message: err });
-    }
+  load.pluginLoadErrors = pluginResult.errors;
+  for (const err of pluginResult.errors) {
+    process.stderr.write(`opensip-tools: plugin failed to load — ${err}\n`);
+    logger.warn({ evt: 'cli.plugin.warning', module: 'cli:sim', message: err });
   }
 
-  // 2. Discover and load every @opensip-tools/scenarios-* package
-  //    installed in node_modules. No package is privileged. Project
-  //    config can override (plugins.scenarioPackages: [...]) or opt
-  //    out (plugins.autoDiscoverScenarios: false). Customer-owned
-  //    scopes are picked up via plugins.packageScopes.
-  //
-  //    Like fitness's path, projectDir is the discovery anchor; an
-  //    ad-hoc invocation without one falls through to no discovery.
-  await loadDiscoveredScenarioPackages(projectDir ?? '');
+  // 2. Scenario packages (+ co-located recipes → the sim-recipe domain) through
+  //    the GENERIC capability substrate (§5.3): name-pattern `<scope>/scenarios-*`
+  //    discovery, the documented plugins.{scenarioPackages,autoDiscoverScenarios,
+  //    packageScopes} keys, and the single-core guard all live in core now — sim
+  //    no longer carries a bespoke loader. Memoized per (domain, project) on the
+  //    scope capability registry, so the CLI pre-action hook and this don't
+  //    double-load.
+  await loadSimScenarioPackages(projectDir ?? '');
 
-  // 3. No-scenarios guard. Silent zero-scenarios would let a misconfig
-  //    or missing dep produce a green run that simulated nothing —
-  //    the same failure mode fitness's no-checks guard exists to
-  //    prevent.
+  // 3. No-scenarios guard (structured-log only; executeSim owns the fatal exit).
   if (currentScenarioRegistry().size === 0) {
-    // Structured-log only. The user-facing decision — fail the run closed
-    // with a CONFIGURATION_ERROR exit so a misconfig/missing-dep can't
-    // produce a green run that simulated nothing — is owned by executeSim's
-    // zero-scenarios guard (single responsibility: the loader loads, the
-    // command decides whether an empty result is fatal).
-    logger.warn({
-      evt: 'cli.scenario_packages.empty',
-      module: 'cli:sim',
-      msg: 'no scenarios loaded',
-    });
+    logger.warn({ evt: 'cli.scenario_packages.empty', module: 'cli:sim', msg: 'no scenarios loaded' });
   }
 
-  scenariosLoadedFor = key;
+  load.loadedFor = key;
 }
 
 /**
- * Lightweight type guard: returns true when `value` has the minimum
- * shape of a `RunnableScenario`. Pulled out of the inner loop so the
- * loadDiscoveredScenarioPackages function stays under the cognitive-
- * complexity limit.
+ * Drive the generic capability loader for the `sim-pack` domain. A no-op when the
+ * run carries no capability registry (a programmatic sim use that never wired the
+ * host capability plane), the domain is unregistered, or no projectDir. Scopes are
+ * merged (default `@opensip-tools` ∪ customer `packageScopes`) here so name-pattern
+ * discovery matches the prior `resolveScopes` behavior. No `@opensip-tools/config` dep.
  */
-function isRunnableScenarioShape(value: unknown): value is { id: string; kind: string; run: unknown } {
-  return value !== null
-    && typeof value === 'object'
-    && 'id' in value
-    && 'kind' in value
-    && 'run' in value;
-}
-
-/**
- * Register each well-shaped scenario from a discovered scenario
- * package's exported `scenarios` array into the current scope's
- * scenario registry. Per-item failures warn but don't throw — one bad
- * scenario shouldn't disqualify the rest of the package.
- */
-function registerScenariosFromMod(
-  scenariosField: unknown,
-  packageName: string,
-): void {
-  if (!Array.isArray(scenariosField)) return;
-  const registry = currentScenarioRegistry();
-  for (const scenario of scenariosField) {
-    if (!isRunnableScenarioShape(scenario)) continue;
-    try {
-      registry.register(scenario as RunnableScenario);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.warn({
-        evt: 'cli.scenario_package.scenario_invalid',
-        module: 'cli:sim',
-        name: packageName,
-        error: msg,
-      });
-    }
-  }
-}
-
-/**
- * Import every scenario package returned by discoverScenarioPackages().
- * Both scenarios and recipes are explicit array exports — neither
- * registers as a side effect of definition (commit 1a0a71b migrated
- * scenarios; Item 1 migrated recipes). The loader iterates each
- * exported `scenarios` / `recipes` array and registers items into the
- * scope-bound registries.
- *
- * Errors loading any one package don't fail the others — they surface
- * to stderr the same way sim-domain plugin failures do.
- */
-export async function loadDiscoveredScenarioPackages(projectDir: string): Promise<void> {
+async function loadSimScenarioPackages(projectDir: string): Promise<void> {
   if (projectDir === '') return;
+  const registry = currentScope()?.capabilities;
+  if (!registry?.hasDomain('sim-pack') || registry.isDomainLoaded('sim-pack', projectDir)) return;
   const prefs = readScenarioPackagePreferences(projectDir);
-  const discovered = discoverScenarioPackages({
-    projectDir,
-    explicitPackages: prefs.scenarioPackages,
-    autoDiscover: prefs.autoDiscoverScenarios,
-    packageScopes: prefs.packageScopes,
-  });
-  // Marker-based discovery runs in parallel with the name-pattern walk.
-  // Customers who declare opensipTools.kind: "sim-pack" in package.json
-  // are discovered regardless of npm scope. Dedupe by package name;
-  // first occurrence (name-pattern walk) wins.
-  const markerDiscovered = discoverPackagesByMarker({ projectDir, kind: 'sim-pack' });
-  const seenNames = new Set(discovered.map((p) => p.name));
-  const allPacks: readonly { name: string; packageDir: string }[] = [
-    ...discovered,
-    ...markerDiscovered
-      .filter((p) => !seenNames.has(p.name))
-      .map((p) => ({ name: p.name, packageDir: p.packageDir })),
-  ];
-  for (const pkg of allPacks) {
-    const meta = readScenarioPackageMetadata(pkg.packageDir);
-    if (!meta) {
-      process.stderr.write(`opensip-tools: scenario package ${pkg.name} has no readable package.json — skipping\n`);
-      continue;
-    }
-    try {
-      const scenarioReg = currentScenarioRegistry();
-      const sizeBefore = scenarioReg.size;
-      const moduleUrl = pathToFileURL(meta.mainEntry).href;
-      const mod = (await import(moduleUrl)) as SimPluginExports;
-      // Walk the exported scenarios array (defineX no longer
-      // self-registers; commit 1a0a71b). registerScenariosFromMod
-      // applies the same silent-skip/throw-on-name-collision behavior
-      // as the .mjs loader and warns on per-item failures.
-      registerScenariosFromMod(mod.scenarios, pkg.name);
-      const scenariosRegistered = scenarioReg.size - sizeBefore;
-      // Register any explicit recipes via the shared helper. The helper
-      // emits the same plugin.recipe.invalid_item warning loader.ts now
-      // emits — replaces the previous silent-drop on malformed recipes.
-      const { recipesRegistered } = registerRecipesFromMod(mod, currentSimulationRecipeRegistry(), {
-        namespace: pkg.name,
-        onWarn: (evt, message, extra) => {
-          logger.warn({
-            evt,
-            module: 'cli:sim',
-            name: pkg.name,
-            msg: message,
-            ...extra,
-          });
-        },
-      });
-      logger.info({
-        evt: 'cli.scenario_package.loaded',
-        module: 'cli:sim',
-        name: pkg.name,
-        scenariosRegistered,
-        recipesRegistered,
-      });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`opensip-tools: failed to load scenario package ${pkg.name}: ${msg}\n`);
-      logger.warn({
-        evt: 'cli.scenario_package.load_failed',
-        module: 'cli:sim',
-        name: pkg.name,
-        error: msg,
-      });
-    }
-  }
+  const scopes = resolveScopes('@opensip-tools', prefs.packageScopes ?? [], 'plugin.scenario_package.invalid_scope');
+  const preferences = {
+    ...(prefs.scenarioPackages === undefined ? {} : { packages: prefs.scenarioPackages }),
+    ...(prefs.autoDiscoverScenarios === undefined ? {} : { autoDiscover: prefs.autoDiscoverScenarios }),
+    scopes,
+  };
+  await loadCapabilityDomain({ registry, domainId: 'sim-pack', projectDir, preferences });
 }
 
 /**

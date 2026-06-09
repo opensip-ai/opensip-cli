@@ -19,15 +19,20 @@ import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { renderSimLive } from './cli/sim-runner.js';
 import { simRunWorkerCommandSpec } from './cli/sim-worker.js';
 import { executeSim, persistSimSession } from './cli/sim.js';
-import { createScenarioRegistry, currentScenarioRegistry } from './framework/registry.js';
+import {
+  createScenarioRegistry,
+  createSimulationLoadState,
+  currentScenarioRegistry,
+} from './framework/registry.js';
 import { simReplayFromSession } from './persistence/session-replay.js';
 import { SIM_PLUGIN_LAYOUT } from './plugins/loader.js';
-import { createSimulationRecipeRegistry } from './recipes/registry.js';
+import { createSimulationRecipeRegistry, currentSimulationRecipeRegistry } from './recipes/registry.js';
 // Side-effect import: ensures the RunScope.simulation augmentation is
 // loaded so `scope.simulation` is the correctly-typed slot here.
 import './scope-augmentation.js';
 
 import type { RunnableScenario } from './framework/runnable-scenario.js';
+import type { SimulationRecipe } from './recipes/types.js';
 import type {
   CapabilityRegistrar,
   CommandSpec,
@@ -300,16 +305,32 @@ const registerSimScenario: CapabilityRegistrar = (contribution) => {
 };
 
 /**
+ * The simulation tool's registrar for its `sim-recipe` capability domain (§5.3
+ * separate-domains fold). A scenario pack's co-located `recipes` export is routed
+ * here by the SAME discovery walk that loads its scenarios. Host-checked against
+ * `requiredKeys: ['id', 'name']`; silently skips an already-registered id/name
+ * (mirroring the shared `registerRecipesFromMod` dedupe).
+ */
+const registerSimRecipe: CapabilityRegistrar = (contribution) => {
+  const recipe = contribution as SimulationRecipe;
+  const registry = currentSimulationRecipeRegistry();
+  if (registry.has(recipe.id) || registry.has(recipe.name)) return;
+  registry.register(recipe, { allowOverwrite: false });
+};
+
+/**
  * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
  * after constructing the scope and before entering it; the kernel installs
- * the returned `simulation` slot. Fresh scenario + recipe registries per
- * run so concurrent scopes carry independent simulation state.
+ * the returned `simulation` slot. Fresh scenario + recipe registries + a fresh
+ * `ensureScenariosLoaded` lifecycle slot per run (audit F1) so concurrent scopes
+ * carry independent simulation state.
  */
 function contributeScope(): ScopeContribution {
   return {
     simulation: {
       scenarios: createScenarioRegistry(),
       recipes: createSimulationRecipeRegistry(),
+      load: createSimulationLoadState(),
     },
   };
 }
@@ -338,5 +359,5 @@ export const simulationTool: Tool = {
   // §5.3 Phase 4: simulation owns the `sim-pack` capability domain (declared in
   // its manifest). It supplies the REAL registrar so the host can replace the
   // manifest-time deferred placeholder once sim's module loads.
-  capabilityRegistrars: { 'sim-pack': registerSimScenario },
+  capabilityRegistrars: { 'sim-pack': registerSimScenario, 'sim-recipe': registerSimRecipe },
 };
