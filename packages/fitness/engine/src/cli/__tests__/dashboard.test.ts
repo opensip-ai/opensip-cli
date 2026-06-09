@@ -9,7 +9,15 @@
  * composition root's job now.
  */
 
-import { enterScope } from '@opensip-tools/core';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  createCapabilityRegistry,
+  enterScope,
+  loadToolManifest,
+  registerCapabilityDomainsFromManifest,
+} from '@opensip-tools/core';
 import { makeTestScope } from '@opensip-tools/core/test-utils/with-scope.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -22,6 +30,25 @@ import type {
   RecipeCatalogEntry,
 } from '../dashboard.js';
 
+/** The fitness engine package root (carries the manifest), 4 dirs up from this test. */
+const ENGINE_DIR = dirname(dirname(dirname(dirname(fileURLToPath(import.meta.url)))));
+
+/**
+ * Wire fitness's capability plane onto a scope exactly as the CLI host does:
+ * register the manifest-declared domains (fit-pack, fit-recipe) and swap in the
+ * tool's real registrars. `ensureChecksLoaded` drives discovery through this, so
+ * without it the dashboard catalog would be empty.
+ */
+function wireFitnessCapabilities(scope: ReturnType<typeof makeTestScope>): void {
+  const capabilities = createCapabilityRegistry();
+  const manifest = loadToolManifest('bundled', ENGINE_DIR);
+  if (manifest) registerCapabilityDomainsFromManifest(manifest, capabilities);
+  for (const [domainId, registrar] of Object.entries(fitnessTool.capabilityRegistrars ?? {})) {
+    if (capabilities.hasDomain(domainId)) capabilities.setRegistrar(domainId, registrar);
+  }
+  Object.assign(scope, { capabilities });
+}
+
 /**
  * Build + enter a RunScope carrying fitness's contributed subscope. The
  * collector reads the check/recipe registries and the `ensureChecksLoaded`
@@ -31,6 +58,7 @@ import type {
 function enterFitnessScope(): ReturnType<typeof makeTestScope> {
   const scope = makeTestScope();
   Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  wireFitnessCapabilities(scope);
   enterScope(scope);
   return scope;
 }

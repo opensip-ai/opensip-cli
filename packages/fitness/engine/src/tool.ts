@@ -65,6 +65,7 @@ import {
   createFitnessLoadState,
   createRecipeRegistry,
   currentCheckRegistry,
+  currentRecipeRegistry,
 } from './framework/scope-registry.js';
 import { fitReplayFromSession } from './persistence/session-replay.js';
 import { FIT_PLUGIN_LAYOUT } from './plugins/loader.js';
@@ -73,6 +74,7 @@ import { FIT_PLUGIN_LAYOUT } from './plugins/loader.js';
 import './scope-augmentation.js';
 
 import type { Check } from './framework/check-types.js';
+import type { FitnessRecipe } from './recipes/types.js';
 import type { FitOptions } from '@opensip-tools/contracts';
 import type {
   CapabilityRegistrar,
@@ -182,6 +184,21 @@ const registerFitCheck: CapabilityRegistrar = (contribution) => {
 };
 
 /**
+ * The fitness tool's registrar for its `fit-recipe` capability domain (§5.3
+ * separate-domains fold). A check pack's co-located `recipes` export is routed
+ * here by the SAME discovery walk that loads its checks. The host has already
+ * shape-checked each contribution against `requiredKeys: ['id', 'name']`; this
+ * silently skips a recipe whose id/name is already registered (mirroring the
+ * shared `registerRecipesFromMod` dedupe), so re-discovery is idempotent.
+ */
+const registerFitRecipe: CapabilityRegistrar = (contribution) => {
+  const recipe = contribution as FitnessRecipe;
+  const registry = currentRecipeRegistry();
+  if (registry.has(recipe.id) || registry.has(recipe.name)) return;
+  registry.register(recipe, { allowOverwrite: false });
+};
+
+/**
  * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
  * after constructing the scope and before entering it; the kernel installs
  * the returned `fitness` slot. Fresh check + recipe registries (and an empty
@@ -229,7 +246,7 @@ export const fitnessTool: Tool = {
   // §5.3 Phase 4: fitness owns the `fit-pack` capability domain (declared in
   // its manifest). It supplies the REAL registrar so the host can replace the
   // manifest-time deferred placeholder once fitness's module loads.
-  capabilityRegistrars: { 'fit-pack': registerFitCheck },
+  capabilityRegistrars: { 'fit-pack': registerFitCheck, 'fit-recipe': registerFitRecipe },
   initialize: async (): Promise<void> => {
     // ensureChecksLoaded() is called inside the executeFit / listChecks
     // / listRecipes paths, so a separate initialize() pass is not

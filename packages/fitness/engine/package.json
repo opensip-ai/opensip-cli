@@ -75,7 +75,8 @@
         "contributionKind": "module-export",
         "contributionSchema": {
           "requiredKeys": [
-            "slug"
+            "config",
+            "run"
           ]
         },
         "discovery": {
@@ -88,7 +89,26 @@
           "configKeys": {
             "packages": "checkPackages"
           },
-          "builtinScope": "@opensip-tools"
+          "builtinScope": "@opensip-tools",
+          "explicitListMode": "augment",
+          "coContributions": [
+            {
+              "exportName": "recipes",
+              "exportShape": "array",
+              "domainId": "fit-recipe"
+            }
+          ]
+        }
+      },
+      {
+        "id": "fit-recipe",
+        "apiVersion": 1,
+        "contributionKind": "module-export",
+        "contributionSchema": {
+          "requiredKeys": [
+            "id",
+            "name"
+          ]
         }
       }
     ]

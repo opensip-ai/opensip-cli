@@ -52,9 +52,7 @@ export {
   getEnabledCheckCount,
   getLoadWarnings,
   getPluginLoadErrors,
-  loadDiscoveredCheckPackages,
 } from './fit/check-loader.js';
-export type { LoadDiscoveredResult } from './fit/check-loader.js';
 export { getDisplayName, getIcon } from './fit/display-registry.js';
 // `formatValidatedColumn` moved to `@opensip-tools/cli-ui` (shared by the
 // fit static + live table views) in ADR-0011 Phase 6; re-export it here so
