@@ -4,8 +4,10 @@
  * The envelope IS the JSON output contract — there is no transform. This
  * single pure formatter replaces the three divergent `CliOutput`-emitting
  * `--json` paths (fitness `buildCliOutput`, graph `json.ts`, sim's bespoke
- * `SimDoneResult`). Consumers keep `--json | jq '.verdict.passed'` /
- * `.verdict.score`; the wire severity is the 4-level `SignalSeverity`.
+ * `SimDoneResult`). This formatter emits the envelope itself; on the CLI wire
+ * it rides under `.envelope` of a `CommandOutcome` (ADR-0024), so a `--json`
+ * consumer reads `jq '.envelope.verdict.passed'` / `.envelope.verdict.score`.
+ * The wire severity is the 4-level `SignalSeverity`.
  *
  * Pure: no IO, no clock, no id generation — stringification only.
  */

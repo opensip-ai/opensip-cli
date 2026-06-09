@@ -5,9 +5,9 @@
  * Three related concerns live here:
  *
  *  1. `createLiveViewRegistry` — backs `ToolCliContext.registerLiveView`
- *     / `renderLive`. Each tool's `register(cli)` calls
- *     `cli.registerLiveView(key, renderer)`; `renderLive(key, args)`
- *     looks the renderer up. An unregistered key throws
+ *     / `renderLive`. A tool sets its live view up on the context (e.g.
+ *     `setUpFitLiveView`) via `cli.registerLiveView(key, renderer)`;
+ *     `renderLive(key, args)` looks the renderer up. An unregistered key throws
  *     `UnknownLiveViewError` rather than silently falling back to a
  *     static render — the latter masked bugs where a tool mistyped its
  *     view key.

@@ -350,8 +350,9 @@ export interface RenderFitLiveOptions {
  * Render the live `fit` view. Returns the run's {@link SignalEnvelope} once
  * the underlying Ink app exits (or `undefined` on an error / no-result run).
  *
- * The CLI's `tool.register(cli)` wires this through
- * `cli.registerLiveView('fit', (args) => renderFitLive(args, { ... }))`.
+ * The fitness tool wires this in via `setUpFitLiveView`, which calls
+ * `cli.registerLiveView('fit', (args) => renderFitLive(args, { ... }))`
+ * lazily on the interactive path (there is no `register()` mount hook).
  * `setExitCode` is the single mutator path on `process.exitCode`; the
  * runner calls it for error and `shouldFail` outcomes so the CLI's
  * exit-code seam stays the only writer. The returned envelope lets the tool's

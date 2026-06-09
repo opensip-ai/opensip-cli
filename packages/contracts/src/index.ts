@@ -204,16 +204,19 @@ export type {
 import type { Command } from 'commander';
 
 /**
- * Type alias for Commander's `Command` class — re-exported here so
- * tool packages can drop the `as Command` cast in their `register(cli)`
- * implementations.
+ * Type alias for Commander's `Command` class — re-exported here so the
+ * host's command-spec mounting (`mountCommandSpec`) and the tool lifecycle
+ * can type the root `program` handle without a direct `commander` import or
+ * an `as Command` cast. (Tools themselves no longer touch Commander — they
+ * declare `commandSpecs`; the host owns `program`.)
  *
  * `commander` is an OPTIONAL peer dependency of
- * `@opensip-tools/contracts`. Plugin authors who reference `CliProgram`
- * (directly or via the `Tool` contract) need `commander` resolvable in
- * their own `node_modules`; pnpm/npm will surface the peer requirement
- * in install output. Plugins that never touch `CliProgram` can skip
- * commander entirely. The alias erases at compile time — no runtime
- * commander require lands in `dist/index.js`.
+ * `@opensip-tools/contracts`. `CliProgram` is now primarily a host-side
+ * type (the `Tool` contract no longer surfaces it — tools declare
+ * `commandSpecs`), so any code referencing it needs `commander` resolvable
+ * in its own `node_modules`; pnpm/npm will surface the peer requirement in
+ * install output. Code that never touches `CliProgram` can skip commander
+ * entirely. The alias erases at compile time — no runtime commander require
+ * lands in `dist/index.js`.
  */
 export type CliProgram = Command;

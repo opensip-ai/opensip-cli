@@ -4,9 +4,11 @@
  * Every tool run yields one envelope: the flat `Signal[]` a run produced
  * (the same currency the cloud egresses via {@link SignalBatch}, ADR-0008)
  * plus run identity (`tool`, `recipe`, `runId`, `createdAt`), a `verdict`
- * header (so `--json | jq '.verdict.passed'` / `.verdict.score` work), and a
- * `units[]` sidecar (so "ran, errored, 0 signals" is expressible — a flat
- * signal list cannot carry per-unit ran/errored/timing facts).
+ * header, and a `units[]` sidecar (so "ran, errored, 0 signals" is expressible
+ * — a flat signal list cannot carry per-unit ran/errored/timing facts). On the
+ * CLI wire this envelope rides under `.envelope` of a `CommandOutcome`
+ * (ADR-0024), so a `--json` consumer reads `jq '.envelope.verdict.passed'` /
+ * `.envelope.verdict.score`.
  *
  * This is intentionally close to {@link SignalBatch} (the cloud egress shape):
  * the cloud sink ships the signals as-is, adding `repo` identity and dropping

@@ -631,54 +631,70 @@ the same way under `opensip-tools/sim/recipes/` and run via
 
 ### JSON Output
 
+Since 2.12.0 (ADR-0024), `--json` emits **one `CommandOutcome` wrapper** on
+stdout; the `SignalEnvelope` rides under `.envelope`:
+
 ```json
 {
-  "schemaVersion": 2,
-  "tool": "fit",
-  "recipe": "default",
-  "runId": "RUN_01JZ8Q0Z7R8V8R4N4Y8QXJ0X9H",
-  "createdAt": "2026-06-07T18:00:00.000Z",
-  "verdict": {
-    "score": 92,
-    "passed": false,
-    "summary": {
-      "total": 124,
-      "passed": 120,
-      "failed": 4,
-      "errors": 12,
-      "warnings": 45
-    }
-  },
-  "units": [
-    {
-      "slug": "no-console-log",
+  "kind": "fit.run",
+  "status": "error",
+  "exitCode": 1,
+  "envelope": {
+    "schemaVersion": 2,
+    "tool": "fit",
+    "runId": "RUN_01JZ8Q0Z7R8V8R4N4Y8QXJ0X9H",
+    "createdAt": "2026-06-07T18:00:00.000Z",
+    "verdict": {
+      "score": 92,
       "passed": false,
-      "violationCount": 1,
-      "filesValidated": 312,
-      "itemType": "files",
-      "durationMs": 150
-    }
-  ],
-  "signals": [
-    {
-      "id": "sig_a3f9c204e1b2",
-      "source": "no-console-log",
-      "provider": "opensip-tools",
-      "severity": "high",
-      "category": "quality",
-      "ruleId": "fit:no-console-log",
-      "message": "console.log found in production code",
-      "suggestion": "Replace with a structured logger",
-      "filePath": "src/utils.ts",
-      "line": 42,
-      "metadata": {},
-      "createdAt": "2026-06-07T18:00:00.000Z"
-    }
-  ]
+      "summary": {
+        "total": 124,
+        "passed": 120,
+        "failed": 4,
+        "errors": 12,
+        "warnings": 45
+      }
+    },
+    "units": [
+      {
+        "slug": "no-console-log",
+        "passed": false,
+        "violationCount": 1,
+        "filesValidated": 312,
+        "itemType": "files",
+        "durationMs": 150
+      }
+    ],
+    "signals": [
+      {
+        "id": "sig_a3f9c204e1b2",
+        "source": "no-console-log",
+        "provider": "opensip-tools",
+        "severity": "high",
+        "category": "quality",
+        "ruleId": "fit:no-console-log",
+        "message": "console.log found in production code",
+        "suggestion": "Replace with a structured logger",
+        "filePath": "src/utils.ts",
+        "line": 42,
+        "metadata": {},
+        "createdAt": "2026-06-07T18:00:00.000Z"
+      }
+    ]
+  },
+  "diagnostics": { }
 }
 ```
 
-Every tool emits this `SignalEnvelope` shape on `--json`. The stable CI fields are `verdict.passed`, `verdict.score`, `verdict.summary`, `units[]`, and the flat `signals[]` list. See [JSON output schema](./docs/public/70-reference/04-json-output-schema.md) for the full field table and v1-to-v2 migration notes.
+Every tool emits this `CommandOutcome` shape on `--json`, with the
+byte-identical `SignalEnvelope` under `.envelope` (list/dashboard commands carry
+their result under `.data`; failures carry structured `errors`). The stable CI
+fields are `.envelope.verdict.passed`, `.envelope.verdict.score`,
+`.envelope.verdict.summary`, `.envelope.units[]`, and the flat
+`.envelope.signals[]` list — e.g. `opensip-tools fit --json | jq
+'.envelope.verdict.passed'`. See [JSON output
+schema](./docs/public/70-reference/04-json-output-schema.md) for the full field
+table and the 2.12.0 migration notes.
 
 ## Dashboard
 

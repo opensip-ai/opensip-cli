@@ -336,8 +336,9 @@ export interface RenderGraphLiveOptions {
 /**
  * Render the live `graph` view. Returns once the underlying Ink app exits.
  *
- * The graph tool's `register(cli)` wires this through
- * `cli.registerLiveView('graph', (args) => renderGraphLive(args, { ... }))`.
+ * The graph tool wires this in via `setUpGraphLiveView`, which calls
+ * `cli.registerLiveView('graph', (args) => renderGraphLive(args, { ... }))`
+ * lazily on the interactive path (there is no `register()` mount hook).
  * `setExitCode` is the single mutator path on `process.exitCode`; the
  * runner calls it for error outcomes so the CLI's exit-code seam stays
  * the only writer.
