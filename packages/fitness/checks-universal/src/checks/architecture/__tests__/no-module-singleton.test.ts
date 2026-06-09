@@ -96,6 +96,40 @@ describe('analyzeNoModuleSingleton (pure detector)', () => {
   })
 })
 
+describe('analyzeNoModuleSingleton — module-level mutable `let` (audit F1/F2 shapes)', () => {
+  it('flags a loaded-state marker let (F1)', () => {
+    const v = analyzeNoModuleSingleton('let scenariosLoadedFor: string | null = null\n', SRC)
+    expect(v).toHaveLength(1)
+    expect(v[0]?.message).toMatch(/loaded-state marker or mutable accumulator/)
+  })
+
+  it('flags a mutable-accumulator-typed let (F2: : *Cache)', () => {
+    expect(analyzeNoModuleSingleton('let activeCache: LanguageParseCache | null = null\n', SRC)).toHaveLength(1)
+  })
+
+  it('flags a let initialized to a Map/Set-typed accumulator', () => {
+    expect(analyzeNoModuleSingleton('let merged: Map<string, number> = new Map()\n', SRC)).toHaveLength(1)
+  })
+
+  it('does NOT flag a *Registry-typed let (the cli-context bootstrap seam)', () => {
+    expect(analyzeNoModuleSingleton('let currentToolRegistry: ToolRegistry | undefined\n', SRC)).toEqual([])
+  })
+
+  it('does NOT flag a primitive/boolean let (telemetry started, warn-once flags)', () => {
+    expect(analyzeNoModuleSingleton('let started = false\n', SRC)).toEqual([])
+    expect(analyzeNoModuleSingleton('let cachedBundle: string | null = null\n', SRC)).toEqual([])
+  })
+
+  it('honors the @allow-module-singleton escape hatch on a flagged let', () => {
+    const allowed = '// @allow-module-singleton process-global by design\nlet activeCache: LanguageParseCache = new LanguageParseCache()\n'
+    expect(analyzeNoModuleSingleton(allowed, SRC)).toEqual([])
+  })
+
+  it('does NOT match a nested (non-top-level) let', () => {
+    expect(analyzeNoModuleSingleton('function f() {\n  let activeCache: SomeCache | null = null\n}\n', SRC)).toEqual([])
+  })
+})
+
 /** Build a fake FileAccessor over an in-memory path→content map. */
 function fakeAccessor(files: Record<string, string>): FileAccessor {
   return {

@@ -56,6 +56,31 @@ const MUTABLE_CTOR_RE =
  */
 const MODULE_SINGLETON_RE = /^export const ([A-Za-z_$][\w$]*) = new ([A-Za-z_$][\w$.]*)\s*\(/
 
+/**
+ * Module-level mutable `let` binding at column 0. Captures the id and the optional
+ * type annotation. A module `let` is reassignable shared state by definition; this
+ * narrows to the two shapes the audit's F1/F2 took (a loaded-state marker, a
+ * mutable-accumulator instance) so legit process-globals don't false-fire.
+ */
+// `[^=\n]` is disjoint from the absent `=`/newline terminators, so the greedy
+// capture is linear (no catastrophic backtracking — the lazy form tripped slow-regex).
+const MODULE_LET_RE = /^let ([A-Za-z_$][\w$]*)\s*(?::\s*([^=\n]+))?/
+
+/**
+ * A `let` id naming cross-call LOADED-STATE — the F1 shape (`scenariosLoadedFor`,
+ * `checksLoadedFor`). A per-run "have I loaded yet" marker belongs on RunScope.
+ */
+const LOADED_STATE_NAME_RE = /Loaded(?:For)?$/
+
+/**
+ * A `let` TYPE annotation naming a mutable ACCUMULATOR — the F2 shape
+ * (`activeCache: LanguageParseCache`). Deliberately EXCLUDES `*Registry`: the
+ * CLI's per-run context holders (`cli-context.ts`) are a sanctioned bootstrap
+ * seam, not a leak, and the AsyncLocalStorage scope is the per-run isolation.
+ */
+const MUTABLE_LET_TYPE_RE =
+  /\b(?:[A-Z]\w*(?:Cache|Store|Profiler|Emitter)|EventEmitter|Map|Set|WeakMap|WeakSet)\b/
+
 /** Allowlisted singleton identifiers, by basename → id (ADR-0023). */
 const EXEMPT_BY_FILE: Readonly<Record<string, string>> = {
   'file-cache.ts': 'fileCache',
@@ -82,33 +107,85 @@ export function analyzeNoModuleSingleton(content: string, filePath: string): Che
   const violations: CheckViolation[] = []
   const lines = content.split('\n')
   for (const [i, line] of lines.entries()) {
-    const m = MODULE_SINGLETON_RE.exec(line)
-    if (!m) continue
-    const [, id, ctor] = m
-    if (!MUTABLE_CTOR_RE.test(ctorLeaf(ctor))) continue
-    // ADR-0023 allowlist (by file + exact identifier).
-    if (id === exemptId) continue
     // Inline escape hatch on this line or the line directly above.
     const above = i > 0 ? (lines[i - 1] ?? '') : ''
-    if (line.includes(ALLOW_MARKER) || above.includes(ALLOW_MARKER)) continue
-    violations.push({
-      line: i + 1,
-      filePath,
-      message:
-        `Module-level singleton 'export const ${id} = new ${ctor}()' holds mutable ` +
-        `shared state. Per-run state must live on RunScope and be constructed by a ` +
-        `create*Registry() factory the CLI bootstrap calls once per invocation ` +
-        `(ADR-0023 / Phase 3) — not a module singleton.`,
-      severity: 'error',
-      suggestion:
-        `Replace with a factory + scope read: 'export function create${id[0]?.toUpperCase()}${id.slice(1)}() { return new ${ctor}() }' ` +
-        `attached to scope, read via current<Registry>(). If this is a genuinely ` +
-        `run-scoped utility like fileCache/memoryProfiler, add it to the ADR-0023 ` +
-        `exemption allowlist or annotate with '// ${ALLOW_MARKER} <reason>'.`,
-      type: 'no-module-singleton',
-    })
+    const suppressed = line.includes(ALLOW_MARKER) || above.includes(ALLOW_MARKER)
+
+    const constViolation = matchConstSingleton(line, i, filePath, exemptId, suppressed)
+    if (constViolation) {
+      violations.push(constViolation)
+      continue
+    }
+    const letViolation = matchMutableLet(line, i, filePath, exemptId, suppressed)
+    if (letViolation) violations.push(letViolation)
   }
   return violations
+}
+
+/** `export const <id> = new <MutableCtor>(` — the classic module-singleton shape. */
+function matchConstSingleton(
+  line: string,
+  i: number,
+  filePath: string,
+  exemptId: string | undefined,
+  suppressed: boolean,
+): CheckViolation | null {
+  const m = MODULE_SINGLETON_RE.exec(line)
+  if (!m) return null
+  const [, id, ctor] = m
+  if (!MUTABLE_CTOR_RE.test(ctorLeaf(ctor)) || id === exemptId || suppressed) return null
+  return {
+    line: i + 1,
+    filePath,
+    message:
+      `Module-level singleton 'export const ${id} = new ${ctor}()' holds mutable ` +
+      `shared state. Per-run state must live on RunScope and be constructed by a ` +
+      `create*Registry() factory the CLI bootstrap calls once per invocation ` +
+      `(ADR-0023 / Phase 3) — not a module singleton.`,
+    severity: 'error',
+    suggestion:
+      `Replace with a factory + scope read: 'export function create${id[0]?.toUpperCase()}${id.slice(1)}() { return new ${ctor}() }' ` +
+      `attached to scope, read via current<Registry>(). If this is a genuinely ` +
+      `run-scoped utility like fileCache/memoryProfiler, add it to the ADR-0023 ` +
+      `exemption allowlist or annotate with '// ${ALLOW_MARKER} <reason>'.`,
+    type: 'no-module-singleton',
+  }
+}
+
+/**
+ * `let <id>[: <MutableType>] =` at column 0 — the F1/F2 audit shapes: a per-run
+ * loaded-state marker (`*Loaded`/`*LoadedFor`) or a mutable-accumulator instance
+ * (`: *Cache`/`Map`/…). These belong on RunScope, not a module `let`.
+ */
+function matchMutableLet(
+  line: string,
+  i: number,
+  filePath: string,
+  exemptId: string | undefined,
+  suppressed: boolean,
+): CheckViolation | null {
+  const m = MODULE_LET_RE.exec(line)
+  if (!m) return null
+  const [, id, typeAnnotation] = m
+  const flagged =
+    LOADED_STATE_NAME_RE.test(id) ||
+    (typeAnnotation !== undefined && MUTABLE_LET_TYPE_RE.test(typeAnnotation))
+  if (!flagged || id === exemptId || suppressed) return null
+  return {
+    line: i + 1,
+    filePath,
+    message:
+      `Module-level mutable 'let ${id}' holds per-run shared state (loaded-state ` +
+      `marker or mutable accumulator). Two concurrent runs would share it. Move it ` +
+      `onto RunScope (a scope subslot like scope.fitness.load) — the audit's F1/F2 fix.`,
+    severity: 'error',
+    suggestion:
+      `Replace the module 'let' with a scope-owned slot: add the field to the tool's ` +
+      `RunScope subscope (e.g. scope.<tool>.load) via its contributeScope() hook, and ` +
+      `read it through a current<Tool>LoadState() accessor. If this is a genuine ` +
+      `process-global (a sanctioned seam), annotate with '// ${ALLOW_MARKER} <reason>'.`,
+    type: 'no-module-singleton',
+  }
 }
 
 /**
@@ -119,7 +196,11 @@ export function analyzeNoModuleSingleton(content: string, filePath: string): Che
 export async function analyzeAllNoModuleSingleton(files: FileAccessor): Promise<CheckViolation[]> {
   const violations: CheckViolation[] = []
   const candidates = files.paths.filter(
-    (p) => PACKAGE_SRC_PATH.test(p) && p.endsWith('.ts') && !p.endsWith('.test.ts'),
+    (p) =>
+      PACKAGE_SRC_PATH.test(p) &&
+      p.endsWith('.ts') &&
+      !p.endsWith('.test.ts') &&
+      !p.includes('/__fixtures__/'), // fixtures carry DELIBERATE violations for other checks
   )
   const contents = await files.readMany(candidates)
   for (const [filePath, content] of contents) {
