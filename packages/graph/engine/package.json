@@ -90,6 +90,18 @@
           "requiredKeys": [
             "id"
           ]
+        },
+        "discovery": {
+          "discovery": {
+            "mode": "marker",
+            "markerKind": "graph-adapter"
+          },
+          "exportName": "adapter",
+          "exportShape": "single",
+          "configKeys": {
+            "packages": "graphAdapters",
+            "autoDiscover": "autoDiscoverGraphAdapters"
+          }
         }
       }
     ]

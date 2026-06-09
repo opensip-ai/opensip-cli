@@ -201,6 +201,76 @@ function manifest(overrides: Partial<{ apiVersion: number | undefined; id: strin
   };
 }
 
+/** Write a single-capability `disc` tool manifest carrying the given `discovery` field. */
+function withCapability(discovery: unknown): void {
+  writePackageManifest(testDir, {
+    name: 'disc-tool',
+    version: '1.0.0',
+    opensipTools: {
+      kind: 'tool',
+      id: 'disc',
+      apiVersion: 1,
+      commands: [{ name: 'disc', description: 'd' }],
+      capabilities: [
+        {
+          id: 'disc-pack',
+          apiVersion: 1,
+          contributionKind: 'module-export',
+          contributionSchema: { requiredKeys: ['id'] },
+          ...(discovery === undefined ? {} : { discovery }),
+        },
+      ],
+    },
+  });
+}
+
+describe('capability discovery descriptor (§5.3)', () => {
+  it('preserves a marker-mode descriptor through the loader (it strips unknown fields, not this)', () => {
+    withCapability({
+      discovery: { mode: 'marker', markerKind: 'disc-pack' },
+      exportName: 'items',
+      exportShape: 'array',
+      configKeys: { packages: 'discPackages' },
+      builtinScope: '@opensip-tools',
+    });
+    const manifest = loadToolManifest('installed', testDir);
+    expect(manifest?.capabilities?.[0]?.discovery).toEqual({
+      discovery: { mode: 'marker', markerKind: 'disc-pack' },
+      exportName: 'items',
+      exportShape: 'array',
+      configKeys: { packages: 'discPackages' },
+      builtinScope: '@opensip-tools',
+    });
+  });
+
+  it('preserves a name-pattern-mode descriptor', () => {
+    withCapability({
+      discovery: { mode: 'name-pattern', prefix: 'items-', defaultScopes: ['@opensip-tools'] },
+      exportName: 'items',
+      exportShape: 'array',
+      configKeys: { packages: 'p', autoDiscover: 'a', scopes: 's' },
+    });
+    expect(loadToolManifest('installed', testDir)?.capabilities?.[0]?.discovery?.discovery).toEqual({
+      mode: 'name-pattern',
+      prefix: 'items-',
+      defaultScopes: ['@opensip-tools'],
+    });
+  });
+
+  it('a capability with NO discovery is valid (no auto-discovery)', () => {
+    withCapability(undefined);
+    const manifest = loadToolManifest('installed', testDir);
+    expect(manifest?.capabilities?.[0]?.discovery).toBeUndefined();
+    expect(manifest?.capabilities?.[0]?.id).toBe('disc-pack');
+  });
+
+  it('a malformed descriptor fails the whole manifest', () => {
+    // bad mode → the manifest is rejected (mirrors the strict contributionKind check)
+    withCapability({ discovery: { mode: 'bogus' }, exportName: 'items', exportShape: 'array', configKeys: {} });
+    expect(loadToolManifest('installed', testDir)).toBeUndefined();
+  });
+});
+
 describe('admitTool', () => {
   it('admits a tool at the current epoch', () => {
     const result = admitTool({

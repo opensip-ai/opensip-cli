@@ -147,6 +147,8 @@ export {
 export type {
   CapabilityDomainSpec,
   CapabilityContributionKind,
+  CapabilityDiscoveryDescriptor,
+  CapabilityDiscoveryMode,
   CapabilityValidator,
   StructuralContributionSchema,
   ToolCapabilityDeclaration,

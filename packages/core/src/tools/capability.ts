@@ -41,6 +41,54 @@
 export type CapabilityContributionKind = 'module-export' | 'manifest-entry' | 'file';
 
 /**
+ * How a domain's contribution PACKAGES are found on disk — the data the generic
+ * discovery substrate reads so the host never compiles in "fit has checks" /
+ * "graph has adapters" knowledge (§5.3). Two modes, mirroring the two shapes the
+ * first-party tools use:
+ *
+ *   - `marker` — packages declaring `package.json#opensipTools.kind === markerKind`
+ *     (fit's `fit-pack`, graph's `graph-adapter`).
+ *   - `name-pattern` — packages named `<scope>/<prefix>*` under a set of scopes
+ *     (sim's `@opensip-tools/scenarios-*`). A legitimate, ADR-documented per-domain
+ *     difference (§6.7): the descriptor exists precisely to carry it.
+ */
+export type CapabilityDiscoveryMode =
+  | { readonly mode: 'marker'; readonly markerKind: string }
+  | { readonly mode: 'name-pattern'; readonly prefix: string; readonly defaultScopes: readonly string[] };
+
+/**
+ * The static descriptor for how a capability domain's contributions are
+ * discovered and loaded — declared in the owning tool's manifest
+ * (`ToolPluginManifest.capabilities[].discovery`) and read by the generic
+ * discovery substrate. Tool-agnostic by construction: the host walks/loads from
+ * this datum, never from compiled-in per-domain code.
+ */
+export interface CapabilityDiscoveryDescriptor {
+  /** The on-disk discovery mode (marker or name-pattern). */
+  readonly discovery: CapabilityDiscoveryMode;
+  /** The module export the contributions live under (`checks`/`scenarios`/`adapter`). */
+  readonly exportName: string;
+  /** Whether `exportName` is an array of contributions or a single one. */
+  readonly exportShape: 'array' | 'single';
+  /**
+   * The `opensip-tools.config.yml` `plugins.*` keys this domain's preferences live
+   * under (the existing per-domain keys, mapped so the documented config keeps
+   * working unchanged). Omitted keys default to "auto-discover on, no explicit list".
+   */
+  readonly configKeys: {
+    readonly packages?: string;
+    readonly autoDiscover?: string;
+    readonly scopes?: string;
+  };
+  /**
+   * Optional package scope that marks a BUILT-IN contribution pack (resolved from
+   * the CLI install dir) vs a custom one (resolved from the project) — e.g. fit
+   * splits `@opensip-tools/` built-in check packs from project-local ones.
+   */
+  readonly builtinScope?: string;
+}
+
+/**
  * The static description of a capability domain a tool owns. Declared in
  * the owning tool's manifest (see {@link ToolCapabilityDeclaration}) and
  * registered into the per-run {@link CapabilityRegistry} alongside the
@@ -72,6 +120,13 @@ export interface CapabilityDomainSpec {
   readonly contributionSchema: unknown;
   /** How contributions to this domain are delivered. */
   readonly contributionKind: CapabilityContributionKind;
+  /**
+   * How this domain's contribution packages are discovered + loaded (§5.3). When
+   * present, the generic discovery substrate auto-discovers contributions for this
+   * domain from it; when absent, the domain receives only explicit/manifest
+   * contributions (no auto-discovery).
+   */
+  readonly discovery?: CapabilityDiscoveryDescriptor;
 }
 
 /**
@@ -94,6 +149,8 @@ export interface ToolCapabilityDeclaration {
   readonly contributionSchema: unknown;
   /** How contributions to this domain are delivered. */
   readonly contributionKind: CapabilityContributionKind;
+  /** How this domain's contribution packages are discovered + loaded (§5.3). */
+  readonly discovery?: CapabilityDiscoveryDescriptor;
 }
 
 /**

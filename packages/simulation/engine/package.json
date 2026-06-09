@@ -51,6 +51,22 @@
           "requiredKeys": [
             "id"
           ]
+        },
+        "discovery": {
+          "discovery": {
+            "mode": "name-pattern",
+            "prefix": "scenarios-",
+            "defaultScopes": [
+              "@opensip-tools"
+            ]
+          },
+          "exportName": "scenarios",
+          "exportShape": "array",
+          "configKeys": {
+            "packages": "scenarioPackages",
+            "autoDiscover": "autoDiscoverScenarios",
+            "scopes": "packageScopes"
+          }
         }
       }
     ]

@@ -77,6 +77,18 @@
           "requiredKeys": [
             "slug"
           ]
+        },
+        "discovery": {
+          "discovery": {
+            "mode": "marker",
+            "markerKind": "fit-pack"
+          },
+          "exportName": "checks",
+          "exportShape": "array",
+          "configKeys": {
+            "packages": "checkPackages"
+          },
+          "builtinScope": "@opensip-tools"
         }
       }
     ]

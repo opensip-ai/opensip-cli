@@ -38,10 +38,10 @@ import { join } from 'node:path';
 import { logger } from '../lib/logger.js';
 import { checkCompatibility, type CompatibilityVerdict } from '../tools/compatibility.js';
 
-import type {
-  CapabilityContributionKind,
-  ToolCapabilityDeclaration,
-} from '../tools/capability.js';
+import { isRecord, isStringArray } from './json-guards.js';
+import { normalizeDiscovery } from './manifest-discovery.js';
+
+import type { CapabilityContributionKind, ToolCapabilityDeclaration } from '../tools/capability.js';
 import type {
   ToolCommandManifest,
   ToolPluginManifest,
@@ -305,6 +305,10 @@ function normalizeCapabilities(
     if (typeof entry.apiVersion !== 'number') return undefined;
     const kind = entry.contributionKind;
     if (!isContributionKind(kind)) return undefined;
+    // `discovery` is optional, but a PRESENT-but-malformed descriptor fails the
+    // manifest (mirroring the strict `contributionKind` check above).
+    const discovery = normalizeDiscovery(entry.discovery);
+    if (discovery.status === 'invalid') return undefined;
     out.push({
       id: entry.id,
       apiVersion: entry.apiVersion,
@@ -313,6 +317,7 @@ function normalizeCapabilities(
       // own registrar).
       contributionSchema: entry.contributionSchema,
       contributionKind: kind,
+      ...(discovery.status === 'ok' ? { discovery: discovery.descriptor } : {}),
     });
   }
   return out;
@@ -344,11 +349,6 @@ function normalizeCommands(value: unknown): readonly ToolCommandManifest[] | und
     });
   }
   return out;
-}
-
-/** Type guard: a value is a `readonly string[]`. */
-function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((a) => typeof a === 'string');
 }
 
 /**
@@ -396,10 +396,6 @@ function readJson(path: string): Record<string, unknown> | undefined {
     });
     return undefined;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /** Emit the structured read-failure diagnostic (debug — a missing/malformed manifest is a skip, not a crash). */
