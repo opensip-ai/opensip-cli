@@ -51,6 +51,16 @@ function mapSeverityToSarifLevel(severity: SignalSeverity): SarifLevel {
   }
 }
 
+/**
+ * Coerce a 1-based SARIF region coordinate (startLine / startColumn) to a valid
+ * value, returning undefined for anything < 1 or non-finite. SARIF 2.1.0
+ * rejects region coordinates below 1; checks that report 0 (meaning "no
+ * specific line/column") must be omitted rather than emitted as 0.
+ */
+function atLeastOne(value: number | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 1 ? value : undefined;
+}
+
 /** Minimal SARIF v2.1.0 shape — only the fields this emitter populates. */
 interface SarifLog {
   readonly $schema: string;
@@ -125,8 +135,13 @@ export function buildOpenSipSarif(signals: readonly Signal[], driver: SarifDrive
     ruleIds.add(signal.ruleId);
 
     const filePath = signal.code?.file ?? signal.filePath;
-    const startLine = signal.code?.line ?? signal.line;
-    const startColumn = signal.code?.column ?? signal.column;
+    // SARIF 2.1.0 requires region.startLine / region.startColumn to be >= 1.
+    // Some checks report 0 to mean "no specific line/column" (a whole-file or
+    // whole-line finding). Normalize <1 (and non-finite) values to undefined so
+    // they are omitted here rather than emitted as invalid 0s — an omitted
+    // startColumn denotes the whole line, which is the intended semantics.
+    const startLine = atLeastOne(signal.code?.line ?? signal.line);
+    const startColumn = atLeastOne(signal.code?.column ?? signal.column);
 
     const physicalLocation: SarifLocation['physicalLocation'] = {
       artifactLocation: { uri: filePath },
