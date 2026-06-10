@@ -23,7 +23,8 @@
 // no engine-internal re-implementation):
 //   1. delete the project datastore (`opensip-tools/.runtime/datastore.sqlite`)
 //      so the next build is genuinely COLD (empty cache),
-//   2. run `graph` (exact) / `graph --sharded` WITH cache enabled — cold build
+//   2. run `graph --exact` (exact) / `graph` (sharded, the default) WITH cache
+//      enabled — cold build
 //      still recomputes everything, but the WITH-cache path is the only one
 //      that PERSISTS the unified catalog (both engines gate `catalogRepo
 //      .replaceAll(...)` behind `useCache`; `--no-cache` builds the catalog but
@@ -99,8 +100,9 @@ function flatten(artifact) {
   return byIdentity;
 }
 
-const exact = flatten(buildAndDump('exact', []));
-const sharded = flatten(buildAndDump('sharded', ['--sharded']));
+// ADR-0032: sharded is the DEFAULT engine, exact is the `--exact` opt-out.
+const exact = flatten(buildAndDump('exact', ['--exact']));
+const sharded = flatten(buildAndDump('sharded', []));
 
 const exactOnly = [];
 const shardedOnly = [];

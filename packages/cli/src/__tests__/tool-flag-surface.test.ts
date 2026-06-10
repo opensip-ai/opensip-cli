@@ -115,10 +115,10 @@ const EXPECTED: Record<string, string[]> = {
     // opensip EngineSubprocessPort contracts depend on them); the spec-based
     // recorder records them faithfully.
     '--api-key', '--catalog-output', '--changed-file', '--concurrency', '--cwd',
-    '--debug', '--gate-compare', '--gate-save', '--git-sha', '--json',
+    '--debug', '--exact', '--gate-compare', '--gate-save', '--git-sha', '--json',
     '--language', '--list-files', '--mode', '--no-cache', '--out',
     '--output-sarif', '--profile', '--quiet', '--recipe', '--repo-id',
-    '--report-to', '--resolution', '--run-id', '--sarif', '--sharded', '--show',
+    '--report-to', '--resolution', '--run-id', '--sarif', '--show',
     '--tenant-id', '--verbose', '--workspace',
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
