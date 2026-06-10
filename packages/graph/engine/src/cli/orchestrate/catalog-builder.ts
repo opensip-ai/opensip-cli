@@ -13,6 +13,7 @@
 import { stampEngineVersion, type EngineMode } from '../../cache/engine-version.js';
 import { ownerEdgeKey } from '../../owner-key.js';
 
+import { countCatalogCallSites } from './catalog-stats.js';
 import {
   expandClosureToFixpoint,
   mergeOccurrences,
@@ -136,25 +137,33 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
 
   const initialCatalog = assembleCatalog(adapter, discovery, walked.occurrences, resolutionMode, engineMode);
 
+  // Stitch inside the resolve stage so the checklist detail counts the
+  // catalog's resolved call edges — the same catalog-derived
+  // `countCatalogCallSites` metric the sharded path reports, so both engines
+  // surface one consistent "N call site(s)" row with no engine-specific
+  // ("cross-shard") leakage.
   const resolved = await runStage({
     stage: 'resolve',
     onProgress,
     monitor,
-    fn: () => adapter.resolveCallSites({
-      project: parsed.project,
-      catalog: initialCatalog,
-      callSites: walked.callSites,
-      dependencySites: walked.dependencySites,
-      projectDirAbs: discovery.projectDirAbs,
-      resolutionMode,
-      emitBoundaryCalls,
-    }),
-    detailFn: (r) => `${String(r.stats.totalCallSites)} call site(s)`,
+    fn: async () => {
+      const result = await adapter.resolveCallSites({
+        project: parsed.project,
+        catalog: initialCatalog,
+        callSites: walked.callSites,
+        dependencySites: walked.dependencySites,
+        projectDirAbs: discovery.projectDirAbs,
+        resolutionMode,
+        emitBoundaryCalls,
+      });
+      const catalog = stitchEdges(initialCatalog, result.edgesByOwner, result.dependenciesByOwner);
+      return { ...result, catalog };
+    },
+    detailFn: (r) => `${String(countCatalogCallSites(r.catalog))} call site(s)`,
   });
 
-  const catalog = stitchEdges(initialCatalog, resolved.edgesByOwner, resolved.dependenciesByOwner);
   return {
-    catalog,
+    catalog: resolved.catalog,
     resolutionStats: resolved.stats,
     boundaryCalls: resolved.boundaryCalls,
     parseErrors: [...parsed.parseErrors, ...walked.parseErrors],
@@ -238,21 +247,10 @@ export async function buildAndResolveCatalogIncremental(
     functions: mergedFunctions,
   } as Catalog;
 
-  const resolved = await runStage({
-    stage: 'resolve',
-    onProgress,
-    monitor,
-    fn: () => adapter.resolveCallSites({
-      project: parsed.project,
-      catalog: initialCatalog,
-      callSites: walked.callSites,
-      dependencySites: walked.dependencySites,
-      projectDirAbs: discovery.projectDirAbs,
-      resolutionMode,
-    }),
-    detailFn: (r) => `${String(r.stats.totalCallSites)} call site(s)`,
-  });
-
+  // Merge the resolved closure edges into the final catalog inside the stage so
+  // the checklist detail counts the catalog's resolved call edges — the same
+  // catalog-derived `countCatalogCallSites` metric the full build reports.
+  //
   // Apply resolved edges only to closure files; unchanged files keep
   // their cached edges. Their bodyHashes are present in the merged
   // catalog by construction, so cached edges are still valid.
@@ -262,19 +260,36 @@ export async function buildAndResolveCatalogIncremental(
   // only handles calls; depends_on edges from the incremental closure
   // are attached via a follow-up stitch pass below. Adapters that
   // don't emit dependencies skip this entirely.
-  const finalFunctions = mergeResolvedAndCachedEdges(
-    initialCatalog,
-    cachedCatalog,
-    resolved.edgesByOwner,
-    closureRel,
-  );
-  const stitchedFunctions = attachDependenciesIncremental(
-    finalFunctions,
-    resolved.dependenciesByOwner,
-  );
-  const finalCatalog: Catalog = { ...initialCatalog, functions: stitchedFunctions };
+  const resolved = await runStage({
+    stage: 'resolve',
+    onProgress,
+    monitor,
+    fn: async () => {
+      const result = await adapter.resolveCallSites({
+        project: parsed.project,
+        catalog: initialCatalog,
+        callSites: walked.callSites,
+        dependencySites: walked.dependencySites,
+        projectDirAbs: discovery.projectDirAbs,
+        resolutionMode,
+      });
+      const finalFunctions = mergeResolvedAndCachedEdges(
+        initialCatalog,
+        cachedCatalog,
+        result.edgesByOwner,
+        closureRel,
+      );
+      const stitchedFunctions = attachDependenciesIncremental(
+        finalFunctions,
+        result.dependenciesByOwner,
+      );
+      const catalog: Catalog = { ...initialCatalog, functions: stitchedFunctions };
+      return { ...result, catalog };
+    },
+    detailFn: (r) => `${String(countCatalogCallSites(r.catalog))} call site(s)`,
+  });
 
-  return { catalog: finalCatalog, resolutionStats: resolved.stats };
+  return { catalog: resolved.catalog, resolutionStats: resolved.stats };
 }
 
 /**

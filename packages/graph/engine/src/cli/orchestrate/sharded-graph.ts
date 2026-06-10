@@ -27,6 +27,7 @@ import { buildIndexes } from '../../pipeline/indexes.js';
 import { currentRules } from '../../rules/registry.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
 
+import { countCatalogCallSites, countCatalogFunctions } from './catalog-stats.js';
 import { mergeAndResolveShards } from './cross-shard-resolve.js';
 import { planShardWork, runShardsInParallel } from './shard-runner.js';
 
@@ -190,14 +191,16 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
 
   // 3b. The cross-shard boundary recovery (already performed inside
   //     `mergeAndResolveShards` above) is graph's analogue of the single-program
-  //     `resolve` stage — report it with the cross-shard call-site count so the
-  //     checklist row matches the exact engine's "N call site(s)".
+  //     `resolve` stage. Report the catalog-derived TOTAL call-site count — the
+  //     same `countCatalogCallSites` metric the exact path reports — so this
+  //     checklist row is computed consistently for `graph` and `graph --exact`
+  //     and leaks no "cross-shard" implementation detail.
   emitStageStart(onProgress, 'resolve');
   emitStage(
     onProgress,
     'resolve',
     0,
-    `${String(boundaryStats.totalCallSites)} cross-shard call site(s)`,
+    `${String(countCatalogCallSites(catalog))} call site(s)`,
   );
 
   // 4. Derive indexes + features over the unified catalog. Features run once
@@ -304,16 +307,6 @@ function emitStage(
   detail?: string,
 ): void {
   onProgress?.({ type: 'stage-done', stage, durationMs, ...(detail === undefined ? {} : { detail }) });
-}
-
-/** Distinct function occurrences in a catalog — the merged `walk` sub-label count. */
-function countCatalogFunctions(catalog: Catalog): number {
-  let n = 0;
-  for (const name of Object.keys(catalog.functions)) {
-    const occs = catalog.functions[name];
-    if (occs) n += occs.length;
-  }
-  return n;
 }
 
 /**

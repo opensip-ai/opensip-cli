@@ -164,7 +164,10 @@ describe('runShardedGraph', () => {
     expect(detailOf('discover')).toBe('2 files');
     expect(detailOf('parse')).toBe('2 shards');
     expect(detailOf('walk')).toBe('2 functions');
-    expect(detailOf('resolve')).toMatch(/cross-shard call site/);
+    // Catalog-derived TOTAL call-site count — the SAME engine-agnostic metric
+    // the exact path reports, with no "cross-shard" implementation leakage.
+    expect(detailOf('resolve')).toMatch(/^\d+ call site\(s\)$/);
+    expect(detailOf('resolve')).not.toMatch(/cross-shard/);
     expect(detailOf('rules')).toBe('0 rule(s), 0 signal(s)');
   });
 
