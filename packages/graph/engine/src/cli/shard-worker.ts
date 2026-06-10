@@ -87,6 +87,10 @@ async function buildShard(spec: ShardWorkerSpec): Promise<ShardBuildResult> {
     discovery,
     resolutionMode,
     emitBoundaryCalls: true,
+    // Stamp this fragment's cacheKey with `mode=sharded` so it matches what
+    // `planShardWork` compares against (loadValidShardFragment) and never
+    // collides with a single-program (exact) catalog row.
+    engineMode: 'sharded',
   });
 
   return {

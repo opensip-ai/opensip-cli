@@ -28,10 +28,10 @@ import type { Shard } from '../shard-model.js';
 // Fixture worker: emits one exported function occurrence per shard, named
 // after the shard id, so the merged catalog has a predictable shape. A
 // shard id starting with 'fail:' exits non-zero.
-// The real worker stamps the engine version onto the fragment cacheKey via
-// assembleCatalog (ADR-0015); the fixture must emit the same stamped key so a
-// no-change rerun is a clean cache hit.
-const STAMPED_KEY = stampEngineVersion('key-none');
+// The real worker stamps the engine version + `mode=sharded` onto the fragment
+// cacheKey via assembleCatalog (ADR-0015 / ADR-0031); the fixture must emit the
+// same stamped key so a no-change rerun is a clean cache hit.
+const STAMPED_KEY = stampEngineVersion('key-none', 'sharded');
 const WORKER_SCRIPT = String.raw`
 const { readFileSync } = require('node:fs');
 const spec = JSON.parse(readFileSync(process.argv[3], 'utf8'));

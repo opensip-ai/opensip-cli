@@ -125,6 +125,9 @@ export function planShardWork(
         configPathAbs: shard.configPathAbs,
         resolutionMode,
       }),
+      // Shard fragments only ever feed the sharded engine; stamp the mode so a
+      // fragment row can never be confused with a single-program (exact) build.
+      'sharded',
     );
     const fingerprint = computeFilesFingerprint(shard.files);
     const fragment = repo.loadValidShardFragment(shard.id, cacheKey, fingerprint);

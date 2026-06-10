@@ -30,6 +30,7 @@
 
 import { posix } from 'node:path';
 
+import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
 import { appendEdge, createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
 
@@ -104,8 +105,16 @@ export function mergeShardFragments(
     // else in this catalog is a pure function of the fragment set.
     builtAt: new Date().toISOString(),
     // Build-level key derived from the per-shard keys so the merged
-    // catalog invalidates when any shard's key changes.
-    cacheKey: `sharded-${String(fragments.length)}-${hashKeys(fragments)}`,
+    // catalog invalidates when any shard's key changes. Stamped with the
+    // engine version + `mode=sharded` (same channel as the single-program
+    // exact key) so the two engines — which share the single `graph_catalog`
+    // row but build structurally incompatible catalogs — can never read each
+    // other's row: a mode switch is a clean `cacheKey` mismatch (a rebuild),
+    // never a silent cross-engine read of a clobbered row.
+    cacheKey: stampEngineVersion(
+      `sharded-${String(fragments.length)}-${hashKeys(fragments)}`,
+      'sharded',
+    ),
     filesFingerprint: computeFilesFingerprint(allFiles),
     resolutionMode: first?.resolutionMode,
     functions: canonicalFunctions,

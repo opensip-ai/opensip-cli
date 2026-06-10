@@ -17,9 +17,9 @@ import { classifyCatalog, computeFilesFingerprint } from '../../cache/invalidate
 import type { Catalog } from '../../types.js';
 
 describe('stampEngineVersion', () => {
-  it('prefixes the adapter cacheKey with the running engine version', () => {
+  it('prefixes the adapter cacheKey with the running engine version and the default exact mode', () => {
     expect(stampEngineVersion('ts-6.0.3-exact-abc')).toBe(
-      `eng=${ENGINE_VERSION}|ts-6.0.3-exact-abc`,
+      `eng=${ENGINE_VERSION}|mode=exact|ts-6.0.3-exact-abc`,
     );
   });
 
@@ -32,8 +32,20 @@ describe('stampEngineVersion', () => {
 
   it('is polyglot — wraps every adapter prefix identically', () => {
     for (const adapterKey of ['ts-6-x', 'go-abc', 'java-abc', 'rs-abc', 'py-abc']) {
-      expect(stampEngineVersion(adapterKey)).toBe(`eng=${ENGINE_VERSION}|${adapterKey}`);
+      expect(stampEngineVersion(adapterKey)).toBe(`eng=${ENGINE_VERSION}|mode=exact|${adapterKey}`);
     }
+  });
+
+  it('folds the engine MODE so exact and sharded keys never collide (Phase 2 / ADR-0031)', () => {
+    // The exact (single-program) and sharded engines share the one
+    // `graph_catalog` row but build structurally incompatible catalogs, so a
+    // mode switch must be a clean cacheKey mismatch — never a silent
+    // cross-engine read. Same adapter key, different mode ⇒ different cacheKey.
+    const exact = stampEngineVersion('ts-6.0.3-exact-abc', 'exact');
+    const sharded = stampEngineVersion('ts-6.0.3-exact-abc', 'sharded');
+    expect(exact).toBe(`eng=${ENGINE_VERSION}|mode=exact|ts-6.0.3-exact-abc`);
+    expect(sharded).toBe(`eng=${ENGINE_VERSION}|mode=sharded|ts-6.0.3-exact-abc`);
+    expect(exact).not.toBe(sharded);
   });
 });
 

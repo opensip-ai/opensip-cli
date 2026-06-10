@@ -124,15 +124,17 @@ describe('planShardWork', () => {
     const b = shard('b');
     // Seed both with a fragment whose key+fingerprint match the current files.
     for (const s of [a, b]) {
-      // planShardWork stamps the engine version onto the comparison key, so
-      // the seeded fragment must carry the same stamp (in production the worker
-      // stamps via assembleCatalog). ADR-0015.
+      // planShardWork stamps the engine version + `mode=sharded` onto the
+      // comparison key, so the seeded fragment must carry the same stamp (in
+      // production the worker stamps via assembleCatalog with engineMode:
+      // 'sharded'). ADR-0015 / ADR-0031.
       const key = stampEngineVersion(
         adapter.cacheKey({
           projectDirAbs: s.rootDir,
           configPathAbs: s.configPathAbs,
           resolutionMode: 'exact',
         }),
+        'sharded',
       );
       const fp = computeFilesFingerprint(s.files);
       repo.upsertShardFragment(result(s.id, key, fp));

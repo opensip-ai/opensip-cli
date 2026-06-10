@@ -38,15 +38,44 @@ export const ENGINE_VERSION = readPackageVersion(import.meta.url);
 const ENGINE_VERSION_PREFIX = 'eng=';
 
 /**
- * Prefix an adapter's `cacheKey` with the running engine version so a
- * tool upgrade invalidates persisted catalogs/fragments. Applied at every
- * engine-side cacheKey computation (build-time stamp + both reuse-decision
- * comparisons), so the stamped and compared keys always agree.
+ * The two build engines whose catalogs share the single `graph_catalog`
+ * row (id=1). The exact engine (single-program `runGraph`) and the
+ * approximate sharded engine produce STRUCTURALLY DIFFERENT catalogs (they
+ * disagree by ~2,400 functions on a large repo), so a consumer must never
+ * read a catalog built by the engine it did not expect. The mode is folded
+ * into the `cacheKey` (below) so a mode switch is a clean, attributable
+ * cache miss — never a silent cross-engine read of a clobbered row.
+ *
+ * Phase 2 (determinism): the default `graph` always uses `'exact'`;
+ * `'sharded'` is reached only via the explicit `--sharded` opt-in.
+ */
+export type EngineMode = 'exact' | 'sharded';
+
+/** Cache-key segment carrying the build engine mode. */
+const ENGINE_MODE_PREFIX = 'mode=';
+
+/**
+ * Prefix an adapter's `cacheKey` with the running engine version AND the
+ * build engine mode so (a) a tool upgrade invalidates persisted
+ * catalogs/fragments, and (b) the exact and sharded engines — which write
+ * the same `graph_catalog` row but produce incompatible catalogs — never
+ * read each other's row. Applied at every engine-side cacheKey computation
+ * (build-time stamp + both reuse-decision comparisons), so the stamped and
+ * compared keys always agree.
+ *
+ * `mode` defaults to `'exact'` because the single-program path (its only
+ * historical caller) IS the exact engine; the sharded path passes
+ * `'sharded'` explicitly, including when it derives the merged build-level
+ * key from the per-shard keys.
  *
  * The result stays an opaque string per the `Catalog.cacheKey` contract;
- * the `eng=<version>|` prefix is human-legible in the invalidate logs
- * (`cached:`/`current:`) so a version-driven rebuild is diagnosable.
+ * the `eng=<version>|mode=<mode>|` prefix is human-legible in the
+ * invalidate logs (`cached:`/`current:`) so a version- or mode-driven
+ * rebuild is diagnosable.
  */
-export function stampEngineVersion(adapterCacheKey: string): string {
-  return `${ENGINE_VERSION_PREFIX}${ENGINE_VERSION}|${adapterCacheKey}`;
+export function stampEngineVersion(
+  adapterCacheKey: string,
+  mode: EngineMode = 'exact',
+): string {
+  return `${ENGINE_VERSION_PREFIX}${ENGINE_VERSION}|${ENGINE_MODE_PREFIX}${mode}|${adapterCacheKey}`;
 }

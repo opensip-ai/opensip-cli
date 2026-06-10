@@ -10,7 +10,7 @@
  * the progress/pressure-monitor wrapper here.
  */
 
-import { stampEngineVersion } from '../../cache/engine-version.js';
+import { stampEngineVersion, type EngineMode } from '../../cache/engine-version.js';
 import { ownerEdgeKey } from '../../owner-key.js';
 
 import {
@@ -78,6 +78,16 @@ export interface CatalogBuildOptions {
    * cross-shard pass. Off for ordinary single-process builds.
    */
   readonly emitBoundaryCalls?: boolean;
+  /**
+   * Which build engine owns this catalog (Phase 2 determinism). Folded into
+   * the catalog `cacheKey` via {@link stampEngineVersion} so the exact
+   * (single-program) and sharded engines — which share the single
+   * `graph_catalog` row / shard-fragment cache but build structurally
+   * incompatible catalogs — never read each other's persisted rows. Defaults
+   * to `'exact'` (the single-program path); the shard worker passes
+   * `'sharded'`.
+   */
+  readonly engineMode?: EngineMode;
 }
 
 /**
@@ -95,6 +105,7 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
 }> {
   const { runStage, adapter, discovery, resolutionMode, onProgress, monitor, emitBoundaryCalls } =
     options;
+  const engineMode: EngineMode = options.engineMode ?? 'exact';
   // Phase 4 unified walk: Stage 1's catalog construction and Stage 2's
   // call-site location share a single AST descent per file. The walk
   // emits the catalog plus a flat list of pre-located call-site
@@ -123,7 +134,7 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
     detailFn: (w) => `${String(Object.keys(w.occurrences).length)} functions`,
   });
 
-  const initialCatalog = assembleCatalog(adapter, discovery, walked.occurrences, resolutionMode);
+  const initialCatalog = assembleCatalog(adapter, discovery, walked.occurrences, resolutionMode, engineMode);
 
   const resolved = await runStage({
     stage: 'resolve',
@@ -306,6 +317,7 @@ function assembleCatalog(
   discovery: DiscoverOutput,
   occurrences: Record<string, FunctionOccurrence[]>,
   resolutionMode: ResolutionMode,
+  engineMode: EngineMode = 'exact',
 ): Catalog {
   return {
     version: '3.0',
@@ -315,6 +327,8 @@ function assembleCatalog(
     // wall-clock stamp), excluded from structural determinism/equivalence
     // comparisons. Mirrors the sharded path (cross-shard-resolve.ts).
     builtAt: new Date().toISOString(),
+    // Stamp the engine version AND mode so the exact and sharded engines never
+    // read each other's persisted catalog / shard-fragment rows (Phase 2).
     cacheKey: stampEngineVersion(
       adapter.cacheKey({
         projectDirAbs: discovery.projectDirAbs,
@@ -322,6 +336,7 @@ function assembleCatalog(
         compilerOptions: discovery.compilerOptions,
         resolutionMode,
       }),
+      engineMode,
     ),
     // Self-describe the tier so loaded catalogs are honest about
     // approximation without re-deriving it from the cacheKey.
