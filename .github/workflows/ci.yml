@@ -113,6 +113,27 @@ jobs:
           sarif_file: graph.sarif
           category: opensip-tools-graph
 
+      # REAL-REPO equivalence guardrail (ADR-0032): assert the SHARDED build is
+      # byte-equivalent to the EXACT single-program build on THIS repo — a genuine
+      # multi-package TS monorepo whose `@opensip-tools/*` imports resolve to built
+      # `dist/*.d.ts`, the exact divergence class the unit fixtures cannot model
+      # (they reuse the production cross-package helpers, so the two engines agree
+      # by construction). This dogfood step builds BOTH catalogs cold with the real
+      # adapter (real dist/*.d.ts resolution), classifies the residual by owner file
+      # (test/fixture-owned ⇒ gate-invisible/benign; production ⇒ the gated signal),
+      # and hard-fails on a budget breach (`.config/graph-equivalence-budget.json`):
+      # a resolver regression (e.g. reintroduced dist/*.d.ts under-resolution) drops
+      # real cross-package edges → the production divergence spikes past budget. A
+      # decrease passes with a tighten hint (a ratchet, like the SARIF net-new
+      # philosophy). functionsOnly{Exact,Sharded} must be 0 (a hard failure). Runs
+      # only on the CI/dogfood lane — the exact build over ~1500 files is too slow
+      # for the fast unit PR gate, so it needs the larger heap (NODE_OPTIONS) and
+      # runs the compiled engine from dist (build step above is the prerequisite).
+      - name: Graph engine equivalence (exact ≡ sharded on this repo)
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm graph:equivalence:ci
+
       # Verify docs/web-generated/ (the website-facing transformed copy
       # of docs/public/) is in sync with its source. Editors who change
       # docs/public/*.md must regenerate docs/web-generated/ by running
