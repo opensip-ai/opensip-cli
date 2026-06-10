@@ -102,14 +102,21 @@ function makeSinks() {
     errors,
     rendered,
     exitCodes,
-    emitJson: (value: unknown) => { emitted.push(value); },
+    emitJson: (value: unknown) => {
+      emitted.push(value);
+    },
     emitError: (detail: { message: string; exitCode: number; code?: string }) => {
       // Mirror the host seam: emitError sets the exit code itself.
       exitCodes.push(detail.exitCode);
       errors.push(detail);
     },
-    render: (result: CommandResult) => { rendered.push(result); return Promise.resolve(); },
-    setExitCode: (code: number) => { exitCodes.push(code); },
+    render: (result: CommandResult) => {
+      rendered.push(result);
+      return Promise.resolve();
+    },
+    setExitCode: (code: number) => {
+      exitCodes.push(code);
+    },
   };
 }
 
@@ -233,7 +240,9 @@ describe('executeSessionShow', () => {
       commands: [],
       sessionReplay: {
         tool: 'fit',
-        replaySession: () => { throw new Error('corrupt payload'); },
+        replaySession: () => {
+          throw new Error('corrupt payload');
+        },
       },
     } satisfies Tool);
     const s = makeSinks();
@@ -299,8 +308,10 @@ describe('executeSessionShow', () => {
       commands: [],
       sessionReplay: {
         tool: 'fit',
-        // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercising the non-Error decode branch.
-        replaySession: () => { throw 'boom-string'; },
+        replaySession: () => {
+          // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercising the non-Error decode branch.
+          throw 'boom-string';
+        },
       },
     } satisfies Tool);
     const s = makeSinks();

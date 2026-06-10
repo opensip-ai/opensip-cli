@@ -20,7 +20,9 @@ function clock(start = 0) {
 /** A no-op sleep for tests that drive timing purely through a custom `now`. */
 const noopSleep = (): Promise<void> => Promise.resolve();
 
-function args(over: Partial<PostChunkedArgs> & Pick<PostChunkedArgs, 'fetchImpl'>): PostChunkedArgs {
+function args(
+  over: Partial<PostChunkedArgs> & Pick<PostChunkedArgs, 'fetchImpl'>,
+): PostChunkedArgs {
   const c = clock();
   return {
     url: 'https://x.test/signals',
@@ -64,21 +66,27 @@ describe('postChunked', () => {
   });
 
   it('retries a 5xx up to maxAttempts, then fails the chunk', async () => {
-    const fetchImpl = vi.fn(() => Promise.resolve(new Response(null, { status: 503 }))) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 503 })),
+    ) as unknown as typeof fetch;
     const r = await postChunked(args({ fetchImpl }));
     expect(fetchImpl).toHaveBeenCalledTimes(3);
     expect(r.outcome).toBe('failed');
   });
 
   it('flags authRejected on 401 and stops immediately', async () => {
-    const fetchImpl = vi.fn(() => Promise.resolve(new Response(null, { status: 401 }))) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 401 })),
+    ) as unknown as typeof fetch;
     const r = await postChunked(args({ fetchImpl, chunks: [{ a: 1 }, { b: 2 }] }));
     expect(r.authRejected).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it('does not retry a non-429 4xx', async () => {
-    const fetchImpl = vi.fn(() => Promise.resolve(new Response(null, { status: 400 }))) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 400 })),
+    ) as unknown as typeof fetch;
     const r = await postChunked(args({ fetchImpl }));
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(r.outcome).toBe('failed');
@@ -86,9 +94,16 @@ describe('postChunked', () => {
 
   it('stops early when the overall deadline elapses', async () => {
     const c = clock();
-    const fetchImpl = vi.fn(() => Promise.resolve(new Response(null, { status: 503 }))) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 503 })),
+    ) as unknown as typeof fetch;
     const r = await postChunked(
-      args({ fetchImpl, now: c.now, sleep: c.sleep, policy: { maxAttempts: 10, overallDeadlineMs: 100, honorRetryAfter: true } }),
+      args({
+        fetchImpl,
+        now: c.now,
+        sleep: c.sleep,
+        policy: { maxAttempts: 10, overallDeadlineMs: 100, honorRetryAfter: true },
+      }),
     );
     expect(r.deadlineExceeded).toBe(true);
   });
@@ -172,7 +187,9 @@ describe('postChunked', () => {
   });
 
   it('never throws when fetch rejects', async () => {
-    const fetchImpl = vi.fn(() => Promise.reject(new Error('ECONNRESET'))) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(() =>
+      Promise.reject(new Error('ECONNRESET')),
+    ) as unknown as typeof fetch;
     const r = await postChunked(args({ fetchImpl }));
     expect(r.outcome).toBe('failed');
     expect(r.errors.join(' ')).toContain('ECONNRESET');
@@ -190,8 +207,10 @@ describe('postChunked', () => {
   });
 
   it('records a non-Error rejection value as a string', async () => {
-    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- deliberately a non-Error value to exercise the String(error) coercion branch
-    const fetchImpl = vi.fn(() => Promise.reject('plain string failure')) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(() =>
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- deliberately a non-Error value to exercise the String(error) coercion branch
+      Promise.reject('plain string failure'),
+    ) as unknown as typeof fetch;
     const r = await postChunked(args({ fetchImpl }));
     expect(r.outcome).toBe('failed');
     expect(r.errors.join(' ')).toContain('plain string failure');
