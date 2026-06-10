@@ -99,7 +99,9 @@ export function createSubprocessProgressRun<TEvent, TResult>(
   });
   child.on('error', (err: Error) => done(() => settle.reject(err)));
   child.on('exit', (code: number | null) => {
-    done(() => settle.reject(new Error(`worker exited (code ${code ?? 'null'}) before producing a result`)));
+    done(() =>
+      settle.reject(new Error(`worker exited (code ${code ?? 'null'}) before producing a result`)),
+    );
   });
 
   return {

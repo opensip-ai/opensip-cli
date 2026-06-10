@@ -6,11 +6,11 @@
  * deduplicating across multiple targets.
  */
 
-import { resolve } from 'node:path'
+import { resolve } from 'node:path';
 
-import { globSync } from 'glob'
+import { globSync } from 'glob';
 
-import type { Target } from './types.js'
+import type { Target } from './types.js';
 
 /**
  * Resolve multiple targets to a deduplicated list of file paths.
@@ -23,22 +23,22 @@ import type { Target } from './types.js'
  * @returns Sorted, deduplicated array of absolute file paths
  */
 export function resolveTargetFiles(targets: readonly Target[], rootDir: string): string[] {
-  const files = new Set<string>()
+  const files = new Set<string>();
 
   for (const target of targets) {
-    const { include, exclude } = target.config
+    const { include, exclude } = target.config;
 
     for (const pattern of include) {
       const matches = globSync(pattern, {
         cwd: rootDir,
         ignore: [...exclude],
         absolute: true,
-      })
+      });
       for (const match of matches) {
-        files.add(resolve(match))
+        files.add(resolve(match));
       }
     }
   }
 
-  return [...files].sort()
+  return [...files].sort();
 }

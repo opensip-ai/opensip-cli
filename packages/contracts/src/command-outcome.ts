@@ -32,7 +32,6 @@
 import type { SignalEnvelope } from './signal-envelope.js';
 import type { RunDiagnostics } from '@opensip-tools/core';
 
-
 /** Outer status of a command outcome. `partial` = ran but with non-fatal gaps. */
 export type CommandOutcomeStatus = 'ok' | 'error' | 'partial';
 

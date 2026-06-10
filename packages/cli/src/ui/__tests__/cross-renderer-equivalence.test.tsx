@@ -23,12 +23,14 @@ import type { CommandResult } from '@opensip-tools/contracts';
 
 /** Collapse all whitespace so wrapping/indentation differences are ignored. */
 function normalize(s: string): string {
-  return s
-    // eslint-disable-next-line no-control-regex -- strip ANSI color sequences from the Ink frame
-    .replaceAll(/\[[0-9;]*m/g, '')
-    .replaceAll(/-{2,}/g, ' ')
-    .replaceAll(/\s+/g, ' ')
-    .trim();
+  return (
+    s
+      // eslint-disable-next-line no-control-regex -- strip ANSI color sequences from the Ink frame
+      .replaceAll(/\[[0-9;]*m/g, '')
+      .replaceAll(/-{2,}/g, ' ')
+      .replaceAll(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 function inkText(result: CommandResult): string {
@@ -70,7 +72,10 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
     durationMs: 1200,
     footerHints: [{ text: 'Use --verbose for detailed results', bold: ['--verbose'] }],
   },
-  'gate-done': { type: 'gate-done', lines: ['opensip-tools gate compare', '', '✓ STABLE — no change'] },
+  'gate-done': {
+    type: 'gate-done',
+    lines: ['opensip-tools gate compare', '', '✓ STABLE — no change'],
+  },
   'graph-status': {
     type: 'graph-status',
     lines: ['saveBaseline — 1 occurrence(s)', '  saveBaseline (function)', '    src/gate.ts:12:0'],
@@ -86,13 +91,62 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
       runId: 'r',
       createdAt: '2026-06-04T00:00:00.000Z',
       units: [
-        { slug: 'no-console', passed: false, durationMs: 5, filesValidated: 10, itemType: 'files', ignoredCount: 0 },
-        { slug: 'naming', passed: true, durationMs: 3, filesValidated: 10, itemType: 'files', ignoredCount: 0 },
+        {
+          slug: 'no-console',
+          passed: false,
+          durationMs: 5,
+          filesValidated: 10,
+          itemType: 'files',
+          ignoredCount: 0,
+        },
+        {
+          slug: 'naming',
+          passed: true,
+          durationMs: 3,
+          filesValidated: 10,
+          itemType: 'files',
+          ignoredCount: 0,
+        },
       ],
       signals: [
-        { id: 's1', source: 'no-console', provider: 'opensip-tools', severity: 'high', category: 'quality', ruleId: 'no-console', message: 'console.log', filePath: 'a.ts', line: 3, metadata: {}, createdAt: '2026-06-04T00:00:00.000Z' },
-        { id: 's2', source: 'no-console', provider: 'opensip-tools', severity: 'high', category: 'quality', ruleId: 'no-console', message: 'console.log', filePath: 'b.ts', line: 4, metadata: {}, createdAt: '2026-06-04T00:00:00.000Z' },
-        { id: 's3', source: 'naming', provider: 'opensip-tools', severity: 'medium', category: 'quality', ruleId: 'naming', message: 'bad name', filePath: 'c.ts', metadata: {}, createdAt: '2026-06-04T00:00:00.000Z' },
+        {
+          id: 's1',
+          source: 'no-console',
+          provider: 'opensip-tools',
+          severity: 'high',
+          category: 'quality',
+          ruleId: 'no-console',
+          message: 'console.log',
+          filePath: 'a.ts',
+          line: 3,
+          metadata: {},
+          createdAt: '2026-06-04T00:00:00.000Z',
+        },
+        {
+          id: 's2',
+          source: 'no-console',
+          provider: 'opensip-tools',
+          severity: 'high',
+          category: 'quality',
+          ruleId: 'no-console',
+          message: 'console.log',
+          filePath: 'b.ts',
+          line: 4,
+          metadata: {},
+          createdAt: '2026-06-04T00:00:00.000Z',
+        },
+        {
+          id: 's3',
+          source: 'naming',
+          provider: 'opensip-tools',
+          severity: 'medium',
+          category: 'quality',
+          ruleId: 'naming',
+          message: 'bad name',
+          filePath: 'c.ts',
+          metadata: {},
+          createdAt: '2026-06-04T00:00:00.000Z',
+        },
       ],
     }),
   },

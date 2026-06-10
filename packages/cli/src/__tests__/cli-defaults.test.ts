@@ -71,28 +71,52 @@ describe('mergeConfigDefaults', () => {
   // merge must leave `opts.recipe` untouched (explicit flag only).
   it('does NOT merge cli.recipe onto opts (tool-scoped per ADR-0022)', async () => {
     const { mergeConfigDefaults } = await loadModule();
-    const opts: Record<string, unknown> = { recipe: undefined, verbose: false, json: false, exclude: [], apiKey: undefined };
+    const opts: Record<string, unknown> = {
+      recipe: undefined,
+      verbose: false,
+      json: false,
+      exclude: [],
+      apiKey: undefined,
+    };
     mergeConfigDefaults(opts, { recipe: 'x' });
     expect(opts.recipe).toBeUndefined();
   });
 
   it('leaves an explicit --recipe untouched', async () => {
     const { mergeConfigDefaults } = await loadModule();
-    const opts: Record<string, unknown> = { recipe: 'explicit', verbose: false, json: false, exclude: [], apiKey: undefined };
+    const opts: Record<string, unknown> = {
+      recipe: 'explicit',
+      verbose: false,
+      json: false,
+      exclude: [],
+      apiKey: undefined,
+    };
     mergeConfigDefaults(opts, { recipe: 'from-config' });
     expect(opts.recipe).toBe('explicit');
   });
 
   it('applies verbose default when flag is false', async () => {
     const { mergeConfigDefaults } = await loadModule();
-    const opts: Record<string, unknown> = { recipe: undefined, verbose: false, json: false, exclude: [], apiKey: undefined };
+    const opts: Record<string, unknown> = {
+      recipe: undefined,
+      verbose: false,
+      json: false,
+      exclude: [],
+      apiKey: undefined,
+    };
     mergeConfigDefaults(opts, { verbose: true });
     expect(opts.verbose).toBe(true);
   });
 
   it('applies json and reportTo defaults', async () => {
     const { mergeConfigDefaults } = await loadModule();
-    const opts: Record<string, unknown> = { recipe: undefined, verbose: false, json: false, exclude: [], apiKey: undefined };
+    const opts: Record<string, unknown> = {
+      recipe: undefined,
+      verbose: false,
+      json: false,
+      exclude: [],
+      apiKey: undefined,
+    };
     mergeConfigDefaults(opts, { json: true, reportTo: join(projectDir, 'r') });
     expect(opts.json).toBe(true);
     expect(opts.reportTo).toBe(join(projectDir, 'r'));
@@ -100,28 +124,52 @@ describe('mergeConfigDefaults', () => {
 
   it('extends exclude when empty', async () => {
     const { mergeConfigDefaults } = await loadModule();
-    const opts: Record<string, unknown> = { recipe: undefined, verbose: false, json: false, exclude: [], apiKey: undefined };
+    const opts: Record<string, unknown> = {
+      recipe: undefined,
+      verbose: false,
+      json: false,
+      exclude: [],
+      apiKey: undefined,
+    };
     mergeConfigDefaults(opts, { exclude: ['dist/**', 'build/**'] });
     expect(opts.exclude).toEqual(['dist/**', 'build/**']);
   });
 
   it('does not extend exclude when it already has values', async () => {
     const { mergeConfigDefaults } = await loadModule();
-    const opts: Record<string, unknown> = { recipe: undefined, verbose: false, json: false, exclude: ['mine/**'], apiKey: undefined };
+    const opts: Record<string, unknown> = {
+      recipe: undefined,
+      verbose: false,
+      json: false,
+      exclude: ['mine/**'],
+      apiKey: undefined,
+    };
     mergeConfigDefaults(opts, { exclude: ['from-config/**'] });
     expect(opts.exclude).toEqual(['mine/**']);
   });
 
   it('resolves apiKey via cli config when flag absent and no env var', async () => {
     const { mergeConfigDefaults } = await loadModule();
-    const opts: Record<string, unknown> = { recipe: undefined, verbose: false, json: false, exclude: [], apiKey: undefined };
+    const opts: Record<string, unknown> = {
+      recipe: undefined,
+      verbose: false,
+      json: false,
+      exclude: [],
+      apiKey: undefined,
+    };
     mergeConfigDefaults(opts, { apiKey: 'sk-from-cli-block' });
     expect(opts.apiKey).toBe('sk-from-cli-block');
   });
 
   it('does not overwrite apiKey when explicitly set on opts', async () => {
     const { mergeConfigDefaults } = await loadModule();
-    const opts: Record<string, unknown> = { recipe: undefined, verbose: false, json: false, exclude: [], apiKey: 'explicit-key' };
+    const opts: Record<string, unknown> = {
+      recipe: undefined,
+      verbose: false,
+      json: false,
+      exclude: [],
+      apiKey: 'explicit-key',
+    };
     mergeConfigDefaults(opts, { apiKey: 'sk-from-cli-block' });
     expect(opts.apiKey).toBe('explicit-key');
   });
@@ -129,7 +177,13 @@ describe('mergeConfigDefaults', () => {
   it('falls back to resolveApiKey (env var) when neither flag nor cli-block provides one', async () => {
     process.env.OPENSIP_API_KEY = 'sk-from-env';
     const { mergeConfigDefaults } = await loadModule();
-    const opts: Record<string, unknown> = { recipe: undefined, verbose: false, json: false, exclude: [], apiKey: undefined };
+    const opts: Record<string, unknown> = {
+      recipe: undefined,
+      verbose: false,
+      json: false,
+      exclude: [],
+      apiKey: undefined,
+    };
     mergeConfigDefaults(opts, {});
     expect(opts.apiKey).toBe('sk-from-env');
   });

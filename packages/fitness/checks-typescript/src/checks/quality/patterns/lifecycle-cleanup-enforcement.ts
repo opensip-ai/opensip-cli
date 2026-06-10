@@ -7,19 +7,18 @@
  * this check analyzes call-sites for proper resource cleanup.
  */
 
-
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { findEnclosingScope, getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { findEnclosingScope, getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Describes a known type that has lifecycle methods requiring cleanup.
  */
 interface LifecycleType {
   /** Class or constructor name */
-  readonly name: string
+  readonly name: string;
   /** Lifecycle methods that must be called for proper cleanup */
-  readonly methods: readonly string[]
+  readonly methods: readonly string[];
 }
 
 /**
@@ -28,20 +27,20 @@ interface LifecycleType {
  */
 const KNOWN_LIFECYCLE_TYPES: readonly LifecycleType[] = [
   { name: 'SipDataClient', methods: ['destroy'] },
-]
+];
 
 /**
  * Set of all known type names for quick filtering.
  */
-const KNOWN_TYPE_NAMES = new Set(KNOWN_LIFECYCLE_TYPES.map((t) => t.name))
+const KNOWN_TYPE_NAMES = new Set(KNOWN_LIFECYCLE_TYPES.map((t) => t.name));
 
 /**
  * Context for creating violations from AST analysis.
  */
 interface ViolationContext {
-  readonly absolutePath: string
-  readonly content: string
-  readonly sourceFile: ts.SourceFile
+  readonly absolutePath: string;
+  readonly content: string;
+  readonly sourceFile: ts.SourceFile;
 }
 
 /**
@@ -49,13 +48,13 @@ interface ViolationContext {
  */
 interface ResourceCreation {
   /** Variable name the resource was assigned to */
-  readonly variableName: string
+  readonly variableName: string;
   /** The lifecycle type information */
-  readonly lifecycleType: LifecycleType
+  readonly lifecycleType: LifecycleType;
   /** AST node of the variable declaration */
-  readonly node: ts.VariableDeclaration
+  readonly node: ts.VariableDeclaration;
   /** The enclosing function or block scope */
-  readonly scope: ts.Node
+  readonly scope: ts.Node;
 }
 
 /**
@@ -66,17 +65,17 @@ interface ResourceCreation {
 function getLifecycleTypeFromNewExpression(node: ts.Expression): LifecycleType | undefined {
   /* v8 ignore next -- defensive AST/type guard */
   if (!ts.isNewExpression(node)) {
-    return undefined
+    return undefined;
   }
 
-  const expression = node.expression
+  const expression = node.expression;
   /* v8 ignore next -- defensive AST/type guard */
   if (!ts.isIdentifier(expression)) {
-    return undefined
+    return undefined;
   }
 
-  const typeName = expression.text
-  return KNOWN_LIFECYCLE_TYPES.find((t) => t.name === typeName)
+  const typeName = expression.text;
+  return KNOWN_LIFECYCLE_TYPES.find((t) => t.name === typeName);
 }
 
 /**
@@ -95,45 +94,45 @@ function hasCleanupCallInScope(
   method: string,
   sourceFile: ts.SourceFile,
 ): boolean {
-  let found = false
+  let found = false;
 
   const visit = (node: ts.Node): void => {
     if (found) {
-      return
+      return;
     }
 
     // Check for direct call: variableName.method()
     if (ts.isCallExpression(node)) {
-      const expr = node.expression
+      const expr = node.expression;
       if (
         ts.isPropertyAccessExpression(expr) &&
         ts.isIdentifier(expr.expression) &&
         expr.expression.text === variableName &&
         expr.name.text === method
       ) {
-        found = true
-        return
+        found = true;
+        return;
       }
     }
 
     // Check for optional chaining: variableName?.method()
     /* v8 ignore next -- defensive AST/type guard */
     if (ts.isCallExpression(node)) {
-      const nodeText = node.getText(sourceFile)
+      const nodeText = node.getText(sourceFile);
       if (
         nodeText.includes(`${variableName}?.${method}(`) ||
         nodeText.includes(`${variableName}.${method}(`)
       ) {
-        found = true
-        return
+        found = true;
+        return;
       }
     }
 
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
 
-  ts.forEachChild(scope, visit)
-  return found
+  ts.forEachChild(scope, visit);
+  return found;
 }
 
 /**
@@ -145,10 +144,10 @@ function hasCleanupCallInScope(
 function isClassDefinitionFile(content: string): boolean {
   for (const typeName of KNOWN_TYPE_NAMES) {
     if (content.includes(`class ${typeName}`)) {
-      return true
+      return true;
     }
   }
-  return false
+  return false;
 }
 
 /**
@@ -158,26 +157,26 @@ function isClassDefinitionFile(content: string): boolean {
  * @returns Array of resource creation records
  */
 function findResourceCreations(sourceFile: ts.SourceFile): ResourceCreation[] {
-  const creations: ResourceCreation[] = []
+  const creations: ResourceCreation[] = [];
 
   const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node) && node.initializer) {
-      const lifecycleType = getLifecycleTypeFromNewExpression(node.initializer)
+      const lifecycleType = getLifecycleTypeFromNewExpression(node.initializer);
       if (lifecycleType && ts.isIdentifier(node.name)) {
         creations.push({
           variableName: node.name.text,
           lifecycleType,
           node,
           scope: findEnclosingScope(node),
-        })
+        });
       }
     }
 
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
 
-  visit(sourceFile)
-  return creations
+  visit(sourceFile);
+  return creations;
 }
 
 /**
@@ -194,9 +193,9 @@ function createMissingCleanupViolation(
 ): CheckViolation {
   const { line: lineIdx, character } = ctx.sourceFile.getLineAndCharacterOfPosition(
     creation.node.getStart(),
-  )
-  const line = lineIdx + 1
-  const methodList = missingMethods.join(', ')
+  );
+  const line = lineIdx + 1;
+  const methodList = missingMethods.join(', ');
 
   return {
     line,
@@ -206,7 +205,7 @@ function createMissingCleanupViolation(
     suggestion: `Add '${creation.variableName}.${missingMethods[0]}()' in a finally block or cleanup handler to prevent resource leaks`,
     type: 'missing-lifecycle-cleanup',
     match: `new ${creation.lifecycleType.name}`,
-  }
+  };
 }
 
 /**
@@ -217,36 +216,36 @@ function createMissingCleanupViolation(
  * @returns Array of violations for uncleaned resources
  */
 function analyzeCleanupCoverage(absolutePath: string, content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Skip files that define the lifecycle types themselves
   if (isClassDefinitionFile(content)) {
-    return violations
+    return violations;
   }
 
-  const sourceFile = getSharedSourceFile(absolutePath, content)
-    /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+  const sourceFile = getSharedSourceFile(absolutePath, content);
+  /* v8 ignore next -- defensive guard */
+  if (!sourceFile) return [];
 
-  const ctx: ViolationContext = { absolutePath, content, sourceFile }
+  const ctx: ViolationContext = { absolutePath, content, sourceFile };
 
-  const creations = findResourceCreations(sourceFile)
+  const creations = findResourceCreations(sourceFile);
 
   for (const creation of creations) {
-    const missingMethods: string[] = []
+    const missingMethods: string[] = [];
 
     for (const method of creation.lifecycleType.methods) {
       if (!hasCleanupCallInScope(creation.scope, creation.variableName, method, sourceFile)) {
-        missingMethods.push(method)
+        missingMethods.push(method);
       }
     }
 
     if (missingMethods.length > 0) {
-      violations.push(createMissingCleanupViolation(ctx, creation, missingMethods))
+      violations.push(createMissingCleanupViolation(ctx, creation, missingMethods));
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -275,11 +274,11 @@ export const lifecycleCleanupEnforcement = defineCheck({
 
   analyze(content, filePath) {
     // Quick filter: skip files that do not reference any known lifecycle type
-    const hasKnownType = [...KNOWN_TYPE_NAMES].some((name) => content.includes(name))
+    const hasKnownType = [...KNOWN_TYPE_NAMES].some((name) => content.includes(name));
     if (!hasKnownType) {
-      return []
+      return [];
     }
 
-    return analyzeCleanupCoverage(filePath, content)
+    return analyzeCleanupCoverage(filePath, content);
   },
-})
+});

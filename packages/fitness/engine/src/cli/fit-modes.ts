@@ -51,7 +51,11 @@ function persistFitRun(
   args: FitOptions,
   fitResult: Awaited<ReturnType<typeof executeFit>>,
 ): void {
-  if (datastore !== undefined && fitResult.envelope !== undefined && fitResult.durationMs !== undefined) {
+  if (
+    datastore !== undefined &&
+    fitResult.envelope !== undefined &&
+    fitResult.durationMs !== undefined
+  ) {
     persistFitSession(datastore, args, fitResult.envelope, fitResult.durationMs);
   }
 }
@@ -93,13 +97,19 @@ async function deliverFitSignals(
 
 export async function runListMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
   const result = await listChecks(args.cwd);
-  if (args.json) { cli.emitJson(result); return; }
+  if (args.json) {
+    cli.emitJson(result);
+    return;
+  }
   await cli.render(result);
 }
 
 export async function runRecipesMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
   const result = await listRecipes(args.cwd);
-  if (args.json) { cli.emitJson(result); return; }
+  if (args.json) {
+    cli.emitJson(result);
+    return;
+  }
   await cli.render(result);
 }
 

@@ -13,14 +13,8 @@
  * subscope, and verify the other scope's subscope is independent.
  */
 
-import {
-  RunScope,
-  runWithScope,
-} from '@opensip-tools/core';
-import {
-  GraphAdapterRegistry,
-  graphTool,
-} from '@opensip-tools/graph';
+import { RunScope, runWithScope } from '@opensip-tools/core';
+import { GraphAdapterRegistry, graphTool } from '@opensip-tools/graph';
 import {
   SimulationRecipeRegistry,
   createScenarioRegistry,

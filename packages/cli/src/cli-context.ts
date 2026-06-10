@@ -268,9 +268,7 @@ export interface LiveViewRegistry {
   readonly has: (key: string) => boolean;
 }
 
-export function createLiveViewRegistry(
-  log: Logger = defaultLogger,
-): LiveViewRegistry {
+export function createLiveViewRegistry(log: Logger = defaultLogger): LiveViewRegistry {
   const renderers = new Map<string, LiveViewRenderer>();
   return {
     register(key, renderer) {
@@ -316,9 +314,7 @@ export interface ToolCliContextHandle {
   readonly getExitCode: () => number | undefined;
 }
 
-export function buildToolCliContext(
-  opts: BuildToolCliContextOptions,
-): ToolCliContextHandle {
+export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliContextHandle {
   const log = opts.logger ?? defaultLogger;
   let exitCode: number | undefined;
 

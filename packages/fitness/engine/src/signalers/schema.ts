@@ -12,8 +12,8 @@ import {
   dashboardConfigSchema,
   globalExcludesSchema,
   targetsRecordSchema,
-} from '@opensip-tools/config'
-import { z } from 'zod'
+} from '@opensip-tools/config';
+import { z } from 'zod';
 
 // Inline defaults
 const DEFAULTS = {
@@ -50,7 +50,7 @@ const FitnessSchema = z.object({
   // name here tolerantly falls back to the built-in `default` recipe; an
   // explicit `--recipe` typo still hard-fails.
   recipe: z.string().min(1).max(128).optional(),
-})
+});
 
 /** Schema for simulation engine configuration. */
 const SimulationSchema = z.object({
@@ -59,7 +59,7 @@ const SimulationSchema = z.object({
   // name here tolerantly falls back to the built-in `default` recipe; an
   // explicit `--recipe` typo still hard-fails.
   recipe: z.string().min(1).max(128).optional(),
-})
+});
 
 // =============================================================================
 // CLI Defaults + Dashboard — now owned by @opensip-tools/config (2.10.1)
@@ -72,8 +72,8 @@ const SimulationSchema = z.object({
 // `signalersConfig.cli.recipe` / `.dashboard.editor` keep resolving) until
 // fitness is repointed to the composed scope config (Phase 4) — it imports the
 // schemas rather than re-defining them, so there is one definition of each.
-const CliDefaultsSchema = cliConfigSchema
-const DashboardSchema = dashboardConfigSchema
+const CliDefaultsSchema = cliConfigSchema;
+const DashboardSchema = dashboardConfigSchema;
 
 // =============================================================================
 // Root Schema
@@ -86,7 +86,7 @@ function section<T extends z.ZodType>(schema: T) {
   // `.default(...)` declaration on the section's fields. Instead, coerce
   // undefined / null inputs to `{}` *before* delegating to the section schema —
   // that way the inner schema parses `{}` and its per-field defaults apply.
-  return z.preprocess((v) => v ?? {}, schema)
+  return z.preprocess((v) => v ?? {}, schema);
 }
 
 /** Root schema for opensip-tools.config.yml validation */
@@ -99,8 +99,8 @@ export const SignalersConfigSchema = z.object({
   globalExcludes: globalExcludesSchema.default([]),
   targets: targetsRecordSchema.default({}),
   checkOverrides: checkOverridesSchema.optional(),
-  fitness:    section(FitnessSchema),
+  fitness: section(FitnessSchema),
   simulation: section(SimulationSchema),
-  cli:        section(CliDefaultsSchema),
-  dashboard:  section(DashboardSchema),
-})
+  cli: section(CliDefaultsSchema),
+  dashboard: section(DashboardSchema),
+});

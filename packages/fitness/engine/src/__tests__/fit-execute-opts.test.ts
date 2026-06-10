@@ -97,7 +97,8 @@ describe('executeFit — persistence-free boundary (ADR-0028)', () => {
     const args = makeArgs(projectDir);
     const fitResult = await withFitScope(() => executeFit(args));
     expect(fitResult.envelope).toBeDefined();
-    if (fitResult.envelope === undefined || fitResult.durationMs === undefined) throw new Error('expected a fit-done result');
+    if (fitResult.envelope === undefined || fitResult.durationMs === undefined)
+      throw new Error('expected a fit-done result');
 
     persistFitSession(datastore, args, fitResult.envelope, fitResult.durationMs);
 

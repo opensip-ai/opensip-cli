@@ -9,17 +9,17 @@
  * function picks it up automatically. (F1/F8.)
  */
 
-import { listToolTabs } from './tool-tab-registry.js'
-import './tool-tabs-registrations.js'  // side-effect: registers fit/sim/graph
+import { listToolTabs } from './tool-tab-registry.js';
+import './tool-tabs-registrations.js'; // side-effect: registers fit/sim/graph
 
 export function dashboardOverviewJs(): string {
-  const toolTabs = listToolTabs()
+  const toolTabs = listToolTabs();
   const badgeStylesEntries = toolTabs
-    .map(t => `    ${JSON.stringify(t.tool)}: ${JSON.stringify(t.badgeStyle)},`)
-    .join('\n')
+    .map((t) => `    ${JSON.stringify(t.tool)}: ${JSON.stringify(t.badgeStyle)},`)
+    .join('\n');
   const tabMapEntries = toolTabs
-    .map(t => `${JSON.stringify(t.tool)}: ${JSON.stringify(t.id)}`)
-    .join(', ')
+    .map((t) => `${JSON.stringify(t.tool)}: ${JSON.stringify(t.id)}`)
+    .join(', ');
   return `
 // =======================================================
 // OVERVIEW TAB

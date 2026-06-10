@@ -12,7 +12,9 @@ import { normalizeProjectDir } from '../normalize-project-dir.js';
 
 describe('normalizeProjectDir (DRY-4)', () => {
   const realDir = realpathSync(mkdtempSync(join(tmpdir(), 'graph-norm-')));
-  afterAll(() => { rmSync(realDir, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(realDir, { recursive: true, force: true });
+  });
 
   it('passes absolute paths through to realpath', () => {
     const out = normalizeProjectDir(realDir);
@@ -26,7 +28,11 @@ describe('normalizeProjectDir (DRY-4)', () => {
 
   it('follows symlinks via realpath', () => {
     const linkPath = `${realDir}-link`;
-    try { symlinkSync(realDir, linkPath, 'dir'); } catch { return; }
+    try {
+      symlinkSync(realDir, linkPath, 'dir');
+    } catch {
+      return;
+    }
     try {
       const out = normalizeProjectDir(linkPath);
       expect(out).toBe(realDir);

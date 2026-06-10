@@ -56,7 +56,9 @@ describe('checkScenario', () => {
   });
 
   it('checks stdoutIncludes', () => {
-    expect(checkScenario(spawnResult({ stdout: 'hello world' }), { stdoutIncludes: 'world' })).toEqual([]);
+    expect(
+      checkScenario(spawnResult({ stdout: 'hello world' }), { stdoutIncludes: 'world' }),
+    ).toEqual([]);
     const miss = checkScenario(spawnResult({ stdout: 'hello' }), { stdoutIncludes: 'world' });
     expect(miss).toHaveLength(1);
     expect(miss[0]).toContain('stdout missing substring');
@@ -70,7 +72,9 @@ describe('checkScenario', () => {
   });
 
   it('checks stderrIncludes', () => {
-    expect(checkScenario(spawnResult({ stderr: 'warn: bad tag' }), { stderrIncludes: 'bad tag' })).toEqual([]);
+    expect(
+      checkScenario(spawnResult({ stderr: 'warn: bad tag' }), { stderrIncludes: 'bad tag' }),
+    ).toEqual([]);
     const miss = checkScenario(spawnResult({ stderr: '' }), { stderrIncludes: 'bad tag' });
     expect(miss).toHaveLength(1);
     expect(miss[0]).toContain('stderr missing substring');
@@ -109,7 +113,9 @@ describe('expectGraphCatalogNonEmpty', () => {
   const predicate = expectGraphCatalogNonEmpty();
 
   it('accepts a graph envelope with at least one unit', () => {
-    expect(predicate({ schemaVersion: 2, tool: 'graph', signals: [], units: [{ slug: 'x' }] })).toEqual([]);
+    expect(
+      predicate({ schemaVersion: 2, tool: 'graph', signals: [], units: [{ slug: 'x' }] }),
+    ).toEqual([]);
   });
 
   it('rejects an empty graph catalog (no signals, no units)', () => {
@@ -137,7 +143,11 @@ describe('.mjs core / TS wrapper parity', () => {
   // pass/fail + failure messages so assertion semantics cannot silently diverge.
   it('produces identical results via the wrapper and the raw core', () => {
     const scenarios: Scenario[] = [
-      { name: 'version passes', args: ['--version'], expect: { exitCode: 0, stdoutIncludes: CLI_PKG_VERSION } },
+      {
+        name: 'version passes',
+        args: ['--version'],
+        expect: { exitCode: 0, stdoutIncludes: CLI_PKG_VERSION },
+      },
       { name: 'version fails (deliberate)', args: ['--version'], expect: { exitCode: 1 } },
     ];
     const descriptor = {

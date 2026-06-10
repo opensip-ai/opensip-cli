@@ -108,7 +108,9 @@ describe('computeFilesFingerprint', () => {
 
   it('starts the fingerprint with the file count', () => {
     expect(computeFilesFingerprint([]).startsWith('0')).toBe(true);
-    expect(computeFilesFingerprint([join(dir, 'x.ts'), join(dir, 'y.ts')]).startsWith('2')).toBe(true);
+    expect(computeFilesFingerprint([join(dir, 'x.ts'), join(dir, 'y.ts')]).startsWith('2')).toBe(
+      true,
+    );
   });
 
   it('reports `missing` for files that fail to stat', () => {

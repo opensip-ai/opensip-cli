@@ -2,11 +2,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  UnknownLiveViewError,
-  type LiveViewRenderer,
-  type Logger,
-} from '@opensip-tools/core';
+import { UnknownLiveViewError, type LiveViewRenderer, type Logger } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildToolCliContext, createLiveViewRegistry } from '../cli-context.js';
@@ -169,7 +165,7 @@ describe('buildToolCliContext', () => {
 
   it('uses defaultLogger when no logger is supplied', () => {
     const { ctx } = buildToolCliContext({
-        render: vi.fn(() => Promise.resolve()),
+      render: vi.fn(() => Promise.resolve()),
       liveViews: createLiveViewRegistry(),
       maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     });

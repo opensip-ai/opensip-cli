@@ -33,11 +33,22 @@ const fakeEnvelope = {
 /** A successful executeFit result whose run verdict is `shouldFail`. */
 const fitResult = (shouldFail: boolean): Awaited<ReturnType<typeof executeFit>> =>
   ({
-    result: { type: 'fit-done', label: 'gate', cwd: '/x', envelope: fakeEnvelope, shouldFail, configFound: true },
+    result: {
+      type: 'fit-done',
+      label: 'gate',
+      cwd: '/x',
+      envelope: fakeEnvelope,
+      shouldFail,
+      configFound: true,
+    },
     envelope: fakeEnvelope,
   }) as unknown as Awaited<ReturnType<typeof executeFit>>;
 
-function mockCli(): { cli: ToolCliContext; setExitCode: ReturnType<typeof vi.fn>; deliverSignals: ReturnType<typeof vi.fn> } {
+function mockCli(): {
+  cli: ToolCliContext;
+  setExitCode: ReturnType<typeof vi.fn>;
+  deliverSignals: ReturnType<typeof vi.fn>;
+} {
   const setExitCode = vi.fn();
   const deliverSignals = vi.fn(() => Promise.resolve());
   const cli = {

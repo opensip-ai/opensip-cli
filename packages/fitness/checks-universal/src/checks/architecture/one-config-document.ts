@@ -45,29 +45,29 @@
  * check inert in adopter repos (whose code never matches those paths), so it
  * enforces THIS platform's architecture, not a universal rule.
  */
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
-import { yamlDocBindings } from './_yaml-doc-bindings.js'
+import { yamlDocBindings } from './_yaml-doc-bindings.js';
 
 /** Resolved-path fragment identifying a first-party tool-engine source file. */
-const TOOL_ENGINE_PATH = /packages\/(fitness|graph|simulation)\/engine\/src\//
+const TOOL_ENGINE_PATH = /packages\/(fitness|graph|simulation)\/engine\/src\//;
 
 /** Maps an engine namespace directory to its config-document top-level key. */
 const NAMESPACE_BY_DIR: Readonly<Record<string, string>> = {
   fitness: 'fitness',
   graph: 'graph',
   simulation: 'simulation',
-}
+};
 
 /** The recipe-name key — an own-namespace read of ONLY this is exempt (ADR-0022). */
-const RECIPE_KEY = 'recipe'
+const RECIPE_KEY = 'recipe';
 
 /** What we learn about one `const <binding> = <yamlDoc>.<namespace>` projection. */
 interface BlockBinding {
   /** Fields projected off the binding (the members after `<binding>.`). */
-  readonly fields: Set<string>
+  readonly fields: Set<string>;
   /** Whether the binding is handed into a Zod `.parse(...)` / `.safeParse(...)`. */
-  parsed: boolean
+  parsed: boolean;
 }
 
 /**
@@ -78,36 +78,36 @@ interface BlockBinding {
  * parse. A binding that IS parsed, or projects only `recipe`, is compliant.
  */
 function bindingsForNamespace(content: string, namespace: string): Map<string, BlockBinding> {
-  const bindings = new Map<string, BlockBinding>()
-  const docs = yamlDocBindings(content)
-  if (docs.size === 0) return bindings
+  const bindings = new Map<string, BlockBinding>();
+  const docs = yamlDocBindings(content);
+  if (docs.size === 0) return bindings;
   // `const block = doc.graph` / `const graphBlock = document.graph` etc. The
   // RHS object MUST be a parsed-YAML-document binding AND the key MUST be the
   // tool's OWN namespace (not `cli`, `targets`, `signalers`, …). Anchoring on a
   // yaml-doc source rejects `scope.graph?.rules` and other unrelated `.graph`
   // member reads.
-  const docAlternation = [...docs].map((d) => d.replaceAll('$', String.raw`\$`)).join('|')
+  const docAlternation = [...docs].map((d) => d.replaceAll('$', String.raw`\$`)).join('|');
   const bindRe = new RegExp(
     String.raw`(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:${docAlternation})\.${namespace}\b`,
     'g',
-  )
+  );
   for (const m of content.matchAll(bindRe)) {
-    bindings.set(m[1], { fields: new Set<string>(), parsed: false })
+    bindings.set(m[1], { fields: new Set<string>(), parsed: false });
   }
-  if (bindings.size === 0) return bindings
+  if (bindings.size === 0) return bindings;
   for (const [binding, info] of bindings) {
     // Fields projected off the binding: `block.minDuplicateBodyLines`, `block.recipe`, …
-    const fieldRe = new RegExp(String.raw`\b${binding}\.([A-Za-z_$][\w$]*)\b`, 'g')
+    const fieldRe = new RegExp(String.raw`\b${binding}\.([A-Za-z_$][\w$]*)\b`, 'g');
     for (const fm of content.matchAll(fieldRe)) {
-      info.fields.add(fm[1])
+      info.fields.add(fm[1]);
     }
     // Binding handed into a Zod parse: `…parse(block)` / `…safeParse(graphBlock)`.
     // Scoped to THIS binding so a sibling hand-projection in the same file
     // (that happens to also parse a different block) is still caught.
-    const parseRe = new RegExp(String.raw`\.(?:safeParse|parse)\s*\(\s*${binding}\b`)
-    info.parsed = parseRe.test(content)
+    const parseRe = new RegExp(String.raw`\.(?:safeParse|parse)\s*\(\s*${binding}\b`);
+    info.parsed = parseRe.test(content);
   }
-  return bindings
+  return bindings;
 }
 
 /**
@@ -117,25 +117,25 @@ function bindingsForNamespace(content: string, namespace: string): Map<string, B
  * Exported for unit tests so the detector runs without the Check framework.
  */
 export function analyzeOneConfigDocument(content: string, filePath: string): CheckViolation[] {
-  const dirMatch = TOOL_ENGINE_PATH.exec(filePath)
-  if (!dirMatch) return []
-  const namespace = NAMESPACE_BY_DIR[dirMatch[1]]
-  if (namespace === undefined) return []
+  const dirMatch = TOOL_ENGINE_PATH.exec(filePath);
+  if (!dirMatch) return [];
+  const namespace = NAMESPACE_BY_DIR[dirMatch[1]];
+  if (namespace === undefined) return [];
 
-  const bindings = bindingsForNamespace(content, namespace)
-  if (bindings.size === 0) return []
+  const bindings = bindingsForNamespace(content, namespace);
+  if (bindings.size === 0) return [];
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
   for (const info of bindings.values()) {
     // A binding routed through a Zod parse is compliant regardless of how many
     // fields it then reads off `parsed.data`.
-    if (info.parsed) continue
+    if (info.parsed) continue;
     // Exempt the ADR-0022 recipe-NAME resolver: an own-namespace block whose
     // ONLY projected field is `recipe` reads a single scalar for cross-tool
     // recipe precedence — not a config hand-projection.
-    const nonRecipe = [...info.fields].filter((f) => f !== RECIPE_KEY)
-    if (nonRecipe.length === 0) continue
-    const readList = nonRecipe.map((f) => `'${f}'`).join(', ')
+    const nonRecipe = [...info.fields].filter((f) => f !== RECIPE_KEY);
+    if (nonRecipe.length === 0) continue;
+    const readList = nonRecipe.map((f) => `'${f}'`).join(', ');
     violations.push({
       line: 1,
       filePath,
@@ -153,9 +153,9 @@ export function analyzeOneConfigDocument(content: string, filePath: string): Che
         `raw YAML fields. The composed dispatch-level validation is the strict ` +
         `typo gate (ADR-0023, Phase 4).`,
       type: 'one-config-document',
-    })
+    });
   }
-  return violations
+  return violations;
 }
 
 /**
@@ -164,20 +164,20 @@ export function analyzeOneConfigDocument(content: string, filePath: string): Che
  * Exported so unit tests can drive it with an in-memory `FileAccessor`.
  */
 export async function analyzeAllOneConfigDocument(files: FileAccessor): Promise<CheckViolation[]> {
-  const violations: CheckViolation[] = []
-  const candidates = files.paths.filter((p) => TOOL_ENGINE_PATH.test(p) && p.endsWith('.ts'))
-  const contents = await files.readMany(candidates)
+  const violations: CheckViolation[] = [];
+  const candidates = files.paths.filter((p) => TOOL_ENGINE_PATH.test(p) && p.endsWith('.ts'));
+  const contents = await files.readMany(candidates);
   for (const [filePath, content] of contents) {
-    violations.push(...analyzeOneConfigDocument(content, filePath))
+    violations.push(...analyzeOneConfigDocument(content, filePath));
   }
-  return violations
+  return violations;
 }
 
 export const oneConfigDocument = defineCheck({
   id: 'd86854d1-bcc0-4aca-9d8c-0d621f193355',
   slug: 'one-config-document',
   description:
-    "A tool must validate its config block through a composed Zod schema, not hand-project its own opensip-tools.config.yml namespace (ADR-0023)",
+    'A tool must validate its config block through a composed Zod schema, not hand-project its own opensip-tools.config.yml namespace (ADR-0023)',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   tags: ['architecture'],
   fileTypes: ['ts'],
@@ -186,4 +186,4 @@ export const oneConfigDocument = defineCheck({
   // so prose mentioning a namespace cannot false-fire.
   contentFilter: 'raw',
   analyzeAll: analyzeAllOneConfigDocument,
-})
+});

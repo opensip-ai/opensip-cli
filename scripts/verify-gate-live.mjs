@@ -83,9 +83,7 @@ const EXTERNAL_GATE_PROBES = [
     // ADR-0004: OTel SDK family may live only in packages/cli. Inject from a
     // tool engine (a non-cli package) and expect the rule to fire.
     file: `${PROBE_DIR}/__gate_probe_otel_sdk__.ts`,
-    source:
-      "import '@opentelemetry/sdk-trace-node';\n" +
-      'export const _gateProbe = 1;\n',
+    source: "import '@opentelemetry/sdk-trace-node';\n" + 'export const _gateProbe = 1;\n',
     rule: 'otel-sdk-only-in-cli',
   },
   {
@@ -93,9 +91,7 @@ const EXTERNAL_GATE_PROBES = [
     // substrate and the lang-* adapters. Inject from a non-lang package and
     // expect the rule to fire.
     file: 'packages/fitness/engine/src/__gate_probe_tree_sitter__.ts',
-    source:
-      "import { Parser } from 'web-tree-sitter';\n" +
-      'export const _gateProbe = Parser;\n',
+    source: "import { Parser } from 'web-tree-sitter';\n" + 'export const _gateProbe = Parser;\n',
     rule: 'tree-sitter-parser-only-in-lang-packs',
   },
 ];
@@ -106,7 +102,15 @@ function depcruiseReport(target) {
   try {
     return execFileSync(
       'npx',
-      ['depcruise', '--config', '.config/dependency-cruiser.cjs', '--no-progress', '--output-type', 'err', target],
+      [
+        'depcruise',
+        '--config',
+        '.config/dependency-cruiser.cjs',
+        '--no-progress',
+        '--output-type',
+        'err',
+        target,
+      ],
       { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
     );
   } catch (error) {
@@ -169,7 +173,15 @@ function main() {
   try {
     const out = execFileSync(
       'npx',
-      ['depcruise', '--config', '.config/dependency-cruiser.cjs', '--no-progress', '--output-type', 'json', 'packages'],
+      [
+        'depcruise',
+        '--config',
+        '.config/dependency-cruiser.cjs',
+        '--no-progress',
+        '--output-type',
+        'json',
+        'packages',
+      ],
       { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
     );
     json = JSON.parse(out);
@@ -199,22 +211,39 @@ function main() {
       // means the resolver fell back to package exports and the gate is
       // half-broken.
       if (isWorkspace && (resolved.includes('/dist/') || resolved.includes('node_modules'))) {
-        console.error('verify-gate-live: @opensip-tools import resolved to built output (gate would be inert): ' + m.source + ' -> ' + resolved);
+        console.error(
+          'verify-gate-live: @opensip-tools import resolved to built output (gate would be inert): ' +
+            m.source +
+            ' -> ' +
+            resolved,
+        );
         process.exit(1);
       }
     }
   }
 
   if (!sawWorkspaceImportResolved) {
-    console.error('verify-gate-live: FAIL — no @opensip-tools import resolved to a package src tree. The dependency-cruiser resolver is broken; every cross-package layer rule is INERT. Check options.tsConfig.fileName -> .config/tsconfig.depcruise.json and its paths map.');
+    console.error(
+      'verify-gate-live: FAIL — no @opensip-tools import resolved to a package src tree. The dependency-cruiser resolver is broken; every cross-package layer rule is INERT. Check options.tsConfig.fileName -> .config/tsconfig.depcruise.json and its paths map.',
+    );
     process.exit(1);
   }
   if (crossPackageEdges < MIN_CROSS_PACKAGE_EDGES) {
-    console.error('verify-gate-live: FAIL — only ' + crossPackageEdges + ' cross-package edges resolved (expected >= ' + MIN_CROSS_PACKAGE_EDGES + '). The resolver is likely partially broken; cross-package rules may be inert.');
+    console.error(
+      'verify-gate-live: FAIL — only ' +
+        crossPackageEdges +
+        ' cross-package edges resolved (expected >= ' +
+        MIN_CROSS_PACKAGE_EDGES +
+        '). The resolver is likely partially broken; cross-package rules may be inert.',
+    );
     process.exit(1);
   }
 
-  console.log('verify-gate-live: OK — ' + crossPackageEdges + ' cross-package edges resolved into package src trees; the architecture gate is live.');
+  console.log(
+    'verify-gate-live: OK — ' +
+      crossPackageEdges +
+      ' cross-package edges resolved into package src trees; the architecture gate is live.',
+  );
 
   // Beyond edge-resolution: prove the ADR-0011 tool-output rules still fire.
   verifyToolOutputGatesFire();

@@ -12,16 +12,19 @@
  * TS/Node ecosystem (drizzle-orm, typed-inject, React-specific, etc.).
  */
 
-import { applyCheckDisplay, collectCheckObjects } from '@opensip-tools/fitness'
+import { applyCheckDisplay, collectCheckObjects } from '@opensip-tools/fitness';
 
-import * as allChecks from './checks/index.js'
-import { CHECK_DISPLAY } from './display/index.js'
+import * as allChecks from './checks/index.js';
+import { CHECK_DISPLAY } from './display/index.js';
 
-import type { Check } from '@opensip-tools/fitness'
+import type { Check } from '@opensip-tools/fitness';
 
 /** All TypeScript-only checks (display folded on from CHECK_DISPLAY), per plugin contract. */
-export const checks: readonly Check[] = applyCheckDisplay(collectCheckObjects(allChecks), CHECK_DISPLAY)
+export const checks: readonly Check[] = applyCheckDisplay(
+  collectCheckObjects(allChecks),
+  CHECK_DISPLAY,
+);
 
 // Display helpers + the authoring map (used by tests / external display lookups).
-export { getCheckDisplayName, getCheckIcon, CHECK_DISPLAY } from './display/index.js'
-export type { CheckDisplayEntry } from './display/types.js'
+export { getCheckDisplayName, getCheckIcon, CHECK_DISPLAY } from './display/index.js';
+export type { CheckDisplayEntry } from './display/types.js';

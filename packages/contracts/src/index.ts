@@ -22,11 +22,7 @@
  */
 
 // CLI option / argument types
-export type {
-  FitOptions,
-  InitOptions,
-  ToolOptions,
-} from './types.js';
+export type { FitOptions, InitOptions, ToolOptions } from './types.js';
 
 // Signal envelope — the universal tool-run output currency (ADR-0011). The
 // `CommandResult` payload every tool returns; it replaced the fitness-shaped

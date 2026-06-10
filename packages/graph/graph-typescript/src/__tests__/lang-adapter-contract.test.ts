@@ -28,16 +28,9 @@ import {
   type GraphLanguageAdapter,
   type WalkOutput,
 } from '@opensip-tools/graph';
-import {
-  pythonGraphAdapter,
-  type PythonParsedProject,
-} from '@opensip-tools/graph-python';
-import {
-  rustGraphAdapter,
-  type RustParsedProject,
-} from '@opensip-tools/graph-rust';
+import { pythonGraphAdapter, type PythonParsedProject } from '@opensip-tools/graph-python';
+import { rustGraphAdapter, type RustParsedProject } from '@opensip-tools/graph-rust';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
 
 import { typescriptGraphAdapter, type TsParsed } from '../index.js';
 
@@ -86,7 +79,10 @@ function setupFixture(dir: string): void {
   }
 }
 
-function buildPipeline(adapter = typescriptGraphAdapter, dir: string): {
+function buildPipeline(
+  adapter = typescriptGraphAdapter,
+  dir: string,
+): {
   readonly project: TsParsed;
   readonly walk: WalkOutput;
   readonly catalog: Catalog;
@@ -317,7 +313,9 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
     for (const f of discovery.files) {
       const seen = reachable.has(f) || erroredFiles.has(f);
       // realpath quirks: try suffix match too.
-      const suffixMatch = [...reachable].some((r) => r.endsWith(f.replace(discovery.projectDirAbs, '')));
+      const suffixMatch = [...reachable].some((r) =>
+        r.endsWith(f.replace(discovery.projectDirAbs, '')),
+      );
       expect(seen || suffixMatch).toBe(true);
     }
   });
@@ -455,7 +453,9 @@ function buildPythonPipeline(
   const cacheKeyArgs: Parameters<typeof adapter.cacheKey>[0] = {
     projectDirAbs: discovery.projectDirAbs,
     ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
-    ...(discovery.compilerOptions === undefined ? {} : { compilerOptions: discovery.compilerOptions }),
+    ...(discovery.compilerOptions === undefined
+      ? {}
+      : { compilerOptions: discovery.compilerOptions }),
     resolutionMode: 'exact',
   };
   const catalog: Catalog = {

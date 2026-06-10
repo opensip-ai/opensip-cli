@@ -176,10 +176,7 @@ describe('Rust depends-on — Cargo.toml parsing edge cases', () => {
   });
 
   it('returns no package-name match when [package] has no name (decoy outside only)', () => {
-    writeFile(
-      'Cargo.toml',
-      `name = "decoy"\n[package]\nversion = "0.1.0"\n`,
-    );
+    writeFile('Cargo.toml', `name = "decoy"\n[package]\nversion = "0.1.0"\n`);
     writeFile('src/lib.rs', `pub mod foo;\n\nuse decoy::foo::Bar;\n\nfn _u(_: Bar) {}\n`);
     writeFile('src/foo.rs', `pub struct Bar;\n`);
 
@@ -218,7 +215,10 @@ describe('Rust depends-on — module-path mapping via mod.rs layout', () => {
 
   it('maps `src/<dir>/mod.rs` to `crate::<dir>` and resolves an import to it', () => {
     writeFile('Cargo.toml', CARGO_TOML);
-    writeFile('src/lib.rs', `pub mod widgets;\n\nuse crate::widgets::Gizmo;\n\nfn _u(_: Gizmo) {}\n`);
+    writeFile(
+      'src/lib.rs',
+      `pub mod widgets;\n\nuse crate::widgets::Gizmo;\n\nfn _u(_: Gizmo) {}\n`,
+    );
     writeFile('src/widgets/mod.rs', `pub struct Gizmo;\n`);
 
     const { catalog, dependenciesByOwner } = runAdapter();

@@ -8,12 +8,11 @@
  * Validates that response types match their Zod schema definitions.
  */
 
-import { basename } from 'node:path'
+import { basename } from 'node:path';
 
-
-import { defineCheck, type CheckViolation, isAPIFile } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation, isAPIFile } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Check if a file contains Fastify route-level response schema definitions.
@@ -29,11 +28,11 @@ import * as ts from 'typescript'
  */
 function hasRouteResponseSchema(content: string): boolean {
   // schema: { ... response: ... } — handles nested braces via lazy match.
-  if (/schema\s*:\s*\{.*?\bresponse\s*:/s.test(content)) return true
+  if (/schema\s*:\s*\{.*?\bresponse\s*:/s.test(content)) return true;
   // Direct `response: { 200: ... }` block — Fastify also accepts this
   // shape outside an enclosing `schema:` wrapper inside `RouteOptions`.
-  if (/\bresponse\s*:\s*\{\s*[12345]\d{2}\s*:/s.test(content)) return true
-  return false
+  if (/\bresponse\s*:\s*\{\s*[12345]\d{2}\s*:/s.test(content)) return true;
+  return false;
 }
 
 /**
@@ -43,35 +42,35 @@ function hasRouteResponseSchema(content: string): boolean {
 function isDynamicReplyOnly(content: string): boolean {
   // If file has reply.send() but no reply.status().send({ ... }) with object literals,
   // it's likely a passthrough/dynamic endpoint
-  const hasSendCalls = content.includes('reply.send(') || content.includes('reply.send (')
-  if (!hasSendCalls) return false
+  const hasSendCalls = content.includes('reply.send(') || content.includes('reply.send (');
+  if (!hasSendCalls) return false;
 
   // If there's a reply.code/status + structured object, it likely has a fixed shape
   const hasStructuredResponse =
-    /reply\s*\.\s*(?:code|status)\s*\([^)]+\)\s*\.\s*send\s*\(\s*\{/.test(content)
+    /reply\s*\.\s*(?:code|status)\s*\([^)]+\)\s*\.\s*send\s*\(\s*\{/.test(content);
 
   // If there's no structured response pattern, treat as dynamic
-  return !hasStructuredResponse
+  return !hasStructuredResponse;
 }
 
 /**
  * State tracking for API response analysis
  */
 interface ApiResponseState {
-  hasResponseSchemaImport: boolean
-  hasResponseValidation: boolean
-  hasApiResponse: boolean
+  hasResponseSchemaImport: boolean;
+  hasResponseValidation: boolean;
+  hasApiResponse: boolean;
 }
 
 /**
  * Check if an import declaration imports schema/contracts
  */
 function checkSchemaImport(node: ts.ImportDeclaration, state: ApiResponseState): void {
-  const moduleSpecifier = node.moduleSpecifier
+  const moduleSpecifier = node.moduleSpecifier;
   if (ts.isStringLiteral(moduleSpecifier)) {
-    const importPath = moduleSpecifier.text
+    const importPath = moduleSpecifier.text;
     if (importPath.includes('schema') || importPath.includes('contracts')) {
-      state.hasResponseSchemaImport = true
+      state.hasResponseSchemaImport = true;
     }
   }
 }
@@ -84,15 +83,15 @@ function checkValidationCall(
   sourceFile: ts.SourceFile,
   state: ApiResponseState,
 ): void {
-  const callText = node.expression.getText(sourceFile)
+  const callText = node.expression.getText(sourceFile);
   if (!callText.includes('parse') && !callText.includes('safeParse')) {
-    return
+    return;
   }
 
   /* v8 ignore next -- defensive nullish fallback */
-  const argText = node.arguments[0]?.getText(sourceFile) ?? ''
+  const argText = node.arguments[0]?.getText(sourceFile) ?? '';
   if (argText.includes('response') || argText.includes('result') || argText.includes('data')) {
-    state.hasResponseValidation = true
+    state.hasResponseValidation = true;
   }
 }
 
@@ -105,15 +104,15 @@ function checkApiResponseReturn(
   state: ApiResponseState,
 ): void {
   /* v8 ignore next -- defensive AST/type guard */
-  if (!node.expression) return
+  if (!node.expression) return;
 
-  const returnText = node.expression.getText(sourceFile)
+  const returnText = node.expression.getText(sourceFile);
   if (
     returnText.includes('res.') ||
     returnText.includes('reply.') ||
     returnText.includes('response.')
   ) {
-    state.hasApiResponse = true
+    state.hasApiResponse = true;
   }
 }
 
@@ -122,7 +121,7 @@ function checkApiResponseReturn(
  * These routes use raw writes or event-stream content types, not structured JSON responses.
  */
 function isStreamingFile(content: string): boolean {
-  return content.includes('text/event-stream') || content.includes('reply.raw.write')
+  return content.includes('text/event-stream') || content.includes('reply.raw.write');
 }
 
 /**
@@ -130,12 +129,10 @@ function isStreamingFile(content: string): boolean {
  * These routes intentionally return dynamic/unstructured payloads.
  */
 function isDiagnosticFile(filePath: string): boolean {
-  const lowerPath = filePath.toLowerCase()
+  const lowerPath = filePath.toLowerCase();
   return (
-    lowerPath.includes('diagnostic') ||
-    lowerPath.includes('debug') ||
-    lowerPath.includes('health')
-  )
+    lowerPath.includes('diagnostic') || lowerPath.includes('debug') || lowerPath.includes('health')
+  );
 }
 
 /**
@@ -143,26 +140,26 @@ function isDiagnosticFile(filePath: string): boolean {
  * Analyze a file for response validation issues
  */
 function analyzeFile(absolutePath: string, content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Skip SSE/streaming routes — they don't return structured JSON
   /* v8 ignore next -- defensive AST/type guard */
-  if (isStreamingFile(content)) return []
+  if (isStreamingFile(content)) return [];
 
   // Skip diagnostic/debug/health endpoints — intentionally dynamic responses
   /* v8 ignore next -- defensive AST/type guard */
-  if (isDiagnosticFile(absolutePath)) return []
+  if (isDiagnosticFile(absolutePath)) return [];
 
   // Skip routes that define response schemas at the Fastify route level
   /* v8 ignore next -- defensive AST/type guard */
-  if (hasRouteResponseSchema(content)) return []
+  if (hasRouteResponseSchema(content)) return [];
 
   // Skip routes that only use reply.send() with dynamic/passthrough payloads
-  if (isDynamicReplyOnly(content)) return []
+  if (isDynamicReplyOnly(content)) return [];
 
-  const sourceFile = getSharedSourceFile(absolutePath, content)
-    /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+  const sourceFile = getSharedSourceFile(absolutePath, content);
+  /* v8 ignore next -- defensive guard */
+  if (!sourceFile) return [];
 
   // Track if file has response schema imports
   // Use state object to track findings across callback invocations
@@ -171,22 +168,22 @@ function analyzeFile(absolutePath: string, content: string): CheckViolation[] {
     hasResponseSchemaImport: false,
     hasResponseValidation: false,
     hasApiResponse: false,
-  }
+  };
 
   const visit = (node: ts.Node) => {
     if (ts.isImportDeclaration(node)) {
-      checkSchemaImport(node, state)
+      checkSchemaImport(node, state);
     }
     if (ts.isCallExpression(node)) {
-      checkValidationCall(node, sourceFile, state)
+      checkValidationCall(node, sourceFile, state);
     }
     if (ts.isReturnStatement(node)) {
-      checkApiResponseReturn(node, sourceFile, state)
+      checkApiResponseReturn(node, sourceFile, state);
     }
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
 
-  visit(sourceFile)
+  visit(sourceFile);
 
   // If file has API responses but no validation, flag it
   if (state.hasApiResponse && !state.hasResponseValidation && !state.hasResponseSchemaImport) {
@@ -199,10 +196,10 @@ function analyzeFile(absolutePath: string, content: string): CheckViolation[] {
         'Import a Zod response schema from shared contract schemas and use .parse() or .safeParse() to validate API responses before sending to clients',
       type: 'missing-response-validation',
       match: basename(absolutePath),
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -238,15 +235,15 @@ export const apiResponseValidation = defineCheck({
   analyze(content, filePath) {
     // Only analyze API files
     if (!isAPIFile(filePath)) {
-      return []
+      return [];
     }
 
     try {
-      return analyzeFile(filePath, content)
-    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+      return analyzeFile(filePath, content);
+      /* v8 ignore next 1 -- defensive catch: parse failures already handled */
     } catch {
       // @swallow-ok Skip files that fail to parse
-      return []
+      return [];
     }
   },
-})
+});

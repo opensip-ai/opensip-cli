@@ -26,7 +26,6 @@
  * `graph-no-typescript-import-outside-lang-typescript` enforces it.
  */
 
-
 import { relative, sep } from 'node:path';
 
 import { ownerEdgeKey } from '@opensip-tools/graph';
@@ -39,8 +38,6 @@ import { resolveEdgesFromRecords, resolveEdgesSyntactic } from './edges.js';
 import { parseProject as parseTypescriptProject } from './parse.js';
 import { isTypescriptTestFile } from './test-file.js';
 import { walkProgram } from './walk.js';
-
-
 
 import type { TypescriptFastParsedProject } from './parse-fast.js';
 import type { TsParsed, TypescriptParsedProject } from './parse.js';
@@ -64,7 +61,6 @@ import type {
   Catalog,
   CallEdge,
 } from '@opensip-tools/graph';
-
 
 /**
  * Starter list of well-known side-effect primitives for the
@@ -118,9 +114,7 @@ function discoverFilesAdapter(input: DiscoverInput): DiscoverOutput {
  * fast mode pulls them from the standalone source-file map.
  */
 function sourceFilesOf(project: TsParsed): Iterable<ts.SourceFile> {
-  return project.kind === 'fast'
-    ? project.sourceFiles.values()
-    : project.program.getSourceFiles();
+  return project.kind === 'fast' ? project.sourceFiles.values() : project.program.getSourceFiles();
 }
 
 function walkProjectAdapter(input: WalkInput<TsParsed>): WalkOutput {
@@ -170,15 +164,14 @@ function toTsCallSites(callSites: readonly ContractCallSiteRecord[]): TsCallSite
   }));
 }
 
-async function resolveCallSitesAdapter(
-  input: ResolveInput<TsParsed>,
-): Promise<ResolveOutput> {
+async function resolveCallSitesAdapter(input: ResolveInput<TsParsed>): Promise<ResolveOutput> {
   // Branch on the parsed-project tier BEFORE touching the checker. The
   // fast tier has no `ts.Program`, so the exact (checker-backed) resolver
   // cannot run on it.
-  const base = input.project.kind === 'fast'
-    ? await resolveCallSitesFast(input, input.project)
-    : await resolveCallSitesExact(input, input.project);
+  const base =
+    input.project.kind === 'fast'
+      ? await resolveCallSitesFast(input, input.project)
+      : await resolveCallSitesExact(input, input.project);
   // Sharded build: also emit cross-boundary descriptors for calls that
   // didn't land within this shard's own occurrences. Syntactic and
   // mode-independent, so it runs identically for both tiers.
@@ -206,21 +199,24 @@ async function resolveCallSitesExact(
   // Phase 4 (DEC-498): resolve dependency sites if any. Translate
   // back to the TS-specific shape (with real ts.Node handles) and
   // run module resolution.
-  const dependenciesByOwner = input.dependencySites && input.dependencySites.length > 0
-    ? resolveDependencies(
-        input.dependencySites.map((r): TsDependencySiteRecord => ({
-          node: r.nodeRef as ts.Node,
-          sourceFile: r.sourceFileRef as ts.SourceFile,
-          ownerHash: r.ownerHash,
-          specifier: r.specifier,
-          line: r.line,
-          column: r.column,
-        })),
-        input.catalog,
-        project.program,
-        input.projectDirAbs,
-      )
-    : undefined;
+  const dependenciesByOwner =
+    input.dependencySites && input.dependencySites.length > 0
+      ? resolveDependencies(
+          input.dependencySites.map(
+            (r): TsDependencySiteRecord => ({
+              node: r.nodeRef as ts.Node,
+              sourceFile: r.sourceFileRef as ts.SourceFile,
+              ownerHash: r.ownerHash,
+              specifier: r.specifier,
+              line: r.line,
+              column: r.column,
+            }),
+          ),
+          input.catalog,
+          project.program,
+          input.projectDirAbs,
+        )
+      : undefined;
 
   return {
     edgesByOwner: collectByOwner(result.catalog),
@@ -287,8 +283,7 @@ function createModuleResolutionHost(): ts.ModuleResolutionHost {
     fileExists: (fileName: string): boolean => ts.sys.fileExists(fileName),
     readFile: (fileName: string, encoding?: string): string | undefined =>
       ts.sys.readFile(fileName, encoding),
-    directoryExists: (directoryName: string): boolean =>
-      ts.sys.directoryExists(directoryName),
+    directoryExists: (directoryName: string): boolean => ts.sys.directoryExists(directoryName),
     getCurrentDirectory: (): string => ts.sys.getCurrentDirectory(),
     getDirectories: (path: string): string[] => ts.sys.getDirectories(path),
     useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
@@ -360,7 +355,10 @@ function resolveDependencies(
     };
     // Key per owner OCCURRENCE (module-init bodyHash + file) to match
     // stitchEdges; module-init bodies can collide across trivial files.
-    const ownerKey = ownerEdgeKey(site.ownerHash, relative(projectDirAbs, site.sourceFile.fileName));
+    const ownerKey = ownerEdgeKey(
+      site.ownerHash,
+      relative(projectDirAbs, site.sourceFile.fileName),
+    );
     const existing = out.get(ownerKey);
     if (existing === undefined) {
       out.set(ownerKey, [edge]);
@@ -377,9 +375,7 @@ function resolveDependencies(
  * contract surface separates resolution from catalog mutation, so the
  * orchestrator can stitch the edges into whatever catalog shape it owns.
  */
-function collectByOwner(
-  catalog: Catalog,
-): ReadonlyMap<string, readonly CallEdge[]> {
+function collectByOwner(catalog: Catalog): ReadonlyMap<string, readonly CallEdge[]> {
   const out = new Map<string, readonly CallEdge[]>();
   for (const arr of Object.values(catalog.functions)) {
     if (!arr) continue;
@@ -396,8 +392,7 @@ export const typescriptGraphAdapter: GraphLanguageAdapter<TsParsed> = {
   fileExtensions: ['.ts', '.tsx'],
   displayName: 'TypeScript',
   discoverFiles: discoverFilesAdapter,
-  parseProject: (input: ParseInput): ParseOutput<TsParsed> =>
-    parseTypescriptProject(input),
+  parseProject: (input: ParseInput): ParseOutput<TsParsed> => parseTypescriptProject(input),
   walkProject: walkProjectAdapter,
   resolveCallSites: resolveCallSitesAdapter,
   cacheKey: typescriptCacheKey,

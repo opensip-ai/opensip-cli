@@ -61,7 +61,7 @@ describe('mapTagsToSignalCategory — warn-once on unknown tags', () => {
     warnSpy.mockRestore();
   });
 
-  it('warns when a check\'s tags include none of the known categories', () => {
+  it("warns when a check's tags include none of the known categories", () => {
     // Use a tag-set we have not seen before so the dedupe cache misses.
     expect(mapTagsToSignalCategory(['custom-foo-misspelled'])).toBe('warning');
     expect(warnSpy).toHaveBeenCalled();

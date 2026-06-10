@@ -78,7 +78,15 @@ describe('graph stage spans — standalone no-op invariant', () => {
   });
 
   it('GRAPH_STAGES is the canonical seven-stage set the spans are named after', () => {
-    expect(GRAPH_STAGES).toEqual(['discover', 'parse', 'walk', 'resolve', 'index', 'features', 'rules']);
+    expect(GRAPH_STAGES).toEqual([
+      'discover',
+      'parse',
+      'walk',
+      'resolve',
+      'index',
+      'features',
+      'rules',
+    ]);
   });
 
   it('runGraph completes normally and the stage spans are non-recording (emit nothing) with no SDK', async () => {

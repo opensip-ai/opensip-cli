@@ -13,4 +13,4 @@ export const DEFAULT_EXCLUSION_PATTERNS = [
   '**/.git/**',
   '**/coverage/**',
   '**/*.tsbuildinfo',
-] as const
+] as const;

@@ -80,10 +80,7 @@ function isCallSiteTarget(node: ts.Identifier, parent: ts.Node): boolean {
   return false;
 }
 
-export function resolveValueReference(
-  node: ts.Identifier,
-  ctx: ResolverContext,
-): ResolverVerdict {
+export function resolveValueReference(node: ts.Identifier, ctx: ResolverContext): ResolverVerdict {
   const symbol = ctx.typeChecker.getSymbolAtLocation(node);
   return resolveSymbolToHash(symbol, node.text, ctx);
 }

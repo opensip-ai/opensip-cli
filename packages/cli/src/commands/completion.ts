@@ -22,9 +22,9 @@
  * that can query `opensip-tools fit --list` at completion time.
  */
 
-import { commonFlags, type CommonFlagKey } from '@opensip-tools/contracts'
+import { commonFlags, type CommonFlagKey } from '@opensip-tools/contracts';
 
-export type Shell = 'bash' | 'zsh' | 'fish'
+export type Shell = 'bash' | 'zsh' | 'fish';
 
 /**
  * Internal/machine-facing command names never offered in shell completion.
@@ -39,7 +39,7 @@ export const INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
   'fit-run-worker',
   'sim-run-worker',
   'graph-run-worker',
-])
+]);
 
 /**
  * The derived completion surface, assembled from the live `CommandSpec`s by
@@ -49,25 +49,25 @@ export const INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
  */
 export interface CompletionInventory {
   /** User-facing top-level command names (incl. aliases + `help`). */
-  readonly subcommands: readonly string[]
+  readonly subcommands: readonly string[];
   /** Per-command long-flag list, keyed by command name (and alias). */
-  readonly commandFlags: Readonly<Record<string, readonly string[]>>
+  readonly commandFlags: Readonly<Record<string, readonly string[]>>;
   /** Sub-subcommand names for the action-less groups (`plugin`, `sessions`). */
-  readonly groupSubcommands: Readonly<Record<string, readonly string[]>>
+  readonly groupSubcommands: Readonly<Record<string, readonly string[]>>;
 }
 
 /** Minimal structural view of a `CommandSpec` this module needs to read. */
 export interface SpecLike {
-  readonly name: string
-  readonly aliases?: readonly string[]
-  readonly commonFlags: readonly CommonFlagKey[]
-  readonly options?: readonly { readonly flag: string }[]
+  readonly name: string;
+  readonly aliases?: readonly string[];
+  readonly commonFlags: readonly CommonFlagKey[];
+  readonly options?: readonly { readonly flag: string }[];
 }
 
 /** One action-less group (`plugin` / `sessions`) and its leaf command names. */
 export interface GroupLike {
-  readonly name: string
-  readonly leaves: readonly { readonly name: string }[]
+  readonly name: string;
+  readonly leaves: readonly { readonly name: string }[];
 }
 
 /** Long `--flag` form of each registry spec (short alias + arg placeholder
@@ -76,10 +76,10 @@ export interface GroupLike {
  *  re-listing flag names that can drift. Dot-access stays null-safe. */
 const LONG_FLAGS = Object.fromEntries(
   Object.entries(commonFlags).map(([key, spec]) => {
-    const match = /--[a-z][a-z-]*/.exec(spec.flags)
-    return [key, match ? match[0] : spec.flags]
+    const match = /--[a-z][a-z-]*/.exec(spec.flags);
+    return [key, match ? match[0] : spec.flags];
   }),
-) as Record<CommonFlagKey, string>
+) as Record<CommonFlagKey, string>;
 
 /** Flags every command implicitly carries — the `*)` fallback when a typed
  *  subcommand has no derived entry. Derived from the ADR-0021 registry (plus
@@ -92,7 +92,7 @@ const COMMON_FLAGS: readonly string[] = [
   LONG_FLAGS.debug,
   '--help',
   '--version',
-]
+];
 
 /**
  * Extract the canonical long `--flag` from a Commander flag string —
@@ -101,8 +101,8 @@ const COMMON_FLAGS: readonly string[] = [
  * flag (none exist in the current surface, but the caller filters defensively).
  */
 export function extractLongFlag(flags: string): string | undefined {
-  const match = /--[a-z][a-z-]*/.exec(flags)
-  return match ? match[0] : undefined
+  const match = /--[a-z][a-z-]*/.exec(flags);
+  return match ? match[0] : undefined;
 }
 
 /**
@@ -113,11 +113,11 @@ export function extractLongFlag(flags: string): string | undefined {
 export function specLongFlags(spec: SpecLike): readonly string[] {
   // LONG_FLAGS is a total `Record<CommonFlagKey, string>`, so the common-flag
   // lookup never yields undefined; only the option extraction can.
-  const common = spec.commonFlags.map((k) => LONG_FLAGS[k])
+  const common = spec.commonFlags.map((k) => LONG_FLAGS[k]);
   const opts = (spec.options ?? [])
     .map((o) => extractLongFlag(o.flag))
-    .filter((f): f is string => f !== undefined)
-  return [...new Set([...common, ...opts, '--help'])]
+    .filter((f): f is string => f !== undefined);
+  return [...new Set([...common, ...opts, '--help'])];
 }
 
 /**
@@ -128,36 +128,36 @@ export function specLongFlags(spec: SpecLike): readonly string[] {
  * filtered out ({@link INTERNAL_COMMANDS}).
  */
 export function assembleCompletionInventory(input: {
-  readonly toolSpecs: readonly SpecLike[]
-  readonly hostSpecs: readonly SpecLike[]
-  readonly groups: readonly GroupLike[]
+  readonly toolSpecs: readonly SpecLike[];
+  readonly hostSpecs: readonly SpecLike[];
+  readonly groups: readonly GroupLike[];
 }): CompletionInventory {
-  const commandFlags: Record<string, readonly string[]> = {}
-  const subcommands: string[] = []
+  const commandFlags: Record<string, readonly string[]> = {};
+  const subcommands: string[] = [];
 
   for (const spec of [...input.toolSpecs, ...input.hostSpecs]) {
-    if (INTERNAL_COMMANDS.has(spec.name)) continue
-    const flags = specLongFlags(spec)
+    if (INTERNAL_COMMANDS.has(spec.name)) continue;
+    const flags = specLongFlags(spec);
     for (const name of [spec.name, ...(spec.aliases ?? [])]) {
-      subcommands.push(name)
-      commandFlags[name] = flags
+      subcommands.push(name);
+      commandFlags[name] = flags;
     }
   }
 
-  const groupSubcommands: Record<string, readonly string[]> = {}
+  const groupSubcommands: Record<string, readonly string[]> = {};
   for (const group of input.groups) {
-    subcommands.push(group.name)
-    groupSubcommands[group.name] = group.leaves.map((l) => l.name)
+    subcommands.push(group.name);
+    groupSubcommands[group.name] = group.leaves.map((l) => l.name);
   }
 
   // `help` is a Commander built-in the script also surfaces.
-  subcommands.push('help')
+  subcommands.push('help');
 
   return {
     subcommands: [...new Set(subcommands)].sort(),
     commandFlags,
     groupSubcommands,
-  }
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -165,17 +165,17 @@ export function assembleCompletionInventory(input: {
 // ---------------------------------------------------------------------------
 
 function bashScript(inv: CompletionInventory): string {
-  const subs = inv.subcommands.join(' ')
-  const commonFlagList = COMMON_FLAGS.join(' ')
-  const arms: string[] = []
+  const subs = inv.subcommands.join(' ');
+  const commonFlagList = COMMON_FLAGS.join(' ');
+  const arms: string[] = [];
   for (const [name, subsList] of Object.entries(inv.groupSubcommands)) {
-    arms.push(`    ${name}) COMPREPLY=($(compgen -W "${subsList.join(' ')}" -- "\${cur}")) ;;`)
+    arms.push(`    ${name}) COMPREPLY=($(compgen -W "${subsList.join(' ')}" -- "\${cur}")) ;;`);
   }
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
-    if (name in inv.groupSubcommands) continue
-    arms.push(`    ${name}) COMPREPLY=($(compgen -W "${flags.join(' ')}" -- "\${cur}")) ;;`)
+    if (name in inv.groupSubcommands) continue;
+    arms.push(`    ${name}) COMPREPLY=($(compgen -W "${flags.join(' ')}" -- "\${cur}")) ;;`);
   }
-  arms.push(`    *) COMPREPLY=($(compgen -W "${commonFlagList}" -- "\${cur}")) ;;`)
+  arms.push(`    *) COMPREPLY=($(compgen -W "${commonFlagList}" -- "\${cur}")) ;;`);
   return `# bash completion for opensip-tools
 # Source this file from ~/.bashrc or /etc/bash_completion.d/
 
@@ -199,7 +199,7 @@ ${arms.join('\n')}
 }
 
 complete -F _opensip_tools opensip-tools
-`
+`;
 }
 
 // ---------------------------------------------------------------------------
@@ -207,17 +207,17 @@ complete -F _opensip_tools opensip-tools
 // ---------------------------------------------------------------------------
 
 function zshScript(inv: CompletionInventory): string {
-  const subs = inv.subcommands.join(' ')
-  const commonFlagList = COMMON_FLAGS.join(' ')
-  const arms: string[] = []
+  const subs = inv.subcommands.join(' ');
+  const commonFlagList = COMMON_FLAGS.join(' ');
+  const arms: string[] = [];
   for (const [name, subsList] of Object.entries(inv.groupSubcommands)) {
-    arms.push(`    ${name}) _values '${name} subcommand' ${subsList.join(' ')} ;;`)
+    arms.push(`    ${name}) _values '${name} subcommand' ${subsList.join(' ')} ;;`);
   }
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
-    if (name in inv.groupSubcommands) continue
-    arms.push(`    ${name}) _values 'flag' ${flags.join(' ')} ;;`)
+    if (name in inv.groupSubcommands) continue;
+    arms.push(`    ${name}) _values 'flag' ${flags.join(' ')} ;;`);
   }
-  arms.push(`    *) _values 'flag' ${commonFlagList} ;;`)
+  arms.push(`    *) _values 'flag' ${commonFlagList} ;;`);
   return `#compdef opensip-tools
 # zsh completion for opensip-tools
 # Source this file from your fpath (e.g. ~/.zsh/completions/_opensip-tools).
@@ -237,7 +237,7 @@ ${arms.join('\n')}
 }
 
 compdef _opensip_tools opensip-tools
-`
+`;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,22 +245,22 @@ compdef _opensip_tools opensip-tools
 // ---------------------------------------------------------------------------
 
 function fishScript(inv: CompletionInventory): string {
-  const subs = inv.subcommands.join(' ')
+  const subs = inv.subcommands.join(' ');
   const lines: string[] = [
     '# fish completion for opensip-tools',
     '# Drop this at ~/.config/fish/completions/opensip-tools.fish',
     '',
     `complete -c opensip-tools -f -n "__fish_use_subcommand" -a "${subs}" -d "opensip-tools subcommand"`,
-  ]
+  ];
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
-    if (name in inv.groupSubcommands) continue
+    if (name in inv.groupSubcommands) continue;
     for (const flag of flags) {
       lines.push(
         `complete -c opensip-tools -n "__fish_seen_subcommand_from ${name}" -l "${flag.replace(/^--/, '')}"`,
-      )
+      );
     }
   }
-  return lines.join('\n') + '\n'
+  return lines.join('\n') + '\n';
 }
 
 // ---------------------------------------------------------------------------
@@ -269,11 +269,14 @@ function fishScript(inv: CompletionInventory): string {
 
 export function buildCompletionScript(shell: Shell, inventory: CompletionInventory): string {
   switch (shell) {
-    case 'bash': { return bashScript(inventory)
+    case 'bash': {
+      return bashScript(inventory);
     }
-    case 'zsh': {  return zshScript(inventory)
+    case 'zsh': {
+      return zshScript(inventory);
     }
-    case 'fish': { return fishScript(inventory)
+    case 'fish': {
+      return fishScript(inventory);
     }
   }
 }
@@ -283,5 +286,5 @@ export function printCompletionScript(
   inventory: CompletionInventory,
   write: (s: string) => void = (s) => process.stdout.write(s),
 ): void {
-  write(buildCompletionScript(shell, inventory))
+  write(buildCompletionScript(shell, inventory));
 }

@@ -37,7 +37,14 @@ interface CallableSite {
   /** Project-relative file path (graph's filePath format). */
   readonly filePath: string;
   /** A coarse classification mirroring graph's FunctionKind. */
-  readonly kind: 'function' | 'method' | 'arrow' | 'constructor' | 'getter' | 'setter' | 'function-expression';
+  readonly kind:
+    | 'function'
+    | 'method'
+    | 'arrow'
+    | 'constructor'
+    | 'getter'
+    | 'setter'
+    | 'function-expression';
 }
 
 /**
@@ -100,7 +107,13 @@ function enumerateCallablesFromTs(
       }
       const name = node.name?.text ?? '<anon>';
       const { line, column } = siteOf(node);
-      out.push({ label: `function:${name}`, line, column, filePath: filePathProjectRel, kind: 'function' });
+      out.push({
+        label: `function:${name}`,
+        line,
+        column,
+        filePath: filePathProjectRel,
+        kind: 'function',
+      });
       ts.forEachChild(node, visit);
       return;
     }
@@ -119,7 +132,13 @@ function enumerateCallablesFromTs(
       else if (ts.isPrivateIdentifier(nameNode)) name = nameNode.text;
       else name = '<computed>';
       const { line, column } = siteOf(node);
-      out.push({ label: `method:${cls}.${name}`, line, column, filePath: filePathProjectRel, kind: 'method' });
+      out.push({
+        label: `method:${cls}.${name}`,
+        line,
+        column,
+        filePath: filePathProjectRel,
+        kind: 'method',
+      });
       ts.forEachChild(node, visit);
       return;
     }
@@ -131,7 +150,13 @@ function enumerateCallablesFromTs(
       }
       const cls = enclosingClass.at(-1) ?? '<anon-class>';
       const { line, column } = siteOf(node);
-      out.push({ label: `constructor:${cls}`, line, column, filePath: filePathProjectRel, kind: 'constructor' });
+      out.push({
+        label: `constructor:${cls}`,
+        line,
+        column,
+        filePath: filePathProjectRel,
+        kind: 'constructor',
+      });
       ts.forEachChild(node, visit);
       return;
     }
@@ -143,9 +168,16 @@ function enumerateCallablesFromTs(
       }
       const cls = enclosingClass.at(-1) ?? '<anon-class>';
       const nameNode = node.name;
-      const name = ts.isIdentifier(nameNode) || ts.isStringLiteral(nameNode) ? nameNode.text : '<computed>';
+      const name =
+        ts.isIdentifier(nameNode) || ts.isStringLiteral(nameNode) ? nameNode.text : '<computed>';
       const { line, column } = siteOf(node);
-      out.push({ label: `get:${cls}.${name}`, line, column, filePath: filePathProjectRel, kind: 'getter' });
+      out.push({
+        label: `get:${cls}.${name}`,
+        line,
+        column,
+        filePath: filePathProjectRel,
+        kind: 'getter',
+      });
       ts.forEachChild(node, visit);
       return;
     }
@@ -157,16 +189,29 @@ function enumerateCallablesFromTs(
       }
       const cls = enclosingClass.at(-1) ?? '<anon-class>';
       const nameNode = node.name;
-      const name = ts.isIdentifier(nameNode) || ts.isStringLiteral(nameNode) ? nameNode.text : '<computed>';
+      const name =
+        ts.isIdentifier(nameNode) || ts.isStringLiteral(nameNode) ? nameNode.text : '<computed>';
       const { line, column } = siteOf(node);
-      out.push({ label: `set:${cls}.${name}`, line, column, filePath: filePathProjectRel, kind: 'setter' });
+      out.push({
+        label: `set:${cls}.${name}`,
+        line,
+        column,
+        filePath: filePathProjectRel,
+        kind: 'setter',
+      });
       ts.forEachChild(node, visit);
       return;
     }
 
     if (ts.isArrowFunction(node)) {
       const { line, column } = siteOf(node);
-      out.push({ label: `arrow@${String(line)}:${String(column)}`, line, column, filePath: filePathProjectRel, kind: 'arrow' });
+      out.push({
+        label: `arrow@${String(line)}:${String(column)}`,
+        line,
+        column,
+        filePath: filePathProjectRel,
+        kind: 'arrow',
+      });
       ts.forEachChild(node, visit);
       return;
     }
@@ -174,7 +219,13 @@ function enumerateCallablesFromTs(
     if (ts.isFunctionExpression(node)) {
       const { line, column } = siteOf(node);
       const name = node.name?.text ?? `fn-expr@${String(line)}:${String(column)}`;
-      out.push({ label: `function-expression:${name}`, line, column, filePath: filePathProjectRel, kind: 'function-expression' });
+      out.push({
+        label: `function-expression:${name}`,
+        line,
+        column,
+        filePath: filePathProjectRel,
+        kind: 'function-expression',
+      });
       ts.forEachChild(node, visit);
       return;
     }
@@ -203,7 +254,10 @@ function siteKey(s: { line: number; column: number; kind: string }): string {
  * TS-Compiler-API enumeration, and return the symmetric difference of
  * (line, column, kind) sites.
  */
-function differentialFor(filePathProjectRel: string, projectDir: string): {
+function differentialFor(
+  filePathProjectRel: string,
+  projectDir: string,
+): {
   onlyInTs: CallableSite[];
   onlyInGraph: FunctionOccurrence[];
   graphCount: number;
@@ -220,9 +274,15 @@ function differentialFor(filePathProjectRel: string, projectDir: string): {
 
   const targetSf = inv.program
     .getSourceFiles()
-    .find((sf) => relative(discovery.projectDirAbs, sf.fileName).split(/[/\\]/).join('/') === filePathProjectRel);
+    .find(
+      (sf) =>
+        relative(discovery.projectDirAbs, sf.fileName).split(/[/\\]/).join('/') ===
+        filePathProjectRel,
+    );
   if (!targetSf) {
-    throw new Error(`Could not find ${filePathProjectRel} in program; tsconfig may not include it.`);
+    throw new Error(
+      `Could not find ${filePathProjectRel} in program; tsconfig may not include it.`,
+    );
   }
 
   const tsCallables = enumerateCallablesFromTs(targetSf, filePathProjectRel);
@@ -275,16 +335,20 @@ describe('Tier 2 — differential test against TS Compiler API on real workspace
         projectDir,
       );
 
-      const tsLines = onlyInTs.map((c) => `${c.label} at ${String(c.line)}:${String(c.column)}`).join('\n  - ');
+      const tsLines = onlyInTs
+        .map((c) => `${c.label} at ${String(c.line)}:${String(c.column)}`)
+        .join('\n  - ');
       const graphLines = onlyInGraph
         .map((o) => `${o.kind} ${o.simpleName} at ${String(o.line)}:${String(o.column)}`)
         .join('\n  - ');
-      const missedLine = onlyInTs.length > 0
-        ? `Missed by graph (${String(onlyInTs.length)}):\n  - ${tsLines}`
-        : 'Missed by graph: none';
-      const spuriousLine = onlyInGraph.length > 0
-        ? `Spurious in graph (${String(onlyInGraph.length)}):\n  - ${graphLines}`
-        : 'Spurious in graph: none';
+      const missedLine =
+        onlyInTs.length > 0
+          ? `Missed by graph (${String(onlyInTs.length)}):\n  - ${tsLines}`
+          : 'Missed by graph: none';
+      const spuriousLine =
+        onlyInGraph.length > 0
+          ? `Spurious in graph (${String(onlyInGraph.length)}):\n  - ${graphLines}`
+          : 'Spurious in graph: none';
       const detail = [
         `Sample: ${sample.packageDir}/${sample.relativePath}`,
         `graph found: ${String(graphCount)} callables`,

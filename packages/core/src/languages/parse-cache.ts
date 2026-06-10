@@ -18,12 +18,12 @@
  * cache.
  */
 
-import { logger } from '../lib/logger.js'
-import { currentScope } from '../lib/run-scope.js'
+import { logger } from '../lib/logger.js';
+import { currentScope } from '../lib/run-scope.js';
 
-import type { LanguageAdapter } from './adapter.js'
+import type { LanguageAdapter } from './adapter.js';
 
-export { LanguageParseCache } from './parse-cache-class.js'
+export { LanguageParseCache } from './parse-cache-class.js';
 
 // =============================================================================
 // SCOPE-OWNED PARSE-CACHE HELPERS
@@ -35,10 +35,10 @@ export { LanguageParseCache } from './parse-cache-class.js'
  * No-op outside a RunScope.
  */
 export function initParseCache(): void {
-  const cache = currentScope()?.parseCache
-  if (!cache) return
-  cache.clear()
-  cache.startAutoClear()
+  const cache = currentScope()?.parseCache;
+  if (!cache) return;
+  cache.clear();
+  cache.startAutoClear();
 }
 
 /**
@@ -47,7 +47,7 @@ export function initParseCache(): void {
  * RunScope — the scope itself disposes its cache on teardown.
  */
 export function clearParseCache(): void {
-  currentScope()?.parseCache.dispose()
+  currentScope()?.parseCache.dispose();
 }
 
 /**
@@ -64,11 +64,11 @@ export function getParseTree<TTree>(
   filePath: string,
   content: string,
 ): TTree | null {
-  const cache = currentScope()?.parseCache
+  const cache = currentScope()?.parseCache;
   if (cache) {
-    return cache.getOrParse(adapter, filePath, content)
+    return cache.getOrParse(adapter, filePath, content);
   }
-  return adapter.parse(content, filePath)
+  return adapter.parse(content, filePath);
 }
 
 /**
@@ -81,21 +81,21 @@ export function getParseTree<TTree>(
  * @throws {Error} When called outside a `runWithScope(...)` block (no current scope).
  */
 export function getParseTreeForFile(filePath: string, content: string): unknown {
-  const scope = currentScope()
+  const scope = currentScope();
   if (!scope) {
     throw new Error(
       'getParseTreeForFile() called outside runWithScope. ' +
         'Engine work must run inside a RunScope so language adapters resolve via cli.scope.languages.',
-    )
+    );
   }
-  const adapter = scope.languages.forFile(filePath)
+  const adapter = scope.languages.forFile(filePath);
   if (!adapter) {
     logger.debug({
       evt: 'lang.parse.no-adapter',
       module: 'core:languages',
       filePath,
-    })
-    return null
+    });
+    return null;
   }
-  return getParseTree(adapter, filePath, content)
+  return getParseTree(adapter, filePath, content);
 }

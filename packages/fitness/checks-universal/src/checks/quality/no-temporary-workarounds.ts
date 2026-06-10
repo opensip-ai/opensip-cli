@@ -10,28 +10,21 @@
  * Extracted from the former `no-legacy-code` umbrella in Phase C4.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-const EXCLUDE_PATTERNS = [
-  /fitness/,
-  /test/,
-  /spec/,
-  /docs/,
-  /reports/,
-  /versioning/,
-]
+const EXCLUDE_PATTERNS = [/fitness/, /test/, /spec/, /docs/, /reports/, /versioning/];
 
 function shouldExcludeFile(relativePath: string): boolean {
-  return EXCLUDE_PATTERNS.some((pattern) => pattern.test(relativePath))
+  return EXCLUDE_PATTERNS.some((pattern) => pattern.test(relativePath));
 }
 
-const MARKER_NEEDLES = ['hack', 'fixme'] as const
-const QUALIFIER_NEEDLES = ['before launch', 'temporary', 'workaround'] as const
+const MARKER_NEEDLES = ['hack', 'fixme'] as const;
+const QUALIFIER_NEEDLES = ['before launch', 'temporary', 'workaround'] as const;
 
 function matchTemporaryWorkaround(line: string): boolean {
-  const lower = line.toLowerCase()
-  if (!MARKER_NEEDLES.some((m) => lower.includes(m))) return false
-  return QUALIFIER_NEEDLES.some((q) => lower.includes(q))
+  const lower = line.toLowerCase();
+  if (!MARKER_NEEDLES.some((m) => lower.includes(m))) return false;
+  return QUALIFIER_NEEDLES.some((q) => lower.includes(q));
 }
 
 export const noTemporaryWorkarounds = defineCheck({
@@ -53,17 +46,17 @@ export const noTemporaryWorkarounds = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze(content, filePath): CheckViolation[] {
-    if (shouldExcludeFile(filePath)) return []
+    if (shouldExcludeFile(filePath)) return [];
 
-    const lower = content.toLowerCase()
-    const hasMarker = MARKER_NEEDLES.some((m) => lower.includes(m))
-    if (!hasMarker) return []
+    const lower = content.toLowerCase();
+    const hasMarker = MARKER_NEEDLES.some((m) => lower.includes(m));
+    if (!hasMarker) return [];
 
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (const [i, line] of lines.entries()) {
-      if (!line) continue
+      if (!line) continue;
       if (matchTemporaryWorkaround(line)) {
         violations.push({
           line: i + 1,
@@ -73,10 +66,10 @@ export const noTemporaryWorkarounds = defineCheck({
           type: 'temporary-workaround',
           suggestion: 'Replace temporary workaround with a permanent, production-ready solution',
           match: line.trim(),
-        })
+        });
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

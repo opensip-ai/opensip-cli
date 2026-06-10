@@ -57,10 +57,7 @@ describe('buildAdjacency', () => {
 describe('tarjanSccIds', () => {
   it('returns an empty map when there are no cycles (all trivial singletons omitted)', () => {
     const nodes = ['a', 'b'];
-    const adj = buildAdjacency(
-      [{ id: 'a' }, { id: 'b' }],
-      [{ source: 'a', target: 'b' }],
-    );
+    const adj = buildAdjacency([{ id: 'a' }, { id: 'b' }], [{ source: 'a', target: 'b' }]);
     const scc = tarjanSccIds(nodes, adj);
     expect(scc.size).toBe(0);
   });

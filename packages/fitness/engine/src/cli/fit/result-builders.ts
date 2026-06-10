@@ -120,7 +120,14 @@ export interface BuildFitDoneArgs {
  * in `executeFit` and threaded in so the gate, render, and session-payload
  * paths all consume the same envelope.
  */
-export function buildFitDoneResult({ args, fitnessResult, envelope, signalersConfig, recipeName, warnings }: BuildFitDoneArgs): FitDoneResult {
+export function buildFitDoneResult({
+  args,
+  fitnessResult,
+  envelope,
+  signalersConfig,
+  recipeName,
+  warnings,
+}: BuildFitDoneArgs): FitDoneResult {
   const { summary } = fitnessResult;
 
   // Determine exit code from the RESOLVED config thresholds (ADR-0023, Phase 4).
@@ -191,7 +198,15 @@ export function buildFitCallbacks(
       onProgress?.(completedCount, total);
     },
     onCheckComplete(checkSlug: string, summary: CheckSummary, index: number, total: number) {
-      logger.debug({ evt: 'cli.check.complete', module: 'cli:fit', checkSlug, passed: summary.passed, errors: summary.errors, warnings: summary.warnings, durationMs: summary.durationMs });
+      logger.debug({
+        evt: 'cli.check.complete',
+        module: 'cli:fit',
+        checkSlug,
+        passed: summary.passed,
+        errors: summary.errors,
+        warnings: summary.warnings,
+        durationMs: summary.durationMs,
+      });
       completedCount++;
       onProgress?.(completedCount, total);
     },

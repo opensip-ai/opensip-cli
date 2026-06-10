@@ -17,11 +17,11 @@
  * resolution is a follow-up plan.
  */
 
-import * as path from 'node:path'
+import * as path from 'node:path';
 
-import ts from 'typescript'
+import ts from 'typescript';
 
-import { getSharedSourceFile } from './parse-cache.js'
+import { getSharedSourceFile } from './parse-cache.js';
 
 // =============================================================================
 // PUBLIC TYPES
@@ -30,11 +30,11 @@ import { getSharedSourceFile } from './parse-cache.js'
 /** A file-level import graph for a project. */
 export interface ImportGraph {
   /** All node file paths (absolute, as supplied by the caller). */
-  readonly nodes: ReadonlySet<string>
+  readonly nodes: ReadonlySet<string>;
   /** Adjacency: file → set of files it imports (intra-project edges only). */
-  readonly outbound: ReadonlyMap<string, ReadonlySet<string>>
+  readonly outbound: ReadonlyMap<string, ReadonlySet<string>>;
   /** Reverse adjacency: file → set of files that import it. */
-  readonly inbound: ReadonlyMap<string, ReadonlySet<string>>
+  readonly inbound: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 // =============================================================================
@@ -54,29 +54,29 @@ export interface ImportGraph {
  * graph remains complete.
  */
 export function buildImportGraph(files: ReadonlyMap<string, string>): ImportGraph {
-  const nodes = new Set<string>(files.keys())
-  const outbound = new Map<string, Set<string>>()
-  const inbound = new Map<string, Set<string>>()
+  const nodes = new Set<string>(files.keys());
+  const outbound = new Map<string, Set<string>>();
+  const inbound = new Map<string, Set<string>>();
 
   // Initialize empty edge sets for every node so callers can safely
   // outbound.get(file) without checking for undefined.
   for (const node of nodes) {
-    outbound.set(node, new Set())
-    inbound.set(node, new Set())
+    outbound.set(node, new Set());
+    inbound.set(node, new Set());
   }
 
   for (const [filePath, content] of files) {
-    const specifiers = extractImportSpecifiers(filePath, content)
+    const specifiers = extractImportSpecifiers(filePath, content);
     for (const spec of specifiers) {
-      const resolved = resolveRelativeSpecifier(filePath, spec, nodes)
+      const resolved = resolveRelativeSpecifier(filePath, spec, nodes);
       if (resolved !== null) {
-        outbound.get(filePath)!.add(resolved)
-        inbound.get(resolved)!.add(filePath)
+        outbound.get(filePath)!.add(resolved);
+        inbound.get(resolved)!.add(filePath);
       }
     }
   }
 
-  return { nodes, outbound, inbound }
+  return { nodes, outbound, inbound };
 }
 
 /**
@@ -92,102 +92,102 @@ export function buildImportGraph(files: ReadonlyMap<string, string>): ImportGrap
 export function findStronglyConnectedComponents(
   graph: ImportGraph,
 ): readonly (readonly string[])[] {
-  const indexOf = new Map<string, number>()
-  const lowlinkOf = new Map<string, number>()
-  const onStack = new Set<string>()
-  const stack: string[] = []
-  const sccs: string[][] = []
-  let nextIndex = 0
+  const indexOf = new Map<string, number>();
+  const lowlinkOf = new Map<string, number>();
+  const onStack = new Set<string>();
+  const stack: string[] = [];
+  const sccs: string[][] = [];
+  let nextIndex = 0;
 
   // Iterative Tarjan's — recursive form blows the stack on large graphs.
   // State machine: we replay each node's adjacency from where we left off.
   interface Frame {
-    node: string
-    neighbors: string[]
-    next: number
+    node: string;
+    neighbors: string[];
+    next: number;
   }
 
   // eslint-disable-next-line sonarjs/cognitive-complexity -- iterative Tarjan SCC: explicit stack to avoid recursion; the algorithm is canonical and reads cleanest as a single function
   function strongConnect(start: string): void {
-    const callStack: Frame[] = []
+    const callStack: Frame[] = [];
 
-    indexOf.set(start, nextIndex)
-    lowlinkOf.set(start, nextIndex)
-    nextIndex++
-    stack.push(start)
-    onStack.add(start)
+    indexOf.set(start, nextIndex);
+    lowlinkOf.set(start, nextIndex);
+    nextIndex++;
+    stack.push(start);
+    onStack.add(start);
     callStack.push({
       node: start,
       neighbors: [...(graph.outbound.get(start) ?? [])],
       next: 0,
-    })
+    });
 
     while (callStack.length > 0) {
-      const frame = callStack.at(-1)!
+      const frame = callStack.at(-1)!;
 
       if (frame.next < frame.neighbors.length) {
-        const w = frame.neighbors[frame.next]
-        frame.next++
+        const w = frame.neighbors[frame.next];
+        frame.next++;
 
         if (!indexOf.has(w)) {
           // Recurse into w.
-          indexOf.set(w, nextIndex)
-          lowlinkOf.set(w, nextIndex)
-          nextIndex++
-          stack.push(w)
-          onStack.add(w)
+          indexOf.set(w, nextIndex);
+          lowlinkOf.set(w, nextIndex);
+          nextIndex++;
+          stack.push(w);
+          onStack.add(w);
           callStack.push({
             node: w,
             neighbors: [...(graph.outbound.get(w) ?? [])],
             next: 0,
-          })
-          continue
+          });
+          continue;
         }
 
         if (onStack.has(w)) {
           // Back edge — update v's lowlink.
-          const vLow = lowlinkOf.get(frame.node)!
-          const wIdx = indexOf.get(w)!
-          if (wIdx < vLow) lowlinkOf.set(frame.node, wIdx)
+          const vLow = lowlinkOf.get(frame.node)!;
+          const wIdx = indexOf.get(w)!;
+          if (wIdx < vLow) lowlinkOf.set(frame.node, wIdx);
         }
-        continue
+        continue;
       }
 
       // All neighbors processed — finalize this node.
-      const v = frame.node
-      const vLow = lowlinkOf.get(v)!
-      const vIdx = indexOf.get(v)!
+      const v = frame.node;
+      const vLow = lowlinkOf.get(v)!;
+      const vIdx = indexOf.get(v)!;
 
       if (vLow === vIdx) {
         // v is the root of an SCC — pop until v is removed.
-        const scc: string[] = []
-        let w: string
+        const scc: string[] = [];
+        let w: string;
         do {
-          w = stack.pop()!
-          onStack.delete(w)
-          scc.push(w)
-        } while (w !== v)
-        sccs.push(scc)
+          w = stack.pop()!;
+          onStack.delete(w);
+          scc.push(w);
+        } while (w !== v);
+        sccs.push(scc);
       }
 
-      callStack.pop()
+      callStack.pop();
 
       // Propagate lowlink up to the parent frame.
       if (callStack.length > 0) {
-        const parent = callStack.at(-1)!
-        const parentLow = lowlinkOf.get(parent.node)!
-        if (vLow < parentLow) lowlinkOf.set(parent.node, vLow)
+        const parent = callStack.at(-1)!;
+        const parentLow = lowlinkOf.get(parent.node)!;
+        if (vLow < parentLow) lowlinkOf.set(parent.node, vLow);
       }
     }
   }
 
   for (const node of graph.nodes) {
     if (!indexOf.has(node)) {
-      strongConnect(node)
+      strongConnect(node);
     }
   }
 
-  return sccs
+  return sccs;
 }
 
 // =============================================================================
@@ -196,15 +196,15 @@ export function findStronglyConnectedComponents(
 
 /** Walk the AST and collect top-level import / export-from specifiers. */
 function extractImportSpecifiers(filePath: string, content: string): string[] {
-  const sourceFile = getSharedSourceFile(filePath, content)
-  if (sourceFile === null) return []
+  const sourceFile = getSharedSourceFile(filePath, content);
+  if (sourceFile === null) return [];
 
-  const specifiers: string[] = []
+  const specifiers: string[] = [];
   for (const stmt of sourceFile.statements) {
     // import foo from './bar';  import './side-effect';  import * as ns from './m';
     if (ts.isImportDeclaration(stmt) && ts.isStringLiteral(stmt.moduleSpecifier)) {
-      specifiers.push(stmt.moduleSpecifier.text)
-      continue
+      specifiers.push(stmt.moduleSpecifier.text);
+      continue;
     }
     // export * from './foo';   export { x } from './foo';
     if (
@@ -212,10 +212,10 @@ function extractImportSpecifiers(filePath: string, content: string): string[] {
       stmt.moduleSpecifier !== undefined &&
       ts.isStringLiteral(stmt.moduleSpecifier)
     ) {
-      specifiers.push(stmt.moduleSpecifier.text)
+      specifiers.push(stmt.moduleSpecifier.text);
     }
   }
-  return specifiers
+  return specifiers;
 }
 
 /**
@@ -239,27 +239,27 @@ function resolveRelativeSpecifier(
   knownPaths: ReadonlySet<string>,
 ): string | null {
   // Only relative specifiers participate in the intra-project graph.
-  if (!specifier.startsWith('.')) return null
+  if (!specifier.startsWith('.')) return null;
 
-  const importerDir = path.dirname(importerPath)
-  const base = path.resolve(importerDir, specifier)
+  const importerDir = path.dirname(importerPath);
+  const base = path.resolve(importerDir, specifier);
 
   // Try the candidate paths in priority order. The first one that exists in
   // the project's file set wins.
-  const candidates: string[] = [ base]
+  const candidates: string[] = [base];
 
   // 1. Literal path (specifier already includes extension).
 
   // 2. ESM extension swap: `.js` → `.ts` / `.tsx` (TypeScript ESM convention).
   if (base.endsWith('.js')) {
-    candidates.push(base.slice(0, -3) + '.ts', base.slice(0, -3) + '.tsx')
+    candidates.push(base.slice(0, -3) + '.ts', base.slice(0, -3) + '.tsx');
   }
   if (base.endsWith('.jsx')) {
-    candidates.push(base.slice(0, -4) + '.tsx')
+    candidates.push(base.slice(0, -4) + '.tsx');
   }
 
   // 3. Append common extensions if the specifier was extension-less.
-  const hasExt = path.extname(base) !== ''
+  const hasExt = path.extname(base) !== '';
   if (!hasExt) {
     // Direct extensions and index resolution.
     candidates.push(
@@ -271,11 +271,11 @@ function resolveRelativeSpecifier(
       path.join(base, 'index.tsx'),
       path.join(base, 'index.js'),
       path.join(base, 'index.jsx'),
-    )
+    );
   }
 
   for (const candidate of candidates) {
-    if (knownPaths.has(candidate)) return candidate
+    if (knownPaths.has(candidate)) return candidate;
   }
-  return null
+  return null;
 }

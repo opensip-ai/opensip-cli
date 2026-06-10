@@ -38,8 +38,13 @@ export function normalizeDiscovery(value: unknown): DiscoveryParse {
   if (value.exportShape !== 'array' && value.exportShape !== 'single') return { status: 'invalid' };
   const configKeys = normalizeConfigKeys(value.configKeys);
   if (configKeys === undefined) return { status: 'invalid' };
-  if (value.builtinScope !== undefined && typeof value.builtinScope !== 'string') return { status: 'invalid' };
-  if (value.explicitListMode !== undefined && value.explicitListMode !== 'replace' && value.explicitListMode !== 'augment') {
+  if (value.builtinScope !== undefined && typeof value.builtinScope !== 'string')
+    return { status: 'invalid' };
+  if (
+    value.explicitListMode !== undefined &&
+    value.explicitListMode !== 'replace' &&
+    value.explicitListMode !== 'augment'
+  ) {
     return { status: 'invalid' };
   }
   const co = normalizeCoContributions(value.coContributions);
@@ -71,16 +76,24 @@ function normalizeCoContributions(value: unknown): CoContributionsParse {
   const out: CapabilityCoContribution[] = [];
   for (const entry of value) {
     if (!isRecord(entry)) return { status: 'invalid' };
-    if (typeof entry.exportName !== 'string' || entry.exportName === '') return { status: 'invalid' };
-    if (entry.exportShape !== 'array' && entry.exportShape !== 'single') return { status: 'invalid' };
+    if (typeof entry.exportName !== 'string' || entry.exportName === '')
+      return { status: 'invalid' };
+    if (entry.exportShape !== 'array' && entry.exportShape !== 'single')
+      return { status: 'invalid' };
     if (typeof entry.domainId !== 'string' || entry.domainId === '') return { status: 'invalid' };
-    out.push({ exportName: entry.exportName, exportShape: entry.exportShape, domainId: entry.domainId });
+    out.push({
+      exportName: entry.exportName,
+      exportShape: entry.exportShape,
+      domainId: entry.domainId,
+    });
   }
   return { status: 'ok', value: out };
 }
 
 /** Validate the optional, all-string `configKeys` map. Returns `undefined` on any non-string member. */
-function normalizeConfigKeys(value: unknown): CapabilityDiscoveryDescriptor['configKeys'] | undefined {
+function normalizeConfigKeys(
+  value: unknown,
+): CapabilityDiscoveryDescriptor['configKeys'] | undefined {
   if (!isRecord(value)) return undefined;
   for (const k of ['packages', 'autoDiscover', 'scopes'] as const) {
     if (value[k] !== undefined && typeof value[k] !== 'string') return undefined;

@@ -37,10 +37,7 @@ import type { Tool } from './types.js';
  * @param tool The runtime tool the manifest is supposed to describe.
  * @throws {ValidationError} when `id` differs, or the command-name sets differ.
  */
-export function assertManifestMatchesTool(
-  manifest: ToolPluginManifest,
-  tool: Tool,
-): void {
+export function assertManifestMatchesTool(manifest: ToolPluginManifest, tool: Tool): void {
   if (manifest.id !== tool.metadata.id) {
     throw new ValidationError(
       `tool manifest id '${manifest.id}' does not match runtime tool id '${tool.metadata.id}'`,

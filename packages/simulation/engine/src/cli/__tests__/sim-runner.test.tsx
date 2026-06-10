@@ -65,19 +65,23 @@ function enterSimScope(opts: RunScopeOptions = {}): void {
 }
 
 function registerProbe(id = 'probe'): void {
-  currentScenarioRegistry().register(defineLoadScenario({
-    id,
-    name: id,
-    description: id,
-    tags: [],
-    target: noopTarget,
-    workload: { rps: 1 },
-    duration: 1,
-    assertions: [ASSERTIONS.lowErrorRate(1)],
-  }));
+  currentScenarioRegistry().register(
+    defineLoadScenario({
+      id,
+      name: id,
+      description: id,
+      tags: [],
+      target: noopTarget,
+      workload: { rps: 1 },
+      duration: 1,
+      assertions: [ASSERTIONS.lowErrorRate(1)],
+    }),
+  );
 }
 
-const baseArgs = (overrides: Partial<ToolOptions & { quiet?: boolean }> = {}): ToolOptions & { quiet?: boolean } => ({
+const baseArgs = (
+  overrides: Partial<ToolOptions & { quiet?: boolean }> = {},
+): ToolOptions & { quiet?: boolean } => ({
   json: false,
   cwd: process.cwd(),
   debug: false,
@@ -88,7 +92,9 @@ const baseArgs = (overrides: Partial<ToolOptions & { quiet?: boolean }> = {}): T
 async function waitForFrame(lastFrame: () => string | undefined, substr: string): Promise<void> {
   for (let i = 0; i < 200; i++) {
     if ((lastFrame() ?? '').includes(substr)) return;
-    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5);
+    });
   }
 }
 
@@ -103,7 +109,9 @@ describe('<SimRunner> — live-view state machine', () => {
       <SimRunner
         args={baseArgs()}
         setExitCode={(c) => exitCodes.push(c)}
-        onEnvelope={(e) => { captured = e; }}
+        onEnvelope={(e) => {
+          captured = e;
+        }}
       />,
     );
 
@@ -146,7 +154,9 @@ describe('<SimRunner> — live-view state machine', () => {
       <SimRunner
         args={baseArgs()}
         setExitCode={(c) => exitCodes.push(c)}
-        onEnvelope={(e) => { captured = e; }}
+        onEnvelope={(e) => {
+          captured = e;
+        }}
       />,
     );
 
@@ -179,7 +189,9 @@ describe('<SimRunner> — live-view state machine', () => {
     // CONFIGURATION_ERROR === 2. The exit code is set in the same async tick as
     // the error-phase transition; poll briefly to absorb the React re-render.
     for (let i = 0; i < 50 && !exitCodes.includes(2); i++) {
-      await new Promise((resolve) => { setTimeout(resolve, 5); });
+      await new Promise((resolve) => {
+        setTimeout(resolve, 5);
+      });
     }
     expect(exitCodes).toContain(2);
 
@@ -190,9 +202,7 @@ describe('<SimRunner> — live-view state machine', () => {
     enterSimScope();
     registerProbe('runner-quiet');
 
-    const { lastFrame, unmount } = render(
-      <SimRunner args={baseArgs({ quiet: true })} />,
-    );
+    const { lastFrame, unmount } = render(<SimRunner args={baseArgs({ quiet: true })} />);
 
     await waitForFrame(lastFrame, 'Passed');
     const frame = lastFrame() ?? '';
@@ -218,9 +228,7 @@ describe('<SimRunner> — live-view state machine', () => {
     });
     registerProbe('runner-mini');
 
-    const { lastFrame, unmount } = render(
-      <SimRunner args={baseArgs()} />,
-    );
+    const { lastFrame, unmount } = render(<SimRunner args={baseArgs()} />);
 
     // The mini banner surfaces the available update; the UpdateHint row renders.
     await waitForFrame(lastFrame, '3.1.0');

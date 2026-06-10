@@ -20,10 +20,7 @@ import type {
   HelpResult,
 } from '@opensip-tools/contracts';
 
-function renderApp(
-  result: AppProps['result'],
-  projectHeader?: AppProps['projectHeader'],
-): string {
+function renderApp(result: AppProps['result'], projectHeader?: AppProps['projectHeader']): string {
   const { lastFrame } = render(
     <ThemeProvider>
       <App result={result} projectHeader={projectHeader} />

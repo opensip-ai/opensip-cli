@@ -1,8 +1,7 @@
+import { parseGo, type GoTree } from './parse.js';
+import { stripComments, stripStrings } from './strip.js';
 
-import { parseGo, type GoTree } from './parse.js'
-import { stripComments, stripStrings } from './strip.js'
-
-import type { LanguageAdapter } from '@opensip-tools/core'
+import type { LanguageAdapter } from '@opensip-tools/core';
 
 export const goAdapter: LanguageAdapter<GoTree> = {
   id: 'go',
@@ -11,7 +10,7 @@ export const goAdapter: LanguageAdapter<GoTree> = {
   parse: parseGo,
   stripStrings,
   stripComments,
-}
+};
 
 /** Plugin contract — exported as the lang plugin's `adapters` array. */
-export const adapters = [goAdapter] as const
+export const adapters = [goAdapter] as const;

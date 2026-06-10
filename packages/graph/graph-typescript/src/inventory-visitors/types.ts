@@ -14,7 +14,6 @@
 import type { FunctionOccurrence } from '@opensip-tools/graph';
 import type ts from 'typescript';
 
-
 /** Per-source-file context carried through every inventory visitor invocation. */
 export interface VisitorContext {
   readonly sourceFile: ts.SourceFile;

@@ -9,7 +9,7 @@
  * `oneViolationPerLine: true` option (combined with non-global regexes).
  */
 
-import { defineRegexListCheck } from '@opensip-tools/fitness'
+import { defineRegexListCheck } from '@opensip-tools/fitness';
 
 /**
  * Check: security/no-eval
@@ -85,4 +85,4 @@ export const noEval = defineRegexListCheck({
         'Pass a function reference instead of a string: setInterval(() => doSomething(), 1000) or setInterval(doSomething, 1000). String arguments are evaluated like eval().',
     },
   ],
-})
+});

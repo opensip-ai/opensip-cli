@@ -94,7 +94,7 @@ const banner =
   ' * Regenerate with: pnpm --filter=@opensip-tools/dashboard vendor:cytoscape\n' +
   ' *\n' +
   ' * Bundled UMD globals (offline-capable, inlined into every report):\n' +
-  sources.map(s => ` *   - ${s.name}@${s.version}  → global "${s.global}"\n`).join('') +
+  sources.map((s) => ` *   - ${s.name}@${s.version}  → global "${s.global}"\n`).join('') +
   ' *\n' +
   ' * cytoscape-dagre@3 self-bundles @dagrejs/dagre; no standalone dagre is\n' +
   ' * vendored. Layout registration happens at view init via\n' +

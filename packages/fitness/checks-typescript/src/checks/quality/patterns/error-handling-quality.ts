@@ -8,10 +8,9 @@
  * Replaces: resilience/no-empty-catch, quality/error-swallowing-boolean
  */
 
-
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 // =============================================================================
 // WHITELIST PATTERNS
@@ -28,7 +27,7 @@ const LOGGING_PATTERNS = [
   /unwrapOrLog\s*\(/,
   /matchLog\s*\(/,
   /handleErr\s*\(/,
-]
+];
 
 /**
  * Patterns that indicate intentional silent handling
@@ -39,7 +38,7 @@ const MARKER_PATTERNS = [
   /\/\/\s*intentionally/i,
   /\/\/\s*expected/i,
   /graceful/i,
-]
+];
 
 /**
  * Patterns that indicate error propagation
@@ -49,17 +48,17 @@ const PROPAGATION_PATTERNS = [
   /Result\.err\s*\(/,
   /new\s+Failure\s*\(/,
   /return\s+\S[^\n]*\.error\b/,
-]
+];
 
 /**
  * Pattern for rethrow
  */
-const RETHROW_PATTERN = /\bthrow\b/
+const RETHROW_PATTERN = /\bthrow\b/;
 
 /**
  * Sentinel return values that indicate silent error handling
  */
-const SENTINEL_VALUES = new Set(['false', 'null', 'undefined', '[]', '{}'])
+const SENTINEL_VALUES = new Set(['false', 'null', 'undefined', '[]', '{}']);
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -71,12 +70,12 @@ const SENTINEL_VALUES = new Set(['false', 'null', 'undefined', '[]', '{}'])
  * @returns True if acceptable pattern found
  */
 function hasAcceptablePattern(text: string): boolean {
-  if (LOGGING_PATTERNS.some((p) => p.test(text))) return true
-  if (MARKER_PATTERNS.some((p) => p.test(text))) return true
+  if (LOGGING_PATTERNS.some((p) => p.test(text))) return true;
+  if (MARKER_PATTERNS.some((p) => p.test(text))) return true;
   /* v8 ignore next -- defensive AST/type guard */
-  if (PROPAGATION_PATTERNS.some((p) => p.test(text))) return true
-  if (RETHROW_PATTERN.test(text)) return true
-  return false
+  if (PROPAGATION_PATTERNS.some((p) => p.test(text))) return true;
+  if (RETHROW_PATTERN.test(text)) return true;
+  return false;
 }
 
 /**
@@ -87,13 +86,13 @@ function hasAcceptablePattern(text: string): boolean {
  */
 function getReturnValue(expr: ts.Expression | undefined, sourceFile: ts.SourceFile): string | null {
   /* v8 ignore next -- defensive AST/type guard */
-  if (!expr) return 'undefined'
-  if (expr.kind === ts.SyntaxKind.FalseKeyword) return 'false'
-  if (expr.kind === ts.SyntaxKind.NullKeyword) return 'null'
-  if (ts.isIdentifier(expr) && expr.getText(sourceFile) === 'undefined') return 'undefined'
-  if (ts.isArrayLiteralExpression(expr) && expr.elements.length === 0) return '[]'
-  if (ts.isObjectLiteralExpression(expr) && expr.properties.length === 0) return '{}'
-  return null
+  if (!expr) return 'undefined';
+  if (expr.kind === ts.SyntaxKind.FalseKeyword) return 'false';
+  if (expr.kind === ts.SyntaxKind.NullKeyword) return 'null';
+  if (ts.isIdentifier(expr) && expr.getText(sourceFile) === 'undefined') return 'undefined';
+  if (ts.isArrayLiteralExpression(expr) && expr.elements.length === 0) return '[]';
+  if (ts.isObjectLiteralExpression(expr) && expr.properties.length === 0) return '{}';
+  return null;
 }
 
 // =============================================================================
@@ -104,93 +103,92 @@ function getReturnValue(expr: ts.Expression | undefined, sourceFile: ts.SourceFi
  * Check a catch clause for violations
  */
 function checkCatchClause(node: ts.CatchClause, sourceFile: ts.SourceFile): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const catchText = node.block.getText(sourceFile)
+  const violations: CheckViolation[] = [];
+  const catchText = node.block.getText(sourceFile);
 
   // Skip if has acceptable pattern
-  if (hasAcceptablePattern(catchText)) return violations
+  if (hasAcceptablePattern(catchText)) return violations;
 
-  const trimmed = catchText.replaceAll(/[{}]/g, '').trim()
+  const trimmed = catchText.replaceAll(/[{}]/g, '').trim();
 
   // Strip leading single-line comments (`// ...` lines, including
   // multi-line stacks) and block comments before testing for empty.
   // The original regex `/^\/[/*]/` only checked the first character,
   // which falsely flags `} catch { // comment\n actualHandler() }`
   // patterns as empty even though real code follows the comment.
-  let codeOnly = trimmed
+  let codeOnly = trimmed;
   while (true) {
     if (codeOnly.startsWith('//')) {
-      const eol = codeOnly.indexOf('\n')
-      codeOnly = (eol === -1 ? '' : codeOnly.slice(eol + 1)).trim()
-      continue
+      const eol = codeOnly.indexOf('\n');
+      codeOnly = (eol === -1 ? '' : codeOnly.slice(eol + 1)).trim();
+      continue;
     }
     if (codeOnly.startsWith('/*')) {
-      const close = codeOnly.indexOf('*/')
-      codeOnly = (close === -1 ? '' : codeOnly.slice(close + 2)).trim()
-      continue
+      const close = codeOnly.indexOf('*/');
+      codeOnly = (close === -1 ? '' : codeOnly.slice(close + 2)).trim();
+      continue;
     }
-    break
+    break;
   }
 
   // Empty catch - SEVERITY: ERROR
   if (trimmed === '' || codeOnly === '') {
-    const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+    const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
     violations.push({
       line: line + 1,
       column: 0,
       message: 'Empty catch block silently swallows errors',
       severity: 'error',
       suggestion:
-
         "Add logging: `logger.error({ evt: 'operation.failed', err })` or add `// @swallow-ok reason`",
       match: 'catch',
-    })
-    return violations
+    });
+    return violations;
   }
 
   // Check for sentinel returns without logging
   const visitReturn = (n: ts.Node): void => {
     if (ts.isReturnStatement(n)) {
-      const val = getReturnValue(n.expression, sourceFile)
+      const val = getReturnValue(n.expression, sourceFile);
       if (val && SENTINEL_VALUES.has(val)) {
-        const { line } = sourceFile.getLineAndCharacterOfPosition(n.getStart())
+        const { line } = sourceFile.getLineAndCharacterOfPosition(n.getStart());
         violations.push({
           line: line + 1,
           column: 0,
           message: `Catch returns ${val} without logging`,
           severity: 'error',
-  
+
           suggestion: `Add logging before return: \`logger.warn({ evt: 'operation.failed', err })\``,
           match: `return ${val}`,
-        })
+        });
       }
     }
-    ts.forEachChild(n, visitReturn)
-  }
-  visitReturn(node.block)
+    ts.forEachChild(n, visitReturn);
+  };
+  visitReturn(node.block);
 
-  return violations
+  return violations;
 }
 
 /**
  * Check Result.isErr() usage for violations
  */
 function checkResultIsErr(node: ts.IfStatement, sourceFile: ts.SourceFile): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const cond = node.expression.getText(sourceFile)
+  const violations: CheckViolation[] = [];
+  const cond = node.expression.getText(sourceFile);
   // @fitness-ignore-next-line error-handling-quality -- String literal check for '.isErr()', not actual Result error handling
-  if (!cond.includes('.isErr()')) return violations
+  if (!cond.includes('.isErr()')) return violations;
 
-  const thenText = node.thenStatement.getText(sourceFile)
+  const thenText = node.thenStatement.getText(sourceFile);
   /* v8 ignore next -- defensive AST/type guard */
-  if (hasAcceptablePattern(thenText)) return violations
+  if (hasAcceptablePattern(thenText)) return violations;
 
   // Check for silent sentinel returns
   const visitReturn = (n: ts.Node): void => {
     if (ts.isReturnStatement(n)) {
-      const val = getReturnValue(n.expression, sourceFile)
+      const val = getReturnValue(n.expression, sourceFile);
       if (val && SENTINEL_VALUES.has(val)) {
-        const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+        const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
         violations.push({
           line: line + 1,
           column: 0,
@@ -198,38 +196,38 @@ function checkResultIsErr(node: ts.IfStatement, sourceFile: ts.SourceFile): Chec
           severity: 'error',
           suggestion: `Use: \`result.unwrapOrLog(${val}, { evt: 'operation.failed' })\``,
           match: 'isErr()',
-        })
+        });
       }
     }
-  }
+  };
 
   if (ts.isBlock(node.thenStatement)) {
-    node.thenStatement.statements.forEach(visitReturn)
+    node.thenStatement.statements.forEach(visitReturn);
   } else {
-    visitReturn(node.thenStatement)
+    visitReturn(node.thenStatement);
   }
 
-  return violations
+  return violations;
 }
 
 /**
  * Check Result methods for violations
  */
 function checkResultMethods(node: ts.CallExpression, sourceFile: ts.SourceFile): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
-  if (!ts.isPropertyAccessExpression(node.expression)) return violations
+  if (!ts.isPropertyAccessExpression(node.expression)) return violations;
 
-  const method = node.expression.name.getText(sourceFile)
+  const method = node.expression.name.getText(sourceFile);
 
   // mapErr without logging - SEVERITY: ERROR
   if (method === 'mapErr' && node.arguments.length > 0) {
-    const firstArg = node.arguments[0]
+    const firstArg = node.arguments[0];
     /* v8 ignore next -- defensive AST/type guard */
-    if (!firstArg) return violations
-    const callback = firstArg.getText(sourceFile)
+    if (!firstArg) return violations;
+    const callback = firstArg.getText(sourceFile);
     if (!hasAcceptablePattern(callback)) {
-      const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+      const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
       violations.push({
         line: line + 1,
         column: 0,
@@ -238,18 +236,18 @@ function checkResultMethods(node: ts.CallExpression, sourceFile: ts.SourceFile):
 
         suggestion: 'Add logging: `mapErr(err => { logger.warn({ err }); return default; })`',
         match: 'mapErr',
-      })
+      });
     }
   }
 
   // match() error handler without logging - SEVERITY: ERROR
   if (method === 'match' && node.arguments.length >= 2) {
-    const secondArg = node.arguments[1]
+    const secondArg = node.arguments[1];
     /* v8 ignore next -- defensive AST/type guard */
-    if (!secondArg) return violations
-    const errHandler = secondArg.getText(sourceFile)
+    if (!secondArg) return violations;
+    const errHandler = secondArg.getText(sourceFile);
     if (!hasAcceptablePattern(errHandler)) {
-      const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+      const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
       violations.push({
         line: line + 1,
         column: 0,
@@ -257,11 +255,11 @@ function checkResultMethods(node: ts.CallExpression, sourceFile: ts.SourceFile):
         severity: 'error',
         suggestion: 'Use matchLog() instead, or add logging to error handler',
         match: 'match',
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -271,16 +269,16 @@ function checkCatchClauseAsErrorCast(
   node: ts.CatchClause,
   sourceFile: ts.SourceFile,
 ): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const catchText = node.block.getText(sourceFile)
+  const violations: CheckViolation[] = [];
+  const catchText = node.block.getText(sourceFile);
 
   // Skip if the catch block contains an instanceof Error guard
-  if (catchText.includes('instanceof Error')) return violations
+  if (catchText.includes('instanceof Error')) return violations;
 
   // Check for `as Error` casts
   if (catchText.includes('as Error')) {
-    const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-    const catchParam = node.variableDeclaration?.name.getText(sourceFile) ?? 'error'
+    const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+    const catchParam = node.variableDeclaration?.name.getText(sourceFile) ?? 'error';
     violations.push({
       line: line + 1,
       column: 0,
@@ -288,10 +286,10 @@ function checkCatchClauseAsErrorCast(
       severity: 'warning',
       suggestion: `Use \`if (${catchParam} instanceof Error)\` guard or normalize the error with a typed error utility`,
       match: 'as Error',
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 // =============================================================================
@@ -331,36 +329,36 @@ export const errorHandlingQuality = defineCheck({
 
   analyze(content, filePath) {
     // Skip test files — as Error casts, match()/mapErr() calls are exercising APIs, not production error handling
-    if (isTestFile(filePath)) return []
+    if (isTestFile(filePath)) return [];
 
     // Quick filter: must have catch or Result patterns
     if (!content.includes('catch') && !content.includes('isErr') && !content.includes('.match(')) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
-    const sourceFile = getSharedSourceFile(filePath, content)
+    const sourceFile = getSharedSourceFile(filePath, content);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
     const visit = (node: ts.Node): void => {
       if (ts.isCatchClause(node)) {
         violations.push(
           ...checkCatchClause(node, sourceFile),
           ...checkCatchClauseAsErrorCast(node, sourceFile),
-        )
+        );
       }
       if (ts.isIfStatement(node)) {
-        violations.push(...checkResultIsErr(node, sourceFile))
+        violations.push(...checkResultIsErr(node, sourceFile));
       }
       if (ts.isCallExpression(node)) {
-        violations.push(...checkResultMethods(node, sourceFile))
+        violations.push(...checkResultMethods(node, sourceFile));
       }
-      ts.forEachChild(node, visit)
-    }
+      ts.forEachChild(node, visit);
+    };
 
-    visit(sourceFile)
-    return violations
+    visit(sourceFile);
+    return violations;
   },
-})
+});

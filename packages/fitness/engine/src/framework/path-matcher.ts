@@ -5,23 +5,23 @@
  * Supports lazy evaluation and composition.
  */
 
-import * as path from 'node:path'
+import * as path from 'node:path';
 
-import { glob } from 'glob'
-import { minimatch } from 'minimatch'
+import { glob } from 'glob';
+import { minimatch } from 'minimatch';
 
 /**
  * Options for PathMatcher.
  */
 export interface PathMatcherOptions {
   /** Root directory to search from */
-  readonly cwd: string
+  readonly cwd: string;
   /** Glob patterns to include */
-  readonly include: readonly string[]
+  readonly include: readonly string[];
   /** Glob patterns to exclude */
-  readonly exclude: readonly string[]
+  readonly exclude: readonly string[];
   /** Additional exclusion patterns (combined with exclude) */
-  readonly additionalExcludes?: readonly string[]
+  readonly additionalExcludes?: readonly string[];
 }
 
 /**
@@ -29,11 +29,11 @@ export interface PathMatcherOptions {
  */
 export interface MatchResult {
   /** Matched files (absolute paths) */
-  readonly files: readonly string[]
+  readonly files: readonly string[];
   /** Files that were excluded */
-  readonly excluded: readonly string[]
+  readonly excluded: readonly string[];
   /** Time taken for glob operation in ms */
-  readonly durationMs: number
+  readonly durationMs: number;
 }
 
 /**
@@ -57,7 +57,7 @@ export class PathMatcher {
    * Create a PathMatcher from options.
    */
   static create(options: PathMatcherOptions): PathMatcher {
-    return new PathMatcher(options)
+    return new PathMatcher(options);
   }
 
   /**
@@ -65,17 +65,17 @@ export class PathMatcher {
    * @returns Array of absolute file paths matching the patterns
    */
   async files(): Promise<readonly string[]> {
-    const result = await this.match()
-    return result.files
+    const result = await this.match();
+    return result.files;
   }
 
   /**
    * Get detailed match result including timing.
    */
   async match(): Promise<MatchResult> {
-    const start = Date.now()
+    const start = Date.now();
 
-    const allExcludes = [...this.options.exclude, ...(this.options.additionalExcludes ?? [])]
+    const allExcludes = [...this.options.exclude, ...(this.options.additionalExcludes ?? [])];
 
     // Run glob for all include patterns
     const matchedSets = await Promise.all(
@@ -87,24 +87,24 @@ export class PathMatcher {
           ignore: allExcludes,
         }),
       ),
-    )
+    );
 
     // Combine and deduplicate results
-    const allMatched = new Set<string>()
+    const allMatched = new Set<string>();
     for (const matches of matchedSets) {
       for (const file of matches) {
-        allMatched.add(path.normalize(file))
+        allMatched.add(path.normalize(file));
       }
     }
 
-    const files = [...allMatched].sort()
-    const durationMs = Date.now() - start
+    const files = [...allMatched].sort();
+    const durationMs = Date.now() - start;
 
     return {
       files,
       excluded: [],
       durationMs,
-    }
+    };
   }
 
   /**
@@ -113,23 +113,23 @@ export class PathMatcher {
    * @returns True if file matches include patterns and is not excluded
    */
   matches(filePath: string): boolean {
-    const relativePath = path.relative(this.options.cwd, filePath)
+    const relativePath = path.relative(this.options.cwd, filePath);
 
     const matchesInclude = this.options.include.some((pattern) =>
       minimatch(relativePath, pattern, { dot: true }),
-    )
+    );
 
     if (!matchesInclude) {
-      return false
+      return false;
     }
 
-    const allExcludes = [...this.options.exclude, ...(this.options.additionalExcludes ?? [])]
+    const allExcludes = [...this.options.exclude, ...(this.options.additionalExcludes ?? [])];
 
     const matchesExclude = allExcludes.some((pattern) =>
       minimatch(relativePath, pattern, { dot: true }),
-    )
+    );
 
-    return !matchesExclude
+    return !matchesExclude;
   }
 
   /**
@@ -139,7 +139,7 @@ export class PathMatcher {
     return new PathMatcher({
       ...this.options,
       additionalExcludes: [...(this.options.additionalExcludes ?? []), ...additionalExcludes],
-    })
+    });
   }
 
   /**
@@ -150,15 +150,15 @@ export class PathMatcher {
       ...this.options,
       include: this.options.include.map((pattern) => {
         if (pattern.endsWith('/*') || pattern.endsWith('/**/*')) {
-          const base = pattern.replace(/\/\*+$/, '')
-          return `${base}/**/*.{ts,tsx}`
+          const base = pattern.replace(/\/\*+$/, '');
+          return `${base}/**/*.{ts,tsx}`;
         }
         if (!pattern.includes('.')) {
-          return `${pattern}/**/*.{ts,tsx}`
+          return `${pattern}/**/*.{ts,tsx}`;
         }
-        return pattern
+        return pattern;
       }),
-    })
+    });
   }
 
   /**
@@ -171,21 +171,21 @@ export class PathMatcher {
       '**/*.test.tsx',
       '**/*.spec.ts',
       '**/*.spec.tsx',
-    ])
+    ]);
   }
 
   /** Get the current working directory. */
   get cwd(): string {
-    return this.options.cwd
+    return this.options.cwd;
   }
 
   /** Get the include patterns. */
   get includePatterns(): readonly string[] {
-    return this.options.include
+    return this.options.include;
   }
 
   /** Get the exclude patterns. */
   get excludePatterns(): readonly string[] {
-    return [...this.options.exclude, ...(this.options.additionalExcludes ?? [])]
+    return [...this.options.exclude, ...(this.options.additionalExcludes ?? [])];
   }
 }

@@ -2,7 +2,7 @@
  * @fileoverview Display entries for cross-language architecture and documentation checks
  */
 
-import type { CheckDisplayEntry } from './types.js'
+import type { CheckDisplayEntry } from './types.js';
 
 /** Architecture check display entries (UNIVERSAL only) */
 export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
@@ -38,10 +38,10 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'tool-has-manifest': ['🪪', 'Tool Has Manifest'],
   'vitest-config-extends-base': ['🧪', 'Vitest Config Extends Base'],
   'vitest-config-required-with-tests': ['🧪', 'Vitest Config Required With Tests'],
-})
+});
 
 /** Documentation check display entries (UNIVERSAL only) */
 export const DOCUMENTATION_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
   'directive-audit': ['📝', 'Directive Audit'],
   'public-api-jsdoc': ['📝', 'Public API JSDoc Coverage'],
-})
+});

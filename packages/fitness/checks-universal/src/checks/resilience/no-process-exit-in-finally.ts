@@ -4,12 +4,12 @@
  * @fileoverview Detects process.exit() usage that bypasses finally blocks
  */
 
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness';
 
 /**
  * Pattern for detecting process.exit() calls
  */
-const PROCESS_EXIT_PATTERN = /process\.exit\s*\(/g
+const PROCESS_EXIT_PATTERN = /process\.exit\s*\(/g;
 
 /**
  * Pattern for detecting an actual try/finally clause: a closing brace
@@ -20,7 +20,7 @@ const PROCESS_EXIT_PATTERN = /process\.exit\s*\(/g
  * `}\s*finally\s*\{` shape excludes both cases by requiring brace
  * adjacency on both sides.
  */
-const TRY_FINALLY_PATTERN = /\}\s*finally\s*\{/
+const TRY_FINALLY_PATTERN = /\}\s*finally\s*\{/;
 
 /**
  * Check: resilience/no-process-exit-in-finally
@@ -49,37 +49,41 @@ export const noProcessExitInFinally = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Skip test files
-    if (filePath.includes('.test.') || filePath.includes('.spec.') || filePath.includes('__tests__')) {
-      return violations
+    if (
+      filePath.includes('.test.') ||
+      filePath.includes('.spec.') ||
+      filePath.includes('__tests__')
+    ) {
+      return violations;
     }
 
     // Quick check: must have both process.exit and finally
     if (!content.includes('process.exit') || !content.includes('finally')) {
-      return violations
+      return violations;
     }
 
     // Verify the file has a real try/finally clause (not Promise.finally).
     // The pattern `}\s*finally\s*\{` requires brace adjacency on both sides,
     // which method-style `.finally(...)` cannot match.
     if (!TRY_FINALLY_PATTERN.test(content)) {
-      return violations
+      return violations;
     }
 
     // Find all process.exit() calls
-    PROCESS_EXIT_PATTERN.lastIndex = 0
-    const lines = content.split('\n')
-    let match
+    PROCESS_EXIT_PATTERN.lastIndex = 0;
+    const lines = content.split('\n');
+    let match;
     while ((match = PROCESS_EXIT_PATTERN.exec(content)) !== null) {
-      const lineNumber = getLineNumber(content, match.index)
-      const line = lines[lineNumber - 1] ?? ''
-      const trimmed = line.trim()
+      const lineNumber = getLineNumber(content, match.index);
+      const line = lines[lineNumber - 1] ?? '';
+      const trimmed = line.trim();
 
       // Skip comment lines
       if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
-        continue
+        continue;
       }
 
       violations.push({
@@ -92,9 +96,9 @@ export const noProcessExitInFinally = defineCheck({
         match: match[0],
         type: 'process-exit-bypasses-finally',
         filePath,
-      })
+      });
     }
 
-    return violations
+    return violations;
   },
-})
+});

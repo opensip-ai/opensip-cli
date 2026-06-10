@@ -15,31 +15,31 @@ export interface IsTestFileOptions {
    * Check for __tests__ directory pattern
    * @default true
    */
-  checkTestsDir?: boolean
+  checkTestsDir?: boolean;
 
   /**
    * Check for .test.ts/.test.tsx extension pattern
    * @default true
    */
-  checkTestExtension?: boolean
+  checkTestExtension?: boolean;
 
   /**
    * Check for .spec.ts/.spec.tsx extension pattern
    * @default true
    */
-  checkSpecExtension?: boolean
+  checkSpecExtension?: boolean;
 
   /**
    * Exclude .d.ts declaration files from being considered test files
    * @default true
    */
-  excludeDeclarationFiles?: boolean
+  excludeDeclarationFiles?: boolean;
 
   /**
    * Additional custom patterns to check (RegExp patterns)
    * @default []
    */
-  additionalPatterns?: RegExp[]
+  additionalPatterns?: RegExp[];
 }
 
 /**
@@ -60,7 +60,7 @@ const TEST_FILE_PATTERNS = {
 
   /** Declaration files that should be excluded */
   declarationFile: /\.d\.ts$/,
-} as const
+} as const;
 
 /**
  * Check if a file path is a test file.
@@ -87,37 +87,37 @@ export function isTestFile(filePath: string, options: IsTestFileOptions = {}): b
     checkSpecExtension = true,
     excludeDeclarationFiles = true,
     additionalPatterns = [],
-  } = options
+  } = options;
 
   // Normalize path separators for cross-platform compatibility
-  const normalized = filePath.replaceAll('\\', '/')
+  const normalized = filePath.replaceAll('\\', '/');
 
   // Exclude declaration files first
   if (excludeDeclarationFiles && normalized.endsWith('.d.ts')) {
-    return false
+    return false;
   }
 
   // Check __tests__ directory
   if (checkTestsDir && TEST_FILE_PATTERNS.testsDirectory.test(normalized)) {
-    return true
+    return true;
   }
 
   // Check .test.ts/.test.tsx extension
   if (checkTestExtension && TEST_FILE_PATTERNS.testExtension.test(normalized)) {
-    return true
+    return true;
   }
 
   // Check .spec.ts/.spec.tsx extension
   if (checkSpecExtension && TEST_FILE_PATTERNS.specExtension.test(normalized)) {
-    return true
+    return true;
   }
 
   // Check additional custom patterns
   for (const pattern of additionalPatterns) {
     if (pattern.test(normalized)) {
-      return true
+      return true;
     }
   }
 
-  return false
+  return false;
 }

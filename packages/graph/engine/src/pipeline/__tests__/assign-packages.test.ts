@@ -18,16 +18,32 @@ function manifest(relDir: string, name: string): void {
 
 function occ(filePath: string): FunctionOccurrence {
   return {
-    bodyHash: filePath, simpleName: 'f', qualifiedName: `${filePath}.f`, filePath,
-    line: 1, column: 0, endLine: 2, kind: 'function-declaration', params: [],
-    returnType: null, enclosingClass: null, decorators: [], visibility: 'exported',
-    inTestFile: false, definedInGenerated: false, calls: [],
+    bodyHash: filePath,
+    simpleName: 'f',
+    qualifiedName: `${filePath}.f`,
+    filePath,
+    line: 1,
+    column: 0,
+    endLine: 2,
+    kind: 'function-declaration',
+    params: [],
+    returnType: null,
+    enclosingClass: null,
+    decorators: [],
+    visibility: 'exported',
+    inTestFile: false,
+    definedInGenerated: false,
+    calls: [],
   };
 }
 
 function catalogOf(filePaths: string[]): Catalog {
   return {
-    version: '3.0', tool: 'graph', language: 'typescript', builtAt: 'x', cacheKey: 'k',
+    version: '3.0',
+    tool: 'graph',
+    language: 'typescript',
+    builtAt: 'x',
+    cacheKey: 'k',
     functions: { f: filePaths.map(occ) },
   };
 }
@@ -38,17 +54,18 @@ function labels(filePaths: string[]): Record<string, string | undefined> {
   return Object.fromEntries(out.functions.f.map((o) => [o.filePath, o.package]));
 }
 
-beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'opensip-ap-')); });
-afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+beforeEach(() => {
+  root = mkdtempSync(join(tmpdir(), 'opensip-ap-'));
+});
+afterEach(() => {
+  rmSync(root, { recursive: true, force: true });
+});
 
 describe('assignPackages', () => {
   it('stamps each occurrence with its nearest package.json name', () => {
     manifest('packages/fitness/engine', '@s/fitness');
     manifest('packages/core', '@s/core');
-    const l = labels([
-      'packages/fitness/engine/src/checks/x.ts',
-      'packages/core/src/y.ts',
-    ]);
+    const l = labels(['packages/fitness/engine/src/checks/x.ts', 'packages/core/src/y.ts']);
     expect(l['packages/fitness/engine/src/checks/x.ts']).toBe('@s/fitness');
     expect(l['packages/core/src/y.ts']).toBe('@s/core');
   });

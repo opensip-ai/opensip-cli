@@ -21,7 +21,9 @@ import type { Catalog } from '@opensip-tools/graph';
 
 describe('edge-resolvers — defensive / unresolved branches', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-resolver-branches-'));
-  afterAll(() => { rmSync(fixtureDir, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(fixtureDir, { recursive: true, force: true });
+  });
 
   writeFixture(fixtureDir, {
     // Direct call where the LHS is a parenthesized expression — not an
@@ -138,7 +140,9 @@ describe('edge-resolvers — defensive / unresolved branches', () => {
     `,
   });
   let catalog!: Catalog;
-  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
+  beforeAll(async () => {
+    catalog = await runFixture(fixtureDir);
+  });
 
   it('produces a catalog (sanity)', () => {
     expect(Object.keys(catalog.functions).length).toBeGreaterThan(0);

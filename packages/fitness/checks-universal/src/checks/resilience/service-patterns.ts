@@ -2,45 +2,49 @@
  * @fileoverview Service communication and infrastructure resilience checks
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import {
+  defineCheck,
+  isTestFile,
+  type CheckViolation,
+  getLineNumber,
+} from '@opensip-tools/fitness';
 
 // =============================================================================
 // PRE-COMPILED REGEX PATTERNS (Safe for static code analysis)
 // =============================================================================
 
 // Service entry patterns (bounded quantifiers to prevent slow regex)
-const LISTEN_PATTERN = /\.listen\s{0,5}\(/
-const FASTIFY_PATTERN = /fastify\s{0,5}\(\)/
-const EXPRESS_PATTERN = /express\s{0,5}\(\)/
-const CREATE_SERVER_PATTERN = /createServer\s{0,5}\(/
+const LISTEN_PATTERN = /\.listen\s{0,5}\(/;
+const FASTIFY_PATTERN = /fastify\s{0,5}\(\)/;
+const EXPRESS_PATTERN = /express\s{0,5}\(\)/;
+const CREATE_SERVER_PATTERN = /createServer\s{0,5}\(/;
 
 // Shutdown patterns (bounded quantifiers to prevent slow regex)
-const SIGTERM_PATTERN = /process\.on\s{0,5}\(\s{0,5}['"]SIGTERM['"]/
-const SIGINT_PATTERN = /process\.on\s{0,5}\(\s{0,5}['"]SIGINT['"]/
-const CLOSE_PATTERN = /\.close\s{0,5}\(\s{0,5}\)/
-const GRACEFUL_PATTERN = /graceful(?:Shutdown|Stop)/i
+const SIGTERM_PATTERN = /process\.on\s{0,5}\(\s{0,5}['"]SIGTERM['"]/;
+const SIGINT_PATTERN = /process\.on\s{0,5}\(\s{0,5}['"]SIGINT['"]/;
+const CLOSE_PATTERN = /\.close\s{0,5}\(\s{0,5}\)/;
+const GRACEFUL_PATTERN = /graceful(?:Shutdown|Stop)/i;
 
 // API endpoint patterns
-const GET_ENDPOINT_PATTERN = /\.get\s*\(\s*['"][^'"]{1,200}['"]/
-const POST_ENDPOINT_PATTERN = /\.post\s*\(\s*['"][^'"]{1,200}['"]/
-const PUT_ENDPOINT_PATTERN = /\.put\s*\(\s*['"][^'"]{1,200}['"]/
-const DELETE_ENDPOINT_PATTERN = /\.delete\s*\(\s*['"][^'"]{1,200}['"]/
-const PATCH_ENDPOINT_PATTERN = /\.patch\s*\(\s*['"][^'"]{1,200}['"]/
+const GET_ENDPOINT_PATTERN = /\.get\s*\(\s*['"][^'"]{1,200}['"]/;
+const POST_ENDPOINT_PATTERN = /\.post\s*\(\s*['"][^'"]{1,200}['"]/;
+const PUT_ENDPOINT_PATTERN = /\.put\s*\(\s*['"][^'"]{1,200}['"]/;
+const DELETE_ENDPOINT_PATTERN = /\.delete\s*\(\s*['"][^'"]{1,200}['"]/;
+const PATCH_ENDPOINT_PATTERN = /\.patch\s*\(\s*['"][^'"]{1,200}['"]/;
 
 // Rate limiting patterns
-const RATE_LIMIT_PATTERN = /rateLimit/i
-const RATE_LIMITER_PATTERN = /rateLimiter/i
-const THROTTLE_PATTERN = /throttle/i
-const RATE_LIMIT_DECORATOR_PATTERN = /@RateLimit/
+const RATE_LIMIT_PATTERN = /rateLimit/i;
+const RATE_LIMITER_PATTERN = /rateLimiter/i;
+const THROTTLE_PATTERN = /throttle/i;
+const RATE_LIMIT_DECORATOR_PATTERN = /@RateLimit/;
 
 // Sensitive endpoints
-const AUTH_ENDPOINT_PATTERN = /\/auth\//i
-const LOGIN_ENDPOINT_PATTERN = /\/login/i
-const REGISTER_ENDPOINT_PATTERN = /\/register/i
-const PASSWORD_ENDPOINT_PATTERN = /\/password/i
-const PAYMENT_ENDPOINT_PATTERN = /\/payment/i
-
+const AUTH_ENDPOINT_PATTERN = /\/auth\//i;
+const LOGIN_ENDPOINT_PATTERN = /\/login/i;
+const REGISTER_ENDPOINT_PATTERN = /\/register/i;
+const PASSWORD_ENDPOINT_PATTERN = /\/password/i;
+const PAYMENT_ENDPOINT_PATTERN = /\/payment/i;
 
 // =============================================================================
 // PATTERN ARRAYS (Using pre-compiled patterns)
@@ -51,9 +55,9 @@ const SERVICE_ENTRY_PATTERNS = [
   FASTIFY_PATTERN,
   EXPRESS_PATTERN,
   CREATE_SERVER_PATTERN,
-]
+];
 
-const SHUTDOWN_PATTERNS = [SIGTERM_PATTERN, SIGINT_PATTERN, CLOSE_PATTERN, GRACEFUL_PATTERN]
+const SHUTDOWN_PATTERNS = [SIGTERM_PATTERN, SIGINT_PATTERN, CLOSE_PATTERN, GRACEFUL_PATTERN];
 
 const API_ENDPOINT_PATTERNS = [
   GET_ENDPOINT_PATTERN,
@@ -61,14 +65,14 @@ const API_ENDPOINT_PATTERNS = [
   PUT_ENDPOINT_PATTERN,
   DELETE_ENDPOINT_PATTERN,
   PATCH_ENDPOINT_PATTERN,
-]
+];
 
 const RATE_LIMITING_PATTERNS = [
   RATE_LIMIT_PATTERN,
   RATE_LIMITER_PATTERN,
   THROTTLE_PATTERN,
   RATE_LIMIT_DECORATOR_PATTERN,
-]
+];
 
 const SENSITIVE_ENDPOINTS = [
   AUTH_ENDPOINT_PATTERN,
@@ -76,8 +80,7 @@ const SENSITIVE_ENDPOINTS = [
   REGISTER_ENDPOINT_PATTERN,
   PASSWORD_ENDPOINT_PATTERN,
   PAYMENT_ENDPOINT_PATTERN,
-]
-
+];
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -87,50 +90,49 @@ function isServiceEntryPoint(content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.service_patterns.is_service_entry_point',
     msg: 'Checking if content is a service entry point',
-  })
-  return SERVICE_ENTRY_PATTERNS.some((pattern) => pattern.test(content))
+  });
+  return SERVICE_ENTRY_PATTERNS.some((pattern) => pattern.test(content));
 }
 
 function hasShutdownHandler(content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.service_patterns.has_shutdown_handler',
     msg: 'Checking if content has shutdown handler',
-  })
-  return SHUTDOWN_PATTERNS.some((pattern) => pattern.test(content))
+  });
+  return SHUTDOWN_PATTERNS.some((pattern) => pattern.test(content));
 }
 
 function hasApiEndpoints(content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.service_patterns.has_api_endpoints',
     msg: 'Checking if content has API endpoints',
-  })
-  return API_ENDPOINT_PATTERNS.some((pattern) => pattern.test(content))
+  });
+  return API_ENDPOINT_PATTERNS.some((pattern) => pattern.test(content));
 }
 
 function matchesRateLimitingPatterns(content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.service_patterns.matches_rate_limiting_patterns',
     msg: 'Checking if content matches rate limiting patterns',
-  })
-  return RATE_LIMITING_PATTERNS.some((pattern) => pattern.test(content))
+  });
+  return RATE_LIMITING_PATTERNS.some((pattern) => pattern.test(content));
 }
 
 function isSensitiveEndpoint(line: string): boolean {
   logger.debug({
     evt: 'fitness.checks.service_patterns.is_sensitive_endpoint',
     msg: 'Checking if line contains a sensitive endpoint',
-  })
-  return SENSITIVE_ENDPOINTS.some((pattern) => pattern.test(line))
+  });
+  return SENSITIVE_ENDPOINTS.some((pattern) => pattern.test(line));
 }
 
 function isApiEndpoint(line: string): boolean {
   logger.debug({
     evt: 'fitness.checks.service_patterns.is_api_endpoint',
     msg: 'Checking if line contains an API endpoint',
-  })
-  return API_ENDPOINT_PATTERNS.some((pattern) => pattern.test(line))
+  });
+  return API_ENDPOINT_PATTERNS.some((pattern) => pattern.test(line));
 }
-
 
 // =============================================================================
 // GRACEFUL SHUTDOWN
@@ -163,27 +165,27 @@ export const gracefulShutdown = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     if (!isServiceEntryPoint(content)) {
-      return violations
+      return violations;
     }
 
     if (hasShutdownHandler(content)) {
-      return violations
+      return violations;
     }
 
     // Find service entry violation
     for (const pattern of SERVICE_ENTRY_PATTERNS) {
       // @fitness-ignore-next-line performance-anti-patterns -- false positive: keyword in comment text below, not an async call
       // @lazy-ok -- 'await' appears in suggestion string literal, not actual await
-      pattern.lastIndex = 0
-      const match = pattern.exec(content)
+      pattern.lastIndex = 0;
+      const match = pattern.exec(content);
       if (!match) {
-        continue
+        continue;
       }
 
-      const lineNumber = getLineNumber(content, match.index)
+      const lineNumber = getLineNumber(content, match.index);
       violations.push({
         line: lineNumber,
         column: 0,
@@ -194,14 +196,14 @@ export const gracefulShutdown = defineCheck({
         match: match[0],
         type: 'missing-shutdown-handler',
         filePath,
-      })
+      });
       // Found one violation, exit loop
-      break
+      break;
     }
 
-    return violations
+    return violations;
   },
-})
+});
 
 // =============================================================================
 // RATE LIMITING COVERAGE
@@ -230,28 +232,28 @@ export const rateLimitingCoverage = defineCheck({
   tags: ['resilience', 'security', 'rate-limiting'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Test files routinely embed endpoint shapes inline as fixtures
     // for this very check; production rate-limiting is the contract,
     // not test scaffolding.
-    if (isTestFile(filePath)) return violations
+    if (isTestFile(filePath)) return violations;
 
     if (!hasApiEndpoints(content)) {
-      return violations
+      return violations;
     }
 
-    const hasRateLimitingInFile = matchesRateLimitingPatterns(content)
-    const lines = content.split('\n')
+    const hasRateLimitingInFile = matchesRateLimitingPatterns(content);
+    const lines = content.split('\n');
 
     for (const [i, line] of lines.entries()) {
-      if (!line) continue
+      if (!line) continue;
 
-      const isEndpoint = isApiEndpoint(line)
-      const isSensitive = isSensitiveEndpoint(line)
+      const isEndpoint = isApiEndpoint(line);
+      const isSensitive = isSensitiveEndpoint(line);
 
       if (isEndpoint && isSensitive && !hasRateLimitingInFile) {
-        const lineNumber = i + 1
+        const lineNumber = i + 1;
         violations.push({
           line: lineNumber,
           column: 0,
@@ -262,11 +264,10 @@ export const rateLimitingCoverage = defineCheck({
           match: line.trim(),
           type: 'sensitive-endpoint-no-rate-limit',
           filePath,
-        })
+        });
       }
     }
 
-    return violations
+    return violations;
   },
-})
-
+});

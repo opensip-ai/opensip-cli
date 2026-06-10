@@ -140,7 +140,13 @@ function edgesOf(catalog: Catalog, name: string): readonly CallEdge[] {
 
 /** Sorted, deduped set of project-relative file paths present in a catalog. */
 function filesOf(catalog: Catalog): string[] {
-  return [...new Set(Object.values(catalog.functions).flat().map((o) => o.filePath))].sort();
+  return [
+    ...new Set(
+      Object.values(catalog.functions)
+        .flat()
+        .map((o) => o.filePath),
+    ),
+  ].sort();
 }
 
 // ── the gate ──────────────────────────────────────────────────────
@@ -194,7 +200,9 @@ describe('exact-sharding equivalence guardrail', () => {
     expect(rootEdge?.crossShard).toBe(true);
     expect(rootEdge?.resolution).toBe('semantic');
     // And the single-program oracle resolves the SAME edge (no cross-shard flag).
-    expect(edgesOf(singleProgram, 'rootMain').flatMap((e) => [...e.to])).toContain(FOUNDATION_CANON);
+    expect(edgesOf(singleProgram, 'rootMain').flatMap((e) => [...e.to])).toContain(
+      FOUNDATION_CANON,
+    );
   });
 
   it('links the OUT-OF-src-tree file cross-package edge (genFixtures → foundation.canonicalize)', async () => {
@@ -290,11 +298,7 @@ describe('exact-sharding equivalence guardrail', () => {
  * Used ONLY by the regression-detector guards to synthesize a degraded linker
  * output without touching production resolution code.
  */
-function rewriteCrossEdgeTarget(
-  catalog: Catalog,
-  from: string,
-  to: string | undefined,
-): Catalog {
+function rewriteCrossEdgeTarget(catalog: Catalog, from: string, to: string | undefined): Catalog {
   const functions: Record<string, FunctionOccurrence[]> = {};
   for (const [name, occs] of Object.entries(catalog.functions)) {
     if (!occs) continue;

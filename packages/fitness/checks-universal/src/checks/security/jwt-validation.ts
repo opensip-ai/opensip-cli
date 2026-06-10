@@ -4,19 +4,19 @@
  * @fileoverview Validate JWT handling follows security best practices
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * JWT security pattern definitions.
  * Each pattern has a check function to avoid complex regex backtracking issues.
  */
 interface JwtSecurityPattern {
-  id: string
-  message: string
-  suggestion: string
-  severity: 'error' | 'warning'
-  check: (line: string) => { matched: boolean; matchIndex: number; matchText: string }
+  id: string;
+  message: string;
+  suggestion: string;
+  severity: 'error' | 'warning';
+  check: (line: string) => { matched: boolean; matchIndex: number; matchText: string };
 }
 
 /**
@@ -27,54 +27,54 @@ interface JwtSecurityPattern {
  * @returns Match result
  */
 function checkJwtVerifyWithoutAlgorithm(line: string): {
-  matched: boolean
-  matchIndex: number
-  matchText: string
+  matched: boolean;
+  matchIndex: number;
+  matchText: string;
 } {
   logger.debug({
     evt: 'fitness.checks.jwt_validation.check_jwt_verify_without_algorithm',
     msg: 'Checking for JWT verify without algorithm option',
-  })
-  const idx = line.indexOf('jwt.verify')
-  if (idx === -1) return { matched: false, matchIndex: -1, matchText: '' }
+  });
+  const idx = line.indexOf('jwt.verify');
+  if (idx === -1) return { matched: false, matchIndex: -1, matchText: '' };
 
   // Find the end of the verify call
-  const afterVerify = line.slice(Math.max(0, idx))
-  const parenStart = afterVerify.indexOf('(')
-  if (parenStart === -1) return { matched: false, matchIndex: -1, matchText: '' }
+  const afterVerify = line.slice(Math.max(0, idx));
+  const parenStart = afterVerify.indexOf('(');
+  if (parenStart === -1) return { matched: false, matchIndex: -1, matchText: '' };
 
   // Count parentheses to find end of call
-  let depth = 0
-  let parenEnd = -1
+  let depth = 0;
+  let parenEnd = -1;
   for (let i = parenStart; i < afterVerify.length; i++) {
-    const char = afterVerify[i]
+    const char = afterVerify[i];
     if (char === '(') {
-      depth++
+      depth++;
     } else if (char === ')') {
-      depth--
+      depth--;
       if (depth === 0) {
-        parenEnd = i
-        break
+        parenEnd = i;
+        break;
       }
     } else {
       // Other characters are ignored during parenthesis counting
     }
   }
 
-  if (parenEnd === -1) return { matched: false, matchIndex: -1, matchText: '' }
+  if (parenEnd === -1) return { matched: false, matchIndex: -1, matchText: '' };
 
-  const callContent = afterVerify.slice(parenStart, parenEnd + 1)
+  const callContent = afterVerify.slice(parenStart, parenEnd + 1);
 
   // Check if there are 2 args (no options) - simple comma count for basic calls
-  const commaCount = (callContent.match(/,/g) ?? []).length
+  const commaCount = (callContent.match(/,/g) ?? []).length;
 
   // jwt.verify(token, secret) has 1 comma, jwt.verify(token, secret, options) has 2+
   // Also check if 'algorithms' is mentioned
   if (commaCount === 1 && !callContent.toLowerCase().includes('algorithm')) {
-    return { matched: true, matchIndex: idx, matchText: 'jwt.verify' + callContent }
+    return { matched: true, matchIndex: idx, matchText: 'jwt.verify' + callContent };
   }
 
-  return { matched: false, matchIndex: -1, matchText: '' }
+  return { matched: false, matchIndex: -1, matchText: '' };
 }
 
 /**
@@ -84,27 +84,27 @@ function checkJwtVerifyWithoutAlgorithm(line: string): {
  * @returns Match result
  */
 function checkJwtDecodeForAuth(line: string): {
-  matched: boolean
-  matchIndex: number
-  matchText: string
+  matched: boolean;
+  matchIndex: number;
+  matchText: string;
 } {
   logger.debug({
     evt: 'fitness.checks.jwt_validation.check_jwt_decode_for_auth',
     msg: 'Checking for JWT decode used for authentication',
-  })
-  const idx = line.indexOf('jwt.decode')
-  if (idx === -1) return { matched: false, matchIndex: -1, matchText: '' }
+  });
+  const idx = line.indexOf('jwt.decode');
+  if (idx === -1) return { matched: false, matchIndex: -1, matchText: '' };
 
   // Check if line contains auth-related keywords
-  const lowerLine = line.toLowerCase()
-  const authKeywords = ['user', 'auth', 'session', 'token']
-  const hasAuthKeyword = authKeywords.some((kw) => lowerLine.includes(kw))
+  const lowerLine = line.toLowerCase();
+  const authKeywords = ['user', 'auth', 'session', 'token'];
+  const hasAuthKeyword = authKeywords.some((kw) => lowerLine.includes(kw));
 
   if (hasAuthKeyword) {
-    return { matched: true, matchIndex: idx, matchText: 'jwt.decode' }
+    return { matched: true, matchIndex: idx, matchText: 'jwt.decode' };
   }
 
-  return { matched: false, matchIndex: -1, matchText: '' }
+  return { matched: false, matchIndex: -1, matchText: '' };
 }
 
 /* v8 ignore start -- secret-detection helpers iterate keywords and apply regex; covered indirectly via fixtures */
@@ -115,33 +115,33 @@ function checkJwtDecodeForAuth(line: string): {
  * @returns Match result
  */
 function checkWeakJwtSecret(line: string): {
-  matched: boolean
-  matchIndex: number
-  matchText: string
+  matched: boolean;
+  matchIndex: number;
+  matchText: string;
 } {
   logger.debug({
     evt: 'fitness.checks.jwt_validation.check_weak_jwt_secret',
     msg: 'Checking for weak JWT secret',
-  })
-  const lowerLine = line.toLowerCase()
-  const secretKeywords = ['jwtsecret', 'jwt_secret', 'jwt-secret', 'secret']
+  });
+  const lowerLine = line.toLowerCase();
+  const secretKeywords = ['jwtsecret', 'jwt_secret', 'jwt-secret', 'secret'];
 
   for (const keyword of secretKeywords) {
-    const idx = lowerLine.indexOf(keyword)
-    if (idx === -1) continue
+    const idx = lowerLine.indexOf(keyword);
+    if (idx === -1) continue;
 
     // Look for assignment after keyword - simple check for short strings
-    const afterKeyword = line.slice(Math.max(0, idx + keyword.length))
+    const afterKeyword = line.slice(Math.max(0, idx + keyword.length));
     // Match patterns like: = 'short' or : "short"
     // @fitness-ignore-next-line sonarjs-regular-expr -- Simple pattern with bounded quantifier {0,20} and negated class [^'"`]; no backtracking risk
-    const assignMatch = /^\s*[:=]\s*['"`]([^'"`]{0,20})['"`]/.exec(afterKeyword)
+    const assignMatch = /^\s*[:=]\s*['"`]([^'"`]{0,20})['"`]/.exec(afterKeyword);
 
     if (assignMatch?.[1] !== undefined && assignMatch[1].length <= 20) {
-      return { matched: true, matchIndex: idx, matchText: keyword + assignMatch[0] }
+      return { matched: true, matchIndex: idx, matchText: keyword + assignMatch[0] };
     }
   }
 
-  return { matched: false, matchIndex: -1, matchText: '' }
+  return { matched: false, matchIndex: -1, matchText: '' };
 }
 
 /**
@@ -151,37 +151,37 @@ function checkWeakJwtSecret(line: string): {
  * @returns Match result
  */
 function checkAlgorithmNone(line: string): {
-  matched: boolean
-  matchIndex: number
-  matchText: string
+  matched: boolean;
+  matchIndex: number;
+  matchText: string;
 } {
   logger.debug({
     evt: 'fitness.checks.jwt_validation.check_algorithm_none',
     msg: 'Checking for insecure algorithm none',
-  })
-  const lowerLine = line.toLowerCase()
+  });
+  const lowerLine = line.toLowerCase();
 
   // Look for algorithms: ['none'] or algorithm: ['none']
-  const patterns = ['algorithms', 'algorithm']
+  const patterns = ['algorithms', 'algorithm'];
   for (const pattern of patterns) {
-    const idx = lowerLine.indexOf(pattern)
-    if (idx === -1) continue
+    const idx = lowerLine.indexOf(pattern);
+    if (idx === -1) continue;
 
-    const afterPattern = lowerLine.slice(Math.max(0, idx))
+    const afterPattern = lowerLine.slice(Math.max(0, idx));
     // Check for assignment to array containing 'none'
     const hasNone =
       afterPattern.includes('[') &&
       (afterPattern.includes("'none'") ||
         afterPattern.includes('"none"') ||
-        afterPattern.includes('`none`'))
+        afterPattern.includes('`none`'));
 
     if (hasNone) {
-      const matchEnd = line.slice(Math.max(0, idx)).indexOf(']') + 1
-      return { matched: true, matchIndex: idx, matchText: line.slice(idx, idx + matchEnd) }
+      const matchEnd = line.slice(Math.max(0, idx)).indexOf(']') + 1;
+      return { matched: true, matchIndex: idx, matchText: line.slice(idx, idx + matchEnd) };
     }
   }
 
-  return { matched: false, matchIndex: -1, matchText: '' }
+  return { matched: false, matchIndex: -1, matchText: '' };
 }
 /* v8 ignore stop */
 
@@ -194,35 +194,35 @@ function checkAlgorithmNone(line: string): {
  * @returns Match result
  */
 function checkMissingIssuerAudience(line: string): {
-  matched: boolean
-  matchIndex: number
-  matchText: string
+  matched: boolean;
+  matchIndex: number;
+  matchText: string;
 } {
   logger.debug({
     evt: 'fitness.checks.jwt_validation.check_missing_issuer_audience',
     msg: 'Checking for missing issuer or audience validation',
-  })
+  });
   // Look for .verify( specifically to match method calls, not substrings like verifyEventSignature
-  const idx = line.indexOf('.verify(')
-  if (idx === -1) return { matched: false, matchIndex: -1, matchText: '' }
+  const idx = line.indexOf('.verify(');
+  if (idx === -1) return { matched: false, matchIndex: -1, matchText: '' };
 
   // Check if there's an options object
-  const afterVerify = line.slice(Math.max(0, idx))
-  if (!afterVerify.includes('{')) return { matched: false, matchIndex: -1, matchText: '' }
+  const afterVerify = line.slice(Math.max(0, idx));
+  if (!afterVerify.includes('{')) return { matched: false, matchIndex: -1, matchText: '' };
 
   // Check if issuer/audience/iss/aud is present
-  const lowerAfter = afterVerify.toLowerCase()
+  const lowerAfter = afterVerify.toLowerCase();
   const hasValidation =
     lowerAfter.includes('issuer') ||
     lowerAfter.includes('audience') ||
     lowerAfter.includes('iss') ||
-    lowerAfter.includes('aud')
+    lowerAfter.includes('aud');
 
   if (!hasValidation) {
-    return { matched: true, matchIndex: idx, matchText: '.verify(...)' }
+    return { matched: true, matchIndex: idx, matchText: '.verify(...)' };
   }
 
-  return { matched: false, matchIndex: -1, matchText: '' }
+  return { matched: false, matchIndex: -1, matchText: '' };
 }
 
 const JWT_SECURITY_PATTERNS: JwtSecurityPattern[] = [
@@ -267,7 +267,7 @@ const JWT_SECURITY_PATTERNS: JwtSecurityPattern[] = [
     severity: 'warning',
     check: checkMissingIssuerAudience,
   },
-]
+];
 
 /**
  * Check if content contains JWT-related keywords.
@@ -280,13 +280,13 @@ function hasJwtKeywords(content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.jwt_validation.has_jwt_keywords',
     msg: 'Checking if content contains JWT-related keywords',
-  })
-  const lowerContent = content.toLowerCase()
+  });
+  const lowerContent = content.toLowerCase();
   return (
     lowerContent.includes('jwt') ||
     lowerContent.includes('jsonwebtoken') ||
     lowerContent.includes('jose')
-  )
+  );
 }
 
 /**
@@ -323,26 +323,26 @@ export const jwtValidation = defineCheck({
     logger.debug({
       evt: 'fitness.checks.jwt_validation.analyze',
       msg: 'Analyzing file for JWT validation best practices',
-    })
+    });
     // Skip files that don't deal with JWT
     if (!hasJwtKeywords(content)) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (const [lineNum, line_] of lines.entries()) {
-      const line = line_ ?? ''
+      const line = line_ ?? '';
 
       // Skip comments
-      const trimmed = line.trim()
+      const trimmed = line.trim();
       if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
-        continue
+        continue;
       }
 
       for (const pattern of JWT_SECURITY_PATTERNS) {
-        const result = pattern.check(line)
+        const result = pattern.check(line);
         if (result.matched) {
           violations.push({
             line: lineNum + 1,
@@ -352,11 +352,11 @@ export const jwtValidation = defineCheck({
             suggestion: pattern.suggestion,
             match: result.matchText,
             filePath,
-          })
+          });
         }
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

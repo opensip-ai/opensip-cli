@@ -17,35 +17,35 @@ import {
   scanRegularString,
   type Region,
   type ScanResult,
-} from '@opensip-tools/core'
+} from '@opensip-tools/core';
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- token-state-machine: cyclomatic complexity is inherent to lexer-style scanners; splitting hurts readability
 function scan(src: string): ScanResult {
-  const stringRegions: Region[] = []
-  const commentRegions: Region[] = []
-  const len = src.length
-  let i = 0
+  const stringRegions: Region[] = [];
+  const commentRegions: Region[] = [];
+  const len = src.length;
+  let i = 0;
 
   while (i < len) {
-    const c = src[i]
-    const next = src[i + 1]
+    const c = src[i];
+    const next = src[i + 1];
 
     // Line comment: // ... \n
     if (c === '/' && next === '/') {
-      const start = i
-      const lc = scanLineComment(src, i)
-      i = lc.end
-      commentRegions.push({ start, end: i })
-      continue
+      const start = i;
+      const lc = scanLineComment(src, i);
+      i = lc.end;
+      commentRegions.push({ start, end: i });
+      continue;
     }
 
     // Block comment: /* ... */ — Go block comments do NOT nest
     if (c === '/' && next === '*') {
-      const start = i
-      const bc = scanBlockCommentNonNesting(src, i)
-      i = bc.end
-      commentRegions.push({ start, end: i })
-      continue
+      const start = i;
+      const bc = scanBlockCommentNonNesting(src, i);
+      i = bc.end;
+      commentRegions.push({ start, end: i });
+      continue;
     }
 
     // Raw string: `...` — no escapes, can span lines.
@@ -56,20 +56,20 @@ function scan(src: string): ScanResult {
     // value-extraction; a future `findStringLiterals` query API will need
     // to apply the \r-discard rule when materializing literal values.
     if (c === '`') {
-      const contentStart = i + 1
-      let j = i + 1
-      while (j < len && src[j] !== '`') j++
-      stringRegions.push({ start: contentStart, end: j })
-      i = j < len ? j + 1 : len
-      continue
+      const contentStart = i + 1;
+      let j = i + 1;
+      while (j < len && src[j] !== '`') j++;
+      stringRegions.push({ start: contentStart, end: j });
+      i = j < len ? j + 1 : len;
+      continue;
     }
 
     // Interpreted string: "..." with \ escapes
     if (c === '"') {
-      const result = scanRegularString(src, i)
-      stringRegions.push({ start: i + 1, end: result.contentEnd })
-      i = result.next
-      continue
+      const result = scanRegularString(src, i);
+      stringRegions.push({ start: i + 1, end: result.contentEnd });
+      i = result.next;
+      continue;
     }
 
     // Rune literal: '...' — preserve as code (don't strip).
@@ -79,19 +79,19 @@ function scan(src: string): ScanResult {
     // load-bearing branch order (escape before close-quote) is the same
     // shape Go's previous inline scanner used.
     if (c === "'") {
-      const result = scanCharLiteral(src, i, { maxScan: 12 })
-      i = result.end
-      continue
+      const result = scanCharLiteral(src, i, { maxScan: 12 });
+      i = result.end;
+      continue;
     }
 
-    i++
+    i++;
   }
 
-  return { stringRegions, commentRegions }
+  return { stringRegions, commentRegions };
 }
 
-const stripper = makeStripper(scan)
+const stripper = makeStripper(scan);
 /** Replace string literal content with whitespace; preserves length. */
-export const stripStrings = stripper.stripStrings
+export const stripStrings = stripper.stripStrings;
 /** Replace string literals AND comments with whitespace; preserves length. */
-export const stripComments = stripper.stripComments
+export const stripComments = stripper.stripComments;

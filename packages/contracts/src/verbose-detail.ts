@@ -19,7 +19,8 @@ import type { FindingGroup, FindingLine } from './command-results.js';
 function toFindingLine(signal: Signal): FindingLine {
   let location: string | undefined;
   if (signal.filePath !== '') {
-    location = signal.line === undefined ? signal.filePath : `${signal.filePath}:${String(signal.line)}`;
+    location =
+      signal.line === undefined ? signal.filePath : `${signal.filePath}:${String(signal.line)}`;
   }
   return {
     severity: isErrorSignal(signal) ? 'error' : 'warning',
@@ -47,7 +48,11 @@ function indexBySource(signals: readonly Signal[]): Map<string, Signal[]> {
 }
 
 /** Build one finding group for a unit + its findings (counts the rungs). */
-function groupForUnit(unit: FindingGroupUnit, findings: readonly Signal[], title: string): FindingGroup {
+function groupForUnit(
+  unit: FindingGroupUnit,
+  findings: readonly Signal[],
+  title: string,
+): FindingGroup {
   let errorCount = 0;
   let warningCount = 0;
   for (const s of findings) {

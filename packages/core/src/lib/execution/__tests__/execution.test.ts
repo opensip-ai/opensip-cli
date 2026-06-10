@@ -40,7 +40,10 @@ describe('runWithTimeout', () => {
   });
 
   it('classifies a thrown domain error as error (not timeout)', async () => {
-    const out = await runWithTimeout({ run: () => Promise.reject(new Error('boom')), timeoutMs: 1000 });
+    const out = await runWithTimeout({
+      run: () => Promise.reject(new Error('boom')),
+      timeoutMs: 1000,
+    });
     expect(out.status).toBe('error');
     expect(out.status === 'error' && (out.error as Error).message).toBe('boom');
   });
@@ -93,14 +96,21 @@ describe('runWithTimeout', () => {
 
 describe('runWithRetry', () => {
   it('returns the result on first success (no retry)', async () => {
-    const out = await runWithRetry(() => Promise.resolve('ok'), { enabled: true, maxRetries: 2, backoffMs: [0, 0] });
+    const out = await runWithRetry(() => Promise.resolve('ok'), {
+      enabled: true,
+      maxRetries: 2,
+      backoffMs: [0, 0],
+    });
     expect(out).toMatchObject({ result: 'ok', wasRetried: false, retryCount: 0 });
   });
 
   it('retries on throw up to maxRetries then returns lastError', async () => {
     let calls = 0;
     const out = await runWithRetry(
-      () => { calls++; return Promise.reject(new Error(`fail ${calls}`)); },
+      () => {
+        calls++;
+        return Promise.reject(new Error(`fail ${calls}`));
+      },
       { enabled: true, maxRetries: 2, backoffMs: [0, 0] },
     );
     expect(calls).toBe(3); // 1 initial + 2 retries
@@ -112,8 +122,16 @@ describe('runWithRetry', () => {
     let calls = 0;
     class AbortLike extends Error {}
     const out = await runWithRetry(
-      () => { calls++; return Promise.reject(new AbortLike()); },
-      { enabled: true, maxRetries: 3, shouldNotRetry: (e) => e instanceof AbortLike, backoffMs: [0, 0] },
+      () => {
+        calls++;
+        return Promise.reject(new AbortLike());
+      },
+      {
+        enabled: true,
+        maxRetries: 3,
+        shouldNotRetry: (e) => e instanceof AbortLike,
+        backoffMs: [0, 0],
+      },
     );
     expect(calls).toBe(1);
     expect(out.wasRetried).toBe(false);
@@ -121,7 +139,13 @@ describe('runWithRetry', () => {
 
   it('runs once when disabled', async () => {
     let calls = 0;
-    await runWithRetry(() => { calls++; return Promise.reject(new Error('x')); }, { enabled: false, maxRetries: 5 });
+    await runWithRetry(
+      () => {
+        calls++;
+        return Promise.reject(new Error('x'));
+      },
+      { enabled: false, maxRetries: 5 },
+    );
     expect(calls).toBe(1);
   });
 });
@@ -132,7 +156,10 @@ describe('scheduleUnits', () => {
     await scheduleUnits<number>({
       units: [1, 2, 3, 4],
       mode: 'sequential',
-      runUnit: (u) => { seen.push(u); return Promise.resolve({ shouldStop: u === 2 }); },
+      runUnit: (u) => {
+        seen.push(u);
+        return Promise.resolve({ shouldStop: u === 2 });
+      },
     });
     expect(seen).toEqual([1, 2]); // stopped after unit 2
   });
@@ -141,12 +168,18 @@ describe('scheduleUnits', () => {
     let active = 0;
     let maxActive = 0;
     const runUnit = async (): Promise<{ shouldStop: boolean }> => {
-      active++; maxActive = Math.max(maxActive, active);
+      active++;
+      maxActive = Math.max(maxActive, active);
       await new Promise((r) => setTimeout(r, 5));
       active--;
       return { shouldStop: false };
     };
-    await scheduleUnits<number>({ units: [1, 2, 3, 4, 5, 6], mode: 'parallel', maxParallel: 2, runUnit });
+    await scheduleUnits<number>({
+      units: [1, 2, 3, 4, 5, 6],
+      mode: 'parallel',
+      maxParallel: 2,
+      runUnit,
+    });
     expect(maxActive).toBeLessThanOrEqual(2);
   });
 
@@ -157,7 +190,11 @@ describe('scheduleUnits', () => {
       units: [1, 2, 3],
       mode: 'sequential',
       shouldAbort: () => aborted,
-      runUnit: (u) => { seen.push(u); aborted = u === 1; return Promise.resolve({ shouldStop: false }); },
+      runUnit: (u) => {
+        seen.push(u);
+        aborted = u === 1;
+        return Promise.resolve({ shouldStop: false });
+      },
     });
     // Sequential checks the abort flag at the TOP of each iteration: unit 1 runs
     // and flips `aborted`, so unit 2's top-check breaks before it launches.
@@ -173,7 +210,10 @@ describe('scheduleUnits', () => {
       units: [1, 2, 3],
       mode: 'sequential',
       yieldBetweenUnits: true,
-      runUnit: (u) => { seen.push(u); return Promise.resolve({ shouldStop: false }); },
+      runUnit: (u) => {
+        seen.push(u);
+        return Promise.resolve({ shouldStop: false });
+      },
     });
     expect(seen).toEqual([1, 2, 3]);
   });
@@ -185,7 +225,10 @@ describe('scheduleUnits', () => {
       mode: 'parallel',
       maxParallel: 2,
       yieldBetweenUnits: true,
-      runUnit: (u) => { seen.push(u); return Promise.resolve({ shouldStop: false }); },
+      runUnit: (u) => {
+        seen.push(u);
+        return Promise.resolve({ shouldStop: false });
+      },
     });
     expect([...seen].sort((a, b) => a - b)).toEqual([1, 2, 3, 4]);
   });
@@ -199,9 +242,14 @@ describe('executePipeline (combinator)', () => {
       options: { mode: 'sequential', timeout: 30 },
       runOne: (u, signal) =>
         u === 2
-          ? new Promise<number>((_r, reject) => signal.addEventListener('abort', () => reject(new Error('to'))))
+          ? new Promise<number>((_r, reject) =>
+              signal.addEventListener('abort', () => reject(new Error('to'))),
+            )
           : Promise.resolve(u * 10),
-      onResult: (_u, _i, outcome) => { statuses.push(outcome.status); return { shouldStop: false }; },
+      onResult: (_u, _i, outcome) => {
+        statuses.push(outcome.status);
+        return { shouldStop: false };
+      },
     });
     expect(statuses).toEqual(['ok', 'timeout', 'ok']);
   });
@@ -212,7 +260,12 @@ describe('executePipeline (combinator)', () => {
     let aborted = false;
     await executePipeline<number, number>({
       units: [1, 2, 3, 4],
-      options: { mode: 'parallel', maxParallel: 2, timeout: 1000, retry: { enabled: true, maxRetries: 1 } },
+      options: {
+        mode: 'parallel',
+        maxParallel: 2,
+        timeout: 1000,
+        retry: { enabled: true, maxRetries: 1 },
+      },
       timeoutFor: (u) => {
         timeoutUnits.push(u);
         return 50;

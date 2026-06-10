@@ -20,7 +20,6 @@ import {
   currentRecipeRegistry,
 } from '../scope-registry.js';
 
-
 import type { Check } from '../check-types.js';
 
 let nextId = 0;

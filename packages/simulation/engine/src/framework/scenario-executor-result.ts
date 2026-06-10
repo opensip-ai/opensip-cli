@@ -10,33 +10,32 @@
  * every dispatch site.
  */
 
-
-import type { ChaosOutcome } from '../kinds/chaos/result.js'
-import type { LoadOutcome } from '../kinds/load/result.js'
-import type { Signal } from '@opensip-tools/core'
+import type { ChaosOutcome } from '../kinds/chaos/result.js';
+import type { LoadOutcome } from '../kinds/load/result.js';
+import type { Signal } from '@opensip-tools/core';
 
 /** Common envelope fields for every kind's result. */
 interface BaseScenarioExecutorResult {
   /** Scenario id this result was produced from (correlates with the registry). */
-  readonly scenarioId: string
+  readonly scenarioId: string;
   /** Top-level pass/fail. Each kind defines its own predicate for `passed`. */
-  readonly passed: boolean
+  readonly passed: boolean;
   /** Wall-clock duration the scenario ran for, in milliseconds. */
-  readonly durationMs: number
+  readonly durationMs: number;
   /** Signals emitted during execution (may be empty for kinds that don't emit). */
-  readonly signals: readonly Signal[]
+  readonly signals: readonly Signal[];
 }
 
 /** Load-kind result envelope. */
 export interface LoadScenarioExecutorResult extends BaseScenarioExecutorResult {
-  readonly kind: 'load'
-  readonly outcome: LoadOutcome
+  readonly kind: 'load';
+  readonly outcome: LoadOutcome;
 }
 
 /** Chaos-kind result envelope. */
 export interface ChaosScenarioExecutorResult extends BaseScenarioExecutorResult {
-  readonly kind: 'chaos'
-  readonly outcome: ChaosOutcome
+  readonly kind: 'chaos';
+  readonly outcome: ChaosOutcome;
 }
 
 /**
@@ -45,6 +44,4 @@ export interface ChaosScenarioExecutorResult extends BaseScenarioExecutorResult 
  * Use exhaustive `switch (result.kind)` to dispatch — TypeScript's narrowing
  * makes per-kind `outcome` access compile-time safe.
  */
-export type ScenarioExecutorResult =
-  | LoadScenarioExecutorResult
-  | ChaosScenarioExecutorResult
+export type ScenarioExecutorResult = LoadScenarioExecutorResult | ChaosScenarioExecutorResult;

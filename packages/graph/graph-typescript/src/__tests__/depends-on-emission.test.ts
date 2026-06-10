@@ -23,7 +23,6 @@ import { join } from 'node:path';
 import { ownerEdgeKey } from '@opensip-tools/graph';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-
 import { typescriptGraphAdapter } from '../index.js';
 
 import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
@@ -65,7 +64,20 @@ function findModuleInit(catalog: Catalog, filePath: string): FunctionOccurrence 
   return undefined;
 }
 
-async function runAdapter(): Promise<{ catalog: Catalog; dependenciesByOwner: ReadonlyMap<string, readonly { readonly to: readonly string[]; readonly specifier: string; readonly line: number; readonly column: number }[]> | undefined }> {
+async function runAdapter(): Promise<{
+  catalog: Catalog;
+  dependenciesByOwner:
+    | ReadonlyMap<
+        string,
+        readonly {
+          readonly to: readonly string[];
+          readonly specifier: string;
+          readonly line: number;
+          readonly column: number;
+        }[]
+      >
+    | undefined;
+}> {
   const discovery = typescriptGraphAdapter.discoverFiles({
     cwd: fixtureRoot,
   });
@@ -121,7 +133,9 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     expect(formatModuleInit, 'format module-init').toBeDefined();
     expect(dependenciesByOwner, 'dependenciesByOwner').toBeDefined();
 
-    const greetDeps = dependenciesByOwner!.get(ownerEdgeKey(greetModuleInit!.bodyHash, greetModuleInit!.filePath));
+    const greetDeps = dependenciesByOwner!.get(
+      ownerEdgeKey(greetModuleInit!.bodyHash, greetModuleInit!.filePath),
+    );
     expect(greetDeps, 'greet has dependency edges').toHaveLength(1);
     expect(greetDeps![0].specifier).toBe('./format.js');
     expect(greetDeps![0].to).toEqual([formatModuleInit!.bodyHash]);
@@ -138,7 +152,9 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     const greetModuleInit = findModuleInit(catalog, 'src/greet.ts');
     expect(greetModuleInit).toBeDefined();
 
-    const greetDeps = dependenciesByOwner!.get(ownerEdgeKey(greetModuleInit!.bodyHash, greetModuleInit!.filePath));
+    const greetDeps = dependenciesByOwner!.get(
+      ownerEdgeKey(greetModuleInit!.bodyHash, greetModuleInit!.filePath),
+    );
     expect(greetDeps).toHaveLength(1);
     expect(greetDeps![0].specifier).toBe('@opensip-tools/nonexistent-pkg');
     expect(greetDeps![0].to).toEqual([]);
@@ -162,7 +178,9 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     const mainModuleInit = findModuleInit(catalog, 'src/main.ts');
     expect(mainModuleInit).toBeDefined();
 
-    const deps = dependenciesByOwner!.get(ownerEdgeKey(mainModuleInit!.bodyHash, mainModuleInit!.filePath));
+    const deps = dependenciesByOwner!.get(
+      ownerEdgeKey(mainModuleInit!.bodyHash, mainModuleInit!.filePath),
+    );
     expect(deps).toHaveLength(3);
 
     const specifiers = deps!.map((d) => d.specifier).sort();
@@ -176,17 +194,16 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
   });
 
   it('produces no dependency edges for a file with no imports', async () => {
-    writeFile(
-      'src/standalone.ts',
-      `export function standalone(): number { return 42; }\n`,
-    );
+    writeFile('src/standalone.ts', `export function standalone(): number { return 42; }\n`);
 
     const { catalog, dependenciesByOwner } = await runAdapter();
     const standaloneModuleInit = findModuleInit(catalog, 'src/standalone.ts');
     expect(standaloneModuleInit).toBeDefined();
 
     // No dependency edges → owner not in the map at all.
-    const deps = dependenciesByOwner?.get(ownerEdgeKey(standaloneModuleInit!.bodyHash, standaloneModuleInit!.filePath));
+    const deps = dependenciesByOwner?.get(
+      ownerEdgeKey(standaloneModuleInit!.bodyHash, standaloneModuleInit!.filePath),
+    );
     expect(deps).toBeUndefined();
   });
 

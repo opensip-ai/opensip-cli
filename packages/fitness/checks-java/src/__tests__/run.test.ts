@@ -37,19 +37,22 @@ let target: string;
 beforeAll(() => {
   cwd = mkdtempSync(join(tmpdir(), 'opensip-checks-java-cov-'));
   target = join(cwd, 'Demo.java');
-  writeFileSync(target, [
-    'public class Demo {',
-    '  public static void main(String[] args) {',
-    '    try {',
-    '      doWork();',
-    '    } catch (Exception e) {',
-    '      e.printStackTrace();',
-    '    }',
-    '  }',
-    '  static void doWork() {}',
-    '}',
-    '',
-  ].join('\n'));
+  writeFileSync(
+    target,
+    [
+      'public class Demo {',
+      '  public static void main(String[] args) {',
+      '    try {',
+      '      doWork();',
+      '    } catch (Exception e) {',
+      '      e.printStackTrace();',
+      '    }',
+      '  }',
+      '  static void doWork() {}',
+      '}',
+      '',
+    ].join('\n'),
+  );
 });
 
 afterAll(() => {

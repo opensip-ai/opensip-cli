@@ -38,34 +38,34 @@
  */
 
 export interface WelcomeOptions {
-  readonly version: string
-  readonly write?: (s: string) => void
+  readonly version: string;
+  readonly write?: (s: string) => void;
 }
 
-const ANSI_BOLD = '\u001B[1m'
-const ANSI_DIM = '\u001B[2m'
-const ANSI_CYAN = '\u001B[36m'
-const ANSI_RESET = '\u001B[0m'
+const ANSI_BOLD = '\u001B[1m';
+const ANSI_DIM = '\u001B[2m';
+const ANSI_CYAN = '\u001B[36m';
+const ANSI_RESET = '\u001B[0m';
 
 /** True when stdout is a terminal and colors are safe to emit. */
 function colorsEnabled(): boolean {
-  if (process.env.NO_COLOR) return false
-  if (process.env.FORCE_COLOR) return true
-  return Boolean(process.stdout.isTTY)
+  if (process.env.NO_COLOR) return false;
+  if (process.env.FORCE_COLOR) return true;
+  return Boolean(process.stdout.isTTY);
 }
 
 function color(enabled: boolean, code: string, text: string): string {
-  return enabled ? `${code}${text}${ANSI_RESET}` : text
+  return enabled ? `${code}${text}${ANSI_RESET}` : text;
 }
 
 /**
  * Render the welcome message as a single string. Exported for testing.
  */
 export function buildWelcome(opts: WelcomeOptions): string {
-  const c = colorsEnabled()
-  const bold = (s: string): string => color(c, ANSI_BOLD, s)
-  const dim = (s: string): string => color(c, ANSI_DIM, s)
-  const accent = (s: string): string => color(c, ANSI_CYAN, s)
+  const c = colorsEnabled();
+  const bold = (s: string): string => color(c, ANSI_BOLD, s);
+  const dim = (s: string): string => color(c, ANSI_DIM, s);
+  const accent = (s: string): string => color(c, ANSI_CYAN, s);
 
   return [
     '',
@@ -86,7 +86,7 @@ export function buildWelcome(opts: WelcomeOptions): string {
     `${dim('Full reference: opensip-tools --help')}`,
     `${dim('Docs:           https://github.com/opensip-ai/opensip-tools')}`,
     '',
-  ].join('\n')
+  ].join('\n');
 }
 
 /**
@@ -95,6 +95,6 @@ export function buildWelcome(opts: WelcomeOptions): string {
  * process.stdout.
  */
 export function printWelcome(opts: WelcomeOptions): void {
-  const write = opts.write ?? ((s: string) => process.stdout.write(s))
-  write(buildWelcome(opts))
+  const write = opts.write ?? ((s: string) => process.stdout.write(s));
+  write(buildWelcome(opts));
 }

@@ -9,7 +9,6 @@ import { PathMatcher } from '../path-matcher.js';
 let testDir: string;
 
 beforeEach(() => {
-   
   testDir = mkdtempSync(join(tmpdir(), 'opensip-pm-'));
   mkdirSync(join(testDir, 'src'), { recursive: true });
   mkdirSync(join(testDir, 'src', '__tests__'), { recursive: true });

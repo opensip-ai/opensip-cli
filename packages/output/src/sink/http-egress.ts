@@ -127,7 +127,12 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
         if (res.ok) {
           chunkResults[ci] = true;
           acceptedChunks++;
-          logger.info({ evt: `${evtPrefix}.chunk`, module: MODULE_TAG, chunk: `${ci + 1}/${chunks.length}`, status: res.status });
+          logger.info({
+            evt: `${evtPrefix}.chunk`,
+            module: MODULE_TAG,
+            chunk: `${ci + 1}/${chunks.length}`,
+            status: res.status,
+          });
           continue outer;
         }
 
@@ -135,16 +140,26 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
 
         if (res.status === 401 || res.status === 403) {
           authRejected = true;
-          logger.info({ evt: `${evtPrefix}.auth-rejected`, module: MODULE_TAG, status: res.status });
+          logger.info({
+            evt: `${evtPrefix}.auth-rejected`,
+            module: MODULE_TAG,
+            status: res.status,
+          });
           break outer; // permanent auth failure — stop everything
         }
         if (!isTransient(res.status)) {
-          logger.info({ evt: `${evtPrefix}.abort`, module: MODULE_TAG, status: res.status, remaining: chunks.length - ci - 1 });
+          logger.info({
+            evt: `${evtPrefix}.abort`,
+            module: MODULE_TAG,
+            status: res.status,
+            remaining: chunks.length - ci - 1,
+          });
           break outer; // other 4xx — retrying won't help; abort remaining
         }
         if (res.status === 429) {
           throttled = true;
-          if (policy.honorRetryAfter) retryAfterMs = parseRetryAfter(res.headers.get('Retry-After'), now());
+          if (policy.honorRetryAfter)
+            retryAfterMs = parseRetryAfter(res.headers.get('Retry-After'), now());
         } else if (res.status === 503 && policy.honorRetryAfter) {
           retryAfterMs = parseRetryAfter(res.headers.get('Retry-After'), now());
         }
@@ -155,7 +170,12 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
 
       // Transient: retry if attempts remain and the deadline allows.
       if (attempt >= policy.maxAttempts) {
-        logger.info({ evt: `${evtPrefix}.error`, module: MODULE_TAG, chunk: `${ci + 1}/${chunks.length}`, attempts: attempt });
+        logger.info({
+          evt: `${evtPrefix}.error`,
+          module: MODULE_TAG,
+          chunk: `${ci + 1}/${chunks.length}`,
+          attempts: attempt,
+        });
         continue outer; // give up on this chunk, try the next
       }
       const wanted = retryAfterMs ?? backoffMs(attempt);
@@ -164,7 +184,14 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
         deadlineExceeded = true;
         break outer;
       }
-      logger.info({ evt: throttled ? `${evtPrefix}.throttled` : `${evtPrefix}.retry`, module: MODULE_TAG, chunk: `${ci + 1}/${chunks.length}`, attempt, delayMs: delay, retryAfterMs });
+      logger.info({
+        evt: throttled ? `${evtPrefix}.throttled` : `${evtPrefix}.retry`,
+        module: MODULE_TAG,
+        chunk: `${ci + 1}/${chunks.length}`,
+        attempt,
+        delayMs: delay,
+        retryAfterMs,
+      });
       await sleep(delay);
     }
   }
@@ -173,5 +200,13 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
   if (acceptedChunks === chunks.length) outcome = 'ok';
   else if (acceptedChunks === 0) outcome = 'failed';
 
-  return { acceptedChunks, chunkResults, outcome, authRejected, throttled, deadlineExceeded, errors };
+  return {
+    acceptedChunks,
+    chunkResults,
+    outcome,
+    authRejected,
+    throttled,
+    deadlineExceeded,
+    errors,
+  };
 }

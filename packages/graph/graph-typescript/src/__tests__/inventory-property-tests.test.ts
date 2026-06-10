@@ -67,7 +67,10 @@ function buildCatalog(rootDir: string, files: Readonly<Record<string, string>>):
   }).catalog;
 }
 
-async function buildCatalogWithEdges(rootDir: string, files: Readonly<Record<string, string>>): Promise<Catalog> {
+async function buildCatalogWithEdges(
+  rootDir: string,
+  files: Readonly<Record<string, string>>,
+): Promise<Catalog> {
   rmSync(rootDir, { recursive: true, force: true });
   mkdirSync(rootDir, { recursive: true });
   writeFileSync(join(rootDir, 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
@@ -317,7 +320,9 @@ describe('Property 5 — synthesized arrow simpleName is deterministic', () => {
         // Arrow callback at line 2 col 23 (the `(` of `(x => ...)`).
         'a.ts': `const arr = [1, 2, 3];\nexport const doubled = arr.map(x => x * 2);\n`,
       });
-      const arrows = allOccurrences(cat).filter((o) => o.kind === 'arrow' && o.filePath === 'a.ts' && o.simpleName.startsWith('<arrow:'));
+      const arrows = allOccurrences(cat).filter(
+        (o) => o.kind === 'arrow' && o.filePath === 'a.ts' && o.simpleName.startsWith('<arrow:'),
+      );
       expect(arrows.length).toBeGreaterThanOrEqual(1);
       const a = arrows[0];
       expect(a.simpleName).toBe(`<arrow:a.ts:${String(a.line)}:${String(a.column)}>`);
@@ -333,8 +338,12 @@ describe('Property 5 — synthesized arrow simpleName is deterministic', () => {
       const src = `export const doubled = [1, 2, 3].map(x => x * 2);\n`;
       const catA = buildCatalog(dirA, { 'a.ts': src });
       const catB = buildCatalog(dirB, { 'a.ts': src });
-      const a = allOccurrences(catA).find((o) => o.kind === 'arrow' && o.simpleName.startsWith('<arrow:'));
-      const b = allOccurrences(catB).find((o) => o.kind === 'arrow' && o.simpleName.startsWith('<arrow:'));
+      const a = allOccurrences(catA).find(
+        (o) => o.kind === 'arrow' && o.simpleName.startsWith('<arrow:'),
+      );
+      const b = allOccurrences(catB).find(
+        (o) => o.kind === 'arrow' && o.simpleName.startsWith('<arrow:'),
+      );
       expect(a).toBeDefined();
       expect(b).toBeDefined();
       expect(a!.simpleName).toBe(b!.simpleName);
@@ -350,8 +359,12 @@ describe('Property 5 — synthesized arrow simpleName is deterministic', () => {
     try {
       const catA = buildCatalog(dirA, { 'top.ts': `console.log('hi');\n` });
       const catB = buildCatalog(dirB, { 'top.ts': `console.log('hi');\n` });
-      const a = allOccurrences(catA).find((o) => o.kind === 'module-init' && o.filePath === 'top.ts');
-      const b = allOccurrences(catB).find((o) => o.kind === 'module-init' && o.filePath === 'top.ts');
+      const a = allOccurrences(catA).find(
+        (o) => o.kind === 'module-init' && o.filePath === 'top.ts',
+      );
+      const b = allOccurrences(catB).find(
+        (o) => o.kind === 'module-init' && o.filePath === 'top.ts',
+      );
       expect(a!.simpleName).toBe(b!.simpleName);
       expect(a!.simpleName).toBe('<module-init:top.ts>');
     } finally {
@@ -438,10 +451,19 @@ describe('Property 7 — simpleName and qualifiedName are mandatory, non-empty f
       let count = 0;
       for (const o of allOccurrences(catalog)) {
         count++;
-        expect(o.simpleName, `occurrence at ${o.filePath}:${String(o.line)} kind=${o.kind} has empty simpleName`).not.toBe('');
-        expect(o.simpleName, `occurrence at ${o.filePath}:${String(o.line)} kind=${o.kind} has nullish simpleName`).not.toBeNull();
+        expect(
+          o.simpleName,
+          `occurrence at ${o.filePath}:${String(o.line)} kind=${o.kind} has empty simpleName`,
+        ).not.toBe('');
+        expect(
+          o.simpleName,
+          `occurrence at ${o.filePath}:${String(o.line)} kind=${o.kind} has nullish simpleName`,
+        ).not.toBeNull();
         expect(typeof o.simpleName).toBe('string');
-        expect(o.qualifiedName, `occurrence at ${o.filePath}:${String(o.line)} kind=${o.kind} has empty qualifiedName`).not.toBe('');
+        expect(
+          o.qualifiedName,
+          `occurrence at ${o.filePath}:${String(o.line)} kind=${o.kind} has empty qualifiedName`,
+        ).not.toBe('');
         expect(typeof o.qualifiedName).toBe('string');
       }
       expect(count).toBeGreaterThan(0);
@@ -505,8 +527,7 @@ describe('Property 8 — inTestFile flag is correct for test path patterns', () 
     const dir = mkdtempSync(join(tmpdir(), 'graph-prop8b2-'));
     try {
       const catalog = buildCatalog(dir, {
-        'src/orchestrate/__fixtures__/multi-pkg/foundation/canonicalize.ts':
-          `export function canonicalize() { return 1; }\n`,
+        'src/orchestrate/__fixtures__/multi-pkg/foundation/canonicalize.ts': `export function canonicalize() { return 1; }\n`,
       });
       const occ = allOccurrences(catalog).find((o) => o.simpleName === 'canonicalize');
       expect(occ).toBeDefined();

@@ -136,10 +136,10 @@ export function warnAboutPhantomRuntimes(project: ProjectContext, jsonOutput: bo
   for (const phantom of phantoms) {
     process.stderr.write(
       `ℹ Detected an orphaned opensip-tools/ at:\n` +
-      `    ${phantom}\n` +
-      `  Left over from running opensip-tools from this subdirectory\n` +
-      `  before project-root discovery was added. Safe to delete with:\n` +
-      `    rm -rf ${phantom}\n\n`
+        `    ${phantom}\n` +
+        `  Left over from running opensip-tools from this subdirectory\n` +
+        `  before project-root discovery was added. Safe to delete with:\n` +
+        `    rm -rf ${phantom}\n\n`,
     );
   }
 }

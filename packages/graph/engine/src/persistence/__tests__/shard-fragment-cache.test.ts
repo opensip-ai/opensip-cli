@@ -5,7 +5,6 @@
  * accordingly — the incremental-parse fix's decision point.
  */
 
-
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

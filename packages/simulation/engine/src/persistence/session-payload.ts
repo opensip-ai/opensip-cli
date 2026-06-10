@@ -35,9 +35,7 @@ export interface SimulationSessionPayload {
   readonly checks: readonly SimulationSessionCheck[];
 }
 
-export function buildSimulationSessionPayload(
-  envelope: SignalEnvelope,
-): SimulationSessionPayload {
+export function buildSimulationSessionPayload(envelope: SignalEnvelope): SimulationSessionPayload {
   const bySource = new Map<string, Signal[]>();
   for (const signal of envelope.signals) {
     const bucket = bySource.get(signal.source);

@@ -5,36 +5,35 @@
  * These are often placeholders that should be replaced with DynamoDB implementations.
  */
 
-
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Patterns that indicate intentional in-memory usage
  */
-const ALLOWED_PATTERNS = [/cache/i, /Cache/, /InMemory/, /Mock/, /Stub/, /Fake/, /Test/]
+const ALLOWED_PATTERNS = [/cache/i, /Cache/, /InMemory/, /Mock/, /Stub/, /Fake/, /Test/];
 
 /**
  * Repository class name patterns
  */
-const REPOSITORY_PATTERNS = [/Repository$/, /Store$/, /Storage$/, /DAO$/, /DataAccess$/]
+const REPOSITORY_PATTERNS = [/Repository$/, /Store$/, /Storage$/, /DAO$/, /DataAccess$/];
 
 /**
  * Quick filter keywords
  */
-const QUICK_FILTER_STORAGE = ['new Map', 'new Set', '= []', '= {}']
+const QUICK_FILTER_STORAGE = ['new Map', 'new Set', '= []', '= {}'];
 
 /**
  * Repeated suggestion message for in-memory storage violations
  */
 const IN_MEMORY_STORAGE_SUGGESTION =
-  'Replace with DynamoDB/PostgreSQL persistent storage implementation. In-memory storage is lost on restart and does not scale.'
+  'Replace with DynamoDB/PostgreSQL persistent storage implementation. In-memory storage is lost on restart and does not scale.';
 
 interface StorageViolationInfo {
-  type: string
-  storageType: string
-  match: string
+  type: string;
+  storageType: string;
+  match: string;
 }
 
 /**
@@ -44,24 +43,24 @@ interface StorageViolationInfo {
  */
 function detectStorageType(initText: string): StorageViolationInfo | null {
   if (initText.includes('new Map')) {
-    return { type: 'map-storage', storageType: 'Map', match: 'new Map' }
+    return { type: 'map-storage', storageType: 'Map', match: 'new Map' };
   }
   if (initText.includes('new Set')) {
-    return { type: 'set-storage', storageType: 'Set', match: 'new Set' }
+    return { type: 'set-storage', storageType: 'Set', match: 'new Set' };
   }
   if (initText === '[]' || initText.startsWith('[')) {
-    return { type: 'array-storage', storageType: 'Array', match: '[]' }
+    return { type: 'array-storage', storageType: 'Array', match: '[]' };
   }
   if (initText === '{}' || initText.startsWith('{')) {
-    return { type: 'object-storage', storageType: 'Object', match: '{}' }
+    return { type: 'object-storage', storageType: 'Object', match: '{}' };
   }
-  return null
+  return null;
 }
 
 interface CheckPropertyContext {
-  member: ts.PropertyDeclaration
-  className: string
-  sourceFile: ts.SourceFile
+  member: ts.PropertyDeclaration;
+  className: string;
+  sourceFile: ts.SourceFile;
 }
 
 /**
@@ -70,22 +69,22 @@ interface CheckPropertyContext {
  * @returns CheckViolation if found, null otherwise
  */
 function checkPropertyForStorage(ctx: CheckPropertyContext): CheckViolation | null {
-  const { member, className, sourceFile } = ctx
-  const initializer = member.initializer
+  const { member, className, sourceFile } = ctx;
+  const initializer = member.initializer;
 
   if (!initializer) {
-    return null
+    return null;
   }
 
-  const initText = initializer.getText(sourceFile)
-  const storageInfo = detectStorageType(initText)
+  const initText = initializer.getText(sourceFile);
+  const storageInfo = detectStorageType(initText);
 
   if (!storageInfo) {
-    return null
+    return null;
   }
 
-  const { line } = sourceFile.getLineAndCharacterOfPosition(member.getStart())
-  const lineNum = line + 1
+  const { line } = sourceFile.getLineAndCharacterOfPosition(member.getStart());
+  const lineNum = line + 1;
 
   return {
     line: lineNum,
@@ -95,7 +94,7 @@ function checkPropertyForStorage(ctx: CheckPropertyContext): CheckViolation | nu
     type: storageInfo.type,
     suggestion: IN_MEMORY_STORAGE_SUGGESTION,
     match: storageInfo.match,
-  }
+  };
 }
 
 /**
@@ -105,34 +104,34 @@ function checkPropertyForStorage(ctx: CheckPropertyContext): CheckViolation | nu
  * @returns Array of violations found
  */
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Quick filter: must have repository pattern AND in-memory storage pattern
-  const hasRepository = REPOSITORY_PATTERNS.some((p) => p.test(content))
-  const hasStorage = QUICK_FILTER_STORAGE.some((kw) => content.includes(kw))
+  const hasRepository = REPOSITORY_PATTERNS.some((p) => p.test(content));
+  const hasStorage = QUICK_FILTER_STORAGE.some((kw) => content.includes(kw));
   if (!hasRepository || !hasStorage) {
-    return violations
+    return violations;
   }
 
   // Check if file has allowed patterns
   if (ALLOWED_PATTERNS.some((pattern) => pattern.test(content))) {
-    return violations
+    return violations;
   }
 
   try {
-    const sourceFile = getSharedSourceFile(filePath, content)
+    const sourceFile = getSharedSourceFile(filePath, content);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
     const visit = (node: ts.Node): void => {
       if (ts.isClassDeclaration(node) && node.name) {
-        const className = node.name.getText(sourceFile)
+        const className = node.name.getText(sourceFile);
 
         // Check if this is a repository class
-        const isRepository = REPOSITORY_PATTERNS.some((p) => p.test(className))
+        const isRepository = REPOSITORY_PATTERNS.some((p) => p.test(className));
         if (!isRepository) {
-          ts.forEachChild(node, visit)
-          return
+          ts.forEachChild(node, visit);
+          return;
         }
 
         // Check class properties for in-memory storage
@@ -142,23 +141,23 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
               member,
               className,
               sourceFile,
-            })
+            });
             if (violation) {
-              violations.push(violation)
+              violations.push(violation);
             }
           }
-        })
+        });
       }
-      ts.forEachChild(node, visit)
-    }
+      ts.forEachChild(node, visit);
+    };
 
-    visit(sourceFile)
-  /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+    visit(sourceFile);
+    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
   } catch {
     // @swallow-ok Skip files that fail to parse
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -190,4 +189,4 @@ export const inMemoryRepositoryDetection = defineCheck({
   fileTypes: ['ts'],
 
   analyze: analyzeFile,
-})
+});

@@ -29,7 +29,9 @@ describe('lang-python cacheKey — branches', () => {
   });
 
   it('returns py-unknown-no-config when configPathAbs is empty', () => {
-    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe('py-unknown-no-config');
+    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe(
+      'py-unknown-no-config',
+    );
   });
 
   it('returns py-unknown-missing:<path> when the file does not exist', () => {
@@ -41,11 +43,7 @@ describe('lang-python cacheKey — branches', () => {
 
   it('extracts requires-python and includes it in the key', () => {
     const file = join(dir, 'pyproject.toml');
-    writeFileSync(
-      file,
-      '[project]\nname = "p"\nrequires-python = ">=3.10,<4.0"\n',
-      'utf8',
-    );
+    writeFileSync(file, '[project]\nname = "p"\nrequires-python = ">=3.10,<4.0"\n', 'utf8');
     const out = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     // requires-python should appear (sanitized) in the key.
     expect(out.startsWith('py-')).toBe(true);

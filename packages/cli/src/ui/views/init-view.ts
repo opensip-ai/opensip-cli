@@ -20,10 +20,16 @@ function relativize(p: string, cwd: string): string {
 
 /** Render a pre-formatted multi-line message (verbatim) as one line node per line. */
 function verbatim(message: string): ViewNode {
-  return group(message.split('\n').map((l) => line([{ text: l }])), 2);
+  return group(
+    message.split('\n').map((l) => line([{ text: l }])),
+    2,
+  );
 }
 
-function partialStateHeadline(state: 'partial-config-only' | 'partial-dir-only' | 'fully-initialized', cfg: string): string {
+function partialStateHeadline(
+  state: 'partial-config-only' | 'partial-dir-only' | 'fully-initialized',
+  cfg: string,
+): string {
   if (state === 'fully-initialized') return 'Already initialized';
   if (state === 'partial-config-only') return `${cfg} present but opensip-tools/ missing`;
   return `opensip-tools/ present but ${cfg} missing`;
@@ -31,7 +37,8 @@ function partialStateHeadline(state: 'partial-config-only' | 'partial-dir-only' 
 
 function createdHeadline(state: InitResult['state']): string {
   if (state === 'fully-initialized') return 'Re-scaffolded';
-  if (state === 'partial-config-only' || state === 'partial-dir-only') return 'Recovered partial state';
+  if (state === 'partial-config-only' || state === 'partial-dir-only')
+    return 'Recovered partial state';
   return 'Scaffolded';
 }
 
@@ -47,7 +54,11 @@ function preExistingLines(files: readonly PreExistingFile[], cwd: string): ViewN
 function ambiguousView(message: string): ViewNode {
   return group(
     [
-      line([{ text: '✗', tone: 'error' }, { text: ' ' }, { text: 'Cannot scaffold — language ambiguous', bold: true }]),
+      line([
+        { text: '✗', tone: 'error' },
+        { text: ' ' },
+        { text: 'Cannot scaffold — language ambiguous', bold: true },
+      ]),
       { kind: 'spacer' },
       line([{ text: `  ${message}` }]),
     ],
@@ -55,7 +66,11 @@ function ambiguousView(message: string): ViewNode {
   );
 }
 
-function partialStateView(err: NonNullable<InitResult['partialStateError']>, cwd: string, configFilename: string): ViewNode {
+function partialStateView(
+  err: NonNullable<InitResult['partialStateError']>,
+  cwd: string,
+  configFilename: string,
+): ViewNode {
   const children: ViewNode[] = [
     line([
       { text: '⚠', tone: 'warning' },
@@ -68,22 +83,33 @@ function partialStateView(err: NonNullable<InitResult['partialStateError']>, cwd
   if (err.preExistingFiles.length > 0) {
     children.push(
       { kind: 'spacer' },
-      line([{ text: `  Found ${err.preExistingFiles.length} file(s) under opensip-tools/:`, dim: true }]),
+      line([
+        { text: `  Found ${err.preExistingFiles.length} file(s) under opensip-tools/:`, dim: true },
+      ]),
       ...preExistingLines(err.preExistingFiles, cwd),
     );
   }
   children.push(
     { kind: 'spacer' },
     line([{ text: '  Choose one:' }]),
-    line([{ text: '    ' }, { text: 'opensip-tools init --keep', tone: 'brand' }, { text: '    Re-scaffold examples; preserve custom files.', dim: true }]),
-    line([{ text: '    ' }, { text: 'opensip-tools init --remove', tone: 'brand' }, { text: '  Delete opensip-tools/ and scaffold fresh.', dim: true }]),
+    line([
+      { text: '    ' },
+      { text: 'opensip-tools init --keep', tone: 'brand' },
+      { text: '    Re-scaffold examples; preserve custom files.', dim: true },
+    ]),
+    line([
+      { text: '    ' },
+      { text: 'opensip-tools init --remove', tone: 'brand' },
+      { text: '  Delete opensip-tools/ and scaffold fresh.', dim: true },
+    ]),
   );
   return group(children, 2);
 }
 
 function createdView(result: InitResult): ViewNode {
   const { cwd } = result;
-  const langDisplay = result.languages && result.languages.length > 0 ? result.languages.join(', ') : 'unknown';
+  const langDisplay =
+    result.languages && result.languages.length > 0 ? result.languages.join(', ') : 'unknown';
   const children: ViewNode[] = [
     line([
       { text: '✓', tone: 'success' },
@@ -94,7 +120,10 @@ function createdView(result: InitResult): ViewNode {
     ]),
   ];
   if (result.createdFiles && result.createdFiles.length > 0) {
-    children.push({ kind: 'spacer' }, ...result.createdFiles.map((f) => line([{ text: `    ${relativize(f, cwd)}`, dim: true }])));
+    children.push(
+      { kind: 'spacer' },
+      ...result.createdFiles.map((f) => line([{ text: `    ${relativize(f, cwd)}`, dim: true }])),
+    );
   }
   if (result.gitignoreUpdated === true) {
     children.push(line([{ text: '    .gitignore (added opensip-tools/.runtime/)', dim: true }]));
@@ -116,12 +145,21 @@ function createdView(result: InitResult): ViewNode {
 }
 
 export function viewInit(result: InitResult): ViewNode {
-  if (result.insideExistingProject !== undefined) return verbatim(result.insideExistingProject.message);
-  if (result.ambiguousLanguageError !== undefined) return ambiguousView(result.ambiguousLanguageError.message);
-  if (result.partialStateError !== undefined) return partialStateView(result.partialStateError, result.cwd, result.configFilename);
+  if (result.insideExistingProject !== undefined)
+    return verbatim(result.insideExistingProject.message);
+  if (result.ambiguousLanguageError !== undefined)
+    return ambiguousView(result.ambiguousLanguageError.message);
+  if (result.partialStateError !== undefined)
+    return partialStateView(result.partialStateError, result.cwd, result.configFilename);
   if (result.created) return createdView(result);
   return group(
-    [line([{ text: '✗', tone: 'error' }, { text: ` Failed to scaffold ${result.configFilename} at ` }, { text: result.path, dim: true }])],
+    [
+      line([
+        { text: '✗', tone: 'error' },
+        { text: ` Failed to scaffold ${result.configFilename} at ` },
+        { text: result.path, dim: true },
+      ]),
+    ],
     2,
   );
 }

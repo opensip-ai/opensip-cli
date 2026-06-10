@@ -6,8 +6,8 @@
  * @fileoverview Detect secrets exposed through env vars in logs/errors
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Creates a pre-compiled RegExp for pattern matching.
@@ -19,7 +19,7 @@ import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fit
  */
 function createPattern(pattern: string, flags?: string): RegExp {
   // @fitness-ignore-next-line semgrep-scan -- non-literal RegExp is intentional; patterns are hardcoded string constants for code analysis, not user input
-  return new RegExp(pattern, flags)
+  return new RegExp(pattern, flags);
 }
 
 // Patterns that indicate potential secret exposure
@@ -75,7 +75,7 @@ const EXPOSURE_PATTERNS = [
       'Do not interpolate secret values into strings that may be logged or displayed. Use the value directly for authentication without exposing it.',
     severity: 'warning' as const,
   },
-]
+];
 
 /**
  * Check: security/env-secret-exposure
@@ -108,28 +108,28 @@ export const envSecretExposure = defineCheck({
   analyze(content: string, filePath: string): CheckViolation[] {
     // Test fixtures intentionally spread/serialize process.env to verify
     // detection logic — skip tests to avoid noise.
-    if (isTestFile(filePath)) return []
+    if (isTestFile(filePath)) return [];
 
     logger.debug({
       evt: 'fitness.checks.env_secret_exposure.analyze',
       msg: 'Analyzing file for environment secret exposure',
-    })
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    });
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (const [lineNum, line_] of lines.entries()) {
-      const line = line_ ?? ''
+      const line = line_ ?? '';
 
       // Skip comments
-      const trimmed = line.trim()
+      const trimmed = line.trim();
       if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
-        continue
+        continue;
       }
 
       for (const pattern of EXPOSURE_PATTERNS) {
         // Reset regex state
-        pattern.regex.lastIndex = 0
-        const match = pattern.regex.exec(line)
+        pattern.regex.lastIndex = 0;
+        const match = pattern.regex.exec(line);
         if (match) {
           violations.push({
             line: lineNum + 1,
@@ -139,11 +139,11 @@ export const envSecretExposure = defineCheck({
             suggestion: pattern.suggestion,
             match: match[0],
             filePath,
-          })
+          });
         }
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

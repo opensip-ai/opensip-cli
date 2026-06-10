@@ -9,7 +9,13 @@
  * banner and the `ℹ Project:` line.
  */
 
-import { Banner, UpdateHint, normalizeBannerSize, ProjectHeader, renderToInk } from '@opensip-tools/cli-ui';
+import {
+  Banner,
+  UpdateHint,
+  normalizeBannerSize,
+  ProjectHeader,
+  renderToInk,
+} from '@opensip-tools/cli-ui';
 import { Box } from 'ink';
 import React from 'react';
 

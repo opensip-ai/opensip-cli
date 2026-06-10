@@ -33,7 +33,10 @@ export interface CapabilityPreferences {
 }
 
 /** Read a key as a `string[]`, filtering non-strings; `undefined` when the key is not an array. */
-function stringArrayAt(record: Record<string, unknown>, key: string | undefined): readonly string[] | undefined {
+function stringArrayAt(
+  record: Record<string, unknown>,
+  key: string | undefined,
+): readonly string[] | undefined {
   if (key === undefined) return undefined;
   const value = record[key];
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : undefined;
@@ -80,5 +83,9 @@ function resolveNamePatternScopes(
 ): readonly string[] | undefined {
   if (descriptor.discovery.mode !== 'name-pattern') return undefined;
   const [primary = '@opensip-tools', ...restDefaults] = descriptor.discovery.defaultScopes;
-  return resolveScopes(primary, [...restDefaults, ...customerScopes], 'plugin.capability.invalid_scope');
+  return resolveScopes(
+    primary,
+    [...restDefaults, ...customerScopes],
+    'plugin.capability.invalid_scope',
+  );
 }

@@ -43,10 +43,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h02",
-              "h03"
-            ],
+            "to": ["h02", "h03"],
             "line": 1,
             "column": 0,
             "resolution": "method-dispatch",
@@ -75,9 +72,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h04"
-            ],
+            "to": ["h04"],
             "line": 1,
             "column": 0,
             "resolution": "jsx",
@@ -106,9 +101,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h04"
-            ],
+            "to": ["h04"],
             "line": 1,
             "column": 0,
             "resolution": "constructor",
@@ -137,10 +130,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h00",
-              "hZZ_external"
-            ],
+            "to": ["h00", "hZZ_external"],
             "line": 1,
             "column": 0,
             "resolution": "unknown",
@@ -169,9 +159,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h06"
-            ],
+            "to": ["h06"],
             "line": 1,
             "column": 0,
             "resolution": "dynamic-string",
@@ -200,9 +188,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h07"
-            ],
+            "to": ["h07"],
             "line": 1,
             "column": 0,
             "resolution": "syntactic",
@@ -231,9 +217,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h05"
-            ],
+            "to": ["h05"],
             "line": 1,
             "column": 0,
             "resolution": "static",
@@ -262,9 +246,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h01"
-            ],
+            "to": ["h01"],
             "line": 1,
             "column": 0,
             "resolution": "method-dispatch",
@@ -293,9 +275,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h01"
-            ],
+            "to": ["h01"],
             "line": 1,
             "column": 0,
             "resolution": "jsx",
@@ -324,9 +304,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h00"
-            ],
+            "to": ["h00"],
             "line": 1,
             "column": 0,
             "resolution": "constructor",
@@ -355,9 +333,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h00"
-            ],
+            "to": ["h00"],
             "line": 1,
             "column": 0,
             "resolution": "unknown",
@@ -386,9 +362,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h00"
-            ],
+            "to": ["h00"],
             "line": 1,
             "column": 0,
             "resolution": "dynamic-string",
@@ -417,9 +391,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h00"
-            ],
+            "to": ["h00"],
             "line": 1,
             "column": 0,
             "resolution": "syntactic",
@@ -448,9 +420,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h00"
-            ],
+            "to": ["h00"],
             "line": 1,
             "column": 0,
             "resolution": "static",
@@ -479,9 +449,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h00"
-            ],
+            "to": ["h00"],
             "line": 1,
             "column": 0,
             "resolution": "method-dispatch",
@@ -510,9 +478,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h00"
-            ],
+            "to": ["h00"],
             "line": 1,
             "column": 0,
             "resolution": "jsx",
@@ -541,9 +507,7 @@
         "definedInGenerated": false,
         "calls": [
           {
-            "to": [
-              "h00"
-            ],
+            "to": ["h00"],
             "line": 1,
             "column": 0,
             "resolution": "constructor",

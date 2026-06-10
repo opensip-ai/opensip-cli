@@ -182,7 +182,9 @@ describe('graph-java resolve.ts', () => {
     );
     const { resolved } = pipeline(dir);
     const edges = allEdges(resolved);
-    const explicits = edges.filter((e) => e.text.startsWith('super(') || e.text.startsWith('this('));
+    const explicits = edges.filter(
+      (e) => e.text.startsWith('super(') || e.text.startsWith('this('),
+    );
     expect(explicits.length).toBeGreaterThanOrEqual(2);
     for (const e of explicits) {
       expect(e.resolution).toBe('unknown');
@@ -254,16 +256,8 @@ describe('graph-java resolve.ts', () => {
   it('skips synthetic <module-init> entries from the byName index', () => {
     // Two files each contribute a `<module-init>` entry but its name
     // starts with `<` and must be excluded from the name index.
-    writeFileSync(
-      join(dir, 'A.java'),
-      `package x;\nclass A { void m() {} }\n`,
-      'utf8',
-    );
-    writeFileSync(
-      join(dir, 'B.java'),
-      `package x;\nclass B { void m() {} }\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'A.java'), `package x;\nclass A { void m() {} }\n`, 'utf8');
+    writeFileSync(join(dir, 'B.java'), `package x;\nclass B { void m() {} }\n`, 'utf8');
     const { resolved } = pipeline(dir);
     // No call sites reference `<module-init>` (it's synthetic), so
     // simply verify the resolver ran without producing any unexpected
@@ -273,11 +267,7 @@ describe('graph-java resolve.ts', () => {
   });
 
   it('emits empty edge map when there are no call sites', () => {
-    writeFileSync(
-      join(dir, 'Empty.java'),
-      `package x;\nclass Empty {}\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'Empty.java'), `package x;\nclass Empty {}\n`, 'utf8');
     const { resolved } = pipeline(dir);
     // module-init occurrence exists but no call-sites are emitted.
     expect(resolved.stats.totalCallSites).toBe(0);

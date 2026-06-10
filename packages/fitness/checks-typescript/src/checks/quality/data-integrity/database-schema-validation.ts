@@ -10,26 +10,25 @@
  * - Index definitions
  */
 
-
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 // =============================================================================
 // Helper Types and Interfaces
 // =============================================================================
 
 interface EntityAnalysisState {
-  hasIdColumn: boolean
-  hasCreatedAt: boolean
-  hasUpdatedAt: boolean
+  hasIdColumn: boolean;
+  hasCreatedAt: boolean;
+  hasUpdatedAt: boolean;
 }
 
 interface AnalysisContext {
-  absolutePath: string
-  content: string
-  sourceFile: ts.SourceFile
-  lines: string[]
+  absolutePath: string;
+  content: string;
+  sourceFile: ts.SourceFile;
+  lines: string[];
 }
 
 // =============================================================================
@@ -45,12 +44,12 @@ interface AnalysisContext {
  */
 function getMissingAuditColumnsDescription(hasCreatedAt: boolean, hasUpdatedAt: boolean): string {
   if (!hasCreatedAt && !hasUpdatedAt) {
-    return 'createdAt and updatedAt'
+    return 'createdAt and updatedAt';
   }
   if (!hasCreatedAt) {
-    return 'createdAt'
+    return 'createdAt';
   }
-  return 'updatedAt'
+  return 'updatedAt';
 }
 
 // =============================================================================
@@ -72,7 +71,7 @@ function hasEntityDecorator(node: ts.ClassDeclaration): boolean {
         ts.isIdentifier(m.expression.expression) &&
         m.expression.expression.text === 'Entity',
     ) ?? false
-  )
+  );
 }
 
 /**
@@ -84,13 +83,13 @@ function hasEntityDecorator(node: ts.ClassDeclaration): boolean {
 function getDecoratorName(decorator: ts.Decorator): string | null {
   /* v8 ignore next -- defensive AST/type guard */
   if (!ts.isCallExpression(decorator.expression)) {
-    return null
+    return null;
   }
   /* v8 ignore next -- defensive AST/type guard */
   if (!ts.isIdentifier(decorator.expression.expression)) {
-    return null
+    return null;
   }
-  return decorator.expression.expression.text
+  return decorator.expression.expression.text;
 }
 
 /**
@@ -102,12 +101,12 @@ function getDecoratorName(decorator: ts.Decorator): string | null {
 function isNullableWithoutDefault(decorator: ts.Decorator): boolean {
   /* v8 ignore next -- defensive AST/type guard */
   if (!ts.isCallExpression(decorator.expression)) {
-    return false
+    return false;
   }
 
-  const arg = decorator.expression.arguments[0]
+  const arg = decorator.expression.arguments[0];
   if (!arg || !ts.isObjectLiteralExpression(arg)) {
-    return false
+    return false;
   }
 
   const isNullable = arg.properties.some(
@@ -116,13 +115,13 @@ function isNullableWithoutDefault(decorator: ts.Decorator): boolean {
       ts.isIdentifier(p.name) &&
       p.name.text === 'nullable' &&
       p.initializer.kind === ts.SyntaxKind.TrueKeyword,
-  )
+  );
 
   const hasDefault = arg.properties.some(
     (p) => ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === 'default',
-  )
+  );
 
-  return isNullable && !hasDefault
+  return isNullable && !hasDefault;
 }
 
 // =============================================================================
@@ -145,7 +144,7 @@ function createNullableColumnViolation(propName: string, line: number): CheckVio
     suggestion: `Add default: null or default: '' to @Column({ nullable: true, default: ... }) for '${propName}' to avoid undefined behavior`,
     type: 'nullable-without-default',
     match: propName,
-  }
+  };
 }
 
 /**
@@ -159,9 +158,11 @@ function createMissingPrimaryKeyViolation(
   ctx: AnalysisContext,
   node: ts.ClassDeclaration,
 ): CheckViolation {
-  const { line: lineIdx, character } = ctx.sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const line = lineIdx + 1
-  const className = node.name?.getText(ctx.sourceFile) ?? 'Entity'
+  const { line: lineIdx, character } = ctx.sourceFile.getLineAndCharacterOfPosition(
+    node.getStart(),
+  );
+  const line = lineIdx + 1;
+  const className = node.name?.getText(ctx.sourceFile) ?? 'Entity';
 
   return {
     line,
@@ -171,7 +172,7 @@ function createMissingPrimaryKeyViolation(
     suggestion: `Add '@PrimaryGeneratedColumn('uuid') id: string;' to ${className} for proper identity management`,
     type: 'missing-primary-key',
     match: className,
-  }
+  };
 }
 
 /**
@@ -187,10 +188,12 @@ function createMissingAuditColumnsViolation(
   node: ts.ClassDeclaration,
   state: EntityAnalysisState,
 ): CheckViolation {
-  const { line: lineIdx, character } = ctx.sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const line = lineIdx + 1
-  const className = node.name?.getText(ctx.sourceFile) ?? 'Entity'
-  const missing = getMissingAuditColumnsDescription(state.hasCreatedAt, state.hasUpdatedAt)
+  const { line: lineIdx, character } = ctx.sourceFile.getLineAndCharacterOfPosition(
+    node.getStart(),
+  );
+  const line = lineIdx + 1;
+  const className = node.name?.getText(ctx.sourceFile) ?? 'Entity';
+  const missing = getMissingAuditColumnsDescription(state.hasCreatedAt, state.hasUpdatedAt);
 
   return {
     line,
@@ -200,7 +203,7 @@ function createMissingAuditColumnsViolation(
     suggestion: `Add '@CreateDateColumn() createdAt: Date;' and '@UpdateDateColumn() updatedAt: Date;' to ${className} for audit trail (missing: ${missing})`,
     type: 'missing-audit-columns',
     match: className,
-  }
+  };
 }
 
 // =============================================================================
@@ -223,22 +226,22 @@ function processPropertyMember(
 ): void {
   /* v8 ignore next -- defensive AST/type guard */
   if (!ts.isIdentifier(member.name)) {
-    return
+    return;
   }
 
-  const propName = member.name.text
-  const { line } = ctx.sourceFile.getLineAndCharacterOfPosition(member.getStart())
+  const propName = member.name.text;
+  const { line } = ctx.sourceFile.getLineAndCharacterOfPosition(member.getStart());
   /* v8 ignore next -- defensive nullish fallback */
-  const decorators = ts.getDecorators(member) ?? []
+  const decorators = ts.getDecorators(member) ?? [];
 
   for (const decorator of decorators) {
-    const decoratorName = getDecoratorName(decorator)
+    const decoratorName = getDecoratorName(decorator);
     if (!decoratorName) {
-      continue
+      continue;
     }
 
-    updateStateFromDecorator(decoratorName, state)
-    checkColumnDecorator({ decorator, decoratorName, propName, line, violations })
+    updateStateFromDecorator(decoratorName, state);
+    checkColumnDecorator({ decorator, decoratorName, propName, line, violations });
   }
 }
 
@@ -250,13 +253,13 @@ function processPropertyMember(
  */
 function updateStateFromDecorator(decoratorName: string, state: EntityAnalysisState): void {
   if (decoratorName === 'PrimaryGeneratedColumn' || decoratorName === 'PrimaryColumn') {
-    state.hasIdColumn = true
+    state.hasIdColumn = true;
   }
   if (decoratorName === 'CreateDateColumn') {
-    state.hasCreatedAt = true
+    state.hasCreatedAt = true;
   }
   if (decoratorName === 'UpdateDateColumn') {
-    state.hasUpdatedAt = true
+    state.hasUpdatedAt = true;
   }
 }
 
@@ -264,11 +267,11 @@ function updateStateFromDecorator(decoratorName: string, state: EntityAnalysisSt
  * Options for checking column decorators
  */
 interface CheckColumnDecoratorOptions {
-  decorator: ts.Decorator
-  decoratorName: string
-  propName: string
-  line: number
-  violations: CheckViolation[]
+  decorator: ts.Decorator;
+  decoratorName: string;
+  propName: string;
+  line: number;
+  violations: CheckViolation[];
 }
 
 /**
@@ -277,20 +280,20 @@ interface CheckColumnDecoratorOptions {
  * @param options - Options containing decorator and analysis context
  */
 function checkColumnDecorator(options: CheckColumnDecoratorOptions): void {
-  const { decorator, decoratorName, propName, line, violations } = options
+  const { decorator, decoratorName, propName, line, violations } = options;
 
   // Validate array parameter
   /* v8 ignore next -- defensive guard */
   if (!Array.isArray(violations)) {
-    return
+    return;
   }
 
   if (decoratorName !== 'Column') {
-    return
+    return;
   }
 
   if (isNullableWithoutDefault(decorator)) {
-    violations.push(createNullableColumnViolation(propName, line))
+    violations.push(createNullableColumnViolation(propName, line));
   }
 }
 
@@ -313,30 +316,30 @@ function analyzeEntityClass(
   // Validate array parameter
   /* v8 ignore next -- defensive guard */
   if (!Array.isArray(violations)) {
-    return
+    return;
   }
 
   const state: EntityAnalysisState = {
     hasIdColumn: false,
     hasCreatedAt: false,
     hasUpdatedAt: false,
-  }
+  };
 
   // Process all property members
   for (const member of node.members) {
     if (ts.isPropertyDeclaration(member)) {
-      processPropertyMember(member, ctx, state, violations)
+      processPropertyMember(member, ctx, state, violations);
     }
   }
 
   // Check for missing primary key
   if (!state.hasIdColumn) {
-    violations.push(createMissingPrimaryKeyViolation(ctx, node))
+    violations.push(createMissingPrimaryKeyViolation(ctx, node));
   }
 
   // Check for missing audit columns
   if (!state.hasCreatedAt || !state.hasUpdatedAt) {
-    violations.push(createMissingAuditColumnsViolation(ctx, node, state))
+    violations.push(createMissingAuditColumnsViolation(ctx, node, state));
   }
 }
 
@@ -353,7 +356,7 @@ function isEntityFile(filePath: string): boolean {
     filePath.includes('/models/') ||
     filePath.includes('.entity.ts') ||
     filePath.includes('.model.ts')
-  )
+  );
 }
 
 /**
@@ -364,38 +367,38 @@ function isEntityFile(filePath: string): boolean {
  * @returns Array of violations found
  */
 function analyzeFile(content: string, absolutePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Filter to entity/schema files
   if (!isEntityFile(absolutePath)) {
-    return violations
+    return violations;
   }
 
   // Check if file contains TypeORM entity
   if (!content.includes('@Entity') && !content.includes('@Table')) {
-    return violations
+    return violations;
   }
 
-  const sourceFile = getSharedSourceFile(absolutePath, content)
-    /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+  const sourceFile = getSharedSourceFile(absolutePath, content);
+  /* v8 ignore next -- defensive guard */
+  if (!sourceFile) return [];
 
   const ctx: AnalysisContext = {
     absolutePath,
     content,
     sourceFile,
     lines: content.split('\n'),
-  }
+  };
 
   const visit = (node: ts.Node): void => {
     if (ts.isClassDeclaration(node) && hasEntityDecorator(node)) {
-      analyzeEntityClass(node, ctx, violations)
+      analyzeEntityClass(node, ctx, violations);
     }
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
 
-  visit(sourceFile)
-  return violations
+  visit(sourceFile);
+  return violations;
 }
 
 /**
@@ -425,4 +428,4 @@ export const databaseSchemaValidation = defineCheck({
   fileTypes: ['ts'],
 
   analyze: analyzeFile,
-})
+});

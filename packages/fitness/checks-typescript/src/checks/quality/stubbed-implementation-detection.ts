@@ -18,23 +18,21 @@
  *   - ({}) as T used as Proxy target
  */
 
-
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
 import {
   findEnclosingFunctionBody,
   getEnclosingFunctionName,
   getSharedSourceFile,
   isInsideConditionalBlock,
-} from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
-
+} from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /** Placeholder comment patterns - using explicit RegExp constructors for safety */
 const PLACEHOLDER_PATTERNS: RegExp[] = [
   new RegExp(String.raw`\/\/\s*Placeholder\s*(implementation|for|:|-)`, 'i'),
   new RegExp(String.raw`\/\/\s*STUB\s*[:|-]`, 'i'),
   new RegExp(String.raw`\/\/\s*Not\s+implemented`, 'i'),
-]
+];
 
 /** Primitive types that should be skipped when checking empty object stubs */
 const PRIMITIVE_TYPES = new Set([
@@ -46,25 +44,25 @@ const PRIMITIVE_TYPES = new Set([
   'void',
   'never',
   'unknown',
-])
+]);
 
 /** Pattern for Promise.resolve stubs - matches exact form without backtracking */
 const PROMISE_RESOLVE_PATTERN = new RegExp(
   String.raw`^Promise\.resolve\((undefined|null|void 0)?\)$`,
-)
+);
 
 /** Pattern for hardcoded stub returns with success: true */
 const STUB_RETURN_PATTERN = new RegExp(
   String.raw`success:\s*true[\s\S]*data:\s*(\[\]|null|\{\})`,
   'i',
-)
+);
 
 /** Lifecycle teardown method names that commonly return Promise.resolve() */
-const LIFECYCLE_METHOD_NAMES = new Set(['destroy', 'dispose', 'close', 'shutdown', 'cleanup'])
+const LIFECYCLE_METHOD_NAMES = new Set(['destroy', 'dispose', 'close', 'shutdown', 'cleanup']);
 
 interface CheckNodeOptions {
-  node: ts.Node
-  sourceFile: ts.SourceFile
+  node: ts.Node;
+  sourceFile: ts.SourceFile;
 }
 
 // =============================================================================
@@ -80,56 +78,56 @@ interface CheckNodeOptions {
 function functionBodyHasSubstantiveStatements(body: ts.Block, returnNode: ts.Node): boolean {
   for (const stmt of body.statements) {
     // Skip the return statement itself
-    if (stmt === returnNode) continue
+    if (stmt === returnNode) continue;
     // Skip variable declarations without initializers (just type annotations)
     if (ts.isVariableStatement(stmt)) {
       const hasInitializer = stmt.declarationList.declarations.some(
         (d) => d.initializer !== undefined,
-      )
-      if (hasInitializer) return true
-      continue
+      );
+      if (hasInitializer) return true;
+      continue;
     }
     // Any other statement (expression statement, if, for, etc.) is substantive
-    return true
+    return true;
   }
-  return false
+  return false;
 }
 
 /**
  * Recursively check if a node contains an await or call expression before a given position.
  */
 function containsAwaitOrCallBefore(node: ts.Node, returnPos: number): boolean {
-  if (node.getStart() >= returnPos) return false
-  if (ts.isAwaitExpression(node)) return true
-  if (ts.isCallExpression(node) && node.getStart() < returnPos) return true
+  if (node.getStart() >= returnPos) return false;
+  if (ts.isAwaitExpression(node)) return true;
+  if (ts.isCallExpression(node) && node.getStart() < returnPos) return true;
 
-  let found = false
+  let found = false;
   ts.forEachChild(node, (child) => {
     if (!found && containsAwaitOrCallBefore(child, returnPos)) {
-      found = true
+      found = true;
     }
-  })
-  return found
+  });
+  return found;
 }
 
 function functionBodyHasAwaitOrCallsBefore(body: ts.Block, returnNode: ts.Node): boolean {
-  const returnPos = returnNode.getStart()
+  const returnPos = returnNode.getStart();
 
   for (const stmt of body.statements) {
-    if (stmt === returnNode) break
-    if (containsAwaitOrCallBefore(stmt, returnPos)) return true
+    if (stmt === returnNode) break;
+    if (containsAwaitOrCallBefore(stmt, returnPos)) return true;
   }
-  return false
+  return false;
 }
 
 /**
  * Check whether the function has multiple return statements (indicating branches, not a stub).
  */
 function functionHasMultipleReturns(body: ts.Block): boolean {
-  let returnCount = 0
+  let returnCount = 0;
   const visit = (node: ts.Node): void => {
     if (ts.isReturnStatement(node)) {
-      returnCount++
+      returnCount++;
     }
     // Do not descend into nested functions
     if (
@@ -138,14 +136,14 @@ function functionHasMultipleReturns(body: ts.Block): boolean {
       ts.isArrowFunction(node) ||
       ts.isMethodDeclaration(node)
     ) {
-      return
+      return;
     }
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
   for (const stmt of body.statements) {
-    visit(stmt)
+    visit(stmt);
   }
-  return returnCount > 1
+  return returnCount > 1;
 }
 
 /**
@@ -161,8 +159,8 @@ function nodeHasTypeParameter(
   typeText: string,
   sourceFile: ts.SourceFile,
 ): boolean {
-  if (!node.typeParameters) return false
-  return node.typeParameters.some((tp) => tp.name.getText(sourceFile) === typeText)
+  if (!node.typeParameters) return false;
+  return node.typeParameters.some((tp) => tp.name.getText(sourceFile) === typeText);
 }
 
 /**
@@ -175,7 +173,7 @@ function isGenericTypeParameter(
   node: ts.Node,
   sourceFile: ts.SourceFile,
 ): boolean {
-  let current: ts.Node = node.parent
+  let current: ts.Node = node.parent;
   while (!ts.isSourceFile(current)) {
     // Check function-like or class declarations for type parameters
     if (
@@ -186,33 +184,33 @@ function isGenericTypeParameter(
         ts.isClassDeclaration(current)) &&
       nodeHasTypeParameter(current, typeText, sourceFile)
     ) {
-      return true
+      return true;
     }
-    current = current.parent
+    current = current.parent;
   }
-  return false
+  return false;
 }
 
 /**
  * Check whether the as-expression is the target argument of a `new Proxy(...)` call.
  */
 function isProxyTarget(node: ts.Node, sourceFile: ts.SourceFile): boolean {
-  const parent = node.parent
+  const parent = node.parent;
 
   // Direct parent should be a NewExpression: new Proxy({} as T, handler)
   if (ts.isNewExpression(parent)) {
-    const exprText = parent.expression.getText(sourceFile)
+    const exprText = parent.expression.getText(sourceFile);
     if (exprText === 'Proxy' && parent.arguments?.[0] === node) {
-      return true
+      return true;
     }
   }
 
   // Or it could be wrapped in parentheses: new Proxy(({} as T), handler)
   if (ts.isParenthesizedExpression(parent)) {
-    return isProxyTarget(parent, sourceFile)
+    return isProxyTarget(parent, sourceFile);
   }
 
-  return false
+  return false;
 }
 
 // =============================================================================
@@ -220,28 +218,28 @@ function isProxyTarget(node: ts.Node, sourceFile: ts.SourceFile): boolean {
 // =============================================================================
 
 function checkEmptyObjectStub(options: CheckNodeOptions): CheckViolation | null {
-  const { node, sourceFile } = options
-  if (!ts.isAsExpression(node) && !ts.isTypeAssertionExpression(node)) return null
+  const { node, sourceFile } = options;
+  if (!ts.isAsExpression(node) && !ts.isTypeAssertionExpression(node)) return null;
 
-  const expression = node.expression
-  if (!ts.isObjectLiteralExpression(expression) || expression.properties.length > 0) return null
+  const expression = node.expression;
+  if (!ts.isObjectLiteralExpression(expression) || expression.properties.length > 0) return null;
 
-  const typeText = node.type.getText(sourceFile)
+  const typeText = node.type.getText(sourceFile);
   // Skip primitives and Record types
-  const isPrimitive = PRIMITIVE_TYPES.has(typeText)
-  const isRecordType = typeText.startsWith('Record<') && typeText.endsWith('>')
+  const isPrimitive = PRIMITIVE_TYPES.has(typeText);
+  const isRecordType = typeText.startsWith('Record<') && typeText.endsWith('>');
 
-  if (isPrimitive || isRecordType) return null
+  if (isPrimitive || isRecordType) return null;
 
   // Skip if type is a generic type parameter (e.g., T in deepMerge<T>)
-  if (isGenericTypeParameter(typeText, node, sourceFile)) return null
+  if (isGenericTypeParameter(typeText, node, sourceFile)) return null;
 
   // Skip if this is the target of a new Proxy(...) call
-  if (isProxyTarget(node, sourceFile)) return null
+  if (isProxyTarget(node, sourceFile)) return null;
 
-  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const lineNum = line + 1
-  const matchText = node.getText(sourceFile)
+  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+  const lineNum = line + 1;
+  const matchText = node.getText(sourceFile);
 
   return {
     line: lineNum,
@@ -250,30 +248,30 @@ function checkEmptyObjectStub(options: CheckNodeOptions): CheckViolation | null 
     severity: 'error',
     suggestion: `Implement the actual ${typeText} object with all required properties, or use a factory function/builder to create valid instances`,
     match: matchText,
-  }
+  };
 }
 
 function checkPromiseResolveStub(options: CheckNodeOptions): CheckViolation | null {
-  const { node, sourceFile } = options
+  const { node, sourceFile } = options;
   if (!ts.isReturnStatement(node) || !node.expression || !ts.isCallExpression(node.expression))
-    return null
+    return null;
 
-  const callText = node.expression.getText(sourceFile)
+  const callText = node.expression.getText(sourceFile);
 
-  if (!PROMISE_RESOLVE_PATTERN.test(callText)) return null
+  if (!PROMISE_RESOLVE_PATTERN.test(callText)) return null;
 
   // Skip if inside a conditional block (guard clause / early return)
-  if (isInsideConditionalBlock(node)) return null
+  if (isInsideConditionalBlock(node)) return null;
 
   // Skip if enclosing function is a lifecycle teardown method
-  const funcName = getEnclosingFunctionName(node, sourceFile)
-  if (funcName && LIFECYCLE_METHOD_NAMES.has(funcName)) return null
+  const funcName = getEnclosingFunctionName(node, sourceFile);
+  if (funcName && LIFECYCLE_METHOD_NAMES.has(funcName)) return null;
 
   // Skip if the function body has substantive statements (real work + async wrapping)
-  const body = findEnclosingFunctionBody(node)
-  if (body && functionBodyHasSubstantiveStatements(body, node)) return null
+  const body = findEnclosingFunctionBody(node);
+  if (body && functionBodyHasSubstantiveStatements(body, node)) return null;
 
-  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
 
   return {
     line: line + 1,
@@ -283,33 +281,33 @@ function checkPromiseResolveStub(options: CheckNodeOptions): CheckViolation | nu
     suggestion:
       'Implement the actual async logic for this method, or if this is intentional no-op, add a comment explaining why',
     match: callText,
-  }
+  };
 }
 
 function checkHardcodedStubReturn(options: CheckNodeOptions): CheckViolation | null {
-  const { node, sourceFile } = options
+  const { node, sourceFile } = options;
   if (
     !ts.isReturnStatement(node) ||
     !node.expression ||
     !ts.isObjectLiteralExpression(node.expression)
   )
-    return null
+    return null;
 
-  const returnText = node.expression.getText(sourceFile)
+  const returnText = node.expression.getText(sourceFile);
 
-  if (!STUB_RETURN_PATTERN.test(returnText)) return null
+  if (!STUB_RETURN_PATTERN.test(returnText)) return null;
 
   // Skip if inside a conditional block (branch return, not the only path)
-  if (isInsideConditionalBlock(node)) return null
+  if (isInsideConditionalBlock(node)) return null;
 
   // Skip if the function has multiple return statements (indicates branching logic)
-  const body = findEnclosingFunctionBody(node)
-  if (body && functionHasMultipleReturns(body)) return null
+  const body = findEnclosingFunctionBody(node);
+  if (body && functionHasMultipleReturns(body)) return null;
 
   // Skip if the function body contains await expressions or calls before this return
-  if (body && functionBodyHasAwaitOrCallsBefore(body, node)) return null
+  if (body && functionBodyHasAwaitOrCallsBefore(body, node)) return null;
 
-  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
 
   return {
     line: line + 1,
@@ -318,7 +316,7 @@ function checkHardcodedStubReturn(options: CheckNodeOptions): CheckViolation | n
     severity: 'warning',
     suggestion: 'Replace this stub with actual implementation that fetches/processes real data',
     match: returnText.slice(0, 80),
-  }
+  };
 }
 
 function checkLineForPlaceholder(line: string, lineNum: number): CheckViolation | null {
@@ -332,10 +330,10 @@ function checkLineForPlaceholder(line: string, lineNum: number): CheckViolation 
         suggestion:
           'Complete the implementation or create a ticket to track this work, then remove the placeholder comment',
         match: line.trim(),
-      }
+      };
     }
   }
-  return null
+  return null;
 }
 
 /**
@@ -375,50 +373,50 @@ export const stubbedImplementationDetection = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze(content, filePath): CheckViolation[] {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Test files routinely use stub patterns (empty type-asserted objects,
     // Promise.resolve()) as intentional fixtures or compile-time drift
     // detectors. Skip AST stub detection in tests; placeholder-comment
     // scanning below is also already test-aware.
-    const inTestFile = isTestFile(filePath)
+    const inTestFile = isTestFile(filePath);
 
     try {
-      const sourceFile = getSharedSourceFile(filePath, content)
-      if (!sourceFile) return []
+      const sourceFile = getSharedSourceFile(filePath, content);
+      if (!sourceFile) return [];
 
       const visit = (node: ts.Node): void => {
-        const nodeOptions = { node, sourceFile }
+        const nodeOptions = { node, sourceFile };
 
         if (!inTestFile) {
-          const emptyStub = checkEmptyObjectStub(nodeOptions)
-          if (emptyStub) violations.push(emptyStub)
+          const emptyStub = checkEmptyObjectStub(nodeOptions);
+          if (emptyStub) violations.push(emptyStub);
 
-          const promiseStub = checkPromiseResolveStub(nodeOptions)
-          if (promiseStub) violations.push(promiseStub)
+          const promiseStub = checkPromiseResolveStub(nodeOptions);
+          if (promiseStub) violations.push(promiseStub);
 
-          const hardcodedStub = checkHardcodedStubReturn(nodeOptions)
-          if (hardcodedStub) violations.push(hardcodedStub)
+          const hardcodedStub = checkHardcodedStubReturn(nodeOptions);
+          if (hardcodedStub) violations.push(hardcodedStub);
         }
 
-        ts.forEachChild(node, visit)
-      }
+        ts.forEachChild(node, visit);
+      };
 
-      visit(sourceFile)
+      visit(sourceFile);
 
       // Check for placeholder comments (skip test files — placeholder comments
       // in tests are intentional)
       if (!isTestFile(filePath)) {
-        const lines = content.split('\n')
+        const lines = content.split('\n');
         for (const [i, line] of lines.entries()) {
-          const placeholder = checkLineForPlaceholder(line ?? '', i + 1)
-          if (placeholder) violations.push(placeholder)
+          const placeholder = checkLineForPlaceholder(line ?? '', i + 1);
+          if (placeholder) violations.push(placeholder);
         }
       }
     } catch {
       // @swallow-ok Skip files that fail to parse
     }
 
-    return violations
+    return violations;
   },
-})
+});

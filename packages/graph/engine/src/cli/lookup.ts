@@ -26,7 +26,10 @@ export interface LookupCommandOptions {
   readonly json?: boolean;
 }
 
-export async function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): Promise<void> {
+export async function executeLookup(
+  opts: LookupCommandOptions,
+  cli: ToolCliContext,
+): Promise<void> {
   logger.info({ evt: 'graph.cli.lookup.start', module: 'graph:cli', name: opts.name });
   try {
     const datastore = cli.scope.datastore() as DataStore | undefined;
@@ -51,7 +54,10 @@ export async function executeLookup(opts: LookupCommandOptions, cli: ToolCliCont
     } else {
       // Human path flows through the render seam (Ink on TTY, plain text in
       // pipes/CI) rather than writing to stdout directly.
-      await cli.render({ type: 'graph-status', lines: humanReportLines(opts.name, matches, resolutionMode) });
+      await cli.render({
+        type: 'graph-status',
+        lines: humanReportLines(opts.name, matches, resolutionMode),
+      });
     }
     cli.setExitCode(EXIT_CODES.SUCCESS);
     logger.info({

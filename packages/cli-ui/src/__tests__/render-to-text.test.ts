@@ -35,7 +35,9 @@ describe('renderToText — no-ANSI invariant', () => {
 
 describe('renderToText — content', () => {
   it('joins line spans without styling', () => {
-    expect(renderToText({ kind: 'line', spans: [{ text: 'a' }, { text: 'b', tone: 'error' }] })).toBe('ab');
+    expect(
+      renderToText({ kind: 'line', spans: [{ text: 'a' }, { text: 'b', tone: 'error' }] }),
+    ).toBe('ab');
   });
 
   it('renders headings with == fences ==', () => {
@@ -44,14 +46,18 @@ describe('renderToText — content', () => {
 
   it('renders key/value pairs one per line', () => {
     expect(
-      renderToText({ kind: 'keyValues', pairs: [{ label: 'a', value: '1' }, { label: 'b', value: '2' }] }),
+      renderToText({
+        kind: 'keyValues',
+        pairs: [
+          { label: 'a', value: '1' },
+          { label: 'b', value: '2' },
+        ],
+      }),
     ).toBe('a: 1\nb: 2');
   });
 
   it('renders hints with two-space indent and pipe separators', () => {
-    expect(
-      renderToText({ kind: 'hints', items: [{ text: 'x' }, { text: 'y' }] }),
-    ).toBe('  x | y');
+    expect(renderToText({ kind: 'hints', items: [{ text: 'x' }, { text: 'y' }] })).toBe('  x | y');
   });
 
   it('indents group children', () => {

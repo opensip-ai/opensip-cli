@@ -124,14 +124,19 @@ function topDir(f) {
   if (!f.startsWith('packages/')) return f.includes('/') ? `${f.split('/')[0]}/` : '<root-file>';
   const p = f.split('/');
   // collapse to packages/<ns> or packages/<ns>/<sub> for the nested engine packs
-  return p.length >= 3 && (p[2] === 'engine' || p[2].startsWith('checks-') || p[2].startsWith('graph-') || p[2].startsWith('lang-'))
+  return p.length >= 3 &&
+    (p[2] === 'engine' ||
+      p[2].startsWith('checks-') ||
+      p[2].startsWith('graph-') ||
+      p[2].startsWith('lang-'))
     ? `packages/${p[1]}/${p[2]}`
     : `packages/${p[1]}`;
 }
 
 function classify(f) {
   if (/\/__fixtures__\//.test(f)) return 'fixture';
-  if (/\.test\.[tj]sx?$/.test(f) || /\/__tests__\//.test(f) || /\.spec\.[tj]sx?$/.test(f)) return 'test';
+  if (/\.test\.[tj]sx?$/.test(f) || /\/__tests__\//.test(f) || /\.spec\.[tj]sx?$/.test(f))
+    return 'test';
   return 'other';
 }
 
@@ -156,24 +161,40 @@ const line = '─'.repeat(72);
 console.log(`\n${line}`);
 console.log('GRAPH CATALOG DIFF — exact vs sharded (non-module-init occurrences)');
 console.log(line);
-console.log(`exact   occurrences: ${String(exact.size).padStart(6)}   files: ${String(exactFiles.size)}`);
-console.log(`sharded occurrences: ${String(sharded.size).padStart(6)}   files: ${String(shardedFiles.size)}`);
+console.log(
+  `exact   occurrences: ${String(exact.size).padStart(6)}   files: ${String(exactFiles.size)}`,
+);
+console.log(
+  `sharded occurrences: ${String(sharded.size).padStart(6)}   files: ${String(shardedFiles.size)}`,
+);
 console.log(line);
 console.log(`both:          ${String(both).padStart(6)}`);
-console.log(`exact_only:    ${String(exactOnly.length).padStart(6)}   (occurrences only the exact engine has)`);
-console.log(`sharded_only:  ${String(shardedOnly.length).padStart(6)}   (occurrences only the sharded engine has)`);
+console.log(
+  `exact_only:    ${String(exactOnly.length).padStart(6)}   (occurrences only the exact engine has)`,
+);
+console.log(
+  `sharded_only:  ${String(shardedOnly.length).padStart(6)}   (occurrences only the sharded engine has)`,
+);
 console.log(line);
 console.log(`exact_only files:        ${String(exactOnlyFiles.length)}`);
-console.log(`module-init delta:       ${String(exactFiles.size - shardedFiles.size)} (one synthetic module-init per exact-only file — excluded above)`);
+console.log(
+  `module-init delta:       ${String(exactFiles.size - shardedFiles.size)} (one synthetic module-init per exact-only file — excluded above)`,
+);
 console.log(
   `≈ TOTAL catalog gap:     ${String(exactOnly.length + (exactFiles.size - shardedFiles.size))} ` +
     `(exact_only occ ${String(exactOnly.length)} + module-init ${String(exactFiles.size - shardedFiles.size)})`,
 );
 console.log(line);
 console.log('exact_only files by class (cause bucket):');
-console.log(`  (b) fixture trees excluded by per-package tsconfig (**/__fixtures__/**): ${String(byClass.fixture)} files`);
-console.log(`  (b) test files excluded by per-package tsconfig (**/__tests__/**,*.test.*): ${String(byClass.test)} files`);
-console.log(`  (a)/(d) other (NOT under packages/, or unexplained):                      ${String(byClass.other)} files`);
+console.log(
+  `  (b) fixture trees excluded by per-package tsconfig (**/__fixtures__/**): ${String(byClass.fixture)} files`,
+);
+console.log(
+  `  (b) test files excluded by per-package tsconfig (**/__tests__/**,*.test.*): ${String(byClass.test)} files`,
+);
+console.log(
+  `  (a)/(d) other (NOT under packages/, or unexplained):                      ${String(byClass.other)} files`,
+);
 console.log(line);
 console.log('exact_only files by top-level directory:');
 for (const [dir, n] of [...byTopDir.entries()].sort((a, b) => b[1] - a[1])) {
@@ -196,7 +217,9 @@ if (otherFiles.length > 0) {
 }
 if (shardedOnly.length > 0) {
   console.log(line);
-  console.log(`sharded_only occurrences (expected ~0 — visibility/merge artifacts): ${String(shardedOnly.length)}`);
+  console.log(
+    `sharded_only occurrences (expected ~0 — visibility/merge artifacts): ${String(shardedOnly.length)}`,
+  );
   for (const occ of shardedOnly.slice(0, 20)) {
     const id = occ.qualifiedName ?? `${occ.filePath}:${String(occ.line)}:${occ.simpleName}`;
     console.log(`  ${id}`);

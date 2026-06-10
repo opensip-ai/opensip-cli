@@ -1,1 +1,1 @@
-export * from './typescript-frontend.js'
+export * from './typescript-frontend.js';

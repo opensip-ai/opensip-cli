@@ -10,13 +10,17 @@
  * 2. Same-named functions with different implementations - consolidation opportunities
  */
 
-import { createHash } from 'node:crypto'
-import { basename, dirname } from 'node:path'
+import { createHash } from 'node:crypto';
+import { basename, dirname } from 'node:path';
 
-
-import { defineCheck, getCheckConfig, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import {
+  defineCheck,
+  getCheckConfig,
+  type CheckViolation,
+  type FileAccessor,
+} from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Recipe-config shape for the duplicate-utility-functions check. Augments
@@ -30,7 +34,7 @@ import * as ts from 'typescript'
  */
 export interface DuplicateUtilityFunctionsConfig extends Record<string, unknown> {
   /** Function names that should be skipped (treated as domain-specific by design). */
-  additionalDomainSpecificFunctions?: readonly string[]
+  additionalDomainSpecificFunctions?: readonly string[];
 }
 
 /**
@@ -56,13 +60,13 @@ const UTILITY_PATTERNS = [
   /^chunk/,
   /^unique/,
   /^flatten/,
-]
+];
 
 /**
  * Minimum function body length (characters) to consider for duplicate detection.
  * Very short functions (1-2 lines) are often trivial and not worth flagging.
  */
-const MIN_FUNCTION_BODY_LENGTH = 50
+const MIN_FUNCTION_BODY_LENGTH = 50;
 
 /**
  * Functions that are intentionally domain-specific and should NOT be flagged
@@ -117,32 +121,35 @@ const DOMAIN_SPECIFIC_FUNCTIONS = new Set([
   'isIdentChar',
   // Assertion validation — fitness engine + simulation engine each own one
   'validateAssertions',
-])
+]);
 
 /**
  * Build the effective domain-specific set by merging built-in defaults with
  * the recipe-provided augmentation for `duplicate-utility-functions`.
  */
 function buildEffectiveDomainSpecificSet(): ReadonlySet<string> {
-  const cfg = getCheckConfig<DuplicateUtilityFunctionsConfig>('duplicate-utility-functions')
-  if (!cfg.additionalDomainSpecificFunctions || cfg.additionalDomainSpecificFunctions.length === 0) {
-    return DOMAIN_SPECIFIC_FUNCTIONS
+  const cfg = getCheckConfig<DuplicateUtilityFunctionsConfig>('duplicate-utility-functions');
+  if (
+    !cfg.additionalDomainSpecificFunctions ||
+    cfg.additionalDomainSpecificFunctions.length === 0
+  ) {
+    return DOMAIN_SPECIFIC_FUNCTIONS;
   }
-  const merged = new Set(DOMAIN_SPECIFIC_FUNCTIONS)
-  for (const name of cfg.additionalDomainSpecificFunctions) merged.add(name)
-  return merged
+  const merged = new Set(DOMAIN_SPECIFIC_FUNCTIONS);
+  for (const name of cfg.additionalDomainSpecificFunctions) merged.add(name);
+  return merged;
 }
 
 interface FunctionInfo {
-  name: string
-  line: number
-  file: string
-  bodyHash: string
-  bodyLength: number
+  name: string;
+  line: number;
+  file: string;
+  bodyHash: string;
+  bodyLength: number;
 }
 
 /** Map from function name to map of body hash to locations */
-type FunctionsByName = Map<string, Map<string, FunctionInfo[]>>
+type FunctionsByName = Map<string, Map<string, FunctionInfo[]>>;
 
 /**
  * Get unique directories from a list of function locations
@@ -150,46 +157,46 @@ type FunctionsByName = Map<string, Map<string, FunctionInfo[]>>
 function getUniqueDirectories(locations: FunctionInfo[]): Set<string> {
   /* v8 ignore next -- defensive guard */
   if (!Array.isArray(locations)) {
-    return new Set()
+    return new Set();
   }
-  return new Set(locations.map((l) => dirname(l.file)))
+  return new Set(locations.map((l) => dirname(l.file)));
 }
 
 /**
  * Flatten all locations from hash groups into a single array
  */
 function flattenHashGroups(hashGroups: Map<string, FunctionInfo[]>): FunctionInfo[] {
-  const allLocations: FunctionInfo[] = []
+  const allLocations: FunctionInfo[] = [];
   if (hashGroups.size === 0) {
-    return allLocations
+    return allLocations;
   }
   for (const locations of hashGroups.values()) {
     if (Array.isArray(locations) && locations.length > 0) {
-      allLocations.push(...locations)
+      allLocations.push(...locations);
     }
   }
-  return allLocations
+  return allLocations;
 }
 
 /**
  * Get first location from each hash group (unique implementations)
  */
 function getFirstFromEachHashGroup(hashGroups: Map<string, FunctionInfo[]>): FunctionInfo[] {
-  const uniqueImpls: FunctionInfo[] = []
+  const uniqueImpls: FunctionInfo[] = [];
   if (hashGroups.size === 0) {
-    return uniqueImpls
+    return uniqueImpls;
   }
   for (const locations of hashGroups.values()) {
     /* v8 ignore next -- defensive guard */
     if (!Array.isArray(locations) || locations.length === 0) {
-      continue
+      continue;
     }
-    const first = locations[0]
+    const first = locations[0];
     if (first) {
-      uniqueImpls.push(first)
+      uniqueImpls.push(first);
     }
   }
-  return uniqueImpls
+  return uniqueImpls;
 }
 
 /**
@@ -199,28 +206,28 @@ function formatOtherFiles(locations: FunctionInfo[]): string {
   const otherFiles = locations
     .slice(1)
     .map((l) => basename(l.file))
-    .slice(0, 3)
-  const moreCount = locations.length > 4 ? ` (+${locations.length - 4} more)` : ''
-  return `${otherFiles.join(', ')}${moreCount}`
+    .slice(0, 3);
+  const moreCount = locations.length > 4 ? ` (+${locations.length - 4} more)` : '';
+  return `${otherFiles.join(', ')}${moreCount}`;
 }
 
 /**
  * Add a function to the functions-by-name collection
  */
 function addFunctionToCollection(functionsByName: FunctionsByName, fn: FunctionInfo): void {
-  let nameGroup = functionsByName.get(fn.name)
+  let nameGroup = functionsByName.get(fn.name);
   if (!nameGroup) {
-    nameGroup = new Map()
-    functionsByName.set(fn.name, nameGroup)
+    nameGroup = new Map();
+    functionsByName.set(fn.name, nameGroup);
   }
 
-  let hashGroup = nameGroup.get(fn.bodyHash)
+  let hashGroup = nameGroup.get(fn.bodyHash);
   if (!hashGroup) {
-    hashGroup = []
-    nameGroup.set(fn.bodyHash, hashGroup)
+    hashGroup = [];
+    nameGroup.set(fn.bodyHash, hashGroup);
   }
 
-  hashGroup.push(fn)
+  hashGroup.push(fn);
 }
 
 /**
@@ -229,10 +236,10 @@ function addFunctionToCollection(functionsByName: FunctionsByName, fn: FunctionI
 function isValidCrossDirectoryDuplicate(locations: FunctionInfo[]): boolean {
   /* v8 ignore next -- defensive guard */
   if (!Array.isArray(locations) || locations.length <= 1) {
-    return false
+    return false;
   }
-  const locationDirs = getUniqueDirectories(locations)
-  return locationDirs.size > 1
+  const locationDirs = getUniqueDirectories(locations);
+  return locationDirs.size > 1;
 }
 
 /**
@@ -242,10 +249,10 @@ function removeSingleLineComments(code: string): string {
   return code
     .split('\n')
     .map((line) => {
-      const commentIndex = line.indexOf('//')
-      return commentIndex === -1 ? line : line.slice(0, commentIndex)
+      const commentIndex = line.indexOf('//');
+      return commentIndex === -1 ? line : line.slice(0, commentIndex);
     })
-    .join('\n')
+    .join('\n');
 }
 
 /**
@@ -253,21 +260,21 @@ function removeSingleLineComments(code: string): string {
  * Uses iterative approach to avoid regex backtracking issues.
  */
 function removeMultiLineComments(code: string): string {
-  let result = ''
-  let i = 0
+  let result = '';
+  let i = 0;
   while (i < code.length) {
     if (code[i] === '/' && code[i + 1] === '*') {
-      const endIndex = code.indexOf('*/', i + 2)
+      const endIndex = code.indexOf('*/', i + 2);
       if (endIndex === -1) {
-        break
+        break;
       }
-      i = endIndex + 2
+      i = endIndex + 2;
     } else {
-      result += code[i]
-      i++
+      result += code[i];
+      i++;
     }
   }
-  return result
+  return result;
 }
 
 /**
@@ -275,12 +282,12 @@ function removeMultiLineComments(code: string): string {
  * Removes whitespace, comments, and normalizes identifiers.
  */
 function normalizeBody(body: string): string {
-  let normalized = body
-  normalized = removeSingleLineComments(normalized)
-  normalized = removeMultiLineComments(normalized)
-  normalized = normalized.replaceAll(/\s+/g, ' ')
-  normalized = normalized.trim()
-  return normalized
+  let normalized = body;
+  normalized = removeSingleLineComments(normalized);
+  normalized = removeMultiLineComments(normalized);
+  normalized = normalized.replaceAll(/\s+/g, ' ');
+  normalized = normalized.trim();
+  return normalized;
 }
 
 /**
@@ -288,8 +295,8 @@ function normalizeBody(body: string): string {
  * Uses SHA-256 for content-addressable deduplication (not for security purposes).
  */
 function hashBody(body: string): string {
-  const normalized = normalizeBody(body)
-  return createHash('sha256').update(normalized).digest('hex')
+  const normalized = normalizeBody(body);
+  return createHash('sha256').update(normalized).digest('hex');
 }
 
 /**
@@ -299,9 +306,9 @@ function hashBody(body: string): string {
  */
 function isUtilityFunction(name: string, domainSpecific: ReadonlySet<string>): boolean {
   if (domainSpecific.has(name)) {
-    return false
+    return false;
   }
-  return UTILITY_PATTERNS.some((pattern) => pattern.test(name))
+  return UTILITY_PATTERNS.some((pattern) => pattern.test(name));
 }
 
 /**
@@ -312,27 +319,27 @@ function extractUtilityFunctionsWithBody(
   content: string,
   domainSpecific: ReadonlySet<string>,
 ): FunctionInfo[] {
-  const functions: FunctionInfo[] = []
+  const functions: FunctionInfo[] = [];
 
   try {
-    const sourceFile = getSharedSourceFile(filePath, content)
+    const sourceFile = getSharedSourceFile(filePath, content);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
     const visit = (node: ts.Node) => {
       // Check function declarations
       if (ts.isFunctionDeclaration(node) && node.name && node.body) {
-        const name = node.name.text
+        const name = node.name.text;
         if (isUtilityFunction(name, domainSpecific)) {
-          const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-          const body = node.body.getText(sourceFile)
+          const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+          const body = node.body.getText(sourceFile);
           functions.push({
             name,
             line: line + 1,
             file: filePath,
             bodyHash: hashBody(body),
             bodyLength: body.length,
-          })
+          });
         }
       }
 
@@ -343,41 +350,41 @@ function extractUtilityFunctionsWithBody(
         node.initializer &&
         ts.isArrowFunction(node.initializer)
       ) {
-        const name = node.name.text
+        const name = node.name.text;
         if (isUtilityFunction(name, domainSpecific)) {
-          const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-          const body = node.initializer.body.getText(sourceFile)
+          const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+          const body = node.initializer.body.getText(sourceFile);
           functions.push({
             name,
             line: line + 1,
             file: filePath,
             bodyHash: hashBody(body),
             bodyLength: body.length,
-          })
+          });
         }
       }
 
-      ts.forEachChild(node, visit)
-    }
+      ts.forEachChild(node, visit);
+    };
 
-    visit(sourceFile)
-  /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+    visit(sourceFile);
+    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
   } catch {
     // @swallow-ok Ignore parse errors
   }
 
-  return functions
+  return functions;
 }
 
 /**
  * Create a violation for identical implementations
  */
 function createIdenticalViolation(name: string, locations: FunctionInfo[]): CheckViolation {
-  const first = locations[0]
+  const first = locations[0];
   if (!first) {
-    throw new Error(`createIdenticalViolation called with empty locations array for '${name}'`)
+    throw new Error(`createIdenticalViolation called with empty locations array for '${name}'`);
   }
-  const otherFilesStr = formatOtherFiles(locations)
+  const otherFilesStr = formatOtherFiles(locations);
 
   return {
     line: first.line,
@@ -387,19 +394,19 @@ function createIdenticalViolation(name: string, locations: FunctionInfo[]): Chec
     type: 'duplicate-utility-identical',
     match: name,
     filePath: first.file,
-  }
+  };
 }
 
 /**
  * Create a violation for similar implementations (same name, different body)
  */
 function createSimilarViolation(name: string, uniqueImpls: FunctionInfo[]): CheckViolation {
-  const first = uniqueImpls[0]
+  const first = uniqueImpls[0];
   if (!first) {
-    throw new Error(`createSimilarViolation called with empty uniqueImpls array for '${name}'`)
+    throw new Error(`createSimilarViolation called with empty uniqueImpls array for '${name}'`);
   }
-  const otherFilesStr = formatOtherFiles(uniqueImpls)
-  const numImplementations = uniqueImpls.length
+  const otherFilesStr = formatOtherFiles(uniqueImpls);
+  const numImplementations = uniqueImpls.length;
 
   return {
     line: first.line,
@@ -409,47 +416,47 @@ function createSimilarViolation(name: string, uniqueImpls: FunctionInfo[]): Chec
     type: 'duplicate-utility-similar',
     match: name,
     filePath: first.file,
-  }
+  };
 }
 
 async function collectFunctionsFromFiles(
   files: FileAccessor,
   domainSpecific: ReadonlySet<string>,
 ): Promise<FunctionsByName> {
-  const functionsByName: FunctionsByName = new Map()
+  const functionsByName: FunctionsByName = new Map();
 
   for (const filePath of files.paths) {
     try {
       // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
-      const content = await files.read(filePath)
-      const functions = extractUtilityFunctionsWithBody(filePath, content, domainSpecific)
-      const validFunctions = functions.filter((fn) => fn.bodyLength >= MIN_FUNCTION_BODY_LENGTH)
+      const content = await files.read(filePath);
+      const functions = extractUtilityFunctionsWithBody(filePath, content, domainSpecific);
+      const validFunctions = functions.filter((fn) => fn.bodyLength >= MIN_FUNCTION_BODY_LENGTH);
 
       for (const fn of validFunctions) {
-        void addFunctionToCollection(functionsByName, fn)
+        void addFunctionToCollection(functionsByName, fn);
       }
-    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+      /* v8 ignore next 1 -- defensive catch: parse failures already handled */
     } catch {
       // @swallow-ok Skip unreadable files
     }
   }
 
-  return functionsByName
+  return functionsByName;
 }
 
 function findIdenticalViolations(
   name: string,
   hashGroups: Map<string, FunctionInfo[]>,
 ): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   for (const locations of hashGroups.values()) {
     if (isValidCrossDirectoryDuplicate(locations)) {
-      violations.push(createIdenticalViolation(name, locations))
+      violations.push(createIdenticalViolation(name, locations));
     }
   }
 
-  return violations
+  return violations;
 }
 
 function findSimilarViolation(
@@ -457,42 +464,42 @@ function findSimilarViolation(
   hashGroups: Map<string, FunctionInfo[]>,
 ): CheckViolation | null {
   if (hashGroups.size <= 1) {
-    return null
+    return null;
   }
 
-  const uniqueImpls = getFirstFromEachHashGroup(hashGroups)
+  const uniqueImpls = getFirstFromEachHashGroup(hashGroups);
   /* v8 ignore next -- defensive guard */
   if (!Array.isArray(uniqueImpls) || uniqueImpls.length <= 1) {
-    return null
+    return null;
   }
 
-  const implDirs = getUniqueDirectories(uniqueImpls)
+  const implDirs = getUniqueDirectories(uniqueImpls);
   if (implDirs.size <= 1) {
-    return null
+    return null;
   }
 
-  return createSimilarViolation(name, uniqueImpls)
+  return createSimilarViolation(name, uniqueImpls);
 }
 
 function processFunctionGroup(
   name: string,
   hashGroups: Map<string, FunctionInfo[]>,
 ): CheckViolation[] {
-  const allLocations = flattenHashGroups(hashGroups)
-  const dirs = getUniqueDirectories(allLocations)
+  const allLocations = flattenHashGroups(hashGroups);
+  const dirs = getUniqueDirectories(allLocations);
 
   if (dirs.size <= 1 || hashGroups.size === 0) {
-    return []
+    return [];
   }
 
-  const violations: CheckViolation[] = [...findIdenticalViolations(name, hashGroups)]
+  const violations: CheckViolation[] = [...findIdenticalViolations(name, hashGroups)];
 
-  const similarViolation = findSimilarViolation(name, hashGroups)
+  const similarViolation = findSimilarViolation(name, hashGroups);
   if (similarViolation) {
-    violations.push(similarViolation)
+    violations.push(similarViolation);
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -526,15 +533,15 @@ export const duplicateUtilityFunctions = defineCheck({
   fileTypes: ['ts'],
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const domainSpecific = buildEffectiveDomainSpecificSet()
-    const functionsByName = await collectFunctionsFromFiles(files, domainSpecific)
-    const violations: CheckViolation[] = []
+    const domainSpecific = buildEffectiveDomainSpecificSet();
+    const functionsByName = await collectFunctionsFromFiles(files, domainSpecific);
+    const violations: CheckViolation[] = [];
 
     for (const [name, hashGroups] of functionsByName) {
       // @fitness-ignore-next-line performance-anti-patterns -- spread aggregates small violation arrays from pure function
-      violations.push(...processFunctionGroup(name, hashGroups))
+      violations.push(...processFunctionGroup(name, hashGroups));
     }
 
-    return violations
+    return violations;
   },
-})
+});

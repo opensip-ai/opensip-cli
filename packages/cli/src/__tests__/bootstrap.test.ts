@@ -20,10 +20,7 @@ import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
 import { registerLanguageAdapters } from '../bootstrap/register-language-adapters.js';
-import {
-  mountAllToolCommands,
-  registerFirstPartyTools,
-} from '../bootstrap/register-tools.js';
+import { mountAllToolCommands, registerFirstPartyTools } from '../bootstrap/register-tools.js';
 
 import { BUNDLED_TOOLS } from './test-utils/bundled-tools.js';
 

@@ -45,7 +45,10 @@ function domain(id: string, ownerToolId: string, marker: string): CapabilityDoma
 }
 
 /** Run `fn` inside a scope carrying `registry` as scope.capabilities. */
-async function withCapabilities(registry: CapabilityRegistry, fn: () => Promise<void>): Promise<void> {
+async function withCapabilities(
+  registry: CapabilityRegistry,
+  fn: () => Promise<void>,
+): Promise<void> {
   const scope = new RunScope();
   Object.assign(scope, { capabilities: registry });
   await runWithScope(scope, fn);
@@ -59,7 +62,7 @@ afterEach(() => {
 });
 
 describe('loadOwningToolCapabilities', () => {
-  it('drives only the invoked tool\'s declared domains', async () => {
+  it("drives only the invoked tool's declared domains", async () => {
     const registry = new CapabilityRegistry();
     const mine = vi.fn();
     const other = vi.fn();

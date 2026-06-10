@@ -3,8 +3,20 @@ import { describe, expect, it } from 'vitest';
 
 import { buildFindingGroups, type FindingGroupUnit } from './verbose-detail.js';
 
-function sig(source: string, severity: Signal['severity'], message: string, file = 'a.ts', line?: number): Signal {
-  return createSignal({ source, severity, ruleId: `${source}-rule`, message, code: { file, line } });
+function sig(
+  source: string,
+  severity: Signal['severity'],
+  message: string,
+  file = 'a.ts',
+  line?: number,
+): Signal {
+  return createSignal({
+    source,
+    severity,
+    ruleId: `${source}-rule`,
+    message,
+    code: { file, line },
+  });
 }
 
 describe('buildFindingGroups', () => {
@@ -30,7 +42,11 @@ describe('buildFindingGroups', () => {
   });
 
   it('applies the displayName resolver to the group title', () => {
-    const groups = buildFindingGroups([{ slug: 'no-todos' }], [sig('no-todos', 'high', 'x')], (s) => `Pretty ${s}`);
+    const groups = buildFindingGroups(
+      [{ slug: 'no-todos' }],
+      [sig('no-todos', 'high', 'x')],
+      (s) => `Pretty ${s}`,
+    );
     expect(groups[0].title).toBe('Pretty no-todos');
   });
 
@@ -38,7 +54,12 @@ describe('buildFindingGroups', () => {
     const units: FindingGroupUnit[] = [{ slug: 'errored', error: 'timed out' }, { slug: 'clean' }];
     const groups = buildFindingGroups(units, []);
     expect(groups).toHaveLength(1);
-    expect(groups[0]).toMatchObject({ title: 'errored', error: 'timed out', errorCount: 0, warningCount: 0 });
+    expect(groups[0]).toMatchObject({
+      title: 'errored',
+      error: 'timed out',
+      errorCount: 0,
+      warningCount: 0,
+    });
   });
 
   it('omits location when the signal has no file path', () => {

@@ -54,9 +54,7 @@ describe('EnvRegistry', () => {
   });
 
   it('applies the default when unset, reporting source=default', () => {
-    const reg = new EnvRegistry([
-      { canonical: 'OST_TEST_VALUE', default: 'fallback', docs: 'x' },
-    ]);
+    const reg = new EnvRegistry([{ canonical: 'OST_TEST_VALUE', default: 'fallback', docs: 'x' }]);
     const result = reg.read('OST_TEST_VALUE');
     expect(result.value).toBe('fallback');
     expect(result.source).toBe('default');
@@ -80,7 +78,12 @@ describe('EnvRegistry', () => {
       { canonical: 'OST_TEST_CANON', docs: 'a' },
       { canonical: 'OST_TEST_VALUE', docs: 'b' },
     ]);
-    expect(reg.describe().map((s) => s.canonical).sort()).toEqual(['OST_TEST_CANON', 'OST_TEST_VALUE']);
+    expect(
+      reg
+        .describe()
+        .map((s) => s.canonical)
+        .sort(),
+    ).toEqual(['OST_TEST_CANON', 'OST_TEST_VALUE']);
     expect(reg.has('OST_TEST_CANON')).toBe(true);
     expect(reg.has('NOPE')).toBe(false);
   });

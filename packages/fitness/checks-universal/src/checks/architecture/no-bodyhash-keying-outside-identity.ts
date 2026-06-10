@@ -36,25 +36,25 @@
  * path guard makes the check inert in adopter repos and exempts the one allowed
  * home (`edge-identity.ts`).
  */
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 /** The graph cross-shard MERGE layer (where the F1 drift lived). */
-const MERGE_LAYER_SEGMENT = 'packages/graph/engine/src/cli/orchestrate/'
+const MERGE_LAYER_SEGMENT = 'packages/graph/engine/src/cli/orchestrate/';
 
 /** The ONE module allowed to key edges by a raw hash (it owns ownerEdgeKey). */
-const IDENTITY_MODULE_SUFFIX = '/edge-identity.ts'
+const IDENTITY_MODULE_SUFFIX = '/edge-identity.ts';
 
 /** A `__tests__` file is fixture-shaped, not production merge code. */
-const TEST_SEGMENT = '/__tests__/'
+const TEST_SEGMENT = '/__tests__/';
 
 /** True when a path is a merge-layer source file this check governs. */
 function isMergeLayerFile(filePath: string): boolean {
-  const p = filePath.replaceAll('\\', '/')
+  const p = filePath.replaceAll('\\', '/');
   return (
     p.includes(MERGE_LAYER_SEGMENT) &&
     !p.endsWith(IDENTITY_MODULE_SUFFIX) &&
     !p.includes(TEST_SEGMENT)
-  )
+  );
 }
 
 /**
@@ -63,7 +63,7 @@ function isMergeLayerFile(filePath: string): boolean {
  * is compliant and never matches — the `.get(`/`.set(` immediately precedes the
  * hash member access only when the raw hash IS the key.
  */
-const MAP_OP_KEY_RE = /\.(?:get|set)\(\s*[A-Za-z_$][\w$]*\.(bodyHash|ownerHash)\b/g
+const MAP_OP_KEY_RE = /\.(?:get|set)\(\s*[A-Za-z_$][\w$]*\.(bodyHash|ownerHash)\b/g;
 
 /**
  * An `appendEdge(<map>, <key>, ...)` whose KEY (the SECOND argument) is a BARE
@@ -72,7 +72,7 @@ const MAP_OP_KEY_RE = /\.(?:get|set)\(\s*[A-Za-z_$][\w$]*\.(bodyHash|ownerHash)\
  * after the comma).
  */
 const APPEND_EDGE_KEY_RE =
-  /appendEdge\(\s*[A-Za-z_$][\w$]*\s*,\s*[A-Za-z_$][\w$]*\.(bodyHash|ownerHash)\b/g
+  /appendEdge\(\s*[A-Za-z_$][\w$]*\s*,\s*[A-Za-z_$][\w$]*\.(bodyHash|ownerHash)\b/g;
 
 /**
  * Pure analysis over one merge-layer source file. Returns a finding for each
@@ -83,17 +83,17 @@ export function analyzeNoBodyhashKeyingOutsideIdentity(
   content: string,
   filePath: string,
 ): CheckViolation[] {
-  if (!isMergeLayerFile(filePath)) return []
+  if (!isMergeLayerFile(filePath)) return [];
 
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
   for (const [i, rawLine] of lines.entries()) {
     // Skip comment lines so prose explaining the keying isn't flagged.
-    const trimmed = rawLine.trimStart()
-    if (trimmed.startsWith('*') || trimmed.startsWith('//')) continue
-    const matches = [...rawLine.matchAll(MAP_OP_KEY_RE), ...rawLine.matchAll(APPEND_EDGE_KEY_RE)]
+    const trimmed = rawLine.trimStart();
+    if (trimmed.startsWith('*') || trimmed.startsWith('//')) continue;
+    const matches = [...rawLine.matchAll(MAP_OP_KEY_RE), ...rawLine.matchAll(APPEND_EDGE_KEY_RE)];
     for (const m of matches) {
-      const hashField = m[1]
+      const hashField = m[1];
       violations.push({
         line: i + 1,
         filePath,
@@ -109,10 +109,10 @@ export function analyzeNoBodyhashKeyingOutsideIdentity(
           `ownerEdgeKey(<x>.bodyHash, <x>.filePath) — never a raw '${hashField}'. The ` +
           `cross-shard merge is pure orchestration; it owns no independent keying.`,
         type: 'no-bodyhash-keying-outside-identity',
-      })
+      });
     }
   }
-  return violations
+  return violations;
 }
 
 /**
@@ -122,13 +122,13 @@ export function analyzeNoBodyhashKeyingOutsideIdentity(
 export async function analyzeAllNoBodyhashKeyingOutsideIdentity(
   files: FileAccessor,
 ): Promise<CheckViolation[]> {
-  const violations: CheckViolation[] = []
-  const candidates = files.paths.filter((p) => p.endsWith('.ts') && isMergeLayerFile(p))
-  const contents = await files.readMany(candidates)
+  const violations: CheckViolation[] = [];
+  const candidates = files.paths.filter((p) => p.endsWith('.ts') && isMergeLayerFile(p));
+  const contents = await files.readMany(candidates);
   for (const [filePath, content] of contents) {
-    violations.push(...analyzeNoBodyhashKeyingOutsideIdentity(content, filePath))
+    violations.push(...analyzeNoBodyhashKeyingOutsideIdentity(content, filePath));
   }
-  return violations
+  return violations;
 }
 
 export const noBodyhashKeyingOutsideIdentity = defineCheck({
@@ -142,4 +142,4 @@ export const noBodyhashKeyingOutsideIdentity = defineCheck({
   // raw content: the map-key shape is a code member-access, not a string.
   contentFilter: 'raw',
   analyzeAll: analyzeAllNoBodyhashKeyingOutsideIdentity,
-})
+});

@@ -110,11 +110,7 @@ describe('graph-go branch coverage', () => {
   it('readGoModulePath handles quoted module path (module "<path>")', () => {
     // Exercises the `match[2]` branch of `match[2] ?? match[3] ?? null`
     // in readGoModulePath (the quoted-form capture group).
-    writeFileSync(
-      join(dir, 'go.mod'),
-      `module "github.com/example/quoted"\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'go.mod'), `module "github.com/example/quoted"\n`, 'utf8');
     writeFileSync(
       join(dir, 'main.go'),
       `package main\nimport "github.com/example/quoted"\nfunc main() {}\n`,
@@ -132,11 +128,7 @@ describe('graph-go branch coverage', () => {
 
   it('resolves an import path that EQUALS the module path (bare module import)', () => {
     // Covers the `specifier === modulePath` branch in resolveGoImportPath.
-    writeFileSync(
-      join(dir, 'go.mod'),
-      `module github.com/example/myproj\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'go.mod'), `module github.com/example/myproj\n`, 'utf8');
     writeFileSync(
       join(dir, 'main.go'),
       `package main\n\nimport "github.com/example/myproj"\n\nfunc main() {}\n`,
@@ -179,7 +171,9 @@ describe('graph-go branch coverage', () => {
     // emit whatever it can. We just assert no exception and that the
     // module-init was produced.
     expect(walked.parseErrors).toEqual([]);
-    const moduleInits = Object.keys(walked.occurrences).filter((n) => n.startsWith('<module-init:'));
+    const moduleInits = Object.keys(walked.occurrences).filter((n) =>
+      n.startsWith('<module-init:'),
+    );
     expect(moduleInits.length).toBe(1);
   });
 });

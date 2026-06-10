@@ -22,15 +22,12 @@
  * importing it from a single, stable location.
  */
 
-import { evaluateOperator } from '../assertions.js'
-import { resolveMetric } from '../resolve-metric.js'
+import { evaluateOperator } from '../assertions.js';
+import { resolveMetric } from '../resolve-metric.js';
 
-import { ScenarioAbortedError } from './scenario-aborted-error.js'
+import { ScenarioAbortedError } from './scenario-aborted-error.js';
 
-import type {
-  SimulationMetrics,
-  ScenarioAssertion,
-} from '../../types/base-types.js'
+import type { SimulationMetrics, ScenarioAssertion } from '../../types/base-types.js';
 
 // =============================================================================
 // ASSERTION VALIDATION
@@ -44,21 +41,21 @@ export function validateAssertions(
   assertions: ScenarioAssertion[],
 ): { passed: boolean; failed: { assertion: ScenarioAssertion; actual: number }[] } {
   if (!Array.isArray(assertions)) {
-    return { passed: false, failed: [] }
+    return { passed: false, failed: [] };
   }
 
-  const failed: { assertion: ScenarioAssertion; actual: number }[] = []
+  const failed: { assertion: ScenarioAssertion; actual: number }[] = [];
 
   for (const assertion of assertions) {
-    const actual = resolveMetric(assertion.metric, metrics)
-    const passed = evaluateOperator(actual, assertion.operator, assertion.value)
+    const actual = resolveMetric(assertion.metric, metrics);
+    const passed = evaluateOperator(actual, assertion.operator, assertion.value);
 
     if (!passed) {
-      failed.push({ assertion, actual })
+      failed.push({ assertion, actual });
     }
   }
 
-  return { passed: failed.length === 0, failed }
+  return { passed: failed.length === 0, failed };
 }
 
 // =============================================================================
@@ -74,18 +71,18 @@ export function validateAssertions(
  * maintaining a full sample set is impractical.
  */
 export function updateLatencyMetrics(metrics: SimulationMetrics, latency: number): void {
-  const n = metrics.totalRequests
+  const n = metrics.totalRequests;
   if (n === 0) {
-    metrics.avgLatencyMs = latency
-    metrics.p50LatencyMs = latency
-    metrics.p95LatencyMs = latency
-    metrics.p99LatencyMs = latency
+    metrics.avgLatencyMs = latency;
+    metrics.p50LatencyMs = latency;
+    metrics.p95LatencyMs = latency;
+    metrics.p99LatencyMs = latency;
   } else {
-    metrics.avgLatencyMs = (metrics.avgLatencyMs * (n - 1) + latency) / n
+    metrics.avgLatencyMs = (metrics.avgLatencyMs * (n - 1) + latency) / n;
     // Rough estimates — use LatencyTracker.getLatencySnapshot() for real percentiles
-    metrics.p50LatencyMs = metrics.avgLatencyMs * 0.9
-    metrics.p95LatencyMs = metrics.avgLatencyMs * 1.5
-    metrics.p99LatencyMs = metrics.avgLatencyMs * 2
+    metrics.p50LatencyMs = metrics.avgLatencyMs * 0.9;
+    metrics.p95LatencyMs = metrics.avgLatencyMs * 1.5;
+    metrics.p99LatencyMs = metrics.avgLatencyMs * 2;
   }
 }
 
@@ -100,22 +97,22 @@ export function updateLatencyMetrics(metrics: SimulationMetrics, latency: number
 export function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
-      reject(new ScenarioAbortedError())
-      return
+      reject(new ScenarioAbortedError());
+      return;
     }
 
     const abortHandler = () => {
-      clearTimeout(timeout)
-      reject(new ScenarioAbortedError())
-    }
+      clearTimeout(timeout);
+      reject(new ScenarioAbortedError());
+    };
 
     const timeout = setTimeout(() => {
-      signal.removeEventListener('abort', abortHandler)
-      resolve()
-    }, ms)
+      signal.removeEventListener('abort', abortHandler);
+      resolve();
+    }, ms);
 
-    signal.addEventListener('abort', abortHandler, { once: true })
-  })
+    signal.addEventListener('abort', abortHandler, { once: true });
+  });
 }
 
 // =============================================================================
@@ -128,8 +125,8 @@ export function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
  */
 export function scenarioAborted(signal: AbortSignal | undefined, scenarioId?: string): void {
   if (signal?.aborted) {
-    throw new ScenarioAbortedError(scenarioId)
+    throw new ScenarioAbortedError(scenarioId);
   }
 }
 
-export { ScenarioAbortedError } from './scenario-aborted-error.js'
+export { ScenarioAbortedError } from './scenario-aborted-error.js';

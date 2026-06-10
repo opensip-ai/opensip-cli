@@ -1,8 +1,7 @@
+import { parseJava, type JavaTree } from './parse.js';
+import { stripComments, stripStrings } from './strip.js';
 
-import { parseJava, type JavaTree } from './parse.js'
-import { stripComments, stripStrings } from './strip.js'
-
-import type { LanguageAdapter } from '@opensip-tools/core'
+import type { LanguageAdapter } from '@opensip-tools/core';
 
 export const javaAdapter: LanguageAdapter<JavaTree> = {
   id: 'java',
@@ -10,7 +9,7 @@ export const javaAdapter: LanguageAdapter<JavaTree> = {
   parse: parseJava,
   stripStrings,
   stripComments,
-}
+};
 
 /** Plugin contract — exported as the lang plugin's `adapters` array. */
-export const adapters = [javaAdapter] as const
+export const adapters = [javaAdapter] as const;

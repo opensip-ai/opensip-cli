@@ -8,23 +8,28 @@
  * the compiled artifact shadows the source file.
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
-const SOURCE_DIRS = ['src/', 'lib/']
-const ARTIFACT_EXTENSIONS = ['.js', '.d.ts', '.js.map']
+const SOURCE_DIRS = ['src/', 'lib/'];
+const ARTIFACT_EXTENSIONS = ['.js', '.d.ts', '.js.map'];
 
 function isArtifactInSource(filePath: string): { ext: string } | null {
   // Must be in a source directory
-  const inSource = SOURCE_DIRS.some(d => filePath.includes(`/${d}`) || filePath.startsWith(d))
-  if (!inSource) return null
+  const inSource = SOURCE_DIRS.some((d) => filePath.includes(`/${d}`) || filePath.startsWith(d));
+  if (!inSource) return null;
 
   // Must not be in dist/, node_modules/, or .cache/
-  if (filePath.includes('/dist/') || filePath.includes('/node_modules/') || filePath.includes('/.cache/')) return null
+  if (
+    filePath.includes('/dist/') ||
+    filePath.includes('/node_modules/') ||
+    filePath.includes('/.cache/')
+  )
+    return null;
 
   for (const ext of ARTIFACT_EXTENSIONS) {
-    if (filePath.endsWith(ext)) return { ext }
+    if (filePath.endsWith(ext)) return { ext };
   }
-  return null
+  return null;
 }
 
 export const staleBuildArtifacts = defineCheck({
@@ -32,15 +37,16 @@ export const staleBuildArtifacts = defineCheck({
   slug: 'stale-build-artifacts',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   confidence: 'high',
-  description: 'Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/',
+  description:
+    'Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/',
   tags: ['architecture', 'build', 'hygiene'],
 
   // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     for (const filePath of files.paths) {
-      const result = isArtifactInSource(filePath)
+      const result = isArtifactInSource(filePath);
       if (result) {
         violations.push({
           filePath,
@@ -49,10 +55,10 @@ export const staleBuildArtifacts = defineCheck({
           severity: 'error',
           suggestion: `Delete ${filePath} and ensure .gitignore excludes compiled files from source directories.`,
           type: 'STALE_ARTIFACT',
-        })
+        });
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

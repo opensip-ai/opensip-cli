@@ -6,7 +6,7 @@
  * (`graph:<…>`), so the parsed id is used directly as `rule`.
  */
 
-import type { DirectiveInfo } from './types.js'
+import type { DirectiveInfo } from './types.js';
 
 function extractGraphDirective(
   line: string,
@@ -14,42 +14,42 @@ function extractGraphDirective(
   filePath: string,
   file: string,
 ): DirectiveInfo | null {
-  const fileMarker = '@graph-ignore-file'
-  const nextLineMarker = '@graph-ignore-next-line'
+  const fileMarker = '@graph-ignore-file';
+  const nextLineMarker = '@graph-ignore-next-line';
 
-  let scopeType: 'file' | 'next-line'
-  let markerEnd: number
+  let scopeType: 'file' | 'next-line';
+  let markerEnd: number;
 
-  const fileIdx = line.indexOf(fileMarker)
-  const nextLineIdx = line.indexOf(nextLineMarker)
+  const fileIdx = line.indexOf(fileMarker);
+  const nextLineIdx = line.indexOf(nextLineMarker);
 
   if (fileIdx !== -1) {
-    scopeType = 'file'
-    markerEnd = fileIdx + fileMarker.length
+    scopeType = 'file';
+    markerEnd = fileIdx + fileMarker.length;
   } else if (nextLineIdx === -1) {
-    return null
+    return null;
   } else {
-    scopeType = 'next-line'
-    markerEnd = nextLineIdx + nextLineMarker.length
+    scopeType = 'next-line';
+    markerEnd = nextLineIdx + nextLineMarker.length;
   }
 
   // Extract rule id and reason
-  const afterMarker = line.slice(markerEnd).trim()
-  const spaceIdx = afterMarker.indexOf(' ')
+  const afterMarker = line.slice(markerEnd).trim();
+  const spaceIdx = afterMarker.indexOf(' ');
   if (spaceIdx === -1) {
-    return null
+    return null;
   }
 
-  const ruleId = afterMarker.slice(0, spaceIdx)
-  const rest = afterMarker.slice(spaceIdx).trim()
+  const ruleId = afterMarker.slice(0, spaceIdx);
+  const rest = afterMarker.slice(spaceIdx).trim();
 
   // Look for -- separator
-  const separatorIdx = rest.indexOf('--')
+  const separatorIdx = rest.indexOf('--');
   if (separatorIdx === -1) {
-    return null
+    return null;
   }
 
-  const reason = rest.slice(separatorIdx + 2).trim()
+  const reason = rest.slice(separatorIdx + 2).trim();
 
   return {
     file,
@@ -60,7 +60,7 @@ function extractGraphDirective(
     rule: ruleId,
     reason,
     raw: line.trim(),
-  }
+  };
 }
 
 export function parseGraphDirectives(
@@ -68,19 +68,19 @@ export function parseGraphDirectives(
   filePath: string,
   file: string,
 ): DirectiveInfo[] {
-  const directives: DirectiveInfo[] = []
-  const lines = content.split('\n')
+  const directives: DirectiveInfo[] = [];
+  const lines = content.split('\n');
 
   for (const [i, line] of lines.entries()) {
     if (line === undefined) {
-      continue
+      continue;
     }
 
-    const directive = extractGraphDirective(line, i, filePath, file)
+    const directive = extractGraphDirective(line, i, filePath, file);
     if (directive) {
-      directives.push(directive)
+      directives.push(directive);
     }
   }
 
-  return directives
+  return directives;
 }

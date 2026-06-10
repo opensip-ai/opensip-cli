@@ -5,18 +5,17 @@
  * Ensures all subscriptions, connections, and resources are disposed.
  */
 
-
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Context for creating violations
  */
 interface ViolationContext {
-  absolutePath: string
-  content: string
-  sourceFile: ts.SourceFile
+  absolutePath: string;
+  content: string;
+  sourceFile: ts.SourceFile;
 }
 
 /**
@@ -26,20 +25,20 @@ interface ViolationContext {
  */
 function classImplementsDisposable(node: ts.ClassDeclaration): boolean {
   if (!node.heritageClauses) {
-    return false
+    return false;
   }
 
   return node.heritageClauses.some((clause) => {
     // @fitness-ignore-next-line unsafe-secret-comparison -- Comparing TypeScript AST syntax kind token, not a cryptographic token
     if (clause.token !== ts.SyntaxKind.ImplementsKeyword) {
-      return false
+      return false;
     }
     return clause.types.some(
       (type) =>
         ts.isIdentifier(type.expression) &&
         (type.expression.text === 'IDisposable' || type.expression.text === 'Disposable'),
-    )
-  })
+    );
+  });
 }
 
 /**
@@ -50,8 +49,8 @@ function classImplementsDisposable(node: ts.ClassDeclaration): boolean {
 function findDisposeMethod(node: ts.ClassDeclaration): ts.MethodDeclaration | undefined {
   const member = node.members.find(
     (m) => ts.isMethodDeclaration(m) && ts.isIdentifier(m.name) && m.name.text === 'dispose',
-  )
-  return member as ts.MethodDeclaration | undefined
+  );
+  return member as ts.MethodDeclaration | undefined;
 }
 
 /**
@@ -66,8 +65,10 @@ function createMissingDisposeViolation(
   node: ts.ClassDeclaration,
   className: string,
 ): CheckViolation {
-  const { line: lineIdx, character } = ctx.sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const line = lineIdx + 1
+  const { line: lineIdx, character } = ctx.sourceFile.getLineAndCharacterOfPosition(
+    node.getStart(),
+  );
+  const line = lineIdx + 1;
 
   return {
     line,
@@ -77,7 +78,7 @@ function createMissingDisposeViolation(
     suggestion: `Add 'dispose(): void { /* cleanup subscriptions, connections, timers */ }' method to ${className}`,
     type: 'missing-dispose',
     match: className,
-  }
+  };
 }
 
 /**
@@ -94,8 +95,8 @@ function createEmptyDisposeViolation(
 ): CheckViolation {
   const { line: lineIdx, character } = ctx.sourceFile.getLineAndCharacterOfPosition(
     disposeMethod.getStart(),
-  )
-  const line = lineIdx + 1
+  );
+  const line = lineIdx + 1;
 
   return {
     line,
@@ -105,7 +106,7 @@ function createEmptyDisposeViolation(
     suggestion: `Add cleanup logic to dispose(): unsubscribe from subscriptions, close connections, clear timers`,
     type: 'empty-dispose',
     match: `${className}.dispose`,
-  }
+  };
 }
 
 /**
@@ -114,8 +115,8 @@ function createEmptyDisposeViolation(
  * @returns True if the dispose method body is empty
  */
 function isDisposeMethodEmpty(disposeMethod: ts.MethodDeclaration): boolean {
-  const methodBody = disposeMethod.body
-  return Boolean(methodBody && ts.isBlock(methodBody) && methodBody.statements.length === 0)
+  const methodBody = disposeMethod.body;
+  return Boolean(methodBody && ts.isBlock(methodBody) && methodBody.statements.length === 0);
 }
 
 /**
@@ -125,10 +126,10 @@ function isDisposeMethodEmpty(disposeMethod: ts.MethodDeclaration): boolean {
  */
 function isSubscriptionField(member: ts.ClassElement): member is ts.PropertyDeclaration {
   if (!ts.isPropertyDeclaration(member) || !ts.isIdentifier(member.name)) {
-    return false
+    return false;
   }
-  const nameLower = member.name.text.toLowerCase()
-  return nameLower.includes('subscription') || nameLower.includes('listener')
+  const nameLower = member.name.text.toLowerCase();
+  return nameLower.includes('subscription') || nameLower.includes('listener');
 }
 
 /**
@@ -145,8 +146,8 @@ function createUncleanedSubscriptionViolation(
 ): CheckViolation {
   const { line: lineIdx, character } = ctx.sourceFile.getLineAndCharacterOfPosition(
     field.getStart(),
-  )
-  const line = lineIdx + 1
+  );
+  const line = lineIdx + 1;
 
   return {
     line,
@@ -156,7 +157,7 @@ function createUncleanedSubscriptionViolation(
     suggestion: `Add 'this.${fieldName}?.unsubscribe();' or 'this.${fieldName} = null;' in the dispose() method`,
     type: 'uncleaned-subscription',
     match: fieldName,
-  }
+  };
 }
 
 /**
@@ -171,22 +172,22 @@ function checkSubscriptionFields(
   node: ts.ClassDeclaration,
   disposeMethod: ts.MethodDeclaration,
 ): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
   /* v8 ignore next -- defensive nullish fallback */
-  const disposeBody = disposeMethod.body?.getText(ctx.sourceFile) ?? ''
+  const disposeBody = disposeMethod.body?.getText(ctx.sourceFile) ?? '';
 
   for (const member of node.members) {
     if (!isSubscriptionField(member)) {
-      continue
+      continue;
     }
 
-    const fieldName = (member.name as ts.Identifier).text
+    const fieldName = (member.name as ts.Identifier).text;
     if (!disposeBody.includes(fieldName)) {
-      violations.push(createUncleanedSubscriptionViolation(ctx, member, fieldName))
+      violations.push(createUncleanedSubscriptionViolation(ctx, member, fieldName));
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -199,27 +200,27 @@ function analyzeClassDeclaration(
   ctx: ViolationContext,
   node: ts.ClassDeclaration,
 ): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   if (!node.name || !classImplementsDisposable(node)) {
-    return violations
+    return violations;
   }
 
-  const className = node.name.text
-  const disposeMethod = findDisposeMethod(node)
+  const className = node.name.text;
+  const disposeMethod = findDisposeMethod(node);
 
   if (!disposeMethod) {
-    violations.push(createMissingDisposeViolation(ctx, node, className))
-    return violations
+    violations.push(createMissingDisposeViolation(ctx, node, className));
+    return violations;
   }
 
   if (isDisposeMethodEmpty(disposeMethod)) {
-    violations.push(createEmptyDisposeViolation(ctx, disposeMethod, className))
+    violations.push(createEmptyDisposeViolation(ctx, disposeMethod, className));
   }
 
-  violations.push(...checkSubscriptionFields(ctx, node, disposeMethod))
+  violations.push(...checkSubscriptionFields(ctx, node, disposeMethod));
 
-  return violations
+  return violations;
 }
 
 /**
@@ -229,23 +230,23 @@ function analyzeClassDeclaration(
  * @returns Array of violations
  */
 function analyzeFile(absolutePath: string, content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
-  const sourceFile = getSharedSourceFile(absolutePath, content)
-    /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+  const sourceFile = getSharedSourceFile(absolutePath, content);
+  /* v8 ignore next -- defensive guard */
+  if (!sourceFile) return [];
 
-  const ctx: ViolationContext = { absolutePath, content, sourceFile }
+  const ctx: ViolationContext = { absolutePath, content, sourceFile };
 
   const visit = (node: ts.Node) => {
     if (ts.isClassDeclaration(node)) {
-      violations.push(...analyzeClassDeclaration(ctx, node))
+      violations.push(...analyzeClassDeclaration(ctx, node));
     }
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
 
-  visit(sourceFile)
-  return violations
+  visit(sourceFile);
+  return violations;
 }
 
 /**
@@ -279,11 +280,11 @@ export const disposePatternCompleteness = defineCheck({
       content.includes('dispose') ||
       content.includes('Disposable') ||
       content.includes('subscription') ||
-      content.includes('unsubscribe')
+      content.includes('unsubscribe');
     if (!hasDisposePatterns) {
-      return []
+      return [];
     }
 
-    return analyzeFile(filePath, content)
+    return analyzeFile(filePath, content);
   },
-})
+});

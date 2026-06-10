@@ -160,9 +160,7 @@ describe('mountCommandSpec — wiring', () => {
     expect((handler.mock.calls[0]?.[0] as Record<string, unknown>).mode).toBe('a');
 
     // Out-of-choice value rejected.
-    await expect(
-      program.parseAsync(['pick', '--mode', 'zzz'], { from: 'user' }),
-    ).rejects.toThrow();
+    await expect(program.parseAsync(['pick', '--mode', 'zzz'], { from: 'user' })).rejects.toThrow();
   });
 
   it('seeds a fresh array for an arrayDefault repeatable option via its parse reducer', async () => {
@@ -252,7 +250,9 @@ describe('mountCommandSpec — wiring', () => {
       handler: () => undefined,
     });
 
-    expect(() => mountCommandSpec(program, spec, ctx)).toThrow(/only value options can be required/);
+    expect(() => mountCommandSpec(program, spec, ctx)).toThrow(
+      /only value options can be required/,
+    );
   });
 });
 
@@ -475,9 +475,9 @@ describe('mountCommandSpec — leaner host CommandMountContext', () => {
     });
     mountCommandSpec(program, spec, ctx);
 
-    await expect(
-      program.parseAsync(['envhost', '--json'], { from: 'user' }),
-    ).rejects.toThrow(/no emitEnvelope/);
+    await expect(program.parseAsync(['envhost', '--json'], { from: 'user' })).rejects.toThrow(
+      /no emitEnvelope/,
+    );
   });
 
   it('live-view throws when the lean context lacks renderLive', async () => {
@@ -493,8 +493,8 @@ describe('mountCommandSpec — leaner host CommandMountContext', () => {
     });
     mountCommandSpec(program, spec, ctx);
 
-    await expect(
-      program.parseAsync(['livehost'], { from: 'user' }),
-    ).rejects.toThrow(/no renderLive/);
+    await expect(program.parseAsync(['livehost'], { from: 'user' })).rejects.toThrow(
+      /no renderLive/,
+    );
   });
 });

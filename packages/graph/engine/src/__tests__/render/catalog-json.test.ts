@@ -26,15 +26,8 @@ import {
   deriveOpenSipSymbolId,
 } from '../../render/opensip-id-derivation.js';
 
-import type {
-  CatalogExportProvenance,
-} from '../../render/catalog-json-types.js';
-import type {
-  CallEdge,
-  Catalog,
-  FunctionOccurrence,
-  Indexes,
-} from '../../types.js';
+import type { CatalogExportProvenance } from '../../render/catalog-json-types.js';
+import type { CallEdge, Catalog, FunctionOccurrence, Indexes } from '../../types.js';
 
 const REPO_ID = 'REP_test_repo';
 const GIT_SHA = 'abc1234567890abc1234567890abc1234567890a';
@@ -162,7 +155,15 @@ describe('renderCatalogJson — symbol rows', () => {
       repoId: REPO_ID,
       gitSha: GIT_SHA,
     });
-    const parsed = JSON.parse(json) as { symbols: { id: string; modulePath: string; kind: string; qualifiedName: string; arity: number | null }[] };
+    const parsed = JSON.parse(json) as {
+      symbols: {
+        id: string;
+        modulePath: string;
+        kind: string;
+        qualifiedName: string;
+        arity: number | null;
+      }[];
+    };
     for (const sym of parsed.symbols) {
       const expected = deriveOpenSipSymbolId({
         repoId: REPO_ID,
@@ -198,7 +199,9 @@ describe('renderCatalogJson — symbol rows', () => {
       repoId: REPO_ID,
       gitSha: GIT_SHA,
     });
-    const parsed = JSON.parse(json) as { symbols: { qualifiedName: string; arity: number | null }[] };
+    const parsed = JSON.parse(json) as {
+      symbols: { qualifiedName: string; arity: number | null }[];
+    };
     const greet = parsed.symbols.find((s) => s.qualifiedName === 'src/greet.greet');
     const formatName = parsed.symbols.find((s) => s.qualifiedName === 'src/format.formatName');
     expect(greet?.arity).toBe(0);
@@ -213,11 +216,13 @@ describe('renderCatalogJson — symbol rows', () => {
       repoId: REPO_ID,
       gitSha: GIT_SHA,
     });
-    const parsed = JSON.parse(json) as { symbols: { qualifiedName: string; isExported: boolean }[] };
+    const parsed = JSON.parse(json) as {
+      symbols: { qualifiedName: string; isExported: boolean }[];
+    };
     const greet = parsed.symbols.find((s) => s.qualifiedName === 'src/greet.greet');
     const formatName = parsed.symbols.find((s) => s.qualifiedName === 'src/format.formatName');
-    expect(greet?.isExported).toBe(false);     // visibility: 'module-local'
-    expect(formatName?.isExported).toBe(true);  // visibility: 'exported'
+    expect(greet?.isExported).toBe(false); // visibility: 'module-local'
+    expect(formatName?.isExported).toBe(true); // visibility: 'exported'
   });
 });
 
@@ -512,6 +517,8 @@ describe('renderCatalogJson — dependency edges (Phase 4)', () => {
       repoId: REPO_ID,
       gitSha: GIT_SHA,
     });
-    await expect(json).toMatchFileSnapshot('./__fixtures__/catalog-json/two-modules-with-deps.json');
+    await expect(json).toMatchFileSnapshot(
+      './__fixtures__/catalog-json/two-modules-with-deps.json',
+    );
   });
 });

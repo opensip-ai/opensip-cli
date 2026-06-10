@@ -9,19 +9,19 @@
  * windows hold.
  */
 
-import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
-import { createFaultModel } from '../../framework/execution/fault-model.js'
-import { runLoadWindow } from '../../framework/execution/run-load-window.js'
-import { ScenarioResultBuilder } from '../../framework/result-builder.js'
-import { createScenarioLogger } from '../../framework/scenario-logger.js'
+import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js';
+import { createFaultModel } from '../../framework/execution/fault-model.js';
+import { runLoadWindow } from '../../framework/execution/run-load-window.js';
+import { ScenarioResultBuilder } from '../../framework/result-builder.js';
+import { createScenarioLogger } from '../../framework/scenario-logger.js';
 
-import type { ChaosScenarioConfig } from './config.js'
-import type { ChaosAssertionVerdict, ChaosEvent } from './result.js'
-import type { FaultModelDeps } from '../../framework/execution/fault-model.js'
-import type { RunnableScenario } from '../../framework/runnable-scenario.js'
-import type { ChaosScenarioExecutorResult } from '../../framework/scenario-executor-result.js'
-import type { SimulationMetrics } from '../../types/base-types.js'
-import type { ScenarioExecutionContext } from '../../types/framework-types.js'
+import type { ChaosScenarioConfig } from './config.js';
+import type { ChaosAssertionVerdict, ChaosEvent } from './result.js';
+import type { FaultModelDeps } from '../../framework/execution/fault-model.js';
+import type { RunnableScenario } from '../../framework/runnable-scenario.js';
+import type { ChaosScenarioExecutorResult } from '../../framework/scenario-executor-result.js';
+import type { SimulationMetrics } from '../../types/base-types.js';
+import type { ScenarioExecutionContext } from '../../types/framework-types.js';
 
 function evaluateAssertionsForWindow(
   scenarioId: string,
@@ -33,11 +33,11 @@ function evaluateAssertionsForWindow(
     .withMetrics(metrics)
     .withDuration(durationSeconds)
     .evaluateAssertions(assertions)
-    .build()
+    .build();
   return {
     passed: built.assertions.passed,
     failed: built.assertions.failed,
-  }
+  };
 }
 
 /**
@@ -60,49 +60,48 @@ export function createChaosScenarioRunner(
     run:
       /** @throws {ScenarioAbortedError} When the scenario is aborted via AbortSignal */
       async (abortSignal: AbortSignal): Promise<ChaosScenarioExecutorResult> => {
-        const correlationId = `scenario-${config.id}-${Date.now().toString(36)}`
+        const correlationId = `scenario-${config.id}-${Date.now().toString(36)}`;
         const context: ScenarioExecutionContext = {
           scenarioId: config.id,
           correlationId,
           abortSignal,
           logger: createScenarioLogger(config.id),
-        }
+        };
         if (abortSignal.aborted) {
-          throw new ScenarioAbortedError(config.id)
+          throw new ScenarioAbortedError(config.id);
         }
 
-        const startTime = Date.now()
+        const startTime = Date.now();
         try {
-          const faultModel = createFaultModel(config.fault, deps)
+          const faultModel = createFaultModel(config.fault, deps);
 
           // Steady-state window: drive the fault-decorated target.
-          const steadyStart = Date.now()
+          const steadyStart = Date.now();
           const steady = await runLoadWindow({ workload: config.workload }, context, {
             windowMs: config.duration * 1000,
             target: faultModel.wrap(config.target),
-          })
+          });
 
           // Recovery window: faults lifted — drive the bare target.
           const recovery = await runLoadWindow({ workload: config.workload }, context, {
             windowMs: config.recoveryWindow,
             target: config.target,
-          })
+          });
 
           const steadyVerdict = evaluateAssertionsForWindow(
             config.id,
             steady.metrics,
             config.duration,
             config.steadyStateAssertions,
-          )
+          );
           const recoveryVerdict = evaluateAssertionsForWindow(
             config.id,
             recovery.metrics,
             config.recoveryWindow / 1000,
             config.recoveryAssertions,
-          )
+          );
 
-          const passed =
-            steadyVerdict.failed.length === 0 && recoveryVerdict.failed.length === 0
+          const passed = steadyVerdict.failed.length === 0 && recoveryVerdict.failed.length === 0;
 
           const chaosEvents: readonly ChaosEvent[] = Object.freeze(
             faultModel.drained().map((f) =>
@@ -112,7 +111,7 @@ export function createChaosScenarioRunner(
                 target: 'client',
               }),
             ),
-          )
+          );
 
           return Object.freeze({
             kind: 'chaos' as const,
@@ -128,13 +127,13 @@ export function createChaosScenarioRunner(
               chaosEvents,
               recoveryWindowMs: config.recoveryWindow,
             }),
-          })
+          });
         } catch (error) {
           if (abortSignal.aborted) {
-            throw new ScenarioAbortedError(config.id)
+            throw new ScenarioAbortedError(config.id);
           }
-          throw error
+          throw error;
         }
       },
-  })
+  });
 }

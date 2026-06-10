@@ -16,44 +16,44 @@
  * (omitting the base) would silently lose the shared timeouts/defaults, exactly
  * the gap that caused the failure.
  */
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 /** A per-package vitest config filename this check governs. Real-run fixture
  *  exclusion is handled by the project config's `globalExcludes` (the
  *  `__fixtures__` glob), NOT here — so the per-check fixture-coverage harness,
  *  which runs from inside a fixture tree, still exercises this check. */
 function isVitestConfigPath(filePath: string): boolean {
-  const base = path.basename(filePath)
-  return base === 'vitest.config.ts' || base === 'vitest.config.mts'
+  const base = path.basename(filePath);
+  return base === 'vitest.config.ts' || base === 'vitest.config.mts';
 }
 
 /** Shared-base filenames that satisfy "the repo centralizes vitest defaults". */
-const BASE_REL_CANDIDATES = ['.config/vitest.base.ts', '.config/vitest.base.mts'] as const
+const BASE_REL_CANDIDATES = ['.config/vitest.base.ts', '.config/vitest.base.mts'] as const;
 
 /** Walk up from a config file to find a repo-root that holds the shared base. */
 function findSharedBase(fromConfigPath: string, exists: (p: string) => boolean): boolean {
-  let dir = path.dirname(path.resolve(fromConfigPath))
+  let dir = path.dirname(path.resolve(fromConfigPath));
   for (;;) {
-    if (BASE_REL_CANDIDATES.some((rel) => exists(path.join(dir, rel)))) return true
-    const parent = path.dirname(dir)
-    if (parent === dir) return false
-    dir = parent
+    if (BASE_REL_CANDIDATES.some((rel) => exists(path.join(dir, rel)))) return true;
+    const parent = path.dirname(dir);
+    if (parent === dir) return false;
+    dir = parent;
   }
 }
 
 /** Token a config must contain to count as "extends the base" — it appears in
  *  the base import specifier (`.../.config/vitest.base.js`). Loose by intent: any
  *  `.js`/`.ts`/`.mts` specifier and any relative depth match. */
-const BASE_REFERENCE_TOKEN = 'vitest.base'
+const BASE_REFERENCE_TOKEN = 'vitest.base';
 
 /** Input for the pure detector (fs + content injected for testability). */
 export interface VitestExtendsBaseInput {
-  readonly vitestConfigPaths: readonly string[]
-  readonly exists: (filePath: string) => boolean
-  readonly readContent: (filePath: string) => string
+  readonly vitestConfigPaths: readonly string[];
+  readonly exists: (filePath: string) => boolean;
+  readonly readContent: (filePath: string) => string;
 }
 
 /**
@@ -62,13 +62,13 @@ export interface VitestExtendsBaseInput {
  * (otherwise returns `[]`, keeping the check inert for non-adopters).
  */
 export function detectConfigsNotExtendingBase(input: VitestExtendsBaseInput): CheckViolation[] {
-  if (input.vitestConfigPaths.length === 0) return []
-  const baseExists = findSharedBase(input.vitestConfigPaths[0], input.exists)
-  if (!baseExists) return []
+  if (input.vitestConfigPaths.length === 0) return [];
+  const baseExists = findSharedBase(input.vitestConfigPaths[0], input.exists);
+  if (!baseExists) return [];
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
   for (const configPath of input.vitestConfigPaths) {
-    if (input.readContent(configPath).includes(BASE_REFERENCE_TOKEN)) continue
+    if (input.readContent(configPath).includes(BASE_REFERENCE_TOKEN)) continue;
     violations.push({
       filePath: configPath,
       line: 1,
@@ -78,9 +78,9 @@ export function detectConfigsNotExtendingBase(input: VitestExtendsBaseInput): Ch
         'vitest.config does not extend the shared .config/vitest.base — its timeouts/defaults will diverge from the rest of the workspace (the gap that broke the v2.7.0 release).',
       suggestion:
         "Import { vitestBase } from the repo's `.config/vitest.base.js` and `export default mergeConfig(vitestBase, defineConfig({ /* include + coverage only */ }))`.",
-    })
+    });
   }
-  return violations
+  return violations;
 }
 
 export const vitestConfigExtendsBase = defineCheck({
@@ -88,7 +88,8 @@ export const vitestConfigExtendsBase = defineCheck({
   slug: 'vitest-config-extends-base',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   confidence: 'high',
-  description: 'Per-package vitest configs must extend the shared .config/vitest.base (when one exists)',
+  description:
+    'Per-package vitest configs must extend the shared .config/vitest.base (when one exists)',
   longDescription: `**Purpose:** When a repo centralizes its vitest defaults in \`.config/vitest.base.{ts,mts}\`, every per-package \`vitest.config.{ts,mts}\` must extend it (import the base + \`mergeConfig\`), so shared settings like \`testTimeout\`/\`hookTimeout\` cannot silently diverge.
 
 **Detects:**
@@ -100,16 +101,16 @@ export const vitestConfigExtendsBase = defineCheck({
   tags: ['architecture', 'testing'],
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const vitestConfigPaths = files.paths.filter(isVitestConfigPath)
-    if (vitestConfigPaths.length === 0) return []
+    const vitestConfigPaths = files.paths.filter(isVitestConfigPath);
+    if (vitestConfigPaths.length === 0) return [];
     // Content via the framework's size-managed BATCH reader (not raw
     // fs.readFileSync, and not a sequential await loop); fs is used ONLY for base
     // existence (no content read, no OOM surface).
-    const contents = await files.readMany(vitestConfigPaths)
+    const contents = await files.readMany(vitestConfigPaths);
     return detectConfigsNotExtendingBase({
       vitestConfigPaths,
       exists: (filePath) => fs.existsSync(filePath),
       readContent: (filePath) => contents.get(filePath) ?? '',
-    })
+    });
   },
-})
+});

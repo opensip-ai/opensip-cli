@@ -16,9 +16,7 @@ describe('ErrorMessage', () => {
   });
 
   it('renders the suggestion when provided', () => {
-    const { lastFrame } = render(
-      <ErrorMessage message="bad input" suggestion="try --help" />,
-    );
+    const { lastFrame } = render(<ErrorMessage message="bad input" suggestion="try --help" />);
     const out = lastFrame() ?? '';
     expect(out).toContain('bad input');
     expect(out).toContain('try --help');

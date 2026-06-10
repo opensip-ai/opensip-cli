@@ -40,7 +40,11 @@ function ensureGitignore(cwd: string): boolean {
   }
 
   const sep = content.endsWith('\n') ? '' : '\n';
-  writeFileSync(path, `${content}${sep}\n# opensip-tools runtime state\n${GITIGNORE_LINE}\n`, 'utf8');
+  writeFileSync(
+    path,
+    `${content}${sep}\n# opensip-tools runtime state\n${GITIGNORE_LINE}\n`,
+    'utf8',
+  );
   return true;
 }
 
@@ -63,7 +67,10 @@ function writeScaffoldedFile(
     // Preserve user content. Stale-scaffolded is also preserved — the
     // user may have been working with it; we surface it but don't
     // overwrite.
-    if (existing && (existing.classification === 'custom' || existing.classification === 'stale-scaffolded')) {
+    if (
+      existing &&
+      (existing.classification === 'custom' || existing.classification === 'stale-scaffolded')
+    ) {
       return;
     }
   }
@@ -116,9 +123,8 @@ function scaffoldExamples(
   scaffoldFitChecks(paths, languages, options, createdFiles);
 
   mkdirSync(paths.userPluginDir('fit', 'recipes'), { recursive: true });
-  const slugs = languages.length === 1
-    ? ['example-check']
-    : languages.map((lang) => `example-check-${lang}`);
+  const slugs =
+    languages.length === 1 ? ['example-check'] : languages.map((lang) => `example-check-${lang}`);
   writeScaffoldedFile(
     join(paths.userPluginDir('fit', 'recipes'), 'example-recipe.mjs'),
     exampleRecipeSource(slugs),

@@ -65,14 +65,18 @@ describe('sim externalization proof slice (§8)', () => {
   });
 
   it('dynamic-imports the built module as an external plugin would (not the FIRST_PARTY import)', async () => {
-    const mod = (await import(pathToFileURL(join(SIM_DIR, 'dist', 'index.js')).href)) as { tool?: Tool };
+    const mod = (await import(pathToFileURL(join(SIM_DIR, 'dist', 'index.js')).href)) as {
+      tool?: Tool;
+    };
     expect(mod.tool, 'the built module must export `tool`').toBeDefined();
     expect(mod.tool?.metadata.id).toBe('simulation');
     expect(mod.tool?.commandSpecs?.length).toBeGreaterThan(0);
   });
 
   it('mounts the externally-loaded CommandSpec to the SAME surface as the bundled mount', async () => {
-    const mod = (await import(pathToFileURL(join(SIM_DIR, 'dist', 'index.js')).href)) as { tool?: Tool };
+    const mod = (await import(pathToFileURL(join(SIM_DIR, 'dist', 'index.js')).href)) as {
+      tool?: Tool;
+    };
     const external = simSpec(mod.tool!);
     const bundled = simSpec(simulationTool);
 

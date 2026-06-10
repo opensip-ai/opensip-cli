@@ -4,7 +4,11 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { discoverPackagesByDeclaredKind, isMarkerKind, readMarkerKind } from '../marker-discovery.js';
+import {
+  discoverPackagesByDeclaredKind,
+  isMarkerKind,
+  readMarkerKind,
+} from '../marker-discovery.js';
 
 let testDir: string;
 
@@ -26,7 +30,16 @@ describe('isMarkerKind', () => {
     expect(isMarkerKind('tool')).toBe(true);
   });
 
-  it.each(['', 'fit-pack', 'sim-pack', 'graph-adapter', 'graph-pack', 'TOOL', 'check-pack', 'tools'])('rejects %s', (kind) => {
+  it.each([
+    '',
+    'fit-pack',
+    'sim-pack',
+    'graph-adapter',
+    'graph-pack',
+    'TOOL',
+    'check-pack',
+    'tools',
+  ])('rejects %s', (kind) => {
     expect(isMarkerKind(kind)).toBe(false);
   });
 

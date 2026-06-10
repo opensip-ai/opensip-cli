@@ -76,7 +76,11 @@ export function ensureUserPluginHostDir(domain: string): string {
  * peers produce no error here, the loader will surface a clear error if
  * the plugin can't resolve its imports.
  */
-export function installMissingPeers(dir: string, requestedSpec: string, depsBefore: Set<string>): void {
+export function installMissingPeers(
+  dir: string,
+  requestedSpec: string,
+  depsBefore: Set<string>,
+): void {
   const installed = findInstalledPackage(dir, requestedSpec, depsBefore);
   if (!installed) return;
 
@@ -100,7 +104,11 @@ export function installMissingPeers(dir: string, requestedSpec: string, depsBefo
   }
 }
 
-export function findInstalledName(dir: string, requestedSpec: string, depsBefore: Set<string>): string | undefined {
+export function findInstalledName(
+  dir: string,
+  requestedSpec: string,
+  depsBefore: Set<string>,
+): string | undefined {
   return findInstalledPackage(dir, requestedSpec, depsBefore)?.name;
 }
 
@@ -149,12 +157,20 @@ export function extractNameFromSpec(spec: string): string | undefined {
   return atIdx === -1 ? spec : spec.slice(0, atIdx);
 }
 
-function readPackageJson(
-  path: string,
-): { name: string; dependencies?: Record<string, string>; peerDependencies?: Record<string, string> } | undefined {
+function readPackageJson(path: string):
+  | {
+      name: string;
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+    }
+  | undefined {
   if (!existsSync(path)) return undefined;
   try {
-    return JSON.parse(readFileSync(path, 'utf8')) as { name: string; dependencies?: Record<string, string>; peerDependencies?: Record<string, string> };
+    return JSON.parse(readFileSync(path, 'utf8')) as {
+      name: string;
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+    };
   } catch {
     return undefined;
   }
@@ -168,7 +184,9 @@ function safeReaddirScopedAndFlat(nodeModulesDir: string): string[] {
       const scopeDir = join(nodeModulesDir, entry);
       try {
         for (const scoped of readdirSync(scopeDir)) out.push(`${entry}/${scoped}`);
-      } catch { /* unreadable scope */ }
+      } catch {
+        /* unreadable scope */
+      }
     } else if (!entry.startsWith('.')) {
       out.push(entry);
     }

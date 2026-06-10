@@ -4,8 +4,13 @@
  * @fileoverview Transaction handling resilience checks
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import {
+  defineCheck,
+  isTestFile,
+  type CheckViolation,
+  getLineNumber,
+} from '@opensip-tools/fitness';
 
 // =============================================================================
 // TRANSACTION BOUNDARY VALIDATION
@@ -25,12 +30,17 @@ const TRANSACTION_PATTERNS = [
   /@Transaction\b/g,
   /@Transactional\b/g, // Match decorator only, not SMS type configurations
   /queryRunner\.startTransaction/g,
-]
+];
 
 /**
  * Patterns indicating proper transaction handling
  */
-const PROPER_TRANSACTION_PATTERNS = [/\.commit\s*\(\)/, /\.rollback\s*\(\)/, /COMMIT/i, /ROLLBACK/i]
+const PROPER_TRANSACTION_PATTERNS = [
+  /\.commit\s*\(\)/,
+  /\.rollback\s*\(\)/,
+  /COMMIT/i,
+  /ROLLBACK/i,
+];
 
 /**
  * Patterns indicating async operations inside transactions (risky).
@@ -42,7 +52,7 @@ const ASYNC_IN_TRANSACTION_PATTERNS = [
   /await.*?request\s*\(/g,
   /await.*?\.publish\s*\(/g, // Event publishing
   /await.*?\.send\s*\(/g, // Message sending
-]
+];
 
 /**
  * Patterns indicating transaction timeout configuration
@@ -52,7 +62,7 @@ const TIMEOUT_PATTERNS = [
   /queryTimeout/i,
   /statementTimeout/i,
   /lockTimeout/i,
-]
+];
 
 /**
  * Check if a line is a simple delegation pattern like:
@@ -63,21 +73,21 @@ function isTransactionDelegation(content: string, matchIndex: number): boolean {
   logger.debug({
     evt: 'fitness.checks.transaction_patterns.is_transaction_delegation',
     msg: 'Checking if transaction usage is a delegation pattern',
-  })
+  });
   // Find the start of the line containing the match
-  let lineStart = content.lastIndexOf('\n', matchIndex)
-  if (lineStart === -1) lineStart = 0
-  else lineStart++ // Move past the newline
+  let lineStart = content.lastIndexOf('\n', matchIndex);
+  if (lineStart === -1) lineStart = 0;
+  else lineStart++; // Move past the newline
 
   // Find the end of the line
-  let lineEnd = content.indexOf('\n', matchIndex)
-  if (lineEnd === -1) lineEnd = content.length
+  let lineEnd = content.indexOf('\n', matchIndex);
+  if (lineEnd === -1) lineEnd = content.length;
 
-  const line = content.slice(lineStart, lineEnd).trim()
+  const line = content.slice(lineStart, lineEnd).trim();
 
   // Simple delegation pattern: return (await?) this.something.transaction(...);
   // or: return (await?) something.transaction(...);
-  return /^\s*return\s+(await\s+)?(?:this\.)?\w+\.transaction\s*\(/.test(line)
+  return /^\s*return\s+(await\s+)?(?:this\.)?\w+\.transaction\s*\(/.test(line);
 }
 
 /**
@@ -89,32 +99,34 @@ function isTransactionDelegation(content: string, matchIndex: number): boolean {
 function isCallbackStyleTransaction(content: string, matchIndex: number): boolean {
   // Look at the slice starting at the match for callback signatures.
   // Bounded window keeps this O(1) per match.
-  const window = content.slice(matchIndex, matchIndex + 200)
+  const window = content.slice(matchIndex, matchIndex + 200);
   return (
     /\.(?:transaction|beginTransaction|startTransaction)\s*\(\s*(?:async\s+)?(?:\([^)]{0,80}\)|\w+)\s*=>/.test(
       window,
     ) ||
-    /\.(?:transaction|beginTransaction|startTransaction)\s*\(\s*(?:async\s+)?function\b/.test(window)
-  )
+    /\.(?:transaction|beginTransaction|startTransaction)\s*\(\s*(?:async\s+)?function\b/.test(
+      window,
+    )
+  );
 }
 
 function findUncommittedTransactionViolations(content: string, filePath: string): CheckViolation[] {
   logger.debug({
     evt: 'fitness.checks.transaction_patterns.find_uncommitted_transaction_violations',
     msg: 'Searching for uncommitted transaction violations',
-  })
-  const violations: CheckViolation[] = []
+  });
+  const violations: CheckViolation[] = [];
 
   for (const pattern of TRANSACTION_PATTERNS) {
-    pattern.lastIndex = 0
-    let match
+    pattern.lastIndex = 0;
+    let match;
     while ((match = pattern.exec(content)) !== null) {
       const isSkippable =
         match[0].includes('@') ||
         isTransactionDelegation(content, match.index) ||
-        isCallbackStyleTransaction(content, match.index)
+        isCallbackStyleTransaction(content, match.index);
       if (isSkippable) {
-        continue
+        continue;
       }
 
       violations.push({
@@ -127,29 +139,29 @@ function findUncommittedTransactionViolations(content: string, filePath: string)
         match: match[0],
         type: 'uncommitted-transaction',
         filePath,
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 function findAsyncInTransactionViolations(content: string, filePath: string): CheckViolation[] {
   logger.debug({
     evt: 'fitness.checks.transaction_patterns.find_async_in_transaction_violations',
     msg: 'Searching for async operations inside transactions',
-  })
-  const violations: CheckViolation[] = []
+  });
+  const violations: CheckViolation[] = [];
 
   for (const pattern of ASYNC_IN_TRANSACTION_PATTERNS) {
-    pattern.lastIndex = 0
-    let match
+    pattern.lastIndex = 0;
+    let match;
     while ((match = pattern.exec(content)) !== null) {
-      const beforeMatch = content.slice(0, Math.max(0, match.index))
-      const hasOpenTransaction = TRANSACTION_PATTERNS.some((p) => p.test(beforeMatch.slice(-500)))
+      const beforeMatch = content.slice(0, Math.max(0, match.index));
+      const hasOpenTransaction = TRANSACTION_PATTERNS.some((p) => p.test(beforeMatch.slice(-500)));
 
       if (!hasOpenTransaction) {
-        continue
+        continue;
       }
 
       violations.push({
@@ -162,11 +174,11 @@ function findAsyncInTransactionViolations(content: string, filePath: string): Ch
         match: match[0],
         type: 'async-in-transaction',
         filePath,
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -201,23 +213,23 @@ export const transactionBoundaryValidation = defineCheck({
   analyze(content: string, filePath: string): CheckViolation[] {
     // Test fixtures intentionally exercise transaction boundaries (no
     // commit/rollback, callback throws, etc.) to verify detection logic.
-    if (isTestFile(filePath)) return []
+    if (isTestFile(filePath)) return [];
 
-    const usesTransactions = TRANSACTION_PATTERNS.some((p) => p.test(content))
+    const usesTransactions = TRANSACTION_PATTERNS.some((p) => p.test(content));
     if (!usesTransactions) {
-      return []
+      return [];
     }
 
-    const hasProperHandling = PROPER_TRANSACTION_PATTERNS.some((p) => p.test(content))
+    const hasProperHandling = PROPER_TRANSACTION_PATTERNS.some((p) => p.test(content));
     const uncommittedViolations = hasProperHandling
       ? []
-      : findUncommittedTransactionViolations(content, filePath)
+      : findUncommittedTransactionViolations(content, filePath);
 
-    const asyncViolations = findAsyncInTransactionViolations(content, filePath)
+    const asyncViolations = findAsyncInTransactionViolations(content, filePath);
 
-    return [...uncommittedViolations, ...asyncViolations]
+    return [...uncommittedViolations, ...asyncViolations];
   },
-})
+});
 
 // =============================================================================
 // TRANSACTION TIMEOUT
@@ -247,30 +259,30 @@ export const transactionTimeout = defineCheck({
   tags: ['resilience', 'database', 'timeout'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Check if this file uses transactions
-    const usesTransactions = TRANSACTION_PATTERNS.some((p) => p.test(content))
+    const usesTransactions = TRANSACTION_PATTERNS.some((p) => p.test(content));
     if (!usesTransactions) {
-      return violations
+      return violations;
     }
 
     // Check for timeout configuration
-    const hasTimeout = TIMEOUT_PATTERNS.some((p) => p.test(content))
+    const hasTimeout = TIMEOUT_PATTERNS.some((p) => p.test(content));
 
     // Only flag if using manual transaction management (not ORM decorators)
     const usesManualTransactions =
       content.includes('.beginTransaction') ||
       content.includes('.startTransaction') ||
-      content.includes('queryRunner')
+      content.includes('queryRunner');
 
     if (usesManualTransactions && !hasTimeout) {
       // Find the transaction usage for line number
       for (const pattern of TRANSACTION_PATTERNS) {
-        pattern.lastIndex = 0
-        const match = pattern.exec(content)
+        pattern.lastIndex = 0;
+        const match = pattern.exec(content);
         if (match) {
-          const lineNumber = getLineNumber(content, match.index)
+          const lineNumber = getLineNumber(content, match.index);
           violations.push({
             line: lineNumber,
             column: 0,
@@ -281,12 +293,12 @@ export const transactionTimeout = defineCheck({
             match: match[0],
             type: 'missing-transaction-timeout',
             filePath,
-          })
-          break
+          });
+          break;
         }
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

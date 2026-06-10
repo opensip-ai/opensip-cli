@@ -8,12 +8,12 @@
  * context. This test pins the FP that previously fired.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest';
 
-import { analyzeContextMutation } from '../context-mutation.js'
+import { analyzeContextMutation } from '../context-mutation.js';
 
 function analyze(src: string): readonly { line: number }[] {
-  return analyzeContextMutation(src, 'test.ts')
+  return analyzeContextMutation(src, 'test.ts');
 }
 
 describe('context-mutation — FP regression suite (1.0.7)', () => {
@@ -25,9 +25,9 @@ describe('context-mutation — FP regression suite (1.0.7)', () => {
         ctx.bar = 42
         return ctx
       }
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 
   it('does NOT flag mutations on a locally-declared let context object', () => {
     const src = `
@@ -36,25 +36,25 @@ describe('context-mutation — FP regression suite (1.0.7)', () => {
         context.id = 'abc'
         return context
       }
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 
   it('STILL flags mutations on req.context (passed request)', () => {
     const src = `
       function middleware(req: Request) {
         req.context.user = 'X'
       }
-    `
-    expect(analyze(src).length).toBeGreaterThanOrEqual(1)
-  })
+    `;
+    expect(analyze(src).length).toBeGreaterThanOrEqual(1);
+  });
 
   it('STILL flags mutations on request.context (passed request)', () => {
     const src = `
       function middleware(request: Request) {
         request.context.user = 'X'
       }
-    `
-    expect(analyze(src).length).toBeGreaterThanOrEqual(1)
-  })
-})
+    `;
+    expect(analyze(src).length).toBeGreaterThanOrEqual(1);
+  });
+});

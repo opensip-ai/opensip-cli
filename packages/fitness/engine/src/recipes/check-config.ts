@@ -35,10 +35,10 @@ import {
   getUnitConfig,
   setCurrentRecipeUnitConfig,
   clearCurrentRecipeUnitConfig,
-} from '@opensip-tools/core'
+} from '@opensip-tools/core';
 
-import type { RecipeCheckConfigMap } from './types.js'
-import type { RunScope } from '@opensip-tools/core'
+import type { RecipeCheckConfigMap } from './types.js';
+import type { RunScope } from '@opensip-tools/core';
 
 /**
  * Read the per-check config slice for the given slug. Alias of core
@@ -49,7 +49,7 @@ import type { RunScope } from '@opensip-tools/core'
  * @typeParam T - The shape the calling check expects.
  */
 export function getCheckConfig<T extends Record<string, unknown>>(slug: string): T {
-  return getUnitConfig<T>(slug)
+  return getUnitConfig<T>(slug);
 }
 
 /**
@@ -61,7 +61,7 @@ export function setCurrentRecipeCheckConfig(
   scope: RunScope,
   config: RecipeCheckConfigMap | undefined,
 ): void {
-  setCurrentRecipeUnitConfig(scope, config)
+  setCurrentRecipeUnitConfig(scope, config);
 }
 
 /**
@@ -70,5 +70,5 @@ export function setCurrentRecipeCheckConfig(
  * `clearCurrentRecipeUnitConfig`.
  */
 export function clearCurrentRecipeCheckConfig(scope: RunScope): void {
-  clearCurrentRecipeUnitConfig(scope)
+  clearCurrentRecipeUnitConfig(scope);
 }

@@ -62,7 +62,13 @@ describe('formatSignalSarif', () => {
       ],
     };
     const parsed = JSON.parse(formatSignalSarif(env)) as {
-      runs: { results: { locations: { physicalLocation: { artifactLocation: { uri: string }; region?: unknown } }[] }[] }[];
+      runs: {
+        results: {
+          locations: {
+            physicalLocation: { artifactLocation: { uri: string }; region?: unknown };
+          }[];
+        }[];
+      }[];
     };
     const loc = parsed.runs[0].results[0].locations[0].physicalLocation;
     expect(loc.artifactLocation.uri).toBe('src/whole.ts');
@@ -83,7 +89,16 @@ describe('formatSignalSarif', () => {
       ],
     };
     const parsed = JSON.parse(formatSignalSarif(env)) as {
-      runs: { results: { locations: { physicalLocation: { artifactLocation: { uri: string }; region?: { startLine?: number; startColumn?: number } } }[] }[] }[];
+      runs: {
+        results: {
+          locations: {
+            physicalLocation: {
+              artifactLocation: { uri: string };
+              region?: { startLine?: number; startColumn?: number };
+            };
+          }[];
+        }[];
+      }[];
     };
     const loc = parsed.runs[0].results[0].locations[0].physicalLocation;
     expect(loc.artifactLocation.uri).toBe('src/legacy.ts');

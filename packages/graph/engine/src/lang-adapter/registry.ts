@@ -23,7 +23,13 @@
  * orchestrator behaves identically to today.
  */
 
-import { ConfigurationError, Registry, currentScope, logger, type Registerable } from '@opensip-tools/core';
+import {
+  ConfigurationError,
+  Registry,
+  currentScope,
+  logger,
+  type Registerable,
+} from '@opensip-tools/core';
 import { globSync } from 'glob';
 
 import type { GraphLanguageAdapter } from './types.js';
@@ -100,7 +106,10 @@ export class GraphAdapterRegistry {
     const ts = this.inner.getById('typescript');
     if (ts) return ts.adapter;
     /* v8 ignore start */
-    const ids = this.inner.getAll().map((r) => r.id).sort();
+    const ids = this.inner
+      .getAll()
+      .map((r) => r.id)
+      .sort();
     const id = ids[0];
     if (!id) throw new ConfigurationError('graph: registry corrupted');
     const entry = this.inner.getById(id);
@@ -179,7 +188,8 @@ export class GraphAdapterRegistry {
 
   private resolveTie(tied: readonly string[]): GraphLanguageAdapter | undefined {
     const preference = ['typescript', 'python', 'rust'];
-    for (const pref of preference) if (tied.includes(pref)) return this.inner.getById(pref)?.adapter;
+    for (const pref of preference)
+      if (tied.includes(pref)) return this.inner.getById(pref)?.adapter;
     /* v8 ignore next 2 */
     const sorted = [...tied].sort();
     return this.inner.getById(sorted[0] ?? '')?.adapter;

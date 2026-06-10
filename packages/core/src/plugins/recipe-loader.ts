@@ -91,7 +91,9 @@ export function registerRecipesFromMod<R extends RecipeBase>(
   return { recipesRegistered };
 }
 
-function isShapedLikeRecipe(value: unknown): value is { readonly id: string; readonly name: string } {
+function isShapedLikeRecipe(
+  value: unknown,
+): value is { readonly id: string; readonly name: string } {
   if (value === null || typeof value !== 'object') return false;
   const obj = value as Record<string, unknown>;
   return typeof obj.id === 'string' && typeof obj.name === 'string';

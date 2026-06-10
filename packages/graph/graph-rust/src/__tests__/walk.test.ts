@@ -279,11 +279,7 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
 
   it('flags files under tests/ as test files (path-based detection)', () => {
     mkdirSync(join(dir, 'tests'), { recursive: true });
-    writeFileSync(
-      join(dir, 'tests/integration.rs'),
-      `fn integ() { }\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'tests/integration.rs'), `fn integ() { }\n`, 'utf8');
     const walk = run();
     const integ = walk.occurrences.integ?.[0];
     expect(integ?.inTestFile).toBe(true);
@@ -291,11 +287,7 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
 
   it('flags `*_test.rs` files as test files (path-based detection)', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
-    writeFileSync(
-      join(dir, 'src/lib_test.rs'),
-      `fn t() { }\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'src/lib_test.rs'), `fn t() { }\n`, 'utf8');
     const walk = run();
     const t = walk.occurrences.t?.[0];
     expect(t?.inTestFile).toBe(true);
@@ -351,10 +343,7 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
     writeFileSync(
       join(dir, 'src/lib.rs'),
-      `fn outer() {\n` +
-        `    let f = |a, b| a;\n` +
-        `    let _ = f;\n` +
-        `}\n`,
+      `fn outer() {\n` + `    let f = |a, b| a;\n` + `    let _ = f;\n` + `}\n`,
       'utf8',
     );
     const walk = run();

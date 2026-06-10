@@ -31,7 +31,9 @@ describe('Registry<T> — duplicatePolicy: warn-first-wins', () => {
   });
 
   it('duplicate id: warn event fires, incumbent kept', () => {
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => { /* swallow */ });
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {
+      /* swallow */
+    });
     const reg = new Registry<TestItem>({
       module: 'test',
       duplicatePolicy: 'warn-first-wins',
@@ -52,7 +54,9 @@ describe('Registry<T> — duplicatePolicy: warn-first-wins', () => {
   });
 
   it('duplicate name with different id: warn fires', () => {
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => { /* swallow */ });
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {
+      /* swallow */
+    });
     const reg = new Registry<TestItem>({
       module: 'test',
       duplicatePolicy: 'warn-first-wins',
@@ -68,7 +72,9 @@ describe('Registry<T> — duplicatePolicy: warn-first-wins', () => {
   });
 
   it('sourcePackage is included in the warn event when passed', () => {
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => { /* swallow */ });
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {
+      /* swallow */
+    });
     const reg = new Registry<TestItem>({
       module: 'test',
       duplicatePolicy: 'warn-first-wins',
@@ -137,7 +143,9 @@ describe('Registry<T> — duplicatePolicy: throw', () => {
     });
     reg.register(make('id-1', 'foo'));
     // Without internal, the second item (same id) would throw.
-    expect(() => reg.registerAll([make('id-1', 'foo'), make('id-2', 'bar')], { internal: true })).not.toThrow();
+    expect(() =>
+      reg.registerAll([make('id-1', 'foo'), make('id-2', 'bar')], { internal: true }),
+    ).not.toThrow();
     expect(reg.size).toBe(2);
   });
 });
@@ -186,7 +194,9 @@ describe('Registry<T> — duplicatePolicy: overwrite', () => {
 
 describe('Registry<T> — duplicatePolicy: silent-skip', () => {
   it('duplicate id returns silently, incumbent kept, no event', () => {
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => { /* swallow */ });
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {
+      /* swallow */
+    });
     const reg = new Registry<TestItem>({
       module: 'test',
       duplicatePolicy: 'silent-skip',
@@ -314,12 +324,22 @@ describe('Registry<T> — accessors', () => {
   it('getAll', () => {
     const reg = buildAccessorRegistry();
     expect(reg.getAll()).toHaveLength(3);
-    expect(reg.getAll().map((i) => i.id).sort()).toEqual(['id-1', 'id-2', 'id-3']);
+    expect(
+      reg
+        .getAll()
+        .map((i) => i.id)
+        .sort(),
+    ).toEqual(['id-1', 'id-2', 'id-3']);
   });
 
   it('getByTag', () => {
     const reg = buildAccessorRegistry();
-    expect(reg.getByTag('y').map((i) => i.id).sort()).toEqual(['id-1', 'id-2']);
+    expect(
+      reg
+        .getByTag('y')
+        .map((i) => i.id)
+        .sort(),
+    ).toEqual(['id-1', 'id-2']);
     expect(reg.getByTag('x').map((i) => i.id)).toEqual(['id-1']);
     expect(reg.getByTag('missing')).toEqual([]);
   });

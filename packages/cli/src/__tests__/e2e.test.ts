@@ -131,7 +131,9 @@ describe('CLI e2e', () => {
       // Regression for 2026-05-25 audit: recipe-not-found must route to
       // CONFIGURATION_ERROR (2), not CHECK_NOT_FOUND (3). Asserting `=== 2`
       // (vs. `not.toBe(0)`) closes the loop on that fix end-to-end.
-      const { stdout, exitCode } = cli.run(['fit', '--json', '--recipe', 'nonexistent-recipe'], { cwd: FIXTURE });
+      const { stdout, exitCode } = cli.run(['fit', '--json', '--recipe', 'nonexistent-recipe'], {
+        cwd: FIXTURE,
+      });
       expect(exitCode).toBe(2);
       // 2.12.0 (§5.5): a failed --json run is a status:'error' outcome carrying a
       // structured `errors[].message` (retires the bare `{ error }` shape).
@@ -141,7 +143,10 @@ describe('CLI e2e', () => {
     });
 
     it('fails with exit 2 when no config is found', () => {
-      const tempDir = join(tmpdir(), `opensip-e2e-noconfig-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      const tempDir = join(
+        tmpdir(),
+        `opensip-e2e-noconfig-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      );
       mkdirSync(tempDir, { recursive: true });
       try {
         const { stdout, exitCode } = cli.run(['fit', '--json'], { cwd: tempDir });
@@ -156,7 +161,10 @@ describe('CLI e2e', () => {
     });
 
     it('respects --config flag with an explicit path', () => {
-      const tempDir = join(tmpdir(), `opensip-e2e-explicit-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      const tempDir = join(
+        tmpdir(),
+        `opensip-e2e-explicit-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      );
       mkdirSync(join(tempDir, 'nested'), { recursive: true });
       try {
         // Seed the fixture's config into a non-default location
@@ -166,7 +174,10 @@ describe('CLI e2e', () => {
         mkdirSync(join(tempDir, 'src'), { recursive: true });
         writeFileSync(join(tempDir, 'src', 'a.ts'), 'export const x = 1\n');
 
-        const { stdout, exitCode } = cli.run(['fit', '--json', '--check', 'no-console-log', '--config', 'nested/custom.yml'], { cwd: tempDir });
+        const { stdout, exitCode } = cli.run(
+          ['fit', '--json', '--check', 'no-console-log', '--config', 'nested/custom.yml'],
+          { cwd: tempDir },
+        );
         expect(exitCode).toBe(0);
         const output = JSON.parse(stdout).envelope;
         expect(output.tool).toBe('fit');
@@ -176,7 +187,10 @@ describe('CLI e2e', () => {
     });
 
     it('respects package.json#opensip-tools.configPath pointer', () => {
-      const tempDir = join(tmpdir(), `opensip-e2e-pkgjson-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      const tempDir = join(
+        tmpdir(),
+        `opensip-e2e-pkgjson-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      );
       mkdirSync(join(tempDir, '.config'), { recursive: true });
       try {
         const configSrc = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf8');
@@ -191,7 +205,9 @@ describe('CLI e2e', () => {
         mkdirSync(join(tempDir, 'src'), { recursive: true });
         writeFileSync(join(tempDir, 'src', 'a.ts'), 'export const x = 1\n');
 
-        const { stdout, exitCode } = cli.run(['fit', '--json', '--check', 'no-console-log'], { cwd: tempDir });
+        const { stdout, exitCode } = cli.run(['fit', '--json', '--check', 'no-console-log'], {
+          cwd: tempDir,
+        });
         expect(exitCode).toBe(0);
         const output = JSON.parse(stdout).envelope;
         expect(output.tool).toBe('fit');
@@ -260,28 +276,42 @@ describe('CLI e2e', () => {
     });
 
     it('creates config + example files for an explicit --language', () => {
-      tempDir = join(tmpdir(), `opensip-e2e-init-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      tempDir = join(
+        tmpdir(),
+        `opensip-e2e-init-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      );
       mkdirSync(tempDir, { recursive: true });
 
       const { exitCode } = cli.run(['init', '--language', 'typescript'], { cwd: tempDir });
       expect(exitCode).toBe(0);
 
       expect(existsSync(join(tempDir, 'opensip-tools.config.yml'))).toBe(true);
-      expect(existsSync(join(tempDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'))).toBe(true);
-      expect(existsSync(join(tempDir, 'opensip-tools', 'fit', 'recipes', 'example-recipe.mjs'))).toBe(true);
-      expect(existsSync(join(tempDir, 'opensip-tools', 'sim', 'scenarios', 'example-scenario.mjs'))).toBe(true);
+      expect(existsSync(join(tempDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'))).toBe(
+        true,
+      );
+      expect(
+        existsSync(join(tempDir, 'opensip-tools', 'fit', 'recipes', 'example-recipe.mjs')),
+      ).toBe(true);
+      expect(
+        existsSync(join(tempDir, 'opensip-tools', 'sim', 'scenarios', 'example-scenario.mjs')),
+      ).toBe(true);
       expect(existsSync(join(tempDir, '.gitignore'))).toBe(true);
     });
 
     it('reports already-initialized state on second run', () => {
-      tempDir = join(tmpdir(), `opensip-e2e-init2-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      tempDir = join(
+        tmpdir(),
+        `opensip-e2e-init2-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      );
       mkdirSync(tempDir, { recursive: true });
 
       // First run creates the layout.
       cli.run(['init', '--language', 'typescript'], { cwd: tempDir });
       // Second run refuses with exit 2 and surfaces a partialStateError
       // pointing at --keep / --remove.
-      const { stdout, exitCode } = cli.run(['init', '--language', 'typescript', '--json'], { cwd: tempDir });
+      const { stdout, exitCode } = cli.run(['init', '--language', 'typescript', '--json'], {
+        cwd: tempDir,
+      });
       expect(exitCode).toBe(2);
       // 2.12.0: the InitResult rides under `.data` of the outcome wrapper.
       const output = JSON.parse(stdout).data;
@@ -291,7 +321,10 @@ describe('CLI e2e', () => {
     });
 
     it('exits 2 with a prompt when language is ambiguous and --language not passed', () => {
-      tempDir = join(tmpdir(), `opensip-e2e-init3-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      tempDir = join(
+        tmpdir(),
+        `opensip-e2e-init3-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      );
       mkdirSync(tempDir, { recursive: true });
 
       const { exitCode } = cli.run(['init', '--json'], { cwd: tempDir });
@@ -305,14 +338,14 @@ describe('CLI e2e', () => {
     it('NO_COLOR=1 disables ANSI escape sequences', () => {
       const { stdout } = cli.run(['--help'], { cwd: FIXTURE });
       // ANSI escape sequences start with ESC (0x1b)
-       
+
       const hasAnsi = stdout.includes('[');
       expect(hasAnsi).toBe(false);
     });
 
     it('--list output has no ANSI escape sequences', () => {
       const { stdout } = cli.run(['fit', '--list'], { cwd: FIXTURE });
-       
+
       const hasAnsi = stdout.includes('[');
       expect(hasAnsi).toBe(false);
     });

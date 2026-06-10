@@ -108,7 +108,10 @@ async function emit<TOpts>(
  */
 export async function emitCommandResult(
   result: CommandResult,
-  opts: { readonly render: (result: CommandResult) => Promise<void>; readonly jsonRequested: boolean },
+  opts: {
+    readonly render: (result: CommandResult) => Promise<void>;
+    readonly jsonRequested: boolean;
+  },
 ): Promise<void> {
   await renderOutcome(outcomeFromResult(result, 0), {
     jsonRequested: opts.jsonRequested,

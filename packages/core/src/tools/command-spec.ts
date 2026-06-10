@@ -149,11 +149,7 @@ export interface ArgSpec {
  *   where the command is UNCONDITIONALLY a live view; the host dispatches to the
  *   tool's registered renderer via `renderLive(name, …)`.
  */
-export type CommandOutputMode =
-  | 'signal-envelope'
-  | 'command-result'
-  | 'raw-stream'
-  | 'live-view';
+export type CommandOutputMode = 'signal-envelope' | 'command-result' | 'raw-stream' | 'live-view';
 
 /**
  * Whether the command needs a resolved project scope (RunScope project context,

@@ -6,11 +6,10 @@
  * the standard way to construct check results.
  */
 
-import { countErrors, countWarnings } from './severity.js'
+import { countErrors, countWarnings } from './severity.js';
 
-import type { DirectiveEntry } from '../framework/directive-inventory.js'
-import type { Signal } from '@opensip-tools/core'
-
+import type { DirectiveEntry } from '../framework/directive-inventory.js';
+import type { Signal } from '@opensip-tools/core';
 
 // =============================================================================
 // SEVERITY
@@ -19,34 +18,34 @@ import type { Signal } from '@opensip-tools/core'
 /**
  * Severity level for findings and violations.
  */
-export type FindingSeverity = 'error' | 'warning'
+export type FindingSeverity = 'error' | 'warning';
 
 /**
  * Alias for FindingSeverity — used by simplified check.ts types.
  */
 // eslint-disable-next-line sonarjs/redundant-type-aliases -- public re-export under a shorter name for ergonomics
-export type Severity = FindingSeverity
+export type Severity = FindingSeverity;
 
 /**
  * A single finding from a fitness check (output format).
  */
 export interface Finding {
-  readonly message: string
-  readonly severity: Severity
-  readonly filePath?: string
-  readonly line?: number
-  readonly column?: number
-  readonly suggestion?: string
-  readonly metadata?: Record<string, unknown>
+  readonly message: string;
+  readonly severity: Severity;
+  readonly filePath?: string;
+  readonly line?: number;
+  readonly column?: number;
+  readonly suggestion?: string;
+  readonly metadata?: Record<string, unknown>;
 }
 
 /**
  * Output from a tool-based check.
  */
 export interface ToolOutput {
-  readonly stdout: string
-  readonly stderr: string
-  readonly exitCode: number
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly exitCode: number;
 }
 
 // =============================================================================
@@ -58,7 +57,7 @@ export interface ToolOutput {
  */
 export interface CheckInfo {
   /** Summary label (e.g., "142/150 files compliant") */
-  readonly label: string
+  readonly label: string;
 }
 
 /**
@@ -66,17 +65,17 @@ export interface CheckInfo {
  */
 export interface CheckResultMetadata {
   /** Total items scanned */
-  readonly totalItems: number
+  readonly totalItems: number;
   /** Signals (same reference as top-level) */
-  readonly signals: readonly Signal[]
+  readonly signals: readonly Signal[];
   /** Duration in milliseconds */
-  readonly durationMs?: number
+  readonly durationMs?: number;
   /** Number of files scanned from filesystem */
-  readonly filesScanned?: number
+  readonly filesScanned?: number;
   /** Item type (e.g., 'files', 'modules') */
-  readonly itemType?: string
+  readonly itemType?: string;
   /** Extra metadata */
-  readonly extra?: Record<string, unknown>
+  readonly extra?: Record<string, unknown>;
 }
 
 /**
@@ -85,21 +84,21 @@ export interface CheckResultMetadata {
  */
 export interface CheckResult {
   /** Whether the check passed (no errors) */
-  readonly passed: boolean
+  readonly passed: boolean;
   /** Number of error-level signals */
-  readonly errors: number
+  readonly errors: number;
   /** Number of warning-level signals */
-  readonly warnings: number
+  readonly warnings: number;
   /** All signals */
-  readonly signals: readonly Signal[]
+  readonly signals: readonly Signal[];
   /** Display info */
-  readonly info: CheckInfo
+  readonly info: CheckInfo;
   /** Run metadata */
-  readonly metadata: CheckResultMetadata
+  readonly metadata: CheckResultMetadata;
   /** Count of violations ignored via directives */
-  readonly ignoredCount?: number
+  readonly ignoredCount?: number;
   /** Directives that actually suppressed signals during this check's execution */
-  readonly appliedDirectives?: readonly DirectiveEntry[]
+  readonly appliedDirectives?: readonly DirectiveEntry[];
 }
 
 // =============================================================================
@@ -123,7 +122,7 @@ export type ItemType =
   | 'violations'
   | 'rules'
   | 'recipes'
-  | 'checks'
+  | 'checks';
 
 const ITEM_TYPE_SINGULAR: Record<ItemType, string> = {
   files: 'file',
@@ -140,13 +139,13 @@ const ITEM_TYPE_SINGULAR: Record<ItemType, string> = {
   rules: 'rule',
   recipes: 'recipe',
   checks: 'check',
-}
+};
 
 /**
  * Get a human-readable label for an item type.
  */
 export function getItemTypeLabel(type: ItemType, count: number): string {
-  return count === 1 ? ITEM_TYPE_SINGULAR[type] : type
+  return count === 1 ? ITEM_TYPE_SINGULAR[type] : type;
 }
 
 // =============================================================================
@@ -158,12 +157,12 @@ export function getItemTypeLabel(type: ItemType, count: number): string {
  */
 export const CheckInfoFactory = Object.freeze({
   compliance(compliantItems: number, totalItems: number, unit: string): CheckInfo {
-    return { label: `${compliantItems}/${totalItems} ${unit} compliant` }
+    return { label: `${compliantItems}/${totalItems} ${unit} compliant` };
   },
   violations(count: number, unit: string): CheckInfo {
-    return { label: count === 0 ? `No ${unit}` : `${count} ${unit}` }
+    return { label: count === 0 ? `No ${unit}` : `${count} ${unit}` };
   },
-})
+});
 
 /**
  * Create a result with signals.
@@ -173,15 +172,15 @@ export function createResultWithSignals(
   signals: readonly Signal[],
   totalItems: number,
   options?: {
-    ignoredCount?: number
-    durationMs?: number
-    filesScanned?: number
-    itemType?: string
-    extra?: Record<string, unknown>
+    ignoredCount?: number;
+    durationMs?: number;
+    filesScanned?: number;
+    itemType?: string;
+    extra?: Record<string, unknown>;
   },
 ): CheckResult {
-  const errors = countErrors(signals)
-  const warnings = countWarnings(signals)
+  const errors = countErrors(signals);
+  const warnings = countWarnings(signals);
 
   return {
     passed: errors === 0,
@@ -200,16 +199,13 @@ export function createResultWithSignals(
     ...(options?.ignoredCount !== undefined && options.ignoredCount > 0
       ? { ignoredCount: options.ignoredCount }
       : {}),
-  }
+  };
 }
 
 /**
  * Create an error result (for check failures).
  */
-export function createErrorResult(
-  message: string,
-  error?: Error,
-): CheckResult {
+export function createErrorResult(message: string, error?: Error): CheckResult {
   return {
     passed: false,
     errors: 1,
@@ -219,7 +215,9 @@ export function createErrorResult(
     metadata: {
       totalItems: 0,
       signals: [],
-      extra: error ? { originalError: error.message, ...(error.stack ? { stack: error.stack } : {}) } : undefined,
+      extra: error
+        ? { originalError: error.message, ...(error.stack ? { stack: error.stack } : {}) }
+        : undefined,
     },
-  }
+  };
 }

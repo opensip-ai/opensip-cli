@@ -43,7 +43,9 @@ describe('createInProcessTransport', () => {
     let emitFn: ((e: string) => void) | undefined;
     const run = transport.run<string, void>((emit) => {
       emitFn = emit;
-      return new Promise<void>((resolve) => { setTimeout(resolve, 5); });
+      return new Promise<void>((resolve) => {
+        setTimeout(resolve, 5);
+      });
     });
     run.onProgress((e) => events.push(e));
     emitFn?.('live1');
@@ -59,7 +61,9 @@ describe('createInProcessTransport', () => {
     const run = transport.run<string, void>((emit) => {
       emit('buffered');
       emitFn = emit;
-      return new Promise<void>((resolve) => { setTimeout(resolve, 5); });
+      return new Promise<void>((resolve) => {
+        setTimeout(resolve, 5);
+      });
     });
     run.onProgress((e) => events.push(e));
     emitFn?.('live');

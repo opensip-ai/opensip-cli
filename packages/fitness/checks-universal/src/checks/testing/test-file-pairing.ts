@@ -6,11 +6,11 @@
  */
 
 // @fitness-ignore-file fitness-check-standards -- Uses fs for directory listing/stat/existsSync operations, not file content reading
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 /**
  * Directories to skip during scanning
@@ -23,7 +23,7 @@ const SKIP_DIRECTORIES = new Set([
   'interfaces',
   'config',
   'checks', // Fitness check definition files are declarative — tested via fitness-check-coverage
-])
+]);
 
 /**
  * Check if entry should be skipped
@@ -34,8 +34,8 @@ function shouldSkipEntry(entry: string): boolean {
   logger.debug({
     evt: 'fitness.checks.test_file_pairing.should_skip_entry',
     msg: 'Checking if entry should be skipped',
-  })
-  return entry.startsWith('.') || SKIP_DIRECTORIES.has(entry)
+  });
+  return entry.startsWith('.') || SKIP_DIRECTORIES.has(entry);
 }
 
 /**
@@ -50,7 +50,7 @@ const CONFIG_FILE_PATTERNS = [
   /^tsconfig\..+\.ts$/,
   /\.config\.ts$/,
   /\.setup\.ts$/,
-]
+];
 
 /**
  * Check if file is a source file that needs tests
@@ -63,34 +63,38 @@ function isSourceFile(filename: string, relativePath?: string): boolean {
   logger.debug({
     evt: 'fitness.checks.test_file_pairing.is_source_file',
     msg: 'Checking if file is a source file that needs tests',
-  })
+  });
   // Must be TS
-  if (!filename.endsWith('.ts') && !filename.endsWith('.tsx')) return false
+  if (!filename.endsWith('.ts') && !filename.endsWith('.tsx')) return false;
   // Skip declarations
-  if (filename.endsWith('.d.ts')) return false
+  if (filename.endsWith('.d.ts')) return false;
   // Skip existing test files
-  if (filename.includes('.test.') || filename.includes('.spec.')) return false
+  if (filename.includes('.test.') || filename.includes('.spec.')) return false;
   // Skip index files (often just exports)
-  if (filename === 'index.ts') return false
+  if (filename === 'index.ts') return false;
   // Skip config files (vitest.config.ts, vitest.setup.ts, etc.)
-  if (CONFIG_FILE_PATTERNS.some((pattern) => pattern.test(filename))) return false
+  if (CONFIG_FILE_PATTERNS.some((pattern) => pattern.test(filename))) return false;
   // Skip interface files (pure type definitions)
-  if (filename.includes('.interface.ts') || filename.includes('.interface.tsx')) return false
+  if (filename.includes('.interface.ts') || filename.includes('.interface.tsx')) return false;
   // Skip type definition files and data-only files
-  const typeOnlyPatterns = ['-types.ts', '-interfaces.ts', 'errors.ts', 'enums.ts', 'logger.ts']
-  if (typeOnlyPatterns.some((pattern) => filename.endsWith(pattern))) return false
+  const typeOnlyPatterns = ['-types.ts', '-interfaces.ts', 'errors.ts', 'enums.ts', 'logger.ts'];
+  if (typeOnlyPatterns.some((pattern) => filename.endsWith(pattern))) return false;
   // Skip exact 'types.ts' (barrel type exports)
-  if (filename === 'types.ts' || filename === 'types.tsx') return false
+  if (filename === 'types.ts' || filename === 'types.tsx') return false;
   // Skip pure data/schema/constants files
-  const dataOnlyPatterns = ['schema.ts', 'constants.ts', 'profiles.ts', 'error-messages.ts']
-  if (dataOnlyPatterns.includes(filename)) return false
+  const dataOnlyPatterns = ['schema.ts', 'constants.ts', 'profiles.ts', 'error-messages.ts'];
+  if (dataOnlyPatterns.includes(filename)) return false;
   // Skip files in types/ or interfaces/ directories
   if (relativePath && (relativePath.includes('/types/') || relativePath.includes('/interfaces/')))
-    return false
+    return false;
   // Skip fitness check definition directories (declarative defineCheck files)
-  if (relativePath && relativePath.includes('/fitness/src/checks/') && !relativePath.includes('__tests__'))
-    return false
-  return true
+  if (
+    relativePath &&
+    relativePath.includes('/fitness/src/checks/') &&
+    !relativePath.includes('__tests__')
+  )
+    return false;
+  return true;
 }
 /* v8 ignore stop */
 
@@ -104,10 +108,10 @@ function hasTestPair(dir: string, filename: string): boolean {
   logger.debug({
     evt: 'fitness.checks.test_file_pairing.has_test_pair',
     msg: 'Checking if file has a test pair',
-  })
+  });
   // @fitness-ignore-next-line null-safety -- path.parse() always returns a valid ParsedPath object with a name property
-  const name = path.parse(filename).name
-  const parentDir = path.dirname(dir)
+  const name = path.parse(filename).name;
+  const parentDir = path.dirname(dir);
 
   const possibilities = [
     // Adjacent test files
@@ -136,9 +140,9 @@ function hasTestPair(dir: string, filename: string): boolean {
     path.join(parentDir, '__tests__', 'unit', `${name}.spec.ts`),
     path.join(parentDir, '__tests__', 'unit', `${name}.unit.test.ts`),
     path.join(parentDir, '__tests__', 'unit', `${name}.unit.spec.ts`),
-  ]
+  ];
 
-  return possibilities.some((possiblePath) => fs.existsSync(possiblePath))
+  return possibilities.some((possiblePath) => fs.existsSync(possiblePath));
 }
 
 /**
@@ -149,13 +153,13 @@ async function hasTestPendingMarker(filePath: string, files: FileAccessor): Prom
   logger.debug({
     evt: 'fitness.checks.test_file_pairing.has_test_pending_marker',
     msg: 'Checking if file has a test-pending marker',
-  })
+  });
   try {
-    const content = await files.read(filePath)
-    return content.slice(0, 500).includes('@test-pending')
+    const content = await files.read(filePath);
+    return content.slice(0, 500).includes('@test-pending');
   } catch {
     // @swallow-ok graceful degradation - return sentinel on failure
-    return false
+    return false;
   }
 }
 
@@ -170,34 +174,34 @@ async function scanDirectory(
   logger.debug({
     evt: 'fitness.checks.test_file_pairing.scan_directory',
     msg: 'Scanning directory for source files without test pairs',
-  })
-  const violations: CheckViolation[] = []
+  });
+  const violations: CheckViolation[] = [];
 
   // @lazy-ok -- validations inside loop depend on loop iteration data, not pre-await guards
   try {
-    const entries = fs.readdirSync(dir)
+    const entries = fs.readdirSync(dir);
 
     // Filter out entries that should be skipped
-    const relevantEntries = entries.filter((entry) => !shouldSkipEntry(entry))
+    const relevantEntries = entries.filter((entry) => !shouldSkipEntry(entry));
 
     for (const entry of relevantEntries) {
-      const fullPath = path.join(dir, entry)
-      const relativePath = path.relative(cwd, fullPath)
-      const stats = fs.statSync(fullPath)
+      const fullPath = path.join(dir, entry);
+      const relativePath = path.relative(cwd, fullPath);
+      const stats = fs.statSync(fullPath);
 
       if (stats.isDirectory()) {
-        const subViolations = await scanDirectory(fullPath, cwd, files)
-        violations.push(...subViolations)
+        const subViolations = await scanDirectory(fullPath, cwd, files);
+        violations.push(...subViolations);
       } else if (stats.isFile()) {
-        if (!isSourceFile(entry, relativePath)) continue
-        if (await hasTestPendingMarker(fullPath, files)) continue
-        if (hasTestPair(dir, entry)) continue
+        if (!isSourceFile(entry, relativePath)) continue;
+        if (await hasTestPendingMarker(fullPath, files)) continue;
+        if (hasTestPair(dir, entry)) continue;
 
         // @fitness-ignore-next-line null-safety -- path.parse() always returns a valid ParsedPath object with a name property
-        const name = path.parse(entry).name
-        const testDir = path.join(dir, '__tests__', 'unit')
-        const expectedTestFile = path.join(testDir, `${name}.unit.test.ts`)
-        const alternativeTestFile = path.join(testDir, `${name}.test.ts`)
+        const name = path.parse(entry).name;
+        const testDir = path.join(dir, '__tests__', 'unit');
+        const expectedTestFile = path.join(testDir, `${name}.unit.test.ts`);
+        const alternativeTestFile = path.join(testDir, `${name}.test.ts`);
 
         violations.push({
           line: 1,
@@ -207,14 +211,14 @@ async function scanDirectory(
           suggestion: `Create a test file: touch ${expectedTestFile} (or ${alternativeTestFile})`,
           match: entry,
           filePath: fullPath,
-        })
+        });
       }
     }
   } catch {
     // @swallow-ok Skip inaccessible directories
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -225,36 +229,32 @@ async function analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
   logger.debug({
     evt: 'fitness.checks.test_file_pairing.analyze_all',
     msg: 'Analyzing all files for test pairing',
-  })
+  });
   // Get the cwd from the first file path (all paths are absolute)
-  const firstPath = files.paths[0]
+  const firstPath = files.paths[0];
   if (!firstPath) {
-    return []
+    return [];
   }
 
   // Find the repo root by looking for packages directory
-  let cwd = path.dirname(firstPath)
+  let cwd = path.dirname(firstPath);
   while (cwd !== '/' && !fs.existsSync(path.join(cwd, 'packages'))) {
-    cwd = path.dirname(cwd)
+    cwd = path.dirname(cwd);
   }
 
-  const scanDirs = [
-    path.join(cwd, 'packages'),
-    path.join(cwd, 'apps'),
-    path.join(cwd, 'services'),
-  ]
+  const scanDirs = [path.join(cwd, 'packages'), path.join(cwd, 'apps'), path.join(cwd, 'services')];
 
-  const allViolations: CheckViolation[] = []
+  const allViolations: CheckViolation[] = [];
   for (const dir of scanDirs) {
-    if (!fs.existsSync(dir)) continue
+    if (!fs.existsSync(dir)) continue;
     // @fitness-ignore-next-line performance-anti-patterns -- sequential directory scanning required: each scan depends on shared file system state
-    const dirViolations = await scanDirectory(dir, cwd, files)
+    const dirViolations = await scanDirectory(dir, cwd, files);
     for (const violation of dirViolations) {
-      allViolations.push(violation)
+      allViolations.push(violation);
     }
   }
 
-  return allViolations
+  return allViolations;
 }
 
 /**
@@ -285,4 +285,4 @@ export const testFilePairing = defineCheck({
   fileTypes: ['ts'],
 
   analyzeAll,
-})
+});

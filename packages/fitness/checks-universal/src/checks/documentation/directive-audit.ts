@@ -15,15 +15,15 @@
  * map directives onto CheckViolations.
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
-import { parseESLintDirectives } from './_directives/eslint.js'
-import { parseFitnessDirectives } from './_directives/fitness.js'
-import { parseGraphDirectives } from './_directives/graph.js'
-import { parseSemgrepDirectives } from './_directives/semgrep.js'
-import { parseTypeScriptDirectives } from './_directives/typescript.js'
+import { parseESLintDirectives } from './_directives/eslint.js';
+import { parseFitnessDirectives } from './_directives/fitness.js';
+import { parseGraphDirectives } from './_directives/graph.js';
+import { parseSemgrepDirectives } from './_directives/semgrep.js';
+import { parseTypeScriptDirectives } from './_directives/typescript.js';
 
-import type { DirectiveInfo } from './_directives/types.js'
+import type { DirectiveInfo } from './_directives/types.js';
 
 // =============================================================================
 // CONSTANTS
@@ -36,14 +36,14 @@ const DIRECTIVE_MARKERS = [
   '@fitness-ignore',
   '@graph-ignore',
   'nosemgrep',
-]
+];
 
 // =============================================================================
 // HELPERS
 // =============================================================================
 
 function hasDirectiveMarkers(content: string): boolean {
-  return DIRECTIVE_MARKERS.some((marker) => content.includes(marker))
+  return DIRECTIVE_MARKERS.some((marker) => content.includes(marker));
 }
 
 function collectFileDirectives(content: string, filePath: string, file: string): DirectiveInfo[] {
@@ -53,26 +53,26 @@ function collectFileDirectives(content: string, filePath: string, file: string):
     ...parseFitnessDirectives(content, filePath, file),
     ...parseGraphDirectives(content, filePath, file),
     ...parseSemgrepDirectives(content, filePath, file),
-  ]
+  ];
 
-  directives.sort((a, b) => a.line - b.line)
-  return directives
+  directives.sort((a, b) => a.line - b.line);
+  return directives;
 }
 
 function isTypeScriptFile(filePath: string): boolean {
-  return filePath.endsWith('.ts') || filePath.endsWith('.tsx')
+  return filePath.endsWith('.ts') || filePath.endsWith('.tsx');
 }
 
 function getFileName(filePath: string): string {
-  const lastSlash = filePath.lastIndexOf('/')
-  return lastSlash === -1 ? filePath : filePath.slice(lastSlash + 1)
+  const lastSlash = filePath.lastIndexOf('/');
+  return lastSlash === -1 ? filePath : filePath.slice(lastSlash + 1);
 }
 
 function directiveToViolation(directive: DirectiveInfo): CheckViolation {
-  const reasonPart = directive.reason ? ` -- ${directive.reason}` : ''
+  const reasonPart = directive.reason ? ` -- ${directive.reason}` : '';
   const suggestion = directive.reason
     ? `Review if this suppression is still needed: ${directive.reason}`
-    : 'Review if this suppression is still needed. Add a reason comment if keeping.'
+    : 'Review if this suppression is still needed. Add a reason comment if keeping.';
 
   return {
     filePath: directive.filePath,
@@ -83,7 +83,7 @@ function directiveToViolation(directive: DirectiveInfo): CheckViolation {
     suggestion,
     match: directive.raw,
     type: `directive-${directive.source}`,
-  }
+  };
 }
 
 // =============================================================================
@@ -95,33 +95,33 @@ function directiveToViolation(directive: DirectiveInfo): CheckViolation {
  * mode because directive auditing is naturally cross-file.
  */
 async function analyzeAllFiles(files: FileAccessor): Promise<CheckViolation[]> {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // @lazy-ok -- validations inside loop depend on file content from await
   for (const filePath of files.paths) {
     if (!isTypeScriptFile(filePath)) {
-      continue
+      continue;
     }
 
     try {
-      const content = await files.read(filePath)
-      const file = getFileName(filePath)
+      const content = await files.read(filePath);
+      const file = getFileName(filePath);
 
       if (!hasDirectiveMarkers(content)) {
-        continue
+        continue;
       }
 
-      const directives = collectFileDirectives(content, filePath, file)
+      const directives = collectFileDirectives(content, filePath, file);
 
       for (const directive of directives) {
-        violations.push(directiveToViolation(directive))
+        violations.push(directiveToViolation(directive));
       }
     } catch {
       // @swallow-ok Skip unreadable files
     }
   }
 
-  return violations
+  return violations;
 }
 
 // =============================================================================
@@ -165,4 +165,4 @@ export const directiveAudit = defineCheck({
   disabled: true, // Run manually for periodic audits
 
   analyzeAll: analyzeAllFiles,
-})
+});

@@ -44,10 +44,7 @@ export type {
 // Capability domain model (release 2.10.0, §5.3): the data shape a tool
 // uses to declare an extension point it owns. The runtime registry lives
 // in `plugins/capability-registry.ts`.
-export {
-  isCapabilityValidator,
-  isStructuralContributionSchema,
-} from './capability.js';
+export { isCapabilityValidator, isStructuralContributionSchema } from './capability.js';
 export type {
   CapabilityDomainSpec,
   CapabilityContributionKind,

@@ -25,7 +25,11 @@ function statusColor(theme: ReturnType<typeof useTheme>, status: FitTableRow['st
   return theme.statusPass;
 }
 
-function ignoredColor(theme: ReturnType<typeof useTheme>, ignored: number, validated: string): string {
+function ignoredColor(
+  theme: ReturnType<typeof useTheme>,
+  ignored: number,
+  validated: string,
+): string {
   const total = parseValidatedCount(validated);
   if (total === 0 || ignored === 0) return theme.muted;
   const pct = (ignored / total) * 100;
@@ -40,7 +44,11 @@ function durationColor(theme: ReturnType<typeof useTheme>, ms: number): string {
   return theme.success;
 }
 
-export function ResultsTable({ rows }: { readonly rows: readonly FitTableRow[] }): React.ReactElement | null {
+export function ResultsTable({
+  rows,
+}: {
+  readonly rows: readonly FitTableRow[];
+}): React.ReactElement | null {
   const theme = useTheme();
   if (rows.length === 0) return null;
   const sorted = [...rows].sort((a, b) => sortFitRowPriority(a) - sortFitRowPriority(b));
@@ -76,15 +84,23 @@ export function ResultsTable({ rows }: { readonly rows: readonly FitTableRow[] }
             {' | '}
             <Text color={statusColor(theme, row.status)}>{row.status.padEnd(widths.status)}</Text>
             {' | '}
-            <Text color={row.errors > 0 ? theme.error : theme.success}>{String(row.errors).padEnd(widths.errors)}</Text>
+            <Text color={row.errors > 0 ? theme.error : theme.success}>
+              {String(row.errors).padEnd(widths.errors)}
+            </Text>
             {' | '}
-            <Text color={row.warnings > 0 ? theme.warning : theme.muted}>{String(row.warnings).padEnd(widths.warnings)}</Text>
+            <Text color={row.warnings > 0 ? theme.warning : theme.muted}>
+              {String(row.warnings).padEnd(widths.warnings)}
+            </Text>
             {' | '}
             {validatedCell.padEnd(widths.validated)}
             {' | '}
-            <Text color={ignoredColor(theme, row.ignored, validatedCell)}>{String(row.ignored).padEnd(widths.ignored)}</Text>
+            <Text color={ignoredColor(theme, row.ignored, validatedCell)}>
+              {String(row.ignored).padEnd(widths.ignored)}
+            </Text>
             {' | '}
-            <Text color={durationColor(theme, row.durationMs)}>{row.duration.padEnd(widths.duration)}</Text>
+            <Text color={durationColor(theme, row.durationMs)}>
+              {row.duration.padEnd(widths.duration)}
+            </Text>
           </Text>
         );
       })}
@@ -107,13 +123,18 @@ export function ResultsTable({ rows }: { readonly rows: readonly FitTableRow[] }
  * frame tracking. Rendering them here through Ink keeps the live view's
  * frame contract intact.
  */
-export function WarningsBlock({ warnings }: { readonly warnings: readonly string[] }): React.ReactElement {
+export function WarningsBlock({
+  warnings,
+}: {
+  readonly warnings: readonly string[];
+}): React.ReactElement {
   const theme = useTheme();
   return (
     <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
       {warnings.map((msg, i) => (
         <Text key={i} color={theme.warning}>
-          {'! '}{msg}
+          {'! '}
+          {msg}
         </Text>
       ))}
     </Box>

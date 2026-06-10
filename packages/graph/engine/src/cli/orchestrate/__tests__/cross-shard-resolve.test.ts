@@ -73,22 +73,38 @@ function manifests(...entries: readonly PackageManifest[]): PackageManifestIndex
 }
 
 /** Manifest mapping the specifier `@scope/pkg<segment>` → `packages/<dir>`. */
-function manifest(name: string, dir: string, exportsMap?: Record<string, unknown>): PackageManifest {
+function manifest(
+  name: string,
+  dir: string,
+  exportsMap?: Record<string, unknown>,
+): PackageManifest {
   return exportsMap === undefined ? { name, dir } : { name, dir, exportsMap };
 }
 
 const EMPTY_MANIFESTS: PackageManifestIndex = new Map();
 
 function crossEdge(catalog: Catalog): CallEdge | undefined {
-  return catalog.functions.caller?.[0]?.calls.find((e) => e.crossShard)
-    ?? catalog.functions.mainA?.[0]?.calls.find((e) => e.crossShard);
+  return (
+    catalog.functions.caller?.[0]?.calls.find((e) => e.crossShard) ??
+    catalog.functions.mainA?.[0]?.calls.find((e) => e.crossShard)
+  );
 }
 
 describe('mergeShardFragments', () => {
   it('unions occurrences from every fragment, preserving intra-shard calls', () => {
-    const a = fragment('typescript', occ('mainA', 'pkgA/a.ts', 'A', [
-      { to: ['LOCAL'], line: 2, column: 4, resolution: 'static', confidence: 'high', text: 'localA()' },
-    ]));
+    const a = fragment(
+      'typescript',
+      occ('mainA', 'pkgA/a.ts', 'A', [
+        {
+          to: ['LOCAL'],
+          line: 2,
+          column: 4,
+          resolution: 'static',
+          confidence: 'high',
+          text: 'localA()',
+        },
+      ]),
+    );
     const b = fragment('typescript', occ('helperB', 'pkgB/b.ts', 'B'));
     const merged = mergeShardFragments([a, b], ['pkgA/a.ts', 'pkgB/b.ts']);
 
@@ -196,7 +212,14 @@ describe('resolveCrossBoundaryCalls', () => {
         fragment(
           'typescript',
           occ('mainA', 'packages/pkg-a/index.ts', 'A', [
-            { to: [], line: 2, column: 9, resolution: 'unknown', confidence: 'low', text: 'helperB()' },
+            {
+              to: [],
+              line: 2,
+              column: 9,
+              resolution: 'unknown',
+              confidence: 'low',
+              text: 'helperB()',
+            },
           ]),
         ),
         fragment('typescript', occ('helperB', 'packages/pkg-b/index.ts', 'B')),
@@ -274,9 +297,7 @@ describe('resolveCrossBoundaryCalls — ambiguity', () => {
   });
 
   it('narrows ambiguous same-name exports when a declared subpath pins one file', () => {
-    const withExports = manifests(
-      manifest('@scope/pkgb', 'packages/pkg-b', { './b': './b.js' }),
-    );
+    const withExports = manifests(manifest('@scope/pkgb', 'packages/pkg-b', { './b': './b.js' }));
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
@@ -294,15 +315,39 @@ describe('resolveCrossBoundaryCalls — ambiguity', () => {
 describe('diffCatalogsByEdge', () => {
   it('reports an intra-shard edge difference when a non-cross edge target changed', () => {
     const a = mergeShardFragments(
-      [fragment('typescript', occ('mainA', 'packages/pkg-a/index.ts', 'A', [
-        { to: ['X'], line: 2, column: 1, resolution: 'static', confidence: 'high', text: 'x()' },
-      ]))],
+      [
+        fragment(
+          'typescript',
+          occ('mainA', 'packages/pkg-a/index.ts', 'A', [
+            {
+              to: ['X'],
+              line: 2,
+              column: 1,
+              resolution: 'static',
+              confidence: 'high',
+              text: 'x()',
+            },
+          ]),
+        ),
+      ],
       ['packages/pkg-a/index.ts'],
     );
     const b = mergeShardFragments(
-      [fragment('typescript', occ('mainA', 'packages/pkg-a/index.ts', 'A', [
-        { to: ['Y'], line: 2, column: 1, resolution: 'static', confidence: 'high', text: 'x()' },
-      ]))],
+      [
+        fragment(
+          'typescript',
+          occ('mainA', 'packages/pkg-a/index.ts', 'A', [
+            {
+              to: ['Y'],
+              line: 2,
+              column: 1,
+              resolution: 'static',
+              confidence: 'high',
+              text: 'x()',
+            },
+          ]),
+        ),
+      ],
       ['packages/pkg-a/index.ts'],
     );
     const diff = diffCatalogsByEdge(a, b);
@@ -329,7 +374,17 @@ describe('diffCatalogsByEdge', () => {
         ],
         ['packages/pkg-a/index.ts', 'packages/pkg-b/index.ts'],
       ),
-      [{ ownerHash: 'A', ownerFile: 'packages/pkg-a/index.ts', calleeName: 'helperB', importSpecifier: '@scope/pkgb', line: 2, column: 1, text: 'helperB()' }],
+      [
+        {
+          ownerHash: 'A',
+          ownerFile: 'packages/pkg-a/index.ts',
+          calleeName: 'helperB',
+          importSpecifier: '@scope/pkgb',
+          line: 2,
+          column: 1,
+          text: 'helperB()',
+        },
+      ],
       manifests(manifest('@scope/pkgb', 'packages/pkg-b')),
     ).catalog;
 
@@ -350,16 +405,21 @@ describe('resolveCrossBoundaryCalls — semantic export linking (packages/ paths
   const gB = occ('g', 'packages/pkg-b/src/g.ts', 'G');
 
   const merged = mergeShardFragments(
-    [
-      fragment('typescript', callerA, fA),
-      fragment('typescript', fB, gB),
-    ],
+    [fragment('typescript', callerA, fA), fragment('typescript', fB, gB)],
     ['packages/pkg-a/src/call.ts', 'packages/pkg-b/src/g.ts'],
   );
   const mIndex = manifests(manifest('@scope/pkgb', 'packages/pkg-b'));
 
   it('links into the imported package for a unique exported callee', () => {
-    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', ownerFile: 'packages/pkg-a/src/call.ts', calleeName: 'g', importSpecifier: '@scope/pkgb', line: 2, column: 0, text: 'g()' };
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'CALLER',
+      ownerFile: 'packages/pkg-a/src/call.ts',
+      calleeName: 'g',
+      importSpecifier: '@scope/pkgb',
+      line: 2,
+      column: 0,
+      text: 'g()',
+    };
     const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
     expect(crossEdge(catalog)?.to).toEqual(['G']);
   });
@@ -368,13 +428,29 @@ describe('resolveCrossBoundaryCalls — semantic export linking (packages/ paths
     // 'f' exists in BOTH pkg-a and pkg-b. The specifier names pkg-b, whose
     // export bucket has exactly one 'f' (FB) — that is the unique linkable
     // target. (The caller's own 'f' lives in a different package bucket.)
-    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', ownerFile: 'packages/pkg-a/src/call.ts', calleeName: 'f', importSpecifier: '@scope/pkgb', line: 2, column: 0, text: 'f()' };
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'CALLER',
+      ownerFile: 'packages/pkg-a/src/call.ts',
+      calleeName: 'f',
+      importSpecifier: '@scope/pkgb',
+      line: 2,
+      column: 0,
+      text: 'f()',
+    };
     const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
     expect(crossEdge(catalog)?.to).toEqual(['FB']); // pkg-b's f, by the specifier
   });
 
   it('declines a callee whose specifier names an untracked package', () => {
-    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', ownerFile: 'packages/pkg-a/src/call.ts', calleeName: 'g', importSpecifier: '@scope/unknown', line: 2, column: 0, text: 'g()' };
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'CALLER',
+      ownerFile: 'packages/pkg-a/src/call.ts',
+      calleeName: 'g',
+      importSpecifier: '@scope/unknown',
+      line: 2,
+      column: 0,
+      text: 'g()',
+    };
     const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
     // Phase 6: declined (pkg not in manifest index) → no persisted placeholder edge.
     expect(crossEdge(catalog)).toBeUndefined();
@@ -444,7 +520,7 @@ describe('resolveCrossBoundaryCalls — body-twin keying (F1, ADR-0003)', () => 
     expect(twinB?.calls.filter((e) => e.crossShard).flatMap((e) => [...e.to])).toEqual(['HB']);
   });
 
-  it('pins each twin\'s relative import against its OWN directory', () => {
+  it("pins each twin's relative import against its OWN directory", () => {
     // Same specifier './helper.js' from both twins must resolve to the helper in
     // the SAME package as the owner — proving pinBySpecifier uses bc.ownerFile,
     // not a last-writer-wins bodyHash->file guess.

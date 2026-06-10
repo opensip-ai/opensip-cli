@@ -5,67 +5,66 @@
  * type checking and should be replaced with 'unknown' with proper type narrowing.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
-
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Quick filter keywords for 'any' type patterns
  */
-const QUICK_FILTER_KEYWORDS = [': any', 'any)', 'any,', 'any;', '<any', 'any>']
+const QUICK_FILTER_KEYWORDS = [': any', 'any)', 'any,', 'any;', '<any', 'any>'];
 
 /**
  * Find lines with eslint-disable-next-line comments
  */
 function findDisabledLines(content: string): Set<number> {
-  const disabledLines = new Set<number>()
-  const lines = content.split('\n')
+  const disabledLines = new Set<number>();
+  const lines = content.split('\n');
 
   for (const [i, line] of lines.entries()) {
     if (line?.includes('eslint-disable-next-line')) {
-      disabledLines.add(i + 1)
+      disabledLines.add(i + 1);
     }
   }
 
-  return disabledLines
+  return disabledLines;
 }
 
 /**
  * Analyze a file for 'any' type usage
  */
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const disabledLines = findDisabledLines(content)
+  const violations: CheckViolation[] = [];
+  const disabledLines = findDisabledLines(content);
 
   try {
-    const sourceFile = getSharedSourceFile(filePath, content)
+    const sourceFile = getSharedSourceFile(filePath, content);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return violations
+    if (!sourceFile) return violations;
 
     const visit = (node: ts.Node): void => {
       if (node.kind === ts.SyntaxKind.AnyKeyword) {
-        const parent = node.parent
-        const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+        const parent = node.parent;
+        const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
 
         // Skip if this line has an eslint-disable-next-line comment
         if (disabledLines.has(line)) {
-          ts.forEachChild(node, visit)
-          return
+          ts.forEachChild(node, visit);
+          return;
         }
 
         // Get context from parent
-        let context = 'type annotation'
+        let context = 'type annotation';
         if (ts.isParameter(parent)) {
-          context = 'function parameter'
+          context = 'function parameter';
         } else if (ts.isVariableDeclaration(parent)) {
-          context = 'variable declaration'
+          context = 'variable declaration';
         } else if (ts.isPropertySignature(parent) || ts.isPropertyDeclaration(parent)) {
-          context = 'property'
+          context = 'property';
         } else if (ts.isFunctionDeclaration(parent) || ts.isMethodDeclaration(parent)) {
-          context = 'return type'
+          context = 'return type';
         } else if (ts.isTypeAliasDeclaration(parent)) {
-          context = 'type alias'
+          context = 'type alias';
         }
 
         violations.push({
@@ -78,18 +77,18 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
             "Replace 'any' with 'unknown' and add type narrowing with type guards or assertion functions.",
           match: 'any',
           filePath,
-        })
+        });
       }
-      ts.forEachChild(node, visit)
-    }
+      ts.forEachChild(node, visit);
+    };
 
-    visit(sourceFile)
-  /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+    visit(sourceFile);
+    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
   } catch {
     // @swallow-ok Skip files that fail to parse
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -119,9 +118,9 @@ export const noAnyTypes = defineCheck({
   analyze(content: string, filePath: string): CheckViolation[] {
     // Quick filter: skip files without 'any' type patterns
     if (!QUICK_FILTER_KEYWORDS.some((kw) => content.includes(kw))) {
-      return []
+      return [];
     }
 
-    return analyzeFile(content, filePath)
+    return analyzeFile(content, filePath);
   },
-})
+});

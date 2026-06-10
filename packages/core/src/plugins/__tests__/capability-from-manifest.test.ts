@@ -178,7 +178,12 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
     writePackageManifest(
       testDir,
       fixturePackageJson([
-        { id: 'audit-rule', apiVersion: 1, contributionSchema: {}, contributionKind: 'module-export' },
+        {
+          id: 'audit-rule',
+          apiVersion: 1,
+          contributionSchema: {},
+          contributionKind: 'module-export',
+        },
       ]),
     );
     const manifest = loadToolManifest('installed', testDir);

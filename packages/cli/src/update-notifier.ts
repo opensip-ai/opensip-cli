@@ -34,10 +34,10 @@
  *   - stdout is not a TTY (scripts, pipelines)
  */
 
-import updateNotifier, { type UpdateNotifier } from 'update-notifier'
+import updateNotifier, { type UpdateNotifier } from 'update-notifier';
 
-import { hostEnv } from './env/host-env-specs.js'
-import { clearKnownLatest, readKnownLatest, writeKnownLatest } from './update-state.js'
+import { hostEnv } from './env/host-env-specs.js';
+import { clearKnownLatest, readKnownLatest, writeKnownLatest } from './update-state.js';
 
 /**
  * How often the detached background fetch may hit npm to learn the latest
@@ -54,30 +54,30 @@ import { clearKnownLatest, readKnownLatest, writeKnownLatest } from './update-st
  * the "I published but the CLI still says up-to-date" window from a day to an
  * hour. One named constant so the two call sites can't drift.
  */
-export const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60
+export const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60;
 
 export interface NotifyOptions {
-  readonly name: string
-  readonly version: string
+  readonly name: string;
+  readonly version: string;
   /** Override stderr writer (for tests). */
-  readonly write?: (s: string) => void
+  readonly write?: (s: string) => void;
 }
 
 export interface CheckForUpdateOptions {
-  readonly name: string
-  readonly version: string
+  readonly name: string;
+  readonly version: string;
   /**
    * Override the sticky update-state file path (for tests). Defaults to
    * `~/.opensip-tools/update-state.json`.
    */
-  readonly stateFile?: string
+  readonly stateFile?: string;
 }
 
 /** Split `2.2.1-beta.1` into `([2,2,1], 'beta.1')`; missing parts → 0 / ''. */
 function splitPrerelease(version: string): [readonly number[], string] {
-  const [core, ...rest] = version.split('-')
-  const nums = core.split('.').map((p) => Number.parseInt(p, 10) || 0)
-  return [nums, rest.join('-')]
+  const [core, ...rest] = version.split('-');
+  const nums = core.split('.').map((p) => Number.parseInt(p, 10) || 0);
+  return [nums, rest.join('-')];
 }
 
 /**
@@ -91,28 +91,28 @@ function splitPrerelease(version: string): [readonly number[], string] {
  * only notify when there is a genuinely newer release to move TO.
  */
 export function isNewerVersion(latest: string, current: string): boolean {
-  const [latestCore, latestPre] = splitPrerelease(latest)
-  const [currentCore, currentPre] = splitPrerelease(current)
+  const [latestCore, latestPre] = splitPrerelease(latest);
+  const [currentCore, currentPre] = splitPrerelease(current);
   for (let i = 0; i < 3; i++) {
-    const l = latestCore[i] ?? 0
-    const c = currentCore[i] ?? 0
-    if (l > c) return true
-    if (l < c) return false
+    const l = latestCore[i] ?? 0;
+    const c = currentCore[i] ?? 0;
+    if (l > c) return true;
+    if (l < c) return false;
   }
   // Cores equal: a full release is newer than a prerelease of the same core.
-  return latestPre === '' && currentPre !== ''
+  return latestPre === '' && currentPre !== '';
 }
 
 function shouldSkip(): boolean {
   // Either opt-out (read through the registry) skips the check — byte-identical
   // to the prior two independent truthy `process.env` checks.
-  if (hostEnv.get<boolean>('OPENSIP_NO_UPDATE') === true) return true
-  if (hostEnv.get<boolean>('NO_UPDATE_NOTIFIER') === true) return true
+  if (hostEnv.get<boolean>('OPENSIP_NO_UPDATE') === true) return true;
+  if (hostEnv.get<boolean>('NO_UPDATE_NOTIFIER') === true) return true;
   // The update-notifier package already suppresses in CI and non-TTY,
   // but we short-circuit so we don't even construct the notifier —
   // keeps the startup path minimal.
-  if (!process.stdout.isTTY) return true
-  return false
+  if (!process.stdout.isTTY) return true;
+  return false;
 }
 
 /**
@@ -132,7 +132,7 @@ function shouldSkip(): boolean {
  * (the `mini` banner inline, or {@link formatUpdateNag} on stderr).
  */
 export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined {
-  if (shouldSkip()) return undefined
+  if (shouldSkip()) return undefined;
   try {
     // Fetcher: schedules the throttled, detached hourly network check. On the
     // run right after that check completes, `notifier.update` is populated
@@ -141,10 +141,10 @@ export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined 
       pkg: { name: opts.name, version: opts.version },
       updateCheckInterval: UPDATE_CHECK_INTERVAL_MS,
       shouldNotifyInNpmScript: false,
-    })
-    const fresh = notifier.update
+    });
+    const fresh = notifier.update;
     if (fresh && isNewerVersion(fresh.latest, fresh.current)) {
-      writeKnownLatest(fresh.latest, opts.stateFile)
+      writeKnownLatest(fresh.latest, opts.stateFile);
     }
     // @fitness-ignore-next-line error-handling-quality -- the update fetch is best-effort cosmetic: any failure (corrupt cache, network helper error) must degrade silently, never break the user's command. The sticky store below still drives display from whatever was last known.
   } catch {
@@ -155,14 +155,14 @@ export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined 
   // Display: driven entirely by the sticky store so the notice persists across
   // runs. Clear it once the running version has caught up so it self-stops
   // after an upgrade.
-  const known = readKnownLatest(opts.stateFile)
+  const known = readKnownLatest(opts.stateFile);
   if (known && isNewerVersion(known, opts.version)) {
-    return known
+    return known;
   }
   if (known) {
-    clearKnownLatest(opts.stateFile)
+    clearKnownLatest(opts.stateFile);
   }
-  return undefined
+  return undefined;
 }
 
 /**
@@ -176,7 +176,7 @@ export function formatUpdateNag(current: string, latest: string): string {
     `\nopensip-tools ${current} → ${latest} available. ` +
     `Run \`npm install -g opensip-tools\` to update.\n` +
     `(Silence with OPENSIP_NO_UPDATE=1.)\n\n`
-  )
+  );
 }
 
 /**
@@ -184,7 +184,7 @@ export function formatUpdateNag(current: string, latest: string): string {
  * assert) or null if skipped.
  */
 export function maybeNotify(opts: NotifyOptions): UpdateNotifier | null {
-  if (shouldSkip()) return null
+  if (shouldSkip()) return null;
 
   const notifier = updateNotifier({
     pkg: { name: opts.name, version: opts.version },
@@ -192,19 +192,19 @@ export function maybeNotify(opts: NotifyOptions): UpdateNotifier | null {
     // command, so we trade a little npm traffic for sub-hourly detection.
     updateCheckInterval: UPDATE_CHECK_INTERVAL_MS,
     shouldNotifyInNpmScript: false,
-  })
+  });
 
-  const update = notifier.update
+  const update = notifier.update;
   // Only nag when npm's latest is genuinely NEWER than what's running — not
   // merely different. Guards against the "2.2.1 → 2.1.0 available" downgrade
   // prompt seen when running a build ahead of the published `latest` tag.
   if (update && isNewerVersion(update.latest, update.current)) {
-    const write = opts.write ?? ((s: string) => process.stderr.write(s))
+    const write = opts.write ?? ((s: string) => process.stderr.write(s));
     const line =
       `\nopensip-tools ${update.current} \u2192 ${update.latest} available. ` +
       `Run \`npm install -g opensip-tools\` to update.\n` +
-      `(Silence with OPENSIP_NO_UPDATE=1.)\n\n`
-    write(line)
+      `(Silence with OPENSIP_NO_UPDATE=1.)\n\n`;
+    write(line);
   }
-  return notifier
+  return notifier;
 }

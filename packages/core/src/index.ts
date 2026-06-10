@@ -1,5 +1,11 @@
 // Types — internal signal (shared across tools)
-export type { Signal, SignalSeverity, SignalCategory, CreateSignalInput, FixHint } from './types/signal.js';
+export type {
+  Signal,
+  SignalSeverity,
+  SignalCategory,
+  CreateSignalInput,
+  FixHint,
+} from './types/signal.js';
 export { createSignal, isErrorSeverity, isErrorSignal } from './types/signal.js';
 
 // Severity & Signal policy (north-star §5.9, release 2.13.0). One home for
@@ -31,8 +37,17 @@ export { COMMENT_OPENERS, stripCommentOpener } from './signals/comment-openers.j
 // Runtime — live-run progress transport seam (ADR-0016). Generic over the event
 // type so the kernel never names cli-ui's concrete ProgressEvent.
 export { createInProcessTransport } from './runtime/in-process-transport.js';
-export { createSubprocessProgressRun, runOffThreadOrInProcess } from './runtime/subprocess-transport.js';
-export type { ProgressTransport, ProgressRun, ProgressJob, SubprocessJobDescriptor, WorkerMessage } from './runtime/progress-transport.js';
+export {
+  createSubprocessProgressRun,
+  runOffThreadOrInProcess,
+} from './runtime/subprocess-transport.js';
+export type {
+  ProgressTransport,
+  ProgressRun,
+  ProgressJob,
+  SubprocessJobDescriptor,
+  WorkerMessage,
+} from './runtime/progress-transport.js';
 
 // Languages — cross-language adapter API
 export * from './languages/index.js';
@@ -154,10 +169,7 @@ export type {
 // uses to declare an extension point it owns. The scope-owned runtime
 // registry is exported from ./plugins/index.js below. Re-exported by
 // @opensip-tools/contracts for the public surface.
-export {
-  isCapabilityValidator,
-  isStructuralContributionSchema,
-} from './tools/index.js';
+export { isCapabilityValidator, isStructuralContributionSchema } from './tools/index.js';
 export type {
   CapabilityDomainSpec,
   CapabilityContributionKind,
@@ -234,7 +246,13 @@ export type {
 // (logger, caches, registries, recipe-config slot, project context,
 // datastore thunk). See `lib/run-scope.ts` for the AsyncLocalStorage
 // seam and the two-copies-of-fitness hazard resolution.
-export { RunScope, runWithScope, runWithScopeSync, enterScope, currentScope } from './lib/run-scope.js';
+export {
+  RunScope,
+  runWithScope,
+  runWithScopeSync,
+  enterScope,
+  currentScope,
+} from './lib/run-scope.js';
 export type { RunScopeOptions } from './lib/run-scope.js';
 // The Tool-contract scope types live in the leaf `scope-types.ts` so the
 // `Tool` contract can depend on them without naming the concrete `RunScope`
@@ -249,7 +267,18 @@ export type {
 } from './lib/scope-types.js';
 
 // Lib — errors + Result pattern
-export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError, PluginIncompatibleError, UnknownCapabilityDomainError, CapabilitySchemaMismatchError } from './lib/errors.js';
+export {
+  ToolError,
+  ValidationError,
+  NotFoundError,
+  SystemError,
+  TimeoutError,
+  NetworkError,
+  ConfigurationError,
+  PluginIncompatibleError,
+  UnknownCapabilityDomainError,
+  CapabilitySchemaMismatchError,
+} from './lib/errors.js';
 export { ok, err, tryCatchAsync, tryCatch } from './lib/errors.js';
 export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 

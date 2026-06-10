@@ -188,9 +188,7 @@ export async function buildEquivalenceReport(
   const productionResolvedDifferences = resolved.filter(
     (d) => !isTestOrFixturePath(d.ownerFilePath),
   );
-  const testResolvedDifferences = resolved.filter((d) =>
-    isTestOrFixturePath(d.ownerFilePath),
-  );
+  const testResolvedDifferences = resolved.filter((d) => isTestOrFixturePath(d.ownerFilePath));
   return {
     functionsOnlyInExact: eq.functionsOnlyInA,
     functionsOnlyInSharded: eq.functionsOnlyInB,
@@ -249,8 +247,7 @@ export function judgeEquivalence(
   const sccCount = report.sccDifferences.length;
   const sccBudget = budget.sccDivergences;
   const functionSetBreached =
-    report.functionsOnlyInExact.length > 0 ||
-    report.functionsOnlyInSharded.length > 0;
+    report.functionsOnlyInExact.length > 0 || report.functionsOnlyInSharded.length > 0;
 
   lines.push(
     `Graph engine equivalence (exact ≡ sharded) on the real repo:`,

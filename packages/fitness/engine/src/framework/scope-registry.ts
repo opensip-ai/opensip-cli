@@ -26,7 +26,6 @@ import { FitnessRecipeRegistry } from '../recipes/registry.js';
 
 import { CheckRegistry } from './registry.js';
 
-
 import type { FitnessLoadState, FitnessSubscope } from '../scope-augmentation.js';
 
 // Side-effect import: ensures the `ScopeContribution.fitness` augmentation is

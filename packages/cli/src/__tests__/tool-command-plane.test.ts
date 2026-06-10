@@ -49,7 +49,7 @@ function makeStubContext(): ToolCliContext {
 /** Silence the per-tool stderr warning the failure-isolation path writes. */
 function silenceStderr(): () => void {
   const orig = process.stderr.write.bind(process.stderr);
-  process.stderr.write = (() => true);
+  process.stderr.write = () => true;
   return () => {
     process.stderr.write = orig;
   };

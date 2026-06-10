@@ -34,7 +34,7 @@ export const RECOGNIZED_NON_CODE_FORMATS: ReadonlySet<string> = new Set([
   'markdown',
   'toml',
   'plaintext',
-])
+]);
 
 /**
  * True when `tag` is a recognized non-code format — a valid scope tag
@@ -42,5 +42,5 @@ export const RECOGNIZED_NON_CODE_FORMATS: ReadonlySet<string> = new Set([
  * case-insensitive.
  */
 export function isRecognizedNonCodeFormat(tag: string): boolean {
-  return RECOGNIZED_NON_CODE_FORMATS.has(tag.toLowerCase())
+  return RECOGNIZED_NON_CODE_FORMATS.has(tag.toLowerCase());
 }

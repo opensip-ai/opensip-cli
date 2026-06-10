@@ -99,7 +99,11 @@ function detectPluginKind(spec: string, cwd: string): string | undefined {
  * explicit `--domain tool`, or (when no `--domain` is given) a detected
  * `kind: "tool"` marker. An explicit fit/sim `--domain` is honoured as-is.
  */
-export function isToolTarget(domainOverride: string | undefined, spec: string, cwd: string): boolean {
+export function isToolTarget(
+  domainOverride: string | undefined,
+  spec: string,
+  cwd: string,
+): boolean {
   if (domainOverride === TOOL_DOMAIN) return true;
   if (domainOverride !== undefined) return false;
   return detectPluginKind(spec, cwd) === 'tool';

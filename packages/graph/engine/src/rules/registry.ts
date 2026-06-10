@@ -33,8 +33,8 @@ import { wideFunctionRule } from './wide-function.js';
 import type { Rule } from '../types.js';
 
 interface RegisterableRule extends Registerable {
-  readonly id: string;     // same as rule.slug
-  readonly name: string;   // same as rule.slug
+  readonly id: string; // same as rule.slug
+  readonly name: string; // same as rule.slug
   readonly rule: Rule;
 }
 

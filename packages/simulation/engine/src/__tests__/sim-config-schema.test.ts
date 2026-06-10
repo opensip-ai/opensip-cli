@@ -4,7 +4,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { SimulationNamespaceSchema, simulationConfigDeclaration } from '../cli/sim-config-schema.js';
+import {
+  SimulationNamespaceSchema,
+  simulationConfigDeclaration,
+} from '../cli/sim-config-schema.js';
 
 describe('SimulationNamespaceSchema', () => {
   it('accepts a block with a recipe', () => {

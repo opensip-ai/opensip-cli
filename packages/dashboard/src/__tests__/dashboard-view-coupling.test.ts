@@ -20,7 +20,10 @@ import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
 
 interface Env {
-  views: { id: string; render: (c: HTMLElement, cat: GraphCatalog, idx: unknown, fs: unknown) => void }[];
+  views: {
+    id: string;
+    render: (c: HTMLElement, cat: GraphCatalog, idx: unknown, fs: unknown) => void;
+  }[];
   graphCatalog: GraphCatalog;
   graphIndexes: { byBodyHash: Map<string, GraphFunctionOccurrence> };
   filterState: { packages: Set<string>; kinds: Set<string>; includeTests: boolean };
@@ -48,22 +51,28 @@ return { views, graphCatalog, graphIndexes, filterState };
 `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
   const factory = new Function(
-    elSrc
-      + dashboardPathUtilsJs()
-      + dashboardIndexesJs()
-      + dashboardViewsRegistryJs()
-      + dashboardFiltersJs()
-      + dashboardFunctionRowJs()
-      + dashboardEditorLinkJs()
-      + dashboardTraceJs()
-      + dashboardFunctionCardJs()
-      + dashboardViewCouplingJs()
-      + tail,
+    elSrc +
+      dashboardPathUtilsJs() +
+      dashboardIndexesJs() +
+      dashboardViewsRegistryJs() +
+      dashboardFiltersJs() +
+      dashboardFunctionRowJs() +
+      dashboardEditorLinkJs() +
+      dashboardTraceJs() +
+      dashboardFunctionCardJs() +
+      dashboardViewCouplingJs() +
+      tail,
   );
   return factory() as Env;
 }
 
-function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string; filePath: string }): GraphFunctionOccurrence {
+function makeOcc(
+  over: Partial<GraphFunctionOccurrence> & {
+    bodyHash: string;
+    simpleName: string;
+    filePath: string;
+  },
+): GraphFunctionOccurrence {
   return {
     qualifiedName: over.simpleName,
     line: 1,
@@ -82,17 +91,52 @@ function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; si
   };
 }
 
-beforeEach(() => { document.body.innerHTML = ''; });
+beforeEach(() => {
+  document.body.innerHTML = '';
+});
 
 describe('View 4 — Coupling matrix', () => {
   it('renders an N×N matrix with the right cell counts for two packages', () => {
     const catalog: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        a: [makeOcc({ bodyHash: 'a', simpleName: 'a', filePath: 'packages/cli/src/a.ts',
-          calls: [{ to: ['x', 'y'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: '...' }] })],
-        b: [makeOcc({ bodyHash: 'b', simpleName: 'b', filePath: 'packages/cli/src/b.ts',
-          calls: [{ to: ['x'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: '...' }] })],
+        a: [
+          makeOcc({
+            bodyHash: 'a',
+            simpleName: 'a',
+            filePath: 'packages/cli/src/a.ts',
+            calls: [
+              {
+                to: ['x', 'y'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: '...',
+              },
+            ],
+          }),
+        ],
+        b: [
+          makeOcc({
+            bodyHash: 'b',
+            simpleName: 'b',
+            filePath: 'packages/cli/src/b.ts',
+            calls: [
+              {
+                to: ['x'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: '...',
+              },
+            ],
+          }),
+        ],
         x: [makeOcc({ bodyHash: 'x', simpleName: 'x', filePath: 'packages/contracts/src/x.ts' })],
         y: [makeOcc({ bodyHash: 'y', simpleName: 'y', filePath: 'packages/contracts/src/y.ts' })],
       },
@@ -101,7 +145,9 @@ describe('View 4 — Coupling matrix', () => {
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
-    env.views.find(v => v.id === 'coupling')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    env.views
+      .find((v) => v.id === 'coupling')!
+      .render(c, env.graphCatalog, env.graphIndexes, env.filterState);
     const cliRow = c.querySelector('td.coupling-cell[data-caller="cli"][data-callee="contracts"]');
     expect(cliRow).not.toBeNull();
     expect(cliRow!.textContent).toBe('3'); // a→x, a→y, b→x
@@ -109,17 +155,37 @@ describe('View 4 — Coupling matrix', () => {
 
   it('wraps the table in a bounded scroll container so a large matrix stays on the page', () => {
     const catalog: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        a: [makeOcc({ bodyHash: 'a', simpleName: 'a', filePath: 'packages/cli/src/a.ts',
-          calls: [{ to: ['x'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'x()' }] })],
+        a: [
+          makeOcc({
+            bodyHash: 'a',
+            simpleName: 'a',
+            filePath: 'packages/cli/src/a.ts',
+            calls: [
+              {
+                to: ['x'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'x()',
+              },
+            ],
+          }),
+        ],
         x: [makeOcc({ bodyHash: 'x', simpleName: 'x', filePath: 'packages/contracts/src/x.ts' })],
       },
       features: { edge: [{ callerPackage: 'cli', calleePackage: 'contracts', count: 1 }] },
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
-    env.views.find(v => v.id === 'coupling')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    env.views
+      .find((v) => v.id === 'coupling')!
+      .render(c, env.graphCatalog, env.graphIndexes, env.filterState);
     const scroll = c.querySelector('.coupling-scroll');
     expect(scroll).not.toBeNull();
     // The table must live *inside* the scroll container — that's what gives it
@@ -129,17 +195,43 @@ describe('View 4 — Coupling matrix', () => {
 
   it('opens a drilldown card listing the call sites when a cell is clicked', () => {
     const catalog: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        caller: [makeOcc({ bodyHash: 'c1', simpleName: 'caller', filePath: 'packages/cli/src/c.ts',
-          calls: [{ to: ['t1'], line: 7, column: 0, resolution: 'static', confidence: 'high', text: 'target()' }] })],
-        target: [makeOcc({ bodyHash: 't1', simpleName: 'target', filePath: 'packages/contracts/src/t.ts' })],
+        caller: [
+          makeOcc({
+            bodyHash: 'c1',
+            simpleName: 'caller',
+            filePath: 'packages/cli/src/c.ts',
+            calls: [
+              {
+                to: ['t1'],
+                line: 7,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+        target: [
+          makeOcc({
+            bodyHash: 't1',
+            simpleName: 'target',
+            filePath: 'packages/contracts/src/t.ts',
+          }),
+        ],
       },
       features: { edge: [{ callerPackage: 'cli', calleePackage: 'contracts', count: 1 }] },
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
-    env.views.find(v => v.id === 'coupling')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    env.views
+      .find((v) => v.id === 'coupling')!
+      .render(c, env.graphCatalog, env.graphIndexes, env.filterState);
     const cell = c.querySelector('td.coupling-cell[data-caller="cli"][data-callee="contracts"]')!;
     cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const overlay = document.querySelector('.function-card-overlay');
@@ -151,10 +243,28 @@ describe('View 4 — Coupling matrix', () => {
 
   it('emits an empty cell shape when there are no calls in this direction', () => {
     const catalog: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        a: [makeOcc({ bodyHash: 'a', simpleName: 'a', filePath: 'packages/cli/src/a.ts',
-          calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
+        a: [
+          makeOcc({
+            bodyHash: 'a',
+            simpleName: 'a',
+            filePath: 'packages/cli/src/a.ts',
+            calls: [
+              {
+                to: ['b'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'b()',
+              },
+            ],
+          }),
+        ],
         b: [makeOcc({ bodyHash: 'b', simpleName: 'b', filePath: 'packages/cli/src/b.ts' })],
       },
       // Only the cli→cli diagonal edge ⇒ a 1×1 matrix.
@@ -162,7 +272,9 @@ describe('View 4 — Coupling matrix', () => {
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
-    env.views.find(v => v.id === 'coupling')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    env.views
+      .find((v) => v.id === 'coupling')!
+      .render(c, env.graphCatalog, env.graphIndexes, env.filterState);
     // cli→contracts has no calls; the diagonal (cli→cli) does. There is no
     // 'contracts' caller, so the matrix is 1×1.
     const cells = c.querySelectorAll('td.coupling-cell');
@@ -172,17 +284,37 @@ describe('View 4 — Coupling matrix', () => {
 
   it('renders an Export CSV button in the coupling toolbar', () => {
     const catalog: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        a: [makeOcc({ bodyHash: 'a', simpleName: 'a', filePath: 'packages/cli/src/a.ts',
-          calls: [{ to: ['x'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'x()' }] })],
+        a: [
+          makeOcc({
+            bodyHash: 'a',
+            simpleName: 'a',
+            filePath: 'packages/cli/src/a.ts',
+            calls: [
+              {
+                to: ['x'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'x()',
+              },
+            ],
+          }),
+        ],
         x: [makeOcc({ bodyHash: 'x', simpleName: 'x', filePath: 'packages/contracts/src/x.ts' })],
       },
       features: { edge: [{ callerPackage: 'cli', calleePackage: 'contracts', count: 3 }] },
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
-    env.views.find(v => v.id === 'coupling')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    env.views
+      .find((v) => v.id === 'coupling')!
+      .render(c, env.graphCatalog, env.graphIndexes, env.filterState);
     const btn = c.querySelector('.coupling-export-btn');
     expect(btn).not.toBeNull();
     expect(btn!.textContent).toBe('Export CSV');
@@ -190,7 +322,10 @@ describe('View 4 — Coupling matrix', () => {
 
   it('downloads the coupling matrix as a wide, properly-escaped CSV mirroring the table', () => {
     const catalog: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
         a: [makeOcc({ bodyHash: 'a', simpleName: 'a', filePath: 'packages/cli/src/a.ts' })],
         x: [makeOcc({ bodyHash: 'x', simpleName: 'x', filePath: 'packages/contracts/src/x.ts' })],
@@ -209,7 +344,9 @@ describe('View 4 — Coupling matrix', () => {
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
-    env.views.find(v => v.id === 'coupling')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    env.views
+      .find((v) => v.id === 'coupling')!
+      .render(c, env.graphCatalog, env.graphIndexes, env.filterState);
 
     // Capture the Blob the download path hands to URL.createObjectURL.
     const createSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
@@ -223,7 +360,7 @@ describe('View 4 — Coupling matrix', () => {
     createSpy.mockRestore();
     revokeSpy.mockRestore();
 
-    return blob.text().then(text => {
+    return blob.text().then((text) => {
       const lines = text.split('\n');
       // Wide matrix: a corner cell + one column per callee package, sorted.
       // Package set + sort match the table: ['@scope/pkg','cli','contracts','odd,pkg'].
@@ -242,17 +379,37 @@ describe('View 4 — Coupling matrix', () => {
 
   it('shows the no-data empty state when the catalog carries no edge feature', () => {
     const catalog: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        a: [makeOcc({ bodyHash: 'a', simpleName: 'a', filePath: 'packages/cli/src/a.ts',
-          calls: [{ to: ['x'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'x()' }] })],
+        a: [
+          makeOcc({
+            bodyHash: 'a',
+            simpleName: 'a',
+            filePath: 'packages/cli/src/a.ts',
+            calls: [
+              {
+                to: ['x'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'x()',
+              },
+            ],
+          }),
+        ],
         x: [makeOcc({ bodyHash: 'x', simpleName: 'x', filePath: 'packages/contracts/src/x.ts' })],
       },
       // No features blob (a non-dashboard run) ⇒ no client recompute, no-data state.
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
-    env.views.find(v => v.id === 'coupling')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    env.views
+      .find((v) => v.id === 'coupling')!
+      .render(c, env.graphCatalog, env.graphIndexes, env.filterState);
     expect(c.querySelector('.empty')).not.toBeNull();
     expect(c.querySelector('td.coupling-cell')).toBeNull();
   });

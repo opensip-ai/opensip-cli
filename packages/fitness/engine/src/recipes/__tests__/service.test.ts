@@ -67,14 +67,24 @@ function uid(): string {
 }
 
 /** A simple check that flags any line containing the marker. */
-function makeMarkerCheck(slug: string, marker: string, severity: 'error' | 'warning' = 'warning', tags: string[] = ['quality']): Check {
+function makeMarkerCheck(
+  slug: string,
+  marker: string,
+  severity: 'error' | 'warning' = 'warning',
+  tags: string[] = ['quality'],
+): Check {
   return defineCheck({
     id: uid(),
     slug,
     description: `Flag any line containing ${marker}`,
     tags,
     analyze: (content, filePath) => {
-      const out: { line: number; message: string; severity: 'error' | 'warning'; filePath: string }[] = [];
+      const out: {
+        line: number;
+        message: string;
+        severity: 'error' | 'warning';
+        filePath: string;
+      }[] = [];
       const lines = content.split('\n');
       for (const [i, line] of lines.entries()) {
         if (line.includes(marker)) {
@@ -114,7 +124,12 @@ describe('FitnessRecipeService — construction', () => {
     checkRegistry.register(makeMarkerCheck('flag-foo', 'FOO'));
     const recipeRegistry = new FitnessRecipeRegistry();
 
-    const svc = new FitnessRecipeService({ cwd: testDir, checkRegistry, recipeRegistry, prewarmCache: false });
+    const svc = new FitnessRecipeService({
+      cwd: testDir,
+      checkRegistry,
+      recipeRegistry,
+      prewarmCache: false,
+    });
     writeFixture('a.ts', 'const x = "FOO";');
 
     const result = await svc.start(makeRecipe());
@@ -176,7 +191,9 @@ describe('FitnessRecipeService — parallel execution', () => {
       callbacks: {
         onCheckStart: (slug) => starts.push(slug),
         onCheckComplete: (slug) => completes.push(slug),
-        onComplete: () => { onComplete = true; },
+        onComplete: () => {
+          onComplete = true;
+        },
       },
     });
 
@@ -198,9 +215,16 @@ describe('FitnessRecipeService — parallel execution', () => {
       prewarmCache: true,
     });
 
-    const result = await svc.start(makeRecipe({
-      execution: { mode: 'parallel', successThreshold: 100, stopOnFirstFailure: false, timeout: 30_000 },
-    }));
+    const result = await svc.start(
+      makeRecipe({
+        execution: {
+          mode: 'parallel',
+          successThreshold: 100,
+          stopOnFirstFailure: false,
+          timeout: 30_000,
+        },
+      }),
+    );
     expect(result.success).toBe(false);
     expect(result.summary.failedChecks).toBe(1);
   });
@@ -229,14 +253,30 @@ describe('FitnessRecipeService — sequential execution', () => {
     const order: string[] = [];
 
     const checkRegistry = new CheckRegistry();
-    checkRegistry.register(defineCheck({
-      id: uid(), slug: 'first', description: 'first', tags: ['demo'],
-      analyze: () => { order.push('first'); return []; },
-    }));
-    checkRegistry.register(defineCheck({
-      id: uid(), slug: 'second', description: 'second', tags: ['demo'],
-      analyze: () => { order.push('second'); return []; },
-    }));
+    checkRegistry.register(
+      defineCheck({
+        id: uid(),
+        slug: 'first',
+        description: 'first',
+        tags: ['demo'],
+        analyze: () => {
+          order.push('first');
+          return [];
+        },
+      }),
+    );
+    checkRegistry.register(
+      defineCheck({
+        id: uid(),
+        slug: 'second',
+        description: 'second',
+        tags: ['demo'],
+        analyze: () => {
+          order.push('second');
+          return [];
+        },
+      }),
+    );
     writeFixture('a.ts', 'export const x = 1;');
 
     const svc = new FitnessRecipeService({
@@ -246,9 +286,11 @@ describe('FitnessRecipeService — sequential execution', () => {
       prewarmCache: true,
     });
 
-    await svc.start(makeRecipe({
-      execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 30_000 },
-    }));
+    await svc.start(
+      makeRecipe({
+        execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 30_000 },
+      }),
+    );
     expect(order).toEqual(['first', 'second']);
   });
 });
@@ -271,9 +313,11 @@ describe('FitnessRecipeService — selector types', () => {
       prewarmCache: false,
     });
 
-    const result = await svc.start(makeRecipe({
-      checks: { type: 'explicit', checkIds: ['selected'] },
-    }));
+    const result = await svc.start(
+      makeRecipe({
+        checks: { type: 'explicit', checkIds: ['selected'] },
+      }),
+    );
     expect(result.summary.totalChecks).toBe(1);
     expect(result.checkResults[0]?.checkSlug).toBe('selected');
   });
@@ -291,9 +335,11 @@ describe('FitnessRecipeService — selector types', () => {
       prewarmCache: false,
     });
 
-    const result = await svc.start(makeRecipe({
-      checks: { type: 'tags', include: ['security'] },
-    }));
+    const result = await svc.start(
+      makeRecipe({
+        checks: { type: 'tags', include: ['security'] },
+      }),
+    );
     expect(result.summary.totalChecks).toBe(1);
     expect(result.checkResults[0]?.checkSlug).toBe('s1');
   });
@@ -311,9 +357,11 @@ describe('FitnessRecipeService — selector types', () => {
       prewarmCache: false,
     });
 
-    const result = await svc.start(makeRecipe({
-      checks: { type: 'all', exclude: ['drop-me'] },
-    }));
+    const result = await svc.start(
+      makeRecipe({
+        checks: { type: 'all', exclude: ['drop-me'] },
+      }),
+    );
     expect(result.summary.totalChecks).toBe(1);
     expect(result.checkResults[0]?.checkSlug).toBe('keep-me');
   });
@@ -377,13 +425,18 @@ describe('FitnessRecipeService — errors', () => {
 
   it('throws SystemError when start() is called twice in parallel', async () => {
     const checkRegistry = new CheckRegistry();
-    checkRegistry.register(defineCheck({
-      id: uid(), slug: 'slow', description: 's', tags: ['demo'],
-      analyzeAll: async () => {
-        await new Promise((r) => setTimeout(r, 50));
-        return [];
-      },
-    }));
+    checkRegistry.register(
+      defineCheck({
+        id: uid(),
+        slug: 'slow',
+        description: 's',
+        tags: ['demo'],
+        analyzeAll: async () => {
+          await new Promise((r) => setTimeout(r, 50));
+          return [];
+        },
+      }),
+    );
     writeFixture('a.ts', '');
 
     const svc = new FitnessRecipeService({
@@ -400,10 +453,17 @@ describe('FitnessRecipeService — errors', () => {
 
   it('captures errors thrown inside a check without aborting the run', async () => {
     const checkRegistry = new CheckRegistry();
-    checkRegistry.register(defineCheck({
-      id: uid(), slug: 'crashes', description: 'c', tags: ['demo'],
-      analyze: () => { throw new Error('check exploded'); },
-    }));
+    checkRegistry.register(
+      defineCheck({
+        id: uid(),
+        slug: 'crashes',
+        description: 'c',
+        tags: ['demo'],
+        analyze: () => {
+          throw new Error('check exploded');
+        },
+      }),
+    );
     checkRegistry.register(makeMarkerCheck('survives', 'X'));
     writeFixture('a.ts', 'export const x = "X";');
 
@@ -480,17 +540,30 @@ describe('FitnessRecipeService — abort', () => {
   it('abort() during a run cancels remaining checks', async () => {
     const checkRegistry = new CheckRegistry();
     let secondRan = false;
-    checkRegistry.register(defineCheck({
-      id: uid(), slug: 'first', description: 'first', tags: ['demo'],
-      analyzeAll: async () => {
-        await new Promise((r) => setTimeout(r, 10));
-        return [];
-      },
-    }));
-    checkRegistry.register(defineCheck({
-      id: uid(), slug: 'second', description: 'second', tags: ['demo'],
-      analyze: () => { secondRan = true; return []; },
-    }));
+    checkRegistry.register(
+      defineCheck({
+        id: uid(),
+        slug: 'first',
+        description: 'first',
+        tags: ['demo'],
+        analyzeAll: async () => {
+          await new Promise((r) => setTimeout(r, 10));
+          return [];
+        },
+      }),
+    );
+    checkRegistry.register(
+      defineCheck({
+        id: uid(),
+        slug: 'second',
+        description: 'second',
+        tags: ['demo'],
+        analyze: () => {
+          secondRan = true;
+          return [];
+        },
+      }),
+    );
     writeFixture('a.ts', '');
 
     const svc = new FitnessRecipeService({
@@ -501,9 +574,11 @@ describe('FitnessRecipeService — abort', () => {
     });
 
     // sequential mode lets us reliably interrupt mid-run
-    const promise = svc.start(makeRecipe({
-      execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 30_000 },
-    }));
+    const promise = svc.start(
+      makeRecipe({
+        execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 30_000 },
+      }),
+    );
     setTimeout(() => svc.abort(), 5);
     await promise;
 
@@ -531,9 +606,11 @@ describe('FitnessRecipeService — timeout', () => {
     });
 
     // A non-timing-out run still completes cleanly when timeout is set.
-    const result = await svc.start(makeRecipe({
-      execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 5000 },
-    }));
+    const result = await svc.start(
+      makeRecipe({
+        execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 5000 },
+      }),
+    );
     expect(result.summary.totalChecks).toBe(1);
     expect(result.checkResults[0]?.timedOut).not.toBe(true);
   });

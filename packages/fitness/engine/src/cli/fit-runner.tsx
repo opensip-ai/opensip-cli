@@ -58,10 +58,7 @@ import React, { useEffect, useState } from 'react';
 
 import { envelopeToFitRows } from './fit/envelope-view.js';
 import { persistFitSession } from './fit/result-builders.js';
-import {
-  ResultsTable,
-  WarningsBlock,
-} from './fit-runner-views.js';
+import { ResultsTable, WarningsBlock } from './fit-runner-views.js';
 import { ensureChecksLoaded, executeFit, getEnabledCheckCount } from './fit.js';
 
 import type { DataStore } from '@opensip-tools/datastore';
@@ -96,7 +93,8 @@ function executeFitWithProgress(
 ): ReturnType<typeof executeFit> {
   emit({ type: 'stage-start', stage: 'checks', label: 'Running checks...' });
   return executeFit(args, {
-    onProgress: (completed, total) => emit({ type: 'stage-progress', stage: 'checks', completed, total }),
+    onProgress: (completed, total) =>
+      emit({ type: 'stage-progress', stage: 'checks', completed, total }),
   });
 }
 
@@ -118,7 +116,12 @@ interface FitRunnerProps {
   readonly onEnvelope?: (envelope: SignalEnvelope) => void;
 }
 
-function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps): React.ReactElement {
+function FitRunner({
+  args,
+  datastore,
+  setExitCode,
+  onEnvelope,
+}: FitRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<FitState>({ phase: 'loading' });
 
@@ -186,7 +189,9 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
       setTimeout(() => exit(), 100);
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const recipe = args.tags ? `tags: ${args.tags}` : (args.recipe ?? 'default');
@@ -221,7 +226,13 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
     if (item === 'banner') {
       return (
         <React.Fragment key={item}>
-          <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} update={ui?.update} />
+          <Banner
+            size={bannerSize}
+            version={ui?.version}
+            projectPath={args.cwd}
+            walkedUp={walkedUp}
+            update={ui?.update}
+          />
           {bannerSize === 'mini' && ui?.update !== undefined && <UpdateHint />}
           {showProjectHeader && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
         </React.Fragment>
@@ -241,11 +252,7 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
     );
   };
 
-  const staticHeader = (
-    <Static items={staticItems}>
-      {renderStaticItem}
-    </Static>
-  );
+  const staticHeader = <Static items={staticItems}>{renderStaticItem}</Static>;
 
   switch (state.phase) {
     case 'loading': {
@@ -277,44 +284,50 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
       // path as the static `fit --verbose | cat` render), not the retired local
       // FindingsBlock.
       const findingsDetail =
-        verboseDetail?.kind === 'findings' && verboseDetail.groups.length > 0 ? verboseDetail : undefined;
+        verboseDetail?.kind === 'findings' && verboseDetail.groups.length > 0
+          ? verboseDetail
+          : undefined;
       return (
         <>
           {staticHeader}
           <Box flexDirection="column">
-          {!args.quiet && args.verbose === true && (
-            <Box paddingTop={1} flexDirection="column">
-              <ResultsTable rows={envelopeToFitRows(envelope)} />
-            </Box>
-          )}
-          <RunSummary
-            passed={summary.passed}
-            failed={summary.failed}
-            errors={summary.errors}
-            warnings={summary.warnings}
-            durationMs={durationMs}
-          />
-          {!args.quiet && state.result.warnings && state.result.warnings.length > 0 && (
-            <WarningsBlock warnings={state.result.warnings} />
-          )}
-          {!args.quiet && findingsDetail !== undefined && (
-            <Box>{renderToInk(viewFindingsGroups(findingsDetail.groups))}</Box>
-          )}
-          {!args.quiet && args.verbose !== true && (
-            <RunFooterHints
-              hints={[
-                VERBOSE_DETAIL_HINT,
-                { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
-              ]}
+            {!args.quiet && args.verbose === true && (
+              <Box paddingTop={1} flexDirection="column">
+                <ResultsTable rows={envelopeToFitRows(envelope)} />
+              </Box>
+            )}
+            <RunSummary
+              passed={summary.passed}
+              failed={summary.failed}
+              errors={summary.errors}
+              warnings={summary.warnings}
+              durationMs={durationMs}
             />
-          )}
-          {!args.quiet && state.result.configFound === false && (
-            <Box paddingLeft={2}>
-              <Text dimColor>
-                No config file found. Run <Text bold>opensip-tools init</Text> to customize targets and settings.
-              </Text>
-            </Box>
-          )}
+            {!args.quiet && state.result.warnings && state.result.warnings.length > 0 && (
+              <WarningsBlock warnings={state.result.warnings} />
+            )}
+            {!args.quiet && findingsDetail !== undefined && (
+              <Box>{renderToInk(viewFindingsGroups(findingsDetail.groups))}</Box>
+            )}
+            {!args.quiet && args.verbose !== true && (
+              <RunFooterHints
+                hints={[
+                  VERBOSE_DETAIL_HINT,
+                  {
+                    text: 'opensip-tools dashboard for HTML report',
+                    bold: ['opensip-tools dashboard'],
+                  },
+                ]}
+              />
+            )}
+            {!args.quiet && state.result.configFound === false && (
+              <Box paddingLeft={2}>
+                <Text dimColor>
+                  No config file found. Run <Text bold>opensip-tools init</Text> to customize
+                  targets and settings.
+                </Text>
+              </Box>
+            )}
           </Box>
         </>
       );
@@ -372,7 +385,9 @@ export async function renderFitLive(
           args={args}
           datastore={datastore}
           setExitCode={options?.setExitCode}
-          onEnvelope={(e) => { envelope = e; }}
+          onEnvelope={(e) => {
+            envelope = e;
+          }}
         />
       </ClockProvider>
     </ThemeProvider>,

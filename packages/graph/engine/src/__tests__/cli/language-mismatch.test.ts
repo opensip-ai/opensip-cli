@@ -7,17 +7,17 @@
  * `--language`) does NOT trigger the check.
  */
 
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry } from '@opensip-tools/core'
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore'
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { enterScope, LanguageRegistry } from '@opensip-tools/core';
+import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import { executeGraph } from '../../cli/graph.js'
-import { currentAdapterRegistry } from '../../lang-adapter/registry.js'
-import { makeGraphTestScope } from '../test-utils/with-graph-scope.js'
+import { executeGraph } from '../../cli/graph.js';
+import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
+import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
   DiscoverOutput,
@@ -25,8 +25,8 @@ import type {
   ParseOutput,
   ResolveOutput,
   WalkOutput,
-} from '../../lang-adapter/types.js'
-import type { ToolCliContext } from '@opensip-tools/core'
+} from '../../lang-adapter/types.js';
+import type { ToolCliContext } from '@opensip-tools/core';
 
 function emptyAdapter(projectDir: string): GraphLanguageAdapter {
   return {
@@ -55,7 +55,7 @@ function emptyAdapter(projectDir: string): GraphLanguageAdapter {
       },
     }),
     cacheKey: () => 'fake-empty-v1',
-  }
+  };
 }
 
 function populatedAdapter(projectDir: string): GraphLanguageAdapter {
@@ -106,16 +106,16 @@ function populatedAdapter(projectDir: string): GraphLanguageAdapter {
       },
     }),
     cacheKey: () => 'fake-populated-v1',
-  }
+  };
 }
 
 interface MockCli {
-  readonly cli: ToolCliContext
-  readonly setExitCode: MockInstance
+  readonly cli: ToolCliContext;
+  readonly setExitCode: MockInstance;
 }
 
 function mockCli(datastore: DataStore | undefined): MockCli {
-  const setExitCode = vi.fn()
+  const setExitCode = vi.fn();
   return {
     cli: {
       datastore,
@@ -124,66 +124,57 @@ function mockCli(datastore: DataStore | undefined): MockCli {
       scope: { datastore: () => datastore, languages: new LanguageRegistry() },
     } as unknown as ToolCliContext,
     setExitCode,
-  }
+  };
 }
 
-let stdoutSpy: MockInstance<typeof process.stdout.write>
-let stderrSpy: MockInstance<typeof process.stderr.write>
-let projectDir: string
-let datastore: DataStore
+let stdoutSpy: MockInstance<typeof process.stdout.write>;
+let stderrSpy: MockInstance<typeof process.stderr.write>;
+let projectDir: string;
+let datastore: DataStore;
 
 beforeEach(() => {
-  enterScope(makeGraphTestScope())
-  projectDir = mkdtempSync(join(tmpdir(), 'graph-d14-'))
-  datastore = DataStoreFactory.open({ backend: 'memory' })
-  stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-  stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-})
+  enterScope(makeGraphTestScope());
+  projectDir = mkdtempSync(join(tmpdir(), 'graph-d14-'));
+  datastore = DataStoreFactory.open({ backend: 'memory' });
+  stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+});
 
 afterEach(() => {
-  currentAdapterRegistry().clear()
-  datastore.close()
-  stdoutSpy.mockRestore()
-  stderrSpy.mockRestore()
-  rmSync(projectDir, { recursive: true, force: true })
-})
+  currentAdapterRegistry().clear();
+  datastore.close();
+  stdoutSpy.mockRestore();
+  stderrSpy.mockRestore();
+  rmSync(projectDir, { recursive: true, force: true });
+});
 
 describe('D14 — --language with zero matching files', () => {
   it('exits 2 with the canonical error message', async () => {
-    currentAdapterRegistry().register(emptyAdapter(projectDir))
-    const { cli, setExitCode } = mockCli(datastore)
-    await executeGraph(
-      { cwd: projectDir, noCache: true, language: 'typescript' },
-      cli,
-    )
-    expect(setExitCode).toHaveBeenCalledWith(2)
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('')
-    expect(err).toContain('--language typescript matched 0 files')
-    expect(err).toContain('check the flag or paths')
-  })
+    currentAdapterRegistry().register(emptyAdapter(projectDir));
+    const { cli, setExitCode } = mockCli(datastore);
+    await executeGraph({ cwd: projectDir, noCache: true, language: 'typescript' }, cli);
+    expect(setExitCode).toHaveBeenCalledWith(2);
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+    expect(err).toContain('--language typescript matched 0 files');
+    expect(err).toContain('check the flag or paths');
+  });
 
   it('does NOT trigger when --language is unset (auto-detect path)', async () => {
-    currentAdapterRegistry().register(emptyAdapter(projectDir))
-    const { cli, setExitCode } = mockCli(datastore)
-    await executeGraph(
-      { cwd: projectDir, noCache: true },
-      cli,
-    )
+    currentAdapterRegistry().register(emptyAdapter(projectDir));
+    const { cli, setExitCode } = mockCli(datastore);
+    await executeGraph({ cwd: projectDir, noCache: true }, cli);
     // Zero files + no --language is a valid (non-error) state.
-    expect(setExitCode).toHaveBeenCalledWith(0)
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('')
-    expect(err).not.toContain('matched 0 files')
-  })
+    expect(setExitCode).toHaveBeenCalledWith(0);
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+    expect(err).not.toContain('matched 0 files');
+  });
 
   it('exits 0 when --language is set and ≥1 file matches', async () => {
-    currentAdapterRegistry().register(populatedAdapter(projectDir))
-    const { cli, setExitCode } = mockCli(datastore)
-    await executeGraph(
-      { cwd: projectDir, noCache: true, language: 'typescript' },
-      cli,
-    )
-    expect(setExitCode).toHaveBeenCalledWith(0)
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('')
-    expect(err).not.toContain('matched 0 files')
-  })
-})
+    currentAdapterRegistry().register(populatedAdapter(projectDir));
+    const { cli, setExitCode } = mockCli(datastore);
+    await executeGraph({ cwd: projectDir, noCache: true, language: 'typescript' }, cli);
+    expect(setExitCode).toHaveBeenCalledWith(0);
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+    expect(err).not.toContain('matched 0 files');
+  });
+});

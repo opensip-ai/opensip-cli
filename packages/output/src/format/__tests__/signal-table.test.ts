@@ -63,7 +63,14 @@ describe('formatSignalTableRows', () => {
     const env: SignalEnvelope = {
       ...EMPTY_ENVELOPE,
       units: [
-        { slug: 'no-todo-comments', passed: true, durationMs: 5, filesValidated: 450, itemType: 'files', ignoredCount: 3 },
+        {
+          slug: 'no-todo-comments',
+          passed: true,
+          durationMs: 5,
+          filesValidated: 450,
+          itemType: 'files',
+          ignoredCount: 3,
+        },
       ],
     };
     const [row] = formatSignalTableRows(env);

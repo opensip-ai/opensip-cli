@@ -6,36 +6,36 @@
  * files don't slip through and trivial generated boilerplate isn't
  * over-counted (configurable later if needed).
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-const SOFT_LIMIT = 400
-const HARD_LIMIT = 800
+const SOFT_LIMIT = 400;
+const HARD_LIMIT = 800;
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the
  * line-counting logic without spinning up an ExecutionContext.
  */
 export function analyzeFileLength(content: string): CheckViolation[] {
-  const lines = content.split('\n').filter((l) => l.trim().length > 0)
-  if (lines.length <= SOFT_LIMIT) return []
+  const lines = content.split('\n').filter((l) => l.trim().length > 0);
+  if (lines.length <= SOFT_LIMIT) return [];
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
   if (lines.length > HARD_LIMIT) {
     violations.push({
       message: `File has ${lines.length} non-empty lines (hard limit ${HARD_LIMIT})`,
       severity: 'error',
       line: 1,
       suggestion: 'Split this file into focused modules organized by responsibility',
-    })
+    });
   } else {
     violations.push({
       message: `File has ${lines.length} non-empty lines (soft limit ${SOFT_LIMIT})`,
       severity: 'warning',
       line: 1,
       suggestion: 'Consider splitting before this exceeds the hard limit',
-    })
+    });
   }
-  return violations
+  return violations;
 }
 
 export const fileLengthLimit = defineCheck({
@@ -45,4 +45,4 @@ export const fileLengthLimit = defineCheck({
   scope: { languages: [], concerns: [] },
   tags: ['quality', 'modularity'],
   analyze: (content) => analyzeFileLength(content),
-})
+});

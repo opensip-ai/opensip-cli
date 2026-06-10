@@ -26,12 +26,16 @@ describe('graph-go cacheKey — branches', () => {
   });
 
   it('returns go-no-config when configPathAbs is empty string', () => {
-    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe('go-no-config');
+    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe(
+      'go-no-config',
+    );
   });
 
   it('returns go-missing:<path> when the config file does not exist', () => {
     const fake = join(dir, 'no-such.sum');
-    expect(cacheKey({ projectDirAbs: dir, configPathAbs: fake, resolutionMode: 'exact' })).toContain('missing:');
+    expect(
+      cacheKey({ projectDirAbs: dir, configPathAbs: fake, resolutionMode: 'exact' }),
+    ).toContain('missing:');
   });
 
   it('returns a stable go-<hash> when the config file is readable', () => {

@@ -30,12 +30,16 @@ describe('lang-rust cacheKey — branches', () => {
   });
 
   it('returns rs-no-config when configPathAbs is empty string', () => {
-    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe('rs-no-config');
+    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe(
+      'rs-no-config',
+    );
   });
 
   it('returns rs-missing:<path> when the config file does not exist', () => {
     const fake = join(dir, 'no-such-file.toml');
-    expect(cacheKey({ projectDirAbs: dir, configPathAbs: fake, resolutionMode: 'exact' })).toContain('missing:');
+    expect(
+      cacheKey({ projectDirAbs: dir, configPathAbs: fake, resolutionMode: 'exact' }),
+    ).toContain('missing:');
   });
 
   it('returns a stable rs-<hash> when the config file is readable', () => {

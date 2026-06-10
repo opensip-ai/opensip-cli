@@ -46,7 +46,9 @@ describe('resolveSession', () => {
   it('resolves latest scoped to a tool', () => {
     repo.save(makeSession({ id: 'FIT_OLD', tool: 'fit', timestamp: '2026-05-01T00:00:00.000Z' }));
     repo.save(makeSession({ id: 'FIT_NEW', tool: 'fit', timestamp: '2026-05-02T00:00:00.000Z' }));
-    repo.save(makeSession({ id: 'GRAPH_NEWER', tool: 'graph', timestamp: '2026-05-03T00:00:00.000Z' }));
+    repo.save(
+      makeSession({ id: 'GRAPH_NEWER', tool: 'graph', timestamp: '2026-05-03T00:00:00.000Z' }),
+    );
     const result = resolveSession(datastore, { ref: 'latest', tool: 'fit' });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.session.id).toBe('FIT_NEW');

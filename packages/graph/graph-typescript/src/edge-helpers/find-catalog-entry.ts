@@ -7,7 +7,6 @@
  * declaration is in the project.
  */
 
-
 import { hashFunctionBody } from '../inventory-helpers/hash-body.js';
 
 import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';

@@ -52,16 +52,18 @@ afterEach(() => {
 
 describe('executeSimWorker', () => {
   it('runs the sim and posts progress + a result over IPC', async () => {
-    currentScenarioRegistry().register(defineLoadScenario({
-      id: 'worker-probe',
-      name: 'worker-probe',
-      description: 'worker-probe',
-      tags: [],
-      target: noopTarget,
-      workload: { rps: 1 },
-      duration: 1,
-      assertions: [ASSERTIONS.lowErrorRate(1)],
-    }));
+    currentScenarioRegistry().register(
+      defineLoadScenario({
+        id: 'worker-probe',
+        name: 'worker-probe',
+        description: 'worker-probe',
+        tags: [],
+        target: noopTarget,
+        workload: { rps: 1 },
+        duration: 1,
+        assertions: [ASSERTIONS.lowErrorRate(1)],
+      }),
+    );
     const specPath = join(dir, 'spec.json');
     writeFileSync(specPath, JSON.stringify({ json: false, cwd: dir, debug: false }), 'utf8');
 

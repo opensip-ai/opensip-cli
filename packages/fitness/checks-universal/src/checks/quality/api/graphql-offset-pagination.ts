@@ -7,9 +7,9 @@
  * where clause) provides stable results.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-const OFFSET_VAR_PATTERN = /\$offset\s*:\s*Int/
+const OFFSET_VAR_PATTERN = /\$offset\s*:\s*Int/;
 
 export const graphqlOffsetPagination = defineCheck({
   id: '0ef4c33d-48e6-4bb1-871b-6ac7c1b579e9',
@@ -32,21 +32,21 @@ export const graphqlOffsetPagination = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
-    let inTemplate = false
+    let inTemplate = false;
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i] ?? ''
+      const line = lines[i] ?? '';
 
       if (line.includes('gql`') || line.includes('gql `')) {
-        inTemplate = true
+        inTemplate = true;
       }
 
       if (!inTemplate && line.includes('= `')) {
-        const nextLines = lines.slice(i, Math.min(i + 3, lines.length)).join('\n')
+        const nextLines = lines.slice(i, Math.min(i + 3, lines.length)).join('\n');
         if (/(?:query|mutation|subscription)\s+\w+/.test(nextLines)) {
-          inTemplate = true
+          inTemplate = true;
         }
       }
 
@@ -58,14 +58,19 @@ export const graphqlOffsetPagination = defineCheck({
           message: 'GraphQL query uses offset-based pagination ($offset: Int).',
           suggestion:
             'Use cursor-based pagination (keyset via where clause) instead of offset for stable results during data changes.',
-        })
+        });
       }
 
-      if (inTemplate && line.trimEnd().endsWith('`') && !line.includes('gql`') && !line.includes('= `')) {
-        inTemplate = false
+      if (
+        inTemplate &&
+        line.trimEnd().endsWith('`') &&
+        !line.includes('gql`') &&
+        !line.includes('= `')
+      ) {
+        inTemplate = false;
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

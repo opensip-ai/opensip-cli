@@ -54,7 +54,10 @@ import type {
 } from '@opensip-tools/graph';
 import type { Node } from '@opensip-tools/tree-sitter';
 
-function pythonPosition(node: Node, file: PythonParsedFile): {
+function pythonPosition(
+  node: Node,
+  file: PythonParsedFile,
+): {
   readonly line: number;
   readonly column: number;
   readonly text: string;
@@ -156,8 +159,11 @@ function resolveDependencies(
       specifier: site.specifier,
     };
     const existing = out.get(site.ownerHash);
-    if (existing === undefined) {out.set(site.ownerHash, [edge]);}
-    else {existing.push(edge);}
+    if (existing === undefined) {
+      out.set(site.ownerHash, [edge]);
+    } else {
+      existing.push(edge);
+    }
   }
   return out;
 }
@@ -218,12 +224,7 @@ function resolvePythonModuleSpecifier(
     /* v8 ignore next */
     return [];
   }
-  return resolveRelativeModule(
-    specifier,
-    leadingDots,
-    importerFilePath,
-    moduleInitByFilePath,
-  );
+  return resolveRelativeModule(specifier, leadingDots, importerFilePath, moduleInitByFilePath);
 }
 
 function countLeadingDots(specifier: string): number {

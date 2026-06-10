@@ -5,10 +5,10 @@
  * check.
  */
 
-import type { WorkspaceUnitRunResult } from './workspace-runner.js'
-import type { ToolCliContext } from '@opensip-tools/core'
+import type { WorkspaceUnitRunResult } from './workspace-runner.js';
+import type { ToolCliContext } from '@opensip-tools/core';
 
-const FINDINGS_PREVIEW = 10
+const FINDINGS_PREVIEW = 10;
 
 /**
  * Compose the human-readable workspace report as plain lines (no Ink twin),
@@ -18,7 +18,7 @@ export function workspaceReportLines(
   perUnit: readonly WorkspaceUnitRunResult[],
   durationMs: number,
 ): readonly string[] {
-  const totalFindings = perUnit.reduce((n, r) => n + r.signals.length, 0)
+  const totalFindings = perUnit.reduce((n, r) => n + r.signals.length, 0);
   return [
     'opensip-tools graph --workspace',
     '',
@@ -29,7 +29,7 @@ export function workspaceReportLines(
     ...renderWorkspaceFindingsLines(perUnit),
     '== Summary ==',
     `${String(totalFindings)} total finding(s) across ${String(perUnit.length)} unit(s) in ${String(durationMs)} ms.`,
-  ]
+  ];
 }
 
 /**
@@ -41,7 +41,7 @@ export async function writeWorkspaceReport(
   durationMs: number,
   cli: ToolCliContext,
 ): Promise<void> {
-  await cli.render({ type: 'graph-status', lines: workspaceReportLines(perUnit, durationMs) })
+  await cli.render({ type: 'graph-status', lines: workspaceReportLines(perUnit, durationMs) });
 }
 
 /**
@@ -69,7 +69,7 @@ export function buildWorkspaceJsonDocument(
       signals: r.signals,
     })),
     totalFindings: perUnit.reduce((n, r) => n + r.signals.length, 0),
-  }
+  };
 }
 
 /**
@@ -81,50 +81,48 @@ export function renderWorkspaceJson(
   perUnit: readonly WorkspaceUnitRunResult[],
   durationMs: number,
 ): string {
-  return JSON.stringify(buildWorkspaceJsonDocument(perUnit, durationMs), null, 2)
+  return JSON.stringify(buildWorkspaceJsonDocument(perUnit, durationMs), null, 2);
 }
 
-function renderWorkspaceStatusLines(
-  perUnit: readonly WorkspaceUnitRunResult[],
-): readonly string[] {
-  const out: string[] = []
+function renderWorkspaceStatusLines(perUnit: readonly WorkspaceUnitRunResult[]): readonly string[] {
+  const out: string[] = [];
   for (const r of perUnit) {
-    const status = r.exitCode === 0 ? 'ok' : `FAILED (exit ${String(r.exitCode)})`
-    const display = unitDisplay(r)
-    out.push(`  ${display}: ${String(r.signals.length)} finding(s) — ${status}`)
+    const status = r.exitCode === 0 ? 'ok' : `FAILED (exit ${String(r.exitCode)})`;
+    const display = unitDisplay(r);
+    out.push(`  ${display}: ${String(r.signals.length)} finding(s) — ${status}`);
     if (r.exitCode !== 0 && r.stderr.length > 0) {
-      const stderrPreview = r.stderr.split('\n').slice(0, 3).join('\n    ')
-      out.push(`    stderr: ${stderrPreview}`)
+      const stderrPreview = r.stderr.split('\n').slice(0, 3).join('\n    ');
+      out.push(`    stderr: ${stderrPreview}`);
     }
   }
-  return out
+  return out;
 }
 
 function renderWorkspaceFindingsLines(
   perUnit: readonly WorkspaceUnitRunResult[],
 ): readonly string[] {
-  const out: string[] = []
+  const out: string[] = [];
   for (const r of perUnit) {
-    if (r.signals.length === 0) continue
-    out.push(`[${unitDisplay(r)}]`, ...renderUnitFindingPreview(r), '')
+    if (r.signals.length === 0) continue;
+    out.push(`[${unitDisplay(r)}]`, ...renderUnitFindingPreview(r), '');
   }
-  return out
+  return out;
 }
 
 function renderUnitFindingPreview(r: WorkspaceUnitRunResult): readonly string[] {
-  const preview = r.signals.slice(0, FINDINGS_PREVIEW)
+  const preview = r.signals.slice(0, FINDINGS_PREVIEW);
   const lines = preview.map((s) => {
-    const loc = typeof s.line === 'number' ? `:${String(s.line)}` : ''
-    return `  ${s.filePath}${loc} — ${s.message}`
-  })
+    const loc = typeof s.line === 'number' ? `:${String(s.line)}` : '';
+    return `  ${s.filePath}${loc} — ${s.message}`;
+  });
   if (r.signals.length > preview.length) {
     lines.push(
       `  ... ${String(r.signals.length - preview.length)} more (use --json for full list)`,
-    )
+    );
   }
-  return lines
+  return lines;
 }
 
 function unitDisplay(r: WorkspaceUnitRunResult): string {
-  return r.displayPath.length > 0 ? r.displayPath : r.rootDir
+  return r.displayPath.length > 0 ? r.displayPath : r.rootDir;
 }

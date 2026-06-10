@@ -230,7 +230,9 @@ describe('Result pattern', () => {
   });
 
   it('tryCatch returns err on throw', () => {
-    const result = tryCatch(() => { throw new Error('boom'); });
+    const result = tryCatch(() => {
+      throw new Error('boom');
+    });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toBe('boom');
   });
@@ -244,14 +246,18 @@ describe('Result pattern', () => {
 
   it('tryCatchAsync returns err on rejection', async () => {
     // eslint-disable-next-line @typescript-eslint/require-await -- arrow signature must be `() => Promise<T>` to match tryCatchAsync
-    const result = await tryCatchAsync(async () => { throw new Error('async boom'); });
+    const result = await tryCatchAsync(async () => {
+      throw new Error('async boom');
+    });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toBe('async boom');
   });
 
   it('tryCatchAsync wraps non-Error throws', async () => {
     /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/only-throw-error -- arrow must match `() => Promise<T>`; intentionally throwing a non-Error to verify wrapping */
-    const result = await tryCatchAsync(async () => { throw 'string error'; });
+    const result = await tryCatchAsync(async () => {
+      throw 'string error';
+    });
     /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/only-throw-error */
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toBe('string error');

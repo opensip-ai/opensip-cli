@@ -6,12 +6,18 @@ import { describe, expect, it } from 'vitest';
 
 import { dashboardEditorLinkJs } from '../code-paths/editor-link.js';
 
-function loadEditorLink(protocol: string | null): (filePath: string, line: number) => string | null {
-  const protoSrc = protocol === null
-    ? 'var EDITOR_PROTOCOL = null;'
-    : 'var EDITOR_PROTOCOL = ' + JSON.stringify(protocol) + ';';
+function loadEditorLink(
+  protocol: string | null,
+): (filePath: string, line: number) => string | null {
+  const protoSrc =
+    protocol === null
+      ? 'var EDITOR_PROTOCOL = null;'
+      : 'var EDITOR_PROTOCOL = ' + JSON.stringify(protocol) + ';';
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
-  const fn = new Function(protoSrc + dashboardEditorLinkJs() + '\nreturn editorLinkUrl;')() as (f: string, l: number) => string | null;
+  const fn = new Function(protoSrc + dashboardEditorLinkJs() + '\nreturn editorLinkUrl;')() as (
+    f: string,
+    l: number,
+  ) => string | null;
   return fn;
 }
 

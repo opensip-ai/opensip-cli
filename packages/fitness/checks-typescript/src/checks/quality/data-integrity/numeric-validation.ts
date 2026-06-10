@@ -5,15 +5,14 @@
  * Detects numeric parameters without NaN/Infinity/range validation.
  */
 
-
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Quick filter keywords for numeric validation patterns
  */
-const QUICK_FILTER_KEYWORDS = ['number', 'Number', 'parseInt', 'parseFloat']
+const QUICK_FILTER_KEYWORDS = ['number', 'Number', 'parseInt', 'parseFloat'];
 
 /**
  * Patterns that indicate proper numeric validation
@@ -25,17 +24,26 @@ const VALIDATION_PATTERNS = [
   /isFinite\(/,
   /isNaN\(/,
   /typeof\s+\w+\s*===?\s*['"]number['"]/,
-]
+];
 
 /**
  * Parameter names that are inherently safe (loop indices, counters, etc.)
  * These are structural values that don't need NaN/Infinity validation.
  */
 const SAFE_PARAMETER_NAMES = new Set([
-  'index', 'i', 'j', 'k',
-  'count', 'length', 'offset', 'limit',
-  'depth', 'level', 'size', 'capacity',
-])
+  'index',
+  'i',
+  'j',
+  'k',
+  'count',
+  'length',
+  'offset',
+  'limit',
+  'depth',
+  'level',
+  'size',
+  'capacity',
+]);
 
 /**
  * Check if a file imports from 'zod', indicating parameters likely come from
@@ -48,10 +56,10 @@ function fileImportsZod(sourceFile: ts.SourceFile): boolean {
       ts.isStringLiteral(stmt.moduleSpecifier) &&
       stmt.moduleSpecifier.text === 'zod'
     ) {
-      return true
+      return true;
     }
   }
-  return false
+  return false;
 }
 
 /**
@@ -64,21 +72,21 @@ function isPrivateOrInternal(
 ): boolean {
   // Arrow functions assigned to _-prefixed variables are handled at the caller level
   if (ts.isFunctionDeclaration(node) && node.name?.text.startsWith('_')) {
-    return true
+    return true;
   }
 
   if (ts.isMethodDeclaration(node)) {
     // Check for `private` keyword
     if (node.modifiers?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword)) {
-      return true
+      return true;
     }
     // Check for _-prefixed method name
     if (ts.isIdentifier(node.name) && node.name.text.startsWith('_')) {
-      return true
+      return true;
     }
   }
 
-  return false
+  return false;
 }
 
 /**
@@ -87,7 +95,7 @@ function isPrivateOrInternal(
  * NaN/Infinity validation at the call boundary.
  */
 function hasDefaultValue(param: ts.ParameterDeclaration): boolean {
-  return param.initializer !== undefined
+  return param.initializer !== undefined;
 }
 
 /**
@@ -95,35 +103,35 @@ function hasDefaultValue(param: ts.ParameterDeclaration): boolean {
  */
 function isNumberTypeParam(param: ts.ParameterDeclaration): boolean {
   if (!param.type || !ts.isTypeReferenceNode(param.type)) {
-    return false
+    return false;
   }
-  const typeName = param.type.typeName
-  return ts.isIdentifier(typeName) && typeName.text === 'number'
+  const typeName = param.type.typeName;
+  return ts.isIdentifier(typeName) && typeName.text === 'number';
 }
 
 /**
  * Check if the function body contains numeric validation patterns
  */
 function bodyHasValidation(body: ts.Node, sourceFile: ts.SourceFile): boolean {
-  const bodyText = body.getText(sourceFile)
-  return VALIDATION_PATTERNS.some((p) => p.test(bodyText))
+  const bodyText = body.getText(sourceFile);
+  return VALIDATION_PATTERNS.some((p) => p.test(bodyText));
 }
 
 /** Options for createParameterViolation */
 interface CreateParameterViolationOptions {
-  param: ts.ParameterDeclaration
-  sourceFile: ts.SourceFile
+  param: ts.ParameterDeclaration;
+  sourceFile: ts.SourceFile;
 }
 
 /**
  * Create a violation for an unvalidated numeric parameter
  */
 function createParameterViolation(options: CreateParameterViolationOptions): CheckViolation {
-  const { param, sourceFile } = options
-  const paramName = ts.isIdentifier(param.name) ? param.name.text : 'param'
-  const { line, character } = sourceFile.getLineAndCharacterOfPosition(param.getStart())
-  const lineNum = line + 1
-  const matchText = param.getText(sourceFile)
+  const { param, sourceFile } = options;
+  const paramName = ts.isIdentifier(param.name) ? param.name.text : 'param';
+  const { line, character } = sourceFile.getLineAndCharacterOfPosition(param.getStart());
+  const lineNum = line + 1;
+  const matchText = param.getText(sourceFile);
 
   return {
     line: lineNum,
@@ -133,77 +141,77 @@ function createParameterViolation(options: CreateParameterViolationOptions): Che
     type: 'unvalidated-numeric',
     suggestion: `Add validation at the start of the function: if (!Number.isFinite(${paramName})) { throw new Error('Invalid ${paramName}: must be a finite number'); }`,
     match: matchText,
-  }
+  };
 }
 
 /** Options for checkFunctionParameters */
 interface CheckFunctionParametersOptions {
-  node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction
-  sourceFile: ts.SourceFile
+  node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction;
+  sourceFile: ts.SourceFile;
 }
 
 /**
  * Check function parameters for unvalidated number types
  */
 function checkFunctionParameters(options: CheckFunctionParametersOptions): CheckViolation[] {
-  const { node, sourceFile } = options
-  const violations: CheckViolation[] = []
-  const body = node.body
+  const { node, sourceFile } = options;
+  const violations: CheckViolation[] = [];
+  const body = node.body;
   /* v8 ignore next -- defensive guard */
-  if (!body) return violations
+  if (!body) return violations;
 
   // Skip private/internal functions — callers validate before passing values
-  if (isPrivateOrInternal(node)) return violations
+  if (isPrivateOrInternal(node)) return violations;
 
   // Filter to number params that lack validation
   const unvalidatedNumberParams = node.parameters.filter((param) => {
     /* v8 ignore next -- defensive AST/type guard */
-    if (!isNumberTypeParam(param)) return false
-    if (bodyHasValidation(body, sourceFile)) return false
+    if (!isNumberTypeParam(param)) return false;
+    if (bodyHasValidation(body, sourceFile)) return false;
 
     // Skip parameters with default values (already have safe fallback)
-    if (hasDefaultValue(param)) return false
+    if (hasDefaultValue(param)) return false;
 
     // Skip safe parameter names (loop indices, counters, etc.)
     /* v8 ignore next -- defensive AST/type guard */
-    if (ts.isIdentifier(param.name) && SAFE_PARAMETER_NAMES.has(param.name.text)) return false
+    if (ts.isIdentifier(param.name) && SAFE_PARAMETER_NAMES.has(param.name.text)) return false;
 
-    return true
-  })
+    return true;
+  });
 
   for (const param of unvalidatedNumberParams) {
-    violations.push(createParameterViolation({ param, sourceFile }))
+    violations.push(createParameterViolation({ param, sourceFile }));
   }
 
-  return violations
+  return violations;
 }
 
 /**
  * Check if node is inside a validation check (e.g., isFinite wrapper)
  */
 function isInsideValidationCheck(node: ts.CallExpression): boolean {
-  const parent = node.parent
-  if (!ts.isCallExpression(parent)) return false
+  const parent = node.parent;
+  if (!ts.isCallExpression(parent)) return false;
 
-  const parentExpr = parent.expression
-  return ts.isPropertyAccessExpression(parentExpr) && parentExpr.name.text === 'isFinite'
+  const parentExpr = parent.expression;
+  return ts.isPropertyAccessExpression(parentExpr) && parentExpr.name.text === 'isFinite';
 }
 
 /** Options for createParseViolation */
 interface CreateParseViolationOptions {
-  node: ts.CallExpression
-  funcName: string
-  sourceFile: ts.SourceFile
+  node: ts.CallExpression;
+  funcName: string;
+  sourceFile: ts.SourceFile;
 }
 
 /**
  * Create a violation for unvalidated parseInt/parseFloat call
  */
 function createParseViolation(options: CreateParseViolationOptions): CheckViolation {
-  const { node, funcName, sourceFile } = options
-  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const lineNum = line + 1
-  const matchText = node.getText(sourceFile)
+  const { node, funcName, sourceFile } = options;
+  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+  const lineNum = line + 1;
+  const matchText = node.getText(sourceFile);
 
   return {
     line: lineNum,
@@ -213,14 +221,14 @@ function createParseViolation(options: CreateParseViolationOptions): CheckViolat
     type: 'unvalidated-parse',
     suggestion: `Wrap the ${funcName}() call with validation: const parsed = ${funcName}(...); if (!Number.isFinite(parsed)) { /* handle invalid input */ }`,
     match: matchText,
-  }
+  };
 }
 
 /** Options for checkParseCall */
 interface CheckParseCallOptions {
-  node: ts.CallExpression
-  sourceFile: ts.SourceFile
-  content: string
+  node: ts.CallExpression;
+  sourceFile: ts.SourceFile;
+  content: string;
 }
 
 /**
@@ -228,34 +236,34 @@ interface CheckParseCallOptions {
  * Looks ahead 3 lines for patterns like isNaN(), Number.isFinite(), etc.
  */
 function nearbyLinesHaveValidation(content: string, lineIndex: number): boolean {
-  const lines = content.split('\n')
-  const lookAhead = 3
-  const end = Math.min(lineIndex + lookAhead + 1, lines.length)
+  const lines = content.split('\n');
+  const lookAhead = 3;
+  const end = Math.min(lineIndex + lookAhead + 1, lines.length);
   for (let i = lineIndex + 1; i < end; i++) {
     /* v8 ignore next -- defensive nullish fallback */
-    const nextLine = lines[i] ?? ''
-    if (VALIDATION_PATTERNS.some((p) => p.test(nextLine))) return true
+    const nextLine = lines[i] ?? '';
+    if (VALIDATION_PATTERNS.some((p) => p.test(nextLine))) return true;
   }
-  return false
+  return false;
 }
 
 /**
  * Patterns for the `|| 0` fallback that safely handles NaN
  * (NaN || 0 evaluates to 0, so NaN never propagates)
  */
-const OR_ZERO_FALLBACK = /\|\|\s*0\b/
+const OR_ZERO_FALLBACK = /\|\|\s*0\b/;
 
 /**
  * Check if a parse call argument accesses a DynamoDB `.N` attribute.
  * DynamoDB `.N` attributes are guaranteed to be valid numeric strings.
  */
 function isDynamoDBNumericAttribute(node: ts.CallExpression, sourceFile: ts.SourceFile): boolean {
-  const firstArg = node.arguments[0]
+  const firstArg = node.arguments[0];
   /* v8 ignore next -- defensive AST/type guard */
-  if (!firstArg) return false
-  const argText = firstArg.getText(sourceFile)
+  if (!firstArg) return false;
+  const argText = firstArg.getText(sourceFile);
   // Match patterns like `item.N`, `attr.N`, `result.Item.count.N`, including with nullish coalescing
-  return /\.N\b/.test(argText)
+  return /\.N\b/.test(argText);
 }
 
 /**
@@ -264,12 +272,12 @@ function isDynamoDBNumericAttribute(node: ts.CallExpression, sourceFile: ts.Sour
  * where the fallback is a literal numeric string.
  */
 function hasSafeNumericFallback(node: ts.CallExpression, sourceFile: ts.SourceFile): boolean {
-  const firstArg = node.arguments[0]
+  const firstArg = node.arguments[0];
   /* v8 ignore next -- defensive AST/type guard */
-  if (!firstArg) return false
-  const argText = firstArg.getText(sourceFile)
+  if (!firstArg) return false;
+  const argText = firstArg.getText(sourceFile);
   // Match `expr || 'digits'` or `expr ?? 'digits'` where the fallback is a numeric string
-  return /(?:\|\||[?][?])\s*'[\d.]+'/.test(argText)
+  return /(?:\|\||[?][?])\s*'[\d.]+'/.test(argText);
 }
 
 /**
@@ -285,78 +293,78 @@ function hasRegexDigitGuard(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,
 ): boolean {
-  const lines = content.split('\n')
-  const lookBack = 3
+  const lines = content.split('\n');
+  const lookBack = 3;
   /* v8 ignore next -- defensive non-negative guard */
-  const start = Math.max(0, lineIndex - lookBack)
+  const start = Math.max(0, lineIndex - lookBack);
 
   // Pattern 1: inline .test() with \d regex on same or preceding lines
   for (let i = start; i <= lineIndex; i++) {
     /* v8 ignore next -- defensive nullish fallback */
-    const line = lines[i] ?? ''
-    if (/\/[^/]*\\d[^/]*\/\w*\.test\(/.test(line)) return true
+    const line = lines[i] ?? '';
+    if (/\/[^/]*\\d[^/]*\/\w*\.test\(/.test(line)) return true;
   }
 
   // Pattern 2: regex capture group - check if parseInt arg is a match subscript
   // AND a regex with \d is defined or used nearby
-  const firstArg = node.arguments[0]
+  const firstArg = node.arguments[0];
   /* v8 ignore next -- defensive AST/type guard */
-  if (!firstArg) return false
-  const argText = firstArg.getText(sourceFile)
+  if (!firstArg) return false;
+  const argText = firstArg.getText(sourceFile);
   // Argument must be a match result subscript (e.g., `match[1]`, `retryAfterMatch[1]`)
   // eslint-disable-next-line sonarjs/slow-regex -- simple pattern matching identifier[digit]; no backtracking risk
-  if (!/\w+\[\d+\]/.test(argText)) return false
+  if (!/\w+\[\d+\]/.test(argText)) return false;
 
   // Look for regex with \d in nearby lines (broader window for variable-defined regex)
-  const regexLookBack = 5
+  const regexLookBack = 5;
   /* v8 ignore next -- defensive non-negative guard */
-  const regexStart = Math.max(0, lineIndex - regexLookBack)
+  const regexStart = Math.max(0, lineIndex - regexLookBack);
   for (let i = regexStart; i <= lineIndex; i++) {
     /* v8 ignore next -- defensive nullish fallback */
-    const line = lines[i] ?? ''
-    if (/\/[^/]*\\d[^/]*\//.test(line)) return true
+    const line = lines[i] ?? '';
+    if (/\/[^/]*\\d[^/]*\//.test(line)) return true;
   }
 
-  return false
+  return false;
 }
 
 /**
  * Check parseInt/parseFloat calls for NaN validation
  */
 function checkParseCall(options: CheckParseCallOptions): CheckViolation | null {
-  const { node, sourceFile, content } = options
-  const expr = node.expression
-  if (!ts.isIdentifier(expr)) return null
-  if (expr.text !== 'parseInt' && expr.text !== 'parseFloat') return null
-  if (isInsideValidationCheck(node)) return null
+  const { node, sourceFile, content } = options;
+  const expr = node.expression;
+  if (!ts.isIdentifier(expr)) return null;
+  if (expr.text !== 'parseInt' && expr.text !== 'parseFloat') return null;
+  if (isInsideValidationCheck(node)) return null;
 
-  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const lines = content.split('\n')
+  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+  const lines = content.split('\n');
   /* v8 ignore next -- defensive nullish fallback */
-  const lineText = lines[line] ?? ''
+  const lineText = lines[line] ?? '';
 
   // Check current line for validation patterns
   /* v8 ignore next -- defensive AST/type guard */
-  if (VALIDATION_PATTERNS.some((p) => p.test(lineText))) return null
+  if (VALIDATION_PATTERNS.some((p) => p.test(lineText))) return null;
 
   // Check next 2-3 lines for NaN validation (multi-line validation pattern)
-  if (nearbyLinesHaveValidation(content, line)) return null
+  if (nearbyLinesHaveValidation(content, line)) return null;
 
   // DynamoDB .N attributes are guaranteed valid numeric strings
-  if (isDynamoDBNumericAttribute(node, sourceFile)) return null
+  if (isDynamoDBNumericAttribute(node, sourceFile)) return null;
 
   // Safe fallback: `|| 0` on the same line converts NaN to 0
   /* v8 ignore next -- defensive AST/type guard */
-  if (OR_ZERO_FALLBACK.test(lineText)) return null
+  if (OR_ZERO_FALLBACK.test(lineText)) return null;
 
   // Safe numeric string fallback in argument (e.g., `x ?? '0'`)
   // combined with `|| 0` on the result line, or standalone safe defaults
-  if (hasSafeNumericFallback(node, sourceFile)) return null
+  if (hasSafeNumericFallback(node, sourceFile)) return null;
 
   // Regex digit guard preceding the parse call guarantees digits-only input
-  if (hasRegexDigitGuard(content, line, node, sourceFile)) return null
+  if (hasRegexDigitGuard(content, line, node, sourceFile)) return null;
 
-  return createParseViolation({ node, funcName: expr.text, sourceFile })
+  return createParseViolation({ node, funcName: expr.text, sourceFile });
 }
 
 /**
@@ -367,30 +375,30 @@ function checkParseCall(options: CheckParseCallOptions): CheckViolation | null {
  * @returns Array of violations found
  */
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Skip test files — test code doesn't need numeric validation guards
   if (isTestFile(filePath)) {
-    return violations
+    return violations;
   }
 
   // Skip route handler files — parameters come from Zod-validated schemas
   if (filePath.includes('routes/')) {
-    return violations
+    return violations;
   }
 
   // Quick filter: skip files without numeric-related patterns
   if (!QUICK_FILTER_KEYWORDS.some((kw) => content.includes(kw))) {
-    return violations
+    return violations;
   }
 
   try {
-    const sourceFile = getSharedSourceFile(filePath, content)
+    const sourceFile = getSharedSourceFile(filePath, content);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
     // Skip files that import Zod — parameters likely come from parsed schemas
-    if (fileImportsZod(sourceFile)) return []
+    if (fileImportsZod(sourceFile)) return [];
 
     const visit = (node: ts.Node): void => {
       if (
@@ -398,26 +406,26 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
         ts.isMethodDeclaration(node) ||
         ts.isArrowFunction(node)
       ) {
-        violations.push(...checkFunctionParameters({ node, sourceFile }))
+        violations.push(...checkFunctionParameters({ node, sourceFile }));
       }
 
       if (ts.isCallExpression(node)) {
-        const parseViolation = checkParseCall({ node, sourceFile, content })
+        const parseViolation = checkParseCall({ node, sourceFile, content });
         if (parseViolation) {
-          violations.push(parseViolation)
+          violations.push(parseViolation);
         }
       }
 
-      ts.forEachChild(node, visit)
-    }
+      ts.forEachChild(node, visit);
+    };
 
-    visit(sourceFile)
-  /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+    visit(sourceFile);
+    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
   } catch {
     // @swallow-ok Skip files that fail to parse
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -460,4 +468,4 @@ export const numericValidation = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze: analyzeFile,
-})
+});

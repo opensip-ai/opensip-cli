@@ -10,18 +10,18 @@
  * (wraps macOS `open`, Linux `xdg-open`, Windows `start`).
  */
 
-import open from 'open'
+import open from 'open';
 
 export interface OpenDashboardDecision {
-  readonly shouldOpen: boolean
-  readonly reason: string
+  readonly shouldOpen: boolean;
+  readonly reason: string;
 }
 
 export interface OpenDashboardContext {
-  readonly openRequested: boolean
-  readonly jsonOutput: boolean
-  readonly stdoutIsTTY: boolean
-  readonly env: NodeJS.ProcessEnv
+  readonly openRequested: boolean;
+  readonly jsonOutput: boolean;
+  readonly stdoutIsTTY: boolean;
+  readonly env: NodeJS.ProcessEnv;
 }
 
 /**
@@ -36,14 +36,14 @@ export interface OpenDashboardContext {
  *     without a graphical session — don't try)
  */
 export function decideOpen(ctx: OpenDashboardContext): OpenDashboardDecision {
-  if (!ctx.openRequested) return { shouldOpen: false, reason: 'not-requested' }
-  if (ctx.jsonOutput) return { shouldOpen: false, reason: 'json-mode' }
-  if (!ctx.stdoutIsTTY) return { shouldOpen: false, reason: 'non-tty' }
-  if (ctx.env.CI) return { shouldOpen: false, reason: 'ci-env' }
-  const ssh = ctx.env.SSH_CONNECTION ?? ctx.env.SSH_CLIENT
-  const display = ctx.env.DISPLAY ?? ctx.env.WAYLAND_DISPLAY
-  if (ssh && !display) return { shouldOpen: false, reason: 'ssh-no-display' }
-  return { shouldOpen: true, reason: 'ok' }
+  if (!ctx.openRequested) return { shouldOpen: false, reason: 'not-requested' };
+  if (ctx.jsonOutput) return { shouldOpen: false, reason: 'json-mode' };
+  if (!ctx.stdoutIsTTY) return { shouldOpen: false, reason: 'non-tty' };
+  if (ctx.env.CI) return { shouldOpen: false, reason: 'ci-env' };
+  const ssh = ctx.env.SSH_CONNECTION ?? ctx.env.SSH_CLIENT;
+  const display = ctx.env.DISPLAY ?? ctx.env.WAYLAND_DISPLAY;
+  if (ssh && !display) return { shouldOpen: false, reason: 'ssh-no-display' };
+  return { shouldOpen: true, reason: 'ok' };
 }
 
 /**
@@ -53,10 +53,10 @@ export function decideOpen(ctx: OpenDashboardContext): OpenDashboardDecision {
  */
 export async function launchBrowser(target: string): Promise<boolean> {
   try {
-    await open(target)
-    return true
+    await open(target);
+    return true;
   } catch {
     // @fitness-ignore-next-line error-handling-quality -- documented contract (see JSDoc above): failure to open a browser must NOT fail the fitness run; caller dispatches on the boolean return.
-    return false
+    return false;
   }
 }

@@ -6,18 +6,18 @@
  * commit 2ed25d3 contract must not regress.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry } from '@opensip-tools/core'
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore'
-import { SessionRepo } from '@opensip-tools/session-store'
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { enterScope, LanguageRegistry } from '@opensip-tools/core';
+import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { SessionRepo } from '@opensip-tools/session-store';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import { executeGraph } from '../../cli/graph.js'
-import { currentAdapterRegistry } from '../../lang-adapter/registry.js'
-import { makeGraphTestScope } from '../test-utils/with-graph-scope.js'
+import { executeGraph } from '../../cli/graph.js';
+import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
+import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
   DiscoverOutput,
@@ -25,9 +25,9 @@ import type {
   ParseOutput,
   ResolveOutput,
   WalkOutput,
-} from '../../lang-adapter/types.js'
-import type { GraphSessionPayload } from '../../persistence/session-payload.js'
-import type { LanguageAdapter, ToolCliContext, WorkspaceUnit } from '@opensip-tools/core'
+} from '../../lang-adapter/types.js';
+import type { GraphSessionPayload } from '../../persistence/session-payload.js';
+import type { LanguageAdapter, ToolCliContext, WorkspaceUnit } from '@opensip-tools/core';
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
   return {
@@ -77,7 +77,7 @@ function fakeAdapter(projectDir: string): GraphLanguageAdapter {
       },
     }),
     cacheKey: () => 'fake-v1',
-  }
+  };
 }
 
 function mockCli(datastore: DataStore, languages?: LanguageRegistry): ToolCliContext {
@@ -89,11 +89,11 @@ function mockCli(datastore: DataStore, languages?: LanguageRegistry): ToolCliCon
       datastore: () => datastore,
       languages: languages ?? new LanguageRegistry(),
     },
-  } as unknown as ToolCliContext
+  } as unknown as ToolCliContext;
 }
 
 function workspaceLangRegistry(units: readonly WorkspaceUnit[]): LanguageRegistry {
-  const r = new LanguageRegistry()
+  const r = new LanguageRegistry();
   const adapter: LanguageAdapter = {
     id: 'typescript',
     fileExtensions: ['.ts'],
@@ -102,55 +102,55 @@ function workspaceLangRegistry(units: readonly WorkspaceUnit[]): LanguageRegistr
     stripComments: (s) => s,
     // eslint-disable-next-line @typescript-eslint/require-await
     discoverWorkspaceUnits: async () => units,
-  }
-  r.register(adapter)
-  return r
+  };
+  r.register(adapter);
+  return r;
 }
 
 function countSessions(datastore: DataStore): number {
-  return new SessionRepo(datastore).count()
+  return new SessionRepo(datastore).count();
 }
 
-let stdoutSpy: MockInstance<typeof process.stdout.write>
-let stderrSpy: MockInstance<typeof process.stderr.write>
-let projectDir: string
-let datastore: DataStore
+let stdoutSpy: MockInstance<typeof process.stdout.write>;
+let stderrSpy: MockInstance<typeof process.stderr.write>;
+let projectDir: string;
+let datastore: DataStore;
 
 beforeEach(() => {
-  enterScope(makeGraphTestScope())
-  projectDir = mkdtempSync(join(tmpdir(), 'graph-session-'))
-  datastore = DataStoreFactory.open({ backend: 'memory' })
-  currentAdapterRegistry().register(fakeAdapter(projectDir))
-  stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-  stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-})
+  enterScope(makeGraphTestScope());
+  projectDir = mkdtempSync(join(tmpdir(), 'graph-session-'));
+  datastore = DataStoreFactory.open({ backend: 'memory' });
+  currentAdapterRegistry().register(fakeAdapter(projectDir));
+  stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+});
 
 afterEach(() => {
-  currentAdapterRegistry().clear()
-  datastore.close()
-  stdoutSpy.mockRestore()
-  stderrSpy.mockRestore()
-  rmSync(projectDir, { recursive: true, force: true })
-})
+  currentAdapterRegistry().clear();
+  datastore.close();
+  stdoutSpy.mockRestore();
+  stderrSpy.mockRestore();
+  rmSync(projectDir, { recursive: true, force: true });
+});
 
 describe('D12 — one CLI invocation = one session', () => {
   it('default run writes exactly one session', async () => {
-    await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore))
-    expect(countSessions(datastore)).toBe(1)
-  })
+    await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore));
+    expect(countSessions(datastore)).toBe(1);
+  });
 
   it('single positional path writes exactly one session', async () => {
-    mkdirSync(join(projectDir, 'sub'))
+    mkdirSync(join(projectDir, 'sub'));
     await executeGraph(
       { cwd: projectDir, noCache: true, paths: [join(projectDir, 'sub')] },
       mockCli(datastore),
-    )
-    expect(countSessions(datastore)).toBe(1)
-  })
+    );
+    expect(countSessions(datastore)).toBe(1);
+  });
 
   it('multiple positional paths write exactly one aggregate session', async () => {
-    mkdirSync(join(projectDir, 'a'))
-    mkdirSync(join(projectDir, 'b'))
+    mkdirSync(join(projectDir, 'a'));
+    mkdirSync(join(projectDir, 'b'));
     await executeGraph(
       {
         cwd: projectDir,
@@ -158,23 +158,23 @@ describe('D12 — one CLI invocation = one session', () => {
         paths: [join(projectDir, 'a'), join(projectDir, 'b')],
       },
       mockCli(datastore),
-    )
-    expect(countSessions(datastore)).toBe(1)
-  })
+    );
+    expect(countSessions(datastore)).toBe(1);
+  });
 
   it('--workspace writes exactly one aggregate session (not one per unit)', async () => {
-    const pkgA = join(projectDir, 'packages', 'a')
-    mkdirSync(pkgA, { recursive: true })
-    writeFileSync(join(pkgA, 'tsconfig.json'), '{}')
-    writeFileSync(join(projectDir, 'tsconfig.json'), '{}')
-    const fakeCliPath = join(projectDir, 'fake.cjs')
+    const pkgA = join(projectDir, 'packages', 'a');
+    mkdirSync(pkgA, { recursive: true });
+    writeFileSync(join(pkgA, 'tsconfig.json'), '{}');
+    writeFileSync(join(projectDir, 'tsconfig.json'), '{}');
+    const fakeCliPath = join(projectDir, 'fake.cjs');
     writeFileSync(
       fakeCliPath,
       `process.stdout.write(JSON.stringify({version:'1.0',tool:'graph',timestamp:new Date().toISOString(),recipe:'graph',score:100,passed:true,summary:{total:0,passed:0,failed:0,errors:0,warnings:0},checks:[],durationMs:0}));process.exit(0);`,
-    )
+    );
     const units: WorkspaceUnit[] = [
       { id: 'a', rootDir: pkgA, configPath: join(pkgA, 'tsconfig.json') },
-    ]
+    ];
     await executeGraph(
       {
         cwd: projectDir,
@@ -184,44 +184,38 @@ describe('D12 — one CLI invocation = one session', () => {
         concurrency: 1,
       },
       mockCli(datastore, workspaceLangRegistry(units)),
-    )
-    expect(countSessions(datastore)).toBe(1)
-  })
+    );
+    expect(countSessions(datastore)).toBe(1);
+  });
 
   it('--json opts out of session persistence', async () => {
-    await executeGraph(
-      { cwd: projectDir, noCache: true, json: true },
-      mockCli(datastore),
-    )
-    expect(countSessions(datastore)).toBe(0)
-  })
+    await executeGraph({ cwd: projectDir, noCache: true, json: true }, mockCli(datastore));
+    expect(countSessions(datastore)).toBe(0);
+  });
 
   it('--gate-save opts out of session persistence', async () => {
-    await executeGraph(
-      { cwd: projectDir, noCache: true, gateSave: true },
-      mockCli(datastore),
-    )
-    expect(countSessions(datastore)).toBe(0)
-  })
+    await executeGraph({ cwd: projectDir, noCache: true, gateSave: true }, mockCli(datastore));
+    expect(countSessions(datastore)).toBe(0);
+  });
 
   it('--report-to opts out of session persistence (even on failure)', async () => {
     await executeGraph(
       { cwd: projectDir, noCache: true, reportTo: 'http://127.0.0.1:1' },
       mockCli(datastore),
-    )
-    expect(countSessions(datastore)).toBe(0)
-  })
-})
+    );
+    expect(countSessions(datastore)).toBe(0);
+  });
+});
 
 describe('graph session payload — rule-grouped detail is persisted', () => {
   it('default run writes a payload with summary + checks (not summary-only)', async () => {
-    await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore))
+    await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore));
 
-    const session = new SessionRepo(datastore).latest()
-    expect(session).not.toBeNull()
+    const session = new SessionRepo(datastore).latest();
+    expect(session).not.toBeNull();
 
-    const payload = session?.payload as GraphSessionPayload | undefined
-    expect(payload).toBeDefined()
+    const payload = session?.payload as GraphSessionPayload | undefined;
+    expect(payload).toBeDefined();
 
     // The native signal summary is carried verbatim from the run's CliOutput.
     expect(payload?.summary).toEqual(
@@ -232,13 +226,13 @@ describe('graph session payload — rule-grouped detail is persisted', () => {
         errors: expect.any(Number),
         warnings: expect.any(Number),
       }),
-    )
+    );
 
     // The rule-grouped detail (`checks`) is what the Code Paths → Sessions
     // panel renders, and the reason the payload is no longer summary-only.
     // A regression to `{ summary }` (the pre-extension shape) drops this key —
     // session count stays 1, so only this assertion catches it.
-    expect(payload).toHaveProperty('checks')
-    expect(Array.isArray(payload?.checks)).toBe(true)
-  })
-})
+    expect(payload).toHaveProperty('checks');
+    expect(Array.isArray(payload?.checks)).toBe(true);
+  });
+});

@@ -49,7 +49,10 @@ describe('filterSignalsBySuppressions', () => {
   });
 
   it('suppresses via a next-line directive on the preceding line', async () => {
-    const content = ['// @graph-ignore-next-line graph:cycle -- intentional recursion', 'function visit() {}'].join('\n');
+    const content = [
+      '// @graph-ignore-next-line graph:cycle -- intentional recursion',
+      'function visit() {}',
+    ].join('\n');
     const res = await filterSignalsBySuppressions({
       signals: [sig('graph:cycle', 'a.ts', 2)],
       keywords: GRAPH_KEYWORDS,
@@ -61,7 +64,9 @@ describe('filterSignalsBySuppressions', () => {
   });
 
   it('suppresses every matching signal via a file-level directive', async () => {
-    const content = ['// @graph-ignore-file graph:wide-function -- generated', 'code', 'more'].join('\n');
+    const content = ['// @graph-ignore-file graph:wide-function -- generated', 'code', 'more'].join(
+      '\n',
+    );
     const res = await filterSignalsBySuppressions({
       signals: [sig('graph:wide-function', 'a.ts', 2), sig('graph:wide-function', 'a.ts', 3)],
       keywords: GRAPH_KEYWORDS,
@@ -72,7 +77,9 @@ describe('filterSignalsBySuppressions', () => {
   });
 
   it('matches per ruleId — a directive for one rule does not suppress another', async () => {
-    const content = ['// @graph-ignore-next-line graph:cycle -- ok', 'function visit() {}'].join('\n');
+    const content = ['// @graph-ignore-next-line graph:cycle -- ok', 'function visit() {}'].join(
+      '\n',
+    );
     const res = await filterSignalsBySuppressions({
       signals: [sig('graph:large-function', 'a.ts', 2)],
       keywords: GRAPH_KEYWORDS,
@@ -114,7 +121,10 @@ describe('filterSignalsBySuppressions', () => {
       keywords: GRAPH_KEYWORDS,
       readFile: readerFor({
         'anchor.ts': 'function a() {}',
-        'member.ts': ['// @graph-ignore-next-line graph:cycle -- intentional', 'function b() {}'].join('\n'),
+        'member.ts': [
+          '// @graph-ignore-next-line graph:cycle -- intentional',
+          'function b() {}',
+        ].join('\n'),
       }),
       locate: () => [
         { file: 'anchor.ts', line: 9 },
@@ -126,7 +136,9 @@ describe('filterSignalsBySuppressions', () => {
 
   it('never suppresses a signal pointing AT a directive line (anti-recursion)', async () => {
     // A directive-audit-style finding lands on the directive comment itself.
-    const content = ['// @graph-ignore-next-line graph:cycle -- ok', 'function visit() {}'].join('\n');
+    const content = ['// @graph-ignore-next-line graph:cycle -- ok', 'function visit() {}'].join(
+      '\n',
+    );
     const res = await filterSignalsBySuppressions({
       signals: [sig('graph:cycle', 'a.ts', 1)],
       keywords: GRAPH_KEYWORDS,
@@ -199,7 +211,9 @@ describe('filterSignalsBySuppressions', () => {
 
   it('does NOT log the missing-file evt on the happy path (present files)', async () => {
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
-    const content = ['// @graph-ignore-next-line graph:cycle -- ok', 'function visit() {}'].join('\n');
+    const content = ['// @graph-ignore-next-line graph:cycle -- ok', 'function visit() {}'].join(
+      '\n',
+    );
     await filterSignalsBySuppressions({
       signals: [sig('graph:cycle', 'a.ts', 2)],
       keywords: GRAPH_KEYWORDS,
@@ -209,7 +223,10 @@ describe('filterSignalsBySuppressions', () => {
   });
 
   it('is keyword-agnostic — same logic under fitness keywords', async () => {
-    const content = ['// @fitness-ignore-next-line no-generic-error -- boundary', 'throw new Error()'].join('\n');
+    const content = [
+      '// @fitness-ignore-next-line no-generic-error -- boundary',
+      'throw new Error()',
+    ].join('\n');
     const res = await filterSignalsBySuppressions({
       signals: [sig('no-generic-error', 'a.ts', 2)],
       keywords: FITNESS_KEYWORDS,

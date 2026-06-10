@@ -33,7 +33,11 @@ describe('JSON output contract', () => {
       tool: 'fit',
       runId: '',
       createdAt: '',
-      verdict: { score: 0, passed: true, summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } },
+      verdict: {
+        score: 0,
+        passed: true,
+        summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+      },
       units: [],
       signals: [],
     };
@@ -41,12 +45,28 @@ describe('JSON output contract', () => {
   });
 
   it('tool is fit or sim', () => {
-    const verdict = { score: 0, passed: true, summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } };
+    const verdict = {
+      score: 0,
+      passed: true,
+      summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+    };
     const fitEnvelope: SignalEnvelope = {
-      schemaVersion: 2, tool: 'fit', runId: '', createdAt: '', verdict, units: [], signals: [],
+      schemaVersion: 2,
+      tool: 'fit',
+      runId: '',
+      createdAt: '',
+      verdict,
+      units: [],
+      signals: [],
     };
     const simEnvelope: SignalEnvelope = {
-      schemaVersion: 2, tool: 'sim', runId: '', createdAt: '', verdict, units: [], signals: [],
+      schemaVersion: 2,
+      tool: 'sim',
+      runId: '',
+      createdAt: '',
+      verdict,
+      units: [],
+      signals: [],
     };
     expect(fitEnvelope.tool).toBe('fit');
     expect(simEnvelope.tool).toBe('sim');

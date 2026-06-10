@@ -133,7 +133,11 @@ export function LiveProgress({ surface, subscribe }: LiveProgressProps): React.R
   return (
     <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
       {state.stages.map((stage) => (
-        <PhaseLine key={stage.id} stage={stage} status={state.status[stage.id] ?? { kind: 'pending' }} />
+        <PhaseLine
+          key={stage.id}
+          stage={stage}
+          status={state.status[stage.id] ?? { kind: 'pending' }}
+        />
       ))}
     </Box>
   );
@@ -151,7 +155,8 @@ function PhaseLine({
   if (status.kind === 'pending') {
     return (
       <Text dimColor>
-        {'  '}<Text>○</Text> {stage.label}
+        {'  '}
+        <Text>○</Text> {stage.label}
       </Text>
     );
   }
@@ -159,8 +164,8 @@ function PhaseLine({
   if (status.kind === 'cached') {
     return (
       <Text>
-        <Text color={theme.success}>✓</Text>{' '}
-        <Text>{stage.label}</Text>{'   '}
+        <Text color={theme.success}>✓</Text> <Text>{stage.label}</Text>
+        {'   '}
         <Text dimColor>(cached)</Text>
       </Text>
     );
@@ -171,8 +176,8 @@ function PhaseLine({
     const detail = status.detail ? `${status.detail} (${dur})` : dur;
     return (
       <Text>
-        <Text color={theme.success}>✓</Text>{' '}
-        <Text>{stage.label}</Text>{'   '}
+        <Text color={theme.success}>✓</Text> <Text>{stage.label}</Text>
+        {'   '}
         <Text dimColor>{detail}</Text>
       </Text>
     );
@@ -197,12 +202,11 @@ function RunningPhaseLine({
   return (
     <Box flexDirection="column">
       <Text>
-        <Text color={theme.brand}>{frame}</Text>{' '}
-        <Text bold>{stage.label}</Text>
+        <Text color={theme.brand}>{frame}</Text> <Text bold>{stage.label}</Text>
       </Text>
       <Text>
         {'    └─ '}
-        {stage.runningDetail ? <Text dimColor>{stage.runningDetail}{' '}</Text> : null}
+        {stage.runningDetail ? <Text dimColor>{stage.runningDetail} </Text> : null}
         <Text dimColor>({elapsed})</Text>
       </Text>
     </Box>

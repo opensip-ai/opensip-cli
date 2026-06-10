@@ -191,7 +191,9 @@ describe('deriveOpenSipModulePath', () => {
   });
 
   it('normalizes Windows backslashes to POSIX separators', () => {
-    expect(deriveOpenSipModulePath(String.raw`packages\foo\src\bar.go`)).toBe('packages/foo/src/bar');
+    expect(deriveOpenSipModulePath(String.raw`packages\foo\src\bar.go`)).toBe(
+      'packages/foo/src/bar',
+    );
   });
 
   it('preserves dot in dirname (no extension stripped)', () => {

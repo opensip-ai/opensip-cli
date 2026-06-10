@@ -47,7 +47,6 @@
  * - `cli/fit-modes.ts` owns the dispatch branches (gate/list/recipes/json/live).
  */
 
-
 import { readPackageVersion } from '@opensip-tools/core';
 
 import { collectFitnessDashboardData } from './cli/dashboard.js';
@@ -114,7 +113,8 @@ const FIT_BASELINE_EXPORT: ToolCommandDescriptor = {
 
 const FIT_RUN_WORKER: ToolCommandDescriptor = {
   name: 'fit-run-worker',
-  description: '[internal] Run fit headless and stream progress + result over IPC (forked by the live view)',
+  description:
+    '[internal] Run fit headless and stream progress + result over IPC (forked by the live view)',
 };
 
 // =============================================================================

@@ -6,21 +6,21 @@
  * When one convention is dominant (>95%), flags the minority files for renaming.
  */
 
-import * as path from 'node:path'
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 /** Threshold for convention dominance (95%) */
-const DOMINANCE_THRESHOLD = 0.95
+const DOMINANCE_THRESHOLD = 0.95;
 
-type Convention = 'test' | 'spec'
+type Convention = 'test' | 'spec';
 
 /**
  * Determine which convention a file path uses.
  */
 function getConvention(filePath: string): Convention {
-  const basename = path.basename(filePath)
-  return basename.includes('.spec.') ? 'spec' : 'test'
+  const basename = path.basename(filePath);
+  return basename.includes('.spec.') ? 'spec' : 'test';
 }
 
 /**
@@ -52,46 +52,46 @@ export const testConventionConsistency = defineCheck({
   // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
   // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const testFiles: string[] = []
-    const specFiles: string[] = []
+    const testFiles: string[] = [];
+    const specFiles: string[] = [];
 
     // Categorize files by convention
     for (const filePath of files.paths) {
-      const convention = getConvention(filePath)
+      const convention = getConvention(filePath);
       if (convention === 'spec') {
-        specFiles.push(filePath)
+        specFiles.push(filePath);
       } else {
-        testFiles.push(filePath)
+        testFiles.push(filePath);
       }
     }
 
-    const total = testFiles.length + specFiles.length
-    if (total === 0) return []
+    const total = testFiles.length + specFiles.length;
+    if (total === 0) return [];
 
     // Determine if one convention is dominant
-    const testRatio = testFiles.length / total
-    const specRatio = specFiles.length / total
+    const testRatio = testFiles.length / total;
+    const specRatio = specFiles.length / total;
 
-    let dominant: Convention | null = null
-    let minorityFiles: string[] = []
+    let dominant: Convention | null = null;
+    let minorityFiles: string[] = [];
 
     if (testRatio >= DOMINANCE_THRESHOLD) {
-      dominant = 'test'
-      minorityFiles = specFiles
+      dominant = 'test';
+      minorityFiles = specFiles;
     } else if (specRatio >= DOMINANCE_THRESHOLD) {
-      dominant = 'spec'
-      minorityFiles = testFiles
+      dominant = 'spec';
+      minorityFiles = testFiles;
     }
 
     // No dominant convention — no violations
-    if (!dominant) return []
+    if (!dominant) return [];
 
-    const violations: CheckViolation[] = []
-    const minorityConvention = dominant === 'test' ? 'spec' : 'test'
+    const violations: CheckViolation[] = [];
+    const minorityConvention = dominant === 'test' ? 'spec' : 'test';
 
     for (const filePath of minorityFiles) {
-      const basename = path.basename(filePath)
-      const renamed = basename.replace(`.${minorityConvention}.`, `.${dominant}.`)
+      const basename = path.basename(filePath);
+      const renamed = basename.replace(`.${minorityConvention}.`, `.${dominant}.`);
 
       violations.push({
         filePath,
@@ -99,9 +99,9 @@ export const testConventionConsistency = defineCheck({
         message: `Test file uses .${minorityConvention} convention but codebase uses .${dominant} (${Math.round((dominant === 'test' ? testRatio : specRatio) * 100)}% dominant)`,
         severity: 'warning',
         suggestion: `Rename to match dominant convention: ${renamed}`,
-      })
+      });
     }
 
-    return violations
+    return violations;
   },
-})
+});

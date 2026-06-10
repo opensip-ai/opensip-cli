@@ -24,7 +24,12 @@ function sig(over: { ruleId: string; message: string; filePath: string; line?: n
 
 describe('gate fingerprintSignal', () => {
   it('builds rule|file|line|column identifier', () => {
-    const s = sig({ ruleId: 'graph:orphan-subtree', message: 'foo is unreachable', filePath: 'src/a.ts', line: 7 });
+    const s = sig({
+      ruleId: 'graph:orphan-subtree',
+      message: 'foo is unreachable',
+      filePath: 'src/a.ts',
+      line: 7,
+    });
     expect(fingerprintSignal(s)).toBe('graph:orphan-subtree|src/a.ts|7|0');
   });
 
@@ -99,7 +104,9 @@ describe('saveBaseline / compareToBaseline (SQLite-backed)', () => {
   });
 
   it('flags new signals as degraded', () => {
-    const original = [sig({ ruleId: 'graph:orphan-subtree', message: 'foo', filePath: 'src/a.ts', line: 1 })];
+    const original = [
+      sig({ ruleId: 'graph:orphan-subtree', message: 'foo', filePath: 'src/a.ts', line: 1 }),
+    ];
     saveBaseline(original, repo);
     const drift = [
       ...original,
@@ -129,10 +136,7 @@ describe('saveBaseline / compareToBaseline (SQLite-backed)', () => {
   });
 
   it('save replaces previous baseline atomically', () => {
-    saveBaseline(
-      [sig({ ruleId: 'r', message: 'old', filePath: 'src/x.ts' })],
-      repo,
-    );
+    saveBaseline([sig({ ruleId: 'r', message: 'old', filePath: 'src/x.ts' })], repo);
     const replacement = [sig({ ruleId: 'r', message: 'new', filePath: 'src/y.ts' })];
     saveBaseline(replacement, repo);
     const fps = repo.loadFingerprints();

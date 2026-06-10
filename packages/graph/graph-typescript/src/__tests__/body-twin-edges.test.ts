@@ -16,7 +16,6 @@ import { join } from 'node:path';
 import { ownerEdgeKey } from '@opensip-tools/graph';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-
 import { typescriptGraphAdapter } from '../index.js';
 
 import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
@@ -28,12 +27,28 @@ beforeEach(() => {
   mkdirSync(join(root, 'src'), { recursive: true });
   writeFileSync(
     join(root, 'tsconfig.json'),
-    JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'Node16', moduleResolution: 'Node16', strict: true }, include: ['**/*.ts'] }),
+    JSON.stringify({
+      compilerOptions: {
+        target: 'ES2022',
+        module: 'Node16',
+        moduleResolution: 'Node16',
+        strict: true,
+      },
+      include: ['**/*.ts'],
+    }),
     'utf8',
   );
   // `work` bodies are identical (body-twin); `helper` bodies differ per file.
-  writeFileSync(join(root, 'src/a.ts'), 'function helper(): number { return 1; }\nexport function work(): number { return helper(); }\n', 'utf8');
-  writeFileSync(join(root, 'src/b.ts'), 'function helper(): number { return 22; }\nexport function work(): number { return helper(); }\n', 'utf8');
+  writeFileSync(
+    join(root, 'src/a.ts'),
+    'function helper(): number { return 1; }\nexport function work(): number { return helper(); }\n',
+    'utf8',
+  );
+  writeFileSync(
+    join(root, 'src/b.ts'),
+    'function helper(): number { return 22; }\nexport function work(): number { return helper(); }\n',
+    'utf8',
+  );
 });
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
@@ -57,7 +72,11 @@ describe('body-twin edge keying', () => {
       files: discovery.files,
     });
     const catalog: Catalog = {
-      version: '3.0', tool: 'graph', language: 'typescript', builtAt: 'x', cacheKey: 't',
+      version: '3.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'x',
+      cacheKey: 't',
       functions: walked.occurrences,
     };
     const { edgesByOwner } = await typescriptGraphAdapter.resolveCallSites({

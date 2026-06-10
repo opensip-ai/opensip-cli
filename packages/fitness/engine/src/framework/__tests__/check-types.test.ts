@@ -42,7 +42,7 @@ describe('collectCheckObjects', () => {
   it('returns a flat list of Check instances from a flat barrel', () => {
     const out = collectCheckObjects({ checkA, checkB });
     expect(out).toHaveLength(2);
-    expect(new Set(out.map(c => c.config.slug))).toEqual(new Set(['check-a', 'check-b']));
+    expect(new Set(out.map((c) => c.config.slug))).toEqual(new Set(['check-a', 'check-b']));
   });
 
   it('recurses into nested object exports', () => {

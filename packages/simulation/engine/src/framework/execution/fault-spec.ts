@@ -21,18 +21,18 @@
  */
 
 /** The client-injectable fault kinds. */
-export type FaultKind = 'latency' | 'abort' | 'drop'
+export type FaultKind = 'latency' | 'abort' | 'drop';
 
 /** A single client-side fault the model may apply to a request. */
 export type Fault =
   | { readonly kind: 'latency'; readonly ms: number }
   | { readonly kind: 'abort' }
-  | { readonly kind: 'drop' }
+  | { readonly kind: 'drop' };
 
 /** Probability-gated set of client-side faults for a chaos scenario. */
 export interface FaultSpec {
   /** Candidate faults; one is selected when a request is perturbed. */
-  readonly faults: readonly Fault[]
+  readonly faults: readonly Fault[];
   /** Per-request probability `[0,1]` that a fault is applied. */
-  readonly probability: number
+  readonly probability: number;
 }

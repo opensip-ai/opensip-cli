@@ -37,16 +37,16 @@
  * excluding tests). Adopter repos are unaffected: the path guard makes the
  * check inert outside this workspace's package layout.
  */
-import path from 'node:path'
+import path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 /** A first-party package source file (excludes tests + build output). */
-const PACKAGE_SRC_PATH = /packages\/[^/]+\/(?:[^/]+\/)?src\//
+const PACKAGE_SRC_PATH = /packages\/[^/]+\/(?:[^/]+\/)?src\//;
 
 /** Constructor-name shapes that denote mutable shared state. */
 const MUTABLE_CTOR_RE =
-  /^(?:[A-Z]\w*(?:Registry|Store|Cache|Profiler|Emitter)|EventEmitter|Map|Set|WeakMap|WeakSet)$/
+  /^(?:[A-Z]\w*(?:Registry|Store|Cache|Profiler|Emitter)|EventEmitter|Map|Set|WeakMap|WeakSet)$/;
 
 /**
  * Module-level singleton export:
@@ -54,7 +54,7 @@ const MUTABLE_CTOR_RE =
  * Anchored at column 0 (a top-level export, not a nested local). Captures the
  * exported identifier and the constructed type name.
  */
-const MODULE_SINGLETON_RE = /^export const ([A-Za-z_$][\w$]*) = new ([A-Za-z_$][\w$.]*)\s*\(/
+const MODULE_SINGLETON_RE = /^export const ([A-Za-z_$][\w$]*) = new ([A-Za-z_$][\w$.]*)\s*\(/;
 
 /**
  * Module-level mutable `let` binding at column 0. Captures the id and the optional
@@ -64,13 +64,13 @@ const MODULE_SINGLETON_RE = /^export const ([A-Za-z_$][\w$]*) = new ([A-Za-z_$][
  */
 // `[^=\n]` is disjoint from the absent `=`/newline terminators, so the greedy
 // capture is linear (no catastrophic backtracking — the lazy form tripped slow-regex).
-const MODULE_LET_RE = /^let ([A-Za-z_$][\w$]*)\s*(?::\s*([^=\n]+))?/
+const MODULE_LET_RE = /^let ([A-Za-z_$][\w$]*)\s*(?::\s*([^=\n]+))?/;
 
 /**
  * A `let` id naming cross-call LOADED-STATE — the F1 shape (`scenariosLoadedFor`,
  * `checksLoadedFor`). A per-run "have I loaded yet" marker belongs on RunScope.
  */
-const LOADED_STATE_NAME_RE = /Loaded(?:For)?$/
+const LOADED_STATE_NAME_RE = /Loaded(?:For)?$/;
 
 /**
  * A `let` TYPE annotation naming a mutable ACCUMULATOR — the F2 shape
@@ -79,21 +79,21 @@ const LOADED_STATE_NAME_RE = /Loaded(?:For)?$/
  * seam, not a leak, and the AsyncLocalStorage scope is the per-run isolation.
  */
 const MUTABLE_LET_TYPE_RE =
-  /\b(?:[A-Z]\w*(?:Cache|Store|Profiler|Emitter)|EventEmitter|Map|Set|WeakMap|WeakSet)\b/
+  /\b(?:[A-Z]\w*(?:Cache|Store|Profiler|Emitter)|EventEmitter|Map|Set|WeakMap|WeakSet)\b/;
 
 /** Allowlisted singleton identifiers, by basename → id (ADR-0023). */
 const EXEMPT_BY_FILE: Readonly<Record<string, string>> = {
   'file-cache.ts': 'fileCache',
   'memory-profiler.ts': 'memoryProfiler',
-}
+};
 
 /** Inline escape-hatch marker (requires a trailing reason after the slug). */
-const ALLOW_MARKER = '@allow-module-singleton'
+const ALLOW_MARKER = '@allow-module-singleton';
 
 /** The last path segment of a dotted constructor (e.g. `node.EventEmitter` → `EventEmitter`). */
 function ctorLeaf(ctor: string): string {
-  const parts = ctor.split('.')
-  return parts.at(-1) ?? ctor
+  const parts = ctor.split('.');
+  return parts.at(-1) ?? ctor;
 }
 
 /**
@@ -102,24 +102,24 @@ function ctorLeaf(ctor: string): string {
  * carries an `@allow-module-singleton` marker. Exported for unit tests.
  */
 export function analyzeNoModuleSingleton(content: string, filePath: string): CheckViolation[] {
-  const basename = path.basename(filePath)
-  const exemptId = EXEMPT_BY_FILE[basename]
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const basename = path.basename(filePath);
+  const exemptId = EXEMPT_BY_FILE[basename];
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
   for (const [i, line] of lines.entries()) {
     // Inline escape hatch on this line or the line directly above.
-    const above = i > 0 ? (lines[i - 1] ?? '') : ''
-    const suppressed = line.includes(ALLOW_MARKER) || above.includes(ALLOW_MARKER)
+    const above = i > 0 ? (lines[i - 1] ?? '') : '';
+    const suppressed = line.includes(ALLOW_MARKER) || above.includes(ALLOW_MARKER);
 
-    const constViolation = matchConstSingleton(line, i, filePath, exemptId, suppressed)
+    const constViolation = matchConstSingleton(line, i, filePath, exemptId, suppressed);
     if (constViolation) {
-      violations.push(constViolation)
-      continue
+      violations.push(constViolation);
+      continue;
     }
-    const letViolation = matchMutableLet(line, i, filePath, exemptId, suppressed)
-    if (letViolation) violations.push(letViolation)
+    const letViolation = matchMutableLet(line, i, filePath, exemptId, suppressed);
+    if (letViolation) violations.push(letViolation);
   }
-  return violations
+  return violations;
 }
 
 /** `export const <id> = new <MutableCtor>(` — the classic module-singleton shape. */
@@ -130,10 +130,10 @@ function matchConstSingleton(
   exemptId: string | undefined,
   suppressed: boolean,
 ): CheckViolation | null {
-  const m = MODULE_SINGLETON_RE.exec(line)
-  if (!m) return null
-  const [, id, ctor] = m
-  if (!MUTABLE_CTOR_RE.test(ctorLeaf(ctor)) || id === exemptId || suppressed) return null
+  const m = MODULE_SINGLETON_RE.exec(line);
+  if (!m) return null;
+  const [, id, ctor] = m;
+  if (!MUTABLE_CTOR_RE.test(ctorLeaf(ctor)) || id === exemptId || suppressed) return null;
   return {
     line: i + 1,
     filePath,
@@ -149,7 +149,7 @@ function matchConstSingleton(
       `run-scoped utility like fileCache/memoryProfiler, add it to the ADR-0023 ` +
       `exemption allowlist or annotate with '// ${ALLOW_MARKER} <reason>'.`,
     type: 'no-module-singleton',
-  }
+  };
 }
 
 /**
@@ -164,13 +164,13 @@ function matchMutableLet(
   exemptId: string | undefined,
   suppressed: boolean,
 ): CheckViolation | null {
-  const m = MODULE_LET_RE.exec(line)
-  if (!m) return null
-  const [, id, typeAnnotation] = m
+  const m = MODULE_LET_RE.exec(line);
+  if (!m) return null;
+  const [, id, typeAnnotation] = m;
   const flagged =
     LOADED_STATE_NAME_RE.test(id) ||
-    (typeAnnotation !== undefined && MUTABLE_LET_TYPE_RE.test(typeAnnotation))
-  if (!flagged || id === exemptId || suppressed) return null
+    (typeAnnotation !== undefined && MUTABLE_LET_TYPE_RE.test(typeAnnotation));
+  if (!flagged || id === exemptId || suppressed) return null;
   return {
     line: i + 1,
     filePath,
@@ -185,7 +185,7 @@ function matchMutableLet(
       `read it through a current<Tool>LoadState() accessor. If this is a genuine ` +
       `process-global (a sanctioned seam), annotate with '// ${ALLOW_MARKER} <reason>'.`,
     type: 'no-module-singleton',
-  }
+  };
 }
 
 /**
@@ -194,19 +194,19 @@ function matchMutableLet(
  * Exported so unit tests can drive it with an in-memory `FileAccessor`.
  */
 export async function analyzeAllNoModuleSingleton(files: FileAccessor): Promise<CheckViolation[]> {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
   const candidates = files.paths.filter(
     (p) =>
       PACKAGE_SRC_PATH.test(p) &&
       p.endsWith('.ts') &&
       !p.endsWith('.test.ts') &&
       !p.includes('/__fixtures__/'), // fixtures carry DELIBERATE violations for other checks
-  )
-  const contents = await files.readMany(candidates)
+  );
+  const contents = await files.readMany(candidates);
   for (const [filePath, content] of contents) {
-    violations.push(...analyzeNoModuleSingleton(content, filePath))
+    violations.push(...analyzeNoModuleSingleton(content, filePath));
   }
-  return violations
+  return violations;
 }
 
 export const noModuleSingleton = defineCheck({
@@ -221,4 +221,4 @@ export const noModuleSingleton = defineCheck({
   // so comments/strings mentioning the pattern do not false-fire.
   contentFilter: 'raw',
   analyzeAll: analyzeAllNoModuleSingleton,
-})
+});

@@ -13,7 +13,7 @@ export interface IsCommentLineOptions {
    * Include block comment start markers (/*) as comment lines
    * @default true
    */
-  includeBlockStart?: boolean
+  includeBlockStart?: boolean;
 }
 
 /**
@@ -35,24 +35,27 @@ export interface IsCommentLineOptions {
  * isCommentLine('  /* block start', { includeBlockStart: true }) // true
  */
 export function isCommentLine(line: string, options: IsCommentLineOptions = {}): boolean {
-  const { includeBlockStart = true } = options
-  const trimmed = line.trim()
+  const { includeBlockStart = true } = options;
+  const trimmed = line.trim();
 
   // Single-line comment
   if (trimmed.startsWith('//')) {
-    return true
+    return true;
   }
 
   // Block comment start (/* ...) — check before * continuation since /* starts with *
   if (trimmed.startsWith('/*')) {
-    return includeBlockStart
+    return includeBlockStart;
   }
 
   // Block comment continuation (lines starting with * followed by space, /, or end-of-line)
   // Excludes operators like *= to avoid false positives
-  if (trimmed.startsWith('*') && (trimmed.length === 1 || trimmed[1] === ' ' || trimmed[1] === '/' || trimmed[1] === '*')) {
-    return true
+  if (
+    trimmed.startsWith('*') &&
+    (trimmed.length === 1 || trimmed[1] === ' ' || trimmed[1] === '/' || trimmed[1] === '*')
+  ) {
+    return true;
   }
 
-  return false
+  return false;
 }

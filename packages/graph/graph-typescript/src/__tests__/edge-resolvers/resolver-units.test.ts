@@ -116,14 +116,14 @@ function ctxFor(
 }
 
 /** Find the first node matching `pred` in a source file. */
-function findNode<T extends ts.Node>(
-  sf: ts.SourceFile,
-  pred: (n: ts.Node) => n is T,
-): T {
+function findNode<T extends ts.Node>(sf: ts.SourceFile, pred: (n: ts.Node) => n is T): T {
   let found: T | undefined;
   const visit = (n: ts.Node): void => {
     if (found) return;
-    if (pred(n)) { found = n; return; }
+    if (pred(n)) {
+      found = n;
+      return;
+    }
     ts.forEachChild(n, visit);
   };
   visit(sf);
@@ -148,7 +148,8 @@ describe('resolveDirectCall — branches', () => {
 
   it('resolves a bare identifier call to its declaration at high confidence', () => {
     const { program, typeChecker, fileNames } = buildProgram({
-      'm.ts': 'function target(): number { return 1; }\nexport function caller(): number { return target(); }',
+      'm.ts':
+        'function target(): number { return 1; }\nexport function caller(): number { return target(); }',
     });
     const catalog = catalogFor(program, fileNames);
     const sf = program.getSourceFile(`${PROJECT_DIR}/m.ts`)!;
@@ -303,10 +304,9 @@ describe('resolveJsxElement — branches', () => {
 
   it('resolves a component element to its function declaration at high confidence', () => {
     const { program, typeChecker, fileNames } = buildProgram({
-      'v.tsx': [
-        'function Comp() { return null; }',
-        'export const V = () => (<Comp />);',
-      ].join('\n'),
+      'v.tsx': ['function Comp() { return null; }', 'export const V = () => (<Comp />);'].join(
+        '\n',
+      ),
     });
     const catalog = catalogFor(program, fileNames);
     const sf = program.getSourceFile(`${PROJECT_DIR}/v.tsx`)!;

@@ -58,7 +58,10 @@ function firstArg(opts: Record<string, unknown>): string {
 }
 
 /** `graph-lookup` — look up function occurrences by simple name. */
-export const graphLookupCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const graphLookupCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'graph-lookup',
   description: 'Look up function occurrences by simple name from the persisted catalog',
   commonFlags: ['json'],
@@ -72,7 +75,10 @@ export const graphLookupCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
 });
 
 /** `graph-shard-worker` — [internal] build one shard from a spec file. */
-export const graphShardWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const graphShardWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'graph-shard-worker',
   description:
     '[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)',
@@ -93,13 +99,20 @@ export const graphShardWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> =
  * the synthetic in-test harness cannot be (it agrees by construction). Owns its
  * full IO + exit code (raw-stream).
  */
-export const graphEquivalenceCheckCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const graphEquivalenceCheckCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'graph-equivalence-check',
   description:
     '[internal] Verify the sharded build is byte-equivalent to the exact build on a real repo (gates production edge divergence against a committed budget)',
   commonFlags: [],
   options: [
-    { flag: OPT_CWD, description: 'Target repo root to check (default: current directory)', default: process.cwd() },
+    {
+      flag: OPT_CWD,
+      description: 'Target repo root to check (default: current directory)',
+      default: process.cwd(),
+    },
     {
       flag: '--budget',
       value: '<path>',
@@ -108,7 +121,8 @@ export const graphEquivalenceCheckCommandSpec: CommandSpec<unknown, ToolCliConte
     },
     {
       flag: '--update-budget',
-      description: 'Rewrite the budget file to the observed production divergence count (capture/tighten); always exits 0',
+      description:
+        'Rewrite the budget file to the observed production divergence count (capture/tighten); always exits 0',
     },
   ],
   scope: 'project',
@@ -123,7 +137,10 @@ export const graphEquivalenceCheckCommandSpec: CommandSpec<unknown, ToolCliConte
 });
 
 /** `graph-symbol-index` — emit a symbolindex.json artifact. */
-export const graphSymbolIndexCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const graphSymbolIndexCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'graph-symbol-index',
   description:
     'Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog',
@@ -133,8 +150,17 @@ export const graphSymbolIndexCommandSpec: CommandSpec<unknown, ToolCliContext> =
     // against it), so it is declared as a tool option rather than the common
     // flag. The literal default is `process.cwd()`, evaluated once at module
     // load (CLI startup) — equivalent to the former register-time evaluation.
-    { flag: OPT_CWD, description: 'Target directory (out path resolves against this)', default: process.cwd() },
-    { flag: '--out', value: '<path>', description: 'Output file path', default: 'symbolindex.json' },
+    {
+      flag: OPT_CWD,
+      description: 'Target directory (out path resolves against this)',
+      default: process.cwd(),
+    },
+    {
+      flag: '--out',
+      value: '<path>',
+      description: 'Output file path',
+      default: 'symbolindex.json',
+    },
   ],
   scope: 'project',
   output: RAW_STREAM,
@@ -145,11 +171,21 @@ export const graphSymbolIndexCommandSpec: CommandSpec<unknown, ToolCliContext> =
 });
 
 /** `graph-baseline-export` — export the graph gate baseline (JSON). */
-export const graphBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const graphBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'graph-baseline-export',
   description: 'Export the graph gate baseline (JSON) from the datastore to a file',
   commonFlags: ['cwd', 'json'],
-  options: [{ flag: '--out', value: '<path>', description: 'Output file path for the JSON baseline', required: true }],
+  options: [
+    {
+      flag: '--out',
+      value: '<path>',
+      description: 'Output file path for the JSON baseline',
+      required: true,
+    },
+  ],
   scope: 'project',
   output: RAW_STREAM,
   handler: (rawOpts, cli): void => {
@@ -185,17 +221,44 @@ export const graphBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext
  * --catalog-output` shape was retired by the split, so docs/consumers must
  * target `catalog-export`.
  */
-export const graphCatalogExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const graphCatalogExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'catalog-export',
   description:
     'Run graph analysis and write the CatalogExport JSON document (symbols + edges + provenance) to a file',
   commonFlags: [],
   options: [
-    { flag: '--catalog-output', value: '<path>', description: 'Output file path for the CatalogExport JSON', required: true },
-    { flag: '--tenant-id', value: '<id>', description: 'Tenant scope stamped on every row + provenance', required: true },
-    { flag: '--repo-id', value: '<id>', description: 'Repository scope stamped on every row', required: true },
-    { flag: '--git-sha', value: '<sha>', description: 'Commit SHA the catalog was extracted at', required: true },
-    { flag: '--run-id', value: '<uuid>', description: 'Run id for provenance (auto-generated if absent)' },
+    {
+      flag: '--catalog-output',
+      value: '<path>',
+      description: 'Output file path for the CatalogExport JSON',
+      required: true,
+    },
+    {
+      flag: '--tenant-id',
+      value: '<id>',
+      description: 'Tenant scope stamped on every row + provenance',
+      required: true,
+    },
+    {
+      flag: '--repo-id',
+      value: '<id>',
+      description: 'Repository scope stamped on every row',
+      required: true,
+    },
+    {
+      flag: '--git-sha',
+      value: '<sha>',
+      description: 'Commit SHA the catalog was extracted at',
+      required: true,
+    },
+    {
+      flag: '--run-id',
+      value: '<uuid>',
+      description: 'Run id for provenance (auto-generated if absent)',
+    },
     {
       flag: '--mode',
       value: '<mode>',
@@ -211,7 +274,11 @@ export const graphCatalogExportCommandSpec: CommandSpec<unknown, ToolCliContext>
       parse: (val, prev) => [...(prev as string[]), val],
     },
     { flag: OPT_CWD, description: OPT_DESC_CWD, default: process.cwd() },
-    { flag: '--language', value: '<name>', description: 'Force a specific language adapter (suppresses auto-detection)' },
+    {
+      flag: '--language',
+      value: '<name>',
+      description: 'Force a specific language adapter (suppresses auto-detection)',
+    },
     {
       flag: '--resolution',
       value: '<mode>',
@@ -284,17 +351,38 @@ export const graphCatalogExportCommandSpec: CommandSpec<unknown, ToolCliContext>
  * file, matching the opensip `EngineSubprocessPort.runSarifExport` contract
  * (DEC-498). Always a full run (findings, not incremental).
  */
-export const graphSarifExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const graphSarifExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'sarif-export',
   description: 'Run graph analysis and write OpenSIP-convention SARIF v2.1.0 findings to a file',
   commonFlags: [],
   options: [
-    { flag: '--output-sarif', value: '<path>', description: 'Output file path for the SARIF v2.1.0 document', required: true },
+    {
+      flag: '--output-sarif',
+      value: '<path>',
+      description: 'Output file path for the SARIF v2.1.0 document',
+      required: true,
+    },
     { flag: '--tenant-id', value: '<id>', description: 'Tenant scope for the run', required: true },
-    { flag: '--repo-id', value: '<id>', description: 'Repository scope for the run', required: true },
-    { flag: '--run-id', value: '<uuid>', description: 'Run id for trace correlation (auto-generated if absent)' },
+    {
+      flag: '--repo-id',
+      value: '<id>',
+      description: 'Repository scope for the run',
+      required: true,
+    },
+    {
+      flag: '--run-id',
+      value: '<uuid>',
+      description: 'Run id for trace correlation (auto-generated if absent)',
+    },
     { flag: OPT_CWD, description: OPT_DESC_CWD, default: process.cwd() },
-    { flag: '--language', value: '<name>', description: 'Force a specific language adapter (suppresses auto-detection)' },
+    {
+      flag: '--language',
+      value: '<name>',
+      description: 'Force a specific language adapter (suppresses auto-detection)',
+    },
     {
       flag: '--resolution',
       value: '<mode>',
@@ -346,7 +434,10 @@ export const graphSarifExportCommandSpec: CommandSpec<unknown, ToolCliContext> =
  * viewListRecipes renderer. `command-result`: the host dispatches the returned
  * result through the shared seam (`--json` → JSON, else render).
  */
-export const graphRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const graphRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'graph-recipes',
   description: 'List available graph recipes',
   aliases: ['list-graph-recipes'],

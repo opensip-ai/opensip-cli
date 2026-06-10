@@ -16,8 +16,26 @@
  * only forbids the reverse — cli-ui must never import contracts.
  */
 
-import { line, group, viewRunSummary, viewFooterHints, viewVerboseLines, viewFindingsGroups, VERBOSE_DETAIL_HINT, formatValidatedColumn, parseValidatedCount, sortFitRowPriority, type Span, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
-import { formatSignalTableRows, formatSignalTableSummary, type SignalTableRow } from '@opensip-tools/output';
+import {
+  line,
+  group,
+  viewRunSummary,
+  viewFooterHints,
+  viewVerboseLines,
+  viewFindingsGroups,
+  VERBOSE_DETAIL_HINT,
+  formatValidatedColumn,
+  parseValidatedCount,
+  sortFitRowPriority,
+  type Span,
+  type Tone,
+  type ViewNode,
+} from '@opensip-tools/cli-ui';
+import {
+  formatSignalTableRows,
+  formatSignalTableSummary,
+  type SignalTableRow,
+} from '@opensip-tools/output';
 
 import { viewInit } from './views/init-view.js';
 import {
@@ -33,7 +51,14 @@ import {
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
 
-import type { CommandResult, ErrorResult, GraphDoneResult, SessionReplayResult, SignalEnvelope, VerboseDetail } from '@opensip-tools/contracts';
+import type {
+  CommandResult,
+  ErrorResult,
+  GraphDoneResult,
+  SessionReplayResult,
+  SignalEnvelope,
+  VerboseDetail,
+} from '@opensip-tools/contracts';
 
 const SPACER: ViewNode = { kind: 'spacer' };
 
@@ -99,7 +124,9 @@ function sessionReplayView(result: SessionReplayResult): ViewNode {
       { text: `${s.score}%`, tone: verdictTone },
       { text: '  ' },
       { text: s.passed ? 'PASS' : 'FAIL', tone: verdictTone },
-      ...(s.recipe === undefined ? [] : [{ text: `  ·  recipe ${s.recipe}`, tone: 'muted' as Tone }]),
+      ...(s.recipe === undefined
+        ? []
+        : [{ text: `  ·  recipe ${s.recipe}`, tone: 'muted' as Tone }]),
       { text: `  ·  replayed (${result.fidelity})`, tone: 'muted' },
     ]),
     SPACER,
@@ -121,7 +148,14 @@ function linesView(lines: readonly string[]): ViewNode {
 // scenario). Replaces the three per-tool, pre-computed `rows`/`reportLines`
 // shapes (the fit/sim/graph `*DoneResult` legacy branches, retired in Phase 7).
 
-const ENV_COL = { status: 7, errors: 6, warnings: 8, validated: 12, ignored: 7, duration: 10 } as const;
+const ENV_COL = {
+  status: 7,
+  errors: 6,
+  warnings: 8,
+  validated: 12,
+  ignored: 7,
+  duration: 10,
+} as const;
 
 function envStatusTone(status: SignalTableRow['status']): Tone {
   if (status === 'FAIL') return 'error';
@@ -160,14 +194,20 @@ function envelopeTableNode(rows: readonly SignalTableRow[]): ViewNode | null {
   const showValidated = sorted.some((r) => r.validated !== undefined);
 
   const headerCells = [
-    'Unit'.padEnd(unitW), 'Status'.padEnd(ENV_COL.status),
-    'Errors'.padEnd(ENV_COL.errors), 'Warnings'.padEnd(ENV_COL.warnings),
-    ...(showValidated ? ['Validated'.padEnd(ENV_COL.validated), 'Ignores'.padEnd(ENV_COL.ignored)] : []),
+    'Unit'.padEnd(unitW),
+    'Status'.padEnd(ENV_COL.status),
+    'Errors'.padEnd(ENV_COL.errors),
+    'Warnings'.padEnd(ENV_COL.warnings),
+    ...(showValidated
+      ? ['Validated'.padEnd(ENV_COL.validated), 'Ignores'.padEnd(ENV_COL.ignored)]
+      : []),
     'Duration'.padEnd(ENV_COL.duration),
   ];
   const sepCells = [
-    '-'.repeat(unitW), '-'.repeat(ENV_COL.status),
-    '-'.repeat(ENV_COL.errors), '-'.repeat(ENV_COL.warnings),
+    '-'.repeat(unitW),
+    '-'.repeat(ENV_COL.status),
+    '-'.repeat(ENV_COL.errors),
+    '-'.repeat(ENV_COL.warnings),
     ...(showValidated ? ['-'.repeat(ENV_COL.validated), '-'.repeat(ENV_COL.ignored)] : []),
     '-'.repeat(ENV_COL.duration),
   ];
@@ -183,17 +223,21 @@ function envelopeTableNode(rows: readonly SignalTableRow[]): ViewNode | null {
       ENV_SEP,
       { text: String(r.errors).padEnd(ENV_COL.errors), tone: r.errors > 0 ? 'error' : 'success' },
       ENV_SEP,
-      { text: String(r.warnings).padEnd(ENV_COL.warnings), tone: r.warnings > 0 ? 'warning' : 'muted' },
+      {
+        text: String(r.warnings).padEnd(ENV_COL.warnings),
+        tone: r.warnings > 0 ? 'warning' : 'muted',
+      },
     ];
     if (showValidated) {
-      spans.push(
-        ENV_SEP,
-        { text: validatedCell.padEnd(ENV_COL.validated) },
-        ENV_SEP,
-        { text: String(r.ignored ?? 0).padEnd(ENV_COL.ignored), tone: envIgnoredTone(r.ignored ?? 0, validatedCell) },
-      );
+      spans.push(ENV_SEP, { text: validatedCell.padEnd(ENV_COL.validated) }, ENV_SEP, {
+        text: String(r.ignored ?? 0).padEnd(ENV_COL.ignored),
+        tone: envIgnoredTone(r.ignored ?? 0, validatedCell),
+      });
     }
-    spans.push(ENV_SEP, { text: r.duration.padEnd(ENV_COL.duration), tone: envDurationTone(r.durationMs) });
+    spans.push(ENV_SEP, {
+      text: r.duration.padEnd(ENV_COL.duration),
+      tone: envDurationTone(r.durationMs),
+    });
     return line(spans);
   });
 
@@ -208,7 +252,9 @@ function envelopeTableNode(rows: readonly SignalTableRow[]): ViewNode | null {
  * in a TTY and a pipe.
  */
 export function renderVerboseDetail(detail: VerboseDetail): ViewNode {
-  return detail.kind === 'lines' ? viewVerboseLines(detail.lines) : viewFindingsGroups(detail.groups);
+  return detail.kind === 'lines'
+    ? viewVerboseLines(detail.lines)
+    : viewFindingsGroups(detail.groups);
 }
 
 /**
@@ -237,7 +283,10 @@ function withVerboseHint(node: ViewNode, show: boolean): ViewNode {
  * When `verboseDetail` is present (a `--verbose` run), its rendered body is
  * prepended above the per-unit table (ADR-0021).
  */
-export function envelopeToTableView(envelope: SignalEnvelope, verboseDetail?: VerboseDetail): ViewNode {
+export function envelopeToTableView(
+  envelope: SignalEnvelope,
+  verboseDetail?: VerboseDetail,
+): ViewNode {
   const rows = formatSignalTableRows(envelope);
   const summary = formatSignalTableSummary(envelope);
   const children: ViewNode[] = [];

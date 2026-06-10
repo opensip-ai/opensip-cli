@@ -1,7 +1,6 @@
 import { detectTerminalCapabilities, ThemeContext } from '@opensip-tools/cli-ui';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-
 describe('theme', () => {
   describe('detectTerminalCapabilities', () => {
     let origIsTTY: boolean | undefined;
@@ -49,11 +48,21 @@ describe('theme', () => {
   describe('theme tokens', () => {
     it('default theme has all expected color tokens', () => {
       // Access the default value from the context — React.createContext stores it
-      const defaultTheme = (ThemeContext as unknown as { _currentValue: Record<string, unknown> })._currentValue;
+      const defaultTheme = (ThemeContext as unknown as { _currentValue: Record<string, unknown> })
+        ._currentValue;
       const expectedKeys = [
-        'brand', 'success', 'error', 'warning', 'info', 'muted',
-        'scoreHigh', 'scoreMid', 'scoreLow',
-        'statusPass', 'statusFail', 'statusTimeout',
+        'brand',
+        'success',
+        'error',
+        'warning',
+        'info',
+        'muted',
+        'scoreHigh',
+        'scoreMid',
+        'scoreLow',
+        'statusPass',
+        'statusFail',
+        'statusTimeout',
         'colorsEnabled',
       ];
       for (const key of expectedKeys) {

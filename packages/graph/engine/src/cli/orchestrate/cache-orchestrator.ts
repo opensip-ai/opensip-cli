@@ -10,10 +10,7 @@
  */
 
 import { stampEngineVersion } from '../../cache/engine-version.js';
-import {
-  classifyCatalog,
-  computeFilesFingerprint,
-} from '../../cache/invalidate.js';
+import { classifyCatalog, computeFilesFingerprint } from '../../cache/invalidate.js';
 import { assignPackages } from '../../pipeline/assign-packages.js';
 import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
 
@@ -24,10 +21,7 @@ import {
 } from './catalog-builder.js';
 
 import type { GraphProgressCallback } from './types.js';
-import type {
-  DiscoverOutput,
-  GraphLanguageAdapter,
-} from '../../lang-adapter/types.js';
+import type { DiscoverOutput, GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
 import type { Catalog, ResolutionMode, ResolutionStats } from '../../types.js';
 import type { PressureMonitor } from '../pressure-monitor.js';
@@ -86,25 +80,26 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
     }
     return { catalog: cachedCatalog, cacheHit: true, resolutionStats: null };
   }
-  const built = verdict.kind === 'incremental' && cachedCatalog
-    ? await buildAndResolveCatalogIncremental({
-        runStage: input.runStage,
-        adapter: input.adapter,
-        discovery: input.discovery,
-        cachedCatalog,
-        changedFilesAbs: verdict.changedFiles,
-        resolutionMode: input.resolutionMode,
-        onProgress: input.onProgress,
-        monitor: input.monitor,
-      })
-    : await buildAndResolveCatalog({
-        runStage: input.runStage,
-        adapter: input.adapter,
-        discovery: input.discovery,
-        resolutionMode: input.resolutionMode,
-        onProgress: input.onProgress,
-        monitor: input.monitor,
-      });
+  const built =
+    verdict.kind === 'incremental' && cachedCatalog
+      ? await buildAndResolveCatalogIncremental({
+          runStage: input.runStage,
+          adapter: input.adapter,
+          discovery: input.discovery,
+          cachedCatalog,
+          changedFilesAbs: verdict.changedFiles,
+          resolutionMode: input.resolutionMode,
+          onProgress: input.onProgress,
+          monitor: input.monitor,
+        })
+      : await buildAndResolveCatalog({
+          runStage: input.runStage,
+          adapter: input.adapter,
+          discovery: input.discovery,
+          resolutionMode: input.resolutionMode,
+          onProgress: input.onProgress,
+          monitor: input.monitor,
+        });
 
   // Stamp packages (nearest package.json), then drop name-guessed edges that
   // contradict the import graph. Order matters: the constraint reads the

@@ -7,10 +7,9 @@
  * Validates that request/response contracts are enforced through types and schemas.
  */
 
-
-import { defineCheck, type CheckViolation, isAPIFile } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation, isAPIFile } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Validation detection patterns
@@ -23,12 +22,12 @@ const VALIDATION_METHOD_NAMES = new Set([
   'validateBody',
   'validateParams',
   'validateQuery',
-])
+]);
 
 /**
  * Handler name patterns
  */
-const HANDLER_NAME_PATTERNS = [/handler$/i, /^handle[A-Z]/, /^process[A-Z]/]
+const HANDLER_NAME_PATTERNS = [/handler$/i, /^handle[A-Z]/, /^process[A-Z]/];
 
 /**
  * Names that match HANDLER_NAME_PATTERNS but are themselves error
@@ -36,20 +35,20 @@ const HANDLER_NAME_PATTERNS = [/handler$/i, /^handle[A-Z]/, /^process[A-Z]/]
  * so requiring try-catch around their body is error-handling-inception.
  * Match: handleXxxError, handleStoreError, processError.
  */
-const ERROR_HANDLER_NAME_PATTERNS = [/^handle[A-Z].*Error$/, /^process[A-Z].*Error$/]
+const ERROR_HANDLER_NAME_PATTERNS = [/^handle[A-Z].*Error$/, /^process[A-Z].*Error$/];
 
 /**
  * Function-like node types that can be API handlers
  */
-type FunctionLikeNode = ts.FunctionDeclaration | ts.ArrowFunction | ts.MethodDeclaration
+type FunctionLikeNode = ts.FunctionDeclaration | ts.ArrowFunction | ts.MethodDeclaration;
 
 /**
  * Options for checking function contract
  */
 interface CheckFunctionContractOptions {
-  absolutePath: string
-  sourceFile: ts.SourceFile
-  node: FunctionLikeNode
+  absolutePath: string;
+  sourceFile: ts.SourceFile;
+  node: FunctionLikeNode;
 }
 
 /**
@@ -58,10 +57,10 @@ interface CheckFunctionContractOptions {
  */
 function getFunctionName(node: FunctionLikeNode): string {
   if (ts.isFunctionDeclaration(node) && node.name) {
-    return node.name.text
+    return node.name.text;
   }
   if (ts.isMethodDeclaration(node) && ts.isIdentifier(node.name)) {
-    return node.name.text
+    return node.name.text;
   }
   // Combined condition for arrow function with variable declaration
   if (
@@ -69,9 +68,9 @@ function getFunctionName(node: FunctionLikeNode): string {
     ts.isVariableDeclaration(node.parent) &&
     ts.isIdentifier(node.parent.name)
   ) {
-    return node.parent.name.text
+    return node.parent.name.text;
   }
-  return '<anonymous>'
+  return '<anonymous>';
 }
 
 /**
@@ -80,17 +79,17 @@ function getFunctionName(node: FunctionLikeNode): string {
  */
 function getParamIdentifierName(p: ts.ParameterDeclaration | undefined): string {
   /* v8 ignore next -- defensive AST/type guard */
-  return p && ts.isIdentifier(p.name) ? p.name.text : ''
+  return p && ts.isIdentifier(p.name) ? p.name.text : '';
 }
 
 function hasExpressHandlerSignature(node: FunctionLikeNode): boolean {
-  const params = node.parameters
-  if (params.length < 2) return false
+  const params = node.parameters;
+  if (params.length < 2) return false;
 
-  const param1 = getParamIdentifierName(params[0])
-  const param2 = getParamIdentifierName(params[1])
+  const param1 = getParamIdentifierName(params[0]);
+  const param2 = getParamIdentifierName(params[1]);
 
-  return (param1 === 'req' || param1 === 'request') && (param2 === 'res' || param2 === 'response')
+  return (param1 === 'req' || param1 === 'request') && (param2 === 'res' || param2 === 'response');
 }
 
 /**
@@ -99,24 +98,24 @@ function hasExpressHandlerSignature(node: FunctionLikeNode): boolean {
  */
 function isHandlerFunction(name: string, filePath: string, node: FunctionLikeNode): boolean {
   /* v8 ignore next -- defensive AST/type guard */
-  if (!isAPIFile(filePath)) return false
+  if (!isAPIFile(filePath)) return false;
 
   // Check if exported
-  let isExported = false
+  let isExported = false;
   if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) {
-    isExported = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false
+    isExported = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false;
   } else if (ts.isArrowFunction(node) && ts.isVariableDeclaration(node.parent)) {
-    const varStatement = node.parent.parent.parent
+    const varStatement = node.parent.parent.parent;
     if (ts.isVariableStatement(varStatement)) {
       isExported =
-        varStatement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false
+        varStatement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false;
     }
   } else {
     // Other node types remain isExported = false (initial value)
   }
 
-  if (!isExported) return false
-  return HANDLER_NAME_PATTERNS.some((pattern) => pattern.test(name))
+  if (!isExported) return false;
+  return HANDLER_NAME_PATTERNS.some((pattern) => pattern.test(name));
 }
 
 /**
@@ -129,16 +128,16 @@ function shouldSkipFunction(
   filePath: string,
 ): boolean {
   if (ts.isMethodDeclaration(node)) {
-    const isPrivate = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword)
+    const isPrivate = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword);
     /* v8 ignore next -- defensive AST/type guard */
-    if (isPrivate) return true
+    if (isPrivate) return true;
   }
 
-  const isExpressHandler = hasExpressHandlerSignature(node)
-  if (functionName === '<anonymous>' && isExpressHandler) return true
-  if (!isExpressHandler && !isHandlerFunction(functionName, filePath, node)) return true
+  const isExpressHandler = hasExpressHandlerSignature(node);
+  if (functionName === '<anonymous>' && isExpressHandler) return true;
+  if (!isExpressHandler && !isHandlerFunction(functionName, filePath, node)) return true;
 
-  return false
+  return false;
 }
 
 /**
@@ -148,11 +147,11 @@ function shouldSkipFunction(
 function hasRequestParameter(node: FunctionLikeNode): boolean {
   return node.parameters.some((param) => {
     /* v8 ignore next -- defensive AST/type guard */
-    if (!ts.isIdentifier(param.name)) return false
-    const name = param.name.text
+    if (!ts.isIdentifier(param.name)) return false;
+    const name = param.name.text;
     /* v8 ignore next -- defensive AST/type guard */
-    return name === 'req' || name === 'request' || name.includes('Request')
-  })
+    return name === 'req' || name === 'request' || name.includes('Request');
+  });
 }
 
 /**
@@ -160,12 +159,12 @@ function hasRequestParameter(node: FunctionLikeNode): boolean {
  */
 function isValidationMethodCall(n: ts.CallExpression): boolean {
   if (ts.isPropertyAccessExpression(n.expression)) {
-    return VALIDATION_METHOD_NAMES.has(n.expression.name.text)
+    return VALIDATION_METHOD_NAMES.has(n.expression.name.text);
   }
   if (ts.isIdentifier(n.expression)) {
-    return n.expression.text.toLowerCase().includes('validate')
+    return n.expression.text.toLowerCase().includes('validate');
   }
-  return false
+  return false;
 }
 
 /**
@@ -173,17 +172,17 @@ function isValidationMethodCall(n: ts.CallExpression): boolean {
  * @returns {boolean} True if the function has validation logic
  */
 function hasRequestValidation(node: FunctionLikeNode): boolean {
-  let hasValidation = false
+  let hasValidation = false;
 
   const visit = (n: ts.Node) => {
     if (ts.isCallExpression(n) && isValidationMethodCall(n)) {
-      hasValidation = true
+      hasValidation = true;
     }
-    if (!hasValidation) ts.forEachChild(n, visit)
-  }
+    if (!hasValidation) ts.forEachChild(n, visit);
+  };
 
-  if (node.body) visit(node.body)
-  return hasValidation
+  if (node.body) visit(node.body);
+  return hasValidation;
 }
 
 /**
@@ -191,13 +190,13 @@ function hasRequestValidation(node: FunctionLikeNode): boolean {
  * @returns {boolean} True if the function has a try-catch block
  */
 function hasTryCatchBlock(node: FunctionLikeNode): boolean {
-  let hasTryCatch = false
+  let hasTryCatch = false;
   const visit = (n: ts.Node) => {
-    if (ts.isTryStatement(n)) hasTryCatch = true
-    if (!hasTryCatch) ts.forEachChild(n, visit)
-  }
-  visit(node)
-  return hasTryCatch
+    if (ts.isTryStatement(n)) hasTryCatch = true;
+    if (!hasTryCatch) ts.forEachChild(n, visit);
+  };
+  visit(node);
+  return hasTryCatch;
 }
 
 /**
@@ -205,7 +204,7 @@ function hasTryCatchBlock(node: FunctionLikeNode): boolean {
  * @returns {boolean} True if the function has any untyped parameters
  */
 function hasUntypedParameters(node: FunctionLikeNode): boolean {
-  return node.parameters.some((param) => !param.type)
+  return node.parameters.some((param) => !param.type);
 }
 
 /**
@@ -214,18 +213,18 @@ function hasUntypedParameters(node: FunctionLikeNode): boolean {
  * @returns {CheckViolation[]} Array of contract violations found
  */
 function checkFunctionContract(options: CheckFunctionContractOptions): CheckViolation[] {
-  const { absolutePath, sourceFile, node } = options
-  const violations: CheckViolation[] = []
-  const functionName = getFunctionName(node)
+  const { absolutePath, sourceFile, node } = options;
+  const violations: CheckViolation[] = [];
+  const functionName = getFunctionName(node);
 
   if (shouldSkipFunction(node, functionName, absolutePath)) {
-    return violations
+    return violations;
   }
 
-  const { line: lineIdx, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const line = lineIdx + 1
+  const { line: lineIdx, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+  const line = lineIdx + 1;
   const functionSignature =
-    node.getText(sourceFile).split('{')[0]?.trim().slice(0, 100) ?? functionName
+    node.getText(sourceFile).split('{')[0]?.trim().slice(0, 100) ?? functionName;
 
   // Check 1: Has explicit return type
   if (!node.type) {
@@ -237,7 +236,7 @@ function checkFunctionContract(options: CheckFunctionContractOptions): CheckViol
       suggestion: `Add explicit return type to '${functionName}', e.g., ': Promise<ServiceResult<T>>' or ': Promise<Response<T>>'`,
       type: 'missing-response-type',
       match: functionSignature,
-    })
+    });
   }
 
   // Check 2: Has typed parameters
@@ -250,7 +249,7 @@ function checkFunctionContract(options: CheckFunctionContractOptions): CheckViol
       suggestion: `Add explicit TypeScript types to all parameters in '${functionName}' for type safety`,
       type: 'untyped-parameters',
       match: functionSignature,
-    })
+    });
   }
 
   // Check 3: Has validation for request parameters
@@ -263,13 +262,13 @@ function checkFunctionContract(options: CheckFunctionContractOptions): CheckViol
       suggestion: `Add Zod schema validation using .parse() or .safeParse() for request body/params in '${functionName}'`,
       type: 'missing-validation',
       match: functionSignature,
-    })
+    });
   }
 
   // Check 4: Has try-catch for error handling
   // Skip functions that ARE error handlers (handleXxxError) — wrapping
   // them in another try-catch is error-handling-inception.
-  const isErrorHandler = ERROR_HANDLER_NAME_PATTERNS.some((p) => p.test(functionName))
+  const isErrorHandler = ERROR_HANDLER_NAME_PATTERNS.some((p) => p.test(functionName));
   if (!isErrorHandler && !hasTryCatchBlock(node)) {
     violations.push({
       line,
@@ -279,10 +278,10 @@ function checkFunctionContract(options: CheckFunctionContractOptions): CheckViol
       suggestion: `Wrap the body of '${functionName}' in try-catch to handle errors gracefully and return appropriate error responses`,
       type: 'missing-error-handling',
       match: functionSignature,
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -290,11 +289,11 @@ function checkFunctionContract(options: CheckFunctionContractOptions): CheckViol
  * @returns {CheckViolation[]} Array of violations found in the file
  */
 function analyzeFile(absolutePath: string, content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
-  const sourceFile = getSharedSourceFile(absolutePath, content)
-    /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+  const sourceFile = getSharedSourceFile(absolutePath, content);
+  /* v8 ignore next -- defensive guard */
+  if (!sourceFile) return [];
 
   const visit = (node: ts.Node) => {
     if (
@@ -306,14 +305,14 @@ function analyzeFile(absolutePath: string, content: string): CheckViolation[] {
         absolutePath,
         sourceFile,
         node,
-      })
-      violations.push(...nodeViolations)
+      });
+      violations.push(...nodeViolations);
     }
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
 
-  visit(sourceFile)
-  return violations
+  visit(sourceFile);
+  return violations;
 }
 
 /**
@@ -348,15 +347,15 @@ export const apiContractValidation = defineCheck({
   analyze(content, filePath) {
     // Only analyze API files
     if (!isAPIFile(filePath)) {
-      return []
+      return [];
     }
 
     try {
-      return analyzeFile(filePath, content)
-    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+      return analyzeFile(filePath, content);
+      /* v8 ignore next 1 -- defensive catch: parse failures already handled */
     } catch {
       // @swallow-ok Skip files that fail to parse
-      return []
+      return [];
     }
   },
-})
+});

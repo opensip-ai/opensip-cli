@@ -8,15 +8,14 @@
  * using Zod schemas.
  */
 
-
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Quick filter regex to check if file might contain Fastify routes
  */
-const QUICK_FILTER_PATTERNS = /fastify\.(post|patch|put)|\.post\(|\.patch\(|\.put\(/i
+const QUICK_FILTER_PATTERNS = /fastify\.(post|patch|put)|\.post\(|\.patch\(|\.put\(/i;
 
 /**
  * Patterns that indicate Zod validation is present
@@ -27,7 +26,7 @@ const ZOD_VALIDATION_PATTERNS = [
   /Schema\.parse/,
   /Schema\.safeParse/,
   /z\.\w+\(\)/,
-]
+];
 
 /**
  * Patterns that indicate other validation libraries are present
@@ -37,14 +36,14 @@ const OTHER_VALIDATION_PATTERNS = [
   /validateBody\s*\(/,
   /validateRequest\s*\(/,
   /validateInput\s*\(/,
-]
+];
 
 interface RouteInfo {
-  method: 'POST' | 'PATCH' | 'PUT'
-  path: string
-  line: number
-  handlerNode: ts.Node | null
-  hasSchemaOption: boolean
+  method: 'POST' | 'PATCH' | 'PUT';
+  path: string;
+  line: number;
+  handlerNode: ts.Node | null;
+  hasSchemaOption: boolean;
 }
 
 /**
@@ -56,40 +55,40 @@ interface RouteInfo {
 // eslint-disable-next-line sonarjs/cognitive-complexity -- AST traversal with multiple node-type checks and nested property extraction
 function extractRouteInfo(node: ts.CallExpression, sourceFile: ts.SourceFile): RouteInfo | null {
   if (!ts.isPropertyAccessExpression(node.expression)) {
-    return null
+    return null;
   }
 
-  const methodName = node.expression.name.text.toLowerCase()
+  const methodName = node.expression.name.text.toLowerCase();
   if (!['post', 'patch', 'put'].includes(methodName)) {
-    return null
+    return null;
   }
 
-  const method = methodName.toUpperCase() as 'POST' | 'PATCH' | 'PUT'
-  const args = node.arguments
+  const method = methodName.toUpperCase() as 'POST' | 'PATCH' | 'PUT';
+  const args = node.arguments;
   if (args.length < 2) {
-    return null
+    return null;
   }
 
-  let routePath = 'unknown'
-  const firstArg = args[0]
+  let routePath = 'unknown';
+  const firstArg = args[0];
   if (firstArg && ts.isStringLiteral(firstArg)) {
-    routePath = firstArg.text
+    routePath = firstArg.text;
   }
 
-  let handlerNode: ts.Node | null = null
-  let hasSchemaOption = false
-  const secondArg = args[1]
+  let handlerNode: ts.Node | null = null;
+  let hasSchemaOption = false;
+  const secondArg = args[1];
   if (secondArg) {
     if (ts.isArrowFunction(secondArg) || ts.isFunctionExpression(secondArg)) {
-      handlerNode = secondArg
+      handlerNode = secondArg;
     } else if (ts.isObjectLiteralExpression(secondArg)) {
       // Check for schema: { body: ... } in the options object (fastify-type-provider-zod pattern)
       hasSchemaOption = secondArg.properties.some((prop) => {
         /* v8 ignore next -- defensive AST/type guard */
-        if (!ts.isPropertyAssignment(prop)) return false
-        const name = prop.name
+        if (!ts.isPropertyAssignment(prop)) return false;
+        const name = prop.name;
         /* v8 ignore next -- defensive AST/type guard */
-        if (!ts.isIdentifier(name) || name.text !== 'schema') return false
+        if (!ts.isIdentifier(name) || name.text !== 'schema') return false;
         // Check if the schema object has a 'body' property
         if (ts.isObjectLiteralExpression(prop.initializer)) {
           return prop.initializer.properties.some(
@@ -97,15 +96,15 @@ function extractRouteInfo(node: ts.CallExpression, sourceFile: ts.SourceFile): R
               ts.isPropertyAssignment(schemaProp) &&
               ts.isIdentifier(schemaProp.name) &&
               schemaProp.name.text === 'body',
-          )
+          );
         }
-        return false
-      })
+        return false;
+      });
       if (args[2]) {
-        const thirdArg = args[2]
+        const thirdArg = args[2];
         /* v8 ignore next -- defensive AST/type guard */
         if (ts.isArrowFunction(thirdArg) || ts.isFunctionExpression(thirdArg)) {
-          handlerNode = thirdArg
+          handlerNode = thirdArg;
         }
       }
     } else {
@@ -113,7 +112,7 @@ function extractRouteInfo(node: ts.CallExpression, sourceFile: ts.SourceFile): R
     }
   }
 
-  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
 
   return {
     method,
@@ -121,7 +120,7 @@ function extractRouteInfo(node: ts.CallExpression, sourceFile: ts.SourceFile): R
     line: line + 1,
     handlerNode,
     hasSchemaOption,
-  }
+  };
 }
 
 /**
@@ -131,7 +130,7 @@ function extractRouteInfo(node: ts.CallExpression, sourceFile: ts.SourceFile): R
  * @returns true if any pattern matches
  */
 function matchesAnyPattern(text: string, patterns: readonly RegExp[]): boolean {
-  return patterns.some((pattern) => pattern.test(text))
+  return patterns.some((pattern) => pattern.test(text));
 }
 
 /**
@@ -141,19 +140,19 @@ function matchesAnyPattern(text: string, patterns: readonly RegExp[]): boolean {
  */
 function hasValidationAfterBodyAccess(handlerText: string): boolean {
   if (!handlerText.includes('request.body')) {
-    return false
+    return false;
   }
 
-  const bodyAccessIndex = handlerText.indexOf('request.body')
-  const afterBodyAccess = handlerText.slice(bodyAccessIndex)
-  const allPatterns = [...ZOD_VALIDATION_PATTERNS, ...OTHER_VALIDATION_PATTERNS]
+  const bodyAccessIndex = handlerText.indexOf('request.body');
+  const afterBodyAccess = handlerText.slice(bodyAccessIndex);
+  const allPatterns = [...ZOD_VALIDATION_PATTERNS, ...OTHER_VALIDATION_PATTERNS];
 
   if (matchesAnyPattern(afterBodyAccess, allPatterns)) {
-    return true
+    return true;
   }
 
   // Check for manual validation with if statement - simple non-backtracking check
-  return afterBodyAccess.includes('if') && afterBodyAccess.includes('!')
+  return afterBodyAccess.includes('if') && afterBodyAccess.includes('!');
 }
 
 /**
@@ -163,14 +162,14 @@ function hasValidationAfterBodyAccess(handlerText: string): boolean {
  */
 function hasValidationResponse(handlerText: string): boolean {
   // Use indexOf for simple string checks to avoid regex complexity
-  const has400Code = handlerText.includes('reply.code') && handlerText.includes('400')
+  const has400Code = handlerText.includes('reply.code') && handlerText.includes('400');
   const hasValidationMessage =
     handlerText.includes('Missing') ||
     handlerText.includes('Invalid') ||
-    handlerText.includes('required')
+    handlerText.includes('required');
 
   /* v8 ignore next -- defensive AST/type guard */
-  return has400Code && hasValidationMessage
+  return has400Code && hasValidationMessage;
 }
 
 /**
@@ -186,34 +185,34 @@ function checkForValidation(
   fullContent: string,
 ): boolean {
   if (!handlerNode) {
-    return hasValidationInContent(fullContent)
+    return hasValidationInContent(fullContent);
   }
 
-  const handlerText = handlerNode.getText(sourceFile)
+  const handlerText = handlerNode.getText(sourceFile);
 
   if (matchesAnyPattern(handlerText, ZOD_VALIDATION_PATTERNS)) {
-    return true
+    return true;
   }
 
   if (matchesAnyPattern(handlerText, OTHER_VALIDATION_PATTERNS)) {
-    return true
+    return true;
   }
 
   if (hasValidationAfterBodyAccess(handlerText)) {
-    return true
+    return true;
   }
 
-  return hasValidationResponse(handlerText)
+  return hasValidationResponse(handlerText);
 }
 
 function hasValidationInContent(content: string): boolean {
   if (content.includes('contracts') && content.includes('Schema')) {
-    return true
+    return true;
   }
   if (content.includes('zod') && content.includes('.parse(')) {
-    return true
+    return true;
   }
-  return false
+  return false;
 }
 
 /**
@@ -233,17 +232,17 @@ function createMissingValidationViolation(routeInfo: RouteInfo, filePath: string
     suggestion:
       'Add Zod schema validation for request body. Import schema from shared contract schemas and use schema.parse(request.body).',
     match: `${routeInfo.method} ${routeInfo.path}`,
-  }
+  };
 }
 
 /**
  * Options for checking a call expression for route validation issues
  */
 interface CheckCallExpressionOptions {
-  node: ts.CallExpression
-  sourceFile: ts.SourceFile
-  content: string
-  filePath: string
+  node: ts.CallExpression;
+  sourceFile: ts.SourceFile;
+  content: string;
+  filePath: string;
 }
 
 /**
@@ -254,23 +253,23 @@ interface CheckCallExpressionOptions {
 function checkCallExpressionForViolation(
   options: CheckCallExpressionOptions,
 ): CheckViolation | null {
-  const { node, sourceFile, content, filePath } = options
-  const routeInfo = extractRouteInfo(node, sourceFile)
+  const { node, sourceFile, content, filePath } = options;
+  const routeInfo = extractRouteInfo(node, sourceFile);
   if (!routeInfo) {
-    return null
+    return null;
   }
 
   // Routes using fastify-type-provider-zod pass schema in options — validation is automatic
   if (routeInfo.hasSchemaOption) {
-    return null
+    return null;
   }
 
-  const hasValidation = checkForValidation(routeInfo.handlerNode, sourceFile, content)
+  const hasValidation = checkForValidation(routeInfo.handlerNode, sourceFile, content);
   if (hasValidation) {
-    return null
+    return null;
   }
 
-  return createMissingValidationViolation(routeInfo, filePath)
+  return createMissingValidationViolation(routeInfo, filePath);
 }
 
 /**
@@ -280,41 +279,37 @@ function checkCallExpressionForViolation(
  * @returns Array of violations found in the file
  */
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   try {
-    const sourceFile = getSharedSourceFile(filePath, content)
+    const sourceFile = getSharedSourceFile(filePath, content);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
     const visit = (node: ts.Node): void => {
       if (ts.isCallExpression(node)) {
-        const violation = checkCallExpressionForViolation({ node, sourceFile, content, filePath })
+        const violation = checkCallExpressionForViolation({ node, sourceFile, content, filePath });
         if (violation) {
-          violations.push(violation)
+          violations.push(violation);
         }
       }
-      ts.forEachChild(node, visit)
-    }
+      ts.forEachChild(node, visit);
+    };
 
-    visit(sourceFile)
-  /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+    visit(sourceFile);
+    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
   } catch {
     // @swallow-ok Skip files that fail to parse
   }
 
-  return violations
+  return violations;
 }
 
 /**
  * Check if file is a route file
  */
 function isRouteFile(file: string): boolean {
-  return (
-    file.includes('/routes/') &&
-    !isTestFile(file) &&
-    !file.endsWith('.d.ts')
-  )
+  return file.includes('/routes/') && !isTestFile(file) && !file.endsWith('.d.ts');
 }
 
 /**
@@ -347,14 +342,14 @@ export const fastifyRouteValidation = defineCheck({
   analyze(content, filePath) {
     // Filter to only route files
     if (!isRouteFile(filePath)) {
-      return []
+      return [];
     }
 
     // Quick filter: skip files that don't contain route patterns
     if (!QUICK_FILTER_PATTERNS.test(content)) {
-      return []
+      return [];
     }
 
-    return analyzeFile(content, filePath)
+    return analyzeFile(content, filePath);
   },
-})
+});

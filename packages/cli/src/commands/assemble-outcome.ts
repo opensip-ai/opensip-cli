@@ -97,7 +97,10 @@ export function outcomeFromResult(value: unknown, exitCode: number): CommandOutc
  * @param kind The outcome kind (e.g. `'bootstrap.error'` for a pre-handler
  *   failure, Phase 3); defaults to `'command.error'`.
  */
-export function outcomeFromError(error: unknown, opts: { readonly kind?: string } = {}): CommandOutcome {
+export function outcomeFromError(
+  error: unknown,
+  opts: { readonly kind?: string } = {},
+): CommandOutcome {
   const message = error instanceof Error ? error.message : String(error);
   const suggestion = getErrorSuggestion(error)?.action;
   const detail: ErrorDetail = {
@@ -105,8 +108,14 @@ export function outcomeFromError(error: unknown, opts: { readonly kind?: string 
     ...(suggestion ? { suggestion } : {}),
     ...(error instanceof ToolError ? { code: error.code } : {}),
   };
-  const exitCode = error instanceof ToolError ? mapToolErrorToExitCode(error) : EXIT_CODES.RUNTIME_ERROR;
-  return withDiagnostics({ kind: opts.kind ?? 'command.error', status: 'error', exitCode, errors: [detail] });
+  const exitCode =
+    error instanceof ToolError ? mapToolErrorToExitCode(error) : EXIT_CODES.RUNTIME_ERROR;
+  return withDiagnostics({
+    kind: opts.kind ?? 'command.error',
+    status: 'error',
+    exitCode,
+    errors: [detail],
+  });
 }
 
 /**

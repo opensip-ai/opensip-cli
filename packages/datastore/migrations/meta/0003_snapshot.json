@@ -53,9 +53,7 @@
       "indexes": {
         "session_checks_session_idx": {
           "name": "session_checks_session_idx",
-          "columns": [
-            "session_id"
-          ],
+          "columns": ["session_id"],
           "isUnique": false
         }
       },
@@ -64,12 +62,8 @@
           "name": "session_checks_session_id_sessions_id_fk",
           "tableFrom": "session_checks",
           "tableTo": "sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -155,9 +149,7 @@
       "indexes": {
         "session_findings_check_idx": {
           "name": "session_findings_check_idx",
-          "columns": [
-            "session_check_id"
-          ],
+          "columns": ["session_check_id"],
           "isUnique": false
         }
       },
@@ -166,12 +158,8 @@
           "name": "session_findings_session_check_id_session_checks_id_fk",
           "tableFrom": "session_findings",
           "tableTo": "session_checks",
-          "columnsFrom": [
-            "session_check_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_check_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -211,12 +199,8 @@
           "name": "session_tool_payload_session_id_sessions_id_fk",
           "tableFrom": "session_tool_payload",
           "tableTo": "sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -295,10 +279,7 @@
       "indexes": {
         "sessions_tool_timestamp_idx": {
           "name": "sessions_tool_timestamp_idx",
-          "columns": [
-            "tool",
-            "\"timestamp\" DESC"
-          ],
+          "columns": ["tool", "\"timestamp\" DESC"],
           "isUnique": false
         }
       },

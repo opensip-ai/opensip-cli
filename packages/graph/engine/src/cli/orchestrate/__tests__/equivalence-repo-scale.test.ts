@@ -64,11 +64,7 @@ import type { Shard } from '../shard-model.js';
 
 // ── medium fixture geography ──────────────────────────────────────
 
-const FIXTURE_ROOT = join(
-  dirname(fileURLToPath(import.meta.url)),
-  '__fixtures__',
-  'medium-pkg',
-);
+const FIXTURE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '__fixtures__', 'medium-pkg');
 
 const PKG = (name: string): string => join(FIXTURE_ROOT, 'packages', name);
 
@@ -182,10 +178,18 @@ describe('repo-scale equivalence guardrail (Phase 4 gate)', () => {
     const exact = await buildSingleProgram();
 
     for (const cat of [sharded, exact]) {
-      expect(targetsOf(cat, 'appMain')).toContain(bodyHashFor('packages/svc-b/src/index.ts', 'svcBRun'));
-      expect(targetsOf(cat, 'svcBRun')).toContain(bodyHashFor('packages/svc-a/src/index.ts', 'svcARun'));
-      expect(targetsOf(cat, 'svcARun')).toContain(bodyHashFor('packages/core/src/index.ts', 'coreInit'));
-      expect(targetsOf(cat, 'svcARun')).toContain(bodyHashFor('packages/util/src/index.ts', 'utilFormat'));
+      expect(targetsOf(cat, 'appMain')).toContain(
+        bodyHashFor('packages/svc-b/src/index.ts', 'svcBRun'),
+      );
+      expect(targetsOf(cat, 'svcBRun')).toContain(
+        bodyHashFor('packages/svc-a/src/index.ts', 'svcARun'),
+      );
+      expect(targetsOf(cat, 'svcARun')).toContain(
+        bodyHashFor('packages/core/src/index.ts', 'coreInit'),
+      );
+      expect(targetsOf(cat, 'svcARun')).toContain(
+        bodyHashFor('packages/util/src/index.ts', 'utilFormat'),
+      );
     }
   });
 

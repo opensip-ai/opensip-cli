@@ -9,7 +9,12 @@
  * Phase 4 of opensip's substrate consolidation (DEC-498).
  */
 
-import type { Catalog, DependencyEdge, DependencySiteRecord, FunctionOccurrence } from '@opensip-tools/graph';
+import type {
+  Catalog,
+  DependencyEdge,
+  DependencySiteRecord,
+  FunctionOccurrence,
+} from '@opensip-tools/graph';
 
 /**
  * Resolve each Java dependency site to one or more catalog bodyHashes.
@@ -52,8 +57,11 @@ export function resolveDependencies(
       specifier: site.specifier,
     };
     const existing = out.get(site.ownerHash);
-    if (existing === undefined) { out.set(site.ownerHash, [edge]); }
-    else { existing.push(edge); }
+    if (existing === undefined) {
+      out.set(site.ownerHash, [edge]);
+    } else {
+      existing.push(edge);
+    }
   }
   return out;
 }
@@ -166,7 +174,10 @@ function resolveJavaImportSpecifier(
 }
 
 /** Strip a leading `static ` keyword, returning the remainder and the flag. */
-function parseStaticPrefix(specifier: string): { readonly raw: string; readonly isStatic: boolean } {
+function parseStaticPrefix(specifier: string): {
+  readonly raw: string;
+  readonly isStatic: boolean;
+} {
   if (specifier.startsWith('static ')) {
     return { raw: specifier.slice('static '.length), isStatic: true };
   }

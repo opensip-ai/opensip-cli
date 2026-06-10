@@ -6,12 +6,12 @@
  * to stay in sync with OpenAPI-generated types.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /** Zod schema match result */
 interface ZodSchemaMatch {
-  schemaName: string
-  startIndex: number
+  schemaName: string;
+  startIndex: number;
 }
 
 /**
@@ -23,39 +23,39 @@ function checkZodSchema(
   match: ZodSchemaMatch,
   satisfiesPattern: RegExp,
 ): { lineNumber: number; schemaName: string } | null {
-  const { schemaName, startIndex } = match
-  const afterMatch = content.slice(startIndex)
-  const endMatch = /;\s*$/m.exec(afterMatch)
+  const { schemaName, startIndex } = match;
+  const afterMatch = content.slice(startIndex);
+  const endMatch = /;\s*$/m.exec(afterMatch);
 
-  if (!endMatch) return null
+  if (!endMatch) return null;
 
-  const endIndex = endMatch.index ?? 0
-  const schemaDefinition = afterMatch.slice(0, endIndex + 1)
+  const endIndex = endMatch.index ?? 0;
+  const schemaDefinition = afterMatch.slice(0, endIndex + 1);
 
-  if (satisfiesPattern.test(schemaDefinition)) return null
+  if (satisfiesPattern.test(schemaDefinition)) return null;
 
-  const lineNumber = content.slice(0, startIndex).split('\n').length
-  return { lineNumber, schemaName }
+  const lineNumber = content.slice(0, startIndex).split('\n').length;
+  return { lineNumber, schemaName };
 }
 
 /**
  * Scan file content for Zod schemas missing satisfies pattern
  */
 function scanFileForZodSchemas(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const zodObjectPattern = /export\s+const\s+(\w+Schema)\s*=\s*z\.object\(/g
-  const satisfiesPattern = /satisfies\s+z\.ZodType</
+  const violations: CheckViolation[] = [];
+  const zodObjectPattern = /export\s+const\s+(\w+Schema)\s*=\s*z\.object\(/g;
+  const satisfiesPattern = /satisfies\s+z\.ZodType</;
 
-  let match
+  let match;
   while ((match = zodObjectPattern.exec(content)) !== null) {
     const result = checkZodSchema(
       content,
       { schemaName: match[1] ?? 'UnknownSchema', startIndex: match.index },
       satisfiesPattern,
-    )
-    if (!result) continue
+    );
+    if (!result) continue;
 
-    const { lineNumber, schemaName } = result
+    const { lineNumber, schemaName } = result;
 
     violations.push({
       filePath,
@@ -65,10 +65,10 @@ function scanFileForZodSchemas(content: string, filePath: string): CheckViolatio
       severity: 'warning',
       suggestion: `Add type constraint after the schema: export const ${schemaName} = z.object({...}) satisfies z.ZodType<GeneratedTypeName>; This ensures the schema stays in sync with OpenAPI-generated types`,
       match: schemaName,
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -99,14 +99,14 @@ export const zodOpenapiSync = defineCheck({
   analyze(content, filePath) {
     // Focus on schema files
     if (!filePath.includes('/schemas/')) {
-      return []
+      return [];
     }
 
     try {
-      return scanFileForZodSchemas(content, filePath)
+      return scanFileForZodSchemas(content, filePath);
     } catch {
       // @swallow-ok Skip unreadable files
-      return []
+      return [];
     }
   },
-})
+});

@@ -24,7 +24,9 @@ import type { ToolCliContext } from '@opensip-tools/core';
 /** Minimal structural view of GraphDoneResult — avoids a contracts dep in this adapter test. */
 interface GraphDoneLike {
   readonly type: string;
-  readonly verboseDetail?: { readonly kind: 'lines'; readonly lines: readonly string[] } | { readonly kind: 'findings'; readonly groups: readonly unknown[] };
+  readonly verboseDetail?:
+    | { readonly kind: 'lines'; readonly lines: readonly string[] }
+    | { readonly kind: 'findings'; readonly groups: readonly unknown[] };
   readonly summary: { readonly passed: number };
 }
 
@@ -92,7 +94,9 @@ function makeCli(): CapturedCli {
       error: vi.fn(),
       debug: vi.fn(),
     },
-    setExitCode: (c: number) => { exitCodes.push(c); },
+    setExitCode: (c: number) => {
+      exitCodes.push(c);
+    },
     // Mirror the composition root's `emitJson` seam (cli-context.ts):
     // JSON.stringify(_, null, 2) + '\n' to stdout, so the `--workspace --json`
     // integration test can parse the emitted document (ADR-0011).
@@ -237,7 +241,11 @@ describe('executeGraph', () => {
     const shared = makeCli();
     await executeGraph({ cwd: dir, gateSave: true }, shared.cli);
     // Mutate fixture to add an orphan
-    writeFileSync(join(dir, 'index.ts'), `function unused(): number { return 1; }\nexport function main(): void {}\n`, 'utf8');
+    writeFileSync(
+      join(dir, 'index.ts'),
+      `function unused(): number { return 1; }\nexport function main(): void {}\n`,
+      'utf8',
+    );
     shared.render.mockClear();
     await executeGraph({ cwd: dir, gateCompare: true, noCache: true }, shared.cli);
     expect(renderedLines(shared.render)).toContain('Graph gate FAILED');
@@ -298,10 +306,7 @@ describe('executeGraph', () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes } = makeCli();
     // No packages/** dir exists — discoverWorkspaceUnits returns [].
-    await executeGraph(
-      { cwd: dir, workspace: true, cliScript: '/usr/bin/node' },
-      cli,
-    );
+    await executeGraph({ cwd: dir, workspace: true, cliScript: '/usr/bin/node' }, cli);
     expect(stderr).toContain('no workspace units');
     expect(exitCodes).toContain(2);
   });
@@ -311,21 +316,14 @@ describe('executeGraph', () => {
     // sub-package has its own. Pass a positional path.
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     mkdirSync(join(dir, 'packages', 'inner'), { recursive: true });
-    writeFileSync(
-      join(dir, 'packages', 'inner', 'tsconfig.json'),
-      FIXTURE_TSCONFIG,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'packages', 'inner', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
     writeFileSync(
       join(dir, 'packages', 'inner', 'main.ts'),
       `export function fromInner(): number { return 1; }\n`,
       'utf8',
     );
     const { cli, exitCodes } = makeCli();
-    await executeGraph(
-      { cwd: dir, paths: [join(dir, 'packages', 'inner')], json: true },
-      cli,
-    );
+    await executeGraph({ cwd: dir, paths: [join(dir, 'packages', 'inner')], json: true }, cli);
     const parsed = JSON.parse(stdout) as { tool: string };
     expect(parsed.tool).toBe('graph');
     expect(exitCodes).toContain(0);
@@ -355,9 +353,17 @@ describe('executeGraph', () => {
     mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
     mkdirSync(join(dir, 'packages', 'b'), { recursive: true });
     writeFileSync(join(dir, 'packages', 'a', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
-    writeFileSync(join(dir, 'packages', 'a', 'main.ts'), `export function a(): number { return 1; }\n`, 'utf8');
+    writeFileSync(
+      join(dir, 'packages', 'a', 'main.ts'),
+      `export function a(): number { return 1; }\n`,
+      'utf8',
+    );
     writeFileSync(join(dir, 'packages', 'b', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
-    writeFileSync(join(dir, 'packages', 'b', 'main.ts'), `export function b(): number { return 1; }\n`, 'utf8');
+    writeFileSync(
+      join(dir, 'packages', 'b', 'main.ts'),
+      `export function b(): number { return 1; }\n`,
+      'utf8',
+    );
     // Helper script that pretends to be the CLI for child invocations:
     // takes the graph subcommand args, ignores them, and emits an empty
     // SignalEnvelope JSON document (ADR-0011 — the parent parses .signals).
@@ -395,7 +401,11 @@ describe('executeGraph', () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
     writeFileSync(join(dir, 'packages', 'a', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
-    writeFileSync(join(dir, 'packages', 'a', 'main.ts'), `export function a(): number { return 1; }\n`, 'utf8');
+    writeFileSync(
+      join(dir, 'packages', 'a', 'main.ts'),
+      `export function a(): number { return 1; }\n`,
+      'utf8',
+    );
     // Helper that emits one signal so the findings section renders (ADR-0011 —
     // the parent parses .signals off the child's SignalEnvelope stdout).
     const helper = join(dir, 'fake-cli.cjs');
@@ -412,10 +422,7 @@ describe('executeGraph', () => {
       'utf8',
     );
     const { cli, exitCodes, render } = makeCli();
-    await executeGraph(
-      { cwd: dir, workspace: true, cliScript: helper, concurrency: 1 },
-      cli,
-    );
+    await executeGraph({ cwd: dir, workspace: true, cliScript: helper, concurrency: 1 }, cli);
     const out = renderedLines(render);
     expect(out).toContain('opensip-tools graph --workspace');
     expect(out).toContain('== Units');
@@ -437,7 +444,7 @@ describe('executeGraph', () => {
       scope: 'none' as const,
     };
     const cli: ToolCliContext = {
-        scope: new RunScope({ projectContext: projectNoStore }),
+      scope: new RunScope({ projectContext: projectNoStore }),
       render: vi.fn(() => Promise.resolve()),
       renderLive: vi.fn(() => Promise.resolve()),
       maybeOpenDashboard: vi.fn(() => Promise.resolve()),
@@ -447,7 +454,9 @@ describe('executeGraph', () => {
         error: vi.fn(),
         debug: vi.fn(),
       },
-      setExitCode: (c: number) => { exitCodes.push(c); },
+      setExitCode: (c: number) => {
+        exitCodes.push(c);
+      },
       emitJson: vi.fn(),
       emitEnvelope: vi.fn(),
       emitError: vi.fn(),
@@ -464,19 +473,16 @@ describe('executeGraph', () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
     writeFileSync(join(dir, 'packages', 'a', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
-    writeFileSync(join(dir, 'packages', 'a', 'main.ts'), `export function a(): number { return 1; }\n`, 'utf8');
-    // Failing helper: writes some stderr + exits 1.
-    const helper = join(dir, 'failing-cli.cjs');
     writeFileSync(
-      helper,
-      `process.stderr.write('boom\\n');\nprocess.exit(1);\n`,
+      join(dir, 'packages', 'a', 'main.ts'),
+      `export function a(): number { return 1; }\n`,
       'utf8',
     );
+    // Failing helper: writes some stderr + exits 1.
+    const helper = join(dir, 'failing-cli.cjs');
+    writeFileSync(helper, `process.stderr.write('boom\\n');\nprocess.exit(1);\n`, 'utf8');
     const { cli, exitCodes } = makeCli();
-    await executeGraph(
-      { cwd: dir, workspace: true, cliScript: helper, concurrency: 1 },
-      cli,
-    );
+    await executeGraph({ cwd: dir, workspace: true, cliScript: helper, concurrency: 1 }, cli);
     expect(exitCodes).toContain(1);
     expect(stderr).toContain('at least one unit run failed');
   });

@@ -93,7 +93,9 @@ export interface PluginScopeOpts {
   readonly project?: boolean;
 }
 
-type InstallOutcome = { readonly ok: true; readonly installedName: string } | { readonly ok: false; readonly error: string };
+type InstallOutcome =
+  | { readonly ok: true; readonly installedName: string }
+  | { readonly ok: false; readonly error: string };
 
 /**
  * `npm install --ignore-scripts <spec>` into a plugin host dir, then
@@ -124,7 +126,10 @@ function npmInstallIntoHost(dir: string, packageName: string): InstallOutcome {
     installMissingPeers(dir, packageName, depsBefore);
     return { ok: true, installedName: resolvedName ?? packageName };
   } catch (error) {
-    return { ok: false, error: `Failed to add ${packageName}: ${error instanceof Error ? error.message : String(error)}` };
+    return {
+      ok: false,
+      error: `Failed to add ${packageName}: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }
 
@@ -134,7 +139,9 @@ function npmInstallIntoHost(dir: string, packageName: string): InstallOutcome {
  * Tool plugins auto-discover by their `kind: "tool"` marker.
  */
 function addToolPlugin(packageName: string, cwd: string, project: boolean): PluginResult {
-  const dir = project ? ensurePluginHostDir(TOOL_DOMAIN, cwd) : ensureUserPluginHostDir(TOOL_DOMAIN);
+  const dir = project
+    ? ensurePluginHostDir(TOOL_DOMAIN, cwd)
+    : ensureUserPluginHostDir(TOOL_DOMAIN);
   const outcome = npmInstallIntoHost(dir, packageName);
   if (!outcome.ok) {
     return { type: PLUGIN_ADD, packageName, success: false, error: outcome.error };
@@ -286,12 +293,24 @@ function npmUninstallFromHost(dir: string, packageName: string): boolean {
 
 /** Remove a Tool plugin from its host dir (user-global by default, --project otherwise). */
 function removeToolPlugin(packageName: string, cwd: string, project: boolean): PluginResult {
-  const dir = project ? resolveProjectPaths(cwd).pluginsDir(TOOL_DOMAIN) : resolveUserPaths().pluginsDir(TOOL_DOMAIN);
+  const dir = project
+    ? resolveProjectPaths(cwd).pluginsDir(TOOL_DOMAIN)
+    : resolveUserPaths().pluginsDir(TOOL_DOMAIN);
   if (!existsSync(join(dir, HOST_PACKAGE_JSON))) {
-    return { type: PLUGIN_REMOVE, packageName, success: false, error: `No tool plugins installed in ${dir}` };
+    return {
+      type: PLUGIN_REMOVE,
+      packageName,
+      success: false,
+      error: `No tool plugins installed in ${dir}`,
+    };
   }
   if (!npmUninstallFromHost(dir, packageName)) {
-    return { type: PLUGIN_REMOVE, packageName, success: false, error: `Failed to remove ${packageName}` };
+    return {
+      type: PLUGIN_REMOVE,
+      packageName,
+      success: false,
+      error: `Failed to remove ${packageName}`,
+    };
   }
   // No config entry to clean up — tool plugins auto-discover by marker.
   return { type: PLUGIN_REMOVE, packageName, success: true };
@@ -353,7 +372,12 @@ export async function pluginRemove(
   }
 
   if (!npmUninstallFromHost(dir, packageName)) {
-    return { type: PLUGIN_REMOVE, packageName, success: false, error: `Failed to remove ${packageName}` };
+    return {
+      type: PLUGIN_REMOVE,
+      packageName,
+      success: false,
+      error: `Failed to remove ${packageName}`,
+    };
   }
   removeFromConfigPluginList(paths.configFile, domain, packageName);
   return { type: PLUGIN_REMOVE, packageName, success: true };

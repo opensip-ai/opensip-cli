@@ -144,10 +144,7 @@ describe('Go adapter — depends_on emission (Phase 4)', () => {
 
   it('emits unresolved edges for stdlib imports', () => {
     writeFile('go.mod', GO_MOD);
-    writeFile(
-      'main.go',
-      `package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hi")\n}\n`,
-    );
+    writeFile('main.go', `package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hi")\n}\n`);
 
     const { catalog, dependenciesByOwner } = runAdapter();
     const mainInit = findModuleInit(catalog, 'main.go');

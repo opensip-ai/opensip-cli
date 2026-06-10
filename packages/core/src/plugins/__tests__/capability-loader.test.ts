@@ -40,7 +40,12 @@ function writeItemsPackage(name: string, source: string): void {
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, 'package.json'),
-    JSON.stringify({ name, type: 'module', main: './index.mjs', opensipTools: { kind: 'items-pack' } }),
+    JSON.stringify({
+      name,
+      type: 'module',
+      main: './index.mjs',
+      opensipTools: { kind: 'items-pack' },
+    }),
   );
   writeFileSync(join(dir, 'index.mjs'), `export const items = ${source};\n`);
 }
@@ -106,7 +111,10 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
     const registrar = vi.fn();
     const registry = new CapabilityRegistry();
     // Require an `id` key — the second contribution fails the host schema check.
-    registry.registerDomain(itemsDomain({ contributionSchema: { requiredKeys: ['id'] } }), registrar);
+    registry.registerDomain(
+      itemsDomain({ contributionSchema: { requiredKeys: ['id'] } }),
+      registrar,
+    );
 
     const errors = await loadCapabilityDomain({ registry, domainId: 'items', projectDir: testDir });
 

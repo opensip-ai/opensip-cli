@@ -8,20 +8,20 @@
  * - Hardcoded pnpm versions that don't match packageManager are errors
  */
 
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
 interface RootPackageJson {
-  packageManager?: string
+  packageManager?: string;
   engines?: {
-    node?: string
-  }
+    node?: string;
+  };
 }
 
 // =============================================================================
@@ -29,13 +29,13 @@ interface RootPackageJson {
 // =============================================================================
 
 /** Matches FROM node:XX or FROM node:XX-alpine etc. */
-const FROM_NODE_PATTERN = /^FROM\s+node:(\d+)/i
+const FROM_NODE_PATTERN = /^FROM\s+node:(\d+)/i;
 
 /** Matches corepack prepare pnpm@X.Y.Z or pnpm@X */
-const PNPM_HARDCODED_PATTERN = /corepack\s+prepare\s+pnpm@([\d.]+)/
+const PNPM_HARDCODED_PATTERN = /corepack\s+prepare\s+pnpm@([\d.]+)/;
 
 /** Matches the dynamic self-read pattern */
-const PNPM_DYNAMIC_PATTERN = /require\(['"]\.\/package\.json['"]\)\.packageManager/
+const PNPM_DYNAMIC_PATTERN = /require\(['"]\.\/package\.json['"]\)\.packageManager/;
 
 // =============================================================================
 // HELPERS
@@ -46,11 +46,11 @@ const PNPM_DYNAMIC_PATTERN = /require\(['"]\.\/package\.json['"]\)\.packageManag
  * @throws {Error} When the file exceeds 10MB
  */
 function readRootPackageJson(cwd: string): RootPackageJson {
-  const pkgPath = path.join(cwd, 'package.json')
-  const stats = fs.statSync(pkgPath)
-  if (stats.size > 10_000_000) throw new Error(`File too large: ${pkgPath}`)
-  const raw = fs.readFileSync(pkgPath, 'utf8')
-  return JSON.parse(raw) as RootPackageJson
+  const pkgPath = path.join(cwd, 'package.json');
+  const stats = fs.statSync(pkgPath);
+  if (stats.size > 10_000_000) throw new Error(`File too large: ${pkgPath}`);
+  const raw = fs.readFileSync(pkgPath, 'utf8');
+  return JSON.parse(raw) as RootPackageJson;
 }
 
 /**
@@ -58,10 +58,10 @@ function readRootPackageJson(cwd: string): RootPackageJson {
  * e.g. ">=20.0.0" → 20
  */
 function extractNodeMajor(constraint: string): number | null {
-  const match = /(\d+)/.exec(constraint)
-  const digit = match?.[1]
+  const match = /(\d+)/.exec(constraint);
+  const digit = match?.[1];
   // @fitness-ignore-next-line numeric-validation -- regex (\d+) guarantees digit-only string
-  return digit ? Number.parseInt(digit, 10) : null
+  return digit ? Number.parseInt(digit, 10) : null;
 }
 
 /**
@@ -69,9 +69,9 @@ function extractNodeMajor(constraint: string): number | null {
  * e.g. "pnpm@10.28.2+sha512.abc..." → "10.28.2"
  */
 function extractPnpmVersion(packageManager: string): string | null {
-  const match = /^pnpm@([\d.]+)/.exec(packageManager)
+  const match = /^pnpm@([\d.]+)/.exec(packageManager);
   /* v8 ignore next -- defensive: regex ([\d.]+) capture is guaranteed when match succeeds */
-  return match?.[1] ?? null
+  return match?.[1] ?? null;
 }
 
 /**
@@ -80,10 +80,10 @@ function extractPnpmVersion(packageManager: string): string | null {
  */
 function extractMajor(version: string): number {
   /* v8 ignore next -- defensive: split always returns at least one element */
-  const major = version.split('.')[0] ?? '0'
-  const parsed = Number.parseInt(major, 10)
+  const major = version.split('.')[0] ?? '0';
+  const parsed = Number.parseInt(major, 10);
   /* v8 ignore next -- defensive: parseInt on digit-only string is always finite */
-  return Number.isFinite(parsed) ? parsed : 0
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 // =============================================================================
@@ -96,9 +96,9 @@ function extractMajor(version: string): number {
  * helpers stay under the wide-function parameter budget.
  */
 interface DockerfileVersionContext {
-  filePath: string
-  relPath: string
-  violations: CheckViolation[]
+  filePath: string;
+  relPath: string;
+  violations: CheckViolation[];
 }
 
 function checkNodeVersion(
@@ -107,13 +107,13 @@ function checkNodeVersion(
   expectedNodeMajor: number,
   ctx: DockerfileVersionContext,
 ): void {
-  const { filePath, violations } = ctx
-  const nodeMatch = FROM_NODE_PATTERN.exec(line)
-  const nodeVersion = nodeMatch?.[1]
-  if (!nodeVersion) return
+  const { filePath, violations } = ctx;
+  const nodeMatch = FROM_NODE_PATTERN.exec(line);
+  const nodeVersion = nodeMatch?.[1];
+  if (!nodeVersion) return;
 
   // @fitness-ignore-next-line numeric-validation -- regex (\d+) guarantees digit-only string
-  const dockerNodeMajor = Number.parseInt(nodeVersion, 10)
+  const dockerNodeMajor = Number.parseInt(nodeVersion, 10);
   if (dockerNodeMajor !== expectedNodeMajor) {
     violations.push({
       line: lineNum,
@@ -122,7 +122,7 @@ function checkNodeVersion(
       severity: 'error',
       suggestion: `Change FROM node:${dockerNodeMajor} to FROM node:${expectedNodeMajor}`,
       type: 'node-version-mismatch',
-    })
+    });
   }
 }
 
@@ -132,20 +132,20 @@ function checkPnpmVersion(
   expectedPnpmVersion: string,
   ctx: DockerfileVersionContext,
 ): boolean {
-  const { filePath, relPath, violations } = ctx
-  const hardcodedMatch = PNPM_HARDCODED_PATTERN.exec(line)
-  const hardcodedVersion = hardcodedMatch?.[1]
-  if (!hardcodedVersion) return false
+  const { filePath, relPath, violations } = ctx;
+  const hardcodedMatch = PNPM_HARDCODED_PATTERN.exec(line);
+  const hardcodedVersion = hardcodedMatch?.[1];
+  if (!hardcodedVersion) return false;
 
   if (PNPM_DYNAMIC_PATTERN.test(line)) {
     // Dynamic pattern is used — this is the preferred approach, no violation
-    return true
+    return true;
   }
 
-  const hardcodedMajor = extractMajor(hardcodedVersion)
-  const expectedMajor = extractMajor(expectedPnpmVersion)
+  const hardcodedMajor = extractMajor(hardcodedVersion);
+  const expectedMajor = extractMajor(expectedPnpmVersion);
   const isVersionMismatch =
-    hardcodedMajor !== expectedMajor || hardcodedVersion !== expectedPnpmVersion
+    hardcodedMajor !== expectedMajor || hardcodedVersion !== expectedPnpmVersion;
 
   if (isVersionMismatch) {
     violations.push({
@@ -155,7 +155,7 @@ function checkPnpmVersion(
       severity: 'error',
       suggestion: `Use dynamic version extraction: corepack prepare $(node -e "process.stdout.write(require('./package.json').packageManager.split('+')[0])") --activate`,
       type: 'pnpm-version-mismatch',
-    })
+    });
   } else {
     // Version matches but is hardcoded — warn to use dynamic pattern
     violations.push({
@@ -165,9 +165,9 @@ function checkPnpmVersion(
       severity: 'warning',
       suggestion: `Use dynamic version extraction: corepack prepare $(node -e "process.stdout.write(require('./package.json').packageManager.split('+')[0])") --activate`,
       type: 'pnpm-hardcoded-version',
-    })
+    });
   }
-  return false
+  return false;
 }
 
 function analyzeDockerfileLines(
@@ -177,17 +177,17 @@ function analyzeDockerfileLines(
   ctx: DockerfileVersionContext,
 ): void {
   for (const [i, rawLine] of lines.entries()) {
-    if (!rawLine) continue
-    const line = rawLine.trim()
-    const lineNum = i + 1
+    if (!rawLine) continue;
+    const line = rawLine.trim();
+    const lineNum = i + 1;
 
     if (expectedNodeMajor !== null) {
-      checkNodeVersion(line, lineNum, expectedNodeMajor, ctx)
+      checkNodeVersion(line, lineNum, expectedNodeMajor, ctx);
     }
 
     if (expectedPnpmVersion !== null) {
-      const shouldSkipLine = checkPnpmVersion(line, lineNum, expectedPnpmVersion, ctx)
-      if (shouldSkipLine) continue
+      const shouldSkipLine = checkPnpmVersion(line, lineNum, expectedPnpmVersion, ctx);
+      if (shouldSkipLine) continue;
     }
   }
 }
@@ -225,32 +225,32 @@ export const dockerVersionSync = defineCheck({
   tags: ['docker', 'version-sync', 'architecture'],
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Read root package.json for version truth
-    const rootPkg = readRootPackageJson(process.cwd())
-    const expectedNodeMajor = rootPkg.engines?.node ? extractNodeMajor(rootPkg.engines.node) : null
+    const rootPkg = readRootPackageJson(process.cwd());
+    const expectedNodeMajor = rootPkg.engines?.node ? extractNodeMajor(rootPkg.engines.node) : null;
     const expectedPnpmVersion = rootPkg.packageManager
       ? extractPnpmVersion(rootPkg.packageManager)
-      : null
+      : null;
 
     for (const filePath of files.paths) {
       // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
-      const content = await files.read(filePath)
-      const lines = content.split('\n')
-      const relPath = path.relative(process.cwd(), filePath)
+      const content = await files.read(filePath);
+      const lines = content.split('\n');
+      const relPath = path.relative(process.cwd(), filePath);
 
       // Skip non-Node Dockerfiles (e.g. Hasura)
-      const hasNodeFrom = lines.some((line) => FROM_NODE_PATTERN.test(line.trim()))
-      if (!hasNodeFrom) continue
+      const hasNodeFrom = lines.some((line) => FROM_NODE_PATTERN.test(line.trim()));
+      if (!hasNodeFrom) continue;
 
       void analyzeDockerfileLines(lines, expectedNodeMajor, expectedPnpmVersion, {
         filePath,
         relPath,
         violations,
-      })
+      });
     }
 
-    return violations
+    return violations;
   },
-})
+});

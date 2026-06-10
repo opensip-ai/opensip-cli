@@ -11,12 +11,7 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  LanguageRegistry,
-  ToolRegistry,
-  logger,
-  readPackageVersion,
-} from '@opensip-tools/core';
+import { LanguageRegistry, ToolRegistry, logger, readPackageVersion } from '@opensip-tools/core';
 import { Command } from 'commander';
 
 import {
@@ -26,7 +21,14 @@ import {
   mountToolCommands,
   renderResult,
 } from './bootstrap/index.js';
-import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore, setCliRegistriesForRun, setToolManifestsForRun, setToolProvenanceForRun } from './cli-context.js';
+import {
+  buildToolCliContext,
+  createLiveViewRegistry,
+  getOrOpenDatastore,
+  setCliRegistriesForRun,
+  setToolManifestsForRun,
+  setToolProvenanceForRun,
+} from './cli-context.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { SessionReplayRegistry } from './session-replay-registry.js';
@@ -88,8 +90,10 @@ async function main(): Promise<void> {
   setToolManifestsForRun(manifests);
 
   const { ctx } = buildToolCliContext({
-    render: renderResult, liveViews: createLiveViewRegistry(logger),
-    maybeOpenDashboard, logger,
+    render: renderResult,
+    liveViews: createLiveViewRegistry(logger),
+    maybeOpenDashboard,
+    logger,
   });
 
   // Step 8 of the tool lifecycle (§5.4): mount each registered tool's commands
@@ -140,7 +144,11 @@ async function main(): Promise<void> {
   const jsonRequested = process.argv.includes('--json');
   await runWithTelemetryContext(() =>
     program.parseAsync().catch((error: unknown) =>
-      handleParseError(error, { setExitCode: ctx.setExitCode, render: renderResult, jsonRequested }),
+      handleParseError(error, {
+        setExitCode: ctx.setExitCode,
+        render: renderResult,
+        jsonRequested,
+      }),
     ),
   );
 }

@@ -3,46 +3,46 @@
  * @fileoverview Catch clause safety check
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Analyze catch clauses for unsafe patterns
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Inherent complexity: multi-pattern catch clause analysis tracking brace depth, instanceof checks, and rethrow patterns
 function analyzeCatchSafety(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Test fixtures intentionally use `catch (e: any)` and unguarded
   // `as Error` casts to exercise detection logic.
-  if (isTestFile(filePath)) return violations
+  if (isTestFile(filePath)) return violations;
 
-  const lines = content.split('\n')
+  const lines = content.split('\n');
 
   // Quick check: skip files without catch
-  if (!content.includes('catch')) return violations
+  if (!content.includes('catch')) return violations;
 
-  let inCatchBlock = false
-  let catchBlockStart = 0
-  let braceDepth = 0
-  let catchHasInstanceofCheck = false
-  let catchVarName = ''
+  let inCatchBlock = false;
+  let catchBlockStart = 0;
+  let braceDepth = 0;
+  let catchHasInstanceofCheck = false;
+  let catchVarName = '';
 
   for (const [i, line_] of lines.entries()) {
-    const line = line_ ?? ''
-    const trimmed = line.trim()
+    const line = line_ ?? '';
+    const trimmed = line.trim();
 
     // Skip comments
-    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
     // Detect catch clause entry
-    const catchMatch = /\bcatch\s*\(\s*(\w+)(?:\s*:\s*(\w+))?\s*\)/.exec(line)
+    const catchMatch = /\bcatch\s*\(\s*(\w+)(?:\s*:\s*(\w+))?\s*\)/.exec(line);
     if (catchMatch) {
-      inCatchBlock = true
-      catchBlockStart = i
-      braceDepth = 0
-      catchHasInstanceofCheck = false
-      catchVarName = catchMatch[1] ?? 'error'
-      const typeAnnotation = catchMatch[2]
+      inCatchBlock = true;
+      catchBlockStart = i;
+      braceDepth = 0;
+      catchHasInstanceofCheck = false;
+      catchVarName = catchMatch[1] ?? 'error';
+      const typeAnnotation = catchMatch[2];
 
       // Check for explicit `any` annotation: catch (e: any)
       if (typeAnnotation === 'any') {
@@ -53,20 +53,20 @@ function analyzeCatchSafety(content: string, filePath: string): CheckViolation[]
           suggestion: `Change \`catch (${catchVarName}: any)\` to \`catch (${catchVarName})\` (TypeScript defaults to unknown with useUnknownInCatchVariables)`,
           type: 'catch-any-annotation',
           match: trimmed.slice(0, 120),
-        })
+        });
       }
     }
 
     if (inCatchBlock) {
       // Track brace depth
       for (const char of line) {
-        if (char === '{') braceDepth++
-        if (char === '}') braceDepth--
+        if (char === '{') braceDepth++;
+        if (char === '}') braceDepth--;
       }
 
       // Check for instanceof Error guard
       if (line.includes('instanceof Error')) {
-        catchHasInstanceofCheck = true
+        catchHasInstanceofCheck = true;
       }
 
       // Check for unsafe `as Error` cast
@@ -79,17 +79,17 @@ function analyzeCatchSafety(content: string, filePath: string): CheckViolation[]
           suggestion: `Use \`if (${catchVarName} instanceof Error)\` guard or normalize the error with a toError() utility`,
           type: 'unsafe-error-cast',
           match: trimmed.slice(0, 120),
-        })
+        });
       }
 
       // Exit catch block when braces close
       if (braceDepth <= 0 && i > catchBlockStart) {
-        inCatchBlock = false
+        inCatchBlock = false;
       }
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -119,4 +119,4 @@ export const catchClauseSafety = defineCheck({
   contentFilter: 'strip-strings',
   confidence: 'medium',
   analyze: analyzeCatchSafety,
-})
+});

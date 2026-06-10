@@ -27,8 +27,8 @@ export interface ClearOptions {
 
 function ask(question: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise(resolve => {
-    rl.question(question, answer => {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
       rl.close();
       resolve(answer.trim().toLowerCase());
     });
@@ -62,7 +62,9 @@ export async function executeClear(opts: ClearOptions): Promise<ClearDoneResult>
       ? `This will delete session data older than ${opts.olderThan} ${dayWord} from the project-local SQLite store.`
       : 'This will delete ALL session data from the project-local SQLite store.';
     process.stdout.write(`\n  ${description}\n`);
-    process.stdout.write(`  ${sessionCount} session${sessionCount === 1 ? '' : 's'} currently stored.\n`);
+    process.stdout.write(
+      `  ${sessionCount} session${sessionCount === 1 ? '' : 's'} currently stored.\n`,
+    );
     process.stdout.write(`  This includes run history and dashboard data.\n\n`);
 
     const answer = await ask('  Continue? (y/n) ');

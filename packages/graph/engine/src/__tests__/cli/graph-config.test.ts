@@ -82,13 +82,7 @@ describe('loadGraphConfig', () => {
   });
 
   it('returns {} when a severityOverrides value is not error/warning (strict enum)', () => {
-    writeConfig(
-      [
-        'graph:',
-        '  severityOverrides:',
-        '    graph:bogus: nonsense',
-      ].join('\n'),
-    );
+    writeConfig(['graph:', '  severityOverrides:', '    graph:bogus: nonsense'].join('\n'));
     expect(loadGraphConfig(workDir)).toEqual({});
   });
 

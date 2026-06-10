@@ -62,7 +62,7 @@ return { views };
     dashboardFiltersJs(),
     dashboardSearchJs(),
     dashboardFunctionRowJs(), // declares makeSectionHeading (the ⓘ heading helper)
-    dashboardHelpDrawerJs(),  // declares openHelpDrawer (so the ⓘ button renders)
+    dashboardHelpDrawerJs(), // declares openHelpDrawer (so the ⓘ button renders)
     dashboardViewGraphJs(),
     tail,
   );
@@ -106,7 +106,7 @@ describe('dashboardViewGraphJs (emitter)', () => {
 describe('View 8 — Visualization', () => {
   it('registers a view with id "graph" and label "Visualization"', () => {
     const env = loadEnv(false);
-    const view = env.views.find(v => v.id === 'graph');
+    const view = env.views.find((v) => v.id === 'graph');
     expect(view).toBeDefined();
     expect(view!.label).toBe('Visualization');
     expect(typeof view!.render).toBe('function');
@@ -122,7 +122,7 @@ describe('View 8 — Visualization', () => {
   it('renders the empty state when no view-model blob is present', () => {
     const env = loadEnv(false);
     const c = document.createElement('div');
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
     expect(c.querySelector('.empty')).not.toBeNull();
     expect(c.querySelector('.empty')!.textContent).toContain('No graph to display');
   });
@@ -132,7 +132,7 @@ describe('View 8 — Visualization', () => {
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
     document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
     expect(c.querySelector('.empty')!.textContent).toContain('Graph renderer unavailable');
     expect(c.querySelector('#code-paths-graph-canvas')).toBeNull();
   });
@@ -142,10 +142,10 @@ describe('View 8 — Visualization', () => {
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
     document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
     const layout = c.querySelector<HTMLSelectElement>('select[data-control="layout"]');
     expect(layout).not.toBeNull();
-    expect([...layout!.options].map(o => o.value)).toEqual(['dagre', 'cose', 'breadthfirst']);
+    expect([...layout!.options].map((o) => o.value)).toEqual(['dagre', 'cose', 'breadthfirst']);
     expect(layout!.value).toBe('dagre'); // default
   });
 
@@ -154,7 +154,7 @@ describe('View 8 — Visualization', () => {
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
     document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
     const heading = c.querySelector('h3');
     expect(heading).not.toBeNull();
     expect(heading!.textContent).toContain('Visualization');
@@ -167,7 +167,7 @@ describe('View 8 — Visualization', () => {
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
     document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
     const sccCb = c.querySelector<HTMLInputElement>('input[type="checkbox"][data-scc-toggle]');
     expect(sccCb).not.toBeNull();
     const lbl = c.querySelector<HTMLElement>('.code-paths-graph-checkbox');
@@ -180,7 +180,7 @@ describe('View 8 — Visualization', () => {
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
     document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
     expect(c.querySelector('#code-paths-graph-canvas')).not.toBeNull();
   });
 
@@ -189,7 +189,7 @@ describe('View 8 — Visualization', () => {
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
     document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
     const input = c.querySelector<HTMLInputElement>('#code-paths-graph-search-input');
     expect(input).not.toBeNull();
     expect(input!.getAttribute('placeholder')).toContain('package');
@@ -227,7 +227,7 @@ describe('View 8 — Visualization', () => {
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
     document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
     const level = c.querySelector<HTMLSelectElement>('select[data-control="level"]');
     const scope = c.querySelector<HTMLSelectElement>('select[data-control="scope"]');
     const pkg = c.querySelector<HTMLSelectElement>('select[data-control="package"]');
@@ -250,20 +250,46 @@ describe('View 8 — Visualization', () => {
   });
 
   it('Kind multi-select enables at function level and updates the graph on close', () => {
-    const occA = { bodyHash: 'A', simpleName: 'a', filePath: 'packages/pkg-a/src/a.ts', kind: 'function-declaration', inTestFile: false, qualifiedName: 'a' };
-    const occB = { bodyHash: 'B', simpleName: 'b', filePath: 'packages/pkg-a/src/b.ts', kind: 'method', inTestFile: false, qualifiedName: 'b' };
+    const occA = {
+      bodyHash: 'A',
+      simpleName: 'a',
+      filePath: 'packages/pkg-a/src/a.ts',
+      kind: 'function-declaration',
+      inTestFile: false,
+      qualifiedName: 'a',
+    };
+    const occB = {
+      bodyHash: 'B',
+      simpleName: 'b',
+      filePath: 'packages/pkg-a/src/b.ts',
+      kind: 'method',
+      inTestFile: false,
+      qualifiedName: 'b',
+    };
     const indexes = {
-      byBodyHash: new Map<string, unknown>([['A', occA], ['B', occB]]),
-      occurrencesByHash: new Map<string, unknown[]>([['A', [occA]], ['B', [occB]]]),
+      byBodyHash: new Map<string, unknown>([
+        ['A', occA],
+        ['B', occB],
+      ]),
+      occurrencesByHash: new Map<string, unknown[]>([
+        ['A', [occA]],
+        ['B', [occB]],
+      ]),
       bySimpleName: new Map(),
       callees: new Map<string, string[]>([['A', ['B']]]),
       callers: new Map<string, string[]>([['B', ['A']]]),
     };
-    const catalog = { version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now', functions: { a: [occA], b: [occB] } };
+    const catalog = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: { a: [occA], b: [occB] },
+    };
     const env = loadEnv(true);
     const c = document.createElement('div');
     document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, catalog, indexes, null);
+    env.views.find((v) => v.id === 'graph')!.render(c, catalog, indexes, null);
 
     // Switch to function level + pick pkg-a so Kind becomes enabled.
     const level = c.querySelector<HTMLSelectElement>('select[data-control="level"]')!;
@@ -278,33 +304,63 @@ describe('View 8 — Visualization', () => {
     expect(kindTrigger.textContent).toContain('All kinds');
     // Open the popover, check one kind, close → graph re-renders, canvas present.
     kindTrigger.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    const boxes = c.querySelectorAll<HTMLInputElement>('.code-paths-graph-ms-panel input[type="checkbox"]');
+    const boxes = c.querySelectorAll<HTMLInputElement>(
+      '.code-paths-graph-ms-panel input[type="checkbox"]',
+    );
     expect(boxes.length).toBeGreaterThan(0);
     boxes[0].checked = true;
     boxes[0].dispatchEvent(new Event('change'));
     // Closing (re-click) applies the selection and re-renders.
-    c.querySelector<HTMLButtonElement>('button[data-control="kind"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    c.querySelector<HTMLButtonElement>('button[data-control="kind"]')!.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
     expect(c.querySelector('#code-paths-graph-canvas')).not.toBeNull();
   });
 
-  it('projects a single package\'s function graph at function level (intra-package)', () => {
+  it("projects a single package's function graph at function level (intra-package)", () => {
     // Two functions in pkg-a, a → b. Switching to function level + selecting
     // pkg-a should project them into a Cytoscape canvas (intra-package default).
-    const occA = { bodyHash: 'A', simpleName: 'a', filePath: 'packages/pkg-a/src/a.ts', kind: 'function-declaration', inTestFile: false, qualifiedName: 'a' };
-    const occB = { bodyHash: 'B', simpleName: 'b', filePath: 'packages/pkg-a/src/b.ts', kind: 'function-declaration', inTestFile: false, qualifiedName: 'b' };
+    const occA = {
+      bodyHash: 'A',
+      simpleName: 'a',
+      filePath: 'packages/pkg-a/src/a.ts',
+      kind: 'function-declaration',
+      inTestFile: false,
+      qualifiedName: 'a',
+    };
+    const occB = {
+      bodyHash: 'B',
+      simpleName: 'b',
+      filePath: 'packages/pkg-a/src/b.ts',
+      kind: 'function-declaration',
+      inTestFile: false,
+      qualifiedName: 'b',
+    };
     const indexes = {
-      byBodyHash: new Map<string, unknown>([['A', occA], ['B', occB]]),
-      occurrencesByHash: new Map<string, unknown[]>([['A', [occA]], ['B', [occB]]]),
+      byBodyHash: new Map<string, unknown>([
+        ['A', occA],
+        ['B', occB],
+      ]),
+      occurrencesByHash: new Map<string, unknown[]>([
+        ['A', [occA]],
+        ['B', [occB]],
+      ]),
       bySimpleName: new Map(),
       callees: new Map<string, string[]>([['A', ['B']]]),
       callers: new Map<string, string[]>([['B', ['A']]]),
     };
-    const catalog = { version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now', functions: { a: [occA], b: [occB] } };
+    const catalog = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: { a: [occA], b: [occB] },
+    };
 
     const env = loadEnv(true);
     const c = document.createElement('div');
     document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, catalog, indexes, null);
+    env.views.find((v) => v.id === 'graph')!.render(c, catalog, indexes, null);
 
     // Switch Level → function (re-renders in place via the change handler).
     const level = c.querySelector<HTMLSelectElement>('[data-control="level"]')!;
@@ -316,7 +372,7 @@ describe('View 8 — Visualization', () => {
 
     // Choose pkg-a → the function graph projects and the canvas mounts.
     const pkg = c.querySelector<HTMLSelectElement>('[data-control="package"]')!;
-    expect([...pkg.options].map(o => o.value)).toContain('pkg-a');
+    expect([...pkg.options].map((o) => o.value)).toContain('pkg-a');
     pkg.value = 'pkg-a';
     pkg.dispatchEvent(new Event('change'));
     expect(c.querySelector('#code-paths-graph-canvas')).not.toBeNull();

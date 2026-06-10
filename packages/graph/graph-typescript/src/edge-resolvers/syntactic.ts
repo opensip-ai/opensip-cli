@@ -121,10 +121,7 @@ function resolvePin(
   return { kind: 'none' };
 }
 
-function verdictForPin(
-  pin: Pin,
-  candidates: readonly FunctionOccurrence[],
-): ResolverVerdict {
+function verdictForPin(pin: Pin, candidates: readonly FunctionOccurrence[]): ResolverVerdict {
   if (pin.kind === 'file') {
     const matches = candidates.filter((c) => c.filePath === pin.file);
     if (matches.length > 0) {
@@ -230,7 +227,11 @@ export function buildImportIndex(
   for (const stmt of sourceFile.statements) {
     if (ts.isImportDeclaration(stmt)) {
       if (!ts.isStringLiteral(stmt.moduleSpecifier)) continue;
-      const target = resolveSpecifierToFile(stmt.moduleSpecifier.text, currentFileRel, knownFilesRel);
+      const target = resolveSpecifierToFile(
+        stmt.moduleSpecifier.text,
+        currentFileRel,
+        knownFilesRel,
+      );
       indexImportClause(stmt.importClause, target, index);
     } else if (
       ts.isImportEqualsDeclaration(stmt) &&

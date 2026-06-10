@@ -5,24 +5,20 @@
  * Each tool tab (Fitness, Simulation) has subtabs: Sessions, Catalog, Recipes.
  */
 
+import { dashboardChecksJs } from './checks.js';
+import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js';
+import { dashboardCodePathsJs } from './code-paths.js';
+import { dashboardCss } from './css.js';
+import { dashboardOverviewJs } from './overview.js';
+import { dashboardRecipesJs } from './recipes.js';
+import { dashboardSessionsJs } from './sessions.js';
+import { dashboardSharedJs } from './shared.js';
+import { dashboardSubtabBarJs } from './subtab-bar.js';
+import { listToolTabs } from './tool-tab-registry.js';
+import './tool-tabs-registrations.js'; // side-effect: registers fit/sim/graph
+import { dashboardToolTabsJs } from './tool-tabs.js';
 
-import { dashboardChecksJs } from './checks.js'
-import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js'
-import { dashboardCodePathsJs } from './code-paths.js'
-import { dashboardCss } from './css.js'
-import { dashboardOverviewJs } from './overview.js'
-import { dashboardRecipesJs } from './recipes.js'
-import { dashboardSessionsJs } from './sessions.js'
-import { dashboardSharedJs } from './shared.js'
-import { dashboardSubtabBarJs } from './subtab-bar.js'
-import { listToolTabs } from './tool-tab-registry.js'
-import './tool-tabs-registrations.js'  // side-effect: registers fit/sim/graph
-import { dashboardToolTabsJs } from './tool-tabs.js'
-
-import type {
-  StoredSession,
-  GraphCatalog,
-} from '@opensip-tools/contracts'
+import type { StoredSession, GraphCatalog } from '@opensip-tools/contracts';
 
 /**
  * Inputs to the dashboard HTML generator.
@@ -59,7 +55,7 @@ export interface DashboardInput {
 
 // Escape all < and > to prevent script injection in HTML <script> context
 function escapeForScriptContext(json: string): string {
-  return json.replaceAll('<', String.raw`\u003c`).replaceAll('>', String.raw`\u003e`)
+  return json.replaceAll('<', String.raw`\u003c`).replaceAll('>', String.raw`\u003e`);
 }
 
 // Coerce a session.score into a finite number safe for HTML interpolation
@@ -67,8 +63,8 @@ function escapeForScriptContext(json: string): string {
 // title remains well-formed even if a legacy or corrupted session row
 // somehow carries a non-numeric score.
 function coerceScoreForTitle(score: unknown): number {
-  const n = Number(score)
-  return Number.isFinite(n) ? n : 0
+  const n = Number(score);
+  return Number.isFinite(n) ? n : 0;
 }
 
 /**
@@ -84,11 +80,7 @@ function coerceScoreForTitle(score: unknown): number {
  * - `'literal'`: emits `const <id> = …;` always — `null` is rendered as
  *   the JS literal `null`, anything else as `JSON.stringify(value)`.
  */
-function serializeOptionalBlob(
-  id: string,
-  value: unknown,
-  kind: 'json' | 'literal',
-): string {
+function serializeOptionalBlob(id: string, value: unknown, kind: 'json' | 'literal'): string {
   switch (kind) {
     case 'json': {
       if (value === null || value === undefined) return '';
@@ -99,9 +91,10 @@ function serializeOptionalBlob(
       // Apply the same script-context escape as the 'json' arm — without it,
       // a value containing the literal sequence `</script>` would close the
       // surrounding inline <script> block (JSON.stringify does not escape `<`).
-      const rendered = value === null || value === undefined
-        ? 'null'
-        : escapeForScriptContext(JSON.stringify(value));
+      const rendered =
+        value === null || value === undefined
+          ? 'null'
+          : escapeForScriptContext(JSON.stringify(value));
       return `const ${id} = ${rendered};`;
     }
   }
@@ -119,44 +112,42 @@ export function generateDashboardHtml(input: DashboardInput): string {
     editorProtocol = null,
   } = input;
 
-  const latest = sessions[0]
+  const latest = sessions[0];
   // Coerce score to a finite number before interpolating into the <title>
   // tag — `latest.score` is typed `number` but originates from a SQLite
   // column and a corrupt or legacy row could carry an arbitrary value.
   // Number(NaN-ish) on a string still yields NaN; we substitute 0 to keep
   // the page title well-formed in the pathological case.
-  const latestScoreSafe = latest ? coerceScoreForTitle(latest.score) : 0
-  const safeDataJson = escapeForScriptContext(JSON.stringify(sessions))
-  const safeCatalogJson = escapeForScriptContext(JSON.stringify(checkCatalog))
-  const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog))
-  const safeGraphRuleCatalogJson = escapeForScriptContext(JSON.stringify(graphRuleCatalog))
-  const safeGraphRecipeCatalogJson = escapeForScriptContext(JSON.stringify(graphRecipeCatalog))
-  const graphCatalogBlock = serializeOptionalBlob('graph-catalog', graphCatalog, 'json')
+  const latestScoreSafe = latest ? coerceScoreForTitle(latest.score) : 0;
+  const safeDataJson = escapeForScriptContext(JSON.stringify(sessions));
+  const safeCatalogJson = escapeForScriptContext(JSON.stringify(checkCatalog));
+  const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog));
+  const safeGraphRuleCatalogJson = escapeForScriptContext(JSON.stringify(graphRuleCatalog));
+  const safeGraphRecipeCatalogJson = escapeForScriptContext(JSON.stringify(graphRecipeCatalog));
+  const graphCatalogBlock = serializeOptionalBlob('graph-catalog', graphCatalog, 'json');
   // The Visualization view (view-graph.ts) consumes a slim, pre-projected
   // view-model rather than the raw catalog: projection aggregates the
   // function call graph up to PACKAGE nodes + package→package edges (with
   // coupling weights + cross-package SCCs) here at generation time and embeds
   // it as its own JSON blob, sized for the renderer rather than for storage.
   // See code-paths/graph-view-model.ts.
-  const graphViewModel = graphCatalog ? projectCatalogToGraphViewModel(graphCatalog) : null
-  const graphViewModelBlock = serializeOptionalBlob('graph-view-model', graphViewModel, 'json')
-  const editorProtocolJs = serializeOptionalBlob('EDITOR_PROTOCOL', editorProtocol, 'literal')
+  const graphViewModel = graphCatalog ? projectCatalogToGraphViewModel(graphCatalog) : null;
+  const graphViewModelBlock = serializeOptionalBlob('graph-view-model', graphViewModel, 'json');
+  const editorProtocolJs = serializeOptionalBlob('EDITOR_PROTOCOL', editorProtocol, 'literal');
 
   // Tool tabs are registered into a single registry; Overview is a
   // cross-tool aggregate kept fixed at position 0. The HTML tab
   // buttons, panel containers, and the renderXxxTab() invocation list
   // all derive from the same iteration so adding a new tab is a single
   // defineToolTab() call (see tool-tabs-registrations.ts).
-  const toolTabs = listToolTabs()
+  const toolTabs = listToolTabs();
   const toolTabButtons = toolTabs
-    .map(t => `  <div class="tab" data-tab="${t.id}">${t.icon} ${t.label}</div>`)
-    .join('\n')
+    .map((t) => `  <div class="tab" data-tab="${t.id}">${t.icon} ${t.label}</div>`)
+    .join('\n');
   const toolTabPanels = toolTabs
-    .map(t => `<div id="panel-${t.id}" class="tab-panel"></div>`)
-    .join('\n')
-  const toolTabRenderCalls = toolTabs
-    .map(t => `${t.renderFunctionName}();`)
-    .join('\n')
+    .map((t) => `<div id="panel-${t.id}" class="tab-panel"></div>`)
+    .join('\n');
+  const toolTabRenderCalls = toolTabs.map((t) => `${t.renderFunctionName}();`).join('\n');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -216,5 +207,5 @@ renderOverview();
 ${toolTabRenderCalls}
 </script>
 </body>
-</html>`
+</html>`;
 }

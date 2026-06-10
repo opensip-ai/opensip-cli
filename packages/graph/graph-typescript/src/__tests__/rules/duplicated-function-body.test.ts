@@ -11,12 +11,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { runFixture, writeFixture } from '../acceptance/_fixture-runner.js';
 
-
-
-
 describe('duplicated-function-body rule', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-dup-'));
-  afterAll(() => { rmSync(fixtureDir, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(fixtureDir, { recursive: true, force: true });
+  });
 
   writeFixture(fixtureDir, {
     'a.ts': `export function calculate(a: number, b: number): number {\n  if (a < 0) return 0;\n  if (b < 0) return 0;\n  const sum = a + b;\n  return sum * 2;\n}\n`,
@@ -30,7 +29,9 @@ describe('duplicated-function-body rule', () => {
     // Disable the wrapper-suppression threshold for this test so we are
     // exercising the rule's core grouping behavior, not its anti-wrapper
     // heuristic.
-    signals = duplicatedFunctionBodyRule.evaluate(catalog, buildIndexes(catalog), { minDuplicateBodySize: 0 });
+    signals = duplicatedFunctionBodyRule.evaluate(catalog, buildIndexes(catalog), {
+      minDuplicateBodySize: 0,
+    });
   });
 
   it('flags duplicated bodies across files', () => {

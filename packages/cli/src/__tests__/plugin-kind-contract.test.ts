@@ -45,11 +45,14 @@ function deriveValidMarkerKinds(packageJsonPaths: readonly string[]): Set<string
   const kinds = new Set<string>(['tool']);
   for (const p of packageJsonPaths) {
     const json = JSON.parse(readFileSync(p, 'utf8')) as {
-      opensipTools?: { capabilities?: { discovery?: { discovery?: { mode?: string; markerKind?: string } } }[] };
+      opensipTools?: {
+        capabilities?: { discovery?: { discovery?: { mode?: string; markerKind?: string } } }[];
+      };
     };
     for (const cap of json.opensipTools?.capabilities ?? []) {
       const mode = cap.discovery?.discovery;
-      if (mode?.mode === 'marker' && typeof mode.markerKind === 'string') kinds.add(mode.markerKind);
+      if (mode?.mode === 'marker' && typeof mode.markerKind === 'string')
+        kinds.add(mode.markerKind);
     }
   }
   return kinds;
@@ -143,7 +146,9 @@ describe('plugin-kind contract (workspace invariant)', () => {
 
   it("every declared kind is 'tool' or a manifest-declared marker (descriptor-driven, not a host union)", () => {
     const valid = [...VALID_MARKER_KINDS].sort();
-    const offenders = PACKAGES.filter((p) => p.kind !== undefined && !VALID_MARKER_KINDS.has(p.kind));
+    const offenders = PACKAGES.filter(
+      (p) => p.kind !== undefined && !VALID_MARKER_KINDS.has(p.kind),
+    );
     expect(
       offenders,
       `package(s) declare an unknown opensipTools.kind (typo? must be one of ${valid.join(', ')}):\n` +
@@ -200,7 +205,10 @@ describe('plugin-kind contract (workspace invariant)', () => {
     const present = new Set(PACKAGES.map((p) => p.name));
     for (const toolName of TOOL_PACKAGES) {
       const pkg = PACKAGES.find((p) => p.name === toolName);
-      expect(present.has(toolName), `expected tool package ${toolName} to exist in the workspace`).toBe(true);
+      expect(
+        present.has(toolName),
+        `expected tool package ${toolName} to exist in the workspace`,
+      ).toBe(true);
       expect(pkg?.kind, `${toolName} must declare opensipTools.kind: "tool"`).toBe('tool');
     }
   });

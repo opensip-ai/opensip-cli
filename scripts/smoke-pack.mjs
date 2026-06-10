@@ -121,10 +121,14 @@ for (const file of tarballs) {
   const unscoped = file.slice(TARBALL_PREFIX.length, -tarballSuffix.length);
   overrides[`${SCOPE}${unscoped}`] = `file:${join(tarballDir, file)}`;
 }
-info(`discovered ${Object.keys(overrides).length} @opensip-tools/* tarball(s) + the opensip-tools CLI`);
+info(
+  `discovered ${Object.keys(overrides).length} @opensip-tools/* tarball(s) + the opensip-tools CLI`,
+);
 
 if (!cliTarball) {
-  fail(`opensip-tools tarball (${cliFileName}) missing from ${tarballDir} — cannot smoke-test the entry point`);
+  fail(
+    `opensip-tools tarball (${cliFileName}) missing from ${tarballDir} — cannot smoke-test the entry point`,
+  );
 }
 
 // ---------------------------------------------------------------------
@@ -144,10 +148,7 @@ const consumerPkg = {
   dependencies: { 'opensip-tools': cliTarball },
   overrides,
 };
-await fs.writeFile(
-  join(workDir, 'package.json'),
-  `${JSON.stringify(consumerPkg, null, 2)}\n`,
-);
+await fs.writeFile(join(workDir, 'package.json'), `${JSON.stringify(consumerPkg, null, 2)}\n`);
 
 // Pack a fixture plugin dir (under packages/cli/.../fixtures/) into a .tgz in
 // the work dir and return the absolute tarball path. `npm pack` prints the
@@ -177,7 +178,9 @@ try {
       stdio: 'inherit',
     });
   } catch {
-    fail('npm install of the packed tarballs failed — a tarball is broken or a dep is unresolvable.');
+    fail(
+      'npm install of the packed tarballs failed — a tarball is broken or a dep is unresolvable.',
+    );
   }
 
   // The real consumer entry point: the bin shim npm created.
@@ -229,7 +232,9 @@ try {
       for (const f of r.failures) console.error(`[smoke-pack]     - ${f}`);
       if (childErr) console.error(`[smoke-pack]     child stderr:\n${childErr}`);
     }
-    fail(`${hardFailures.length}/${results.length} packed-smoke scenario(s) failed — the packed artifacts do not behave correctly together.`);
+    fail(
+      `${hardFailures.length}/${results.length} packed-smoke scenario(s) failed — the packed artifacts do not behave correctly together.`,
+    );
   }
 
   info(`all ${passed}/${results.length} packed-artifact smoke scenarios passed — safe to publish.`);

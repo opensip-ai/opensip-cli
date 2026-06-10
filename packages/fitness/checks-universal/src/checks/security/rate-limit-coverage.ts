@@ -2,10 +2,9 @@
  * @fileoverview Validate routes have rate limiting configured
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness'
-
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness';
 
 /**
  * Pre-compiled regex patterns for rate limit detection.
@@ -14,26 +13,29 @@ import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fit
 const RATE_LIMIT_REGEX = new RegExp(
   'rateLimit|rateLimiter|preHandler.*rateLimit|onRequest.*rateLimit',
   'i',
-)
-const INTERNAL_ROUTE_REGEX = new RegExp('/health|/metrics|/ready|/live|internal', 'i')
+);
+const INTERNAL_ROUTE_REGEX = new RegExp('/health|/metrics|/ready|/live|internal', 'i');
 const FASTIFY_ROUTE_REGEX = new RegExp(
   'fastify\\.(get|post|put|patch|delete)\\s*\\(\\s*[\'"`]/api[^\'"`]*[\'"`]',
   'gi',
-)
+);
 const EXPRESS_ROUTE_REGEX = new RegExp(
   '(?:app|router)\\.(get|post|put|patch|delete)\\s*\\(\\s*[\'"`]/api[^\'"`]*[\'"`]',
   'gi',
-)
+);
 const SENSITIVE_ENDPOINT_REGEX = new RegExp(
   '\\.(post|put)\\s*\\(\\s*[\'"`][^\'"`]*(?:login|signin|signup|register|password|reset|auth|token)[^\'"`]*[\'"`]',
   'gi',
-)
+);
 const GLOBAL_RATE_LIMIT_REGISTER_REGEX = new RegExp(
   String.raw`register\s*\(\s*(?:rateLimit|rateLimiter)`,
   'i',
-)
-const GLOBAL_RATE_LIMIT_USE_REGEX = new RegExp(String.raw`use\s*\(\s*(?:rateLimit|rateLimiter)`, 'i')
-const FRAMEWORK_DETECT_REGEX = /(?:fastify|app|router)\.(get|post|put|patch|delete)\s*\(/i
+);
+const GLOBAL_RATE_LIMIT_USE_REGEX = new RegExp(
+  String.raw`use\s*\(\s*(?:rateLimit|rateLimiter)`,
+  'i',
+);
+const FRAMEWORK_DETECT_REGEX = /(?:fastify|app|router)\.(get|post|put|patch|delete)\s*\(/i;
 
 /**
  * Check if context has rate limiting
@@ -44,8 +46,8 @@ function hasRateLimiting(context: string): boolean {
   logger.debug({
     evt: 'fitness.checks.rate_limit_coverage.has_rate_limiting',
     msg: 'Checking if context has rate limiting',
-  })
-  return RATE_LIMIT_REGEX.test(context)
+  });
+  return RATE_LIMIT_REGEX.test(context);
 }
 
 /**
@@ -57,8 +59,8 @@ function isInternalRoute(context: string): boolean {
   logger.debug({
     evt: 'fitness.checks.rate_limit_coverage.is_internal_route',
     msg: 'Checking if route is internal',
-  })
-  return INTERNAL_ROUTE_REGEX.test(context)
+  });
+  return INTERNAL_ROUTE_REGEX.test(context);
 }
 
 // Patterns that indicate route definitions needing rate limiting
@@ -90,7 +92,7 @@ const ROUTE_PATTERNS = [
       'Authentication endpoints must have strict rate limiting to prevent brute force attacks. Apply a limit of ~5-10 requests per minute for login/password endpoints.',
     severity: 'error' as const,
   },
-]
+];
 
 /**
  * Check: security/rate-limit-coverage
@@ -123,43 +125,43 @@ export const rateLimitCoverage = defineCheck({
     logger.debug({
       evt: 'fitness.checks.rate_limit_coverage.analyze',
       msg: 'Analyzing file for rate limit coverage',
-    })
+    });
     // Only check files that might define routes
     if (!FRAMEWORK_DETECT_REGEX.test(stripStringsAndComments(content))) {
-      return []
+      return [];
     }
 
     // Check if file has global rate limiting applied
     const hasGlobalRateLimit =
-      GLOBAL_RATE_LIMIT_REGISTER_REGEX.test(content) || GLOBAL_RATE_LIMIT_USE_REGEX.test(content)
+      GLOBAL_RATE_LIMIT_REGISTER_REGEX.test(content) || GLOBAL_RATE_LIMIT_USE_REGEX.test(content);
 
     // If global rate limiting is applied, skip detailed checking
     if (hasGlobalRateLimit) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? ''
+      const line = lines[lineNum] ?? '';
 
       // Get context (current line + next few lines)
-      const context = lines.slice(lineNum, lineNum + 8).join(' ')
+      const context = lines.slice(lineNum, lineNum + 8).join(' ');
 
       // Skip comments
-      const trimmed = line.trim()
+      const trimmed = line.trim();
       if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
-        continue
+        continue;
       }
 
-      const strippedLine = stripStringLiterals(line)
-      const strippedContext = stripStringLiterals(context)
+      const strippedLine = stripStringLiterals(line);
+      const strippedContext = stripStringLiterals(context);
 
       for (const pattern of ROUTE_PATTERNS) {
         // Reset regex state
-        pattern.regex.lastIndex = 0
-        const match = pattern.regex.exec(strippedLine)
+        pattern.regex.lastIndex = 0;
+        const match = pattern.regex.exec(strippedLine);
         if (match && pattern.check(strippedContext)) {
           violations.push({
             line: lineNum + 1,
@@ -169,11 +171,11 @@ export const rateLimitCoverage = defineCheck({
             suggestion: pattern.suggestion,
             match: match[0],
             filePath,
-          })
+          });
         }
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

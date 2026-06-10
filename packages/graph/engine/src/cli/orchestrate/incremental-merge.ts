@@ -19,11 +19,7 @@ import type {
   ParsedProject,
   WalkOutput,
 } from '../../lang-adapter/types.js';
-import type {
-  Catalog,
-  CallEdge,
-  FunctionOccurrence,
-} from '../../types.js';
+import type { Catalog, CallEdge, FunctionOccurrence } from '../../types.js';
 
 export interface ClosureInput {
   readonly adapter: GraphLanguageAdapter;
@@ -195,10 +191,7 @@ function findEdgeDependents(
   return [...dependents].sort();
 }
 
-function occHasEdgeIntoStale(
-  occ: FunctionOccurrence,
-  staleHashes: ReadonlySet<string>,
-): boolean {
+function occHasEdgeIntoStale(occ: FunctionOccurrence, staleHashes: ReadonlySet<string>): boolean {
   for (const edge of occ.calls) {
     for (const target of edge.to) {
       if (staleHashes.has(target)) return true;

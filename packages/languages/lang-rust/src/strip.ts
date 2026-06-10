@@ -24,35 +24,35 @@ import {
   scanRegularString,
   type Region,
   type ScanResult,
-} from '@opensip-tools/core'
+} from '@opensip-tools/core';
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- token-state-machine: cyclomatic complexity is inherent to lexer-style scanners; splitting hurts readability
 function scan(src: string): ScanResult {
-  const stringRegions: Region[] = []
-  const commentRegions: Region[] = []
-  const len = src.length
-  let i = 0
+  const stringRegions: Region[] = [];
+  const commentRegions: Region[] = [];
+  const len = src.length;
+  let i = 0;
 
   while (i < len) {
-    const c = src[i]
-    const next = src[i + 1]
+    const c = src[i];
+    const next = src[i + 1];
 
     // Line comment: // ... \n
     if (c === '/' && next === '/') {
-      const start = i
-      const lc = scanLineComment(src, i)
-      i = lc.end
-      commentRegions.push({ start, end: i })
-      continue
+      const start = i;
+      const lc = scanLineComment(src, i);
+      i = lc.end;
+      commentRegions.push({ start, end: i });
+      continue;
     }
 
     // Block comment: /* ... */ with nesting
     if (c === '/' && next === '*') {
-      const start = i
-      const bc = scanBlockCommentNesting(src, i)
-      i = bc.end
-      commentRegions.push({ start, end: i })
-      continue
+      const start = i;
+      const bc = scanBlockCommentNesting(src, i);
+      i = bc.end;
+      commentRegions.push({ start, end: i });
+      continue;
     }
 
     // Raw string: r"..." or r#"..."# or r##"..."## (any number of #)
@@ -61,58 +61,58 @@ function scan(src: string): ScanResult {
       (c === 'r' && (next === '"' || next === '#')) ||
       (c === 'b' && src[i + 1] === 'r' && (src[i + 2] === '"' || src[i + 2] === '#'))
     ) {
-      const prefixLen = c === 'b' ? 2 : 1 // br vs r
-      let j = i + prefixLen
-      let hashes = 0
+      const prefixLen = c === 'b' ? 2 : 1; // br vs r
+      let j = i + prefixLen;
+      let hashes = 0;
       while (j < len && src[j] === '#') {
-        hashes++
-        j++
+        hashes++;
+        j++;
       }
       if (j < len && src[j] === '"') {
-        const contentStart = j + 1
-        j++
+        const contentStart = j + 1;
+        j++;
         // Find closing " followed by `hashes` # characters
         while (j < len) {
           if (src[j] === '"') {
-            let k = 0
-            while (k < hashes && src[j + 1 + k] === '#') k++
+            let k = 0;
+            while (k < hashes && src[j + 1 + k] === '#') k++;
             if (k === hashes) {
-              const contentEnd = j
-              stringRegions.push({ start: contentStart, end: contentEnd })
-              j += 1 + hashes
-              i = j
-              break
+              const contentEnd = j;
+              stringRegions.push({ start: contentStart, end: contentEnd });
+              j += 1 + hashes;
+              i = j;
+              break;
             }
           }
-          j++
+          j++;
         }
         if (j >= len) {
           // Unterminated raw string — record what we have
-          stringRegions.push({ start: contentStart, end: len })
-          i = len
+          stringRegions.push({ start: contentStart, end: len });
+          i = len;
         }
-        continue
+        continue;
       }
       // Not actually a raw string (e.g. `r` is just an identifier)
-      i++
-      continue
+      i++;
+      continue;
     }
 
     // Byte string: b"..." — Rust strings may span multiple lines.
     if (c === 'b' && next === '"') {
-      i++
-      const result = scanRegularString(src, i, { allowMultiline: true })
-      stringRegions.push({ start: i + 1, end: result.contentEnd })
-      i = result.next
-      continue
+      i++;
+      const result = scanRegularString(src, i, { allowMultiline: true });
+      stringRegions.push({ start: i + 1, end: result.contentEnd });
+      i = result.next;
+      continue;
     }
 
     // Regular string: "..." — Rust strings may span multiple lines.
     if (c === '"') {
-      const result = scanRegularString(src, i, { allowMultiline: true })
-      stringRegions.push({ start: i + 1, end: result.contentEnd })
-      i = result.next
-      continue
+      const result = scanRegularString(src, i, { allowMultiline: true });
+      stringRegions.push({ start: i + 1, end: result.contentEnd });
+      i = result.next;
+      continue;
     }
 
     // Char literal: '...' — skip without recording (char literals are single chars)
@@ -120,10 +120,10 @@ function scan(src: string): ScanResult {
     // Otherwise it's a lifetime annotation ('a, 'static, etc.).
     if (c === "'") {
       // Lifetime: 'identifier (no closing quote)
-      const after = src[i + 1]
+      const after = src[i + 1];
       if (after === undefined) {
-        i++
-        continue
+        i++;
+        continue;
       }
       // Look ahead to see if there's a closing quote within ~8 chars.
       // (Same heuristic the previous inline scanner used.) Core's
@@ -135,41 +135,41 @@ function scan(src: string): ScanResult {
       // decision local to the lexer state machine and the explicit
       // `escape`/`foundClose` variables are easier to follow for the
       // Rust-specific edge cases the test suite exercises.
-      const maxScan = Math.min(i + 8, len)
-      let foundClose = -1
-      let escape = false
+      const maxScan = Math.min(i + 8, len);
+      let foundClose = -1;
+      let escape = false;
       for (let k = i + 1; k < maxScan; k++) {
         if (escape) {
-          escape = false
-          continue
+          escape = false;
+          continue;
         }
         if (src[k] === '\\') {
-          escape = true
-          continue
+          escape = true;
+          continue;
         }
         if (src[k] === "'") {
-          foundClose = k
-          break
+          foundClose = k;
+          break;
         }
       }
       if (foundClose >= 0) {
         // Char literal — preserve as code (don't strip)
-        i = foundClose + 1
+        i = foundClose + 1;
       } else {
         // Lifetime — skip the apostrophe and continue
-        i++
+        i++;
       }
-      continue
+      continue;
     }
 
-    i++
+    i++;
   }
 
-  return { stringRegions, commentRegions }
+  return { stringRegions, commentRegions };
 }
 
-const stripper = makeStripper(scan)
+const stripper = makeStripper(scan);
 /** Replace string literal content with whitespace; preserves length. */
-export const stripStrings = stripper.stripStrings
+export const stripStrings = stripper.stripStrings;
 /** Replace string literals AND comments with whitespace; preserves length. */
-export const stripComments = stripper.stripComments
+export const stripComments = stripper.stripComments;

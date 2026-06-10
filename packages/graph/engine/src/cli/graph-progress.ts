@@ -50,7 +50,12 @@ export function toProgressEvent(event: GraphProgressEvent, sharded = false): Pro
     return { type: 'stage-start', stage: event.stage, label: labels[event.stage] };
   }
   if (event.type === 'stage-done') {
-    return { type: 'stage-done', stage: event.stage, durationMs: event.durationMs ?? 0, detail: event.detail };
+    return {
+      type: 'stage-done',
+      stage: event.stage,
+      durationMs: event.durationMs ?? 0,
+      detail: event.detail,
+    };
   }
   return { type: 'stage-cached', stage: event.stage };
 }

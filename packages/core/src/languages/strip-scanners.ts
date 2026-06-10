@@ -154,7 +154,11 @@ export function scanLineComment(
  * `bodyStart` bounds the back-walk so we do not count backslashes from
  * before the `//` opener.
  */
-function hasUnescapedTrailingBackslash(src: string, bodyStart: number, newlinePos: number): boolean {
+function hasUnescapedTrailingBackslash(
+  src: string,
+  bodyStart: number,
+  newlinePos: number,
+): boolean {
   let count = 0;
   let k = newlinePos - 1;
   while (k >= bodyStart && src[k] === '\\') {

@@ -21,10 +21,7 @@ import {
 } from './incremental-merge.js';
 
 import type { GraphProgressCallback, GraphStage } from './types.js';
-import type {
-  DiscoverOutput,
-  GraphLanguageAdapter,
-} from '../../lang-adapter/types.js';
+import type { DiscoverOutput, GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type {
   Catalog,
   CallEdge,
@@ -115,27 +112,35 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
     stage: 'parse',
     onProgress,
     monitor,
-    fn: () => adapter.parseProject({
-      projectDirAbs: discovery.projectDirAbs,
-      files: discovery.files,
-      compilerOptions: discovery.compilerOptions,
-      resolutionMode,
-    }),
+    fn: () =>
+      adapter.parseProject({
+        projectDirAbs: discovery.projectDirAbs,
+        files: discovery.files,
+        compilerOptions: discovery.compilerOptions,
+        resolutionMode,
+      }),
     detailFn: () => adapter.displayName,
   });
   const walked = await runStage({
     stage: 'walk',
     onProgress,
     monitor,
-    fn: () => adapter.walkProject({
-      project: parsed.project,
-      files: discovery.files,
-      projectDirAbs: discovery.projectDirAbs,
-    }),
+    fn: () =>
+      adapter.walkProject({
+        project: parsed.project,
+        files: discovery.files,
+        projectDirAbs: discovery.projectDirAbs,
+      }),
     detailFn: (w) => `${String(Object.keys(w.occurrences).length)} functions`,
   });
 
-  const initialCatalog = assembleCatalog(adapter, discovery, walked.occurrences, resolutionMode, engineMode);
+  const initialCatalog = assembleCatalog(
+    adapter,
+    discovery,
+    walked.occurrences,
+    resolutionMode,
+    engineMode,
+  );
 
   // Stitch inside the resolve stage so the checklist detail counts the
   // catalog's resolved call edges — the same catalog-derived
@@ -206,17 +211,27 @@ export interface IncrementalCatalogBuildOptions {
 export async function buildAndResolveCatalogIncremental(
   options: IncrementalCatalogBuildOptions,
 ): Promise<{ readonly catalog: Catalog; readonly resolutionStats: ResolutionStats }> {
-  const { runStage, adapter, discovery, cachedCatalog, changedFilesAbs, resolutionMode, onProgress, monitor } = options;
+  const {
+    runStage,
+    adapter,
+    discovery,
+    cachedCatalog,
+    changedFilesAbs,
+    resolutionMode,
+    onProgress,
+    monitor,
+  } = options;
   const parsed = await runStage({
     stage: 'parse',
     onProgress,
     monitor,
-    fn: () => adapter.parseProject({
-      projectDirAbs: discovery.projectDirAbs,
-      files: discovery.files,
-      compilerOptions: discovery.compilerOptions,
-      resolutionMode,
-    }),
+    fn: () =>
+      adapter.parseProject({
+        projectDirAbs: discovery.projectDirAbs,
+        files: discovery.files,
+        compilerOptions: discovery.compilerOptions,
+        resolutionMode,
+      }),
     detailFn: () => `${adapter.displayName} (incremental)`,
   });
 
@@ -224,13 +239,14 @@ export async function buildAndResolveCatalogIncremental(
     stage: 'walk',
     onProgress,
     monitor,
-    fn: () => expandClosureToFixpoint({
-      adapter,
-      discovery,
-      cachedCatalog,
-      parsedProject: parsed.project,
-      changedFilesAbs,
-    }),
+    fn: () =>
+      expandClosureToFixpoint({
+        adapter,
+        discovery,
+        cachedCatalog,
+        parsedProject: parsed.project,
+        changedFilesAbs,
+      }),
     detailFn: (out) => `${String(out.closureRel.size)} closure file(s)`,
   });
 
@@ -395,9 +411,7 @@ function stitchEdges(
       // Omit `dependencies` entirely when no edges resolved — the
       // optional field stays absent, matching the pre-Phase-4 wire
       // shape for adapters that don't emit dependency sites.
-      return dependencies === undefined
-        ? { ...o, calls }
-        : { ...o, calls, dependencies };
+      return dependencies === undefined ? { ...o, calls } : { ...o, calls, dependencies };
     });
   }
   return { ...initial, functions: next };

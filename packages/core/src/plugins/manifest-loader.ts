@@ -81,10 +81,7 @@ const LOADER_MODULE = 'core:plugins';
  *   `plugin.manifest.read_failed` diagnostic) when the file is missing,
  *   unparseable, or fails identity validation.
  */
-export function loadToolManifest(
-  source: ToolSource,
-  dir: string,
-): ToolPluginManifest | undefined {
+export function loadToolManifest(source: ToolSource, dir: string): ToolPluginManifest | undefined {
   // Both authored sources (project-local + user-global) declare identity via
   // the JSON sidecar; bundled/installed read package.json#opensipTools.
   const authored = source === 'project-local' || source === 'user-global';
@@ -301,9 +298,7 @@ const CONTRIBUTION_KINDS: readonly CapabilityContributionKind[] = [
  * `undefined` when the slot is malformed (the caller fails the manifest,
  * mirroring `normalizeCommands`). The absent case is handled by the caller.
  */
-function normalizeCapabilities(
-  value: unknown,
-): readonly ToolCapabilityDeclaration[] | undefined {
+function normalizeCapabilities(value: unknown): readonly ToolCapabilityDeclaration[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const out: ToolCapabilityDeclaration[] = [];
   for (const entry of value) {

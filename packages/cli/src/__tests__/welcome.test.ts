@@ -17,7 +17,7 @@ afterEach(() => {
 
 /** Pattern that matches the ANSI CSI prefix (ESC + '['). Constructed from
  * the Unicode escape so the source file stays free of literal control bytes. */
-const ANSI_PATTERN = new RegExp(String.raw`${String.fromCodePoint(0x1B)}\[`);
+const ANSI_PATTERN = new RegExp(String.raw`${String.fromCodePoint(0x1b)}\[`);
 
 describe('buildWelcome', () => {
   it('includes the version and primary subcommands', () => {

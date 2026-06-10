@@ -19,12 +19,7 @@ import type {
   ResolveOutput,
   WalkOutput,
 } from '../../../lang-adapter/types.js';
-import type {
-  Catalog,
-  CallEdge,
-  DependencyEdge,
-  FunctionOccurrence,
-} from '../../../types.js';
+import type { Catalog, CallEdge, DependencyEdge, FunctionOccurrence } from '../../../types.js';
 import type { RunStage } from '../catalog-builder.js';
 
 // A pass-through runStage: just invoke the work fn. The orchestrator's
@@ -102,7 +97,13 @@ function incrementalAdapter(opts: {
     resolveCallSites: (): ResolveOutput => ({
       edgesByOwner: opts.edges,
       dependenciesByOwner: opts.deps,
-      stats: { totalCallSites: 1, resolvedHigh: 1, resolvedMedium: 0, resolvedLow: 0, unresolved: 0 },
+      stats: {
+        totalCallSites: 1,
+        resolvedHigh: 1,
+        resolvedMedium: 0,
+        resolvedLow: 0,
+        unresolved: 0,
+      },
     }),
     cacheKey: () => 'fake-v1',
   } as unknown as GraphLanguageAdapter;
@@ -113,13 +114,23 @@ describe('buildAndResolveCatalogIncremental', () => {
 
   it('re-resolves closure files and keeps cached edges for unchanged files', async () => {
     const cachedEdge: CallEdge = {
-      to: ['B1'], line: 5, column: 1, resolution: 'static', confidence: 'high', text: 'b()',
+      to: ['B1'],
+      line: 5,
+      column: 1,
+      resolution: 'static',
+      confidence: 'high',
+      text: 'b()',
     };
     const cached = catalogOf(occ('a', 'a.ts', 'A1'), occ('b', 'b.ts', 'B1', [cachedEdge]));
 
     // a.ts changed → re-walks to A2 with a fresh edge into B1.
     const freshEdge: CallEdge = {
-      to: ['B1'], line: 7, column: 1, resolution: 'static', confidence: 'high', text: 'b()',
+      to: ['B1'],
+      line: 7,
+      column: 1,
+      resolution: 'static',
+      confidence: 'high',
+      text: 'b()',
     };
     const adapter = incrementalAdapter({
       walked: { 'a.ts': [occ('a', 'a.ts', 'A2')] },

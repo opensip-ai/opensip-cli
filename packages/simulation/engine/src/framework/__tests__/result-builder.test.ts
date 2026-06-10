@@ -175,8 +175,18 @@ describe('mergeMetrics', () => {
   });
 
   it('sums totals and weights average latency', () => {
-    const a = baseMetrics({ totalRequests: 100, successfulRequests: 100, failedRequests: 0, avgLatencyMs: 50 });
-    const b = baseMetrics({ totalRequests: 100, successfulRequests: 50, failedRequests: 50, avgLatencyMs: 150 });
+    const a = baseMetrics({
+      totalRequests: 100,
+      successfulRequests: 100,
+      failedRequests: 0,
+      avgLatencyMs: 50,
+    });
+    const b = baseMetrics({
+      totalRequests: 100,
+      successfulRequests: 50,
+      failedRequests: 50,
+      avgLatencyMs: 150,
+    });
     const merged = mergeMetrics([a, b]);
     expect(merged.totalRequests).toBe(200);
     expect(merged.successfulRequests).toBe(150);

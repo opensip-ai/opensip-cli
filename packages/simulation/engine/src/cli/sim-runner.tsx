@@ -108,7 +108,12 @@ export interface SimRunnerProps {
 
 /** The sim live-view component (loading → running → done/error). Exported for
  *  testing; production renders it through {@link renderSimLive}. */
-export function SimRunner({ args, setExitCode, onEnvelope, datastore }: SimRunnerProps): React.ReactElement {
+export function SimRunner({
+  args,
+  setExitCode,
+  onEnvelope,
+  datastore,
+}: SimRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<SimState>({ phase: 'loading' });
 
@@ -149,13 +154,19 @@ export function SimRunner({ args, setExitCode, onEnvelope, datastore }: SimRunne
         onEnvelope?.(result.envelope);
         setState({
           phase: 'done',
-          result: { envelope: result.envelope, durationMs: result.durationMs, verboseDetail: result.verboseDetail },
+          result: {
+            envelope: result.envelope,
+            durationMs: result.durationMs,
+            verboseDetail: result.verboseDetail,
+          },
         });
       }
       setTimeout(() => exit(), 100);
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (state.phase === 'error') {
@@ -168,22 +179,29 @@ export function SimRunner({ args, setExitCode, onEnvelope, datastore }: SimRunne
   const bannerSize = normalizeBannerSize(ui?.bannerSize);
   const recipe = args.recipe ?? 'default';
 
-  const header = args.quiet === true ? null : (
-    <Static items={['header']}>
-      {() => (
-        <React.Fragment key="header">
-          <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} update={ui?.update} />
-          {bannerSize === 'mini' && ui?.update !== undefined && <UpdateHint />}
-          {bannerSize !== 'mini' && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
-          <RunHeader
-            tool={SIM_TOOL_TITLE}
-            description={SIM_TOOL_DESCRIPTION}
-            metadata={[{ label: 'Recipe', value: recipe }]}
-          />
-        </React.Fragment>
-      )}
-    </Static>
-  );
+  const header =
+    args.quiet === true ? null : (
+      <Static items={['header']}>
+        {() => (
+          <React.Fragment key="header">
+            <Banner
+              size={bannerSize}
+              version={ui?.version}
+              projectPath={args.cwd}
+              walkedUp={walkedUp}
+              update={ui?.update}
+            />
+            {bannerSize === 'mini' && ui?.update !== undefined && <UpdateHint />}
+            {bannerSize !== 'mini' && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
+            <RunHeader
+              tool={SIM_TOOL_TITLE}
+              description={SIM_TOOL_DESCRIPTION}
+              metadata={[{ label: 'Recipe', value: recipe }]}
+            />
+          </React.Fragment>
+        )}
+      </Static>
+    );
 
   if (state.phase === 'loading') {
     return (
@@ -208,7 +226,9 @@ export function SimRunner({ args, setExitCode, onEnvelope, datastore }: SimRunne
   const { summary } = state.result.envelope.verdict;
   const { verboseDetail } = state.result;
   const findingsDetail =
-    verboseDetail?.kind === 'findings' && verboseDetail.groups.length > 0 ? verboseDetail : undefined;
+    verboseDetail?.kind === 'findings' && verboseDetail.groups.length > 0
+      ? verboseDetail
+      : undefined;
   return (
     <>
       {header}
@@ -227,10 +247,18 @@ export function SimRunner({ args, setExitCode, onEnvelope, datastore }: SimRunne
           <RunFooterHints
             hints={
               args.verbose === true
-                ? [{ text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] }]
+                ? [
+                    {
+                      text: 'opensip-tools dashboard for HTML report',
+                      bold: ['opensip-tools dashboard'],
+                    },
+                  ]
                 : [
                     VERBOSE_DETAIL_HINT,
-                    { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
+                    {
+                      text: 'opensip-tools dashboard for HTML report',
+                      bold: ['opensip-tools dashboard'],
+                    },
                   ]
             }
           />
@@ -261,7 +289,9 @@ export async function renderSimLive(
         <SimRunner
           args={args}
           setExitCode={options?.setExitCode}
-          onEnvelope={(e) => { envelope = e; }}
+          onEnvelope={(e) => {
+            envelope = e;
+          }}
           datastore={options?.datastore}
         />
       </ClockProvider>

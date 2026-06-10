@@ -4,10 +4,9 @@
  * Detects API handlers and functions accepting external input without validation.
  */
 
-
-import { createPathMatcher, defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { createPathMatcher, defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Paths that should be excluded from validation check
@@ -30,21 +29,21 @@ const EXCLUDED_PATH_SEGMENTS = [
   '/core/',
   '/shared/',
   '/common/',
-]
+];
 
-const isExcludedValidationPath = createPathMatcher(EXCLUDED_PATH_SEGMENTS)
+const isExcludedValidationPath = createPathMatcher(EXCLUDED_PATH_SEGMENTS);
 
 type FunctionLike =
   | ts.FunctionDeclaration
   | ts.MethodDeclaration
   | ts.ArrowFunction
-  | ts.FunctionExpression
+  | ts.FunctionExpression;
 
 /**
  * Quick filter regex for handler patterns
  */
 const QUICK_FILTER_HANDLER_PATTERNS =
-  /\b(req|request|res|response|reply|handler|Handler|route|Route|endpoint|Endpoint|controller|Controller)\b/
+  /\b(req|request|res|response|reply|handler|Handler|route|Route|endpoint|Endpoint|controller|Controller)\b/;
 
 /**
  * Validation patterns
@@ -58,7 +57,7 @@ const VALIDATION_PATTERNS = [
   /\.validate\s*\(/,
   /validator\./i,
   /assertValid/i,
-]
+];
 
 /**
  * @param {*} node
@@ -68,41 +67,41 @@ const VALIDATION_PATTERNS = [
 // @fitness-ignore-next-line duplicate-utility-functions -- Check-specific helper typed to FunctionLike; each fitness check defines its own variant for its node type
 function getFunctionName(node: FunctionLike): string {
   /* v8 ignore next -- defensive AST/type guard */
-  if (ts.isFunctionDeclaration(node) && node.name) return node.name.text
+  if (ts.isFunctionDeclaration(node) && node.name) return node.name.text;
   /* v8 ignore next -- defensive AST/type guard */
-  if (ts.isMethodDeclaration(node) && ts.isIdentifier(node.name)) return node.name.text
+  if (ts.isMethodDeclaration(node) && ts.isIdentifier(node.name)) return node.name.text;
   /* v8 ignore next -- defensive AST/type guard */
   if (ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)) {
-    return node.parent.name.text
+    return node.parent.name.text;
   }
-  return 'anonymous'
+  return 'anonymous';
 }
 
 /**
  * Check if function has API handler parameters
  */
 function hasApiParams(params: ts.NodeArray<ts.ParameterDeclaration>): boolean {
-  if (params.length < 2) return false
+  if (params.length < 2) return false;
 
-  const [firstParam, secondParam] = params
+  const [firstParam, secondParam] = params;
   /* v8 ignore next -- defensive AST/type guard */
-  if (!firstParam || !secondParam) return false
+  if (!firstParam || !secondParam) return false;
 
-  const firstName = ts.isIdentifier(firstParam.name) ? firstParam.name.text : ''
-  const secondName = ts.isIdentifier(secondParam.name) ? secondParam.name.text : ''
+  const firstName = ts.isIdentifier(firstParam.name) ? firstParam.name.text : '';
+  const secondName = ts.isIdentifier(secondParam.name) ? secondParam.name.text : '';
 
   // Express: (req, res) or Fastify: (request, reply)
   return (
     (/^(req|request)$/i.test(firstName) && /^(res|response)$/i.test(secondName)) ||
     (/^request$/i.test(firstName) && /^reply$/i.test(secondName))
-  )
+  );
 }
 
 /**
  * Check if function is an API handler
  */
 function isApiHandler(node: FunctionLike): boolean {
-  return hasApiParams(node.parameters)
+  return hasApiParams(node.parameters);
 }
 
 /**
@@ -110,41 +109,41 @@ function isApiHandler(node: FunctionLike): boolean {
  */
 function hasValidation(node: FunctionLike, sourceFile: ts.SourceFile): boolean {
   /* v8 ignore next -- defensive guard */
-  if (!node.body) return true // No body = nothing to validate
+  if (!node.body) return true; // No body = nothing to validate
 
-  const bodyText = node.body.getText(sourceFile)
-  return VALIDATION_PATTERNS.some((pattern) => pattern.test(bodyText))
+  const bodyText = node.body.getText(sourceFile);
+  return VALIDATION_PATTERNS.some((pattern) => pattern.test(bodyText));
 }
 
 /**
  * Analyze a file for missing input validation
  */
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Skip excluded paths
   if (isExcludedValidationPath(filePath)) {
-    return violations
+    return violations;
   }
 
   // Quick filter: skip files without handler patterns
   if (!QUICK_FILTER_HANDLER_PATTERNS.test(content)) {
-    return violations
+    return violations;
   }
 
   try {
-    const sourceFile = getSharedSourceFile(filePath, content)
+    const sourceFile = getSharedSourceFile(filePath, content);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
     const checkFunction = (node: FunctionLike): void => {
-      if (!isApiHandler(node)) return
+      if (!isApiHandler(node)) return;
 
-      const functionName = getFunctionName(node)
+      const functionName = getFunctionName(node);
       /* v8 ignore next -- defensive AST/type guard */
-      if (hasValidation(node, sourceFile)) return
+      if (hasValidation(node, sourceFile)) return;
 
-      const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+      const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
 
       violations.push({
         line: line + 1,
@@ -153,30 +152,30 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
         suggestion: 'Add input validation using Zod, Joi, or similar library',
         match: functionName,
         type: 'missing-validation',
-      })
-    }
+      });
+    };
 
     const visit = (node: ts.Node): void => {
       if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) {
-        checkFunction(node)
+        checkFunction(node);
       }
       if (
         ts.isVariableDeclaration(node) &&
         node.initializer &&
         (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
       ) {
-        checkFunction(node.initializer)
+        checkFunction(node.initializer);
       }
-      ts.forEachChild(node, visit)
-    }
+      ts.forEachChild(node, visit);
+    };
 
-    visit(sourceFile)
-  /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+    visit(sourceFile);
+    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
   } catch {
     // @swallow-ok Skip files that fail to parse
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -206,4 +205,4 @@ export const missingInputValidation = defineCheck({
   fileTypes: ['ts'],
 
   analyze: analyzeFile,
-})
+});

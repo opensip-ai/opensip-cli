@@ -15,9 +15,14 @@
  * `getCheckConfig` and merges it into the effective sync-call sets.
  */
 
-import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile, isInAsyncContext } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import {
+  defineCheck,
+  getCheckConfig,
+  isTestFile,
+  type CheckViolation,
+} from '@opensip-tools/fitness';
+import { getSharedSourceFile, isInAsyncContext } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Recipe-config shape for the detached-promises check. Each field augments the
@@ -27,11 +32,11 @@ import * as ts from 'typescript'
  */
 export interface DetachedPromisesConfig extends Record<string, unknown> {
   /** Method/function names that are synchronous (no await needed). */
-  additionalSyncFunctions?: readonly string[]
+  additionalSyncFunctions?: readonly string[];
   /** Receiver identifiers (the part before the dot) that are synchronous. */
-  additionalSyncReceivers?: readonly string[]
+  additionalSyncReceivers?: readonly string[];
   /** Method-name prefixes that mark a call as synchronous (e.g. `'wire'`). */
-  additionalSyncPrefixes?: readonly string[]
+  additionalSyncPrefixes?: readonly string[];
 }
 
 /**
@@ -197,7 +202,7 @@ const KNOWN_SYNC_FUNCTIONS = new Set([
   'toLocaleTimeString',
   'toLocaleString',
   'now',
-])
+]);
 
 /**
  * Known synchronous receiver identifiers — generic JS / Node namespaces.
@@ -237,7 +242,7 @@ const KNOWN_SYNC_RECEIVERS = new Set([
   'Reflect',
   'Proxy',
   'Intl',
-])
+]);
 
 /**
  * Substrings to match against receiver variable names (case-insensitive).
@@ -255,7 +260,7 @@ const KNOWN_SYNC_RECEIVER_PATTERNS = [
   'timer',
   'counter',
   'gauge',
-]
+];
 
 /**
  * File path patterns that indicate CLI commands or route registrations.
@@ -270,7 +275,7 @@ const FILE_SKIP_PATTERNS = [
   '/plugins/',
   'register-routes',
   'register-plugins',
-]
+];
 
 /**
  * Method-name prefixes that indicate synchronous calls. Limited to broadly
@@ -304,15 +309,13 @@ const KNOWN_SYNC_PREFIXES = [
   'off',
   'once',
   'dispatch',
-]
+];
 
 /**
  * Method name suffixes that indicate synchronous calls.
  * Methods ending with these suffixes are synchronous by convention.
  */
-const KNOWN_SYNC_SUFFIXES = [
-  'Sync',
-]
+const KNOWN_SYNC_SUFFIXES = ['Sync'];
 
 /**
  * Fire-and-forget patterns that are intentionally not awaited.
@@ -324,16 +327,16 @@ const FIRE_AND_FORGET_PATTERNS = new Set([
   'setInterval',
   'nextTick',
   'queueMicrotask',
-])
+]);
 
 /**
  * Built-in defaults merged with the recipe's `detached-promises` config slice.
  * Built once per `analyze` invocation and threaded through helpers.
  */
 interface EffectiveSyncSets {
-  syncFunctions: ReadonlySet<string>
-  syncReceivers: ReadonlySet<string>
-  syncPrefixes: readonly string[]
+  syncFunctions: ReadonlySet<string>;
+  syncReceivers: ReadonlySet<string>;
+  syncPrefixes: readonly string[];
 }
 
 /**
@@ -341,22 +344,25 @@ interface EffectiveSyncSets {
  * recipe-provided augmentation for `detached-promises`.
  */
 function buildEffectiveSyncSets(): EffectiveSyncSets {
-  const cfg = getCheckConfig<DetachedPromisesConfig>('detached-promises')
-  const fns = new Set(KNOWN_SYNC_FUNCTIONS)
-  for (const name of cfg.additionalSyncFunctions ?? []) fns.add(name)
-  const recvs = new Set(KNOWN_SYNC_RECEIVERS)
-  for (const name of cfg.additionalSyncReceivers ?? []) recvs.add(name)
-  const prefixes = [...KNOWN_SYNC_PREFIXES, ...(cfg.additionalSyncPrefixes ?? [])]
-  return { syncFunctions: fns, syncReceivers: recvs, syncPrefixes: prefixes }
+  const cfg = getCheckConfig<DetachedPromisesConfig>('detached-promises');
+  const fns = new Set(KNOWN_SYNC_FUNCTIONS);
+  for (const name of cfg.additionalSyncFunctions ?? []) fns.add(name);
+  const recvs = new Set(KNOWN_SYNC_RECEIVERS);
+  for (const name of cfg.additionalSyncReceivers ?? []) recvs.add(name);
+  const prefixes = [...KNOWN_SYNC_PREFIXES, ...(cfg.additionalSyncPrefixes ?? [])];
+  return { syncFunctions: fns, syncReceivers: recvs, syncPrefixes: prefixes };
 }
 
 /**
  * Check if a method call expression is to a known synchronous receiver or method.
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- multi-pattern dispatcher: distinguishes receivers, methods, and aliased members across N known sync APIs
-function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression, sets: EffectiveSyncSets): boolean {
-  const methodName = expr.name.text
-  const receiverExpr = expr.expression
+function isKnownSyncMethodCall(
+  expr: ts.PropertyAccessExpression,
+  sets: EffectiveSyncSets,
+): boolean {
+  const methodName = expr.name.text;
+  const receiverExpr = expr.expression;
 
   // Check if method is known sync, fire-and-forget, or matches sync prefix
   if (
@@ -364,138 +370,138 @@ function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression, sets: Effectiv
     FIRE_AND_FORGET_PATTERNS.has(methodName) ||
     matchesSyncNamePattern(methodName, sets)
   ) {
-    return true
+    return true;
   }
 
   // Check if receiver is known sync object: logger.info(), path.join(), etc.
   if (ts.isIdentifier(receiverExpr)) {
-    const receiverName = receiverExpr.text
+    const receiverName = receiverExpr.text;
     if (sets.syncReceivers.has(receiverName)) {
-      return true
+      return true;
     }
     // Handle this.logger.info() via logger at end
     if (receiverName === 'this') {
-      return false
+      return false;
     }
   }
 
   // Handle nested: this.logger.info(), this.config.get(), this.callbacks.onUpdate()
   if (ts.isPropertyAccessExpression(receiverExpr)) {
-    const nestedName = receiverExpr.name.text
+    const nestedName = receiverExpr.name.text;
     if (sets.syncReceivers.has(nestedName)) {
-      return true
+      return true;
     }
     // Also walk to the root identifier of the chain. e.g. Pyroscope.default.start()
     // — the call's receiver is `Pyroscope.default` (PropertyAccess); the rightmost
     // segment is `default`, but the SDK identity is `Pyroscope`. Walk left to find it.
-    let cursor: ts.Node = receiverExpr.expression
+    let cursor: ts.Node = receiverExpr.expression;
 
     while (cursor && ts.isPropertyAccessExpression(cursor)) {
-      cursor = cursor.expression
+      cursor = cursor.expression;
     }
     if (ts.isIdentifier(cursor) && sets.syncReceivers.has(cursor.text)) {
-      return true
+      return true;
     }
   }
 
   // Check receiver name pattern matching (e.g. myLogger.info(), cliWriter.output())
   if (ts.isIdentifier(receiverExpr)) {
-    const receiverName = receiverExpr.text.toLowerCase()
+    const receiverName = receiverExpr.text.toLowerCase();
     if (KNOWN_SYNC_RECEIVER_PATTERNS.some((pattern) => receiverName.includes(pattern))) {
-      return true
+      return true;
     }
   }
 
-  return false
+  return false;
 }
 
 /**
  * Check if a function/method name matches a known synchronous prefix or suffix.
  */
 function matchesSyncNamePattern(name: string, sets: EffectiveSyncSets): boolean {
-  if (sets.syncPrefixes.some((prefix) => name.startsWith(prefix))) return true
-  if (KNOWN_SYNC_SUFFIXES.some((suffix) => name.endsWith(suffix))) return true
-  return false
+  if (sets.syncPrefixes.some((prefix) => name.startsWith(prefix))) return true;
+  if (KNOWN_SYNC_SUFFIXES.some((suffix) => name.endsWith(suffix))) return true;
+  return false;
 }
 
 /**
  * Check if a call expression is to a known synchronous function
  */
 function isKnownSyncCall(node: ts.CallExpression, sets: EffectiveSyncSets): boolean {
-  const expr = node.expression
+  const expr = node.expression;
 
   // super() calls — constructor delegation, always synchronous
   if (expr.kind === ts.SyntaxKind.SuperKeyword) {
-    return true
+    return true;
   }
 
   // Direct function call: functionName()
   if (ts.isIdentifier(expr)) {
-    const name = expr.text
+    const name = expr.text;
     if (
       sets.syncFunctions.has(name) ||
       FIRE_AND_FORGET_PATTERNS.has(name) ||
       matchesSyncNamePattern(name, sets)
     ) {
-      return true
+      return true;
     }
   }
 
   // Method call: receiver.method()
   if (ts.isPropertyAccessExpression(expr)) {
-    return isKnownSyncMethodCall(expr, sets)
+    return isKnownSyncMethodCall(expr, sets);
   }
 
-  return false
+  return false;
 }
 
 /**
  * Check if a call expression has explicit promise handling via .then/.catch/.finally chain
  */
 function hasPromiseChainHandling(node: ts.ExpressionStatement): boolean {
-  const expr = node.expression
-  if (!ts.isCallExpression(expr)) return false
+  const expr = node.expression;
+  if (!ts.isCallExpression(expr)) return false;
 
   // Check if the call itself is a .then/.catch/.finally method
   if (ts.isPropertyAccessExpression(expr.expression)) {
-    const methodName = expr.expression.name.text
+    const methodName = expr.expression.name.text;
     if (methodName === 'then' || methodName === 'catch' || methodName === 'finally') {
-      return true
+      return true;
     }
   }
 
-  return false
+  return false;
 }
 
 /**
  * Check if a statement is a floating expression (not assigned, awaited, or returned)
  */
 function isFloatingExpression(node: ts.ExpressionStatement): boolean {
-  const expr = node.expression
+  const expr = node.expression;
 
   // Check for void prefix: void doSomething()
 
   if (expr.kind === ts.SyntaxKind.VoidExpression) {
-    return false // Explicitly voided
+    return false; // Explicitly voided
   }
 
   // Must be a call expression
-  if (!ts.isCallExpression(expr)) return false
+  if (!ts.isCallExpression(expr)) return false;
 
   // Pattern: `(await x.foo()).bar()` and similar paren-wrapped awaits with a chained call.
   // The outer call is a CallExpression whose callee descends through PropertyAccess/Element
   // access into a ParenthesizedExpression wrapping an AwaitExpression. The await is the
   // real promise consumer; the chained sync call after it is not a floating promise.
-  if (containsAwaitedReceiver(expr)) return false
+  if (containsAwaitedReceiver(expr)) return false;
 
   // Pattern: `unwrap(await x.foo())`, `assertOk(await fn())`, `expectSuccess(await ...)`.
   // The outer call wraps an awaited promise — a sync helper that consumes a Result/value.
   // The await is the real promise consumer; the floating outer call only operates on the
   // already-resolved value. Marking the statement as floating produces false positives at
   // every boundary that uses a sync result-unwrap helper.
-  if (hasAwaitedArgument(expr)) return false
+  if (hasAwaitedArgument(expr)) return false;
 
-  return true
+  return true;
 }
 
 /**
@@ -506,9 +512,9 @@ function isFloatingExpression(node: ts.ExpressionStatement): boolean {
  */
 function hasAwaitedArgument(call: ts.CallExpression): boolean {
   for (const arg of call.arguments) {
-    if (isAwaitedExpression(arg)) return true
+    if (isAwaitedExpression(arg)) return true;
   }
-  return false
+  return false;
 }
 
 /**
@@ -516,21 +522,21 @@ function hasAwaitedArgument(call: ts.CallExpression): boolean {
  * the underlying expression is an `await`.
  */
 function isAwaitedExpression(node: ts.Expression): boolean {
-  let current: ts.Expression = node
+  let current: ts.Expression = node;
 
   while (current) {
-    if (ts.isAwaitExpression(current)) return true
+    if (ts.isAwaitExpression(current)) return true;
     if (ts.isParenthesizedExpression(current)) {
-      current = current.expression
-      continue
+      current = current.expression;
+      continue;
     }
     if (ts.isNonNullExpression(current)) {
-      current = current.expression
-      continue
+      current = current.expression;
+      continue;
     }
-    break
+    break;
   }
-  return false
+  return false;
 }
 
 /**
@@ -539,30 +545,30 @@ function isAwaitedExpression(node: ts.Expression): boolean {
  * tails like `(await x.f()).g().h`.
  */
 function containsAwaitedReceiver(call: ts.CallExpression): boolean {
-  let current: ts.Expression = call.expression
+  let current: ts.Expression = call.expression;
 
   while (current) {
     if (ts.isParenthesizedExpression(current)) {
-      const inner = current.expression
-      if (ts.isAwaitExpression(inner)) return true
-      current = inner
-      continue
+      const inner = current.expression;
+      if (ts.isAwaitExpression(inner)) return true;
+      current = inner;
+      continue;
     }
     if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
-      current = current.expression
-      continue
+      current = current.expression;
+      continue;
     }
     if (ts.isCallExpression(current)) {
-      current = current.expression
-      continue
+      current = current.expression;
+      continue;
     }
     if (ts.isNonNullExpression(current)) {
-      current = current.expression
-      continue
+      current = current.expression;
+      continue;
     }
-    break
+    break;
   }
-  return false
+  return false;
 }
 
 /**
@@ -573,85 +579,85 @@ function containsAwaitedReceiver(call: ts.CallExpression): boolean {
  */
 function isDefinedAsSyncInSameFile(expr: ts.CallExpression): boolean {
   // Must be this.method() pattern
-  if (!ts.isPropertyAccessExpression(expr.expression)) return false
-  const propAccess = expr.expression
-  if (propAccess.expression.kind !== ts.SyntaxKind.ThisKeyword) return false
+  if (!ts.isPropertyAccessExpression(expr.expression)) return false;
+  const propAccess = expr.expression;
+  if (propAccess.expression.kind !== ts.SyntaxKind.ThisKeyword) return false;
 
-  const methodName = propAccess.name.text
+  const methodName = propAccess.name.text;
 
   // Walk up to the enclosing class
-  let current: ts.Node | undefined = expr.parent
+  let current: ts.Node | undefined = expr.parent;
 
   while (current && !ts.isClassDeclaration(current) && !ts.isClassExpression(current)) {
-    current = current.parent
+    current = current.parent;
   }
 
-  if (!current) return false
+  if (!current) return false;
 
   // Look for a method with the same name in the class
   for (const member of current.members) {
-    if (!ts.isMethodDeclaration(member)) continue
-    if (!ts.isIdentifier(member.name)) continue
-    if (member.name.text !== methodName) continue
+    if (!ts.isMethodDeclaration(member)) continue;
+    if (!ts.isIdentifier(member.name)) continue;
+    if (member.name.text !== methodName) continue;
 
     // Found the method — check if it is NOT async
-    const isAsync = member.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)
-    return !isAsync
+    const isAsync = member.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword);
+    return !isAsync;
   }
 
-  return false
+  return false;
 }
 
 /**
  * Analyze a file for detached promise issues
  */
 function analyzeFileForDetachedPromises(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Skip CLI command files and route registrations — dominated by sync calls in async contexts
   if (FILE_SKIP_PATTERNS.some((pattern) => filePath.includes(pattern))) {
-    return violations
+    return violations;
   }
 
   // Build the effective sync-call sets once per file from defaults + recipe config.
-  const sets = buildEffectiveSyncSets()
+  const sets = buildEffectiveSyncSets();
 
   try {
     // @lazy-ok -- 'await' appears in string literals, not actual await expression
-    const sourceFile = getSharedSourceFile(filePath, content)
-    if (!sourceFile) return []
+    const sourceFile = getSharedSourceFile(filePath, content);
+    if (!sourceFile) return [];
 
     const visit = (node: ts.Node): void => {
-      ts.forEachChild(node, visit)
+      ts.forEachChild(node, visit);
 
       // Only check expression statements (standalone calls ending with ;)
-      if (!ts.isExpressionStatement(node)) return
+      if (!ts.isExpressionStatement(node)) return;
 
       // Skip void expressions entirely (explicitly fire-and-forget)
-      if (node.expression.kind === ts.SyntaxKind.VoidExpression) return
+      if (node.expression.kind === ts.SyntaxKind.VoidExpression) return;
 
       // Skip expressions with .then/.catch/.finally chains (explicitly handled)
-      if (hasPromiseChainHandling(node)) return
+      if (hasPromiseChainHandling(node)) return;
 
       // Must be a call expression
-      const expr = node.expression
-      if (!ts.isCallExpression(expr)) return
+      const expr = node.expression;
+      if (!ts.isCallExpression(expr)) return;
 
       // Must be inside an async context
-      if (!isInAsyncContext(node)) return
+      if (!isInAsyncContext(node)) return;
 
       // Skip known synchronous calls
-      if (isKnownSyncCall(expr, sets)) return
+      if (isKnownSyncCall(expr, sets)) return;
 
       // Skip this.method() calls where method is defined as sync in the same class
-      if (isDefinedAsSyncInSameFile(expr)) return
+      if (isDefinedAsSyncInSameFile(expr)) return;
 
       // Skip if this is a floating expression that's not a detached promise
-      if (!isFloatingExpression(node)) return
+      if (!isFloatingExpression(node)) return;
 
-      const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-      const lineNum = line + 1
-      const matchText = node.getText(sourceFile)
+      const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+      const lineNum = line + 1;
+      const matchText = node.getText(sourceFile);
 
       violations.push({
         line: lineNum,
@@ -663,15 +669,15 @@ function analyzeFileForDetachedPromises(content: string, filePath: string): Chec
           'Add await to ensure the promise is handled, or use void with error handling if intentionally fire-and-forget',
         match: matchText,
         filePath,
-      })
-    }
+      });
+    };
 
-    visit(sourceFile)
+    visit(sourceFile);
   } catch {
     // @swallow-ok Skip files that fail to parse
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -708,7 +714,7 @@ export const detachedPromises = defineCheck({
 
   analyze(content: string, filePath: string): CheckViolation[] {
     // Skip test files — detached promises in tests are low-risk
-    if (isTestFile(filePath)) return []
-    return analyzeFileForDetachedPromises(content, filePath)
+    if (isTestFile(filePath)) return [];
+    return analyzeFileForDetachedPromises(content, filePath);
   },
-})
+});

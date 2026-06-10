@@ -29,12 +29,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import {
-  LanguageRegistry,
-  RunScope,
-  ToolRegistry,
-  runWithScopeSync,
-} from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, ToolRegistry, runWithScopeSync } from '@opensip-tools/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -194,7 +189,10 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       expect(cmd, `expected a mounted '${name}' command`).toBeDefined();
       const resolution = cmd!.options.find((o) => o.long === '--resolution');
       expect(resolution, `${name} must declare --resolution`).toBeDefined();
-      expect((resolution as { argChoices?: readonly string[] }).argChoices).toEqual(['exact', 'fast']);
+      expect((resolution as { argChoices?: readonly string[] }).argChoices).toEqual([
+        'exact',
+        'fast',
+      ]);
       expect(resolution!.defaultValue).toBe('exact');
     }
   });

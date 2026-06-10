@@ -29,9 +29,9 @@ import { noopTarget } from './test-utils/targets.js';
 import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PKG = JSON.parse(
-  readFileSync(resolve(HERE, '../../package.json'), 'utf8'),
-) as { version: string };
+const PKG = JSON.parse(readFileSync(resolve(HERE, '../../package.json'), 'utf8')) as {
+  version: string;
+};
 
 beforeEach(() => {
   // Item 1: scenarioRegistry and recipe registry are per-RunScope.
@@ -119,16 +119,18 @@ function makeFakeContext(): {
  * than a sim-done pass — happy-path tests must supply at least one scenario.
  */
 function registerProbeScenario(): void {
-  currentScenarioRegistry().register(defineLoadScenario({
-    id: 'probe',
-    name: 'probe',
-    description: 'probe',
-    tags: [],
-    target: noopTarget,
-    workload: { rps: 1 },
-    duration: 1,
-    assertions: [ASSERTIONS.lowErrorRate(1)],
-  }));
+  currentScenarioRegistry().register(
+    defineLoadScenario({
+      id: 'probe',
+      name: 'probe',
+      description: 'probe',
+      tags: [],
+      target: noopTarget,
+      workload: { rps: 1 },
+      duration: 1,
+      assertions: [ASSERTIONS.lowErrorRate(1)],
+    }),
+  );
 }
 
 describe('simulationTool metadata', () => {
@@ -169,7 +171,16 @@ describe('simulationTool command surface (Phase 3 — CommandSpec migration)', (
     const spec = simSpec();
     // Cross-tool flags from the single registry (ADR-0021).
     expect([...spec.commonFlags]).toEqual(
-      expect.arrayContaining(['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open']),
+      expect.arrayContaining([
+        'cwd',
+        'json',
+        'quiet',
+        'verbose',
+        'debug',
+        'reportTo',
+        'apiKey',
+        'open',
+      ]),
     );
     const optionFlags = (spec.options ?? []).map((o) => o.flag);
     expect(optionFlags).toContain('--recipe');

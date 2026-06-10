@@ -3,21 +3,20 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-environment-set
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js'
+import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js';
 
 function analyze(content: string, _filePath: string): CheckViolation[] {
-  if (!hasSentryInit(content)) return []
+  if (!hasSentryInit(content)) return [];
 
-  const initBlock = extractSentryInitBlock(content)
-  if (!initBlock) return []
+  const initBlock = extractSentryInitBlock(content);
+  if (!initBlock) return [];
 
   const hasEnvironment =
-    initBlock.block.includes('environment') ||
-    initBlock.block.includes('SENTRY_ENVIRONMENT')
+    initBlock.block.includes('environment') || initBlock.block.includes('SENTRY_ENVIRONMENT');
 
-  if (hasEnvironment) return []
+  if (hasEnvironment) return [];
 
   return [
     {
@@ -29,7 +28,7 @@ function analyze(content: string, _filePath: string): CheckViolation[] {
         'Add environment to Sentry.init(): Sentry.init({ environment: process.env.NODE_ENV, ... })',
       type: 'sentry-missing-environment',
     },
-  ]
+  ];
 }
 
 /**
@@ -56,4 +55,4 @@ export const sentryEnvironmentSet = defineCheck({
   fileTypes: ['ts', 'js', 'tsx', 'jsx', 'mjs'],
   confidence: 'high',
   analyze,
-})
+});

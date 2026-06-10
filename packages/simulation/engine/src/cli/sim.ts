@@ -21,9 +21,19 @@
  *      empty registry; the fatal decision is the command's.)
  */
 
-
-import { BUILTIN_DEFAULT_RECIPE, buildFindingGroups, buildSignalEnvelope, EXIT_CODES } from '@opensip-tools/contracts';
-import { currentScope, generatePrefixedId, loadCapabilityDomain, logger, resolveScopes } from '@opensip-tools/core';
+import {
+  BUILTIN_DEFAULT_RECIPE,
+  buildFindingGroups,
+  buildSignalEnvelope,
+  EXIT_CODES,
+} from '@opensip-tools/contracts';
+import {
+  currentScope,
+  generatePrefixedId,
+  loadCapabilityDomain,
+  logger,
+  resolveScopes,
+} from '@opensip-tools/core';
 import { SessionRepo } from '@opensip-tools/session-store';
 
 import { currentScenarioRegistry, currentSimulationLoadState } from '../framework/registry.js';
@@ -36,7 +46,13 @@ import { SimulationRecipeService } from '../recipes/service.js';
 import { resolveSimRecipeSelection } from './sim-config.js';
 
 import type { SimulationScenarioResult } from '../recipes/service.js';
-import type { ErrorResult, SimDoneResult, ToolOptions, UnitResult, VerboseDetail } from '@opensip-tools/contracts';
+import type {
+  ErrorResult,
+  SimDoneResult,
+  ToolOptions,
+  UnitResult,
+  VerboseDetail,
+} from '@opensip-tools/contracts';
 import type { Signal } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -83,7 +99,11 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
 
   // 3. No-scenarios guard (structured-log only; executeSim owns the fatal exit).
   if (currentScenarioRegistry().size === 0) {
-    logger.warn({ evt: 'cli.scenario_packages.empty', module: 'cli:sim', msg: 'no scenarios loaded' });
+    logger.warn({
+      evt: 'cli.scenario_packages.empty',
+      module: 'cli:sim',
+      msg: 'no scenarios loaded',
+    });
   }
 
   load.loadedFor = key;
@@ -101,10 +121,16 @@ async function loadSimScenarioPackages(projectDir: string): Promise<void> {
   const registry = currentScope()?.capabilities;
   if (!registry?.hasDomain('sim-pack') || registry.isDomainLoaded('sim-pack', projectDir)) return;
   const prefs = readScenarioPackagePreferences(projectDir);
-  const scopes = resolveScopes('@opensip-tools', prefs.packageScopes ?? [], 'plugin.scenario_package.invalid_scope');
+  const scopes = resolveScopes(
+    '@opensip-tools',
+    prefs.packageScopes ?? [],
+    'plugin.scenario_package.invalid_scope',
+  );
   const preferences = {
     ...(prefs.scenarioPackages === undefined ? {} : { packages: prefs.scenarioPackages }),
-    ...(prefs.autoDiscoverScenarios === undefined ? {} : { autoDiscover: prefs.autoDiscoverScenarios }),
+    ...(prefs.autoDiscoverScenarios === undefined
+      ? {}
+      : { autoDiscover: prefs.autoDiscoverScenarios }),
     scopes,
   };
   await loadCapabilityDomain({ registry, domainId: 'sim-pack', projectDir, preferences });
@@ -118,9 +144,7 @@ async function loadSimScenarioPackages(projectDir: string): Promise<void> {
  * without emitting a critical/high signal).
  */
 function scenarioPassed(scenario: SimulationScenarioResult, signals: readonly Signal[]): boolean {
-  const hasErrorSignal = signals.some(
-    (s) => s.severity === 'critical' || s.severity === 'high',
-  );
+  const hasErrorSignal = signals.some((s) => s.severity === 'critical' || s.severity === 'high');
   return scenario.passed && !hasErrorSignal;
 }
 
@@ -139,9 +163,10 @@ function scenarioPassed(scenario: SimulationScenarioResult, signals: readonly Si
  * `SimulationMetrics` (load p50/p95/p99) stays a tool-specific artifact on the
  * per-kind `result` and is NOT lifted into the envelope's core shape.
  */
-function assembleEnvelopeInputs(
-  scenarios: readonly SimulationScenarioResult[],
-): { units: UnitResult[]; signals: Signal[] } {
+function assembleEnvelopeInputs(scenarios: readonly SimulationScenarioResult[]): {
+  units: UnitResult[];
+  signals: Signal[];
+} {
   const units: UnitResult[] = [];
   const signals: Signal[] = [];
 
@@ -150,7 +175,9 @@ function assembleEnvelopeInputs(
     // Remap source → scenarioId so per-scenario grouping is exact (the
     // unit slug IS the scenarioId, per the migrated-tool contract).
     for (const signal of scenarioSignals) {
-      signals.push(signal.source === scenario.scenarioId ? signal : { ...signal, source: scenario.scenarioId });
+      signals.push(
+        signal.source === scenario.scenarioId ? signal : { ...signal, source: scenario.scenarioId },
+      );
     }
     units.push({
       slug: scenario.scenarioId,

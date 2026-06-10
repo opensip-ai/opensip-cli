@@ -27,7 +27,9 @@ import type { Registerable } from '../../lib/registry.js';
 /** Test-only `*`-glob matcher (exact match when the pattern has no `*`). */
 function glob(target: string, pattern: string): boolean {
   if (!pattern.includes('*')) return target === pattern;
-  const escaped = pattern.split('*').map((part) => part.replaceAll(/[.+?^${}()|[\]\\]/g, String.raw`\$&`));
+  const escaped = pattern
+    .split('*')
+    .map((part) => part.replaceAll(/[.+?^${}()|[\]\\]/g, String.raw`\$&`));
   return new RegExp(`^${escaped.join('.*')}$`).test(target);
 }
 
@@ -124,7 +126,11 @@ describe('resolveSelector — built-in arms', () => {
       items,
       fitnessOpts,
     );
-    expect(ids(result)).toEqual(['security:no-eval', 'architecture:layering', 'backend:max-params']);
+    expect(ids(result)).toEqual([
+      'security:no-eval',
+      'architecture:layering',
+      'backend:max-params',
+    ]);
   });
 
   it('tags: tag-based exclude removes matched items', () => {
@@ -181,20 +187,33 @@ describe('resolveSelector — predicate override (simulation-style)', () => {
         if (sel.type !== 'kind') return false;
         const kinds = new Set(sel.kinds);
         const exclude = new Set(sel.exclude);
-        return item.kind !== undefined && kinds.has(item.kind) && !exclude.has(item.id) && !exclude.has(item.name);
+        return (
+          item.kind !== undefined &&
+          kinds.has(item.kind) &&
+          !exclude.has(item.id) &&
+          !exclude.has(item.name)
+        );
       },
       // sim's `tags` excludes on id/name (not tags) — overrides the built-in arm.
       tags: (item, sel) => {
         if (sel.type !== 'tags') return false;
         const include = new Set(sel.include);
         const exclude = new Set(sel.exclude);
-        return (item.tags ?? []).some((t) => include.has(t)) && !exclude.has(item.id) && !exclude.has(item.name);
+        return (
+          (item.tags ?? []).some((t) => include.has(t)) &&
+          !exclude.has(item.id) &&
+          !exclude.has(item.name)
+        );
       },
     },
   };
 
   it('kind predicate filters by item.kind', () => {
-    const result = resolveSelector<Item, AnySelector>({ type: 'kind', kinds: ['load'] }, items, simOpts);
+    const result = resolveSelector<Item, AnySelector>(
+      { type: 'kind', kinds: ['load'] },
+      items,
+      simOpts,
+    );
     expect(ids(result)).toEqual(['load-test']);
   });
 

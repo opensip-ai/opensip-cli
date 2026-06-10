@@ -12,7 +12,6 @@ function base() {
 }
 
 describe('decideOpen', () => {
-
   it('does not open when not requested', () => {
     expect(decideOpen({ ...base(), openRequested: false })).toEqual({
       shouldOpen: false,
@@ -53,9 +52,10 @@ describe('decideOpen', () => {
   });
 
   it('opens under SSH if DISPLAY is set', () => {
-    expect(
-      decideOpen({ ...base(), env: { SSH_CONNECTION: 'x', DISPLAY: ':0' } }),
-    ).toEqual({ shouldOpen: true, reason: 'ok' });
+    expect(decideOpen({ ...base(), env: { SSH_CONNECTION: 'x', DISPLAY: ':0' } })).toEqual({
+      shouldOpen: true,
+      reason: 'ok',
+    });
   });
 
   it('opens under SSH if WAYLAND_DISPLAY is set', () => {

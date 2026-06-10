@@ -9,18 +9,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  EXIT_CODES,
-  mapToolErrorToExitCode,
-} from '@opensip-tools/contracts';
+import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-tools/contracts';
 import { PluginIncompatibleError } from '@opensip-tools/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { admitProjectLocalTool, admitUserGlobalTool } from '../bootstrap/register-tools.js';
-import {
-  isProjectLocalToolTrusted,
-  PROJECT_TOOL_ALLOWLIST_ENV,
-} from '../bootstrap/tool-trust.js';
+import { isProjectLocalToolTrusted, PROJECT_TOOL_ALLOWLIST_ENV } from '../bootstrap/tool-trust.js';
 
 const SIDECAR = 'opensip-tool.manifest.json';
 
@@ -95,9 +89,9 @@ describe('admitProjectLocalTool — trust gate precedes import', () => {
   it('fail-closes a missing/malformed sidecar manifest', () => {
     const dir = mkdtempSync(join(tmpdir(), 'opensip-projlocal-empty-'));
     staged.push(dir);
-    expect(() => admitProjectLocalTool({ dir, env: { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' } })).toThrow(
-      PluginIncompatibleError,
-    );
+    expect(() =>
+      admitProjectLocalTool({ dir, env: { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' } }),
+    ).toThrow(PluginIncompatibleError);
   });
 
   it('fail-closes an allowlisted but compatibility-incompatible tool', () => {

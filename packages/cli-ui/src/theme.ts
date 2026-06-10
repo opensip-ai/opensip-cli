@@ -109,9 +109,7 @@ export function detectTerminalCapabilities(): TerminalCapabilities {
     termProgram === 'Hyper';
 
   const envSuggests256Color =
-    envSuggestsTrueColor ||
-    term.includes('256color') ||
-    termProgram === 'Apple_Terminal';
+    envSuggestsTrueColor || term.includes('256color') || termProgram === 'Apple_Terminal';
 
   // All capability flags MUST be gated on `isTTY`. When stdout is piped to a
   // file or CI log, ANSI truecolor escapes still leak in if callers inspect

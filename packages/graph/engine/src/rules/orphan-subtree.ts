@@ -51,7 +51,8 @@ export const orphanSubtreeRule = defineRule({
           category: 'quality',
           message: `${occ.simpleName} is not reachable from any inferred entry point.${caveat}`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
-          suggestion: 'Either delete the function, mark it as an entry point in opensip-tools.config.yml, or add a caller.',
+          suggestion:
+            'Either delete the function, mark it as an entry point in opensip-tools.config.yml, or add a caller.',
           metadata: {
             simpleName: occ.simpleName,
             qualifiedName: occ.qualifiedName,

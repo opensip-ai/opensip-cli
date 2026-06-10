@@ -22,39 +22,47 @@
  * / `fdescribe(` detection is folded in here); the slug and id are retained
  * so the dogfood baseline stays continuous.
  */
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
 
 /** A skip/focus idiom: its detection regex and the violation it yields. */
 interface SkipIdiom {
   /** Regex (with `g` flag) matched against each stripped source line. */
-  readonly pattern: RegExp
+  readonly pattern: RegExp;
   /** Human-readable name of the idiom, used in the violation message. */
-  readonly label: string
+  readonly label: string;
   /** Whether this idiom FOCUSES (disables all other tests) vs. merely skips one. */
-  readonly focused: boolean
+  readonly focused: boolean;
 }
 
 const SUGGESTION =
   'Re-enable the test or remove it; track the reason in an issue. ' +
-  '`.only` must never ship — it silences the rest of the suite.'
+  '`.only` must never ship — it silences the rest of the suite.';
 
 const FOCUSED_SUGGESTION =
   'A focused test disables EVERY OTHER test in the file. Remove the focus ' +
-  '(`.only` / `fit(` / `fdescribe(`) before committing — it must never ship.'
+  '(`.only` / `fit(` / `fdescribe(`) before committing — it must never ship.';
 
 // JS/TS — vitest / jest / mocha / playwright. Method-call forms (`.skip(`,
 // `.only(`, `.todo(`, `.concurrent.skip(`) plus the word-boundary call forms
 // (`xit(`, `fit(`, ...).
 const JS_IDIOMS: readonly SkipIdiom[] = [
-  { pattern: /\b(?:it|test|describe|context|suite|bench)(?:\.concurrent)?\.only\b/g, label: '.only focused test', focused: true },
-  { pattern: /\b(?:it|test|describe|context|suite|bench)(?:\.concurrent)?\.skip\b/g, label: '.skip skipped test', focused: false },
+  {
+    pattern: /\b(?:it|test|describe|context|suite|bench)(?:\.concurrent)?\.only\b/g,
+    label: '.only focused test',
+    focused: true,
+  },
+  {
+    pattern: /\b(?:it|test|describe|context|suite|bench)(?:\.concurrent)?\.skip\b/g,
+    label: '.skip skipped test',
+    focused: false,
+  },
   { pattern: /\b(?:it|test)\.todo\b/g, label: '.todo placeholder test', focused: false },
   { pattern: /\bfit\s*\(/g, label: 'fit() focused test', focused: true },
   { pattern: /\bfdescribe\s*\(/g, label: 'fdescribe() focused suite', focused: true },
   { pattern: /\bxit\s*\(/g, label: 'xit() skipped test', focused: false },
   { pattern: /\bxtest\s*\(/g, label: 'xtest() skipped test', focused: false },
   { pattern: /\bxdescribe\s*\(/g, label: 'xdescribe() skipped suite', focused: false },
-]
+];
 
 // Python — pytest / unittest.
 const PY_IDIOMS: readonly SkipIdiom[] = [
@@ -64,29 +72,29 @@ const PY_IDIOMS: readonly SkipIdiom[] = [
   { pattern: /@unittest\.skip\b/g, label: '@unittest.skip', focused: false },
   { pattern: /\bself\.skipTest\s*\(/g, label: 'self.skipTest()', focused: false },
   { pattern: /\bpytest\.skip\s*\(/g, label: 'pytest.skip()', focused: false },
-]
+];
 
 // Go — testing.T skip APIs.
 const GO_IDIOMS: readonly SkipIdiom[] = [
   { pattern: /\bt\.SkipNow\s*\(/g, label: 't.SkipNow()', focused: false },
   { pattern: /\bt\.Skipf\s*\(/g, label: 't.Skipf()', focused: false },
   { pattern: /\bt\.Skip\s*\(/g, label: 't.Skip()', focused: false },
-]
+];
 
 // Rust — the #[ignore] test attribute.
 const RUST_IDIOMS: readonly SkipIdiom[] = [
   { pattern: /#\[\s*ignore\b/g, label: '#[ignore] test attribute', focused: false },
-]
+];
 
 // Java — JUnit 5 (@Disabled) / JUnit 4 (@Ignore).
 const JAVA_IDIOMS: readonly SkipIdiom[] = [
   { pattern: /@Disabled\b/g, label: '@Disabled', focused: false },
   { pattern: /@Ignore\b/g, label: '@Ignore', focused: false },
-]
+];
 
 /** Map a file extension (no leading dot) to its idiom set. */
 function idiomsForExtension(filePath: string): readonly SkipIdiom[] {
-  const ext = filePath.slice(filePath.lastIndexOf('.') + 1).toLowerCase()
+  const ext = filePath.slice(filePath.lastIndexOf('.') + 1).toLowerCase();
   switch (ext) {
     case 'ts':
     case 'tsx':
@@ -94,22 +102,22 @@ function idiomsForExtension(filePath: string): readonly SkipIdiom[] {
     case 'jsx':
     case 'mjs':
     case 'cjs': {
-      return JS_IDIOMS
+      return JS_IDIOMS;
     }
     case 'py': {
-      return PY_IDIOMS
+      return PY_IDIOMS;
     }
     case 'go': {
-      return GO_IDIOMS
+      return GO_IDIOMS;
     }
     case 'rs': {
-      return RUST_IDIOMS
+      return RUST_IDIOMS;
     }
     case 'java': {
-      return JAVA_IDIOMS
+      return JAVA_IDIOMS;
     }
     default: {
-      return []
+      return [];
     }
   }
 }
@@ -122,14 +130,14 @@ function idiomsForExtension(filePath: string): readonly SkipIdiom[] {
  * language idiom set (the caller is responsible for the `isTestFile` gate).
  */
 export function analyzeSkippedTests(content: string, filePath: string): CheckViolation[] {
-  const idioms = idiomsForExtension(filePath)
-  if (idioms.length === 0) return []
+  const idioms = idiomsForExtension(filePath);
+  if (idioms.length === 0) return [];
 
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
   for (const [i, line] of lines.entries()) {
     for (const idiom of idioms) {
-      idiom.pattern.lastIndex = 0
+      idiom.pattern.lastIndex = 0;
       if (idiom.pattern.test(line)) {
         violations.push({
           message: idiom.focused
@@ -140,11 +148,11 @@ export function analyzeSkippedTests(content: string, filePath: string): CheckVio
           severity: 'warning',
           line: i + 1,
           suggestion: idiom.focused ? FOCUSED_SUGGESTION : SUGGESTION,
-        })
+        });
       }
     }
   }
-  return violations
+  return violations;
 }
 
 /**
@@ -180,7 +188,7 @@ export const noSkippedTests = defineCheck({
   analyze: (content, filePath) => {
     // INVERSION: this hygiene rule applies ONLY to test files. A skip idiom
     // in production code is not this check's concern.
-    if (!isTestFile(filePath)) return []
-    return analyzeSkippedTests(content, filePath)
+    if (!isTestFile(filePath)) return [];
+    return analyzeSkippedTests(content, filePath);
   },
-})
+});

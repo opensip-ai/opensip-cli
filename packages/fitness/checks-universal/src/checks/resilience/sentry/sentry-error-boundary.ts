@@ -3,9 +3,9 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-error-boundary
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-import { hasSentryUsage } from './_helpers/sentry.js'
+import { hasSentryUsage } from './_helpers/sentry.js';
 
 // Sentry error boundary patterns (component or HOC)
 const ERROR_BOUNDARY_PATTERNS = [
@@ -13,32 +13,32 @@ const ERROR_BOUNDARY_PATTERNS = [
   'withErrorBoundary',
   'Sentry.withErrorBoundary',
   'ErrorBoundary', // Sentry re-export or custom with Sentry wiring
-]
+];
 
 function analyze(content: string, filePath: string): CheckViolation[] {
   // Only check React files (JSX/TSX)
-  if (!filePath.endsWith('.tsx') && !filePath.endsWith('.jsx')) return []
+  if (!filePath.endsWith('.tsx') && !filePath.endsWith('.jsx')) return [];
 
   // Must use Sentry
-  if (!hasSentryUsage(content)) return []
+  if (!hasSentryUsage(content)) return [];
 
   // Must be a React component file (has JSX return or render)
-  const hasJsx = content.includes('return (') || content.includes('return(')
-  const hasReactImport = content.includes('react') || content.includes('React')
-  if (!hasJsx && !hasReactImport) return []
+  const hasJsx = content.includes('return (') || content.includes('return(');
+  const hasReactImport = content.includes('react') || content.includes('React');
+  if (!hasJsx && !hasReactImport) return [];
 
   // Check if any error boundary pattern is present
-  const hasErrorBoundary = ERROR_BOUNDARY_PATTERNS.some((pattern) => content.includes(pattern))
-  if (hasErrorBoundary) return []
+  const hasErrorBoundary = ERROR_BOUNDARY_PATTERNS.some((pattern) => content.includes(pattern));
+  if (hasErrorBoundary) return [];
 
   // Find the Sentry import line for the violation location
-  const lines = content.split('\n')
-  let sentryImportLine = 1
+  const lines = content.split('\n');
+  let sentryImportLine = 1;
   for (const [i, line_] of lines.entries()) {
-    const line = line_ ?? ''
+    const line = line_ ?? '';
     if (line.includes('@sentry/') || line.includes('Sentry')) {
-      sentryImportLine = i + 1
-      break
+      sentryImportLine = i + 1;
+      break;
     }
   }
 
@@ -53,7 +53,7 @@ function analyze(content: string, filePath: string): CheckViolation[] {
       type: 'sentry-missing-error-boundary',
       filePath,
     },
-  ]
+  ];
 }
 
 /**
@@ -79,4 +79,4 @@ export const sentryErrorBoundary = defineCheck({
   fileTypes: ['tsx', 'jsx'],
   confidence: 'medium',
   analyze,
-})
+});

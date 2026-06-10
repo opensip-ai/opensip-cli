@@ -5,10 +5,15 @@
  * @fileoverview Dangerous configuration defaults check
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import {
+  defineCheck,
+  isTestFile,
+  type CheckViolation,
+  getLineNumber,
+} from '@opensip-tools/fitness';
 
-import { isDigit, isAlphanumericChar } from './_helpers/config-validation.js'
+import { isDigit, isAlphanumericChar } from './_helpers/config-validation.js';
 
 // =============================================================================
 // TYPES
@@ -19,21 +24,21 @@ import { isDigit, isAlphanumericChar } from './_helpers/config-validation.js'
  * Avoids regex patterns that trigger SonarJS warnings.
  */
 interface ConfigPatternChecker {
-  check: (content: string) => { index: number; match: string }[]
-  message: string
-  suggestion: string
-  severity: 'error' | 'warning'
+  check: (content: string) => { index: number; match: string }[];
+  message: string;
+  suggestion: string;
+  severity: 'error' | 'warning';
 }
 
 /**
  * Options for creating a config pattern checker.
  */
 interface CreateConfigCheckerOptions {
-  configKey: string
-  expectedValue: string
-  message: string
-  suggestion: string
-  severity: 'error' | 'warning'
+  configKey: string;
+  expectedValue: string;
+  message: string;
+  suggestion: string;
+  severity: 'error' | 'warning';
 }
 
 // =============================================================================
@@ -47,30 +52,30 @@ function extractAssignment(afterKey: string, expectedValue: string): string | nu
   logger.debug({
     evt: 'fitness.checks.dangerous_config_defaults.extract_assignment',
     msg: 'Extracting assignment part after config key',
-  })
-  let i = 0
+  });
+  let i = 0;
   while (i < afterKey.length && (afterKey[i] === ' ' || afterKey[i] === '\t')) {
-    i++
+    i++;
   }
 
   if (afterKey[i] !== '=' && afterKey[i] !== ':') {
-    return null
+    return null;
   }
-  i++
+  i++;
 
   while (i < afterKey.length && (afterKey[i] === ' ' || afterKey[i] === '\t')) {
-    i++
+    i++;
   }
 
-  const remaining = afterKey.slice(Math.max(0, i))
+  const remaining = afterKey.slice(Math.max(0, i));
   if (remaining.toLowerCase().startsWith(expectedValue.toLowerCase())) {
-    const nextChar = remaining[expectedValue.length]
+    const nextChar = remaining[expectedValue.length];
     if (!nextChar || !isAlphanumericChar(nextChar)) {
-      return afterKey.slice(0, Math.max(0, i + expectedValue.length))
+      return afterKey.slice(0, Math.max(0, i + expectedValue.length));
     }
   }
 
-  return null
+  return null;
 }
 
 /**
@@ -78,42 +83,42 @@ function extractAssignment(afterKey: string, expectedValue: string): string | nu
  * This avoids regex safety warnings from SonarJS.
  */
 function createConfigChecker(options: CreateConfigCheckerOptions): ConfigPatternChecker {
-  const { configKey, expectedValue, message, suggestion, severity } = options
+  const { configKey, expectedValue, message, suggestion, severity } = options;
   return {
     check(content: string): { index: number; match: string }[] {
       logger.debug({
         evt: 'fitness.checks.dangerous_config_defaults.config_checker_check',
         msg: 'Checking content for dangerous config pattern matches',
-      })
-      const results: { index: number; match: string }[] = []
-      const lowerContent = content.toLowerCase()
-      const lowerKey = configKey.toLowerCase()
-      let searchStart = 0
+      });
+      const results: { index: number; match: string }[] = [];
+      const lowerContent = content.toLowerCase();
+      const lowerKey = configKey.toLowerCase();
+      let searchStart = 0;
 
       for (;;) {
-        const keyIndex = lowerContent.indexOf(lowerKey, searchStart)
-        if (keyIndex === -1) break
+        const keyIndex = lowerContent.indexOf(lowerKey, searchStart);
+        if (keyIndex === -1) break;
 
-        const afterKey = content.slice(Math.max(0, keyIndex + configKey.length))
-        const assignMatch = extractAssignment(afterKey, expectedValue)
+        const afterKey = content.slice(Math.max(0, keyIndex + configKey.length));
+        const assignMatch = extractAssignment(afterKey, expectedValue);
 
         if (assignMatch) {
           const fullMatch = content.slice(
             keyIndex,
             keyIndex + configKey.length + assignMatch.length,
-          )
-          results.push({ index: keyIndex, match: fullMatch })
+          );
+          results.push({ index: keyIndex, match: fullMatch });
         }
 
-        searchStart = keyIndex + 1
+        searchStart = keyIndex + 1;
       }
 
-      return results
+      return results;
     },
     message,
     suggestion,
     severity,
-  }
+  };
 }
 
 /**
@@ -123,34 +128,34 @@ function extractTlsAssignment(afterKey: string): string | null {
   logger.debug({
     evt: 'fitness.checks.dangerous_config_defaults.extract_tls_assignment',
     msg: 'Extracting TLS assignment value with optional quotes',
-  })
-  let i = 0
+  });
+  let i = 0;
   while (i < afterKey.length && (afterKey[i] === ' ' || afterKey[i] === '\t')) {
-    i++
+    i++;
   }
 
   if (afterKey[i] !== '=' && afterKey[i] !== ':') {
-    return null
+    return null;
   }
-  i++
+  i++;
 
   while (i < afterKey.length && (afterKey[i] === ' ' || afterKey[i] === '\t')) {
-    i++
+    i++;
   }
 
-  const hasQuote = afterKey[i] === '"' || afterKey[i] === "'"
-  if (hasQuote) i++
+  const hasQuote = afterKey[i] === '"' || afterKey[i] === "'";
+  if (hasQuote) i++;
 
   if (afterKey[i] !== '0') {
-    return null
+    return null;
   }
-  i++
+  i++;
 
   if (hasQuote && (afterKey[i] === '"' || afterKey[i] === "'")) {
-    i++
+    i++;
   }
 
-  return afterKey.slice(0, Math.max(0, i))
+  return afterKey.slice(0, Math.max(0, i));
 }
 
 /**
@@ -163,33 +168,33 @@ function createTlsRejectChecker(): ConfigPatternChecker {
       logger.debug({
         evt: 'fitness.checks.dangerous_config_defaults.tls_reject_checker_check',
         msg: 'Checking content for TLS reject unauthorized patterns',
-      })
-      const results: { index: number; match: string }[] = []
-      const lowerContent = content.toLowerCase()
-      const key = 'node_tls_reject_unauthorized'
-      let searchStart = 0
+      });
+      const results: { index: number; match: string }[] = [];
+      const lowerContent = content.toLowerCase();
+      const key = 'node_tls_reject_unauthorized';
+      let searchStart = 0;
 
       for (;;) {
-        const keyIndex = lowerContent.indexOf(key, searchStart)
-        if (keyIndex === -1) break
+        const keyIndex = lowerContent.indexOf(key, searchStart);
+        if (keyIndex === -1) break;
 
-        const afterKey = content.slice(Math.max(0, keyIndex + key.length))
-        const assignMatch = extractTlsAssignment(afterKey)
+        const afterKey = content.slice(Math.max(0, keyIndex + key.length));
+        const assignMatch = extractTlsAssignment(afterKey);
 
         if (assignMatch) {
-          const fullMatch = content.slice(keyIndex, keyIndex + key.length + assignMatch.length)
-          results.push({ index: keyIndex, match: fullMatch })
+          const fullMatch = content.slice(keyIndex, keyIndex + key.length + assignMatch.length);
+          results.push({ index: keyIndex, match: fullMatch });
         }
 
-        searchStart = keyIndex + 1
+        searchStart = keyIndex + 1;
       }
 
-      return results
+      return results;
     },
     message: 'TLS validation globally disabled via environment',
     suggestion: 'Remove this setting - it disables all TLS security',
     severity: 'error',
-  }
+  };
 }
 
 /**
@@ -202,61 +207,61 @@ function createPoolSizeChecker(): ConfigPatternChecker {
       logger.debug({
         evt: 'fitness.checks.dangerous_config_defaults.pool_size_checker_check',
         msg: 'Checking content for small connection pool size patterns',
-      })
-      const results: { index: number; match: string }[] = []
-      const lowerContent = content.toLowerCase()
-      let searchStart = 0
+      });
+      const results: { index: number; match: string }[] = [];
+      const lowerContent = content.toLowerCase();
+      let searchStart = 0;
 
       for (;;) {
-        const keyIndex = lowerContent.indexOf('poolsize', searchStart)
-        if (keyIndex === -1) break
+        const keyIndex = lowerContent.indexOf('poolsize', searchStart);
+        if (keyIndex === -1) break;
 
-        const afterKey = content.slice(Math.max(0, keyIndex + 8))
-        const assignMatch = extractPoolSizeAssignment(afterKey)
+        const afterKey = content.slice(Math.max(0, keyIndex + 8));
+        const assignMatch = extractPoolSizeAssignment(afterKey);
 
         if (assignMatch) {
-          const fullMatch = content.slice(keyIndex, keyIndex + 8 + assignMatch.length)
-          results.push({ index: keyIndex, match: fullMatch })
+          const fullMatch = content.slice(keyIndex, keyIndex + 8 + assignMatch.length);
+          results.push({ index: keyIndex, match: fullMatch });
         }
 
-        searchStart = keyIndex + 1
+        searchStart = keyIndex + 1;
       }
 
-      return results
+      return results;
     },
     message: 'Very small connection pool size',
     suggestion: 'Consider larger pool size for production workloads',
     severity: 'warning',
-  }
+  };
 }
 
 function extractPoolSizeAssignment(afterKey: string): string | null {
   logger.debug({
     evt: 'fitness.checks.dangerous_config_defaults.extract_pool_size_assignment',
     msg: 'Extracting pool size assignment value',
-  })
-  let i = 0
+  });
+  let i = 0;
   while (i < afterKey.length && (afterKey[i] === ' ' || afterKey[i] === '\t')) {
-    i++
+    i++;
   }
 
   if (afterKey[i] !== '=' && afterKey[i] !== ':') {
-    return null
+    return null;
   }
-  i++
+  i++;
 
   while (i < afterKey.length && (afterKey[i] === ' ' || afterKey[i] === '\t')) {
-    i++
+    i++;
   }
 
   if (afterKey[i] === '1' || afterKey[i] === '2') {
-    const nextChar = afterKey[i + 1]
+    const nextChar = afterKey[i + 1];
     if (!nextChar || !isDigit(nextChar)) {
-      return afterKey.slice(0, Math.max(0, i + 1))
+      return afterKey.slice(0, Math.max(0, i + 1));
     }
   }
 
-  return null
+  return null;
 }
 
 // =============================================================================
@@ -304,7 +309,7 @@ const DANGEROUS_DEFAULTS: ConfigPatternChecker[] = [
     severity: 'error',
   }),
   createPoolSizeChecker(),
-]
+];
 
 // =============================================================================
 // CHECK DEFINITION
@@ -344,18 +349,18 @@ export const dangerousConfigDefaults = defineCheck({
     // Test fixtures intentionally exercise dangerous defaults (debug:true,
     // zero retries, SSL disabled, etc.) to verify the check's detection
     // logic. These are not production config — skip to avoid noise.
-    if (isTestFile(filePath)) return []
+    if (isTestFile(filePath)) return [];
 
     logger.debug({
       evt: 'fitness.checks.dangerous_config_defaults.analyze',
       msg: 'Analyzing file for dangerous configuration defaults',
-    })
-    const violations: CheckViolation[] = []
+    });
+    const violations: CheckViolation[] = [];
 
     for (const checker of DANGEROUS_DEFAULTS) {
-      const matches = checker.check(content)
+      const matches = checker.check(content);
       for (const { index, match } of matches) {
-        const lineNumber = getLineNumber(content, index)
+        const lineNumber = getLineNumber(content, index);
         violations.push({
           line: lineNumber,
           column: 0,
@@ -365,10 +370,10 @@ export const dangerousConfigDefaults = defineCheck({
           match,
           type: 'dangerous-config',
           filePath,
-        })
+        });
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

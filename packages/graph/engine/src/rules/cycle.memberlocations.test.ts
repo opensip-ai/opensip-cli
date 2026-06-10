@@ -23,7 +23,12 @@ import type {
 } from '../types.js';
 
 function occ(
-  over: Partial<FunctionOccurrence> & { bodyHash: string; simpleName: string; filePath: string; line: number },
+  over: Partial<FunctionOccurrence> & {
+    bodyHash: string;
+    simpleName: string;
+    filePath: string;
+    line: number;
+  },
 ): FunctionOccurrence {
   return {
     qualifiedName: `${over.filePath}.${over.simpleName}`,

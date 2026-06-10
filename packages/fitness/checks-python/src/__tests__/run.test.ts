@@ -27,17 +27,20 @@ let target: string;
 beforeAll(() => {
   cwd = mkdtempSync(join(tmpdir(), 'opensip-checks-python-cov-'));
   target = join(cwd, 'demo.py');
-  writeFileSync(target, [
-    'def main():',
-    '    try:',
-    '        do_work()',
-    '    except:',
-    '        pass',
-    '',
-    'def do_work():',
-    '    return 1',
-    '',
-  ].join('\n'));
+  writeFileSync(
+    target,
+    [
+      'def main():',
+      '    try:',
+      '        do_work()',
+      '    except:',
+      '        pass',
+      '',
+      'def do_work():',
+      '    return 1',
+      '',
+    ].join('\n'),
+  );
 });
 
 afterAll(() => {

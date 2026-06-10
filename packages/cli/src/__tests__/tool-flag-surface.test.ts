@@ -1,4 +1,3 @@
- 
 /**
  * Capability guard (Tier-2): lock the registered flag surface of every
  * first-party tool. A flag added or removed from any command — across all of
@@ -46,7 +45,7 @@ function recordSpecFlags(tool: Tool): string[] {
  */
 function recordRegisterFlags(tool: Tool): string[] {
   const flags = new Set<string>();
-   
+
   // Self-referential proxy: the traps return `recorder`, so it must be declared
   // then assigned (a const cannot reference itself in its own initializer).
   // eslint-disable-next-line prefer-const
@@ -61,7 +60,9 @@ function recordRegisterFlags(tool: Tool): string[] {
     get: (_target, prop) => (prop === 'option' ? recordOption : returnRecorder),
     apply: returnRecorder,
   };
-  recorder = new Proxy(function noop() { return recorder; }, handler);
+  recorder = new Proxy(function noop() {
+    return recorder;
+  }, handler);
   // cli answers `program` with the recorder; any other method register() calls
   // (registerLiveView, …) is a harmless no-op — we only care about the flags.
   const cli = new Proxy(
@@ -94,9 +95,24 @@ const EXPECTED: Record<string, string[]> = {
     // register()-recorder missed: it only trapped `.option(...)` calls and
     // `--out` was declared via `.requiredOption(...)`. The flag was always part
     // of the real surface; the spec-based recorder records it faithfully.
-    '--api-key', '--check', '--config', '--cwd', '--debug', '--exclude',
-    '--gate-compare', '--gate-save', '--json', '--list', '--open',
-    '--out', '--quiet', '--recipe', '--recipes', '--report-to', '--show', '--tags',
+    '--api-key',
+    '--check',
+    '--config',
+    '--cwd',
+    '--debug',
+    '--exclude',
+    '--gate-compare',
+    '--gate-save',
+    '--json',
+    '--list',
+    '--open',
+    '--out',
+    '--quiet',
+    '--recipe',
+    '--recipes',
+    '--report-to',
+    '--show',
+    '--tags',
     '--verbose',
   ],
   graph: [
@@ -117,16 +133,52 @@ const EXPECTED: Record<string, string[]> = {
     //
     // graph-equivalence-check (internal real-repo sharded≡exact guardrail) adds
     // `--budget` (committed budget path) and `--update-budget` (capture/tighten).
-    '--api-key', '--budget', '--catalog-output', '--changed-file', '--concurrency', '--cwd',
-    '--debug', '--exact', '--gate-compare', '--gate-save', '--git-sha', '--json',
-    '--language', '--list-files', '--mode', '--no-cache', '--out',
-    '--output-sarif', '--profile', '--quiet', '--recipe', '--repo-id',
-    '--report-to', '--resolution', '--run-id', '--sarif', '--show',
-    '--tenant-id', '--update-budget', '--verbose', '--workspace',
+    '--api-key',
+    '--budget',
+    '--catalog-output',
+    '--changed-file',
+    '--concurrency',
+    '--cwd',
+    '--debug',
+    '--exact',
+    '--gate-compare',
+    '--gate-save',
+    '--git-sha',
+    '--json',
+    '--language',
+    '--list-files',
+    '--mode',
+    '--no-cache',
+    '--out',
+    '--output-sarif',
+    '--profile',
+    '--quiet',
+    '--recipe',
+    '--repo-id',
+    '--report-to',
+    '--resolution',
+    '--run-id',
+    '--sarif',
+    '--show',
+    '--tenant-id',
+    '--update-budget',
+    '--verbose',
+    '--workspace',
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
   // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).
-  simulation: ['--api-key', '--cwd', '--debug', '--json', '--open', '--quiet', '--recipe', '--report-to', '--show', '--verbose'],
+  simulation: [
+    '--api-key',
+    '--cwd',
+    '--debug',
+    '--json',
+    '--open',
+    '--quiet',
+    '--recipe',
+    '--report-to',
+    '--show',
+    '--verbose',
+  ],
 };
 
 describe('first-party tool flag-surface contract', () => {

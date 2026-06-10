@@ -69,7 +69,7 @@ describe('completion wiring', () => {
 
     // Mute stderr while we run the bad-input branch.
     const origWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = (() => true);
+    process.stderr.write = () => true;
     try {
       await program.parseAsync(['node', 'cli', 'completion', 'powershell']);
     } catch {

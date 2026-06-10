@@ -17,10 +17,10 @@
  * semantics.
  */
 
-import { defineRegexListCheck } from '@opensip-tools/fitness'
+import { defineRegexListCheck } from '@opensip-tools/fitness';
 
-const FIX_MESSAGE = 'Remove AI-generation metadata; comments must stand on their own merit'
-const VIOLATION_MESSAGE = `AI-attribution comment found. ${FIX_MESSAGE}`
+const FIX_MESSAGE = 'Remove AI-generation metadata; comments must stand on their own merit';
+const VIOLATION_MESSAGE = `AI-attribution comment found. ${FIX_MESSAGE}`;
 
 /**
  * Check: quality/no-ai-attribution
@@ -78,4 +78,4 @@ export const noAiAttribution = defineRegexListCheck({
       suggestion: FIX_MESSAGE,
     },
   ],
-})
+});

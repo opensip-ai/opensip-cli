@@ -3,21 +3,26 @@
  * @fileoverview Validates logger event names follow the 3+ dot-separated segment convention
  */
 
-import { defineCheck, isInsideStringLiteral, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { countUnescapedBackticks } from '@opensip-tools/lang-typescript'
+import {
+  defineCheck,
+  isInsideStringLiteral,
+  isTestFile,
+  type CheckViolation,
+} from '@opensip-tools/fitness';
+import { countUnescapedBackticks } from '@opensip-tools/lang-typescript';
 
 /**
  * Validates evt format: domain.component.action (3+ segments in lowercase with underscores)
  * Also allows hyphens in segments (e.g., 'tickets.service.create-many')
  */
-const EVT_FORMAT_PATTERN = /^[a-z0-9_-]{1,50}\.[a-z0-9_-]{1,50}\.[a-z0-9_.-]{1,100}$/
+const EVT_FORMAT_PATTERN = /^[a-z0-9_-]{1,50}\.[a-z0-9_-]{1,50}\.[a-z0-9_.-]{1,100}$/;
 
 /**
  * Extracts evt field value from a line — only matches single/double quoted strings, NOT template literals.
  * Template literals with interpolation (e.g., `${prefix}.action.start`) resolve at runtime
  * and cannot be statically validated.
  */
-const EVT_FIELD_PATTERN = /evt\s{0,5}:\s{0,5}['"]([^'"]{1,200})['"]/
+const EVT_FIELD_PATTERN = /evt\s{0,5}:\s{0,5}['"]([^'"]{1,200})['"]/;
 
 /**
  * Patterns that indicate event constant usage (can't statically validate)
@@ -28,26 +33,31 @@ const EVENT_CONSTANT_PATTERNS = [
   /evt\s*:\s*LogEvents\./,
   /evt\s*:\s*LOG_EVENTS\./,
   /evt\s*:\s*[A-Z_]+_EVENTS\./,
-]
+];
 
 function shouldSkipLine(line: string, inTemplateLiteral: boolean, backtickCount: number): boolean {
   /* v8 ignore next -- defensive AST/type guard */
-  if (inTemplateLiteral && backtickCount % 2 === 0) return true
-  const trimmed = line.trim()
+  if (inTemplateLiteral && backtickCount % 2 === 0) return true;
+  const trimmed = line.trim();
   /* v8 ignore next -- defensive AST/type guard */
-  if (trimmed.startsWith('//') || trimmed.startsWith('*')) return true
-  if (EVENT_CONSTANT_PATTERNS.some((p) => p.test(line))) return true
-  return false
+  if (trimmed.startsWith('//') || trimmed.startsWith('*')) return true;
+  if (EVENT_CONSTANT_PATTERNS.some((p) => p.test(line))) return true;
+  return false;
 }
 
 function isEvtPropertyContext(line: string, matchIndex: number): boolean {
   /* v8 ignore next -- defensive non-negative guard */
-  const beforeEvt = line.slice(0, Math.max(0, matchIndex)).trim()
-  return beforeEvt.length === 0 || /^[{,]$/.test(beforeEvt)
+  const beforeEvt = line.slice(0, Math.max(0, matchIndex)).trim();
+  return beforeEvt.length === 0 || /^[{,]$/.test(beforeEvt);
 }
 
-function createEvtViolation(evtValue: string, evtMatch: RegExpExecArray, lineNum: number, filePath: string): CheckViolation {
-  const segmentCount = evtValue.split('.').length
+function createEvtViolation(
+  evtValue: string,
+  evtMatch: RegExpExecArray,
+  lineNum: number,
+  filePath: string,
+): CheckViolation {
+  const segmentCount = evtValue.split('.').length;
   return {
     line: lineNum,
     column: evtMatch.index,
@@ -57,33 +67,33 @@ function createEvtViolation(evtValue: string, evtMatch: RegExpExecArray, lineNum
     match: evtMatch[0],
     type: 'invalid-evt-segments',
     filePath,
-  }
+  };
 }
 
 function analyzeEvtNames(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
-  let inTemplateLiteral = false
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
+  let inTemplateLiteral = false;
 
   for (const [i, line] of lines.entries()) {
     /* v8 ignore next -- defensive guard */
-    if (!line) continue
+    if (!line) continue;
 
-    const backtickCount = countUnescapedBackticks(line)
-    if (backtickCount % 2 === 1) inTemplateLiteral = !inTemplateLiteral
-    if (shouldSkipLine(line, inTemplateLiteral, backtickCount)) continue
+    const backtickCount = countUnescapedBackticks(line);
+    if (backtickCount % 2 === 1) inTemplateLiteral = !inTemplateLiteral;
+    if (shouldSkipLine(line, inTemplateLiteral, backtickCount)) continue;
 
-    const evtMatch = EVT_FIELD_PATTERN.exec(line)
-    if (!evtMatch?.[1]) continue
-    if (isInsideStringLiteral(line, evtMatch.index)) continue
-    if (!isEvtPropertyContext(line, evtMatch.index)) continue
+    const evtMatch = EVT_FIELD_PATTERN.exec(line);
+    if (!evtMatch?.[1]) continue;
+    if (isInsideStringLiteral(line, evtMatch.index)) continue;
+    if (!isEvtPropertyContext(line, evtMatch.index)) continue;
 
     if (!EVT_FORMAT_PATTERN.test(evtMatch[1])) {
-      violations.push(createEvtViolation(evtMatch[1], evtMatch, i + 1, filePath))
+      violations.push(createEvtViolation(evtMatch[1], evtMatch, i + 1, filePath));
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -119,14 +129,14 @@ export const loggerEventNameFormat = defineCheck({
   analyze(content: string, filePath: string): CheckViolation[] {
     // Skip test files
     if (isTestFile(filePath)) {
-      return []
+      return [];
     }
 
     // Quick check: must have both logger and evt
     if (!content.includes('logger.') || !content.includes('evt')) {
-      return []
+      return [];
     }
 
-    return analyzeEvtNames(content, filePath)
+    return analyzeEvtNames(content, filePath);
   },
-})
+});

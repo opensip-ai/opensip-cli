@@ -3,35 +3,35 @@
  * @fileoverview Graph ignore hygiene check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /** Regex to match @graph-ignore directives */
-const GRAPH_IGNORE_REGEX = /@graph-ignore(?:-file|-next-line)?\s+(\S+)/g
+const GRAPH_IGNORE_REGEX = /@graph-ignore(?:-file|-next-line)?\s+(\S+)/g;
 
 /** Valid graph rule id format: graph-namespaced kebab-case (e.g. `graph:cycle`) */
-const VALID_GRAPH_ID = /^graph:[a-z][a-z0-9-]*$/
+const VALID_GRAPH_ID = /^graph:[a-z][a-z0-9-]*$/;
 
 /**
  * Analyze @graph-ignore directives for hygiene issues
  */
 function analyzeIgnoreHygiene(content: string, _filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
 
-  let totalIgnoreDirectives = 0
+  let totalIgnoreDirectives = 0;
 
   for (const [i, line_] of lines.entries()) {
-    const line = line_ ?? ''
+    const line = line_ ?? '';
 
     // Only check actual comment lines — skip string literals, code, and template literals
     // that happen to contain ignore-directive text (e.g., regex patterns, suggestion strings)
-    if (!line.trim().startsWith('//')) continue
+    if (!line.trim().startsWith('//')) continue;
 
-    GRAPH_IGNORE_REGEX.lastIndex = 0
-    const ignoreMatches = [...line.matchAll(GRAPH_IGNORE_REGEX)]
+    GRAPH_IGNORE_REGEX.lastIndex = 0;
+    const ignoreMatches = [...line.matchAll(GRAPH_IGNORE_REGEX)];
     for (const match of ignoreMatches) {
-      totalIgnoreDirectives++
-      const ruleId = match[1]
+      totalIgnoreDirectives++;
+      const ruleId = match[1];
 
       // Validate graph rule id format (graph:<kebab>)
       if (ruleId && !VALID_GRAPH_ID.test(ruleId)) {
@@ -42,13 +42,13 @@ function analyzeIgnoreHygiene(content: string, _filePath: string): CheckViolatio
           suggestion: 'Use a valid graph rule id like "graph:cycle" or "graph:large-function"',
           type: 'invalid-ignore-slug',
           match: line.trim().slice(0, 120),
-        })
+        });
       }
 
       // Check for ignore directive without a reason comment
       // Expected format: @graph-ignore graph:<rule> -- reason
-      const afterMatch = line.slice(match.index + match[0].length)
-      const hasReason = afterMatch.includes('--')
+      const afterMatch = line.slice(match.index + match[0].length);
+      const hasReason = afterMatch.includes('--');
       if (!hasReason) {
         violations.push({
           line: i + 1,
@@ -57,7 +57,7 @@ function analyzeIgnoreHygiene(content: string, _filePath: string): CheckViolatio
           suggestion: 'Add a reason: @graph-ignore graph:rule-id -- Reason why this is suppressed',
           type: 'ignore-without-reason',
           match: line.trim().slice(0, 120),
-        })
+        });
       }
     }
   }
@@ -70,10 +70,10 @@ function analyzeIgnoreHygiene(content: string, _filePath: string): CheckViolatio
       severity: 'warning',
       suggestion: 'Review each suppression to determine if the underlying issue can be fixed',
       type: 'excessive-ignores',
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -104,4 +104,4 @@ export const graphIgnoreHygiene = defineCheck({
   fileTypes: ['ts'],
   confidence: 'medium',
   analyze: analyzeIgnoreHygiene,
-})
+});

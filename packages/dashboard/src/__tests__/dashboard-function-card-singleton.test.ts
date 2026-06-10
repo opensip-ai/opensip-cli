@@ -21,11 +21,24 @@ interface Env {
   open: (h: string) => void;
 }
 
-function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string }): GraphFunctionOccurrence {
+function makeOcc(
+  over: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string },
+): GraphFunctionOccurrence {
   return {
-    qualifiedName: over.simpleName, filePath: 'packages/x/src/x.ts', line: 1, column: 0, endLine: 5,
-    kind: 'function-declaration', params: [], returnType: null, enclosingClass: null,
-    decorators: [], visibility: 'exported', inTestFile: false, definedInGenerated: false, calls: [],
+    qualifiedName: over.simpleName,
+    filePath: 'packages/x/src/x.ts',
+    line: 1,
+    column: 0,
+    endLine: 5,
+    kind: 'function-declaration',
+    params: [],
+    returnType: null,
+    enclosingClass: null,
+    decorators: [],
+    visibility: 'exported',
+    inTestFile: false,
+    definedInGenerated: false,
+    calls: [],
     ...over,
   };
 }
@@ -52,22 +65,27 @@ return { open: openFunctionCard };
 `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
   return new Function(
-    elSrc
-      + dashboardPathUtilsJs()
-      + dashboardIndexesJs()
-      + dashboardEditorLinkJs()
-      + dashboardTraceJs()
-      + dashboardFunctionCardJs()
-      + tail,
+    elSrc +
+      dashboardPathUtilsJs() +
+      dashboardIndexesJs() +
+      dashboardEditorLinkJs() +
+      dashboardTraceJs() +
+      dashboardFunctionCardJs() +
+      tail,
   )() as Env;
 }
 
-beforeEach(() => { document.body.innerHTML = ''; });
+beforeEach(() => {
+  document.body.innerHTML = '';
+});
 
 describe('Function Card singleton — §10.2', () => {
   it('opening three cards in succession leaves exactly one overlay in the DOM', () => {
     const env = loadEnv({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
         a: [makeOcc({ bodyHash: 'ha', simpleName: 'a' })],
         b: [makeOcc({ bodyHash: 'hb', simpleName: 'b' })],

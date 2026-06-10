@@ -46,8 +46,10 @@ export interface DiscoveredToolPackage {
 export function discoverToolPackages(
   options: ToolPackageDiscoveryOptions,
 ): DiscoveredToolPackage[] {
-  return discoverPackagesByMarker({ projectDir: options.projectDir, kind: 'tool' })
-    .map((pkg) => ({ name: pkg.name, packageDir: pkg.packageDir }));
+  return discoverPackagesByMarker({ projectDir: options.projectDir, kind: 'tool' }).map((pkg) => ({
+    name: pkg.name,
+    packageDir: pkg.packageDir,
+  }));
 }
 
 /**
@@ -149,7 +151,8 @@ function readAuthoredSidecarEntry(dir: string): ToolPackageMetadata | undefined 
     return undefined;
   }
   if (!isRecord(parsed)) return undefined;
-  const rawMain = typeof parsed.main === 'string' && parsed.main.length > 0 ? parsed.main : './index.js';
+  const rawMain =
+    typeof parsed.main === 'string' && parsed.main.length > 0 ? parsed.main : './index.js';
   // Name from the sidecar's name/id, falling back to the directory name (always
   // present for a real authored-tool dir).
   const name =

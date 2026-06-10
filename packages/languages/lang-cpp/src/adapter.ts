@@ -1,7 +1,6 @@
-import { stripComments, stripStrings } from './strip.js'
+import { stripComments, stripStrings } from './strip.js';
 
-import type { LanguageAdapter } from '@opensip-tools/core'
-
+import type { LanguageAdapter } from '@opensip-tools/core';
 
 /**
  * C/C++ adapter. parse() returns null intentionally — for C/C++ we
@@ -25,6 +24,6 @@ export const cppAdapter: LanguageAdapter<null> = {
   parse: () => null,
   stripStrings,
   stripComments,
-}
+};
 
-export const adapters = [cppAdapter] as const
+export const adapters = [cppAdapter] as const;

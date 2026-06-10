@@ -1,14 +1,14 @@
 globalExcludes:
-  - "node_modules/**"
+  - 'node_modules/**'
 
 targets:
   cpp-source:
-    description: "C++ acceptance source"
+    description: 'C++ acceptance source'
     languages: [cpp]
     concerns: [backend]
     include:
-      - "src/**/*.cpp"
-      - "src/**/*.hpp"
+      - 'src/**/*.cpp'
+      - 'src/**/*.hpp'
 
 fitness:
   failOnErrors: 0

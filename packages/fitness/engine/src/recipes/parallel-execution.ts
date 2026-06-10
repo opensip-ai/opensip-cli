@@ -7,15 +7,15 @@
  * shape.
  */
 
-import { scheduleUnits } from '@opensip-tools/core'
+import { scheduleUnits } from '@opensip-tools/core';
 
-import { runOneCheck } from './run-one-check.js'
-import { getEffectiveMaxParallel } from './types.js'
+import { runOneCheck } from './run-one-check.js';
+import { getEffectiveMaxParallel } from './types.js';
 
-import type { ProcessorContext } from './check-result-processor.js'
-import type { FitnessRecipeServiceCallbacks, FitnessRecipeSession } from './service-types.js'
-import type { FitnessRecipe } from './types.js'
-import type { Check } from '../framework/check-types.js'
+import type { ProcessorContext } from './check-result-processor.js';
+import type { FitnessRecipeServiceCallbacks, FitnessRecipeSession } from './service-types.js';
+import type { FitnessRecipe } from './types.js';
+import type { Check } from '../framework/check-types.js';
 
 // =============================================================================
 // TYPES
@@ -23,25 +23,25 @@ import type { Check } from '../framework/check-types.js'
 
 /** Options for executing a set of fitness checks */
 export interface ExecutionOptions {
-  checks: Check[]
-  cwd: string
-  recipe: FitnessRecipe
+  checks: Check[];
+  cwd: string;
+  recipe: FitnessRecipe;
   /** Per-check pre-resolved file paths from target overrides */
-  checkTargetFiles?: ReadonlyMap<string, readonly string[]>
+  checkTargetFiles?: ReadonlyMap<string, readonly string[]>;
   /**
    * Run-wide globalExcludes from project config. Forwarded into each
    * check's RunOptions so scope-empty checks honor exclusions instead
    * of scanning every file in the prewarmed cache.
    */
-  globalExcludes?: readonly string[]
+  globalExcludes?: readonly string[];
 }
 
 /** Service context providing session state, callbacks, and abort control */
 export interface ExecutionServiceContext {
-  session: FitnessRecipeSession
-  callbacks: FitnessRecipeServiceCallbacks
-  abortController?: AbortController
-  includeViolations?: boolean
+  session: FitnessRecipeSession;
+  callbacks: FitnessRecipeServiceCallbacks;
+  abortController?: AbortController;
+  includeViolations?: boolean;
 }
 
 // =============================================================================
@@ -49,21 +49,24 @@ export interface ExecutionServiceContext {
 // =============================================================================
 
 /** Execute fitness checks concurrently with configurable parallelism and per-check timeouts */
-export async function executeParallel(ctx: ExecutionServiceContext, opts: ExecutionOptions): Promise<void> {
-  const { checks, cwd, recipe, checkTargetFiles, globalExcludes } = opts
-  const { session, callbacks, abortController } = ctx
-  const recipeTimeout = recipe.execution.timeout ?? 30_000
-  const maxParallel = getEffectiveMaxParallel(recipe)
-  const totalChecks = checks.length
+export async function executeParallel(
+  ctx: ExecutionServiceContext,
+  opts: ExecutionOptions,
+): Promise<void> {
+  const { checks, cwd, recipe, checkTargetFiles, globalExcludes } = opts;
+  const { session, callbacks, abortController } = ctx;
+  const recipeTimeout = recipe.execution.timeout ?? 30_000;
+  const maxParallel = getEffectiveMaxParallel(recipe);
+  const totalChecks = checks.length;
 
-  if (totalChecks === 0) return
+  if (totalChecks === 0) return;
 
   const processorCtx: ProcessorContext = {
     session,
     callbacks,
     recipe,
     includeViolations: ctx.includeViolations ?? false,
-  }
+  };
 
   // Release 2.13.0 (§5.8): the sliding-window scheduling shape now lives in the
   // shared substrate (`scheduleUnits`). This file keeps only the fitness setup +
@@ -81,17 +84,21 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
     yieldBetweenUnits: true,
     shouldAbort: () => abortController?.signal.aborted === true,
     runUnit: async (check, index) => {
-      const outcome = await runOneCheck(check, {
-        cwd,
-        checkIndex: index + 1,
-        totalChecks,
-        recipeTimeoutMs: recipeTimeout,
-        retryEnabled: recipe.execution.retryOnFailure ?? false,
-        maxRetries: recipe.execution.maxRetries ?? 2,
-        ...(checkTargetFiles ? { checkTargetFiles } : {}),
-        ...(globalExcludes ? { globalExcludes } : {}),
-      }, processorCtx)
-      return { shouldStop: outcome.shouldStop }
+      const outcome = await runOneCheck(
+        check,
+        {
+          cwd,
+          checkIndex: index + 1,
+          totalChecks,
+          recipeTimeoutMs: recipeTimeout,
+          retryEnabled: recipe.execution.retryOnFailure ?? false,
+          maxRetries: recipe.execution.maxRetries ?? 2,
+          ...(checkTargetFiles ? { checkTargetFiles } : {}),
+          ...(globalExcludes ? { globalExcludes } : {}),
+        },
+        processorCtx,
+      );
+      return { shouldStop: outcome.shouldStop };
     },
-  })
+  });
 }

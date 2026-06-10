@@ -16,11 +16,7 @@
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-import {
-  GLOBAL_CONFIG_PATH,
-  readGlobalConfig,
-  writeGlobalConfig,
-} from '@opensip-tools/config';
+import { GLOBAL_CONFIG_PATH, readGlobalConfig, writeGlobalConfig } from '@opensip-tools/config';
 import { resolveUserPaths } from '@opensip-tools/core';
 import { checkEntitlement, DEFAULT_CLOUD_ENDPOINT } from '@opensip-tools/output';
 

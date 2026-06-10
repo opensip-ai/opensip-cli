@@ -7,8 +7,8 @@
  * middleware in concurrent server environments.
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness';
 
 // =============================================================================
 // CONTEXT MUTATION CHECK
@@ -27,7 +27,7 @@ const CONTEXT_STRING_PATTERNS = [
   'context.',
   'RequestContext',
   'ExecutionContext',
-]
+];
 
 /**
  * Checks if content uses context patterns.
@@ -35,7 +35,7 @@ const CONTEXT_STRING_PATTERNS = [
  * @returns True if content contains context patterns
  */
 function usesContextPattern(content: string): boolean {
-  return CONTEXT_STRING_PATTERNS.some((pattern) => content.includes(pattern))
+  return CONTEXT_STRING_PATTERNS.some((pattern) => content.includes(pattern));
 }
 
 /**
@@ -56,13 +56,13 @@ function usesContextPattern(content: string): boolean {
 const LOCAL_DECLARATION_PATTERNS: readonly (readonly [string, RegExp])[] = [
   ['ctx', /\b(?:const|let|var)\s+ctx\b(?!\s*\.)/],
   ['context', /\b(?:const|let|var)\s+context\b(?!\s*\.)/],
-]
+];
 function findLocallyDeclaredNames(content: string): Set<string> {
-  const declared = new Set<string>()
+  const declared = new Set<string>();
   for (const [name, pattern] of LOCAL_DECLARATION_PATTERNS) {
-    if (pattern.test(content)) declared.add(name)
+    if (pattern.test(content)) declared.add(name);
   }
-  return declared
+  return declared;
 }
 
 /**
@@ -70,8 +70,8 @@ function findLocallyDeclaredNames(content: string): Set<string> {
  * Using simple string matching for linear-time detection.
  */
 interface MutationDetector {
-  readonly test: (line: string) => boolean
-  readonly patternName: string
+  readonly test: (line: string) => boolean;
+  readonly patternName: string;
 }
 
 /**
@@ -83,17 +83,17 @@ function findWordEndIndex(str: string): number {
   logger.debug({
     evt: 'fitness.checks.context_mutation.find_word_end_index',
     msg: 'Finding end index of word characters in string',
-  })
-  let wordEnd = 0
+  });
+  let wordEnd = 0;
   // eslint-disable-next-line unicorn/no-for-loop -- offset-bearing scan: returns the UTF-16 index after the last word char
   for (let i = 0; i < str.length; i++) {
-    const char = str[i]
+    const char = str[i];
     if (char === undefined || !/\w/.test(char)) {
-      return wordEnd
+      return wordEnd;
     }
-    wordEnd = i + 1
+    wordEnd = i + 1;
   }
-  return wordEnd
+  return wordEnd;
 }
 
 /**
@@ -109,24 +109,24 @@ function createAssignmentDetector(prefix: string): MutationDetector {
       logger.debug({
         evt: 'fitness.checks.context_mutation.assignment_detector_test',
         msg: 'Testing line for context assignment mutation',
-      })
-      const idx = line.indexOf(prefix)
-      if (idx === -1) return false
+      });
+      const idx = line.indexOf(prefix);
+      if (idx === -1) return false;
       // Find next non-word character after prefix
-      const afterPrefix = line.slice(Math.max(0, idx + prefix.length))
+      const afterPrefix = line.slice(Math.max(0, idx + prefix.length));
       // Must have at least one word character
-      const wordEnd = findWordEndIndex(afterPrefix)
-      if (wordEnd === 0) return false
-      const afterWord = afterPrefix.slice(Math.max(0, wordEnd)).trimStart()
+      const wordEnd = findWordEndIndex(afterPrefix);
+      if (wordEnd === 0) return false;
+      const afterWord = afterPrefix.slice(Math.max(0, wordEnd)).trimStart();
       // Check for assignment (but NOT comparison operators)
-      if (!afterWord.startsWith('=')) return false
+      if (!afterWord.startsWith('=')) return false;
       // Exclude === and == (comparison) and !=, !==
-      const secondChar = afterWord.charAt(1)
-      if (secondChar === '=' || secondChar === '!') return false
-      return true
+      const secondChar = afterWord.charAt(1);
+      if (secondChar === '=' || secondChar === '!') return false;
+      return true;
     },
     patternName: `${prefix}*=`,
-  }
+  };
 }
 
 /**
@@ -138,7 +138,7 @@ function createContainsDetector(pattern: string): MutationDetector {
   return {
     test: (line: string): boolean => line.includes(pattern),
     patternName: pattern,
-  }
+  };
 }
 
 /**
@@ -156,30 +156,30 @@ function createContextArrayMutationDetector(method: string): MutationDetector {
     'request.context.',
     'req.',
     'request.',
-  ]
+  ];
   return {
     test: (line: string): boolean => {
       logger.debug({
         evt: 'fitness.checks.context_mutation.array_mutation_detector_test',
         msg: 'Testing line for context array mutation pattern',
-      })
+      });
       // Must contain the method call
-      if (!line.includes(`.${method}(`)) return false
+      if (!line.includes(`.${method}(`)) return false;
       // Check if it's prefixed by a context variable
       for (const prefix of contextPrefixes) {
-        const prefixIdx = line.indexOf(prefix)
+        const prefixIdx = line.indexOf(prefix);
         if (prefixIdx !== -1) {
           // Check if the method call is after the context prefix
-          const methodIdx = line.indexOf(`.${method}(`, prefixIdx)
+          const methodIdx = line.indexOf(`.${method}(`, prefixIdx);
           if (methodIdx > prefixIdx) {
-            return true
+            return true;
           }
         }
       }
-      return false
+      return false;
     },
     patternName: `ctx/*.${method}()`,
-  }
+  };
 }
 
 /**
@@ -203,7 +203,7 @@ const MUTATION_DETECTORS: readonly MutationDetector[] = [
   createContextArrayMutationDetector('unshift'),
   createContainsDetector('delete ctx.'),
   createContainsDetector('delete context.'),
-]
+];
 
 /**
  * Safe keywords (allowed mutations).
@@ -240,7 +240,7 @@ const SAFE_KEYWORDS = [
   'boosts', // Used in search relevance context
   // Fitness check analysis context fields
   'violations', // Used in fitness check analysis contexts
-]
+];
 
 /**
  * Safe context prefixes that indicate non-request context objects.
@@ -259,7 +259,7 @@ const SAFE_CONTEXT_PREFIXES = [
   'item.context', // Item/element context
   'record.context', // Record context
   'event.context', // Event context
-]
+];
 
 /**
  * Checks if a line contains safe mutation patterns.
@@ -270,16 +270,16 @@ function isSafeMutation(line: string): boolean {
   logger.debug({
     evt: 'fitness.checks.context_mutation.is_safe_mutation',
     msg: 'Checking if line contains safe mutation patterns',
-  })
+  });
   // Check for safe keywords
   if (SAFE_KEYWORDS.some((keyword) => line.includes(keyword))) {
-    return true
+    return true;
   }
   // Check for safe context prefixes (non-request context objects)
   if (SAFE_CONTEXT_PREFIXES.some((prefix) => line.includes(prefix))) {
-    return true
+    return true;
   }
-  return false
+  return false;
 }
 
 /**
@@ -290,10 +290,10 @@ function isSafeMutation(line: string): boolean {
 function findMutationMatch(line: string): { detector: MutationDetector; isSafe: boolean } | null {
   for (const detector of MUTATION_DETECTORS) {
     if (detector.test(line)) {
-      return { detector, isSafe: isSafeMutation(line) }
+      return { detector, isSafe: isSafeMutation(line) };
     }
   }
-  return null
+  return null;
 }
 
 /**
@@ -304,10 +304,10 @@ function findMutationMatch(line: string): { detector: MutationDetector; isSafe: 
  */
 function isDefensiveMutation(lines: string[], index: number): boolean {
   if (!Array.isArray(lines)) {
-    return false
+    return false;
   }
-  const contextBefore = lines.slice(Math.max(0, index - 5), index).join('\n')
-  return contextBefore.includes('try')
+  const contextBefore = lines.slice(Math.max(0, index - 5), index).join('\n');
+  return contextBefore.includes('try');
 }
 
 /**
@@ -320,27 +320,27 @@ export function analyzeContextMutation(content: string, filePath: string): Check
   logger.debug({
     evt: 'fitness.checks.context_mutation.context_mutation_check_analyze',
     msg: 'Analyzing file for unsafe context mutations',
-  })
-  const violations: CheckViolation[] = []
+  });
+  const violations: CheckViolation[] = [];
 
-  if (!usesContextPattern(content)) return violations
+  if (!usesContextPattern(content)) return violations;
 
-  const locallyDeclared = findLocallyDeclaredNames(content)
+  const locallyDeclared = findLocallyDeclaredNames(content);
 
-  const lines = content.split('\n')
+  const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    if (line === undefined || !line) continue
-    if (isCommentLine(line)) continue
+    const line = lines[i];
+    if (line === undefined || !line) continue;
+    if (isCommentLine(line)) continue;
 
-    const match = findMutationMatch(line)
-    if (!match || match.isSafe) continue
+    const match = findMutationMatch(line);
+    if (!match || match.isSafe) continue;
 
-    const rootName = match.detector.patternName.split('.')[0]
-    if (locallyDeclared.has(rootName)) continue
+    const rootName = match.detector.patternName.split('.')[0];
+    if (locallyDeclared.has(rootName)) continue;
 
-    const isDefensive = isDefensiveMutation(lines, i)
-    const lineNumber = i + 1
+    const isDefensive = isDefensiveMutation(lines, i);
+    const lineNumber = i + 1;
 
     violations.push({
       line: lineNumber,
@@ -352,10 +352,10 @@ export function analyzeContextMutation(content: string, filePath: string): Check
       match: match.detector.patternName,
       type: 'context-mutation',
       filePath,
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -388,6 +388,6 @@ export const contextMutationCheck = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    return analyzeContextMutation(content, filePath)
+    return analyzeContextMutation(content, filePath);
   },
-})
+});

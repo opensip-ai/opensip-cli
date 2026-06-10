@@ -11,17 +11,13 @@ describe('RunFooterHints', () => {
   });
 
   it('renders a single hint with no bold spans verbatim', () => {
-    const { lastFrame } = render(
-      <RunFooterHints hints={[{ text: 'press q to quit' }]} />,
-    );
+    const { lastFrame } = render(<RunFooterHints hints={[{ text: 'press q to quit' }]} />);
     expect(lastFrame() ?? '').toContain('press q to quit');
   });
 
   it('joins multiple hints with a pipe separator', () => {
     const { lastFrame } = render(
-      <RunFooterHints
-        hints={[{ text: 'first hint' }, { text: 'second hint' }]}
-      />,
+      <RunFooterHints hints={[{ text: 'first hint' }, { text: 'second hint' }]} />,
     );
     const out = lastFrame() ?? '';
     expect(out).toContain('first hint');
@@ -31,9 +27,7 @@ describe('RunFooterHints', () => {
 
   it('renders the bolded substrings within a hint', () => {
     const { lastFrame } = render(
-      <RunFooterHints
-        hints={[{ text: 'run --verbose for detail', bold: ['--verbose'] }]}
-      />,
+      <RunFooterHints hints={[{ text: 'run --verbose for detail', bold: ['--verbose'] }]} />,
     );
     const out = lastFrame() ?? '';
     // The hint text (including the flag) must round-trip through the
@@ -43,9 +37,7 @@ describe('RunFooterHints', () => {
 
   it('escapes regex metacharacters in bold substrings', () => {
     const { lastFrame } = render(
-      <RunFooterHints
-        hints={[{ text: 'use --report-to <url> to upload', bold: ['<url>'] }]}
-      />,
+      <RunFooterHints hints={[{ text: 'use --report-to <url> to upload', bold: ['<url>'] }]} />,
     );
     // If the metachars weren't escaped, the RegExp would throw or mis-split;
     // a clean render proves the escape path ran.

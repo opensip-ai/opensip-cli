@@ -188,13 +188,31 @@ describe('handleParseError', () => {
 function spyStreams(): { stdout: string[]; stderr: string[]; restore: () => void } {
   const stdout: string[] = [];
   const stderr: string[] = [];
-  const o = vi.spyOn(process.stdout, 'write').mockImplementation((c) => { stdout.push(String(c)); return true; });
-  const e = vi.spyOn(process.stderr, 'write').mockImplementation((c) => { stderr.push(String(c)); return true; });
-  return { stdout, stderr, restore: () => { o.mockRestore(); e.mockRestore(); } };
+  const o = vi.spyOn(process.stdout, 'write').mockImplementation((c) => {
+    stdout.push(String(c));
+    return true;
+  });
+  const e = vi.spyOn(process.stderr, 'write').mockImplementation((c) => {
+    stderr.push(String(c));
+    return true;
+  });
+  return {
+    stdout,
+    stderr,
+    restore: () => {
+      o.mockRestore();
+      e.mockRestore();
+    },
+  };
 }
 
 const bootstrapErr = (): BootstrapError =>
-  new BootstrapError({ message: 'No project found.', humanMessage: '✗ No project found.\n  Run init.', suggestion: 'Run opensip-tools init.', exitCode: 2 });
+  new BootstrapError({
+    message: 'No project found.',
+    humanMessage: '✗ No project found.\n  Run init.',
+    suggestion: 'Run opensip-tools init.',
+    exitCode: 2,
+  });
 
 describe('handleParseError — 2.12.0 outcomes', () => {
   it('renders a BootstrapError to stderr verbatim (human mode), exit from the error', async () => {
@@ -219,7 +237,11 @@ describe('handleParseError — 2.12.0 outcomes', () => {
       s.restore();
     }
     expect(opts.setExitCode).toHaveBeenCalledWith(2);
-    const outcome = JSON.parse(s.stdout.join('')) as { kind: string; status: string; errors: { message: string; suggestion?: string }[] };
+    const outcome = JSON.parse(s.stdout.join('')) as {
+      kind: string;
+      status: string;
+      errors: { message: string; suggestion?: string }[];
+    };
     expect(outcome.kind).toBe('bootstrap.error');
     expect(outcome.status).toBe('error');
     expect(outcome.errors[0]?.message).toBe('No project found.');
@@ -235,7 +257,11 @@ describe('handleParseError — 2.12.0 outcomes', () => {
       s.restore();
     }
     expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CHECK_NOT_FOUND);
-    const outcome = JSON.parse(s.stdout.join('')) as { kind: string; status: string; errors: { message: string }[] };
+    const outcome = JSON.parse(s.stdout.join('')) as {
+      kind: string;
+      status: string;
+      errors: { message: string }[];
+    };
     expect(outcome.kind).toBe('command.error');
     expect(outcome.errors[0]?.message).toContain('not found');
     expect(opts.rendered).toHaveLength(0); // JSON path never renders Ink

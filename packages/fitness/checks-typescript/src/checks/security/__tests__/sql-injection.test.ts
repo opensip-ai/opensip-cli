@@ -14,12 +14,12 @@
  * refactors don't reintroduce them.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest';
 
-import { analyzeSqlInjection } from '../sql-injection.js'
+import { analyzeSqlInjection } from '../sql-injection.js';
 
 function analyze(src: string): readonly { line: number; message: string }[] {
-  return analyzeSqlInjection(src, 'test.ts')
+  return analyzeSqlInjection(src, 'test.ts');
 }
 
 describe('sql-injection — FP regression suite (1.0.7)', () => {
@@ -33,9 +33,9 @@ describe('sql-injection — FP regression suite (1.0.7)', () => {
         'Verifies the chain hash and surfaces every seal row.\n' +
         'Exits 0 on a clean pass.\n',
       )
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 
   it('does NOT flag CLI help text with lowercase "or" between concatenated strings', () => {
     const src = String.raw`
@@ -45,9 +45,9 @@ describe('sql-injection — FP regression suite (1.0.7)', () => {
         '  shadow — log only\n' +
         '  apply  — write the change\n',
       )
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 
   it('does NOT flag logger.warn argument with concatenation', () => {
     const src = `
@@ -55,16 +55,16 @@ describe('sql-injection — FP regression suite (1.0.7)', () => {
       logger.warn({
         msg: 'phase ' + name + ' will retry and continue',
       })
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 
   it('does NOT flag console.log with English-text concatenation', () => {
     const src = String.raw`
       console.log('Tables: ' + tables.join(', ') + '\n' + 'audit_log and chain_seals are checked')
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 
   it('STILL flags real SQL concatenation with WHERE', () => {
     // Pre-1.0.7 caught this via arm-1 (left-side SELECT keyword); the
@@ -72,9 +72,9 @@ describe('sql-injection — FP regression suite (1.0.7)', () => {
     const src = `
       const q = 'SELECT * FROM users WHERE id = ' + userId
       db.execute(q)
-    `
-    expect(analyze(src).length).toBeGreaterThanOrEqual(1)
-  })
+    `;
+    expect(analyze(src).length).toBeGreaterThanOrEqual(1);
+  });
 
   it('STILL flags right-side WHERE/AND continuation when chain has a SQL keyword', () => {
     // Build-up pattern: prefix + variable + suffix where the suffix
@@ -83,9 +83,9 @@ describe('sql-injection — FP regression suite (1.0.7)', () => {
     const src = `
       const q = 'SELECT * FROM users WHERE id = ' + userId + ' AND status = $1'
       db.execute(q)
-    `
-    expect(analyze(src).length).toBeGreaterThanOrEqual(1)
-  })
+    `;
+    expect(analyze(src).length).toBeGreaterThanOrEqual(1);
+  });
 
   it('does NOT flag uppercase AND/OR inside an output call even when the chain looks SQL-ish', () => {
     // Edge case: even if the help text uses uppercase "AND" /
@@ -100,7 +100,7 @@ describe('sql-injection — FP regression suite (1.0.7)', () => {
         '\n' +
         'BOTH are safe to run; SHADOW is read-only.\n',
       )
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
-})
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
+});

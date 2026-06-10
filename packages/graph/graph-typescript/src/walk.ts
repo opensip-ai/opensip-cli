@@ -192,9 +192,7 @@ function walkFile(
   callSites: CallSiteRecord[],
   dependencySites: DependencySiteRecord[],
 ): void {
-  const filePathProjectRel = relative(projectDirAbs, sourceFile.fileName)
-    .split(sep)
-    .join('/');
+  const filePathProjectRel = relative(projectDirAbs, sourceFile.fileName).split(sep).join('/');
 
   const baseCtx: VisitorContext = {
     sourceFile,
@@ -243,23 +241,26 @@ function walkFile(
       const className = node.name?.text ?? '<anon-class>';
       const childCtx: VisitorContext = { ...ctx, enclosingClass: className };
       // @graph-ignore-next-line graph:cycle -- intentional recursive descent; forEachChild re-enters the visitor (descend)
-      ts.forEachChild(node, (c) => { descend(c, childCtx, childOwnerHash); });
+      ts.forEachChild(node, (c) => {
+        descend(c, childCtx, childOwnerHash);
+      });
       return;
     }
 
-    ts.forEachChild(node, (c) => { descend(c, ctx, childOwnerHash); });
+    ts.forEachChild(node, (c) => {
+      descend(c, ctx, childOwnerHash);
+    });
   }
 
   // SourceFile itself isn't function-shaped or a resolver candidate.
   // Descend its children directly with module-init as the initial
   // owner.
-  ts.forEachChild(sourceFile, (c) => { descend(c, baseCtx, moduleInit.bodyHash); });
+  ts.forEachChild(sourceFile, (c) => {
+    descend(c, baseCtx, moduleInit.bodyHash);
+  });
 }
 
-function record(
-  out: Record<string, FunctionOccurrence[]>,
-  occ: FunctionOccurrence,
-): void {
+function record(out: Record<string, FunctionOccurrence[]>, occ: FunctionOccurrence): void {
   const list = out[occ.simpleName];
   if (list) {
     /* v8 ignore next */

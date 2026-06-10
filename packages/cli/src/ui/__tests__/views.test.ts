@@ -27,7 +27,10 @@ describe('list-checks view', () => {
 
 describe('list-recipes view', () => {
   it('lists recipe name, description, and check count', () => {
-    const out = text({ type: 'list-recipes', recipes: [{ name: 'example', description: 'demo recipe', checkCount: '5 checks' }] });
+    const out = text({
+      type: 'list-recipes',
+      recipes: [{ name: 'example', description: 'demo recipe', checkCount: '5 checks' }],
+    });
     expect(out).toContain('Available Recipes');
     expect(out).toContain('example — demo recipe (5 checks)');
   });
@@ -42,8 +45,27 @@ describe('history view', () => {
     const out = text({
       type: 'history',
       sessions: [
-        { id: 'FIT_1', tool: 'fit', timestamp: '2026-01-01T00:00:00.000Z', score: 95, passed: true, durationMs: 1500, recipe: 'example', payload: { summary: { passed: 9, total: 10 } }, showCommand: 'opensip-tools sessions show FIT_1 --json' } as never,
-        { id: 'GRAPH_2', tool: 'graph', timestamp: '2026-01-02T00:00:00.000Z', score: 40, passed: false, durationMs: 500, payload: {}, showCommand: 'opensip-tools sessions show GRAPH_2 --json' } as never,
+        {
+          id: 'FIT_1',
+          tool: 'fit',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          score: 95,
+          passed: true,
+          durationMs: 1500,
+          recipe: 'example',
+          payload: { summary: { passed: 9, total: 10 } },
+          showCommand: 'opensip-tools sessions show FIT_1 --json',
+        } as never,
+        {
+          id: 'GRAPH_2',
+          tool: 'graph',
+          timestamp: '2026-01-02T00:00:00.000Z',
+          score: 40,
+          passed: false,
+          durationMs: 500,
+          payload: {},
+          showCommand: 'opensip-tools sessions show GRAPH_2 --json',
+        } as never,
       ],
     });
     expect(out).toContain('Run History (2 sessions)');
@@ -83,18 +105,23 @@ describe('session-replay view', () => {
     const out = text({
       type: 'session-replay',
       session: {
-        id: 'GRAPH_X', tool: 'graph', timestamp: '2026-01-01T00:00:00.000Z',
-        recipe: 'strict', score: 60, passed: false, durationMs: 1200,
+        id: 'GRAPH_X',
+        tool: 'graph',
+        timestamp: '2026-01-01T00:00:00.000Z',
+        recipe: 'strict',
+        score: 60,
+        passed: false,
+        durationMs: 1200,
       },
       envelope,
       fidelity: 'projection',
     });
     expect(out).toContain('Session GRAPH_X');
     expect(out).toContain('graph');
-    expect(out).toContain('recipe strict');     // recipe-present branch
-    expect(out).toContain('FAIL');              // passed:false verdict branch
+    expect(out).toContain('recipe strict'); // recipe-present branch
+    expect(out).toContain('FAIL'); // passed:false verdict branch
     expect(out).toContain('replayed (projection)');
-    expect(out).toContain('graph:cycle');       // the shared envelope table body
+    expect(out).toContain('graph:cycle'); // the shared envelope table body
     // The live-run footer must NOT appear on a replay.
     expect(out).not.toContain('Use --verbose');
     expect(out).not.toContain('dashboard for HTML report');
@@ -113,37 +140,67 @@ describe('experimental + help + dashboard views', () => {
   });
 
   it('renders dashboard opened / not-opened', () => {
-    expect(text({ type: 'dashboard', path: '/r.html', opened: true })).toContain('Opened in browser.');
-    expect(text({ type: 'dashboard', path: '/r.html', opened: false })).toContain('Open the file in your browser');
+    expect(text({ type: 'dashboard', path: '/r.html', opened: true })).toContain(
+      'Opened in browser.',
+    );
+    expect(text({ type: 'dashboard', path: '/r.html', opened: false })).toContain(
+      'Open the file in your browser',
+    );
   });
 });
 
 describe('clear/configure/uninstall done views', () => {
   it('clear-done: empty / cancelled / done', () => {
-    expect(text({ type: 'clear-done', action: 'empty', deletedCount: 0, sessionCount: 0 })).toContain('No session data');
-    expect(text({ type: 'clear-done', action: 'cancelled', deletedCount: 0, sessionCount: 3 })).toContain('Cancelled');
-    expect(text({ type: 'clear-done', action: 'done', deletedCount: 1, sessionCount: 1 })).toContain('1 session deleted.');
+    expect(
+      text({ type: 'clear-done', action: 'empty', deletedCount: 0, sessionCount: 0 }),
+    ).toContain('No session data');
+    expect(
+      text({ type: 'clear-done', action: 'cancelled', deletedCount: 0, sessionCount: 3 }),
+    ).toContain('Cancelled');
+    expect(
+      text({ type: 'clear-done', action: 'done', deletedCount: 1, sessionCount: 1 }),
+    ).toContain('1 session deleted.');
   });
 
   it('configure-done: saved / cancelled', () => {
-    expect(text({ type: 'configure-done', action: 'saved', configPath: '/c.yml' })).toContain('API key saved to /c.yml');
-    expect(text({ type: 'configure-done', action: 'cancelled', configPath: '/c.yml' })).toContain('No key provided');
+    expect(text({ type: 'configure-done', action: 'saved', configPath: '/c.yml' })).toContain(
+      'API key saved to /c.yml',
+    );
+    expect(text({ type: 'configure-done', action: 'cancelled', configPath: '/c.yml' })).toContain(
+      'No key provided',
+    );
   });
 
   it('uninstall-done: removed / dry-run / empty / cancelled', () => {
     const base = { type: 'uninstall-done', mode: 'user', rootPath: '/r', sizeBytes: 2048 } as const;
-    expect(text({ ...base, action: 'removed', targets: [{ path: '/r/a', kind: 'file' }] })).toContain('Removed 1 target');
-    expect(text({ ...base, action: 'dry-run', targets: [{ path: '/r/a', kind: 'file' }] })).toContain('[dry-run]');
+    expect(
+      text({ ...base, action: 'removed', targets: [{ path: '/r/a', kind: 'file' }] }),
+    ).toContain('Removed 1 target');
+    expect(
+      text({ ...base, action: 'dry-run', targets: [{ path: '/r/a', kind: 'file' }] }),
+    ).toContain('[dry-run]');
     expect(text({ ...base, action: 'empty', targets: [] })).toContain('Nothing to remove');
     expect(text({ ...base, action: 'cancelled', targets: [] })).toContain('Cancelled');
   });
 });
 
 describe('init view', () => {
-  const base = { type: 'init', created: true, path: '/p/cfg.yml', cwd: '/p', configFilename: 'opensip-tools.config.yml' } as const;
+  const base = {
+    type: 'init',
+    created: true,
+    path: '/p/cfg.yml',
+    cwd: '/p',
+    configFilename: 'opensip-tools.config.yml',
+  } as const;
 
   it('renders the pristine success scaffold with created files + try-it hints', () => {
-    const out = text({ ...base, state: 'pristine', languages: ['typescript'], createdFiles: ['/p/opensip-tools/x.ts'], gitignoreUpdated: true });
+    const out = text({
+      ...base,
+      state: 'pristine',
+      languages: ['typescript'],
+      createdFiles: ['/p/opensip-tools/x.ts'],
+      gitignoreUpdated: true,
+    });
     expect(out).toContain('Scaffolded for typescript');
     expect(out).toContain('opensip-tools/x.ts');
     expect(out).toContain('.gitignore');
@@ -151,13 +208,21 @@ describe('init view', () => {
   });
 
   it('renders the inside-existing-project refusal verbatim', () => {
-    const out = text({ ...base, created: false, insideExistingProject: { discoveredRoot: '/p', message: 'line one\nline two' } });
+    const out = text({
+      ...base,
+      created: false,
+      insideExistingProject: { discoveredRoot: '/p', message: 'line one\nline two' },
+    });
     expect(out).toContain('line one');
     expect(out).toContain('line two');
   });
 
   it('renders the ambiguous-language refusal', () => {
-    const out = text({ ...base, created: false, ambiguousLanguageError: { detected: ['ts', 'py'], message: 'pass --language' } });
+    const out = text({
+      ...base,
+      created: false,
+      ambiguousLanguageError: { detected: ['ts', 'py'], message: 'pass --language' },
+    });
     expect(out).toContain('language ambiguous');
     expect(out).toContain('pass --language');
   });
@@ -228,15 +293,22 @@ describe('plugin view', () => {
 
   it('add / remove success and failure', () => {
     expect(text({ type: 'plugin-add', packageName: 'p', success: true })).toContain('Installed p');
-    expect(text({ type: 'plugin-add', packageName: 'p', success: false, error: 'eperm' })).toContain('Failed to install p (eperm)');
+    expect(
+      text({ type: 'plugin-add', packageName: 'p', success: false, error: 'eperm' }),
+    ).toContain('Failed to install p (eperm)');
     expect(text({ type: 'plugin-remove', packageName: 'p', success: true })).toContain('Removed p');
   });
 
   it('sync: empty / populated with errors', () => {
-    expect(text({ type: 'plugin-sync', synced: [], success: true })).toContain('No plugins declared');
+    expect(text({ type: 'plugin-sync', synced: [], success: true })).toContain(
+      'No plugins declared',
+    );
     const out = text({
       type: 'plugin-sync',
-      synced: [{ domain: 'fit', package: 'a', installed: true }, { domain: 'sim', package: 'b', installed: false }],
+      synced: [
+        { domain: 'fit', package: 'a', installed: true },
+        { domain: 'sim', package: 'b', installed: false },
+      ],
       success: false,
       errors: ['b failed'],
     });

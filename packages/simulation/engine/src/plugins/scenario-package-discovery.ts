@@ -10,11 +10,11 @@
  * to the generic loader.
  */
 
-import { join } from 'node:path'
+import { join } from 'node:path';
 
-import { readYamlFile } from '@opensip-tools/core'
+import { readYamlFile } from '@opensip-tools/core';
 
-const CONFIG_FILENAME = 'opensip-tools.config.yml'
+const CONFIG_FILENAME = 'opensip-tools.config.yml';
 
 /**
  * Read `plugins.scenarioPackages`, `plugins.autoDiscoverScenarios`, and
@@ -23,29 +23,29 @@ const CONFIG_FILENAME = 'opensip-tools.config.yml'
  * `readProjectPluginsList()`.
  */
 export function readScenarioPackagePreferences(projectDir: string): {
-  readonly scenarioPackages?: readonly string[]
-  readonly autoDiscoverScenarios?: boolean
-  readonly packageScopes?: readonly string[]
+  readonly scenarioPackages?: readonly string[];
+  readonly autoDiscoverScenarios?: boolean;
+  readonly packageScopes?: readonly string[];
 } {
-  const configPath = join(projectDir, CONFIG_FILENAME)
-  const doc = readYamlFile(configPath)
-  if (!doc || typeof doc !== 'object') return {}
-  const plugins = (doc as Record<string, unknown>).plugins
-  if (!plugins || typeof plugins !== 'object') return {}
-  const p = plugins as Record<string, unknown>
+  const configPath = join(projectDir, CONFIG_FILENAME);
+  const doc = readYamlFile(configPath);
+  if (!doc || typeof doc !== 'object') return {};
+  const plugins = (doc as Record<string, unknown>).plugins;
+  if (!plugins || typeof plugins !== 'object') return {};
+  const p = plugins as Record<string, unknown>;
   const result: {
-    scenarioPackages?: readonly string[]
-    autoDiscoverScenarios?: boolean
-    packageScopes?: readonly string[]
-  } = {}
+    scenarioPackages?: readonly string[];
+    autoDiscoverScenarios?: boolean;
+    packageScopes?: readonly string[];
+  } = {};
   if (Array.isArray(p.scenarioPackages)) {
-    result.scenarioPackages = p.scenarioPackages.filter((v): v is string => typeof v === 'string')
+    result.scenarioPackages = p.scenarioPackages.filter((v): v is string => typeof v === 'string');
   }
   if (typeof p.autoDiscoverScenarios === 'boolean') {
-    result.autoDiscoverScenarios = p.autoDiscoverScenarios
+    result.autoDiscoverScenarios = p.autoDiscoverScenarios;
   }
   if (Array.isArray(p.packageScopes)) {
-    result.packageScopes = p.packageScopes.filter((v): v is string => typeof v === 'string')
+    result.packageScopes = p.packageScopes.filter((v): v is string => typeof v === 'string');
   }
-  return result
+  return result;
 }

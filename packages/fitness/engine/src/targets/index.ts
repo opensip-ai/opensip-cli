@@ -7,7 +7,7 @@
  */
 
 // Loader
-export { loadTargetsConfig } from './loader.js'
+export { loadTargetsConfig } from './loader.js';
 
 // Resolver
-export { resolveTargetFiles } from './resolver.js'
+export { resolveTargetFiles } from './resolver.js';

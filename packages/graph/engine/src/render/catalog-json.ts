@@ -27,7 +27,6 @@ import {
   deriveOpenSipSymbolId,
 } from './opensip-id-derivation.js';
 
-
 import type {
   CatalogExport,
   CatalogExportEdge,
@@ -111,9 +110,10 @@ function occurrenceToSymbol(
     startLine: occurrence.line,
     endLine: occurrence.endLine,
     isExported: occurrence.visibility === 'exported',
-    signature: occurrence.returnType === null
-      ? null
-      : `(${occurrence.params.map((p) => p.name).join(', ')}): ${occurrence.returnType}`,
+    signature:
+      occurrence.returnType === null
+        ? null
+        : `(${occurrence.params.map((p) => p.name).join(', ')}): ${occurrence.returnType}`,
     docSummary: null,
     gitSha,
   };

@@ -139,7 +139,6 @@ export type { EdgePosition, EdgeSink, MutableStats } from './lang-adapter/edge-h
 export { normalizeWhitespace, hashBody } from './lang-adapter/body-digest.js';
 export type { BodyDigest } from './lang-adapter/body-digest.js';
 
-
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md:
 // first-party adapters live in their own graph-* packages, so the
 // engine no longer re-exports any adapter, parsed-project type, or
@@ -181,7 +180,12 @@ export { defineRule } from './rules/define-rule.js';
 export type { RuleDataset, GraphFeatures, DefineRuleConfig } from './rules/define-rule.js';
 // ── Graph recipes (Plan B — symmetric with fitness recipes) ────────
 export { defineGraphRecipe } from './recipes/types.js';
-export type { GraphRecipe, GraphRecipeDefinition, RuleSelector, RuleConfigMap } from './recipes/types.js';
+export type {
+  GraphRecipe,
+  GraphRecipeDefinition,
+  RuleSelector,
+  RuleConfigMap,
+} from './recipes/types.js';
 export {
   builtInGraphRecipes,
   builtInGraphRecipesByName,
@@ -189,5 +193,9 @@ export {
   deadCodeGraphRecipe,
   isBuiltInGraphRecipe,
 } from './recipes/built-in-recipes.js';
-export { GraphRecipeRegistry, createRecipeRegistry, currentGraphRecipes } from './recipes/registry.js';
+export {
+  GraphRecipeRegistry,
+  createRecipeRegistry,
+  currentGraphRecipes,
+} from './recipes/registry.js';
 export { resolveRecipeToRules } from './recipes/resolve.js';

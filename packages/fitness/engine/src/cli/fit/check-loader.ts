@@ -22,19 +22,11 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  currentScope,
-  loadCapabilityDomain,
-  logger,
-} from '@opensip-tools/core';
+import { currentScope, loadCapabilityDomain, logger } from '@opensip-tools/core';
 
-import {
-  currentCheckRegistry,
-  currentFitnessLoadState,
-} from '../../framework/scope-registry.js';
+import { currentCheckRegistry, currentFitnessLoadState } from '../../framework/scope-registry.js';
 import { readCheckPackagePreferences } from '../../plugins/check-package-discovery.js';
 import { loadAllPlugins } from '../../plugins/loader.js';
-
 
 // ---------------------------------------------------------------------------
 // Public accessors — all read the current RunScope's fitness load state
@@ -125,7 +117,11 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
         'Install at least one package declaring opensipTools.kind: "fit-pack", ' +
         'or declare plugins.checkPackages in opensip-tools.config.yml.',
     );
-    logger.warn({ evt: 'cli.check_packages.empty', module: 'cli:fit', msg: 'no check packages loaded' });
+    logger.warn({
+      evt: 'cli.check_packages.empty',
+      module: 'cli:fit',
+      msg: 'no check packages loaded',
+    });
   }
 
   load.loadedFor = key;
@@ -146,7 +142,13 @@ async function loadFitCheckPackages(projectDir: string): Promise<readonly string
   const preferences = prefs.checkPackages === undefined ? {} : { packages: prefs.checkPackages };
   return registry.isDomainLoaded('fit-pack', projectDir)
     ? registry.domainLoadErrors('fit-pack')
-    : loadCapabilityDomain({ registry, domainId: 'fit-pack', projectDir, cliDir: cliInstallDir(), preferences });
+    : loadCapabilityDomain({
+        registry,
+        domainId: 'fit-pack',
+        projectDir,
+        cliDir: cliInstallDir(),
+        preferences,
+      });
 }
 
 /**
@@ -165,4 +167,3 @@ function cliInstallDir(): string {
   const thisFile = fileURLToPath(import.meta.url);
   return dirname(dirname(dirname(thisFile)));
 }
-

@@ -4,7 +4,7 @@ targets:
     languages: [klingon]
     concerns: [backend]
     include:
-      - "src/**/*.kl"
+      - 'src/**/*.kl'
 
 fitness:
   failOnErrors: 0

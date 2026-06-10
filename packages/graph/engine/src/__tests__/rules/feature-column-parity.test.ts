@@ -36,12 +36,32 @@ function messages(signals: readonly { message: string }[]): string[] {
 describe('rule feature-column parity — features present vs absent', () => {
   it('duplicated-function-body: identical signals with and without features', () => {
     // Two identical big bodies across packages → a dup signal.
-    const a = occ({ bodyHash: 'dup', simpleName: 'fmt', filePath: 'packages/a/src/x.ts', qualifiedName: 'a.fmt', endLine: 30, bodySize: 400 });
-    const b = occ({ bodyHash: 'dup', simpleName: 'fmt', filePath: 'packages/b/src/x.ts', qualifiedName: 'b.fmt', endLine: 30, bodySize: 400 });
+    const a = occ({
+      bodyHash: 'dup',
+      simpleName: 'fmt',
+      filePath: 'packages/a/src/x.ts',
+      qualifiedName: 'a.fmt',
+      endLine: 30,
+      bodySize: 400,
+    });
+    const b = occ({
+      bodyHash: 'dup',
+      simpleName: 'fmt',
+      filePath: 'packages/b/src/x.ts',
+      qualifiedName: 'b.fmt',
+      endLine: 30,
+      bodySize: 400,
+    });
     const catalog = makeCatalog([a, b]);
     const indexes = buildIndexes(catalog);
     const features = featuresFor(duplicatedFunctionBodyRule, catalog);
-    const withF = duplicatedFunctionBodyRule.evaluate(catalog, indexes, CONFIG, undefined, features);
+    const withF = duplicatedFunctionBodyRule.evaluate(
+      catalog,
+      indexes,
+      CONFIG,
+      undefined,
+      features,
+    );
     const without = duplicatedFunctionBodyRule.evaluate(catalog, indexes, CONFIG);
     expect(messages(withF)).toEqual(messages(without));
     expect(without.length).toBeGreaterThan(0);
@@ -50,8 +70,13 @@ describe('rule feature-column parity — features present vs absent', () => {
 
   it('no-side-effect-path: identical signals with and without features', () => {
     // A pure ≥10-line function that calls two other pure functions.
-    const pure = occ({ bodyHash: 'p', simpleName: 'compute', endLine: 14, returnType: 'number',
-      calls: [staticCall('h1'), staticCall('h2')] });
+    const pure = occ({
+      bodyHash: 'p',
+      simpleName: 'compute',
+      endLine: 14,
+      returnType: 'number',
+      calls: [staticCall('h1'), staticCall('h2')],
+    });
     const h1 = occ({ bodyHash: 'h1', simpleName: 'h1', returnType: 'number' });
     const h2 = occ({ bodyHash: 'h2', simpleName: 'h2', returnType: 'number' });
     const catalog = makeCatalog([pure, h1, h2]);
@@ -65,7 +90,12 @@ describe('rule feature-column parity — features present vs absent', () => {
 
   it('orphan-subtree: identical signals with and without features', () => {
     const orphan = occ({ bodyHash: 'o', simpleName: 'lonely', visibility: 'module-local' });
-    const entry = occ({ bodyHash: 'e', simpleName: 'main', visibility: 'exported', calls: [staticCall('used')] });
+    const entry = occ({
+      bodyHash: 'e',
+      simpleName: 'main',
+      visibility: 'exported',
+      calls: [staticCall('used')],
+    });
     const used = occ({ bodyHash: 'used', simpleName: 'used', visibility: 'module-local' });
     const catalog = makeCatalog([orphan, entry, used]);
     const indexes = buildIndexes(catalog);
@@ -79,8 +109,13 @@ describe('rule feature-column parity — features present vs absent', () => {
 
   it('test-only-reachable: identical signals with and without features', () => {
     const helper = occ({ bodyHash: 'h', simpleName: 'helper', visibility: 'module-local' });
-    const testCaller = occ({ bodyHash: 't', simpleName: 'spec', filePath: 'src/__tests__/x.test.ts',
-      inTestFile: true, calls: [staticCall('h')] });
+    const testCaller = occ({
+      bodyHash: 't',
+      simpleName: 'spec',
+      filePath: 'src/__tests__/x.test.ts',
+      inTestFile: true,
+      calls: [staticCall('h')],
+    });
     const catalog = makeCatalog([helper, testCaller]);
     const indexes = buildIndexes(catalog);
     const features = featuresFor(testOnlyReachableRule, catalog);
@@ -98,8 +133,22 @@ describe('rule feature-column parity — the column actually drives the verdict'
     // features override, this is a dup. Feed a features table whose bodyLines
     // for the hash is BELOW the floor; the rule must drop it, proving it read
     // the column rather than the inline endLine−line+1 fallback.
-    const a = occ({ bodyHash: 'dup', simpleName: 'fmt', filePath: 'packages/a/src/x.ts', qualifiedName: 'a.fmt', endLine: 30, bodySize: 400 });
-    const b = occ({ bodyHash: 'dup', simpleName: 'fmt', filePath: 'packages/b/src/x.ts', qualifiedName: 'b.fmt', endLine: 30, bodySize: 400 });
+    const a = occ({
+      bodyHash: 'dup',
+      simpleName: 'fmt',
+      filePath: 'packages/a/src/x.ts',
+      qualifiedName: 'a.fmt',
+      endLine: 30,
+      bodySize: 400,
+    });
+    const b = occ({
+      bodyHash: 'dup',
+      simpleName: 'fmt',
+      filePath: 'packages/b/src/x.ts',
+      qualifiedName: 'b.fmt',
+      endLine: 30,
+      bodySize: 400,
+    });
     const catalog = makeCatalog([a, b]);
     const indexes = buildIndexes(catalog);
     const config: GraphConfig = { minDuplicateBodyLines: 10, minCrossPackageDuplicatePackages: 99 };
@@ -116,7 +165,13 @@ describe('rule feature-column parity — the column actually drives the verdict'
       scc: [],
       edge: [],
     };
-    const dropped = duplicatedFunctionBodyRule.evaluate(catalog, indexes, config, undefined, features);
+    const dropped = duplicatedFunctionBodyRule.evaluate(
+      catalog,
+      indexes,
+      config,
+      undefined,
+      features,
+    );
     expect(dropped.length).toBe(0);
   });
 

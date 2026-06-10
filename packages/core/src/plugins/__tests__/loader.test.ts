@@ -97,7 +97,9 @@ describe('loadPlugin', () => {
     const entry = writePluginFile('plugin-empty.mjs', 'export const x = 1;');
     await loadPlugin(makeDiscovered(entry), () => ({}));
     const calls = warnSpy.mock.calls.map((c: readonly unknown[]) => c[0]);
-    expect(calls.some((c: unknown) => (c as { evt?: string }).evt === 'plugin.loader.no_exports')).toBe(true);
+    expect(
+      calls.some((c: unknown) => (c as { evt?: string }).evt === 'plugin.loader.no_exports'),
+    ).toBe(true);
   });
 
   it('does not warn when at least one counter is non-zero', async () => {
@@ -142,7 +144,9 @@ describe('loadPlugin', () => {
 
   it('passes warn/debug helpers to the callback', async () => {
     const entry = writePluginFile('plugin-ctx.mjs', 'export const x = 1;');
-    let captured: { warn: typeof globalThis.console.warn; debug: typeof globalThis.console.debug } | undefined;
+    let captured:
+      | { warn: typeof globalThis.console.warn; debug: typeof globalThis.console.debug }
+      | undefined;
     await loadPlugin(makeDiscovered(entry), (_mod, ctx) => {
       ctx.warn('my.evt', 'my message', { extra: 'field' });
       ctx.debug('my.debug.evt', { foo: 'bar' });

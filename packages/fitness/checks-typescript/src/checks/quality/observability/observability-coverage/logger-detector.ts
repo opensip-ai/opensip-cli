@@ -3,14 +3,13 @@
  * @fileoverview Logger call detector for observability coverage analysis
  */
 
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
-
-import type { LoggerCall } from './types.js'
+import type { LoggerCall } from './types.js';
 
 /** Logger method names we recognize as logging calls */
-const LOGGER_METHODS = new Set(['info', 'warn', 'error', 'debug'])
+const LOGGER_METHODS = new Set(['info', 'warn', 'error', 'debug']);
 
 /**
  * Detect logger calls within a specific line range of a source file.
@@ -31,30 +30,30 @@ export function detectLoggerCalls(
   startLine: number,
   endLine: number,
 ): LoggerCall[] {
-  const sourceFile = getSharedSourceFile(filePath, content)
+  const sourceFile = getSharedSourceFile(filePath, content);
   /* v8 ignore next -- defensive guard */
-  if (!sourceFile) return []
+  if (!sourceFile) return [];
   // Local non-nullable alias so the nested `visit` function declaration —
   // which TypeScript treats as hoisted and therefore non-narrowing — can
   // still see a non-null SourceFile.
-  const sf = sourceFile
+  const sf = sourceFile;
 
-  const calls: LoggerCall[] = []
+  const calls: LoggerCall[] = [];
 
   function visit(node: ts.Node): void {
     if (ts.isCallExpression(node)) {
-      const call = extractLoggerCall(node, sf, startLine, endLine)
+      const call = extractLoggerCall(node, sf, startLine, endLine);
       if (call) {
-        calls.push(call)
+        calls.push(call);
       }
     }
 
-    ts.forEachChild(node, visit)
+    ts.forEachChild(node, visit);
   }
 
-  ts.forEachChild(sf, visit)
+  ts.forEachChild(sf, visit);
 
-  return calls
+  return calls;
 }
 
 /**
@@ -67,7 +66,7 @@ export function detectLoggerCalls(
 function isLoggerReceiver(node: ts.Expression): boolean {
   // logger.info(...)
   if (ts.isIdentifier(node) && node.text === 'logger') {
-    return true
+    return true;
   }
 
   // this.logger.info(...)
@@ -76,10 +75,10 @@ function isLoggerReceiver(node: ts.Expression): boolean {
     node.expression.kind === ts.SyntaxKind.ThisKeyword &&
     node.name.text === 'logger'
   ) {
-    return true
+    return true;
   }
 
-  return false
+  return false;
 }
 
 /**
@@ -94,23 +93,23 @@ function extractLoggerCall(
   endLine: number,
 ): LoggerCall | undefined {
   // @fitness-ignore-next-line null-safety -- getLineAndCharacterOfPosition always returns a valid {line, character} object
-  const lineNumber = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1
+  const lineNumber = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
 
   if (lineNumber < startLine || lineNumber > endLine) {
-    return undefined
+    return undefined;
   }
 
   // Check for property access calls: logger.info(...), this.logger.warn(...), etc.
   if (ts.isPropertyAccessExpression(node.expression)) {
-    const propertyAccess = node.expression
+    const propertyAccess = node.expression;
     // @fitness-ignore-next-line null-safety -- ts.isPropertyAccessExpression guarantees .name is a valid Identifier node
-    const methodName = propertyAccess.name.text
+    const methodName = propertyAccess.name.text;
 
     if (LOGGER_METHODS.has(methodName) && isLoggerReceiver(propertyAccess.expression)) {
       return {
         line: lineNumber,
         level: methodName as LoggerCall['level'],
-      }
+      };
     }
   }
 
@@ -122,10 +121,10 @@ function extractLoggerCall(
     return {
       line: lineNumber,
       level: 'info',
-    }
+    };
   }
 
-  return undefined
+  return undefined;
 }
 
 /**
@@ -142,5 +141,5 @@ export function fileImportsLogger(content: string): boolean {
     /(?:\/logger['"]|from\s+['"][^'"]*logger)/.test(content) ||
     content.includes('logToFitnessFile') ||
     content.includes('logToCLIFile')
-  )
+  );
 }

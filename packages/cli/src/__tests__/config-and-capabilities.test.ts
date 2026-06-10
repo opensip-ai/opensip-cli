@@ -109,7 +109,11 @@ describe('composeAndValidateToolConfig', () => {
       'cli:\n  recipe: example\ntargets:\n  app:\n    description: App\n    include: ["src/**"]\nfutureThing:\n  whatever: 1\n',
     );
     expect(() =>
-      composeAndValidateToolConfig({ tools: registryWith([graphTool, fitnessTool]), configPath, env: {} }),
+      composeAndValidateToolConfig({
+        tools: registryWith([graphTool, fitnessTool]),
+        configPath,
+        env: {},
+      }),
     ).not.toThrow();
   });
 
@@ -118,14 +122,22 @@ describe('composeAndValidateToolConfig', () => {
     // target missing the required `description` now fails the composed gate.
     const configPath = writeConfig('targets:\n  app:\n    include: ["src/**"]\n');
     expect(() =>
-      composeAndValidateToolConfig({ tools: registryWith([graphTool, fitnessTool]), configPath, env: {} }),
+      composeAndValidateToolConfig({
+        tools: registryWith([graphTool, fitnessTool]),
+        configPath,
+        env: {},
+      }),
     ).toThrow(ConfigurationError);
   });
 
   it('throws ConfigurationError on a typo inside any tool namespace', () => {
     const configPath = writeConfig('graph:\n  minPackges: 2\n');
     expect(() =>
-      composeAndValidateToolConfig({ tools: registryWith([graphTool, fitnessTool]), configPath, env: {} }),
+      composeAndValidateToolConfig({
+        tools: registryWith([graphTool, fitnessTool]),
+        configPath,
+        env: {},
+      }),
     ).toThrow(ConfigurationError);
   });
 

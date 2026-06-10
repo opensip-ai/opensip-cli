@@ -2,7 +2,7 @@
  * @fileoverview Display entries for TypeScript-specific architecture checks
  */
 
-import type { CheckDisplayEntry } from './types.js'
+import type { CheckDisplayEntry } from './types.js';
 
 /** Architecture check display entries (TS_AST only) */
 export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
@@ -15,7 +15,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'package-json-exports-field': ['📦', 'package.json Exports Field'],
   'phantom-dependency-detection': ['📦', 'Phantom Dependency Detection'],
   'tsconfig-extends-validation': ['⚙️', 'tsconfig Extends Validation'],
-})
+});
 
 /** No documentation TS_AST checks; export empty object for symmetry */
-export const DOCUMENTATION_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({})
+export const DOCUMENTATION_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({});

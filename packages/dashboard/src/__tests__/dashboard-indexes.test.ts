@@ -25,7 +25,9 @@ function loadBuildIndexes(): BuildIndexesFn {
   return factory() as BuildIndexesFn;
 }
 
-function occ(overrides: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string }): GraphFunctionOccurrence {
+function occ(
+  overrides: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string },
+): GraphFunctionOccurrence {
   return {
     qualifiedName: overrides.simpleName,
     filePath: 'packages/x/src/x.ts',
@@ -49,7 +51,11 @@ describe('buildIndexes (browser-side)', () => {
   it('returns empty maps for an empty catalog', () => {
     const buildIndexes = loadBuildIndexes();
     const empty: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now', functions: {},
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {},
     };
     const idx = buildIndexes(empty);
     expect(idx.byBodyHash.size).toBe(0);
@@ -69,11 +75,59 @@ describe('buildIndexes (browser-side)', () => {
     const buildIndexes = loadBuildIndexes();
     // a → b, a → c, b → d, c → d, e isolated.
     const cat: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        a: [occ({ bodyHash: 'ha', simpleName: 'a', calls: [{ to: ['hb', 'hc'], line: 2, column: 0, resolution: 'static', confidence: 'high', text: 'b(); c();' }] })],
-        b: [occ({ bodyHash: 'hb', simpleName: 'b', calls: [{ to: ['hd'], line: 2, column: 0, resolution: 'static', confidence: 'high', text: 'd();' }] })],
-        c: [occ({ bodyHash: 'hc', simpleName: 'c', calls: [{ to: ['hd'], line: 2, column: 0, resolution: 'static', confidence: 'high', text: 'd();' }] })],
+        a: [
+          occ({
+            bodyHash: 'ha',
+            simpleName: 'a',
+            calls: [
+              {
+                to: ['hb', 'hc'],
+                line: 2,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'b(); c();',
+              },
+            ],
+          }),
+        ],
+        b: [
+          occ({
+            bodyHash: 'hb',
+            simpleName: 'b',
+            calls: [
+              {
+                to: ['hd'],
+                line: 2,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'd();',
+              },
+            ],
+          }),
+        ],
+        c: [
+          occ({
+            bodyHash: 'hc',
+            simpleName: 'c',
+            calls: [
+              {
+                to: ['hd'],
+                line: 2,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'd();',
+              },
+            ],
+          }),
+        ],
         d: [occ({ bodyHash: 'hd', simpleName: 'd' })],
         e: [occ({ bodyHash: 'he', simpleName: 'e' })],
       },
@@ -93,9 +147,27 @@ describe('buildIndexes (browser-side)', () => {
   it('produces multiple caller entries for a single polymorphic CallEdge.to', () => {
     const buildIndexes = loadBuildIndexes();
     const cat: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        f: [occ({ bodyHash: 'hf', simpleName: 'f', calls: [{ to: ['ht1', 'ht2', 'ht3'], line: 3, column: 0, resolution: 'method-dispatch', confidence: 'medium', text: 'x.foo()' }] })],
+        f: [
+          occ({
+            bodyHash: 'hf',
+            simpleName: 'f',
+            calls: [
+              {
+                to: ['ht1', 'ht2', 'ht3'],
+                line: 3,
+                column: 0,
+                resolution: 'method-dispatch',
+                confidence: 'medium',
+                text: 'x.foo()',
+              },
+            ],
+          }),
+        ],
         t1: [occ({ bodyHash: 'ht1', simpleName: 't1' })],
         t2: [occ({ bodyHash: 'ht2', simpleName: 't2' })],
         t3: [occ({ bodyHash: 'ht3', simpleName: 't3' })],
@@ -111,9 +183,27 @@ describe('buildIndexes (browser-side)', () => {
   it('drops edges whose target is not in the catalog', () => {
     const buildIndexes = loadBuildIndexes();
     const cat: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        a: [occ({ bodyHash: 'ha', simpleName: 'a', calls: [{ to: ['external-hash-not-in-catalog'], line: 1, column: 0, resolution: 'unknown', confidence: 'low', text: 'external()' }] })],
+        a: [
+          occ({
+            bodyHash: 'ha',
+            simpleName: 'a',
+            calls: [
+              {
+                to: ['external-hash-not-in-catalog'],
+                line: 1,
+                column: 0,
+                resolution: 'unknown',
+                confidence: 'low',
+                text: 'external()',
+              },
+            ],
+          }),
+        ],
       },
     };
     const idx = buildIndexes(cat);
@@ -124,7 +214,10 @@ describe('buildIndexes (browser-side)', () => {
   it('groups multiple occurrences under the same simpleName', () => {
     const buildIndexes = loadBuildIndexes();
     const cat: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
         format: [
           occ({ bodyHash: 'h1', simpleName: 'format' }),

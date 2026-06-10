@@ -62,10 +62,9 @@ function migrateFailureMessage(opts: DataStoreOpenOptions): string {
 
 function requireSqlitePath(opts: DataStoreOpenOptions): string {
   if (!opts.path) {
-    throw new ConfigurationError(
-      'DataStoreFactory.open: SQLite backend requires a `path` option',
-      { code: 'CONFIGURATION.DATASTORE.MISSING_PATH' },
-    );
+    throw new ConfigurationError('DataStoreFactory.open: SQLite backend requires a `path` option', {
+      code: 'CONFIGURATION.DATASTORE.MISSING_PATH',
+    });
   }
   return opts.path;
 }

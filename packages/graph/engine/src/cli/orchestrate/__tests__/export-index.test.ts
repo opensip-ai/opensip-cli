@@ -92,9 +92,24 @@ describe('buildExportIndex', () => {
     );
     const index = buildExportIndex(cat);
     expect([...index.keys()].sort()).toEqual(['core', 'graph']);
-    expect(index.get('core')?.get('build')?.map((o) => o.bodyHash)).toEqual(['A']);
-    expect(index.get('graph')?.get('build')?.map((o) => o.bodyHash)).toEqual(['B']);
-    expect(index.get('graph')?.get('run')?.map((o) => o.bodyHash)).toEqual(['C']);
+    expect(
+      index
+        .get('core')
+        ?.get('build')
+        ?.map((o) => o.bodyHash),
+    ).toEqual(['A']);
+    expect(
+      index
+        .get('graph')
+        ?.get('build')
+        ?.map((o) => o.bodyHash),
+    ).toEqual(['B']);
+    expect(
+      index
+        .get('graph')
+        ?.get('run')
+        ?.map((o) => o.bodyHash),
+    ).toEqual(['C']);
   });
 
   it('collects multiple exported occurrences of one name in a package', () => {
@@ -103,7 +118,13 @@ describe('buildExportIndex', () => {
       occ('overload', 'packages/core/src/b.ts', 'B'),
     );
     const index = buildExportIndex(cat);
-    expect(index.get('core')?.get('overload')?.map((o) => o.bodyHash).sort()).toEqual(['A', 'B']);
+    expect(
+      index
+        .get('core')
+        ?.get('overload')
+        ?.map((o) => o.bodyHash)
+        .sort(),
+    ).toEqual(['A', 'B']);
   });
 
   it('keeps same-named exports in different packages separate (name collision)', () => {
@@ -112,8 +133,18 @@ describe('buildExportIndex', () => {
       occ('serialize', 'packages/output/src/b.ts', 'B'),
     );
     const index = buildExportIndex(cat);
-    expect(index.get('core')?.get('serialize')?.map((o) => o.bodyHash)).toEqual(['A']);
-    expect(index.get('output')?.get('serialize')?.map((o) => o.bodyHash)).toEqual(['B']);
+    expect(
+      index
+        .get('core')
+        ?.get('serialize')
+        ?.map((o) => o.bodyHash),
+    ).toEqual(['A']);
+    expect(
+      index
+        .get('output')
+        ?.get('serialize')
+        ?.map((o) => o.bodyHash),
+    ).toEqual(['B']);
   });
 });
 

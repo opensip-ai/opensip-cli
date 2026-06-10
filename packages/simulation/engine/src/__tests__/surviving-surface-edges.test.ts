@@ -11,10 +11,7 @@ import { enterScope, RunScope, runWithScopeSync } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
-import {
-  clearScenarioRegistry,
-  currentScenarioRegistry,
-} from '../framework/registry.js';
+import { clearScenarioRegistry, currentScenarioRegistry } from '../framework/registry.js';
 import { resolveMetric } from '../framework/resolve-metric.js';
 import { defineLoadScenario } from '../kinds/load/define.js';
 import { currentSimulationRecipeRegistry } from '../recipes/registry.js';
@@ -117,8 +114,12 @@ describe('resolveMetric — latency key aliases', () => {
 
 describe('SimulationRecipeService — onProgress', () => {
   it('fires (0, total) up front then a monotonic completed count per scenario', async () => {
-    currentScenarioRegistry().register(defineLoadScenario(loadConfig({ id: 'prog-a', name: 'prog-a' })));
-    currentScenarioRegistry().register(defineLoadScenario(loadConfig({ id: 'prog-b', name: 'prog-b' })));
+    currentScenarioRegistry().register(
+      defineLoadScenario(loadConfig({ id: 'prog-a', name: 'prog-a' })),
+    );
+    currentScenarioRegistry().register(
+      defineLoadScenario(loadConfig({ id: 'prog-b', name: 'prog-b' })),
+    );
 
     const events: [number, number][] = [];
     const service = new SimulationRecipeService({

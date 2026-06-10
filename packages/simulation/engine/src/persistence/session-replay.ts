@@ -19,10 +19,11 @@ import type { Signal } from '@opensip-tools/core';
  * @throws {Error | TypeError} when the stored payload is not the expected shape
  *   (propagated from `decodeSessionPayload`).
  */
-export function simReplayFromSession(
-  stored: StoredSession,
-): ToolSessionReplay<SimDoneResult> {
-  const payload = decodeSessionPayload(stored.payload, { tool: 'sim', requireViolationCount: true });
+export function simReplayFromSession(stored: StoredSession): ToolSessionReplay<SimDoneResult> {
+  const payload = decodeSessionPayload(stored.payload, {
+    tool: 'sim',
+    requireViolationCount: true,
+  });
   const units: UnitResult[] = payload.checks.map((check) => ({
     slug: check.checkSlug,
     passed: check.passed,
@@ -80,13 +81,15 @@ function replaySignal(
     filePath: finding.filePath ?? '',
     ...(finding.line === undefined ? {} : { line: finding.line }),
     ...(finding.column === undefined ? {} : { column: finding.column }),
-    ...(finding.filePath === undefined ? {} : {
-      code: {
-        file: finding.filePath,
-        ...(finding.line === undefined ? {} : { line: finding.line }),
-        ...(finding.column === undefined ? {} : { column: finding.column }),
-      },
-    }),
+    ...(finding.filePath === undefined
+      ? {}
+      : {
+          code: {
+            file: finding.filePath,
+            ...(finding.line === undefined ? {} : { line: finding.line }),
+            ...(finding.column === undefined ? {} : { column: finding.column }),
+          },
+        }),
     metadata: {},
     createdAt: stored.timestamp,
   };

@@ -65,7 +65,13 @@ describe('graph:large-function bands (explicit thresholds 80/150)', () => {
       scc: [],
       edge: [],
     };
-    const signals = largeFunctionRule.evaluate(makeCatalog([]), indexes, BANDS, undefined, features);
+    const signals = largeFunctionRule.evaluate(
+      makeCatalog([]),
+      indexes,
+      BANDS,
+      undefined,
+      features,
+    );
     expect(signals).toHaveLength(1);
     expect(signals[0]?.severity).toBe('high');
     expect(signals[0]?.metadata.bodyLines).toBe(200);
@@ -80,7 +86,9 @@ describe('graph:large-function bands (explicit thresholds 80/150)', () => {
   });
 
   it('returns [] for an empty catalog', () => {
-    expect(largeFunctionRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([])), EMPTY)).toEqual([]);
+    expect(
+      largeFunctionRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([])), EMPTY),
+    ).toEqual([]);
   });
 });
 
@@ -95,16 +103,32 @@ describe('graph:large-function shipped defaults (warn 300 / error 500)', () => {
 
 describe('graph:large-function skips non-functions and test files', () => {
   it('does not flag a long <module-init> (whole-file body, not a function)', () => {
-    const idx = buildIndexes(makeCatalog([
-      occ({ bodyHash: 'm', simpleName: '<module-init:src/a.ts>', line: 1, endLine: 400, kind: 'module-init' }),
-    ]));
+    const idx = buildIndexes(
+      makeCatalog([
+        occ({
+          bodyHash: 'm',
+          simpleName: '<module-init:src/a.ts>',
+          line: 1,
+          endLine: 400,
+          kind: 'module-init',
+        }),
+      ]),
+    );
     expect(largeFunctionRule.evaluate(makeCatalog([]), idx, BANDS)).toEqual([]);
   });
 
   it('does not flag a long function defined in a test file', () => {
-    const idx = buildIndexes(makeCatalog([
-      occ({ bodyHash: 't', simpleName: 'bigTestHelper', line: 1, endLine: 400, inTestFile: true }),
-    ]));
+    const idx = buildIndexes(
+      makeCatalog([
+        occ({
+          bodyHash: 't',
+          simpleName: 'bigTestHelper',
+          line: 1,
+          endLine: 400,
+          inTestFile: true,
+        }),
+      ]),
+    );
     expect(largeFunctionRule.evaluate(makeCatalog([]), idx, BANDS)).toEqual([]);
   });
 });

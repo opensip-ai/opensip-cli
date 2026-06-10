@@ -20,12 +20,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import {
-  ConfigurationError,
-  isErrorSignal,
-  logger,
-  ToolError,
-} from '@opensip-tools/core';
+import { ConfigurationError, isErrorSignal, logger, ToolError } from '@opensip-tools/core';
 
 import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
 import { GraphBaselineRepo } from '../persistence/baseline-repo.js';

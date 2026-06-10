@@ -9,8 +9,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # softprops/action-gh-release creates the GitHub Release
-      id-token: write       # OIDC token for npm trusted publishing
+      contents: write # softprops/action-gh-release creates the GitHub Release
+      id-token: write # OIDC token for npm trusted publishing
     steps:
       - uses: actions/checkout@v6
 

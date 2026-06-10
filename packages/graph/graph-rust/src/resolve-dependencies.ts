@@ -24,7 +24,11 @@ export function resolveDependencies(
 
   const out = new Map<string, DependencyEdge[]>();
   for (const site of sites) {
-    const importerModulePath = lookupImporterModulePath(catalog, modulePathByFilePath, site.ownerHash);
+    const importerModulePath = lookupImporterModulePath(
+      catalog,
+      modulePathByFilePath,
+      site.ownerHash,
+    );
     const edge = buildDependencyEdge(site, packageName, importerModulePath, moduleInitByModulePath);
     appendDependencyEdge(out, site.ownerHash, edge);
   }

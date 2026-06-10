@@ -5,7 +5,7 @@
  * Recommends using Expo Image or optimized image loading strategies.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Check if content contains a react-native Image import.
@@ -15,17 +15,17 @@ import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
  * @returns True if react-native Image import is found
  */
 function hasReactNativeImageImport(content: string): boolean {
-  const lines = content.split('\n')
+  const lines = content.split('\n');
   for (const line of lines) {
-    const isImportStatement = line.includes('import') && line.includes('Image')
-    const isFromReactNative = line.includes('react-native')
-    const isNamedImport = line.includes('{') && line.includes('}')
+    const isImportStatement = line.includes('import') && line.includes('Image');
+    const isFromReactNative = line.includes('react-native');
+    const isNamedImport = line.includes('{') && line.includes('}');
 
     if (isImportStatement && isFromReactNative && isNamedImport) {
-      return true
+      return true;
     }
   }
-  return false
+  return false;
 }
 
 /**
@@ -35,7 +35,7 @@ function hasReactNativeImageImport(content: string): boolean {
  * @returns True if expo-image import is found
  */
 function hasExpoImageImport(content: string): boolean {
-  return content.includes("from 'expo-image'") || content.includes('from "expo-image"')
+  return content.includes("from 'expo-image'") || content.includes('from "expo-image"');
 }
 
 /**
@@ -45,21 +45,21 @@ function hasExpoImageImport(content: string): boolean {
  * @returns Line number (1-based) and snippet, or null if not found
  */
 function findReactNativeImageLine(content: string): { line: number; snippet: string } | null {
-  const lines = content.split('\n')
+  const lines = content.split('\n');
   for (const [i, line] of lines.entries()) {
     /* v8 ignore next 3 -- defensive: lines.entries() never yields undefined */
     if (line === undefined) {
-      continue
+      continue;
     }
-    const isImportStatement = line.includes('import') && line.includes('Image')
-    const isFromReactNative = line.includes('react-native')
-    const isNamedImport = line.includes('{') && line.includes('}')
+    const isImportStatement = line.includes('import') && line.includes('Image');
+    const isFromReactNative = line.includes('react-native');
+    const isNamedImport = line.includes('{') && line.includes('}');
 
     if (isImportStatement && isFromReactNative && isNamedImport) {
-      return { line: i + 1, snippet: line.trim() }
+      return { line: i + 1, snippet: line.trim() };
     }
   }
-  return null
+  return null;
 }
 
 /**
@@ -70,29 +70,29 @@ function findReactNativeImageLine(content: string): { line: number; snippet: str
  * @returns Array of violations with line numbers
  */
 function findImagesWithoutPlaceholder(content: string): { line: number; snippet: string }[] {
-  const results: { line: number; snippet: string }[] = []
-  const lines = content.split('\n')
+  const results: { line: number; snippet: string }[] = [];
+  const lines = content.split('\n');
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+    const line = lines[i];
     /* v8 ignore next 3 -- defensive: index access on existing array never returns undefined */
     if (line === undefined) {
-      continue
+      continue;
     }
     // Look for <Image with source prop but without placeholder
     if (line.includes('<Image') && line.includes('source=')) {
       // Check this line and surrounding context for placeholder
-      const contextStart = Math.max(0, i - 2)
-      const contextEnd = Math.min(lines.length, i + 3)
-      const context = lines.slice(contextStart, contextEnd).join('\n')
+      const contextStart = Math.max(0, i - 2);
+      const contextEnd = Math.min(lines.length, i + 3);
+      const context = lines.slice(contextStart, contextEnd).join('\n');
 
       if (!context.includes('placeholder')) {
-        results.push({ line: i + 1, snippet: line.trim().slice(0, 100) })
+        results.push({ line: i + 1, snippet: line.trim().slice(0, 100) });
       }
     }
   }
 
-  return results
+  return results;
 }
 
 /**
@@ -105,22 +105,22 @@ function findImagesWithoutPlaceholder(content: string): { line: number; snippet:
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
   // Only check TSX files
   if (!filePath.endsWith('.tsx')) {
-    return []
+    return [];
   }
 
   // Quick filter: skip files without Image
   if (!content.includes('Image')) {
-    return []
+    return [];
   }
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Check for react-native Image without expo-image
-  const hasRNImage = hasReactNativeImageImport(content)
-  const hasExpoImage = hasExpoImageImport(content)
+  const hasRNImage = hasReactNativeImageImport(content);
+  const hasExpoImage = hasExpoImageImport(content);
 
   if (hasRNImage && !hasExpoImage) {
-    const importInfo = findReactNativeImageLine(content)
+    const importInfo = findReactNativeImageLine(content);
     if (importInfo) {
       violations.push({
         filePath,
@@ -132,13 +132,13 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
         suggestion:
           "Replace with expo-image for better performance and caching: import { Image } from 'expo-image'. Expo Image provides automatic caching, better memory management, and supports modern image formats.",
         match: 'react-native Image',
-      })
+      });
     }
   }
 
   // Check for Image without placeholder prop (for expo-image)
   if (hasExpoImage) {
-    const imagesWithoutPlaceholder = findImagesWithoutPlaceholder(content)
+    const imagesWithoutPlaceholder = findImagesWithoutPlaceholder(content);
     for (const img of imagesWithoutPlaceholder) {
       violations.push({
         filePath,
@@ -150,11 +150,11 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
         suggestion:
           'Add placeholder prop for better UX during loading. Use a low-resolution placeholder or blurhash for smooth loading transitions.',
         match: '<Image',
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -184,4 +184,4 @@ export const imageOptimization = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze: analyzeFile,
-})
+});

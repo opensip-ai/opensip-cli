@@ -63,9 +63,7 @@ interface ReleaseEntry {
 // dynamic import across the package boundary is clean. dependency-cruiser
 // excludes test files + `includeOnly: '^packages/'`, so this import is not an
 // architecture-layer edge.
-const sourceOfTruth = (await import(
-  join(REPO_ROOT, 'scripts', 'release-package-order.mjs')
-)) as {
+const sourceOfTruth = (await import(join(REPO_ROOT, 'scripts', 'release-package-order.mjs'))) as {
   RELEASE_PACKAGE_ORDER: ReleaseEntry[];
   discoverPublishablePackages: (repoRoot?: string) => Promise<{ name: string; dir: string }[]>;
 };
@@ -125,7 +123,8 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
     expect(
       literalPackLines,
       'release.yml still contains hand-listed `pnpm --filter <pkg> pack` lines — ' +
-        'these must be derived from the source of truth:\n' + literalPackLines.join('\n'),
+        'these must be derived from the source of truth:\n' +
+        literalPackLines.join('\n'),
     ).toEqual([]);
   });
 
@@ -144,7 +143,8 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
     expect(
       literalPublishLines,
       'release.yml still contains hand-listed `publish_if_new <pkg>` calls — ' +
-        'these must be driven from the source of truth:\n' + literalPublishLines.join('\n'),
+        'these must be driven from the source of truth:\n' +
+        literalPublishLines.join('\n'),
     ).toEqual([]);
   });
 
@@ -210,7 +210,8 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
 
     expect(
       inTableNotRef,
-      'RELEASING.md table lists package(s) not in the source of truth:\n' + inTableNotRef.join('\n'),
+      'RELEASING.md table lists package(s) not in the source of truth:\n' +
+        inTableNotRef.join('\n'),
     ).toEqual([]);
     expect(
       inRefNotTable,

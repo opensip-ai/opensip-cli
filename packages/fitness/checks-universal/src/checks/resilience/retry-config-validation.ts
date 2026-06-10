@@ -2,11 +2,11 @@
  * @fileoverview Retry configuration validation check
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness';
 
-import { isDigit } from './_helpers/config-validation.js'
+import { isDigit } from './_helpers/config-validation.js';
 
 // =============================================================================
 // CONFIG PARSING
@@ -22,47 +22,47 @@ function parseConfigValueFromLine(
   logger.debug({
     evt: 'fitness.checks.retry_config_validation.parse_config_value_from_line',
     msg: 'Parsing config value from line',
-  })
-  const lowerLine = line.toLowerCase()
-  const lowerKey = configKey.toLowerCase()
-  const idx = lowerLine.indexOf(lowerKey)
-  if (idx === -1) return null
+  });
+  const lowerLine = line.toLowerCase();
+  const lowerKey = configKey.toLowerCase();
+  const idx = lowerLine.indexOf(lowerKey);
+  if (idx === -1) return null;
 
-  const afterKey = line.slice(Math.max(0, idx + configKey.length))
-  let i = 0
+  const afterKey = line.slice(Math.max(0, idx + configKey.length));
+  let i = 0;
 
   // Skip whitespace
   while (i < afterKey.length && (afterKey[i] === ' ' || afterKey[i] === '\t')) {
-    i++
+    i++;
   }
 
   // Check for = or :
   if (afterKey[i] !== '=' && afterKey[i] !== ':') {
-    return null
+    return null;
   }
-  i++
+  i++;
 
   // Skip whitespace
   while (i < afterKey.length && (afterKey[i] === ' ' || afterKey[i] === '\t')) {
-    i++
+    i++;
   }
 
   // Parse digits
-  const digitStart = i
+  const digitStart = i;
   while (i < afterKey.length && isDigit(afterKey[i])) {
-    i++
+    i++;
   }
 
   if (digitStart === i) {
-    return null // No digits found
+    return null; // No digits found
   }
 
   // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by isDigit loop above
-  const value = Number.parseInt(afterKey.slice(digitStart, i), 10)
+  const value = Number.parseInt(afterKey.slice(digitStart, i), 10);
   return {
     value,
     matchText: `${configKey}${afterKey.slice(0, Math.max(0, i))}`,
-  }
+  };
 }
 
 // =============================================================================
@@ -70,18 +70,18 @@ function parseConfigValueFromLine(
 // =============================================================================
 
 interface RetryViolation {
-  message: string
-  severity: 'error' | 'warning'
-  suggestion: string
-  type: string
+  message: string;
+  severity: 'error' | 'warning';
+  suggestion: string;
+  type: string;
 }
 
 function checkMaxRetriesValue(value: number): RetryViolation | null {
   logger.debug({
     evt: 'fitness.checks.retry_config_validation.check_max_retries_value',
     msg: 'Checking maxRetries value for excessive count',
-  })
-  if (value <= 10) return null
+  });
+  if (value <= 10) return null;
 
   return {
     message: `maxRetries of ${value} is excessive`,
@@ -89,15 +89,15 @@ function checkMaxRetriesValue(value: number): RetryViolation | null {
     suggestion:
       'Consider reducing maxRetries to 3-5 with exponential backoff. Use a shared retry utility for proper retry handling.',
     type: 'excessive-retries',
-  }
+  };
 }
 
 function checkBaseDelayValue(value: number): RetryViolation | null {
   logger.debug({
     evt: 'fitness.checks.retry_config_validation.check_base_delay_value',
     msg: 'Checking baseDelay value for aggressive timing',
-  })
-  if (value >= 100) return null
+  });
+  if (value >= 100) return null;
 
   return {
     message: `baseDelay of ${value}ms may be too aggressive`,
@@ -105,7 +105,7 @@ function checkBaseDelayValue(value: number): RetryViolation | null {
     suggestion:
       'Consider a baseDelay of at least 100ms to avoid overwhelming downstream services. Use exponential backoff for better resilience.',
     type: 'aggressive-retry-delay',
-  }
+  };
 }
 
 // =============================================================================
@@ -119,11 +119,11 @@ function checkConfigOnLine(
   lineNumber: number,
   filePath: string,
 ): CheckViolation | null {
-  const result = parseConfigValueFromLine(strippedLine, configKey)
-  if (!result) return null
+  const result = parseConfigValueFromLine(strippedLine, configKey);
+  if (!result) return null;
 
-  const violation = checker(result.value)
-  if (!violation) return null
+  const violation = checker(result.value);
+  if (!violation) return null;
 
   return {
     line: lineNumber,
@@ -134,7 +134,7 @@ function checkConfigOnLine(
     match: result.matchText,
     type: violation.type,
     filePath,
-  }
+  };
 }
 
 // =============================================================================
@@ -172,36 +172,44 @@ export const retryConfigValidation = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
-    const strippedContent = stripStringsAndComments(content).toLowerCase()
+    const strippedContent = stripStringsAndComments(content).toLowerCase();
     if (!strippedContent.includes('retry') && !strippedContent.includes('attempt')) {
-      return violations
+      return violations;
     }
 
-    const lines = content.split('\n')
+    const lines = content.split('\n');
     for (const [i, line] of lines.entries()) {
-      if (!line) continue
+      if (!line) continue;
 
-      const strippedLine = stripStringLiterals(line)
-      const trimmed = strippedLine.trim()
+      const strippedLine = stripStringLiterals(line);
+      const trimmed = strippedLine.trim();
       if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
-        continue
+        continue;
       }
 
-      const lineNumber = i + 1
+      const lineNumber = i + 1;
 
       const maxRetriesViolation = checkConfigOnLine(
-        strippedLine, 'maxRetries', checkMaxRetriesValue, lineNumber, filePath,
-      )
-      if (maxRetriesViolation) violations.push(maxRetriesViolation)
+        strippedLine,
+        'maxRetries',
+        checkMaxRetriesValue,
+        lineNumber,
+        filePath,
+      );
+      if (maxRetriesViolation) violations.push(maxRetriesViolation);
 
       const baseDelayViolation = checkConfigOnLine(
-        strippedLine, 'baseDelay', checkBaseDelayValue, lineNumber, filePath,
-      )
-      if (baseDelayViolation) violations.push(baseDelayViolation)
+        strippedLine,
+        'baseDelay',
+        checkBaseDelayValue,
+        lineNumber,
+        filePath,
+      );
+      if (baseDelayViolation) violations.push(baseDelayViolation);
     }
 
-    return violations
+    return violations;
   },
-})
+});

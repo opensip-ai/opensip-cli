@@ -2,15 +2,15 @@
  * @fileoverview No Custom Event Emitter check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 interface EventEmitterIssue {
-  file: string
-  line: number
-  type: string
-  match: string
-  suggestion: string
-  severity: 'error' | 'warning'
+  file: string;
+  line: number;
+  type: string;
+  match: string;
+  suggestion: string;
+  severity: 'error' | 'warning';
 }
 
 /**
@@ -22,7 +22,7 @@ interface EventEmitterIssue {
  */
 function createPattern(pattern: string, flags?: string): RegExp {
   // @fitness-ignore-next-line semgrep-scan -- non-literal RegExp is intentional; patterns are hardcoded string constants for code analysis, not user input
-  return new RegExp(pattern, flags)
+  return new RegExp(pattern, flags);
 }
 
 // Note: These regex patterns operate on trusted source code files, not user input.
@@ -39,12 +39,16 @@ const EVENT_EMITTER_PATTERNS = [
     // Fixed pattern - word boundary prevents issues
     pattern: createPattern(String.raw`extends\s+EventEmitter\b`, 'g'),
     type: 'extends-event-emitter',
-    suggestion: 'Implement event handling via a centralized event bus instead of extending EventEmitter',
+    suggestion:
+      'Implement event handling via a centralized event bus instead of extending EventEmitter',
     severity: 'error' as const,
   },
   {
     // Use [^}]* (bounded by curly brace) instead of .* to prevent catastrophic backtracking
-    pattern: createPattern(String.raw`import\s+[^}]*\bEventEmitter\b[^}]*from\s+['"]events['"]`, 'g'),
+    pattern: createPattern(
+      String.raw`import\s+[^}]*\bEventEmitter\b[^}]*from\s+['"]events['"]`,
+      'g',
+    ),
     type: 'import-event-emitter',
     suggestion: 'Use a centralized event bus instead of importing EventEmitter directly',
     severity: 'error' as const,
@@ -59,25 +63,30 @@ const EVENT_EMITTER_PATTERNS = [
     suggestion: 'Use a centralized event bus instead of importing EventEmitter directly',
     severity: 'error' as const,
   },
-]
+];
 
-const EVENT_INFRA_PATTERNS = [/infrastructure\/events\//, /foundation\//, /\/adapters\//, /interfaces\//]
+const EVENT_INFRA_PATTERNS = [
+  /infrastructure\/events\//,
+  /foundation\//,
+  /\/adapters\//,
+  /interfaces\//,
+];
 
 function analyzeFile(filePath: string, content: string): EventEmitterIssue[] {
-  const issues: EventEmitterIssue[] = []
+  const issues: EventEmitterIssue[] = [];
 
   if (EVENT_INFRA_PATTERNS.some((p) => p.test(filePath))) {
-    return []
+    return [];
   }
 
-  const lines = content.split('\n')
+  const lines = content.split('\n');
 
   for (const [i, line] of lines.entries()) {
-    if (!line) continue
+    if (!line) continue;
 
     for (const { pattern, type, suggestion, severity } of EVENT_EMITTER_PATTERNS) {
-      pattern.lastIndex = 0
-      const match = pattern.exec(line)
+      pattern.lastIndex = 0;
+      const match = pattern.exec(line);
       if (match) {
         issues.push({
           file: filePath,
@@ -86,12 +95,12 @@ function analyzeFile(filePath: string, content: string): EventEmitterIssue[] {
           match: match[0],
           suggestion,
           severity,
-        })
+        });
       }
     }
   }
 
-  return issues
+  return issues;
 }
 
 /**
@@ -126,10 +135,10 @@ export const noCustomEventEmitter = defineCheck({
   analyze(content: string, filePath: string): CheckViolation[] {
     // Skip if no EventEmitter usage
     if (!content.includes('EventEmitter')) {
-      return []
+      return [];
     }
 
-    const issues = analyzeFile(filePath, content)
+    const issues = analyzeFile(filePath, content);
 
     return issues.map((issue) => ({
       line: issue.line,
@@ -138,6 +147,6 @@ export const noCustomEventEmitter = defineCheck({
       suggestion: issue.suggestion,
       match: issue.match,
       type: issue.type,
-    }))
+    }));
   },
-})
+});

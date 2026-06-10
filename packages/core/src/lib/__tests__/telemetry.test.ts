@@ -55,11 +55,9 @@ describe('telemetry primitive (no-op-until-SDK contract)', () => {
       end: vi.fn(),
       isRecording: () => false,
     };
-    const spy = vi
-      .spyOn(trace, 'getTracer')
-      .mockReturnValue({
-        startActiveSpan: ((_name: string, fn: (s: unknown) => unknown) => fn(span)) as never,
-      } as never);
+    const spy = vi.spyOn(trace, 'getTracer').mockReturnValue({
+      startActiveSpan: ((_name: string, fn: (s: unknown) => unknown) => fn(span)) as never,
+    } as never);
     try {
       withSpan('test-scope', 'unit', () => 'ok', { 'k.count': 3, 'k.flag': true });
       expect(setAttributes).toHaveBeenCalledWith({ 'k.count': 3, 'k.flag': true });
@@ -106,11 +104,9 @@ describe('telemetry primitive (no-op-until-SDK contract)', () => {
       end,
       isRecording: () => false,
     };
-    const spy = vi
-      .spyOn(trace, 'getTracer')
-      .mockReturnValue({
-        startActiveSpan: ((_name: string, fn: (s: unknown) => unknown) => fn(span)) as never,
-      } as never);
+    const spy = vi.spyOn(trace, 'getTracer').mockReturnValue({
+      startActiveSpan: ((_name: string, fn: (s: unknown) => unknown) => fn(span)) as never,
+    } as never);
     const boom = new Error('boom');
     try {
       expect(() =>
@@ -192,7 +188,13 @@ describe('withSpanAsync (async-aware span)', () => {
     const recordException = vi.fn();
     const setStatus = vi.fn();
     const end = vi.fn();
-    const span = { setAttributes: vi.fn(), setStatus, recordException, end, isRecording: () => false };
+    const span = {
+      setAttributes: vi.fn(),
+      setStatus,
+      recordException,
+      end,
+      isRecording: () => false,
+    };
     const spy = vi.spyOn(trace, 'getTracer').mockReturnValue({
       startActiveSpan: ((_name: string, fn: (s: unknown) => unknown) => fn(span)) as never,
     } as never);

@@ -95,7 +95,10 @@ function skipBlockComment(text: string, start: number): number {
   return i;
 }
 
-function consumeStringLiteral(text: string, start: number): { readonly text: string; readonly index: number } {
+function consumeStringLiteral(
+  text: string,
+  start: number,
+): { readonly text: string; readonly index: number } {
   let i = start + 1;
   let buf = '"';
   while (i < text.length) {
@@ -132,7 +135,10 @@ function isCharLiteral(text: string, i: number): boolean {
   return slice[closeIdx] === "'";
 }
 
-function consumeCharLiteral(text: string, start: number): { readonly text: string; readonly index: number } {
+function consumeCharLiteral(
+  text: string,
+  start: number,
+): { readonly text: string; readonly index: number } {
   // Already verified by isCharLiteral.
   const escape = text[start + 1] === '\\';
   const len = escape ? 4 : 3;

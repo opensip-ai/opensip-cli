@@ -28,10 +28,10 @@
  * node:child_process) so smoke-pack.mjs can import it with no build step.
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { expectEnvelope } from './cli-acceptance-core.mjs'
+import { expectEnvelope } from './cli-acceptance-core.mjs';
 
 /**
  * 2.12.0 (§5.5): `--json` is a `CommandOutcome` wrapper. Non-run command results
@@ -39,8 +39,8 @@ import { expectEnvelope } from './cli-acceptance-core.mjs'
  * envelopes ride under `.envelope`. These unwrap the inner payload, tolerating a
  * bare shape too (forward/backward robustness — matches `expectEnvelope`).
  */
-const cmdData = (parsed) => parsed?.data ?? parsed
-const cmdEnvelope = (parsed) => parsed?.envelope ?? parsed
+const cmdData = (parsed) => parsed?.data ?? parsed;
+const cmdEnvelope = (parsed) => parsed?.envelope ?? parsed;
 
 /**
  * Build the ordered packed-smoke scenario list.
@@ -52,7 +52,12 @@ const cmdEnvelope = (parsed) => parsed?.envelope ?? parsed
  * @param {string} opts.fitPackTarball    absolute path to the packed `kind:"fit-pack"` fixture tarball
  * @returns {import('./cli-acceptance-core.mjs').Scenario[]}
  */
-export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPluginTarball, fitPackTarball }) {
+export function buildPackedSmokeScenarios({
+  expectedVersion,
+  consumerCwd,
+  toolPluginTarball,
+  fitPackTarball,
+}) {
   /** @type {import('./cli-acceptance-core.mjs').Scenario[]} */
   const scenarios = [
     {
@@ -92,14 +97,18 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
       expect: {
         exitCode: 0,
         json: (parsed) => {
-          const failures = []
-          const data = cmdData(parsed)
-          if (data?.type !== 'init') failures.push(`init.type: expected "init", got ${JSON.stringify(data?.type)}`)
-          if (data?.created !== true) failures.push(`init.created: expected true, got ${JSON.stringify(data?.created)}`)
+          const failures = [];
+          const data = cmdData(parsed);
+          if (data?.type !== 'init')
+            failures.push(`init.type: expected "init", got ${JSON.stringify(data?.type)}`);
+          if (data?.created !== true)
+            failures.push(`init.created: expected true, got ${JSON.stringify(data?.created)}`);
           if (typeof data?.path !== 'string' || !data.path.endsWith('opensip-tools.config.yml')) {
-            failures.push(`init.path: expected a path ending in opensip-tools.config.yml, got ${JSON.stringify(data?.path)}`)
+            failures.push(
+              `init.path: expected a path ending in opensip-tools.config.yml, got ${JSON.stringify(data?.path)}`,
+            );
           }
-          return failures
+          return failures;
         },
       },
     },
@@ -112,28 +121,29 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
       args: ['fit', '--json', '--check', 'no-console-log'],
       cwd: consumerCwd,
       setup: ({ cwd }) => {
-        const root = cwd ?? consumerCwd
-        mkdirSync(join(root, 'src'), { recursive: true })
-        writeFileSync(join(root, 'src', 'clean.ts'), 'export const x = 1;\n')
-        writeFileSync(join(root, 'src', 'bad.ts'), "console.log('debug');\n")
+        const root = cwd ?? consumerCwd;
+        mkdirSync(join(root, 'src'), { recursive: true });
+        writeFileSync(join(root, 'src', 'clean.ts'), 'export const x = 1;\n');
+        writeFileSync(join(root, 'src', 'bad.ts'), "console.log('debug');\n");
         writeFileSync(
           join(root, 'tsconfig.json'),
           `${JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext' } }, null, 2)}\n`,
-        )
+        );
       },
       // fit exits 1 when it records error-severity findings (failOnErrors: 1).
       expect: {
         exitCode: 1,
         json: (parsed) => {
-          const failures = expectEnvelope({ tool: 'fit' })(parsed)
-          const env = cmdEnvelope(parsed)
-          const total = env?.verdict?.summary?.total
-          if (total !== 1) failures.push(`fit verdict.summary.total: expected 1, got ${JSON.stringify(total)}`)
-          const signals = Array.isArray(env?.signals) ? env.signals : []
+          const failures = expectEnvelope({ tool: 'fit' })(parsed);
+          const env = cmdEnvelope(parsed);
+          const total = env?.verdict?.summary?.total;
+          if (total !== 1)
+            failures.push(`fit verdict.summary.total: expected 1, got ${JSON.stringify(total)}`);
+          const signals = Array.isArray(env?.signals) ? env.signals : [];
           if (!signals.some((s) => s?.source === 'no-console-log')) {
-            failures.push('fit signals: expected a no-console-log signal')
+            failures.push('fit signals: expected a no-console-log signal');
           }
-          return failures
+          return failures;
         },
       },
     },
@@ -144,13 +154,17 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
       expect: {
         exitCode: 0,
         json: (parsed) => {
-          const failures = []
-          const data = cmdData(parsed)
+          const failures = [];
+          const data = cmdData(parsed);
           if (data?.type !== 'list-checks') {
-            failures.push(`list-checks.type: expected "list-checks", got ${JSON.stringify(data?.type)}`)
+            failures.push(
+              `list-checks.type: expected "list-checks", got ${JSON.stringify(data?.type)}`,
+            );
           }
           if (typeof data?.totalCount !== 'number' || data.totalCount <= 0) {
-            failures.push(`list-checks.totalCount: expected > 0, got ${JSON.stringify(data?.totalCount)}`)
+            failures.push(
+              `list-checks.totalCount: expected > 0, got ${JSON.stringify(data?.totalCount)}`,
+            );
           }
           // Guardrail (P1-1): a packed `opensip-tools` install must bundle every
           // language check pack it advertises (README/FAQ/CLAUDE/checks-index all
@@ -159,24 +173,22 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
           // resolves the CLI's *declared* deps alone. Assert one stable slug per
           // pack so a pack dropped from cli/package.json fails the release gate
           // instead of silently shipping a TS-only CLI.
-          const slugs = new Set(
-            Array.isArray(data?.checks) ? data.checks.map((c) => c?.slug) : [],
-          )
+          const slugs = new Set(Array.isArray(data?.checks) ? data.checks.map((c) => c?.slug) : []);
           const requiredByPack = {
             'checks-python': 'python-no-bare-except',
             'checks-go': 'go-no-fmt-print',
             'checks-java': 'java-no-print-stack-trace',
             'checks-cpp': 'cpp-clang-tidy',
             'checks-rust': 'rust-no-dbg-macro',
-          }
+          };
           for (const [pack, slug] of Object.entries(requiredByPack)) {
             if (!slugs.has(slug)) {
               failures.push(
                 `list-checks: expected a "${slug}" check from ${pack} — the packed CLI does not bundle that language pack`,
-              )
+              );
             }
           }
-          return failures
+          return failures;
         },
       },
     },
@@ -196,13 +208,16 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
       expect: {
         exitCode: 0,
         json: (parsed) => {
-          const failures = []
-          const data = cmdData(parsed)
+          const failures = [];
+          const data = cmdData(parsed);
           if (data?.type !== 'dashboard') {
-            failures.push(`dashboard.type: expected "dashboard", got ${JSON.stringify(data?.type)}`)
+            failures.push(
+              `dashboard.type: expected "dashboard", got ${JSON.stringify(data?.type)}`,
+            );
           }
-          if (data?.opened !== false) failures.push(`dashboard.opened: expected false, got ${JSON.stringify(data?.opened)}`)
-          return failures
+          if (data?.opened !== false)
+            failures.push(`dashboard.opened: expected false, got ${JSON.stringify(data?.opened)}`);
+          return failures;
         },
       },
     },
@@ -222,7 +237,14 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
       timeout: 120_000,
       expect: {
         exitCode: 0,
-        json: (parsed) => { const data = cmdData(parsed); return data?.success === true ? [] : [`plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`] },
+        json: (parsed) => {
+          const data = cmdData(parsed);
+          return data?.success === true
+            ? []
+            : [
+                `plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
+              ];
+        },
       },
     },
     {
@@ -244,12 +266,19 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
       timeout: 120_000,
       setup: ({ cwd }) => {
         // Seed a file that trips the fixture check's FIT_PACK_FIXTURE marker.
-        const root = cwd ?? consumerCwd
-        writeFileSync(join(root, 'src', 'marker.ts'), 'export const m = "FIT_PACK_FIXTURE";\n')
+        const root = cwd ?? consumerCwd;
+        writeFileSync(join(root, 'src', 'marker.ts'), 'export const m = "FIT_PACK_FIXTURE";\n');
       },
       expect: {
         exitCode: 0,
-        json: (parsed) => { const data = cmdData(parsed); return data?.success === true ? [] : [`plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`] },
+        json: (parsed) => {
+          const data = cmdData(parsed);
+          return data?.success === true
+            ? []
+            : [
+                `plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
+              ];
+        },
       },
     },
     {
@@ -260,19 +289,20 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
       expect: {
         exitCode: 1,
         json: (parsed) => {
-          const failures = expectEnvelope({ tool: 'fit' })(parsed)
-          const env = cmdEnvelope(parsed)
-          const total = env?.verdict?.summary?.total
-          if (total !== 1) failures.push(`fit verdict.summary.total: expected 1, got ${JSON.stringify(total)}`)
-          const signals = Array.isArray(env?.signals) ? env.signals : []
+          const failures = expectEnvelope({ tool: 'fit' })(parsed);
+          const env = cmdEnvelope(parsed);
+          const total = env?.verdict?.summary?.total;
+          if (total !== 1)
+            failures.push(`fit verdict.summary.total: expected 1, got ${JSON.stringify(total)}`);
+          const signals = Array.isArray(env?.signals) ? env.signals : [];
           if (!signals.some((s) => s?.source === 'fit-pack-fixture-marker')) {
-            failures.push('fit signals: expected a fit-pack-fixture-marker signal')
+            failures.push('fit signals: expected a fit-pack-fixture-marker signal');
           }
-          return failures
+          return failures;
         },
       },
     },
-  ]
+  ];
 
-  return scenarios
+  return scenarios;
 }

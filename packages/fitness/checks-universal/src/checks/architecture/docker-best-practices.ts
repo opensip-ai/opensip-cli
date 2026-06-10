@@ -8,40 +8,40 @@
  * - All Dockerfiles in the repository are scanned
  */
 
-import * as path from 'node:path'
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
 interface DockerfileViolation {
-  file: string
-  filePath: string
-  line: number
-  rule: string
-  message: string
-  severity: 'error' | 'warning'
-  suggestion?: string
+  file: string;
+  filePath: string;
+  line: number;
+  rule: string;
+  message: string;
+  severity: 'error' | 'warning';
+  suggestion?: string;
 }
 
 interface AnalysisState {
-  hasNonRootUser: boolean
-  hasHealthcheck: boolean
-  hasFrozenLockfile: boolean
-  hasNodeEnvProduction: boolean
-  hasProductionDepsFlag: boolean
-  baseImages: string[]
-  fromCount: number
-  isInRunnerStage: boolean
-  runnerStageBaseImage: string | null
-  lastFromLine: number
-  stageNames: string[]
-  runnerCopiesNodeModules: boolean
-  runnerNodeModulesLine: number
-  runnerInheritsBuildStage: boolean
-  runnerFromLine: number
+  hasNonRootUser: boolean;
+  hasHealthcheck: boolean;
+  hasFrozenLockfile: boolean;
+  hasNodeEnvProduction: boolean;
+  hasProductionDepsFlag: boolean;
+  baseImages: string[];
+  fromCount: number;
+  isInRunnerStage: boolean;
+  runnerStageBaseImage: string | null;
+  lastFromLine: number;
+  stageNames: string[];
+  runnerCopiesNodeModules: boolean;
+  runnerNodeModulesLine: number;
+  runnerInheritsBuildStage: boolean;
+  runnerFromLine: number;
 }
 
 // =============================================================================
@@ -49,28 +49,30 @@ interface AnalysisState {
 // =============================================================================
 
 // Maximum line length for regex matching to prevent DoS
-const MAX_DOCKERFILE_LINE_LENGTH = 2000
+const MAX_DOCKERFILE_LINE_LENGTH = 2000;
 
 /**
  * Safely truncate a line for regex matching.
  */
 function safeDockerLine(line: string): string {
   /* v8 ignore next -- defensive: real Dockerfile lines never exceed 2000 chars */
-  return line.length > MAX_DOCKERFILE_LINE_LENGTH ? line.slice(0, MAX_DOCKERFILE_LINE_LENGTH) : line
+  return line.length > MAX_DOCKERFILE_LINE_LENGTH
+    ? line.slice(0, MAX_DOCKERFILE_LINE_LENGTH)
+    : line;
 }
 
 // Secret patterns - using word character classes with bounded quantifiers
 // Using \w for alphanumeric plus underscore, adding dash separately with explicit bounds
 const SECRET_API_KEY_PATTERN =
-  /(?:API_KEY|APIKEY|API_SECRET|SECRET_KEY|AUTH_TOKEN|ACCESS_TOKEN)\s{0,10}=\s{0,10}['"]?[\w-]{16,200}/i
+  /(?:API_KEY|APIKEY|API_SECRET|SECRET_KEY|AUTH_TOKEN|ACCESS_TOKEN)\s{0,10}=\s{0,10}['"]?[\w-]{16,200}/i;
 const SECRET_AWS_PATTERN =
-  /(?:AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY)\s{0,10}=\s{0,10}['"]?[\w/+=]{20,200}/i
+  /(?:AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY)\s{0,10}=\s{0,10}['"]?[\w/+=]{20,200}/i;
 const SECRET_DB_URL_PATTERN =
-  /(?:DATABASE_URL|DB_URL|MONGO_URL|REDIS_URL)\s{0,10}=\s{0,10}['"]?[a-z]{1,20}:\/\/[^:]{1,100}:[^@]{1,100}@/i
+  /(?:DATABASE_URL|DB_URL|MONGO_URL|REDIS_URL)\s{0,10}=\s{0,10}['"]?[a-z]{1,20}:\/\/[^:]{1,100}:[^@]{1,100}@/i;
 const SECRET_PASSWORD_PATTERN =
-  /(?:PASSWORD|PASSWD|DB_PASSWORD|ADMIN_PASSWORD)\s{0,10}=\s{0,10}['"]?[^\s'"]{8,200}/i
-const SECRET_PRIVATE_KEY_PATTERN = /-----BEGIN\s{1,10}(?:RSA\s{1,10})?PRIVATE\s{1,10}KEY-----/
-const SECRET_JWT_PATTERN = /JWT_SECRET\s{0,10}=\s{0,10}['"]?[\w-]{32,500}/i
+  /(?:PASSWORD|PASSWD|DB_PASSWORD|ADMIN_PASSWORD)\s{0,10}=\s{0,10}['"]?[^\s'"]{8,200}/i;
+const SECRET_PRIVATE_KEY_PATTERN = /-----BEGIN\s{1,10}(?:RSA\s{1,10})?PRIVATE\s{1,10}KEY-----/;
+const SECRET_JWT_PATTERN = /JWT_SECRET\s{0,10}=\s{0,10}['"]?[\w-]{32,500}/i;
 
 const SECRET_PATTERNS = [
   SECRET_API_KEY_PATTERN,
@@ -79,19 +81,19 @@ const SECRET_PATTERNS = [
   SECRET_PASSWORD_PATTERN,
   SECRET_PRIVATE_KEY_PATTERN,
   SECRET_JWT_PATTERN,
-]
+];
 
 // Package manager patterns - pre-compiled with bounded quantifiers
-const PNPM_INSTALL_PATTERN = /pnpm\s{1,10}install(?!\s{1,10}--frozen-lockfile)/
+const PNPM_INSTALL_PATTERN = /pnpm\s{1,10}install(?!\s{1,10}--frozen-lockfile)/;
 const NPM_INSTALL_PATTERN =
-  /npm\s{1,10}(?:install|ci)(?!\s{1,10}-g)(?!\s{1,10}--global)(?!\s{1,10}--ci)(?!\s{1,10}--frozen-lockfile)/
+  /npm\s{1,10}(?:install|ci)(?!\s{1,10}-g)(?!\s{1,10}--global)(?!\s{1,10}--ci)(?!\s{1,10}--frozen-lockfile)/;
 const YARN_INSTALL_PATTERN =
-  /yarn\s{1,10}install(?!\s{1,10}--frozen-lockfile)(?!\s{1,10}--immutable)/
+  /yarn\s{1,10}install(?!\s{1,10}--frozen-lockfile)(?!\s{1,10}--immutable)/;
 
 interface PackageManagerPattern {
-  pattern: RegExp
-  manager: string
-  fix: string
+  pattern: RegExp;
+  manager: string;
+  fix: string;
 }
 
 const PACKAGE_MANAGER_PATTERNS: PackageManagerPattern[] = [
@@ -102,26 +104,26 @@ const PACKAGE_MANAGER_PATTERNS: PackageManagerPattern[] = [
     manager: 'yarn',
     fix: '--frozen-lockfile or --immutable',
   },
-]
+];
 
 // Cache mount patterns - pre-compiled with bounded quantifiers
-const PKG_INSTALL_PATTERN = /(?:pnpm|npm|yarn)\s{1,10}install(?!\s{1,10}-g)(?!\s{1,10}--global)/
+const PKG_INSTALL_PATTERN = /(?:pnpm|npm|yarn)\s{1,10}install(?!\s{1,10}-g)(?!\s{1,10}--global)/;
 
 // Production dependency patterns - pre-compiled with bounded quantifiers
-const PROD_DEPS_FLAG_PATTERN = /(?:--prod\b|--production\b)/
+const PROD_DEPS_FLAG_PATTERN = /(?:--prod\b|--production\b)/;
 
 // Other patterns - pre-compiled with bounded quantifiers
-const APT_UPGRADE_PATTERN = /apt-get\s{1,10}upgrade/i
-const COPY_PATTERN = /COPY\s{1,10}(?:--from=\S{1,100}\s{1,10})?(\S{1,500})/i
+const APT_UPGRADE_PATTERN = /apt-get\s{1,10}upgrade/i;
+const COPY_PATTERN = /COPY\s{1,10}(?:--from=\S{1,100}\s{1,10})?(\S{1,500})/i;
 const PACKAGE_FILE_COPY_PATTERN =
-  /COPY\s{1,10}[^\n]{0,500}(?:package\.json|pnpm-lock|yarn\.lock|package-lock)/i
-const NODE_MODULES_FROM_STAGE_PATTERN = /COPY\s{1,10}--from=\S{1,100}[^\n]{0,500}node_modules/i
-const FROM_IMAGE_PATTERN = /FROM\s{1,10}(\S{1,200})/i
-const FROM_STAGE_PATTERN = /\bAS\s{1,10}(\w{1,100})/i
-const USER_PATTERN = /USER\s{1,10}(\S{1,100})/i
-const NODE_ENV_PROD_PATTERN = /NODE_ENV\s{0,10}=\s{0,10}production/i
+  /COPY\s{1,10}[^\n]{0,500}(?:package\.json|pnpm-lock|yarn\.lock|package-lock)/i;
+const NODE_MODULES_FROM_STAGE_PATTERN = /COPY\s{1,10}--from=\S{1,100}[^\n]{0,500}node_modules/i;
+const FROM_IMAGE_PATTERN = /FROM\s{1,10}(\S{1,200})/i;
+const FROM_STAGE_PATTERN = /\bAS\s{1,10}(\w{1,100})/i;
+const USER_PATTERN = /USER\s{1,10}(\S{1,100})/i;
+const NODE_ENV_PROD_PATTERN = /NODE_ENV\s{0,10}=\s{0,10}production/i;
 
-const RUNNER_STAGE_NAMES = new Set(['runner', 'production', 'prod', 'final', 'runtime'])
+const RUNNER_STAGE_NAMES = new Set(['runner', 'production', 'prod', 'final', 'runtime']);
 
 // =============================================================================
 // ANALYSIS FUNCTIONS
@@ -133,7 +135,7 @@ function checkForSecrets(
   file: string,
   filePath: string,
 ): DockerfileViolation | null {
-  const safeLine = safeDockerLine(line)
+  const safeLine = safeDockerLine(line);
   for (const pattern of SECRET_PATTERNS) {
     if (pattern.test(safeLine)) {
       return {
@@ -145,10 +147,10 @@ function checkForSecrets(
         severity: 'error',
         suggestion:
           'Use build arguments, runtime environment variables, or a secrets manager instead',
-      }
+      };
     }
   }
-  return null
+  return null;
 }
 
 function checkRunCommand(
@@ -157,13 +159,13 @@ function checkRunCommand(
   file: string,
   filePath: string,
 ): { violations: DockerfileViolation[]; hasFrozenLockfileViolation: boolean } {
-  const violations: DockerfileViolation[] = []
-  let hasFrozenLockfileViolation = false
-  const safeLine = safeDockerLine(line)
+  const violations: DockerfileViolation[] = [];
+  let hasFrozenLockfileViolation = false;
+  const safeLine = safeDockerLine(line);
 
   for (const { pattern, manager, fix } of PACKAGE_MANAGER_PATTERNS) {
     if (pattern.test(safeLine)) {
-      hasFrozenLockfileViolation = true
+      hasFrozenLockfileViolation = true;
       violations.push({
         file,
         filePath,
@@ -172,7 +174,7 @@ function checkRunCommand(
         message: `${manager} install without frozen lockfile flag`,
         severity: 'error',
         suggestion: `Add ${fix} to ensure reproducible builds`,
-      })
+      });
     }
   }
 
@@ -185,45 +187,45 @@ function checkRunCommand(
       message: 'apt-get upgrade makes builds non-reproducible',
       severity: 'warning',
       suggestion: 'Pin specific package versions instead of upgrading all packages',
-    })
+    });
   }
 
-  return { violations, hasFrozenLockfileViolation }
+  return { violations, hasFrozenLockfileViolation };
 }
 
 interface CheckCopyOrderOptions {
-  line: string
-  lineNum: number
-  file: string
-  filePath: string
-  lines: string[]
-  lastFromLine: number
-  lineIndex: number
+  line: string;
+  lineNum: number;
+  file: string;
+  filePath: string;
+  lines: string[];
+  lastFromLine: number;
+  lineIndex: number;
 }
 
 function checkCopyOrder(options: CheckCopyOrderOptions): DockerfileViolation | null {
-  const { line, lineNum, file, filePath, lines, lastFromLine, lineIndex } = options
+  const { line, lineNum, file, filePath, lines, lastFromLine, lineIndex } = options;
 
   /* v8 ignore next 4 -- defensive: callers always pass an array */
   // Validate array parameter
   if (!Array.isArray(lines)) {
-    return null
+    return null;
   }
 
-  const safeLine = safeDockerLine(line)
-  const copyMatch = COPY_PATTERN.exec(safeLine)
-  if (copyMatch?.[1] !== '.' && copyMatch?.[1] !== './') return null
-  if (safeLine.includes('--from=')) return null
+  const safeLine = safeDockerLine(line);
+  const copyMatch = COPY_PATTERN.exec(safeLine);
+  if (copyMatch?.[1] !== '.' && copyMatch?.[1] !== './') return null;
+  if (safeLine.includes('--from=')) return null;
 
-  const stageLines = lines.slice(lastFromLine, lineIndex)
+  const stageLines = lines.slice(lastFromLine, lineIndex);
 
   const hasPackageFileCopy = stageLines.some((l) =>
     PACKAGE_FILE_COPY_PATTERN.test(safeDockerLine(l)),
-  )
+  );
 
   const hasNodeModulesFromStage = stageLines.some((l) =>
     NODE_MODULES_FROM_STAGE_PATTERN.test(safeDockerLine(l)),
-  )
+  );
 
   if (!hasPackageFileCopy && !hasNodeModulesFromStage) {
     return {
@@ -235,9 +237,9 @@ function checkCopyOrder(options: CheckCopyOrderOptions): DockerfileViolation | n
       severity: 'warning',
       suggestion:
         'Copy package.json and lockfile first, run install, then copy source for better layer caching',
-    }
+    };
   }
-  return null
+  return null;
 }
 
 function checkCacheMount(
@@ -246,7 +248,7 @@ function checkCacheMount(
   file: string,
   filePath: string,
 ): DockerfileViolation | null {
-  const safeLine = safeDockerLine(line)
+  const safeLine = safeDockerLine(line);
   if (PKG_INSTALL_PATTERN.test(safeLine) && !safeLine.includes('--mount=type=cache')) {
     return {
       file,
@@ -257,44 +259,44 @@ function checkCacheMount(
       severity: 'warning',
       suggestion:
         'Add --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store to cache the package store across builds',
-    }
+    };
   }
-  return null
+  return null;
 }
 
 /* v8 ignore start -- Dockerfile multi-stage state-machine; many edge-case branches covered by integration */
 function processFromLine(line: string, lineNum: number, state: AnalysisState): void {
-  state.fromCount++
-  state.lastFromLine = lineNum
-  const safeLine = safeDockerLine(line)
-  const match = FROM_IMAGE_PATTERN.exec(safeLine)
-  const baseImage = match?.[1] ?? null
-  if (baseImage) state.baseImages.push(baseImage)
+  state.fromCount++;
+  state.lastFromLine = lineNum;
+  const safeLine = safeDockerLine(line);
+  const match = FROM_IMAGE_PATTERN.exec(safeLine);
+  const baseImage = match?.[1] ?? null;
+  if (baseImage) state.baseImages.push(baseImage);
 
-  const stageMatch = FROM_STAGE_PATTERN.exec(safeLine)
-  const stageName = stageMatch?.[1]?.toLowerCase() ?? null
+  const stageMatch = FROM_STAGE_PATTERN.exec(safeLine);
+  const stageName = stageMatch?.[1]?.toLowerCase() ?? null;
 
   // Determine if this is the runner stage
   if (stageName) {
-    state.isInRunnerStage = RUNNER_STAGE_NAMES.has(stageName)
+    state.isInRunnerStage = RUNNER_STAGE_NAMES.has(stageName);
   } else if (state.fromCount > 1) {
-    state.isInRunnerStage = true
+    state.isInRunnerStage = true;
   }
 
   if (state.isInRunnerStage) {
-    state.runnerStageBaseImage = baseImage
-    state.runnerFromLine = lineNum
+    state.runnerStageBaseImage = baseImage;
+    state.runnerFromLine = lineNum;
 
     // Check if runner's base image references a previously defined build stage
     if (baseImage) {
-      const baseImageLower = baseImage.toLowerCase()
-      state.runnerInheritsBuildStage = state.stageNames.includes(baseImageLower)
+      const baseImageLower = baseImage.toLowerCase();
+      state.runnerInheritsBuildStage = state.stageNames.includes(baseImageLower);
     }
   }
 
   // Record stage name after checks (to avoid self-matching)
   if (stageName) {
-    state.stageNames.push(stageName)
+    state.stageNames.push(stageName);
   }
 }
 
@@ -304,8 +306,8 @@ function addMissingBestPracticeViolations(
   lineCount: number,
   state: AnalysisState,
 ): DockerfileViolation[] {
-  const violations: DockerfileViolation[] = []
-  const hasMultiStage = state.fromCount >= 2
+  const violations: DockerfileViolation[] = [];
+  const hasMultiStage = state.fromCount >= 2;
 
   if (!hasMultiStage && state.fromCount > 0) {
     violations.push({
@@ -317,7 +319,7 @@ function addMissingBestPracticeViolations(
       severity: 'error',
       suggestion:
         'Use separate stages for building and running to reduce image size and attack surface',
-    })
+    });
   }
 
   if (!state.hasNonRootUser && state.fromCount > 0) {
@@ -328,9 +330,8 @@ function addMissingBestPracticeViolations(
       rule: 'non-root-user',
       message: 'Dockerfile does not specify a non-root user',
       severity: 'error',
-      suggestion:
-        String.raw`Add USER directive with a non-root user: RUN addgroup --system app && adduser --system --ingroup app app\nUSER app`,
-    })
+      suggestion: String.raw`Add USER directive with a non-root user: RUN addgroup --system app && adduser --system --ingroup app app\nUSER app`,
+    });
   }
 
   if (!state.hasHealthcheck && state.fromCount > 0) {
@@ -342,11 +343,11 @@ function addMissingBestPracticeViolations(
       message: 'Dockerfile does not include a HEALTHCHECK instruction',
       severity: 'warning',
       suggestion: 'Add HEALTHCHECK to help orchestrators verify container health',
-    })
+    });
   }
 
   // Check NODE_ENV only if runner stage uses Node.js
-  const runnerUsesNode = state.runnerStageBaseImage?.includes('node') ?? false
+  const runnerUsesNode = state.runnerStageBaseImage?.includes('node') ?? false;
   if (runnerUsesNode && !state.hasNodeEnvProduction) {
     violations.push({
       file,
@@ -356,7 +357,7 @@ function addMissingBestPracticeViolations(
       message: 'NODE_ENV=production not set in runtime stage',
       severity: 'warning',
       suggestion: 'Add ENV NODE_ENV=production in the runner stage for Node.js optimizations',
-    })
+    });
   }
 
   // Check if runner copies node_modules without production-only dependency resolution
@@ -370,7 +371,7 @@ function addMissingBestPracticeViolations(
       severity: 'error',
       suggestion:
         'Use "pnpm deploy --prod" to create a production bundle, or add --prod to install command to exclude devDependencies from the runtime image',
-    })
+    });
   }
 
   // Check if runner stage inherits from a build stage (includes build tools)
@@ -385,16 +386,16 @@ function addMissingBestPracticeViolations(
       severity: 'warning',
       suggestion:
         'Use a clean base image (e.g., node:20-alpine) for the runtime stage instead of inheriting from a build stage',
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 /* v8 ignore stop */
 
 function analyzeDockerfile(content: string, filePath: string, file: string): DockerfileViolation[] {
-  const lines = content.split('\n')
-  const violations: DockerfileViolation[] = []
+  const lines = content.split('\n');
+  const violations: DockerfileViolation[] = [];
 
   const state: AnalysisState = {
     hasNonRootUser: false,
@@ -412,7 +413,7 @@ function analyzeDockerfile(content: string, filePath: string, file: string): Doc
     runnerNodeModulesLine: 0,
     runnerInheritsBuildStage: false,
     runnerFromLine: 0,
-  }
+  };
 
   for (let i = 0; i < lines.length; i++) {
     processDockerfileLine({
@@ -423,69 +424,69 @@ function analyzeDockerfile(content: string, filePath: string, file: string): Doc
       violations,
       file,
       filePath,
-    })
+    });
   }
 
   // Add violations for missing best practices
-  violations.push(...addMissingBestPracticeViolations(file, filePath, lines.length, state))
+  violations.push(...addMissingBestPracticeViolations(file, filePath, lines.length, state));
 
-  return violations
+  return violations;
 }
 
 interface ProcessDockerfileLineOptions {
-  line: string | undefined
-  index: number
-  lines: string[]
-  state: AnalysisState
-  violations: DockerfileViolation[]
-  file: string
-  filePath: string
+  line: string | undefined;
+  index: number;
+  lines: string[];
+  state: AnalysisState;
+  violations: DockerfileViolation[];
+  file: string;
+  filePath: string;
 }
 
 function processUserLine(trimmedLine: string, state: AnalysisState): void {
-  const safeLine = safeDockerLine(trimmedLine)
-  const userMatch = USER_PATTERN.exec(safeLine)
+  const safeLine = safeDockerLine(trimmedLine);
+  const userMatch = USER_PATTERN.exec(safeLine);
   if (userMatch?.[1] && userMatch[1] !== 'root') {
-    state.hasNonRootUser = true
+    state.hasNonRootUser = true;
   }
 }
 
 interface ProcessRunLineOptions {
-  trimmedLine: string
-  lineNum: number
-  file: string
-  filePath: string
-  state: AnalysisState
-  violations: DockerfileViolation[]
+  trimmedLine: string;
+  lineNum: number;
+  file: string;
+  filePath: string;
+  state: AnalysisState;
+  violations: DockerfileViolation[];
 }
 
 function processRunLine(options: ProcessRunLineOptions): void {
-  const { trimmedLine, lineNum, file, filePath, state, violations } = options
-  const runResult = checkRunCommand(trimmedLine, lineNum, file, filePath)
-  violations.push(...runResult.violations)
-  if (runResult.hasFrozenLockfileViolation) state.hasFrozenLockfile = false
+  const { trimmedLine, lineNum, file, filePath, state, violations } = options;
+  const runResult = checkRunCommand(trimmedLine, lineNum, file, filePath);
+  violations.push(...runResult.violations);
+  if (runResult.hasFrozenLockfileViolation) state.hasFrozenLockfile = false;
 
-  const cacheMountViolation = checkCacheMount(trimmedLine, lineNum, file, filePath)
-  if (cacheMountViolation) violations.push(cacheMountViolation)
+  const cacheMountViolation = checkCacheMount(trimmedLine, lineNum, file, filePath);
+  if (cacheMountViolation) violations.push(cacheMountViolation);
 
   if (PROD_DEPS_FLAG_PATTERN.test(safeDockerLine(trimmedLine))) {
-    state.hasProductionDepsFlag = true
+    state.hasProductionDepsFlag = true;
   }
 }
 
 interface ProcessCopyLineOptions {
-  trimmedLine: string
-  lineNum: number
-  index: number
-  lines: string[]
-  file: string
-  filePath: string
-  state: AnalysisState
-  violations: DockerfileViolation[]
+  trimmedLine: string;
+  lineNum: number;
+  index: number;
+  lines: string[];
+  file: string;
+  filePath: string;
+  state: AnalysisState;
+  violations: DockerfileViolation[];
 }
 
 function processCopyLine(options: ProcessCopyLineOptions): void {
-  const { trimmedLine, lineNum, index, lines, file, filePath, state, violations } = options
+  const { trimmedLine, lineNum, index, lines, file, filePath, state, violations } = options;
   const copyViolation = checkCopyOrder({
     line: trimmedLine,
     lineNum,
@@ -494,49 +495,49 @@ function processCopyLine(options: ProcessCopyLineOptions): void {
     lines,
     lastFromLine: state.lastFromLine,
     lineIndex: index,
-  })
-  if (copyViolation) violations.push(copyViolation)
+  });
+  if (copyViolation) violations.push(copyViolation);
 
   if (state.isInRunnerStage && NODE_MODULES_FROM_STAGE_PATTERN.test(safeDockerLine(trimmedLine))) {
-    state.runnerCopiesNodeModules = true
-    state.runnerNodeModulesLine = lineNum
+    state.runnerCopiesNodeModules = true;
+    state.runnerNodeModulesLine = lineNum;
   }
 }
 
 function processDockerfileLine(options: ProcessDockerfileLineOptions): void {
-  const { line, index, lines, state, violations, file, filePath } = options
+  const { line, index, lines, state, violations, file, filePath } = options;
   /* v8 ignore next -- defensive: lines.entries() never yields undefined */
-  const trimmedLine = line?.trim() ?? ''
-  if (!trimmedLine || trimmedLine.startsWith('#')) return
+  const trimmedLine = line?.trim() ?? '';
+  if (!trimmedLine || trimmedLine.startsWith('#')) return;
 
-  const upperLine = trimmedLine.toUpperCase()
-  const lineNum = index + 1
+  const upperLine = trimmedLine.toUpperCase();
+  const lineNum = index + 1;
 
   if (upperLine.startsWith('FROM ')) {
-    processFromLine(trimmedLine, lineNum, state)
+    processFromLine(trimmedLine, lineNum, state);
   }
 
   if (upperLine.startsWith('USER ')) {
-    processUserLine(trimmedLine, state)
+    processUserLine(trimmedLine, state);
   }
 
   if (upperLine.startsWith('HEALTHCHECK ')) {
-    state.hasHealthcheck = true
+    state.hasHealthcheck = true;
   }
 
   if (NODE_ENV_PROD_PATTERN.test(safeDockerLine(trimmedLine))) {
-    state.hasNodeEnvProduction = true
+    state.hasNodeEnvProduction = true;
   }
 
-  const secretViolation = checkForSecrets(trimmedLine, lineNum, file, filePath)
-  if (secretViolation) violations.push(secretViolation)
+  const secretViolation = checkForSecrets(trimmedLine, lineNum, file, filePath);
+  if (secretViolation) violations.push(secretViolation);
 
   if (upperLine.startsWith('RUN ')) {
-    processRunLine({ trimmedLine, lineNum, file, filePath, state, violations })
+    processRunLine({ trimmedLine, lineNum, file, filePath, state, violations });
   }
 
   if (upperLine.startsWith('COPY ')) {
-    processCopyLine({ trimmedLine, lineNum, index, lines, file, filePath, state, violations })
+    processCopyLine({ trimmedLine, lineNum, index, lines, file, filePath, state, violations });
   }
 }
 
@@ -583,8 +584,8 @@ export const dockerBestPractices = defineCheck({
   tags: ['docker', 'security', 'best-practices', 'architecture'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const file = path.relative(process.cwd(), filePath)
-    const violations = analyzeDockerfile(content, filePath, file)
+    const file = path.relative(process.cwd(), filePath);
+    const violations = analyzeDockerfile(content, filePath, file);
 
     return violations.map((violation) => ({
       line: violation.line,
@@ -593,6 +594,6 @@ export const dockerBestPractices = defineCheck({
       suggestion: violation.suggestion ?? 'See Docker best practices documentation.',
       match: violation.rule,
       type: violation.rule,
-    }))
+    }));
   },
-})
+});

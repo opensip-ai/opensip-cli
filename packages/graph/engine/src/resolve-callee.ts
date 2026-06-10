@@ -90,8 +90,6 @@ export function resolveCallee(
   return lowestByQualifiedName(candidates);
 }
 
-function lowestByQualifiedName(
-  occs: readonly FunctionOccurrence[],
-): FunctionOccurrence {
+function lowestByQualifiedName(occs: readonly FunctionOccurrence[]): FunctionOccurrence {
   return occs.reduce((lo, c) => (c.qualifiedName < lo.qualifiedName ? c : lo));
 }

@@ -10,7 +10,6 @@ import { loadTargetsConfig } from '../loader.js';
 let testDir: string;
 
 beforeEach(() => {
-   
   testDir = mkdtempSync(join(tmpdir(), 'opensip-targets-loader-'));
 });
 

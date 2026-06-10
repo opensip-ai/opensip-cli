@@ -13,7 +13,7 @@ class C { method() {} }
 `;
     const tree = parseSource(src, 'a.ts')!;
     const fns = typescriptQuery.findFunctions(tree);
-    const names = fns.map(f => f.name).sort();
+    const names = fns.map((f) => f.name).sort();
     // arrow is anonymous → null; rest have names
     expect(names).toContain('declared');
     expect(names).toContain('namedExpr');
@@ -29,8 +29,8 @@ import './side-effect';
 `;
     const tree = parseSource(src, 'a.ts')!;
     const imports = typescriptQuery.findImports(tree);
-    expect(imports.find(i => i.specifier === 'mod-a')?.names).toEqual(['foo']);
-    expect(imports.find(i => i.specifier === 'mod-b')?.names).toEqual(['bar', 'baz']);
+    expect(imports.find((i) => i.specifier === 'mod-a')?.names).toEqual(['foo']);
+    expect(imports.find((i) => i.specifier === 'mod-b')?.names).toEqual(['bar', 'baz']);
   });
 
   it('findCallsTo matches identifier and member-call by simple name', () => {
@@ -49,7 +49,7 @@ other();
     const src = `const a = 'hi'; const b = "yo"; const c = \`tpl\`;`;
     const tree = parseSource(src, 'a.ts')!;
     const lits = typescriptQuery.findStringLiterals(tree);
-    const values = lits.map(l => l.value).sort();
+    const values = lits.map((l) => l.value).sort();
     expect(values).toContain('hi');
     expect(values).toContain('yo');
     // Tagged template literal text is also captured

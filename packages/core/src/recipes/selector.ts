@@ -84,7 +84,10 @@ type Matcher = (target: string, pattern: string) => boolean;
  * Injected, tool-supplied resolution hooks. Keeping these external is what
  * lets core resolve selectors without naming any tool type.
  */
-export interface ResolveSelectorOptions<T extends Registerable, S extends { readonly type: string }> {
+export interface ResolveSelectorOptions<
+  T extends Registerable,
+  S extends { readonly type: string },
+> {
   /** Match keys for an item — used by the `all` and `pattern` arms. */
   readonly keysOf: (item: T) => readonly string[];
   /** Tags an item carries — used by the built-in `tags` arm. Defaults to `item.tags ?? []`. */
@@ -112,9 +115,12 @@ const UNKNOWN_SELECTOR_CODE = 'SYSTEM.CORE.UNKNOWN_SELECTOR';
 function requireMatcher(match: Matcher | undefined, arm: string): Matcher {
   if (match === undefined) {
     // @fitness-ignore-next-line result-pattern-consistency -- programmer error: a pattern/all-exclude arm reached the resolver without an injected matcher
-    throw new SystemError(`resolveSelector: '${arm}' selector needs a 'match' matcher but none was supplied`, {
-      code: NO_MATCHER_CODE,
-    });
+    throw new SystemError(
+      `resolveSelector: '${arm}' selector needs a 'match' matcher but none was supplied`,
+      {
+        code: NO_MATCHER_CODE,
+      },
+    );
   }
   return match;
 }
@@ -212,7 +218,12 @@ export function resolveSelector<T extends Registerable, S extends { readonly typ
       return resolveAllArm(arm.exclude ?? [], items, opts.keysOf, opts.match);
     }
     case 'tags': {
-      return resolveTagsArm(arm.include, arm.exclude ?? [], items, opts.tagsOf ?? ((item) => item.tags ?? []));
+      return resolveTagsArm(
+        arm.include,
+        arm.exclude ?? [],
+        items,
+        opts.tagsOf ?? ((item) => item.tags ?? []),
+      );
     }
     case 'pattern': {
       return resolvePatternArm(arm.include, arm.exclude ?? [], items, opts.keysOf, opts.match);
@@ -221,9 +232,12 @@ export function resolveSelector<T extends Registerable, S extends { readonly typ
     default: {
       const _exhaustive: never = arm;
       // @fitness-ignore-next-line result-pattern-consistency -- programmer error: unknown selector arm with no predicate
-      throw new SystemError(`resolveSelector: unknown selector type: ${JSON.stringify(_exhaustive)}`, {
-        code: UNKNOWN_SELECTOR_CODE,
-      });
+      throw new SystemError(
+        `resolveSelector: unknown selector type: ${JSON.stringify(_exhaustive)}`,
+        {
+          code: UNKNOWN_SELECTOR_CODE,
+        },
+      );
     }
     /* v8 ignore stop */
   }

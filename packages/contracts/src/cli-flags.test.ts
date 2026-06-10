@@ -1,16 +1,27 @@
 import { Command } from 'commander';
 import { describe, expect, it } from 'vitest';
 
-import { applyCommonFlags, commonFlags, MANDATORY_COMMON_FLAGS, type CommonFlagKey } from './cli-flags.js';
+import {
+  applyCommonFlags,
+  commonFlags,
+  MANDATORY_COMMON_FLAGS,
+  type CommonFlagKey,
+} from './cli-flags.js';
 
 describe('commonFlags registry', () => {
   it('pins the canonical flag strings + descriptions (drift fails here)', () => {
-    expect(commonFlags.json).toEqual({ flags: '--json', description: 'Output structured JSON', defaultValue: false });
+    expect(commonFlags.json).toEqual({
+      flags: '--json',
+      description: 'Output structured JSON',
+      defaultValue: false,
+    });
     expect(commonFlags.cwd).toEqual({ flags: '--cwd <path>', description: 'Target directory' });
     expect(commonFlags.verbose.flags).toBe('-v, --verbose');
     expect(commonFlags.quiet.flags).toBe('-q, --quiet');
     // The drift this registry exists to prevent: one canonical --report-to string.
-    expect(commonFlags.reportTo.description).toBe('POST findings to OpenSIP Cloud or a compatible endpoint');
+    expect(commonFlags.reportTo.description).toBe(
+      'POST findings to OpenSIP Cloud or a compatible endpoint',
+    );
     expect(commonFlags.apiKey.description).toBe('API key for --report-to authentication');
   });
 

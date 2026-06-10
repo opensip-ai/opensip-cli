@@ -23,10 +23,14 @@
  * SQL). All-local-receiver patterns are excluded.
  */
 
-
-import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import {
+  defineCheck,
+  getCheckConfig,
+  isTestFile,
+  type CheckViolation,
+} from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Recipe-config shape for toctou-race-condition. Project-specific safe-paths
@@ -38,7 +42,7 @@ export interface TocTouConfig extends Record<string, unknown> {
    * Additional path patterns where TOCTOU is not a concern. Each entry is
    * compiled to a case-insensitive RegExp via `new RegExp(entry, 'i')`.
    */
-  additionalSafeTOCTOUPaths?: readonly string[]
+  additionalSafeTOCTOUPaths?: readonly string[];
 }
 
 /** Patterns that indicate proper atomic update handling */
@@ -69,9 +73,9 @@ const ATOMIC_PATTERNS = [
   /atomic in.*Node/i,
   // Documented coalescing/event-loop safety patterns commonly used in Node single-threaded code
   /single-threaded coalesce/i, // explicit coalescing-cache documentation
-  /Node single-threaded/i,     // explicit Node single-threaded documentation
-  /event-loop semantics/i,     // explicit event-loop atomicity documentation
-]
+  /Node single-threaded/i, // explicit Node single-threaded documentation
+  /event-loop semantics/i, // explicit event-loop atomicity documentation
+];
 
 /**
  * Paths where TOCTOU is typically not a concern
@@ -120,15 +124,15 @@ const SAFE_TOCTOU_PATHS = [
   // NOTE: opensip-specific paths (e.g. `/chain-walker/` for audit-chain
   // walkers) are NOT defaults. They live in opensip's recipe under
   // `checks.config['toctou-race-condition'].additionalSafeTOCTOUPaths`.
-]
+];
 
 /**
  * Compile recipe-provided string entries to case-insensitive RegExp values.
  */
 function buildEffectiveSafePaths(): readonly RegExp[] {
-  const cfg = getCheckConfig<TocTouConfig>('toctou-race-condition')
-  const extras = (cfg.additionalSafeTOCTOUPaths ?? []).map((src) => new RegExp(src, 'i'))
-  return [...SAFE_TOCTOU_PATHS, ...extras]
+  const cfg = getCheckConfig<TocTouConfig>('toctou-race-condition');
+  const extras = (cfg.additionalSafeTOCTOUPaths ?? []).map((src) => new RegExp(src, 'i'));
+  return [...SAFE_TOCTOU_PATHS, ...extras];
 }
 
 /**
@@ -136,20 +140,30 @@ function buildEffectiveSafePaths(): readonly RegExp[] {
  * defaults with the recipe-config augmentation.
  */
 function isSafeToctouPath(filePath: string, safePaths: readonly RegExp[]): boolean {
-  return safePaths.some((pattern) => pattern.test(filePath))
+  return safePaths.some((pattern) => pattern.test(filePath));
 }
 
 /** Read operation method names */
-const READ_METHODS = new Set(['get', 'find', 'findOne', 'findFirst', 'findMany', 'getById', 'fetch', 'load', 'read'])
+const READ_METHODS = new Set([
+  'get',
+  'find',
+  'findOne',
+  'findFirst',
+  'findMany',
+  'getById',
+  'fetch',
+  'load',
+  'read',
+]);
 
 /** Update operation method names */
-const UPDATE_METHODS = new Set(['update', 'save', 'put', 'set', 'patch', 'modify'])
+const UPDATE_METHODS = new Set(['update', 'save', 'put', 'set', 'patch', 'modify']);
 
 /**
  * Check if content has atomic patterns
  */
 function hasAtomicPatterns(content: string): boolean {
-  return ATOMIC_PATTERNS.some((p) => p.test(content))
+  return ATOMIC_PATTERNS.some((p) => p.test(content));
 }
 
 /**
@@ -159,22 +173,22 @@ type FunctionLikeNode =
   | ts.FunctionDeclaration
   | ts.MethodDeclaration
   | ts.ArrowFunction
-  | ts.FunctionExpression
+  | ts.FunctionExpression;
 
 /**
  * Get function name from a function-like node
  */
 function getFunctionNameFromNode(node: FunctionLikeNode, sourceFile: ts.SourceFile): string {
   if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) {
-    return node.name?.getText(sourceFile) ?? 'anonymous'
+    return node.name?.getText(sourceFile) ?? 'anonymous';
   }
   if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
-    const parent = node.parent
+    const parent = node.parent;
     if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
-      return parent.name.getText(sourceFile)
+      return parent.name.getText(sourceFile);
     }
   }
-  return 'anonymous'
+  return 'anonymous';
 }
 
 /**
@@ -186,7 +200,7 @@ function isFunctionLikeNode(node: ts.Node): node is FunctionLikeNode {
     ts.isMethodDeclaration(node) ||
     ts.isArrowFunction(node) ||
     ts.isFunctionExpression(node)
-  )
+  );
 }
 
 /**
@@ -200,23 +214,23 @@ const IN_MEMORY_COLLECTION_TYPE_NAMES = new Set([
   'Set',
   'WeakSet',
   'ReadonlySet',
-])
+]);
 
 function isInMemoryCollectionTypeNode(typeNode: ts.TypeNode | undefined): boolean {
-  if (!typeNode) return false
+  if (!typeNode) return false;
   if (ts.isTypeReferenceNode(typeNode)) {
-    const name = typeNode.typeName
+    const name = typeNode.typeName;
     if (ts.isIdentifier(name)) {
-      if (IN_MEMORY_COLLECTION_TYPE_NAMES.has(name.text)) return true
+      if (IN_MEMORY_COLLECTION_TYPE_NAMES.has(name.text)) return true;
       // Type names ending in `Cache` (e.g. `SecretsCache`) are an
       // OpenSIP-wide convention for in-process keyed coalescing
       // structures. Treating them as local-collection eliminates the
       // FP class where a service-level `cache: XCache` parameter is
       // read+written within a function body.
-      if (name.text.endsWith('Cache')) return true
+      if (name.text.endsWith('Cache')) return true;
     }
   }
-  return false
+  return false;
 }
 
 /**
@@ -224,11 +238,11 @@ function isInMemoryCollectionTypeNode(typeNode: ts.TypeNode | undefined): boolea
  * e.g. `const counts = new Map()`, `new Set<string>()`.
  */
 function isInMemoryCollectionInitializer(init: ts.Expression | undefined): boolean {
-  if (!init) return false
+  if (!init) return false;
   if (ts.isNewExpression(init) && ts.isIdentifier(init.expression)) {
-    return IN_MEMORY_COLLECTION_TYPE_NAMES.has(init.expression.text)
+    return IN_MEMORY_COLLECTION_TYPE_NAMES.has(init.expression.text);
   }
-  return false
+  return false;
 }
 
 /**
@@ -242,10 +256,10 @@ function isInMemoryCollectionInitializer(init: ts.Expression | undefined): boole
  */
 function isInMemoryCacheReceiverText(text: string): boolean {
   // strip a leading `#` (private field) and `_` (convention)
-  const normalized = text.replace(/^[#_]/, '')
-  if (normalized === 'cache') return true
-  if (normalized.endsWith('Cache')) return true
-  return false
+  const normalized = text.replace(/^[#_]/, '');
+  if (normalized === 'cache') return true;
+  if (normalized.endsWith('Cache')) return true;
+  return false;
 }
 
 /**
@@ -254,12 +268,12 @@ function isInMemoryCacheReceiverText(text: string): boolean {
  * matched against the simple receiver of `<name>.get/set/...` calls.
  */
 function collectLocalCollectionNames(node: FunctionLikeNode): Set<string> {
-  const names = new Set<string>()
+  const names = new Set<string>();
 
   // Parameters typed as Map/Set
   for (const param of node.parameters) {
     if (ts.isIdentifier(param.name) && isInMemoryCollectionTypeNode(param.type)) {
-      names.add(param.name.text)
+      names.add(param.name.text);
     }
   }
 
@@ -267,14 +281,18 @@ function collectLocalCollectionNames(node: FunctionLikeNode): Set<string> {
   const visit = (n: ts.Node): void => {
     // Don't descend into nested functions — their locals belong to a
     // different scope.
-    if (n !== node && isFunctionLikeNode(n)) return
-    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && (isInMemoryCollectionInitializer(n.initializer) || isInMemoryCollectionTypeNode(n.type))) {
-        names.add(n.name.text)
-      }
-    ts.forEachChild(n, visit)
-  }
-  if (node.body) visit(node.body)
-  return names
+    if (n !== node && isFunctionLikeNode(n)) return;
+    if (
+      ts.isVariableDeclaration(n) &&
+      ts.isIdentifier(n.name) &&
+      (isInMemoryCollectionInitializer(n.initializer) || isInMemoryCollectionTypeNode(n.type))
+    ) {
+      names.add(n.name.text);
+    }
+    ts.forEachChild(n, visit);
+  };
+  if (node.body) visit(node.body);
+  return names;
 }
 
 /**
@@ -288,32 +306,32 @@ function collectLocalCollectionNames(node: FunctionLikeNode): Set<string> {
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- AST walk over class members: nested type checks reflect the TypeScript AST shape
 function collectClassInMemoryFieldNames(node: FunctionLikeNode): Set<string> {
-  const names = new Set<string>()
-  let cls: ts.Node | undefined = node.parent
+  const names = new Set<string>();
+  let cls: ts.Node | undefined = node.parent;
   while (cls && !ts.isClassDeclaration(cls) && !ts.isClassExpression(cls)) {
-    cls = cls.parent
+    cls = cls.parent;
   }
-  if (!cls) return names
-  const classNode = cls
+  if (!cls) return names;
+  const classNode = cls;
   for (const member of classNode.members) {
     if (ts.isPropertyDeclaration(member)) {
-      const memberName = member.name
-      let fieldName: string | undefined
+      const memberName = member.name;
+      let fieldName: string | undefined;
       if (ts.isIdentifier(memberName)) {
-        fieldName = memberName.text
+        fieldName = memberName.text;
       } else if (ts.isPrivateIdentifier(memberName)) {
-        fieldName = memberName.text.replace(/^#/, '')
+        fieldName = memberName.text.replace(/^#/, '');
       }
-      if (!fieldName) continue
+      if (!fieldName) continue;
       if (
         isInMemoryCollectionInitializer(member.initializer) ||
         isInMemoryCollectionTypeNode(member.type)
       ) {
-        names.add(fieldName)
+        names.add(fieldName);
       }
     }
   }
-  return names
+  return names;
 }
 
 /**
@@ -329,30 +347,30 @@ function collectClassInMemoryFieldNames(node: FunctionLikeNode): Set<string> {
  * classifier would otherwise treat conservatively as shared.
  */
 function collectInterfaceCollectionFields(sourceFile: ts.SourceFile): Map<string, Set<string>> {
-  const byType = new Map<string, Set<string>>()
+  const byType = new Map<string, Set<string>>();
   const fieldsFrom = (members: ts.NodeArray<ts.TypeElement>): Set<string> => {
-    const fields = new Set<string>()
+    const fields = new Set<string>();
     for (const member of members) {
       if (
         ts.isPropertySignature(member) &&
         ts.isIdentifier(member.name) &&
         isInMemoryCollectionTypeNode(member.type)
       ) {
-        fields.add(member.name.text)
+        fields.add(member.name.text);
       }
     }
-    return fields
-  }
+    return fields;
+  };
   for (const stmt of sourceFile.statements) {
     if (ts.isInterfaceDeclaration(stmt)) {
-      const fields = fieldsFrom(stmt.members)
-      if (fields.size > 0) byType.set(stmt.name.text, fields)
+      const fields = fieldsFrom(stmt.members);
+      if (fields.size > 0) byType.set(stmt.name.text, fields);
     } else if (ts.isTypeAliasDeclaration(stmt) && ts.isTypeLiteralNode(stmt.type)) {
-      const fields = fieldsFrom(stmt.type.members)
-      if (fields.size > 0) byType.set(stmt.name.text, fields)
+      const fields = fieldsFrom(stmt.type.members);
+      if (fields.size > 0) byType.set(stmt.name.text, fields);
     }
   }
-  return byType
+  return byType;
 }
 
 /**
@@ -365,31 +383,31 @@ function collectLocalObjectCollectionFieldKeys(
   node: FunctionLikeNode,
   interfaceCollectionFields: ReadonlyMap<string, Set<string>>,
 ): Set<string> {
-  const keys = new Set<string>()
+  const keys = new Set<string>();
   const addFor = (name: string, typeNode: ts.TypeNode | undefined): void => {
-    if (!typeNode || !ts.isTypeReferenceNode(typeNode)) return
-    if (!ts.isIdentifier(typeNode.typeName)) return
-    const fields = interfaceCollectionFields.get(typeNode.typeName.text)
-    if (!fields) return
-    for (const field of fields) keys.add(`${name}.${field}`)
-  }
+    if (!typeNode || !ts.isTypeReferenceNode(typeNode)) return;
+    if (!ts.isIdentifier(typeNode.typeName)) return;
+    const fields = interfaceCollectionFields.get(typeNode.typeName.text);
+    if (!fields) return;
+    for (const field of fields) keys.add(`${name}.${field}`);
+  };
   for (const param of node.parameters) {
-    if (ts.isIdentifier(param.name)) addFor(param.name.text, param.type)
+    if (ts.isIdentifier(param.name)) addFor(param.name.text, param.type);
   }
   const visit = (n: ts.Node): void => {
-    if (n !== node && isFunctionLikeNode(n)) return
-    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) addFor(n.name.text, n.type)
-    ts.forEachChild(n, visit)
-  }
-  if (node.body) visit(node.body)
-  return keys
+    if (n !== node && isFunctionLikeNode(n)) return;
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) addFor(n.name.text, n.type);
+    ts.forEachChild(n, visit);
+  };
+  if (node.body) visit(node.body);
+  return keys;
 }
 
 /** Call-site classification kinds — narrow string literal alias set. */
-const KIND_READ_SHARED = 'read-shared' as const
-const KIND_UPDATE_SHARED = 'update-shared' as const
-const KIND_READ_LOCAL = 'read-local' as const
-const KIND_UPDATE_LOCAL = 'update-local' as const
+const KIND_READ_SHARED = 'read-shared' as const;
+const KIND_UPDATE_SHARED = 'update-shared' as const;
+const KIND_READ_LOCAL = 'read-local' as const;
+const KIND_UPDATE_LOCAL = 'update-local' as const;
 
 /**
  * Classification of a `<receiver>.<method>(...)` call site.
@@ -400,7 +418,7 @@ type CallKind =
   | { kind: typeof KIND_READ_LOCAL }
   | { kind: typeof KIND_UPDATE_LOCAL }
   | { kind: 'atomic-sql-write' }
-  | { kind: 'unrelated' }
+  | { kind: 'unrelated' };
 
 /**
  * Return true if a call expression is `<tx-or-db>.execute(sql\`...\`)`
@@ -408,13 +426,17 @@ type CallKind =
  * (single statement, no separate read-then-update window).
  */
 function isAtomicSqlExecute(call: ts.CallExpression): boolean {
-  if (!ts.isPropertyAccessExpression(call.expression)) return false
-  if (call.expression.name.text !== 'execute') return false
-  const arg = call.arguments[0]
-  if (!arg) return false
-  if (ts.isTaggedTemplateExpression(arg) && // `sql\`...\``
-    ts.isIdentifier(arg.tag) && arg.tag.text === 'sql') return true
-  return false
+  if (!ts.isPropertyAccessExpression(call.expression)) return false;
+  if (call.expression.name.text !== 'execute') return false;
+  const arg = call.arguments[0];
+  if (!arg) return false;
+  if (
+    ts.isTaggedTemplateExpression(arg) && // `sql\`...\``
+    ts.isIdentifier(arg.tag) &&
+    arg.tag.text === 'sql'
+  )
+    return true;
+  return false;
 }
 
 /**
@@ -426,19 +448,19 @@ function isAtomicSqlExecute(call: ts.CallExpression): boolean {
  * unless there is an *actual* read-then-update on a shared receiver
  * elsewhere.
  */
-const DRIZZLE_ATOMIC_WRITE_METHODS = new Set(['update', 'insert', 'delete'])
+const DRIZZLE_ATOMIC_WRITE_METHODS = new Set(['update', 'insert', 'delete']);
 
 function isDrizzleAtomicWrite(call: ts.CallExpression): boolean {
-  if (!ts.isPropertyAccessExpression(call.expression)) return false
-  const methodName = call.expression.name.text
-  if (!DRIZZLE_ATOMIC_WRITE_METHODS.has(methodName)) return false
+  if (!ts.isPropertyAccessExpression(call.expression)) return false;
+  const methodName = call.expression.name.text;
+  if (!DRIZZLE_ATOMIC_WRITE_METHODS.has(methodName)) return false;
   // Heuristic: receiver looks like a db/tx (named `db`, `tx`, ends in `Db`/`Tx`).
-  const receiver = call.expression.expression
+  const receiver = call.expression.expression;
   if (ts.isIdentifier(receiver)) {
-    const r = receiver.text
-    if (r === 'db' || r === 'tx' || /Db$|Tx$/.test(r)) return true
+    const r = receiver.text;
+    if (r === 'db' || r === 'tx' || /Db$|Tx$/.test(r)) return true;
   }
-  return false
+  return false;
 }
 
 /**
@@ -448,13 +470,16 @@ function isDrizzleAtomicWrite(call: ts.CallExpression): boolean {
  * Returns null if the receiver isn't a simple identifier or this-property.
  */
 function getReceiverName(call: ts.CallExpression): { name: string; isThisField: boolean } | null {
-  if (!ts.isPropertyAccessExpression(call.expression)) return null
-  const receiver = call.expression.expression
+  if (!ts.isPropertyAccessExpression(call.expression)) return null;
+  const receiver = call.expression.expression;
   if (ts.isIdentifier(receiver)) {
-    return { name: receiver.text, isThisField: false }
+    return { name: receiver.text, isThisField: false };
   }
-  if (ts.isPropertyAccessExpression(receiver) && receiver.expression.kind === ts.SyntaxKind.ThisKeyword) {
-    return { name: receiver.name.text, isThisField: true }
+  if (
+    ts.isPropertyAccessExpression(receiver) &&
+    receiver.expression.kind === ts.SyntaxKind.ThisKeyword
+  ) {
+    return { name: receiver.name.text, isThisField: true };
   }
   // `<id>.<field>.method()` — a dotted receiver key (e.g. `state.lowlink`).
   // Keying per `<id>.<field>` is strictly more precise than the old
@@ -462,9 +487,9 @@ function getReceiverName(call: ts.CallExpression): { name: string; isThisField: 
   // on `x.b` no longer collide, and it lets the classifier match a
   // state-object's Map/Set field against the local-collection key set.
   if (ts.isPropertyAccessExpression(receiver) && ts.isIdentifier(receiver.expression)) {
-    return { name: `${receiver.expression.text}.${receiver.name.text}`, isThisField: false }
+    return { name: `${receiver.expression.text}.${receiver.name.text}`, isThisField: false };
   }
-  return null
+  return null;
 }
 
 /**
@@ -473,31 +498,31 @@ function getReceiverName(call: ts.CallExpression): { name: string; isThisField: 
 function classifyCall(
   call: ts.CallExpression,
   ctx: {
-    localCollections: Set<string>
-    classCacheFields: Set<string>
-    localObjectCollectionKeys: Set<string>
+    localCollections: Set<string>;
+    classCacheFields: Set<string>;
+    localObjectCollectionKeys: Set<string>;
   },
 ): CallKind {
   // First, atomic SQL writes anywhere short-circuit.
-  if (isAtomicSqlExecute(call)) return { kind: 'atomic-sql-write' }
-  if (isDrizzleAtomicWrite(call)) return { kind: 'atomic-sql-write' }
+  if (isAtomicSqlExecute(call)) return { kind: 'atomic-sql-write' };
+  if (isDrizzleAtomicWrite(call)) return { kind: 'atomic-sql-write' };
 
-  if (!ts.isPropertyAccessExpression(call.expression)) return { kind: 'unrelated' }
-  const methodName = call.expression.name.text
-  const isRead = READ_METHODS.has(methodName)
-  const isUpdate = UPDATE_METHODS.has(methodName)
-  if (!isRead && !isUpdate) return { kind: 'unrelated' }
+  if (!ts.isPropertyAccessExpression(call.expression)) return { kind: 'unrelated' };
+  const methodName = call.expression.name.text;
+  const isRead = READ_METHODS.has(methodName);
+  const isUpdate = UPDATE_METHODS.has(methodName);
+  if (!isRead && !isUpdate) return { kind: 'unrelated' };
 
-  const receiver = getReceiverName(call)
+  const receiver = getReceiverName(call);
   if (!receiver) {
     // chained / non-simple receiver — treat as shared
-    return { kind: isRead ? KIND_READ_SHARED : KIND_UPDATE_SHARED }
+    return { kind: isRead ? KIND_READ_SHARED : KIND_UPDATE_SHARED };
   }
 
   if (isLocalReceiver(receiver, ctx)) {
-    return { kind: isRead ? KIND_READ_LOCAL : KIND_UPDATE_LOCAL }
+    return { kind: isRead ? KIND_READ_LOCAL : KIND_UPDATE_LOCAL };
   }
-  return { kind: isRead ? KIND_READ_SHARED : KIND_UPDATE_SHARED }
+  return { kind: isRead ? KIND_READ_SHARED : KIND_UPDATE_SHARED };
 }
 
 /**
@@ -509,13 +534,13 @@ function classifyCall(
 function isLocalReceiver(
   receiver: { name: string; isThisField: boolean },
   ctx: {
-    localCollections: Set<string>
-    classCacheFields: Set<string>
-    localObjectCollectionKeys: Set<string>
+    localCollections: Set<string>;
+    classCacheFields: Set<string>;
+    localObjectCollectionKeys: Set<string>;
   },
 ): boolean {
   if (receiver.isThisField) {
-    return ctx.classCacheFields.has(receiver.name) || isInMemoryCacheReceiverText(receiver.name)
+    return ctx.classCacheFields.has(receiver.name) || isInMemoryCacheReceiverText(receiver.name);
   }
   return (
     ctx.localCollections.has(receiver.name) ||
@@ -524,7 +549,7 @@ function isLocalReceiver(
     ctx.localObjectCollectionKeys.has(receiver.name) ||
     // bare `cache` / `<X>Cache` naming convention.
     isInMemoryCacheReceiverText(receiver.name)
-  )
+  );
 }
 
 /**
@@ -541,49 +566,49 @@ function classifyFunctionCalls(
   classCacheFields: Set<string>,
   localObjectCollectionKeys: Set<string>,
 ): { hasSharedReadAndUpdateOnSameReceiver: boolean } {
-  const ctx = { localCollections, classCacheFields, localObjectCollectionKeys }
+  const ctx = { localCollections, classCacheFields, localObjectCollectionKeys };
   // receiver-key → { read, update }. Receiver-key is `<name>` for plain
   // identifiers and `this.<name>` for this-field accesses.
-  const perReceiver = new Map<string, { read: boolean; update: boolean }>()
-  let hasReadOnUnknownReceiver = false
-  let hasUpdateOnUnknownReceiver = false
+  const perReceiver = new Map<string, { read: boolean; update: boolean }>();
+  let hasReadOnUnknownReceiver = false;
+  let hasUpdateOnUnknownReceiver = false;
 
   const visit = (n: ts.Node): void => {
-    if (n !== node && isFunctionLikeNode(n)) return
+    if (n !== node && isFunctionLikeNode(n)) return;
     if (ts.isCallExpression(n)) {
-      const cls = classifyCall(n, ctx)
+      const cls = classifyCall(n, ctx);
       if (cls.kind === 'read-shared' || cls.kind === 'update-shared') {
-        const recv = getReceiverName(n)
+        const recv = getReceiverName(n);
         if (recv) {
-          const key = recv.isThisField ? `this.${recv.name}` : recv.name
-          let entry = perReceiver.get(key)
+          const key = recv.isThisField ? `this.${recv.name}` : recv.name;
+          let entry = perReceiver.get(key);
           if (!entry) {
-            entry = { read: false, update: false }
-            perReceiver.set(key, entry)
+            entry = { read: false, update: false };
+            perReceiver.set(key, entry);
           }
-          if (cls.kind === 'read-shared') entry.read = true
-          else entry.update = true
+          if (cls.kind === 'read-shared') entry.read = true;
+          else entry.update = true;
         } else {
-          if (cls.kind === 'read-shared') hasReadOnUnknownReceiver = true
-          else hasUpdateOnUnknownReceiver = true
+          if (cls.kind === 'read-shared') hasReadOnUnknownReceiver = true;
+          else hasUpdateOnUnknownReceiver = true;
         }
       }
     }
-    ts.forEachChild(n, visit)
-  }
-  if (node.body) visit(node.body)
+    ts.forEachChild(n, visit);
+  };
+  if (node.body) visit(node.body);
 
   for (const entry of perReceiver.values()) {
     if (entry.read && entry.update) {
-      return { hasSharedReadAndUpdateOnSameReceiver: true }
+      return { hasSharedReadAndUpdateOnSameReceiver: true };
     }
   }
   // Conservative fallback: if we have unknown-receiver reads paired with
   // unknown-receiver updates, treat as shared (chained / dynamic call).
   if (hasReadOnUnknownReceiver && hasUpdateOnUnknownReceiver) {
-    return { hasSharedReadAndUpdateOnSameReceiver: true }
+    return { hasSharedReadAndUpdateOnSameReceiver: true };
   }
-  return { hasSharedReadAndUpdateOnSameReceiver: false }
+  return { hasSharedReadAndUpdateOnSameReceiver: false };
 }
 /* eslint-enable sonarjs/cognitive-complexity */
 
@@ -591,43 +616,43 @@ function classifyFunctionCalls(
  * Options for checking a function for TOCTOU patterns
  */
 interface CheckFunctionForToctouOptions {
-  node: FunctionLikeNode
-  sourceFile: ts.SourceFile
+  node: FunctionLikeNode;
+  sourceFile: ts.SourceFile;
   /** File-local interface/type → Map/Set field names (computed once per file). */
-  interfaceCollectionFields: ReadonlyMap<string, Set<string>>
+  interfaceCollectionFields: ReadonlyMap<string, Set<string>>;
 }
 
 /**
  * Check a function for TOCTOU patterns
  */
 function checkFunctionForToctou(options: CheckFunctionForToctouOptions): CheckViolation | null {
-  const { node, sourceFile, interfaceCollectionFields } = options
-  if (!node.body) return null
+  const { node, sourceFile, interfaceCollectionFields } = options;
+  if (!node.body) return null;
 
   // Atomic-comment escape hatch retained from the regex implementation —
   // a function (or its surrounding scope) that documents single-threaded
   // / coalescing semantics is treated as safe.
-  const funcText = node.getText(sourceFile)
-  if (hasAtomicPatterns(funcText)) return null
+  const funcText = node.getText(sourceFile);
+  if (hasAtomicPatterns(funcText)) return null;
 
-  const localCollections = collectLocalCollectionNames(node)
-  const classCacheFields = collectClassInMemoryFieldNames(node)
+  const localCollections = collectLocalCollectionNames(node);
+  const classCacheFields = collectClassInMemoryFieldNames(node);
   const localObjectCollectionKeys = collectLocalObjectCollectionFieldKeys(
     node,
     interfaceCollectionFields,
-  )
+  );
   const { hasSharedReadAndUpdateOnSameReceiver } = classifyFunctionCalls(
     node,
     localCollections,
     classCacheFields,
     localObjectCollectionKeys,
-  )
+  );
 
-  if (!hasSharedReadAndUpdateOnSameReceiver) return null
+  if (!hasSharedReadAndUpdateOnSameReceiver) return null;
 
-  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const lineNum = line + 1
-  const funcName = getFunctionNameFromNode(node, sourceFile)
+  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+  const lineNum = line + 1;
+  const funcName = getFunctionNameFromNode(node, sourceFile);
 
   return {
     line: lineNum,
@@ -637,7 +662,7 @@ function checkFunctionForToctou(options: CheckFunctionForToctouOptions): CheckVi
     suggestion:
       'Use optimistic locking: pass expectedVersion to update, or use ConditionExpression for DynamoDB, or wrap in a transaction with SELECT FOR UPDATE for SQL',
     match: funcName,
-  }
+  };
 }
 
 /**
@@ -645,37 +670,37 @@ function checkFunctionForToctou(options: CheckFunctionForToctouOptions): CheckVi
  * suite (see `__tests__/toctou-fp.test.ts`).
  */
 export function analyzeFileForToctou(filePath: string, content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Skip files in safe TOCTOU paths (caches, rate limiters, CLI, etc.).
   // Merge built-in defaults with recipe config once per file.
-  const safePaths = buildEffectiveSafePaths()
+  const safePaths = buildEffectiveSafePaths();
   if (isSafeToctouPath(filePath, safePaths)) {
-    return violations
+    return violations;
   }
 
   // Skip if the whole file documents atomic / single-threaded semantics.
   if (hasAtomicPatterns(content)) {
-    return violations
+    return violations;
   }
 
-  const sourceFile = getSharedSourceFile(filePath, content)
-  if (!sourceFile) return []
+  const sourceFile = getSharedSourceFile(filePath, content);
+  if (!sourceFile) return [];
 
-  const interfaceCollectionFields = collectInterfaceCollectionFields(sourceFile)
+  const interfaceCollectionFields = collectInterfaceCollectionFields(sourceFile);
 
   const visit = (node: ts.Node): void => {
     if (isFunctionLikeNode(node)) {
-      const violation = checkFunctionForToctou({ node, sourceFile, interfaceCollectionFields })
+      const violation = checkFunctionForToctou({ node, sourceFile, interfaceCollectionFields });
       if (violation) {
-        violations.push(violation)
+        violations.push(violation);
       }
     }
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
 
-  visit(sourceFile)
-  return violations
+  visit(sourceFile);
+  return violations;
 }
 
 /**
@@ -705,7 +730,7 @@ export const toctouRaceCondition = defineCheck({
 
   analyze(content, filePath) {
     // Skip test files — TOCTOU patterns in tests are low-risk
-    if (isTestFile(filePath)) return []
-    return analyzeFileForToctou(filePath, content)
+    if (isTestFile(filePath)) return [];
+    return analyzeFileForToctou(filePath, content);
   },
-})
+});

@@ -22,10 +22,11 @@ import { findOccurrence, runFixture, writeFixture } from './acceptance/_fixture-
 
 import type { Catalog } from '@opensip-tools/graph';
 
-
 describe('value-reference + shorthand edge resolution', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-value-ref-'));
-  afterAll(() => { rmSync(fixtureDir, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(fixtureDir, { recursive: true, force: true });
+  });
 
   writeFixture(fixtureDir, {
     // A top-level function declaration handed to another function as a
@@ -82,7 +83,9 @@ describe('value-reference + shorthand edge resolution', () => {
     `,
   });
   let catalog!: Catalog;
-  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
+  beforeAll(async () => {
+    catalog = await runFixture(fixtureDir);
+  });
 
   it('builds a catalog (sanity)', () => {
     expect(Object.keys(catalog.functions).length).toBeGreaterThan(0);

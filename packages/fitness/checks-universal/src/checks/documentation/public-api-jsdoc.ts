@@ -3,9 +3,9 @@
  * @fileoverview Public API JSDoc check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-import { isInPublicApiSurface } from './_public-api-graph.js'
+import { isInPublicApiSurface } from './_public-api-graph.js';
 
 /**
  * Patterns for exported declarations that should have JSDoc
@@ -16,21 +16,21 @@ const EXPORT_PATTERNS = [
   /^export\s+interface\s+(\w+)/,
   /^export\s+type\s+(\w+)\s*=\s*(?!z\.infer)/,
   /^export\s+const\s+(\w+)\s*=\s*(?:async\s*)?\(/,
-]
+];
 
 /** Re-export barrels don't need JSDoc */
-const REEXPORT_PATTERN = /^export\s+(?:\{|\*\s+from|type\s+\{)/
+const REEXPORT_PATTERN = /^export\s+(?:\{|\*\s+from|type\s+\{)/;
 
 /**
  * Determine the kind of export for messaging
  */
 function getExportKind(line: string): string {
-  if (line.includes('function ')) return 'function'
-  if (line.includes('class ')) return 'class'
-  if (line.includes('interface ')) return 'interface'
-  if (line.includes('type ')) return 'type'
-  if (line.includes('const ')) return 'const'
-  return 'declaration'
+  if (line.includes('function ')) return 'function';
+  if (line.includes('class ')) return 'class';
+  if (line.includes('interface ')) return 'interface';
+  if (line.includes('type ')) return 'type';
+  if (line.includes('const ')) return 'const';
+  return 'declaration';
 }
 
 /**
@@ -50,37 +50,37 @@ function getExportKind(line: string): string {
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Inherent complexity: line-by-line export pattern matching with preceding JSDoc detection and re-export filtering
 function analyzeJsdoc(content: string, filePath: string): CheckViolation[] {
-  if (!isInPublicApiSurface(filePath)) return []
+  if (!isInPublicApiSurface(filePath)) return [];
 
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
-    const trimmed = line.trim()
+    const line = lines[i] ?? '';
+    const trimmed = line.trim();
 
     // Skip re-exports (they inherit docs from the source)
-    if (REEXPORT_PATTERN.test(trimmed)) continue
+    if (REEXPORT_PATTERN.test(trimmed)) continue;
 
     // Check if this line is an export declaration
     for (const pattern of EXPORT_PATTERNS) {
-      const match = pattern.exec(trimmed)
-      if (!match?.[1]) continue
+      const match = pattern.exec(trimmed);
+      if (!match?.[1]) continue;
 
-      const exportName = match[1]
+      const exportName = match[1];
 
       // Look backward for JSDoc comment (/** ... */)
-      let hasJsdoc = false
+      let hasJsdoc = false;
       for (let j = i - 1; j >= Math.max(0, i - 15); j--) {
-        const prevLine = (lines[j] ?? '').trim()
-        if (prevLine === '') continue // skip blank lines
+        const prevLine = (lines[j] ?? '').trim();
+        if (prevLine === '') continue; // skip blank lines
         if (prevLine.endsWith('*/')) {
-          hasJsdoc = true
-          break
+          hasJsdoc = true;
+          break;
         }
-        if (prevLine.startsWith('//')) continue // skip single-line comments
-        if (prevLine.startsWith('*')) continue // inside JSDoc block
-        break // non-comment, non-blank line means no JSDoc
+        if (prevLine.startsWith('//')) continue; // skip single-line comments
+        if (prevLine.startsWith('*')) continue; // inside JSDoc block
+        break; // non-comment, non-blank line means no JSDoc
       }
 
       if (!hasJsdoc) {
@@ -91,13 +91,13 @@ function analyzeJsdoc(content: string, filePath: string): CheckViolation[] {
           suggestion: `Add a /** ... */ JSDoc comment describing the purpose of '${exportName}'`,
           type: 'missing-jsdoc',
           match: trimmed.slice(0, 120),
-        })
+        });
       }
-      break // Only match first pattern per line
+      break; // Only match first pattern per line
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -132,4 +132,4 @@ export const publicApiJsdoc = defineCheck({
   tags: ['documentation', 'api', 'quality'],
   fileTypes: ['ts'],
   analyze: analyzeJsdoc,
-})
+});

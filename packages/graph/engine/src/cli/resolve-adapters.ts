@@ -30,9 +30,7 @@ export function resolveAdaptersForRun(
     const canonical = registry.canonicalize(opts.language) ?? opts.language;
     const adapter = registry.get(canonical);
     if (!adapter) {
-      throw new ConfigurationError(
-        `--language '${opts.language}' is not a registered adapter.`,
-      );
+      throw new ConfigurationError(`--language '${opts.language}' is not a registered adapter.`);
     }
     return [adapter];
   }

@@ -26,7 +26,10 @@ import {
 } from './framework/registry.js';
 import { simReplayFromSession } from './persistence/session-replay.js';
 import { SIM_PLUGIN_LAYOUT } from './plugins/loader.js';
-import { createSimulationRecipeRegistry, currentSimulationRecipeRegistry } from './recipes/registry.js';
+import {
+  createSimulationRecipeRegistry,
+  currentSimulationRecipeRegistry,
+} from './recipes/registry.js';
 // Side-effect import: ensures the RunScope.simulation augmentation is
 // loaded so `scope.simulation` is the correctly-typed slot here.
 import './scope-augmentation.js';
@@ -43,7 +46,6 @@ import type {
 } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
-
 const SIM: ToolCommandDescriptor = {
   name: 'sim',
   description: 'Run simulation scenarios [experimental]',
@@ -51,7 +53,8 @@ const SIM: ToolCommandDescriptor = {
 
 const SIM_RUN_WORKER: ToolCommandDescriptor = {
   name: 'sim-run-worker',
-  description: '[internal] Run sim headless and stream progress + result over IPC (forked by the live view)',
+  description:
+    '[internal] Run sim headless and stream progress + result over IPC (forked by the live view)',
 };
 
 // Live-view key — matches the `sim` subcommand name so the dispatcher's
@@ -172,7 +175,12 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
 async function runSimShowMode(opts: SimOptions, cli: ToolCliContext): Promise<void> {
   const datastore = cli.scope.datastore() as DataStore | undefined;
   if (datastore === undefined) {
-    await emitSimShowError(opts, cli, 'datastore-unavailable', 'session replay requires a datastore');
+    await emitSimShowError(
+      opts,
+      cli,
+      'datastore-unavailable',
+      'session replay requires a datastore',
+    );
     return;
   }
   const resolved = resolveSession(datastore, { ref: opts.show ?? 'latest', tool: 'sim' });
@@ -281,7 +289,11 @@ const simCommand: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, 
   // (per-scenario detail). `cwd` is seeded with process.cwd() by the mounter.
   commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
   options: [
-    { flag: '--recipe', value: '<name>', description: 'Run a named sim recipe (default: built-in `default`)' },
+    {
+      flag: '--recipe',
+      value: '<name>',
+      description: 'Run a named sim recipe (default: built-in `default`)',
+    },
     {
       flag: '--show',
       value: '<session>',

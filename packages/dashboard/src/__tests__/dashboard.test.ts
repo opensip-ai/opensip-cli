@@ -94,7 +94,9 @@ describe('generateDashboardHtml', () => {
     });
     // The escaped form must be present; the raw form must NOT appear inside
     // the EDITOR_PROTOCOL constant assignment.
-    const literalLine = html.split('\n').find(line => line.startsWith('const EDITOR_PROTOCOL = '));
+    const literalLine = html
+      .split('\n')
+      .find((line) => line.startsWith('const EDITOR_PROTOCOL = '));
     expect(literalLine).toBeDefined();
     expect(literalLine ?? '').not.toContain('</script>');
     // The escape function rewrites `<` to the JS Unicode escape `<`,

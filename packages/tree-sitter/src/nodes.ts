@@ -8,7 +8,7 @@
  * `lang-*` package.
  */
 
-import type { Node } from 'web-tree-sitter'
+import type { Node } from 'web-tree-sitter';
 
 /**
  * Read the text of a node's `name` field, or `null` when absent. Every
@@ -16,8 +16,8 @@ import type { Node } from 'web-tree-sitter'
  * class / impl nodes.
  */
 export function nameOf(node: Node): string | null {
-  const name = node.childForFieldName('name')
-  return name ? name.text : null
+  const name = node.childForFieldName('name');
+  return name ? name.text : null;
 }
 
 /**
@@ -27,27 +27,27 @@ export function nameOf(node: Node): string | null {
  * always populated, but we filter once here so consumers get a clean `Node[]`.
  */
 export function childrenOf(node: Node): Node[] {
-  return node.children.filter((c): c is Node => c !== null)
+  return node.children.filter((c): c is Node => c !== null);
 }
 
 /** `node.namedChildren` with the nulls removed. See {@link childrenOf}. */
 export function namedChildrenOf(node: Node): Node[] {
-  return node.namedChildren.filter((c): c is Node => c !== null)
+  return node.namedChildren.filter((c): c is Node => c !== null);
 }
 
 /** The node's source text. */
 export function nodeText(node: Node): string {
-  return node.text
+  return node.text;
 }
 
 /** 1-based line number of the node's start. */
 export function getLineNumber(node: Node): number {
-  return node.startPosition.row + 1
+  return node.startPosition.row + 1;
 }
 
 /** 0-based column of the node's start. */
 export function getColumn(node: Node): number {
-  return node.startPosition.column
+  return node.startPosition.column;
 }
 
 /**
@@ -57,8 +57,8 @@ export function getColumn(node: Node): number {
  */
 export function walkNodes(root: Node, visitor: (node: Node) => void): void {
   for (const child of namedChildrenOf(root)) {
-    visitor(child)
-    walkNodes(child, visitor)
+    visitor(child);
+    walkNodes(child, visitor);
   }
 }
 
@@ -69,10 +69,10 @@ export function walkNodes(root: Node, visitor: (node: Node) => void): void {
  * this with a node-kind predicate.
  */
 export function findEnclosing(node: Node, predicate: (n: Node) => boolean): Node | null {
-  let current: Node | null = node.parent
+  let current: Node | null = node.parent;
   while (current) {
-    if (predicate(current)) return current
-    current = current.parent
+    if (predicate(current)) return current;
+    current = current.parent;
   }
-  return null
+  return null;
 }

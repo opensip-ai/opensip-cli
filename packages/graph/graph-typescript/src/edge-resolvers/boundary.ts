@@ -17,7 +17,6 @@
  * cross-shard edge.
  */
 
-
 import { relative, sep } from 'node:path';
 
 import { isReturnValueDiscarded } from '../edges.js';

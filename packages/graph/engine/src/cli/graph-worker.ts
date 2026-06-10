@@ -21,7 +21,12 @@
 
 import { readFileSync } from 'node:fs';
 
-import { defineCommand, type CommandSpec, type ToolCliContext, type WorkerMessage } from '@opensip-tools/core';
+import {
+  defineCommand,
+  type CommandSpec,
+  type ToolCliContext,
+  type WorkerMessage,
+} from '@opensip-tools/core';
 
 import { resolveRecipeToRules } from '../recipes/resolve.js';
 
@@ -54,7 +59,9 @@ export async function executeGraphWorker(specPath: string, cli: ToolCliContext):
     const args = JSON.parse(readFileSync(specPath, 'utf8')) as GraphWorkerSpec;
     const config = loadGraphConfig(args.cwd);
     const recipeSelection = resolveGraphRecipeSelection(args.cwd, args.recipe);
-    const rules = resolveRecipeToRules(recipeSelection.name, { tolerant: recipeSelection.tolerant });
+    const rules = resolveRecipeToRules(recipeSelection.name, {
+      tolerant: recipeSelection.tolerant,
+    });
     const result = await runGraph({
       cwd: args.cwd,
       noCache: args.noCache,
@@ -84,9 +91,13 @@ export async function executeGraphWorker(specPath: string, cli: ToolCliContext):
 }
 
 /** `graph-run-worker` — [internal] headless graph build, IPC progress/result. */
-export const graphRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const graphRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'graph-run-worker',
-  description: '[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)',
+  description:
+    '[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)',
   commonFlags: [],
   args: [{ name: 'specPath', description: 'Path to a JSON graph build-spec file' }],
   scope: 'project',

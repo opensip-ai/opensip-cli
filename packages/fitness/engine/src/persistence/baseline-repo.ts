@@ -47,7 +47,11 @@ export class FitBaselineRepo {
   /** Load the SARIF baseline. Returns `null` if no row is present. */
   load(): unknown {
     try {
-      const row = this.datastore.db.select().from(fitBaseline).where(sql`id = 1`).get();
+      const row = this.datastore.db
+        .select()
+        .from(fitBaseline)
+        .where(sql`id = 1`)
+        .get();
       if (!row) {
         logger.info({
           evt: 'fit.baseline.load.miss',
@@ -75,7 +79,12 @@ export class FitBaselineRepo {
 
   /** True iff a baseline row exists. */
   exists(): boolean {
-    const row = this.datastore.db.select().from(fitBaseline).where(sql`id = 1`).limit(1).get();
+    const row = this.datastore.db
+      .select()
+      .from(fitBaseline)
+      .where(sql`id = 1`)
+      .limit(1)
+      .get();
     return row !== undefined;
   }
 }

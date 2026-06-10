@@ -2,16 +2,16 @@
  * @fileoverview No hardcoded timeouts check
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness';
 
 import {
   isDigit,
   isAlphanumericChar,
   skipWhitespace,
   parseDigits,
-} from './_helpers/config-validation.js'
+} from './_helpers/config-validation.js';
 
 // =============================================================================
 // CONSTANTS
@@ -21,7 +21,7 @@ import {
  * Minimum timeout to flag (5000ms = 5 seconds)
  */
 // @fitness-ignore-next-line no-hardcoded-timeouts -- constant defined at module scope for check threshold configuration
-const MIN_FLAGGABLE_TIMEOUT = 5000
+const MIN_FLAGGABLE_TIMEOUT = 5000;
 
 // =============================================================================
 // TIMEOUT EXTRACTION
@@ -34,24 +34,24 @@ function findSetTimeoutComma(str: string, startPos: number): number {
   logger.debug({
     evt: 'fitness.checks.no_hardcoded_timeouts.find_set_timeout_comma',
     msg: 'Finding comma separator after setTimeout callback',
-  })
-  let i = startPos
-  let parenDepth = 1
+  });
+  let i = startPos;
+  let parenDepth = 1;
 
   while (i < str.length && parenDepth > 0) {
     if (str[i] === '(') {
-      parenDepth++
+      parenDepth++;
     } else if (str[i] === ')') {
-      parenDepth--
+      parenDepth--;
     } else if (str[i] === ',' && parenDepth === 1) {
-      break
+      break;
     } else {
       // Other characters - continue scanning
     }
-    i++
+    i++;
   }
 
-  return i
+  return i;
 }
 
 /* v8 ignore start -- timeout extraction state machines; many parser-state branches covered indirectly */
@@ -62,39 +62,39 @@ function extractSetTimeoutValue(line: string): { timeout: number; matchText: str
   logger.debug({
     evt: 'fitness.checks.no_hardcoded_timeouts.extract_set_timeout_value',
     msg: 'Extracting setTimeout value from line',
-  })
-  const idx = line.indexOf('setTimeout')
-  if (idx === -1) return null
+  });
+  const idx = line.indexOf('setTimeout');
+  if (idx === -1) return null;
 
-  const afterSetTimeout = line.slice(Math.max(0, idx + 10))
-  let i = skipWhitespace(afterSetTimeout, 0)
+  const afterSetTimeout = line.slice(Math.max(0, idx + 10));
+  let i = skipWhitespace(afterSetTimeout, 0);
 
   // Expect (
-  if (afterSetTimeout[i] !== '(') return null
-  i++
+  if (afterSetTimeout[i] !== '(') return null;
+  i++;
 
   // Find the comma (skip over the callback argument)
-  i = findSetTimeoutComma(afterSetTimeout, i)
-  if (afterSetTimeout[i] !== ',') return null
-  i++
+  i = findSetTimeoutComma(afterSetTimeout, i);
+  if (afterSetTimeout[i] !== ',') return null;
+  i++;
 
   // Skip whitespace
-  i = skipWhitespace(afterSetTimeout, i)
+  i = skipWhitespace(afterSetTimeout, i);
 
   // Parse the timeout number (4+ digits)
-  const { endPos, value: timeout, digitCount } = parseDigits(afterSetTimeout, i)
-  i = endPos
-  if (digitCount < 4) return null
+  const { endPos, value: timeout, digitCount } = parseDigits(afterSetTimeout, i);
+  i = endPos;
+  if (digitCount < 4) return null;
 
   // Skip whitespace and expect )
-  i = skipWhitespace(afterSetTimeout, i)
-  if (afterSetTimeout[i] !== ')') return null
-  i++
+  i = skipWhitespace(afterSetTimeout, i);
+  if (afterSetTimeout[i] !== ')') return null;
+  i++;
 
   return {
     timeout,
     matchText: `setTimeout${afterSetTimeout.slice(0, Math.max(0, i))}`,
-  }
+  };
 }
 
 /**
@@ -104,53 +104,53 @@ function extractTimeoutAssignment(line: string): { timeout: number; matchText: s
   logger.debug({
     evt: 'fitness.checks.no_hardcoded_timeouts.extract_timeout_assignment',
     msg: 'Extracting timeout assignment value from line',
-  })
-  const lowerLine = line.toLowerCase()
-  const idx = lowerLine.indexOf('timeout')
-  if (idx === -1) return null
+  });
+  const lowerLine = line.toLowerCase();
+  const idx = lowerLine.indexOf('timeout');
+  if (idx === -1) return null;
 
   // Skip if this is setTimeout (handled separately)
-  if (idx >= 3 && lowerLine.slice(idx - 3, idx) === 'set') return null
+  if (idx >= 3 && lowerLine.slice(idx - 3, idx) === 'set') return null;
 
-  const afterTimeout = line.slice(Math.max(0, idx + 7))
-  let i = 0
+  const afterTimeout = line.slice(Math.max(0, idx + 7));
+  let i = 0;
 
   // Skip whitespace
   while (i < afterTimeout.length && (afterTimeout[i] === ' ' || afterTimeout[i] === '\t')) {
-    i++
+    i++;
   }
 
   // Check for = or :
   if (afterTimeout[i] !== '=' && afterTimeout[i] !== ':') {
-    return null
+    return null;
   }
-  i++
+  i++;
 
   // Skip whitespace
   while (i < afterTimeout.length && (afterTimeout[i] === ' ' || afterTimeout[i] === '\t')) {
-    i++
+    i++;
   }
 
   // Parse the timeout number (4+ digits)
-  const digitStart = i
+  const digitStart = i;
   while (i < afterTimeout.length && isDigit(afterTimeout[i])) {
-    i++
+    i++;
   }
 
-  const digitCount = i - digitStart
-  if (digitCount < 4) return null
+  const digitCount = i - digitStart;
+  if (digitCount < 4) return null;
 
   // Word boundary check
   if (i < afterTimeout.length && isAlphanumericChar(afterTimeout[i])) {
-    return null
+    return null;
   }
 
   // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by isDigit loop above
-  const timeout = Number.parseInt(afterTimeout.slice(digitStart, i), 10)
+  const timeout = Number.parseInt(afterTimeout.slice(digitStart, i), 10);
   return {
     timeout,
     matchText: `timeout${afterTimeout.slice(0, Math.max(0, i))}`,
-  }
+  };
 }
 
 /**
@@ -160,59 +160,59 @@ function extractDotTimeout(line: string): { timeout: number; matchText: string }
   logger.debug({
     evt: 'fitness.checks.no_hardcoded_timeouts.extract_dot_timeout',
     msg: 'Extracting .timeout() value from line',
-  })
-  const idx = line.indexOf('.timeout')
-  if (idx === -1) return null
+  });
+  const idx = line.indexOf('.timeout');
+  if (idx === -1) return null;
 
-  const afterDotTimeout = line.slice(Math.max(0, idx + 8))
-  let i = 0
+  const afterDotTimeout = line.slice(Math.max(0, idx + 8));
+  let i = 0;
 
   // Skip whitespace
   while (
     i < afterDotTimeout.length &&
     (afterDotTimeout[i] === ' ' || afterDotTimeout[i] === '\t')
   ) {
-    i++
+    i++;
   }
 
   // Expect (
-  if (afterDotTimeout[i] !== '(') return null
-  i++
+  if (afterDotTimeout[i] !== '(') return null;
+  i++;
 
   // Skip whitespace
   while (
     i < afterDotTimeout.length &&
     (afterDotTimeout[i] === ' ' || afterDotTimeout[i] === '\t')
   ) {
-    i++
+    i++;
   }
 
   // Parse the timeout number (4+ digits)
-  const digitStart = i
+  const digitStart = i;
   while (i < afterDotTimeout.length && isDigit(afterDotTimeout[i])) {
-    i++
+    i++;
   }
 
-  const digitCount = i - digitStart
-  if (digitCount < 4) return null
+  const digitCount = i - digitStart;
+  if (digitCount < 4) return null;
 
   // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by isDigit loop above
-  const timeout = Number.parseInt(afterDotTimeout.slice(digitStart, i), 10)
+  const timeout = Number.parseInt(afterDotTimeout.slice(digitStart, i), 10);
 
   // Skip whitespace and expect )
   while (
     i < afterDotTimeout.length &&
     (afterDotTimeout[i] === ' ' || afterDotTimeout[i] === '\t')
   ) {
-    i++
+    i++;
   }
-  if (afterDotTimeout[i] !== ')') return null
-  i++
+  if (afterDotTimeout[i] !== ')') return null;
+  i++;
 
   return {
     timeout,
     matchText: `.timeout${afterDotTimeout.slice(0, Math.max(0, i))}`,
-  }
+  };
 }
 /* v8 ignore stop */
 
@@ -223,20 +223,20 @@ function extractTimeoutFromLine(line: string): { timeout: number; matchText: str
   logger.debug({
     evt: 'fitness.checks.no_hardcoded_timeouts.extract_timeout_from_line',
     msg: 'Extracting timeout value from line',
-  })
+  });
   // Check for setTimeout(fn, NUMBER)
-  const setTimeoutMatch = extractSetTimeoutValue(line)
-  if (setTimeoutMatch) return setTimeoutMatch
+  const setTimeoutMatch = extractSetTimeoutValue(line);
+  if (setTimeoutMatch) return setTimeoutMatch;
 
   // Check for timeout = NUMBER or timeout: NUMBER
-  const timeoutAssignMatch = extractTimeoutAssignment(line)
-  if (timeoutAssignMatch) return timeoutAssignMatch
+  const timeoutAssignMatch = extractTimeoutAssignment(line);
+  if (timeoutAssignMatch) return timeoutAssignMatch;
 
   // Check for .timeout(NUMBER)
-  const dotTimeoutMatch = extractDotTimeout(line)
-  if (dotTimeoutMatch) return dotTimeoutMatch
+  const dotTimeoutMatch = extractDotTimeout(line);
+  if (dotTimeoutMatch) return dotTimeoutMatch;
 
-  return null
+  return null;
 }
 
 // =============================================================================
@@ -250,11 +250,11 @@ function shouldSkipTimeoutLine(line: string | undefined): boolean {
   logger.debug({
     evt: 'fitness.checks.no_hardcoded_timeouts.should_skip_timeout_line',
     msg: 'Checking if line should be skipped for timeout checking',
-  })
+  });
   /* v8 ignore next -- defensive: lines.entries() never yields undefined */
-  if (!line) return true
-  const trimmed = line.trim()
-  return trimmed.startsWith('//') || trimmed.startsWith('*')
+  if (!line) return true;
+  const trimmed = line.trim();
+  return trimmed.startsWith('//') || trimmed.startsWith('*');
 }
 
 // =============================================================================
@@ -290,31 +290,31 @@ export const noHardcodedTimeouts = defineCheck({
 
   analyze(content: string, filePath: string): CheckViolation[] {
     // Skip test files — hardcoded timeouts in tests are low-risk
-    if (isTestFile(filePath)) return []
+    if (isTestFile(filePath)) return [];
 
     logger.debug({
       evt: 'fitness.checks.no_hardcoded_timeouts.analyze',
       msg: 'Analyzing file for hardcoded timeout values',
-    })
-    const violations: CheckViolation[] = []
+    });
+    const violations: CheckViolation[] = [];
 
     // Skip files that don't have timeout patterns (strip strings/comments to avoid false positives)
-    const strippedContent = stripStringsAndComments(content)
+    const strippedContent = stripStringsAndComments(content);
     if (!strippedContent.includes('timeout') && !strippedContent.includes('setTimeout')) {
-      return violations
+      return violations;
     }
 
-    const lines = content.split('\n')
+    const lines = content.split('\n');
     for (const [i, line] of lines.entries()) {
       if (!line || shouldSkipTimeoutLine(line)) {
-        continue
+        continue;
       }
 
-      const strippedLine = stripStringLiterals(line)
-      const result = extractTimeoutFromLine(strippedLine)
-      if (!result || result.timeout < MIN_FLAGGABLE_TIMEOUT) continue
+      const strippedLine = stripStringLiterals(line);
+      const result = extractTimeoutFromLine(strippedLine);
+      if (!result || result.timeout < MIN_FLAGGABLE_TIMEOUT) continue;
 
-      const lineNumber = i + 1
+      const lineNumber = i + 1;
       violations.push({
         line: lineNumber,
         column: 0,
@@ -325,9 +325,9 @@ export const noHardcodedTimeouts = defineCheck({
         match: result.matchText,
         type: 'hardcoded-timeout',
         filePath,
-      })
+      });
     }
 
-    return violations
+    return violations;
   },
-})
+});

@@ -15,16 +15,16 @@
  * adapter's own top-level `await loadGrammar(<wasm>)`.
  */
 
-import { Parser, Language, type Tree } from 'web-tree-sitter'
+import { Parser, Language, type Tree } from 'web-tree-sitter';
 
 // One-time WASM runtime init. Top-level await — every consumer statically
 // imports this module — guarantees the runtime is ready before any adapter's
 // `loadGrammar(<wasm>)` (which also runs at module top level).
-await Parser.init()
+await Parser.init();
 
 /** Load a tree-sitter grammar from a `.wasm` path (adapter module top level). */
 export async function loadGrammar(wasmPath: string): Promise<Language> {
-  return Language.load(wasmPath)
+  return Language.load(wasmPath);
 }
 
 /**
@@ -34,9 +34,9 @@ export async function loadGrammar(wasmPath: string): Promise<Language> {
  * trees with no per-call allocation.
  */
 export function createParser(grammar: Language): Parser {
-  const parser = new Parser()
-  parser.setLanguage(grammar)
-  return parser
+  const parser = new Parser();
+  parser.setLanguage(grammar);
+  return parser;
 }
 
 /**
@@ -48,5 +48,5 @@ export function createParser(grammar: Language): Parser {
  * propagates to the caller's project loop, which records a `ParseError`.
  */
 export function parseToTree(parser: Parser, source: string): Tree | null {
-  return parser.parse(source)
+  return parser.parse(source);
 }

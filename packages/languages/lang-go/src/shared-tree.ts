@@ -6,13 +6,13 @@
  * is parsed once; falls back to a direct parse when no cache is active.
  */
 
-import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js'
+import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js';
 
-import { goAdapter } from './adapter.js'
+import { goAdapter } from './adapter.js';
 
-import type { GoTree } from './parse.js'
+import type { GoTree } from './parse.js';
 
 /** Returns the shared (cached) Go parse tree for `filePath`, or null when unparseable. */
 export function getSharedTree(filePath: string, content: string): GoTree | null {
-  return getParseTree(goAdapter, filePath, content)
+  return getParseTree(goAdapter, filePath, content);
 }

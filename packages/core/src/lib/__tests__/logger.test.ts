@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,10 +22,10 @@ describe('logger', () => {
     // Reset the singleton to defaults before each test. T1 Item C
     // collapsed the four prior free mutators into `configureLogger`.
     configureLogger({ silent: false, debugMode: false, runId: '' });
-    vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
       stderrCalls.push(String(chunk));
       return true;
-    }));
+    });
   });
 
   afterEach(() => {
@@ -44,8 +52,8 @@ describe('logger', () => {
       warnOnly.info('i');
 
       const calls = stderrCalls;
-      const debugCalls = calls.filter(c => c.includes('"level":"debug"'));
-      const infoCalls = calls.filter(c => c.includes('"level":"info"'));
+      const debugCalls = calls.filter((c) => c.includes('"level":"debug"'));
+      const infoCalls = calls.filter((c) => c.includes('"level":"info"'));
       expect(debugCalls).toHaveLength(0);
       expect(infoCalls).toHaveLength(0);
       // Reference `fresh` so it's not an unused declaration.
@@ -60,10 +68,10 @@ describe('logger', () => {
       logger.error('e');
 
       const calls = stderrCalls;
-      expect(calls.some(c => c.includes('"level":"debug"'))).toBe(true);
-      expect(calls.some(c => c.includes('"level":"info"'))).toBe(true);
-      expect(calls.some(c => c.includes('"level":"warn"'))).toBe(true);
-      expect(calls.some(c => c.includes('"level":"error"'))).toBe(true);
+      expect(calls.some((c) => c.includes('"level":"debug"'))).toBe(true);
+      expect(calls.some((c) => c.includes('"level":"info"'))).toBe(true);
+      expect(calls.some((c) => c.includes('"level":"warn"'))).toBe(true);
+      expect(calls.some((c) => c.includes('"level":"error"'))).toBe(true);
     });
   });
 
@@ -86,8 +94,8 @@ describe('logger', () => {
       logger.debug('audible');
 
       const calls = stderrCalls;
-      expect(calls.some(c => c.includes('"msg":"audible"'))).toBe(true);
-      expect(calls.some(c => c.includes('"msg":"silent"'))).toBe(false);
+      expect(calls.some((c) => c.includes('"msg":"audible"'))).toBe(true);
+      expect(calls.some((c) => c.includes('"msg":"silent"'))).toBe(false);
     });
   });
 
@@ -158,8 +166,8 @@ describe('logger', () => {
       configureLogger({ debugMode: true, runId: 'RUN_xyz' });
       logger.info({ evt: 'runid.check' });
       const matched = stderrCalls
-        .map(c => JSON.parse(c.trim()) as { evt?: string; runId?: string })
-        .find(e => e.evt === 'runid.check');
+        .map((c) => JSON.parse(c.trim()) as { evt?: string; runId?: string })
+        .find((e) => e.evt === 'runid.check');
       expect(matched?.runId).toBe('RUN_xyz');
     });
   });
@@ -168,7 +176,6 @@ describe('logger', () => {
     let tempDir: string;
 
     beforeEach(() => {
-       
       tempDir = mkdtempSync(join(tmpdir(), 'opensip-logger-'));
     });
 
@@ -259,7 +266,6 @@ describe('logger', () => {
     let tempDir: string;
 
     beforeEach(() => {
-       
       tempDir = mkdtempSync(join(tmpdir(), 'opensip-logger-err-'));
     });
 
@@ -321,7 +327,7 @@ describe('logger', () => {
       expect(readFileSync(filePath, 'utf8')).toContain('fresh-only');
     });
 
-    it('fresh instances do not see each other\'s state', () => {
+    it("fresh instances do not see each other's state", () => {
       const a = new LoggerImpl();
       const b = new LoggerImpl();
       a.setRunId('a');
@@ -338,8 +344,8 @@ describe('logger', () => {
       expect(logger).toBeInstanceOf(LoggerImpl);
       logger.info({ evt: 'singleton.runid.probe' });
       const matched = stderrCalls
-        .map(c => JSON.parse(c.trim()) as { evt?: string; runId?: string })
-        .find(e => e.evt === 'singleton.runid.probe');
+        .map((c) => JSON.parse(c.trim()) as { evt?: string; runId?: string })
+        .find((e) => e.evt === 'singleton.runid.probe');
       expect(matched?.runId).toBe('SINGLETON');
     });
   });

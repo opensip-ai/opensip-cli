@@ -11,15 +11,15 @@
  * knowing which language a file is in.
  */
 
-import { logger } from '../lib/logger.js'
-import { currentScope } from '../lib/run-scope.js'
+import { logger } from '../lib/logger.js';
+import { currentScope } from '../lib/run-scope.js';
 
 /**
  * One-shot guard so the degradation warning fires at most once per process.
  * The condition is process-global (a missing scope or duplicate core affects
  * every subsequent call identically), so repeating the warning adds only noise.
  */
-let warnedFilterDegraded = false
+let warnedFilterDegraded = false;
 
 /**
  * Test-only reset of the one-shot degradation-warning guard. Production never
@@ -27,7 +27,7 @@ let warnedFilterDegraded = false
  * regardless of cross-test ordering.
  */
 export function resetContentFilterWarningForTests(): void {
-  warnedFilterDegraded = false
+  warnedFilterDegraded = false;
 }
 
 /**
@@ -36,11 +36,7 @@ export function resetContentFilterWarningForTests(): void {
  *  - 'strip-strings': string literal content replaced with whitespace
  *  - 'strip-strings-and-comments': both string literals and comments replaced
  */
-export type ContentFilterMode =
-  | 'strip-strings'
-  | 'strip-strings-and-comments'
-  | 'none'
-  | 'raw'
+export type ContentFilterMode = 'strip-strings' | 'strip-strings-and-comments' | 'none' | 'raw';
 
 /**
  * Apply a content filter to file content, dispatching to the
@@ -56,9 +52,9 @@ export function applyContentFilter(
   content: string,
   mode: ContentFilterMode,
 ): string {
-  if (mode === 'none' || mode === 'raw') return content
+  if (mode === 'none' || mode === 'raw') return content;
 
-  const scope = currentScope()
+  const scope = currentScope();
   if (!scope) {
     // No active RunScope at all. Two cases land here:
     //   1. A unit test calling `check.run` directly (documented, benign).
@@ -73,25 +69,23 @@ export function applyContentFilter(
     // degradation is observable instead of mysterious. (Case 2 is also
     // refused outright at pack-load time; see discovery's single-core guard.)
     if (!warnedFilterDegraded) {
-      warnedFilterDegraded = true
+      warnedFilterDegraded = true;
       logger.warn('content filter degraded to raw — no active run scope', {
         evt: 'core.content_filter.degraded',
         module: 'core:content-filter',
         mode,
         hint: 'A check requested string/comment stripping but no RunScope is active. If you are running a globally-installed opensip-tools inside a project that also installs @opensip-tools packages, duplicate core instances split the scope — prefer the project-local CLI (e.g. `pnpm fit`). Results may contain false positives.',
-      })
+      });
     }
-    return content
+    return content;
   }
 
-  const adapter = scope.languages.forFile(filePath)
+  const adapter = scope.languages.forFile(filePath);
   if (!adapter) {
     // Scope is present but no adapter owns this extension — a genuinely
     // unknown language (JSON/YAML/plain text). Returning raw is correct and
     // expected here, so this path stays silent.
-    return content
+    return content;
   }
-  return mode === 'strip-strings'
-    ? adapter.stripStrings(content)
-    : adapter.stripComments(content)
+  return mode === 'strip-strings' ? adapter.stripStrings(content) : adapter.stripComments(content);
 }

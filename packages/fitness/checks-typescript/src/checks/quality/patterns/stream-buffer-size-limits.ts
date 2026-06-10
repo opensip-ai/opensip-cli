@@ -6,10 +6,9 @@
  * These patterns can lead to DoS vulnerabilities when processing untrusted input.
  */
 
-
-import { defineCheck, stripStringsAndComments, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, stripStringsAndComments, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /** Patterns that indicate bounded buffer usage */
 const BOUNDED_PATTERNS = [
@@ -32,54 +31,54 @@ const BOUNDED_PATTERNS = [
   /for\s*\([^)]{0,200}<\s*[A-Za-z_$][\w$.]{0,80}\.length\s*;[^)]{0,80}\+=\s*(?:[A-Z][A-Z0-9_]{1,80}|\d{1,8})/,
   // Named chunk-size constants are themselves a strong bounded signal.
   /\b(?:MAX_ROWS_PER_\w+|BATCH_SIZE|CHUNK_SIZE|PAGE_SIZE|MAX_BATCH|MAX_CHUNK|MAX_PAGE)\b/,
-]
+];
 
 /** Quick filter keywords */
-const QUICK_FILTER = ['Buffer', 'chunks', 'stream']
+const QUICK_FILTER = ['Buffer', 'chunks', 'stream'];
 
 interface CallExpressionContext {
-  node: ts.CallExpression
-  sourceFile: ts.SourceFile
-  content: string
+  node: ts.CallExpression;
+  sourceFile: ts.SourceFile;
+  content: string;
 }
 
 /**
  * Get surrounding context for a line (50 lines before and after)
  */
 function getSurroundingContext(content: string, line: number): string {
-  const lines = content.split('\n')
+  const lines = content.split('\n');
   /* v8 ignore next -- defensive non-negative guard */
-  const start = Math.max(0, line - 50)
-  const end = Math.min(lines.length, line + 50)
-  return lines.slice(start, end).join('\n')
+  const start = Math.max(0, line - 50);
+  const end = Math.min(lines.length, line + 50);
+  return lines.slice(start, end).join('\n');
 }
 
 /**
  * Check if context has bounded patterns
  */
 function hasBoundedPattern(context: string): boolean {
-  return BOUNDED_PATTERNS.some((p) => p.test(context))
+  return BOUNDED_PATTERNS.some((p) => p.test(context));
 }
 
 /**
  * Check Buffer.concat call for size limit guards
  */
 function checkBufferConcat(ctx: CallExpressionContext): CheckViolation | null {
-  const { node, sourceFile, content } = ctx
-  const callText = node.getText(sourceFile)
+  const { node, sourceFile, content } = ctx;
+  const callText = node.getText(sourceFile);
 
   if (!callText.includes('Buffer.concat')) {
-    return null
+    return null;
   }
 
-  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const context = getSurroundingContext(content, line)
+  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+  const context = getSurroundingContext(content, line);
 
   if (hasBoundedPattern(context)) {
-    return null
+    return null;
   }
 
-  const lineNum = line + 1
+  const lineNum = line + 1;
 
   return {
     line: lineNum,
@@ -89,38 +88,37 @@ function checkBufferConcat(ctx: CallExpressionContext): CheckViolation | null {
     suggestion:
       'Add a size limit check before Buffer.concat: track totalSize as chunks are pushed, and throw an error if totalSize exceeds MAX_SIZE (e.g., 10MB)',
     match: callText.slice(0, 50),
-  }
+  };
 }
 
 /**
  * Check unbounded push to chunk arrays
  */
 function checkUnboundedPush(ctx: CallExpressionContext): CheckViolation | null {
-  const { node, sourceFile, content } = ctx
+  const { node, sourceFile, content } = ctx;
 
   if (!ts.isPropertyAccessExpression(node.expression)) {
-    return null
+    return null;
   }
 
-  const methodName = node.expression.name.getText(sourceFile)
-  const objectName = node.expression.expression.getText(sourceFile)
+  const methodName = node.expression.name.getText(sourceFile);
+  const objectName = node.expression.expression.getText(sourceFile);
   const isChunkPush =
-    methodName === 'push' &&
-    /^(?:chunks?|buffers?|dataChunks?|dataBuffers?)$/.test(objectName)
+    methodName === 'push' && /^(?:chunks?|buffers?|dataChunks?|dataBuffers?)$/.test(objectName);
 
   if (!isChunkPush) {
-    return null
+    return null;
   }
 
-  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const context = getSurroundingContext(content, line)
+  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+  const context = getSurroundingContext(content, line);
 
   if (hasBoundedPattern(context)) {
-    return null
+    return null;
   }
 
-  const callText = node.getText(sourceFile)
-  const lineNum = line + 1
+  const callText = node.getText(sourceFile);
+  const lineNum = line + 1;
 
   return {
     line: lineNum,
@@ -129,7 +127,7 @@ function checkUnboundedPush(ctx: CallExpressionContext): CheckViolation | null {
     severity: 'warning',
     suggestion: `Add a size check before pushing: if (totalSize + chunk.length > MAX_SIZE) throw new Error('Size limit exceeded'); then track totalSize += chunk.length`,
     match: callText.slice(0, 50),
-  }
+  };
 }
 
 /**
@@ -161,16 +159,16 @@ export const streamBufferSizeLimits = defineCheck({
 
   analyze(content, filePath) {
     // Quick filter
-    const strippedContent = stripStringsAndComments(content)
+    const strippedContent = stripStringsAndComments(content);
     if (!QUICK_FILTER.some((kw) => strippedContent.includes(kw))) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
-    const sourceFile = getSharedSourceFile(filePath, content)
+    const sourceFile = getSharedSourceFile(filePath, content);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
     const visit = (node: ts.Node): void => {
       if (ts.isCallExpression(node)) {
@@ -178,23 +176,23 @@ export const streamBufferSizeLimits = defineCheck({
           node,
           sourceFile,
           content,
-        }
+        };
 
-        const bufferConcatViolation = checkBufferConcat(callCtx)
+        const bufferConcatViolation = checkBufferConcat(callCtx);
         if (bufferConcatViolation) {
-          violations.push(bufferConcatViolation)
+          violations.push(bufferConcatViolation);
         }
 
-        const unboundedPushViolation = checkUnboundedPush(callCtx)
+        const unboundedPushViolation = checkUnboundedPush(callCtx);
         if (unboundedPushViolation) {
-          violations.push(unboundedPushViolation)
+          violations.push(unboundedPushViolation);
         }
       }
 
-      ts.forEachChild(node, visit)
-    }
+      ts.forEachChild(node, visit);
+    };
 
-    visit(sourceFile)
-    return violations
+    visit(sourceFile);
+    return violations;
   },
-})
+});

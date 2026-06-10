@@ -81,11 +81,15 @@ describe('getDisplayName / getIcon read from the scope check registry (no single
     const scopeA = fitnessScope();
     const scopeB = fitnessScope();
     runWithScopeSync(scopeA, () => {
-      const [a] = applyCheckDisplay([stubCheck('shared-slug')], { 'shared-slug': ['🅰️', 'From A'] });
+      const [a] = applyCheckDisplay([stubCheck('shared-slug')], {
+        'shared-slug': ['🅰️', 'From A'],
+      });
       currentCheckRegistry().register(a);
     });
     runWithScopeSync(scopeB, () => {
-      const [b] = applyCheckDisplay([stubCheck('shared-slug')], { 'shared-slug': ['🅱️', 'From B'] });
+      const [b] = applyCheckDisplay([stubCheck('shared-slug')], {
+        'shared-slug': ['🅱️', 'From B'],
+      });
       currentCheckRegistry().register(b);
     });
     // Each scope sees only its own registration — no cross-scope leakage.

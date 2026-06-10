@@ -20,7 +20,11 @@ const EMPTY: GraphConfig = {};
 const BANDS: GraphConfig = { wideFunctionWarnParams: 4, wideFunctionErrorParams: 7 };
 
 function params(n: number): Param[] {
-  return Array.from({ length: n }, (_, i) => ({ name: `p${String(i)}`, optional: false, rest: false }));
+  return Array.from({ length: n }, (_, i) => ({
+    name: `p${String(i)}`,
+    optional: false,
+    rest: false,
+  }));
 }
 
 function run(n: number, config: GraphConfig = BANDS) {
@@ -56,12 +60,16 @@ describe('graph:wide-function bands (explicit thresholds 4/7)', () => {
   });
 
   it('returns [] for an empty catalog', () => {
-    expect(wideFunctionRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([])), EMPTY)).toEqual([]);
+    expect(
+      wideFunctionRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([])), EMPTY),
+    ).toEqual([]);
   });
 
   it('does not flag a wide function defined in a test file', () => {
     const o = occ({ bodyHash: 'h', simpleName: 'wideHelper', params: params(9), inTestFile: true });
-    expect(wideFunctionRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([o])), EMPTY)).toEqual([]);
+    expect(
+      wideFunctionRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([o])), EMPTY),
+    ).toEqual([]);
   });
 });
 

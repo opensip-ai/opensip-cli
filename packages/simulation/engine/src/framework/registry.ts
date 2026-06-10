@@ -23,15 +23,15 @@
  *     route through the scope-bound registry.
  */
 
-import { Registry, currentScope } from '@opensip-tools/core'
+import { Registry, currentScope } from '@opensip-tools/core';
 
-import type { RunnableScenario } from './runnable-scenario.js'
-import type { SimulationLoadState } from '../scope-augmentation.js'
-import type { ScenarioKind } from '../types/kind-types.js'
+import type { RunnableScenario } from './runnable-scenario.js';
+import type { SimulationLoadState } from '../scope-augmentation.js';
+import type { ScenarioKind } from '../types/kind-types.js';
 
 /** Construct a fresh `ensureScenariosLoaded` lifecycle slot for a single `RunScope` (audit F1). */
 export function createSimulationLoadState(): SimulationLoadState {
-  return { loadedFor: null, pluginLoadErrors: [] }
+  return { loadedFor: null, pluginLoadErrors: [] };
 }
 
 /**
@@ -43,15 +43,15 @@ export function createSimulationLoadState(): SimulationLoadState {
  *   scope has no simulation subscope.
  */
 export function currentSimulationLoadState(): SimulationLoadState {
-  const scope = currentScope()
+  const scope = currentScope();
   if (!scope?.simulation) {
     throw new Error(
       'simulation: currentSimulationLoadState() requires an active RunScope with a ' +
         'simulation subscope (production: the pre-action-hook; tests: makeTestScope + ' +
         'simulationTool.contributeScope()).',
-    )
+    );
   }
-  return scope.simulation.load
+  return scope.simulation.load;
 }
 
 /** Construct a fresh scenario registry for a single `RunScope`. */
@@ -62,7 +62,7 @@ export function createScenarioRegistry(): Registry<RunnableScenario> {
     evtPrefix: 'scenario.registry',
     nameCollisionMode: 'throw',
     validationCode: 'VALIDATION.REGISTRY.NAME_COLLISION',
-  })
+  });
 }
 
 /**
@@ -75,14 +75,14 @@ export function createScenarioRegistry(): Registry<RunnableScenario> {
  *   active scope has no simulation subscope.
  */
 export function currentScenarioRegistry(): Registry<RunnableScenario> {
-  const scope = currentScope()
+  const scope = currentScope();
   if (!scope) {
     throw new Error(
       'simulation: currentScenarioRegistry() called outside a RunScope. ' +
         'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
         'this; tests: use makeTestScope + simulationTool.contributeScope or construct ' +
         'a Registry directly).',
-    )
+    );
   }
   if (!scope.simulation) {
     throw new Error(
@@ -90,33 +90,35 @@ export function currentScenarioRegistry(): Registry<RunnableScenario> {
         'registered and its contributeScope hook must run before scenario reads. ' +
         '(production: bootstrap registers simulationTool; tests: call ' +
         'simulationTool.contributeScope() after makeTestScope.)',
-    )
+    );
   }
-  return scope.simulation.scenarios
+  return scope.simulation.scenarios;
 }
 
 /** Get all registered scenarios from the current scope's registry. */
 export function getRegisteredScenarios(): Map<string, RunnableScenario> {
-  const map = new Map<string, RunnableScenario>()
+  const map = new Map<string, RunnableScenario>();
   for (const scenario of currentScenarioRegistry().getAll()) {
-    map.set(scenario.id, scenario)
+    map.set(scenario.id, scenario);
   }
-  return map
+  return map;
 }
 
 /** Get a scenario by id or name from the current scope's registry. */
 export function getScenario(idOrName: string): RunnableScenario | undefined {
-  return currentScenarioRegistry().get(idOrName)
+  return currentScenarioRegistry().get(idOrName);
 }
 
 /** Get scenarios filtered by tag (any kind). */
 export function getScenariosByTag(tag: string): readonly RunnableScenario[] {
-  return currentScenarioRegistry().getByTag(tag)
+  return currentScenarioRegistry().getByTag(tag);
 }
 
 /** Get scenarios filtered by kind. */
 export function getScenariosByKind(kind: ScenarioKind): RunnableScenario[] {
-  return currentScenarioRegistry().getAll().filter((s) => s.kind === kind)
+  return currentScenarioRegistry()
+    .getAll()
+    .filter((s) => s.kind === kind);
 }
 
 /**
@@ -126,5 +128,5 @@ export function getScenariosByKind(kind: ScenarioKind): RunnableScenario[] {
  * re-populates it on the next load cycle.
  */
 export function clearScenarioRegistry(): void {
-  currentScenarioRegistry().clear()
+  currentScenarioRegistry().clear();
 }

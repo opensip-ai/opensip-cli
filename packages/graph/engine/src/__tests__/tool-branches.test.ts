@@ -65,7 +65,13 @@ function fakeAdapter(projectDir: string): GraphLanguageAdapter {
     walkProject: (): WalkOutput => ({ occurrences: {}, callSites: [], parseErrors: [] }),
     resolveCallSites: (): ResolveOutput => ({
       edgesByOwner: new Map(),
-      stats: { totalCallSites: 0, resolvedHigh: 0, resolvedMedium: 0, resolvedLow: 0, unresolved: 0 },
+      stats: {
+        totalCallSites: 0,
+        resolvedHigh: 0,
+        resolvedMedium: 0,
+        resolvedLow: 0,
+        unresolved: 0,
+      },
     }),
     cacheKey: () => 'fake-v1',
   };
@@ -171,10 +177,17 @@ describe('graph interactive --exact path honors graph config', () => {
     const { cli, renderLive } = makeMockCli();
 
     // The animated live view is taken only on a TTY, under --exact.
-    await withTTY(true, () => handlerFor('graph')({ cwd: workDir, exact: true, _args: [[]] }, cli) as Promise<unknown>);
+    await withTTY(
+      true,
+      () =>
+        handlerFor('graph')({ cwd: workDir, exact: true, _args: [[]] }, cli) as Promise<unknown>,
+    );
 
     expect(renderLive).toHaveBeenCalledTimes(1);
-    const [, args] = renderLive.mock.calls[0] as [string, { config?: { minCrossPackageDuplicatePackages?: number } }];
+    const [, args] = renderLive.mock.calls[0] as [
+      string,
+      { config?: { minCrossPackageDuplicatePackages?: number } },
+    ];
     expect(args.config?.minCrossPackageDuplicatePackages).toBe(2);
   });
 
@@ -185,7 +198,10 @@ describe('graph interactive --exact path honors graph config', () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const { cli, renderLive, render } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
 
-    await withTTY(false, () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>);
+    await withTTY(
+      false,
+      () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>,
+    );
 
     expect(renderLive).not.toHaveBeenCalled();
     expect(render).toHaveBeenCalledTimes(1);
@@ -204,13 +220,19 @@ describe('graph interactive --exact path honors graph config', () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const { cli, renderLive, render } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
 
-    await withTTY(true, () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>);
+    await withTTY(
+      true,
+      () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>,
+    );
 
     expect(renderLive).toHaveBeenCalledTimes(1);
     expect(render).not.toHaveBeenCalled();
     // The live args carry the engine selector: `exact` (false here) + the
     // pre-resolved shard set the runner uses to pick its transport.
-    const [, args] = renderLive.mock.calls[0] as [string, { exact?: boolean; shards?: readonly unknown[] }];
+    const [, args] = renderLive.mock.calls[0] as [
+      string,
+      { exact?: boolean; shards?: readonly unknown[] },
+    ];
     expect(args.exact).toBe(false);
     expect(Array.isArray(args.shards)).toBe(true);
   });

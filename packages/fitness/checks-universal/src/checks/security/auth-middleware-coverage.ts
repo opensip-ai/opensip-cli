@@ -3,9 +3,9 @@
  * @fileoverview Validate routes have authentication middleware
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { stripStringsAndComments } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { stripStringsAndComments } from '@opensip-tools/fitness';
 
 /**
  * Match Fastify route definitions
@@ -15,9 +15,9 @@ function matchFastifyRoute(line: string): RegExpExecArray | null {
   logger.debug({
     evt: 'fitness.checks.auth_middleware_coverage.match_fastify_route',
     msg: 'Checking for Fastify route definition',
-  })
+  });
   // @fitness-ignore-next-line sonarjs-regular-expr -- Simple pattern with no backtracking risk; negated character class [^'"`]+ is linear
-  return /fastify\.(get|post|put|patch|delete)\s*\(\s*['"`]([^'"`]+)['"`]/i.exec(line)
+  return /fastify\.(get|post|put|patch|delete)\s*\(\s*['"`]([^'"`]+)['"`]/i.exec(line);
 }
 
 /**
@@ -28,9 +28,9 @@ function matchExpressRoute(line: string): RegExpExecArray | null {
   logger.debug({
     evt: 'fitness.checks.auth_middleware_coverage.match_express_route',
     msg: 'Checking for Express route definition',
-  })
+  });
   // @fitness-ignore-next-line sonarjs-regular-expr -- Simple pattern with no backtracking risk; negated character class [^'"`]+ is linear
-  return /(?:app|router)\.(get|post|put|patch|delete)\s*\(\s*['"`]([^'"`]+)['"`]/i.exec(line)
+  return /(?:app|router)\.(get|post|put|patch|delete)\s*\(\s*['"`]([^'"`]+)['"`]/i.exec(line);
 }
 
 // Patterns that indicate route definitions
@@ -53,7 +53,7 @@ const ROUTE_PATTERNS = [
       'Add auth middleware before the route handler: router.get("/path", authMiddleware, handler). Or mark as public: { public: true }.',
     severity: 'warning' as const,
   },
-]
+];
 
 // Keywords indicating auth middleware is present
 const AUTH_MIDDLEWARE_KEYWORDS = [
@@ -63,7 +63,7 @@ const AUTH_MIDDLEWARE_KEYWORDS = [
   'isauthenticated',
   'verifytoken',
   'verifyjwt',
-]
+];
 
 // Keywords indicating intentionally public routes
 const PUBLIC_ROUTE_KEYWORDS = [
@@ -80,38 +80,38 @@ const PUBLIC_ROUTE_KEYWORDS = [
   '/swagger',
   '/openapi',
   '/.well-known',
-]
+];
 
 function hasAuthMiddleware(line: string): boolean {
   logger.debug({
     evt: 'fitness.checks.auth_middleware_coverage.has_auth_middleware',
     msg: 'Checking if line has auth middleware',
-  })
-  const lowerLine = line.toLowerCase()
+  });
+  const lowerLine = line.toLowerCase();
   if (AUTH_MIDDLEWARE_KEYWORDS.some((kw) => lowerLine.includes(kw))) {
-    return true
+    return true;
   }
   // Check for preHandler.*auth or onRequest.*auth patterns
   if (
     (lowerLine.includes('prehandler') || lowerLine.includes('onrequest')) &&
     lowerLine.includes('auth')
   ) {
-    return true
+    return true;
   }
-  return false
+  return false;
 }
 
 function isPublicRoute(line: string): boolean {
   logger.debug({
     evt: 'fitness.checks.auth_middleware_coverage.is_public_route',
     msg: 'Checking if route is public',
-  })
-  const lowerLine = line.toLowerCase()
-  return PUBLIC_ROUTE_KEYWORDS.some((kw) => lowerLine.includes(kw))
+  });
+  const lowerLine = line.toLowerCase();
+  return PUBLIC_ROUTE_KEYWORDS.some((kw) => lowerLine.includes(kw));
 }
 
 // Paths to exclude from checking
-const PUBLIC_ROUTE_PATTERNS = ['/health/', '/status/']
+const PUBLIC_ROUTE_PATTERNS = ['/health/', '/status/'];
 
 /**
  * Check if content contains route-defining framework references
@@ -120,9 +120,9 @@ function containsRouteFramework(content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.auth_middleware_coverage.contains_route_framework',
     msg: 'Checking if content contains route framework references',
-  })
-  const stripped = stripStringsAndComments(content)
-  return /(?:fastify|app|router)\.(get|post|put|patch|delete)\s*\(/i.test(stripped)
+  });
+  const stripped = stripStringsAndComments(content);
+  return /(?:fastify|app|router)\.(get|post|put|patch|delete)\s*\(/i.test(stripped);
 }
 
 /**
@@ -132,9 +132,9 @@ function hasGlobalAuthMiddleware(content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.auth_middleware_coverage.has_global_auth_middleware',
     msg: 'Checking if file has global auth middleware applied',
-  })
-  const stripped = stripStringsAndComments(content)
-  return /\.register\s*\(\s*auth/i.test(stripped) || /\.use\s*\(\s*auth/i.test(stripped)
+  });
+  const stripped = stripStringsAndComments(content);
+  return /\.register\s*\(\s*auth/i.test(stripped) || /\.use\s*\(\s*auth/i.test(stripped);
 }
 
 /**
@@ -144,20 +144,20 @@ function shouldProcessFile(filePath: string, content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.auth_middleware_coverage.should_process_file',
     msg: 'Determining if file should be processed for auth middleware checks',
-  })
+  });
   // Skip excluded paths
   if (PUBLIC_ROUTE_PATTERNS.some((p) => filePath.includes(p))) {
-    return false
+    return false;
   }
   // Only check files that might define routes
   if (!containsRouteFramework(content)) {
-    return false
+    return false;
   }
   // If global auth is applied, skip detailed checking
   if (hasGlobalAuthMiddleware(content)) {
-    return false
+    return false;
   }
-  return true
+  return true;
 }
 
 /**
@@ -193,28 +193,28 @@ export const authMiddlewareCoverage = defineCheck({
     logger.debug({
       evt: 'fitness.checks.auth_middleware_coverage.analyze',
       msg: 'Analyzing file for auth middleware coverage',
-    })
+    });
     if (!shouldProcessFile(filePath, content)) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? ''
+      const line = lines[lineNum] ?? '';
 
       // Get context (current line + next few lines)
-      const context = lines.slice(lineNum, lineNum + 5).join(' ')
+      const context = lines.slice(lineNum, lineNum + 5).join(' ');
 
       // Skip comments
-      const trimmed = line.trim()
+      const trimmed = line.trim();
       if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
-        continue
+        continue;
       }
 
       for (const pattern of ROUTE_PATTERNS) {
-        const match = pattern.match(line)
+        const match = pattern.match(line);
         if (match && pattern.check(context)) {
           violations.push({
             line: lineNum + 1,
@@ -224,11 +224,11 @@ export const authMiddlewareCoverage = defineCheck({
             suggestion: pattern.suggestion,
             match: match[0],
             filePath,
-          })
+          });
         }
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

@@ -101,11 +101,7 @@ describe('runSarifExportMode', () => {
     const outPath = join(workDir, 'empty.sarif');
     const { cli, setExitCode } = makeCli();
 
-    await runSarifExportMode(
-      { outputSarif: outPath, tenantId: 't1', repoId: 'r1' },
-      [],
-      cli,
-    );
+    await runSarifExportMode({ outputSarif: outPath, tenantId: 't1', repoId: 'r1' }, [], cli);
 
     const parsed = JSON.parse(readFileSync(outPath, 'utf8')) as {
       version: string;

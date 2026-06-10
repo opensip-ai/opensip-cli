@@ -7,7 +7,11 @@
  * shape via `FitnessRecipeService`.
  */
 
-import { BUILTIN_DEFAULT_RECIPE, EXIT_CODES, resolveToolRecipeName } from '@opensip-tools/contracts';
+import {
+  BUILTIN_DEFAULT_RECIPE,
+  EXIT_CODES,
+  resolveToolRecipeName,
+} from '@opensip-tools/contracts';
 import { logger } from '@opensip-tools/core';
 
 import { currentRecipeRegistry } from '../../framework/scope-registry.js';
@@ -104,7 +108,10 @@ export async function runRecipeOrAdHoc(
       return await service.start(FitnessRecipeService.createAdHocRecipe({ check: args.check }));
     }
     if (args.tags) {
-      const tagFilters = args.tags.split(',').map(t => t.trim()).filter(Boolean);
+      const tagFilters = args.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
       return await service.start(FitnessRecipeService.createAdHocRecipe({ tagFilters }));
     }
     // selectRecipe sets recipeName to undefined only when args.check or

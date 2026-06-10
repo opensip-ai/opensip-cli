@@ -20,8 +20,23 @@ import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
 
 function runPipeline(dir: string): {
   occurrences: Record<string, FunctionOccurrence[]>;
-  edgesByOwner: ReadonlyMap<string, readonly { to: readonly string[]; resolution: string; confidence: string; text: string; discarded: boolean }[]>;
-  stats: { totalCallSites: number; resolvedHigh: number; resolvedMedium: number; resolvedLow: number; unresolved: number };
+  edgesByOwner: ReadonlyMap<
+    string,
+    readonly {
+      to: readonly string[];
+      resolution: string;
+      confidence: string;
+      text: string;
+      discarded: boolean;
+    }[]
+  >;
+  stats: {
+    totalCallSites: number;
+    resolvedHigh: number;
+    resolvedMedium: number;
+    resolvedLow: number;
+    unresolved: number;
+  };
 } {
   const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
   const parsed = pythonGraphAdapter.parseProject({
@@ -52,15 +67,45 @@ function runPipeline(dir: string): {
   });
   return {
     occurrences: walk.occurrences,
-    edgesByOwner: resolved.edgesByOwner as ReadonlyMap<string, readonly { to: readonly string[]; resolution: string; confidence: string; text: string; discarded: boolean }[]>,
+    edgesByOwner: resolved.edgesByOwner as ReadonlyMap<
+      string,
+      readonly {
+        to: readonly string[];
+        resolution: string;
+        confidence: string;
+        text: string;
+        discarded: boolean;
+      }[]
+    >,
     stats: resolved.stats,
   };
 }
 
 function flattenEdges(
-  edgesByOwner: ReadonlyMap<string, readonly { to: readonly string[]; resolution: string; confidence: string; text: string; discarded: boolean }[]>,
-): readonly { to: readonly string[]; resolution: string; confidence: string; text: string; discarded: boolean }[] {
-  const out: { to: readonly string[]; resolution: string; confidence: string; text: string; discarded: boolean }[] = [];
+  edgesByOwner: ReadonlyMap<
+    string,
+    readonly {
+      to: readonly string[];
+      resolution: string;
+      confidence: string;
+      text: string;
+      discarded: boolean;
+    }[]
+  >,
+): readonly {
+  to: readonly string[];
+  resolution: string;
+  confidence: string;
+  text: string;
+  discarded: boolean;
+}[] {
+  const out: {
+    to: readonly string[];
+    resolution: string;
+    confidence: string;
+    text: string;
+    discarded: boolean;
+  }[] = [];
   for (const edges of edgesByOwner.values()) {
     for (const e of edges) out.push(e);
   }
@@ -110,21 +155,9 @@ describe('lang-python resolve.ts — branches', () => {
   });
 
   it('emits method-dispatch low-confidence when multiple catalog entries share a name', () => {
-    writeFileSync(
-      join(dir, 'a.py'),
-      `class A:\n    def run(self):\n        return 1\n`,
-      'utf8',
-    );
-    writeFileSync(
-      join(dir, 'b.py'),
-      `class B:\n    def run(self):\n        return 2\n`,
-      'utf8',
-    );
-    writeFileSync(
-      join(dir, 'use.py'),
-      `def use(obj):\n    return obj.run()\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'a.py'), `class A:\n    def run(self):\n        return 1\n`, 'utf8');
+    writeFileSync(join(dir, 'b.py'), `class B:\n    def run(self):\n        return 2\n`, 'utf8');
+    writeFileSync(join(dir, 'use.py'), `def use(obj):\n    return obj.run()\n`, 'utf8');
     const { edgesByOwner, stats } = runPipeline(dir);
     const all = flattenEdges(edgesByOwner);
     const runCall = all.find((e) => e.text.includes('obj.run'));
@@ -136,11 +169,7 @@ describe('lang-python resolve.ts — branches', () => {
   });
 
   it('emits unknown/low when calling an unknown name', () => {
-    writeFileSync(
-      join(dir, 'main.py'),
-      `def entry():\n    return missing_name(1)\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'main.py'), `def entry():\n    return missing_name(1)\n`, 'utf8');
     const { edgesByOwner, stats } = runPipeline(dir);
     const all = flattenEdges(edgesByOwner);
     const missing = all.find((e) => e.text.includes('missing_name'));
@@ -152,11 +181,7 @@ describe('lang-python resolve.ts — branches', () => {
   });
 
   it('emits unknown for non-identifier/attribute call shapes (lambda IIFE)', () => {
-    writeFileSync(
-      join(dir, 'main.py'),
-      `def entry():\n    return (lambda x: x)(1)\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'main.py'), `def entry():\n    return (lambda x: x)(1)\n`, 'utf8');
     const { edgesByOwner } = runPipeline(dir);
     const all = flattenEdges(edgesByOwner);
     // The (lambda...)(1) is a call whose target is a parenthesized
@@ -165,11 +190,7 @@ describe('lang-python resolve.ts — branches', () => {
   });
 
   it('emits unknown for subscript calls (e.g. fns[0]())', () => {
-    writeFileSync(
-      join(dir, 'main.py'),
-      `def entry(fns):\n    return fns[0]()\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'main.py'), `def entry(fns):\n    return fns[0]()\n`, 'utf8');
     const { edgesByOwner } = runPipeline(dir);
     const all = flattenEdges(edgesByOwner);
     expect(all.some((e) => e.resolution === 'unknown')).toBe(true);
@@ -229,16 +250,8 @@ describe('lang-python resolve.ts — branches', () => {
 
   it('skips synthetic/module-init names from the name index (names starting with <)', () => {
     // <module-init> names start with '<' and should not be lookup targets
-    writeFileSync(
-      join(dir, 'a.py'),
-      `def f():\n    return 1\n`,
-      'utf8',
-    );
-    writeFileSync(
-      join(dir, 'b.py'),
-      `def caller():\n    return f()\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'a.py'), `def f():\n    return 1\n`, 'utf8');
+    writeFileSync(join(dir, 'b.py'), `def caller():\n    return f()\n`, 'utf8');
     const { edgesByOwner } = runPipeline(dir);
     const all = flattenEdges(edgesByOwner);
     // The synthetic names like <module-init:a.py> exist as keys in

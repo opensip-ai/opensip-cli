@@ -50,10 +50,7 @@ export function inferEntryPoints(catalog: Catalog, indexes: Indexes): readonly E
   return out;
 }
 
-function classify(
-  occ: FunctionOccurrence,
-  indexes: Indexes,
-): EntryPoint['reason'] | null {
+function classify(occ: FunctionOccurrence, indexes: Indexes): EntryPoint['reason'] | null {
   // Every <module-init> is an entry point. Top-level statements run
   // whenever the file is part of the import closure of a real
   // entry point. We don't track import edges, so a conservative

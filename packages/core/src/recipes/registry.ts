@@ -137,10 +137,9 @@ export class RecipeRegistry<T extends RecipeBase> {
         (this.inner.has(recipe.name) && this.inner.getByName(recipe.name)?.id !== recipe.id);
       if (dup) {
         // @fitness-ignore-next-line result-pattern-consistency -- registration guard, throw is appropriate
-        throw new ValidationError(
-          `Recipe '${recipe.name}' (${recipe.id}) already registered`,
-          { code: options.validationCode ?? this.validationCode },
-        );
+        throw new ValidationError(`Recipe '${recipe.name}' (${recipe.id}) already registered`, {
+          code: options.validationCode ?? this.validationCode,
+        });
       }
       this.inner.register(recipe, { internal: true });
       return;

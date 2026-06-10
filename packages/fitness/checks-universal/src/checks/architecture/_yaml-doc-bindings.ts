@@ -21,9 +21,9 @@
  * @returns the set of local binding names that hold a parsed YAML document.
  */
 export function yamlDocBindings(content: string): Set<string> {
-  const docs = new Set<string>()
+  const docs = new Set<string>();
   const re =
-    /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:await\s+)?(?:readYamlFile|readYamlFileOrThrow|parseYaml|loadYaml)\s*\(/g
-  for (const m of content.matchAll(re)) docs.add(m[1])
-  return docs
+    /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:await\s+)?(?:readYamlFile|readYamlFileOrThrow|parseYaml|loadYaml)\s*\(/g;
+  for (const m of content.matchAll(re)) docs.add(m[1]);
+  return docs;
 }

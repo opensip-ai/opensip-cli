@@ -9,10 +9,9 @@
  * @see CLAUDE.md Error Handling Policy
  */
 
-
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Expected error types that should use Result pattern
@@ -24,7 +23,7 @@ const EXPECTED_ERROR_TYPES = [
   'ConflictError',
   'InvalidInputError',
   'DuplicateError',
-]
+];
 
 /**
  * Function name patterns where throwing is legitimate (validation/guard helpers
@@ -53,7 +52,7 @@ const LEGITIMATE_THROW_FUNCTION_PATTERNS = [
   /Guard$/,
   /Validator$/,
   /Assertion$/,
-]
+];
 
 /**
  * Paths where throwing is expected (infrastructure boundaries per DEC-015).
@@ -87,166 +86,159 @@ const THROW_ALLOWED_PATHS = [
   /packages\/infrastructure\//,
   /\/stores\//,
   /\/registry\//,
-]
+];
 
 /**
  * File name patterns where throwing is legitimate (infrastructure boundary classes)
  */
-const INFRASTRUCTURE_FILE_PATTERNS = [
-  /registry/i,
-  /-registry/i,
-  /store/i,
-  /-store/i,
-  /adapter/i,
-]
+const INFRASTRUCTURE_FILE_PATTERNS = [/registry/i, /-registry/i, /store/i, /-store/i, /adapter/i];
 
 /**
  * Check if a file path is in a throw-allowed context
  */
 function isThrowAllowedPath(filePath: string): boolean {
   if (THROW_ALLOWED_PATHS.some((pattern) => pattern.test(filePath))) {
-    return true
+    return true;
   }
 
   // Check file name against infrastructure patterns (registries, stores, adapters)
   /* v8 ignore next -- defensive nullish fallback */
-  const fileName = filePath.split('/').pop() ?? ''
-  return INFRASTRUCTURE_FILE_PATTERNS.some((pattern) => pattern.test(fileName))
+  const fileName = filePath.split('/').pop() ?? '';
+  return INFRASTRUCTURE_FILE_PATTERNS.some((pattern) => pattern.test(fileName));
 }
 
 /**
  * Check if a function name indicates it's a validation/guard helper
  */
 function isValidationHelper(funcName: string): boolean {
-  return LEGITIMATE_THROW_FUNCTION_PATTERNS.some((pattern) => pattern.test(funcName))
+  return LEGITIMATE_THROW_FUNCTION_PATTERNS.some((pattern) => pattern.test(funcName));
 }
 
 /**
  * Check if a throw statement is inside a catch block (re-throw pattern)
  */
 function isInCatchBlock(node: ts.Node): boolean {
-  let current: ts.Node | undefined = node.parent
-   
+  let current: ts.Node | undefined = node.parent;
+
   while (current) {
     if (ts.isCatchClause(current)) {
-      return true
+      return true;
     }
-    current = current.parent
+    current = current.parent;
   }
-  return false
+  return false;
 }
 
 /**
  * Get the containing function name for a node
  */
 function getContainingFunctionName(node: ts.Node, sourceFile: ts.SourceFile): string | undefined {
-  let current: ts.Node | undefined = node.parent
-   
+  let current: ts.Node | undefined = node.parent;
+
   while (current) {
-     
     if (ts.isFunctionDeclaration(current) && current.name) {
-      return current.name.getText(sourceFile)
+      return current.name.getText(sourceFile);
     }
-     
+
     /* v8 ignore next -- defensive AST/type guard */
     if (ts.isMethodDeclaration(current) && current.name) {
-      return current.name.getText(sourceFile)
+      return current.name.getText(sourceFile);
     }
     /* v8 ignore next -- defensive AST/type guard */
     if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
-      const parent = current.parent
+      const parent = current.parent;
       if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
-        return parent.name.getText(sourceFile)
+        return parent.name.getText(sourceFile);
       }
     }
-    current = current.parent
+    current = current.parent;
   }
-  return undefined
+  return undefined;
 }
 
 /**
  * Check if a node is inside a constructor (constructors should throw, not return Result)
  */
 function isInConstructor(node: ts.Node): boolean {
-  let current: ts.Node | undefined = node.parent
-   
+  let current: ts.Node | undefined = node.parent;
+
   while (current) {
     if (ts.isConstructorDeclaration(current)) {
-      return true
+      return true;
     }
-    current = current.parent
+    current = current.parent;
   }
-  return false
+  return false;
 }
 
 /**
  * Check if a node is inside a private method (private methods may throw for internal consistency)
  */
 function isInPrivateMethod(node: ts.Node): boolean {
-  let current: ts.Node | undefined = node.parent
-   
+  let current: ts.Node | undefined = node.parent;
+
   while (current) {
     if (ts.isMethodDeclaration(current)) {
-      const modifiers = ts.getModifiers(current)
+      const modifiers = ts.getModifiers(current);
       if (modifiers?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword)) {
-        return true
+        return true;
       }
     }
-    current = current.parent
+    current = current.parent;
   }
-  return false
+  return false;
 }
 
 /** Options for checkThrowStatement */
 interface CheckThrowStatementOptions {
-  node: ts.ThrowStatement
-  sourceFile: ts.SourceFile
-  filePath: string
+  node: ts.ThrowStatement;
+  sourceFile: ts.SourceFile;
+  filePath: string;
 }
 
 /**
  * Checks a throw statement for expected error types that should use Result pattern
  */
 function checkThrowStatement(options: CheckThrowStatementOptions): CheckViolation | null {
-  const { node, sourceFile, filePath } = options
+  const { node, sourceFile, filePath } = options;
 
   // Skip files in throw-allowed paths (routes, handlers, plugins)
   if (isThrowAllowedPath(filePath)) {
-    return null
+    return null;
   }
 
   // Skip re-throws in catch blocks (error wrapping is legitimate)
   if (isInCatchBlock(node)) {
-    return null
+    return null;
   }
 
   // Skip constructors (constructor validation should throw, not return Result)
   if (isInConstructor(node)) {
-    return null
+    return null;
   }
 
   // Skip private methods (internal consistency checks may throw)
   if (isInPrivateMethod(node)) {
-    return null
+    return null;
   }
 
   // Skip validation/guard helper functions
-  const funcName = getContainingFunctionName(node, sourceFile)
+  const funcName = getContainingFunctionName(node, sourceFile);
   if (funcName && isValidationHelper(funcName)) {
-    return null
+    return null;
   }
 
-  const throwText = node.expression.getText(sourceFile)
+  const throwText = node.expression.getText(sourceFile);
 
   // Find the first matching expected error type
-  const matchedErrorType = EXPECTED_ERROR_TYPES.find((errorType) => throwText.includes(errorType))
+  const matchedErrorType = EXPECTED_ERROR_TYPES.find((errorType) => throwText.includes(errorType));
   if (!matchedErrorType) {
-    return null
+    return null;
   }
 
-  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const lineNum = line + 1
-  const matchText = node.getText(sourceFile)
+  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+  const lineNum = line + 1;
+  const matchText = node.getText(sourceFile);
 
   return {
     line: lineNum,
@@ -255,34 +247,34 @@ function checkThrowStatement(options: CheckThrowStatementOptions): CheckViolatio
     severity: 'warning',
     suggestion: `Replace 'throw new ${matchedErrorType}(...)' with 'return err(new ${matchedErrorType}(...))' and update the function return type to Result<T, ${matchedErrorType}>`,
     match: matchText,
-  }
+  };
 }
 
 /** Options for checkResultFunctionBody */
 interface CheckResultFunctionBodyOptions {
-  bodyText: string
-  node: ts.FunctionDeclaration | ts.MethodDeclaration
-  sourceFile: ts.SourceFile
-  filePath: string
+  bodyText: string;
+  node: ts.FunctionDeclaration | ts.MethodDeclaration;
+  sourceFile: ts.SourceFile;
+  filePath: string;
 }
 
 /**
  * Checks function body for thrown expected errors when return type is Result
  */
 function checkResultFunctionBody(options: CheckResultFunctionBodyOptions): CheckViolation | null {
-  const { bodyText, node, sourceFile, filePath } = options
+  const { bodyText, node, sourceFile, filePath } = options;
 
   // Skip files in throw-allowed paths
   if (isThrowAllowedPath(filePath)) {
-    return null
+    return null;
   }
 
   // Skip private methods (internal consistency checks may throw)
   /* v8 ignore next -- defensive AST/type guard */
   if (ts.isMethodDeclaration(node)) {
-    const modifiers = ts.getModifiers(node)
+    const modifiers = ts.getModifiers(node);
     if (modifiers?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword)) {
-      return null
+      return null;
     }
   }
 
@@ -290,19 +282,19 @@ function checkResultFunctionBody(options: CheckResultFunctionBodyOptions): Check
   const funcName =
     ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)
       ? node.name?.getText(sourceFile)
-      : undefined
+      : undefined;
 
   // Skip validation helper functions
   if (funcName && isValidationHelper(funcName)) {
-    return null
+    return null;
   }
 
   for (const errorType of EXPECTED_ERROR_TYPES) {
-    if (!bodyText.includes(`throw new ${errorType}`)) continue
+    if (!bodyText.includes(`throw new ${errorType}`)) continue;
 
-    const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-    const lineNum = line + 1
-    const matchText = `throw new ${errorType}`
+    const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+    const lineNum = line + 1;
+    const matchText = `throw new ${errorType}`;
 
     return {
       line: lineNum,
@@ -311,10 +303,10 @@ function checkResultFunctionBody(options: CheckResultFunctionBodyOptions): Check
       severity: 'error',
       suggestion: `This function declares Result<T,E> return type but throws ${errorType}. Replace 'throw new ${errorType}(...)' with 'return err(new ${errorType}(...))' for consistency`,
       match: matchText,
-    }
+    };
   }
 
-  return null
+  return null;
 }
 
 /**
@@ -345,33 +337,33 @@ export const resultPatternConsistency = defineCheck({
 
   analyze(content, filePath) {
     // Quick filter: skip files without error patterns
-    const hasErrorPatterns = content.includes('throw') || content.includes('Result')
+    const hasErrorPatterns = content.includes('throw') || content.includes('Result');
     if (!hasErrorPatterns) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
-    const sourceFile = getSharedSourceFile(filePath, content)
+    const sourceFile = getSharedSourceFile(filePath, content);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
     const visit = (node: ts.Node): void => {
-      ts.forEachChild(node, visit)
+      ts.forEachChild(node, visit);
 
       // Check throw statements for expected error types
       if (ts.isThrowStatement(node)) {
-        const violation = checkThrowStatement({ node, sourceFile, filePath })
+        const violation = checkThrowStatement({ node, sourceFile, filePath });
         if (violation) {
-          violations.push(violation)
+          violations.push(violation);
         }
-        return
+        return;
       }
 
       // Check functions that return Result but also throw expected errors
-      if (!ts.isFunctionDeclaration(node) && !ts.isMethodDeclaration(node)) return
+      if (!ts.isFunctionDeclaration(node) && !ts.isMethodDeclaration(node)) return;
 
-      const returnType = node.type?.getText(sourceFile)
+      const returnType = node.type?.getText(sourceFile);
       // Require the canonical generic form `Result<…>` (also matches
       // `Promise<Result<…>>`). A bare substring match for "Result"
       // misclassifies domain types like `GateCompareResult`, `AnalyzeResult`,
@@ -379,17 +371,17 @@ export const resultPatternConsistency = defineCheck({
       // wherever such a function throws on a legitimate infrastructure
       // boundary. Word-boundary + `<` preserves the intent without matching
       // unrelated trailing-token names.
-      if (!returnType || !/\bResult\s*</.test(returnType)) return
+      if (!returnType || !/\bResult\s*</.test(returnType)) return;
 
       /* v8 ignore next -- defensive nullish fallback */
-      const bodyText = node.body?.getText(sourceFile) ?? ''
-      const violation = checkResultFunctionBody({ bodyText, node, sourceFile, filePath })
+      const bodyText = node.body?.getText(sourceFile) ?? '';
+      const violation = checkResultFunctionBody({ bodyText, node, sourceFile, filePath });
       if (violation) {
-        violations.push(violation)
+        violations.push(violation);
       }
-    }
+    };
 
-    visit(sourceFile)
-    return violations
+    visit(sourceFile);
+    return violations;
   },
-})
+});

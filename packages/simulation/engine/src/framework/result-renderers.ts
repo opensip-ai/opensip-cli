@@ -13,21 +13,20 @@
  * omission as a compile-time error.
  */
 
-
-import type { ScenarioExecutorResult } from './scenario-executor-result.js'
-import type { SimulationMetrics } from '../types/base-types.js'
+import type { ScenarioExecutorResult } from './scenario-executor-result.js';
+import type { SimulationMetrics } from '../types/base-types.js';
 
 /** View-friendly summary common to every kind. */
 export interface ScenarioResultView {
-  readonly kind: ScenarioExecutorResult['kind']
-  readonly scenarioId: string
-  readonly passed: boolean
-  readonly durationMs: number
-  readonly metrics: SimulationMetrics
-  readonly assertionsPassed: number
-  readonly assertionsFailed: number
+  readonly kind: ScenarioExecutorResult['kind'];
+  readonly scenarioId: string;
+  readonly passed: boolean;
+  readonly durationMs: number;
+  readonly metrics: SimulationMetrics;
+  readonly assertionsPassed: number;
+  readonly assertionsFailed: number;
   /** Short human label describing the kind-specific outcome. */
-  readonly outcomeLabel: string
+  readonly outcomeLabel: string;
 }
 
 /**
@@ -37,9 +36,7 @@ export interface ScenarioResultView {
  *   variants. This is an exhaustiveness guard — a runtime hit means a new
  *   variant was added without updating this dispatch.
  */
-export function renderScenarioResultView(
-  result: ScenarioExecutorResult,
-): ScenarioResultView {
+export function renderScenarioResultView(result: ScenarioExecutorResult): ScenarioResultView {
   switch (result.kind) {
     case 'load': {
       return {
@@ -51,16 +48,16 @@ export function renderScenarioResultView(
         assertionsPassed: result.outcome.assertions.passed.length,
         assertionsFailed: result.outcome.assertions.failed.length,
         outcomeLabel: `${result.outcome.metrics.totalRequests} req, ${result.outcome.assertions.failed.length} failed`,
-      }
+      };
     }
 
     case 'chaos': {
       const passedCount =
         result.outcome.steadyStateAssertions.passed.length +
-        result.outcome.recoveryAssertions.passed.length
+        result.outcome.recoveryAssertions.passed.length;
       const failedCount =
         result.outcome.steadyStateAssertions.failed.length +
-        result.outcome.recoveryAssertions.failed.length
+        result.outcome.recoveryAssertions.failed.length;
       return {
         kind: 'chaos',
         scenarioId: result.scenarioId,
@@ -70,18 +67,18 @@ export function renderScenarioResultView(
         assertionsPassed: passedCount,
         assertionsFailed: failedCount,
         outcomeLabel: `${result.outcome.chaosEvents.length} chaos events, ${failedCount} failed`,
-      }
+      };
     }
 
     default: {
       // Exhaustiveness guard — adding a new variant to the discriminated union
       // turns this assignment into a compile-time error, forcing every dispatch
       // site (including this one) to add the missing branch.
-      const _exhaustive: never = result
+      const _exhaustive: never = result;
       // @fitness-ignore-next-line result-pattern-consistency -- exhaustiveness probe; runtime should never hit this
       throw new Error(
         `Unreachable: ScenarioExecutorResult kind exhaustiveness violation (${String(_exhaustive)})`,
-      )
+      );
     }
   }
 }

@@ -5,21 +5,21 @@
  * Recommends using @expo/vector-icons for React Native compatibility.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-const PREFERRED_ICON_LIBRARY = '@expo/vector-icons'
+const PREFERRED_ICON_LIBRARY = '@expo/vector-icons';
 const DISCOURAGED_LIBRARIES = [
   'react-native-vector-icons',
   'react-icons',
   '@fortawesome/react-native-fontawesome',
-]
+];
 
 /**
  * Escape special regex characters in a string
  */
 function escapeRegExp(str: string): string {
   // @fitness-ignore-next-line fitness-check-standards -- Character class regex is safe from ReDoS, no backtracking
-  return str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+  return str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 /**
@@ -31,18 +31,18 @@ function escapeRegExp(str: string): string {
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
   // Quick filter: skip if no discouraged library mentioned
   if (!DISCOURAGED_LIBRARIES.some((lib) => content.includes(lib))) {
-    return []
+    return [];
   }
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   for (const lib of DISCOURAGED_LIBRARIES) {
-    const escapedLib = escapeRegExp(lib)
-    const pattern = String.raw`import\s+.*\s+from\s+['"]${escapedLib}['"]`
-    const regex = new RegExp(pattern, 'g')
-    let match
+    const escapedLib = escapeRegExp(lib);
+    const pattern = String.raw`import\s+.*\s+from\s+['"]${escapedLib}['"]`;
+    const regex = new RegExp(pattern, 'g');
+    let match;
     while ((match = regex.exec(content)) !== null) {
-      const line = content.slice(0, Math.max(0, match.index)).split('\n').length
+      const line = content.slice(0, Math.max(0, match.index)).split('\n').length;
       violations.push({
         filePath,
         line,
@@ -52,11 +52,11 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
         type: 'discouraged-library',
         suggestion: `Replace import with: import { IconName } from '${PREFERRED_ICON_LIBRARY}/FontAwesome' or another icon family from @expo/vector-icons`,
         match: lib,
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -86,4 +86,4 @@ export const expoVectorIcons = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze: analyzeFile,
-})
+});

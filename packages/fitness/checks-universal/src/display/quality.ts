@@ -2,7 +2,7 @@
  * @fileoverview Display entries for cross-language quality checks
  */
 
-import type { CheckDisplayEntry } from './types.js'
+import type { CheckDisplayEntry } from './types.js';
 
 /** Quality check display entries (UNIVERSAL only, sorted alphabetically by slug) */
 export const QUALITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
@@ -33,4 +33,4 @@ export const QUALITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>(
   'semgrep-justifications': ['🔍', 'Semgrep Justifications'],
   'typescript-directive-hygiene': ['📘', 'TypeScript Directive Hygiene'],
   'zod-openapi-sync': ['🔌', 'Zod OpenAPI Sync'],
-})
+});

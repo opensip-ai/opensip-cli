@@ -16,7 +16,12 @@ function edge(to: readonly string[], line: number, column = 0): CallEdge {
   return { to, line, column, resolution: 'semantic', confidence: 'high', text: 'x()' };
 }
 
-function occ(simpleName: string, filePath: string, bodyHash: string, calls: readonly CallEdge[] = []): FunctionOccurrence {
+function occ(
+  simpleName: string,
+  filePath: string,
+  bodyHash: string,
+  calls: readonly CallEdge[] = [],
+): FunctionOccurrence {
   return {
     bodyHash,
     simpleName,
@@ -55,9 +60,17 @@ describe('bucketEdgesByOwner', () => {
       { bodyHash: 'TWIN', filePath: 'packages/a/x.ts', e: edge(['HA'], 2) },
       { bodyHash: 'TWIN', filePath: 'packages/b/x.ts', e: edge(['HB'], 2) },
     ];
-    const byOwner = bucketEdgesByOwner(items, (i) => ({ bodyHash: i.bodyHash, filePath: i.filePath }), (i) => i.e);
-    expect(byOwner.get(ownerEdgeKey('TWIN', 'packages/a/x.ts'))?.flatMap((e) => [...e.to])).toEqual(['HA']);
-    expect(byOwner.get(ownerEdgeKey('TWIN', 'packages/b/x.ts'))?.flatMap((e) => [...e.to])).toEqual(['HB']);
+    const byOwner = bucketEdgesByOwner(
+      items,
+      (i) => ({ bodyHash: i.bodyHash, filePath: i.filePath }),
+      (i) => i.e,
+    );
+    expect(byOwner.get(ownerEdgeKey('TWIN', 'packages/a/x.ts'))?.flatMap((e) => [...e.to])).toEqual(
+      ['HA'],
+    );
+    expect(byOwner.get(ownerEdgeKey('TWIN', 'packages/b/x.ts'))?.flatMap((e) => [...e.to])).toEqual(
+      ['HB'],
+    );
   });
 
   it('appends multiple edges to the same owner in order', () => {
@@ -65,7 +78,11 @@ describe('bucketEdgesByOwner', () => {
       { bodyHash: 'H', filePath: 'f.ts', e: edge(['X'], 2) },
       { bodyHash: 'H', filePath: 'f.ts', e: edge(['Y'], 3) },
     ];
-    const byOwner = bucketEdgesByOwner(items, (i) => ({ bodyHash: i.bodyHash, filePath: i.filePath }), (i) => i.e);
+    const byOwner = bucketEdgesByOwner(
+      items,
+      (i) => ({ bodyHash: i.bodyHash, filePath: i.filePath }),
+      (i) => i.e,
+    );
     expect(byOwner.get(ownerEdgeKey('H', 'f.ts'))?.flatMap((e) => [...e.to])).toEqual(['X', 'Y']);
   });
 });
@@ -78,7 +95,10 @@ describe('stitchEdgesByOwner', () => {
     const byOwner = new Map<string, readonly CallEdge[]>([
       [ownerEdgeKey('TWIN', 'packages/a/x.ts'), [edge(['HA'], 2)]],
     ]);
-    const out = stitchEdgesByOwner(functions, byOwner, (o, recovered) => ({ ...o, calls: [...o.calls, ...recovered] }));
+    const out = stitchEdgesByOwner(functions, byOwner, (o, recovered) => ({
+      ...o,
+      calls: [...o.calls, ...recovered],
+    }));
     const twinA = out.twin?.find((o) => o.filePath === 'packages/a/x.ts');
     const twinB = out.twin?.find((o) => o.filePath === 'packages/b/x.ts');
     expect(twinA?.calls.flatMap((e) => [...e.to])).toEqual(['HA']); // got its edge
@@ -88,18 +108,25 @@ describe('stitchEdgesByOwner', () => {
   it('returns an occurrence unchanged when it has no recovered edges', () => {
     const original = occ('f', 'f.ts', 'H');
     const functions = { f: [original] };
-    const out = stitchEdgesByOwner(functions, new Map(), (o) => ({ ...o, calls: [edge(['NEVER'], 9)] }));
+    const out = stitchEdgesByOwner(functions, new Map(), (o) => ({
+      ...o,
+      calls: [edge(['NEVER'], 9)],
+    }));
     // combine must NOT run for an owner with no recovered edges.
     expect(out.f?.[0]).toBe(original);
   });
 
   it('runs the combine callback for an owner WITH recovered edges', () => {
     const functions = { f: [occ('f', 'f.ts', 'H', [edge([], 2)])] };
-    const byOwner = new Map<string, readonly CallEdge[]>([[ownerEdgeKey('H', 'f.ts'), [edge(['T'], 2)]]]);
+    const byOwner = new Map<string, readonly CallEdge[]>([
+      [ownerEdgeKey('H', 'f.ts'), [edge(['T'], 2)]],
+    ]);
     // combine drops the empty placeholder at the recovered site, then concats.
     const out = stitchEdgesByOwner(functions, byOwner, (o, recovered) => {
       const at = new Set(recovered.map((e) => `${String(e.line)}:${String(e.column)}`));
-      const kept = o.calls.filter((e) => !(e.to.length === 0 && at.has(`${String(e.line)}:${String(e.column)}`)));
+      const kept = o.calls.filter(
+        (e) => !(e.to.length === 0 && at.has(`${String(e.line)}:${String(e.column)}`)),
+      );
       return { ...o, calls: [...kept, ...recovered] };
     });
     expect(out.f?.[0]?.calls.flatMap((e) => [...e.to])).toEqual(['T']);

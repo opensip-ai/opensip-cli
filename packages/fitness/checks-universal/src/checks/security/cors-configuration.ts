@@ -3,8 +3,8 @@
  * @fileoverview Validate CORS configuration follows security best practices
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Pre-compiled CORS security patterns for static code analysis.
@@ -13,16 +13,16 @@ import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
  * and do not have catastrophic backtracking issues.
  */
 // Wildcard origin: origin: "*" or origin = "*"
-const WILDCARD_ORIGIN_PATTERN = /origin\s{0,10}[:=]\s{0,10}(['"])\*\1/g
+const WILDCARD_ORIGIN_PATTERN = /origin\s{0,10}[:=]\s{0,10}(['"])\*\1/g;
 // Wildcard origin with credentials (simplified to avoid backtracking)
 const WILDCARD_WITH_CREDS_PATTERN =
-  /origin\s{0,10}[:=]\s{0,10}(['"])\*\1[^}]{0,200}credentials\s{0,10}[:=]\s{0,10}true/gi
+  /origin\s{0,10}[:=]\s{0,10}(['"])\*\1[^}]{0,200}credentials\s{0,10}[:=]\s{0,10}true/gi;
 // Reflecting origin without validation
-const REFLECTING_ORIGIN_PATTERN = /origin\s{0,10}[:=]\s{0,10}(?:request|req)\.headers?\.origin/gi
+const REFLECTING_ORIGIN_PATTERN = /origin\s{0,10}[:=]\s{0,10}(?:request|req)\.headers?\.origin/gi;
 // All origins allowed
-const ORIGIN_TRUE_PATTERN = /origin\s{0,10}[:=]\s{0,10}true/g
+const ORIGIN_TRUE_PATTERN = /origin\s{0,10}[:=]\s{0,10}true/g;
 // Missing credentials in CORS call (simplified)
-const MISSING_CREDS_PATTERN = /cors\s{0,10}\([^)]{0,500}\)(?![^}]{0,200}credentials)/gi
+const MISSING_CREDS_PATTERN = /cors\s{0,10}\([^)]{0,500}\)(?![^}]{0,200}credentials)/gi;
 
 // Patterns that indicate CORS security issues
 const CORS_SECURITY_PATTERNS = [
@@ -66,7 +66,7 @@ const CORS_SECURITY_PATTERNS = [
       'If this API uses cookies or Authorization headers, add credentials: true to allow credentialed requests.',
     severity: 'warning' as const,
   },
-]
+];
 
 /**
  * Check: security/cors-configuration
@@ -102,27 +102,27 @@ export const corsConfiguration = defineCheck({
     logger.debug({
       evt: 'fitness.checks.cors_configuration.analyze',
       msg: 'Analyzing file for CORS configuration issues',
-    })
+    });
     // Only scan files that might contain CORS config
     if (!/cors/i.test(content)) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (const [lineNum, line_] of lines.entries()) {
-      const line = line_ ?? ''
+      const line = line_ ?? '';
 
       // Skip comments
       if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
-        continue
+        continue;
       }
 
       for (const pattern of CORS_SECURITY_PATTERNS) {
         // Reset regex state
-        pattern.regex.lastIndex = 0
-        const match = pattern.regex.exec(line)
+        pattern.regex.lastIndex = 0;
+        const match = pattern.regex.exec(line);
         if (match) {
           violations.push({
             line: lineNum + 1,
@@ -132,11 +132,11 @@ export const corsConfiguration = defineCheck({
             suggestion: pattern.suggestion,
             match: match[0],
             filePath,
-          })
+          });
         }
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

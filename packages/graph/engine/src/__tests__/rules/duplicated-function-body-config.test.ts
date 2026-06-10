@@ -19,7 +19,14 @@ const span10: Partial<FunctionOccurrence> = { line: 1, endLine: 10, bodySize: 50
 describe('duplicated-function-body config thresholds', () => {
   it('skips occurrences whose source span is below minDuplicateBodyLines', () => {
     const a = occ({ bodyHash: 'h', simpleName: 'a', line: 1, endLine: 3, bodySize: 500 });
-    const b = occ({ bodyHash: 'h', simpleName: 'b', filePath: 'src/b.ts', line: 1, endLine: 3, bodySize: 500 });
+    const b = occ({
+      bodyHash: 'h',
+      simpleName: 'b',
+      filePath: 'src/b.ts',
+      line: 1,
+      endLine: 3,
+      bodySize: 500,
+    });
     const catalog = makeCatalog([a, b]);
     const signals = duplicatedFunctionBodyRule.evaluate(catalog, buildIndexes(catalog), {
       minDuplicateBodyLines: 5,
@@ -41,7 +48,14 @@ describe('duplicated-function-body config thresholds', () => {
 
   it('skips occurrences whose normalized body size is below minDuplicateBodySize', () => {
     const a = occ({ bodyHash: 'h', simpleName: 'a', line: 1, endLine: 10, bodySize: 50 });
-    const b = occ({ bodyHash: 'h', simpleName: 'b', filePath: 'src/b.ts', line: 1, endLine: 10, bodySize: 50 });
+    const b = occ({
+      bodyHash: 'h',
+      simpleName: 'b',
+      filePath: 'src/b.ts',
+      line: 1,
+      endLine: 10,
+      bodySize: 50,
+    });
     const catalog = makeCatalog([a, b]);
     const signals = duplicatedFunctionBodyRule.evaluate(catalog, buildIndexes(catalog), {
       minDuplicateBodyLines: 0,
@@ -52,7 +66,14 @@ describe('duplicated-function-body config thresholds', () => {
 
   it('treats missing bodySize as passing the size threshold (legacy catalog)', () => {
     const a = occ({ bodyHash: 'h', simpleName: 'a', line: 1, endLine: 10, bodySize: undefined });
-    const b = occ({ bodyHash: 'h', simpleName: 'b', filePath: 'src/b.ts', line: 1, endLine: 10, bodySize: undefined });
+    const b = occ({
+      bodyHash: 'h',
+      simpleName: 'b',
+      filePath: 'src/b.ts',
+      line: 1,
+      endLine: 10,
+      bodySize: undefined,
+    });
     const catalog = makeCatalog([a, b]);
     const signals = duplicatedFunctionBodyRule.evaluate(catalog, buildIndexes(catalog), {
       minDuplicateBodyLines: 0,
@@ -63,7 +84,13 @@ describe('duplicated-function-body config thresholds', () => {
 
   it('skips arrow / function-expression / module-init occurrences', () => {
     const a = occ({ bodyHash: 'h', simpleName: 'a', kind: 'arrow', ...span10 });
-    const b = occ({ bodyHash: 'h', simpleName: 'b', kind: 'arrow', filePath: 'src/b.ts', ...span10 });
+    const b = occ({
+      bodyHash: 'h',
+      simpleName: 'b',
+      kind: 'arrow',
+      filePath: 'src/b.ts',
+      ...span10,
+    });
     const catalog = makeCatalog([a, b]);
     const signals = duplicatedFunctionBodyRule.evaluate(catalog, buildIndexes(catalog), {
       minDuplicateBodyLines: 0,
@@ -73,8 +100,20 @@ describe('duplicated-function-body config thresholds', () => {
   });
 
   it('skips occurrences inside test files', () => {
-    const a = occ({ bodyHash: 'h', simpleName: 'a', filePath: 'src/__tests__/a.test.ts', inTestFile: true, ...span10 });
-    const b = occ({ bodyHash: 'h', simpleName: 'b', filePath: 'src/__tests__/b.test.ts', inTestFile: true, ...span10 });
+    const a = occ({
+      bodyHash: 'h',
+      simpleName: 'a',
+      filePath: 'src/__tests__/a.test.ts',
+      inTestFile: true,
+      ...span10,
+    });
+    const b = occ({
+      bodyHash: 'h',
+      simpleName: 'b',
+      filePath: 'src/__tests__/b.test.ts',
+      inTestFile: true,
+      ...span10,
+    });
     const catalog = makeCatalog([a, b]);
     const signals = duplicatedFunctionBodyRule.evaluate(catalog, buildIndexes(catalog), {
       minDuplicateBodyLines: 0,

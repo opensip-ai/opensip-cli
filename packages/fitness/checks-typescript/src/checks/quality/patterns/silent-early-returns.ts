@@ -5,32 +5,32 @@
  * These patterns make debugging difficult by hiding why code paths weren't executed.
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 // =============================================================================
 // DETECTION PATTERNS
 // =============================================================================
 
 /** Function-like AST nodes this check operates on. */
-type FunctionLikeNode = ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction
+type FunctionLikeNode = ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction;
 
 /**
  * Patterns that indicate logging is present
  */
-const LOGGING_PATTERNS = [/logger\./, /console\./, /\.log\(/]
+const LOGGING_PATTERNS = [/logger\./, /console\./, /\.log\(/];
 
 /**
  * Patterns that indicate intentional silent return
  */
-const MARKER_PATTERNS = [/@silent-ok/, /\/\/\s*type\s*guard/i]
+const MARKER_PATTERNS = [/@silent-ok/, /\/\/\s*type\s*guard/i];
 
 /**
  * Sentinel return value kinds
  */
-const SENTINEL_KINDS = new Set([ts.SyntaxKind.NullKeyword, ts.SyntaxKind.FalseKeyword])
+const SENTINEL_KINDS = new Set([ts.SyntaxKind.NullKeyword, ts.SyntaxKind.FalseKeyword]);
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -46,10 +46,8 @@ const SENTINEL_KINDS = new Set([ts.SyntaxKind.NullKeyword, ts.SyntaxKind.FalseKe
  * inspect. Switching to the canonical helper would change behavior for
  * `if (!x) return null` directly inside a constructor body.
  */
-function findFunction(
-  node: ts.Node,
-): FunctionLikeNode | null {
-  let current = node.parent
+function findFunction(node: ts.Node): FunctionLikeNode | null {
+  let current = node.parent;
 
   while (current) {
     if (
@@ -57,11 +55,11 @@ function findFunction(
       ts.isMethodDeclaration(current) ||
       ts.isArrowFunction(current)
     ) {
-      return current
+      return current;
     }
-    current = current.parent
+    current = current.parent;
   }
-  return null
+  return null;
 }
 
 /**
@@ -69,38 +67,32 @@ function findFunction(
  * - Type guards: functions that return `x is T`
  * - Predicate functions: isXxx, hasXxx, canXxx, shouldXxx
  */
-function isTypeGuard(
-  fn: FunctionLikeNode,
-  sourceFile: ts.SourceFile,
-): boolean {
+function isTypeGuard(fn: FunctionLikeNode, sourceFile: ts.SourceFile): boolean {
   // Check return type predicate
   if (fn.type?.getText(sourceFile).includes(' is ')) {
-    return true
+    return true;
   }
 
   // Check function name matches predicate patterns
   if ((ts.isFunctionDeclaration(fn) || ts.isMethodDeclaration(fn)) && fn.name) {
-    const name = fn.name.getText(sourceFile)
+    const name = fn.name.getText(sourceFile);
     // Predicate function patterns: isXxx, hasXxx, canXxx, shouldXxx
     if (/^(is|has|can|should)[A-Z]/.test(name)) {
-      return true
+      return true;
     }
   }
 
-  return false
+  return false;
 }
 
 /**
  * Check if a function is a validation/parsing function where silent returns are expected.
  * These functions legitimately return null/false for invalid input.
  */
-function isValidationOrParserFunction(
-  fn: FunctionLikeNode,
-  sourceFile: ts.SourceFile,
-): boolean {
+function isValidationOrParserFunction(fn: FunctionLikeNode, sourceFile: ts.SourceFile): boolean {
   // Get function name if available
   if ((ts.isFunctionDeclaration(fn) || ts.isMethodDeclaration(fn)) && fn.name) {
-    const name = fn.name.getText(sourceFile)
+    const name = fn.name.getText(sourceFile);
     // Validation/parsing function patterns: validate*, verify*, parse*, check*, extract*, get*OrNull, etc.
     if (
       // eslint-disable-next-line sonarjs/regex-complexity -- exhaustive list of known validator/parser prefixes; readable as written
@@ -108,41 +100,38 @@ function isValidationOrParserFunction(
         name,
       )
     ) {
-      return true
+      return true;
     }
   }
 
   // Check return type - functions returning T | null or T | undefined are validators
   if (fn.type) {
-    const returnType = fn.type.getText(sourceFile)
+    const returnType = fn.type.getText(sourceFile);
     if (returnType.includes('| null') || returnType.includes('| undefined')) {
-      return true
+      return true;
     }
   }
 
-  return false
+  return false;
 }
 
 /**
  * Check if a return is a guard clause at the start of a function (first 3 statements).
  * Early guard clauses are a common defensive coding pattern.
  */
-function isEarlyGuardClause(
-  returnNode: ts.IfStatement,
-  fn: FunctionLikeNode,
-): boolean {
-  const body = fn.body
+function isEarlyGuardClause(returnNode: ts.IfStatement, fn: FunctionLikeNode): boolean {
+  const body = fn.body;
   /* v8 ignore next -- defensive AST/type guard */
-  if (!body || !ts.isBlock(body)) return false
+  if (!body || !ts.isBlock(body)) return false;
 
-  const statements = body.statements
+  const statements = body.statements;
   for (let i = 0; i < Math.min(statements.length, 3); i++) {
     if (statements[i] === returnNode) {
-      return true
+      return true;
     }
   }
 
-  return false
+  return false;
 }
 
 /**
@@ -157,78 +146,78 @@ const PREDICATE_METHODS = new Set([
   'some',
   'every',
   'map',
-])
+]);
 
 /**
  * Check if a function is a callback in an array predicate method
  * Example: arr.filter(x => { if (!x) return false; ... })
  */
-function isPredicateCallback(
-  fn: FunctionLikeNode,
-): boolean {
+function isPredicateCallback(fn: FunctionLikeNode): boolean {
   // Only arrow functions can be predicate callbacks
-  if (!ts.isArrowFunction(fn)) return false
+  if (!ts.isArrowFunction(fn)) return false;
 
   // Check if parent is a call expression argument
-  const parent = fn.parent
+  const parent = fn.parent;
   /* v8 ignore next -- defensive AST/type guard */
-  if (!ts.isCallExpression(parent)) return false
+  if (!ts.isCallExpression(parent)) return false;
 
   // Check if the call is a method call
-  const callee = parent.expression
+  const callee = parent.expression;
   /* v8 ignore next -- defensive AST/type guard */
-  if (!ts.isPropertyAccessExpression(callee)) return false
+  if (!ts.isPropertyAccessExpression(callee)) return false;
 
   // Check if method name is a predicate method
-  const methodName = callee.name.getText()
-  return PREDICATE_METHODS.has(methodName)
+  const methodName = callee.name.getText();
+  return PREDICATE_METHODS.has(methodName);
 }
 
 function extractReturnStatement(node: ts.IfStatement): ts.ReturnStatement | null {
   if (ts.isReturnStatement(node.thenStatement)) {
-    return node.thenStatement
+    return node.thenStatement;
   }
 
   /* v8 ignore next -- defensive AST/type guard */
   if (ts.isBlock(node.thenStatement) && node.thenStatement.statements.length === 1) {
-    const statement = node.thenStatement.statements[0]
+    const statement = node.thenStatement.statements[0];
     if (statement && ts.isReturnStatement(statement)) {
-      return statement
+      return statement;
     }
   }
 
-  return null
+  return null;
 }
 
-type SentinelReturnStatement = ts.ReturnStatement & { expression: ts.Expression }
+type SentinelReturnStatement = ts.ReturnStatement & { expression: ts.Expression };
 
 function isSentinelReturn(
   returnStatement: ts.ReturnStatement | null,
 ): returnStatement is SentinelReturnStatement {
-  return Boolean(returnStatement?.expression && SENTINEL_KINDS.has(returnStatement.expression.kind))
+  return Boolean(
+    returnStatement?.expression && SENTINEL_KINDS.has(returnStatement.expression.kind),
+  );
 }
 
 function shouldSkipForFunction(node: ts.IfStatement, sourceFile: ts.SourceFile): boolean {
-  const fn = findFunction(node)
+  const fn = findFunction(node);
   /* v8 ignore next -- defensive AST/type guard */
-  if (!fn) return false
+  if (!fn) return false;
 
   return (
     isTypeGuard(fn, sourceFile) ||
     isPredicateCallback(fn) ||
     isValidationOrParserFunction(fn, sourceFile) ||
     isEarlyGuardClause(node, fn)
-  )
+  );
 }
 
 function hasLoggingOrMarkerInContext(node: ts.IfStatement, content: string): boolean {
   /* v8 ignore next -- defensive non-negative guard */
-  const start = Math.max(0, node.getStart() - 200)
-  const context = content.slice(start, node.getEnd())
+  const start = Math.max(0, node.getStart() - 200);
+  const context = content.slice(start, node.getEnd());
 
   return (
     LOGGING_PATTERNS.some((p) => p.test(context)) || MARKER_PATTERNS.some((p) => p.test(context))
-  )
+  );
 }
 
 function createSilentReturnViolation(
@@ -236,9 +225,9 @@ function createSilentReturnViolation(
   returnStatement: SentinelReturnStatement,
   sourceFile: ts.SourceFile,
 ): CheckViolation {
-  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
   /* v8 ignore next -- defensive AST/type guard */
-  const val = returnStatement.expression.kind === ts.SyntaxKind.NullKeyword ? 'null' : 'false'
+  const val = returnStatement.expression.kind === ts.SyntaxKind.NullKeyword ? 'null' : 'false';
 
   return {
     line: line + 1,
@@ -248,7 +237,7 @@ function createSilentReturnViolation(
     // @fitness-ignore-next-line logging-standards -- String literal in suggestion text, not actual logger call
     suggestion: `Add logging: \`if (cond) { logger.info({ evt: 'validation.failed' }); return ${val}; }\``,
     match: `return ${val}`,
-  }
+  };
 }
 
 function checkSilentReturn(
@@ -256,21 +245,21 @@ function checkSilentReturn(
   sourceFile: ts.SourceFile,
   content: string,
 ): CheckViolation | null {
-  const returnStatement = extractReturnStatement(node)
+  const returnStatement = extractReturnStatement(node);
 
   if (!isSentinelReturn(returnStatement)) {
-    return null
+    return null;
   }
 
   if (shouldSkipForFunction(node, sourceFile)) {
-    return null
+    return null;
   }
 
   if (hasLoggingOrMarkerInContext(node, content)) {
-    return null
+    return null;
   }
 
-  return createSilentReturnViolation(node, returnStatement, sourceFile)
+  return createSilentReturnViolation(node, returnStatement, sourceFile);
 }
 
 // =============================================================================
@@ -314,30 +303,30 @@ export const silentEarlyReturns = defineCheck({
       evt: 'fitness.check.silent_early_returns.analyze',
       msg: 'Analyzing file for silent early return patterns',
       filePath,
-    })
+    });
     // Quick filter: must have potential silent returns
     if (!content.includes('return null') && !content.includes('return false')) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
-    const sourceFile = getSharedSourceFile(filePath, content)
+    const sourceFile = getSharedSourceFile(filePath, content);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
     const visit = (node: ts.Node): void => {
       // Only check if statements without else (single-line guards)
       if (ts.isIfStatement(node) && !node.elseStatement) {
-        const violation = checkSilentReturn(node, sourceFile, content)
+        const violation = checkSilentReturn(node, sourceFile, content);
         if (violation) {
-          violations.push(violation)
+          violations.push(violation);
         }
       }
-      ts.forEachChild(node, visit)
-    }
+      ts.forEachChild(node, visit);
+    };
 
-    visit(sourceFile)
-    return violations
+    visit(sourceFile);
+    return violations;
   },
-})
+});

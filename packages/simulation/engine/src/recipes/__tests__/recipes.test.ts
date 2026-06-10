@@ -1,5 +1,5 @@
 // @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
- 
+
 /**
  * @fileoverview Sim-recipe contract + integration tests.
  *
@@ -20,9 +20,7 @@ import { defineChaosScenario } from '../../kinds/chaos/define.js';
 import { defineLoadScenario } from '../../kinds/load/define.js';
 import { isBuiltInSimulationRecipe } from '../built-in-recipes.js';
 import { defineSimulationRecipe } from '../define-recipe.js';
-import {
-  SimulationRecipeRegistry,
-} from '../registry.js';
+import { SimulationRecipeRegistry } from '../registry.js';
 import { SimulationRecipeService } from '../service.js';
 
 import type { RunnableScenario } from '../../framework/runnable-scenario.js';
@@ -42,13 +40,14 @@ function makeStubScenario(id: string, run: () => Promise<unknown>): RunnableScen
   };
 }
 
-const stubLoadResult = (id: string) => Promise.resolve({
-  kind: 'load' as const,
-  scenarioId: id,
-  passed: true,
-  durationMs: 0,
-  signals: [] as const,
-});
+const stubLoadResult = (id: string) =>
+  Promise.resolve({
+    kind: 'load' as const,
+    scenarioId: id,
+    passed: true,
+    durationMs: 0,
+    signals: [] as const,
+  });
 
 beforeEach(() => {
   // Item 1: scenarioRegistry + recipe registry are per-RunScope.
@@ -76,7 +75,8 @@ const trackingScenario = (id: string, peak: { active: number; max: number }) =>
 describe('SimulationRecipeService — parallel concurrency', () => {
   it('caps in-flight scenarios at recipe.execution.maxParallel', async () => {
     const peak = { active: 0, max: 0 };
-    for (let i = 0; i < 6; i++) currentScenarioRegistry().register(trackingScenario(`p-${i}`, peak));
+    for (let i = 0; i < 6; i++)
+      currentScenarioRegistry().register(trackingScenario(`p-${i}`, peak));
     const recipe = defineSimulationRecipe({
       id: 'URCP_par_bound',
       name: 'par-bound',
@@ -95,7 +95,8 @@ describe('SimulationRecipeService — parallel concurrency', () => {
 
   it('runs unbounded when maxParallel is unset', async () => {
     const peak = { active: 0, max: 0 };
-    for (let i = 0; i < 4; i++) currentScenarioRegistry().register(trackingScenario(`u-${i}`, peak));
+    for (let i = 0; i < 4; i++)
+      currentScenarioRegistry().register(trackingScenario(`u-${i}`, peak));
     const recipe = defineSimulationRecipe({
       id: 'URCP_par_unbounded',
       name: 'par-unbounded',
@@ -308,8 +309,22 @@ describe('SimulationRecipeRegistry', () => {
     const registry = new SimulationRecipeRegistry();
     registry.clear();
     registry.registerAll([
-      { id: 'URCP_a', name: 'a', displayName: 'A', description: 'a', scenarios: { type: 'all' }, execution: { mode: 'parallel' } },
-      { id: 'URCP_b', name: 'b', displayName: 'B', description: 'b', scenarios: { type: 'all' }, execution: { mode: 'parallel' } },
+      {
+        id: 'URCP_a',
+        name: 'a',
+        displayName: 'A',
+        description: 'a',
+        scenarios: { type: 'all' },
+        execution: { mode: 'parallel' },
+      },
+      {
+        id: 'URCP_b',
+        name: 'b',
+        displayName: 'B',
+        description: 'b',
+        scenarios: { type: 'all' },
+        execution: { mode: 'parallel' },
+      },
     ]);
     expect(registry.size).toBe(2);
   });
@@ -342,39 +357,45 @@ describe('SimulationRecipeRegistry', () => {
 // =============================================================================
 
 function defineThreeScenarios(): void {
-  currentScenarioRegistry().register(defineLoadScenario({
-    id: 'load-a',
-    name: 'load-a',
-    description: 'load',
-    tags: ['fast', 'demo'],
-    target: noopTarget,
-    workload: { rps: 1 },
-    duration: 1,
-    assertions: [ASSERTIONS.lowErrorRate(1)],
-  }));
-  currentScenarioRegistry().register(defineLoadScenario({
-    id: 'load-b',
-    name: 'load-b',
-    description: 'load',
-    tags: ['slow'],
-    target: noopTarget,
-    workload: { rps: 1 },
-    duration: 1,
-    assertions: [ASSERTIONS.lowErrorRate(1)],
-  }));
-  currentScenarioRegistry().register(defineChaosScenario({
-    id: 'chaos-a',
-    name: 'chaos-a',
-    description: 'chaos',
-    tags: ['demo'],
-    target: noopTarget,
-    workload: { rps: 1 },
-    duration: 1,
-    fault: fault.of([fault.drop()], { probability: 0.1 }),
-    steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
-    recoveryAssertions: [ASSERTIONS.lowErrorRate(0.5)],
-    recoveryWindow: 100,
-  }));
+  currentScenarioRegistry().register(
+    defineLoadScenario({
+      id: 'load-a',
+      name: 'load-a',
+      description: 'load',
+      tags: ['fast', 'demo'],
+      target: noopTarget,
+      workload: { rps: 1 },
+      duration: 1,
+      assertions: [ASSERTIONS.lowErrorRate(1)],
+    }),
+  );
+  currentScenarioRegistry().register(
+    defineLoadScenario({
+      id: 'load-b',
+      name: 'load-b',
+      description: 'load',
+      tags: ['slow'],
+      target: noopTarget,
+      workload: { rps: 1 },
+      duration: 1,
+      assertions: [ASSERTIONS.lowErrorRate(1)],
+    }),
+  );
+  currentScenarioRegistry().register(
+    defineChaosScenario({
+      id: 'chaos-a',
+      name: 'chaos-a',
+      description: 'chaos',
+      tags: ['demo'],
+      target: noopTarget,
+      workload: { rps: 1 },
+      duration: 1,
+      fault: fault.of([fault.drop()], { probability: 0.1 }),
+      steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
+      recoveryAssertions: [ASSERTIONS.lowErrorRate(0.5)],
+      recoveryWindow: 100,
+    }),
+  );
 }
 
 describe('SimulationRecipeService — selector resolution', () => {
@@ -487,7 +508,9 @@ describe('SimulationRecipeService — execution modes + failure handling', () =>
     currentScenarioRegistry().register(
       makeStubScenario('failing', () => Promise.reject(new Error('boom'))),
     );
-    currentScenarioRegistry().register(makeStubScenario('passing', () => stubLoadResult('passing')));
+    currentScenarioRegistry().register(
+      makeStubScenario('passing', () => stubLoadResult('passing')),
+    );
 
     const service = new SimulationRecipeService();
     const result = await service.runRecipe({
@@ -509,14 +532,18 @@ describe('SimulationRecipeService — execution modes + failure handling', () =>
 
   it('runs sequentially when execution.mode === sequential', async () => {
     const order: string[] = [];
-    currentScenarioRegistry().register(makeStubScenario('first', () => {
-      order.push('first');
-      return stubLoadResult('first');
-    }));
-    currentScenarioRegistry().register(makeStubScenario('second', () => {
-      order.push('second');
-      return stubLoadResult('second');
-    }));
+    currentScenarioRegistry().register(
+      makeStubScenario('first', () => {
+        order.push('first');
+        return stubLoadResult('first');
+      }),
+    );
+    currentScenarioRegistry().register(
+      makeStubScenario('second', () => {
+        order.push('second');
+        return stubLoadResult('second');
+      }),
+    );
 
     const service = new SimulationRecipeService();
     await service.runRecipe({
@@ -533,14 +560,18 @@ describe('SimulationRecipeService — execution modes + failure handling', () =>
 
   it('stops on first failure in sequential mode when stopOnFirstFailure is set', async () => {
     const order: string[] = [];
-    currentScenarioRegistry().register(makeStubScenario('crashes', () => {
-      order.push('crashes');
-      return Promise.reject(new Error('nope'));
-    }));
-    currentScenarioRegistry().register(makeStubScenario('never-runs', () => {
-      order.push('never-runs');
-      return stubLoadResult('never-runs');
-    }));
+    currentScenarioRegistry().register(
+      makeStubScenario('crashes', () => {
+        order.push('crashes');
+        return Promise.reject(new Error('nope'));
+      }),
+    );
+    currentScenarioRegistry().register(
+      makeStubScenario('never-runs', () => {
+        order.push('never-runs');
+        return stubLoadResult('never-runs');
+      }),
+    );
 
     const service = new SimulationRecipeService();
     const result = await service.runRecipe({

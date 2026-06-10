@@ -13,14 +13,14 @@
  * flows through this helper.
  */
 
-import { logger } from '../lib/logger.js'
+import { logger } from '../lib/logger.js';
 
 /**
  * npm scope syntax: `@` followed by a kebab-case identifier. We anchor
  * strictly because scope strings end up in `path.join('node_modules', scope)`
  * — a stray `..` or `/` would scan the wrong directory.
  */
-export const VALID_NPM_SCOPE_REGEX = /^@[a-z0-9][a-z0-9._-]*$/
+export const VALID_NPM_SCOPE_REGEX = /^@[a-z0-9][a-z0-9._-]*$/;
 
 /**
  * Resolve the effective list of npm scopes to scan: the platform
@@ -33,15 +33,15 @@ export const VALID_NPM_SCOPE_REGEX = /^@[a-z0-9][a-z0-9._-]*$/
  * @param extraScopes   Customer-configured additions
  * @param evt           Log event name to use when warning about invalid
  *                       entries — lets each caller emit a domain-specific
-   *                       event name (`plugin.scenario_package.invalid_scope`).
+ *                       event name (`plugin.scenario_package.invalid_scope`).
  */
 export function resolveScopes(
   defaultScope: string,
   extraScopes: readonly string[],
   evt: string,
 ): readonly string[] {
-  const out: string[] = [defaultScope]
-  const seen = new Set<string>(out)
+  const out: string[] = [defaultScope];
+  const seen = new Set<string>(out);
   for (const scope of extraScopes) {
     if (!VALID_NPM_SCOPE_REGEX.test(scope)) {
       logger.warn({
@@ -49,12 +49,12 @@ export function resolveScopes(
         module: 'core:plugins',
         scope,
         msg: `plugins.packageScopes entry "${scope}" is not a valid npm scope (expected "@kebab-case") — skipping`,
-      })
-      continue
+      });
+      continue;
     }
-    if (seen.has(scope)) continue
-    seen.add(scope)
-    out.push(scope)
+    if (seen.has(scope)) continue;
+    seen.add(scope);
+    out.push(scope);
   }
-  return out
+  return out;
 }

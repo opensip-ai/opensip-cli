@@ -117,10 +117,20 @@ describe('renderCatalogJson kind mapping', () => {
 describe('renderCatalogJson edge invariants', () => {
   it('emits a resolved call edge and drops one whose target hash is unknown', () => {
     const resolved: CallEdge = {
-      to: ['h2'], line: 3, column: 1, resolution: 'static', confidence: 'high', text: 'b()',
+      to: ['h2'],
+      line: 3,
+      column: 1,
+      resolution: 'static',
+      confidence: 'high',
+      text: 'b()',
     };
     const dangling: CallEdge = {
-      to: ['NOPE'], line: 4, column: 1, resolution: 'static', confidence: 'high', text: 'gone()',
+      to: ['NOPE'],
+      line: 4,
+      column: 1,
+      resolution: 'static',
+      confidence: 'high',
+      text: 'gone()',
     };
     const catalog = catalogOf([
       occ('a', 'h1', 'function-declaration', [resolved, dangling]),
@@ -133,7 +143,10 @@ describe('renderCatalogJson edge invariants', () => {
 
   it('drops a dependency edge whose target hash is unknown', () => {
     const dep: DependencyEdge = {
-      to: ['MISSING'], specifier: 'x', line: 1, column: 0,
+      to: ['MISSING'],
+      specifier: 'x',
+      line: 1,
+      column: 0,
     };
     const catalog = catalogOf([occ('mod', 'h1', 'module-init', [], [dep])]);
     const doc = render(catalog);

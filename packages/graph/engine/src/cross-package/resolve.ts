@@ -84,7 +84,9 @@ export interface CrossPackageCallInput {
  *   3. otherwise look the callee name up in that package's export bucket and
  *      {@link linkExported} it to a unique occurrence (else decline).
  */
-export function resolveCrossPackageCall(input: CrossPackageCallInput): FunctionOccurrence | undefined {
+export function resolveCrossPackageCall(
+  input: CrossPackageCallInput,
+): FunctionOccurrence | undefined {
   const { importSpecifier, calleeName, exportIndex, manifestIndex } = input;
   if (importSpecifier === undefined || importSpecifier.length === 0) return undefined;
   if (importSpecifier.startsWith('.')) return undefined; // relative — not this seam's job

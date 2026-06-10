@@ -44,7 +44,9 @@ return { passesFilter, packageOfPath };
   return factory() as FilterEnv;
 }
 
-function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string }): GraphFunctionOccurrence {
+function makeOcc(
+  over: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string },
+): GraphFunctionOccurrence {
   return {
     qualifiedName: over.simpleName,
     filePath: 'packages/contracts/src/x.ts',
@@ -82,7 +84,11 @@ describe('passesFilter (filter chip predicate)', () => {
   it('rejects functions whose package is not in the active set (when set is non-empty)', () => {
     const env = loadFilterEnv();
     const occ = makeOcc({ bodyHash: 'h', simpleName: 'f', filePath: 'packages/cli/src/x.ts' });
-    const fs: FilterState = { packages: new Set(['contracts']), kinds: new Set(), includeTests: false };
+    const fs: FilterState = {
+      packages: new Set(['contracts']),
+      kinds: new Set(),
+      includeTests: false,
+    };
     expect(env.passesFilter(occ, fs)).toBe(false);
   });
 
@@ -96,7 +102,11 @@ describe('passesFilter (filter chip predicate)', () => {
   it('rejects functions whose kind is not in the active kinds set', () => {
     const env = loadFilterEnv();
     const occ = makeOcc({ bodyHash: 'h', simpleName: 'f', kind: 'arrow' });
-    const fs: FilterState = { packages: new Set(), kinds: new Set(['method']), includeTests: false };
+    const fs: FilterState = {
+      packages: new Set(),
+      kinds: new Set(['method']),
+      includeTests: false,
+    };
     expect(env.passesFilter(occ, fs)).toBe(false);
   });
 

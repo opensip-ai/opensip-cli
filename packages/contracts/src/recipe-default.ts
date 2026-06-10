@@ -71,13 +71,33 @@ export function resolveToolRecipeName(input: {
   readonly cliRecipe?: string;
 }): ResolvedRecipe {
   if (isSet(input.explicit)) {
-    return { name: input.explicit, source: 'flag', tolerant: false, usedDeprecatedCliRecipe: false };
+    return {
+      name: input.explicit,
+      source: 'flag',
+      tolerant: false,
+      usedDeprecatedCliRecipe: false,
+    };
   }
   if (isSet(input.toolRecipe)) {
-    return { name: input.toolRecipe, source: 'tool-config', tolerant: true, usedDeprecatedCliRecipe: false };
+    return {
+      name: input.toolRecipe,
+      source: 'tool-config',
+      tolerant: true,
+      usedDeprecatedCliRecipe: false,
+    };
   }
   if (isSet(input.cliRecipe)) {
-    return { name: input.cliRecipe, source: 'cli-config', tolerant: true, usedDeprecatedCliRecipe: true };
+    return {
+      name: input.cliRecipe,
+      source: 'cli-config',
+      tolerant: true,
+      usedDeprecatedCliRecipe: true,
+    };
   }
-  return { name: BUILTIN_DEFAULT_RECIPE, source: 'builtin', tolerant: true, usedDeprecatedCliRecipe: false };
+  return {
+    name: BUILTIN_DEFAULT_RECIPE,
+    source: 'builtin',
+    tolerant: true,
+    usedDeprecatedCliRecipe: false,
+  };
 }

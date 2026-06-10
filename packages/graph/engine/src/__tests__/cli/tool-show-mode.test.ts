@@ -34,7 +34,9 @@ function graphSession(overrides: Partial<StoredSession> = {}): StoredSession {
           passed: false,
           violationCount: 1,
           durationMs: 0,
-          findings: [{ ruleId: 'graph:god-file', message: 'too big', severity: 'error', filePath: 'a.ts' }],
+          findings: [
+            { ruleId: 'graph:god-file', message: 'too big', severity: 'error', filePath: 'a.ts' },
+          ],
         },
       ],
     },
@@ -53,14 +55,23 @@ function makeContext(datastore: DataStore | undefined): {
   const exitCodes: number[] = [];
   const ctx = {
     scope: { datastore: () => datastore },
-    render: vi.fn((result: unknown) => { rendered.push(result); return Promise.resolve(); }),
+    render: vi.fn((result: unknown) => {
+      rendered.push(result);
+      return Promise.resolve();
+    }),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    setExitCode: (code: number) => { exitCodes.push(code); },
-    emitJson: (value: unknown) => { emitted.push(value); },
-    emitEnvelope: (value: unknown) => { emitted.push(value); },
+    setExitCode: (code: number) => {
+      exitCodes.push(code);
+    },
+    emitJson: (value: unknown) => {
+      emitted.push(value);
+    },
+    emitEnvelope: (value: unknown) => {
+      emitted.push(value);
+    },
     emitError: (detail: { message: string; exitCode: number; code?: string }) => {
       exitCodes.push(detail.exitCode);
       emitted.push(detail);

@@ -103,9 +103,7 @@ describe('graph SARIF — golden fixtures', () => {
 
     it(`matches fixture for ${fixture.slug}`, async () => {
       const sarif = graphSarif([makeSignal(fixture)]);
-      await expect(sarif).toMatchFileSnapshot(
-        `./__fixtures__/sarif/${ruleSlug}.json`,
-      );
+      await expect(sarif).toMatchFileSnapshot(`./__fixtures__/sarif/${ruleSlug}.json`);
     });
   }
 });
@@ -157,16 +155,76 @@ interface NewRuleCase {
 
 /** One case per (new rule × severity band) plus non-TS file paths. */
 const NEW_RULE_CASES: readonly NewRuleCase[] = [
-  { slug: 'graph:large-function', mappedId: 'graph.complexity.large-function', severity: 'high', expectedLevel: 'error', filePath: 'src/big.ts' },
-  { slug: 'graph:large-function', mappedId: 'graph.complexity.large-function', severity: 'medium', expectedLevel: 'warning', filePath: 'pkg/mod.py' },
-  { slug: 'graph:wide-function', mappedId: 'graph.complexity.wide-function', severity: 'high', expectedLevel: 'error', filePath: 'src/lib.rs' },
-  { slug: 'graph:wide-function', mappedId: 'graph.complexity.wide-function', severity: 'medium', expectedLevel: 'warning', filePath: 'src/wide.ts' },
-  { slug: 'graph:high-blast-untested', mappedId: 'graph.coverage.high-blast-untested', severity: 'high', expectedLevel: 'error', filePath: 'app/service.go' },
-  { slug: 'graph:high-blast-untested', mappedId: 'graph.coverage.high-blast-untested', severity: 'medium', expectedLevel: 'warning', filePath: 'src/hot.ts' },
-  { slug: 'graph:cycle', mappedId: 'graph.architecture.cycle', severity: 'high', expectedLevel: 'error', filePath: 'src/cycle.py' },
-  { slug: 'graph:cycle', mappedId: 'graph.architecture.cycle', severity: 'medium', expectedLevel: 'warning', filePath: 'src/cycle.ts' },
-  { slug: 'graph:cycle', mappedId: 'graph.architecture.cycle', severity: 'low', expectedLevel: 'note', filePath: 'src/mutual.ts' },
-  { slug: 'graph:unexpected-coupling', mappedId: 'graph.architecture.unexpected-coupling', severity: 'high', expectedLevel: 'error', filePath: 'crate/src/lib.rs' },
+  {
+    slug: 'graph:large-function',
+    mappedId: 'graph.complexity.large-function',
+    severity: 'high',
+    expectedLevel: 'error',
+    filePath: 'src/big.ts',
+  },
+  {
+    slug: 'graph:large-function',
+    mappedId: 'graph.complexity.large-function',
+    severity: 'medium',
+    expectedLevel: 'warning',
+    filePath: 'pkg/mod.py',
+  },
+  {
+    slug: 'graph:wide-function',
+    mappedId: 'graph.complexity.wide-function',
+    severity: 'high',
+    expectedLevel: 'error',
+    filePath: 'src/lib.rs',
+  },
+  {
+    slug: 'graph:wide-function',
+    mappedId: 'graph.complexity.wide-function',
+    severity: 'medium',
+    expectedLevel: 'warning',
+    filePath: 'src/wide.ts',
+  },
+  {
+    slug: 'graph:high-blast-untested',
+    mappedId: 'graph.coverage.high-blast-untested',
+    severity: 'high',
+    expectedLevel: 'error',
+    filePath: 'app/service.go',
+  },
+  {
+    slug: 'graph:high-blast-untested',
+    mappedId: 'graph.coverage.high-blast-untested',
+    severity: 'medium',
+    expectedLevel: 'warning',
+    filePath: 'src/hot.ts',
+  },
+  {
+    slug: 'graph:cycle',
+    mappedId: 'graph.architecture.cycle',
+    severity: 'high',
+    expectedLevel: 'error',
+    filePath: 'src/cycle.py',
+  },
+  {
+    slug: 'graph:cycle',
+    mappedId: 'graph.architecture.cycle',
+    severity: 'medium',
+    expectedLevel: 'warning',
+    filePath: 'src/cycle.ts',
+  },
+  {
+    slug: 'graph:cycle',
+    mappedId: 'graph.architecture.cycle',
+    severity: 'low',
+    expectedLevel: 'note',
+    filePath: 'src/mutual.ts',
+  },
+  {
+    slug: 'graph:unexpected-coupling',
+    mappedId: 'graph.architecture.unexpected-coupling',
+    severity: 'high',
+    expectedLevel: 'error',
+    filePath: 'crate/src/lib.rs',
+  },
 ];
 
 function newRuleSignal(c: NewRuleCase): Signal {
@@ -201,7 +259,13 @@ describe('graph SARIF — Plan D rules level mapping + multi-language', () => {
   }
 
   it('a Python and a TypeScript occurrence of the same rule produce identical SARIF shape', () => {
-    const ts = newRuleSignal({ slug: 'graph:large-function', mappedId: 'graph.complexity.large-function', severity: 'high', expectedLevel: 'error', filePath: 'src/x.ts' });
+    const ts = newRuleSignal({
+      slug: 'graph:large-function',
+      mappedId: 'graph.complexity.large-function',
+      severity: 'high',
+      expectedLevel: 'error',
+      filePath: 'src/x.ts',
+    });
     const py = { ...ts, filePath: 'src/x.py', code: { file: 'src/x.py', line: 10, column: 0 } };
     const rTs = firstResult(ts);
     const rPy = firstResult(py);

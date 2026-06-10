@@ -16,11 +16,7 @@ import React from 'react';
 import { useClock, useTick } from './clock.js';
 import { useTheme } from './theme.js';
 
-const SPINNER_FRAMES = [
-  '⠋', '⠙', '⠹', '⠸',
-  '⠼', '⠴', '⠦', '⠧',
-  '⠇', '⠏',
-];
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 /** Spinner frame keyed off the surrounding `<ClockProvider>`. */
 export function useSpinner(): string {
@@ -46,32 +42,86 @@ export interface SpinnerProps {
   readonly standalone?: boolean;
 }
 
-export function Spinner({ total, completed, label = 'Running...', standalone = false }: SpinnerProps): React.ReactElement {
-  return standalone
-    ? <SpinnerStandalone total={total} completed={completed} label={label} />
-    : <SpinnerCtx total={total} completed={completed} label={label} />;
+export function Spinner({
+  total,
+  completed,
+  label = 'Running...',
+  standalone = false,
+}: SpinnerProps): React.ReactElement {
+  return standalone ? (
+    <SpinnerStandalone total={total} completed={completed} label={label} />
+  ) : (
+    <SpinnerCtx total={total} completed={completed} label={label} />
+  );
 }
 
-function SpinnerCtx({ total, completed, label }: { readonly total: number; readonly completed: number; readonly label: string }): React.ReactElement {
+function SpinnerCtx({
+  total,
+  completed,
+  label,
+}: {
+  readonly total: number;
+  readonly completed: number;
+  readonly label: string;
+}): React.ReactElement {
   const theme = useTheme();
   const frame = useSpinner();
-  return <SpinnerLine frame={frame} brand={theme.brand} total={total} completed={completed} label={label} />;
+  return (
+    <SpinnerLine
+      frame={frame}
+      brand={theme.brand}
+      total={total}
+      completed={completed}
+      label={label}
+    />
+  );
 }
 
-function SpinnerStandalone({ total, completed, label }: { readonly total: number; readonly completed: number; readonly label: string }): React.ReactElement {
+function SpinnerStandalone({
+  total,
+  completed,
+  label,
+}: {
+  readonly total: number;
+  readonly completed: number;
+  readonly label: string;
+}): React.ReactElement {
   const theme = useTheme();
   const frame = useStandaloneSpinner();
-  return <SpinnerLine frame={frame} brand={theme.brand} total={total} completed={completed} label={label} />;
+  return (
+    <SpinnerLine
+      frame={frame}
+      brand={theme.brand}
+      total={total}
+      completed={completed}
+      label={label}
+    />
+  );
 }
 
-function SpinnerLine({ frame, brand, total, completed, label }: { readonly frame: string; readonly brand: string; readonly total: number; readonly completed: number; readonly label: string }): React.ReactElement {
+function SpinnerLine({
+  frame,
+  brand,
+  total,
+  completed,
+  label,
+}: {
+  readonly frame: string;
+  readonly brand: string;
+  readonly total: number;
+  readonly completed: number;
+  readonly label: string;
+}): React.ReactElement {
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
   return (
     <Text>
-      <Text color={brand}>{frame}</Text>
-      {' '}
-      {label}
-      {total > 0 ? <Text>  {completed}/{total} ({pct}%)</Text> : null}
+      <Text color={brand}>{frame}</Text> {label}
+      {total > 0 ? (
+        <Text>
+          {' '}
+          {completed}/{total} ({pct}%)
+        </Text>
+      ) : null}
     </Text>
   );
 }

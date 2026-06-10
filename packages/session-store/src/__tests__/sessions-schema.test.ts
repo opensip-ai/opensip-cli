@@ -24,7 +24,16 @@ describe('sessions schema', () => {
     const names = columns.map((c) => c.name);
     expect(names).not.toContain('summary');
     expect(names).toEqual(
-      expect.arrayContaining(['id', 'tool', 'timestamp', 'cwd', 'recipe', 'score', 'passed', 'duration_ms']),
+      expect.arrayContaining([
+        'id',
+        'tool',
+        'timestamp',
+        'cwd',
+        'recipe',
+        'score',
+        'passed',
+        'duration_ms',
+      ]),
     );
   });
 

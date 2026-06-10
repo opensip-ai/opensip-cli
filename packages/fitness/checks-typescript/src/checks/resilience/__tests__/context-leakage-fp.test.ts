@@ -9,12 +9,12 @@
  * are spared, so a genuine `let activeContext: RequestContext` still fires.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest';
 
-import { analyzeContextLeakage } from '../context-leakage.js'
+import { analyzeContextLeakage } from '../context-leakage.js';
 
 function analyze(src: string): readonly { line: number }[] {
-  return analyzeContextLeakage(src, 'src/cli/telemetry/sdk-init.ts')
+  return analyzeContextLeakage(src, 'src/cli/telemetry/sdk-init.ts');
 }
 
 describe('context-leakage — OTel Context FP regression', () => {
@@ -23,16 +23,16 @@ describe('context-leakage — OTel Context FP regression', () => {
       import { context as otelContext, type Context } from '@opentelemetry/api';
       let parentContext: Context | undefined;
       export function setParent(c: Context): void { parentContext = c; }
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 
   it('STILL flags a module-level binding typed as a non-OTel request context', () => {
     const src = `
       import type { RequestContext } from './http.js';
       let activeContext: RequestContext | null = null;
       export function setCtx(c: RequestContext): void { activeContext = c; }
-    `
-    expect(analyze(src).length).toBeGreaterThan(0)
-  })
-})
+    `;
+    expect(analyze(src).length).toBeGreaterThan(0);
+  });
+});

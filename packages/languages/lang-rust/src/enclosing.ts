@@ -4,19 +4,19 @@
  * over the generic `findEnclosing`/`nameOf` from `@opensip-tools/tree-sitter`.
  */
 
-import { findEnclosing, nameOf, type Node } from '@opensip-tools/tree-sitter'
+import { findEnclosing, nameOf, type Node } from '@opensip-tools/tree-sitter';
 
-import { isFunction, isImpl } from './predicates.js'
+import { isFunction, isImpl } from './predicates.js';
 
 /** The nearest enclosing `fn` of `node`, or `null` at module scope. */
 export function findEnclosingFunction(node: Node): Node | null {
-  return findEnclosing(node, isFunction)
+  return findEnclosing(node, isFunction);
 }
 
 /** The name of the nearest enclosing `fn`, or `null`. */
 export function getEnclosingFunctionName(node: Node): string | null {
-  const fn = findEnclosingFunction(node)
-  return fn ? nameOf(fn) : null
+  const fn = findEnclosingFunction(node);
+  return fn ? nameOf(fn) : null;
 }
 
 /**
@@ -25,7 +25,7 @@ export function getEnclosingFunctionName(node: Node): string | null {
  * another `fn`) is therefore not a method.
  */
 export function isMethod(node: Node): boolean {
-  if (!isFunction(node)) return false
-  const enclosing = findEnclosing(node, (n) => isFunction(n) || isImpl(n))
-  return enclosing !== null && isImpl(enclosing)
+  if (!isFunction(node)) return false;
+  const enclosing = findEnclosing(node, (n) => isFunction(n) || isImpl(n));
+  return enclosing !== null && isImpl(enclosing);
 }

@@ -25,7 +25,13 @@ describe('dashboard graph-tab — rule/recipe catalog wiring', () => {
       { slug: 'graph:duplicated-function-body', defaultSeverity: 'warning', source: 'built-in' },
     ],
     graphRecipeCatalog: [
-      { name: 'default', displayName: 'Default', description: 'Run all graph rules', tags: ['default'], selectorType: 'all' },
+      {
+        name: 'default',
+        displayName: 'Default',
+        description: 'Run all graph rules',
+        tags: ['default'],
+        selectorType: 'all',
+      },
     ],
   });
 
@@ -67,7 +73,9 @@ describe('dashboard graph-tab — rule/recipe catalog wiring', () => {
     // them rather than assuming a single rule / source order.
     const baselineRule = html
       .split('.data-table td')
-      .find(seg => seg.startsWith(' {') && seg.slice(0, seg.indexOf('}')).includes('font-size: 13px'));
+      .find(
+        (seg) => seg.startsWith(' {') && seg.slice(0, seg.indexOf('}')).includes('font-size: 13px'),
+      );
     expect(baselineRule).toBeDefined();
     expect(baselineRule).toContain('font-family: var(--font)');
   });

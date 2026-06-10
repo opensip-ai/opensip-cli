@@ -100,5 +100,8 @@ export function buildFitVerboseDetail(
   opts: { readonly verbose?: boolean },
 ): VerboseDetail | undefined {
   if (opts.verbose !== true) return undefined;
-  return { kind: 'findings', groups: buildFindingGroups(envelope.units, envelope.signals, getDisplayName) };
+  return {
+    kind: 'findings',
+    groups: buildFindingGroups(envelope.units, envelope.signals, getDisplayName),
+  };
 }

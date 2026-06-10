@@ -10,7 +10,7 @@
  * - Nested O(n^2) loops
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Performance anti-pattern types
@@ -20,13 +20,13 @@ type AntiPatternType =
   | 'spread-in-loop'
   | 'string-concat-in-loop'
   | 'nested-loop'
-  | 'sync-in-async'
+  | 'sync-in-async';
 
 interface PatternConfig {
-  pattern: RegExp
-  type: AntiPatternType
-  message: string
-  severity: 'error' | 'warning'
+  pattern: RegExp;
+  type: AntiPatternType;
+  message: string;
+  severity: 'error' | 'warning';
 }
 
 // Anti-pattern type identifiers
@@ -34,7 +34,7 @@ const ANTI_PATTERN_TYPES = {
   SEQUENTIAL_AWAIT: 'sequential-await',
   SPREAD_IN_LOOP: 'spread-in-loop',
   STRING_CONCAT_IN_LOOP: 'string-concat-in-loop',
-} as const
+} as const;
 
 // Patterns use bounded quantifiers to prevent ReDoS vulnerabilities
 const PATTERNS: PatternConfig[] = [
@@ -67,7 +67,8 @@ const PATTERNS: PatternConfig[] = [
     // Bounded to prevent super-linear runtime.
     pattern: /for\s{0,5}\([^)]{0,200}\)\s{0,5}\{[^}]{0,500}[[{]\s{0,5}\.\.\./,
     type: ANTI_PATTERN_TYPES.SPREAD_IN_LOOP,
-    message: 'Spread-accumulation in a loop — rebuilding a collection by spreading it back into itself is O(n^2); push/assign into the existing collection instead',
+    message:
+      'Spread-accumulation in a loop — rebuilding a collection by spreading it back into itself is O(n^2); push/assign into the existing collection instead',
     severity: 'warning',
   },
   {
@@ -77,11 +78,11 @@ const PATTERNS: PatternConfig[] = [
     message: 'String concatenation in loop - use array.join() instead',
     severity: 'warning',
   },
-]
+];
 
 interface CheckLineForPerformancePatternsOptions {
-  lines: string[]
-  index: number
+  lines: string[];
+  index: number;
 }
 
 /**
@@ -94,28 +95,28 @@ interface CheckLineForPerformancePatternsOptions {
  *
  * Bounded quantifiers prevent ReDoS — context is at most 8 lines.
  */
-const RETRY_LOOP_BODY = /await\s{1,5}(delay|sleep|wait|setTimeout|backoff|pause)\s{0,5}\(/
+const RETRY_LOOP_BODY = /await\s{1,5}(delay|sleep|wait|setTimeout|backoff|pause)\s{0,5}\(/;
 
 /* v8 ignore start -- multi-pattern AST-style detector with many type-specific branches; covered indirectly */
 function checkLineForPerformancePatterns(
   options: CheckLineForPerformancePatternsOptions,
 ): CheckViolation | null {
-  const { lines, index } = options
-  const line = lines[index]
-  if (!line) return null
+  const { lines, index } = options;
+  const line = lines[index];
+  if (!line) return null;
 
   // Get multi-line context for loop detection
-  const contextStart = Math.max(0, index - 2)
-  const contextEnd = Math.min(lines.length, index + 5)
-  const context = lines.slice(contextStart, contextEnd).join('\n')
+  const contextStart = Math.max(0, index - 2);
+  const contextEnd = Math.min(lines.length, index + 5);
+  const context = lines.slice(contextStart, contextEnd).join('\n');
 
   // Wider window for retry-loop detection — the `await delay()` that
   // marks an intentional retry/backoff loop often sits past the small
   // 8-line context window that the anti-pattern regexes themselves use.
   // 30 lines forward covers nearly all real retry helpers without
   // crossing function boundaries in normal code.
-  const retryContextEnd = Math.min(lines.length, index + 30)
-  const retryContext = lines.slice(contextStart, retryContextEnd).join('\n')
+  const retryContextEnd = Math.min(lines.length, index + 30);
+  const retryContext = lines.slice(contextStart, retryContextEnd).join('\n');
 
   for (const patternConfig of PATTERNS) {
     if (patternConfig.pattern.test(context)) {
@@ -127,24 +128,24 @@ function checkLineForPerformancePatterns(
         patternConfig.type === ANTI_PATTERN_TYPES.SEQUENTIAL_AWAIT &&
         RETRY_LOOP_BODY.test(retryContext)
       ) {
-        continue
+        continue;
       }
 
       // Check if this line contains the key indicator
       // Using bounded quantifiers to prevent ReDoS
       const isSequentialAwait =
-        patternConfig.type === ANTI_PATTERN_TYPES.SEQUENTIAL_AWAIT && line.includes('await')
+        patternConfig.type === ANTI_PATTERN_TYPES.SEQUENTIAL_AWAIT && line.includes('await');
       const isSpreadInLoop =
-        patternConfig.type === ANTI_PATTERN_TYPES.SPREAD_IN_LOOP && isAccumulatingSpread(line)
+        patternConfig.type === ANTI_PATTERN_TYPES.SPREAD_IN_LOOP && isAccumulatingSpread(line);
       const isStringConcatInLoop =
         patternConfig.type === ANTI_PATTERN_TYPES.STRING_CONCAT_IN_LOOP &&
-        /\+=\s{0,5}['"`]/.test(line)
-      const isRelevantLine = isSequentialAwait || isSpreadInLoop || isStringConcatInLoop
+        /\+=\s{0,5}['"`]/.test(line);
+      const isRelevantLine = isSequentialAwait || isSpreadInLoop || isStringConcatInLoop;
 
       if (isRelevantLine) {
-        const lineNum = index + 1
+        const lineNum = index + 1;
 
-        const suggestion = getPerformanceSuggestion(patternConfig.type, patternConfig.message)
+        const suggestion = getPerformanceSuggestion(patternConfig.type, patternConfig.message);
 
         return {
           line: lineNum,
@@ -153,12 +154,12 @@ function checkLineForPerformancePatterns(
           severity: patternConfig.severity,
           suggestion,
           match: line,
-        }
+        };
       }
     }
   }
 
-  return null
+  return null;
 }
 /* v8 ignore stop */
 
@@ -189,32 +190,39 @@ function checkLineForPerformancePatterns(
  * defensive copy. All quantifiers are bounded to prevent ReDoS.
  */
 function isAccumulatingSpread(line: string): boolean {
-  if (!line.includes('...')) return false
+  if (!line.includes('...')) return false;
   // Self-referential rebuild: `ID = [...ID` / `ID = {...ID` (spread re-reads
   // the same binding being assigned). The `[^=;]` window allows leading
   // elements like `x = [first, ...x]`.
-  if (/\b([A-Za-z_$][\w$]*)\s{0,5}=\s{0,5}[[{][^=;]{0,200}\.\.\.\s{0,5}\1\b/.test(line)) return true
+  if (/\b([A-Za-z_$][\w$]*)\s{0,5}=\s{0,5}[[{][^=;]{0,200}\.\.\.\s{0,5}\1\b/.test(line))
+    return true;
   // Grouping into a Map slot: `X.set(k, [...X.get(...` (read-modify-write).
-  if (/\.set\s{0,5}\([^,;]{0,80},\s{0,5}[[{][^=;]{0,160}\.\.\.[^;]{0,80}\.get\s{0,5}\(/.test(line)) return true
+  if (/\.set\s{0,5}\([^,;]{0,80},\s{0,5}[[{][^=;]{0,160}\.\.\.[^;]{0,80}\.get\s{0,5}\(/.test(line))
+    return true;
   // Grouping into an indexed slot: `ID[k] = [...ID[`.
-  if (/\b([A-Za-z_$][\w$]*)\[[^\]]{0,80}\]\s{0,5}=\s{0,5}[[{][^=;]{0,160}\.\.\.\s{0,5}\1\b\[/.test(line)) return true
-  return false
+  if (
+    /\b([A-Za-z_$][\w$]*)\[[^\]]{0,80}\]\s{0,5}=\s{0,5}[[{][^=;]{0,160}\.\.\.\s{0,5}\1\b\[/.test(
+      line,
+    )
+  )
+    return true;
+  return false;
 }
 
 /* v8 ignore start -- switch over anti-pattern types; covered when patterns fire */
 function getPerformanceSuggestion(type: AntiPatternType, defaultMessage: string): string {
   switch (type) {
     case 'sequential-await': {
-      return 'Collect promises in an array and use Promise.all() to execute them in parallel, e.g.: const results = await Promise.all(items.map(item => fetchItem(item)));'
+      return 'Collect promises in an array and use Promise.all() to execute them in parallel, e.g.: const results = await Promise.all(items.map(item => fetchItem(item)));';
     }
     case 'spread-in-loop': {
-      return 'Mutate the existing collection instead of rebuilding it each iteration: array.push(x) (or push(...items)), map.get(k).push(x), or Object.assign(obj, { k: v }) — spreading the accumulator back into a new literal is O(n^2)'
+      return 'Mutate the existing collection instead of rebuilding it each iteration: array.push(x) (or push(...items)), map.get(k).push(x), or Object.assign(obj, { k: v }) — spreading the accumulator back into a new literal is O(n^2)';
     }
     case 'string-concat-in-loop': {
-      return 'Collect strings in an array and call .join("") after the loop completes to avoid O(n^2) string allocation'
+      return 'Collect strings in an array and call .join("") after the loop completes to avoid O(n^2) string allocation';
     }
     default: {
-      return defaultMessage
+      return defaultMessage;
     }
   }
 }
@@ -250,34 +258,34 @@ export const performanceAntiPatterns = defineCheck({
 
   analyze(content, filePath) {
     // Skip test files — performance anti-patterns in tests are low-risk
-    if (isTestFile(filePath)) return []
+    if (isTestFile(filePath)) return [];
 
     // Skip fitness check definitions — they iterate files with sequential async operations
     // as part of analysis, which is bounded by the check's file set
-    if (filePath.includes('/fitness/src/checks/')) return []
+    if (filePath.includes('/fitness/src/checks/')) return [];
 
     // Skip diagnostic/debug endpoints — sequential processing is acceptable for diagnostics
-    if (filePath.includes('/diagnostics')) return []
+    if (filePath.includes('/diagnostics')) return [];
 
     // @lazy-ok -- 'await' appears as a string literal, not an actual await expression
     // Quick filter: skip files without performance-related patterns
     if (!content.includes('await') && !content.includes('for') && !content.includes('while')) {
-      return []
+      return [];
     }
 
     // Skip files with explicit sequential-ok marker (intentional sequential processing)
-    if (content.includes('@sequential-ok')) return []
+    if (content.includes('@sequential-ok')) return [];
 
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (let i = 0; i < lines.length; i++) {
-      const violation = checkLineForPerformancePatterns({ lines, index: i })
+      const violation = checkLineForPerformancePatterns({ lines, index: i });
       if (violation) {
-        violations.push(violation)
+        violations.push(violation);
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

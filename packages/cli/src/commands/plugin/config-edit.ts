@@ -22,7 +22,6 @@ import {
   type YAMLSeq,
 } from 'yaml';
 
-
 /**
  * Edit the project's `plugins.<domain>` list. Returns true when the
  * file was changed.
@@ -39,11 +38,7 @@ export function editPluginList(
   if (!existsSync(configPath)) {
     if (op === 'remove') return false;
     // No config to edit — write a minimal one.
-    writeFileSync(
-      configPath,
-      `plugins:\n  ${domain}:\n    - "${name}"\n`,
-      'utf8',
-    );
+    writeFileSync(configPath, `plugins:\n  ${domain}:\n    - "${name}"\n`, 'utf8');
     return true;
   }
 
@@ -53,7 +48,7 @@ export function editPluginList(
     const first = doc.errors[0]?.message ?? 'unknown YAML error';
     throw new Error(
       `Cannot edit plugins.${domain} in ${configPath}: ${first}. ` +
-      `Fix the syntax error and re-run.`,
+        `Fix the syntax error and re-run.`,
     );
   }
 
@@ -61,11 +56,7 @@ export function editPluginList(
   if (root === null) {
     if (op === 'remove') return false;
     // Empty doc — write a fresh `plugins:` map.
-    writeFileSync(
-      configPath,
-      `plugins:\n  ${domain}:\n    - "${name}"\n`,
-      'utf8',
-    );
+    writeFileSync(configPath, `plugins:\n  ${domain}:\n    - "${name}"\n`, 'utf8');
     return true;
   }
 
@@ -75,7 +66,7 @@ export function editPluginList(
   if (!isMap(root)) {
     throw new Error(
       `Cannot edit plugins.${domain} in ${configPath}: top-level node is not a mapping. ` +
-      `opensip-tools.config.yml must start with a YAML map.`,
+        `opensip-tools.config.yml must start with a YAML map.`,
     );
   }
 
@@ -142,6 +133,10 @@ export function addToConfigPluginList(configPath: string, domain: string, name: 
   return editPluginList(configPath, domain, name, 'add');
 }
 
-export function removeFromConfigPluginList(configPath: string, domain: string, name: string): boolean {
+export function removeFromConfigPluginList(
+  configPath: string,
+  domain: string,
+  name: string,
+): boolean {
   return editPluginList(configPath, domain, name, 'remove');
 }

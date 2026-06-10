@@ -39,13 +39,13 @@ export function stripStringLiterals(line: string): string {
   return line
     .replaceAll(/'(?:[^'\\]|\\.)*'/g, "''")
     .replaceAll(/"(?:[^"\\]|\\.)*"/g, '""')
-    .replaceAll(/`(?:[^`\\]|\\.)*`/gs, '``')
+    .replaceAll(/`(?:[^`\\]|\\.)*`/gs, '``');
 }
 
 /** Shared regex patterns for string literal replacement */
-const SINGLE_QUOTE_RE = /'(?:[^'\\]|\\.)*'/g
-const DOUBLE_QUOTE_RE = /"(?:[^"\\]|\\.)*"/g
-const BACKTICK_RE = /`(?:[^`\\]|\\.)*`/gs
+const SINGLE_QUOTE_RE = /'(?:[^'\\]|\\.)*'/g;
+const DOUBLE_QUOTE_RE = /"(?:[^"\\]|\\.)*"/g;
+const BACKTICK_RE = /`(?:[^`\\]|\\.)*`/gs;
 
 /**
  * Strip string literals and single-line comments from full file content.
@@ -58,30 +58,30 @@ const BACKTICK_RE = /`(?:[^`\\]|\\.)*`/gs
  * Used by checks to avoid false positives from suggestion/description text.
  */
 export function isInsideStringLiteral(line: string, matchIndex: number): boolean {
-  let inSingle = false
-  let inDouble = false
-  let inTemplate = false
-  let escaped = false
+  let inSingle = false;
+  let inDouble = false;
+  let inTemplate = false;
+  let escaped = false;
 
   for (let i = 0; i < matchIndex; i++) {
-    const ch = line[i]
+    const ch = line[i];
 
     if (escaped) {
-      escaped = false
-      continue
+      escaped = false;
+      continue;
     }
 
     if (ch === '\\' && (inSingle || inDouble || inTemplate)) {
-      escaped = true
-      continue
+      escaped = true;
+      continue;
     }
 
-    if (ch === "'" && !inDouble && !inTemplate) inSingle = !inSingle
-    else if (ch === '"' && !inSingle && !inTemplate) inDouble = !inDouble
-    else if (ch === '`' && !inSingle && !inDouble) inTemplate = !inTemplate
+    if (ch === "'" && !inDouble && !inTemplate) inSingle = !inSingle;
+    else if (ch === '"' && !inSingle && !inTemplate) inDouble = !inDouble;
+    else if (ch === '`' && !inSingle && !inDouble) inTemplate = !inTemplate;
   }
 
-  return inSingle || inDouble || inTemplate
+  return inSingle || inDouble || inTemplate;
 }
 
 /**
@@ -94,11 +94,11 @@ export function stripStringsAndComments(content: string): string {
   let result = content
     .replaceAll(SINGLE_QUOTE_RE, "''")
     .replaceAll(DOUBLE_QUOTE_RE, '""')
-    .replaceAll(BACKTICK_RE, '``')
+    .replaceAll(BACKTICK_RE, '``');
   // Strip single-line comments (after string stripping to avoid matching // inside strings)
   // eslint-disable-next-line sonarjs/slow-regex -- .*$ anchored to line end; linear scan
-  result = result.replaceAll(/\/\/.*$/gm, '')
-  return result
+  result = result.replaceAll(/\/\/.*$/gm, '');
+  return result;
 }
 
 /**
@@ -120,106 +120,106 @@ export function stripStringsAndComments(content: string): string {
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- token-state-machine: single-pass tokenizer, branches reflect quote/comment state
 export function stripStringsAndCommentsPreservingPositions(content: string): string {
-  const out: string[] = []
-  let i = 0
-  let inSingle = false
-  let inDouble = false
-  let inTemplate = false
-  let inLineComment = false
-  let inBlockComment = false
-  let escaped = false
+  const out: string[] = [];
+  let i = 0;
+  let inSingle = false;
+  let inDouble = false;
+  let inTemplate = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+  let escaped = false;
 
   while (i < content.length) {
-    const ch = content[i]
-    const next = content[i + 1]
+    const ch = content[i];
+    const next = content[i + 1];
 
     // Inside any string: blank out chars (preserve newlines) until terminator.
     if (inSingle || inDouble || inTemplate) {
       if (escaped) {
-        out.push(ch === '\n' ? '\n' : ' ')
-        escaped = false
-        i++
-        continue
+        out.push(ch === '\n' ? '\n' : ' ');
+        escaped = false;
+        i++;
+        continue;
       }
       if (ch === '\\') {
-        out.push(' ')
-        escaped = true
-        i++
-        continue
+        out.push(' ');
+        escaped = true;
+        i++;
+        continue;
       }
       if ((ch === "'" && inSingle) || (ch === '"' && inDouble) || (ch === '`' && inTemplate)) {
         // Keep terminator for symmetry — replace with space too. The
         // string itself is gone; outer code doesn't care about the quote.
-        out.push(' ')
-        inSingle = inDouble = inTemplate = false
-        i++
-        continue
+        out.push(' ');
+        inSingle = inDouble = inTemplate = false;
+        i++;
+        continue;
       }
-      out.push(ch === '\n' ? '\n' : ' ')
-      i++
-      continue
+      out.push(ch === '\n' ? '\n' : ' ');
+      i++;
+      continue;
     }
 
     // Inside line comment: blank to end of line.
     if (inLineComment) {
       if (ch === '\n') {
-        inLineComment = false
-        out.push('\n')
+        inLineComment = false;
+        out.push('\n');
       } else {
-        out.push(' ')
+        out.push(' ');
       }
-      i++
-      continue
+      i++;
+      continue;
     }
 
     // Inside block comment: blank until `*/`.
     if (inBlockComment) {
       if (ch === '*' && next === '/') {
-        out.push('  ')
-        inBlockComment = false
-        i += 2
-        continue
+        out.push('  ');
+        inBlockComment = false;
+        i += 2;
+        continue;
       }
-      out.push(ch === '\n' ? '\n' : ' ')
-      i++
-      continue
+      out.push(ch === '\n' ? '\n' : ' ');
+      i++;
+      continue;
     }
 
     // Outside any region: detect openers.
     if (ch === '/' && next === '/') {
-      out.push('  ')
-      inLineComment = true
-      i += 2
-      continue
+      out.push('  ');
+      inLineComment = true;
+      i += 2;
+      continue;
     }
     if (ch === '/' && next === '*') {
-      out.push('  ')
-      inBlockComment = true
-      i += 2
-      continue
+      out.push('  ');
+      inBlockComment = true;
+      i += 2;
+      continue;
     }
     if (ch === "'") {
-      out.push(' ')
-      inSingle = true
-      i++
-      continue
+      out.push(' ');
+      inSingle = true;
+      i++;
+      continue;
     }
     if (ch === '"') {
-      out.push(' ')
-      inDouble = true
-      i++
-      continue
+      out.push(' ');
+      inDouble = true;
+      i++;
+      continue;
     }
     if (ch === '`') {
-      out.push(' ')
-      inTemplate = true
-      i++
-      continue
+      out.push(' ');
+      inTemplate = true;
+      i++;
+      continue;
     }
 
-    out.push(ch)
-    i++
+    out.push(ch);
+    i++;
   }
 
-  return out.join('')
+  return out.join('');
 }

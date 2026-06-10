@@ -140,8 +140,9 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     // The handler's own renderLive (the live view) is dispatched through
     // cli.renderLive (mocked to a no-op), so it does not invoke renderSimLive;
     // only the directly-invoked callback below does, returning undefined.
-    (renderSimLive as unknown as { mockResolvedValueOnce: (v: unknown) => void })
-      .mockResolvedValueOnce(undefined);
+    (
+      renderSimLive as unknown as { mockResolvedValueOnce: (v: unknown) => void }
+    ).mockResolvedValueOnce(undefined);
     const cap = makeCtx();
     await simHandler()({ cwd: '/proj' }, cap.ctx);
 

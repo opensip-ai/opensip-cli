@@ -182,7 +182,7 @@ function jsString(value: string): string {
 export function defineRankedView(config: RankedViewConfig): string {
   const helpJson = JSON.stringify(config.help);
   const columnsLiteral = config.columns
-    .map(c => `        { label: ${jsString(c.label)}, value: ${c.value} }`)
+    .map((c) => `        { label: ${jsString(c.label)}, value: ${c.value} }`)
     .join(',\n');
   const predicate = config.predicate ?? 'passesFilter(occ, filterState)';
   const rowExtras = config.rowExtras ?? '{}';

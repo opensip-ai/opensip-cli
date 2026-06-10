@@ -15,26 +15,26 @@
 // `scope.simulation` on the augmented RunScope interface.
 // =============================================================================
 
-import './scope-augmentation.js'
-export type { SimulationSubscope } from './scope-augmentation.js'
+import './scope-augmentation.js';
+export type { SimulationSubscope } from './scope-augmentation.js';
 
 // =============================================================================
 // KIND DISCRIMINATOR
 // =============================================================================
 
-export type { ScenarioKind } from './types/kind-types.js'
-export { SCENARIO_KINDS } from './types/kind-types.js'
+export type { ScenarioKind } from './types/kind-types.js';
+export { SCENARIO_KINDS } from './types/kind-types.js';
 
 // =============================================================================
 // SHARED RUNTIME CONTRACT
 // =============================================================================
 
-export type { RunnableScenario, ScenarioRegistryEntry } from './framework/runnable-scenario.js'
+export type { RunnableScenario, ScenarioRegistryEntry } from './framework/runnable-scenario.js';
 export type {
   ScenarioExecutorResult,
   LoadScenarioExecutorResult,
   ChaosScenarioExecutorResult,
-} from './framework/scenario-executor-result.js'
+} from './framework/scenario-executor-result.js';
 
 // =============================================================================
 // REGISTRY
@@ -48,7 +48,7 @@ export {
   getScenariosByTag,
   getScenariosByKind,
   clearScenarioRegistry,
-} from './framework/registry.js'
+} from './framework/registry.js';
 
 // =============================================================================
 // LOAD KIND
@@ -58,8 +58,8 @@ export {
   defineLoadScenario,
   validateLoadScenarioConfig,
   type LoadScenarioConfig,
-} from './kinds/load/define.js'
-export type { LoadOutcome } from './kinds/load/result.js'
+} from './kinds/load/define.js';
+export type { LoadOutcome } from './kinds/load/result.js';
 
 // =============================================================================
 // CHAOS KIND
@@ -69,8 +69,8 @@ export {
   defineChaosScenario,
   validateChaosScenarioConfig,
   type ChaosScenarioConfig,
-} from './kinds/chaos/define.js'
-export type { ChaosOutcome, ChaosEvent, ChaosAssertionVerdict } from './kinds/chaos/result.js'
+} from './kinds/chaos/define.js';
+export type { ChaosOutcome, ChaosEvent, ChaosAssertionVerdict } from './kinds/chaos/result.js';
 
 // =============================================================================
 // TOOL PLUGIN — simulation as a Tool implementation
@@ -80,7 +80,7 @@ export type { ChaosOutcome, ChaosEvent, ChaosAssertionVerdict } from './kinds/ch
 // (which keys on `mod.tool`) treats first-party and third-party Tool
 // packages uniformly; dedup at register-tools.ts handles the
 // duplicate-id case.
-export { simulationTool, simulationTool as tool } from './tool.js'
+export { simulationTool, simulationTool as tool } from './tool.js';
 // CLI lifecycle surface (mirrors fitness's curated barrel per ADR-0009).
 // `executeSim` is NOT here — it lives in `cli/sim.ts` and is not part of the
 // public barrel; the CLI drives simulation through the Tool contract
@@ -88,15 +88,15 @@ export { simulationTool, simulationTool as tool } from './tool.js'
 // `cli/sim.js` path. `getPluginLoadErrors` is an internal render/accessor helper
 // with no external consumer, so it is exported only from its own module for
 // the simulation CLI's relative imports — not re-exported here.
-export { ensureScenariosLoaded } from './cli/sim.js'
+export { ensureScenariosLoaded } from './cli/sim.js';
 
 // =============================================================================
 // PLUGIN DISCOVERY — sim plugin contract + @opensip-tools/scenarios-*
 // =============================================================================
 
-export type { SimPluginExports } from './plugins/types.js'
-export { readScenarioPackagePreferences } from './plugins/scenario-package-discovery.js'
-export { loadAllSimPlugins } from './plugins/loader.js'
+export type { SimPluginExports } from './plugins/types.js';
+export { readScenarioPackagePreferences } from './plugins/scenario-package-discovery.js';
+export { loadAllSimPlugins } from './plugins/loader.js';
 
 // =============================================================================
 // SHARED INFRASTRUCTURE
@@ -111,26 +111,23 @@ export {
   evaluateAssertion,
   evaluateOperator,
   getOperatorDescription,
-} from './framework/assertions.js'
+} from './framework/assertions.js';
 
 // BYO-target authoring surface: the `Target` seam, the neutral workload, and
 // the client-side fault vocabulary + ergonomic builders.
-export { httpTarget, type HttpTargetOptions } from './framework/execution/http-target.js'
-export { fault } from './framework/execution/fault-builders.js'
-export type { Target, TargetContext } from './framework/execution/target.js'
-export type { Workload } from './types/workload.js'
-export type { Fault, FaultKind, FaultSpec } from './framework/execution/fault-spec.js'
+export { httpTarget, type HttpTargetOptions } from './framework/execution/http-target.js';
+export { fault } from './framework/execution/fault-builders.js';
+export type { Target, TargetContext } from './framework/execution/target.js';
+export type { Workload } from './types/workload.js';
+export type { Fault, FaultKind, FaultSpec } from './framework/execution/fault-spec.js';
 
 export {
   ScenarioResultBuilder,
   createEmptyMetrics,
   mergeMetrics,
-} from './framework/result-builder.js'
+} from './framework/result-builder.js';
 
-export {
-  resolveMetric,
-  type ScenarioMetricKey,
-} from './framework/resolve-metric.js'
+export { resolveMetric, type ScenarioMetricKey } from './framework/resolve-metric.js';
 
 export {
   ScenarioAbortedError,
@@ -138,32 +135,30 @@ export {
   validateAssertions,
   updateLatencyMetrics,
   sleepWithAbort,
-} from './framework/execution/execution-engine.js'
+} from './framework/execution/execution-engine.js';
 
 // =============================================================================
 // RECIPES — sim recipes mirror the fitness recipe shape
 // =============================================================================
 
-export { defineSimulationRecipe } from './recipes/define-recipe.js'
+export { defineSimulationRecipe } from './recipes/define-recipe.js';
 export {
   SimulationRecipeRegistry,
   createSimulationRecipeRegistry,
   currentSimulationRecipeRegistry,
-} from './recipes/registry.js'
-export type { SimulationRecipeDisplayInfo } from './recipes/registry.js'
+} from './recipes/registry.js';
+export type { SimulationRecipeDisplayInfo } from './recipes/registry.js';
 export {
   builtInSimulationRecipes,
   builtInSimulationRecipesByName,
   isBuiltInSimulationRecipe,
-} from './recipes/built-in-recipes.js'
-export {
-  SimulationRecipeService,
-} from './recipes/service.js'
+} from './recipes/built-in-recipes.js';
+export { SimulationRecipeService } from './recipes/service.js';
 export type {
   SimulationRecipeServiceConfig,
   SimulationScenarioResult,
   SimulationRecipeResult,
-} from './recipes/service.js'
+} from './recipes/service.js';
 export type {
   SimulationRecipe,
   SimulationRecipeConfig,
@@ -173,7 +168,7 @@ export type {
   AllScenarioSelector,
   TagsScenarioSelector,
   KindScenarioSelector,
-} from './recipes/types.js'
+} from './recipes/types.js';
 
 // =============================================================================
 // CROSS-KIND TYPES (shared by every kind's define/executor/result modules)
@@ -187,4 +182,4 @@ export type {
   ScenarioLogger,
   SimulationMetrics,
   LoadResultPayload,
-} from './types/framework-types.js'
+} from './types/framework-types.js';

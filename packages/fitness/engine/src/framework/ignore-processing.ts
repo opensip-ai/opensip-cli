@@ -11,17 +11,17 @@
  * lives once in `@opensip-tools/core`.
  */
 
-import { filterSignalsBySuppressions, logger } from '@opensip-tools/core'
+import { filterSignalsBySuppressions, logger } from '@opensip-tools/core';
 
-import { countErrors, countWarnings } from '../types/severity.js'
+import { countErrors, countWarnings } from '../types/severity.js';
 
-import { extractGroup, isWeakReason, parseDirectiveLine } from './directive-inventory.js'
-import { FITNESS_KEYWORDS } from './directive-parsing.js'
-import { fileCache } from './file-cache.js'
+import { extractGroup, isWeakReason, parseDirectiveLine } from './directive-inventory.js';
+import { FITNESS_KEYWORDS } from './directive-parsing.js';
+import { fileCache } from './file-cache.js';
 
-import type { DirectiveEntry } from './directive-inventory.js'
-import type { CheckResult } from '../types/findings.js'
-import type { Signal } from '@opensip-tools/core'
+import type { DirectiveEntry } from './directive-inventory.js';
+import type { CheckResult } from '../types/findings.js';
+import type { Signal } from '@opensip-tools/core';
 
 // =============================================================================
 // SIGNAL FILTERING
@@ -44,36 +44,44 @@ export async function filterSignalsByDirectives(
   signals: readonly Signal[],
   checkId: string,
   initialIgnoredCount: number,
-): Promise<{ filteredSignals: Signal[]; ignoredCount: number; appliedDirectives: DirectiveEntry[] }> {
+): Promise<{
+  filteredSignals: Signal[];
+  ignoredCount: number;
+  appliedDirectives: DirectiveEntry[];
+}> {
   const { kept, suppressed } = await filterSignalsBySuppressions({
     signals,
     keywords: FITNESS_KEYWORDS,
     readFile: (filePath) => fileCache.get(filePath),
     ruleIdOf: () => checkId,
-  })
+  });
 
-  const appliedFileIgnores = new Set<string>()
-  const appliedLineIgnores = new Map<string, Set<number>>()
+  const appliedFileIgnores = new Set<string>();
+  const appliedLineIgnores = new Map<string, Set<number>>();
   for (const match of suppressed) {
     if (match.line === 'file') {
-      appliedFileIgnores.add(match.file)
+      appliedFileIgnores.add(match.file);
     } else {
-      let lineSet = appliedLineIgnores.get(match.file)
+      let lineSet = appliedLineIgnores.get(match.file);
       if (!lineSet) {
-        lineSet = new Set()
-        appliedLineIgnores.set(match.file, lineSet)
+        lineSet = new Set();
+        appliedLineIgnores.set(match.file, lineSet);
       }
-      lineSet.add(match.line)
+      lineSet.add(match.line);
     }
   }
 
-  const appliedDirectives = await collectAppliedDirectives(checkId, appliedFileIgnores, appliedLineIgnores)
+  const appliedDirectives = await collectAppliedDirectives(
+    checkId,
+    appliedFileIgnores,
+    appliedLineIgnores,
+  );
 
   return {
     filteredSignals: [...kept],
     ignoredCount: initialIgnoredCount + suppressed.length,
     appliedDirectives,
-  }
+  };
 }
 
 // =============================================================================
@@ -93,7 +101,7 @@ function toDirectiveEntry(
     group: extractGroup(parsed.checkId),
     reason: parsed.reason,
     weakReason: isWeakReason(parsed.reason),
-  }
+  };
 }
 
 async function collectFileIgnoreDirectives(
@@ -103,21 +111,25 @@ async function collectFileIgnoreDirectives(
   const results = await Promise.all(
     [...appliedFileIgnores].map(async (filePath): Promise<DirectiveEntry | null> => {
       try {
-        const content = await fileCache.get(filePath)
-        const lines = content.split('\n')
+        const content = await fileCache.get(filePath);
+        const lines = content.split('\n');
         for (let i = 0; i < Math.min(lines.length, 50); i++) {
-          const parsed = parseDirectiveLine(lines[i] ?? '')
+          const parsed = parseDirectiveLine(lines[i] ?? '');
           if (parsed?.type === 'file' && parsed.checkId === checkId) {
-            return toDirectiveEntry(filePath, i + 1, parsed)
+            return toDirectiveEntry(filePath, i + 1, parsed);
           }
         }
       } catch (error) {
-        logger.warn('fitness.ignore.directive_read.failed', { evt: 'fitness.ignore.directive_read.failed', module: 'fitness:ignore-processing', err: error });
+        logger.warn('fitness.ignore.directive_read.failed', {
+          evt: 'fitness.ignore.directive_read.failed',
+          module: 'fitness:ignore-processing',
+          err: error,
+        });
       }
-      return null
+      return null;
     }),
-  )
-  return results.filter((d): d is DirectiveEntry => d !== null)
+  );
+  return results.filter((d): d is DirectiveEntry => d !== null);
 }
 
 async function collectLineIgnoreDirectives(
@@ -125,35 +137,44 @@ async function collectLineIgnoreDirectives(
   appliedLineIgnores: Map<string, Set<number>>,
 ): Promise<DirectiveEntry[]> {
   const results = await Promise.all(
-    [...appliedLineIgnores.entries()].map(async ([filePath, suppressedLines]): Promise<DirectiveEntry[]> => {
-      const found: DirectiveEntry[] = []
-      try {
-        const content = await fileCache.get(filePath)
-        const lines = content.split('\n')
-        for (let i = 0; i < lines.length; i++) {
-          const parsed = parseDirectiveLine(lines[i] ?? '')
-          if (parsed?.type !== 'next-line' || parsed.checkId !== checkId) continue
-          let targetLine = i + 1
-          while (targetLine < lines.length && (lines[targetLine] ?? '').trimStart().startsWith('//')) {
-            targetLine++
+    [...appliedLineIgnores.entries()].map(
+      async ([filePath, suppressedLines]): Promise<DirectiveEntry[]> => {
+        const found: DirectiveEntry[] = [];
+        try {
+          const content = await fileCache.get(filePath);
+          const lines = content.split('\n');
+          for (let i = 0; i < lines.length; i++) {
+            const parsed = parseDirectiveLine(lines[i] ?? '');
+            if (parsed?.type !== 'next-line' || parsed.checkId !== checkId) continue;
+            let targetLine = i + 1;
+            while (
+              targetLine < lines.length &&
+              (lines[targetLine] ?? '').trimStart().startsWith('//')
+            ) {
+              targetLine++;
+            }
+            if (suppressedLines.has(targetLine + 1)) {
+              found.push(toDirectiveEntry(filePath, i + 1, parsed));
+            }
           }
-          if (suppressedLines.has(targetLine + 1)) {
-            found.push(toDirectiveEntry(filePath, i + 1, parsed))
-          }
+        } catch (error) {
+          logger.warn('fitness.ignore.directive_read.failed', {
+            evt: 'fitness.ignore.directive_read.failed',
+            module: 'fitness:ignore-processing',
+            err: error,
+          });
         }
-      } catch (error) {
-        logger.warn('fitness.ignore.directive_read.failed', { evt: 'fitness.ignore.directive_read.failed', module: 'fitness:ignore-processing', err: error });
-      }
-      return found
-    }),
-  )
-  const directives: DirectiveEntry[] = []
+        return found;
+      },
+    ),
+  );
+  const directives: DirectiveEntry[] = [];
   for (const batch of results) {
     for (const d of batch) {
-      directives.push(d)
+      directives.push(d);
     }
   }
-  return directives
+  return directives;
 }
 
 async function collectAppliedDirectives(
@@ -164,8 +185,8 @@ async function collectAppliedDirectives(
   const [fileDirectives, lineDirectives] = await Promise.all([
     collectFileIgnoreDirectives(checkId, appliedFileIgnores),
     collectLineIgnoreDirectives(checkId, appliedLineIgnores),
-  ])
-  return [...fileDirectives, ...lineDirectives]
+  ]);
+  return [...fileDirectives, ...lineDirectives];
 }
 
 // =============================================================================
@@ -182,12 +203,12 @@ export function buildFilteredResult(
   start: number,
 ): CheckResult {
   if (!Array.isArray(filteredSignals)) {
-    return result
+    return result;
   }
 
-  const durationMs = result.metadata.durationMs ?? Date.now() - start
-  const filteredErrors = countErrors(filteredSignals)
-  const filteredWarnings = countWarnings(filteredSignals)
+  const durationMs = result.metadata.durationMs ?? Date.now() - start;
+  const filteredErrors = countErrors(filteredSignals);
+  const filteredWarnings = countWarnings(filteredSignals);
 
   const filteredResult: CheckResult = {
     ...result,
@@ -201,7 +222,7 @@ export function buildFilteredResult(
       signals: filteredSignals,
     },
     ...(ignoredCount > 0 ? { ignoredCount } : {}),
-  }
+  };
 
-  return filteredResult
+  return filteredResult;
 }

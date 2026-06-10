@@ -14,17 +14,20 @@ import { findOccurrence, runFixture, writeFixture } from './_fixture-runner.js';
 
 import type { Catalog } from '@opensip-tools/graph';
 
-
 describe('jsx-resolution acceptance fixture', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-jsx-'));
-  afterAll(() => { rmSync(fixtureDir, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(fixtureDir, { recursive: true, force: true });
+  });
 
   writeFixture(fixtureDir, {
     'foo.tsx': `export function Foo(): JSX.Element { return <span>foo</span>; }\n`,
     'caller.tsx': `import { Foo } from './foo.js';\nexport function Caller(): JSX.Element {\n  return <div><Foo /></div>;\n}\n`,
   });
   let catalog!: Catalog;
-  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
+  beforeAll(async () => {
+    catalog = await runFixture(fixtureDir);
+  });
 
   it('resolves <Foo /> to the Foo function declaration', () => {
     const callerOcc = findOccurrence(catalog, (o) => o.simpleName === 'Caller');
@@ -34,7 +37,10 @@ describe('jsx-resolution acceptance fixture', () => {
     expect(fooEdge!.resolution).toBe('jsx');
     expect(fooEdge!.to.length).toBe(1);
 
-    const fooOcc = findOccurrence(catalog, (o) => o.simpleName === 'Foo' && o.kind === 'function-declaration');
+    const fooOcc = findOccurrence(
+      catalog,
+      (o) => o.simpleName === 'Foo' && o.kind === 'function-declaration',
+    );
     expect(fooOcc).toBeDefined();
     expect(fooEdge!.to[0]).toBe(fooOcc!.bodyHash);
   });

@@ -6,17 +6,17 @@
  * Detects configuration properties that are defined but never accessed.
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 interface ConfigProperty {
-  name: string
-  interfaceName: string
-  filePath: string
-  line: number
-  isOptional: boolean
+  name: string;
+  interfaceName: string;
+  filePath: string;
+  line: number;
+  isOptional: boolean;
 }
 
 /**
@@ -45,7 +45,7 @@ const COMMON_PROPERTY_NAMES = new Set([
   'path',
   'level',
   'mode',
-])
+]);
 
 /**
  * Paths where this check should not run (CLI, scripts, test utilities)
@@ -62,13 +62,13 @@ const NON_CONFIG_CONSUMER_PATTERNS = [
   /types\.ts$/,
   /interfaces\.ts$/,
   /index\.d\.ts$/,
-]
+];
 
 /**
  * Check if a path should be excluded from analysis
  */
 function shouldExcludePath(filePath: string): boolean {
-  return NON_CONFIG_CONSUMER_PATTERNS.some((pattern) => pattern.test(filePath))
+  return NON_CONFIG_CONSUMER_PATTERNS.some((pattern) => pattern.test(filePath));
 }
 
 /**
@@ -76,7 +76,7 @@ function shouldExcludePath(filePath: string): boolean {
  */
 function isConfigInterface(interfaceName: string): boolean {
   /* v8 ignore next -- defensive AST/type guard */
-  return interfaceName.includes('Config') || interfaceName.includes('Options')
+  return interfaceName.includes('Config') || interfaceName.includes('Options');
 }
 
 /**
@@ -89,23 +89,23 @@ function extractPropertyFromMember(
   filePath: string,
 ): ConfigProperty | null {
   /* v8 ignore next -- defensive AST/type guard */
-  if (!ts.isPropertySignature(member)) return null
+  if (!ts.isPropertySignature(member)) return null;
   /* v8 ignore next -- defensive AST/type guard */
-  if (!ts.isIdentifier(member.name)) return null
+  if (!ts.isIdentifier(member.name)) return null;
 
-  const propName = member.name.text
+  const propName = member.name.text;
 
   // Skip common property names that would cause many false positives
-  if (COMMON_PROPERTY_NAMES.has(propName)) return null
+  if (COMMON_PROPERTY_NAMES.has(propName)) return null;
 
-  const { line } = sourceFile.getLineAndCharacterOfPosition(member.getStart())
+  const { line } = sourceFile.getLineAndCharacterOfPosition(member.getStart());
   return {
     name: propName,
     interfaceName,
     filePath,
     line: line + 1,
     isOptional: member.questionToken !== undefined,
-  }
+  };
 }
 
 /**
@@ -116,20 +116,20 @@ function extractInterfaceProperties(
   sourceFile: ts.SourceFile,
   filePath: string,
 ): ConfigProperty[] {
-  const properties: ConfigProperty[] = []
-  const interfaceName = node.name.text
+  const properties: ConfigProperty[] = [];
+  const interfaceName = node.name.text;
 
   for (const member of node.members) {
-    const prop = extractPropertyFromMember(member, sourceFile, interfaceName, filePath)
-    if (!prop) continue
-    properties.push(prop)
+    const prop = extractPropertyFromMember(member, sourceFile, interfaceName, filePath);
+    if (!prop) continue;
+    properties.push(prop);
   }
 
-  return properties
+  return properties;
 }
 
 function isConfigFilePath(filePath: string): boolean {
-  return filePath.includes('config') || filePath.includes('Config')
+  return filePath.includes('config') || filePath.includes('Config');
 }
 
 async function extractConfigPropertiesFromFile(
@@ -137,39 +137,39 @@ async function extractConfigPropertiesFromFile(
   files: FileAccessor,
 ): Promise<ConfigProperty[]> {
   // @lazy-ok -- visit function's conditionals are not pre-await validation guards
-  const content = await files.read(filePath)
-  const sourceFile = getSharedSourceFile(filePath, content)
-    /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
-  const properties: ConfigProperty[] = []
+  const content = await files.read(filePath);
+  const sourceFile = getSharedSourceFile(filePath, content);
+  /* v8 ignore next -- defensive guard */
+  if (!sourceFile) return [];
+  const properties: ConfigProperty[] = [];
 
   const visit = (node: ts.Node): void => {
-    ts.forEachChild(node, visit)
-    if (!ts.isInterfaceDeclaration(node)) return
+    ts.forEachChild(node, visit);
+    if (!ts.isInterfaceDeclaration(node)) return;
     /* v8 ignore next -- defensive AST/type guard */
-    if (!isConfigInterface(node.name.text)) return
-    properties.push(...extractInterfaceProperties(node, sourceFile, filePath))
-  }
+    if (!isConfigInterface(node.name.text)) return;
+    properties.push(...extractInterfaceProperties(node, sourceFile, filePath));
+  };
 
-  void visit(sourceFile)
-  return properties
+  void visit(sourceFile);
+  return properties;
 }
 
 async function collectConfigProperties(files: FileAccessor): Promise<ConfigProperty[]> {
   logger.debug({
     evt: 'fitness.collect_config_properties.start',
     msg: 'Collecting config properties',
-  })
-  const configProperties: ConfigProperty[] = []
+  });
+  const configProperties: ConfigProperty[] = [];
 
   for (const filePath of files.paths) {
-    if (shouldExcludePath(filePath) || !isConfigFilePath(filePath)) continue
+    if (shouldExcludePath(filePath) || !isConfigFilePath(filePath)) continue;
 
     try {
       // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
-      const props = await extractConfigPropertiesFromFile(filePath, files)
-      configProperties.push(...props)
-    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+      const props = await extractConfigPropertiesFromFile(filePath, files);
+      configProperties.push(...props);
+      /* v8 ignore next 1 -- defensive catch: parse failures already handled */
     } catch {
       // @swallow-ok Skip unreadable files
     }
@@ -179,49 +179,49 @@ async function collectConfigProperties(files: FileAccessor): Promise<ConfigPrope
     evt: 'fitness.collect_config_properties.complete',
     count: configProperties.length,
     msg: 'Config properties collected',
-  })
-  return configProperties
+  });
+  return configProperties;
 }
 
 async function countPropertyAccesses(files: FileAccessor): Promise<Map<string, number>> {
   logger.debug({
     evt: 'fitness.count_property_accesses.start',
     msg: 'Counting property accesses across files',
-  })
-  const accessCounts = new Map<string, number>()
+  });
+  const accessCounts = new Map<string, number>();
 
   for (const filePath of files.paths) {
     try {
       // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
-      const content = await files.read(filePath)
-      const sourceFile = getSharedSourceFile(filePath, content)
+      const content = await files.read(filePath);
+      const sourceFile = getSharedSourceFile(filePath, content);
       /* v8 ignore next -- defensive guard */
-      if (!sourceFile) continue
+      if (!sourceFile) continue;
 
       const visit = (node: ts.Node): void => {
         if (ts.isPropertyAccessExpression(node)) {
-          const propertyName = node.name.text
+          const propertyName = node.name.text;
           /* v8 ignore next -- defensive nullish fallback */
-          accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1)
+          accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
         }
 
         if (ts.isBindingElement(node) && ts.isIdentifier(node.name)) {
-          const propertyName = node.name.text
+          const propertyName = node.name.text;
           /* v8 ignore next -- defensive nullish fallback */
-          accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1)
+          accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
         }
 
-        ts.forEachChild(node, visit)
-      }
+        ts.forEachChild(node, visit);
+      };
 
-      void visit(sourceFile)
-    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+      void visit(sourceFile);
+      /* v8 ignore next 1 -- defensive catch: parse failures already handled */
     } catch {
       // @swallow-ok Skip unreadable files
     }
   }
 
-  return accessCounts
+  return accessCounts;
 }
 
 function createViolationForUnusedProperty(prop: ConfigProperty): CheckViolation {
@@ -233,25 +233,25 @@ function createViolationForUnusedProperty(prop: ConfigProperty): CheckViolation 
     suggestion: `Remove unused config property '${prop.name}' from ${prop.interfaceName}, or implement code that uses this configuration option`,
     match: prop.name,
     filePath: prop.filePath,
-  }
+  };
 }
 
 function findUnusedProperties(
   configProperties: ConfigProperty[],
   accessCounts: Map<string, number>,
 ): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   for (const prop of configProperties) {
-    if (prop.isOptional) continue
+    if (prop.isOptional) continue;
     /* v8 ignore next -- defensive nullish fallback */
-    const count = accessCounts.get(prop.name) ?? 0
+    const count = accessCounts.get(prop.name) ?? 0;
     if (count === 0) {
-      violations.push(createViolationForUnusedProperty(prop))
+      violations.push(createViolationForUnusedProperty(prop));
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -282,8 +282,8 @@ export const unusedConfigOptions = defineCheck({
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     // @fitness-ignore-next-line async-waterfall-detection -- Both scan all files independently; parallelizing would double peak memory by loading file contents twice concurrently
-    const configProperties = await collectConfigProperties(files)
-    const accessCounts = await countPropertyAccesses(files)
-    return findUnusedProperties(configProperties, accessCounts)
+    const configProperties = await collectConfigProperties(files);
+    const accessCounts = await countPropertyAccesses(files);
+    return findUnusedProperties(configProperties, accessCounts);
   },
-})
+});

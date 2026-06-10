@@ -11,7 +11,11 @@ import { describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
-import { buildLiveGraphOutput, buildUnifiedReportLines, resolutionBannerText } from '../graph-report.js';
+import {
+  buildLiveGraphOutput,
+  buildUnifiedReportLines,
+  resolutionBannerText,
+} from '../graph-report.js';
 
 import type { Catalog, FunctionOccurrence } from '../../types.js';
 import type { Signal } from '@opensip-tools/core';
@@ -38,7 +42,10 @@ function occ(over: Partial<FunctionOccurrence> = {}): FunctionOccurrence {
   };
 }
 
-function catalogOf(occs: readonly FunctionOccurrence[], resolutionMode?: 'exact' | 'fast'): Catalog {
+function catalogOf(
+  occs: readonly FunctionOccurrence[],
+  resolutionMode?: 'exact' | 'fast',
+): Catalog {
   const functions: Record<string, FunctionOccurrence[]> = {};
   for (const o of occs) {
     const bucket = functions[o.simpleName];
@@ -108,7 +115,16 @@ describe('buildUnifiedReportLines', () => {
       bodyHash: 'h1',
       simpleName: 'driver',
       visibility: 'module-local',
-      calls: [{ to: ['h2'], line: 5, column: 1, resolution: 'static', confidence: 'high', text: 'helper()' }],
+      calls: [
+        {
+          to: ['h2'],
+          line: 5,
+          column: 1,
+          resolution: 'static',
+          confidence: 'high',
+          text: 'helper()',
+        },
+      ],
     });
     // driver is module-local + uncalled, so it would be... still not exported → not an entry point.
     const catalog = catalogOf([caller, callee]);

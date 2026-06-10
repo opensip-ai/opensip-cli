@@ -21,7 +21,11 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { posix, relative, sep } from 'node:path';
 
-import { buildExportIndex, buildPackageManifestIndex, resolveSpecifierToPackage } from '../../../cross-package/export-index.js';
+import {
+  buildExportIndex,
+  buildPackageManifestIndex,
+  resolveSpecifierToPackage,
+} from '../../../cross-package/export-index.js';
 import { ownerEdgeKey } from '../../../owner-key.js';
 import { buildAndResolveCatalog } from '../catalog-builder.js';
 import { mergeAndResolveShards } from '../cross-shard-resolve.js';
@@ -39,12 +43,7 @@ import type {
   WalkInput,
   WalkOutput,
 } from '../../../lang-adapter/types.js';
-import type {
-  CallEdge,
-  Catalog,
-  CrossBoundaryCall,
-  FunctionOccurrence,
-} from '../../../types.js';
+import type { CallEdge, Catalog, CrossBoundaryCall, FunctionOccurrence } from '../../../types.js';
 import type { RunStage } from '../catalog-builder.js';
 import type { Shard, ShardBuildResult } from '../shard-model.js';
 
@@ -324,7 +323,10 @@ function makeOccurrence(
  *       single-program: resolve to the unique export of the named package.
  * Declines (empty `to`) on ambiguity — never name-only guesses (the phantom).
  */
-function resolveFixtureEdges(input: ResolveInput<FixtureProject>, deps: AdapterDeps): ResolveOutput {
+function resolveFixtureEdges(
+  input: ResolveInput<FixtureProject>,
+  deps: AdapterDeps,
+): ResolveOutput {
   const exportIndex = buildExportIndex(input.catalog);
   // ALL package manifests are always in scope: even a single-package shard must
   // resolve a bare specifier to a package group (the imported package's own
@@ -434,7 +436,9 @@ function resolveOne(
   if (ctx.emitBoundaryCalls && exported.length === 0) return { boundary: true };
   if (exported.length !== 1) return { boundary: false, to: [] }; // ambiguous / absent → decline
   const only = exported[0];
-  return only === undefined ? { boundary: false, to: [] } : { boundary: false, to: [only.bodyHash] };
+  return only === undefined
+    ? { boundary: false, to: [] }
+    : { boundary: false, to: [only.bodyHash] };
 }
 
 function resolveRelative(ownerRel: string, spec: string): string {

@@ -162,7 +162,12 @@ export interface GraphDoneResult {
   /** Fast-tier approximation caveat, or `undefined` for an exact catalog. */
   readonly resolutionBanner?: string;
   /** Counts for the shared one-line PASS/FAIL summary. */
-  readonly summary: { readonly passed: number; readonly failed: number; readonly errors: number; readonly warnings: number };
+  readonly summary: {
+    readonly passed: number;
+    readonly failed: number;
+    readonly errors: number;
+    readonly warnings: number;
+  };
   readonly durationMs: number;
   /**
    * Verbose detail body (ADR-0021). Graph populates the `lines` kind (its

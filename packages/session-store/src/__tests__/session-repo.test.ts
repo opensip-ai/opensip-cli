@@ -19,7 +19,13 @@ function fitnessLikePayload(): unknown {
         violationCount: 1,
         durationMs: 50,
         findings: [
-          { ruleId: 'demo-check', message: 'demo finding', severity: 'warning', filePath: 'src/a.ts', line: 10 },
+          {
+            ruleId: 'demo-check',
+            message: 'demo finding',
+            severity: 'warning',
+            filePath: 'src/a.ts',
+            line: 10,
+          },
         ],
       },
     ],
@@ -75,7 +81,11 @@ describe('SessionRepo — save / get', () => {
   });
 
   it('treats the payload as fully opaque — any JSON shape round-trips verbatim', () => {
-    const payload = { kind: 'graph', summary: { total: 3 }, nested: [{ a: 1 }, { b: [true, null] }] };
+    const payload = {
+      kind: 'graph',
+      summary: { total: 3 },
+      nested: [{ a: 1 }, { b: [true, null] }],
+    };
     const session = makeSession({ id: 'opaque', tool: 'graph', payload });
     repo.save(session);
     expect(repo.get('opaque')?.payload).toEqual(payload);
@@ -158,7 +168,9 @@ describe('SessionRepo — latest', () => {
   it('returns the most recent session scoped to a tool', () => {
     repo.save(makeSession({ id: 'fit-old', tool: 'fit', timestamp: '2026-05-01T00:00:00.000Z' }));
     repo.save(makeSession({ id: 'fit-new', tool: 'fit', timestamp: '2026-05-02T00:00:00.000Z' }));
-    repo.save(makeSession({ id: 'graph-newer', tool: 'graph', timestamp: '2026-05-03T00:00:00.000Z' }));
+    repo.save(
+      makeSession({ id: 'graph-newer', tool: 'graph', timestamp: '2026-05-03T00:00:00.000Z' }),
+    );
     expect(repo.latest({ tool: 'fit' })?.id).toBe('fit-new');
     expect(repo.latest()?.id).toBe('graph-newer');
   });

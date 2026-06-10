@@ -72,9 +72,10 @@ export function createDiscover(
       fileCount: files.length,
     });
 
-    const out: DiscoverOutput = configPathAbs === undefined
-      ? { projectDirAbs, files }
-      : { projectDirAbs, files, configPathAbs };
+    const out: DiscoverOutput =
+      configPathAbs === undefined
+        ? { projectDirAbs, files }
+        : { projectDirAbs, files, configPathAbs };
     return out;
   };
 }

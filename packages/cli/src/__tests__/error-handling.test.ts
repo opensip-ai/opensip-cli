@@ -2,7 +2,6 @@ import { getErrorSuggestion, EXIT_CODES } from '@opensip-tools/contracts';
 import { describe, it, expect } from 'vitest';
 
 describe('error handling', () => {
-
   describe('EXIT_CODES', () => {
     it('has SUCCESS = 0', () => {
       expect(EXIT_CODES.SUCCESS).toBe(0);

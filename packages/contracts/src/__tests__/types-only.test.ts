@@ -39,7 +39,10 @@ describe('@opensip-tools/contracts is types-only', () => {
     for (const file of files) {
       const content = readFileSync(file, 'utf8');
       // Match a CALL (identifier followed by `(`), not a mention in prose/strings.
-      if (/\breadYamlFile(?:OrThrow)?\s*\(/.test(content) || /\bresolveProjectConfigPath\s*\(/.test(content)) {
+      if (
+        /\breadYamlFile(?:OrThrow)?\s*\(/.test(content) ||
+        /\bresolveProjectConfigPath\s*\(/.test(content)
+      ) {
         offenders.push(file.slice(SRC.length + 1));
       }
     }

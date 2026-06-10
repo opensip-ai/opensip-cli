@@ -16,9 +16,9 @@ import { describe, expect, it } from 'vitest';
 import { fitnessTool } from '../tool.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PKG = JSON.parse(
-  readFileSync(resolve(HERE, '../../package.json'), 'utf8'),
-) as { version: string };
+const PKG = JSON.parse(readFileSync(resolve(HERE, '../../package.json'), 'utf8')) as {
+  version: string;
+};
 
 describe('fitnessTool contract conformance', () => {
   it("metadata.id is 'fitness'", () => {
@@ -35,9 +35,7 @@ describe('fitnessTool contract conformance', () => {
 
   it('commands list includes fit, fit-list, fit-recipes', () => {
     const names = fitnessTool.commands.map((c) => c.name);
-    expect(names).toEqual(
-      expect.arrayContaining(['fit', 'fit-list', 'fit-recipes']),
-    );
+    expect(names).toEqual(expect.arrayContaining(['fit', 'fit-list', 'fit-recipes']));
   });
 
   it("no longer owns the cross-tool 'dashboard' command (moved to the CLI in L2)", () => {
@@ -63,9 +61,7 @@ describe('fitnessTool contract conformance', () => {
   });
 
   it('fit-list / fit-recipes carry their legacy aliases on the spec', () => {
-    const byName = new Map(
-      (fitnessTool.commandSpecs ?? []).map((s) => [s.name, s]),
-    );
+    const byName = new Map((fitnessTool.commandSpecs ?? []).map((s) => [s.name, s]));
     expect(byName.get('fit-list')?.aliases).toEqual(['list-checks']);
     expect(byName.get('fit-recipes')?.aliases).toEqual(['list-recipes']);
   });

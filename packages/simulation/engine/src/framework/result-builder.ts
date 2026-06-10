@@ -6,20 +6,18 @@
  * Assertions are evaluated in order.
  */
 
-import { ValidationError } from '@opensip-tools/core'
+import { ValidationError } from '@opensip-tools/core';
 
-import { evaluateAssertion } from './assertions.js'
-import { resolveMetric } from './resolve-metric.js'
+import { evaluateAssertion } from './assertions.js';
+import { resolveMetric } from './resolve-metric.js';
 
-import type { SimulationMetrics } from '../types/base-types.js'
+import type { SimulationMetrics } from '../types/base-types.js';
 import type {
   ScenarioAssertion,
   FailedAssertion,
   LoadResultPayload,
-} from '../types/framework-types.js'
-import type { Signal } from '@opensip-tools/core'
-
-
+} from '../types/framework-types.js';
+import type { Signal } from '@opensip-tools/core';
 
 // =============================================================================
 // RESULT BUILDER
@@ -39,25 +37,25 @@ import type { Signal } from '@opensip-tools/core'
  * ```
  */
 export class ScenarioResultBuilder {
-  private readonly scenarioId: string
-  private _metrics: SimulationMetrics | null = null
-  private _duration: number | null = null
-  private readonly _passedAssertions: ScenarioAssertion[] = []
-  private readonly _failedAssertions: FailedAssertion[] = []
-  private readonly _signals: Signal[] = []
+  private readonly scenarioId: string;
+  private _metrics: SimulationMetrics | null = null;
+  private _duration: number | null = null;
+  private readonly _passedAssertions: ScenarioAssertion[] = [];
+  private readonly _failedAssertions: FailedAssertion[] = [];
+  private readonly _signals: Signal[] = [];
 
   private constructor(scenarioId: string) {
-    this.scenarioId = scenarioId
+    this.scenarioId = scenarioId;
   }
 
   /** Get the scenario ID for this builder. */
   getScenarioId(): string {
-    return this.scenarioId
+    return this.scenarioId;
   }
 
   /** Create a new result builder. */
   static create(scenarioId: string): ScenarioResultBuilder {
-    return new ScenarioResultBuilder(scenarioId)
+    return new ScenarioResultBuilder(scenarioId);
   }
 
   // ===========================================================================
@@ -66,14 +64,14 @@ export class ScenarioResultBuilder {
 
   /** Set the simulation metrics. */
   withMetrics(metrics: SimulationMetrics): this {
-    this._metrics = metrics
-    return this
+    this._metrics = metrics;
+    return this;
   }
 
   /** Set the scenario duration in seconds (used for derived metrics like RPS). */
   withDuration(seconds: number): this {
-    this._duration = seconds
-    return this
+    this._duration = seconds;
+    return this;
   }
 
   // ===========================================================================
@@ -82,14 +80,14 @@ export class ScenarioResultBuilder {
 
   /** Record a passed assertion. */
   assertionPassed(assertion: ScenarioAssertion): this {
-    this._passedAssertions.push(assertion)
-    return this
+    this._passedAssertions.push(assertion);
+    return this;
   }
 
   /** Record a failed assertion. */
   assertionFailed(assertion: ScenarioAssertion, actual: number): this {
-    this._failedAssertions.push({ ...assertion, actual })
-    return this
+    this._failedAssertions.push({ ...assertion, actual });
+    return this;
   }
 
   /** Evaluate all assertions against the current metrics. */
@@ -99,19 +97,19 @@ export class ScenarioResultBuilder {
       throw new ValidationError(
         'Metrics must be set before evaluating assertions. Call withMetrics() first.',
         { code: 'VALIDATION.RESULT_BUILDER.METRICS_REQUIRED' },
-      )
+      );
     }
 
     for (const assertion of assertions) {
-      const actual = this.resolveAssertionMetric(assertion.metric)
+      const actual = this.resolveAssertionMetric(assertion.metric);
       if (evaluateAssertion(assertion, actual)) {
-        this.assertionPassed(assertion)
+        this.assertionPassed(assertion);
       } else {
-        this.assertionFailed(assertion, actual)
+        this.assertionFailed(assertion, actual);
       }
     }
 
-    return this
+    return this;
   }
 
   // ===========================================================================
@@ -120,14 +118,14 @@ export class ScenarioResultBuilder {
 
   /** Add a single signal. */
   addSignal(signal: Signal): this {
-    this._signals.push(signal)
-    return this
+    this._signals.push(signal);
+    return this;
   }
 
   /** Add multiple signals. */
   addSignals(signals: readonly Signal[]): this {
-    this._signals.push(...signals)
-    return this
+    this._signals.push(...signals);
+    return this;
   }
 
   // ===========================================================================
@@ -141,7 +139,7 @@ export class ScenarioResultBuilder {
       // @fitness-ignore-next-line result-pattern-consistency -- builder precondition, throw is appropriate
       throw new ValidationError('Metrics are required. Call withMetrics() before build().', {
         code: 'VALIDATION.RESULT_BUILDER.METRICS_REQUIRED',
-      })
+      });
     }
 
     return Object.freeze({
@@ -152,7 +150,7 @@ export class ScenarioResultBuilder {
         failed: Object.freeze([...this._failedAssertions]),
       }),
       signals: Object.freeze([...this._signals]),
-    })
+    });
   }
 
   // ===========================================================================
@@ -164,9 +162,9 @@ export class ScenarioResultBuilder {
        (evaluateAssertions) already throws when `_metrics` is unset, so this
        branch can never fire through the public API. */
     if (!this._metrics) {
-      return 0
+      return 0;
     }
-    return resolveMetric(metric, this._metrics, this._duration ?? undefined)
+    return resolveMetric(metric, this._metrics, this._duration ?? undefined);
   }
 }
 
@@ -187,7 +185,7 @@ export function createEmptyMetrics(): SimulationMetrics {
     p95LatencyMs: 0,
     p99LatencyMs: 0,
     errorsGenerated: 0,
-  }
+  };
 }
 
 /**
@@ -196,26 +194,26 @@ export function createEmptyMetrics(): SimulationMetrics {
  */
 export function mergeMetrics(metricsList: readonly SimulationMetrics[]): SimulationMetrics {
   if (metricsList.length === 0) {
-    return createEmptyMetrics()
+    return createEmptyMetrics();
   }
 
   if (metricsList.length === 1) {
-    const first = metricsList[0]
-    return first ?? createEmptyMetrics()
+    const first = metricsList[0];
+    return first ?? createEmptyMetrics();
   }
 
-  const totalRequests = metricsList.reduce((sum, m) => sum + m.totalRequests, 0)
-  const totalSuccessful = metricsList.reduce((sum, m) => sum + m.successfulRequests, 0)
-  const totalFailed = metricsList.reduce((sum, m) => sum + m.failedRequests, 0)
+  const totalRequests = metricsList.reduce((sum, m) => sum + m.totalRequests, 0);
+  const totalSuccessful = metricsList.reduce((sum, m) => sum + m.successfulRequests, 0);
+  const totalFailed = metricsList.reduce((sum, m) => sum + m.failedRequests, 0);
 
   const weightedAvgLatency =
     totalRequests > 0
       ? metricsList.reduce((sum, m) => sum + m.avgLatencyMs * m.totalRequests, 0) / totalRequests
-      : 0
+      : 0;
 
-  const p50 = Math.max(...metricsList.map((m) => m.p50LatencyMs))
-  const p95 = Math.max(...metricsList.map((m) => m.p95LatencyMs))
-  const p99 = Math.max(...metricsList.map((m) => m.p99LatencyMs))
+  const p50 = Math.max(...metricsList.map((m) => m.p50LatencyMs));
+  const p95 = Math.max(...metricsList.map((m) => m.p95LatencyMs));
+  const p99 = Math.max(...metricsList.map((m) => m.p99LatencyMs));
 
   return {
     totalRequests,
@@ -226,5 +224,5 @@ export function mergeMetrics(metricsList: readonly SimulationMetrics[]): Simulat
     p95LatencyMs: p95,
     p99LatencyMs: p99,
     errorsGenerated: metricsList.reduce((sum, m) => sum + m.errorsGenerated, 0),
-  }
+  };
 }

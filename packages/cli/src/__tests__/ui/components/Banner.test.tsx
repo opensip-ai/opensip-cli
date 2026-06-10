@@ -4,7 +4,6 @@ import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
-
 describe('Banner', () => {
   it('renders the ASCII art banner with block characters', () => {
     const { lastFrame } = render(

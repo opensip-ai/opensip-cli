@@ -1,20 +1,20 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { readCheckPackagePreferences } from '../check-package-discovery.js'
+import { readCheckPackagePreferences } from '../check-package-discovery.js';
 
-let testDir: string
+let testDir: string;
 
 beforeEach(() => {
-  testDir = mkdtempSync(join(tmpdir(), 'opensip-check-pkg-disc-'))
-})
+  testDir = mkdtempSync(join(tmpdir(), 'opensip-check-pkg-disc-'));
+});
 
 afterEach(() => {
-  rmSync(testDir, { recursive: true, force: true })
-})
+  rmSync(testDir, { recursive: true, force: true });
+});
 
 describe('readCheckPackagePreferences', () => {
   it('reads checkPackages from project config', () => {
@@ -34,10 +34,10 @@ fitness:
   failOnWarnings: 0
   disabledChecks: []
 `,
-    )
-    const prefs = readCheckPackagePreferences(testDir)
-    expect(prefs.checkPackages).toEqual(['@opensip-tools/checks-python'])
-  })
+    );
+    const prefs = readCheckPackagePreferences(testDir);
+    expect(prefs.checkPackages).toEqual(['@opensip-tools/checks-python']);
+  });
 
   it('ignores removed prefix-discovery preferences', () => {
     writeFileSync(
@@ -47,19 +47,19 @@ fitness:
   packageScopes:
     - "@acme"
 `,
-    )
-    expect(readCheckPackagePreferences(testDir)).toEqual({})
-  })
+    );
+    expect(readCheckPackagePreferences(testDir)).toEqual({});
+  });
 
   it('returns empty object when config has no plugins section', () => {
     writeFileSync(
       join(testDir, 'opensip-tools.config.yml'),
       `fitness: { failOnErrors: 0, failOnWarnings: 0, disabledChecks: [] }\n`,
-    )
-    expect(readCheckPackagePreferences(testDir)).toEqual({})
-  })
+    );
+    expect(readCheckPackagePreferences(testDir)).toEqual({});
+  });
 
   it('returns empty object when no config file exists', () => {
-    expect(readCheckPackagePreferences(testDir)).toEqual({})
-  })
-})
+    expect(readCheckPackagePreferences(testDir)).toEqual({});
+  });
+});

@@ -1,49 +1,49 @@
 globalExcludes:
-  - "node_modules/**"
+  - 'node_modules/**'
 
 targets:
   rust-source:
-    description: "Sample Rust files"
+    description: 'Sample Rust files'
     languages: [rust]
     concerns: [backend]
     include:
-      - "src/**/*.rs"
+      - 'src/**/*.rs'
 
   python-source:
-    description: "Sample Python files"
+    description: 'Sample Python files'
     languages: [python]
     concerns: [backend]
     include:
-      - "src/**/*.py"
+      - 'src/**/*.py'
 
   java-source:
-    description: "Sample Java files"
+    description: 'Sample Java files'
     languages: [java]
     concerns: [backend]
     include:
-      - "src/**/*.java"
+      - 'src/**/*.java'
 
   go-source:
-    description: "Sample Go files"
+    description: 'Sample Go files'
     languages: [go]
     concerns: [backend]
     include:
-      - "src/**/*.go"
+      - 'src/**/*.go'
 
   cpp-source:
-    description: "Sample C++ files"
+    description: 'Sample C++ files'
     languages: [cpp]
     concerns: [backend]
     include:
-      - "src/**/*.cpp"
-      - "src/**/*.hpp"
+      - 'src/**/*.cpp'
+      - 'src/**/*.hpp'
 
   typescript-source:
-    description: "Sample TypeScript files"
+    description: 'Sample TypeScript files'
     languages: [typescript]
     concerns: [backend]
     include:
-      - "src/**/*.ts"
+      - 'src/**/*.ts'
 
 fitness:
   failOnErrors: 0

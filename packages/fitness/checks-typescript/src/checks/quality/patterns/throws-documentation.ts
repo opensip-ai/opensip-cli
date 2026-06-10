@@ -8,10 +8,14 @@
  *
  */
 
-
-import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import {
+  defineCheck,
+  getCheckConfig,
+  isTestFile,
+  type CheckViolation,
+} from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Recipe-config shape for throws-documentation. Project-specific typed-error
@@ -21,7 +25,7 @@ import * as ts from 'typescript'
  */
 export interface ThrowsDocConfig extends Record<string, unknown> {
   /** Class-name suffixes that mark a thrown error as self-documenting. */
-  additionalSelfDocumentingSuffixes?: readonly string[]
+  additionalSelfDocumentingSuffixes?: readonly string[];
 }
 
 // =============================================================================
@@ -29,15 +33,15 @@ export interface ThrowsDocConfig extends Record<string, unknown> {
 // =============================================================================
 
 /** Function-like node types that can have throw statements */
-type FunctionLikeNode = ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction
+type FunctionLikeNode = ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction;
 
 /** Context for analyzing a single file */
 interface FileAnalysisContext {
-  sourceFile: ts.SourceFile
-  content: string
-  filePath: string
+  sourceFile: ts.SourceFile;
+  content: string;
+  filePath: string;
   /** Effective self-documenting suffix list (built-in + recipe config). */
-  selfDocumentingSuffixes: readonly string[]
+  selfDocumentingSuffixes: readonly string[];
 }
 
 // =============================================================================
@@ -55,7 +59,7 @@ function isFunctionLikeNode(n: ts.Node): boolean {
     ts.isFunctionExpression(n) ||
     ts.isArrowFunction(n) ||
     ts.isMethodDeclaration(n)
-  )
+  );
 }
 
 /**
@@ -64,21 +68,21 @@ function isFunctionLikeNode(n: ts.Node): boolean {
  * @returns Array of throw statements found in the node (excluding nested functions)
  */
 function findThrowStatements(node: ts.Node): ts.ThrowStatement[] {
-  const throws: ts.ThrowStatement[] = []
+  const throws: ts.ThrowStatement[] = [];
 
   const visit = (n: ts.Node): void => {
     // Don't descend into nested functions
     if (isFunctionLikeNode(n) && n !== node) {
-      return
+      return;
     }
     if (ts.isThrowStatement(n)) {
-      throws.push(n)
+      throws.push(n);
     }
-    ts.forEachChild(n, visit)
-  }
+    ts.forEachChild(n, visit);
+  };
 
-  visit(node)
-  return throws
+  visit(node);
+  return throws;
 }
 
 /**
@@ -88,22 +92,22 @@ function findThrowStatements(node: ts.Node): ts.ThrowStatement[] {
  * @returns True if the node has a @throws JSDoc comment
  */
 function hasThrowsJSDoc(node: ts.Node, sourceFile: ts.SourceFile): boolean {
-  const fullText = sourceFile.getFullText()
-  const nodeStart = node.getFullStart()
-  const comments = ts.getLeadingCommentRanges(fullText, nodeStart)
+  const fullText = sourceFile.getFullText();
+  const nodeStart = node.getFullStart();
+  const comments = ts.getLeadingCommentRanges(fullText, nodeStart);
 
-  if (!comments) return false
+  if (!comments) return false;
 
   for (const comment of comments) {
-    const commentText = fullText.slice(comment.pos, comment.end)
+    const commentText = fullText.slice(comment.pos, comment.end);
     if (commentText.includes('@throws')) {
-      return true
+      return true;
     }
   }
-  return false
+  return false;
 }
 
-const ANONYMOUS_FUNCTION_NAME = '<anonymous>'
+const ANONYMOUS_FUNCTION_NAME = '<anonymous>';
 
 /**
  * Get function name from a function declaration node
@@ -111,7 +115,7 @@ const ANONYMOUS_FUNCTION_NAME = '<anonymous>'
  * @returns The function name, or "<anonymous>" if unnamed
  */
 function getNameFromFunctionDeclaration(node: ts.FunctionDeclaration): string {
-  return node.name?.text ?? ANONYMOUS_FUNCTION_NAME
+  return node.name?.text ?? ANONYMOUS_FUNCTION_NAME;
 }
 
 /**
@@ -120,7 +124,7 @@ function getNameFromFunctionDeclaration(node: ts.FunctionDeclaration): string {
  * @returns The method name, or "<anonymous>" if the name is not an identifier
  */
 function getNameFromMethodDeclaration(node: ts.MethodDeclaration): string {
-  return ts.isIdentifier(node.name) ? node.name.text : ANONYMOUS_FUNCTION_NAME
+  return ts.isIdentifier(node.name) ? node.name.text : ANONYMOUS_FUNCTION_NAME;
 }
 
 /**
@@ -129,11 +133,11 @@ function getNameFromMethodDeclaration(node: ts.MethodDeclaration): string {
  * @returns The variable name if assigned to a variable, or "<anonymous>" otherwise
  */
 function getNameFromArrowFunction(node: ts.ArrowFunction): string {
-  const parent = node.parent
+  const parent = node.parent;
   if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
-    return parent.name.text
+    return parent.name.text;
   }
-  return ANONYMOUS_FUNCTION_NAME
+  return ANONYMOUS_FUNCTION_NAME;
 }
 
 /**
@@ -144,12 +148,12 @@ function getNameFromArrowFunction(node: ts.ArrowFunction): string {
 // @fitness-ignore-next-line duplicate-utility-functions -- Check-specific helper for FunctionLikeNode; each fitness check defines its own variant for its node type
 function getFunctionName(node: FunctionLikeNode): string {
   if (ts.isFunctionDeclaration(node)) {
-    return getNameFromFunctionDeclaration(node)
+    return getNameFromFunctionDeclaration(node);
   }
   if (ts.isMethodDeclaration(node)) {
-    return getNameFromMethodDeclaration(node)
+    return getNameFromMethodDeclaration(node);
   }
-  return getNameFromArrowFunction(node)
+  return getNameFromArrowFunction(node);
 }
 
 /**
@@ -158,8 +162,8 @@ function getFunctionName(node: FunctionLikeNode): string {
  * @returns True if the arrow function is used as a callback in a call expression
  */
 function isAnonymousCallback(node: ts.ArrowFunction): boolean {
-  const parent = node.parent
-  return ts.isCallExpression(parent) || ts.isCallExpression(parent.parent)
+  const parent = node.parent;
+  return ts.isCallExpression(parent) || ts.isCallExpression(parent.parent);
 }
 
 /**
@@ -211,7 +215,7 @@ const SELF_DOCUMENTING_ERRORS = new Set([
   'ResourceNotFoundError',
   'DuplicateResourceError',
   'DataIntegrityError',
-])
+]);
 
 /**
  * Suffixes that indicate a self-documenting error type.
@@ -262,24 +266,24 @@ const SELF_DOCUMENTING_SUFFIXES = [
   // `CanonicalizationError`, `TransformError`, `VersioningError`,
   // `TransitionError` — are NOT defaults. They live in opensip's recipe
   // under `checks.config['throws-documentation'].additionalSelfDocumentingSuffixes`.
-]
+];
 
 /**
  * Build the effective self-documenting suffix list by merging built-in
  * defaults with the recipe config slice. Called per-file from the analyze entry.
  */
 function buildEffectiveSuffixes(): readonly string[] {
-  const cfg = getCheckConfig<ThrowsDocConfig>('throws-documentation')
-  return [...SELF_DOCUMENTING_SUFFIXES, ...(cfg.additionalSelfDocumentingSuffixes ?? [])]
+  const cfg = getCheckConfig<ThrowsDocConfig>('throws-documentation');
+  return [...SELF_DOCUMENTING_SUFFIXES, ...(cfg.additionalSelfDocumentingSuffixes ?? [])];
 }
 
 function isSelfDocumentingError(errorType: string, suffixes: readonly string[]): boolean {
   // Check exact match
   if (SELF_DOCUMENTING_ERRORS.has(errorType)) {
-    return true
+    return true;
   }
   // Check if it ends with known self-documenting patterns
-  return suffixes.some((suffix) => errorType.endsWith(suffix))
+  return suffixes.some((suffix) => errorType.endsWith(suffix));
 }
 
 /**
@@ -289,10 +293,10 @@ function isSelfDocumentingError(errorType: string, suffixes: readonly string[]):
  * @returns The error class name (e.g., "TypeError"), or "Error" if not determinable
  */
 function extractThrownType(throwStmt: ts.ThrowStatement, sourceFile: ts.SourceFile): string {
-  const text = throwStmt.expression.getText(sourceFile)
+  const text = throwStmt.expression.getText(sourceFile);
   // @fitness-ignore-next-line sonarjs-backend -- Safe regex with fixed tokens for extracting error class name
-  const typeMatch = /new\s+(\w+)/.exec(text)
-  return typeMatch?.[1] ?? 'Error'
+  const typeMatch = /new\s+(\w+)/.exec(text);
+  return typeMatch?.[1] ?? 'Error';
 }
 
 /**
@@ -306,10 +310,10 @@ function getUniqueThrowTypes(
   sourceFile: ts.SourceFile,
 ): string[] {
   if (!Array.isArray(throwStatements)) {
-    return []
+    return [];
   }
-  const thrownTypes = throwStatements.map((t) => extractThrownType(t, sourceFile))
-  return [...new Set(thrownTypes)]
+  const thrownTypes = throwStatements.map((t) => extractThrownType(t, sourceFile));
+  return [...new Set(thrownTypes)];
 }
 
 /**
@@ -328,11 +332,11 @@ function createMissingThrowsViolation(
   ctx: FileAnalysisContext,
 ): CheckViolation {
   if (!Array.isArray(throwStatements)) {
-    throw new TypeError('throwStatements must be an array')
+    throw new TypeError('throwStatements must be an array');
   }
-  const { line, character } = ctx.sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const lineNum = line + 1
-  const uniqueTypes = getUniqueThrowTypes(throwStatements, ctx.sourceFile)
+  const { line, character } = ctx.sourceFile.getLineAndCharacterOfPosition(node.getStart());
+  const lineNum = line + 1;
+  const uniqueTypes = getUniqueThrowTypes(throwStatements, ctx.sourceFile);
 
   return {
     line: lineNum,
@@ -341,7 +345,7 @@ function createMissingThrowsViolation(
     severity: 'warning',
     suggestion: `Add @throws JSDoc above the function: /** @throws {${uniqueTypes.join(' | ')}} Description of when this error is thrown */`,
     match: funcName,
-  }
+  };
 }
 
 /**
@@ -353,9 +357,9 @@ function createMissingThrowsViolation(
 function shouldAnalyzeFunction(node: FunctionLikeNode, funcName: string): boolean {
   // Skip anonymous arrow function callbacks
   if (funcName === '<anonymous>' && ts.isArrowFunction(node)) {
-    return !isAnonymousCallback(node)
+    return !isAnonymousCallback(node);
   }
-  return true
+  return true;
 }
 
 /**
@@ -370,26 +374,26 @@ function allThrowsSelfDocumenting(
   suffixes: readonly string[],
 ): boolean {
   if (!Array.isArray(throwStatements) || throwStatements.length === 0) {
-    return false
+    return false;
   }
   return throwStatements.every((stmt) => {
-    const errorType = extractThrownType(stmt, sourceFile)
-    return isSelfDocumentingError(errorType, suffixes)
-  })
+    const errorType = extractThrownType(stmt, sourceFile);
+    return isSelfDocumentingError(errorType, suffixes);
+  });
 }
 
 /**
  * Common error-field name patterns on `this` that indicate a stored-error rethrow.
  * Used to recognise patterns like `throw this.error` (Result-pattern Failure rethrow).
  */
-const ERROR_FIELD_NAME_PATTERN = /^(error|err|cause|innerError|originalError)$/i
+const ERROR_FIELD_NAME_PATTERN = /^(error|err|cause|innerError|originalError)$/i;
 
 /**
  * Generic error-variable name patterns (caught-error identifiers).
  * Used as a fallback when we cannot statically determine the enclosing catch clause
  * (e.g. when isRethrow is called without a function context).
  */
-const ERROR_VAR_NAME_PATTERN = /^(error|err|e|ex|exception)$/i
+const ERROR_VAR_NAME_PATTERN = /^(error|err|e|ex|exception)$/i;
 
 /**
  * Collect identifier names introduced by `catch (X)` clauses anywhere inside the
@@ -401,23 +405,23 @@ const ERROR_VAR_NAME_PATTERN = /^(error|err|e|ex|exception)$/i
  * @returns Set of caught-error variable names
  */
 function collectCaughtErrorNames(fnNode: ts.Node): Set<string> {
-  const names = new Set<string>()
+  const names = new Set<string>();
   const visit = (n: ts.Node): void => {
     // Don't descend into nested function bodies — their catch variables are
     // out of scope at the throw site we care about.
     if (isFunctionLikeNode(n) && n !== fnNode) {
-      return
+      return;
     }
     if (ts.isCatchClause(n) && n.variableDeclaration) {
-      const decl = n.variableDeclaration
+      const decl = n.variableDeclaration;
       if (ts.isIdentifier(decl.name)) {
-        names.add(decl.name.text)
+        names.add(decl.name.text);
       }
     }
-    ts.forEachChild(n, visit)
-  }
-  visit(fnNode)
-  return names
+    ts.forEachChild(n, visit);
+  };
+  visit(fnNode);
+  return names;
 }
 
 /**
@@ -440,41 +444,42 @@ function isRethrow(
   sourceFile: ts.SourceFile,
   caughtNames?: Set<string>,
 ): boolean {
-  const expr = throwStmt.expression
-  const text = expr.getText(sourceFile).trim()
+  const expr = throwStmt.expression;
+  const text = expr.getText(sourceFile).trim();
 
   // `new X(...)` is never a re-throw.
-  if (ts.isNewExpression(expr)) return false
+  if (ts.isNewExpression(expr)) return false;
 
   // `throw err` — bare identifier
   if (ts.isIdentifier(expr)) {
-    if (caughtNames?.has(expr.text)) return true
+    if (caughtNames?.has(expr.text)) return true;
     // Fallback: name matches a generic caught-error pattern (used when no context).
-    return ERROR_VAR_NAME_PATTERN.test(expr.text)
+    return ERROR_VAR_NAME_PATTERN.test(expr.text);
   }
 
   // `throw this.error` / `throw this.cause` — stored-error field rethrow
-  if (ts.isPropertyAccessExpression(expr) && 
-      expr.expression.kind === ts.SyntaxKind.ThisKeyword &&
-      ts.isIdentifier(expr.name) &&
-      ERROR_FIELD_NAME_PATTERN.test(expr.name.text)
-    ) {
-      return true
-    }
+  if (
+    ts.isPropertyAccessExpression(expr) &&
+    expr.expression.kind === ts.SyntaxKind.ThisKeyword &&
+    ts.isIdentifier(expr.name) &&
+    ERROR_FIELD_NAME_PATTERN.test(expr.name.text)
+  ) {
+    return true;
+  }
 
   // Result-pattern rethrows: `throw X.unwrapErr()` / `throw X.unwrap()` —
   // the throw extracts an already-typed error from a Result and propagates it.
   // We treat this as a rethrow regardless of whether X is in scope as a caught
   // variable, because the wrapped error is itself a typed error from elsewhere.
   if (ts.isCallExpression(expr) && ts.isPropertyAccessExpression(expr.expression)) {
-    const methodName = ts.isIdentifier(expr.expression.name) ? expr.expression.name.text : ''
+    const methodName = ts.isIdentifier(expr.expression.name) ? expr.expression.name.text : '';
     if (methodName === 'unwrapErr' || methodName === 'unwrap') {
-      return true
+      return true;
     }
     // Method invocation on a caught-error variable — also a rethrow.
-    const root = expr.expression.expression
+    const root = expr.expression.expression;
     if (ts.isIdentifier(root) && caughtNames?.has(root.text)) {
-      return true
+      return true;
     }
   }
 
@@ -482,16 +487,16 @@ function isRethrow(
   // Heuristic: the call has exactly one argument and that argument is an identifier
   // matching a caught-error name (preferred) or the generic err/error pattern.
   if (ts.isCallExpression(expr) && expr.arguments.length === 1) {
-    const arg = expr.arguments[0]
+    const arg = expr.arguments[0];
     if (arg && ts.isIdentifier(arg)) {
-      if (caughtNames?.has(arg.text)) return true
-      if (!caughtNames && ERROR_VAR_NAME_PATTERN.test(arg.text)) return true
+      if (caughtNames?.has(arg.text)) return true;
+      if (!caughtNames && ERROR_VAR_NAME_PATTERN.test(arg.text)) return true;
     }
   }
 
   // Legacy fallback: bare-identifier-shaped text without 'new'. Kept for backward
   // compatibility with call sites that don't pass the AST node.
-  return !text.includes('new ') && ERROR_VAR_NAME_PATTERN.test(text)
+  return !text.includes('new ') && ERROR_VAR_NAME_PATTERN.test(text);
 }
 
 /**
@@ -504,38 +509,38 @@ function analyzeFunctionNode(
   node: FunctionLikeNode,
   ctx: FileAnalysisContext,
 ): CheckViolation | null {
-  const funcName = getFunctionName(node)
+  const funcName = getFunctionName(node);
 
   if (!shouldAnalyzeFunction(node, funcName)) {
-    return null
+    return null;
   }
 
-  const throwStatements = findThrowStatements(node)
+  const throwStatements = findThrowStatements(node);
 
   if (throwStatements.length === 0) {
-    return null
+    return null;
   }
 
   // Skip if already has @throws documentation
   if (hasThrowsJSDoc(node, ctx.sourceFile)) {
-    return null
+    return null;
   }
 
   // Skip if all throws are self-documenting typed errors
   if (allThrowsSelfDocumenting(throwStatements, ctx.sourceFile, ctx.selfDocumentingSuffixes)) {
-    return null
+    return null;
   }
 
   // Skip if all throws are re-throws (error propagation). We pass the set of
   // caught-error variable names declared in any `catch (X)` clause inside the
   // function so that `throw err`, `throw err.unwrapErr()`, and
   // `throw sanitizedError(err)` are recognised as rethrows.
-  const caughtNames = collectCaughtErrorNames(node)
+  const caughtNames = collectCaughtErrorNames(node);
   if (throwStatements.every((stmt) => isRethrow(stmt, ctx.sourceFile, caughtNames))) {
-    return null
+    return null;
   }
 
-  return createMissingThrowsViolation(node, funcName, throwStatements, ctx)
+  return createMissingThrowsViolation(node, funcName, throwStatements, ctx);
 }
 
 /**
@@ -544,7 +549,7 @@ function analyzeFunctionNode(
  * @returns Array of violations for functions missing @throws documentation
  */
 function analyzeFile(ctx: FileAnalysisContext): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   const visit = (node: ts.Node): void => {
     if (
@@ -552,16 +557,16 @@ function analyzeFile(ctx: FileAnalysisContext): CheckViolation[] {
       ts.isMethodDeclaration(node) ||
       ts.isArrowFunction(node)
     ) {
-      const violation = analyzeFunctionNode(node, ctx)
+      const violation = analyzeFunctionNode(node, ctx);
       if (violation) {
-        violations.push(violation)
+        violations.push(violation);
       }
     }
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
 
-  visit(ctx.sourceFile)
-  return violations
+  visit(ctx.sourceFile);
+  return violations;
 }
 
 // =============================================================================
@@ -596,21 +601,21 @@ export const throwsDocumentation = defineCheck({
     // Skip test files — assertion failures, anonymous test callbacks, and
     // fixture helpers are not public-API surface. Matches the convention in
     // `null-safety`. Public-API throws are documented in non-test code.
-    if (isTestFile(filePath)) return []
+    if (isTestFile(filePath)) return [];
 
     // Quick filter
     if (!content.includes('throw ')) {
-      return []
+      return [];
     }
 
-    const sourceFile = getSharedSourceFile(filePath, content)
-    if (!sourceFile) return []
+    const sourceFile = getSharedSourceFile(filePath, content);
+    if (!sourceFile) return [];
 
     return analyzeFile({
       sourceFile,
       content,
       filePath,
       selfDocumentingSuffixes: buildEffectiveSuffixes(),
-    })
+    });
   },
-})
+});

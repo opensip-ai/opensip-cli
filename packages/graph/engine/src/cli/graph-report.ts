@@ -120,9 +120,7 @@ export function buildUnifiedReportLines(
 ): readonly string[] {
   const knownRuleIds = currentRules().map((r) => r.slug);
   const byRule = groupSignalsByRule(input.signals);
-  const eps = input.catalog && input.indexes
-    ? enrichEntryPoints(input.catalog, input.indexes)
-    : [];
+  const eps = input.catalog && input.indexes ? enrichEntryPoints(input.catalog, input.indexes) : [];
   const includeSummary = options?.includeSummary ?? true;
 
   return [
@@ -151,7 +149,9 @@ function resolutionBanner(): string {
  * the render seam shows it once, themed in Ink and plain in pipes — no
  * hand-written stdout copy.
  */
-export function resolutionBannerText(resolutionMode: 'exact' | 'fast' | undefined): string | undefined {
+export function resolutionBannerText(
+  resolutionMode: 'exact' | 'fast' | undefined,
+): string | undefined {
   return resolutionMode === 'fast' ? resolutionBanner() : undefined;
 }
 
@@ -191,17 +191,20 @@ function renderRuleBlock(ruleId: string, findings: readonly Signal[]): readonly 
     const loc = f.line ? `:${String(f.line)}` : '';
     return `  ${f.filePath}${loc} — ${f.message}`;
   });
-  const overflow = findings.length > preview.length
-    /* v8 ignore next */
-    ? [`  ... ${String(findings.length - preview.length)} more (use --json for full list)`]
-    : [];
+  const overflow =
+    findings.length > preview.length
+      ? /* v8 ignore next */
+        [`  ... ${String(findings.length - preview.length)} more (use --json for full list)`]
+      : [];
   return [header, ...preview, ...overflow, ''];
 }
 
 function renderEntryPointsSection(eps: readonly EnrichedEntryPoint[]): readonly string[] {
   const header = `== Entry points (${String(eps.length)}) ==`;
   if (eps.length === 0) return [header, '(none inferred)'];
-  const top = [...eps].sort((a, b) => a.qualifiedName.localeCompare(b.qualifiedName)).slice(0, ENTRY_POINTS_PREVIEW);
+  const top = [...eps]
+    .sort((a, b) => a.qualifiedName.localeCompare(b.qualifiedName))
+    .slice(0, ENTRY_POINTS_PREVIEW);
   const intro = `Top ${String(top.length)} (use --json for full list):`;
   const items = top.map((ep) => `  [${ep.reason}] ${ep.qualifiedName}`);
   return [header, intro, ...items];

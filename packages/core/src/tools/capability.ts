@@ -54,7 +54,11 @@ export type CapabilityContributionKind = 'module-export' | 'manifest-entry' | 'f
  */
 export type CapabilityDiscoveryMode =
   | { readonly mode: 'marker'; readonly markerKind: string }
-  | { readonly mode: 'name-pattern'; readonly prefix: string; readonly defaultScopes: readonly string[] };
+  | {
+      readonly mode: 'name-pattern';
+      readonly prefix: string;
+      readonly defaultScopes: readonly string[];
+    };
 
 /**
  * A SECONDARY export the same package walk also routes — to a (usually different)

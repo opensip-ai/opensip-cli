@@ -76,15 +76,19 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
   });
 
   it('dynamic-imports the built module as an external plugin would (not the static import)', async () => {
-    const mod = (await import(pathToFileURL(join(FIT_DIR, 'dist', 'index.js')).href)) as { tool?: Tool };
+    const mod = (await import(pathToFileURL(join(FIT_DIR, 'dist', 'index.js')).href)) as {
+      tool?: Tool;
+    };
     expect(mod.tool, 'the built module must export `tool`').toBeDefined();
     expect(mod.tool?.metadata.id).toBe('fitness');
     // fit, fit-list, fit-recipes, fit-baseline-export, fit-run-worker (internal).
     expect(mod.tool?.commandSpecs?.length).toBe(5);
   });
 
-  it("the externally-loaded fit has a command surface identical to the bundled fit", async () => {
-    const mod = (await import(pathToFileURL(join(FIT_DIR, 'dist', 'index.js')).href)) as { tool?: Tool };
+  it('the externally-loaded fit has a command surface identical to the bundled fit', async () => {
+    const mod = (await import(pathToFileURL(join(FIT_DIR, 'dist', 'index.js')).href)) as {
+      tool?: Tool;
+    };
     const external = specsByName(mod.tool!);
     const bundled = specsByName(fitnessTool);
 
@@ -104,13 +108,17 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
   });
 
   it('the host mounts the externally-loaded fit to a Commander surface (names + aliases + flags)', async () => {
-    const mod = (await import(pathToFileURL(join(FIT_DIR, 'dist', 'index.js')).href)) as { tool?: Tool };
+    const mod = (await import(pathToFileURL(join(FIT_DIR, 'dist', 'index.js')).href)) as {
+      tool?: Tool;
+    };
     const program = new Command();
     for (const spec of mod.tool!.commandSpecs ?? []) {
       mountCommandSpec(program, spec as CommandSpec<unknown, CommandMountContext>, STUB_CTX);
     }
     const mounted = program.commands.map((c) => c.name());
-    expect(mounted).toEqual(expect.arrayContaining(['fit', 'fit-list', 'fit-recipes', 'fit-baseline-export']));
+    expect(mounted).toEqual(
+      expect.arrayContaining(['fit', 'fit-list', 'fit-recipes', 'fit-baseline-export']),
+    );
 
     // The `fit` command carries the host-provided `--json` common flag + its own
     // `--recipe` option — proving flags + options travel the plugin path intact.

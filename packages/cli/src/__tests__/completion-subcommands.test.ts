@@ -15,10 +15,7 @@ import { ToolRegistry, type ToolCliContext } from '@opensip-tools/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  registerFirstPartyTools,
-  mountAllToolCommands,
-} from '../bootstrap/register-tools.js';
+import { registerFirstPartyTools, mountAllToolCommands } from '../bootstrap/register-tools.js';
 import {
   assembleCompletionInventory,
   buildCompletionScript,

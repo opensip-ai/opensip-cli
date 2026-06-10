@@ -67,10 +67,18 @@ describe('lang-typescript cacheKey — branches', () => {
     const file = join(dir, 'tsconfig.json');
     writeFileSync(file, `{"extends": "./tsconfig.base.json", "compilerOptions": {}}`, 'utf8');
 
-    writeFileSync(base, `{"compilerOptions": {"baseUrl": ".", "paths": {"@a/*": ["a/*"]}}}`, 'utf8');
+    writeFileSync(
+      base,
+      `{"compilerOptions": {"baseUrl": ".", "paths": {"@a/*": ["a/*"]}}}`,
+      'utf8',
+    );
     const before = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
 
-    writeFileSync(base, `{"compilerOptions": {"baseUrl": ".", "paths": {"@a/*": ["DIFFERENT/*"]}}}`, 'utf8');
+    writeFileSync(
+      base,
+      `{"compilerOptions": {"baseUrl": ".", "paths": {"@a/*": ["DIFFERENT/*"]}}}`,
+      'utf8',
+    );
     const after = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
 
     expect(after).not.toBe(before);

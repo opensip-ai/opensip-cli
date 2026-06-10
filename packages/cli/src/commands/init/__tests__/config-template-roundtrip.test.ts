@@ -22,7 +22,14 @@ import { generateConfig } from '../config-templates.js';
 
 import type { SupportedLanguage } from '../language-detection.js';
 
-const LANGUAGES: readonly SupportedLanguage[] = ['typescript', 'rust', 'python', 'go', 'java', 'cpp'];
+const LANGUAGES: readonly SupportedLanguage[] = [
+  'typescript',
+  'rust',
+  'python',
+  'go',
+  'java',
+  'cpp',
+];
 
 function realRegistry(): ToolRegistry {
   const reg = new ToolRegistry();

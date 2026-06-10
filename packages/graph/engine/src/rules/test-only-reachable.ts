@@ -35,9 +35,9 @@ export const testOnlyReachableRule = defineRule({
     const signals: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
       if (occ.kind === 'module-init') continue;
-      if (occ.inTestFile) continue;                  // Tests-of-tests are fine.
+      if (occ.inTestFile) continue; // Tests-of-tests are fine.
       if (occ.definedInGenerated) continue;
-      if (!isTestOnly(occ.bodyHash)) continue;       // not-prod-reachable + all-test callers
+      if (!isTestOnly(occ.bodyHash)) continue; // not-prod-reachable + all-test callers
       // Skip exports — they may be intentionally test-callable APIs.
       if (occ.visibility === 'exported') continue;
       const callers = indexes.callers.get(occ.bodyHash) ?? [];
@@ -76,13 +76,16 @@ function computeTestOnlyLocal(
   return callers.every((h) => indexes.byBodyHash.get(h)?.inTestFile === true);
 }
 
-function computeProductionEntries(catalog: Parameters<Rule['evaluate']>[0], indexes: Indexes): Set<string> {
+function computeProductionEntries(
+  catalog: Parameters<Rule['evaluate']>[0],
+  indexes: Indexes,
+): Set<string> {
   const out = new Set<string>();
   for (const ep of inferEntryPoints(catalog, indexes)) {
     const occ = indexes.byBodyHash.get(ep.bodyHash);
     /* v8 ignore next */
     if (!occ) continue;
-    if (occ.inTestFile) continue;                    // Test-runner entries don't count.
+    if (occ.inTestFile) continue; // Test-runner entries don't count.
     out.add(ep.bodyHash);
   }
   return out;

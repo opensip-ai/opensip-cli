@@ -4,18 +4,18 @@
  * @fileoverview Cache TTL validation check
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
 
-import { isDigit } from './_helpers/config-validation.js'
+import { isDigit } from './_helpers/config-validation.js';
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
 
-const MIN_TTL_SECONDS = 5 // Minimum 5 seconds to avoid thundering herd
-const MAX_TTL_SECONDS = 86_400 // Maximum 24 hours for general data
-const MAX_FINANCIAL_TTL_SECONDS = 60 // Maximum 1 minute for financial data
+const MIN_TTL_SECONDS = 5; // Minimum 5 seconds to avoid thundering herd
+const MAX_TTL_SECONDS = 86_400; // Maximum 24 hours for general data
+const MAX_FINANCIAL_TTL_SECONDS = 60; // Maximum 1 minute for financial data
 
 // =============================================================================
 // DATA TYPE DETECTION
@@ -25,46 +25,48 @@ const MAX_FINANCIAL_TTL_SECONDS = 60 // Maximum 1 minute for financial data
  * Check if line contains financial data keywords.
  */
 function isFinancialDataLine(line: string): boolean {
-  const lowerLine = line.toLowerCase()
+  const lowerLine = line.toLowerCase();
   const hasMoneyTerms =
-    lowerLine.includes('balance') || lowerLine.includes('wallet') || lowerLine.includes('payment')
+    lowerLine.includes('balance') || lowerLine.includes('wallet') || lowerLine.includes('payment');
   const hasTransactionTerms =
-    lowerLine.includes('transaction') || lowerLine.includes('escrow') || lowerLine.includes('price')
+    lowerLine.includes('transaction') ||
+    lowerLine.includes('escrow') ||
+    lowerLine.includes('price');
   const hasAccountingTerms =
-    lowerLine.includes('amount') || lowerLine.includes('credit') || lowerLine.includes('debit')
-  return hasMoneyTerms || hasTransactionTerms || hasAccountingTerms
+    lowerLine.includes('amount') || lowerLine.includes('credit') || lowerLine.includes('debit');
+  return hasMoneyTerms || hasTransactionTerms || hasAccountingTerms;
 }
 
 /**
  * Check if line contains sensitive data keywords.
  */
 function isSensitiveDataLine(line: string): boolean {
-  const lowerLine = line.toLowerCase()
-  const hasSessionTerms = lowerLine.includes('session') || lowerLine.includes('token')
+  const lowerLine = line.toLowerCase();
+  const hasSessionTerms = lowerLine.includes('session') || lowerLine.includes('token');
   const hasAuthTerms =
-    lowerLine.includes('auth') || lowerLine.includes('permission') || lowerLine.includes('role')
-  return hasSessionTerms || hasAuthTerms
+    lowerLine.includes('auth') || lowerLine.includes('permission') || lowerLine.includes('role');
+  return hasSessionTerms || hasAuthTerms;
 }
 
 /**
  * Check if line should be skipped (non-cache pattern).
  */
 function isNonCachePattern(line: string): boolean {
-  const lowerLine = line.toLowerCase()
-  const isMapOperation = line.includes('Map()') && line.includes('.set')
-  const isCollectionInit = line.includes('new Map') || line.includes('new Set')
-  const isMetricsOperation = lowerLine.includes('metrics.set') || lowerLine.includes('gauge.set')
-  return isMapOperation || isCollectionInit || isMetricsOperation
+  const lowerLine = line.toLowerCase();
+  const isMapOperation = line.includes('Map()') && line.includes('.set');
+  const isCollectionInit = line.includes('new Map') || line.includes('new Set');
+  const isMetricsOperation = lowerLine.includes('metrics.set') || lowerLine.includes('gauge.set');
+  return isMapOperation || isCollectionInit || isMetricsOperation;
 }
 
 /**
  * Check if file contains cache-related patterns.
  */
 function hasCachePatterns(content: string): boolean {
-  const lowerContent = content.toLowerCase()
+  const lowerContent = content.toLowerCase();
   return (
     lowerContent.includes('cache') || lowerContent.includes('redis') || lowerContent.includes('ttl')
-  )
+  );
 }
 
 // =============================================================================
@@ -78,46 +80,46 @@ function parseTtlFromLine(line: string): { ttl: number; matchText: string } | nu
   logger.debug({
     evt: 'fitness.checks.cache_ttl_validation.parse_ttl_from_line',
     msg: 'Parsing TTL value from line using string matching',
-  })
-  const lowerLine = line.toLowerCase()
-  const ttlIndex = lowerLine.indexOf('ttl')
-  if (ttlIndex === -1) return null
+  });
+  const lowerLine = line.toLowerCase();
+  const ttlIndex = lowerLine.indexOf('ttl');
+  if (ttlIndex === -1) return null;
 
-  const afterTtl = line.slice(Math.max(0, ttlIndex + 3))
-  let i = 0
+  const afterTtl = line.slice(Math.max(0, ttlIndex + 3));
+  let i = 0;
 
   // Skip whitespace
   while (i < afterTtl.length && (afterTtl[i] === ' ' || afterTtl[i] === '\t')) {
-    i++
+    i++;
   }
 
   // Check for = or :
   if (afterTtl[i] !== '=' && afterTtl[i] !== ':') {
-    return null
+    return null;
   }
-  i++
+  i++;
 
   // Skip whitespace
   while (i < afterTtl.length && (afterTtl[i] === ' ' || afterTtl[i] === '\t')) {
-    i++
+    i++;
   }
 
   // Parse digits
-  const digitStart = i
+  const digitStart = i;
   while (i < afterTtl.length && isDigit(afterTtl[i])) {
-    i++
+    i++;
   }
 
   if (digitStart === i) {
-    return null // No digits found
+    return null; // No digits found
   }
 
   // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by isDigit loop above
-  const ttlValue = Number.parseInt(afterTtl.slice(digitStart, i), 10)
+  const ttlValue = Number.parseInt(afterTtl.slice(digitStart, i), 10);
   return {
     ttl: ttlValue,
     matchText: `ttl${afterTtl.slice(0, Math.max(0, i))}`,
-  }
+  };
 }
 
 // =============================================================================
@@ -125,10 +127,10 @@ function parseTtlFromLine(line: string): { ttl: number; matchText: string } | nu
 // =============================================================================
 
 interface TtlViolation {
-  message: string
-  severity: 'error' | 'warning'
-  suggestion: string
-  patternId: string
+  message: string;
+  severity: 'error' | 'warning';
+  suggestion: string;
+  patternId: string;
 }
 
 /**
@@ -142,7 +144,7 @@ function detectTtlViolation(
   logger.debug({
     evt: 'fitness.checks.cache_ttl_validation.detect_ttl_violation',
     msg: 'Detecting TTL violation type based on value and data type',
-  })
+  });
   // TTL too short
   if (ttl < MIN_TTL_SECONDS) {
     return {
@@ -150,7 +152,7 @@ function detectTtlViolation(
       severity: 'warning',
       suggestion: `Increase TTL to at least ${MIN_TTL_SECONDS}s to prevent thundering herd when cache expires simultaneously for many requests.`,
       patternId: 'ttl-too-short',
-    }
+    };
   }
 
   // Financial data with long TTL
@@ -160,7 +162,7 @@ function detectTtlViolation(
       severity: 'error',
       suggestion: `Reduce TTL to ${MAX_FINANCIAL_TTL_SECONDS}s or less for financial data. Stale financial data can cause incorrect balances, payments, or escrow issues.`,
       patternId: 'financial-ttl-too-long',
-    }
+    };
   }
 
   // Sensitive data with long TTL
@@ -170,7 +172,7 @@ function detectTtlViolation(
       severity: 'warning',
       suggestion: `Consider reducing TTL to ${MAX_TTL_SECONDS / 4}s or less for sensitive data like sessions, tokens, or permissions to prevent stale authorization state.`,
       patternId: 'sensitive-ttl-too-long',
-    }
+    };
   }
 
   // General data with excessive TTL
@@ -180,10 +182,10 @@ function detectTtlViolation(
       severity: 'warning',
       suggestion: `Reduce TTL to ${MAX_TTL_SECONDS}s (24 hours) or add a comment justifying the longer TTL for this specific use case.`,
       patternId: 'ttl-too-long',
-    }
+    };
   }
 
-  return null
+  return null;
 }
 
 // =============================================================================
@@ -224,36 +226,36 @@ export const cacheTtlValidation = defineCheck({
   analyze(content: string, filePath: string): CheckViolation[] {
     // Test fixtures intentionally exercise TTL boundary cases (too short,
     // too long, financial TTLs) to verify detection logic.
-    if (isTestFile(filePath)) return []
+    if (isTestFile(filePath)) return [];
 
     logger.debug({
       evt: 'fitness.checks.cache_ttl_validation.analyze',
       msg: 'Analyzing file for cache TTL validation violations',
-    })
-    const violations: CheckViolation[] = []
+    });
+    const violations: CheckViolation[] = [];
 
     // Skip files that don't have cache patterns
     if (!hasCachePatterns(content)) {
-      return violations
+      return violations;
     }
 
-    const lines = content.split('\n')
+    const lines = content.split('\n');
     for (const [i, line] of lines.entries()) {
       if (!line || isNonCachePattern(line)) {
-        continue
+        continue;
       }
 
-      const ttlResult = parseTtlFromLine(line)
-      if (!ttlResult) continue
+      const ttlResult = parseTtlFromLine(line);
+      if (!ttlResult) continue;
 
-      const { ttl, matchText } = ttlResult
-      const isFinancialData = isFinancialDataLine(line)
-      const isSensitiveData = isSensitiveDataLine(line)
+      const { ttl, matchText } = ttlResult;
+      const isFinancialData = isFinancialDataLine(line);
+      const isSensitiveData = isSensitiveDataLine(line);
 
-      const violation = detectTtlViolation(ttl, isFinancialData, isSensitiveData)
-      if (!violation) continue
+      const violation = detectTtlViolation(ttl, isFinancialData, isSensitiveData);
+      if (!violation) continue;
 
-      const lineNumber = i + 1
+      const lineNumber = i + 1;
       violations.push({
         line: lineNumber,
         column: 0,
@@ -263,9 +265,9 @@ export const cacheTtlValidation = defineCheck({
         match: matchText,
         type: violation.patternId,
         filePath,
-      })
+      });
     }
 
-    return violations
+    return violations;
   },
-})
+});

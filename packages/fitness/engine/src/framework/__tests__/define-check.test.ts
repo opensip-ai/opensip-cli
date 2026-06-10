@@ -28,7 +28,12 @@ describe('defineCheck', () => {
       description: 'flag any line containing FOO',
       tags: ['quality'],
       analyze: (content, filePath) => {
-        const out: { line: number; message: string; severity: 'error' | 'warning'; filePath: string }[] = [];
+        const out: {
+          line: number;
+          message: string;
+          severity: 'error' | 'warning';
+          filePath: string;
+        }[] = [];
         const lines = content.split('\n');
         for (const [i, line] of lines.entries()) {
           if (line?.includes('FOO')) {
@@ -310,7 +315,12 @@ describe('defineCheck — analyze mode end-to-end run', () => {
       description: 'd',
       tags: ['quality'],
       analyze: (content, filePath) => {
-        const out: { line: number; message: string; severity: 'error' | 'warning'; filePath: string }[] = [];
+        const out: {
+          line: number;
+          message: string;
+          severity: 'error' | 'warning';
+          filePath: string;
+        }[] = [];
         const lines = content.split('\n');
         for (const [i, line] of lines.entries()) {
           if (line.includes('FOO')) {
@@ -380,7 +390,12 @@ describe('defineCheck — analyzeAll mode end-to-end run', () => {
       analyzeAll: async (accessor) => {
         const files = accessor.paths;
         return [
-          { line: 1, message: `saw ${files.length} files`, severity: 'warning' as const, filePath: files[0] ?? 'unknown' },
+          {
+            line: 1,
+            message: `saw ${files.length} files`,
+            severity: 'warning' as const,
+            filePath: files[0] ?? 'unknown',
+          },
         ];
       },
     });
@@ -400,9 +415,7 @@ describe('defineCheck — analyzeAll mode end-to-end run', () => {
       description: 'd',
       tags: ['quality'],
       // eslint-disable-next-line @typescript-eslint/require-await -- analyzeAll signature is Promise<Violation[]>; this body is synchronous
-      analyzeAll: async () => [
-        { line: 1, message: 'global', severity: 'warning' as const },
-      ],
+      analyzeAll: async () => [{ line: 1, message: 'global', severity: 'warning' as const }],
     });
 
     const result = await check.run(testDir, { verbose: true });
@@ -423,12 +436,14 @@ describe('defineCheck — command mode end-to-end run', () => {
       command: {
         bin: 'echo',
         args: ['1 finding'],
-        parseOutput: (stdout) => [{
-          line: 1,
-          message: stdout.trim(),
-          severity: 'warning' as const,
-          filePath: 'virtual',
-        }],
+        parseOutput: (stdout) => [
+          {
+            line: 1,
+            message: stdout.trim(),
+            severity: 'warning' as const,
+            filePath: 'virtual',
+          },
+        ],
       },
     });
 

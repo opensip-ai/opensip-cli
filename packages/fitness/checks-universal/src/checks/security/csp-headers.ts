@@ -6,8 +6,8 @@
  * @fileoverview Validate Content Security Policy headers configuration
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Match unsafe-inline CSP directive
@@ -16,8 +16,8 @@ function matchUnsafeInline(line: string): RegExpExecArray | null {
   logger.debug({
     evt: 'fitness.checks.csp_headers.match_unsafe_inline',
     msg: 'Checking for unsafe-inline CSP directive',
-  })
-  return /['"`]unsafe-inline['"`]/i.exec(line)
+  });
+  return /['"`]unsafe-inline['"`]/i.exec(line);
 }
 
 /**
@@ -27,8 +27,8 @@ function matchUnsafeEval(line: string): RegExpExecArray | null {
   logger.debug({
     evt: 'fitness.checks.csp_headers.match_unsafe_eval',
     msg: 'Checking for unsafe-eval CSP directive',
-  })
-  return /['"`]unsafe-eval['"`]/i.exec(line)
+  });
+  return /['"`]unsafe-eval['"`]/i.exec(line);
 }
 
 /**
@@ -38,16 +38,16 @@ function matchCspWildcard(line: string): RegExpExecArray | null {
   logger.debug({
     evt: 'fitness.checks.csp_headers.match_csp_wildcard',
     msg: 'Checking for wildcard in CSP directive',
-  })
-  const lowerLine = line.toLowerCase()
-  const cspDirectives = ['default-src', 'script-src', 'style-src', 'img-src', 'connect-src']
+  });
+  const lowerLine = line.toLowerCase();
+  const cspDirectives = ['default-src', 'script-src', 'style-src', 'img-src', 'connect-src'];
   for (const directive of cspDirectives) {
     if (lowerLine.includes(directive)) {
-      const match = /['"]\*['"]/i.exec(line)
-      if (match) return match
+      const match = /['"]\*['"]/i.exec(line);
+      if (match) return match;
     }
   }
-  return null
+  return null;
 }
 
 /**
@@ -57,12 +57,12 @@ function matchMissingDefaultSrc(line: string): RegExpExecArray | null {
   logger.debug({
     evt: 'fitness.checks.csp_headers.match_missing_default_src',
     msg: 'Checking for missing default-src CSP directive',
-  })
-  const lowerLine = line.toLowerCase()
-  if (!lowerLine.includes('contentsecuritypolicy')) return null
-  if (lowerLine.includes('defaultsrc') || lowerLine.includes('default-src')) return null
+  });
+  const lowerLine = line.toLowerCase();
+  if (!lowerLine.includes('contentsecuritypolicy')) return null;
+  if (lowerLine.includes('defaultsrc') || lowerLine.includes('default-src')) return null;
   // @fitness-ignore-next-line sonarjs-regular-expr -- Simple pattern with no backtracking; \s* followed by character class, then literal
-  return /contentSecurityPolicy\s*[:=]\s*\{/i.exec(line)
+  return /contentSecurityPolicy\s*[:=]\s*\{/i.exec(line);
 }
 
 /**
@@ -72,10 +72,10 @@ function matchDataUriInScriptSrc(line: string): RegExpExecArray | null {
   logger.debug({
     evt: 'fitness.checks.csp_headers.match_data_uri_in_script_src',
     msg: 'Checking for data URI in script-src directive',
-  })
-  const lowerLine = line.toLowerCase()
-  if (!lowerLine.includes('script-src')) return null
-  return /['"`]data:['"`]/i.exec(line)
+  });
+  const lowerLine = line.toLowerCase();
+  if (!lowerLine.includes('script-src')) return null;
+  return /['"`]data:['"`]/i.exec(line);
 }
 
 // Patterns that indicate CSP issues
@@ -120,10 +120,10 @@ const CSP_SECURITY_PATTERNS = [
       "Remove 'data:' from script-src. Data URIs in scripts allow arbitrary code execution, defeating the purpose of CSP. Move scripts to external files or use nonces.",
     severity: 'error' as const,
   },
-]
+];
 
 // Files likely to contain CSP configuration
-const CSP_CONFIG_PATTERNS = ['helmet', 'contentsecuritypolicy', 'content-security-policy', 'csp']
+const CSP_CONFIG_PATTERNS = ['helmet', 'contentsecuritypolicy', 'content-security-policy', 'csp'];
 
 /**
  * Check if content contains CSP configuration references
@@ -132,9 +132,9 @@ function containsCspContent(content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.csp_headers.contains_csp_content',
     msg: 'Checking if content contains CSP configuration references',
-  })
-  const lowerContent = content.toLowerCase()
-  return CSP_CONFIG_PATTERNS.some((pattern) => lowerContent.includes(pattern))
+  });
+  const lowerContent = content.toLowerCase();
+  return CSP_CONFIG_PATTERNS.some((pattern) => lowerContent.includes(pattern));
 }
 
 /**
@@ -171,25 +171,25 @@ export const cspHeaders = defineCheck({
     logger.debug({
       evt: 'fitness.checks.csp_headers.analyze',
       msg: 'Analyzing file for CSP header configuration issues',
-    })
+    });
     // Only scan files that might contain CSP config
     if (!containsCspContent(content)) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (const [lineNum, line_] of lines.entries()) {
-      const line = line_ ?? ''
+      const line = line_ ?? '';
 
       // Skip comments
       if (isCommentLine(line)) {
-        continue
+        continue;
       }
 
       for (const pattern of CSP_SECURITY_PATTERNS) {
-        const match = pattern.match(line)
+        const match = pattern.match(line);
         if (match) {
           violations.push({
             line: lineNum + 1,
@@ -199,11 +199,11 @@ export const cspHeaders = defineCheck({
             suggestion: pattern.suggestion,
             match: match[0],
             filePath,
-          })
+          });
         }
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

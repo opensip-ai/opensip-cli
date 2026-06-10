@@ -73,16 +73,18 @@ describe('executeSim', () => {
     // Register a scenario so the default recipe has something to run — an
     // empty selection now fails closed (see the zero-scenario guard tests
     // below), so this test must supply work to exercise the happy path.
-    currentScenarioRegistry().register(defineLoadScenario({
-      id: 'default-probe',
-      name: 'default-probe',
-      description: 'default-probe',
-      tags: [],
-      target: noopTarget,
-      workload: { rps: 1 },
-      duration: 1,
-      assertions: [ASSERTIONS.lowErrorRate(1)],
-    }));
+    currentScenarioRegistry().register(
+      defineLoadScenario({
+        id: 'default-probe',
+        name: 'default-probe',
+        description: 'default-probe',
+        tags: [],
+        target: noopTarget,
+        workload: { rps: 1 },
+        duration: 1,
+        assertions: [ASSERTIONS.lowErrorRate(1)],
+      }),
+    );
     const { result } = await executeSim(args());
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
@@ -91,16 +93,18 @@ describe('executeSim', () => {
   });
 
   it('returns SimDoneResult with per-scenario outcomes', async () => {
-    currentScenarioRegistry().register(defineLoadScenario({
-      id: 'load-a',
-      name: 'load-a',
-      description: 'load a',
-      tags: ['demo'],
-      target: noopTarget,
-      workload: { rps: 1 },
-      duration: 1,
-      assertions: [ASSERTIONS.lowErrorRate(1)],
-    }));
+    currentScenarioRegistry().register(
+      defineLoadScenario({
+        id: 'load-a',
+        name: 'load-a',
+        description: 'load a',
+        tags: ['demo'],
+        target: noopTarget,
+        workload: { rps: 1 },
+        duration: 1,
+        assertions: [ASSERTIONS.lowErrorRate(1)],
+      }),
+    );
     const { result } = await executeSim(args());
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
@@ -169,9 +173,8 @@ describe('executeSim', () => {
       description: 'emits a signal',
       kind: 'load',
       tags: [],
-      run: () => Promise.resolve(
-        loadResultWithSignal('sig-scenario', 'some-other-source', 'low', 'fyi'),
-      ),
+      run: () =>
+        Promise.resolve(loadResultWithSignal('sig-scenario', 'some-other-source', 'low', 'fyi')),
     });
 
     const { result } = await executeSim(args());
@@ -192,9 +195,10 @@ describe('executeSim', () => {
       description: 'passes but emits a critical signal',
       kind: 'load',
       tags: [],
-      run: () => Promise.resolve(
-        loadResultWithSignal('crit-scenario', 'crit-scenario', 'critical', 'meltdown'),
-      ),
+      run: () =>
+        Promise.resolve(
+          loadResultWithSignal('crit-scenario', 'crit-scenario', 'critical', 'meltdown'),
+        ),
     });
 
     const { result } = await executeSim(args());
@@ -209,17 +213,21 @@ describe('executeSim', () => {
 
 /** Run a minimal sim and return its SimDoneResult — the caller persists it.
  *  Hoisted to module scope (called inside the per-test scope from beforeEach). */
-async function simDone(): Promise<Extract<Awaited<ReturnType<typeof executeSim>>['result'], { type: 'sim-done' }>> {
-  currentScenarioRegistry().register(defineLoadScenario({
-    id: 'persist-probe',
-    name: 'persist-probe',
-    description: 'persist-probe',
-    tags: [],
-    target: noopTarget,
-    workload: { rps: 1 },
-    duration: 1,
-    assertions: [ASSERTIONS.lowErrorRate(1)],
-  }));
+async function simDone(): Promise<
+  Extract<Awaited<ReturnType<typeof executeSim>>['result'], { type: 'sim-done' }>
+> {
+  currentScenarioRegistry().register(
+    defineLoadScenario({
+      id: 'persist-probe',
+      name: 'persist-probe',
+      description: 'persist-probe',
+      tags: [],
+      target: noopTarget,
+      workload: { rps: 1 },
+      duration: 1,
+      assertions: [ASSERTIONS.lowErrorRate(1)],
+    }),
+  );
   const { result } = await executeSim(args());
   if (result.type !== 'sim-done') throw new Error(`expected sim-done, got ${result.type}`);
   return result;

@@ -5,7 +5,7 @@
  * @fileoverview No stub tests check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Patterns for empty test bodies on a single line
@@ -15,32 +15,32 @@ const EMPTY_BODY_PATTERNS = [
   /(?:it|test)\s*\(\s*['"`].*['"`]\s*,\s*(?:async\s*)?\(\)\s*=>\s*\{\s*\}\s*\)/,
   // it('...', function() {}) or it('...', function() { })
   /(?:it|test)\s*\(\s*['"`].*['"`]\s*,\s*(?:async\s*)?function\s*\(\)\s*\{\s*\}\s*\)/,
-]
+];
 
 /**
  * Pattern for TODO/FIXME comments inside test bodies on same line
  */
 const TODO_IN_TEST_BODY =
-  /(?:it|test)\s*\(\s*['"`].*['"`]\s*,\s*(?:async\s*)?\(\)\s*=>\s*\{\s*\/[/*]\s*(?:TODO|FIXME|HACK|STUB)/i
+  /(?:it|test)\s*\(\s*['"`].*['"`]\s*,\s*(?:async\s*)?\(\)\s*=>\s*\{\s*\/[/*]\s*(?:TODO|FIXME|HACK|STUB)/i;
 
 /**
  * Pattern for trivial always-passing assertions
  */
-const TRIVIAL_ASSERTION = /expect\s*\(\s*true\s*\)\s*\.toBe\s*\(\s*true\s*\)/
+const TRIVIAL_ASSERTION = /expect\s*\(\s*true\s*\)\s*\.toBe\s*\(\s*true\s*\)/;
 
 /**
  * Analyze a test file for stub tests
  */
 function analyzeTestFile(content: string, _filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
 
   for (const [i, line_] of lines.entries()) {
-    const line = line_ ?? ''
-    const trimmed = line.trim()
+    const line = line_ ?? '';
+    const trimmed = line.trim();
 
     // Skip actual comments (not inside test bodies)
-    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
     // Check for empty test bodies
     for (const pattern of EMPTY_BODY_PATTERNS) {
@@ -53,8 +53,8 @@ function analyzeTestFile(content: string, _filePath: string): CheckViolation[] {
             'Add meaningful assertions or use `it.todo()` if the test is planned but not yet implemented',
           type: 'empty-test-body',
           match: trimmed.slice(0, 120),
-        })
-        break
+        });
+        break;
       }
     }
 
@@ -67,7 +67,7 @@ function analyzeTestFile(content: string, _filePath: string): CheckViolation[] {
         suggestion: 'Implement the test or convert to `it.todo()` to track as unimplemented',
         type: 'todo-stub-test',
         match: trimmed.slice(0, 120),
-      })
+      });
     }
 
     // Check for trivial always-passing assertions
@@ -79,11 +79,11 @@ function analyzeTestFile(content: string, _filePath: string): CheckViolation[] {
         suggestion: 'Replace with a meaningful assertion that validates actual behavior',
         type: 'trivial-assertion',
         match: trimmed.slice(0, 120),
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -114,4 +114,4 @@ export const noStubTests = defineCheck({
   tags: ['testing', 'quality', 'coverage'],
   fileTypes: ['ts', 'tsx'],
   analyze: analyzeTestFile,
-})
+});

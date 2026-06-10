@@ -21,7 +21,11 @@ const batch = (n: number) =>
   buildSignalBatch({
     tool: 'fit',
     repo: {},
-    signals: Array.from({ length: n }, (_, i): Signal => createSignal({ source: 't', severity: 'high', ruleId: `r${i}`, message: 'm' })),
+    signals: Array.from(
+      { length: n },
+      (_, i): Signal =>
+        createSignal({ source: 't', severity: 'high', ruleId: `r${i}`, message: 'm' }),
+    ),
   });
 
 /** Route entitlement vs signals by URL. */
@@ -38,20 +42,35 @@ describe('resolveSignalSink (opt-out paths return the no-op, no IO)', () => {
     expect(resolveSignalSink({ cacheDir: 'unused-cache-dir' })).toBe(noopSignalSink);
   });
   it('cloud.sync:false → no-op', () => {
-    expect(resolveSignalSink({ apiKey: 'k', cloud: { sync: false }, cacheDir: 'unused-cache-dir' })).toBe(noopSignalSink);
+    expect(
+      resolveSignalSink({ apiKey: 'k', cloud: { sync: false }, cacheDir: 'unused-cache-dir' }),
+    ).toBe(noopSignalSink);
   });
   it('--no-cloud → no-op', () => {
-    expect(resolveSignalSink({ apiKey: 'k', noCloud: true, cacheDir: 'unused-cache-dir' })).toBe(noopSignalSink);
+    expect(resolveSignalSink({ apiKey: 'k', noCloud: true, cacheDir: 'unused-cache-dir' })).toBe(
+      noopSignalSink,
+    );
   });
   it('non-https endpoint → no-op (never sends the key)', () => {
-    expect(resolveSignalSink({ apiKey: 'k', cloud: { endpoint: 'http://insecure.test' }, cacheDir: 'unused-cache-dir' })).toBe(noopSignalSink);
+    expect(
+      resolveSignalSink({
+        apiKey: 'k',
+        cloud: { endpoint: 'http://insecure.test' },
+        cacheDir: 'unused-cache-dir',
+      }),
+    ).toBe(noopSignalSink);
   });
 });
 
 describe('resolveSignalSink (deferred entitlement)', () => {
   it('emits via the cloud when entitled', async () => {
     const cacheDir = await dir();
-    const sink = resolveSignalSink({ apiKey: 'k', cloud: { endpoint: 'https://x.test/api' }, cacheDir, fetchImpl: routedFetch(true) });
+    const sink = resolveSignalSink({
+      apiKey: 'k',
+      cloud: { endpoint: 'https://x.test/api' },
+      cacheDir,
+      fetchImpl: routedFetch(true),
+    });
     const r = await sink.emit(batch(2));
     expect(r.accepted).toBe(2);
   });
@@ -59,16 +78,28 @@ describe('resolveSignalSink (deferred entitlement)', () => {
   it('does not emit (and never hits /signals) when not entitled', async () => {
     const cacheDir = await dir();
     const fetchImpl = routedFetch(false);
-    const sink = resolveSignalSink({ apiKey: 'k', cloud: { endpoint: 'https://x.test/api' }, cacheDir, fetchImpl });
+    const sink = resolveSignalSink({
+      apiKey: 'k',
+      cloud: { endpoint: 'https://x.test/api' },
+      cacheDir,
+      fetchImpl,
+    });
     const r = await sink.emit(batch(2));
     expect(r).toEqual({ accepted: 0, authRejected: false });
-    const hitSignals = (fetchImpl as unknown as { mock: { calls: unknown[][] } }).mock.calls.some((c) => String(c[0]).includes('/signals'));
+    const hitSignals = (fetchImpl as unknown as { mock: { calls: unknown[][] } }).mock.calls.some(
+      (c) => String(c[0]).includes('/signals'),
+    );
     expect(hitSignals).toBe(false);
   });
 
   it('writes the first-run notice marker once, then skips it on the next emit', async () => {
     const cacheDir = await dir();
-    const sink = resolveSignalSink({ apiKey: 'k', cloud: { endpoint: 'https://x.test/api' }, cacheDir, fetchImpl: routedFetch(true) });
+    const sink = resolveSignalSink({
+      apiKey: 'k',
+      cloud: { endpoint: 'https://x.test/api' },
+      cacheDir,
+      fetchImpl: routedFetch(true),
+    });
 
     await sink.emit(batch(1)); // first emit writes the marker
     const marker = join(cacheDir, 'signal-sync-notice');
@@ -91,7 +122,12 @@ describe('resolveSignalSink (deferred entitlement)', () => {
         : Promise.resolve(new Response(null, { status: 403 })),
     ) as unknown as typeof fetch;
 
-    const sink = resolveSignalSink({ apiKey: 'k', cloud: { endpoint: 'https://x.test/api' }, cacheDir, fetchImpl });
+    const sink = resolveSignalSink({
+      apiKey: 'k',
+      cloud: { endpoint: 'https://x.test/api' },
+      cacheDir,
+      fetchImpl,
+    });
     const r = await sink.emit(batch(1));
     expect(r.authRejected).toBe(true);
 
@@ -103,7 +139,12 @@ describe('resolveSignalSink (deferred entitlement)', () => {
   it('never throws into the run when entitlement resolution unexpectedly fails', async () => {
     const cacheDir = await dir();
     vi.mocked(checkEntitlement).mockRejectedValueOnce(new Error('unexpected'));
-    const sink = resolveSignalSink({ apiKey: 'k', cloud: { endpoint: 'https://x.test/api' }, cacheDir, fetchImpl: routedFetch(true) });
+    const sink = resolveSignalSink({
+      apiKey: 'k',
+      cloud: { endpoint: 'https://x.test/api' },
+      cacheDir,
+      fetchImpl: routedFetch(true),
+    });
     const r = await sink.emit(batch(1));
     expect(r).toEqual({ accepted: 0, authRejected: false });
   });

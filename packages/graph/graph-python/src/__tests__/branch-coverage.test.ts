@@ -26,7 +26,12 @@ import { pythonGraphAdapter } from '../index.js';
 import { resolveCallSites } from '../resolve.js';
 
 import type { PythonParsedFile, PythonParsedProject } from '../parse.js';
-import type { Catalog, DependencyEdge, DependencySiteRecord, FunctionOccurrence } from '@opensip-tools/graph';
+import type {
+  Catalog,
+  DependencyEdge,
+  DependencySiteRecord,
+  FunctionOccurrence,
+} from '@opensip-tools/graph';
 
 let dir: string;
 
@@ -182,8 +187,8 @@ describe('walk-dependencies.ts — import-shape branches', () => {
     writeFile('pkg/__init__.py', '');
     writeFile('pkg/a.py', `from . import *\n`);
     const walk = runWalk();
-    const aSites = walk.dependencySites.filter(
-      (s) => (s.sourceFileRef as { source: string }).source.includes('from . import'),
+    const aSites = walk.dependencySites.filter((s) =>
+      (s.sourceFileRef as { source: string }).source.includes('from . import'),
     );
     expect(aSites).toHaveLength(0);
   });

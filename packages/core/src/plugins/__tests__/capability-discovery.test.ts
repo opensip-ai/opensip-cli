@@ -37,7 +37,10 @@ function writeFixturePackage(opts: {
       ...(opts.markerKind === undefined ? {} : { opensipTools: { kind: opts.markerKind } }),
     }),
   );
-  writeFileSync(join(dir, 'index.mjs'), `export const ${opts.exportName} = ${opts.exportSource};\n`);
+  writeFileSync(
+    join(dir, 'index.mjs'),
+    `export const ${opts.exportName} = ${opts.exportSource};\n`,
+  );
 }
 
 const MARKER_DESCRIPTOR: CapabilityDiscoveryDescriptor = {
@@ -259,18 +262,39 @@ describe('discoverCapabilityContributions — co-contributions (§5.3)', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, 'package.json'),
-      JSON.stringify({ name: '@acme/items-co', type: 'module', main: './index.mjs', opensipTools: { kind: 'items-pack' } }),
+      JSON.stringify({
+        name: '@acme/items-co',
+        type: 'module',
+        main: './index.mjs',
+        opensipTools: { kind: 'items-pack' },
+      }),
     );
-    writeFileSync(join(dir, 'index.mjs'), "export const items = [{ id: 'a' }];\nexport const extras = [{ id: 'x' }, { id: 'y' }];\n");
+    writeFileSync(
+      join(dir, 'index.mjs'),
+      "export const items = [{ id: 'a' }];\nexport const extras = [{ id: 'x' }, { id: 'y' }];\n",
+    );
 
     const out = await discoverCapabilityContributions({
-      descriptor: { ...MARKER_DESCRIPTOR, coContributions: [{ exportName: 'extras', exportShape: 'array', domainId: 'extras-domain' }] },
+      descriptor: {
+        ...MARKER_DESCRIPTOR,
+        coContributions: [
+          { exportName: 'extras', exportShape: 'array', domainId: 'extras-domain' },
+        ],
+      },
       projectDir: testDir,
     });
     expect(out).toEqual([
       { contribution: { id: 'a' }, sourcePackage: '@acme/items-co' },
-      { contribution: { id: 'x' }, sourcePackage: '@acme/items-co', targetDomainId: 'extras-domain' },
-      { contribution: { id: 'y' }, sourcePackage: '@acme/items-co', targetDomainId: 'extras-domain' },
+      {
+        contribution: { id: 'x' },
+        sourcePackage: '@acme/items-co',
+        targetDomainId: 'extras-domain',
+      },
+      {
+        contribution: { id: 'y' },
+        sourcePackage: '@acme/items-co',
+        targetDomainId: 'extras-domain',
+      },
     ]);
   });
 
@@ -284,7 +308,10 @@ describe('discoverCapabilityContributions — co-contributions (§5.3)', () => {
     });
     const diags: CapabilityDiscoveryDiagnostic[] = [];
     const out = await discoverCapabilityContributions({
-      descriptor: { ...MARKER_DESCRIPTOR, coContributions: [{ exportName: 'recipes', exportShape: 'array', domainId: 'r' }] },
+      descriptor: {
+        ...MARKER_DESCRIPTOR,
+        coContributions: [{ exportName: 'recipes', exportShape: 'array', domainId: 'r' }],
+      },
       projectDir: testDir,
       onDiagnostic: (d) => diags.push(d),
     });
@@ -294,7 +321,7 @@ describe('discoverCapabilityContributions — co-contributions (§5.3)', () => {
 });
 
 describe('discoverCapabilityContributions — explicit list mode', () => {
-  it("augment mode unions explicit + auto-discovered packages", async () => {
+  it('augment mode unions explicit + auto-discovered packages', async () => {
     writeFixturePackage({
       relDir: 'node_modules/@acme/items-auto',
       name: '@acme/items-auto',
@@ -351,7 +378,12 @@ describe('discoverCapabilityContributions — per-package isolation', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, 'package.json'),
-      JSON.stringify({ name: '@acme/items-throws', type: 'module', main: './index.mjs', opensipTools: { kind: 'items-pack' } }),
+      JSON.stringify({
+        name: '@acme/items-throws',
+        type: 'module',
+        main: './index.mjs',
+        opensipTools: { kind: 'items-pack' },
+      }),
     );
     writeFileSync(join(dir, 'index.mjs'), "throw new Error('boom on import');\n");
     const diags: CapabilityDiscoveryDiagnostic[] = [];

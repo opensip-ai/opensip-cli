@@ -49,7 +49,9 @@ function bootDashboard(html: string): BootResult {
   // attaches document-level listeners that capture that state. Re-booting per
   // test never releases the prior boots' listeners/closures, so the worker
   // heap climbs with each `it` and eventually OOMs. One boot keeps it flat.
-  document.documentElement.innerHTML = html.replace(/^[\s\S]*?<html[^>]*>/i, '').replace(/<\/html>[\s\S]*$/i, '');
+  document.documentElement.innerHTML = html
+    .replace(/^[\s\S]*?<html[^>]*>/i, '')
+    .replace(/<\/html>[\s\S]*$/i, '');
   // eslint-disable-next-line unicorn/prefer-spread -- NodeListOf<HTMLScriptElement> spread requires lib.dom.iterable.
   const scripts = Array.from(document.querySelectorAll('script'));
   let combined = '';
@@ -66,7 +68,9 @@ function bootDashboard(html: string): BootResult {
 }
 
 function activateExploreSubtab(): void {
-  const exploreTab = document.querySelector<HTMLElement>('#panel-code-paths .subtab[data-subtab="explore"]');
+  const exploreTab = document.querySelector<HTMLElement>(
+    '#panel-code-paths .subtab[data-subtab="explore"]',
+  );
   if (exploreTab) exploreTab.click();
 }
 
@@ -92,12 +96,18 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('latest.html embeds the graph catalog', () => {
-    if (!reportHtml) { expect(true).toBe(true); return; }
+    if (!reportHtml) {
+      expect(true).toBe(true);
+      return;
+    }
     expect(reportHtml).toContain('id="graph-catalog"');
   });
 
   it('boots without throwing and registers the 3 restructured Code Paths views', () => {
-    if (!env) { expect(true).toBe(true); return; }
+    if (!env) {
+      expect(true).toBe(true);
+      return;
+    }
     expect(env.views).toBeDefined();
     // The restructured explore set: graph (node-link, with the SCC cycle
     // highlight fold) / coupling / distribution. The single-metric views
@@ -111,25 +121,40 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('Code Paths panel hosts Sessions and Explore subtabs', () => {
-    if (!env) { expect(true).toBe(true); return; }
+    if (!env) {
+      expect(true).toBe(true);
+      return;
+    }
     expect(document.querySelector('#panel-code-paths-sessions')).not.toBeNull();
     expect(document.querySelector('#panel-code-paths-explore')).not.toBeNull();
-    expect(document.querySelector('#panel-code-paths .subtab[data-subtab="sessions"]')).not.toBeNull();
-    expect(document.querySelector('#panel-code-paths .subtab[data-subtab="explore"]')).not.toBeNull();
+    expect(
+      document.querySelector('#panel-code-paths .subtab[data-subtab="sessions"]'),
+    ).not.toBeNull();
+    expect(
+      document.querySelector('#panel-code-paths .subtab[data-subtab="explore"]'),
+    ).not.toBeNull();
   });
 
   it('renders the name-filter search input inside the Functions (distribution) view', () => {
-    if (!env) { expect(true).toBe(true); return; }
+    if (!env) {
+      expect(true).toBe(true);
+      return;
+    }
     activateExploreSubtab();
     env.activateView('distribution');
-    const input = document.querySelector('#code-paths-view-distribution #code-paths-search-distribution');
+    const input = document.querySelector(
+      '#code-paths-view-distribution #code-paths-search-distribution',
+    );
     expect(input).not.toBeNull();
     // The standalone Search view is gone — no #code-paths-view-search container.
     expect(document.querySelector('#code-paths-view-search')).toBeNull();
   });
 
   it('every Explore view container exists and the active one renders something', () => {
-    if (!env) { expect(true).toBe(true); return; }
+    if (!env) {
+      expect(true).toBe(true);
+      return;
+    }
     activateExploreSubtab();
     for (const id of ['graph', 'coupling', 'distribution']) {
       const c = document.querySelector('#code-paths-view-' + id);
@@ -143,18 +168,27 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('Function Card overlay opens for the first row of the distribution view', () => {
-    if (!env) { expect(true).toBe(true); return; }
+    if (!env) {
+      expect(true).toBe(true);
+      return;
+    }
     activateExploreSubtab();
     env.activateView('distribution');
     const firstRow = document.querySelector('#code-paths-view-distribution [data-body-hash]');
-    if (!firstRow) { expect(true).toBe(true); return; }
+    if (!firstRow) {
+      expect(true).toBe(true);
+      return;
+    }
     env.openFunctionCard((firstRow as HTMLElement).dataset.bodyHash!);
     const overlays = document.querySelectorAll('.function-card-overlay');
     expect(overlays.length).toBe(1);
   });
 
   it('typing into the Functions name filter re-filters the table in place', () => {
-    if (!env) { expect(true).toBe(true); return; }
+    if (!env) {
+      expect(true).toBe(true);
+      return;
+    }
     activateExploreSubtab();
     env.activateView('distribution');
     const view = document.querySelector('#code-paths-view-distribution')!;
@@ -174,10 +208,15 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('the active view section heading exposes an info button that opens the help drawer', () => {
-    if (!env) { expect(true).toBe(true); return; }
+    if (!env) {
+      expect(true).toBe(true);
+      return;
+    }
     activateExploreSubtab();
     env.activateView('distribution');
-    const info = document.querySelector<HTMLButtonElement>('#code-paths-view-distribution .section-info');
+    const info = document.querySelector<HTMLButtonElement>(
+      '#code-paths-view-distribution .section-info',
+    );
     expect(info).not.toBeNull();
     info!.click();
     const drawer = document.querySelector('.help-drawer');
@@ -189,14 +228,24 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('openCodePathsSession switches to Code Paths and selects the session row', () => {
-    if (!env) { expect(true).toBe(true); return; }
-    const firstGraphRow = document.querySelector<HTMLElement>('#panel-code-paths-sessions tr[data-session-id]');
-    if (!firstGraphRow) { expect(true).toBe(true); return; } // No graph sessions yet.
+    if (!env) {
+      expect(true).toBe(true);
+      return;
+    }
+    const firstGraphRow = document.querySelector<HTMLElement>(
+      '#panel-code-paths-sessions tr[data-session-id]',
+    );
+    if (!firstGraphRow) {
+      expect(true).toBe(true);
+      return;
+    } // No graph sessions yet.
     const sessionId = firstGraphRow.dataset.sessionId!;
     env.openCodePathsSession(sessionId);
     const codePathsTab = document.querySelector('.tab[data-tab="code-paths"]');
     expect(codePathsTab!.classList.contains('active')).toBe(true);
-    expect(document.querySelector('#panel-code-paths-sessions')!.classList.contains('active')).toBe(true);
+    expect(document.querySelector('#panel-code-paths-sessions')!.classList.contains('active')).toBe(
+      true,
+    );
     const selected = document.querySelector<HTMLElement>('#panel-code-paths-sessions tr.selected');
     expect(selected).not.toBeNull();
     expect(selected!.dataset.sessionId).toBe(sessionId);

@@ -77,7 +77,9 @@ export function extractAnnotations(node: Node): readonly string[] {
 export function hasTestAnnotation(decorators: readonly string[]): boolean {
   for (const d of decorators) {
     // Matches `@Test`, `@org.junit.Test`, `@ParameterizedTest`, etc.
-    if (/@(?:[\w.]*\.)?(?:Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\b/.test(d)) {
+    if (
+      /@(?:[\w.]*\.)?(?:Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\b/.test(d)
+    ) {
       return true;
     }
   }

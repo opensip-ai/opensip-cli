@@ -12,11 +12,11 @@
  * each define.ts.
  */
 
-import { ValidationError as CoreValidationError } from '@opensip-tools/core'
+import { ValidationError as CoreValidationError } from '@opensip-tools/core';
 
-import type { ScenarioKind } from '../types/kind-types.js'
-import type { Target } from './execution/target.js'
-import type { Workload } from '../types/workload.js'
+import type { ScenarioKind } from '../types/kind-types.js';
+import type { Target } from './execution/target.js';
+import type { Workload } from '../types/workload.js';
 
 // =============================================================================
 // PUBLIC TYPES
@@ -24,8 +24,8 @@ import type { Workload } from '../types/workload.js'
 
 /** A single validation error: which field failed and why. */
 export interface ScenarioValidationError {
-  readonly field: string
-  readonly message: string
+  readonly field: string;
+  readonly message: string;
 }
 
 /**
@@ -34,9 +34,9 @@ export interface ScenarioValidationError {
  * concrete config in.
  */
 export interface ScenarioMetadataInput {
-  readonly id?: string
-  readonly name?: string
-  readonly description?: string
+  readonly id?: string;
+  readonly name?: string;
+  readonly description?: string;
 }
 
 /**
@@ -46,8 +46,8 @@ export interface ScenarioMetadataInput {
  * each kind can pass its concrete config in.
  */
 export interface TargetWorkloadInput {
-  readonly target: Target
-  readonly workload: Workload
+  readonly target: Target;
+  readonly workload: Workload;
 }
 
 /** Options for shared metadata validation. */
@@ -58,11 +58,11 @@ export interface ValidateMetadataOptions {
    * `requireId: 'shape'` keeps the strict form check, while
    * `requireId: 'present-only'` only checks for non-empty.
    */
-  readonly requireId?: 'shape' | 'present-only'
+  readonly requireId?: 'shape' | 'present-only';
   /** When true (default), `name` must be a non-empty trimmed string. */
-  readonly requireName?: boolean
+  readonly requireName?: boolean;
   /** When true (default), `description` must be a non-empty trimmed string. */
-  readonly requireDescription?: boolean
+  readonly requireDescription?: boolean;
 }
 
 // =============================================================================
@@ -79,29 +79,29 @@ export function validateScenarioMetadata(
   errors: ScenarioValidationError[],
   options: ValidateMetadataOptions = {},
 ): void {
-  const requireId = options.requireId ?? 'shape'
-  const requireName = options.requireName ?? true
-  const requireDescription = options.requireDescription ?? true
+  const requireId = options.requireId ?? 'shape';
+  const requireName = options.requireName ?? true;
+  const requireDescription = options.requireDescription ?? true;
 
   // id
-  const id = config.id
+  const id = config.id;
   if (!id || id.trim() === '') {
-    errors.push({ field: 'id', message: 'id is required' })
+    errors.push({ field: 'id', message: 'id is required' });
   } else if (requireId === 'shape' && !/^[a-z0-9-]+$/.test(id)) {
     errors.push({
       field: 'id',
       message: 'id must be lowercase alphanumeric with hyphens',
-    })
+    });
   }
 
   // name
   if (requireName && (!config.name || config.name.trim() === '')) {
-    errors.push({ field: 'name', message: 'name is required' })
+    errors.push({ field: 'name', message: 'name is required' });
   }
 
   // description
   if (requireDescription && (!config.description || config.description.trim() === '')) {
-    errors.push({ field: 'description', message: 'description is required' })
+    errors.push({ field: 'description', message: 'description is required' });
   }
 }
 
@@ -126,13 +126,13 @@ export function validateTargetAndWorkload(
   errors: ScenarioValidationError[],
 ): void {
   if (typeof config.target !== 'function') {
-    errors.push({ field: 'target', message: 'target must be a function (the BYO seam)' })
+    errors.push({ field: 'target', message: 'target must be a function (the BYO seam)' });
   }
   if (typeof config.workload?.rps !== 'number' || config.workload.rps <= 0) {
-    errors.push({ field: 'workload.rps', message: 'workload.rps must be a positive number' })
+    errors.push({ field: 'workload.rps', message: 'workload.rps must be a positive number' });
   }
   if (config.workload?.concurrency !== undefined && config.workload.concurrency < 1) {
-    errors.push({ field: 'workload.concurrency', message: 'workload.concurrency must be >= 1' })
+    errors.push({ field: 'workload.concurrency', message: 'workload.concurrency must be >= 1' });
   }
 }
 
@@ -151,11 +151,11 @@ export function throwValidationErrors(
   errors: readonly ScenarioValidationError[],
   kind: ScenarioKind,
 ): void {
-  if (errors.length === 0) return
-  const messages = errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n')
+  if (errors.length === 0) return;
+  const messages = errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n');
   // @fitness-ignore-next-line result-pattern-consistency -- definition-time validation, throw is appropriate
   throw new CoreValidationError(`Invalid ${kind} scenario configuration:\n${messages}`, {
     code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
     metadata: { errors: [...errors], kind },
-  })
+  });
 }

@@ -109,7 +109,7 @@ if (pkgs.length === 0) {
 }
 
 // 1 — Version consistency
-const versions = new Set(pkgs.map(p => p.version));
+const versions = new Set(pkgs.map((p) => p.version));
 let consensusVersion;
 if (versions.size === 1) {
   consensusVersion = pkgs[0].version;
@@ -136,7 +136,10 @@ if (expectedVersion === null) {
   if (normalized === consensusVersion) {
     pass(2, `tag ${expectedVersion} matches package version ${consensusVersion}.`);
   } else {
-    fail(2, `tag ${expectedVersion} (→ ${normalized}) does not match package version ${consensusVersion}.`);
+    fail(
+      2,
+      `tag ${expectedVersion} (→ ${normalized}) does not match package version ${consensusVersion}.`,
+    );
   }
 }
 
@@ -152,7 +155,10 @@ if (topEntry === null) {
   if (entryVersion === consensusVersion) {
     pass(3, `CHANGELOG.md top entry is for ${consensusVersion}.`);
   } else {
-    fail(3, `CHANGELOG.md top entry is for ${entryVersion}, but packages are at ${consensusVersion}.`);
+    fail(
+      3,
+      `CHANGELOG.md top entry is for ${entryVersion}, but packages are at ${consensusVersion}.`,
+    );
   }
   if (/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
     pass(6, `CHANGELOG.md entry date is a valid ISO date (${entryDate}).`);
@@ -171,7 +177,10 @@ try {
 } catch (error) {
   const stderr = error.stderr?.toString() ?? '';
   const stdout = error.stdout?.toString() ?? '';
-  fail(4, `docs/web-generated/ is stale. Run \`pnpm docs:build\` to regenerate.\n${stdout.trim() || stderr.trim() || error.message}`);
+  fail(
+    4,
+    `docs/web-generated/ is stale. Run \`pnpm docs:build\` to regenerate.\n${stdout.trim() || stderr.trim() || error.message}`,
+  );
 }
 
 // 5 — Cross-package deps consistent
@@ -188,9 +197,15 @@ for (const p of pkgs) {
   }
 }
 if (crossPkgIssues.length === 0) {
-  pass(5, `cross-package deps consistent (all using workspace:* or pinned to ${consensusVersion}).`);
+  pass(
+    5,
+    `cross-package deps consistent (all using workspace:* or pinned to ${consensusVersion}).`,
+  );
 } else {
-  fail(5, `${crossPkgIssues.length} stale cross-package dep range(s):\n    ${crossPkgIssues.join('\n    ')}`);
+  fail(
+    5,
+    `${crossPkgIssues.length} stale cross-package dep range(s):\n    ${crossPkgIssues.join('\n    ')}`,
+  );
 }
 
 // 7/8/9 — the other generated artifacts must be in sync too. A version bump
@@ -198,10 +213,19 @@ if (crossPkgIssues.length === 0) {
 // (web docs) does not cover.
 function delegateGenerator(id, scriptArgs, okMsg, fixMsg, input) {
   try {
-    execFileSync('node', scriptArgs, { cwd: REPO_ROOT, stdio: 'pipe', ...(input ? { input } : {}) });
+    execFileSync('node', scriptArgs, {
+      cwd: REPO_ROOT,
+      stdio: 'pipe',
+      ...(input ? { input } : {}),
+    });
     pass(id, okMsg);
   } catch (error) {
-    const out = (error.stdout?.toString() || error.stderr?.toString() || error.message || '').trim();
+    const out = (
+      error.stdout?.toString() ||
+      error.stderr?.toString() ||
+      error.message ||
+      ''
+    ).trim();
     fail(id, `${fixMsg}\n${out}`);
   }
 }
@@ -241,14 +265,21 @@ try {
   const inWorkspaceNotOrder = [...discoveredNames].filter((n) => !orderNames.has(n)).sort();
   const inOrderNotWorkspace = [...orderNames].filter((n) => !discoveredNames.has(n)).sort();
   if (inWorkspaceNotOrder.length === 0 && inOrderNotWorkspace.length === 0) {
-    pass(10, `publishable workspace set (${discoveredNames.size}) matches release-package-order.mjs.`);
+    pass(
+      10,
+      `publishable workspace set (${discoveredNames.size}) matches release-package-order.mjs.`,
+    );
   } else {
     const lines = [];
     if (inWorkspaceNotOrder.length > 0) {
-      lines.push(`    in workspace but NOT in release order (add to scripts/release-package-order.mjs): ${inWorkspaceNotOrder.join(', ')}`);
+      lines.push(
+        `    in workspace but NOT in release order (add to scripts/release-package-order.mjs): ${inWorkspaceNotOrder.join(', ')}`,
+      );
     }
     if (inOrderNotWorkspace.length > 0) {
-      lines.push(`    in release order but NOT in workspace (remove/rename in scripts/release-package-order.mjs): ${inOrderNotWorkspace.join(', ')}`);
+      lines.push(
+        `    in release order but NOT in workspace (remove/rename in scripts/release-package-order.mjs): ${inOrderNotWorkspace.join(', ')}`,
+      );
     }
     fail(10, `publishable set disagrees with release-package-order.mjs:\n${lines.join('\n')}`);
   }
@@ -266,9 +297,13 @@ try {
     pass(11, `all ${pkgs.length} packages declare a \`files\` allowlist that ships \`dist\`.`);
   } else {
     const lines = missing.map(
-      (p) => `    ${p.name}: files=${JSON.stringify(p.files)} (add \`"files": ["dist"]\` so the tarball ships only built output)`,
+      (p) =>
+        `    ${p.name}: files=${JSON.stringify(p.files)} (add \`"files": ["dist"]\` so the tarball ships only built output)`,
     );
-    fail(11, `package(s) missing a \`files\` allowlist — npm would publish src/coverage/.turbo junk:\n${lines.join('\n')}`);
+    fail(
+      11,
+      `package(s) missing a \`files\` allowlist — npm would publish src/coverage/.turbo junk:\n${lines.join('\n')}`,
+    );
   }
 }
 

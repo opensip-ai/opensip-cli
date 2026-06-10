@@ -37,7 +37,9 @@ export interface RunWithTimeoutOptions<R> {
  * `signal.aborted` check is canonical-timeout because the controller has a single
  * abort source).
  */
-export async function runWithTimeout<R>(opts: RunWithTimeoutOptions<R>): Promise<UnitRunOutcome<R>> {
+export async function runWithTimeout<R>(
+  opts: RunWithTimeoutOptions<R>,
+): Promise<UnitRunOutcome<R>> {
   const controller = new AbortController();
   const startTime = Date.now();
   const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs);

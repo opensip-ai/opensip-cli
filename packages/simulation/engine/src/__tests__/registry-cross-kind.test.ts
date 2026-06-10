@@ -3,36 +3,36 @@
  * kind filtering, and discriminated-union exhaustiveness.
  */
 
-import { enterScope } from '@opensip-tools/core'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { enterScope } from '@opensip-tools/core';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { ASSERTIONS } from '../framework/assertions.js'
-import { fault } from '../framework/execution/fault-builders.js'
+import { ASSERTIONS } from '../framework/assertions.js';
+import { fault } from '../framework/execution/fault-builders.js';
 import {
   clearScenarioRegistry,
   currentScenarioRegistry,
   getRegisteredScenarios,
   getScenariosByKind,
   getScenariosByTag,
-} from '../framework/registry.js'
-import { renderScenarioResultView } from '../framework/result-renderers.js'
-import { defineChaosScenario } from '../kinds/chaos/define.js'
-import { defineLoadScenario } from '../kinds/load/define.js'
-import { SCENARIO_KINDS } from '../types/kind-types.js'
+} from '../framework/registry.js';
+import { renderScenarioResultView } from '../framework/result-renderers.js';
+import { defineChaosScenario } from '../kinds/chaos/define.js';
+import { defineLoadScenario } from '../kinds/load/define.js';
+import { SCENARIO_KINDS } from '../types/kind-types.js';
 
-import { makeSimTestScope } from './test-utils/with-sim-scope.js'
+import { makeSimTestScope } from './test-utils/with-sim-scope.js';
 
-import type { ScenarioExecutorResult } from '../framework/scenario-executor-result.js'
+import type { ScenarioExecutorResult } from '../framework/scenario-executor-result.js';
 
 beforeEach(() => {
-  enterScope(makeSimTestScope())
-})
+  enterScope(makeSimTestScope());
+});
 
 afterEach(() => {
-  clearScenarioRegistry()
-})
+  clearScenarioRegistry();
+});
 
-const noopTarget = (): Promise<void> => Promise.resolve()
+const noopTarget = (): Promise<void> => Promise.resolve();
 
 function defineOneOfEachKind(): void {
   currentScenarioRegistry().register(
@@ -46,7 +46,7 @@ function defineOneOfEachKind(): void {
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(1)],
     }),
-  )
+  );
 
   currentScenarioRegistry().register(
     defineChaosScenario({
@@ -62,47 +62,49 @@ function defineOneOfEachKind(): void {
       recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
       recoveryWindow: 100,
     }),
-  )
+  );
 }
 
 describe('cross-kind registry', () => {
   it('registers both kinds in the same registry', () => {
-    defineOneOfEachKind()
-    expect(getRegisteredScenarios().size).toBe(2)
-  })
+    defineOneOfEachKind();
+    expect(getRegisteredScenarios().size).toBe(2);
+  });
 
   it('SCENARIO_KINDS enumerates exactly the supported kinds', () => {
-    expect(SCENARIO_KINDS).toEqual(['load', 'chaos'])
-  })
+    expect(SCENARIO_KINDS).toEqual(['load', 'chaos']);
+  });
 
   it('getScenariosByKind filters by kind', () => {
-    defineOneOfEachKind()
-    expect(getScenariosByKind('load').map((s) => s.id)).toEqual(['cross-load'])
-    expect(getScenariosByKind('chaos').map((s) => s.id)).toEqual(['cross-chaos'])
-  })
+    defineOneOfEachKind();
+    expect(getScenariosByKind('load').map((s) => s.id)).toEqual(['cross-load']);
+    expect(getScenariosByKind('chaos').map((s) => s.id)).toEqual(['cross-chaos']);
+  });
 
   it('getScenariosByTag works across kinds', () => {
-    defineOneOfEachKind()
-    const all = getScenariosByTag('shared-tag').map((s) => s.id).sort()
-    expect(all).toEqual(['cross-chaos', 'cross-load'])
-  })
-})
+    defineOneOfEachKind();
+    const all = getScenariosByTag('shared-tag')
+      .map((s) => s.id)
+      .sort();
+    expect(all).toEqual(['cross-chaos', 'cross-load']);
+  });
+});
 
 describe('result discriminated union', () => {
   it('renderScenarioResultView produces a uniform view per kind', async () => {
-    defineOneOfEachKind()
-    const all = [...getRegisteredScenarios().values()]
-    const results: ScenarioExecutorResult[] = []
+    defineOneOfEachKind();
+    const all = [...getRegisteredScenarios().values()];
+    const results: ScenarioExecutorResult[] = [];
     for (const s of all) {
-      results.push(await s.run(new AbortController().signal))
+      results.push(await s.run(new AbortController().signal));
     }
-    const views = results.map(renderScenarioResultView)
-    expect(views).toHaveLength(2)
+    const views = results.map(renderScenarioResultView);
+    expect(views).toHaveLength(2);
     for (const v of views) {
-      expect(typeof v.outcomeLabel).toBe('string')
-      expect(typeof v.assertionsPassed).toBe('number')
-      expect(typeof v.assertionsFailed).toBe('number')
+      expect(typeof v.outcomeLabel).toBe('string');
+      expect(typeof v.assertionsPassed).toBe('number');
+      expect(typeof v.assertionsFailed).toBe('number');
     }
-    expect(views.map((v) => v.kind).sort()).toEqual(['chaos', 'load'].sort())
-  })
-})
+    expect(views.map((v) => v.kind).sort()).toEqual(['chaos', 'load'].sort());
+  });
+});

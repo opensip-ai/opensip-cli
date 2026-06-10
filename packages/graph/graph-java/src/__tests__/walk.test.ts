@@ -55,11 +55,7 @@ describe('graph-java walk.ts', () => {
   });
 
   it('emits constructor with kind=constructor and enclosingClass set', () => {
-    writeFileSync(
-      join(dir, 'Foo.java'),
-      'package x;\nclass Foo { Foo(int n) { } }\n',
-      'utf8',
-    );
+    writeFileSync(join(dir, 'Foo.java'), 'package x;\nclass Foo { Foo(int n) { } }\n', 'utf8');
     const walk = run(dir);
     const ctor = walk.occurrences.Foo;
     // The constructor is named the same as the class; it lives under
@@ -217,7 +213,9 @@ describe('graph-java walk.ts', () => {
     // string scanner).
     writeFileSync(
       join(dir, 'TextEsc.java'),
-      'package x;\nclass TextEsc { String m() { return """\n      ' + String.raw`a\nb\"c` + '\n      """; } }\n',
+      'package x;\nclass TextEsc { String m() { return """\n      ' +
+        String.raw`a\nb\"c` +
+        '\n      """; } }\n',
       'utf8',
     );
     const walk = run(dir);
@@ -250,11 +248,7 @@ describe('graph-java walk.ts', () => {
   it('walks a malformed type declaration without throwing', () => {
     // Malformed input — tree-sitter still produces some tree shape; we
     // care only that walkProject is total over the file set.
-    writeFileSync(
-      join(dir, 'Anon.java'),
-      'package x;\nclass class Bad {}\n',
-      'utf8',
-    );
+    writeFileSync(join(dir, 'Anon.java'), 'package x;\nclass class Bad {}\n', 'utf8');
     const walk = run(dir);
     expect(walk).toBeDefined();
   });
@@ -274,31 +268,19 @@ describe('graph-java walk.ts', () => {
     // generated-by-folder paths never reach walkProject. The
     // `$Pb.java` suffix is the protobuf-Java codegen marker and is the
     // only generated-detection path that bypasses the dir exclusions.
-    writeFileSync(
-      join(dir, 'Foo$Pb.java'),
-      'package x;\nclass Foo$Pb { void g() {} }\n',
-      'utf8',
-    );
+    writeFileSync(join(dir, 'Foo$Pb.java'), 'package x;\nclass Foo$Pb { void g() {} }\n', 'utf8');
     const walk = run(dir);
     expect(walk.occurrences.g?.[0]?.definedInGenerated).toBe(true);
   });
 
   it('extracts package name from `package` declaration', () => {
-    writeFileSync(
-      join(dir, 'A.java'),
-      'package foo.bar.baz;\nclass A { void m() {} }\n',
-      'utf8',
-    );
+    writeFileSync(join(dir, 'A.java'), 'package foo.bar.baz;\nclass A { void m() {} }\n', 'utf8');
     const walk = run(dir);
     expect(walk.occurrences.m?.[0]?.qualifiedName).toBe('foo.bar.baz.A.m');
   });
 
   it('falls back to path-based qualifier when no package declaration', () => {
-    writeFileSync(
-      join(dir, 'NoPkg.java'),
-      'class NoPkg { void m() {} }\n',
-      'utf8',
-    );
+    writeFileSync(join(dir, 'NoPkg.java'), 'class NoPkg { void m() {} }\n', 'utf8');
     const walk = run(dir);
     // No `package` clause → qualifier derived from filename "NoPkg".
     expect(walk.occurrences.m?.[0]?.qualifiedName).toBe('NoPkg.NoPkg.m');

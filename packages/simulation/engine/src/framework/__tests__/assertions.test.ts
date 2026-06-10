@@ -15,7 +15,13 @@ describe('ASSERTIONS factories', () => {
     ['lowErrorRate(custom)', () => ASSERTIONS.lowErrorRate(0.01), 'error_rate', 'lt', 0.01],
     ['zeroErrors', () => ASSERTIONS.zeroErrors(), 'error_rate', 'eq', 0],
     ['lowLatency(default)', () => ASSERTIONS.lowLatency(), 'p95_latency_ms', 'lt', 500],
-    ['lowLatency(p99,1000)', () => ASSERTIONS.lowLatency('p99', 1000), 'p99_latency_ms', 'lt', 1000],
+    [
+      'lowLatency(p99,1000)',
+      () => ASSERTIONS.lowLatency('p99', 1000),
+      'p99_latency_ms',
+      'lt',
+      1000,
+    ],
     ['avgLatency', () => ASSERTIONS.avgLatency(), 'avg_latency_ms', 'lt', 200],
     ['avgLatency(custom)', () => ASSERTIONS.avgLatency(50), 'avg_latency_ms', 'lt', 50],
     ['maxLatency', () => ASSERTIONS.maxLatency(), 'max_latency_ms', 'lt', 2000],
@@ -23,7 +29,13 @@ describe('ASSERTIONS factories', () => {
     ['minThroughput', () => ASSERTIONS.minThroughput(100), 'requests_per_second', 'gte', 100],
     ['maxThroughput', () => ASSERTIONS.maxThroughput(50), 'requests_per_second', 'lte', 50],
     ['highSuccessRate(default)', () => ASSERTIONS.highSuccessRate(), 'success_rate', 'gte', 0.95],
-    ['highSuccessRate(custom)', () => ASSERTIONS.highSuccessRate(0.99), 'success_rate', 'gte', 0.99],
+    [
+      'highSuccessRate(custom)',
+      () => ASSERTIONS.highSuccessRate(0.99),
+      'success_rate',
+      'gte',
+      0.99,
+    ],
     ['perfectSuccessRate', () => ASSERTIONS.perfectSuccessRate(), 'success_rate', 'eq', 1],
     ['memoryUsage', () => ASSERTIONS.memoryUsage(512), 'memory_mb', 'lt', 512],
     ['cpuUsage', () => ASSERTIONS.cpuUsage(80), 'cpu_percent', 'lt', 80],
@@ -118,12 +130,12 @@ describe('getOperatorDescription', () => {
     ['eq', 'equal to'],
     ['neq', 'not equal to'],
   ])('getOperatorDescription(%s) === %s', (op, want) => {
-    expect(getOperatorDescription(op as Parameters<typeof getOperatorDescription>[0]))
-      .toBe(want);
+    expect(getOperatorDescription(op as Parameters<typeof getOperatorDescription>[0])).toBe(want);
   });
 
   it('returns the operator string for unknown operators', () => {
-    expect(getOperatorDescription('unknown' as Parameters<typeof getOperatorDescription>[0]))
-      .toBe('unknown');
+    expect(getOperatorDescription('unknown' as Parameters<typeof getOperatorDescription>[0])).toBe(
+      'unknown',
+    );
   });
 });

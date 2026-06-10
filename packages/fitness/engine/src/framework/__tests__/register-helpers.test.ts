@@ -7,7 +7,6 @@ import { registerChecks } from '../register-helpers.js';
 import { CheckRegistry } from '../registry.js';
 import { currentCheckRegistry } from '../scope-registry.js';
 
-
 import type { Check } from '../check-types.js';
 
 let nextId = 0;

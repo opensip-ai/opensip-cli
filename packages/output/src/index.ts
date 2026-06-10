@@ -26,7 +26,12 @@ export {
   type CheckEntitlementInput,
 } from './sink/entitlement.js';
 export { createCloudSignalSink, type CloudSignalSinkOptions } from './sink/cloud-signal-sink.js';
-export { postChunked, type EgressResult, type RetryPolicy, type PostChunkedArgs } from './sink/http-egress.js';
+export {
+  postChunked,
+  type EgressResult,
+  type RetryPolicy,
+  type PostChunkedArgs,
+} from './sink/http-egress.js';
 export {
   resolveSignalSink,
   DEFAULT_CLOUD_ENDPOINT,

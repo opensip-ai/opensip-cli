@@ -23,9 +23,7 @@ import { mapToolErrorToExitCode, EXIT_CODES } from '@opensip-tools/contracts';
 import { PluginIncompatibleError, ToolRegistry } from '@opensip-tools/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import {
-  discoverAndRegisterAuthoredTools,
-} from '../bootstrap/register-tools.js';
+import { discoverAndRegisterAuthoredTools } from '../bootstrap/register-tools.js';
 import { PROJECT_TOOL_ALLOWLIST_ENV } from '../bootstrap/tool-trust.js';
 
 import type { ToolPluginManifest, ToolProvenance } from '@opensip-tools/core';

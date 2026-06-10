@@ -20,7 +20,11 @@
  */
 
 export { SessionRepo, type SessionListOptions } from './session-repo.js';
-export { resolveSession, type SessionReference, type SessionResolveResult } from './resolve-session.js';
+export {
+  resolveSession,
+  type SessionReference,
+  type SessionResolveResult,
+} from './resolve-session.js';
 export { generateSessionId, sanitizeForFilename } from './store.js';
 export {
   decodeSessionPayload,

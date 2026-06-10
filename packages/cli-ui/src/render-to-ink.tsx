@@ -23,17 +23,23 @@ const REGEX_META = /[.*+?^${}()|[\]\\]/g;
 /** Map a semantic tone to a theme color token. `default` → no override. */
 function toneColor(theme: Theme, tone: Span['tone']): string | undefined {
   switch (tone) {
-    case 'brand': { return theme.brand;
+    case 'brand': {
+      return theme.brand;
     }
-    case 'success': { return theme.success;
+    case 'success': {
+      return theme.success;
     }
-    case 'error': { return theme.error;
+    case 'error': {
+      return theme.error;
     }
-    case 'warning': { return theme.warning;
+    case 'warning': {
+      return theme.warning;
     }
-    case 'info': { return theme.info;
+    case 'info': {
+      return theme.info;
     }
-    case 'muted': { return theme.muted;
+    case 'muted': {
+      return theme.muted;
     }
     case 'default':
     case undefined: {
@@ -44,7 +50,11 @@ function toneColor(theme: Theme, tone: Span['tone']): string | undefined {
 
 function SpanText({ span }: { readonly span: Span }): React.ReactElement {
   const theme = useTheme();
-  return <Text color={toneColor(theme, span.tone)} bold={span.bold} dimColor={span.dim}>{span.text}</Text>;
+  return (
+    <Text color={toneColor(theme, span.tone)} bold={span.bold} dimColor={span.dim}>
+      {span.text}
+    </Text>
+  );
 }
 
 /** Render one hint, bolding any configured substrings (longest-first). */
@@ -58,7 +68,15 @@ function HintText({ item }: { readonly item: HintItem }): React.ReactElement {
   const boldSet = new Set<string>(bolds);
   return (
     <Text>
-      {parts.map((p, i) => (boldSet.has(p) ? <Text key={i} bold>{p}</Text> : <Text key={i}>{p}</Text>))}
+      {parts.map((p, i) =>
+        boldSet.has(p) ? (
+          <Text key={i} bold>
+            {p}
+          </Text>
+        ) : (
+          <Text key={i}>{p}</Text>
+        ),
+      )}
     </Text>
   );
 }
@@ -68,7 +86,9 @@ function NodeView({ node }: { readonly node: ViewNode }): React.ReactElement | n
     case 'line': {
       return (
         <Text dimColor={node.dim}>
-          {node.spans.map((s, i) => <SpanText key={i} span={s} />)}
+          {node.spans.map((s, i) => (
+            <SpanText key={i} span={s} />
+          ))}
         </Text>
       );
     }
@@ -78,7 +98,11 @@ function NodeView({ node }: { readonly node: ViewNode }): React.ReactElement | n
     case 'keyValues': {
       return (
         <Box flexDirection="column">
-          {node.pairs.map((p, i) => <Text key={i}>{p.label}: {p.value}</Text>)}
+          {node.pairs.map((p, i) => (
+            <Text key={i}>
+              {p.label}: {p.value}
+            </Text>
+          ))}
         </Box>
       );
     }
@@ -90,7 +114,12 @@ function NodeView({ node }: { readonly node: ViewNode }): React.ReactElement | n
         <Box flexDirection="column">
           {showHeader && (
             <Text dimColor>
-              {widths.map((w, i) => (i > 0 ? '  ' : '') + padTableCell(node.columns[i] ?? '', w, alignOf(i))).join('')}
+              {widths
+                .map(
+                  (w, i) =>
+                    (i > 0 ? '  ' : '') + padTableCell(node.columns[i] ?? '', w, alignOf(i)),
+                )
+                .join('')}
             </Text>
           )}
           {node.rows.map((cells, r) => (
@@ -98,7 +127,12 @@ function NodeView({ node }: { readonly node: ViewNode }): React.ReactElement | n
               {widths.map((w, ci) => (
                 <Text key={ci}>
                   {ci > 0 ? '  ' : ''}
-                  <SpanText span={{ ...(cells[ci] ?? { text: '' }), text: padTableCell(cells[ci]?.text ?? '', w, alignOf(ci)) }} />
+                  <SpanText
+                    span={{
+                      ...(cells[ci] ?? { text: '' }),
+                      text: padTableCell(cells[ci]?.text ?? '', w, alignOf(ci)),
+                    }}
+                  />
                 </Text>
               ))}
             </Text>
@@ -111,7 +145,10 @@ function NodeView({ node }: { readonly node: ViewNode }): React.ReactElement | n
         <Box paddingLeft={2}>
           <Text dimColor>
             {node.items.map((h, i) => (
-              <Text key={i}>{i > 0 ? ' | ' : ''}<HintText item={h} /></Text>
+              <Text key={i}>
+                {i > 0 ? ' | ' : ''}
+                <HintText item={h} />
+              </Text>
             ))}
           </Text>
         </Box>
@@ -126,16 +163,28 @@ function NodeView({ node }: { readonly node: ViewNode }): React.ReactElement | n
     case 'group': {
       return (
         <Box flexDirection="column" paddingLeft={node.indent ?? 0}>
-          {node.children.map((c, i) => <NodeView key={i} node={c} />)}
+          {node.children.map((c, i) => (
+            <NodeView key={i} node={c} />
+          ))}
         </Box>
       );
     }
   }
 }
 
-function HeadingView({ text, tone }: { readonly text: string; readonly tone?: Span['tone'] }): React.ReactElement {
+function HeadingView({
+  text,
+  tone,
+}: {
+  readonly text: string;
+  readonly tone?: Span['tone'];
+}): React.ReactElement {
   const theme = useTheme();
-  return <Text bold color={toneColor(theme, tone)}>== {text} ==</Text>;
+  return (
+    <Text bold color={toneColor(theme, tone)}>
+      == {text} ==
+    </Text>
+  );
 }
 
 /** Render a view-model node to an Ink element. */

@@ -40,7 +40,9 @@ export interface ExecutePipelineOptions<Unit, R> {
 }
 
 /** Run `units` on the substrate: scheduled, timed out, retried, and stop-policied. */
-export async function executePipeline<Unit, R>(opts: ExecutePipelineOptions<Unit, R>): Promise<void> {
+export async function executePipeline<Unit, R>(
+  opts: ExecutePipelineOptions<Unit, R>,
+): Promise<void> {
   await scheduleUnits<Unit>({
     units: opts.units,
     mode: opts.options.mode,

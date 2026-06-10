@@ -82,7 +82,11 @@ describe('discoverAuthoredToolSidecars', () => {
     const dir = stageSidecarTool('with-throwing-entry');
     // Discovery keys on the sidecar file, never importing the runtime — so a
     // module that would throw on import must not affect the walk.
-    writeFileSync(join(dir, 'index.js'), 'throw new Error("must never be imported by discovery");\n', 'utf8');
+    writeFileSync(
+      join(dir, 'index.js'),
+      'throw new Error("must never be imported by discovery");\n',
+      'utf8',
+    );
     const out = discoverAuthoredToolSidecars(root);
     expect(out.map((c) => c.name)).toEqual(['with-throwing-entry']);
     expect(out[0]?.dir).toBe(dir);
@@ -107,7 +111,9 @@ describe('discoverAuthoredToolSidecars', () => {
 
   it('returns every sidecar dir when several coexist (directory listing is already unique)', () => {
     for (const n of ['t1', 't2', 't3']) stageSidecarTool(n);
-    const names = discoverAuthoredToolSidecars(root).map((c) => c.name).sort((a, b) => a.localeCompare(b));
+    const names = discoverAuthoredToolSidecars(root)
+      .map((c) => c.name)
+      .sort((a, b) => a.localeCompare(b));
     expect(names).toEqual(['t1', 't2', 't3']);
   });
 });

@@ -13,13 +13,34 @@
  * detection. Safe to import from any Layer 3 tool package.
  */
 
-export { Banner, UpdateHint, normalizeBannerSize, type BannerSize, type BannerProps } from './banner.js';
+export {
+  Banner,
+  UpdateHint,
+  normalizeBannerSize,
+  type BannerSize,
+  type BannerProps,
+} from './banner.js';
 export { ErrorMessage, type ErrorMessageProps } from './error-message.js';
-export { ProjectHeader, formatProjectHeader, viewProjectHeader, type ProjectHeaderInput } from './project-header.js';
+export {
+  ProjectHeader,
+  formatProjectHeader,
+  viewProjectHeader,
+  type ProjectHeaderInput,
+} from './project-header.js';
 export { RunHeader, type RunHeaderProps, type RunHeaderMeta } from './run-header.js';
 export { RunSummary, viewRunSummary, type RunSummaryProps } from './run-summary.js';
-export { RunFooterHints, viewFooterHints, type RunFooterHint, type RunFooterHintsProps } from './run-footer-hints.js';
-export { sortFitRowPriority, parseValidatedCount, formatValidatedColumn, type FitRowSortKey } from './fit-table-format.js';
+export {
+  RunFooterHints,
+  viewFooterHints,
+  type RunFooterHint,
+  type RunFooterHintsProps,
+} from './run-footer-hints.js';
+export {
+  sortFitRowPriority,
+  parseValidatedCount,
+  formatValidatedColumn,
+  type FitRowSortKey,
+} from './fit-table-format.js';
 export { Spinner, type SpinnerProps, useSpinner, useStandaloneSpinner } from './spinner.js';
 export { ClockProvider, type ClockProviderProps, useClock, useTick } from './clock.js';
 export { formatDuration } from './format-duration.js';

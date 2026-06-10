@@ -1,7 +1,7 @@
-export { javaAdapter, adapters } from './adapter.js'
-export { parseJava, type JavaTree } from './parse.js'
-export { getSharedTree } from './shared-tree.js'
-export { stripStrings, stripComments } from './strip.js'
+export { javaAdapter, adapters } from './adapter.js';
+export { parseJava, type JavaTree } from './parse.js';
+export { getSharedTree } from './shared-tree.js';
+export { stripStrings, stripComments } from './strip.js';
 export {
   isFunction,
   isMethod,
@@ -12,5 +12,5 @@ export {
   isCatch,
   isConditional,
   isLoop,
-} from './predicates.js'
-export { findEnclosingFunction, getEnclosingFunctionName } from './enclosing.js'
+} from './predicates.js';
+export { findEnclosingFunction, getEnclosingFunctionName } from './enclosing.js';

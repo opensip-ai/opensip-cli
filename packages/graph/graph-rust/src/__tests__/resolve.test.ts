@@ -29,11 +29,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { rustGraphAdapter } from '../index.js';
 
-import type {
-  CallEdge,
-  Catalog,
-  ResolveOutput,
-} from '@opensip-tools/graph';
+import type { CallEdge, Catalog, ResolveOutput } from '@opensip-tools/graph';
 
 /**
  * Drive the full pipeline against a temp project and return the
@@ -147,8 +143,7 @@ describe('lang-rust resolve.ts — call-target decoding and resolution', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
     writeFileSync(
       join(dir, 'src/lib.rs'),
-      `fn other() -> i32 { 1 }\n` +
-        `fn entry() -> i32 { Foreign::other() }\n`,
+      `fn other() -> i32 { 1 }\n` + `fn entry() -> i32 { Foreign::other() }\n`,
       'utf8',
     );
     const { allEdges } = runPipeline(dir);
@@ -162,11 +157,7 @@ describe('lang-rust resolve.ts — call-target decoding and resolution', () => {
 
   it('returns 0 matches as resolution `unknown` + low confidence', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
-    writeFileSync(
-      join(dir, 'src/lib.rs'),
-      `fn entry() { unknown_function() }\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'src/lib.rs'), `fn entry() { unknown_function() }\n`, 'utf8');
     const { allEdges, resolved } = runPipeline(dir);
     const call = allEdges.find((e) => e.text.includes('unknown_function'));
     expect(call).toBeDefined();
@@ -196,11 +187,7 @@ describe('lang-rust resolve.ts — call-target decoding and resolution', () => {
 
   it('tags macro_invocations as `unknown` with edge text `name! ...` for primitive matching', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
-    writeFileSync(
-      join(dir, 'src/lib.rs'),
-      `fn entry() { println!("hello"); }\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'src/lib.rs'), `fn entry() { println!("hello"); }\n`, 'utf8');
     const { allEdges } = runPipeline(dir);
     const macro = allEdges.find((e) => e.text.startsWith('println! '));
     expect(macro).toBeDefined();
@@ -233,10 +220,7 @@ describe('lang-rust resolve.ts — call-target decoding and resolution', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
     writeFileSync(
       join(dir, 'src/lib.rs'),
-      `fn helper() {}\n` +
-        `fn entry() {\n` +
-        `    helper();\n` +
-        `}\n`,
+      `fn helper() {}\n` + `fn entry() {\n` + `    helper();\n` + `}\n`,
       'utf8',
     );
     const { allEdges } = runPipeline(dir);
@@ -267,10 +251,7 @@ describe('lang-rust resolve.ts — call-target decoding and resolution', () => {
     // the parenthesized_expression chain.
     writeFileSync(
       join(dir, 'src/lib.rs'),
-      `fn helper() -> i32 { 1 }\n` +
-        `fn entry() {\n` +
-        `    (helper());\n` +
-        `}\n`,
+      `fn helper() -> i32 { 1 }\n` + `fn entry() {\n` + `    (helper());\n` + `}\n`,
       'utf8',
     );
     const { allEdges } = runPipeline(dir);
@@ -283,12 +264,12 @@ describe('lang-rust resolve.ts — call-target decoding and resolution', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
     writeFileSync(
       join(dir, 'src/lib.rs'),
-      `fn helper() -> i32 { 1 }\n` +
-        `fn entry() -> i32 { helper() + unknown_fn() }\n`,
+      `fn helper() -> i32 { 1 }\n` + `fn entry() -> i32 { helper() + unknown_fn() }\n`,
       'utf8',
     );
     const { resolved } = runPipeline(dir);
-    const totalEdges = resolved.stats.resolvedHigh +
+    const totalEdges =
+      resolved.stats.resolvedHigh +
       resolved.stats.resolvedMedium +
       resolved.stats.resolvedLow +
       resolved.stats.unresolved;
@@ -299,11 +280,7 @@ describe('lang-rust resolve.ts — call-target decoding and resolution', () => {
 
   it('decodes `mod::Type::method()` shape (nested scoped_identifier path)', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
-    writeFileSync(
-      join(dir, 'src/lib.rs'),
-      `fn entry() { std::fs::read("x"); }\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'src/lib.rs'), `fn entry() { std::fs::read("x"); }\n`, 'utf8');
     const { allEdges } = runPipeline(dir);
     // `read` isn't in the catalog; it should emit an unknown edge.
     const call = allEdges.find((e) => e.text.includes('std::fs::read'));
@@ -313,11 +290,7 @@ describe('lang-rust resolve.ts — call-target decoding and resolution', () => {
 
   it('strips the leading namespace from a scoped macro invocation `path::name!()`', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
-    writeFileSync(
-      join(dir, 'src/lib.rs'),
-      `fn entry() { log::info!("hello"); }\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'src/lib.rs'), `fn entry() { log::info!("hello"); }\n`, 'utf8');
     const { allEdges } = runPipeline(dir);
     // `decodeCallTarget` for `macro_invocation` keeps only the trailing
     // segment after `::`, so the edge text is prefixed with `info!`.
@@ -421,12 +394,15 @@ interface FakeNode {
 }
 
 /** Build a tiny tree-sitter-ish fake node. */
-function makeNode(type: string, opts: Partial<{
-  text: string;
-  parent: unknown;
-  fields: Record<string, unknown>;
-  named: unknown[];
-}> = {}): FakeNode {
+function makeNode(
+  type: string,
+  opts: Partial<{
+    text: string;
+    parent: unknown;
+    fields: Record<string, unknown>;
+    named: unknown[];
+  }> = {},
+): FakeNode {
   const text = opts.text ?? '';
   const fields = opts.fields ?? {};
   const named = opts.named ?? [];

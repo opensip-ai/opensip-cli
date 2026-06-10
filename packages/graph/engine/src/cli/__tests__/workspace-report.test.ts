@@ -62,10 +62,7 @@ describe('workspaceReportLines', () => {
   });
 
   it('marks a failed unit and includes a truncated stderr preview', () => {
-    const out = text(
-      [unit({ exitCode: 2, stderr: 'line1\nline2\nline3\nline4\nline5' })],
-      5,
-    );
+    const out = text([unit({ exitCode: 2, stderr: 'line1\nline2\nline3\nline4\nline5' })], 5);
     expect(out).toContain('FAILED (exit 2)');
     expect(out).toContain('stderr: line1');
     expect(out).toContain('line3');

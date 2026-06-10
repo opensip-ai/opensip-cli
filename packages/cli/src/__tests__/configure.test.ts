@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { checkEntitlement } from '@opensip-tools/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-
 import type * as NodeOs from 'node:os';
 
 // Mock the cloud entitlement check so the configure flow's key-verification
@@ -31,7 +30,9 @@ vi.mock('node:os', async () => {
 vi.mock('node:readline', () => ({
   createInterface: () => ({
     question: (_q: string, cb: (answer: string) => void) => cb(nextAnswer),
-    close: () => { /* no-op for tests */ },
+    close: () => {
+      /* no-op for tests */
+    },
   }),
 }));
 
@@ -45,10 +46,10 @@ beforeEach(() => {
   HOME = mkdtempSync(join(tmpdir(), 'opensip-configure-test-'));
   writes = [];
   const origWrite = process.stdout.write.bind(process.stdout);
-  process.stdout.write = ((s: unknown) => {
+  process.stdout.write = (s: unknown) => {
     writes.push(String(s));
     return true;
-  });
+  };
   // Restore in afterEach.
   (globalThis as { __origStdoutWrite?: typeof origWrite }).__origStdoutWrite = origWrite;
   vi.resetModules();

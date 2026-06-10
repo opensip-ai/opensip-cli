@@ -27,23 +27,23 @@
  * parent must terminate with the child's exact exit code (it runs no event loop
  * of its own to drain), so it is allow-listed by basename.
  */
-import { defineCheck } from '@opensip-tools/fitness'
+import { defineCheck } from '@opensip-tools/fitness';
 
 /** A real `process.exit(...)` call (post strip-strings-and-comments). */
-const PROCESS_EXIT_RE = /\bprocess\.exit\s*\(/
+const PROCESS_EXIT_RE = /\bprocess\.exit\s*\(/;
 
 /** Check packs describe/detect process.exit in user code; excluded wholesale. */
-const CHECK_PACK_PATH = /packages\/[^/]+\/checks-/
+const CHECK_PACK_PATH = /packages\/[^/]+\/checks-/;
 
 /** Subprocess-relaunch wrappers that must propagate a child's exact exit code. */
-const ALLOWLISTED_BASENAMES = new Set(['heap-preflight.ts'])
+const ALLOWLISTED_BASENAMES = new Set(['heap-preflight.ts']);
 
 /** Tests legitimately spy on / drive process.exit. */
-const TEST_PATH = /\.test\.tsx?$|\/__tests__\//
+const TEST_PATH = /\.test\.tsx?$|\/__tests__\//;
 
 /** Pure analysis. Exported so the dogfood-integration test can exercise it. */
 export function analyzeNoLocalExit(content) {
-  const violations = []
+  const violations = [];
   for (const [i, line] of content.split('\n').entries()) {
     if (PROCESS_EXIT_RE.test(line)) {
       violations.push({
@@ -56,25 +56,26 @@ export function analyzeNoLocalExit(content) {
         suggestion:
           'Set `process.exitCode = n` at the boundary, or throw a typed error ' +
           '(BootstrapError / ToolError) for the boundary to render and map.',
-      })
+      });
     }
   }
-  return violations
+  return violations;
 }
 
 export const checks = [
   defineCheck({
     id: '60201712-a9c3-467d-b1db-c9ca53acf4dd',
     slug: 'no-local-exit-or-stdout',
-    description: 'No local process.exit(); exit codes flow through the one boundary via process.exitCode (§4.7)',
+    description:
+      'No local process.exit(); exit codes flow through the one boundary via process.exitCode (§4.7)',
     scope: { languages: ['typescript'], concerns: ['backend'] },
     tags: ['architecture', 'quality'],
     fileTypes: ['ts', 'tsx'],
     contentFilter: 'strip-strings-and-comments',
     analyze: (content, filePath) => {
-      if (CHECK_PACK_PATH.test(filePath) || TEST_PATH.test(filePath)) return []
-      if (ALLOWLISTED_BASENAMES.has(filePath.split('/').at(-1) ?? '')) return []
-      return analyzeNoLocalExit(content)
+      if (CHECK_PACK_PATH.test(filePath) || TEST_PATH.test(filePath)) return [];
+      if (ALLOWLISTED_BASENAMES.has(filePath.split('/').at(-1) ?? '')) return [];
+      return analyzeNoLocalExit(content);
     },
   }),
-]
+];

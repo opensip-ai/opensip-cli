@@ -63,9 +63,10 @@ describe('bundle weight gate', () => {
     const bytes = size(dashboardCytoscapeVendorJs()) + size(dashboardViewGraphJs());
     const kb = Math.round(bytes / KB);
     const limit = (BUDGET_KB + 50) * KB;
-    expect(bytes, `vendor + view JS ${kb} KB exceeds ${(BUDGET_KB + 50)} KB budget`).toBeLessThanOrEqual(
-      limit,
-    );
+    expect(
+      bytes,
+      `vendor + view JS ${kb} KB exceeds ${BUDGET_KB + 50} KB budget`,
+    ).toBeLessThanOrEqual(limit);
   });
 
   it('the Graph view emitter JS is a small fraction of the bundle', () => {

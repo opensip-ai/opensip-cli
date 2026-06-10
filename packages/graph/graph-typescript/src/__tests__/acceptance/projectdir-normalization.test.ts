@@ -20,7 +20,11 @@ describe('projectdir-normalization acceptance fixture', () => {
   const realDir = realpathSync(mkdtempSync(join(tmpdir(), 'graph-realdir-')));
   const linkPath = `${realDir}-link`;
   afterAll(() => {
-    try { rmSync(linkPath, { recursive: true, force: true }); } catch { /* ignore */ }
+    try {
+      rmSync(linkPath, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
     rmSync(realDir, { recursive: true, force: true });
   });
 

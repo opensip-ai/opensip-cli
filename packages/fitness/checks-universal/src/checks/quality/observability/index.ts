@@ -1,1 +1,1 @@
-export * from './pino-serializer-coverage.js'
+export * from './pino-serializer-coverage.js';

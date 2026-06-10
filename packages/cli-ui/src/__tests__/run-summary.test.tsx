@@ -51,9 +51,11 @@ describe('RunSummary', () => {
   it('plain-text form matches the legacy writeRunSummaryPlain string (byte parity)', () => {
     // Locks the format graph's deleted writeRunSummaryPlain produced, so the
     // Phase 3 migration is provably content-preserving on the piped path.
-    expect(renderToText(viewRunSummary({ passed: 12, failed: 3, errors: 1, warnings: 2, durationMs: 450 }))).toBe(
-      '12 Passed, 3 Failed (1 Errors, 2 Warnings) | Duration 450ms',
-    );
+    expect(
+      renderToText(
+        viewRunSummary({ passed: 12, failed: 3, errors: 1, warnings: 2, durationMs: 450 }),
+      ),
+    ).toBe('12 Passed, 3 Failed (1 Errors, 2 Warnings) | Duration 450ms');
   });
 
   it('renders the all-zero (no errors/warnings/failures) shape', () => {

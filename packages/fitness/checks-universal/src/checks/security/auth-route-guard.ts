@@ -2,8 +2,8 @@
  * @fileoverview Verify auth group routes are protected
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 // Patterns indicating auth protection
 const AUTH_PROTECTION_PATTERNS = [
@@ -16,7 +16,7 @@ const AUTH_PROTECTION_PATTERNS = [
   /ProtectedRoute/,
   /AuthGuard/,
   /useUser/,
-]
+];
 
 /**
  * Check: security/auth-route-guard
@@ -50,14 +50,14 @@ export const authRouteGuard = defineCheck({
     logger.debug({
       evt: 'fitness.checks.auth_route_guard.analyze',
       msg: 'Analyzing file for auth route guard compliance',
-    })
+    });
     // Only check auth group layout files
     if (!filePath.includes('(auth)') || !filePath.includes('_layout')) {
-      return []
+      return [];
     }
 
     // Check if file has auth protection
-    const hasAuthCheck = AUTH_PROTECTION_PATTERNS.some((pattern) => pattern.test(content))
+    const hasAuthCheck = AUTH_PROTECTION_PATTERNS.some((pattern) => pattern.test(content));
 
     if (!hasAuthCheck) {
       return [
@@ -72,9 +72,9 @@ export const authRouteGuard = defineCheck({
           match: '(auth)/_layout',
           filePath,
         },
-      ]
+      ];
     }
 
-    return []
+    return [];
   },
-})
+});

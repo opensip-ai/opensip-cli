@@ -20,7 +20,10 @@ function ProbeSpinner({ onFrame }: Readonly<{ onFrame: (s: string) => void }>): 
   return <Text>{f}</Text>;
 }
 
-function ProbeStandalone({ onFrame, intervalMs }: Readonly<{ onFrame: (s: string) => void; intervalMs?: number }>): React.ReactElement {
+function ProbeStandalone({
+  onFrame,
+  intervalMs,
+}: Readonly<{ onFrame: (s: string) => void; intervalMs?: number }>): React.ReactElement {
   const f = useStandaloneSpinner(intervalMs);
   onFrame(f);
   return <Text>{f}</Text>;

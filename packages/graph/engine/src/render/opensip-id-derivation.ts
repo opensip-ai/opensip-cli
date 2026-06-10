@@ -69,8 +69,7 @@ export function deriveOpenSipSymbolId(input: OpenSipSymbolIdInput): string {
  * `<fromSymbolId>::<edgeKind>::unresolved:`).
  */
 export function deriveOpenSipEdgeId(input: OpenSipEdgeIdInput): string {
-  const target =
-    input.toSymbolId ?? `unresolved:${input.toQualifiedNameUnresolved ?? ''}`;
+  const target = input.toSymbolId ?? `unresolved:${input.toQualifiedNameUnresolved ?? ''}`;
   const key = `${input.fromSymbolId}::${input.edgeKind}::${target}`;
   return createHash('sha256').update(key).digest('hex');
 }

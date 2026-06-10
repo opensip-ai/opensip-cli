@@ -8,9 +8,9 @@
  */
 export interface LoggerCall {
   /** 1-indexed line number */
-  readonly line: number
+  readonly line: number;
   /** Logger level (info, warn, error, debug) */
-  readonly level: 'info' | 'warn' | 'error' | 'debug'
+  readonly level: 'info' | 'warn' | 'error' | 'debug';
 }
 
 /**
@@ -18,23 +18,23 @@ export interface LoggerCall {
  */
 export interface FunctionInfo {
   /** Function name (or '<anonymous>' for unnamed functions) */
-  readonly name: string
+  readonly name: string;
   /** Absolute file path */
-  readonly filePath: string
+  readonly filePath: string;
   /** 1-indexed start line */
-  readonly startLine: number
+  readonly startLine: number;
   /** 1-indexed end line */
-  readonly endLine: number
+  readonly endLine: number;
   /** Total lines of code in the function body */
-  readonly lineCount: number
+  readonly lineCount: number;
   /** Whether the function is async */
-  readonly isAsync: boolean
+  readonly isAsync: boolean;
   /** Whether the function contains a try/catch block */
-  readonly hasTryCatch: boolean
+  readonly hasTryCatch: boolean;
   /** Whether any logger calls were detected */
-  readonly hasLogging: boolean
+  readonly hasLogging: boolean;
   /** List of detected logger calls */
-  readonly loggerCalls: readonly LoggerCall[]
+  readonly loggerCalls: readonly LoggerCall[];
 }
 
 /**
@@ -42,13 +42,13 @@ export interface FunctionInfo {
  */
 export interface CoverageResult {
   /** Total number of functions that require logging */
-  readonly totalFunctions: number
+  readonly totalFunctions: number;
   /** Number of functions that have at least one logger call */
-  readonly functionsWithLogging: number
+  readonly functionsWithLogging: number;
   /** Coverage percentage (0-100) */
-  readonly coveragePercent: number
+  readonly coveragePercent: number;
   /** Functions that require logging but don't have it */
-  readonly unloggedFunctions: readonly FunctionInfo[]
+  readonly unloggedFunctions: readonly FunctionInfo[];
 }
 
 /**
@@ -56,13 +56,13 @@ export interface CoverageResult {
  */
 export interface CoverageConfig {
   /** Minimum lines of code for a function to require logging */
-  readonly minLinesForLogging: number
+  readonly minLinesForLogging: number;
   /** Whether async functions require logging (subject to minLinesForAsyncLogging) */
-  readonly requireLoggingInAsync: boolean
+  readonly requireLoggingInAsync: boolean;
   /** Minimum lines for an async function to require logging (avoids flagging trivial async wrappers) */
-  readonly minLinesForAsyncLogging: number
+  readonly minLinesForAsyncLogging: number;
   /** Whether functions with try/catch always require logging regardless of line count */
-  readonly requireLoggingInTryCatch: boolean
+  readonly requireLoggingInTryCatch: boolean;
   /** Minimum coverage percentage before the check reports errors (vs warnings) */
-  readonly minCoveragePercent: number
+  readonly minCoveragePercent: number;
 }
