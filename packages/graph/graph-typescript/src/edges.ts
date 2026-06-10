@@ -379,14 +379,25 @@ const UNRESOLVED_VERDICT: ResolverVerdict = { to: [], resolution: 'unknown', con
  *     `greet` was never imported by name;
  *   - the name is imported via a RELATIVE specifier (`./x`) — intra-package; or
  *   - the name is imported via a WORKSPACE specifier (`@scope/pkg`) the manifest
- *     index knows — inter-package; or
- *   - a same-named occurrence is DEFINED in this file.
+ *     index knows — inter-package.
  *
  * A callee whose symbol resolves only into an EXTERNAL/ambient `.d.ts` (Vitest's
  * `describe`, `process.cwd`, a `Map`'s `.set`/`.get`) has NO project binding:
  * the real target is outside the catalog, so a unique project function sharing
  * the simple name would be a phantom. Without a project binding we decline —
  * decline-beats-guess.
+ *
+ * NOTE: a same-named function merely EXISTING in the caller's file is NOT a
+ * binding — its presence is no evidence THIS call targets it. The former
+ * same-file name-presence branch let `process.send()` / `arr.push()` /
+ * `new Map().has()` / core `logger.info()` enter the name-only catalog fallback,
+ * which then resolved by SHARD-SCOPED catalog uniqueness — unsound under sharding
+ * (unique-in-shard ≠ unique-in-repo). That fabricated 33 local same-name edges on
+ * this repo (a cross-package/external method call → a same-file same-name
+ * function) that the whole-program checker correctly declines. Removed:
+ * decline-beats-guess. (Genuine cross-package edges sharded *does* resolve come
+ * from the type-checker resolvers' `.d.ts`→source hop, not this fallback, so they
+ * are unaffected.)
  */
 function fallbackWithBinding(
   calleeExpr: ts.Expression,
@@ -406,8 +417,10 @@ function hasProjectBinding(calleeExpr: ts.Expression, name: string, ctx: Resolve
     // Bare specifier → only a project binding if it resolves to a workspace pkg.
     return resolveSpecifierToPackage(spec, ctx.crossPackage.manifestIndex) !== undefined;
   }
-  const sameFileRel = relative(ctx.projectDirAbs, ctx.sourceFile.fileName).split(sep).join('/');
-  return (ctx.catalog.functions[name] ?? []).some((o) => o.filePath === sameFileRel);
+  // No type-checked in-project binding and no import specifier ⇒ no binding.
+  // (A same-named function merely existing in this file is not a binding — see
+  // the fallbackWithBinding doc. Declining here is the decline-beats-guess floor.)
+  return false;
 }
 
 /**
