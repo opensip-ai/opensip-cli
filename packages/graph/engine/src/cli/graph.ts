@@ -26,6 +26,9 @@
  * above; see docs/plans/graph-cli-language-neutral-scoping/.
  */
 
+import { realpathSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
+
 import { EXIT_CODES, passRate } from '@opensip-tools/contracts';
 import {
   ConfigurationError,
@@ -155,7 +158,19 @@ export async function executeGraph(
       writeProfileIfRequested(opts, profile);
       return envelope;
     }
-    const runCwd = positionalPaths[0] ?? opts.cwd;
+    // Realpath the run root ONCE, before engine selection (F3 path parity). The
+    // EXACT engine normalizes its project dir via realpathSync internally
+    // (graph-typescript normalize-project-dir); the SHARDED worker derives
+    // project-relative `code.file` paths against this `projectRoot`. Under a
+    // symlinked cwd a RAW root would make the sharded paths gain `../..` prefixes
+    // while exact stays canonical → the two engines emit different `code.file`,
+    // and since the engine choice is environment-sensitive, a `--gate-save`
+    // baseline written by one engine would flag everything new under the other.
+    // Canonicalizing here (idempotent for non-symlinks) keeps both engines'
+    // emitted paths byte-identical. Shard discovery already realpaths internally
+    // (discoverFiles → normalizeProjectDir), so the shard files and this root now
+    // share the same canonical base.
+    const runCwd = realpathOrSelf(positionalPaths[0] ?? opts.cwd);
     // Honor the project's `graph:` config block (rule knobs like
     // minCrossPackageDuplicatePackages). Resolved from the original cwd so a
     // positional subtree run still picks up the project-root config.
@@ -228,6 +243,23 @@ export async function executeGraph(
  *     no worker script is available — a graceful fall-through to exact, the
  *     natural single-package path.
  */
+/**
+ * Resolve a path to absolute, then realpath it (follow symlinks) — the SAME
+ * normalization the exact engine's `normalizeProjectDir` applies, so both
+ * engines see one canonical run root (F3). Falls back to the absolute path if
+ * realpath fails (e.g. the path doesn't exist yet — discovery reports the error
+ * downstream). Idempotent on an already-canonical path.
+ */
+function realpathOrSelf(input: string): string {
+  const absolute = isAbsolute(input) ? input : resolve(input);
+  try {
+    return realpathSync(absolute);
+  } catch {
+    /* v8 ignore next */
+    return absolute;
+  }
+}
+
 async function resolveEngineShards(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
