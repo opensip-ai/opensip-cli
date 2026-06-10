@@ -189,6 +189,15 @@ distinct from:
   `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`, fail-closed exit 5 before import) is
   discovered, trust-gated, and routed through the same admit → import → register
   path bundled/installed tools travel. `plugin add --project` stays `installed`
+- [ADR-0031](./ADR-0031-graph-determinism-one-build-one-finalize.md) — Graph
+  determinism: one build → one finalize → many renderers. `@graph-ignore`
+  suppression runs in a single `finalizeGraphSignals` seam every path must cross
+  (enforced by a branded `FinalizedSignals` type — un-suppressed signals fail to
+  typecheck at `persistSession`), closing the recurring TTY-only waiver leak. The
+  build engine is chosen deterministically with the **exact** single-program
+  engine as the default; **sharding is opt-in** via `--sharded`; `isTTY` selects
+  only the renderer, never the engine; and the catalog cache key carries
+  `mode=exact|sharded` so the engines never clobber each other
 
 ### Superseded
 
