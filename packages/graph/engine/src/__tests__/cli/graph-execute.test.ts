@@ -108,6 +108,61 @@ function renderedLines(render: MockInstance): string {
     .join('\n');
 }
 
+// A large flat TypeScript adapter that synthetic-shards (>1 partition) so the
+// engine-selection branch is exercised. Registered under the given cwd.
+function registerLargeFlatAdapter(cwdDir: string): void {
+  const files = Array.from({ length: 2501 }, (_unused, i) =>
+    join(cwdDir, 'src', `file-${String(i)}.ts`),
+  );
+  const largeFlatAdapter: GraphLanguageAdapter = {
+    ...populatedAdapter(),
+    discoverFiles: ({ cwd }: { cwd: string }): DiscoverOutput => ({
+      projectDirAbs: cwd,
+      files,
+      configPathAbs: join(cwd, 'tsconfig.json'),
+      compilerOptions: undefined,
+    }),
+  };
+  currentAdapterRegistry().register(largeFlatAdapter);
+}
+
+// A fake shard-worker CLI that emits one ShardBuildResult per spawned shard,
+// so the sharded build path completes end-to-end without the real worker.
+function writeFakeShardCli(cwdDir: string): string {
+  const fakeCliPath = join(cwdDir, 'fake-shard-cli.cjs');
+  writeFileSync(
+    fakeCliPath,
+    String.raw`
+const { readFileSync } = require('node:fs');
+const spec = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+const id = spec.shard.id;
+const name = id.replace(/[^a-zA-Z0-9]/g, '_');
+const occ = {
+  bodyHash: 'h-' + id, simpleName: name, qualifiedName: id + '.' + name,
+  filePath: 'src/' + name + '.ts', line: 1, column: 0, endLine: 1,
+  kind: 'function-declaration', params: [], returnType: null,
+  enclosingClass: null, decorators: [], visibility: 'exported',
+  inTestFile: false, definedInGenerated: false, calls: [],
+};
+const result = {
+  shardId: id,
+  fragment: {
+    version: '3.0', tool: 'graph', language: 'typescript', builtAt: 'x',
+    cacheKey: 'k-' + id, resolutionMode: spec.resolutionMode,
+    functions: { [name]: [occ] },
+  },
+  fingerprint: 'fp-' + id,
+  boundaryCalls: [],
+  parseErrors: [],
+};
+process.stdout.write(JSON.stringify(result));
+process.exit(0);
+`,
+    'utf8',
+  );
+  return fakeCliPath;
+}
+
 let stdoutSpy: MockInstance<typeof process.stdout.write>;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 let projectDir: string;
@@ -204,100 +259,21 @@ describe('executeGraph — render dispatch', () => {
     }
   });
 
-  it('uses the EXACT engine for a shardable project when --sharded is NOT set (Phase 2 / ADR-0031)', async () => {
-    // A large flat TypeScript repo that WOULD synthetic-shard under the old
-    // auto-policy. Without --sharded it must stay single-process (exact), so
-    // the build is deterministic across TTY/pipe/CI.
-    const files = Array.from({ length: 2501 }, (_unused, i) =>
-      join(projectDir, 'src', `file-${String(i)}.ts`),
-    );
-    const largeFlatAdapter: GraphLanguageAdapter = {
-      ...populatedAdapter(),
-      discoverFiles: ({ cwd }: { cwd: string }): DiscoverOutput => ({
-        projectDirAbs: cwd,
-        files,
-        configPathAbs: join(cwd, 'tsconfig.json'),
-        compilerOptions: undefined,
-      }),
-    };
-    currentAdapterRegistry().register(largeFlatAdapter);
-    const profilePath = join(projectDir, 'profile-exact.json');
+  it('uses the SHARDED engine by default for a shardable project (ADR-0032)', async () => {
+    // A bare run (no --exact) on a shardable repo builds with the SHARDED
+    // engine — the default proven byte-equivalent to exact by the repo-scale
+    // guardrail.
+    registerLargeFlatAdapter(projectDir);
+    const fakeCliPath = writeFakeShardCli(projectDir);
+    const profilePath = join(projectDir, 'profile-default.json');
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const { cli, setExitCode } = mockCli(datastore);
       await executeGraph({
         cwd: projectDir,
         noCache: true,
-        // No `sharded: true` and a real cliScript present — proves the policy
-        // keys off the flag, not script availability or file count.
-        cliScript: join(projectDir, 'fake-shard-cli.cjs'),
-        profileOutput: profilePath,
-      }, cli);
-      expect(setExitCode).toHaveBeenCalledWith(0);
-      const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
-        runs: { mode: string }[];
-      };
-      expect(profile.runs[0]?.mode).toBe('single-process');
-    } finally {
-      datastore.close();
-    }
-  });
-
-  it('profiles a synthetic sharded build for a large flat TypeScript project (opt-in --sharded)', async () => {
-    const files = Array.from({ length: 2501 }, (_unused, i) =>
-      join(projectDir, 'src', `file-${String(i)}.ts`),
-    );
-    const largeFlatAdapter: GraphLanguageAdapter = {
-      ...populatedAdapter(),
-      discoverFiles: ({ cwd }: { cwd: string }): DiscoverOutput => ({
-        projectDirAbs: cwd,
-        files,
-        configPathAbs: join(cwd, 'tsconfig.json'),
-        compilerOptions: undefined,
-      }),
-    };
-    currentAdapterRegistry().register(largeFlatAdapter);
-    const fakeCliPath = join(projectDir, 'fake-shard-cli.cjs');
-    writeFileSync(
-      fakeCliPath,
-      String.raw`
-const { readFileSync } = require('node:fs');
-const spec = JSON.parse(readFileSync(process.argv[3], 'utf8'));
-const id = spec.shard.id;
-const name = id.replace(/[^a-zA-Z0-9]/g, '_');
-const occ = {
-  bodyHash: 'h-' + id, simpleName: name, qualifiedName: id + '.' + name,
-  filePath: 'src/' + name + '.ts', line: 1, column: 0, endLine: 1,
-  kind: 'function-declaration', params: [], returnType: null,
-  enclosingClass: null, decorators: [], visibility: 'exported',
-  inTestFile: false, definedInGenerated: false, calls: [],
-};
-const result = {
-  shardId: id,
-  fragment: {
-    version: '3.0', tool: 'graph', language: 'typescript', builtAt: 'x',
-    cacheKey: 'k-' + id, resolutionMode: spec.resolutionMode,
-    functions: { [name]: [occ] },
-  },
-  fingerprint: 'fp-' + id,
-  boundaryCalls: [],
-  parseErrors: [],
-};
-process.stdout.write(JSON.stringify(result));
-process.exit(0);
-`,
-      'utf8',
-    );
-    const profilePath = join(projectDir, 'profile.json');
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const { cli, setExitCode } = mockCli(datastore);
-      await executeGraph({
-        cwd: projectDir,
-        noCache: true,
-        // Phase 2 (ADR-0031): sharding is opt-in; a bare run is always exact,
-        // so the synthetic-flat sharded build only engages with --sharded.
-        sharded: true,
+        // No `exact: true` — the default. A working worker script is present so
+        // the sharded build completes.
         cliScript: fakeCliPath,
         concurrency: 1,
         profileOutput: profilePath,
@@ -313,6 +289,90 @@ process.exit(0);
         ]),
       );
     } finally {
+      datastore.close();
+    }
+  });
+
+  it('uses the EXACT single-program engine when --exact is set, even on a shardable project (ADR-0032)', async () => {
+    // --exact opts OUT of the default sharded engine: a shardable repo with a
+    // working worker script must still build single-process (exact). Proves the
+    // policy keys off the flag, not script availability or file count.
+    registerLargeFlatAdapter(projectDir);
+    const fakeCliPath = writeFakeShardCli(projectDir);
+    const profilePath = join(projectDir, 'profile-exact.json');
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const { cli, setExitCode } = mockCli(datastore);
+      await executeGraph({
+        cwd: projectDir,
+        noCache: true,
+        exact: true,
+        cliScript: fakeCliPath,
+        profileOutput: profilePath,
+      }, cli);
+      expect(setExitCode).toHaveBeenCalledWith(0);
+      const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
+        runs: { mode: string }[];
+      };
+      expect(profile.runs[0]?.mode).toBe('single-process');
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('falls back to the EXACT engine on a NON-shardable project (no worker script, default policy)', async () => {
+    // The natural single-package / small-repo path: even without --exact, a
+    // project that can't shard (here: no cliScript to spawn workers) uses the
+    // exact single-program engine rather than failing.
+    registerLargeFlatAdapter(projectDir);
+    const profilePath = join(projectDir, 'profile-fallback.json');
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const { cli, setExitCode } = mockCli(datastore);
+      await executeGraph({
+        cwd: projectDir,
+        noCache: true,
+        // No cliScript → resolveShards returns [] → exact fallback. No --exact.
+        cliScript: '',
+        profileOutput: profilePath,
+      }, cli);
+      expect(setExitCode).toHaveBeenCalledWith(0);
+      const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
+        runs: { mode: string }[];
+      };
+      expect(profile.runs[0]?.mode).toBe('single-process');
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('engine choice is independent of process.stdout.isTTY (TTY selects only the renderer)', async () => {
+    // executeGraph is the STATIC path; the engine decision is a pure function of
+    // the parsed options + shardability and never reads isTTY. Force isTTY true
+    // and confirm a bare default run still shards (same as the non-TTY case).
+    registerLargeFlatAdapter(projectDir);
+    const fakeCliPath = writeFakeShardCli(projectDir);
+    const original = process.stdout.isTTY;
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    const profilePath = join(projectDir, 'profile-tty.json');
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const { cli, setExitCode } = mockCli(datastore);
+      await executeGraph({
+        cwd: projectDir,
+        noCache: true,
+        cliScript: fakeCliPath,
+        concurrency: 1,
+        profileOutput: profilePath,
+      }, cli);
+      expect(setExitCode).toHaveBeenCalledWith(0);
+      const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
+        runs: { mode: string }[];
+      };
+      // Sharded regardless of isTTY — the engine is TTY-independent.
+      expect(profile.runs[0]?.mode).toBe('sharded');
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: original, configurable: true });
       datastore.close();
     }
   });

@@ -161,9 +161,11 @@ describe('graph handler — end-to-end via the real typescript adapter', () => {
     }
   });
 
-  it('interactive default path delegates to cli.renderLive', async () => {
-    // Default mode (no other flags) calls cli.renderLive on a TTY. The fixture
-    // is tiny so the heap preflight no-ops (file count < 1000).
+  it('interactive --exact path delegates to cli.renderLive', async () => {
+    // The Ink live view drives the EXACT engine, so it is eligible only under
+    // `--exact` on a TTY (ADR-0032: sharded is the default and routes to the
+    // static path). The fixture is tiny so heap preflight no-ops (file count
+    // < 1000).
     const dir = mkdtempSync(join(tmpdir(), 'graph-tool-action-live-'));
     try {
       mkdirSync(dir, { recursive: true });
@@ -179,14 +181,15 @@ describe('graph handler — end-to-end via the real typescript adapter', () => {
 
       const renderLive = vi.fn(() => Promise.resolve());
       const cli = makeCli({ renderLive });
-      // No --json/--gate-*/--report-to/positional: this is the interactive
-      // default path, which delegates to renderLive — but only on a TTY (a
-      // non-TTY run falls back to the static render seam). vitest's stdout is
-      // not a TTY, so force it for this assertion.
+      // --exact (the live view drives the exact engine), no
+      // --json/--gate-*/--report-to/positional: this is the interactive live
+      // path, which delegates to renderLive — but only on a TTY (a non-TTY run
+      // falls back to the static render seam). vitest's stdout is not a TTY, so
+      // force it for this assertion.
       const prevTTY = process.stdout.isTTY;
       Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
       try {
-        await graphHandler()({ cwd: dir, _args: [[]] }, cli);
+        await graphHandler()({ cwd: dir, exact: true, _args: [[]] }, cli);
       } finally {
         Object.defineProperty(process.stdout, 'isTTY', { value: prevTTY, configurable: true });
       }

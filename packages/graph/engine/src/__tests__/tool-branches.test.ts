@@ -155,11 +155,13 @@ describe('--resolution declaration', () => {
   });
 });
 
-describe('graph interactive default path honors graph config', () => {
-  it('loads opensip-tools.config.yml graph block and forwards it to renderLive (TTY)', async () => {
-    // Regression: the interactive live-view path (bare `graph`) used to
-    // call runGraph with no config, silently ignoring the project's
-    // `graph:` block — so `graph --verbose` disagreed with `graph --json`.
+describe('graph interactive --exact path honors graph config', () => {
+  it('loads opensip-tools.config.yml graph block and forwards it to renderLive (--exact, TTY)', async () => {
+    // Regression: the interactive live-view path used to call runGraph with no
+    // config, silently ignoring the project's `graph:` block — so
+    // `graph --verbose` disagreed with `graph --json`. ADR-0032: the Ink live
+    // view drives the EXACT engine, so it is eligible only under `--exact`
+    // (sharded is the default and routes to the static path).
     currentAdapterRegistry().register(fakeAdapter(workDir));
     writeFileSync(
       join(workDir, 'opensip-tools.config.yml'),
@@ -168,8 +170,8 @@ describe('graph interactive default path honors graph config', () => {
     );
     const { cli, renderLive } = makeMockCli();
 
-    // The animated live view is taken only on a TTY.
-    await withTTY(true, () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>);
+    // The animated live view is taken only on a TTY, under --exact.
+    await withTTY(true, () => handlerFor('graph')({ cwd: workDir, exact: true, _args: [[]] }, cli) as Promise<unknown>);
 
     expect(renderLive).toHaveBeenCalledTimes(1);
     const [, args] = renderLive.mock.calls[0] as [string, { config?: { minCrossPackageDuplicatePackages?: number } }];
@@ -184,6 +186,22 @@ describe('graph interactive default path honors graph config', () => {
     const { cli, renderLive, render } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
 
     await withTTY(false, () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>);
+
+    expect(renderLive).not.toHaveBeenCalled();
+    expect(render).toHaveBeenCalledTimes(1);
+    const [result] = render.mock.calls[0] as [{ type?: string }];
+    expect(result.type).toBe('graph-done');
+  });
+
+  it('a bare default run routes to the static path even on a TTY (ADR-0032: sharded default is not live-view eligible)', async () => {
+    // Sharded is the default (ADR-0032); the Ink live runner only drives the
+    // EXACT engine, so a bare `graph` (no --exact) must route to the static
+    // path — never renderLive — regardless of TTY. This pins "TTY selects only
+    // the renderer for the chosen engine; it never changes the engine."
+    currentAdapterRegistry().register(fakeAdapter(workDir));
+    const { cli, renderLive, render } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
+
+    await withTTY(true, () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>);
 
     expect(renderLive).not.toHaveBeenCalled();
     expect(render).toHaveBeenCalledTimes(1);

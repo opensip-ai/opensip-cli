@@ -229,7 +229,7 @@ describe('graphTool command surface', () => {
       }
     });
 
-    it('default interactive path registers + routes through cli.renderLive', async () => {
+    it('interactive --exact path registers + routes through cli.renderLive', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         currentAdapterRegistry().register(fakeAdapter(workDir));
@@ -243,8 +243,11 @@ describe('graphTool command surface', () => {
         const prevTTY = process.stdout.isTTY;
         Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
         try {
-          // No positionals: `_args` carries the empty variadic array.
-          await handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli);
+          // The Ink live runner drives the EXACT single-program engine, so it is
+          // eligible only under `--exact` (ADR-0032: sharded is the default and
+          // routes to the static path). No positionals: `_args` is the empty
+          // variadic array.
+          await handlerFor('graph')({ cwd: workDir, exact: true, _args: [[]] }, cli);
         } finally {
           if (prev === undefined) delete process.env.OPENSIP_HEAP_ELEVATED;
           else process.env.OPENSIP_HEAP_ELEVATED = prev;

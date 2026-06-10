@@ -36,11 +36,12 @@ describe('stampEngineVersion', () => {
     }
   });
 
-  it('folds the engine MODE so exact and sharded keys never collide (Phase 2 / ADR-0031)', () => {
+  it('folds the engine MODE so exact and sharded keys never collide (ADR-0032)', () => {
     // The exact (single-program) and sharded engines share the one
-    // `graph_catalog` row but build structurally incompatible catalogs, so a
-    // mode switch must be a clean cacheKey mismatch — never a silent
-    // cross-engine read. Same adapter key, different mode ⇒ different cacheKey.
+    // `graph_catalog` row. Though now proven byte-equivalent (ADR-0032), a mode
+    // switch must still be a clean cacheKey mismatch — independent cache
+    // lineages, never a silent cross-engine read. Same adapter key, different
+    // mode ⇒ different cacheKey.
     const exact = stampEngineVersion('ts-6.0.3-exact-abc', 'exact');
     const sharded = stampEngineVersion('ts-6.0.3-exact-abc', 'sharded');
     expect(exact).toBe(`eng=${ENGINE_VERSION}|mode=exact|ts-6.0.3-exact-abc`);
