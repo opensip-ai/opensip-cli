@@ -776,6 +776,46 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
     },
     {
       "aliases": [],
+      "args": [],
+      "name": "graph-equivalence-check",
+      "options": [
+        {
+          "choices": undefined,
+          "defaultValue": ".config/graph-equivalence-budget.json",
+          "description": "Path to the committed budget JSON (relative to cwd or absolute)",
+          "flags": "--budget <path>",
+          "negate": false,
+          "optional": false,
+          "required": true,
+          "variadic": false,
+        },
+        {
+          "choices": undefined,
+          "defaultValue": "<cwd>",
+          "description": "Target repo root to check (default: current directory)",
+          "flags": "--cwd <path>",
+          "negate": false,
+          "optional": false,
+          "required": true,
+          "variadic": false,
+        },
+        {
+          "choices": undefined,
+          "defaultValue": undefined,
+          "description": "Rewrite the budget file to the observed production divergence count (capture/tighten); always exits 0",
+          "flags": "--update-budget",
+          "negate": false,
+          "optional": false,
+          "required": false,
+          "variadic": false,
+        },
+      ],
+      "subcommands": [],
+      "synopsis": "[internal] Verify the sharded build is byte-equivalent to the exact build on a real repo (gates production edge divergence against a committed budget)",
+      "usage": "[options]",
+    },
+    {
+      "aliases": [],
       "args": [
         {
           "name": "name",

@@ -310,6 +310,23 @@ async function resolveShards(opts: GraphCommandOptions, cli: ToolCliContext): Pr
 }
 
 /**
+ * Resolve a project's shard set the SAME way a production `graph` run does
+ * (workspace units → canonical-file partition, else synthetic flat shards),
+ * exposed for the real-repo equivalence guardrail (`graph-equivalence-check`).
+ * Returns `[]` when the project isn't shardable (≤1 shard / no worker script) —
+ * the guardrail rejects that, since the comparison is only meaningful on a
+ * shardable multi-package repo. Reuses the private {@link resolveShards} so
+ * there is ONE shard-resolution model, never a drifting copy.
+ */
+export async function resolveShardsForCwd(
+  cwd: string,
+  cliScript: string,
+  cli: ToolCliContext,
+): Promise<readonly Shard[]> {
+  return resolveShards({ cwd, cliScript, noCache: true }, cli);
+}
+
+/**
  * Flat-large fallback for single-tsconfig TypeScript repos. Workspace
  * sharding is preferred because package boundaries are semantically real. When
  * no workspace split exists and the TypeScript file count crosses the same

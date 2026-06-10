@@ -31,6 +31,7 @@ import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/dashboard-
 import {
   graphBaselineExportCommandSpec,
   graphCatalogExportCommandSpec,
+  graphEquivalenceCheckCommandSpec,
   graphLookupCommandSpec,
   graphRecipesCommandSpec,
   graphSarifExportCommandSpec,
@@ -92,6 +93,12 @@ const GRAPH_SHARD_WORKER: ToolCommandDescriptor = {
     '[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)',
 };
 
+const GRAPH_EQUIVALENCE_CHECK: ToolCommandDescriptor = {
+  name: 'graph-equivalence-check',
+  description:
+    '[internal] Verify the sharded build is byte-equivalent to the exact build on a real repo (gates production edge divergence against a committed budget)',
+};
+
 const GRAPH_RUN_WORKER: ToolCommandDescriptor = {
   name: 'graph-run-worker',
   description: '[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)',
@@ -138,6 +145,7 @@ const graphCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
   graphCatalogExportCommandSpec,
   graphSarifExportCommandSpec,
   graphRecipesCommandSpec,
+  graphEquivalenceCheckCommandSpec,
 ];
 
 /**
@@ -226,7 +234,7 @@ export const graphTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },
-  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT, GRAPH_SHARD_WORKER, GRAPH_RUN_WORKER, GRAPH_CATALOG_EXPORT, GRAPH_SARIF_EXPORT, GRAPH_RECIPES],
+  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT, GRAPH_SHARD_WORKER, GRAPH_EQUIVALENCE_CHECK, GRAPH_RUN_WORKER, GRAPH_CATALOG_EXPORT, GRAPH_SARIF_EXPORT, GRAPH_RECIPES],
   // Release 2.11.0 Phase 5: graph declares its command surface; the host mounts
   // each spec via mountCommandSpec. The deprecated `register()` fallback is gone
   // — graph no longer touches Commander.

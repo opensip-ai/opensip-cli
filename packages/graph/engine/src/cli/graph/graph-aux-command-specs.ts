@@ -24,6 +24,7 @@ import { commonFlags } from '@opensip-tools/contracts';
 import { defineCommand, logger } from '@opensip-tools/core';
 
 import { exportGraphBaseline } from '../baseline-export.js';
+import { executeEquivalenceCheck } from '../equivalence-check-command.js';
 import { runCatalogJsonMode } from '../graph-modes.js';
 import { handleGraphError } from '../graph.js';
 import { listGraphRecipes } from '../list-graph-recipes.js';
@@ -81,6 +82,43 @@ export const graphShardWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> =
   output: RAW_STREAM,
   handler: async (rawOpts, cli): Promise<void> => {
     await executeShardWorker(firstArg(rawOpts as Record<string, unknown>), cli);
+  },
+});
+
+/**
+ * `graph-equivalence-check` — [internal] REAL-REPO sharded≡exact equivalence
+ * guardrail. Builds both catalogs on the target with the real adapter (real
+ * `dist/*.d.ts` resolution), classifies the residual by owner file, and gates
+ * the PRODUCTION divergence against the committed budget. The dogfood/CI gate
+ * the synthetic in-test harness cannot be (it agrees by construction). Owns its
+ * full IO + exit code (raw-stream).
+ */
+export const graphEquivalenceCheckCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+  name: 'graph-equivalence-check',
+  description:
+    '[internal] Verify the sharded build is byte-equivalent to the exact build on a real repo (gates production edge divergence against a committed budget)',
+  commonFlags: [],
+  options: [
+    { flag: OPT_CWD, description: 'Target repo root to check (default: current directory)', default: process.cwd() },
+    {
+      flag: '--budget',
+      value: '<path>',
+      description: 'Path to the committed budget JSON (relative to cwd or absolute)',
+      default: '.config/graph-equivalence-budget.json',
+    },
+    {
+      flag: '--update-budget',
+      description: 'Rewrite the budget file to the observed production divergence count (capture/tighten); always exits 0',
+    },
+  ],
+  scope: 'project',
+  output: RAW_STREAM,
+  handler: async (rawOpts, cli): Promise<void> => {
+    const opts = rawOpts as { cwd: string; budget?: string; updateBudget?: boolean };
+    await executeEquivalenceCheck(
+      { cwd: opts.cwd, budget: opts.budget, updateBudget: opts.updateBudget },
+      cli,
+    );
   },
 });
 

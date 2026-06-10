@@ -205,6 +205,7 @@ describe('graphTool command surface', () => {
       'catalog-export',
       'sarif-export',
       'graph-recipes',
+      'graph-equivalence-check',
     ]);
   });
 

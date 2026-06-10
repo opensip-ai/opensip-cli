@@ -28,6 +28,14 @@ export default mergeConfig(vitestBase, defineConfig({
         // by the orchestrate + graph test suites. End-to-end coverage
         // happens at the CLI dispatcher level.
         'src/cli/graph-runner.tsx',
+        // Real-repo equivalence guardrail COMMAND shell: orchestrates TWO full
+        // cold catalog builds (`runGraph` + `runShardedGraph`) over the whole
+        // repo plus budget-file IO — it cannot be meaningfully unit-tested (the
+        // build is the dogfood CI step `graph-equivalence-check`). Its pure
+        // logic (owner-file classification + the ratchet verdict) lives in
+        // `equivalence-check.ts` and IS covered directly by
+        // `equivalence-check.test.ts`. Same rationale as graph-runner.tsx.
+        'src/cli/equivalence-check-command.ts',
       ],
       thresholds: {
         statements: 90,

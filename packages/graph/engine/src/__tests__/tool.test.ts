@@ -45,6 +45,7 @@ describe('graphTool contract conformance (AC-2)', () => {
       'graph-symbol-index',
       'graph-baseline-export',
       'graph-shard-worker',
+      'graph-equivalence-check',
       'graph-run-worker',
       'catalog-export',
       'sarif-export',
@@ -65,6 +66,7 @@ describe('graphTool contract conformance (AC-2)', () => {
       'catalog-export',
       'sarif-export',
       'graph-recipes',
+      'graph-equivalence-check',
     ]);
   });
 });

@@ -114,12 +114,15 @@ const EXPECTED: Record<string, string[]> = {
     // `.requiredOption(...)`. They were always part of the real surface (the
     // opensip EngineSubprocessPort contracts depend on them); the spec-based
     // recorder records them faithfully.
-    '--api-key', '--catalog-output', '--changed-file', '--concurrency', '--cwd',
+    //
+    // graph-equivalence-check (internal real-repo sharded≡exact guardrail) adds
+    // `--budget` (committed budget path) and `--update-budget` (capture/tighten).
+    '--api-key', '--budget', '--catalog-output', '--changed-file', '--concurrency', '--cwd',
     '--debug', '--exact', '--gate-compare', '--gate-save', '--git-sha', '--json',
     '--language', '--list-files', '--mode', '--no-cache', '--out',
     '--output-sarif', '--profile', '--quiet', '--recipe', '--repo-id',
     '--report-to', '--resolution', '--run-id', '--sarif', '--show',
-    '--tenant-id', '--verbose', '--workspace',
+    '--tenant-id', '--update-budget', '--verbose', '--workspace',
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
   // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).

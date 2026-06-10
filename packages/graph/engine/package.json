@@ -62,6 +62,10 @@
         "description": "[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)"
       },
       {
+        "name": "graph-equivalence-check",
+        "description": "[internal] Verify the sharded build is byte-equivalent to the exact build on a real repo (gates production edge divergence against a committed budget)"
+      },
+      {
         "name": "graph-run-worker",
         "description": "[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)"
       },
