@@ -19,10 +19,15 @@ import { defineConfig } from 'vitest/config';
  *
  * A genuine hang is still caught — by the job-level CI timeout — so the generous
  * values do not mask real failures.
+ *
+ * `testTimeout` is 120s (not 60s): graph-typescript's inventory-differential /
+ * property suites build a real TS catalog per case and intermittently crossed a
+ * 60s cap on slow CI runners (a boundary-flake — they pass locally and on
+ * re-run), wedging unrelated PRs. The job-level timeout still catches true hangs.
  */
 export const vitestBase = defineConfig({
   test: {
-    testTimeout: 60_000,
+    testTimeout: 120_000,
     hookTimeout: 30_000,
   },
 });

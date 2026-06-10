@@ -15,8 +15,6 @@
 import { logger, ValidationError, withSpanAsync, type Signal, type Span } from '@opensip-tools/core';
 
 import { buildPackageManifestIndex } from '../../cross-package/export-index.js';
-import { assignPackages } from '../../pipeline/assign-packages.js';
-import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
 import { unionFeatureDeps } from '../../pipeline/feature-deps.js';
 import {
   buildFeatures,
@@ -28,7 +26,11 @@ import { currentRules } from '../../rules/registry.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
 
 import { countCatalogCallSites, countCatalogFunctions } from './catalog-stats.js';
-import { mergeShardFragments, resolveCrossBoundaryCalls } from './cross-shard-resolve.js';
+import {
+  mergeShardFragments,
+  resolveCrossBoundaryCalls,
+  stampAndConstrainPackages,
+} from './cross-shard-resolve.js';
 import { planShardWork, runShardsInParallel } from './shard-runner.js';
 
 import type { Shard, ShardBuildResult } from './shard-model.js';
@@ -200,7 +202,7 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     boundaryCalls,
     manifestIndex,
   );
-  const catalog = constrainCrossPackageEdges(assignPackages(resolved, projectRoot));
+  const catalog = stampAndConstrainPackages(resolved, projectRoot);
   emitStage(
     onProgress,
     'resolve',
@@ -232,6 +234,7 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   //    unified full catalog (with materialized features when requested) so
   //    whole-catalog consumers (incl. the dashboard) still work.
   if (useCache && catalogRepo) {
+    // @fitness-ignore-next-line detached-promises -- persistShardedCatalog is a synchronous void helper (better-sqlite3/Drizzle writes); there is no promise to await.
     persistShardedCatalog(catalogRepo, built.fragments, shards, catalogToPersist);
   }
 

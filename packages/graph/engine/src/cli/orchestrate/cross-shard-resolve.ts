@@ -35,6 +35,8 @@ import { computeFilesFingerprint } from '../../cache/invalidate.js';
 import { buildExportIndex } from '../../cross-package/export-index.js';
 import { resolveCrossPackageCall } from '../../cross-package/resolve.js';
 import { createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
+import { assignPackages } from '../../pipeline/assign-packages.js';
+import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
 import { computeSccs } from '../../pipeline/features.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
 
@@ -68,6 +70,19 @@ export function mergeAndResolveShards(
   const merged = mergeShardFragments(fragments.map((f) => f.fragment), allFiles);
   const boundaryCalls = fragments.flatMap((f) => f.boundaryCalls);
   return resolveCrossBoundaryCalls(merged, boundaryCalls, manifestIndex);
+}
+
+/**
+ * Finalize cross-package edges on a merged catalog: stamp each occurrence's
+ * owning package (`assignPackages`) then drop name-guessed cross-package edges
+ * that contradict the import graph (`constrainCrossPackageEdges`). These two
+ * pipeline steps are always applied as a pair on the post-resolve catalog — by
+ * both the sharded build (`runShardedGraph`) and the cached single-program
+ * recovery path (`cache-orchestrator`) — so they live here, the cross-package
+ * resolution module, as one helper rather than duplicated import pairs.
+ */
+export function stampAndConstrainPackages(catalog: Catalog, projectRoot: string): Catalog {
+  return constrainCrossPackageEdges(assignPackages(catalog, projectRoot));
 }
 
 // ── Task 2.1: merge fragments ─────────────────────────────────────
