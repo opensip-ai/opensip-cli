@@ -56,7 +56,7 @@ import React, { useEffect, useState } from 'react';
 
 import { assertFinalizedAcrossBoundary } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
-import { STAGE_LABELS, toProgressEvent } from './graph-progress.js';
+import { SHARDED_STAGE_LABELS, STAGE_LABELS, toProgressEvent } from './graph-progress.js';
 import {
   buildLiveGraphOutput,
   persistSession,
@@ -83,16 +83,32 @@ const STAGE_RUNNING_DETAIL: Readonly<Record<GraphStage, string>> = {
   rules: 'Evaluating rule set...',
 };
 
-// The phases surface the shared renderer consumes: graph's fixed, ordered
-// stages, each carrying its checklist label + running sub-label.
-const GRAPH_SURFACE: ProgressSurface = {
-  shape: 'phases',
-  stages: GRAPH_STAGES.map((id) => ({
-    id,
-    label: STAGE_LABELS[id],
-    runningDetail: STAGE_RUNNING_DETAIL[id],
-  })),
+// Sharded-engine running sub-labels — mirror SHARDED_STAGE_LABELS: the parallel
+// shard build (parse), the fragment merge (walk), the cross-package link (resolve).
+const SHARDED_STAGE_RUNNING_DETAIL: Readonly<Record<GraphStage, string>> = {
+  ...STAGE_RUNNING_DETAIL,
+  parse: 'Building shards in parallel...',
+  walk: 'Merging shard fragments...',
+  resolve: 'Linking cross-package calls...',
 };
+
+// The phases surface the shared renderer consumes: graph's fixed, ordered stages,
+// each carrying its checklist label + running sub-label. Engine-aware: the sharded
+// pipeline names its stages for what they actually do (Build shards / Merge catalog
+// / Link cross-package) so the checklist reflects the real parallel build, not the
+// single-program "Parse / Walk / Resolve" shape.
+function graphSurface(sharded: boolean): ProgressSurface {
+  const labels = sharded ? SHARDED_STAGE_LABELS : STAGE_LABELS;
+  const runningDetail = sharded ? SHARDED_STAGE_RUNNING_DETAIL : STAGE_RUNNING_DETAIL;
+  return {
+    shape: 'phases',
+    stages: GRAPH_STAGES.map((id) => ({
+      id,
+      label: labels[id],
+      runningDetail: runningDetail[id],
+    })),
+  };
+}
 
 interface RunSummaryShape {
   readonly passed: number;
@@ -203,6 +219,11 @@ interface GraphRunnerProps {
 function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<ViewState>({ phase: 'loading' });
+  // Engine policy (ADR-0032): sharded is the default, `--exact` opts out. The
+  // engine is selected upstream and handed to us as `args.shards` (length > 1 ⇒
+  // sharded). Drives BOTH the run transport (in-process vs off-process worker)
+  // and the engine-aware checklist labels below. `isTTY` never affects it.
+  const sharded = (args.shards?.length ?? 0) > 1;
 
   useEffect(() => {
     let cancelled = false;
@@ -227,7 +248,6 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
     //
     // Both transports converge on one `LiveGraphOutput` — already crossed the
     // single suppression chokepoint (`buildLiveGraphOutput` → `finalizeGraphSignals`).
-    const sharded = (args.shards?.length ?? 0) > 1;
     const specDir = mkdtempSync(join(tmpdir(), 'graph-worker-'));
     const specPath = join(specDir, 'spec.json');
     writeFileSync(specPath, JSON.stringify({
@@ -256,7 +276,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
               },
               args.shards ?? [],
               datastore,
-              (event) => emit(toProgressEvent(event)),
+              (event) => emit(toProgressEvent(event, true)),
             )
           : runGraphWithProgress(args, datastore, emit),
     });
@@ -364,7 +384,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
   return (
     <Box flexDirection="column">
       {header}
-      <LiveProgress surface={GRAPH_SURFACE} subscribe={state.subscribe} />
+      <LiveProgress surface={graphSurface(sharded)} subscribe={state.subscribe} />
       {state.phase === 'done' && (
         <>
           {args.verbose === true && (
