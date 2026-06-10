@@ -1,79 +1,38 @@
 /**
- * CHARACTERIZATION of the exact-vs-sharded function-set gap (graph-sharded-exact
- * -parity, Phase 0). The two graph build engines discover DIFFERENT file sets,
- * so the sharded catalog is missing functions the exact catalog has. This test
- * reproduces the mechanism on a small fixture and PINS it as an expected-fail
- * (`it.fails`) until Phase 1 unifies discovery. It must NOT change engine code.
+ * PARITY of the exact-vs-sharded function set on the canonical file set
+ * (graph-sharded-exact-parity, Phase 1). Phase 0 characterized the gap as an
+ * expected-fail; Phase 1 unifies discovery on ONE canonical set so both engines
+ * see the identical files. This test now asserts that parity GREEN.
  *
- * ── EMPIRICAL ROOT CAUSE (Task 0.2, measured on THIS repo via
- *    `node scripts/graph-catalog-diff.mjs`) ─────────────────────────────────
+ * ── THE PHASE-1 MODEL ──────────────────────────────────────────────────────
+ * Both engines start from the SAME project-wide root discovery (the root
+ * tsconfig's file set — every `.ts(x)`, fixtures + tests included) and reduce it
+ * via the SINGLE canonical filter (`resolveCanonicalFileSet`, which drops
+ * `__fixtures__/` and KEEPS real test files). The exact engine analyzes that set
+ * directly; the sharded engine PARTITIONS it across unit boundaries via
+ * `partitionFilesIntoShards` (files under no unit → synthetic `:root` shard).
+ * Because the sharded file set is `union(shard.files)` of a total + disjoint
+ * partition of the canonical set, the two engines analyze byte-identical files.
  *
- *   exact   : 15,752 fn occurrences over 1,447 files  (non-module-init)
- *   sharded : 13,537 fn occurrences over 1,134 files
- *   ─────────────────────────────────────────────────────────────────────────
- *   exact_only   : 2,215 occurrences over 313 files
- *   sharded_only :     0 occurrences          ← no visibility/merge artifacts
- *   + module-init: 313 (one synthetic whole-file occurrence per exact-only
- *                  file; the symbol-index dump excludes these)
- *   ≈ TOTAL catalog gap: ~2,528 occurrences  (matches the ~2,700 estimate)
- *
- *   Bucketed cause accounting of the 313 exact_only FILES:
- *     (a) not under any workspace unit's rootDir .................   0 files
- *     (b) under a unit but EXCLUDED by per-unit discovery ........ 313 files
- *           - fixture trees (the __fixtures__ exclude glob) ...... 197 files
- *           - test files (the __tests__ / .test.ts exclude globs)  116 files
- *     (c) duplicate / visibility / merge artifact ...............   0 files
- *     (d) other / unexplained ...................................   0 files
- *
- *   So the discovery-scope hypothesis is CONFIRMED but REFINED: the gap is not
- *   "files outside packages/" (that bucket was empty here) — it is "files under
- *   a package but EXCLUDED by that package's own tsconfig include/exclude."
- *
- * ── WHY (the two discovery paths) ──────────────────────────────────────────
- *
- *   exact   (orchestrate.ts → runGraph): ONE
- *           `adapter.discoverFiles({ cwd: projectRoot })` over the ROOT
- *           tsconfig. The root tsconfig declares no `include`/`exclude`, so
- *           `ts.parseJsonConfigFileContent` defaults to EVERY `.ts(x)` under
- *           the tree — fixtures and tests included.
- *
- *   sharded (graph.ts resolveShards → workspace-units.ts
- *           `discoverTypescriptWorkspaceUnits`): walk `<root>/packages/**` for
- *           dirs with a `tsconfig.json`, then per unit
- *           `adapter.discoverFiles({ cwd: unit.rootDir,
- *           configPathOverride: unit.configPath })`. Per-unit discovery honors
- *           EACH package's own tsconfig, which excludes its __fixtures__ tree
- *           (every check pack) and its __tests__ / .test.ts files
- *           (cli, cli-ui, output, config, session-store). Those files are
- *           therefore in no shard. Files outside the packages tree (root
- *           scripts, .config) would also be dropped — bucket (a) — but this
- *           repo had none in the catalog, so (a) was 0.
+ * ── CANONICAL DECISION (LOCKED, Phase 0) ───────────────────────────────────
+ *   - `__fixtures__/` (synthetic test-input code) is EXCLUDED from both engines.
+ *   - real test files (`*.test.ts`, `__tests__/`) are KEPT in both (needed for
+ *     test-only-reachable + test→production blast/coverage edges).
  *
  * ── FIXTURE (`__fixtures__/function-set-gap/`) ─────────────────────────────
- *   A two-package tree plus a root script, reproducing all three sub-causes:
- *     packages/alpha  — tsconfig excludes the __fixtures__ tree; contains
- *                       `src/index.ts` (kept) + `src/__fixtures__/sample.ts`
- *                       (sharded-dropped — bucket (b) fixture).
- *     packages/beta   — tsconfig excludes __tests__ + .test.ts; contains
- *                       `src/index.ts` (kept) +
- *                       `src/__tests__/index.ts` (sharded-dropped — bucket (b)
- *                       test).
- *     scripts/        — `root-script.ts` outside `packages/**` entirely
- *                       (sharded-never-discovered — bucket (a)).
+ *   packages/alpha — `src/index.ts` (kept) + `src/__fixtures__/sample.ts`
+ *                    (a fixture → EXCLUDED from the canonical set, both engines).
+ *   packages/beta  — `src/index.ts` (kept) + `src/__tests__/index.ts`
+ *                    (a real test file → KEPT in both engines).
+ *   scripts/       — `root-script.ts` outside `packages/**` → under no unit →
+ *                    lands in the synthetic `:root` shard (KEPT in both).
  *
  * ── METHOD ─────────────────────────────────────────────────────────────────
- *   The engine layer may not import the real TypeScript graph adapter
- *   (`@opensip-tools/graph-typescript`). Instead this test exercises the SAME
- *   primitive that adapter's `discoverFiles` uses —
- *   `ts.parseJsonConfigFileContent` — to model the two discovery STRATEGIES
- *   faithfully, then derives a function set from the discovered files (one
- *   subject fn per fixture file). The exact-vs-sharded delta this produces is
- *   the same class of gap measured on the real repo above.
- *
- *   Phase 1 fix: "unified file-set sharding" — partition the FULL exact file
- *   set across shards instead of re-deriving each shard's files from the
- *   package tsconfig. When that lands, the two strategies discover the same
- *   files and these `it.fails` assertions flip to passing; remove `.fails`.
+ *   The engine layer may not import the real TypeScript graph adapter. So the
+ *   root discovery is modeled via `ts.parseJsonConfigFileContent` (the same
+ *   primitive that adapter's `discoverFiles` uses), and the canonical filter +
+ *   partition are the REAL engine primitives under test
+ *   (`resolveCanonicalFileSet`, `partitionFilesIntoShards`).
  */
 
 import { readFileSync } from 'node:fs';
@@ -83,29 +42,26 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+import { resolveCanonicalFileSet } from '../canonical-file-set.js';
+import { partitionFilesIntoShards, ROOT_SHARD_ID } from '../partition-files.js';
+
 const FIXTURE_ROOT = join(
   dirname(fileURLToPath(import.meta.url)),
   '__fixtures__',
   'function-set-gap',
 );
 
-/** Workspace units the sharded path would discover: `<root>/packages/*` dirs with a tsconfig. */
+/** Workspace units the sharded path discovers: `<root>/packages/*` dirs with a tsconfig. */
 const UNIT_DIRS = ['alpha', 'beta'].map((p) => join(FIXTURE_ROOT, 'packages', p));
 
-/** Resolve a tsconfig's file set the way the real TS adapter does. */
-function discoverFilesViaTsconfig(tsconfigPath: string): readonly string[] {
+/** Resolve the ROOT tsconfig's raw file set the way the real TS adapter does. */
+function discoverRootFilesAbs(): readonly string[] {
+  const tsconfigPath = join(FIXTURE_ROOT, 'tsconfig.json');
   const read = ts.readConfigFile(tsconfigPath, (p) => ts.sys.readFile(p));
   if (read.error) throw new Error(`tsconfig read failed: ${tsconfigPath}`);
-  const parsed = ts.parseJsonConfigFileContent(
-    read.config,
-    ts.sys,
-    dirname(tsconfigPath),
-  );
+  const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, dirname(tsconfigPath));
   // Mirror the adapter's source-file filter: .ts(x) only, no declaration files.
-  return parsed.fileNames
-    .filter((f) => /\.tsx?$/.test(f) && !f.endsWith('.d.ts'))
-    .map((f) => toProjectRel(f))
-    .sort();
+  return parsed.fileNames.filter((f) => /\.tsx?$/.test(f) && !f.endsWith('.d.ts')).sort();
 }
 
 function toProjectRel(absFile: string): string {
@@ -114,36 +70,67 @@ function toProjectRel(absFile: string): string {
 }
 
 /**
- * exact discovery: ONE pass over the ROOT tsconfig (whole tree). Models
- * `runGraph`'s single `discoverFiles({ cwd: projectRoot })`.
+ * The canonical filter operates over PROJECT-RELATIVE paths here. In the real
+ * engine the project root is never itself under a `__fixtures__` segment, so the
+ * filter (run on absolute paths) only matches a project's OWN `__fixtures__`
+ * trees. This test's FIXTURE_ROOT, however, lives under the engine package's own
+ * `__tests__/__fixtures__/` — so filtering its absolute paths would
+ * (incorrectly) strip the entire tree. Converting to project-relative paths
+ * first reproduces the engine's semantics faithfully: only the fixture's OWN
+ * inner `src/__fixtures__/` is dropped, not the project root above it.
  */
-function discoverExact(): readonly string[] {
-  return discoverFilesViaTsconfig(join(FIXTURE_ROOT, 'tsconfig.json'));
+function discoverRootFilesRel(): readonly string[] {
+  return discoverRootFilesAbs().map(toProjectRel).sort();
 }
 
 /**
- * sharded discovery: per-workspace-unit, each from its OWN tsconfig. Models
- * `resolveShards` → per-unit `discoverFiles({ cwd: unit.rootDir,
- * configPathOverride: unit.configPath })`. Files outside `packages/**` (the
- * root script) are in no unit and never discovered.
+ * exact engine's canonical set: ONE root discovery → resolveCanonicalFileSet.
+ * Models `runGraph`'s `discoverFiles({ cwd })` + canonical filter (orchestrate.ts).
  */
-function discoverSharded(): readonly string[] {
-  const out = new Set<string>();
-  for (const unit of UNIT_DIRS) {
-    for (const f of discoverFilesViaTsconfig(join(unit, 'tsconfig.json'))) out.add(f);
-  }
-  return [...out].sort();
+function exactCanonical(): readonly string[] {
+  return [...resolveCanonicalFileSet(discoverRootFilesRel())].sort();
 }
 
 /**
- * Derive the function set from a discovered file set. Each fixture source
- * declares exactly one `export function <name>()`; we extract it so the
- * function-set identity (`filePath::name`) is grounded in real file content,
- * mirroring the walk stage's "one occurrence per declared function."
+ * sharded engine's canonical set: the SAME root discovery + canonical filter,
+ * then PARTITIONED across unit boundaries (resolveShards, Phase 1). The sharded
+ * file set is `union(shard.files)`. Models `partitionFilesIntoShards`.
+ *
+ * The partition runs over project-relative paths (units' rootDirs are likewise
+ * project-relative) so the prefix math is self-consistent with the canonical set.
  */
-function functionSetOf(files: readonly string[]): string[] {
+function shardedCanonicalShards(): ReturnType<typeof partitionFilesIntoShards> {
+  const canonicalFiles = resolveCanonicalFileSet(discoverRootFilesRel());
+  return partitionFilesIntoShards({
+    canonicalFiles,
+    units: UNIT_DIRS.map((rootDir) => {
+      const rel = toProjectRel(rootDir);
+      return {
+        id: `pkg:${rel.replace('packages/', '')}`,
+        rootDir: rel,
+        configPathAbs: `${rel}/tsconfig.json`,
+      };
+    }),
+    projectRoot: '',
+    rootConfigPathAbs: 'tsconfig.json',
+  });
+}
+
+function shardedCanonical(): readonly string[] {
+  return shardedCanonicalShards()
+    .flatMap((s) => s.files)
+    .sort();
+}
+
+/**
+ * Derive the function set from a file set. Each fixture source declares exactly
+ * one `export function <name>()`; extracting it grounds the function-set identity
+ * (`filePath::name`) in real content, mirroring the walk's "one occurrence per
+ * declared function."
+ */
+function functionSetOf(filesProjectRel: readonly string[]): string[] {
   const set: string[] = [];
-  for (const rel of files) {
+  for (const rel of filesProjectRel) {
     const text = readFileSync(join(FIXTURE_ROOT, rel), 'utf8');
     const m = /export\s+function\s+([A-Za-z_]\w*)\(/.exec(text);
     if (m?.[1]) set.push(`${rel}::${m[1]}`);
@@ -151,37 +138,45 @@ function functionSetOf(files: readonly string[]): string[] {
   return set.sort();
 }
 
-describe('graph sharded-vs-exact function-set parity (characterization)', () => {
-  // Guard the FIXTURE itself: the gap must actually reproduce, else the
-  // expected-fail below is vacuous. These assert the cause is present.
-  it('the fixture reproduces the discovery-scope gap (sanity)', () => {
-    const exact = discoverExact();
-    const sharded = discoverSharded();
-    const exactOnly = exact.filter((f) => !sharded.includes(f));
-
-    // bucket (b) fixture: alpha's __fixtures__ tree is exact-only.
-    expect(exactOnly).toContain('packages/alpha/src/__fixtures__/sample.ts');
-    // bucket (b) test: beta's __tests__ tree is exact-only.
-    expect(exactOnly).toContain('packages/beta/src/__tests__/index.ts');
-    // bucket (a): the root script outside packages/** is exact-only.
-    expect(exactOnly).toContain('scripts/root-script.ts');
-    // sharded_only must be empty (no visibility/merge artifacts — bucket (c)=0).
-    expect(sharded.filter((f) => !exact.includes(f))).toEqual([]);
+describe('graph sharded-vs-exact function-set parity (canonical set)', () => {
+  it('the partition is total + disjoint over the canonical set', () => {
+    const canonical = [...resolveCanonicalFileSet(discoverRootFilesRel())].sort();
+    const shards = shardedCanonicalShards();
+    const partitioned = shards.flatMap((s) => s.files).sort();
+    // union(shard.files) === canonicalFiles (no file dropped, none invented).
+    expect(partitioned).toEqual(canonical);
+    // disjoint: every file in exactly one shard (no duplicates across shards).
+    expect(new Set(partitioned).size).toBe(partitioned.length);
   });
 
-  // THE GAP — expected-fail until Phase 1 unifies discovery. `it.fails` keeps
-  // the suite GREEN while documenting the defect (vitest forbids `.skip` here).
-  it.fails(
-    'sharded and exact discover the same FILE set [FIXED IN PHASE 1: unified file-set sharding]',
-    () => {
-      expect(discoverSharded()).toEqual(discoverExact());
-    },
-  );
+  it('the root script (under no unit) lands in the synthetic :root shard', () => {
+    const shards = shardedCanonicalShards();
+    const rootShard = shards.find((s) => s.id === ROOT_SHARD_ID);
+    expect(rootShard).toBeDefined();
+    expect(rootShard?.files).toContain('scripts/root-script.ts');
+    // It is anchored at the project root + root tsconfig so it parses correctly.
+    expect(rootShard?.rootDir).toBe('');
+    expect(rootShard?.configPathAbs).toBe('tsconfig.json');
+  });
 
-  it.fails(
-    'sharded and exact produce the same FUNCTION set [FIXED IN PHASE 1: unified file-set sharding]',
-    () => {
-      expect(functionSetOf(discoverSharded())).toEqual(functionSetOf(discoverExact()));
-    },
-  );
+  it('sharded and exact discover the same canonical FILE set', () => {
+    expect(shardedCanonical()).toEqual(exactCanonical());
+  });
+
+  it('sharded and exact produce the same canonical FUNCTION set', () => {
+    expect(functionSetOf(shardedCanonical())).toEqual(functionSetOf(exactCanonical()));
+  });
+
+  it('NEITHER engine includes any /__fixtures__/ path', () => {
+    expect(exactCanonical().some((f) => f.includes('/__fixtures__/'))).toBe(false);
+    expect(shardedCanonical().some((f) => f.includes('/__fixtures__/'))).toBe(false);
+    // The fixture file specifically is gone from both.
+    expect(exactCanonical()).not.toContain('packages/alpha/src/__fixtures__/sample.ts');
+    expect(shardedCanonical()).not.toContain('packages/alpha/src/__fixtures__/sample.ts');
+  });
+
+  it('BOTH engines keep real test files (test → production edges depend on them)', () => {
+    expect(exactCanonical()).toContain('packages/beta/src/__tests__/index.ts');
+    expect(shardedCanonical()).toContain('packages/beta/src/__tests__/index.ts');
+  });
 });
