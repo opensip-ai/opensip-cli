@@ -4,7 +4,9 @@
  * scope-bound rule list, so the tests run inside a graph-extended scope.
  */
 
-import { runWithScopeSync } from '@opensip-tools/core';
+import { tmpdir } from 'node:os';
+
+import { runWithScope, runWithScopeSync } from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
@@ -61,6 +63,10 @@ function signal(over: Partial<Signal> = {}): Signal {
     severity: 'medium',
     filePath: 'src/index.ts',
     line: 4,
+    // `metadata` is part of the Signal contract (createSignal always sets it);
+    // include it so the suppression chokepoint's graphLocate can read it.
+    metadata: {},
+    code: { file: 'src/index.ts', line: 4 },
     ...over,
   } as Signal;
 }
@@ -123,15 +129,18 @@ describe('resolutionBannerText', () => {
 });
 
 describe('buildLiveGraphOutput', () => {
-  it('reduces a build to the slim, serializable { signals, reportLines } payload', () => {
+  it('reduces a build to the slim { signals, suppressedCount, reportLines } payload (crossing the suppression seam)', async () => {
     const catalog = catalogOf([occ()]);
     const indexes = buildIndexes(catalog);
     const signals = [signal()];
-    const out = runWithScopeSync(makeGraphTestScope(), () =>
-      buildLiveGraphOutput({ catalog, indexes, signals, cacheHit: true }),
+    // tmpdir holds no `@graph-ignore` directive file for the signal's code.file,
+    // so the suppression chokepoint reads ENOENT (non-fatal) and keeps the signal.
+    const out = await runWithScope(makeGraphTestScope(), () =>
+      buildLiveGraphOutput({ catalog, indexes, signals, cacheHit: true }, tmpdir()),
     );
-    // The signals pass through verbatim (the parent persists them + derives the verdict).
-    expect(out.signals).toBe(signals);
+    // The (unwaived) signal survives; no waivers applied here.
+    expect(out.signals).toEqual(signals);
+    expect(out.suppressedCount).toBe(0);
     // reportLines are pre-rendered WITHOUT the "== Summary ==" footer — RunSummary
     // renders that in the live view's place (includeSummary: false).
     const text = out.reportLines.join('\n');

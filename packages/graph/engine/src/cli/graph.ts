@@ -43,7 +43,11 @@ import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { resolveRecipeToRules } from '../recipes/resolve.js';
 import { mapOpenSipRuleIdToEngineSlug } from '../render/rule-id-mapping.js';
 
-import { applyGraphSuppressions } from './apply-suppressions.js';
+import {
+  assertFinalizedAcrossBoundary,
+  finalizeGraphSignals,
+  type FinalizedSignals,
+} from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
 import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './graph-report.js';
@@ -430,10 +434,13 @@ async function executeMultiPathGraph(
     // Each path's signals are relative to THAT path's root — so waive them
     // against `p` here, before aggregating. A single post-aggregation pass
     // (the old shape) could only use one base and would leak waivers for every
-    // path but one. Mirrors the single-path `dispatchGraphResult` contract.
-    const { kept, suppressedCount } = await applyGraphSuppressions(r.signals, p);
-    totalSuppressed += suppressedCount;
-    allSignals.push(...kept);
+    // path but one. Each per-path call crosses the single suppression
+    // chokepoint (finalizeGraphSignals); the aggregate is then re-branded once
+    // below via assertFinalizedAcrossBoundary (an assertion that every member
+    // was finalized, NOT a second suppression pass).
+    const finalized = await finalizeGraphSignals(r.signals, p);
+    totalSuppressed += finalized.suppressedCount;
+    allSignals.push(...finalized.signals);
     if (r.catalog !== null) combinedFiles += countFiles(r.catalog);
   }
   // D14: count files across every analyzed path. Zero files + a
@@ -459,8 +466,11 @@ async function executeMultiPathGraph(
   };
   // `allSignals` is already waived per-path (each against its own root), so
   // deliver directly — a second suppression pass would have no single correct
-  // root and risk re-resolving paths under the wrong base.
-  return await deliverGraphResult(opts, combined, cli, startedAt, totalSuppressed);
+  // root and risk re-resolving paths under the wrong base. Re-brand the
+  // aggregate FinalizedSignals (each member already crossed finalizeGraphSignals
+  // above) so deliverGraphResult's persist call gets the type it requires.
+  const finalizedAggregate = assertFinalizedAcrossBoundary(allSignals, totalSuppressed);
+  return await deliverGraphResult(opts, combined, cli, startedAt, finalizedAggregate);
 }
 
 /**
@@ -513,8 +523,13 @@ export async function dispatchGraphResult(
   // resolve under that root. Resolving against `opts.cwd` instead made every
   // `@graph-ignore` directive file unreadable (ENOENT), silently leaking the
   // waiver — the bug this parameter closes.
-  const { kept, suppressedCount } = await applyGraphSuppressions(rawResult.signals, suppressionRoot);
-  return deliverGraphResult(opts, { ...rawResult, signals: kept }, cli, startedAt, suppressedCount);
+  // Route through the SINGLE suppression chokepoint (finalizeGraphSignals) — the
+  // same seam the live/worker producers cross via buildLiveGraphOutput. The
+  // branded FinalizedSignals it returns is the only signal shape persistSession
+  // (and, transitively, the verdict + render) will accept, so a future fourth
+  // output path cannot deliver un-waived signals: the compiler rejects it.
+  const finalized = await finalizeGraphSignals(rawResult.signals, suppressionRoot);
+  return deliverGraphResult(opts, { ...rawResult, signals: finalized.signals }, cli, startedAt, finalized);
 }
 
 /**
@@ -529,8 +544,9 @@ async function deliverGraphResult(
   result: Awaited<ReturnType<typeof runGraph>>,
   cli: ToolCliContext,
   startedAt: string,
-  suppressedCount: number,
+  finalized: FinalizedSignals,
 ): Promise<SignalEnvelope | undefined> {
+  const suppressedCount = finalized.suppressedCount;
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
   if (opts.gateSave === true || opts.gateCompare === true) {
     await runGateMode(opts, result.signals, cli, result.catalog?.resolutionMode);
@@ -552,7 +568,10 @@ async function deliverGraphResult(
   //     history — the root delivers the envelope to the receiver instead).
   const isReportTo = typeof opts.reportTo === 'string' && opts.reportTo.length > 0;
   if (opts.json !== true && !isReportTo) {
-    persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined, durationMs);
+    // Persist the branded FinalizedSignals — persistSession accepts ONLY the
+    // post-finalize type, so the dashboard history can never record un-waived
+    // findings regardless of which output path reached here.
+    persistSession(opts, finalized, cli.scope.datastore() as DataStore | undefined, durationMs);
   }
   cli.setExitCode(EXIT_CODES.SUCCESS);
   logger.info({
@@ -730,20 +749,25 @@ async function executeWorkspaceGraph(
  * Persist one graph session after a non-opt-out run. Exported so the
  * live-view orchestrator (`graph-runner.tsx`) can call it on its own
  * success transition — the dispatch-path orchestrator (`executeGraph`)
- * and the live-view path are parallel today, so both call this
- * directly. A future cleanup should consolidate the post-run
- * finalization into a single shared helper rather than two call sites.
+ * and the live-view path both call this directly.
+ *
+ * Takes the branded {@link FinalizedSignals} (not a raw `Signal[]`): the only
+ * way to obtain one is to cross the single suppression chokepoint
+ * (`finalizeGraphSignals`, or `assertFinalizedAcrossBoundary` after the worker
+ * IPC boundary). This is the compile-time guardrail that makes the TTY-leak bug
+ * un-regressable — a caller that hands raw, un-waived signals here does not
+ * type-check, so the dashboard history can never record un-waived findings.
  */
 export function persistSession(
-  opts: GraphCommandOptions,
-  signals: readonly Signal[],
+  opts: Pick<GraphCommandOptions, 'cwd'>,
+  finalized: FinalizedSignals,
   datastore: DataStore | undefined,
   durationMs: number,
 ): void {
   if (!datastore) return;
   // The single-process path holds the raw engine signals (engine slugs), so
   // the session payload's per-rule keys are engine slugs directly.
-  saveGraphSession(opts, signals, durationMs, datastore);
+  saveGraphSession(opts, finalized.signals, durationMs, datastore);
 }
 
 function persistWorkspaceSession(
@@ -765,7 +789,7 @@ function persistWorkspaceSession(
 }
 
 function saveGraphSession(
-  opts: GraphCommandOptions,
+  opts: Pick<GraphCommandOptions, 'cwd'>,
   signals: readonly Signal[],
   durationMs: number,
   datastore: DataStore,

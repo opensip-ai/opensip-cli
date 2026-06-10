@@ -31,6 +31,78 @@ export interface GraphSuppressionOutcome {
 }
 
 /**
+ * Phantom brand stamped onto a signal set that has crossed the single
+ * suppression chokepoint ({@link finalizeGraphSignals}). It carries no runtime
+ * data — `FINALIZED_BRAND` is a compile-time-only marker — so a `FinalizedSignals`
+ * serializes to a plain `{ signals, suppressedCount }` object across the worker
+ * IPC boundary, yet the type system forbids constructing one anywhere except the
+ * seam below.
+ */
+declare const FINALIZED_BRAND: unique symbol;
+
+/**
+ * The run's signal set AFTER `@graph-ignore` waivers have been applied — the
+ * ONLY signal shape that may be persisted, verdict-computed, or rendered.
+ *
+ * Structural-typing escape hatch closed via the {@link FINALIZED_BRAND} phantom:
+ * a raw `readonly Signal[]` is NOT assignable to `FinalizedSignals`, and the
+ * brand can only be minted by {@link finalizeGraphSignals}. A future fourth
+ * output path therefore CANNOT hand un-waived signals to the persist / verdict /
+ * render functions — the compiler rejects it. This is the structural guardrail
+ * that makes the TTY-leak class of bug (suppression applied on one path only)
+ * un-regressable rather than patched.
+ */
+export interface FinalizedSignals {
+  readonly signals: readonly Signal[];
+  readonly suppressedCount: number;
+  readonly [FINALIZED_BRAND]: true;
+}
+
+/**
+ * THE single suppression/finalize chokepoint. Apply `@graph-ignore` waivers to a
+ * run's raw engine signals and brand the result {@link FinalizedSignals}. Every
+ * output path — the static `dispatchGraphResult` family AND the live-view
+ * in-process + off-process-worker producers (via `buildLiveGraphOutput`) — MUST
+ * route through here; the branded return type is what enforces "one build → one
+ * finalize → many renderers" at compile time.
+ *
+ * `buildRoot` is the directory the signals' project-relative `code.file` paths
+ * are RELATIVE TO (the positional subtree / sharded-child / workspace-unit root,
+ * not necessarily `opts.cwd`). Resolving against the wrong base makes every
+ * directive file unreadable (ENOENT) and silently leaks the waiver — the
+ * `743fab98` class of regression.
+ */
+export async function finalizeGraphSignals(
+  rawSignals: readonly Signal[],
+  buildRoot: string,
+): Promise<FinalizedSignals> {
+  const { kept, suppressedCount } = await applyGraphSuppressions(rawSignals, buildRoot);
+  return brandFinalized(kept, suppressedCount);
+}
+
+/**
+ * Re-establish the {@link FinalizedSignals} brand on a signal set that has
+ * ALREADY crossed {@link finalizeGraphSignals} but lost its phantom brand by
+ * crossing a serialization boundary (the off-process graph worker streams back a
+ * plain `{ signals, suppressedCount }` payload over IPC). This is NOT a second
+ * suppression entry point — it ASSERTS a prior finalize, it does not perform one
+ * — so the "one seam" invariant holds: the worker finalizes once inside itself,
+ * and the parent merely re-stamps the brand the structured-clone dropped.
+ *
+ * @internal
+ */
+export function assertFinalizedAcrossBoundary(
+  signals: readonly Signal[],
+  suppressedCount: number,
+): FinalizedSignals {
+  return brandFinalized(signals, suppressedCount);
+}
+
+function brandFinalized(signals: readonly Signal[], suppressedCount: number): FinalizedSignals {
+  return { signals, suppressedCount } as FinalizedSignals;
+}
+
+/**
  * Apply `@graph-ignore` waivers to a run's signals. `projectRoot` resolves the
  * project-relative `code.file` paths the signals carry.
  *

@@ -16,6 +16,8 @@
 import { inferEntryPoints } from '../rules/_entry-points.js';
 import { currentRules } from '../rules/registry.js';
 
+import { finalizeGraphSignals } from './apply-suppressions.js';
+
 import type { EntryPoint } from '../rules/_entry-points.js';
 import type { Catalog, Indexes } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
@@ -34,24 +36,46 @@ export interface UnifiedReportInput {
  * The serializable live-run output the off-process graph worker streams back to
  * the parent (ADR-0028). A `RunGraphResult` itself can't cross the fork boundary
  * — it carries class instances with methods (the resolution-stats accumulator) +
- * Maps — so the worker (which holds the catalog/indexes) pre-computes the two
- * things the live renderer needs: the run's `signals` (for persistence + the
- * verdict) and the already-built `reportLines`. Both are plain data.
+ * Maps — so the worker (which holds the catalog/indexes) pre-computes the things
+ * the live renderer needs: the run's `signals` (for persistence + the verdict),
+ * the count of waivers applied, and the already-built `reportLines`. All plain
+ * data.
+ *
+ * `signals` here is the POST-`@graph-ignore` waived set. {@link buildLiveGraphOutput}
+ * is the live path's leg of the single suppression chokepoint (it calls
+ * {@link finalizeGraphSignals}), so the live/worker producers and the static
+ * `dispatchGraphResult` path apply IDENTICAL waivers — that is the structural fix
+ * for the TTY-only leak (suppression was previously applied on the static path
+ * only). `reportLines` is rendered from the SAME waived set, so the TTY final
+ * frame and the piped report agree finding-for-finding.
  */
 export interface LiveGraphOutput {
   readonly signals: readonly Signal[];
+  readonly suppressedCount: number;
   readonly reportLines: readonly string[];
 }
 
 /**
- * Derive the serializable {@link LiveGraphOutput} from a completed build. Used by
- * BOTH the off-process worker and the in-process fallback so the live renderer
- * gets an identical payload regardless of where the build ran.
+ * Derive the serializable {@link LiveGraphOutput} from a completed build — the
+ * LIVE path's leg of the single suppression chokepoint. Used by BOTH the
+ * off-process worker and the in-process fallback so the live renderer gets an
+ * identical, already-waived payload regardless of where the build ran.
+ *
+ * `buildRoot` is the directory the signals' project-relative `code.file` paths
+ * resolve against — the same base the static path threads as `suppressionRoot`.
+ * For the bare-`graph` live view this is the project cwd. Both `signals` and the
+ * `reportLines` rendered from them are the WAIVED set, closing the parity gap.
  */
-export function buildLiveGraphOutput(input: UnifiedReportInput): LiveGraphOutput {
+export async function buildLiveGraphOutput(
+  input: UnifiedReportInput,
+  buildRoot: string,
+): Promise<LiveGraphOutput> {
+  const finalized = await finalizeGraphSignals(input.signals, buildRoot);
+  const waivedInput: UnifiedReportInput = { ...input, signals: finalized.signals };
   return {
-    signals: input.signals,
-    reportLines: buildUnifiedReportLines(input, { includeSummary: false }),
+    signals: finalized.signals,
+    suppressedCount: finalized.suppressedCount,
+    reportLines: buildUnifiedReportLines(waivedInput, { includeSummary: false }),
   };
 }
 

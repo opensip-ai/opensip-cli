@@ -67,7 +67,13 @@ export async function executeGraphWorker(specPath: string, cli: ToolCliContext):
     // Send only the serializable slim payload — a RunGraphResult can't cross the
     // fork boundary (class-method accumulators + Maps). The parent persists the
     // signals + renders from reportLines (ADR-0028).
-    send({ kind: 'result', value: buildLiveGraphOutput(result) });
+    //
+    // Suppression runs HERE, inside the worker (ADR-0014): buildLiveGraphOutput
+    // is the single chokepoint, and the worker holds the build root (args.cwd)
+    // plus disk access to read the `@graph-ignore`-directive files. The parent
+    // receives an already-waived LiveGraphOutput — it re-stamps the FinalizedSignals
+    // brand the IPC structured-clone drops, but performs NO second suppression.
+    send({ kind: 'result', value: await buildLiveGraphOutput(result, args.cwd) });
   } catch (error) {
     send({
       kind: 'error',

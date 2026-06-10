@@ -54,6 +54,7 @@ import { runOffThreadOrInProcess, currentScope } from '@opensip-tools/core';
 import { Box, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
+import { assertFinalizedAcrossBoundary } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { STAGE_LABELS, toProgressEvent } from './graph-progress.js';
 import { buildLiveGraphOutput, persistSession, type LiveGraphOutput } from './graph.js';
@@ -163,7 +164,11 @@ async function runGraphWithProgress(
     datastore,
     onProgress: (event) => emit(toProgressEvent(event)),
   });
-  return buildLiveGraphOutput(result);
+  // The interactive live view is whole-project against cwd, so cwd is the build
+  // root the signals' code.file paths resolve against — pass it as the
+  // suppression base so the in-process leg waives `@graph-ignore` identically to
+  // the static path (and to the off-process worker, which uses args.cwd too).
+  return buildLiveGraphOutput(result, args.cwd);
 }
 
 interface GraphRunnerProps {
@@ -212,14 +217,22 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
         }
         if (cancelled) return;
         const durationMs = Date.now() - startedAt;
+        // `result` already crossed the single suppression chokepoint inside the
+        // producer (`buildLiveGraphOutput` → `finalizeGraphSignals`), but the
+        // IPC structured-clone dropped the FinalizedSignals brand. Re-stamp it
+        // here — an assertion of the prior finalize, NOT a second suppression —
+        // so persistSession (and the verdict below, derived from the same set)
+        // consume the branded, already-waived signals. This is the live path's
+        // structural parity with the static `dispatchGraphResult` path.
+        const finalized = assertFinalizedAcrossBoundary(result.signals, result.suppressedCount);
         // Persist exactly one session — matches the contract the dispatch-path
         // orchestrator (`executeGraph` → `persistSession`) enforces, so the
         // dashboard's Code Paths > Sessions sees the interactive run.
-        persistSession({ cwd: args.cwd }, result.signals, datastore, durationMs);
-        // Compute the fit-style summary the cli-ui `RunSummary` renders. The
-        // envelope's verdict applies the fit-aligned per-rule pass rule.
+        persistSession({ cwd: args.cwd }, finalized, datastore, durationMs);
+        // Compute the fit-style summary the cli-ui `RunSummary` renders from the
+        // SAME waived set — so the TTY summary matches the piped report.
         const verdictSummary = buildGraphEnvelope({
-          signals: result.signals,
+          signals: finalized.signals,
           runId: currentScope()?.runId ?? '',
           createdAt: new Date().toISOString(),
         }).verdict.summary;
