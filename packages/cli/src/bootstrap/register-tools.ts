@@ -629,29 +629,44 @@ export async function discoverAndRegisterAuthoredTools(
 ): Promise<void> {
   // Global FIRST (trusted-by-default), then project (deny-by-default).
   for (const candidate of discoverAuthoredToolSidecars(opts.globalAuthoredDir)) {
-    await admitAndRegisterAuthored(
+    await admitAndRegisterAuthored({
       registry,
-      admitUserGlobalTool({ dir: candidate.dir }),
-      candidate.dir,
+      admission: admitUserGlobalTool({ dir: candidate.dir }),
+      dir: candidate.dir,
       builtInIds,
       provenance,
       manifests,
-    );
+    });
   }
   if (opts.projectAuthoredDir !== undefined) {
     for (const candidate of discoverAuthoredToolSidecars(opts.projectAuthoredDir)) {
       // admitProjectLocalTool embeds the deny-by-default trust gate; a
       // non-allowlisted tool THROWS here, BEFORE importToolRuntime below.
-      await admitAndRegisterAuthored(
+      await admitAndRegisterAuthored({
         registry,
-        admitProjectLocalTool({ dir: candidate.dir, env: opts.env }),
-        candidate.dir,
+        admission: admitProjectLocalTool({ dir: candidate.dir, env: opts.env }),
+        dir: candidate.dir,
         builtInIds,
         provenance,
         manifests,
-      );
+      });
     }
   }
+}
+
+/**
+ * The inputs to {@link admitAndRegisterAuthored}: the per-invocation registry +
+ * collectors, the already-resolved admission, and the candidate's directory. A
+ * single params object (rather than a positional list) keeps the register-step
+ * narrow and lets both authored legs call it with one readable record.
+ */
+interface AuthoredRegisterArgs {
+  readonly registry: ToolRegistry;
+  readonly admission: AuthoredAdmission;
+  readonly dir: string;
+  readonly builtInIds: ReadonlySet<string>;
+  readonly provenance: ToolProvenance[];
+  readonly manifests: ToolPluginManifest[];
 }
 
 /**
@@ -666,14 +681,8 @@ export async function discoverAndRegisterAuthoredTools(
  *   load via the plugin path — an authored tool is first-party-intent, so a
  *   load failure is fail-closed (surfaced), never silently skipped.
  */
-async function admitAndRegisterAuthored(
-  registry: ToolRegistry,
-  admission: AuthoredAdmission,
-  dir: string,
-  builtInIds: ReadonlySet<string>,
-  provenance: ToolProvenance[],
-  manifests: ToolPluginManifest[],
-): Promise<void> {
+async function admitAndRegisterAuthored(args: AuthoredRegisterArgs): Promise<void> {
+  const { registry, admission, dir, builtInIds, provenance, manifests } = args;
   const { provenance: prov, manifest } = admission;
   // Never shadow a bundled tool (defense in depth; the registry also dedupes).
   if (builtInIds.has(prov.id)) return;
