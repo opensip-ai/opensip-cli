@@ -164,6 +164,9 @@ function functionCount(catalog: Catalog): number {
  * `diffCatalogs(exact, sharded)` — so `functionsOnlyInA` is exact-only and
  * `functionsOnlyInB` is sharded-only — then partitions the edge differences by
  * owner file (production vs test/fixture).
+ *
+ * @throws {Error} If the exact (single-program) build produces no catalog — the
+ *   target repo must contain analyzable source for the comparison to be meaningful.
  */
 export async function buildEquivalenceReport(
   input: BuildEquivalenceInput,
