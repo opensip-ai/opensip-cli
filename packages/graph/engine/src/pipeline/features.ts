@@ -333,9 +333,14 @@ function buildOccGraph(indexes: Indexes): OccGraph {
  * `crossesPackages` over the members' resolved packages. Irreducible iterative
  * Tarjan (no recursion, to survive deep call graphs) — splitting it would
  * obscure the well-known algorithm.
+ *
+ * Exported so the equivalence diff (`cross-shard-resolve.diffCatalogs`) can run
+ * the SAME occId-keyed SCC computation over both the exact and the sharded
+ * catalog and diff component membership — the Phase-4 cycle-finding gate. There
+ * is exactly one SCC implementation; the diff reuses it rather than reimplement.
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- iterative Tarjan, see above
-function computeSccs(indexes: Indexes): SccFeatures[] {
+export function computeSccs(indexes: Indexes): SccFeatures[] {
   const graph = buildOccGraph(indexes);
   const result: SccFeatures[] = [];
   const index = new Map<string, number>();

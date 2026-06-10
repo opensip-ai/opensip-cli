@@ -33,6 +33,8 @@ import { posix } from 'node:path';
 import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
 import { appendEdge, createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
+import { computeSccs } from '../../pipeline/features.js';
+import { buildIndexes } from '../../pipeline/indexes.js';
 
 import { buildExportIndex, resolveSpecifierToPackage } from './export-index.js';
 
@@ -177,8 +179,7 @@ function sortCalls(calls: readonly CallEdge[]): CallEdge[] {
 }
 
 /** Append one fragment's occurrences into the merged map, deduping by
- *  occurrence identity (bodyHash, filePath, line, column). Extracted to keep
- *  mergeShardFragments flat. */
+ *  (bodyHash, filePath, line). Extracted to keep mergeShardFragments flat. */
 function addFragmentOccurrences(
   frag: Catalog,
   functions: Record<string, FunctionOccurrence[]>,
@@ -410,7 +411,135 @@ function stitchCrossShardEdges(
   return out;
 }
 
-// ── Task 2.3: correctness diff helper (test/validation) ───────────
+// ── Task 2.3 / Phase 3: equivalence diff (test/validation) ────────
+
+/**
+ * The full sharded≡exact equivalence verdict — the Phase-4 gate's currency.
+ * Five partitions, ALL of which MUST be empty for the sharded build to be
+ * byte-equivalent to the single-program build:
+ *
+ *  - `functionsOnlyInA` / `functionsOnlyInB` — symmetric difference of the
+ *    occurrence IDENTITY sets (the function set itself). A non-empty side means
+ *    one engine discovered a function the other did not — a discovery/merge
+ *    divergence, NOT an edge difference. (This is the partition that caught the
+ *    two body-twin arrows the column-less merge dedup dropped; see
+ *    `mergeShardFragments`.)
+ *  - `intraMismatches` / `crossDifferences` — edges whose target set differs,
+ *    partitioned by whether either side is a cross-shard (boundary-linked) edge
+ *    (see {@link CatalogEdgeDiff}).
+ *  - `sccDifferences` — strongly-connected components present in one catalog's
+ *    occId-keyed SCC graph but not the other (by sorted-member signature). SCCs
+ *    drive the `cycle` rule's findings, so an SCC divergence is a gate-visible
+ *    divergence even when every individual edge matches (e.g. a dropped function
+ *    that was a cycle member changes the component).
+ *
+ * `equivalence` ⇔ every partition empty.
+ */
+export interface CatalogEquivalence {
+  readonly functionsOnlyInA: readonly string[];
+  readonly functionsOnlyInB: readonly string[];
+  readonly intraMismatches: readonly string[];
+  readonly crossDifferences: readonly string[];
+  readonly sccDifferences: readonly string[];
+}
+
+/**
+ * Full structural diff of two catalogs: function set + edges + SCCs. The
+ * Phase-4 equivalence gate runs this over (sharded, exact) and asserts every
+ * partition empty. Composes the three orthogonal diffs:
+ *   - `diffFunctionSets` — occurrence-identity symmetric difference;
+ *   - `diffCatalogsByEdge` — the per-edge target diff (intra / cross);
+ *   - `diffSccs` — occId-keyed SCC membership diff (reusing the engine's own
+ *     `computeSccs` over `buildIndexes`, so the gate measures the SAME SCCs the
+ *     `cycle` rule consumes).
+ */
+export function diffCatalogs(a: Catalog, b: Catalog): CatalogEquivalence {
+  const fnDiff = diffFunctionSets(a, b);
+  const edgeDiff = diffCatalogsByEdge(a, b);
+  const sccDifferences = diffSccs(a, b);
+  return {
+    functionsOnlyInA: fnDiff.onlyInA,
+    functionsOnlyInB: fnDiff.onlyInB,
+    intraMismatches: edgeDiff.intraMismatches,
+    crossDifferences: edgeDiff.crossDifferences,
+    sccDifferences,
+  };
+}
+
+/** True when every partition of a {@link CatalogEquivalence} is empty. */
+export function isEquivalent(eq: CatalogEquivalence): boolean {
+  return (
+    eq.functionsOnlyInA.length === 0 &&
+    eq.functionsOnlyInB.length === 0 &&
+    eq.intraMismatches.length === 0 &&
+    eq.crossDifferences.length === 0 &&
+    eq.sccDifferences.length === 0
+  );
+}
+
+/**
+ * Symmetric difference of the two catalogs' OCCURRENCE IDENTITY sets. Identity
+ * is `qualifiedName` when present, else `filePath:line:simpleName` — mirroring
+ * the FunctionOccurrence identity model used by `graph-catalog-diff.mjs` and
+ * the symbol index, so the in-test gate and the repo-scale diagnostic agree.
+ */
+function diffFunctionSets(
+  a: Catalog,
+  b: Catalog,
+): { onlyInA: readonly string[]; onlyInB: readonly string[] } {
+  const idsA = functionIdentities(a);
+  const idsB = functionIdentities(b);
+  const onlyInA = [...idsA].filter((id) => !idsB.has(id)).sort();
+  const onlyInB = [...idsB].filter((id) => !idsA.has(id)).sort();
+  return { onlyInA, onlyInB };
+}
+
+/** The set of occurrence identities (`qualifiedName` ?? `filePath:line:name`). */
+function functionIdentities(catalog: Catalog): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const [name, occs] of Object.entries(catalog.functions)) {
+    if (!occs) continue;
+    for (const o of occs) ids.add(occurrenceIdentity(o, name));
+  }
+  return ids;
+}
+
+function occurrenceIdentity(o: FunctionOccurrence, simpleName: string): string {
+  return o.qualifiedName.length > 0
+    ? o.qualifiedName
+    : `${o.filePath}:${String(o.line)}:${simpleName}`;
+}
+
+/**
+ * Diff the two catalogs' strongly-connected components by SORTED-MEMBER
+ * signature. Each SCC is computed via the engine's canonical `computeSccs`
+ * (occId-keyed Tarjan) over `buildIndexes(catalog)` — the exact same pass the
+ * `cycle` rule's feature column uses — then keyed by its sorted member occIds
+ * joined. The result is the symmetric difference of those signatures: a
+ * component present in one catalog but not the other (a cycle the two engines
+ * disagree on). Singletons are included by `computeSccs` but are stable across
+ * engines once the function set matches, so they don't generate noise; only a
+ * genuine membership divergence surfaces.
+ */
+function diffSccs(a: Catalog, b: Catalog): readonly string[] {
+  const sigA = sccSignatures(a);
+  const sigB = sccSignatures(b);
+  const diff = [
+    ...[...sigA].filter((s) => !sigB.has(s)),
+    ...[...sigB].filter((s) => !sigA.has(s)),
+  ];
+  return [...new Set(diff)].sort();
+}
+
+/** Sorted-member signatures of a catalog's SCCs (the engine's own computation). */
+function sccSignatures(catalog: Catalog): ReadonlySet<string> {
+  const indexes = buildIndexes(catalog);
+  const signatures = new Set<string>();
+  for (const scc of computeSccs(indexes)) {
+    signatures.add([...scc.members].sort().join('|'));
+  }
+  return signatures;
+}
 
 export interface CatalogEdgeDiff {
   /** Intra-shard edges whose target differs between the two catalogs. MUST be
