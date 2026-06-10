@@ -38,6 +38,7 @@ import { currentRules } from '../rules/registry.js';
 
 import { GRAPH_TRACER } from './graph-tracer.js';
 import { obtainCatalog } from './orchestrate/cache-orchestrator.js';
+import { resolveCanonicalFileSet } from './orchestrate/canonical-file-set.js';
 import { createPressureMonitor } from './pressure-monitor.js';
 
 import type {
@@ -201,10 +202,19 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       stage: 'discover',
       onProgress: input.onProgress,
       monitor,
-      fn: () => adapter.discoverFiles({
-        cwd: input.cwd,
-        configPathOverride: input.tsConfigPath,
-      }),
+      // Reduce raw discovery to the CANONICAL file set (Phase 1, parity): the
+      // root tsconfig declares no exclude, so `discoverFiles` returns every
+      // `.ts(x)` — fixtures included. The sharded engine partitions the SAME
+      // canonical set, so both engines parse/walk an identical file set. Real
+      // test files are kept (needed for test-only-reachable + test→prod edges);
+      // only `__fixtures__/` (synthetic test input) is dropped.
+      fn: () => {
+        const raw = adapter.discoverFiles({
+          cwd: input.cwd,
+          configPathOverride: input.tsConfigPath,
+        });
+        return { ...raw, files: resolveCanonicalFileSet(raw.files) };
+      },
       detailFn: (d) => `${String(d.files.length)} files`,
       attrsFn: (d) => ({ 'opensip_tools.graph.file_count': d.files.length }),
     });
