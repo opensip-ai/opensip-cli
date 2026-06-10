@@ -189,16 +189,25 @@ distinct from:
   `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`, fail-closed exit 5 before import) is
   discovered, trust-gated, and routed through the same admit → import → register
   path bundled/installed tools travel. `plugin add --project` stays `installed`
+- [ADR-0032](./ADR-0032-sharded-engine-default.md) — The **sharded** engine is
+  the graph default (proven byte-equivalent to exact by the repo-scale
+  `equivalence-repo-scale` guardrail), and **`--exact` is the opt-out** (the
+  small/single-package/oracle escape hatch). `--sharded` is removed. A bare
+  `graph` shards when the project is shardable and falls back to exact when it
+  isn't; `isTTY` still selects only the renderer, never the engine; the catalog
+  cache key still carries `mode=exact|sharded`. Supersedes ADR-0031's interim
+  exact-as-default, retaining every other ADR-0031 invariant
+
+### Superseded
+
 - [ADR-0031](./ADR-0031-graph-determinism-one-build-one-finalize.md) — Graph
   determinism: one build → one finalize → many renderers. `@graph-ignore`
   suppression runs in a single `finalizeGraphSignals` seam every path must cross
   (enforced by a branded `FinalizedSignals` type — un-suppressed signals fail to
   typecheck at `persistSession`), closing the recurring TTY-only waiver leak. The
-  build engine is chosen deterministically with the **exact** single-program
-  engine as the default; **sharding is opt-in** via `--sharded`; `isTTY` selects
-  only the renderer, never the engine; and the catalog cache key carries
-  `mode=exact|sharded` so the engines never clobber each other
-
-### Superseded
-
-_(none yet)_
+  build engine is chosen deterministically; `isTTY` selects only the renderer,
+  never the engine; and the catalog cache key carries `mode=exact|sharded` so the
+  engines never clobber each other. **Superseded by
+  [ADR-0032](./ADR-0032-sharded-engine-default.md)**, which flips the default
+  engine to sharded and replaces `--sharded` with `--exact` (the suppression seam
+  + renderer-by-TTY + cache-mode invariants carry over unchanged)

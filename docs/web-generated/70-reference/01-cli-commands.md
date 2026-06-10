@@ -200,6 +200,7 @@ opensip-tools graph --language python packages/services/api
 # Other modes
 opensip-tools graph --json
 opensip-tools graph --no-cache
+opensip-tools graph --exact          # force the single-program exact engine (default is the sharded engine)
 opensip-tools graph --gate-save
 opensip-tools graph --gate-compare
 opensip-tools graph --gate-save --sarif graph.sarif   # gate + SARIF 2.1.0 for Code Scanning
@@ -225,7 +226,8 @@ opensip-tools graph --list-files --workspace  # the per-unit fan-out set
 | `--language <name>` | string | — | Force a specific language adapter, suppressing marker-based auto-detection. If the discovered file count is zero, exits with code 2 and the message `--language <name> matched 0 files under <paths>; check the flag or paths.` (D14). |
 | `--json` | bool | `false` | Output the `CommandOutcome` JSON document (envelope under `.envelope`) instead of the unified terminal report. |
 | `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
-| `--resolution <mode>` | string | `exact` | Edge resolution tier: `exact` (semantic, uses the type checker) or `fast` (syntactic, no type checker — ~2× faster cold builds at lower edge fidelity). Invalid values fail loudly at the boundary. |
+| `--exact` | bool | `false` | Use the single-program **exact** build engine instead of the default parallel **sharded** engine. Sharded is the default on shardable (multi-package) repos and is proven byte-equivalent to exact by the repo-scale equivalence guardrail (ADR-0032); `--exact` forces the single-program engine and suits small / single-package repos. A repo that can't shard already uses exact, no flag needed. Engine choice is deterministic and never depends on `isTTY` (a terminal and CI build the same catalog). |
+| `--resolution <mode>` | string | `exact` | Edge resolution tier: `exact` (semantic, uses the type checker) or `fast` (syntactic, no type checker — ~2× faster cold builds at lower edge fidelity). Invalid values fail loudly at the boundary. Note: `--resolution` (edge tier) is orthogonal to `--exact` (build engine). |
 | `--profile <path>` | path | — | Write a graph performance profile JSON artifact with stage timings, run mode, cache verdict, file/function counts, and resolution stats. Relative paths resolve against `--cwd`. |
 | `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph-recipes`. |
 | `--show <session>` | string | — | Replay a stored graph session (by id, or `latest`) instead of building — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
