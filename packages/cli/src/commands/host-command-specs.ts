@@ -34,7 +34,13 @@ import { defineCommand, type ProjectContext } from '@opensip-tools/core';
 
 import { composeAndWriteDashboard } from '../dashboard-compose.js';
 
-import { assembleCompletionInventory, printCompletionScript, type Shell } from './completion.js';
+import {
+  assembleCompletionInventory,
+  printCompletionScript,
+  type GroupLike,
+  type Shell,
+  type SpecLike,
+} from './completion.js';
 import { executeConfigure } from './configure.js';
 import { buildHostSubcommandGroups, type HostSpec } from './host-subcommand-groups.js';
 import { executeInit } from './init.js';
@@ -180,10 +186,19 @@ function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
       // (supplied by the composition root via `ctx.toolCommandSpecs`), the
       // top-level host commands, and the action-less groups. Single source of
       // truth — the emitted script tracks the real command surface.
+      //
+      // The host surface is read via {@link buildHostCompletionSurface}, NOT
+      // `buildTopLevelHostSpecs`: that assembly includes `buildCompletionSpec`,
+      // so calling it from this handler would form a `buildCompletionSpec →
+      // buildTopLevelHostSpecs → buildCompletionSpec` call cycle. The surface
+      // helper derives the same `SpecLike` views WITHOUT rebuilding the
+      // completion spec (it contributes a static, options-free descriptor for
+      // itself), keeping the dependency one-directional.
+      const host = buildHostCompletionSurface(ctx);
       const inventory = assembleCompletionInventory({
         toolSpecs: ctx.toolCommandSpecs ?? [],
-        hostSpecs: buildTopLevelHostSpecs(ctx),
-        groups: buildHostSubcommandGroups(ctx),
+        hostSpecs: host.specs,
+        groups: host.groups,
       });
       printCompletionScript(normalized satisfies Shell, inventory);
     },
@@ -251,8 +266,55 @@ function buildUninstallSpec(): HostSpec {
 // ---------------------------------------------------------------------------
 
 /**
+ * The `completion` command's own completion surface — a static, options-free
+ * `SpecLike`. The command declares `commonFlags: []` and no options (only a
+ * positional `<shell>` arg, which is not a flag), so this descriptor is an
+ * exact, drift-free stand-in for it in the inventory. Hand-declaring it here
+ * (rather than calling `buildCompletionSpec`) is what keeps the completion
+ * handler from depending back on its own builder — breaking the
+ * `buildCompletionSpec → buildTopLevelHostSpecs → buildCompletionSpec` cycle at
+ * the root rather than suppressing it.
+ */
+const COMPLETION_SELF_SPEC: SpecLike = { name: 'completion', commonFlags: [] };
+
+/**
+ * The top-level host specs EXCEPT `completion`. The shared leaf both
+ * {@link buildTopLevelHostSpecs} (which splices the completion spec back in at
+ * its canonical position) and {@link buildHostCompletionSurface} depend on. It
+ * calls neither {@link buildCompletionSpec} nor `buildTopLevelHostSpecs`, so
+ * neither caller can form a call cycle back through the completion handler.
+ */
+function buildNonCompletionHostSpecs(ctx: CliCommandsContext): readonly HostSpec[] {
+  return [buildInitSpec(ctx), buildDashboardSpec(), buildConfigureSpec(), buildUninstallSpec()];
+}
+
+/**
+ * The host portion of the completion inventory: the `SpecLike` views of every
+ * top-level host command and the action-less groups. The completion command's
+ * own surface is the static {@link COMPLETION_SELF_SPEC} stand-in; every OTHER
+ * host command is read from its live spec (so its flags can't drift). Consumed
+ * by the `completion` handler INSTEAD of {@link buildTopLevelHostSpecs}, so the
+ * handler never depends back on {@link buildCompletionSpec}.
+ *
+ * Order is irrelevant here — the inventory subcommand list is sorted — so the
+ * static completion descriptor is simply appended.
+ */
+function buildHostCompletionSurface(ctx: CliCommandsContext): {
+  readonly specs: readonly SpecLike[];
+  readonly groups: readonly GroupLike[];
+} {
+  return {
+    specs: [...buildNonCompletionHostSpecs(ctx), COMPLETION_SELF_SPEC],
+    groups: buildHostSubcommandGroups(ctx),
+  };
+}
+
+/**
  * Build the top-level (non-grouped) host command specs. Exported so tests can
- * inspect the host command surface that the host mounts (single source).
+ * inspect the host command surface that the host mounts (single source). The
+ * `completion` spec keeps its canonical position (after `configure`, before
+ * `uninstall`) so the mounted command order — and thus `--help` ordering — is
+ * byte-identical to before the cycle-breaking split.
  */
 export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSpec[] {
   return [
