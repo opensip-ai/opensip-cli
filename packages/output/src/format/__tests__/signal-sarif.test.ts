@@ -111,13 +111,31 @@ describe('formatSignalSarif', () => {
       signals: [
         // A whole-line finding reports column 0 ("no specific column"). SARIF
         // rejects 0, so the column is dropped, leaving a valid line-only region.
-        { ...FIXTURE_ENVELOPE.signals[0], code: undefined, filePath: 'src/zero-col.ts', line: 23, column: 0 },
+        {
+          ...FIXTURE_ENVELOPE.signals[0],
+          code: undefined,
+          filePath: 'src/zero-col.ts',
+          line: 23,
+          column: 0,
+        },
         // Both coordinates < 1 → the whole region is omitted.
-        { ...FIXTURE_ENVELOPE.signals[1], code: undefined, filePath: 'src/none.ts', line: 0, column: 0 },
+        {
+          ...FIXTURE_ENVELOPE.signals[1],
+          code: undefined,
+          filePath: 'src/none.ts',
+          line: 0,
+          column: 0,
+        },
       ],
     };
     const parsed = JSON.parse(formatSignalSarif(env)) as {
-      runs: { results: { locations: { physicalLocation: { region?: { startLine?: number; startColumn?: number } } }[] }[] }[];
+      runs: {
+        results: {
+          locations: {
+            physicalLocation: { region?: { startLine?: number; startColumn?: number } };
+          }[];
+        }[];
+      }[];
     };
     const [r0, r1] = parsed.runs[0].results;
     expect(r0.locations[0].physicalLocation.region).toEqual({ startLine: 23 });

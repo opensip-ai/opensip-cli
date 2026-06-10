@@ -10,10 +10,7 @@
  */
 
 import { stampEngineVersion } from '../../cache/engine-version.js';
-import {
-  classifyCatalog,
-  computeFilesFingerprint,
-} from '../../cache/invalidate.js';
+import { classifyCatalog, computeFilesFingerprint } from '../../cache/invalidate.js';
 
 import {
   buildAndResolveCatalog,
