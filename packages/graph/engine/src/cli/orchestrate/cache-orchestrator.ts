@@ -10,15 +10,17 @@
  */
 
 import { stampEngineVersion } from '../../cache/engine-version.js';
-import { classifyCatalog, computeFilesFingerprint } from '../../cache/invalidate.js';
-import { assignPackages } from '../../pipeline/assign-packages.js';
-import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
+import {
+  classifyCatalog,
+  computeFilesFingerprint,
+} from '../../cache/invalidate.js';
 
 import {
   buildAndResolveCatalog,
   buildAndResolveCatalogIncremental,
   type RunStage,
 } from './catalog-builder.js';
+import { stampAndConstrainPackages } from './cross-shard-resolve.js';
 
 import type { GraphProgressCallback } from './types.js';
 import type { DiscoverOutput, GraphLanguageAdapter } from '../../lang-adapter/types.js';
@@ -104,14 +106,13 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
   // Stamp packages (nearest package.json), then drop name-guessed edges that
   // contradict the import graph. Order matters: the constraint reads the
   // stamped `occurrence.package`.
-  const stamped = assignPackages(
+  const catalog: Catalog = stampAndConstrainPackages(
     {
       ...built.catalog,
       filesFingerprint: computeFilesFingerprint(input.discovery.files),
     },
     input.projectRoot,
   );
-  const catalog: Catalog = constrainCrossPackageEdges(stamped);
   if (input.useCache && input.catalogRepo) {
     try {
       input.catalogRepo.replaceAll(catalog);

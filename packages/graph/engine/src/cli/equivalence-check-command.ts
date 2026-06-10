@@ -70,10 +70,14 @@ const BUDGET_NOTE =
 
 /** Read + validate the committed budget. A missing file is a configuration error
  *  (the budget is committed; CI must compare against it), unless --update-budget
- *  is set (then a missing file is seeded). */
+ *  is set (then a missing file is seeded).
+ *  @throws {Error} If the budget file is missing/unreadable, is not valid JSON, or
+ *    does not have the required `{ productionResolvedEdgeDivergences, sccDivergences }`
+ *    numeric shape. */
 function loadBudget(path: string): EquivalenceBudget {
-  const raw = readFileSync(path, 'utf8');
-  const parsed = JSON.parse(raw) as unknown;
+  // Structured-doc load: the budget is a small committed JSON file parsed
+  // immediately — bounded by nature, not a streamed blob.
+  const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
   if (
     typeof parsed !== 'object' ||
     parsed === null ||
@@ -135,6 +139,14 @@ async function buildShardedCatalog(input: {
   return result.catalog;
 }
 
+/**
+ * Run the real-repo sharded≡exact equivalence guardrail and set the process
+ * exit code via `cli.setExitCode`. Never propagates: every error raised in the
+ * body (no CLI entry script, non-shardable repo, a failed catalog build, a
+ * missing/invalid budget) is caught locally and converted to
+ * `EXIT_CODES.RUNTIME_ERROR` — so this function does not throw to its caller.
+ */
+// @fitness-ignore-next-line throws-documentation -- All throws in the body are caught by this function's own try/catch and converted to an exit code; the function never propagates an error to its caller, so a caller-facing @throws tag would be inaccurate.
 export async function executeEquivalenceCheck(
   opts: EquivalenceCheckOptions,
   cli: ToolCliContext,
@@ -178,6 +190,7 @@ export async function executeEquivalenceCheck(
     for (const line of verdict.lines) process.stdout.write(`${line}\n`);
 
     if (opts.updateBudget === true) {
+      // @fitness-ignore-next-line detached-promises -- writeBudget is a synchronous void helper (writeFileSync); there is no promise to await.
       writeBudget(budgetPath, verdict.productionCount, verdict.sccCount);
       process.stdout.write(
         `Wrote budget productionResolvedEdgeDivergences=${String(verdict.productionCount)} ` +
@@ -187,11 +200,13 @@ export async function executeEquivalenceCheck(
       // exit 0 so a maintainer can record the new floor without the (now-stale)
       // budget failing the same invocation.
       cli.setExitCode(EXIT_CODES.SUCCESS);
+      // @fitness-ignore-next-line detached-promises -- logEnd is a synchronous void helper (logger.info); there is no promise to await.
       logEnd(report, verdict, false);
       return;
     }
 
     cli.setExitCode(verdict.failed ? EXIT_CODES.RUNTIME_ERROR : EXIT_CODES.SUCCESS);
+    // @fitness-ignore-next-line detached-promises -- logEnd is a synchronous void helper (logger.info); there is no promise to await.
     logEnd(report, verdict, verdict.failed);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

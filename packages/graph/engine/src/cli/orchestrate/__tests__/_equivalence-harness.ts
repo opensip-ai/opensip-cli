@@ -122,6 +122,7 @@ function bodyHashFor(projectRel: string, name: string): string {
 export function createEquivalenceHarness(config: HarnessConfig): EquivalenceHarness {
   const { fixtureRoot, shards, allFiles } = config;
 
+  // @fitness-ignore-next-line duplicate-utility-functions -- Layer-local path relativizer: the engine layer cannot import graph-typescript's toProjectRel (cross-layer import forbidden by dependency-cruiser); this fixture harness owns its own variant tuned to its absolute-fixture-file input. Same legitimate-distinct-implementation case as normalizeProjectDir/parseProject in the check's DOMAIN_SPECIFIC_FUNCTIONS list.
   const toProjectRel = (absFile: string): string => {
     const rel = relative(fixtureRoot, absFile);
     return sep === '/' ? rel : rel.split(sep).join('/');

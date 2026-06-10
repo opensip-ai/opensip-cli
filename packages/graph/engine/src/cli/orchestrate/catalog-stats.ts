@@ -20,6 +20,7 @@ import type { Catalog } from '../../types.js';
  */
 export function countCatalogFunctions(catalog: Catalog): number {
   let n = 0;
+  // @fitness-ignore-next-line batch-operation-limits -- Pure in-memory summation over an already-materialized catalog map (no IO, no external/unbounded dataset); not a batch operation needing pagination/concurrency limits.
   for (const name of Object.keys(catalog.functions)) {
     const occs = catalog.functions[name];
     if (occs) n += occs.length;

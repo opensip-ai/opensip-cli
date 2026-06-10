@@ -51,7 +51,7 @@ import { describe, expect, it } from 'vitest';
 
 import { diffCatalogs, diffCatalogsByEdge, isEquivalent } from '../cross-shard-resolve.js';
 
-import { createEquivalenceHarness } from './equivalence-harness.js';
+import { createEquivalenceHarness } from './_equivalence-harness.js';
 
 import type { CallEdge, Catalog, FunctionOccurrence } from '../../../types.js';
 import type { Shard } from '../shard-model.js';

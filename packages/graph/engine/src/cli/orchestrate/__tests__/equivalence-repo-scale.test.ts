@@ -57,7 +57,7 @@ import { computeSccs } from '../../../pipeline/features.js';
 import { buildIndexes } from '../../../pipeline/indexes.js';
 import { diffCatalogs, isEquivalent } from '../cross-shard-resolve.js';
 
-import { createEquivalenceHarness } from './equivalence-harness.js';
+import { createEquivalenceHarness } from './_equivalence-harness.js';
 
 import type { Catalog } from '../../../types.js';
 import type { Shard } from '../shard-model.js';
