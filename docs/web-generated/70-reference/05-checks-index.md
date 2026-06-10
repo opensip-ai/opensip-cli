@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-09
+last_verified: 2026-06-10
 release: v3.0.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -20,17 +20,17 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **167+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **168+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(109 checks)*
+## Universal  *(110 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(29)*
+### Architecture  *(30)*
 
 | Slug | Description |
 |---|---|
@@ -47,6 +47,7 @@ Language-agnostic; runs against every project.
 | [`heavy-import-detection`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/heavy-import-detection.ts) | Detects heavy/deprecated library imports and excessive named imports that bloat bundle size |
 | [`interface-implementation-consistency`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/modules/interface-implementation-consistency.ts) | Verifies interfaces match their implementations |
 | [`live-runs-off-thread`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/live-runs-off-thread.ts) | Live runners drive the engine off the main process; worker entries stay persistence-free (ADR-0028) |
+| [`no-bodyhash-keying-outside-identity`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-bodyhash-keying-outside-identity.ts) | The graph cross-shard merge must key/stitch edges through ownerEdgeKey in cli/orchestrate/edge-identity.ts, never by a bare bodyHash/ownerHash (ADR-0003) |
 | [`no-config-loader-outside-config`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-config-loader-outside-config.ts) | A tool-agnostic config block (cli/targets/globalExcludes/checkOverrides/dashboard) must be parsed only in @opensip-tools/config, not hand-rolled elsewhere (ADR-0023) |
 | [`no-custom-event-emitter`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-custom-event-emitter.ts) | Detects direct EventEmitter usage that should use infrastructure/events |
 | [`no-direct-stdout-in-tool-engine`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts) | Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011) |
