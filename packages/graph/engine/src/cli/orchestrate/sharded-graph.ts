@@ -31,6 +31,7 @@ import { buildPackageManifestIndex } from './export-index.js';
 import { planShardWork, runShardsInParallel } from './shard-runner.js';
 
 import type { Shard } from './shard-model.js';
+import type { GraphProgressCallback, GraphStage } from './types.js';
 import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
 import type {
@@ -69,6 +70,21 @@ export interface RunShardedInput {
    * the rule set's `featureDeps`.
    */
   readonly emitFeatures?: readonly FeatureColumn[];
+  /**
+   * Optional structured progress callback (ADR-0032). The sharded build maps its
+   * work onto the SAME seven canonical {@link GraphStage}s the single-program
+   * (`runGraph`) path emits, so the live renderer (`graph-runner.tsx`) shows the
+   * identical "Code Graph" checklist for the sharded default and `--exact`:
+   *   - `discover` — total file count across all shards
+   *   - `parse`    — the parallel shard phase (sub-label: shard count)
+   *   - `walk`     — merge the per-shard fragments into the unified catalog
+   *   - `resolve`  — recover cross-package edges across shard boundaries
+   *   - `index`    — derive reverse indexes over the merged catalog
+   *   - `features` — derive the feature columns
+   *   - `rules`    — evaluate the rule set
+   * Non-interactive callers (json/gate/report) leave it undefined — a no-op.
+   */
+  readonly onProgress?: GraphProgressCallback;
 }
 
 /**
@@ -107,6 +123,7 @@ export async function runShardedGraph(input: RunShardedInput): Promise<RunSharde
 
 async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<RunShardedResult> {
   const { shards, projectRoot, cliScript, adapter, resolutionMode, useCache, catalogRepo } = input;
+  const onProgress = input.onProgress;
 
   // 0. Fail loud on duplicate shard ids. The shard id is the per-shard
   //    fragment-cache PRIMARY KEY (`graph_shard_fragment.shard_id`); two shards
@@ -119,10 +136,21 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   // @fitness-ignore-next-line detached-promises -- assertUniqueShardIds is a synchronous void assertion (throws on a duplicate id); there is no promise to await.
   assertUniqueShardIds(shards);
 
-  // 1. Decide which shards can be reused from cache vs must be rebuilt.
-  const plan = planShardWork(shards, catalogRepo, adapter, resolutionMode, useCache);
+  // The seven canonical stages, mapped onto the sharded work so the live view
+  // shows the same "Code Graph" checklist as the exact engine (ADR-0032). The
+  // file set is fixed before any phase runs (shards are pre-enumerated), so the
+  // `discover` stage is a zero-cost report of the partitioned total.
+  const allFiles = shards.flatMap((s) => s.files);
+  emitStageStart(onProgress, 'discover');
+  emitStage(onProgress, 'discover', 0, `${String(allFiles.length)} files`);
 
-  // 2. Build the changed shards in parallel worker processes.
+  // 1. Decide which shards can be reused from cache vs must be rebuilt, then
+  //    2. build the changed shards in parallel worker processes. Both fold into
+  //    the `parse` stage (the heavy per-shard parse/walk/resolve runs inside the
+  //    subprocesses) — its sub-label reflects the shard count.
+  const parseStart = Date.now();
+  emitStageStart(onProgress, 'parse');
+  const plan = planShardWork(shards, catalogRepo, adapter, resolutionMode, useCache);
   const built = await runShardsInParallel({
     shards: plan.toBuild,
     projectRoot,
@@ -139,29 +167,53 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
       stderr: failure.stderr.slice(0, 500),
     });
   }
+  const shardWord = shards.length === 1 ? 'shard' : 'shards';
+  emitStage(onProgress, 'parse', Date.now() - parseStart, `${String(shards.length)} ${shardWord}`);
 
-  // 3. Merge cached + freshly-built fragments and recover cross-package edges.
+  // 3a. Merge cached + freshly-built fragments — the `walk` stage. Mirrors the
+  //     single-program walk: it assembles the per-file occurrences into one
+  //     catalog, so its sub-label reports the resulting function count.
   const fragments = [...plan.cached, ...built.fragments];
-  const allFiles = shards.flatMap((s) => s.files);
   // The export linker keys packages by name; build the manifest index once from
   // the resolved shard set (each shard.rootDir holds a package.json) so the
   // boundary resolver can turn a bare specifier into a target package group.
   const manifestIndex = buildPackageManifestIndex(shards, projectRoot);
+  const walkStart = Date.now();
+  emitStageStart(onProgress, 'walk');
   const { catalog: merged, boundaryStats } = mergeAndResolveShards(fragments, allFiles, manifestIndex);
   // Stamp each occurrence's package, then drop name-guessed cross-package edges
   // that contradict the import graph — the same correction applied to the
   // single-program path, so the persisted catalog (and the coupling grid) is
   // import-consistent in both build modes.
   const catalog = constrainCrossPackageEdges(assignPackages(merged, projectRoot));
+  emitStage(onProgress, 'walk', Date.now() - walkStart, `${String(countCatalogFunctions(catalog))} functions`);
+
+  // 3b. The cross-shard boundary recovery (already performed inside
+  //     `mergeAndResolveShards` above) is graph's analogue of the single-program
+  //     `resolve` stage — report it with the cross-shard call-site count so the
+  //     checklist row matches the exact engine's "N call site(s)".
+  emitStageStart(onProgress, 'resolve');
+  emitStage(
+    onProgress,
+    'resolve',
+    0,
+    `${String(boundaryStats.totalCallSites)} cross-shard call site(s)`,
+  );
 
   // 4. Derive indexes + features over the unified catalog. Features run once
   //    here on the merged global catalog (not per shard), after merge / before
   //    rules — the same stage order as the single-program path.
+  const indexStart = Date.now();
+  emitStageStart(onProgress, 'index');
   const indexes = buildIndexes(catalog);
+  emitStage(onProgress, 'index', Date.now() - indexStart);
   const ruleSet = input.rules ?? currentRules();
   const config: GraphConfig = input.config ?? {};
   const requestedColumns = unionFeatureDeps(ruleSet, input.emitFeatures);
+  const featuresStart = Date.now();
+  emitStageStart(onProgress, 'features');
   const features = buildFeatures(catalog, indexes, config, requestedColumns);
+  emitStage(onProgress, 'features', Date.now() - featuresStart);
   const persistedFeatures = toPersistedFeatures(features, requestedColumns);
   const persisted = isPersistedFeaturesEmpty(persistedFeatures) ? undefined : persistedFeatures;
   // The catalog persisted (and returned) carries the materialized dashboard
@@ -192,13 +244,15 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   }
 
   // 6. Run rules over the unified catalog, threading the feature table (5th arg).
-  const signals: Signal[] = [];
-  for (const rule of ruleSet) {
-    // Indexed append rather than spread-in-loop — avoids re-allocating the
-    // accumulator on every rule (O(n²)) over a potentially large rule set.
-    const ruleSignals = rule.evaluate(catalog, indexes, config, adapter.ruleHints, features);
-    for (const signal of ruleSignals) signals.push(signal);
-  }
+  const rulesStart = Date.now();
+  emitStageStart(onProgress, 'rules');
+  const signals = evaluateRules(ruleSet, catalog, indexes, config, adapter, features);
+  emitStage(
+    onProgress,
+    'rules',
+    Date.now() - rulesStart,
+    `${String(ruleSet.length)} rule(s), ${String(signals.length)} signal(s)`,
+  );
 
   span.setAttributes({
     'opensip_tools.graph.shards_built': plan.toBuild.length,
@@ -214,6 +268,50 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     failedShardIds: built.failures.map((f) => f.shardId),
     features,
   };
+}
+
+/** Evaluate every rule over the unified catalog, threading the feature table. */
+function evaluateRules(
+  ruleSet: readonly Rule[],
+  catalog: Catalog,
+  indexes: Indexes,
+  config: GraphConfig,
+  adapter: GraphLanguageAdapter,
+  features: FeatureTable,
+): Signal[] {
+  const signals: Signal[] = [];
+  for (const rule of ruleSet) {
+    // Indexed append rather than spread-in-loop — avoids re-allocating the
+    // accumulator on every rule (O(n²)) over a potentially large rule set.
+    const ruleSignals = rule.evaluate(catalog, indexes, config, adapter.ruleHints, features);
+    for (const signal of ruleSignals) signals.push(signal);
+  }
+  return signals;
+}
+
+/** Emit a `stage-start` for `stage` (no-op when no callback). */
+function emitStageStart(onProgress: GraphProgressCallback | undefined, stage: GraphStage): void {
+  onProgress?.({ type: 'stage-start', stage });
+}
+
+/** Emit a `stage-done` for `stage` with its duration + optional checklist detail. */
+function emitStage(
+  onProgress: GraphProgressCallback | undefined,
+  stage: GraphStage,
+  durationMs: number,
+  detail?: string,
+): void {
+  onProgress?.({ type: 'stage-done', stage, durationMs, ...(detail === undefined ? {} : { detail }) });
+}
+
+/** Distinct function occurrences in a catalog — the merged `walk` sub-label count. */
+function countCatalogFunctions(catalog: Catalog): number {
+  let n = 0;
+  for (const name of Object.keys(catalog.functions)) {
+    const occs = catalog.functions[name];
+    if (occs) n += occs.length;
+  }
+  return n;
 }
 
 /**

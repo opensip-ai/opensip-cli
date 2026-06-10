@@ -132,6 +132,42 @@ describe('runShardedGraph', () => {
     expect(out.resolutionStats.totalCallSites).toBe(0);
   });
 
+  it('emits the seven canonical stages onto onProgress (ADR-0032: engine-agnostic live view)', async () => {
+    // The sharded build maps its work onto the SAME stages the single-program
+    // (`runGraph`) path emits, so the live renderer shows one "Code Graph"
+    // checklist for both engines. This pins the order + the discover/parse/walk/
+    // resolve/rules sub-labels the runner surfaces.
+    const events: { type: string; stage: string; detail?: string }[] = [];
+
+    await runShardedGraph({
+      shards: [shard('pkg:a'), shard('pkg:b')],
+      projectRoot: dir,
+      cliScript,
+      adapter,
+      resolutionMode: 'exact',
+      useCache: false,
+      catalogRepo: null,
+      rules: [],
+      onProgress: (e) => events.push({ type: e.type, stage: e.stage, ...(e.detail === undefined ? {} : { detail: e.detail }) }),
+    });
+
+    // Each of the 7 stages fires exactly one start + one done, in canonical order.
+    const stageOrder = ['discover', 'parse', 'walk', 'resolve', 'index', 'features', 'rules'];
+    const dones = events.filter((e) => e.type === 'stage-done').map((e) => e.stage);
+    expect(dones).toEqual(stageOrder);
+    const starts = events.filter((e) => e.type === 'stage-start').map((e) => e.stage);
+    expect(starts).toEqual(stageOrder);
+
+    // The familiar sub-labels carry the sharded work onto the exact checklist.
+    const detailOf = (stage: string): string | undefined =>
+      events.find((e) => e.type === 'stage-done' && e.stage === stage)?.detail;
+    expect(detailOf('discover')).toBe('2 files');
+    expect(detailOf('parse')).toBe('2 shards');
+    expect(detailOf('walk')).toBe('2 functions');
+    expect(detailOf('resolve')).toMatch(/cross-shard call site/);
+    expect(detailOf('rules')).toBe('0 rule(s), 0 signal(s)');
+  });
+
   it('throws (fails loud) when two shards share an id', async () => {
     // Duplicate ids collide on the fragment-cache primary key and silently
     // corrupt the warm-build cache → non-determinism. The orchestrator must
