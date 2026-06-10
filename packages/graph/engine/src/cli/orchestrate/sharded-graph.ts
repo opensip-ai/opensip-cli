@@ -14,6 +14,7 @@
 
 import { logger, ValidationError, withSpanAsync, type Signal, type Span } from '@opensip-tools/core';
 
+import { buildPackageManifestIndex } from '../../cross-package/export-index.js';
 import { assignPackages } from '../../pipeline/assign-packages.js';
 import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
 import { unionFeatureDeps } from '../../pipeline/feature-deps.js';
@@ -27,7 +28,6 @@ import { currentRules } from '../../rules/registry.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
 
 import { mergeAndResolveShards } from './cross-shard-resolve.js';
-import { buildPackageManifestIndex } from './export-index.js';
 import { planShardWork, runShardsInParallel } from './shard-runner.js';
 
 import type { Shard, ShardBuildResult } from './shard-model.js';

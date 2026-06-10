@@ -29,14 +29,16 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { posix, relative, sep } from 'node:path';
+import { posix, relative } from 'node:path';
 
 import { logger } from '@opensip-tools/core';
 
-import { packageOf } from '../../resolve-callee.js';
+import { packageOf } from '../resolve-callee.js';
 
-import type { Shard } from './shard-model.js';
-import type { Catalog, FunctionOccurrence } from '../../types.js';
+import { toPosixPath } from './posix-path.js';
+
+import type { Shard } from '../cli/orchestrate/shard-model.js';
+import type { Catalog, FunctionOccurrence } from '../types.js';
 
 // ── Task 1.1: per-package export symbol index ─────────────────────
 
@@ -74,17 +76,27 @@ export function buildExportIndex(catalog: Catalog): ExportIndex {
     for (const occ of occs) {
       if (occ.visibility !== 'exported') continue;
       const pkg = packageOf(occ.filePath);
-      let byName = index.get(pkg);
-      if (byName === undefined) {
-        byName = new Map<string, FunctionOccurrence[]>();
-        index.set(pkg, byName);
-      }
+      const byName: Map<string, FunctionOccurrence[]> = getOrCreateMap(index, pkg);
       const bucket = byName.get(occ.simpleName);
       if (bucket) bucket.push(occ);
       else byName.set(occ.simpleName, [occ]);
     }
   }
   return index;
+}
+
+/**
+ * Get `outer.get(key)`, creating + inserting a fresh inner `Map` when absent.
+ * A pure single-threaded grouping helper over a local in-memory `Map` (no shared
+ * state) — extracted so the get-then-insert lives behind one typed-`Map`
+ * parameter rather than inline in {@link buildExportIndex}.
+ */
+function getOrCreateMap<K, IK, IV>(outer: Map<K, Map<IK, IV>>, key: K): Map<IK, IV> {
+  const existing = outer.get(key);
+  if (existing !== undefined) return existing;
+  const created = new Map<IK, IV>();
+  outer.set(key, created);
+  return created;
 }
 
 // ── Task 1.2: package-name → package(+exports) manifest index ─────
@@ -120,9 +132,28 @@ export function buildPackageManifestIndex(
   shards: readonly Shard[],
   projectRoot: string,
 ): PackageManifestIndex {
+  return buildPackageManifestIndexFromRoots(
+    shards.map((s) => s.rootDir),
+    projectRoot,
+  );
+}
+
+/**
+ * Build a {@link PackageManifestIndex} from a bare list of package ROOT dirs
+ * (absolute), reading each `<rootDir>/package.json`. The `Shard`-free entry the
+ * single-program (exact) engine uses: it has no `Shard[]` to hand the shard
+ * overload, only the package roots it derived from the catalog. Same best-effort
+ * semantics — a root with no readable/parseable manifest, or a manifest with no
+ * string `name`, is skipped (it won't be specifier-resolvable). First write
+ * wins on a duplicate `name`.
+ */
+export function buildPackageManifestIndexFromRoots(
+  rootDirs: readonly string[],
+  projectRoot: string,
+): PackageManifestIndex {
   const index = new Map<string, PackageManifest>();
-  for (const shard of shards) {
-    const manifest = readManifest(shard.rootDir, projectRoot);
+  for (const rootDir of rootDirs) {
+    const manifest = readManifest(rootDir, projectRoot);
     if (manifest && !index.has(manifest.name)) index.set(manifest.name, manifest);
   }
   return index;
@@ -130,7 +161,7 @@ export function buildPackageManifestIndex(
 
 /** Read + parse one package's `package.json`; `undefined` on any failure. */
 function readManifest(rootDirAbs: string, projectRoot: string): PackageManifest | undefined {
-  const manifestPath = posix.join(toPosix(rootDirAbs), 'package.json');
+  const manifestPath = posix.join(toPosixPath(rootDirAbs), 'package.json');
   let raw: string;
   try {
     raw = readFileSync(manifestPath, 'utf8');
@@ -173,12 +204,7 @@ function readManifest(rootDirAbs: string, projectRoot: string): PackageManifest 
 
 /** Project-relative POSIX dir for a shard's absolute rootDir (the `packageOf` form). */
 function relativeDir(rootDirAbs: string, projectRoot: string): string {
-  return toPosix(relative(projectRoot, rootDirAbs));
-}
-
-/** Normalize OS path separators to POSIX `/` so `packageOf`'s regex matches. */
-function toPosix(p: string): string {
-  return sep === '/' ? p : p.split(sep).join('/');
+  return toPosixPath(relative(projectRoot, rootDirAbs));
 }
 
 /** The outcome of resolving a bare import specifier to a workspace package. */

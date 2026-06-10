@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest';
 
 import { mergeAndResolveShards } from '../cross-shard-resolve.js';
 
+import type { PackageManifestIndex } from '../../../cross-package/export-index.js';
 import type {
   CallEdge,
   Catalog,
@@ -27,7 +28,6 @@ import type {
   FunctionOccurrence,
   ResolutionStats,
 } from '../../../types.js';
-import type { PackageManifestIndex } from '../export-index.js';
 import type { ShardBuildResult } from '../shard-model.js';
 
 function occ(

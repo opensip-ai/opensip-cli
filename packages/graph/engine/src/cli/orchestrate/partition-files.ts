@@ -20,6 +20,8 @@
  * disjoint, which is what makes the merged sharded catalog equal the exact one.
  */
 
+import { toPosixPath } from '../../cross-package/posix-path.js';
+
 import type { Shard } from './shard-model.js';
 
 /** Stable id of the synthetic catch-all shard that owns files under no unit. */
@@ -47,14 +49,6 @@ export interface PartitionInput {
   readonly rootConfigPathAbs?: string;
 }
 
-/** Normalize a path to forward slashes so prefix math is OS-independent. */
-function toPosix(p: string): string {
-  // Always normalize backslashes (not just when `sep` is `\`) so prefix math is
-  // OS-independent and self-consistent with `isFixturePath`'s normalization —
-  // the path source (the adapter) emits native separators, but a stray
-  // backslash from any caller must still collapse to `/`.
-  return p.replaceAll('\\', '/');
-}
 
 /**
  * True when `dir` is a path-prefix of `file` at a SEGMENT boundary — i.e. `file`
@@ -102,13 +96,13 @@ export function partitionFilesIntoShards(input: PartitionInput): Shard[] {
   const { canonicalFiles, units, projectRoot, rootConfigPathAbs } = input;
 
   // Pre-normalize unit rootDirs once; index by id to accumulate file buckets.
-  const normUnits: NormUnit[] = units.map((u) => ({ unit: u, rootPosix: toPosix(u.rootDir) }));
+  const normUnits: NormUnit[] = units.map((u) => ({ unit: u, rootPosix: toPosixPath(u.rootDir) }));
   const buckets = new Map<string, string[]>();
   for (const u of units) buckets.set(u.id, []);
   const rootBucket: string[] = [];
 
   for (const file of canonicalFiles) {
-    const bestId = longestMatchingUnitId(toPosix(file), normUnits);
+    const bestId = longestMatchingUnitId(toPosixPath(file), normUnits);
     if (bestId === undefined) rootBucket.push(file);
     else buckets.get(bestId)!.push(file);
   }

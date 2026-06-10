@@ -149,6 +149,31 @@ export type { BodyDigest } from './lang-adapter/body-digest.js';
 // `ownerEdgeKey` is public API: the tree-sitter adapter packs consume it to
 // emit owner edges consistently with the engine (part of the adapter contract).
 export { ownerEdgeKey } from './owner-key.js';
+
+// ── Cross-package resolution primitives ────────────────────────────
+//
+// The SINGLE (import specifier + callee name) → unique exported SOURCE
+// occurrence resolution model both graph engines link `@scope/pkg` calls
+// through. The sharded orchestrator's cross-shard linker uses it; the
+// TypeScript adapter's exact resolvers use it too, so the exact engine
+// resolves cross-package calls the SAME way sharded does (binding-required,
+// decline-beats-guess) instead of following the type-checker alias into a
+// bodiless `dist/*.d.ts`. Pure, language-agnostic — part of the adapter
+// contract surface alongside the edge-helpers and body-digest primitives.
+export {
+  buildExportIndex,
+  buildPackageManifestIndex,
+  buildPackageManifestIndexFromRoots,
+  resolveSpecifierToPackage,
+} from './cross-package/export-index.js';
+export type {
+  ExportIndex,
+  PackageManifest,
+  PackageManifestIndex,
+  ResolvedSpecifier,
+} from './cross-package/export-index.js';
+export { resolveCrossPackageCall, linkExported } from './cross-package/resolve.js';
+export type { CrossPackageCallInput } from './cross-package/resolve.js';
 // `buildIndexes` and the individual built-in rule instances are NOT public —
 // they're consumed only by the cross-package rule tests and moved to
 // `@opensip-tools/graph/internal` (rules run via recipes by id). See ADR-0009.

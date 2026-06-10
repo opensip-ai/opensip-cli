@@ -32,14 +32,15 @@ import { posix } from 'node:path';
 
 import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
+import { buildExportIndex } from '../../cross-package/export-index.js';
+import { resolveCrossPackageCall } from '../../cross-package/resolve.js';
 import { appendEdge, createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
 import { computeSccs } from '../../pipeline/features.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
 
-import { buildExportIndex, resolveSpecifierToPackage } from './export-index.js';
 
-import type { ExportIndex, PackageManifestIndex } from './export-index.js';
 import type { ShardBuildResult } from './shard-model.js';
+import type { ExportIndex, PackageManifestIndex } from '../../cross-package/export-index.js';
 import type {
   CallEdge,
   Catalog,
@@ -289,41 +290,15 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
       : { ...base, to: [] };
   }
 
-  // (b)/(c) Bare or workspace specifier → resolve to a package and link by export.
-  if (spec === undefined || spec.length === 0) return { ...base, to: [] };
-  const resolved = resolveSpecifierToPackage(spec, ctx.manifestIndex);
-  if (resolved === undefined) {
-    // No known workspace package (external npm, or unmappable subpath) — decline.
-    return { ...base, to: [] };
-  }
-  const exported = ctx.exportIndex.get(resolved.packageGroup)?.get(bc.calleeName) ?? [];
-  const linked = linkExported(exported, resolved.subpath);
-  return linked === undefined ? { ...base, to: [] } : { ...base, to: [linked.bodyHash] };
-}
-
-/**
- * Choose the single exported occurrence the specifier + name link to, or
- * `undefined` to decline. Exactly one export → it. More than one (same simple
- * name exported from multiple files in the package) → narrow to the lone export
- * whose project-relative file path ends with the addressed subpath; if that
- * does not collapse the set to exactly one, DECLINE rather than guess. Zero
- * exports → decline (name not exported by this package — e.g. a re-export chain
- * the V1 linker does not follow).
- */
-function linkExported(
-  exported: readonly FunctionOccurrence[],
-  subpath: string | undefined,
-): FunctionOccurrence | undefined {
-  if (exported.length === 1) return exported[0];
-  if (exported.length === 0 || subpath === undefined) return undefined;
-  // Subpath is `./rest` addressing a file within the imported package; keep only
-  // exports whose file path matches that subpath stem (extension-insensitive).
-  const stem = stripExt(subpath.replace(/^\.\//, ''));
-  const narrowed = exported.filter((o) => {
-    const fp = stripExt(o.filePath);
-    return fp === stem || fp.endsWith(`/${stem}`) || fp.endsWith(`/${stem}/index`);
+  // (b)/(c) Bare or workspace specifier → resolve to a package and link by export
+  // through the SHARED cross-package resolver the exact adapter also uses.
+  const linked = resolveCrossPackageCall({
+    importSpecifier: spec,
+    calleeName: bc.calleeName,
+    exportIndex: ctx.exportIndex,
+    manifestIndex: ctx.manifestIndex,
   });
-  return narrowed.length === 1 ? narrowed[0] : undefined;
+  return linked === undefined ? { ...base, to: [] } : { ...base, to: [linked.bodyHash] };
 }
 
 /**

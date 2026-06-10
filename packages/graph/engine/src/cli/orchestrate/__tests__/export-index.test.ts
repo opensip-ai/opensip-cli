@@ -19,7 +19,7 @@ import {
   buildExportIndex,
   buildPackageManifestIndex,
   resolveSpecifierToPackage,
-} from '../export-index.js';
+} from '../../../cross-package/export-index.js';
 
 import type { Catalog, FunctionOccurrence, Visibility } from '../../../types.js';
 import type { Shard } from '../shard-model.js';

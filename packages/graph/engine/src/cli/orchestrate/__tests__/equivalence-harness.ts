@@ -21,11 +21,12 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { posix, relative, sep } from 'node:path';
 
+import { buildExportIndex, buildPackageManifestIndex, resolveSpecifierToPackage } from '../../../cross-package/export-index.js';
 import { ownerEdgeKey } from '../../../owner-key.js';
 import { buildAndResolveCatalog } from '../catalog-builder.js';
 import { mergeAndResolveShards } from '../cross-shard-resolve.js';
-import { buildExportIndex, buildPackageManifestIndex, resolveSpecifierToPackage } from '../export-index.js';
 
+import type { PackageManifestIndex } from '../../../cross-package/export-index.js';
 import type {
   CallSiteRecord,
   DiscoverInput,
@@ -45,7 +46,6 @@ import type {
   FunctionOccurrence,
 } from '../../../types.js';
 import type { RunStage } from '../catalog-builder.js';
-import type { PackageManifestIndex } from '../export-index.js';
 import type { Shard, ShardBuildResult } from '../shard-model.js';
 
 // ── parsed-fixture model ──────────────────────────────────────────

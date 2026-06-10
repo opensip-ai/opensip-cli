@@ -33,6 +33,13 @@ const EXPECTED_VALUE_EXPORTS = [
   'appendEdge',
   'builtInGraphRecipes',
   'builtInGraphRecipesByName',
+  // Cross-package resolution primitives — the (import specifier + callee name) →
+  // unique exported SOURCE occurrence model BOTH engines link `@scope/pkg` calls
+  // through (the exact↔sharded convergence contract). Part of the adapter
+  // surface alongside the edge-helpers and body-digest primitives.
+  'buildExportIndex',
+  'buildPackageManifestIndex',
+  'buildPackageManifestIndexFromRoots',
   'createAdapterRegistry',
   'createMutableStats',
   'createRecipeRegistry',
@@ -45,11 +52,14 @@ const EXPECTED_VALUE_EXPORTS = [
   'graphTool',
   'hashBody',
   'isBuiltInGraphRecipe',
+  'linkExported',
   'normalizeWhitespace',
   'ownerEdgeKey',
   'pickAdapter',
   'pushCreationEdge',
+  'resolveCrossPackageCall',
   'resolveRecipeToRules',
+  'resolveSpecifierToPackage',
   'tool',
   'truncateForCallEdge',
 ].sort();

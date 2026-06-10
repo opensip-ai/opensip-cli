@@ -17,8 +17,8 @@ import {
   resolveCrossBoundaryCalls,
 } from '../cross-shard-resolve.js';
 
+import type { PackageManifest, PackageManifestIndex } from '../../../cross-package/export-index.js';
 import type { Catalog, CallEdge, CrossBoundaryCall, FunctionOccurrence } from '../../../types.js';
-import type { PackageManifest, PackageManifestIndex } from '../export-index.js';
 import type { Shard } from '../shard-model.js';
 
 function occ(
