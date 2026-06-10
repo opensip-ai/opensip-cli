@@ -256,6 +256,56 @@ the default). Can't be run from the opensip-tools checkout.
    → flip default to sharded (ADR-0032 supersedes ADR-0031) → tests → validation
    (opensip no-OOM). Resolves items 2 AND 3.
 
+## Edge-divergence reconciliation (2026-06-09/10)
+
+A user asking why the live view said "32333 **cross-shard** call site(s)" uncovered
+that the sharded and exact engines produced different *edge* sets on opensip-tools —
+the "equivalence" shipped in the parity plan was function-set parity + edge/SCC parity
+**only on a synthetic fixture** (the fixture adapter resolved bare specifiers straight
+to source, so it structurally could not model the real `dist/*.d.ts` divergence). The
+repo-scale guardrail gave false confidence.
+
+**Investigation verdict (root-caused):** sharded (the new default) is the *more*
+correct engine. EXACT (`--exact`) had TWO bugs:
+- **Under-resolution:** workspace imports (`@opensip-tools/*`) resolve via Node16 to a
+  package's built `dist/*.d.ts` (bodiless); the exact resolver hashed that signature →
+  bodyHash ≠ source → real cross-package edge dropped (`graph-typescript/.../direct-call.ts`
+  → `find-catalog-entry.ts` → `hash-body.ts`).
+- **Over-resolution:** a whole-catalog same-name scan fallback fabricated phantom edges
+  (`describe`→Vitest global, `getText`→`ts.Node.getText`, `cwd`→`process.cwd`). ~70% of
+  exact-only edges were phantoms. Sharded declined all of these (its linker requires an
+  import binding).
+The earlier "~46k edge gap" alarm was overstated: ~106k of it was empty-`to` placeholder
+edges, not real edges; the genuine resolved-edge difference was ~1–2k.
+
+**Reconciliation (`dfeea8e4`):** hoisted the sharded linker's import-binding/export-index
+resolution to engine core (`graph/engine/src/cross-package/`) and routed the EXACT engine
+through it — fixing both bugs with one shared model (decline-beats-guess preserved).
+Convergence on opensip-tools: intraMismatches 1447→231, exact phantoms 914→87,
+under-resolution 1349→165, **zero new findings**, full gate + fit green. Residual is
+benign + characterized: test-file owners (gate-invisible), ~56 prod re-export chains where
+exact is now *more* correct than sharded's V1 linker (which declines re-exports), and JSX
+positional/body-twin intra picks.
+
+**Label fix (`17a12998`):** the resolve stage now shows engine-agnostic
+"N call site(s)" (no "cross-shard"), counting **resolved** edges (`to.length>0`), not the
+~106k empty-`to` placeholders that were inflating the sharded number. Post-reconciliation
+default ≈ `--exact` (≈41,235 vs 39,538; the ~1.7k gap = the documented re-export residual).
+
+### Still open from this episode
+- **Real-repo equivalence guardrail.** The fixture guardrail is blind to the `dist/.d.ts`
+  divergence (synthetic adapter resolves to source). Replace/augment with a `diffCatalogs`
+  run on a built multi-package fixture (real `dist/*.d.ts`) or opensip-tools itself — run
+  as a dogfood/nightly step (exact ~48s, too slow for the fast PR gate). Without this, an
+  edge-resolution regression won't be caught.
+- **Sharded re-export handling.** Sharded's V1 boundary linker declines re-export chains
+  (`childrenOf`/`nameOf` re-exported by `graph-adapter-common` from `tree-sitter`) — the
+  main remaining prod residual (~56 edges) where exact is now more correct. Teaching the
+  linker to follow re-exports would close most of the ~1.7k resolved-count gap.
+- **Sharded empty-`to` placeholder edges (~106k).** Noise in the persisted catalog (one
+  per unresolved cross-shard call site). Harmless to findings (no target) but inflates the
+  catalog/datastore and the raw edge count; worth pruning before persist.
+
 ### <next occurrence> — template
 - **Observed:** _(command, TTY or pipe, count, session id)_
 - **Found:** _(which defect / new mechanism; file:line)_
