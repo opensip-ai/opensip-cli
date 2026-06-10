@@ -35,7 +35,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ownerEdgeKey } from '../../../owner-key.js';
 import { buildAndResolveCatalog } from '../catalog-builder.js';
-import { diffCatalogsByEdge, mergeAndResolveShards } from '../cross-shard-resolve.js';
+import { diffCatalogs, diffCatalogsByEdge, isEquivalent, mergeAndResolveShards } from '../cross-shard-resolve.js';
 import { buildExportIndex, buildPackageManifestIndex, resolveSpecifierToPackage } from '../export-index.js';
 
 import type {
@@ -76,14 +76,33 @@ const PKG_DIRS = {
   b: join(FIXTURE_ROOT, 'packages', 'b'),
 } as const;
 
-/** Every fixture `.ts` source, absolute, grouped by package. */
+/**
+ * Every fixture `.ts` source, absolute, grouped by package. pkg-a additionally
+ * owns an OUT-OF-`src`-tree file (`scripts/gen.ts`): it lives under packages/a
+ * so the partitioner assigns it to the pkg-a shard, but a `src`-only tsconfig
+ * would exclude it — the canonical-file-set gap Phase 1 closed. The boundary
+ * resolver must still link its cross-package call identically in both engines.
+ */
 const PKG_FILES: Record<keyof typeof PKG_DIRS, readonly string[]> = {
-  a: [join(PKG_DIRS.a, 'src', 'main.ts'), join(PKG_DIRS.a, 'src', 'local.ts')],
+  a: [
+    join(PKG_DIRS.a, 'src', 'main.ts'),
+    join(PKG_DIRS.a, 'src', 'local.ts'),
+    join(PKG_DIRS.a, 'scripts', 'gen.ts'),
+  ],
   foundation: [join(PKG_DIRS.foundation, 'src', 'canonicalize.ts')],
   b: [join(PKG_DIRS.b, 'src', 'util.ts')],
 };
 
-const ALL_FILES: readonly string[] = Object.values(PKG_FILES).flat();
+/**
+ * A ROOT-LEVEL file under NO packages/* unit → the synthetic `:root` shard in
+ * the sharded build. Phase 2 must cover it: a bare workspace import from a root
+ * file (whose `packageOf` is `<unknown>`) must link to the imported package's
+ * unique export, and the `:root` shard's rootDir (which has no package.json)
+ * must not crash the manifest index. Built separately from the package shards.
+ */
+const ROOT_FILES: readonly string[] = [join(FIXTURE_ROOT, 'root-tool.ts')];
+
+const ALL_FILES: readonly string[] = [...Object.values(PKG_FILES).flat(), ...ROOT_FILES];
 
 function toFixtureProjectRel(absFile: string): string {
   const rel = relative(FIXTURE_ROOT, absFile);
@@ -417,11 +436,19 @@ function appendEdge(map: Map<string, CallEdge[]>, owner: string, edge: CallEdge)
   else map.set(owner, [edge]);
 }
 
-/** The three package shards — one per workspace package. */
+/**
+ * The four shards: one per workspace package + the synthetic `:root` shard
+ * (rootDir = FIXTURE_ROOT) that owns root-level files under no package unit.
+ * The root shard's rootDir has NO package.json, so `buildPackageManifestIndex`
+ * skips it (best-effort) — it stays a non-resolvable shard whose files still
+ * merge into the unified catalog and whose bare imports link against the OTHER
+ * packages' manifests. Mirrors `partitionFilesIntoShards` (root shard last).
+ */
 const FIXTURE_SHARDS: readonly Shard[] = [
   { id: 'pkg:a', rootDir: PKG_DIRS.a, files: [...PKG_FILES.a] },
   { id: 'pkg:foundation', rootDir: PKG_DIRS.foundation, files: [...PKG_FILES.foundation] },
   { id: 'pkg:b', rootDir: PKG_DIRS.b, files: [...PKG_FILES.b] },
+  { id: ':root', rootDir: FIXTURE_ROOT, files: [...ROOT_FILES] },
 ];
 
 // ── build the catalog two ways through the real engine ────────────
@@ -477,6 +504,11 @@ function targetsOf(catalog: Catalog): readonly string[] {
   return mainEdges(catalog).flatMap((e) => [...e.to]);
 }
 
+/** Every call edge of a single named occurrence (first occurrence of `name`). */
+function edgesOf(catalog: Catalog, name: string): readonly CallEdge[] {
+  return catalog.functions[name]?.[0]?.calls ?? [];
+}
+
 /** Sorted, deduped set of project-relative file paths present in a catalog. */
 function filesOf(catalog: Catalog): string[] {
   return [...new Set(Object.values(catalog.functions).flat().map((o) => o.filePath))].sort();
@@ -498,10 +530,55 @@ describe('exact-sharding equivalence guardrail', () => {
     expect(diff.crossDifferences).toEqual([]);
   });
 
+  it('is FULLY equivalent — function set + edges + SCCs all empty (Phase 4 gate)', async () => {
+    const singleProgram = await buildSingleProgram();
+    const sharded = await buildSharded();
+
+    const eq = diffCatalogs(sharded, singleProgram);
+    // Function set is byte-identical (the merge-dedup column fix) …
+    expect(eq.functionsOnlyInA).toEqual([]);
+    expect(eq.functionsOnlyInB).toEqual([]);
+    // … edges match on both partitions …
+    expect(eq.intraMismatches).toEqual([]);
+    expect(eq.crossDifferences).toEqual([]);
+    // … and the SCC membership (cycle-finding driver) matches.
+    expect(eq.sccDifferences).toEqual([]);
+    expect(isEquivalent(eq)).toBe(true);
+  });
+
   it('builds the two catalogs over the same project-relative file set', async () => {
     const singleProgram = await buildSingleProgram();
     const sharded = await buildSharded();
     expect(filesOf(sharded)).toEqual(filesOf(singleProgram));
+    // The set includes the root-level file and the out-of-src-tree file.
+    expect(filesOf(sharded)).toContain('root-tool.ts');
+    expect(filesOf(sharded)).toContain('packages/a/scripts/gen.ts');
+  });
+
+  it('links the ROOT-shard file cross-package edge (rootMain → foundation.canonicalize)', async () => {
+    const sharded = await buildSharded();
+    const singleProgram = await buildSingleProgram();
+    // A root-level file (under no packages/* unit, `:root` shard) must link its
+    // bare workspace import to the unique export — the `:root` shard neither
+    // crashes the manifest index nor declines a genuine boundary call.
+    const rootEdge = edgesOf(sharded, 'rootMain').find((e) => e.to.includes(FOUNDATION_CANON));
+    expect(rootEdge?.crossShard).toBe(true);
+    expect(rootEdge?.resolution).toBe('semantic');
+    // And the single-program oracle resolves the SAME edge (no cross-shard flag).
+    expect(edgesOf(singleProgram, 'rootMain').flatMap((e) => [...e.to])).toContain(FOUNDATION_CANON);
+  });
+
+  it('links the OUT-OF-src-tree file cross-package edge (genFixtures → foundation.canonicalize)', async () => {
+    const sharded = await buildSharded();
+    const singleProgram = await buildSingleProgram();
+    // packages/a/scripts/gen.ts is in the pkg-a shard but outside src/ — the
+    // canonical-file-set inclusion gap. Its cross-package call must link in both.
+    const genEdge = edgesOf(sharded, 'genFixtures').find((e) => e.to.includes(FOUNDATION_CANON));
+    expect(genEdge?.crossShard).toBe(true);
+    expect(genEdge?.resolution).toBe('semantic');
+    expect(edgesOf(singleProgram, 'genFixtures').flatMap((e) => [...e.to])).toContain(
+      FOUNDATION_CANON,
+    );
   });
 
   it('keeps the genuine pkg-a → foundation.canonicalize cross-package edge', async () => {
