@@ -192,9 +192,7 @@ function walkFile(
   callSites: CallSiteRecord[],
   dependencySites: DependencySiteRecord[],
 ): void {
-  const filePathProjectRel = relative(projectDirAbs, sourceFile.fileName)
-    .split(sep)
-    .join('/');
+  const filePathProjectRel = relative(projectDirAbs, sourceFile.fileName).split(sep).join('/');
 
   const baseCtx: VisitorContext = {
     sourceFile,
@@ -243,23 +241,26 @@ function walkFile(
       const className = node.name?.text ?? '<anon-class>';
       const childCtx: VisitorContext = { ...ctx, enclosingClass: className };
       // @graph-ignore-next-line graph:cycle -- intentional recursive descent; forEachChild re-enters the visitor (descend)
-      ts.forEachChild(node, (c) => { descend(c, childCtx, childOwnerHash); });
+      ts.forEachChild(node, (c) => {
+        descend(c, childCtx, childOwnerHash);
+      });
       return;
     }
 
-    ts.forEachChild(node, (c) => { descend(c, ctx, childOwnerHash); });
+    ts.forEachChild(node, (c) => {
+      descend(c, ctx, childOwnerHash);
+    });
   }
 
   // SourceFile itself isn't function-shaped or a resolver candidate.
   // Descend its children directly with module-init as the initial
   // owner.
-  ts.forEachChild(sourceFile, (c) => { descend(c, baseCtx, moduleInit.bodyHash); });
+  ts.forEachChild(sourceFile, (c) => {
+    descend(c, baseCtx, moduleInit.bodyHash);
+  });
 }
 
-function record(
-  out: Record<string, FunctionOccurrence[]>,
-  occ: FunctionOccurrence,
-): void {
+function record(out: Record<string, FunctionOccurrence[]>, occ: FunctionOccurrence): void {
   const list = out[occ.simpleName];
   if (list) {
     /* v8 ignore next */
@@ -364,10 +365,31 @@ function isLikelyValueReference(node: ts.Identifier): boolean {
   const parent = node.parent;
   if (!parent) return false;
   if (isStructuralParent(parent)) return false;
+  if (isJsxTagName(node, parent)) return false;
   if (isDeclarationName(node, parent)) return false;
   if (isPropertyOrLabelName(node, parent)) return false;
   if (isCallTargetIdentifier(node, parent)) return false;
   return true;
+}
+
+/**
+ * The identifier IS the tag name of a JSX element (`<Banner/>`, `</Banner>`).
+ * The JSX element node is its own resolver candidate
+ * ({@link isResolverCandidate}) and `resolveJsxElement` owns the edge — so the
+ * tag-name identifier must NOT also be admitted as a standalone value
+ * reference, or the sharded boundary extractor recovers BOTH (element + tag
+ * name) and emits a duplicate cross-package edge at the adjacent column. (Exact
+ * silently drops the redundant value-ref; sharded did not — the source of the
+ * 36 sharded-only column-twin divergences.) A qualified tag (`<A.B/>`) is a
+ * PropertyAccess/QualifiedName and is already excluded by `isStructuralParent`.
+ */
+function isJsxTagName(node: ts.Identifier, parent: ts.Node): boolean {
+  return (
+    (ts.isJsxOpeningElement(parent) ||
+      ts.isJsxSelfClosingElement(parent) ||
+      ts.isJsxClosingElement(parent)) &&
+    parent.tagName === node
+  );
 }
 
 /** Parents that make the identifier a type or import position. */
