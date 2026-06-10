@@ -57,6 +57,13 @@ function catalogOf(...occs: FunctionOccurrence[]): Catalog {
   };
 }
 
+/**
+ * Project root the boundary extractor derives `ownerFile` against. Empty string
+ * resolves to cwd, so `relative('', 'm.ts')` === `'m.ts'` — matching the parsed
+ * snippet's file name (and the test catalog occurrences' `filePath`).
+ */
+const PROJECT_DIR = '';
+
 /** Parse a snippet into a source file with parent pointers set. */
 function parse(source: string): ts.SourceFile {
   return ts.createSourceFile('m.ts', source, ts.ScriptTarget.Latest, true);
@@ -95,12 +102,15 @@ describe('extractBoundaryCalls', () => {
     // another shard).
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
 
-    const out = extractBoundaryCalls(callRecords(sf), catalog);
+    const out = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
     expect(out).toHaveLength(1);
     const [call] = out;
     expect(call?.calleeName).toBe('helper');
     expect(call?.importSpecifier).toBe('./other.js');
     expect(call?.ownerHash).toBe('owner');
+    // Owner file is derived project-relative (matches FunctionOccurrence.filePath)
+    // so the cross-shard merge can key by ownerEdgeKey(ownerHash, ownerFile).
+    expect(call?.ownerFile).toBe('m.ts');
     // `return helper()` — the value is used, not discarded.
     expect(call?.discarded).toBe(false);
     expect(call?.line).toBe(3);
@@ -117,7 +127,7 @@ describe('extractBoundaryCalls', () => {
     ].join('\n'));
     const catalog = catalogOf(occ('run', 'm.ts', 'owner'));
 
-    const [call] = extractBoundaryCalls(callRecords(sf), catalog);
+    const [call] = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
     expect(call?.calleeName).toBe('sideEffect');
     expect(call?.discarded).toBe(true);
   });
@@ -131,7 +141,7 @@ describe('extractBoundaryCalls', () => {
     ].join('\n'));
     const catalog = catalogOf(occ('run', 'm.ts', 'owner'));
 
-    const [call] = extractBoundaryCalls(callRecords(sf), catalog);
+    const [call] = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
     expect(call?.calleeName).toBe('flush');
     expect(call?.discarded).toBe(true);
   });
@@ -146,7 +156,7 @@ describe('extractBoundaryCalls', () => {
     // This time the shard DOES own `helper` → not a boundary call.
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'), occ('helper', 'm.ts', 'h2'));
 
-    const out = extractBoundaryCalls(callRecords(sf), catalog);
+    const out = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
     expect(out).toEqual([]);
   });
 
@@ -161,7 +171,7 @@ describe('extractBoundaryCalls', () => {
     // even though `log`/`notImported` are absent from the catalog.
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
 
-    const out = extractBoundaryCalls(callRecords(sf), catalog);
+    const out = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
     expect(out).toEqual([]);
   });
 
@@ -176,7 +186,7 @@ describe('extractBoundaryCalls', () => {
 
     // `table["dynamic"]()` has no simple callee name → calleeSimpleName
     // returns null → skipped.
-    const out = extractBoundaryCalls(callRecords(sf), catalog);
+    const out = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
     expect(out).toEqual([]);
   });
 
@@ -195,7 +205,7 @@ describe('extractBoundaryCalls', () => {
       childHash: 'child',
     }));
 
-    const out = extractBoundaryCalls(creationRecords, catalog);
+    const out = extractBoundaryCalls(creationRecords, catalog, PROJECT_DIR);
     expect(out).toEqual([]);
   });
 
@@ -211,7 +221,7 @@ describe('extractBoundaryCalls', () => {
     // The callee simple name is `method` (rightmost of `svc.method`), but
     // only `svc` carries an import specifier — `method` does not, so it is
     // not a cross-module candidate and is skipped.
-    const out = extractBoundaryCalls(callRecords(sf), catalog);
+    const out = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
     expect(out).toEqual([]);
   });
 
@@ -222,7 +232,7 @@ describe('extractBoundaryCalls', () => {
     ].join('\n'));
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
 
-    const [call] = extractBoundaryCalls(callRecords(sf), catalog);
+    const [call] = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
     expect(call?.calleeName).toBe('legacy');
     expect(call?.importSpecifier).toBe('./legacy.js');
   });
@@ -235,7 +245,7 @@ describe('extractBoundaryCalls', () => {
     ].join('\n'));
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
 
-    const [call] = extractBoundaryCalls(callRecords(sf), catalog);
+    const [call] = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
     expect(call?.text.length).toBeLessThanOrEqual(80);
     expect(call?.text.endsWith('...')).toBe(true);
   });
@@ -249,7 +259,7 @@ describe('extractBoundaryCalls', () => {
     ].join('\n'));
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
 
-    const out = extractBoundaryCalls(callRecords(sf), catalog);
+    const out = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
     expect(out.map((c) => c.calleeName).sort()).toEqual(['a', 'b']);
     for (const c of out) expect(c.importSpecifier).toBe('./ab.js');
   });

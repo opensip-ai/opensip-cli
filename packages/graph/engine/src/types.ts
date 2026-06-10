@@ -232,6 +232,16 @@ export interface ParseError {
 export interface CrossBoundaryCall {
   /** bodyHash of the enclosing function (an occurrence in this shard's fragment). */
   readonly ownerHash: string;
+  /**
+   * Project-relative file path of the owning occurrence — byte-identical to its
+   * `FunctionOccurrence.filePath` (posix-normalized, as the walk emits it). The
+   * cross-shard merge keys/stitches edges by `ownerEdgeKey(ownerHash, ownerFile)`
+   * — NOT by `ownerHash` alone — so body-twins (identical bodies in different
+   * files) never smear each other's edges (ADR-0003). It is ALSO the directory
+   * the cross-shard linker resolves a relative import specifier against (the
+   * owner's actual file, not a last-writer-wins `bodyHash→file` guess).
+   */
+  readonly ownerFile: string;
   /** Syntactic callee simple name (`foo` in `foo()`, rightmost in `a.b.c()`). */
   readonly calleeName: string;
   /** The raw import specifier the name came from, if imported (`'./x.js'`, `'@scope/pkg'`). */

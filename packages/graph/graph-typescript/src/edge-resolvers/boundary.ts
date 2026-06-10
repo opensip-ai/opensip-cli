@@ -18,6 +18,8 @@
  */
 
 
+import { relative, sep } from 'node:path';
+
 import { isReturnValueDiscarded } from '../edges.js';
 
 import { calleeSimpleName, buildImportSpecifierIndex } from './syntactic.js';
@@ -38,10 +40,14 @@ const TEXT_MAX = 80;
 export function extractBoundaryCalls(
   callSites: readonly CallSiteRecord[],
   catalog: Catalog,
+  projectDirAbs: string,
 ): CrossBoundaryCall[] {
   const out: CrossBoundaryCall[] = [];
   // One import-specifier index per source file, built lazily and cached.
   const specifierIndexBySf = new Map<ts.SourceFile, ReadonlyMap<string, string>>();
+  // Owner-file derivation is per source file; cache it so each boundary call on
+  // the same file doesn't re-run the relative/posix math.
+  const ownerFileBySf = new Map<ts.SourceFile, string>();
 
   for (const r of callSites) {
     if (r.kind !== 'call') continue; // 'creation' edges are always intra-shard
@@ -60,9 +66,19 @@ export function extractBoundaryCalls(
     // Only imported names are cross-module candidates; skip globals/locals.
     if (importSpecifier === undefined) continue;
 
+    let ownerFile = ownerFileBySf.get(r.sourceFile);
+    if (ownerFile === undefined) {
+      // Byte-identical to FunctionOccurrence.filePath (walk.ts) so the merge's
+      // ownerEdgeKey(ownerHash, ownerFile) lookup hits and relative-import
+      // pinning resolves against the owner's REAL directory.
+      ownerFile = relative(projectDirAbs, r.sourceFile.fileName).split(sep).join('/');
+      ownerFileBySf.set(r.sourceFile, ownerFile);
+    }
+
     const pos = positionOf(r.node, r.sourceFile);
     out.push({
       ownerHash: r.ownerHash,
+      ownerFile,
       calleeName: callee.name,
       importSpecifier,
       line: pos.line,

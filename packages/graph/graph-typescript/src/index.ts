@@ -183,7 +183,11 @@ async function resolveCallSitesAdapter(
   // didn't land within this shard's own occurrences. Syntactic and
   // mode-independent, so it runs identically for both tiers.
   if (input.emitBoundaryCalls !== true) return base;
-  const boundaryCalls = extractBoundaryCalls(toTsCallSites(input.callSites), input.catalog);
+  const boundaryCalls = extractBoundaryCalls(
+    toTsCallSites(input.callSites),
+    input.catalog,
+    input.projectDirAbs,
+  );
   return { ...base, boundaryCalls };
 }
 
