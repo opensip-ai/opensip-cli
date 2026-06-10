@@ -292,19 +292,50 @@ positional/body-twin intra picks.
 ~106k empty-`to` placeholders that were inflating the sharded number. Post-reconciliation
 default ≈ `--exact` (≈41,235 vs 39,538; the ~1.7k gap = the documented re-export residual).
 
+### Real-repo equivalence guardrail — BUILT (2026-06-10, commit `10f6fa9c`)
+The blind synthetic fixture guardrail (its adapter resolves bare specifiers straight to
+source, so the engines agreed by construction — it could never model the real
+`dist/.d.ts` divergence) is now backed by a REAL-repo dogfood guardrail:
+- **`graph-equivalence-check` subcommand** + **`pnpm graph:equivalence:ci`** + a CI step
+  ("Graph engine equivalence") after `pnpm build` (real `dist/*.d.ts` present). Builds BOTH
+  engines on opensip-tools, runs `diffCatalogs`, classifies divergence by owner file, and
+  **ratchets** the production resolved-edge divergence against a committed budget
+  (`.config/graph-equivalence-budget.json`). `functionsOnly` must be 0 (hard fail);
+  test/fixture-owned divergences are excluded as benign (gate-invisible).
+- **Regression-catch proven:** temporarily reintroducing the `dist/.d.ts` under-resolution
+  spiked production divergence 204 → 359 → guardrail FAILED (exit 1). The class of bug that
+  silently shipped before is now caught.
+- The synthetic fixture tests stay as fast PR-gate sanity checks; their headers now state
+  they do NOT exercise real `dist/.d.ts` resolution and point to this guardrail.
+
+### ⚠️ KEY FINDING the guardrail surfaced — engines are NOT byte-equivalent on real code
+The committed budget is **204 production resolved-edge divergences + 3 SCC** (functionsOnly
+= 0; exact = sharded = 17,462 functions). The earlier "~56 re-export" estimate was far low.
+Breakdown of the 204:
+- **110 — exact UNDER-resolves cross-package PROPERTY/METHOD calls** (`logger.info(...)`,
+  registry methods on imported objects) that sharded resolves. **NOT fixed by the
+  reconciliation** (`dfeea8e4`), which only fixed direct `import { fn }` calls hitting
+  `dist/.d.ts`. This is the dominant residual and the real open bug.
+- **81 — sharded declines cross-package RE-EXPORT chains** (exact is more correct here).
+- **13 — genuine target disagreement.**
+(Plus ~1,613 unresolved-vs-absent *structural* diffs, informational; SCC 3.)
+So sharded (the default) remains the more-correct engine; `--exact` still under-resolves
+property-access cross-package calls. The guardrail MEASURES + LOCKS this state (catches any
+worsening) — it is a ratchet on an imperfect baseline, not a proof of equivalence.
+
 ### Still open from this episode
-- **Real-repo equivalence guardrail.** The fixture guardrail is blind to the `dist/.d.ts`
-  divergence (synthetic adapter resolves to source). Replace/augment with a `diffCatalogs`
-  run on a built multi-package fixture (real `dist/*.d.ts`) or opensip-tools itself — run
-  as a dogfood/nightly step (exact ~48s, too slow for the fast PR gate). Without this, an
-  edge-resolution regression won't be caught.
-- **Sharded re-export handling.** Sharded's V1 boundary linker declines re-export chains
-  (`childrenOf`/`nameOf` re-exported by `graph-adapter-common` from `tree-sitter`) — the
-  main remaining prod residual (~56 edges) where exact is now more correct. Teaching the
-  linker to follow re-exports would close most of the ~1.7k resolved-count gap.
+- **Exact property-access cross-package under-resolution (the 110).** The dominant residual.
+  A property/method call on an imported object whose type resolves into a workspace
+  `dist/*.d.ts` doesn't link to the source occurrence. The same `dist/.d.ts`→source repoint
+  the direct-call path got (`resolve-decl.ts`) needs extending to the property-access /
+  method-call resolvers. Larger than the direct-call fix; drives the budget toward 0.
+- **Sharded re-export handling (the 81).** Sharded's V1 boundary linker declines re-export
+  chains (`childrenOf`/`nameOf` re-exported by `graph-adapter-common` from `tree-sitter`)
+  where exact is more correct. Teaching the linker to follow re-exports closes this class.
 - **Sharded empty-`to` placeholder edges (~106k).** Noise in the persisted catalog (one
   per unresolved cross-shard call site). Harmless to findings (no target) but inflates the
   catalog/datastore and the raw edge count; worth pruning before persist.
+- As the 110 + 81 are fixed, **tighten `.config/graph-equivalence-budget.json` toward 0**.
 
 ### <next occurrence> — template
 - **Observed:** _(command, TTY or pipe, count, session id)_
