@@ -237,6 +237,15 @@ describe('runShardedGraph', () => {
       });
       expect(second.cacheHit).toBe(true);
       expect(Object.keys(second.catalog.functions).sort()).toEqual(['pkg_a', 'pkg_b']);
+
+      // F4 (Phase 7): the WARM build (fragments served from the REAL
+      // graph_shard_fragment cache, not a second in-memory rebuild) must be
+      // byte-identical to the COLD build, modulo the wall-clock `builtAt`. This
+      // exercises the actual datastore cache path the in-memory equivalence
+      // harness structurally cannot, locking determinism on the real cache.
+      const canon = (c: typeof first.catalog): string =>
+        JSON.stringify({ ...c, builtAt: 'EXCLUDED' });
+      expect(canon(second.catalog)).toBe(canon(first.catalog));
     } finally {
       datastore.close?.();
     }
