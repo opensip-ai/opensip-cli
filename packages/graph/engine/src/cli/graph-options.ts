@@ -66,22 +66,23 @@ export interface GraphCommandOptions {
    */
   readonly workspace?: boolean;
   /**
-   * `--sharded`: opt in to the parallel, memory-isolated SHARDED build
-   * engine (one worker per workspace package / synthetic flat partition,
-   * with a cross-shard edge-recovery pass). Phase 2 determinism (ADR-0031):
-   * the build engine is chosen by THIS explicit flag alone — never by
-   * `process.stdout.isTTY` or on-disk discovery state. A bare `graph` always
-   * uses the EXACT single-program engine (deterministic default); sharding
-   * runs ONLY when this flag is set.
+   * `--exact`: opt OUT of the default parallel SHARDED build engine and use
+   * the single-program EXACT engine instead. Determinism (ADR-0032, superseding
+   * ADR-0031): the build engine is chosen by THIS explicit flag (plus the
+   * project's shardability) — never by `process.stdout.isTTY` or on-disk
+   * discovery state. A bare `graph` uses the SHARDED engine (the default,
+   * proven byte-equivalent to exact by the repo-scale equivalence guardrail);
+   * `--exact` forces the single-program engine.
    *
-   * The sharded engine is faster on very large multi-package repos but its
-   * catalog is an APPROXIMATION of the exact engine's (it can disagree by
-   * thousands of functions on cross-package edges), so it is a deliberate,
-   * opt-in trade of accuracy for speed. Ignored for the whole-`--workspace`
-   * fan-out (which already runs one isolated child process per unit) and for
-   * positional-path / multi-path runs (those always use the exact engine).
+   * The sharded engine is faster on large multi-package repos and — now that
+   * it is proven byte-equivalent to exact — is the authoritative default.
+   * `--exact` is the escape hatch for small/single-package repos (where exact
+   * is the natural path anyway) and the oracle used to verify equivalence.
+   * Sharding is always skipped for the whole-`--workspace` fan-out (which
+   * already runs one isolated child process per unit) and for positional-path /
+   * multi-path runs (those always use the exact engine).
    */
-  readonly sharded?: boolean;
+  readonly exact?: boolean;
   /**
    * `--language <name>`: force a single language adapter. Suppresses
    * marker-based detection. Errors if the name is not registered.

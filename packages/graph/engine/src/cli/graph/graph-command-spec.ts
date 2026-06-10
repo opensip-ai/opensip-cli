@@ -63,7 +63,7 @@ interface GraphCommandOptions {
   apiKey?: string;
   profile?: string;
   workspace?: boolean;
-  sharded?: boolean;
+  exact?: boolean;
   concurrency?: number;
   language?: string;
   verbose?: boolean;
@@ -209,22 +209,24 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
     if (reExecing) return;
   }
 
-  // Phase 2 determinism (ADR-0031): TTY selects only the RENDERER (the Ink
-  // live view vs the static `executeGraph` text/JSON path), NEVER the build
-  // engine. The build engine is chosen downstream by `executeGraph`'s explicit
-  // `--sharded` policy alone, so a bare `graph` builds the identical (exact)
-  // catalog whether run in a terminal or piped.
+  // Determinism (ADR-0032, superseding ADR-0031): TTY selects only the RENDERER
+  // (the Ink live view vs the static `executeGraph` text/JSON path), NEVER the
+  // build engine. The build engine is chosen downstream by `executeGraph`'s
+  // explicit `--exact` policy + shardability alone — never by `isTTY`.
   //
-  // The live view is only eligible for the EXACT-engine default render — the
-  // Ink runner drives the single-program (exact) build, so `--sharded` is
-  // excluded here and routes to the static path (the only path that can drive
-  // the sharded engine). Every other non-rendering mode (json/gate/report/
-  // profile/workspace/positional-paths/language) is excluded too.
+  // The Ink live runner drives the single-program (EXACT) build, so it is only
+  // eligible when the run resolves to the exact engine — i.e. when `--exact` is
+  // set. Sharded is now the default (ADR-0032), so a bare `graph` routes to the
+  // static path (the only path that can drive the sharded engine), in a terminal
+  // or piped. This keeps the engine decoupled from TTY: `--exact` runs exact
+  // (live in a terminal, static when piped) and the default runs sharded
+  // (static, regardless of TTY). Every other non-rendering mode (json/gate/
+  // report/profile/workspace/positional-paths/language) is excluded too.
   const isLiveViewEligible =
     opts.json !== true
     && opts.gateSave !== true
     && opts.gateCompare !== true
-    && opts.sharded !== true
+    && opts.exact === true
     /* v8 ignore next */
     && (typeof opts.reportTo !== 'string' || opts.reportTo.length === 0)
     && (typeof opts.profile !== 'string' || opts.profile.length === 0)
@@ -237,8 +239,9 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
   // In a pipe / CI / redirected run (non-TTY) it would emit garbled or
   // empty frames, so fall through to the static `executeGraph` path, whose
   // `graph-done` result is dual-rendered through the seam (`renderToText`)
-  // — the same report content (and the SAME exact engine), consistent with
-  // the TTY final frame. Only the rendering surface differs by TTY.
+  // — the same report content (and the SAME exact engine, since live view is
+  // only eligible under `--exact`), consistent with the TTY final frame. Only
+  // the rendering surface differs by TTY.
   if (isLiveViewEligible && process.stdout.isTTY === true) {
     await dispatchGraphLiveView(opts, cli, resolution);
     return;
@@ -258,7 +261,7 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
       profileOutput: opts.profile,
       paths,
       workspace: opts.workspace,
-      sharded: opts.sharded,
+      exact: opts.exact,
       concurrency: opts.concurrency,
       language: opts.language,
       verbose: opts.verbose,
@@ -427,15 +430,15 @@ export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineComm
       default: false,
     },
     {
-      flag: '--sharded',
+      flag: '--exact',
       description:
-        'Opt in to the parallel sharded build engine (faster on large multi-package repos; approximate cross-package edges). Default: the exact single-program engine.',
+        'Use the single-program exact build engine instead of the default parallel sharded engine (the sharded default is proven byte-equivalent to exact; --exact suits small/single-package repos).',
       default: false,
     },
     {
       flag: '--concurrency',
       value: '<n>',
-      description: 'Concurrency cap for --workspace and --sharded (default: cpus()-1)',
+      description: 'Concurrency cap for --workspace and the sharded build (default: cpus()-1)',
       parse: (v) => Number.parseInt(v, 10),
     },
     {

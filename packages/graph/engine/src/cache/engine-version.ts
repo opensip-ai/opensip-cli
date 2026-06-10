@@ -39,15 +39,16 @@ const ENGINE_VERSION_PREFIX = 'eng=';
 
 /**
  * The two build engines whose catalogs share the single `graph_catalog`
- * row (id=1). The exact engine (single-program `runGraph`) and the
- * approximate sharded engine produce STRUCTURALLY DIFFERENT catalogs (they
- * disagree by ~2,400 functions on a large repo), so a consumer must never
- * read a catalog built by the engine it did not expect. The mode is folded
- * into the `cacheKey` (below) so a mode switch is a clean, attributable
- * cache miss — never a silent cross-engine read of a clobbered row.
+ * row (id=1). The exact engine (single-program `runGraph`) and the sharded
+ * engine are proven byte-equivalent (ADR-0032's repo-scale guardrail), but
+ * the mode is still folded into the `cacheKey` (below) so a mode switch is a
+ * clean, attributable cache miss rather than a silent cross-engine read of a
+ * row built under different orchestration — keeping the two cache lineages
+ * independent and the invalidate logs diagnosable.
  *
- * Phase 2 (determinism): the default `graph` always uses `'exact'`;
- * `'sharded'` is reached only via the explicit `--sharded` opt-in.
+ * Determinism (ADR-0032, superseding ADR-0031): the default `graph` uses
+ * `'sharded'` when the project is shardable; `'exact'` is reached via the
+ * explicit `--exact` opt-out or when the project isn't shardable.
  */
 export type EngineMode = 'exact' | 'sharded';
 
@@ -58,15 +59,15 @@ const ENGINE_MODE_PREFIX = 'mode=';
  * Prefix an adapter's `cacheKey` with the running engine version AND the
  * build engine mode so (a) a tool upgrade invalidates persisted
  * catalogs/fragments, and (b) the exact and sharded engines — which write
- * the same `graph_catalog` row but produce incompatible catalogs — never
+ * the same `graph_catalog` row — keep independent cache lineages and never
  * read each other's row. Applied at every engine-side cacheKey computation
  * (build-time stamp + both reuse-decision comparisons), so the stamped and
  * compared keys always agree.
  *
- * `mode` defaults to `'exact'` because the single-program path (its only
- * historical caller) IS the exact engine; the sharded path passes
- * `'sharded'` explicitly, including when it derives the merged build-level
- * key from the per-shard keys.
+ * `mode` defaults to `'exact'` because the single-program `runGraph` path IS
+ * the exact engine and stamps the default; the (now-default) sharded path
+ * passes `'sharded'` explicitly, including when it derives the merged
+ * build-level key from the per-shard keys.
  *
  * The result stays an opaque string per the `Catalog.cacheKey` contract;
  * the `eng=<version>|mode=<mode>|` prefix is human-legible in the

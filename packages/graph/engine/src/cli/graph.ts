@@ -110,9 +110,11 @@ export async function executeGraph(
     evt: 'graph.cli.graph.start',
     module: MODULE_GRAPH_CLI,
     cwd: opts.cwd,
-    // Phase 2 observability: which build engine the user requested. The
-    // resolved engine (after shardability) is logged at `graph.cli.graph.engine`.
-    requestedEngine: opts.sharded === true ? 'sharded' : 'exact',
+    // Observability: which build engine the user requested. Sharded is the
+    // default (ADR-0032), so a bare run requests `sharded`; `--exact` opts back
+    // to the single-program engine. The RESOLVED engine (after shardability) is
+    // logged at `graph.cli.graph.engine`.
+    requestedEngine: opts.exact === true ? 'exact' : 'sharded',
   });
   const startedAt = new Date().toISOString();
   const profile = createProfileBuilder(opts, startedAt);
@@ -151,20 +153,21 @@ export async function executeGraph(
     // minCrossPackageDuplicatePackages). Resolved from the original cwd so a
     // positional subtree run still picks up the project-root config.
     const config = loadGraphConfig(opts.cwd);
-    // Phase 2 determinism (ADR-0031): the build engine is chosen by an
-    // explicit, deterministic policy — `--sharded` opts IN to the approximate
-    // parallel engine; everything else uses the EXACT single-program engine.
-    // It is NOT chosen by `process.stdout.isTTY` or on-disk discovery state,
-    // so a bare `graph` builds the same catalog whether run in a terminal,
-    // piped, or under `--gate-*`/`--json`. When `--sharded` is set but the
-    // project can't shard (no worker script, single-unit, discovery failure)
-    // we fall back to the exact engine rather than silently auto-selecting.
+    // Determinism (ADR-0032, superseding ADR-0031): the build engine is chosen
+    // by an explicit, deterministic policy — the SHARDED engine is the DEFAULT
+    // (proven byte-equivalent to exact by the repo-scale equivalence guardrail),
+    // and `--exact` opts OUT to the single-program engine. It is NOT chosen by
+    // `process.stdout.isTTY` or on-disk discovery state, so a bare `graph` builds
+    // the same catalog whether run in a terminal, piped, or under
+    // `--gate-*`/`--json`. When the project can't shard (no worker script,
+    // single-unit, discovery failure) we fall back to the exact engine — the
+    // natural single-package/small-repo path — rather than failing.
     const shards = await resolveEngineShards(opts, cli, positionalPaths);
     logger.info({
       evt: 'graph.cli.graph.engine',
       module: MODULE_GRAPH_CLI,
       mode: shards.length > 1 ? 'sharded' : 'exact',
-      requestedSharded: opts.sharded === true,
+      requestedExact: opts.exact === true,
       shards: shards.length,
       reason: engineSelectionReason(opts, positionalPaths, shards.length > 1),
     });
@@ -201,26 +204,29 @@ export async function executeGraph(
 }
 
 /**
- * Phase 2 engine-selection policy (ADR-0031). Returns the shard set ONLY when
- * the run explicitly opted in via `--sharded` AND the project can actually
- * shard; returns an empty array (→ the EXACT single-program engine) in every
- * other case. The decision is a pure function of the parsed options + the
- * project's shardability — it never reads `process.stdout.isTTY`, so a bare
- * `graph` is deterministic across terminal / pipe / CI invocations.
+ * Engine-selection policy (ADR-0032, superseding ADR-0031). The SHARDED engine
+ * is the DEFAULT — proven byte-equivalent to exact by the repo-scale
+ * equivalence guardrail (`equivalence-repo-scale.test.ts`). Returns the shard
+ * set whenever the project can actually shard (>1 non-empty shard); returns an
+ * empty array (→ the EXACT single-program engine) when `--exact` is passed OR
+ * the project isn't shardable (single-package / flat / discovery failure — the
+ * natural exact fallback). The decision is a pure function of the parsed options
+ * + the project's shardability — it never reads `process.stdout.isTTY`, so a
+ * bare `graph` is deterministic across terminal / pipe / CI invocations.
  *
- * Sharding is suppressed (returns `[]`, exact engine) when:
- *   - `--sharded` was not passed (the deterministic default);
+ * The exact engine is selected (returns `[]`) when:
+ *   - `--exact` was passed (the explicit small-repo / oracle escape hatch);
  *   - positional `[paths...]` were given (subtree/multi-path runs are exact);
  *   - the project resolves to ≤1 non-empty shard (nothing to parallelize) or
- *     no worker script is available — a graceful fall-through to exact rather
- *     than a silent auto-detected catalog.
+ *     no worker script is available — a graceful fall-through to exact, the
+ *     natural single-package path.
  */
 async function resolveEngineShards(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
   positionalPaths: readonly string[],
 ): Promise<Shard[]> {
-  if (opts.sharded !== true) return [];
+  if (opts.exact === true) return [];
   if (positionalPaths.length > 0) return [];
   return resolveShards(opts, cli);
 }
@@ -235,10 +241,10 @@ function engineSelectionReason(
   positionalPaths: readonly string[],
   sharded: boolean,
 ): string {
-  if (sharded) return 'sharded-opt-in';
-  if (opts.sharded === true && positionalPaths.length > 0) return 'sharded-ignored-positional-paths';
-  if (opts.sharded === true) return 'sharded-requested-but-not-shardable';
-  return 'exact-default';
+  if (sharded) return 'sharded-default';
+  if (opts.exact === true) return 'exact-opt-out';
+  if (positionalPaths.length > 0) return 'exact-positional-paths';
+  return 'exact-not-shardable';
 }
 
 /**
@@ -248,8 +254,9 @@ function engineSelectionReason(
  * available to spawn, or when discovery fails. Each unit's file set is
  * enumerated via the graph adapter; partitions with no files are dropped.
  *
- * Phase 2 (ADR-0031): only reached when `--sharded` was explicitly requested
- * (see {@link resolveEngineShards}); it no longer auto-engages on a bare run.
+ * ADR-0032: reached for any run that did NOT pass `--exact` (see
+ * {@link resolveEngineShards}) — sharded is the default. A project that yields
+ * ≤1 non-empty shard falls back to the exact single-program engine naturally.
  */
 async function resolveShards(opts: GraphCommandOptions, cli: ToolCliContext): Promise<Shard[]> {
   const cliScript = opts.cliScript ?? process.argv[1];
