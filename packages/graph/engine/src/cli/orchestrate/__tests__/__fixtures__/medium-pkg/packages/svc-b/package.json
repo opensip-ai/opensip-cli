@@ -1,0 +1,8 @@
+{
+  "name": "@medium/svc-b",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  }
+}

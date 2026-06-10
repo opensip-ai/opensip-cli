@@ -9,6 +9,7 @@
   "include": ["src"],
   "exclude": [
     "src/cli/orchestrate/__fixtures__/multi-pkg/**",
-    "src/cli/orchestrate/__tests__/__fixtures__/function-set-gap/**"
+    "src/cli/orchestrate/__tests__/__fixtures__/function-set-gap/**",
+    "src/cli/orchestrate/__tests__/__fixtures__/medium-pkg/**"
   ]
 }
