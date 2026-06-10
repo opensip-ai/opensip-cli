@@ -374,3 +374,80 @@ describe('resolveCrossBoundaryCalls — semantic export linking (packages/ paths
     expect(crossEdge(catalog)?.to).toEqual([]); // declined — pkg not in manifest index
   });
 });
+
+describe('resolveCrossBoundaryCalls — body-twin keying (F1, ADR-0003)', () => {
+  // Two functions named `twin` with BYTE-IDENTICAL bodies in different packages
+  // → they share a bodyHash ('TWIN'). Each makes its OWN cross-shard call via a
+  // RELATIVE import to a sibling in its OWN package. The corpus the real
+  // equivalence gate runs on happens to contain no cross-shard-calling body
+  // twins, so this is the fixture that locks the keying: keyed by `ownerHash`
+  // alone (the pre-fix scheme), BOTH twins would receive BOTH recovered edges
+  // (smearing) AND the relative pin would resolve against a last-writer-wins
+  // twin's directory. Keyed by ownerEdgeKey(ownerHash, ownerFile), each twin
+  // gets exactly its own edge, pinned against its own directory.
+  const merged = mergeShardFragments(
+    [
+      fragment(
+        'typescript',
+        occ('twin', 'packages/pkg-a/src/twin.ts', 'TWIN'),
+        occ('helperA', 'packages/pkg-a/src/helper.ts', 'HA'),
+      ),
+      fragment(
+        'typescript',
+        occ('twin', 'packages/pkg-b/src/twin.ts', 'TWIN'),
+        occ('helperB', 'packages/pkg-b/src/helper.ts', 'HB'),
+      ),
+    ],
+    [
+      'packages/pkg-a/src/twin.ts',
+      'packages/pkg-a/src/helper.ts',
+      'packages/pkg-b/src/twin.ts',
+      'packages/pkg-b/src/helper.ts',
+    ],
+  );
+
+  // pkg-a's twin calls helperA via './helper.js'; pkg-b's twin calls helperB via
+  // the IDENTICAL specifier './helper.js' — only the ownerFile disambiguates.
+  const bcA: CrossBoundaryCall = {
+    ownerHash: 'TWIN',
+    ownerFile: 'packages/pkg-a/src/twin.ts',
+    calleeName: 'helperA',
+    importSpecifier: './helper.js',
+    line: 2,
+    column: 9,
+    text: 'helperA()',
+  };
+  const bcB: CrossBoundaryCall = {
+    ownerHash: 'TWIN',
+    ownerFile: 'packages/pkg-b/src/twin.ts',
+    calleeName: 'helperB',
+    importSpecifier: './helper.js',
+    line: 2,
+    column: 9,
+    text: 'helperB()',
+  };
+
+  it('routes each body-twin its OWN recovered edge (no smearing)', () => {
+    const { catalog } = resolveCrossBoundaryCalls(merged, [bcA, bcB], EMPTY_MANIFESTS);
+    const twins = catalog.functions.twin ?? [];
+    const twinA = twins.find((o) => o.filePath === 'packages/pkg-a/src/twin.ts');
+    const twinB = twins.find((o) => o.filePath === 'packages/pkg-b/src/twin.ts');
+
+    // Each twin carries EXACTLY its own cross-shard edge — never the other's.
+    expect(twinA?.calls.filter((e) => e.crossShard).flatMap((e) => [...e.to])).toEqual(['HA']);
+    expect(twinB?.calls.filter((e) => e.crossShard).flatMap((e) => [...e.to])).toEqual(['HB']);
+  });
+
+  it('pins each twin\'s relative import against its OWN directory', () => {
+    // Same specifier './helper.js' from both twins must resolve to the helper in
+    // the SAME package as the owner — proving pinBySpecifier uses bc.ownerFile,
+    // not a last-writer-wins bodyHash->file guess.
+    const { catalog } = resolveCrossBoundaryCalls(merged, [bcA, bcB], EMPTY_MANIFESTS);
+    const twins = catalog.functions.twin ?? [];
+    const twinA = twins.find((o) => o.filePath === 'packages/pkg-a/src/twin.ts');
+    const twinB = twins.find((o) => o.filePath === 'packages/pkg-b/src/twin.ts');
+    // HA lives in pkg-a, HB in pkg-b — no crossed wires.
+    expect(twinA?.calls.flatMap((e) => [...e.to])).not.toContain('HB');
+    expect(twinB?.calls.flatMap((e) => [...e.to])).not.toContain('HA');
+  });
+});
