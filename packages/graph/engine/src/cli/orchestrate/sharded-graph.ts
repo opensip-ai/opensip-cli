@@ -30,7 +30,7 @@ import { mergeAndResolveShards } from './cross-shard-resolve.js';
 import { buildPackageManifestIndex } from './export-index.js';
 import { planShardWork, runShardsInParallel } from './shard-runner.js';
 
-import type { Shard } from './shard-model.js';
+import type { Shard, ShardBuildResult } from './shard-model.js';
 import type { GraphProgressCallback, GraphStage } from './types.js';
 import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
@@ -224,29 +224,19 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   //    unified full catalog (with materialized features when requested) so
   //    whole-catalog consumers (incl. the dashboard) still work.
   if (useCache && catalogRepo) {
-    // @fitness-ignore-next-line detached-promises -- CatalogRepo is synchronous (better-sqlite3/Drizzle); upsertShardFragment returns void, not a Promise.
-    for (const fragment of built.fragments) catalogRepo.upsertShardFragment(fragment);
-    // @fitness-ignore-next-line detached-promises -- CatalogRepo is synchronous (better-sqlite3/Drizzle); pruneShardFragmentsExcept returns void, not a Promise.
-    catalogRepo.pruneShardFragmentsExcept(shards.map((s) => s.id));
-    try {
-      catalogRepo.replaceAll(catalogToPersist);
-    } catch (error) {
-      /* v8 ignore next */
-      // Best-effort write: the freshly-built catalog is returned regardless.
-      // replaceAll already logged the underlying error; note the continuation
-      // so the swallow isn't silent.
-      logger.debug({
-        evt: 'graph.sharded.cache_write_skipped',
-        module: 'graph:sharded',
-        err: error instanceof Error ? error.message : String(error),
-      });
-    }
+    persistShardedCatalog(catalogRepo, built.fragments, shards, catalogToPersist);
   }
 
   // 6. Run rules over the unified catalog, threading the feature table (5th arg).
   const rulesStart = Date.now();
   emitStageStart(onProgress, 'rules');
-  const signals = evaluateRules(ruleSet, catalog, indexes, config, adapter, features);
+  const signals: Signal[] = [];
+  for (const rule of ruleSet) {
+    // Indexed append rather than spread-in-loop — avoids re-allocating the
+    // accumulator on every rule (O(n²)) over a potentially large rule set.
+    const ruleSignals = rule.evaluate(catalog, indexes, config, adapter.ruleHints, features);
+    for (const signal of ruleSignals) signals.push(signal);
+  }
   emitStage(
     onProgress,
     'rules',
@@ -270,23 +260,35 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   };
 }
 
-/** Evaluate every rule over the unified catalog, threading the feature table. */
-function evaluateRules(
-  ruleSet: readonly Rule[],
-  catalog: Catalog,
-  indexes: Indexes,
-  config: GraphConfig,
-  adapter: GraphLanguageAdapter,
-  features: FeatureTable,
-): Signal[] {
-  const signals: Signal[] = [];
-  for (const rule of ruleSet) {
-    // Indexed append rather than spread-in-loop — avoids re-allocating the
-    // accumulator on every rule (O(n²)) over a potentially large rule set.
-    const ruleSignals = rule.evaluate(catalog, indexes, config, adapter.ruleHints, features);
-    for (const signal of ruleSignals) signals.push(signal);
+/**
+ * Persist the rebuilt shard fragments, prune fragments for removed shards, and
+ * write the unified catalog — best-effort (a failed catalog write is logged, not
+ * thrown: the freshly-built result is returned regardless). Extracted so
+ * {@link buildShardedGraph} stays under the cognitive-complexity bound.
+ */
+function persistShardedCatalog(
+  catalogRepo: CatalogRepo,
+  builtFragments: readonly ShardBuildResult[],
+  shards: readonly Shard[],
+  catalogToPersist: Catalog,
+): void {
+  // @fitness-ignore-next-line detached-promises -- CatalogRepo is synchronous (better-sqlite3/Drizzle); upsertShardFragment returns void, not a Promise.
+  for (const fragment of builtFragments) catalogRepo.upsertShardFragment(fragment);
+  // @fitness-ignore-next-line detached-promises -- CatalogRepo is synchronous (better-sqlite3/Drizzle); pruneShardFragmentsExcept returns void, not a Promise.
+  catalogRepo.pruneShardFragmentsExcept(shards.map((s) => s.id));
+  try {
+    catalogRepo.replaceAll(catalogToPersist);
+  } catch (error) {
+    /* v8 ignore next */
+    // Best-effort write: the freshly-built catalog is returned regardless.
+    // replaceAll already logged the underlying error; note the continuation
+    // so the swallow isn't silent.
+    logger.debug({
+      evt: 'graph.sharded.cache_write_skipped',
+      module: 'graph:sharded',
+      err: error instanceof Error ? error.message : String(error),
+    });
   }
-  return signals;
 }
 
 /** Emit a `stage-start` for `stage` (no-op when no callback). */
