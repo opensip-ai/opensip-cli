@@ -61,6 +61,7 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
       'graph-symbol-index',
       'graph-baseline-export',
       'graph-shard-worker',
+      'graph-equivalence-check',
       'graph-run-worker',
       'catalog-export',
       'sarif-export',
