@@ -416,6 +416,14 @@ export interface CatalogEquivalence {
   readonly intraMismatches: readonly string[];
   readonly crossDifferences: readonly string[];
   readonly sccDifferences: readonly string[];
+  /**
+   * Owner-attributed detail for every differing edge (the union of
+   * `intraMismatches` + `crossDifferences`). Additive: it carries the owner file
+   * path + position the real-repo equivalence guardrail classifies on (and
+   * prints on a budget breach). The five partition arrays above are the
+   * authoritative equivalence verdict (`isEquivalent` ignores this field).
+   */
+  readonly edgeDifferences: readonly EdgeDifference[];
 }
 
 /**
@@ -438,6 +446,7 @@ export function diffCatalogs(a: Catalog, b: Catalog): CatalogEquivalence {
     intraMismatches: edgeDiff.intraMismatches,
     crossDifferences: edgeDiff.crossDifferences,
     sccDifferences,
+    edgeDifferences: edgeDiff.differences,
   };
 }
 
@@ -535,6 +544,25 @@ export interface CatalogEdgeDiff {
    * partition empty.
    */
   readonly crossDifferences: readonly string[];
+  readonly differences: readonly EdgeDifference[];
+}
+
+/**
+ * One owner-attributed edge difference. `key` is the same `ownerHash@line:col`
+ * the partition arrays use. `ownerFilePath` is the project-relative path of the
+ * owner occurrence (resolved from whichever catalog holds it — the two catalogs
+ * share occurrence identities, so the owner file is the same on both sides).
+ * `toA` / `toB` are the sorted-joined target sets on each side (one is `''` when
+ * the edge is present only on one side). `cross` mirrors the partition split.
+ */
+export interface EdgeDifference {
+  readonly key: string;
+  readonly ownerFilePath: string;
+  readonly line: number;
+  readonly column: number;
+  readonly toA: string;
+  readonly toB: string;
+  readonly cross: boolean;
 }
 
 /**
@@ -548,12 +576,19 @@ export interface CatalogEdgeDiff {
  * a difference falls on (cross when either edge is `crossShard`), so a
  * regression is attributable to the linker vs a local resolver. The Phase 4
  * equivalence guardrail (`__tests__/equivalence.test.ts`) is the live gate.
+ *
+ * `differences` additionally carries the OWNER FILE PATH + call-site line/column
+ * of every differing edge, so the real-repo equivalence guardrail can classify a
+ * divergence by owner file (test/fixture-owned ⇒ gate-invisible; production ⇒
+ * meaningful) and print the offending `file:line → target` on a budget breach.
+ * The legacy key arrays are unchanged.
  */
 export function diffCatalogsByEdge(a: Catalog, b: Catalog): CatalogEdgeDiff {
   const ea = indexEdges(a);
   const eb = indexEdges(b);
   const intraMismatches: string[] = [];
   const crossDifferences: string[] = [];
+  const differences: EdgeDifference[] = [];
 
   const keys = new Set<string>([...ea.keys(), ...eb.keys()]);
   for (const key of keys) {
@@ -562,18 +597,44 @@ export function diffCatalogsByEdge(a: Catalog, b: Catalog): CatalogEdgeDiff {
     if (x?.to === y?.to) continue; // identical (or both absent) → no difference
     const isCross = (x?.crossShard ?? false) || (y?.crossShard ?? false);
     (isCross ? crossDifferences : intraMismatches).push(key);
+    // Owner file path + position is the same on both sides (shared occurrence
+    // identity); take whichever side carries the edge.
+    const present = x ?? y;
+    differences.push({
+      key,
+      ownerFilePath: present?.ownerFilePath ?? '',
+      line: present?.line ?? 0,
+      column: present?.column ?? 0,
+      toA: x?.to ?? '',
+      toB: y?.to ?? '',
+      cross: isCross,
+    });
   }
-  return { intraMismatches, crossDifferences };
+  return { intraMismatches, crossDifferences, differences };
 }
 
-function indexEdges(catalog: Catalog): ReadonlyMap<string, { to: string; crossShard: boolean }> {
-  const map = new Map<string, { to: string; crossShard: boolean }>();
+interface IndexedEdge {
+  readonly to: string;
+  readonly crossShard: boolean;
+  readonly ownerFilePath: string;
+  readonly line: number;
+  readonly column: number;
+}
+
+function indexEdges(catalog: Catalog): ReadonlyMap<string, IndexedEdge> {
+  const map = new Map<string, IndexedEdge>();
   for (const occs of Object.values(catalog.functions)) {
     if (!occs) continue;
     for (const o of occs) {
       for (const e of o.calls) {
         const key = `${o.bodyHash}@${String(e.line)}:${String(e.column)}`;
-        map.set(key, { to: [...e.to].sort().join(','), crossShard: e.crossShard ?? false });
+        map.set(key, {
+          to: [...e.to].sort().join(','),
+          crossShard: e.crossShard ?? false,
+          ownerFilePath: o.filePath,
+          line: e.line,
+          column: e.column,
+        });
       }
     }
   }
