@@ -43,7 +43,7 @@ const RESULT: ShardBuildResult = {
   },
   fingerprint: 'fp-abc',
   boundaryCalls: [
-    { ownerHash: 'h1', calleeName: 'dep', importSpecifier: '@scope/dep', line: 3, column: 2, text: 'dep()' },
+    { ownerHash: 'h1', ownerFile: 'core/index.ts', calleeName: 'dep', importSpecifier: '@scope/dep', line: 3, column: 2, text: 'dep()' },
   ],
   parseErrors: [],
 };

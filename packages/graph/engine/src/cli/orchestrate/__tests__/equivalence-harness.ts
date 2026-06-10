@@ -341,8 +341,9 @@ function resolveFixtureEdges(input: ResolveInput<FixtureProject>, deps: AdapterD
   for (const site of input.callSites) {
     const { file, call } = site.nodeRef as { file: ParsedFile; call: ParsedCall };
     totalCallSites++;
-    // The engine stitches local edges back by (bodyHash, filePath) — boundary
-    // edges by bodyHash alone — so a body-twin's edges never union.
+    // The engine stitches BOTH local AND boundary edges back by
+    // ownerEdgeKey(bodyHash, filePath) — so a body-twin's edges never union
+    // (ADR-0003). The boundary descriptor carries `ownerFile` for exactly this.
     const ownerKey = ownerEdgeKey(site.ownerHash, file.projectRel);
     const spec = file.importsByName.get(call.calleeName);
     const target = resolveOne(call, file, spec, {
@@ -355,6 +356,7 @@ function resolveFixtureEdges(input: ResolveInput<FixtureProject>, deps: AdapterD
     if (target.boundary) {
       boundaryCalls.push({
         ownerHash: site.ownerHash,
+        ownerFile: file.projectRel,
         calleeName: call.calleeName,
         importSpecifier: spec,
         line: call.line,

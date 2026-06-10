@@ -120,6 +120,7 @@ describe('resolveCrossBoundaryCalls', () => {
   it('links a bare-specifier call to a unique export as a semantic crossShard edge', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
       calleeName: 'helperB',
       importSpecifier: '@scope/pkgb', // bare → resolved via manifest + export index
       line: 2,
@@ -141,6 +142,7 @@ describe('resolveCrossBoundaryCalls', () => {
     // pkg-a/index.ts imports '../pkg-b/index.js' → resolves to pkg-b/index.ts.
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
       calleeName: 'helperB',
       importSpecifier: '../pkg-b/index.js',
       line: 2,
@@ -157,6 +159,7 @@ describe('resolveCrossBoundaryCalls', () => {
   it('declines a call whose specifier maps to no known workspace package', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
       calleeName: 'chalk', // external npm
       importSpecifier: 'chalk',
       line: 3,
@@ -172,6 +175,7 @@ describe('resolveCrossBoundaryCalls', () => {
   it('declines a name the resolved package does not export', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
       calleeName: 'notExported', // package pkg-b exports helperB only
       importSpecifier: '@scope/pkgb',
       line: 4,
@@ -197,6 +201,7 @@ describe('resolveCrossBoundaryCalls', () => {
     );
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
       calleeName: 'helperB',
       importSpecifier: '@scope/pkgb',
       line: 2,
@@ -249,6 +254,7 @@ describe('resolveCrossBoundaryCalls — ambiguity', () => {
   it('declines an ambiguous unpinned name (two same-name exports, root specifier)', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
       calleeName: 'dup', // two occurrences named 'dup' in pkg-b
       importSpecifier: '@scope/pkgb', // root specifier → no subpath to narrow
       line: 2,
@@ -268,6 +274,7 @@ describe('resolveCrossBoundaryCalls — ambiguity', () => {
     );
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
       calleeName: 'dup',
       importSpecifier: '@scope/pkgb/b', // subpath → narrows to packages/pkg-b/b.ts
       line: 2,
@@ -317,7 +324,7 @@ describe('diffCatalogsByEdge', () => {
         ],
         ['packages/pkg-a/index.ts', 'packages/pkg-b/index.ts'],
       ),
-      [{ ownerHash: 'A', calleeName: 'helperB', importSpecifier: '@scope/pkgb', line: 2, column: 1, text: 'helperB()' }],
+      [{ ownerHash: 'A', ownerFile: 'packages/pkg-a/index.ts', calleeName: 'helperB', importSpecifier: '@scope/pkgb', line: 2, column: 1, text: 'helperB()' }],
       manifests(manifest('@scope/pkgb', 'packages/pkg-b')),
     ).catalog;
 
@@ -347,7 +354,7 @@ describe('resolveCrossBoundaryCalls — semantic export linking (packages/ paths
   const mIndex = manifests(manifest('@scope/pkgb', 'packages/pkg-b'));
 
   it('links into the imported package for a unique exported callee', () => {
-    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', calleeName: 'g', importSpecifier: '@scope/pkgb', line: 2, column: 0, text: 'g()' };
+    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', ownerFile: 'packages/pkg-a/src/call.ts', calleeName: 'g', importSpecifier: '@scope/pkgb', line: 2, column: 0, text: 'g()' };
     const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
     expect(crossEdge(catalog)?.to).toEqual(['G']);
   });
@@ -356,13 +363,13 @@ describe('resolveCrossBoundaryCalls — semantic export linking (packages/ paths
     // 'f' exists in BOTH pkg-a and pkg-b. The specifier names pkg-b, whose
     // export bucket has exactly one 'f' (FB) — that is the unique linkable
     // target. (The caller's own 'f' lives in a different package bucket.)
-    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', calleeName: 'f', importSpecifier: '@scope/pkgb', line: 2, column: 0, text: 'f()' };
+    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', ownerFile: 'packages/pkg-a/src/call.ts', calleeName: 'f', importSpecifier: '@scope/pkgb', line: 2, column: 0, text: 'f()' };
     const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
     expect(crossEdge(catalog)?.to).toEqual(['FB']); // pkg-b's f, by the specifier
   });
 
   it('declines a callee whose specifier names an untracked package', () => {
-    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', calleeName: 'g', importSpecifier: '@scope/unknown', line: 2, column: 0, text: 'g()' };
+    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', ownerFile: 'packages/pkg-a/src/call.ts', calleeName: 'g', importSpecifier: '@scope/unknown', line: 2, column: 0, text: 'g()' };
     const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
     expect(crossEdge(catalog)?.to).toEqual([]); // declined — pkg not in manifest index
   });

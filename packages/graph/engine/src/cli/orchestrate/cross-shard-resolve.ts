@@ -34,10 +34,11 @@ import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
 import { buildExportIndex } from '../../cross-package/export-index.js';
 import { resolveCrossPackageCall } from '../../cross-package/resolve.js';
-import { appendEdge, createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
+import { createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
 import { computeSccs } from '../../pipeline/features.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
 
+import { bucketEdgesByOwner, stitchEdgesByOwner } from './edge-identity.js';
 
 import type { ShardBuildResult } from './shard-model.js';
 import type { ExportIndex, PackageManifestIndex } from '../../cross-package/export-index.js';
@@ -224,20 +225,29 @@ export function resolveCrossBoundaryCalls(
 ): CrossShardOutput {
   const exportIndex = buildExportIndex(merged);
   const nameIndex = buildNameIndex(merged);
-  const fileByHash = buildFileByHash(merged);
   const knownFiles = new Set<string>(Object.values(merged.functions).flat().map((o) => o.filePath));
 
-  const edgesByOwner = new Map<string, CallEdge[]>();
+  const ctx: ResolveContext = { exportIndex, manifestIndex, nameIndex, knownFiles };
   const stats = createMutableStats();
 
-  for (const bc of boundaryCalls) {
-    const edge = resolveOne(bc, { exportIndex, manifestIndex, nameIndex, fileByHash, knownFiles });
+  // Resolve each boundary call to a recovered edge first (counting as we go),
+  // THEN bucket the (bc, edge) pairs by OCCURRENCE via the shared identity
+  // module — keyed `ownerEdgeKey(bc.ownerHash, bc.ownerFile)`, never `ownerHash`
+  // alone (ADR-0003: body-twins in different files share a hash; an owner-hash
+  // bucket would union their edges into phantom cross-package coupling).
+  const resolvedCalls = boundaryCalls.map((bc) => {
+    const edge = resolveOne(bc, ctx);
     stats.totalCallSites++;
-    appendEdge(edgesByOwner, bc.ownerHash, edge);
     stats.apply(edge);
-  }
+    return { bc, edge };
+  });
+  const edgesByOwnerKey = bucketEdgesByOwner(
+    resolvedCalls,
+    ({ bc }) => ({ bodyHash: bc.ownerHash, filePath: bc.ownerFile }),
+    ({ edge }) => edge,
+  );
 
-  const functions = stitchCrossShardEdges(merged.functions, edgesByOwner);
+  const functions = stitchCrossShardEdges(merged.functions, edgesByOwnerKey);
   return { catalog: { ...merged, functions }, boundaryStats: stats };
 }
 
@@ -249,7 +259,6 @@ interface ResolveContext {
   readonly manifestIndex: PackageManifestIndex;
   /** name → all occurrences with that name (the relative-import pin candidates). */
   readonly nameIndex: ReadonlyMap<string, readonly FunctionOccurrence[]>;
-  readonly fileByHash: ReadonlyMap<string, string>;
   readonly knownFiles: ReadonlySet<string>;
 }
 
@@ -284,7 +293,7 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
   // (a) Relative import → path-pin (intra-package, already exact).
   if (spec?.startsWith('.')) {
     const candidates = ctx.nameIndex.get(bc.calleeName) ?? [];
-    const pinned = pinBySpecifier(bc, candidates, ctx.fileByHash, ctx.knownFiles);
+    const pinned = pinBySpecifier(bc, candidates, ctx.knownFiles);
     return pinned.length > 0
       ? { ...base, to: pinned.map((o) => o.bodyHash) }
       : { ...base, to: [] };
@@ -304,20 +313,21 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
 /**
  * Pin a boundary call to specific target occurrences via its import
  * specifier. Only RELATIVE specifiers are path-pinnable here (resolved
- * against the owner's file directory); bare/package specifiers fall
- * through to name-only resolution. Purely generic path math.
+ * against the owner's REAL file directory carried on the descriptor —
+ * `bc.ownerFile`, byte-identical to the owner occurrence's `filePath`);
+ * bare/package specifiers fall through to name-only resolution. Purely
+ * generic path math. Resolving against the owner's actual file (not a
+ * last-writer-wins `bodyHash→file` guess) is what keeps body-twins from
+ * pinning relative imports against the wrong twin's directory (ADR-0003).
  */
 function pinBySpecifier(
   bc: CrossBoundaryCall,
   candidates: readonly FunctionOccurrence[],
-  fileByHash: ReadonlyMap<string, string>,
   knownFiles: ReadonlySet<string>,
 ): readonly FunctionOccurrence[] {
   const spec = bc.importSpecifier;
   if (!spec?.startsWith('.')) return [];
-  const ownerFile = fileByHash.get(bc.ownerHash);
-  if (ownerFile === undefined) return [];
-  const resolved = posix.normalize(posix.join(posix.dirname(ownerFile), spec));
+  const resolved = posix.normalize(posix.join(posix.dirname(bc.ownerFile), spec));
   const target = stripExt(resolved);
   // Accept either `<target>.<ext>` or `<target>/index.<ext>`.
   const matchesTarget = (filePath: string): boolean => {
@@ -343,47 +353,30 @@ function buildNameIndex(catalog: Catalog): ReadonlyMap<string, readonly Function
   return index;
 }
 
-function buildFileByHash(catalog: Catalog): ReadonlyMap<string, string> {
-  const map = new Map<string, string>();
-  for (const occs of Object.values(catalog.functions)) {
-    if (!occs) continue;
-    for (const o of occs) map.set(o.bodyHash, o.filePath);
-  }
-  return map;
-}
-
 /**
- * Stitch cross-shard edges onto each owner occurrence. A recovered edge
- * REPLACES the unresolved (`to: []`) intra-shard placeholder the local
- * resolver left at the same call site — otherwise the site would carry
- * two edges (one unresolved, one recovered) and double-count. Resolved
- * intra-shard edges are always kept.
+ * Stitch cross-shard edges onto each owner occurrence, via the shared identity
+ * module keyed by `ownerEdgeKey(o.bodyHash, o.filePath)` — so ONLY the owning
+ * occurrence receives its recovered edges (body-twins in different files never
+ * smear; ADR-0003). A recovered edge REPLACES the unresolved (`to: []`)
+ * intra-shard placeholder the local resolver left at the same call site —
+ * otherwise the site would carry two edges (one unresolved, one recovered) and
+ * double-count. Resolved intra-shard edges are always kept.
  */
 function stitchCrossShardEdges(
   functions: Readonly<Record<string, readonly FunctionOccurrence[]>>,
-  edgesByOwner: ReadonlyMap<string, readonly CallEdge[]>,
+  edgesByOwnerKey: ReadonlyMap<string, readonly CallEdge[]>,
 ): Record<string, readonly FunctionOccurrence[]> {
-  const out: Record<string, readonly FunctionOccurrence[]> = Object.create(null) as Record<
-    string,
-    readonly FunctionOccurrence[]
-  >;
-  for (const [name, occs] of Object.entries(functions)) {
-    if (!occs) continue;
-    out[name] = occs.map((o) => {
-      const extra = edgesByOwner.get(o.bodyHash);
-      if (!extra || extra.length === 0) return o;
-      const recoveredAt = new Set(extra.map((e) => `${String(e.line)}:${String(e.column)}`));
-      // Drop the unresolved placeholder the local pass left at a recovered site.
-      const kept = o.calls.filter(
-        (e) => !(e.to.length === 0 && recoveredAt.has(`${String(e.line)}:${String(e.column)}`)),
-      );
-      // Re-canonicalize the merged edge list — `extra` is in boundary-call
-      // (flat-map) order, which depends on shard completion order; sorting here
-      // keeps the stitched occurrence byte-identical across runs.
-      return { ...o, calls: sortCalls([...kept, ...extra]) };
-    });
-  }
-  return out;
+  return stitchEdgesByOwner(functions, edgesByOwnerKey, (o, extra) => {
+    const recoveredAt = new Set(extra.map((e) => `${String(e.line)}:${String(e.column)}`));
+    // Drop the unresolved placeholder the local pass left at a recovered site.
+    const kept = o.calls.filter(
+      (e) => !(e.to.length === 0 && recoveredAt.has(`${String(e.line)}:${String(e.column)}`)),
+    );
+    // Re-canonicalize the merged edge list — `extra` is in boundary-call
+    // (flat-map) order, which depends on shard completion order; sorting here
+    // keeps the stitched occurrence byte-identical across runs.
+    return { ...o, calls: sortCalls([...kept, ...extra]) };
+  });
 }
 
 // ── Task 2.3 / Phase 3: equivalence diff (test/validation) ────────
