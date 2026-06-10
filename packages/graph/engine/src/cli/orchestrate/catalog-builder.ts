@@ -11,9 +11,9 @@
  */
 
 import { stampEngineVersion, type EngineMode } from '../../cache/engine-version.js';
-import { ownerEdgeKey } from '../../owner-key.js';
 
 import { countCatalogCallSites } from './catalog-stats.js';
+import { ownerEdgeKey } from './edge-identity.js';
 import {
   expandClosureToFixpoint,
   mergeOccurrences,
@@ -386,6 +386,9 @@ function stitchEdges(
   for (const [name, occs] of Object.entries(initial.functions)) {
     if (!occs) continue;
     next[name] = occs.map((o) => {
+      // Owner identity comes from the ONE shared module (ADR-0003 canonical
+      // key) — the exact and cross-shard paths bucket/stitch through the same
+      // `ownerEdgeKey`, never a bare `bodyHash`.
       const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath);
       const calls = edgesByOwner.get(ownerKey) ?? [];
       const dependencies = dependenciesByOwner?.get(ownerKey);

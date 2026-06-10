@@ -11,7 +11,7 @@ import { join, relative, sep } from 'node:path';
 
 import { logger } from '@opensip-tools/core';
 
-import { ownerEdgeKey } from '../../owner-key.js';
+import { ownerEdgeKey } from './edge-identity.js';
 
 import type {
   GraphLanguageAdapter,
