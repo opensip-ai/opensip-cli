@@ -28,7 +28,7 @@ import { currentRules } from '../../rules/registry.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
 
 import { countCatalogCallSites, countCatalogFunctions } from './catalog-stats.js';
-import { mergeAndResolveShards } from './cross-shard-resolve.js';
+import { mergeShardFragments, resolveCrossBoundaryCalls } from './cross-shard-resolve.js';
 import { planShardWork, runShardsInParallel } from './shard-runner.js';
 
 import type { Shard, ShardBuildResult } from './shard-model.js';
@@ -181,25 +181,30 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   const manifestIndex = buildPackageManifestIndex(shards, projectRoot);
   const walkStart = Date.now();
   emitStageStart(onProgress, 'walk');
-  const { catalog: merged, boundaryStats } = mergeAndResolveShards(fragments, allFiles, manifestIndex);
-  // Stamp each occurrence's package, then drop name-guessed cross-package edges
-  // that contradict the import graph — the same correction applied to the
-  // single-program path, so the persisted catalog (and the coupling grid) is
-  // import-consistent in both build modes.
-  const catalog = constrainCrossPackageEdges(assignPackages(merged, projectRoot));
-  emitStage(onProgress, 'walk', Date.now() - walkStart, `${String(countCatalogFunctions(catalog))} functions`);
+  const merged = mergeShardFragments(fragments.map((f) => f.fragment), allFiles);
+  emitStage(onProgress, 'walk', Date.now() - walkStart, `${String(countCatalogFunctions(merged))} functions`);
 
-  // 3b. The cross-shard boundary recovery (already performed inside
-  //     `mergeAndResolveShards` above) is graph's analogue of the single-program
-  //     `resolve` stage. Report the catalog-derived TOTAL call-site count — the
-  //     same `countCatalogCallSites` metric the exact path reports — so this
-  //     checklist row is computed consistently for `graph` and `graph --exact`
-  //     and leaks no "cross-shard" implementation detail.
+  // 3b. Resolve the cross-shard boundary calls against the export index — graph's
+  //     main-thread analogue of the single-program `resolve` stage — then stamp
+  //     packages + drop name-guessed cross-package edges that contradict the import
+  //     graph (same correction as the single-program path). Timed for REAL (not a
+  //     hardcoded 0): the per-shard intra-package resolution already ran inside the
+  //     shard subprocesses (the `parse`/build-shards stage), so this stage is the
+  //     cross-package linking + constraint pass. Sub-label is the catalog-derived
+  //     resolved-call-site count, identical metric to the exact path.
+  const resolveStart = Date.now();
   emitStageStart(onProgress, 'resolve');
+  const boundaryCalls = fragments.flatMap((f) => f.boundaryCalls);
+  const { catalog: resolved, boundaryStats } = resolveCrossBoundaryCalls(
+    merged,
+    boundaryCalls,
+    manifestIndex,
+  );
+  const catalog = constrainCrossPackageEdges(assignPackages(resolved, projectRoot));
   emitStage(
     onProgress,
     'resolve',
-    0,
+    Date.now() - resolveStart,
     `${String(countCatalogCallSites(catalog))} call site(s)`,
   );
 
