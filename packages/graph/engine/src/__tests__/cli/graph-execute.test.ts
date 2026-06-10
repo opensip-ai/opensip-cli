@@ -204,7 +204,46 @@ describe('executeGraph — render dispatch', () => {
     }
   });
 
-  it('profiles a synthetic sharded build for a large flat TypeScript project', async () => {
+  it('uses the EXACT engine for a shardable project when --sharded is NOT set (Phase 2 / ADR-0031)', async () => {
+    // A large flat TypeScript repo that WOULD synthetic-shard under the old
+    // auto-policy. Without --sharded it must stay single-process (exact), so
+    // the build is deterministic across TTY/pipe/CI.
+    const files = Array.from({ length: 2501 }, (_unused, i) =>
+      join(projectDir, 'src', `file-${String(i)}.ts`),
+    );
+    const largeFlatAdapter: GraphLanguageAdapter = {
+      ...populatedAdapter(),
+      discoverFiles: ({ cwd }: { cwd: string }): DiscoverOutput => ({
+        projectDirAbs: cwd,
+        files,
+        configPathAbs: join(cwd, 'tsconfig.json'),
+        compilerOptions: undefined,
+      }),
+    };
+    currentAdapterRegistry().register(largeFlatAdapter);
+    const profilePath = join(projectDir, 'profile-exact.json');
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const { cli, setExitCode } = mockCli(datastore);
+      await executeGraph({
+        cwd: projectDir,
+        noCache: true,
+        // No `sharded: true` and a real cliScript present — proves the policy
+        // keys off the flag, not script availability or file count.
+        cliScript: join(projectDir, 'fake-shard-cli.cjs'),
+        profileOutput: profilePath,
+      }, cli);
+      expect(setExitCode).toHaveBeenCalledWith(0);
+      const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
+        runs: { mode: string }[];
+      };
+      expect(profile.runs[0]?.mode).toBe('single-process');
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('profiles a synthetic sharded build for a large flat TypeScript project (opt-in --sharded)', async () => {
     const files = Array.from({ length: 2501 }, (_unused, i) =>
       join(projectDir, 'src', `file-${String(i)}.ts`),
     );
@@ -256,6 +295,9 @@ process.exit(0);
       await executeGraph({
         cwd: projectDir,
         noCache: true,
+        // Phase 2 (ADR-0031): sharding is opt-in; a bare run is always exact,
+        // so the synthetic-flat sharded build only engages with --sharded.
+        sharded: true,
         cliScript: fakeCliPath,
         concurrency: 1,
         profileOutput: profilePath,

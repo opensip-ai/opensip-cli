@@ -66,6 +66,23 @@ export interface GraphCommandOptions {
    */
   readonly workspace?: boolean;
   /**
+   * `--sharded`: opt in to the parallel, memory-isolated SHARDED build
+   * engine (one worker per workspace package / synthetic flat partition,
+   * with a cross-shard edge-recovery pass). Phase 2 determinism (ADR-0031):
+   * the build engine is chosen by THIS explicit flag alone — never by
+   * `process.stdout.isTTY` or on-disk discovery state. A bare `graph` always
+   * uses the EXACT single-program engine (deterministic default); sharding
+   * runs ONLY when this flag is set.
+   *
+   * The sharded engine is faster on very large multi-package repos but its
+   * catalog is an APPROXIMATION of the exact engine's (it can disagree by
+   * thousands of functions on cross-package edges), so it is a deliberate,
+   * opt-in trade of accuracy for speed. Ignored for the whole-`--workspace`
+   * fan-out (which already runs one isolated child process per unit) and for
+   * positional-path / multi-path runs (those always use the exact engine).
+   */
+  readonly sharded?: boolean;
+  /**
    * `--language <name>`: force a single language adapter. Suppresses
    * marker-based detection. Errors if the name is not registered.
    * Also drives the D14 mixed mismatch policy at the end of the run.

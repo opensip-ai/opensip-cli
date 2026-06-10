@@ -104,7 +104,14 @@ export async function executeGraph(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
 ): Promise<SignalEnvelope | undefined> {
-  logger.info({ evt: 'graph.cli.graph.start', module: MODULE_GRAPH_CLI, cwd: opts.cwd });
+  logger.info({
+    evt: 'graph.cli.graph.start',
+    module: MODULE_GRAPH_CLI,
+    cwd: opts.cwd,
+    // Phase 2 observability: which build engine the user requested. The
+    // resolved engine (after shardability) is logged at `graph.cli.graph.engine`.
+    requestedEngine: opts.sharded === true ? 'sharded' : 'exact',
+  });
   const startedAt = new Date().toISOString();
   const profile = createProfileBuilder(opts, startedAt);
   try {
@@ -142,11 +149,23 @@ export async function executeGraph(
     // minCrossPackageDuplicatePackages). Resolved from the original cwd so a
     // positional subtree run still picks up the project-root config.
     const config = loadGraphConfig(opts.cwd);
-    // Auto-shard a multi-package project (bare `graph`, no explicit subtree):
-    // build packages in parallel and recover cross-package edges. Falls back
-    // to the single-process build for one-package repos or when sharding
-    // can't engage (no worker script, discovery failure).
-    const shards = positionalPaths.length === 0 ? await resolveShards(opts, cli) : [];
+    // Phase 2 determinism (ADR-0031): the build engine is chosen by an
+    // explicit, deterministic policy — `--sharded` opts IN to the approximate
+    // parallel engine; everything else uses the EXACT single-program engine.
+    // It is NOT chosen by `process.stdout.isTTY` or on-disk discovery state,
+    // so a bare `graph` builds the same catalog whether run in a terminal,
+    // piped, or under `--gate-*`/`--json`. When `--sharded` is set but the
+    // project can't shard (no worker script, single-unit, discovery failure)
+    // we fall back to the exact engine rather than silently auto-selecting.
+    const shards = await resolveEngineShards(opts, cli, positionalPaths);
+    logger.info({
+      evt: 'graph.cli.graph.engine',
+      module: MODULE_GRAPH_CLI,
+      mode: shards.length > 1 ? 'sharded' : 'exact',
+      requestedSharded: opts.sharded === true,
+      shards: shards.length,
+      reason: engineSelectionReason(opts, positionalPaths, shards.length > 1),
+    });
     const profileRun = profile?.startRun({
       label: positionalPaths.length === 0 ? 'root' : positionalPathLabel(runCwd, opts.cwd),
       cwd: runCwd,
@@ -180,11 +199,55 @@ export async function executeGraph(
 }
 
 /**
+ * Phase 2 engine-selection policy (ADR-0031). Returns the shard set ONLY when
+ * the run explicitly opted in via `--sharded` AND the project can actually
+ * shard; returns an empty array (→ the EXACT single-program engine) in every
+ * other case. The decision is a pure function of the parsed options + the
+ * project's shardability — it never reads `process.stdout.isTTY`, so a bare
+ * `graph` is deterministic across terminal / pipe / CI invocations.
+ *
+ * Sharding is suppressed (returns `[]`, exact engine) when:
+ *   - `--sharded` was not passed (the deterministic default);
+ *   - positional `[paths...]` were given (subtree/multi-path runs are exact);
+ *   - the project resolves to ≤1 non-empty shard (nothing to parallelize) or
+ *     no worker script is available — a graceful fall-through to exact rather
+ *     than a silent auto-detected catalog.
+ */
+async function resolveEngineShards(
+  opts: GraphCommandOptions,
+  cli: ToolCliContext,
+  positionalPaths: readonly string[],
+): Promise<Shard[]> {
+  if (opts.sharded !== true) return [];
+  if (positionalPaths.length > 0) return [];
+  return resolveShards(opts, cli);
+}
+
+/**
+ * Human-readable explanation of the engine decision for the
+ * `graph.cli.graph.engine` observability event. Pure; mirrors
+ * {@link resolveEngineShards}'s branches.
+ */
+function engineSelectionReason(
+  opts: GraphCommandOptions,
+  positionalPaths: readonly string[],
+  sharded: boolean,
+): string {
+  if (sharded) return 'sharded-opt-in';
+  if (opts.sharded === true && positionalPaths.length > 0) return 'sharded-ignored-positional-paths';
+  if (opts.sharded === true) return 'sharded-requested-but-not-shardable';
+  return 'exact-default';
+}
+
+/**
  * Resolve a project to its shards (one per workspace package). Returns an
  * empty array — signalling the caller to use the single-process build —
  * when the project isn't multi-package, when no worker script is
  * available to spawn, or when discovery fails. Each unit's file set is
  * enumerated via the graph adapter; partitions with no files are dropped.
+ *
+ * Phase 2 (ADR-0031): only reached when `--sharded` was explicitly requested
+ * (see {@link resolveEngineShards}); it no longer auto-engages on a bare run.
  */
 async function resolveShards(opts: GraphCommandOptions, cli: ToolCliContext): Promise<Shard[]> {
   const cliScript = opts.cliScript ?? process.argv[1];

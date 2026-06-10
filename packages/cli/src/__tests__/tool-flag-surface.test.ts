@@ -118,8 +118,8 @@ const EXPECTED: Record<string, string[]> = {
     '--debug', '--gate-compare', '--gate-save', '--git-sha', '--json',
     '--language', '--list-files', '--mode', '--no-cache', '--out',
     '--output-sarif', '--profile', '--quiet', '--recipe', '--repo-id',
-    '--report-to', '--resolution', '--run-id', '--sarif', '--show', '--tenant-id',
-    '--verbose', '--workspace',
+    '--report-to', '--resolution', '--run-id', '--sarif', '--sharded', '--show',
+    '--tenant-id', '--verbose', '--workspace',
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
   // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).
