@@ -1,64 +1,43 @@
 /**
  * Phase 4 equivalence guardrail: the SHARDED build must equal the
- * SINGLE-PROGRAM build on a committed multi-package fixture — for BOTH
- * intra- and cross-package edges — with the `canonicalize`-style phantom as a
- * named regression case.
+ * SINGLE-PROGRAM build on a committed multi-package fixture — for the FULL
+ * `CatalogEquivalence` (function set + intra/cross edges + SCCs) — with the
+ * `canonicalize`-style phantom as a named regression case.
  *
- * The fixture (`../__fixtures__/multi-pkg`) is three tiny workspace packages:
+ * The fixture (`../__fixtures__/multi-pkg`) is three tiny workspace packages
+ * plus a root-level file and an out-of-`src`-tree file:
  *   - @fixture/a       — `main` calls `@fixture/foundation.canonicalize` (bare
  *                        workspace specifier → genuine cross-package edge) and
- *                        `./local.formatLocal` (relative → intra-package edge).
+ *                        `./local.formatLocal` (relative → intra-package edge);
+ *                        `scripts/gen.ts` (OUT of src/) calls foundation too.
  *   - @fixture/foundation — `canonicalize` is self-recursive (the leaf-util case).
  *   - @fixture/b       — ALSO exports `canonicalize`, which pkg-a NEVER imports.
  *                        A name-only resolver would link pkg-a → b.canonicalize:
  *                        the phantom trap this gate catches.
+ *   - root-tool.ts     — a ROOT-LEVEL file (no packages/* unit → `:root` shard)
+ *                        whose bare import must link from the root shard.
  *
- * We build the SAME files two ways through the REAL engine pipeline:
- *   single-program → one `buildAndResolveCatalog` over ALL fixture files;
- *   sharded        → one `buildAndResolveCatalog` per package (emitting
- *                    boundary calls) merged + linked by `mergeAndResolveShards`.
- * Then `diffCatalogsByEdge(sharded, singleProgram)` must report BOTH partitions
- * empty. A test-local fixture-driven adapter supplies the occurrences / call
- * sites / import specifiers (the engine layer cannot import a real TS adapter);
- * its cross-package resolution reuses the SAME engine helpers the linker uses
- * (`resolveSpecifierToPackage` + `buildExportIndex`), so the single-program
- * oracle and the sharded linker agree by construction — and both decline the
- * phantom.
+ * We build the SAME files two ways through the REAL engine pipeline (the shared
+ * `createEquivalenceHarness`): single-program → one `buildAndResolveCatalog`
+ * over ALL files; sharded → one per shard (emitting boundary calls) merged +
+ * linked by `mergeAndResolveShards`. Then `diffCatalogs(sharded, singleProgram)`
+ * must report EVERY partition empty. The harness's fixture-driven adapter reuses
+ * the SAME engine helpers the linker uses (`resolveSpecifierToPackage` +
+ * `buildExportIndex`), so the single-program oracle and the sharded linker agree
+ * by construction — and both decline the phantom.
  */
 
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { dirname, join, posix, relative, sep } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { ownerEdgeKey } from '../../../owner-key.js';
-import { buildAndResolveCatalog } from '../catalog-builder.js';
-import { diffCatalogs, diffCatalogsByEdge, isEquivalent, mergeAndResolveShards } from '../cross-shard-resolve.js';
-import { buildExportIndex, buildPackageManifestIndex, resolveSpecifierToPackage } from '../export-index.js';
+import { diffCatalogs, diffCatalogsByEdge, isEquivalent } from '../cross-shard-resolve.js';
 
-import type {
-  CallSiteRecord,
-  DiscoverInput,
-  DiscoverOutput,
-  GraphLanguageAdapter,
-  ParseInput,
-  ParseOutput,
-  ResolveInput,
-  ResolveOutput,
-  WalkInput,
-  WalkOutput,
-} from '../../../lang-adapter/types.js';
-import type {
-  CallEdge,
-  Catalog,
-  CrossBoundaryCall,
-  FunctionOccurrence,
-} from '../../../types.js';
-import type { RunStage } from '../catalog-builder.js';
-import type { PackageManifestIndex } from '../export-index.js';
-import type { Shard, ShardBuildResult } from '../shard-model.js';
+import { createEquivalenceHarness } from './equivalence-harness.js';
+
+import type { CallEdge, Catalog, FunctionOccurrence } from '../../../types.js';
+import type { Shard } from '../shard-model.js';
 
 // ── fixture geography ─────────────────────────────────────────────
 
@@ -80,8 +59,7 @@ const PKG_DIRS = {
  * Every fixture `.ts` source, absolute, grouped by package. pkg-a additionally
  * owns an OUT-OF-`src`-tree file (`scripts/gen.ts`): it lives under packages/a
  * so the partitioner assigns it to the pkg-a shard, but a `src`-only tsconfig
- * would exclude it — the canonical-file-set gap Phase 1 closed. The boundary
- * resolver must still link its cross-package call identically in both engines.
+ * would exclude it — the canonical-file-set gap Phase 1 closed.
  */
 const PKG_FILES: Record<keyof typeof PKG_DIRS, readonly string[]> = {
   a: [
@@ -94,355 +72,21 @@ const PKG_FILES: Record<keyof typeof PKG_DIRS, readonly string[]> = {
 };
 
 /**
- * A ROOT-LEVEL file under NO packages/* unit → the synthetic `:root` shard in
- * the sharded build. Phase 2 must cover it: a bare workspace import from a root
- * file (whose `packageOf` is `<unknown>`) must link to the imported package's
- * unique export, and the `:root` shard's rootDir (which has no package.json)
- * must not crash the manifest index. Built separately from the package shards.
+ * A ROOT-LEVEL file under NO packages/* unit → the synthetic `:root` shard. A
+ * bare workspace import from a root file (whose `packageOf` is `<unknown>`) must
+ * link to the imported package's unique export, and the `:root` shard's rootDir
+ * (which has no package.json) must not crash the manifest index.
  */
 const ROOT_FILES: readonly string[] = [join(FIXTURE_ROOT, 'root-tool.ts')];
 
 const ALL_FILES: readonly string[] = [...Object.values(PKG_FILES).flat(), ...ROOT_FILES];
 
-function toFixtureProjectRel(absFile: string): string {
-  const rel = relative(FIXTURE_ROOT, absFile);
-  return sep === '/' ? rel : rel.split(sep).join('/');
-}
-
-function bodyHashFor(projectRel: string, name: string): string {
-  return createHash('sha256').update(`${projectRel}#${name}`).digest('hex').slice(0, 16);
-}
-
-// ── a deterministic, fixture-driven graph adapter ─────────────────
-//
-// Reads the committed `.ts` source as text and extracts exactly what the
-// equivalence pipeline needs: exported functions, their call sites, and the
-// import binding (specifier) each callee name arrived through. It exercises the
-// REAL engine path (buildAndResolveCatalog → mergeAndResolveShards →
-// diffCatalogsByEdge) without an in-tree TypeScript parser the engine layer is
-// not allowed to import.
-
-/** One parsed fixture file. */
-interface ParsedFile {
-  readonly projectRel: string;
-  /** exported function name → { line, column } of its declaration. */
-  readonly exports: Map<string, { line: number; column: number }>;
-  /** imported callee name → its import specifier (bare or relative). */
-  readonly importsByName: Map<string, string>;
-  /** call sites inside the file, attributed to their enclosing exported fn. */
-  readonly callSites: readonly ParsedCall[];
-}
-
-interface ParsedCall {
-  readonly ownerName: string;
-  readonly calleeName: string;
-  readonly line: number;
-  readonly column: number;
-  readonly text: string;
-}
-
-// Identifier = `[A-Za-z_]\w{0,80}` with NO `\s*` before `(` — the fixture
-// writes parens flush to the name. The bounded `\w{0,80}` is delimited by the
-// literal `(`, so there is no backtracking / ReDoS exposure.
-const EXPORT_FN_RE = /export\s+function\s+([A-Za-z_]\w{0,80})\(/;
-const CALL_RE = /([A-Za-z_]\w{0,80})\(/g;
-
-/**
- * Parse `import { a, b } from 'spec'` into the bound names + specifier without
- * a backtracking-prone regex (linear `indexOf`/`slice` scan over the line).
- * Returns `undefined` for non-named-import lines.
- */
-function parseImportLine(line: string): { names: string[]; specifier: string } | undefined {
-  const open = line.indexOf('{');
-  const close = line.indexOf('}');
-  const from = line.indexOf('from', close);
-  if (!line.includes('import') || open === -1 || close < open || from === -1) return undefined;
-  const specifier = extractQuoted(line.slice(from));
-  if (specifier === undefined) return undefined;
-  const names = line
-    .slice(open + 1, close)
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return { names, specifier };
-}
-
-/** The text between the first quote (`'` or `"`) and its matching close. */
-function extractQuoted(s: string): string | undefined {
-  const q = s.search(/['"]/);
-  if (q === -1) return undefined;
-  const end = s.indexOf(s[q] ?? '"', q + 1);
-  return end === -1 ? undefined : s.slice(q + 1, end);
-}
-
-/** Parse one fixture file into the occurrence / call / import model. */
-function parseFixtureFile(absFile: string): ParsedFile {
-  const projectRel = toFixtureProjectRel(absFile);
-  const text = readFileSync(absFile, 'utf8');
-  const lines = text.split('\n');
-
-  const exports = new Map<string, { line: number; column: number }>();
-  const importsByName = new Map<string, string>();
-  const callSites: ParsedCall[] = [];
-
-  let currentOwner: string | undefined;
-  for (const [i, rawLine] of lines.entries()) {
-    const line = i + 1;
-    const imported = parseImportLine(rawLine);
-    if (imported !== undefined) {
-      for (const name of imported.names) importsByName.set(name, imported.specifier);
-      continue;
-    }
-    const exportMatch = EXPORT_FN_RE.exec(rawLine);
-    if (exportMatch?.[1] !== undefined) {
-      currentOwner = exportMatch[1];
-      const column = rawLine.indexOf('function');
-      exports.set(currentOwner, { line, column });
-      continue; // the declaration line's own `name(` is the signature, not a call
-    }
-    if (currentOwner === undefined) continue;
-    for (const callMatch of rawLine.matchAll(CALL_RE)) {
-      const calleeName = callMatch[1];
-      if (calleeName === undefined) continue;
-      const keyword = new Set(['if', 'for', 'while', 'switch', 'catch', 'return', 'function']);
-      if (keyword.has(calleeName)) continue;
-      callSites.push({
-        ownerName: currentOwner,
-        calleeName,
-        line,
-        column: callMatch.index ?? 0,
-        text: `${calleeName}()`,
-      });
-    }
-  }
-  return { projectRel, exports, importsByName, callSites };
-}
-
-/** Internal parse state the adapter threads parse → walk → resolve. */
-interface FixtureProject {
-  readonly files: readonly ParsedFile[];
-}
-
-const KEYWORD_CALLS = new Set(['map']); // array helpers we don't model as fn edges
-
-function makeFixtureAdapter(): GraphLanguageAdapter<FixtureProject> {
-  return {
-    id: 'typescript',
-    fileExtensions: ['.ts'],
-    displayName: 'fixture-ts',
-
-    discoverFiles(input: DiscoverInput): DiscoverOutput {
-      // Files are supplied explicitly via the catalog-build options; discovery
-      // only needs to echo the project root.
-      return { projectDirAbs: input.cwd, files: [] };
-    },
-
-    parseProject(input: ParseInput): ParseOutput<FixtureProject> {
-      const files = input.files.map((f) => parseFixtureFile(f));
-      return { project: { files }, parseErrors: [] };
-    },
-
-    walkProject(input: WalkInput<FixtureProject>): WalkOutput {
-      const occurrences: Record<string, FunctionOccurrence[]> = {};
-      const callSites: CallSiteRecord[] = [];
-      for (const file of input.project.files) {
-        for (const [name, pos] of file.exports) {
-          const occ = makeOccurrence(file.projectRel, name, pos.line, pos.column);
-          const bucket = occurrences[name] ?? [];
-          bucket.push(occ);
-          occurrences[name] = bucket;
-        }
-        for (const call of file.callSites) {
-          if (KEYWORD_CALLS.has(call.calleeName)) continue;
-          callSites.push({
-            // nodeRef/sourceFileRef carry the resolution facts this fixture
-            // adapter needs; the engine treats them as opaque handles.
-            nodeRef: { file, call },
-            sourceFileRef: file,
-            ownerHash: bodyHashFor(file.projectRel, call.ownerName),
-            kind: 'call',
-          });
-        }
-      }
-      return { occurrences, callSites, parseErrors: [] };
-    },
-
-    resolveCallSites(input: ResolveInput<FixtureProject>): ResolveOutput {
-      return resolveFixtureEdges(input);
-    },
-
-    cacheKey: () => 'fixture-key',
-    ruleHints: undefined,
-  };
-}
-
-function makeOccurrence(
-  projectRel: string,
-  name: string,
-  line: number,
-  column: number,
-): FunctionOccurrence {
-  return {
-    bodyHash: bodyHashFor(projectRel, name),
-    simpleName: name,
-    qualifiedName: `${projectRel}.${name}`,
-    filePath: projectRel,
-    line,
-    column,
-    endLine: line,
-    kind: 'function-declaration',
-    params: [],
-    returnType: null,
-    enclosingClass: null,
-    decorators: [],
-    visibility: 'exported',
-    inTestFile: false,
-    definedInGenerated: false,
-    calls: [],
-  };
-}
-
-/**
- * Resolve every call site to a CallEdge, mirroring the cross-shard linker:
- *   - callee defined in the SAME file              → static intra-file edge;
- *   - callee imported via a RELATIVE specifier     → path-pin to the target file;
- *   - callee imported via a BARE workspace specifier:
- *       sharded (emitBoundaryCalls): NOT in this build's files → boundary call;
- *       single-program: resolve to the unique export of the named package.
- * Declines (empty `to`) on ambiguity — never name-only guesses (the phantom).
- */
-function resolveFixtureEdges(input: ResolveInput<FixtureProject>): ResolveOutput {
-  const exportIndex = buildExportIndex(input.catalog);
-  // All three package manifests are always in scope: even a single-package
-  // shard must resolve the bare specifier `@fixture/foundation` to a package
-  // group (the imported package's own occurrences may be absent from THIS
-  // shard — that's exactly when the call becomes a boundary call).
-  const manifestIndex = buildPackageManifestIndex(FIXTURE_SHARDS, FIXTURE_ROOT);
-  const fileByRel = new Map(input.project.files.map((f) => [f.projectRel, f]));
-
-  const edgesByOwner = new Map<string, CallEdge[]>();
-  const boundaryCalls: CrossBoundaryCall[] = [];
-  let resolvedHigh = 0;
-  let unresolved = 0;
-  let totalCallSites = 0;
-
-  for (const site of input.callSites) {
-    const { file, call } = site.nodeRef as { file: ParsedFile; call: ParsedCall };
-    totalCallSites++;
-    // The engine stitches local edges back by (bodyHash, filePath) — boundary
-    // edges by bodyHash alone — so a body-twin's edges never union.
-    const ownerKey = ownerEdgeKey(site.ownerHash, file.projectRel);
-    const spec = importSpecifierFor(file, call.calleeName);
-    const target = resolveOne(call, file, spec, {
-      exportIndex,
-      manifestIndex,
-      fileByRel,
-      emitBoundaryCalls: input.emitBoundaryCalls ?? false,
-    });
-    if (target.boundary) {
-      boundaryCalls.push({
-        ownerHash: site.ownerHash,
-        calleeName: call.calleeName,
-        importSpecifier: spec,
-        line: call.line,
-        column: call.column,
-        text: call.text,
-      });
-      appendEdge(edgesByOwner, ownerKey, {
-        to: [],
-        line: call.line,
-        column: call.column,
-        resolution: 'unknown',
-        confidence: 'low',
-        text: call.text,
-      });
-      continue;
-    }
-    const edge: CallEdge = {
-      to: target.to,
-      line: call.line,
-      column: call.column,
-      resolution: target.to.length > 0 ? 'static' : 'unknown',
-      confidence: target.to.length > 0 ? 'high' : 'low',
-      text: call.text,
-    };
-    appendEdge(edgesByOwner, ownerKey, edge);
-    if (target.to.length > 0) resolvedHigh++;
-    else unresolved++;
-  }
-
-  return {
-    edgesByOwner,
-    boundaryCalls,
-    stats: { totalCallSites, resolvedHigh, resolvedMedium: 0, resolvedLow: 0, unresolved },
-  };
-}
-
-interface ResolveCtx {
-  readonly exportIndex: ReturnType<typeof buildExportIndex>;
-  readonly manifestIndex: PackageManifestIndex;
-  readonly fileByRel: ReadonlyMap<string, ParsedFile>;
-  readonly emitBoundaryCalls: boolean;
-}
-
-/** Either a resolved edge target, or a flag to defer to the cross-shard pass. */
-type Resolution = { boundary: true } | { boundary: false; to: readonly string[] };
-
-function resolveOne(
-  call: ParsedCall,
-  file: ParsedFile,
-  spec: string | undefined,
-  ctx: ResolveCtx,
-): Resolution {
-  // (1) Same-file definition (e.g. canonicalize calling itself).
-  if (file.exports.has(call.calleeName)) {
-    return { boundary: false, to: [bodyHashFor(file.projectRel, call.calleeName)] };
-  }
-  // (2) Relative import → path-pin to the resolved file (intra-package).
-  if (spec?.startsWith('.')) {
-    const targetRel = resolveRelative(file.projectRel, spec);
-    const targetFile = ctx.fileByRel.get(targetRel);
-    if (targetFile?.exports.has(call.calleeName)) {
-      return { boundary: false, to: [bodyHashFor(targetRel, call.calleeName)] };
-    }
-    return { boundary: false, to: [] };
-  }
-  // (3) Bare workspace specifier → resolve the named package's unique export.
-  if (spec === undefined) return { boundary: false, to: [] };
-  const resolved = resolveSpecifierToPackage(spec, ctx.manifestIndex);
-  if (resolved === undefined) return { boundary: false, to: [] };
-  const exported = ctx.exportIndex.get(resolved.packageGroup)?.get(call.calleeName) ?? [];
-  // In sharded mode the imported package's occurrences are absent from THIS
-  // shard's catalog → defer to the cross-shard linker. In single-program mode
-  // they are present → resolve directly (the oracle).
-  if (ctx.emitBoundaryCalls && exported.length === 0) return { boundary: true };
-  if (exported.length !== 1) return { boundary: false, to: [] }; // ambiguous / absent → decline
-  const only = exported[0];
-  return only === undefined ? { boundary: false, to: [] } : { boundary: false, to: [only.bodyHash] };
-}
-
-function importSpecifierFor(file: ParsedFile, name: string): string | undefined {
-  return file.importsByName.get(name);
-}
-
-function resolveRelative(ownerRel: string, spec: string): string {
-  const stripped = spec.replace(/\.js$/, '.ts');
-  return posix.normalize(posix.join(posix.dirname(ownerRel), stripped));
-}
-
-function appendEdge(map: Map<string, CallEdge[]>, owner: string, edge: CallEdge): void {
-  const bucket = map.get(owner);
-  if (bucket) bucket.push(edge);
-  else map.set(owner, [edge]);
-}
-
 /**
  * The four shards: one per workspace package + the synthetic `:root` shard
- * (rootDir = FIXTURE_ROOT) that owns root-level files under no package unit.
- * The root shard's rootDir has NO package.json, so `buildPackageManifestIndex`
- * skips it (best-effort) — it stays a non-resolvable shard whose files still
- * merge into the unified catalog and whose bare imports link against the OTHER
- * packages' manifests. Mirrors `partitionFilesIntoShards` (root shard last).
+ * (rootDir = FIXTURE_ROOT). The root shard's rootDir has NO package.json, so
+ * `buildPackageManifestIndex` skips it — it stays a non-resolvable shard whose
+ * files still merge and whose bare imports link against the OTHER packages'
+ * manifests. Mirrors `partitionFilesIntoShards` (root shard last).
  */
 const FIXTURE_SHARDS: readonly Shard[] = [
   { id: 'pkg:a', rootDir: PKG_DIRS.a, files: [...PKG_FILES.a] },
@@ -451,44 +95,12 @@ const FIXTURE_SHARDS: readonly Shard[] = [
   { id: ':root', rootDir: FIXTURE_ROOT, files: [...ROOT_FILES] },
 ];
 
-// ── build the catalog two ways through the real engine ────────────
-
-/** A trivial runStage: just await the stage work (no live view, no spans). */
-const runStage: RunStage = async (args) => args.fn();
-
-async function buildSingleProgram(): Promise<Catalog> {
-  const adapter = makeFixtureAdapter();
-  const built = await buildAndResolveCatalog({
-    runStage,
-    adapter,
-    discovery: { projectDirAbs: FIXTURE_ROOT, files: ALL_FILES },
-    resolutionMode: 'exact',
-  });
-  return built.catalog;
-}
-
-async function buildSharded(): Promise<Catalog> {
-  const adapter = makeFixtureAdapter();
-  const fragments: ShardBuildResult[] = [];
-  for (const shard of FIXTURE_SHARDS) {
-    const built = await buildAndResolveCatalog({
-      runStage,
-      adapter,
-      discovery: { projectDirAbs: FIXTURE_ROOT, files: shard.files },
-      resolutionMode: 'exact',
-      emitBoundaryCalls: true,
-    });
-    fragments.push({
-      shardId: shard.id,
-      fragment: built.catalog,
-      fingerprint: `fp-${shard.id}`,
-      boundaryCalls: built.boundaryCalls ?? [],
-      parseErrors: built.parseErrors,
-    });
-  }
-  const manifestIndex = buildPackageManifestIndex(FIXTURE_SHARDS, FIXTURE_ROOT);
-  return mergeAndResolveShards(fragments, ALL_FILES, manifestIndex).catalog;
-}
+const harness = createEquivalenceHarness({
+  fixtureRoot: FIXTURE_ROOT,
+  shards: FIXTURE_SHARDS,
+  allFiles: ALL_FILES,
+});
+const { buildSingleProgram, buildSharded, bodyHashFor } = harness;
 
 // ── edge-lookup helpers for the named assertions ──────────────────
 
@@ -614,7 +226,7 @@ describe('exact-sharding equivalence guardrail', () => {
 
   // ── the gate has teeth (regression-detector guard) ──────────────
   //
-  // The two assertions above prove the SHIPPING semantic linker agrees with the
+  // The assertions above prove the SHIPPING semantic linker agrees with the
   // single-program oracle (crossDifferences empty) and declines the phantom.
   // This pair proves the gate would actually FAIL if the linker regressed — that
   // the empty `crossDifferences` is a real signal, not a vacuous pass. We do NOT
