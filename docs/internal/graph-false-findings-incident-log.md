@@ -208,6 +208,15 @@ The `graph-sharded-exact-parity` plan was built end-to-end and pushed to main:
 - **P4 flip + ADR** (`672b5c91`): **sharded is now the default**, `--exact` is the
   opt-out, `isTTY` selects only the renderer. ADR-0032 supersedes ADR-0031. Verified:
   bare `graph` ~4s (sharded) == `--exact` ~44s == TTY, all 0 findings, catalog gap 0.
+- **P4 follow-up — live-view regression fixed** (`8f1fa73e`): the flip had gated the
+  Ink live progress view to `--exact` (the live runner was hardwired to the
+  single-program build), so a bare interactive `graph` (sharded default) dropped to a
+  bare summary with no staged checklist — violating "isTTY selects only the renderer."
+  Fix: the sharded build now emits the 7 canonical progress stages, and the live view
+  drives the policy-selected engine (sharded in-process — its shards are already
+  subprocesses; `--exact` keeps the ADR-0028 off-process worker). Both engines now show
+  the staged "Code Graph" view in a TTY, static when piped. Suppression-finalize seam
+  preserved on the live path.
 
 Net: `graph` is fast (sharded default) AND byte-exact AND deterministic AND
 scale-safe, with parity enforced in CI. The two original defects (TTY suppression
