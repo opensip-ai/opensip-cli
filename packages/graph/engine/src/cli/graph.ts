@@ -51,11 +51,13 @@ import {
 import { buildGraphEnvelope } from './build-envelope.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
 import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './graph-report.js';
+import { resolveCanonicalFileSet } from './orchestrate/canonical-file-set.js';
 import {
   detectMonorepoLayout,
   partitionFlatRepo,
   selectStrategyForLayout,
 } from './orchestrate/flat-monorepo-strategy.js';
+import { partitionFilesIntoShards } from './orchestrate/partition-files.js';
 import { loadGraphConfig, resolveGraphRecipeSelection, runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
@@ -262,20 +264,32 @@ async function resolveShards(opts: GraphCommandOptions, cli: ToolCliContext): Pr
   }
   if (units.length <= 1) return resolveSyntheticFlatShards(opts);
 
+  // Phase 1 (graph-sharded-exact-parity): enumerate the canonical file set ONCE
+  // from project-wide root discovery — the SAME source + filter the exact engine
+  // uses — then PARTITION it across the discovered unit boundaries. The old loop
+  // re-derived each shard's files from that package's own tsconfig, which
+  // excludes the package's __fixtures__ tree and (for some) its test files, so
+  // the sharded engine silently dropped files the exact engine kept. Partitioning
+  // the canonical set guarantees both engines see the identical files.
   const adapter = pickAdapter(opts.cwd);
-  const shards: Shard[] = [];
-  for (const unit of units) {
-    let files: readonly string[];
-    let configPathAbs: string | undefined;
-    try {
-      const disc = adapter.discoverFiles({ cwd: unit.rootDir, configPathOverride: unit.configPath });
-      files = disc.files;
-      configPathAbs = unit.configPath ?? disc.configPathAbs;
-    } catch {
-      continue; // a unit the graph adapter can't discover is skipped, not fatal
-    }
-    if (files.length > 0) shards.push({ id: unit.id, rootDir: unit.rootDir, files, configPathAbs });
+  let rootDiscovery: ReturnType<typeof adapter.discoverFiles>;
+  try {
+    rootDiscovery = adapter.discoverFiles({ cwd: opts.cwd });
+  } catch {
+    /* v8 ignore next */
+    return resolveSyntheticFlatShards(opts);
   }
+  const canonicalFiles = resolveCanonicalFileSet(rootDiscovery.files);
+  const shards = partitionFilesIntoShards({
+    canonicalFiles,
+    units: units.map((u) => ({
+      id: u.id,
+      rootDir: u.rootDir,
+      ...(u.configPath === undefined ? {} : { configPathAbs: u.configPath }),
+    })),
+    projectRoot: rootDiscovery.projectDirAbs,
+    rootConfigPathAbs: rootDiscovery.configPathAbs,
+  });
   // Need at least two non-empty shards to justify the parallel/merge overhead.
   if (shards.length > 1) return shards;
   return resolveSyntheticFlatShards(opts);
@@ -298,9 +312,12 @@ function resolveSyntheticFlatShards(opts: GraphCommandOptions): Shard[] {
   } catch {
     return [];
   }
+  // Canonical set (Phase 1): drop fixtures before partitioning so the flat-large
+  // fallback shards match the exact engine's file set just like the workspace path.
+  const canonicalFiles = resolveCanonicalFileSet(discovery.files);
   const layout = detectMonorepoLayout({
     repoRoot: discovery.projectDirAbs,
-    files: discovery.files,
+    files: canonicalFiles,
   });
   const selection = selectStrategyForLayout(layout);
   if (layout.kind !== 'flat-large' || selection.mode !== 'synthetic-partition') {
