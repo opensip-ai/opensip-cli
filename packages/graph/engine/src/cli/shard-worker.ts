@@ -65,7 +65,14 @@ async function buildShard(spec: ShardWorkerSpec): Promise<ShardBuildResult> {
 
   // Anchor compiler options to the shard's own config, but compute
   // occurrence filePaths against the COMMON project root so fragments
-  // align across shards when merged.
+  // align across shards when merged. For the synthetic `:root` shard,
+  // `shard.configPathAbs` is the ROOT tsconfig — so root scripts and other
+  // files under no package tsconfig parse/resolve against the root compiler
+  // options (Phase 1). The discovery here is consulted ONLY for those compiler
+  // options: the file set is `shard.files` (the canonical partition the runner
+  // pre-enumerated), NOT the tsconfig's own include/exclude glob — so test
+  // files now assigned to a package shard parse even though that package's
+  // tsconfig would have excluded them (tsc compiles `rootNames` verbatim).
   const discovered = adapter.discoverFiles({
     cwd: shard.rootDir,
     configPathOverride: shard.configPathAbs,

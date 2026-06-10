@@ -32,13 +32,23 @@ import type { Catalog, CrossBoundaryCall, ParseError, ResolutionMode } from '../
  * single shape.
  */
 export interface Shard {
-  /** Stable shard id, e.g. `'pkg:core'`, `'partition:3'`. Used as the cache key component. */
+  /**
+   * Stable shard id, e.g. `'pkg:core'`, `'partition:3'`, or the synthetic
+   * catch-all `':root'` ({@link partition-files.ROOT_SHARD_ID}). Used as the
+   * per-shard fragment-cache primary key — MUST be unique across the shard set
+   * (asserted by `assertUniqueShardIds`).
+   */
   readonly id: string;
-  /** Absolute root dir the shard's files live under. */
+  /** Absolute root dir the shard's files live under. The `':root'` shard's rootDir is the project root. */
   readonly rootDir: string;
   /** Absolute file paths belonging to this shard (already enumerated — no re-discovery). */
   readonly files: readonly string[];
-  /** Absolute path to the shard's config anchor (tsconfig.json, etc.), if any. */
+  /**
+   * Absolute path to the shard's config anchor (tsconfig.json, etc.), if any.
+   * For the synthetic `':root'` shard this is the ROOT tsconfig — the worker
+   * builds that shard's files (root scripts, unowned/`.config` files) against
+   * the root compiler options so they parse/resolve correctly (Phase 1).
+   */
   readonly configPathAbs?: string;
 }
 
