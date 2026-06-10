@@ -167,8 +167,11 @@ describe('resolveCrossBoundaryCalls', () => {
       text: 'chalk()',
     };
     const { catalog, boundaryStats } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
+    // Phase 6: a declined cross-shard call persists NO standalone `to: []`
+    // crossShard edge (parity with exact, which emits no per-site catalog edge).
+    // The decline is still counted in the boundary stats.
     const edge = catalog.functions.mainA?.[0]?.calls.find((e) => e.crossShard);
-    expect(edge?.to).toEqual([]);
+    expect(edge).toBeUndefined();
     expect(boundaryStats.unresolved).toBe(1);
   });
 
@@ -183,7 +186,8 @@ describe('resolveCrossBoundaryCalls', () => {
       text: 'notExported()',
     };
     const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
-    expect(crossEdge(catalog)?.to).toEqual([]);
+    // Phase 6: declined → no persisted crossShard placeholder edge.
+    expect(crossEdge(catalog)).toBeUndefined();
   });
 
   it('replaces the unresolved intra-shard placeholder at the same site', () => {
@@ -263,8 +267,9 @@ describe('resolveCrossBoundaryCalls — ambiguity', () => {
     };
     const { catalog, boundaryStats } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
     const edge = catalog.functions.mainA?.[0]?.calls.find((e) => e.crossShard);
-    // Ambiguous + unpinned → declines (empty target) but is counted.
-    expect(edge?.to).toEqual([]);
+    // Ambiguous + unpinned → declines. Phase 6: no persisted placeholder edge,
+    // but the decline is still counted.
+    expect(edge).toBeUndefined();
     expect(boundaryStats.unresolved).toBe(1);
   });
 
@@ -371,7 +376,8 @@ describe('resolveCrossBoundaryCalls — semantic export linking (packages/ paths
   it('declines a callee whose specifier names an untracked package', () => {
     const bc: CrossBoundaryCall = { ownerHash: 'CALLER', ownerFile: 'packages/pkg-a/src/call.ts', calleeName: 'g', importSpecifier: '@scope/unknown', line: 2, column: 0, text: 'g()' };
     const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
-    expect(crossEdge(catalog)?.to).toEqual([]); // declined — pkg not in manifest index
+    // Phase 6: declined (pkg not in manifest index) → no persisted placeholder edge.
+    expect(crossEdge(catalog)).toBeUndefined();
   });
 });
 

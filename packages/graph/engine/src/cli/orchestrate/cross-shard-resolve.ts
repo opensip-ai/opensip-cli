@@ -230,19 +230,31 @@ export function resolveCrossBoundaryCalls(
   const ctx: ResolveContext = { exportIndex, manifestIndex, nameIndex, knownFiles };
   const stats = createMutableStats();
 
-  // Resolve each boundary call to a recovered edge first (counting as we go),
-  // THEN bucket the (bc, edge) pairs by OCCURRENCE via the shared identity
-  // module — keyed `ownerEdgeKey(bc.ownerHash, bc.ownerFile)`, never `ownerHash`
-  // alone (ADR-0003: body-twins in different files share a hash; an owner-hash
-  // bucket would union their edges into phantom cross-package coupling).
+  // Resolve each boundary call to a recovered edge first (counting as we go).
+  // The stats DO count declined (`to: []`) calls — they are attributable
+  // unresolved cross-shard sites — but only RESOLVED edges are stitched into the
+  // catalog (see below).
   const resolvedCalls = boundaryCalls.map((bc) => {
     const edge = resolveOne(bc, ctx);
     stats.totalCallSites++;
     stats.apply(edge);
     return { bc, edge };
   });
+  // Placeholder pruning (Phase 6): a boundary call that resolved to NOTHING must
+  // NOT persist a standalone `to: []` crossShard CallEdge. The single-program
+  // (exact) engine emits no such per-call-site catalog edge — it simply has no
+  // edge there (the intra-shard `to: []` placeholder the local pass left, which
+  // exact ALSO emits for its own unresolved sites, remains and is the parity
+  // representation). Persisting ~45k empty-`to` crossShard placeholders only
+  // bloated the catalog and formed the bulk of the guardrail's `structural`
+  // (unresolved-vs-absent) divergence partition. Bucket ONLY resolved edges; a
+  // declined site contributes nothing, so its intra placeholder is left intact
+  // (matching exact) rather than replaced by a crossShard placeholder.
+  // Keyed by OCCURRENCE via the shared identity module — `ownerEdgeKey(ownerHash,
+  // ownerFile)`, never `ownerHash` alone (ADR-0003: body-twins share a hash; an
+  // owner-hash bucket would union their edges into phantom cross-package coupling).
   const edgesByOwnerKey = bucketEdgesByOwner(
-    resolvedCalls,
+    resolvedCalls.filter(({ edge }) => edge.to.length > 0),
     ({ bc }) => ({ bodyHash: bc.ownerHash, filePath: bc.ownerFile }),
     ({ edge }) => edge,
   );
