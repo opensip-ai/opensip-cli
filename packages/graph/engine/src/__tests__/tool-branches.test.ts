@@ -193,20 +193,26 @@ describe('graph interactive --exact path honors graph config', () => {
     expect(result.type).toBe('graph-done');
   });
 
-  it('a bare default run routes to the static path even on a TTY (ADR-0032: sharded default is not live-view eligible)', async () => {
-    // Sharded is the default (ADR-0032); the Ink live runner only drives the
-    // EXACT engine, so a bare `graph` (no --exact) must route to the static
-    // path — never renderLive — regardless of TTY. This pins "TTY selects only
-    // the renderer for the chosen engine; it never changes the engine."
+  it('a bare default run takes the live view on a TTY (ADR-0032: the live renderer is engine-agnostic — drives the sharded default too)', async () => {
+    // Regression fix: the live runner is engine-agnostic — it drives WHICHEVER
+    // engine the `--exact` + shardability policy selects (sharded in-process /
+    // exact off-process). So a bare `graph` (sharded default) on a TTY MUST take
+    // the live view — same as `--exact` — restoring the staged "Code Graph"
+    // checklist that the earlier `opts.exact === true` gate had removed. This
+    // pins "TTY selects only the renderer; it never changes the engine" without
+    // tying the renderer to one engine.
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const { cli, renderLive, render } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
 
     await withTTY(true, () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>);
 
-    expect(renderLive).not.toHaveBeenCalled();
-    expect(render).toHaveBeenCalledTimes(1);
-    const [result] = render.mock.calls[0] as [{ type?: string }];
-    expect(result.type).toBe('graph-done');
+    expect(renderLive).toHaveBeenCalledTimes(1);
+    expect(render).not.toHaveBeenCalled();
+    // The live args carry the engine selector: `exact` (false here) + the
+    // pre-resolved shard set the runner uses to pick its transport.
+    const [, args] = renderLive.mock.calls[0] as [string, { exact?: boolean; shards?: readonly unknown[] }];
+    expect(args.exact).toBe(false);
+    expect(Array.isArray(args.shards)).toBe(true);
   });
 });
 

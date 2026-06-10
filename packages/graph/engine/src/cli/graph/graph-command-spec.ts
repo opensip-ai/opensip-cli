@@ -31,12 +31,13 @@ import { resolveSession } from '@opensip-tools/session-store';
 import { graphReplayFromSession } from '../../persistence/session-replay.js';
 import { resolveRecipeToRules } from '../../recipes/resolve.js';
 import { renderGraphLive } from '../graph-runner.js';
-import { executeGraph } from '../graph.js';
+import { executeGraph, resolveLiveEngineShards } from '../graph.js';
 import { runHeapPreflight } from '../heap-preflight.js';
 import { executeListFiles } from '../list-files.js';
 import { loadGraphConfig, resolveGraphRecipeSelection } from '../orchestrate.js';
 
 import type { GraphConfig, ResolutionMode, Rule } from '../../types.js';
+import type { Shard } from '../orchestrate/shard-model.js';
 import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -97,6 +98,8 @@ function setUpGraphLiveView(cli: ToolCliContext): void {
         config?: GraphConfig;
         rules?: readonly Rule[];
         recipe?: string;
+        exact?: boolean;
+        shards?: readonly Shard[];
       },
       cli.scope.datastore() as DataStore | undefined,
       { setExitCode: cli.setExitCode },
@@ -125,12 +128,33 @@ async function dispatchGraphLiveView(
   // `default`, ADR-0022), with config-sourced unknown names tolerantly
   // falling back to `default` and explicit-flag typos still hard-failing.
   const recipeSelection = resolveGraphRecipeSelection(opts.cwd, opts.recipe);
+  // Resolve the build engine HERE, on the dispatch seam — `resolveLiveEngineShards`
+  // needs the `cli` context (language registry + datastore) the React runner does
+  // not hold. The SAME policy the static path uses (ADR-0032): sharded when
+  // `--exact` is absent and the project yields >1 shard, exact otherwise. The
+  // runner reads `shards.length` to pick its transport (in-process sharded vs
+  // off-process exact worker). `isTTY` is never consulted — engine = exact +
+  // shardability alone.
+  const shards = await resolveLiveEngineShards(
+    {
+      cwd: opts.cwd,
+      noCache: opts.cache === false,
+      resolution,
+      exact: opts.exact,
+      cliScript: process.argv[1],
+    },
+    cli,
+  );
   await cli.renderLive(GRAPH_LIVE_VIEW_KEY, {
     cwd: opts.cwd,
     noCache: opts.cache === false,
     verbose: opts.verbose === true,
     quiet: opts.quiet === true,
     resolution,
+    // The engine selector (`--exact` + the pre-resolved shard set). Sharded runs
+    // in-process; exact forks the off-process worker (ADR-0028).
+    exact: opts.exact === true,
+    shards,
     // The recipe NAME (serializable) for the off-process worker, which
     // re-resolves rules itself (ADR-0028); `rules` below is the in-process path.
     ...(opts.recipe === undefined ? {} : { recipe: opts.recipe }),
@@ -211,22 +235,18 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
 
   // Determinism (ADR-0032, superseding ADR-0031): TTY selects only the RENDERER
   // (the Ink live view vs the static `executeGraph` text/JSON path), NEVER the
-  // build engine. The build engine is chosen downstream by `executeGraph`'s
-  // explicit `--exact` policy + shardability alone — never by `isTTY`.
-  //
-  // The Ink live runner drives the single-program (EXACT) build, so it is only
-  // eligible when the run resolves to the exact engine — i.e. when `--exact` is
-  // set. Sharded is now the default (ADR-0032), so a bare `graph` routes to the
-  // static path (the only path that can drive the sharded engine), in a terminal
-  // or piped. This keeps the engine decoupled from TTY: `--exact` runs exact
-  // (live in a terminal, static when piped) and the default runs sharded
-  // (static, regardless of TTY). Every other non-rendering mode (json/gate/
-  // report/profile/workspace/positional-paths/language) is excluded too.
+  // build engine. The build engine is chosen downstream — by `--exact` +
+  // shardability alone — and the live view drives WHICHEVER engine that policy
+  // selects (sharded in-process / exact off-process), so the live runner is
+  // engine-agnostic. A bare `graph` (sharded default) and `graph --exact` BOTH
+  // show the staged "Code Graph" checklist in a terminal; both fall through to
+  // the static path when piped. The live view is therefore eligible for any
+  // rendering run — there is no `--exact` gate. Every non-rendering mode (json/
+  // gate/report/profile/workspace/positional-paths/language) is excluded.
   const isLiveViewEligible =
     opts.json !== true
     && opts.gateSave !== true
     && opts.gateCompare !== true
-    && opts.exact === true
     /* v8 ignore next */
     && (typeof opts.reportTo !== 'string' || opts.reportTo.length === 0)
     && (typeof opts.profile !== 'string' || opts.profile.length === 0)
@@ -239,9 +259,9 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
   // In a pipe / CI / redirected run (non-TTY) it would emit garbled or
   // empty frames, so fall through to the static `executeGraph` path, whose
   // `graph-done` result is dual-rendered through the seam (`renderToText`)
-  // — the same report content (and the SAME exact engine, since live view is
-  // only eligible under `--exact`), consistent with the TTY final frame. Only
-  // the rendering surface differs by TTY.
+  // — the same report content (and the SAME engine the policy selects),
+  // consistent with the TTY final frame. Only the rendering surface differs
+  // by TTY.
   if (isLiveViewEligible && process.stdout.isTTY === true) {
     await dispatchGraphLiveView(opts, cli, resolution);
     return;

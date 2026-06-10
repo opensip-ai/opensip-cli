@@ -57,9 +57,15 @@ import React, { useEffect, useState } from 'react';
 import { assertFinalizedAcrossBoundary } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { STAGE_LABELS, toProgressEvent } from './graph-progress.js';
-import { buildLiveGraphOutput, persistSession, type LiveGraphOutput } from './graph.js';
+import {
+  buildLiveGraphOutput,
+  persistSession,
+  runShardedLiveBuild,
+  type LiveGraphOutput,
+} from './graph.js';
 import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 
+import type { Shard } from './orchestrate/shard-model.js';
 import type { GraphStage } from './orchestrate.js';
 import type { GraphConfig, ResolutionMode, Rule } from '../types.js';
 import type { DataStore } from '@opensip-tools/datastore';
@@ -142,6 +148,23 @@ interface GraphRunnerArgs {
    * fork boundary). The in-process fallback uses {@link GraphRunnerArgs.rules}.
    */
   readonly recipe?: string;
+  /**
+   * `--exact`: whether the user opted out of the default sharded engine. Threaded
+   * through so the live view drives the SAME engine the static path's policy
+   * selects (ADR-0032). `isTTY` NEVER affects the engine — only `exact` +
+   * shardability do.
+   */
+  readonly exact?: boolean;
+  /**
+   * The pre-resolved shard set (ADR-0032), computed on the dispatch seam
+   * (`dispatchGraphLiveView`, which holds the `cli` context the engine policy
+   * needs). `length > 1` ⇒ the SHARDED engine runs IN-PROCESS here (its shards
+   * are already subprocesses, so the render thread isn't doing the heavy build);
+   * otherwise the EXACT single-program engine runs OFF-process in the
+   * `graph-run-worker` (ADR-0028). Passed by reference in-process (the runner
+   * shares the dispatch process), so the file paths never cross an IPC boundary.
+   */
+  readonly shards?: readonly Shard[];
 }
 
 /** Run the pipeline through the in-process transport, mapping graph events to the
@@ -185,14 +208,26 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
     let cancelled = false;
     const startedAt = Date.now();
 
-    // Execute the build OFF the main process (ADR-0028): fork the CLI to
-    // `graph-run-worker`, which re-bootstraps the scope, re-resolves config +
-    // rules from the recipe name, runs the build, and streams stage progress +
-    // the slim LiveGraphOutput ({ signals, reportLines }) over IPC — so this
-    // process stays free to animate the checklist + 80ms clock during the (heavy)
-    // type-check. Falls back to the in-process closure (OPENSIP_TOOLS_NO_WORKER /
-    // fork failure), which reduces to the SAME LiveGraphOutput. The worker reads
-    // its serializable spec from a temp file cleaned up after the run.
+    // Engine policy (ADR-0032): the SHARDED engine is the default; `--exact`
+    // opts out. The engine is selected upstream on the dispatch seam (which holds
+    // the `cli` context) and handed to us as `args.shards` — `length > 1` ⇒
+    // sharded. `isTTY` NEVER affects this decision; we are only choosing the
+    // RENDERER's transport here, not the engine.
+    //
+    //   - SHARDED (default): run IN-PROCESS. Its shards are already subprocesses,
+    //     so the heavy parse/walk/resolve is off the render thread and the main
+    //     thread stays free to animate the checklist + 80ms clock while it awaits
+    //     the (I/O-bound) shard pool. No `graph-run-worker` fork needed.
+    //   - EXACT (`--exact` / not-shardable fallback): run the single-program build
+    //     OFF the main process (ADR-0028) — fork the CLI to `graph-run-worker`,
+    //     which streams stage progress + the slim LiveGraphOutput over IPC, so the
+    //     heavy in-process type-check never freezes the spinner. Falls back to the
+    //     in-process closure (OPENSIP_TOOLS_NO_WORKER / fork failure), which
+    //     reduces to the SAME LiveGraphOutput.
+    //
+    // Both transports converge on one `LiveGraphOutput` — already crossed the
+    // single suppression chokepoint (`buildLiveGraphOutput` → `finalizeGraphSignals`).
+    const sharded = (args.shards?.length ?? 0) > 1;
     const specDir = mkdtempSync(join(tmpdir(), 'graph-worker-'));
     const specPath = join(specDir, 'spec.json');
     writeFileSync(specPath, JSON.stringify({
@@ -202,8 +237,28 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
       ...(args.recipe === undefined ? {} : { recipe: args.recipe }),
     }), 'utf8');
     const run = runOffThreadOrInProcess<ProgressEvent, LiveGraphOutput>({
+      // Sharded runs in-process (shards are already subprocesses); exact forks the
+      // off-process worker. `preferWorker:false` forces the in-process arm for the
+      // sharded path — the descriptor is unused there but still required by the API.
+      preferWorker: !sharded,
       descriptor: { command: process.argv[1] ?? '', argv: ['graph-run-worker', specPath] },
-      inProcess: (emit) => runGraphWithProgress(args, datastore, emit),
+      inProcess: (emit) =>
+        sharded
+          ? runShardedLiveBuild(
+              {
+                cwd: args.cwd,
+                noCache: args.noCache,
+                resolution: args.resolution,
+                exact: args.exact,
+                config: args.config,
+                rules: args.rules,
+                cliScript: process.argv[1],
+              },
+              args.shards ?? [],
+              datastore,
+              (event) => emit(toProgressEvent(event)),
+            )
+          : runGraphWithProgress(args, datastore, emit),
     });
     setState({ phase: 'running', subscribe: run.onProgress });
 

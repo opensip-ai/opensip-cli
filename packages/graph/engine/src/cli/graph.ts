@@ -42,6 +42,7 @@ import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { resolveRecipeToRules } from '../recipes/resolve.js';
 import { mapOpenSipRuleIdToEngineSlug } from '../render/rule-id-mapping.js';
+import { currentRules } from '../rules/registry.js';
 
 import {
   assertFinalizedAcrossBoundary,
@@ -50,7 +51,13 @@ import {
 } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
-import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './graph-report.js';
+import {
+  buildLiveGraphOutput,
+  buildUnifiedReportLines,
+  countFiles,
+  resolutionBannerText,
+  type LiveGraphOutput,
+} from './graph-report.js';
 import { resolveCanonicalFileSet } from './orchestrate/canonical-file-set.js';
 import {
   detectMonorepoLayout,
@@ -68,9 +75,9 @@ import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { Shard } from './orchestrate/shard-model.js';
-import type { RunGraphResult } from './orchestrate.js';
+import type { GraphProgressCallback, RunGraphResult } from './orchestrate.js';
 import type { GraphProfileRunRecorder } from './profile.js';
-import type { Catalog, FeatureColumn, GraphConfig, Rule } from '../types.js';
+import type { Catalog, FeatureColumn, GraphConfig, ResolutionMode, Rule } from '../types.js';
 import type { GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-tools/contracts';
 import type { Signal, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
@@ -78,8 +85,8 @@ import type { DataStore } from '@opensip-tools/datastore';
 // Re-exports kept so the package barrel + cli/graph-runner.tsx + tests
 // keep using `cli/graph.js` as a single import site for these shapes.
 export type { GraphCommandOptions } from './graph-options.js';
-export { buildUnifiedReportLines, buildLiveGraphOutput, type LiveGraphOutput } from './graph-report.js';
-export type { UnifiedReportInput } from './graph-report.js';
+
+export type { UnifiedReportInput, LiveGraphOutput } from './graph-report.js';
 
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
 const MODULE_GRAPH_CLI = 'graph:cli';
@@ -359,6 +366,13 @@ interface ShardedBuildContext {
   readonly cli: ToolCliContext;
   readonly config: GraphConfig;
   readonly rules: readonly Rule[];
+  /**
+   * Optional progress callback (ADR-0032). The interactive live path threads the
+   * Ink renderer's emitter here so the sharded build emits the SAME seven-stage
+   * checklist the exact engine does. The static dispatch path leaves it
+   * undefined (the `--profile` recorder hooks the per-build timing separately).
+   */
+  readonly onProgress?: GraphProgressCallback;
 }
 
 /** Drive the sharded build and adapt it to the RunGraphResult dispatch shape. */
@@ -377,6 +391,7 @@ async function runShardedBuild(ctx: ShardedBuildContext): Promise<RunGraphResult
     rules,
     catalogRepo: datastore ? new CatalogRepo(datastore) : null,
     emitFeatures: DASHBOARD_FEATURE_COLUMNS,
+    ...(ctx.onProgress === undefined ? {} : { onProgress: ctx.onProgress }),
   });
   return {
     catalog: sharded.catalog,
@@ -400,6 +415,97 @@ async function runProfiledShardedBuild(
     `${String(ctx.shards.length)} shard(s)`,
   );
   return result;
+}
+
+/**
+ * The serializable live-build request the interactive runner (`graph-runner.tsx`)
+ * hands the engine. Mirrors the subset of {@link GraphCommandOptions} the
+ * whole-project live view exercises: cwd scope, cache/resolution tier, the
+ * resolved rule subset + config, and `exact` (which, with the project's
+ * shardability, selects the engine — ADR-0032). `cliScript` is needed to spawn
+ * the shard subprocesses for the in-process sharded path.
+ */
+export interface GraphLiveBuildArgs {
+  readonly cwd: string;
+  readonly noCache?: boolean;
+  readonly resolution?: ResolutionMode;
+  readonly exact?: boolean;
+  readonly config?: GraphConfig;
+  readonly rules?: readonly Rule[];
+  readonly cliScript?: string;
+}
+
+/**
+ * Resolve the build engine for the interactive live path — the SAME policy
+ * `executeGraph` uses (ADR-0032): the SHARDED engine when `--exact` is absent
+ * and the project yields >1 non-empty shard, the EXACT (single-program) engine
+ * otherwise. Returns the shard set (`length > 1` ⇒ sharded) so the live runner
+ * can decide its transport: sharded runs in-process (its shards are already
+ * subprocesses), exact runs off-process in the `graph-run-worker` (ADR-0028).
+ * `isTTY` is NEVER consulted — the engine is a pure function of the request +
+ * shardability, identical to the static path.
+ */
+export async function resolveLiveEngineShards(
+  args: GraphLiveBuildArgs,
+  cli: ToolCliContext,
+): Promise<Shard[]> {
+  const opts: GraphCommandOptions = {
+    cwd: args.cwd,
+    noCache: args.noCache,
+    resolution: args.resolution,
+    exact: args.exact,
+    ...(args.cliScript === undefined ? {} : { cliScript: args.cliScript }),
+  };
+  // No positional paths in the whole-project live view, so the engine decision
+  // is `--exact` + shardability alone.
+  return resolveEngineShards(opts, cli, []);
+}
+
+/**
+ * Run the SHARDED build in-process for the live view and reduce it to the slim,
+ * serializable {@link LiveGraphOutput} the interactive runner consumes —
+ * IDENTICAL in shape to what the off-process exact worker streams back, so both
+ * live transports converge on one payload. The heavy per-shard parse/walk/resolve
+ * runs in the shard SUBPROCESSES, so the main thread (which animates the Ink
+ * checklist) is only orchestrating + merging — no off-process worker is needed
+ * for the sharded path (ADR-0032). Progress events flow through `onProgress`,
+ * mapped onto the same seven canonical stages the exact engine emits.
+ *
+ * Crosses the single suppression chokepoint via {@link buildLiveGraphOutput}
+ * (against `args.cwd`, the build root) — so the live sharded path waives
+ * `@graph-ignore` directives IDENTICALLY to the static/exact paths (ADR-0014/0031).
+ */
+export async function runShardedLiveBuild(
+  args: GraphLiveBuildArgs,
+  shards: readonly Shard[],
+  datastore: DataStore | undefined,
+  onProgress: GraphProgressCallback,
+): Promise<LiveGraphOutput> {
+  const result = await runShardedGraph({
+    shards,
+    projectRoot: args.cwd,
+    cliScript: args.cliScript ?? process.argv[1] ?? '',
+    adapter: pickAdapter(args.cwd),
+    resolutionMode: args.resolution ?? 'exact',
+    useCache: args.noCache !== true,
+    config: args.config ?? {},
+    // The live dispatch always resolves the recipe → rules; fall back to the
+    // full registered set if a programmatic caller omits them (parity with the
+    // exact path, where `runGraph` applies the same `?? currentRules()` default).
+    rules: args.rules ?? currentRules(),
+    catalogRepo: datastore ? new CatalogRepo(datastore) : null,
+    emitFeatures: DASHBOARD_FEATURE_COLUMNS,
+    onProgress,
+  });
+  return buildLiveGraphOutput(
+    {
+      catalog: result.catalog,
+      indexes: result.indexes,
+      signals: result.signals,
+      cacheHit: result.cacheHit,
+    },
+    args.cwd,
+  );
 }
 
 /** Profile bucket for the run shape: workspace fan-out, multi-path, or single graph. */
@@ -930,3 +1036,5 @@ export function handleGraphError(label: string, error: unknown, cli: ToolCliCont
   }
   process.stderr.write(`${label}: ${error instanceof Error ? error.message : String(error)}\n`);
 }
+
+export {buildUnifiedReportLines, buildLiveGraphOutput} from './graph-report.js';
