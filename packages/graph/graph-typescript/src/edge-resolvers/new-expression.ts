@@ -9,7 +9,7 @@
 
 import ts from 'typescript';
 
-import { findCatalogEntry } from '../edge-helpers/find-catalog-entry.js';
+import { resolveDeclToHash } from '../edge-helpers/resolve-decl.js';
 import { unaliasSymbol } from '../edge-helpers/unalias-symbol.js';
 
 import type { EdgeResolver } from './types.js';
@@ -40,7 +40,7 @@ export const resolveNewExpression: EdgeResolver<ts.NewExpression> = (node, ctx) 
     const sf = d.getSourceFile();
     /* v8 ignore next */
     const candidateNames = className ? [className] : [];
-    const hash = findCatalogEntry(ctor, sf, ctx.catalog, candidateNames);
+    const hash = resolveDeclToHash(ctor, sf, candidateNames, ctx);
     if (hash) {
       return { to: [hash], resolution: 'constructor', confidence: 'high' };
     }

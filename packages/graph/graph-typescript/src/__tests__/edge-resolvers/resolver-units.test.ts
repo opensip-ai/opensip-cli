@@ -17,11 +17,13 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+import { buildCrossPackageContext } from '../../edge-helpers/cross-package-context.js';
 import { resolveDirectCall } from '../../edge-resolvers/direct-call.js';
 import { resolveJsxElement } from '../../edge-resolvers/jsx-element.js';
 import { resolveNewExpression } from '../../edge-resolvers/new-expression.js';
 import { resolvePolymorphicCall } from '../../edge-resolvers/polymorphic.js';
 import { resolvePropertyAccessCall } from '../../edge-resolvers/property-access.js';
+import { buildImportSpecifierIndex } from '../../edge-resolvers/syntactic.js';
 import { walkProgram } from '../../walk.js';
 
 import type { ResolverContext } from '../../edge-resolvers/types.js';
@@ -102,7 +104,15 @@ function ctxFor(
   catalog: Catalog,
   sourceFile: ts.SourceFile,
 ): ResolverContext {
-  return { catalog, program, typeChecker, sourceFile, projectDirAbs: PROJECT_DIR };
+  return {
+    catalog,
+    program,
+    typeChecker,
+    sourceFile,
+    projectDirAbs: PROJECT_DIR,
+    crossPackage: buildCrossPackageContext(catalog, PROJECT_DIR),
+    importSpecifiers: buildImportSpecifierIndex(sourceFile),
+  };
 }
 
 /** Find the first node matching `pred` in a source file. */

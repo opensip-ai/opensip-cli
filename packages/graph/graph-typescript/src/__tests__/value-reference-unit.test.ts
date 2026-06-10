@@ -13,6 +13,8 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+import { buildCrossPackageContext } from '../edge-helpers/cross-package-context.js';
+import { buildImportSpecifierIndex } from '../edge-resolvers/syntactic.js';
 import { isValueReference, resolveValueReference } from '../edges-value-reference.js';
 
 import type { ResolverContext } from '../edge-resolvers/types.js';
@@ -202,6 +204,8 @@ describe('resolveValueReference — symbol resolution branches', () => {
       typeChecker,
       sourceFile: sf,
       projectDirAbs: PROJECT_DIR,
+      crossPackage: buildCrossPackageContext(catalog, PROJECT_DIR),
+      importSpecifiers: buildImportSpecifierIndex(sf),
     };
     // Re-read the program's copy of the source file so symbols bind.
     const boundSf = program.getSourceFile(fileAbs)!;

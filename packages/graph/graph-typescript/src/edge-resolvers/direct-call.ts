@@ -9,7 +9,7 @@
 import ts from 'typescript';
 
 import { DeclShape, functionLikeFromDeclaration } from '../edge-helpers/declaration-to-node.js';
-import { findCatalogEntry } from '../edge-helpers/find-catalog-entry.js';
+import { resolveDeclToHash } from '../edge-helpers/resolve-decl.js';
 import { unaliasSymbol } from '../edge-helpers/unalias-symbol.js';
 
 import type { EdgeResolver } from './types.js';
@@ -41,7 +41,7 @@ export const resolveDirectCall: EdgeResolver<ts.CallExpression> = (node, ctx) =>
     const sf = d.getSourceFile();
     const declNode = functionLikeFromDeclaration(d, ACCEPT);
     if (!declNode) continue;
-    const hash = findCatalogEntry(declNode, sf, ctx.catalog, [name]);
+    const hash = resolveDeclToHash(declNode, sf, [name], ctx);
     if (hash) {
       return { to: [hash], resolution: 'static', confidence: 'high' };
     }

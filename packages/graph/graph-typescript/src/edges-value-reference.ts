@@ -14,7 +14,7 @@
 
 import ts from 'typescript';
 
-import { findCatalogEntry } from './edge-helpers/find-catalog-entry.js';
+import { resolveDeclToHash } from './edge-helpers/resolve-decl.js';
 
 import type { ResolverContext } from './edge-resolvers/types.js';
 import type { ResolverVerdict } from '@opensip-tools/graph';
@@ -123,7 +123,7 @@ function hashFromDeclaration(
     const ctor = findClassConstructor(d);
     if (!ctor) return null;
     const className = d.name?.text;
-    return findCatalogEntry(ctor, d.getSourceFile(), ctx.catalog, className ? [className] : []);
+    return resolveDeclToHash(ctor, d.getSourceFile(), className ? [className] : [], ctx);
   }
   if (
     ts.isFunctionDeclaration(d) ||
@@ -131,12 +131,12 @@ function hashFromDeclaration(
     ts.isFunctionExpression(d) ||
     ts.isMethodDeclaration(d)
   ) {
-    return findCatalogEntry(d, d.getSourceFile(), ctx.catalog, [fallbackName]);
+    return resolveDeclToHash(d, d.getSourceFile(), [fallbackName], ctx);
   }
   if (ts.isVariableDeclaration(d) && d.initializer) {
     const init = d.initializer;
     if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) {
-      return findCatalogEntry(init, d.getSourceFile(), ctx.catalog, [fallbackName]);
+      return resolveDeclToHash(init, d.getSourceFile(), [fallbackName], ctx);
     }
   }
   return null;

@@ -21,10 +21,13 @@ import {
   createMutableStats,
   ownerEdgeKey,
   pushCreationEdge as pushSharedCreationEdge,
+  resolveSpecifierToPackage,
   truncateForCallEdge,
 } from '@opensip-tools/graph';
 import ts from 'typescript';
 
+import { buildCrossPackageContext } from './edge-helpers/cross-package-context.js';
+import { unaliasSymbol } from './edge-helpers/unalias-symbol.js';
 import { resolveByCatalogFallback } from './edge-resolvers/catalog-fallback.js';
 import { resolveDirectCall } from './edge-resolvers/direct-call.js';
 import { resolveJsxElement } from './edge-resolvers/jsx-element.js';
@@ -33,6 +36,7 @@ import { resolvePolymorphicCall } from './edge-resolvers/polymorphic.js';
 import { resolvePropertyAccessCall } from './edge-resolvers/property-access.js';
 import {
   buildImportIndex,
+  buildImportSpecifierIndex,
   collectKnownFiles,
   resolveSyntactic,
   type ImportIndex,
@@ -110,6 +114,18 @@ export async function resolveEdgesFromRecords(
   const stats = createMutableStats();
   const sink: EdgeSink = { edgesByOwner: callsByHash, stats };
 
+  // Cross-package resolution context (export index + manifest index) — the SAME
+  // model the sharded linker uses. Built once for the whole resolve stage so a
+  // workspace `@scope/pkg` call resolves to the SOURCE occurrence instead of the
+  // type checker's bodiless `dist/*.d.ts` declaration (ADR — exact↔sharded
+  // convergence). The per-file raw-import-specifier index (binding name → raw
+  // specifier) is built lazily and cached, mirroring the boundary extractor.
+  const crossPackage = buildCrossPackageContext(input.catalog, input.projectDirAbs);
+  // One import-specifier index per source file, built lazily and cached inline in
+  // the loop below (the cache Map is a local of THIS function, like the fast
+  // path's `importIndexByFile`).
+  const importSpecifiersByFile = new Map<ts.SourceFile, ReadonlyMap<string, string>>();
+
   let processed = 0;
   for (const r of input.callSites) {
     // Cooperative yield (ADR-0016): resolve is the heaviest stage (tens of
@@ -129,12 +145,19 @@ export async function resolveEdgesFromRecords(
       pushSharedCreationEdge(tsPosition(r.node, r.sourceFile), ownerKey, r.childHash, sink);
       continue;
     }
+    let importSpecifiers = importSpecifiersByFile.get(r.sourceFile);
+    if (importSpecifiers === undefined) {
+      importSpecifiers = buildImportSpecifierIndex(r.sourceFile);
+      importSpecifiersByFile.set(r.sourceFile, importSpecifiers);
+    }
     const ctx: ResolverContext = {
       catalog: input.catalog,
       program: input.program,
       typeChecker: checker,
       sourceFile: r.sourceFile,
       projectDirAbs: input.projectDirAbs,
+      crossPackage,
+      importSpecifiers,
     };
     const verdict = computeVerdict(r.node, ctx);
     if (verdict === null) continue;
@@ -328,7 +351,7 @@ function dispatchCall(
   if (ts.isIdentifier(node.expression)) {
     const direct = resolveDirectCall(node, ctx);
     if (direct.to.length > 0) return direct;
-    return resolveByCatalogFallback(node.expression.text, ctx.catalog);
+    return fallbackWithBinding(node.expression, node.expression.text, ctx);
   }
   // Property access call: obj.method()
   if (ts.isPropertyAccessExpression(node.expression)) {
@@ -336,10 +359,74 @@ function dispatchCall(
     if (direct.to.length > 0) return direct;
     const poly = resolvePolymorphicCall(node, ctx);
     if (poly.to.length > 0) return poly;
-    // Fallback: look up by the rightmost simple name.
-    return resolveByCatalogFallback(node.expression.name.text, ctx.catalog);
+    // Fallback: look up by the rightmost simple name (binding-gated).
+    return fallbackWithBinding(node.expression, node.expression.name.text, ctx);
   }
   return { to: [], resolution: 'unknown', confidence: 'low' };
+}
+
+const UNRESOLVED_VERDICT: ResolverVerdict = { to: [], resolution: 'unknown', confidence: 'low' };
+
+/**
+ * Binding-gated catalog fallback. The unique-name catalog lookup
+ * ({@link resolveByCatalogFallback}) only fires when the call site has a binding
+ * that points INTO the project. A project binding is any of:
+ *
+ *   - the callee expression's resolved symbol has an IN-PROJECT SOURCE
+ *     declaration (a `.ts(x)` file, not a `.d.ts`). This is the receiver/type
+ *     case the import graph can't see: `g.greet()` where `g: Greeter` resolves
+ *     to the interface method declared in a project source file, even though
+ *     `greet` was never imported by name;
+ *   - the name is imported via a RELATIVE specifier (`./x`) — intra-package; or
+ *   - the name is imported via a WORKSPACE specifier (`@scope/pkg`) the manifest
+ *     index knows — inter-package; or
+ *   - a same-named occurrence is DEFINED in this file.
+ *
+ * A callee whose symbol resolves only into an EXTERNAL/ambient `.d.ts` (Vitest's
+ * `describe`, `process.cwd`, a `Map`'s `.set`/`.get`) has NO project binding:
+ * the real target is outside the catalog, so a unique project function sharing
+ * the simple name would be a phantom. Without a project binding we decline —
+ * decline-beats-guess.
+ */
+function fallbackWithBinding(
+  calleeExpr: ts.Expression,
+  name: string,
+  ctx: ResolverContext,
+): ResolverVerdict {
+  if (!hasProjectBinding(calleeExpr, name, ctx)) return UNRESOLVED_VERDICT;
+  return resolveByCatalogFallback(name, ctx.catalog);
+}
+
+/** True when the call's callee binds into the project (see {@link fallbackWithBinding}). */
+function hasProjectBinding(calleeExpr: ts.Expression, name: string, ctx: ResolverContext): boolean {
+  if (symbolHasInProjectSourceDecl(calleeExpr, ctx)) return true;
+  const spec = ctx.importSpecifiers.get(name);
+  if (spec !== undefined) {
+    if (spec.startsWith('.')) return true; // relative → intra-project
+    // Bare specifier → only a project binding if it resolves to a workspace pkg.
+    return resolveSpecifierToPackage(spec, ctx.crossPackage.manifestIndex) !== undefined;
+  }
+  const sameFileRel = relative(ctx.projectDirAbs, ctx.sourceFile.fileName).split(sep).join('/');
+  return (ctx.catalog.functions[name] ?? []).some((o) => o.filePath === sameFileRel);
+}
+
+/**
+ * True when the callee expression's resolved symbol has at least one declaration
+ * in an IN-PROJECT SOURCE file (a non-`.d.ts` source file in the program). This
+ * is the binding the import graph can't express: a receiver-typed method call
+ * (`g.greet()` where `g: Greeter`) whose target is declared in project source,
+ * even though the method name was never imported. A symbol that resolves only
+ * into `.d.ts` (external / ambient) declarations fails this check, so the
+ * name-only fallback stays declined for globals.
+ */
+function symbolHasInProjectSourceDecl(calleeExpr: ts.Expression, ctx: ResolverContext): boolean {
+  const symbol = ctx.typeChecker.getSymbolAtLocation(calleeExpr);
+  if (!symbol) return false;
+  const real = unaliasSymbol(symbol, ctx.typeChecker);
+  for (const d of real.getDeclarations() ?? []) {
+    if (!d.getSourceFile().isDeclarationFile) return true;
+  }
+  return false;
 }
 
 /**

@@ -13,7 +13,7 @@
 import ts from 'typescript';
 
 import { DeclShape, functionLikeFromDeclaration } from '../edge-helpers/declaration-to-node.js';
-import { findCatalogEntry } from '../edge-helpers/find-catalog-entry.js';
+import { resolveDeclToHash } from '../edge-helpers/resolve-decl.js';
 import { unaliasSymbol } from '../edge-helpers/unalias-symbol.js';
 
 import type { EdgeResolver } from './types.js';
@@ -43,14 +43,31 @@ export const resolveJsxElement: EdgeResolver<JsxOpeningLike> = (node, ctx) => {
   const decls = real.getDeclarations() ?? [];
 
   const candidateName = ts.isIdentifier(tagName) ? tagName.text : tagName.getText();
+  // Cross-package binding name: `<Foo/>` binds `Foo`; `<A.B/>` binds the leftmost
+  // identifier `A` (the namespace import). The exported callee name to look up
+  // stays `candidateName`.
+  const bindingNames = jsxBindingNames(tagName, candidateName);
   for (const d of decls) {
     const sf = d.getSourceFile();
     const declNode = functionLikeFromDeclaration(d, ACCEPT);
     if (!declNode) continue;
-    const hash = findCatalogEntry(declNode, sf, ctx.catalog, [candidateName]);
+    const hash = resolveDeclToHash(declNode, sf, [candidateName], ctx, bindingNames);
     if (hash) {
       return { to: [hash], resolution: 'jsx', confidence: 'high' };
     }
   }
   return UNRESOLVED;
 };
+
+/**
+ * The local binding name(s) a JSX tag could be imported under: the tag itself
+ * for `<Foo/>`, plus the leftmost identifier for a qualified `<A.B.C/>` tag (the
+ * namespace import `A`). Deduped, binding candidates first.
+ */
+function jsxBindingNames(tagName: ts.JsxTagNameExpression, candidateName: string): readonly string[] {
+  const names = new Set<string>([candidateName]);
+  let cur: ts.Node = tagName;
+  while (ts.isPropertyAccessExpression(cur)) cur = cur.expression;
+  if (ts.isIdentifier(cur)) names.add(cur.text);
+  return [...names];
+}

@@ -15,7 +15,16 @@ import type ts from 'typescript';
 
 /**
  * Returns the bodyHash if the declaration's hash is present in the
- * catalog under any simpleName key. Returns null otherwise.
+ * catalog under one of `candidateNames`. Returns null otherwise.
+ *
+ * Matching is strictly (candidate simple name) × (body hash): the declaration's
+ * hashed source body must equal a cataloged occurrence's `bodyHash` UNDER THE
+ * NAME the call site addressed. The old whole-catalog hash scan (any name) was
+ * removed — for an in-project declaration the correct name bucket is always one
+ * of `candidateNames` (the callee/declaration name), so the scan only ever
+ * fired on a `.d.ts` (bodiless) hash that happened to collide, fabricating
+ * phantom edges. Cross-package (`.d.ts`) resolution now goes through
+ * `resolveDeclToHash`'s export-index path, never this hasher.
  */
 export function findCatalogEntry(
   decl: ts.Node,
@@ -30,17 +39,7 @@ export function findCatalogEntry(
     const hit = candidates.find((c) => c.bodyHash === bodyHash);
     if (hit) return hit.bodyHash;
   }
-  /* v8 ignore start */
-  // Fallback: scan all own keys (rare path; used when caller can't
-  // narrow the candidate names).
-  for (const key of Object.keys(catalog.functions)) {
-    const occs = lookup(catalog, key);
-    if (!occs) continue;
-    const hit = occs.find((c) => c.bodyHash === bodyHash);
-    if (hit) return hit.bodyHash;
-  }
   return null;
-  /* v8 ignore stop */
 }
 
 function lookup(catalog: Catalog, name: string): readonly FunctionOccurrence[] | null {

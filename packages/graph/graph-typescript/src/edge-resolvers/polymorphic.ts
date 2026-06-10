@@ -7,7 +7,7 @@
 import ts from 'typescript';
 
 import { DeclShape, functionLikeFromDeclaration } from '../edge-helpers/declaration-to-node.js';
-import { findCatalogEntry } from '../edge-helpers/find-catalog-entry.js';
+import { resolveDeclToHash } from '../edge-helpers/resolve-decl.js';
 
 import type { EdgeResolver } from './types.js';
 
@@ -64,7 +64,7 @@ function appendHashesForSymbol(
   for (const d of decls) {
     const declNode = functionLikeFromDeclaration(d, ACCEPT);
     if (!declNode) continue;
-    const hash = findCatalogEntry(declNode, d.getSourceFile(), ctx.catalog, [methodName]);
+    const hash = resolveDeclToHash(declNode, d.getSourceFile(), [methodName], ctx);
     if (hash && !out.includes(hash)) out.push(hash);
   }
 }
