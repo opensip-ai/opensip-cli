@@ -25,6 +25,23 @@
  * the SAME engine helpers the linker uses (`resolveSpecifierToPackage` +
  * `buildExportIndex`), so the single-program oracle and the sharded linker agree
  * by construction — and both decline the phantom.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * SCOPE / WHAT THIS TEST DOES *NOT* COVER — read before trusting it as the gate:
+ *
+ * This is a FAST PR-gate SANITY check, NOT the authoritative equivalence gate.
+ * Because BOTH engines build through the SYNTHETIC text adapter that reuses the
+ * production cross-package helpers, they AGREE BY CONSTRUCTION — this test
+ * structurally CANNOT model the REAL TypeScript `dist/*.d.ts` resolution, where
+ * a `@scope/pkg` import binds to a BUILT, BODILESS declaration file. That is the
+ * exact divergence class the exact-engine-under-resolution bug lived in, and
+ * this fixture-driven test could never have caught it.
+ *
+ * The REAL guardrail is the dogfood CI step `graph-equivalence-check` (npm
+ * `graph:equivalence:ci`), which builds BOTH catalogs on this real monorepo with
+ * the real adapter (real dist/*.d.ts resolution) and ratchets the production
+ * divergence against `.config/graph-equivalence-budget.json`. Do NOT mistake a
+ * green run here for byte-equivalence on real code.
  */
 
 import { dirname, join } from 'node:path';

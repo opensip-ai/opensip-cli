@@ -1,13 +1,29 @@
 /**
- * THE PHASE-4 GATE — repo-scale sharded ≡ exact equivalence oracle.
+ * repo-scale sharded ≡ exact equivalence oracle (FAST PR-gate SANITY check).
  *
- * This is the hard gate that authorizes flipping the default engine to sharded
- * (Phase 4): the SHARDED build must be byte-equivalent to the SINGLE-PROGRAM
- * (exact) build on the FULL `CatalogEquivalence` — function set + intra/cross
- * edges + SCCs — over a medium multi-package fixture big enough to exercise the
- * real divergence classes, yet small enough that the EXACT engine (the oracle)
- * completes in single-digit milliseconds. It runs under `pnpm test` (Vitest), so
- * it is already in the PR gate; if this test goes red, Phase 4 does not proceed.
+ * The SHARDED build must be byte-equivalent to the SINGLE-PROGRAM (exact) build
+ * on the FULL `CatalogEquivalence` — function set + intra/cross edges + SCCs —
+ * over a medium multi-package fixture big enough to exercise the real divergence
+ * classes, yet small enough that the EXACT engine (the oracle) completes in
+ * single-digit milliseconds. It runs under `pnpm test` (Vitest), so it is in the
+ * PR gate.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * THIS IS NOT THE AUTHORITATIVE GATE — it does NOT exercise real dist/*.d.ts
+ * resolution. Both engines build through the SYNTHETIC `createEquivalenceHarness`
+ * adapter that reuses the production cross-package helpers
+ * (`resolveSpecifierToPackage` + `buildExportIndex`), so they AGREE BY
+ * CONSTRUCTION. A real `@scope/pkg` import that Node16 resolves to a BUILT,
+ * BODILESS `dist/*.d.ts` — the divergence class the exact-engine-under-resolution
+ * bug lived in — is structurally unrepresentable here, so this fixture-driven
+ * test could never have caught it (false confidence).
+ *
+ * The REAL guardrail is the dogfood CI step `graph-equivalence-check` (npm
+ * `graph:equivalence:ci`): it builds BOTH catalogs on this real monorepo with the
+ * real adapter (real dist/*.d.ts resolution) and ratchets the production
+ * divergence against `.config/graph-equivalence-budget.json`. Keep this fast test
+ * as a sanity check, but the dogfood step is what protects against an
+ * edge-resolution regression on real code.
  *
  * ── DIVERGENCE CLASSES the medium fixture (`__fixtures__/medium-pkg`) covers ──
  *   - DEEP cross-package chain      : app -> svc-b -> svc-a -> {core, util}.
