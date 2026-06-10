@@ -21,6 +21,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'heavy-import-detection': ['📦', 'Heavy Import Detection'],
   'interface-implementation-consistency': ['📋', 'Interface Implementation Consistency'],
   'live-runs-off-thread': ['🧵', 'Live Runs Off Thread'],
+  'no-bodyhash-keying-outside-identity': ['🧬', 'No BodyHash Keying Outside Identity'],
   'no-custom-event-emitter': ['📨', 'No Custom Event Emitter'],
   'no-direct-stdout-in-tool-engine': ['📤', 'No Direct Stdout In Tool Engine'],
   'no-config-loader-outside-config': ['🔐', 'No Config Loader Outside Config'],
