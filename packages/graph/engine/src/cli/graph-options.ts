@@ -71,11 +71,12 @@ export interface GraphCommandOptions {
    * ADR-0031): the build engine is chosen by THIS explicit flag (plus the
    * project's shardability) — never by `process.stdout.isTTY` or on-disk
    * discovery state. A bare `graph` uses the SHARDED engine (the default,
-   * proven byte-equivalent to exact by the repo-scale equivalence guardrail);
+   * equivalent to exact within the CI-ratcheted budget held by the
+   * equivalence guardrails; ADR-0032 amendment 2026-06-10);
    * `--exact` forces the single-program engine.
    *
-   * The sharded engine is faster on large multi-package repos and — now that
-   * it is proven byte-equivalent to exact — is the authoritative default.
+   * The sharded engine is faster on large multi-package repos and — with
+   * equivalence held by the guardrails — is the authoritative default.
    * `--exact` is the escape hatch for small/single-package repos (where exact
    * is the natural path anyway) and the oracle used to verify equivalence.
    * Sharding is always skipped for the whole-`--workspace` fan-out (which

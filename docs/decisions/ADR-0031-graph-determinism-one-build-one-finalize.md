@@ -7,8 +7,9 @@ owner: opensip-tools
 # ADR-0031: Graph determinism — one build, one finalize, many renderers
 
 > **Superseded by [ADR-0032](./ADR-0032-sharded-engine-default.md).** ADR-0032 flips
-> the **default engine** to sharded (now proven byte-equivalent to exact by the
-> repo-scale equivalence guardrail) and replaces `--sharded` with `--exact`. Every
+> the **default engine** to sharded (equivalent to exact within the CI-ratcheted
+> budget held by the equivalence guardrails — see ADR-0032's 2026-06-10
+> amendment) and replaces `--sharded` with `--exact`. Every
 > other invariant in this ADR — the single `finalizeGraphSignals` suppression seam,
 > the branded `FinalizedSignals` type, `isTTY` selecting only the renderer, and the
 > `mode=exact|sharded` cache stamping — is retained unchanged.

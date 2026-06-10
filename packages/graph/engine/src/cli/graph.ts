@@ -27,7 +27,7 @@
  */
 
 import { realpathSync } from 'node:fs';
-import { isAbsolute, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 import { EXIT_CODES, passRate } from '@opensip-tools/contracts';
 import {
@@ -170,15 +170,16 @@ export async function executeGraph(
     // emitted paths byte-identical. Shard discovery already realpaths internally
     // (discoverFiles → normalizeProjectDir), so the shard files and this root now
     // share the same canonical base.
-    const runCwd = realpathOrSelf(positionalPaths[0] ?? opts.cwd);
+    const runCwd = realpathOrSelf(positionalPaths[0] ?? opts.cwd, opts.cwd);
     // Honor the project's `graph:` config block (rule knobs like
     // minCrossPackageDuplicatePackages). Resolved from the original cwd so a
     // positional subtree run still picks up the project-root config.
     const config = loadGraphConfig(opts.cwd);
     // Determinism (ADR-0032, superseding ADR-0031): the build engine is chosen
     // by an explicit, deterministic policy — the SHARDED engine is the DEFAULT
-    // (proven byte-equivalent to exact by the repo-scale equivalence guardrail),
-    // and `--exact` opts OUT to the single-program engine. It is NOT chosen by
+    // (equivalent to exact within the CI-ratcheted budget held by the
+    // equivalence guardrails; see ADR-0032's 2026-06-10 amendment), and
+    // `--exact` opts OUT to the single-program engine. It is NOT chosen by
     // `process.stdout.isTTY` or on-disk discovery state, so a bare `graph` builds
     // the same catalog whether run in a terminal, piped, or under
     // `--gate-*`/`--json`. When the project can't shard (no worker script,
@@ -227,8 +228,9 @@ export async function executeGraph(
 
 /**
  * Engine-selection policy (ADR-0032, superseding ADR-0031). The SHARDED engine
- * is the DEFAULT — proven byte-equivalent to exact by the repo-scale
- * equivalence guardrail (`equivalence-repo-scale.test.ts`). Returns the shard
+ * is the DEFAULT — equivalent to exact within the CI-ratcheted budget held by
+ * the equivalence guardrails (`equivalence-repo-scale.test.ts` fixture +
+ * `graph-equivalence-check` real-repo ratchet; ADR-0032 amendment). Returns the shard
  * set whenever the project can actually shard (>1 non-empty shard); returns an
  * empty array (→ the EXACT single-program engine) when `--exact` is passed OR
  * the project isn't shardable (single-package / flat / discovery failure — the
@@ -244,14 +246,17 @@ export async function executeGraph(
  *     natural single-package path.
  */
 /**
- * Resolve a path to absolute, then realpath it (follow symlinks) — the SAME
- * normalization the exact engine's `normalizeProjectDir` applies, so both
- * engines see one canonical run root (F3). Falls back to the absolute path if
- * realpath fails (e.g. the path doesn't exist yet — discovery reports the error
- * downstream). Idempotent on an already-canonical path.
+ * Resolve a path to absolute (a RELATIVE input resolves against `base` —
+ * the command's `opts.cwd`, NOT `process.cwd()`, which may differ when the
+ * CLI is hosted), then realpath it (follow symlinks) — the SAME normalization
+ * the exact engine's `normalizeProjectDir` applies, so both engines see one
+ * canonical run root (F3). Falls back to the absolute path if realpath fails
+ * (e.g. the path doesn't exist yet — discovery reports the error downstream).
+ * Idempotent on an already-canonical path.
  */
-function realpathOrSelf(input: string): string {
-  const absolute = isAbsolute(input) ? input : resolve(input);
+function realpathOrSelf(input: string, base: string): string {
+  // `resolve(base, input)` returns `input` unchanged when it is already absolute.
+  const absolute = resolve(base, input);
   try {
     return realpathSync(absolute);
   } catch {

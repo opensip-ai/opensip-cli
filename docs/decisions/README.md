@@ -190,8 +190,10 @@ distinct from:
   discovered, trust-gated, and routed through the same admit → import → register
   path bundled/installed tools travel. `plugin add --project` stays `installed`
 - [ADR-0032](./ADR-0032-sharded-engine-default.md) — The **sharded** engine is
-  the graph default (proven byte-equivalent to exact by the repo-scale
-  `equivalence-repo-scale` guardrail), and **`--exact` is the opt-out** (the
+  the graph default (byte-equal to exact on the `equivalence-repo-scale` fixture
+  guardrail; equivalent within a characterized, CI-ratcheted residual budget on
+  real repos via `graph-equivalence-check` — see the 2026-06-10 amendment), and
+  **`--exact` is the opt-out** (the
   small/single-package/oracle escape hatch). `--sharded` is removed. A bare
   `graph` shards when the project is shardable and falls back to exact when it
   isn't; `isTTY` still selects only the renderer, never the engine; the catalog

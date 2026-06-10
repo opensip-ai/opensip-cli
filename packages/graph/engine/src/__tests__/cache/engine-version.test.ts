@@ -38,7 +38,8 @@ describe('stampEngineVersion', () => {
 
   it('folds the engine MODE so exact and sharded keys never collide (ADR-0032)', () => {
     // The exact (single-program) and sharded engines share the one
-    // `graph_catalog` row. Though now proven byte-equivalent (ADR-0032), a mode
+    // `graph_catalog` row. Though equivalent within the budgeted residual
+    // (ADR-0032 + 2026-06-10 amendment), a mode
     // switch must still be a clean cacheKey mismatch — independent cache
     // lineages, never a silent cross-engine read. Same adapter key, different
     // mode ⇒ different cacheKey.

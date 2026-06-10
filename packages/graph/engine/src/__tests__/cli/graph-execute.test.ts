@@ -261,8 +261,8 @@ describe('executeGraph — render dispatch', () => {
 
   it('uses the SHARDED engine by default for a shardable project (ADR-0032)', async () => {
     // A bare run (no --exact) on a shardable repo builds with the SHARDED
-    // engine — the default proven byte-equivalent to exact by the repo-scale
-    // guardrail.
+    // engine — the default, equivalent to exact within the CI-ratcheted
+    // budget held by the equivalence guardrails (ADR-0032 amendment).
     registerLargeFlatAdapter(projectDir);
     const fakeCliPath = writeFakeShardCli(projectDir);
     const profilePath = join(projectDir, 'profile-default.json');

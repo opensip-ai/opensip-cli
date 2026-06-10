@@ -40,7 +40,8 @@ const ENGINE_VERSION_PREFIX = 'eng=';
 /**
  * The two build engines whose catalogs share the single `graph_catalog`
  * row (id=1). The exact engine (single-program `runGraph`) and the sharded
- * engine are proven byte-equivalent (ADR-0032's repo-scale guardrail), but
+ * engine are equivalent within the CI-ratcheted budget held by the
+ * equivalence guardrails (ADR-0032 + its 2026-06-10 amendment), but
  * the mode is still folded into the `cacheKey` (below) so a mode switch is a
  * clean, attributable cache miss rather than a silent cross-engine read of a
  * row built under different orchestration — keeping the two cache lineages
