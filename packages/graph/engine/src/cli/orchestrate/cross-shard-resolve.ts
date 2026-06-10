@@ -72,8 +72,19 @@ export function mergeAndResolveShards(
  * Union every fragment's `functions` map into one catalog. Each
  * occurrence keeps its already-resolved intra-shard `calls`. Shards are
  * disjoint by construction (distinct files), so occurrences don't
- * conflict; a defensive dedup by (bodyHash, filePath, line) drops any
- * accidental duplicate rather than double-counting.
+ * conflict; a defensive dedup by occurrence IDENTITY — (bodyHash,
+ * filePath, line, column) — drops any accidental duplicate rather than
+ * double-counting.
+ *
+ * The dedup key MUST include `column`: two distinct callables can share a
+ * `(bodyHash, filePath, line)` triple when they sit on the SAME source line
+ * with BYTE-IDENTICAL bodies — e.g. `a.some((p) => p.test(x)) || b.some((p) =>
+ * p.test(x))` (two body-twin arrows on one line). `bodyHash` is a CONTENT hash,
+ * so both twins hash equally; a column-less key collapsed them into one,
+ * dropping the second occurrence the single-program engine keeps. Keying on the
+ * full occurrence identity (filePath:line:column — the same tuple the SCC graph
+ * uses as its node id) makes the merged function set byte-identical to exact
+ * (Phase 3 closed the residual 2-occurrence delta this way).
  */
 export function mergeShardFragments(
   fragments: readonly Catalog[],
@@ -166,7 +177,8 @@ function sortCalls(calls: readonly CallEdge[]): CallEdge[] {
 }
 
 /** Append one fragment's occurrences into the merged map, deduping by
- *  (bodyHash, filePath, line). Extracted to keep mergeShardFragments flat. */
+ *  occurrence identity (bodyHash, filePath, line, column). Extracted to keep
+ *  mergeShardFragments flat. */
 function addFragmentOccurrences(
   frag: Catalog,
   functions: Record<string, FunctionOccurrence[]>,
@@ -175,7 +187,7 @@ function addFragmentOccurrences(
   for (const [name, occs] of Object.entries(frag.functions)) {
     if (!occs) continue;
     for (const occ of occs) {
-      const key = `${occ.bodyHash}|${occ.filePath}|${String(occ.line)}`;
+      const key = `${occ.bodyHash}|${occ.filePath}|${String(occ.line)}|${String(occ.column)}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const bucket = functions[name];
