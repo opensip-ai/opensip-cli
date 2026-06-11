@@ -238,8 +238,7 @@ export function SimRunner({
           <Box>{renderToInk(viewFindingsGroups(findingsDetail.groups))}</Box>
         )}
         <RunSummary
-          passed={summary.passed}
-          failed={summary.failed}
+          passed={state.result.envelope.verdict.passed}
           errors={summary.errors}
           warnings={summary.warnings}
           durationMs={state.result.durationMs}

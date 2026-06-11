@@ -88,7 +88,17 @@ function graphDoneView(result: GraphDoneResult): ViewNode {
   if (result.resolutionBanner !== undefined) {
     children.push(line([{ text: result.resolutionBanner, tone: 'muted' }]));
   }
-  children.push(viewRunSummary({ ...result.summary, durationMs: result.durationMs }));
+  // ADR-0035: the headline verdict is PASS/FAIL. graph-done carries count-based
+  // summary (no envelope verdict on this report path), so derive the verdict from
+  // graph's default policy — fail on any error-rung finding ({failOnErrors:1}).
+  children.push(
+    viewRunSummary({
+      passed: result.summary.errors === 0,
+      errors: result.summary.errors,
+      warnings: result.summary.warnings,
+      durationMs: result.durationMs,
+    }),
+  );
   // Non-verbose run: show the shared "Use --verbose…" hint plus graph's
   // dashboard hint (ADR-0021 — one source for the verbose-hint string).
   if (result.verboseDetail === undefined) {
@@ -324,8 +334,9 @@ export function envelopeToTableView(
   if (table !== null) children.push(table);
   children.push(
     viewRunSummary({
-      passed: summary.passed,
-      failed: summary.failed,
+      // ADR-0035: the headline is the run's single verdict; the per-unit
+      // passed/failed counts live in the table rows above.
+      passed: envelope.verdict.passed,
       errors: summary.totalErrors,
       warnings: summary.totalWarnings,
       durationMs: summary.durationMs,

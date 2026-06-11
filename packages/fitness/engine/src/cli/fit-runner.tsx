@@ -296,8 +296,7 @@ function FitRunner({
               </Box>
             )}
             <RunSummary
-              passed={summary.passed}
-              failed={summary.failed}
+              passed={envelope.verdict.passed}
               errors={summary.errors}
               warnings={summary.warnings}
               durationMs={durationMs}

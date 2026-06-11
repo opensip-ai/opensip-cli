@@ -95,7 +95,7 @@ describe('resultToView', () => {
     expect(out).toContain('10 files');
     expect(out.indexOf('no-console')).toBeLessThan(out.indexOf('naming')); // FAIL before PASS
     // Shared summary line (1 passed, 1 failed; 2 errors, 1 warning).
-    expect(out).toContain('1 Passed, 1 Failed (2 Errors, 1 Warnings) | Duration 8ms');
+    expect(out).toContain('FAIL  (2 Errors, 1 Warnings) | Duration 8ms');
   });
 
   it('renders the fit-done verbose findings body and suppresses the hint (ADR-0021)', () => {
@@ -275,7 +275,7 @@ describe('resultToView', () => {
     expect(out).toContain('a');
     expect(out).toContain('b');
     // Shared run summary: 1 passed, 1 failed, 1 error.
-    expect(out).toContain('1 Passed, 1 Failed (1 Errors, 0 Warnings)');
+    expect(out).toContain('FAIL  (1 Errors, 0 Warnings)');
   });
 
   it('renders the empty-scenarios sim-done shape (no table, zeroed summary)', () => {
@@ -292,7 +292,7 @@ describe('resultToView', () => {
         runFaulted: false,
       }),
     });
-    expect(out).toContain('0 Passed, 0 Failed (0 Errors, 0 Warnings)');
+    expect(out).toContain('PASS  (0 Errors, 0 Warnings)');
   });
 
   it('renders graph-done summary + footer via the shared producers (no banner text)', () => {
@@ -303,7 +303,7 @@ describe('resultToView', () => {
       summary: { passed: 3, failed: 0, errors: 0, warnings: 0 },
       durationMs: 1200,
     });
-    expect(out).toContain('3 Passed, 0 Failed (0 Errors, 0 Warnings) | Duration 1.2s');
+    expect(out).toContain('PASS  (0 Errors, 0 Warnings) | Duration 1.2s');
     expect(out).toContain('  Use --verbose for detailed results');
     expect(out).toContain('opensip-tools dashboard for HTML report');
   });
@@ -332,7 +332,7 @@ describe('resultToView', () => {
     expect(out).toContain('== Catalog ==');
     expect(out).toContain('5 functions across 2 files');
     expect(out).toContain('Resolution: fast (syntactic)');
-    expect(out).toContain('1 Passed, 1 Failed');
+    expect(out).toContain('PASS'); // ADR-0035: graph-done errors:0 → PASS verdict
     expect(out).not.toContain('Use --verbose for detailed results');
   });
 });

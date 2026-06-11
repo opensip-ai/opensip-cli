@@ -111,8 +111,8 @@ function graphSurface(sharded: boolean): ProgressSurface {
 }
 
 interface RunSummaryShape {
-  readonly passed: number;
-  readonly failed: number;
+  /** ADR-0035: the run's single verdict — the headline PASS/FAIL token. */
+  readonly passed: boolean;
   readonly errors: number;
   readonly warnings: number;
   readonly durationMs: number;
@@ -315,16 +315,15 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
         persistSession({ cwd: args.cwd }, finalized, datastore, durationMs);
         // Compute the fit-style summary the cli-ui `RunSummary` renders from the
         // SAME waived set — so the TTY summary matches the piped report.
-        const verdictSummary = buildGraphEnvelope({
+        const verdict = buildGraphEnvelope({
           signals: finalized.signals,
           runId: currentScope()?.runId ?? '',
           createdAt: new Date().toISOString(),
-        }).verdict.summary;
+        }).verdict;
         const summary: RunSummaryShape = {
-          passed: verdictSummary.passed,
-          failed: verdictSummary.failed,
-          errors: verdictSummary.errors,
-          warnings: verdictSummary.warnings,
+          passed: verdict.passed,
+          errors: verdict.summary.errors,
+          warnings: verdict.summary.warnings,
           durationMs,
         };
         // The worker (or the in-process fallback) already assembled the report
@@ -412,7 +411,6 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
           )}
           <RunSummary
             passed={state.summary.passed}
-            failed={state.summary.failed}
             errors={state.summary.errors}
             warnings={state.summary.warnings}
             durationMs={state.summary.durationMs}

@@ -120,11 +120,10 @@ describe('<SimRunner> — live-view state machine', () => {
     expect(lastFrame()).toContain('Recipe');
     expect(lastFrame()).toContain('default');
 
-    // The run completes; the summary surfaces the single passing scenario.
-    await waitForFrame(lastFrame, 'Passed');
+    // The run completes; the summary shows the PASS verdict (ADR-0035).
+    await waitForFrame(lastFrame, 'PASS');
     const frame = lastFrame() ?? '';
-    expect(frame).toContain('Passed');
-    expect(frame).toContain('1');
+    expect(frame).toContain('PASS');
 
     // The completed run handed its envelope back to the composition root, and a
     // green run sets no failure exit code.
@@ -160,7 +159,7 @@ describe('<SimRunner> — live-view state machine', () => {
       />,
     );
 
-    await waitForFrame(lastFrame, 'Failed');
+    await waitForFrame(lastFrame, 'FAIL');
     // ADR-0035: the runner no longer sets the findings exit — it hands the
     // envelope to the host (via onEnvelope → deliverSignals), which derives the
     // exit from envelope.verdict.passed. The runner itself sets no findings code.
@@ -205,12 +204,12 @@ describe('<SimRunner> — live-view state machine', () => {
 
     const { lastFrame, unmount } = render(<SimRunner args={baseArgs({ quiet: true })} />);
 
-    await waitForFrame(lastFrame, 'Passed');
+    await waitForFrame(lastFrame, 'PASS');
     const frame = lastFrame() ?? '';
     // Quiet drops the run-header chrome…
     expect(frame).not.toContain('Simulation Scenarios');
-    // …but keeps the pass/fail summary.
-    expect(frame).toContain('Passed');
+    // …but keeps the PASS/FAIL verdict summary.
+    expect(frame).toContain('PASS');
 
     unmount();
   });

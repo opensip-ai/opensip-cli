@@ -196,13 +196,12 @@ describe('root table path (renderResult derives the table from the envelope)', (
 
     const out = stdout.join('');
     // One row per UNIT (not per finding) — the envelope-derived neutral table.
+    // Per-unit row status: no-console FAIL, no-todo PASS.
     expect(out).toContain('no-console');
     expect(out).toContain('no-todo');
-    expect(out).toContain('FAIL');
-    expect(out).toContain('PASS');
-    // The shared run-summary line is derived from verdict.summary.
-    expect(out).toMatch(/1 Passed/);
-    expect(out).toMatch(/1 Failed/);
+    expect(out).toContain('PASS'); // no-todo row status
+    // ADR-0035: the headline is the run's single verdict (errors=1 → FAIL).
+    expect(out).toContain('FAIL  (1 Errors, 1 Warnings)');
   });
 });
 
@@ -211,7 +210,8 @@ describe('envelopeToTableView', () => {
     const text = renderToText(envelopeToTableView(ENVELOPE));
     expect(text).toContain('no-console');
     expect(text).toContain('no-todo');
-    expect(text).toMatch(/1 Passed/);
+    // ADR-0035: the summary line is the single PASS/FAIL verdict (errors=1 → FAIL).
+    expect(text).toContain('FAIL  (1 Errors, 1 Warnings)');
   });
 });
 

@@ -2,11 +2,14 @@
  * RunSummary — shared one-line PASS/FAIL summary used by every Ink live
  * view in the suite (fitness, graph, sim).
  *
- * The format is fixed: `{P} Passed, {F} Failed ({E} Errors, {W} Warnings) | Duration {dur}`
- * with per-segment colors driven by the active theme. Counts are rendered
- * with semantically meaningful colors — error for nonzero errors, warning
- * for nonzero warnings, muted when zero — so the eye anchors on the bad
- * numbers without counting digits.
+ * The format is fixed: `{PASS|FAIL}  ({E} Errors, {W} Warnings) | Duration {dur}`
+ * (ADR-0035). The leading token is the run's single verdict
+ * (`envelope.verdict.passed`) — the same value that drives the exit code — so
+ * the headline answers "did this run pass?" directly; the error/warning counts
+ * are the detail. A clean run reads `PASS  (0 Errors, 0 Warnings)` (no more
+ * misleading `0 Passed, 0 Failed`). Per-unit pass/fail lives in the table below.
+ * Colors are theme-driven (success/error for the verdict; error/warning for
+ * nonzero counts, muted when zero).
  *
  * The format lives once, as the `viewRunSummary` view-model producer. The
  * Ink component is a thin wrapper that renders that view; the
@@ -23,8 +26,8 @@ import { renderToInk } from './render-to-ink.js';
 import { line, type Span, type ViewNode } from './view-model.js';
 
 export interface RunSummaryProps {
-  readonly passed: number;
-  readonly failed: number;
+  /** The run's single verdict (ADR-0035) — the headline PASS/FAIL token. */
+  readonly passed: boolean;
   readonly errors: number;
   readonly warnings: number;
   readonly durationMs: number;
@@ -33,20 +36,17 @@ export interface RunSummaryProps {
 /**
  * The canonical summary line as a renderer-agnostic view-model node. Span
  * text concatenates to exactly:
- *   `{P} Passed, {F} Failed ({E} Errors, {W} Warnings) | Duration {dur}`
+ *   `{PASS|FAIL}  ({E} Errors, {W} Warnings) | Duration {dur}`
  */
 export function viewRunSummary({
   passed,
-  failed,
   errors,
   warnings,
   durationMs,
 }: RunSummaryProps): ViewNode {
   const spans: Span[] = [
-    { text: `${passed} Passed`, tone: 'success' },
-    { text: ', ' },
-    { text: `${failed} Failed`, tone: failed > 0 ? 'error' : 'muted' },
-    { text: ' (' },
+    { text: passed ? 'PASS' : 'FAIL', tone: passed ? 'success' : 'error' },
+    { text: '  (' },
     { text: `${errors} Errors`, tone: errors > 0 ? 'error' : 'muted' },
     { text: ', ' },
     { text: `${warnings} Warnings`, tone: warnings > 0 ? 'warning' : 'muted' },
