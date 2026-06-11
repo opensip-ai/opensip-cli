@@ -210,6 +210,16 @@ distinct from:
   (ADR-0010), not a behavioral plugin, so ambient discovery would silently
   invalidate caches/baselines. This is the documented exception to the §8
   invariant-1 parity rule for first-party code in the host
+- [ADR-0035](./ADR-0035-host-owned-verdict-from-tool-declared-policy.md) —
+  **Pass/fail is a host-owned verdict** computed by `buildSignalEnvelope` from a
+  **tool-declared findings policy** (reserved `failOnErrors`/`failOnWarnings`
+  config keys, host fallback `{1, 0}`). One verdict (`envelope.verdict.passed`)
+  drives both exit code and the new `{PASS|FAIL} (E Errors, W Warnings)` headline,
+  retiring the hardcoded `errors === 0` and per-tool `shouldFail`. A plugin
+  inherits it for free. Precondition: **sim must emit an error-severity signal per
+  failed scenario** (it emits none today — an ADR-0011 currency violation) before
+  it can migrate. Exit semantics behavior-preserving + verified per tool; headline
+  is a deliberate change
 
 ### Superseded
 
