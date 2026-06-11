@@ -104,6 +104,10 @@ describe('buildEquivalenceReport classification', () => {
     expect(r.functionsOnlyInSharded).toEqual([]);
     expect(r.productionResolvedDifferences).toHaveLength(1);
     expect(r.productionResolvedDifferences[0]?.ownerFilePath).toBe('packages/x/src/a.ts');
+    // exact empty + sharded resolved ⇒ a PHANTOM-direction divergence.
+    expect(r.productionPhantom).toHaveLength(1);
+    expect(r.productionDecline).toEqual([]);
+    expect(r.productionConflict).toEqual([]);
     expect(r.testResolvedDifferences).toEqual([]);
     expect(r.structuralDifferences).toEqual([]);
   });
@@ -137,6 +141,9 @@ function reportWith(over: Partial<EquivalenceReport>): EquivalenceReport {
     sccDifferences: [],
     allEdgeDifferences: [],
     productionResolvedDifferences: [],
+    productionPhantom: [],
+    productionDecline: [],
+    productionConflict: [],
     testResolvedDifferences: [],
     structuralDifferences: [],
     exactFunctionCount: 100,
@@ -145,60 +152,129 @@ function reportWith(over: Partial<EquivalenceReport>): EquivalenceReport {
   };
 }
 
-const diff = (owner: string): EquivalenceReport['productionResolvedDifferences'][number] => ({
+type Diff = EquivalenceReport['productionResolvedDifferences'][number];
+
+/** A divergence in a given direction: phantom (sharded-only), decline (exact-only),
+ *  conflict (both differ). `toA`=exact, `toB`=sharded. */
+const diffOf = (owner: string, toA: string, toB: string): Diff => ({
   key: `${owner}@1:1`,
   ownerFilePath: owner,
   line: 1,
   column: 1,
-  toA: '',
-  toB: 'X',
+  toA,
+  toB,
   cross: true,
 });
+const phantom = (owner: string): Diff => diffOf(owner, '', 'X'); // sharded-only
+const decline = (owner: string): Diff => diffOf(owner, 'X', ''); // exact-only
+const conflict = (owner: string): Diff => diffOf(owner, 'X', 'Y'); // both differ
 
-describe('judgeEquivalence ratchet', () => {
-  it('PASSES when production + SCC match the budget', () => {
+/** Build a report whose three directional partitions are populated, with the
+ *  total kept consistent (the judge reads the partitions for gating). */
+function reportWithDirections(d: {
+  phantom?: Diff[];
+  decline?: Diff[];
+  conflict?: Diff[];
+  scc?: string[];
+  functionsOnlyInExact?: string[];
+}): EquivalenceReport {
+  const p = d.phantom ?? [];
+  const dec = d.decline ?? [];
+  const c = d.conflict ?? [];
+  return reportWith({
+    productionResolvedDifferences: [...p, ...dec, ...c],
+    productionPhantom: p,
+    productionDecline: dec,
+    productionConflict: c,
+    sccDifferences: d.scc ?? [],
+    ...(d.functionsOnlyInExact ? { functionsOnlyInExact: d.functionsOnlyInExact } : {}),
+  });
+}
+
+const FLOOR = {
+  phantomDivergences: 0,
+  declineDivergences: 0,
+  conflictDivergences: 0,
+  sccDivergences: 0,
+};
+
+describe('judgeEquivalence directional ratchet', () => {
+  it('PASSES when every direction + SCC match their floors', () => {
     const v = judgeEquivalence(
-      reportWith({
-        productionResolvedDifferences: [diff('p/a.ts'), diff('p/b.ts')],
-        sccDifferences: ['s'],
+      reportWithDirections({
+        phantom: [phantom('p/a.ts')],
+        conflict: [conflict('p/b.ts')],
+        scc: ['s'],
       }),
-      { productionResolvedEdgeDivergences: 2, sccDivergences: 1 },
+      { ...FLOOR, phantomDivergences: 1, conflictDivergences: 1, sccDivergences: 1 },
     );
     expect(v.failed).toBe(false);
+    expect(v.phantomCount).toBe(1);
+    expect(v.conflictCount).toBe(1);
   });
 
-  it('FAILS when production EXCEEDS budget (a regression spike) and prints offenders', () => {
+  it('FAILS when a direction EXCEEDS its floor and prints the offenders for THAT direction', () => {
     const v = judgeEquivalence(
-      reportWith({
-        productionResolvedDifferences: [diff('p/a.ts'), diff('p/b.ts'), diff('p/c.ts')],
-      }),
-      { productionResolvedEdgeDivergences: 1, sccDivergences: 0 },
+      reportWithDirections({ phantom: [phantom('p/a.ts'), phantom('p/c.ts')] }),
+      { ...FLOOR, phantomDivergences: 1 },
     );
     expect(v.failed).toBe(true);
     expect(v.lines.join('\n')).toContain('EXCEEDS budget');
     expect(v.lines.join('\n')).toContain('p/a.ts:1:1');
   });
 
-  it('FAILS when SCC divergence EXCEEDS its budget', () => {
-    const v = judgeEquivalence(reportWith({ sccDifferences: ['s1', 's2'] }), {
-      productionResolvedEdgeDivergences: 0,
+  it('counts each direction independently (phantom / decline / conflict)', () => {
+    const v = judgeEquivalence(
+      reportWithDirections({
+        phantom: [phantom('p/a.ts')],
+        decline: [decline('p/b.ts'), decline('p/c.ts')],
+        conflict: [conflict('p/d.ts')],
+      }),
+      { ...FLOOR, phantomDivergences: 1, declineDivergences: 2, conflictDivergences: 1 },
+    );
+    expect(v.failed).toBe(false);
+    expect(v.phantomCount).toBe(1);
+    expect(v.declineCount).toBe(2);
+    expect(v.conflictCount).toBe(1);
+    expect(v.productionCount).toBe(4);
+  });
+
+  it('a NEW phantom is NOT masked by a fixed conflict (per-direction gating)', () => {
+    // Total stays 2, but a conflict was "fixed" into a new phantom: phantom
+    // exceeds its floor (0) even though the total equals the old total.
+    const v = judgeEquivalence(
+      reportWithDirections({ phantom: [phantom('p/a.ts'), phantom('p/b.ts')] }),
+      {
+        ...FLOOR,
+        phantomDivergences: 0,
+        conflictDivergences: 2,
+      },
+    );
+    expect(v.failed).toBe(true);
+  });
+
+  it('FAILS when SCC divergence EXCEEDS its floor', () => {
+    const v = judgeEquivalence(reportWithDirections({ scc: ['s1', 's2'] }), {
+      ...FLOOR,
       sccDivergences: 1,
     });
     expect(v.failed).toBe(true);
   });
 
-  it('PASSES with a tighten hint when production is BELOW budget', () => {
-    const v = judgeEquivalence(reportWith({ productionResolvedDifferences: [diff('p/a.ts')] }), {
-      productionResolvedEdgeDivergences: 5,
-      sccDivergences: 0,
+  it('PASSES with a tighten hint when a direction is BELOW its floor', () => {
+    const v = judgeEquivalence(reportWithDirections({ phantom: [phantom('p/a.ts')] }), {
+      ...FLOOR,
+      phantomDivergences: 5,
     });
     expect(v.failed).toBe(false);
     expect(v.lines.join('\n')).toContain('tighten the ratchet');
   });
 
   it('HARD-FAILS on a function-set breach regardless of budget', () => {
-    const v = judgeEquivalence(reportWith({ functionsOnlyInExact: ['ghost'] }), {
-      productionResolvedEdgeDivergences: 1000,
+    const v = judgeEquivalence(reportWithDirections({ functionsOnlyInExact: ['ghost'] }), {
+      phantomDivergences: 1000,
+      declineDivergences: 1000,
+      conflictDivergences: 1000,
       sccDivergences: 1000,
     });
     expect(v.failed).toBe(true);

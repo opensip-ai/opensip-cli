@@ -41,6 +41,7 @@ import {
   buildEquivalenceReport,
   judgeEquivalence,
   type EquivalenceBudget,
+  type EquivalenceVerdict,
 } from './orchestrate/equivalence-check.js';
 import { runGraph, runShardedGraph } from './orchestrate.js';
 
@@ -62,50 +63,57 @@ export interface EquivalenceCheckOptions {
 
 const BUDGET_NOTE =
   'Accepted PRODUCTION (non-test/fixture) sharded≡exact RESOLVED-edge divergences ' +
-  'on this repo, plus the downstream SCC-membership divergence count. ' +
-  'functionsOnly{Exact,Sharded} MUST be 0 (a hard failure). A run EXCEEDING either ' +
-  'number fails graph-equivalence-check (a resolver regression — e.g. reintroduced ' +
-  'dist/*.d.ts under-resolution drops real cross-package edges). This is a ratchet: ' +
-  'a decrease passes and prints a hint to tighten the number.';
+  'on this repo, classified by DIRECTION on the unified model (ADR-0033): phantom ' +
+  '(sharded-only / exact-declined), decline (exact-only / sharded-declined), and ' +
+  'conflict (both resolved, different targets — the same-name disambiguation class). ' +
+  'functionsOnly{Exact,Sharded} MUST be 0 (a hard failure). A run EXCEEDING any ' +
+  'direction’s floor fails graph-equivalence-check (a NEW divergence on the ' +
+  'unified model — direction tells you which bound is insufficient). This is a ' +
+  'ratchet: a decrease passes and prints a hint to tighten that number. The pinned-' +
+  'corpus resolution-completeness floor lives in resolution-completeness-floor.test.ts.';
+
+/** Numeric divergence keys every budget file must carry. */
+const BUDGET_KEYS = [
+  'phantomDivergences',
+  'declineDivergences',
+  'conflictDivergences',
+  'sccDivergences',
+] as const;
 
 /** Read + validate the committed budget. A missing file is a configuration error
  *  (the budget is committed; CI must compare against it), unless --update-budget
  *  is set (then a missing file is seeded).
  *  @throws {Error} If the budget file is missing/unreadable, is not valid JSON, or
- *    does not have the required `{ productionResolvedEdgeDivergences, sccDivergences }`
- *    numeric shape. */
+ *    does not carry every numeric key in {@link BUDGET_KEYS}. */
 function loadBudget(path: string): EquivalenceBudget {
   // Structured-doc load: the budget is a small committed JSON file parsed
   // immediately — bounded by nature, not a streamed blob.
   const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+  const rec = parsed as Record<string, unknown> | null;
   if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    typeof (parsed as { productionResolvedEdgeDivergences?: unknown })
-      .productionResolvedEdgeDivergences !== 'number' ||
-    typeof (parsed as { sccDivergences?: unknown }).sccDivergences !== 'number'
+    typeof rec !== 'object' ||
+    rec === null ||
+    BUDGET_KEYS.some((k) => typeof rec[k] !== 'number')
   ) {
-    throw new Error(
-      `Invalid budget file ${path}: expected ` +
-        `{ "productionResolvedEdgeDivergences": <number>, "sccDivergences": <number> }.`,
-    );
+    const keyList = BUDGET_KEYS.map((k) => `"${k}"`).join(', ');
+    throw new Error(`Invalid budget file ${path}: expected numeric { ${keyList} }.`);
   }
-  const obj = parsed as {
-    productionResolvedEdgeDivergences: number;
-    sccDivergences: number;
-    note?: string;
-  };
+  const obj = parsed as Record<(typeof BUDGET_KEYS)[number], number> & { note?: string };
   return {
-    productionResolvedEdgeDivergences: obj.productionResolvedEdgeDivergences,
+    phantomDivergences: obj.phantomDivergences,
+    declineDivergences: obj.declineDivergences,
+    conflictDivergences: obj.conflictDivergences,
     sccDivergences: obj.sccDivergences,
     ...(typeof obj.note === 'string' ? { note: obj.note } : {}),
   };
 }
 
-function writeBudget(path: string, productionCount: number, sccCount: number): void {
+function writeBudget(path: string, verdict: EquivalenceVerdict): void {
   const budget = {
-    productionResolvedEdgeDivergences: productionCount,
-    sccDivergences: sccCount,
+    phantomDivergences: verdict.phantomCount,
+    declineDivergences: verdict.declineCount,
+    conflictDivergences: verdict.conflictCount,
+    sccDivergences: verdict.sccCount,
     note: BUDGET_NOTE,
   };
   mkdirSync(dirname(path), { recursive: true });
@@ -181,7 +189,9 @@ export async function executeEquivalenceCheck(
     const seedMissing = opts.updateBudget === true && !existsSync(budgetPath);
     const budget: EquivalenceBudget = seedMissing
       ? {
-          productionResolvedEdgeDivergences: report.productionResolvedDifferences.length,
+          phantomDivergences: report.productionPhantom.length,
+          declineDivergences: report.productionDecline.length,
+          conflictDivergences: report.productionConflict.length,
           sccDivergences: report.sccDifferences.length,
         }
       : loadBudget(budgetPath);
@@ -191,10 +201,11 @@ export async function executeEquivalenceCheck(
 
     if (opts.updateBudget === true) {
       // @fitness-ignore-next-line detached-promises -- writeBudget is a synchronous void helper (writeFileSync); there is no promise to await.
-      writeBudget(budgetPath, verdict.productionCount, verdict.sccCount);
+      writeBudget(budgetPath, verdict);
       process.stdout.write(
-        `Wrote budget productionResolvedEdgeDivergences=${String(verdict.productionCount)} ` +
-          `sccDivergences=${String(verdict.sccCount)} to ${budgetPath}\n`,
+        `Wrote budget phantom=${String(verdict.phantomCount)} ` +
+          `decline=${String(verdict.declineCount)} conflict=${String(verdict.conflictCount)} ` +
+          `scc=${String(verdict.sccCount)} to ${budgetPath}\n`,
       );
       // --update-budget is a capture/tighten action, not a gate run: always
       // exit 0 so a maintainer can record the new floor without the (now-stale)
@@ -223,7 +234,7 @@ function logEnd(
     readonly structuralDifferences: readonly unknown[];
     readonly sccDifferences: readonly unknown[];
   },
-  verdict: { budgetCount: number; sccBudget: number },
+  verdict: EquivalenceVerdict,
   failed: boolean,
 ): void {
   logger.info({
@@ -231,10 +242,12 @@ function logEnd(
     module: MODULE,
     failed,
     productionResolved: report.productionResolvedDifferences.length,
+    phantom: verdict.phantomCount,
+    decline: verdict.declineCount,
+    conflict: verdict.conflictCount,
     testResolved: report.testResolvedDifferences.length,
     structural: report.structuralDifferences.length,
     scc: report.sccDifferences.length,
-    productionBudget: verdict.budgetCount,
     sccBudget: verdict.sccBudget,
   });
 }

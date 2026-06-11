@@ -1,6 +1,8 @@
 # Graph False-Findings — Incident Log & Consolidation Plan
 
-**Status:** OPEN (root cause confirmed 2026-06-09; fix in progress)
+**Status:** CONVERGED (2026-06-11 — 204 → 12 on one shared model, ADR-0033; the 12
+are documented directional residual classes, tracked. See the 2026-06-11 entry +
+"Still open after 2026-06-11" below.)
 **Scope:** the `graph` tool reporting warnings/errors that are not real, recurring
 across multiple "fix" attempts.
 
@@ -336,6 +338,41 @@ worsening) — it is a ratchet on an imperfect baseline, not a proof of equivale
   per unresolved cross-shard call site). Harmless to findings (no target) but inflates the
   catalog/datastore and the raw edge count; worth pruning before persist.
 - As the 110 + 81 are fixed, **tighten `.config/graph-equivalence-budget.json` toward 0**.
+
+### 2026-06-11 — convergence (204 → 12) + directional guardrail (ADR-0033)
+- **Observed:** the `graph-resolution-correctness` plan executed the
+  direction-of-travel above; production resolved-edge divergence 204 → **12**.
+- **Found / Changed:** the root cause of the ill-posed flat ratchet was that the
+  two engines ran **different resolution models**. Fixed by converging onto ONE
+  shared hop — the exact build now recovers cross-package edges via the SAME
+  post-merge linker the sharded build runs (`cache-orchestrator.recoverExactBoundaryEdges`,
+  exact = the 1-shard case). Plus: `buildExportIndex` re-export chains (closed the
+  81 class in BOTH engines); sharded JSX double-emission dedup (the 36); file+name
+  pin with unique-or-decline (identical semantics in both engines); declined
+  parameter/callback name-guesses. Commits 8ac3b167 (Phase 3) + this Phase 4.
+- **The 110 re-examined:** exact property/method under-resolution is now mostly
+  recovered through the shared boundary linker. The 12 residual = **1 phantom**
+  (exact under-resolves `scope.graph?.rules.getAll()` through an optional chain —
+  sharded is correct), **0 decline**, **11 conflict** (cross-package same-name
+  registry-method mis-narrowing — both engines pick different occurrences; the real
+  open bug, tracked).
+- **Guardrail inverted (ADR-0033, supersedes ADR-0032):** the flat
+  `productionResolvedEdgeDivergences` budget became a **directional** ratchet
+  (phantom / decline / conflict, each floored, gated per-direction) + a pinned-
+  corpus **completeness floor** (`resolution-completeness-floor.test.ts`, floor=7)
+  for the both-engine-decline blind spot (the `logger.info()` arrow-property class).
+- **Verified:** `graph-equivalence-check` PASS (phantom=1, decline=0, conflict=11,
+  scc=0); full `pnpm test:coverage` + `graph`/`fit` dogfood + lint + typecheck +
+  `docs:check` green.
+
+### Still open after 2026-06-11
+- **Conflict class (the 11).** Cross-package same-name registry-method
+  disambiguation — needs the linker to pick the import-attested occurrence over a
+  same-name sibling. The load-bearing residual.
+- **Phantom (the 1).** Exact optional-chain (`?.`) property-access resolution.
+- **Clean-checkout parity for WORKSPACE imports.** Exact still reaches the linker
+  via the dep's built `dist/*.d.ts`; relative imports are clean-safe (file+name
+  pin). Source-as-surface program change deferred.
 
 ### <next occurrence> — template
 - **Observed:** _(command, TTY or pipe, count, session id)_

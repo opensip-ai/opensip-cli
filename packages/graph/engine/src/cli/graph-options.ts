@@ -70,10 +70,10 @@ export interface GraphCommandOptions {
    * the single-program EXACT engine instead. Determinism (ADR-0032, superseding
    * ADR-0031): the build engine is chosen by THIS explicit flag (plus the
    * project's shardability) — never by `process.stdout.isTTY` or on-disk
-   * discovery state. A bare `graph` uses the SHARDED engine (the default,
-   * equivalent to exact within the CI-ratcheted budget held by the
-   * equivalence guardrails; ADR-0032 amendment 2026-06-10);
-   * `--exact` forces the single-program engine.
+   * discovery state. A bare `graph` uses the SHARDED engine (the default;
+   * both engines resolve through one shared model — exact = the 1-shard case —
+   * held equivalent by the directional soundness invariant + completeness floor,
+   * ADR-0033); `--exact` forces the single-program engine.
    *
    * The sharded engine is faster on large multi-package repos and — with
    * equivalence held by the guardrails — is the authoritative default.

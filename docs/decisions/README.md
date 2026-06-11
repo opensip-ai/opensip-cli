@@ -189,18 +189,31 @@ distinct from:
   `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`, fail-closed exit 5 before import) is
   discovered, trust-gated, and routed through the same admit → import → register
   path bundled/installed tools travel. `plugin add --project` stays `installed`
-- [ADR-0032](./ADR-0032-sharded-engine-default.md) — The **sharded** engine is
-  the graph default (byte-equal to exact on the `equivalence-repo-scale` fixture
-  guardrail; equivalent within a characterized, CI-ratcheted residual budget on
-  real repos via `graph-equivalence-check` — see the 2026-06-10 amendment), and
-  **`--exact` is the opt-out** (the
-  small/single-package/oracle escape hatch). `--sharded` is removed. A bare
-  `graph` shards when the project is shardable and falls back to exact when it
-  isn't; `isTTY` still selects only the renderer, never the engine; the catalog
-  cache key still carries `mode=exact|sharded`. Supersedes ADR-0031's interim
-  exact-as-default, retaining every other ADR-0031 invariant
+- [ADR-0033](./ADR-0033-cross-package-resolution-via-shared-hop.md) — Cross-package
+  edges resolve through **one shared hop** (the `resolve-decl` seam +
+  `export-index` linker); the exact build is the **1-shard case** — it runs the
+  SAME post-merge boundary linker sharded runs, so both engines compute
+  cross-package edges by ONE model. The equivalence guardrail becomes a
+  **directional soundness invariant** — any NEW divergence on the unified model
+  fails, classified phantom (sharded-only) / decline (exact-only) / conflict (both
+  differ), each ratcheted to its documented floor (gated per-direction so a fixed
+  conflict can't mask a new phantom) — plus a **pinned-corpus completeness floor**
+  (`resolution-completeness-floor.test.ts`) for the both-engine-decline blind spot.
+  Direction is a diagnostic, not a verdict (neither engine is the oracle: a
+  sharded-only edge is often a real edge exact under-resolved). Supersedes
+  ADR-0032, **carrying its default-engine policy forward unchanged**
 
 ### Superseded
+
+- [ADR-0032](./ADR-0032-sharded-engine-default.md) — The **sharded** engine is
+  the graph default; **`--exact` is the opt-out** (`--sharded` removed; bare
+  `graph` shards when shardable, exact fallback otherwise; `isTTY` selects only
+  the renderer; cache key carries `mode=exact|sharded`). Its 2026-06-10 amendment
+  recorded a flat CI-ratcheted residual budget. **Superseded by
+  [ADR-0033](./ADR-0033-cross-package-resolution-via-shared-hop.md)**, which
+  corrects the resolution model (one shared hop) and replaces the flat budget with
+  a directional invariant + completeness floor — **retaining this ADR's
+  default-engine policy unchanged**
 
 - [ADR-0031](./ADR-0031-graph-determinism-one-build-one-finalize.md) — Graph
   determinism: one build → one finalize → many renderers. `@graph-ignore`

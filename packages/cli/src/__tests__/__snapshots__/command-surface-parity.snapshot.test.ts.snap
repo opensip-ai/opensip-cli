@@ -569,7 +569,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "Use the single-program exact build engine instead of the default parallel sharded engine (the sharded default is equivalent to exact within a CI-ratcheted budget; --exact suits small/single-package repos).",
+          "description": "Use the single-program exact build engine instead of the default parallel sharded engine (both resolve through one shared model — exact = the 1-shard case — held equivalent by the directional equivalence guardrail; --exact suits small/single-package repos).",
           "flags": "--exact",
           "negate": false,
           "optional": false,

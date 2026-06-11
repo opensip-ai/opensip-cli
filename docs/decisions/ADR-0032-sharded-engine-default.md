@@ -1,18 +1,29 @@
 ---
-status: active
-last_verified: 2026-06-10
+status: superseded
+last_verified: 2026-06-11
 owner: opensip-tools
 ---
 
 # ADR-0032: The sharded engine is the graph default; `--exact` is the opt-out
 
+> **Superseded by [ADR-0033](./ADR-0033-cross-package-resolution-via-shared-hop.md).**
+> ADR-0033 records the *corrected* cross-package resolution model — both engines
+> resolve through ONE shared hop (exact = the 1-shard case), so the equivalence
+> guardrail becomes a DIRECTIONAL soundness invariant (phantom / decline /
+> conflict, each ratcheted) plus a pinned-corpus completeness floor, replacing
+> this ADR's flat "budget toward zero" (the 2026-06-10 amendment below). The
+> **default-engine policy in this ADR — sharded default, `--exact` opt-out,
+> `isTTY` selects only the renderer, `mode=exact|sharded` cache stamping — is
+> RETAINED unchanged** by ADR-0033; only the equivalence/guardrail model is
+> replaced.
+
 ```yaml
 id: ADR-0032
 title: The sharded engine is the graph default; `--exact` is the opt-out
 date: 2026-06-09
-status: active
+status: superseded
 supersedes: [ADR-0031]
-superseded_by: null
+superseded_by: ADR-0033
 related: [ADR-0015, ADR-0031]   # engine-version/mode cache stamping; one build/one finalize/many renderers
 tags: [graph, cli, cache, determinism, performance]
 enforcement: mechanizable

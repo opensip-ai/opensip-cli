@@ -470,7 +470,7 @@ export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineComm
     {
       flag: '--exact',
       description:
-        'Use the single-program exact build engine instead of the default parallel sharded engine (the sharded default is equivalent to exact within a CI-ratcheted budget; --exact suits small/single-package repos).',
+        'Use the single-program exact build engine instead of the default parallel sharded engine (both resolve through one shared model — exact = the 1-shard case — held equivalent by the directional equivalence guardrail; --exact suits small/single-package repos).',
       default: false,
     },
     {

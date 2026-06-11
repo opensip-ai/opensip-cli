@@ -21,13 +21,16 @@
  *     - TEST/FIXTURE-owned edge divergences are benign (the graph rules skip
  *       test files, so they are gate-invisible) — counted separately, never
  *       gated.
- *     - PRODUCTION edge divergences are the meaningful signal (the residual
- *       re-export cases the sharded V1 linker declines). Compared against a
- *       COMMITTED BUDGET; the guardrail FAILS when production divergence EXCEEDS
- *       the budget (a regression — e.g. reintroduced `dist/*.d.ts`
- *       under-resolution drops many real cross-package edges → spike) and PASSES
- *       (with a tighten hint) on a decrease. A ratchet, mirroring the repo's
- *       net-new SARIF philosophy.
+ *     - PRODUCTION edge divergences are the meaningful signal, classified by
+ *       DIRECTION on the unified model (ADR-0033): phantom (sharded-only),
+ *       decline (exact-only), conflict (both resolve to different targets). Each
+ *       direction is compared against its COMMITTED FLOOR; the guardrail FAILS
+ *       when any direction EXCEEDS its floor (a NEW divergence on the unified
+ *       model) and PASSES (with a tighten hint) on a decrease. Per-direction
+ *       gating so a fixed conflict can't mask a new phantom. A ratchet, mirroring
+ *       the repo's net-new SARIF philosophy. (The both-engine-DECLINE blind spot
+ *       this differential cannot see is guarded by the pinned-corpus completeness
+ *       floor in `resolution-completeness-floor.test.ts`.)
  *
  * Engine-layer + language-agnostic: it drives `runGraph` (exact) and
  * `runShardedGraph` (sharded) through the same shard-resolution the production
@@ -75,15 +78,50 @@ function isResolvedDivergence(d: EdgeDifference): boolean {
   return d.toA !== d.toB && (d.toA.length > 0 || d.toB.length > 0);
 }
 
-/** A committed budget: accepted divergence counts (the ratchet floor). */
+/**
+ * The DIRECTION of a resolved-edge divergence — which engine resolved the site,
+ * once both engines run ONE model (Phase 3 convergence, ADR-0033). Direction no
+ * longer encodes "wrongness" (neither engine is the oracle: a sharded-only edge
+ * is frequently a REAL edge the single-program type checker under-resolved, e.g.
+ * `scope.graph?.rules.getAll()` through an optional chain). It is a DIAGNOSTIC
+ * label — "which bound is insufficient" — and each direction is ratcheted to its
+ * measured floor so any NEW divergence on the unified model fails, with a
+ * documented residual class per direction.
+ *
+ *   - `phantom`  — sharded resolved, exact declined  (exact-only gap)
+ *   - `decline`  — exact resolved, sharded declined  (sharded-only gap)
+ *   - `conflict` — BOTH resolved, to DIFFERENT targets (a real disambiguation
+ *                  bug: at least one engine picked the wrong same-name occurrence)
+ *
+ * `conflict` is the load-bearing class — both engines confidently disagree, so
+ * one is provably wrong. `phantom`/`decline` are one-sided gaps where the other
+ * engine simply has more/less reach.
+ */
+export type DivergenceDirection = 'phantom' | 'decline' | 'conflict';
+
+/** Classify a resolved divergence by which engine(s) resolved it. */
+export function divergenceDirection(d: EdgeDifference): DivergenceDirection {
+  if (d.toA.length === 0) return 'phantom'; // exact empty, sharded resolved
+  if (d.toB.length === 0) return 'decline'; // sharded empty, exact resolved
+  return 'conflict'; // both resolved, different targets
+}
+
+/**
+ * A committed budget: the per-direction ratchet floors for production resolved-
+ * edge divergences on the unified model (ADR-0033). Replaces the single
+ * `productionResolvedEdgeDivergences` total: after convergence, a flat total can
+ * hide a direction flip (a fixed conflict masking a new phantom). Each direction
+ * is gated independently; any count EXCEEDING its floor FAILS, a decrease passes
+ * with a tighten hint, equal passes.
+ */
 export interface EquivalenceBudget {
-  /**
-   * Accepted PRODUCTION resolved-edge divergences (test/fixture-owned excluded).
-   * A run with MORE than this FAILS (a regression — e.g. reintroduced
-   * `dist/*.d.ts` under-resolution drops real cross-package edges → spike);
-   * FEWER passes with a tighten hint; equal passes.
-   */
-  readonly productionResolvedEdgeDivergences: number;
+  /** Accepted sharded-only (exact-declined) production divergences. */
+  readonly phantomDivergences: number;
+  /** Accepted exact-only (sharded-declined) production divergences. */
+  readonly declineDivergences: number;
+  /** Accepted both-resolved-differently production divergences (the same-name
+   *  disambiguation class — a real bug, tracked for follow-up). */
+  readonly conflictDivergences: number;
   /**
    * Accepted SCC membership divergences. SCCs are a DOWNSTREAM consequence of the
    * resolved-edge residual (a differing cross-package edge can reshape a
@@ -92,8 +130,8 @@ export interface EquivalenceBudget {
    */
   readonly sccDivergences: number;
   /**
-   * Optional human note recorded alongside the numbers (what the residual is).
-   * Ignored by the comparison.
+   * Optional human note recorded alongside the numbers (what each residual class
+   * is). Ignored by the comparison.
    */
   readonly note?: string;
 }
@@ -110,9 +148,16 @@ export interface EquivalenceReport {
   readonly allEdgeDifferences: readonly EdgeDifference[];
   /**
    * RESOLVED-edge divergences owned by a PRODUCTION file — the gated signal
-   * (dropped/added real edges in non-test code).
+   * (dropped/added real edges in non-test code). The directional partitions
+   * below sum to this.
    */
   readonly productionResolvedDifferences: readonly EdgeDifference[];
+  /** Production divergences where SHARDED resolved but EXACT declined. */
+  readonly productionPhantom: readonly EdgeDifference[];
+  /** Production divergences where EXACT resolved but SHARDED declined. */
+  readonly productionDecline: readonly EdgeDifference[];
+  /** Production divergences where BOTH resolved, to DIFFERENT targets. */
+  readonly productionConflict: readonly EdgeDifference[];
   /**
    * RESOLVED-edge divergences owned by a TEST/FIXTURE file — benign
    * (gate-invisible: the graph rules skip test files). Reported, not gated.
@@ -192,17 +237,44 @@ export async function buildEquivalenceReport(
     (d) => !isTestOrFixturePath(d.ownerFilePath),
   );
   const testResolvedDifferences = resolved.filter((d) => isTestOrFixturePath(d.ownerFilePath));
+  const byDirection = (dir: DivergenceDirection): readonly EdgeDifference[] =>
+    productionResolvedDifferences.filter((d) => divergenceDirection(d) === dir);
   return {
     functionsOnlyInExact: eq.functionsOnlyInA,
     functionsOnlyInSharded: eq.functionsOnlyInB,
     sccDifferences: eq.sccDifferences,
     allEdgeDifferences: eq.edgeDifferences,
     productionResolvedDifferences,
+    productionPhantom: byDirection('phantom'),
+    productionDecline: byDirection('decline'),
+    productionConflict: byDirection('conflict'),
     testResolvedDifferences,
     structuralDifferences,
     exactFunctionCount: functionCount(exact),
     shardedFunctionCount: functionCount(sharded),
   };
+}
+
+/**
+ * Resolved CROSS-PACKAGE edge count in a catalog — the completeness metric for
+ * the pinned-corpus floor (ADR-0033). A `crossShard` edge with a non-empty
+ * target set is a recovered cross-package call; declined boundary calls are
+ * PRUNED from the catalog (they leave only the intra placeholder), so this count
+ * IS the resolved numerator. On a PINNED corpus (fixed call-site denominator) a
+ * non-decreasing count is equivalent to a non-decreasing resolution RATE — it
+ * catches a both-engine completeness regression (one that drops edges in BOTH
+ * engines, so the differential gate above stays silent).
+ */
+export function countResolvedCrossPackageEdges(catalog: Catalog): number {
+  let n = 0;
+  for (const occs of Object.values(catalog.functions)) {
+    for (const o of occs ?? []) {
+      for (const e of o.calls) {
+        if (e.crossShard === true && e.to.length > 0) n++;
+      }
+    }
+  }
+  return n;
 }
 
 /** The verdict of comparing a report against a budget. */
@@ -211,10 +283,14 @@ export interface EquivalenceVerdict {
   readonly failed: boolean;
   /** True ⇒ a function-set breach (a hard failure regardless of budget). */
   readonly functionSetBreached: boolean;
-  /** Observed production resolved-edge divergence count. */
+  /** Observed sharded-only (exact-declined) production divergence count. */
+  readonly phantomCount: number;
+  /** Observed exact-only (sharded-declined) production divergence count. */
+  readonly declineCount: number;
+  /** Observed both-resolved-differently production divergence count. */
+  readonly conflictCount: number;
+  /** Total observed production resolved-edge divergence count (sum of the three). */
   readonly productionCount: number;
-  /** The budget's accepted production count. */
-  readonly budgetCount: number;
   /** Observed SCC divergence count. */
   readonly sccCount: number;
   /** The budget's accepted SCC count. */
@@ -225,18 +301,22 @@ export interface EquivalenceVerdict {
 
 /**
  * Compare a report against the committed budget and produce the gate verdict +
- * human-readable lines.
+ * human-readable lines. After Phase 3 convergence (ADR-0033) the gate is the
+ * DIRECTIONAL soundness invariant: any NEW divergence on the unified model fails,
+ * each direction ratcheted to its measured floor.
  *
  *   - Any function-set breach (functionsOnly{Exact,Sharded}) ⇒ HARD FAIL: the
  *     function SET must be byte-equal post-reconciliation (a discovery/merge
  *     regression, never an edge gap).
- *   - production RESOLVED-edge divergences > budget ⇒ FAIL (a regression),
- *     printing the offending owner `file:line → exact|sharded` edges.
+ *   - phantom / decline / conflict production divergences each > their floor ⇒
+ *     FAIL, printing the offending owner edges for the breached direction(s).
+ *     Gating per-direction (not a flat total) so a fixed conflict can't mask a
+ *     new phantom.
  *   - SCC divergences > budget ⇒ FAIL (a downstream consequence of the edge
  *     residual — budgeted, not hard-failed, since the real-repo residual is
  *     non-zero).
- *   - any metric < budget ⇒ PASS, with a hint to tighten that number.
- *   - == budget ⇒ PASS.
+ *   - any metric < its floor ⇒ PASS, with a hint to tighten that number.
+ *   - == floor ⇒ PASS.
  *
  * Structural (unresolved-vs-absent) divergences are reported but never gated.
  */
@@ -245,8 +325,10 @@ export function judgeEquivalence(
   budget: EquivalenceBudget,
 ): EquivalenceVerdict {
   const lines: string[] = [];
+  const phantomCount = report.productionPhantom.length;
+  const declineCount = report.productionDecline.length;
+  const conflictCount = report.productionConflict.length;
   const productionCount = report.productionResolvedDifferences.length;
-  const budgetCount = budget.productionResolvedEdgeDivergences;
   const sccCount = report.sccDifferences.length;
   const sccBudget = budget.sccDivergences;
   const functionSetBreached =
@@ -257,8 +339,11 @@ export function judgeEquivalence(
     `  functions: exact=${String(report.exactFunctionCount)} sharded=${String(report.shardedFunctionCount)}`,
     `  functionsOnlyInExact=${String(report.functionsOnlyInExact.length)} ` +
       `functionsOnlyInSharded=${String(report.functionsOnlyInSharded.length)}`,
-    `  resolved-edge divergences: production=${String(productionCount)} (budget ${String(budgetCount)}) ` +
-      `test/fixture=${String(report.testResolvedDifferences.length)} (benign)`,
+    `  production resolved-edge divergences (total=${String(productionCount)}) by direction:`,
+    `    phantom  (sharded-only): ${String(phantomCount)} (budget ${String(budget.phantomDivergences)})`,
+    `    decline  (exact-only):   ${String(declineCount)} (budget ${String(budget.declineDivergences)})`,
+    `    conflict (both differ):  ${String(conflictCount)} (budget ${String(budget.conflictDivergences)})`,
+    `  test/fixture resolved divergences: ${String(report.testResolvedDifferences.length)} (benign)`,
     `  scc divergences: ${String(sccCount)} (budget ${String(sccBudget)})`,
     `  structural (unresolved-vs-absent) divergences: ${String(report.structuralDifferences.length)} (informational)`,
   );
@@ -272,23 +357,46 @@ export function judgeEquivalence(
     appendSample(lines, 'sharded-only function', report.functionsOnlyInSharded);
   }
 
-  const productionOverBudget = productionCount > budgetCount;
-  judgeMetric(lines, {
-    label: 'production resolved-edge divergence',
-    key: 'productionResolvedEdgeDivergences',
-    count: productionCount,
-    budget: budgetCount,
-  });
-  if (productionOverBudget) {
-    lines.push(
-      `    A resolver regression dropped/added real edges. Offending production edges ` +
-        `(owner file:line  exact=[..] sharded=[..]):`,
-    );
-    for (const d of report.productionResolvedDifferences) {
-      lines.push(
-        `      ${d.ownerFilePath}:${String(d.line)}:${String(d.column)}  ` +
-          `exact=[${d.toA}] sharded=[${d.toB}]`,
-      );
+  const directions = [
+    {
+      label: 'phantom (sharded-only)',
+      key: 'phantomDivergences',
+      count: phantomCount,
+      budget: budget.phantomDivergences,
+      diffs: report.productionPhantom,
+    },
+    {
+      label: 'decline (exact-only)',
+      key: 'declineDivergences',
+      count: declineCount,
+      budget: budget.declineDivergences,
+      diffs: report.productionDecline,
+    },
+    {
+      label: 'conflict (both differ)',
+      key: 'conflictDivergences',
+      count: conflictCount,
+      budget: budget.conflictDivergences,
+      diffs: report.productionConflict,
+    },
+  ] as const;
+  let directionBreached = false;
+  for (const d of directions) {
+    judgeMetric(lines, {
+      label: `${d.label} divergence`,
+      key: d.key,
+      count: d.count,
+      budget: d.budget,
+    });
+    if (d.count > d.budget) {
+      directionBreached = true;
+      lines.push(`    NEW ${d.label} edges (owner file:line  exact=[..] sharded=[..]):`);
+      for (const diff of d.diffs) {
+        lines.push(
+          `      ${diff.ownerFilePath}:${String(diff.line)}:${String(diff.column)}  ` +
+            `exact=[${diff.toA}] sharded=[${diff.toB}]`,
+        );
+      }
     }
   }
 
@@ -300,9 +408,19 @@ export function judgeEquivalence(
     budget: sccBudget,
   });
 
-  const failed = functionSetBreached || productionOverBudget || sccOverBudget;
+  const failed = functionSetBreached || directionBreached || sccOverBudget;
   lines.push(failed ? `  RESULT: FAIL` : `  RESULT: PASS`);
-  return { failed, functionSetBreached, productionCount, budgetCount, sccCount, sccBudget, lines };
+  return {
+    failed,
+    functionSetBreached,
+    phantomCount,
+    declineCount,
+    conflictCount,
+    productionCount,
+    sccCount,
+    sccBudget,
+    lines,
+  };
 }
 
 /** Emit the PASS/FAIL/tighten line for one budgeted metric. */

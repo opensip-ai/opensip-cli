@@ -185,10 +185,11 @@ export async function executeGraph(
     // minCrossPackageDuplicatePackages). Resolved from the original cwd so a
     // positional subtree run still picks up the project-root config.
     const config = loadGraphConfig(opts.cwd);
-    // Determinism (ADR-0032, superseding ADR-0031): the build engine is chosen
-    // by an explicit, deterministic policy — the SHARDED engine is the DEFAULT
-    // (equivalent to exact within the CI-ratcheted budget held by the
-    // equivalence guardrails; see ADR-0032's 2026-06-10 amendment), and
+    // Determinism (ADR-0033, superseding ADR-0032/0031): the build engine is
+    // chosen by an explicit, deterministic policy — the SHARDED engine is the
+    // DEFAULT (both engines resolve through one shared model — exact = the
+    // 1-shard case — held equivalent by the directional soundness invariant +
+    // completeness floor; ADR-0033), and
     // `--exact` opts OUT to the single-program engine. It is NOT chosen by
     // `process.stdout.isTTY` or on-disk discovery state, so a bare `graph` builds
     // the same catalog whether run in a terminal, piped, or under
@@ -245,10 +246,12 @@ export async function executeGraph(
 }
 
 /**
- * Engine-selection policy (ADR-0032, superseding ADR-0031). The SHARDED engine
- * is the DEFAULT — equivalent to exact within the CI-ratcheted budget held by
- * the equivalence guardrails (`equivalence-repo-scale.test.ts` fixture +
- * `graph-equivalence-check` real-repo ratchet; ADR-0032 amendment). Returns the shard
+ * Engine-selection policy (ADR-0033, superseding ADR-0032/0031). The SHARDED
+ * engine is the DEFAULT — both engines resolve through one shared model (exact =
+ * the 1-shard case), held equivalent by the directional soundness invariant +
+ * completeness floor (`equivalence-repo-scale.test.ts` fixture +
+ * `graph-equivalence-check` directional real-repo ratchet +
+ * `resolution-completeness-floor.test.ts`; ADR-0033). Returns the shard
  * set whenever the project can actually shard (>1 non-empty shard); returns an
  * empty array (→ the EXACT single-program engine) when `--exact` is passed OR
  * the project isn't shardable (single-package / flat / discovery failure — the

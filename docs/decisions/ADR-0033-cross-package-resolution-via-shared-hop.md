@@ -1,0 +1,123 @@
+---
+status: active
+last_verified: 2026-06-11
+owner: opensip-tools
+---
+
+# ADR-0033: Cross-package resolution via one shared hop; directional soundness invariant + completeness floor
+
+```yaml
+id: ADR-0033
+title: Cross-package resolution via one shared hop; directional soundness invariant + completeness floor
+date: 2026-06-11
+status: active
+supersedes: [ADR-0032]
+superseded_by: null
+related: [ADR-0003, ADR-0010, ADR-0014, ADR-0015, ADR-0031]
+tags: [graph, resolution, determinism, cache, ci]
+enforcement: mechanizable
+enforcement-reason: >
+  The resolution model is held by THREE layers. (1) The DIRECTIONAL real-repo
+  guardrail `graph-equivalence-check` (CI, every PR): builds this repo through
+  both engines and gates `.config/graph-equivalence-budget.json` per DIRECTION —
+  phantom (sharded-only), decline (exact-only), conflict (both resolve to
+  different targets) — each ratcheted to its measured floor, plus
+  `functionsOnly{Exact,Sharded}` and structural=invariants; gating per-direction
+  so a fixed conflict cannot mask a new phantom. (2) The pinned-corpus
+  COMPLETENESS floor `resolution-completeness-floor.test.ts`: asserts a
+  non-decreasing count of resolved cross-package edges on the committed
+  `medium-pkg` fixture (fixed denominator ⇒ a count floor is a resolution-rate
+  floor), catching a both-engine drop the differential gate is blind to. (3) The
+  byte-equivalence fixture suite (`equivalence-repo-scale.test.ts`) and the
+  no-bodyhash-keying / ownerEdgeKey identity tests (ADR-0003). Engine-selection
+  policy and cache stamping carry forward from ADR-0032 / ADR-0015.
+```
+
+**Decision:** Cross-package call edges resolve through **one shared hop** used by
+*both* engines — the `resolve-decl` declaration→bodyHash seam plus the
+`export-index` `resolveCrossPackageCall`/`resolveCrossBoundaryCalls` linker. The
+single-program (**exact**) build is treated as the **1-shard case**: after its
+type-checker-driven inline pass, it runs the *same* post-merge boundary linker
+the **sharded** build runs, so the two engines compute cross-package edges by one
+model rather than two. Consequently the equivalence guardrail is redefined: it no
+longer tolerates a flat "budget toward zero" but enforces a **directional
+soundness invariant** — *any new divergence on the unified model fails*, each
+direction (phantom / decline / conflict) ratcheted to its documented residual —
+backed by a **resolution-completeness floor** on a pinned corpus. Neither engine
+is the oracle; **direction is a diagnostic** ("which bound is insufficient"), not
+a verdict of wrongness. The ADR-0032 default-engine policy (sharded is the
+default; `--exact` is the opt-out; `isTTY` selects only the renderer; the cache
+key carries `mode=exact|sharded`) **carries forward unchanged**.
+
+**Alternatives:**
+- *Keep ADR-0032's flat budget ratcheting toward 0 (`productionResolvedEdgeDivergences`).*
+  Rejected: it presumed every divergence would shrink to zero with the "phantom =
+  sharded-only" class eliminated. Measurement falsified that — a sharded-only edge
+  is frequently a *correct* edge the type checker under-resolves (e.g.
+  `scope.graph?.rules.getAll()` through an optional chain), so "direction =
+  wrongness" is not a sound proxy once neither engine is the oracle. A flat total
+  also lets a fixed conflict mask a new phantom.
+- *A directional "phantom = 0, hard" gate (the pre-measurement plan).* Rejected:
+  driving sharded-only to zero would delete real edges exact misses. Phantom is
+  ratcheted to its measured floor (currently 1, documented), not forced to zero.
+- *A new bounded-`ts.Program` resolution adapter + augmentation census (the
+  Phase-1 "soundness spike").* Rejected/retired by the Task-0.4 diagnosis: the
+  fix was bounded corrections to the shared hop (re-export chains; file+name pin
+  with unique-or-decline; declining parameter/callback name-guesses) plus engine
+  convergence — not a new capability surface.
+- *Keep two independent resolution paths and diff them.* Rejected: that is the
+  pre-convergence state where "the engines disagree" is undecidable without ground
+  truth. One shared hop makes any disagreement mechanically a bug.
+
+**Rationale:** ADR-0032's 2026-06-10 amendment recorded a 204-edge budgeted
+residual and a direction-of-travel ("eliminate phantom classes, ratchet toward
+the re-export class"). Executing that (the `graph-resolution-correctness` plan)
+drove the residual 204 → 12 and, critically, revealed *why* a flat ratchet toward
+zero was ill-posed: the two engines were running *different* resolution models, so
+some divergences were exact under-resolving and some were sharded mis-narrowing —
+no single number, and no directional sign, encodes "wrong." The cure was to make
+both engines run **one** model (exact recovers cross-package edges via the sharded
+linker — `cache-orchestrator.recoverExactBoundaryEdges`), after which a divergence
+is mechanically a real bug, classified by direction for diagnosis. The remaining
+12 are documented classes: 1 phantom (exact under-resolves an optional-chain
+property access — sharded is correct), 0 decline, 11 conflict (cross-package
+same-name registry-method mis-narrowing — a real disambiguation gap, tracked for
+follow-up). A separate blind spot — sites both engines decline (e.g.
+arrow-property `logger.info()`) — is invisible to a differential gate by
+construction, so it is guarded by the pinned-corpus completeness floor.
+
+**Consequences:**
+- `.config/graph-equivalence-budget.json` changes shape: `{ phantomDivergences,
+  declineDivergences, conflictDivergences, sccDivergences }` (per-direction
+  floors) replaces the single `productionResolvedEdgeDivergences`. `--update-budget`
+  writes the new shape.
+- `graph-equivalence-check` output now reports the directional breakdown every run
+  and fails on a per-direction breach (printing only the breached direction's
+  offenders).
+- A new CI-relevant test, `resolution-completeness-floor.test.ts`, ratchets the
+  resolved cross-package edge count on `medium-pkg` (floor = 7). Adding resolved
+  edges to the fixture requires raising the floor.
+- The exact engine emits syntactic boundary calls (`emitBoundaryCalls`) and runs
+  the cross-shard linker in `obtainCatalog`; a debug-only `GRAPH_SITE_LOG` trace
+  harness (isolated, env-gated) is retained for the next investigation
+  (`docs/internal/graph-resolution-trace.md`).
+- **Build-state independence is partial and explicit:** the file+name pin made
+  RELATIVE/intra-package imports clean-checkout-safe in both engines; WORKSPACE
+  `@scope/pkg` imports still reach the linker in exact via the dep's built
+  `dist/*.d.ts`, so a `rm -rf packages/*/dist` still drops those edges in exact
+  (sharded's syntactic extractor is dist-independent). The source-as-surface
+  program change is deferred to a follow-up; the clean-checkout assertion is
+  scoped to the relative class accordingly.
+- ADR-0032 is **superseded**; its default-engine policy is restated here and
+  remains in force. ADR-0031's suppression seam / `FinalizedSignals` /
+  renderer-by-TTY / `mode=` cache stamping remain unchanged.
+
+**Related specs / ADRs:** Supersedes ADR-0032 (sharded default), carrying its
+engine-selection policy forward. Builds on ADR-0003 (ownerEdgeKey occurrence
+identity — body-twins must not union edges), ADR-0010 (cross-package export
+model), ADR-0014 (shared inline-suppression primitive), ADR-0015 (engine-version +
+mode cache stamping), ADR-0031 (one build / one finalize / many renderers).
+Implements the `graph-resolution-correctness` plan (local). Residual diagnosis +
+the `GRAPH_SITE_LOG` harness recorded in
+`docs/internal/graph-resolution-trace.md` and
+`docs/internal/graph-false-findings-incident-log.md`.
