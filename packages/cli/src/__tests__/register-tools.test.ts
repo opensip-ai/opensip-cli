@@ -8,6 +8,7 @@ import {
   ToolRegistry as ToolRegistryClass,
   type Tool,
   type ToolCliContext,
+  type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-tools/core';
@@ -188,7 +189,12 @@ describe('registerFirstPartyTools', () => {
           kind: 'tool',
           id: 'broken-bundled',
           apiVersion: 1,
-          commands: [{ name: 'broken-bundled', description: 'a tool that throws on import' }],
+          commands: [
+            {
+              name: 'broken-bundled',
+              description: 'a tool that throws on import',
+            },
+          ],
         },
       }),
       'utf8',
@@ -245,7 +251,12 @@ describe('mountAllToolCommands', () => {
     const registry = makeRegistry();
     // A tool with neither commandSpecs nor any mount surface — a mis-declaration.
     registry.register({
-      metadata: { id: 'tool-empty', name: 'empty', version: '0.0.0', description: 'empty' },
+      metadata: {
+        id: 'tool-empty',
+        name: 'empty',
+        version: '0.0.0',
+        description: 'empty',
+      },
       commands: [],
     } as never);
     registry.register(specTool('tool-ok', 'ok'));
@@ -267,7 +278,12 @@ describe('mountAllToolCommands', () => {
     const registry = makeRegistry();
     // A malformed spec (a required boolean flag) throws inside mountCommandSpec.
     registry.register({
-      metadata: { id: 'tool-bad', name: 'bad', version: '0.0.0', description: 'bad' },
+      metadata: {
+        id: 'tool-bad',
+        name: 'bad',
+        version: '0.0.0',
+        description: 'bad',
+      },
       commands: [{ name: 'bad', description: 'bad' }],
       commandSpecs: [
         {
@@ -276,7 +292,13 @@ describe('mountAllToolCommands', () => {
           commonFlags: [],
           scope: 'project',
           output: 'command-result',
-          options: [{ flag: '--flag', description: 'boolean but required', required: true }],
+          options: [
+            {
+              flag: '--flag',
+              description: 'boolean but required',
+              required: true,
+            },
+          ],
           handler: () => Promise.resolve({ type: 'noop' }),
         },
       ] as never,
@@ -373,7 +395,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           },
         },
         indexJs:
-          "export const tool = { metadata: { id: 'fixture-valid', name: 'Fixture', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
+          "export const tool = { metadata: { id: 'fixture-valid', name: 'Fixture', version: '0.0.0' }, commands: [{ name: 'fixture-valid', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();
@@ -383,6 +405,52 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       BUILTIN_IDS,
     );
     expect(registry.get('fixture-valid')).toBeDefined();
+  });
+
+  it('skips a discovered package whose manifest drifted from its runtime commands', async () => {
+    // The drift guard (assertManifestMatchesTool) runs on the installed leg
+    // exactly as on the bundled/authored legs. An installed tool's mismatch
+    // skips-with-diagnostic (it must not take fit/graph/sim down).
+    staged.push(
+      stageFixture('drifted-manifest', {
+        packageJson: {
+          name: '@opensip-tools-fixture/drifted-manifest',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: {
+            kind: 'tool',
+            id: 'fixture-drift',
+            apiVersion: 1,
+            commands: [
+              {
+                name: 'fixture-drift',
+                description: 'declared in manifest only',
+              },
+            ],
+          },
+        },
+        indexJs:
+          "export const tool = { metadata: { id: 'fixture-drift', name: 'Drift', version: '0.0.0' }, commands: [{ name: 'something-else', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    const provenance: ToolProvenance[] = [];
+    const restore = silenceStderr();
+    try {
+      await expect(
+        discoverAndRegisterToolPackages(
+          registry,
+          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          BUILTIN_IDS,
+          provenance,
+        ),
+      ).resolves.toBeUndefined();
+    } finally {
+      restore();
+    }
+    expect(registry.get('fixture-drift')).toBeUndefined();
+    expect(provenance.some((p) => p.id === 'fixture-drift')).toBe(false);
   });
 
   it('skips a discovered package whose `tool` export is malformed', async () => {
@@ -542,7 +610,10 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
             kind: 'tool',
             id: 'fixture-no-apiv',
             commands: [
-              { name: 'fixture-no-apiv', description: 'a tool with no declared apiVersion' },
+              {
+                name: 'fixture-no-apiv',
+                description: 'a tool with no declared apiVersion',
+              },
             ],
           },
         },
@@ -597,5 +668,50 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       restore();
     }
     expect(registry.list()).toHaveLength(0);
+  });
+
+  it('records no provenance or manifest for an admitted tool whose import fails', async () => {
+    // Parity regression: provenance + manifest are recorded only AFTER the
+    // runtime actually registered. An installed tool that admits on its static
+    // manifest but throws on import must leave NO trace in the collectors —
+    // otherwise `plugin list` would show a tool that never loaded and the
+    // capability registry would be seeded with its domains.
+    staged.push(
+      stageFixture('admits-then-throws', {
+        packageJson: {
+          name: '@opensip-tools-fixture/admits-then-throws',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: {
+            kind: 'tool',
+            id: 'fixture-admits-then-throws',
+            apiVersion: 1,
+            commands: [{ name: 'fixture-admits-then-throws', description: 'x' }],
+          },
+        },
+        indexJs: "throw new Error('boom after admission');",
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    const provenance: ToolProvenance[] = [];
+    const manifests: ToolPluginManifest[] = [];
+    const restore = silenceStderr();
+    try {
+      await expect(
+        discoverAndRegisterToolPackages(
+          registry,
+          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          BUILTIN_IDS,
+          provenance,
+          manifests,
+        ),
+      ).resolves.toBeUndefined();
+    } finally {
+      restore();
+    }
+    expect(registry.get('fixture-admits-then-throws')).toBeUndefined();
+    expect(provenance.some((p) => p.id === 'fixture-admits-then-throws')).toBe(false);
+    expect(manifests.some((m) => m.id === 'fixture-admits-then-throws')).toBe(false);
   });
 });

@@ -202,6 +202,14 @@ distinct from:
   Direction is a diagnostic, not a verdict (neither engine is the oracle: a
   sharded-only edge is often a real edge exact under-resolved). Supersedes
   ADR-0032, **carrying its default-engine policy forward unchanged**
+- [ADR-0034](./ADR-0034-language-adapters-host-wired.md) — Language adapters are
+  **host-wired, not plugin-discovered**: the six bundled `@opensip-tools/lang-*`
+  adapters are statically registered by the composition root
+  (`register-language-adapters.ts`) and deliberately do NOT travel the
+  tool-plugin path — they are the closed, version-locked parse substrate
+  (ADR-0010), not a behavioral plugin, so ambient discovery would silently
+  invalidate caches/baselines. This is the documented exception to the §8
+  invariant-1 parity rule for first-party code in the host
 
 ### Superseded
 

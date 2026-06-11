@@ -107,7 +107,9 @@ function resolveBundledPackageDir(packageName: string): string | undefined {
     const pkgPath = join(dir, 'package.json');
     if (existsSync(pkgPath)) {
       try {
-        const json = JSON.parse(readFileSync(pkgPath, 'utf8')) as { name?: unknown };
+        const json = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
+          name?: unknown;
+        };
         if (json.name === packageName) return dir;
       } catch {
         // @swallow-ok unreadable package.json on the walk-up — keep climbing.
@@ -150,7 +152,9 @@ async function importToolRuntime(dir: string): Promise<ToolRuntimeLoad> {
   if (!meta) return { ok: false, reason: 'no-entry' };
   let mod: { tool?: unknown };
   try {
-    mod = (await import(pathToFileURL(meta.mainEntry).href)) as { tool?: unknown };
+    mod = (await import(pathToFileURL(meta.mainEntry).href)) as {
+      tool?: unknown;
+    };
   } catch (error) {
     return {
       ok: false,
@@ -322,24 +326,23 @@ export function buildToolDiscoverySources(
  * incompatible installed tool skips rather than failing the whole CLI).
  *
  * Returns:
- *   - `'reject'`  — skip this package (no conformant manifest, gate skipped it,
- *                   or its id collides with a built-in). The reason is logged.
- *   - `'proceed'` — the manifest is conformant + compatible; continue to import
- *                   + register.
+ *   - `undefined` — skip this package (no conformant manifest, gate skipped
+ *     it, or its id collides with a built-in). The reason is logged.
+ *   - the admission `{ provenance, manifest }` — the manifest is conformant +
+ *     compatible; the caller continues to import + register, and records the
+ *     provenance/manifest only AFTER the runtime actually registered (so
+ *     `plugin list` and the capability registry never see a tool whose import
+ *     subsequently failed — matching the bundled/authored legs).
  *
  * 3.0.0 GA: the grace window ended. A discovered `kind:'tool'` package whose
  * manifest is missing/malformed (`loadToolManifest` → undefined) or declares no
  * `apiVersion` (`admitTool` → skip via {@link checkCompatibility}) is no longer
- * admitted off the marker alone — it is rejected with a diagnostic. On
- * `'proceed'` the tool's `ToolProvenance` is pushed onto `provenance` for `plugin
- * list`.
+ * admitted off the marker alone — it is rejected with a diagnostic.
  */
 function admitInstalledTool(
   pkg: { readonly name: string; readonly packageDir: string },
   builtInIds: ReadonlySet<string>,
-  provenance: ToolProvenance[],
-  manifests: ToolPluginManifest[],
-): 'reject' | 'proceed' {
+): AuthoredAdmission | undefined {
   const manifest = loadToolManifest('installed', pkg.packageDir);
   if (manifest === undefined) {
     // 3.0.0: a discovered tool with no conformant manifest is no longer admitted
@@ -347,10 +350,14 @@ function admitInstalledTool(
     process.stderr.write(
       `opensip-tools: tool package ${pkg.name} has no conformant package.json#opensipTools manifest — skipping\n`,
     );
-    logger.warn({ evt: 'cli.tool.manifest_invalid', module: BOOTSTRAP_MODULE, name: pkg.name });
-    return 'reject';
+    logger.warn({
+      evt: 'cli.tool.manifest_invalid',
+      module: BOOTSTRAP_MODULE,
+      name: pkg.name,
+    });
+    return undefined;
   }
-  if (builtInIds.has(manifest.id)) return 'reject';
+  if (builtInIds.has(manifest.id)) return undefined;
 
   const result = admitTool({
     manifest,
@@ -361,12 +368,8 @@ function admitInstalledTool(
     // tool's command, so default false → incompatible installed tools skip.
     explicitlyRequested: false,
   });
-  if (result.decision !== 'admit') return 'reject';
-  provenance.push(result.provenance);
-  // Record the admitted manifest so the pre-action-hook can register an
-  // installed tool's declared capability domains too (§5.3).
-  manifests.push(manifest);
-  return 'proceed';
+  if (result.decision !== 'admit') return undefined;
+  return { provenance: result.provenance, manifest };
 }
 
 /**
@@ -410,13 +413,22 @@ function emitInstalledLoadFailure(
     process.stderr.write(
       `opensip-tools: tool package ${name} does not export a valid \`tool\` — skipping\n`,
     );
-    logger.warn({ evt: 'cli.tool.invalid_shape', module: BOOTSTRAP_MODULE, name });
+    logger.warn({
+      evt: 'cli.tool.invalid_shape',
+      module: BOOTSTRAP_MODULE,
+      name,
+    });
     return;
   }
   process.stderr.write(
     `opensip-tools: failed to load tool ${name}: ${load.detail ?? 'import failed'}\n`,
   );
-  logger.warn({ evt: 'cli.tool.load_failed', module: BOOTSTRAP_MODULE, name, error: load.detail });
+  logger.warn({
+    evt: 'cli.tool.load_failed',
+    module: BOOTSTRAP_MODULE,
+    name,
+    error: load.detail,
+  });
 }
 
 export async function discoverAndRegisterToolPackages(
@@ -434,10 +446,11 @@ export async function discoverAndRegisterToolPackages(
 
   for (const pkg of discovered) {
     try {
-      // Compatibility gate BEFORE import (release 2.8.0). `'reject'` means the
-      // gate skipped it (or it's a built-in id); `'proceed'` means import +
-      // register as before (manifest absent → grace window, or admitted).
-      if (admitInstalledTool(pkg, builtInIds, provenance, manifests) === 'reject') continue;
+      // Compatibility gate BEFORE import (release 2.8.0). `undefined` means the
+      // gate skipped it (or it's a built-in id); an admission means import +
+      // register as before.
+      const admission = admitInstalledTool(pkg, builtInIds);
+      if (admission === undefined) continue;
 
       // Load the runtime through the SHARED dynamic-import path (3.0.0) — the
       // same `importToolRuntime` the bundled path uses. Resolves the entry
@@ -451,7 +464,19 @@ export async function discoverAndRegisterToolPackages(
         continue;
       }
       if (builtInIds.has(load.tool.metadata.id)) continue;
+
+      // Drift guard — the SAME manifest⇔runtime identity check the bundled and
+      // authored legs run. For an installed tool a mismatch throws into the
+      // surrounding catch (skip-with-diagnostic posture), never crashing the CLI.
+      assertManifestMatchesTool(admission.manifest, load.tool);
+
       registry.register(load.tool, { sourcePackage: pkg.name });
+      // Record provenance + manifest only now that the tool actually
+      // registered — `plugin list` and the per-run capability registry must
+      // never include a tool whose runtime failed to load (parity with the
+      // bundled/authored legs, which also record after registration).
+      provenance.push(admission.provenance);
+      manifests.push(admission.manifest);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       process.stderr.write(`opensip-tools: failed to load tool ${pkg.name}: ${msg}\n`);
@@ -466,9 +491,11 @@ export async function discoverAndRegisterToolPackages(
 }
 
 /**
- * The outcome of admitting an AUTHORED (sidecar) tool — the recorded
- * `ToolProvenance` plus the loaded `ToolPluginManifest`. The manifest is
- * returned (not re-read) so the discovery walk can run the drift guard
+ * The outcome of admitting a tool — the recorded `ToolProvenance` plus the
+ * loaded `ToolPluginManifest`. Returned by the authored legs
+ * ({@link admitUserGlobalTool} / {@link admitProjectLocalTool}) and the
+ * installed leg ({@link admitInstalledTool}) alike. The manifest is returned
+ * (not re-read) so the register step can run the drift guard
  * (`assertManifestMatchesTool`) against the imported runtime and seed the
  * per-run capability registry, without a second filesystem read.
  */
