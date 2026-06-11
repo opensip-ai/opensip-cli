@@ -85,8 +85,30 @@ describe('analyzeRawDbAccess', () => {
     expect(analyzeRawDbAccess('logger.db.warn("x")', OUTSIDE)).toHaveLength(0);
   });
 
-  it('does NOT flag a bare local `db.select(` (handle is reached as a property)', () => {
+  it('does NOT flag an arbitrary bare local `db.select(` with no raw-handle alias', () => {
     expect(analyzeRawDbAccess('db.select().from(t)', OUTSIDE)).toHaveLength(0);
+  });
+
+  it('flags a raw handle assigned to a local alias', () => {
+    const content = ['const rawDb = store.db;', 'rawDb.select().from(t).get();'].join('\n');
+    const violations = analyzeRawDbAccess(content, OUTSIDE);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.line).toBe(2);
+  });
+
+  it('flags a raw handle destructured to `db` or an alias', () => {
+    expect(
+      analyzeRawDbAccess(
+        ['const { db } = store;', 'db.insert(t).values(v).run();'].join('\n'),
+        OUTSIDE,
+      ),
+    ).toHaveLength(1);
+    expect(
+      analyzeRawDbAccess(
+        ['const { db: rawDb } = store;', 'rawDb.delete(t).run();'].join('\n'),
+        OUTSIDE,
+      ),
+    ).toHaveLength(1);
   });
 
   it('reports correct line numbers and one violation per offending line', () => {

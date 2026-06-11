@@ -587,7 +587,7 @@
       "audience": [
         "contributors"
       ],
-      "purpose": "The dependency-cruiser rules that enforce the five-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
+      "purpose": "The dependency-cruiser rules that enforce the six-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
     },
     {
       "file": "docs/web-generated/80-implementation/06-doc-conventions.md",

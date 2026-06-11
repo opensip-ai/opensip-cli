@@ -37,20 +37,6 @@ export type {
 } from './framework/scenario-executor-result.js';
 
 // =============================================================================
-// REGISTRY
-// =============================================================================
-
-export {
-  createScenarioRegistry,
-  currentScenarioRegistry,
-  getRegisteredScenarios,
-  getScenario,
-  getScenariosByTag,
-  getScenariosByKind,
-  clearScenarioRegistry,
-} from './framework/registry.js';
-
-// =============================================================================
 // LOAD KIND
 // =============================================================================
 
@@ -81,22 +67,17 @@ export type { ChaosOutcome, ChaosEvent, ChaosAssertionVerdict } from './kinds/ch
 // packages uniformly; dedup at register-tools.ts handles the
 // duplicate-id case.
 export { simulationTool, simulationTool as tool } from './tool.js';
-// CLI lifecycle surface (mirrors fitness's curated barrel per ADR-0009).
+// CLI lifecycle helpers intentionally stay off the public barrel.
 // `executeSim` is NOT here — it lives in `cli/sim.ts` and is not part of the
 // public barrel; the CLI drives simulation through the Tool contract
-// (`simulationTool`), and sim's own tests import it via the relative
-// `cli/sim.js` path. `getPluginLoadErrors` is an internal render/accessor helper
-// with no external consumer, so it is exported only from its own module for
-// the simulation CLI's relative imports — not re-exported here.
-export { ensureScenariosLoaded } from './cli/sim.js';
+// (`simulationTool`), and sim's own tests import lifecycle helpers through
+// relative paths or `@opensip-tools/simulation/internal`.
 
 // =============================================================================
 // PLUGIN DISCOVERY — sim plugin contract + @opensip-tools/scenarios-*
 // =============================================================================
 
 export type { SimPluginExports } from './plugins/types.js';
-export { readScenarioPackagePreferences } from './plugins/scenario-package-discovery.js';
-export { loadAllSimPlugins } from './plugins/loader.js';
 
 // =============================================================================
 // SHARED INFRASTRUCTURE
@@ -142,23 +123,6 @@ export {
 // =============================================================================
 
 export { defineSimulationRecipe } from './recipes/define-recipe.js';
-export {
-  SimulationRecipeRegistry,
-  createSimulationRecipeRegistry,
-  currentSimulationRecipeRegistry,
-} from './recipes/registry.js';
-export type { SimulationRecipeDisplayInfo } from './recipes/registry.js';
-export {
-  builtInSimulationRecipes,
-  builtInSimulationRecipesByName,
-  isBuiltInSimulationRecipe,
-} from './recipes/built-in-recipes.js';
-export { SimulationRecipeService } from './recipes/service.js';
-export type {
-  SimulationRecipeServiceConfig,
-  SimulationScenarioResult,
-  SimulationRecipeResult,
-} from './recipes/service.js';
 export type {
   SimulationRecipe,
   SimulationRecipeConfig,

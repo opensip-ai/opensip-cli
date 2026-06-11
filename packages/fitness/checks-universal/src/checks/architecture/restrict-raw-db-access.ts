@@ -22,17 +22,16 @@
  * very file) never false-fires; only real call expressions survive. The shape
  * being matched is purely local and lexical: a `.db` property access whose
  * member is *immediately* a Drizzle query/builder method
- * (`.db.select(` / `.db.insert(` / `.db.delete(` / `.db.run(` …). A regex on
- * `\.db\.<method>\s*\(` is both precise and simpler here than standing up an
- * AST walk: there is no cross-statement reasoning, type resolution, or scope
- * analysis that AST would buy us, and the property-chain `<x>.db.<method>(` is
- * unambiguous as a single token sequence. Requiring the trailing query method
+ * (`.db.select(` / `.db.insert(` / `.db.delete(` / `.db.run(` …). The detector
+ * also tracks obvious same-file aliases (`const db = store.db`,
+ * `const { db } = store`) so a caller cannot bypass the check by peeling the
+ * handle off first. Regexes are precise enough here because the protected
+ * shapes are small local token sequences; requiring the trailing query method
  * (rather than bare `.db`) keeps false-positives near zero — an unrelated
  * `.db` field on some other object (e.g. `config.db`, `connection.db.host`)
- * does not trip unless it is *immediately* called as a Drizzle query, which a
- * non-handle `.db` would not be. `strip-strings-and-comments` blanks both
- * string literals and comment bodies so `.db.select(` inside a literal or doc
- * example never false-fires.
+ * does not trip unless it is used as a Drizzle query handle. `strip-strings-
+ * and-comments` blanks both string literals and comment bodies so `.db.select(`
+ * inside a literal or doc example never false-fires.
  *
  * ALLOWED BOUNDARY (no violation) — implemented inside `analyze` by inspecting
  * `filePath`, so the check is self-contained and correct regardless of the
@@ -87,11 +86,41 @@ const DRIZZLE_METHODS = [
 /**
  * Matches a property-access whose member is `db` followed immediately by a
  * Drizzle query method call: `<anything>.db.select(` / `.db.run(` / …
- * Anchored on a `.db.` so a top-level `db.select(` (a bare local named `db`)
- * is intentionally NOT matched — the public handle is reached as a property
- * (`this.datastore.db`, `store.db`), which is the shape this seam protects.
  */
 const RAW_DB_QUERY = new RegExp(String.raw`\.db\.(?:${DRIZZLE_METHODS.join('|')})\s*\(`);
+
+const IDENTIFIER = String.raw`[A-Za-z_$][\w$]*`;
+
+/** Matches `const { db } = store` and `const { db: rawDb } = store`. */
+const RAW_DB_DESTRUCTURE = new RegExp(
+  String.raw`\b(?:const|let|var)\s+\{[^}]*\bdb\b\s*(?::\s*(${IDENTIFIER}))?[^}]*\}\s*=`,
+  'g',
+);
+
+/** Matches `const rawDb = store.db`. */
+const RAW_DB_ASSIGNMENT = new RegExp(
+  String.raw`\b(?:const|let|var)\s+(${IDENTIFIER})\s*=\s*[^;\n]+\.db\b`,
+  'g',
+);
+
+function escapeRegExp(value: string): string {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+}
+
+function collectRawDbAliases(line: string): string[] {
+  const aliases: string[] = [];
+  for (const match of line.matchAll(RAW_DB_DESTRUCTURE)) {
+    aliases.push(match[1] ?? 'db');
+  }
+  for (const match of line.matchAll(RAW_DB_ASSIGNMENT)) {
+    if (match[1]) aliases.push(match[1]);
+  }
+  return aliases;
+}
+
+function rawDbAliasQuery(alias: string): RegExp {
+  return new RegExp(String.raw`\b${escapeRegExp(alias)}\.(?:${DRIZZLE_METHODS.join('|')})\s*\(`);
+}
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the detection
@@ -107,8 +136,13 @@ export function analyzeRawDbAccess(content: string, filePath: string): CheckViol
 
   const violations: CheckViolation[] = [];
   const lines = content.split('\n');
+  const rawDbAliases = new Set<string>();
   for (const [i, line] of lines.entries()) {
-    if (RAW_DB_QUERY.test(line)) {
+    for (const alias of collectRawDbAliases(line)) {
+      rawDbAliases.add(alias);
+    }
+    const usesRawDbAlias = [...rawDbAliases].some((alias) => rawDbAliasQuery(alias).test(line));
+    if (RAW_DB_QUERY.test(line) || usesRawDbAlias) {
       violations.push({
         message:
           'Raw Drizzle handle (`DataStore.db`) used outside the persistence ' +

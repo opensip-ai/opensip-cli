@@ -15,11 +15,11 @@
 
 import { RunScope, runWithScope } from '@opensip-tools/core';
 import { GraphAdapterRegistry, graphTool } from '@opensip-tools/graph';
+import { simulationTool } from '@opensip-tools/simulation';
 import {
   SimulationRecipeRegistry,
   createScenarioRegistry,
-  simulationTool,
-} from '@opensip-tools/simulation';
+} from '@opensip-tools/simulation/internal';
 import { describe, expect, it } from 'vitest';
 
 import type { GraphLanguageAdapter } from '@opensip-tools/graph';

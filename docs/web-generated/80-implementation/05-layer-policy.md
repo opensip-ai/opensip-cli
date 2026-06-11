@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-11
 release: v3.0.0
 title: "Layer policy"
 audience: [contributors]
-purpose: "The dependency-cruiser rules that enforce the five-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
+purpose: "The dependency-cruiser rules that enforce the six-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
 source-files:
   - .config/dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -16,7 +16,7 @@ related-docs:
 ---
 # Layer policy
 
-The five-layer package graph (core → datastore/contracts → tools/libraries/adapters → checks → cli) is enforced by [dependency-cruiser](https://github.com/sverweij/dependency-cruiser). Build fails on any forbidden edge. This doc walks every rule and the reasoning.
+The six-layer package graph (core → substrates → shared libraries/adapters → tools → check/adapter packs → cli) is enforced by [dependency-cruiser](https://github.com/sverweij/dependency-cruiser). Build fails on any forbidden edge. This doc walks every rule and the reasoning.
 
 For the conceptual layer narrative, see [`../10-concepts/03-modular-monolith.md`](/docs/opensip-tools/10-concepts/03-modular-monolith/).
 
@@ -50,27 +50,24 @@ No circular dependencies between modules within a package. The main pass ignores
 
 No imports from deprecated/removed Node core modules. Catches accidental usage of legacy Node APIs.
 
-### `not-to-spec` and `not-to-dev-dep`
+### `not-to-spec` and dev-dependency hygiene
 
-Production code can't import test files; source code can't import devDependencies. These rules guard the runtime surface — a check pack accidentally importing vitest would crash any consumer who installed the pack as a regular dep.
+Production code can't import test files, and source code can't import undeclared runtime dependencies. These guards protect the runtime surface — a check pack accidentally importing vitest would crash any consumer who installed the pack as a regular dep.
 
 ```js
 { name: 'not-to-spec',
   from: { pathNot: ['/__tests__/', '\\.test\\.(ts|tsx)$'] },
   to:   { path: ['/__tests__/', '\\.test\\.(ts|tsx)$'] },
 }
-
-{ name: 'not-to-dev-dep',
-  from: { path: '^packages/', pathNot: ['/__tests__/', '\\.test\\.(ts|tsx)$'] },
-  to:   { dependencyTypes: ['npm-dev'] },
-}
 ```
+
+`not-to-spec` lives in dependency-cruiser because it is a workspace file edge. Dev-dependency hygiene lives in ESLint (`import-x/no-extraneous-dependencies`, `.config/eslint.config.mjs`) because dependency-cruiser intentionally drops almost all `node_modules` edges under this config; a `to: { dependencyTypes: ['npm-dev'] }` cruiser rule would be structurally inert here.
 
 ---
 
 ## Layer enforcement rules
 
-The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, fitness/simulation/lang/check-pack isolation). Three more runtime packages split out of `contracts` carry their own "depends-on-core-only-ish" rules in the same shape: `session-store-imports-core-datastore-contracts-only`, `output-imports-core-contracts-only`, and `dashboard-imports-only-core-contracts` (plus `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit). They read exactly like the ones below — a `from` package, a forbidden `to` path-list.
+The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, config, fitness/simulation/graph, language/check/adapter-pack isolation). Several runtime packages carry their own narrow allowlist rules in the same shape: `session-store-imports-core-datastore-contracts-only`, `output-imports-core-contracts-only`, `config-imports-core-only`, `dashboard-imports-only-core-contracts`, and `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit. They read exactly like the ones below — a `from` package, a forbidden `to` path-list.
 
 ### `core-imports-nothing-workspace`
 
@@ -78,15 +75,8 @@ The rules that pin the cross-package layer cake. The set below covers the load-b
 {
   from: { path: '^packages/core/src/' },
   to: {
-    path: [
-      '^@opensip-tools/datastore',
-      '^@opensip-tools/contracts',
-      '^opensip-tools($|/)',
-      '^@opensip-tools/fitness',
-      '^@opensip-tools/simulation',
-      '^@opensip-tools/lang-',
-      '^@opensip-tools/checks-',
-    ],
+    path: '^packages/',
+    pathNot: '^packages/core/',
   },
 }
 ```
@@ -97,7 +87,7 @@ This is the load-bearing rule. The kernel is what every Tool depends on; if the 
 
 The kernel is also where genuinely *shared* substrate lives so it doesn't get duplicated across peer tools. Besides `Registry<T>` and `RunScope`, core now hosts the **generic recipe substrate** (`packages/core/src/recipes/` — `RecipeRegistry<T>`, selector resolution, per-unit config override), hoisted out of fitness so fitness, simulation, and graph share one selection + config-override mechanism (ADR-0005). Execution strategy stays tool-owned; only the generic selection machinery is shared. Because it lives *in* core, it's available to every layer above without inverting the dependency arrow.
 
-The rule's path-list is exhaustive — every package outside `packages/core/` is forbidden. Adding a new package below `core` would require updating this rule (it doesn't, today — the kernel is the bottom).
+The rule is future-proof by shape: any target under `packages/` is forbidden unless it is still inside `packages/core/`. Adding a new package cannot accidentally create an unguarded core back-edge.
 
 ### `datastore-imports-core-only`
 

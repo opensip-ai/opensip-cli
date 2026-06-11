@@ -3,7 +3,14 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 export type DrizzleHandle<TSchema extends Record<string, unknown> = Record<string, unknown>> =
   BetterSQLite3Database<TSchema>;
 
-/** Persistence handle exposing a typed Drizzle DB and a transaction runner. */
+/**
+ * Persistence handle exposing a typed Drizzle DB and a transaction runner.
+ *
+ * `db` is intentionally available to persistence-owned packages, but direct
+ * query calls must stay inside `src/persistence/`, `session-store`, or
+ * `datastore`. Cross-module business code should go through the owning
+ * repository/API; `restrict-raw-db-access` guards that boundary.
+ */
 export interface DataStore<TSchema extends Record<string, unknown> = Record<string, unknown>> {
   readonly db: DrizzleHandle<TSchema>;
   close(): void;
