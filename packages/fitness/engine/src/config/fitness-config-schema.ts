@@ -1,20 +1,15 @@
 /**
- * fitness-config-schema — the fitness tool's namespaced Zod config schema
- * (release 2.10.0, ADR-0023, Phase 4 Task 4.2).
+ * fitness-config-schema — the fitness tool's namespaced Zod config schema.
  *
  * Describes the `fitness:` top-level block of `opensip-tools.config.yml` —
  * the knobs fitness owns: gate thresholds (`failOnErrors`/`failOnWarnings`),
  * the `disabledChecks` list, the tool-scoped `recipe` default, and the
  * scheduling/targeting knobs (`defaultTarget`/`maxParallel`/`timeout`).
  *
- * This is the schema fitness contributes to the host's composed
- * whole-document validation. It deliberately covers ONLY the `fitness:`
- * namespace — shared targeting (`targets`/`globalExcludes`/`checkOverrides`)
- * and the `cli:` block stay with their existing loaders (the strict
- * `SignalersConfigSchema`); they migrate to namespaced declarations in
- * 2.10.1. So `loadSignalersConfig` keeps reading the document for targeting +
- * fitness-block values; the composed dispatch-level gate adds the strict
- * cross-tool typo check over the three TOOL namespaces.
+ * This is the single field definition for the `fitness:` namespace. The host's
+ * composed config resolver uses it directly, and the older whole-document
+ * `SignalersConfigSchema` reuses it with parser defaults while it still owns
+ * shared targeting sections (`targets`/`globalExcludes`/`checkOverrides`).
  *
  * Defaults live on the {@link ToolConfigDeclaration} (`failOnErrors: 1`,
  * `failOnWarnings: 0`, `disabledChecks: []`) — the lowest-precedence source
@@ -25,6 +20,13 @@
 import { z } from 'zod';
 
 import type { ToolConfigDeclaration } from '@opensip-tools/config';
+
+/** Defaults for fitness-owned config keys. */
+export const FITNESS_CONFIG_DEFAULTS = {
+  failOnErrors: 1,
+  failOnWarnings: 0,
+  disabledChecks: [],
+} as const;
 
 /**
  * Zod object for the `fitness:` namespace. Every field optional so a config
@@ -57,11 +59,7 @@ export const FitnessNamespaceSchema = z.object({
 export const fitnessConfigDeclaration: ToolConfigDeclaration = {
   namespace: 'fitness',
   schema: FitnessNamespaceSchema,
-  defaults: {
-    failOnErrors: 1,
-    failOnWarnings: 0,
-    disabledChecks: [],
-  },
+  defaults: FITNESS_CONFIG_DEFAULTS,
   env: [
     { envVar: 'OPENSIP_FIT_FAIL_ON_ERRORS', key: 'failOnErrors', type: 'number' },
     { envVar: 'OPENSIP_FIT_FAIL_ON_WARNINGS', key: 'failOnWarnings', type: 'number' },

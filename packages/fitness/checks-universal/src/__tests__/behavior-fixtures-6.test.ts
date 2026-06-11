@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Targeted branch-coverage tests to push package over 90% branch.
+ * @fileoverview Targeted branch-behavior tests to push package over 90% branch.
  *
  * Strategy: import internal helpers directly when possible, otherwise drive
  * the check via fixtures hitting specific branch conditions.

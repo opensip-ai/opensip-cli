@@ -1,11 +1,15 @@
 /**
- * Unit coverage for the fitness namespace config schema (Phase 4 Task 4.2).
+ * Unit tests for the fitness namespace config schema.
  * The schema validates the `fitness:` block; the composer adds `.strict()`.
  */
 
 import { describe, expect, it } from 'vitest';
 
-import { FitnessNamespaceSchema, fitnessConfigDeclaration } from '../fitness-config-schema.js';
+import {
+  FITNESS_CONFIG_DEFAULTS,
+  FitnessNamespaceSchema,
+  fitnessConfigDeclaration,
+} from '../fitness-config-schema.js';
 
 describe('FitnessNamespaceSchema', () => {
   it('accepts a well-formed fitness block', () => {
@@ -37,12 +41,8 @@ describe('FitnessNamespaceSchema', () => {
     expect(strict.safeParse({ faliOnErrors: 1 }).success).toBe(false);
   });
 
-  it('declares namespace fitness with the historical defaults', () => {
+  it('declares namespace fitness with shared defaults', () => {
     expect(fitnessConfigDeclaration.namespace).toBe('fitness');
-    expect(fitnessConfigDeclaration.defaults).toEqual({
-      failOnErrors: 1,
-      failOnWarnings: 0,
-      disabledChecks: [],
-    });
+    expect(fitnessConfigDeclaration.defaults).toEqual(FITNESS_CONFIG_DEFAULTS);
   });
 });

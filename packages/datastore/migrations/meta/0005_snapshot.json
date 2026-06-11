@@ -279,8 +279,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "sarif_payload": {
-          "name": "sarif_payload",
+        "payload": {
+          "name": "payload",
           "type": "text",
           "primaryKey": false,
           "notNull": true,

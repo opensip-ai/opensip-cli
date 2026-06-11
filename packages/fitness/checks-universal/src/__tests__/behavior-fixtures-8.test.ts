@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Branch-coverage tests for medium-coverage checks (round 8).
+ * @fileoverview Branch-behavior tests for medium-coverage checks (round 8).
  *
  * Targets the remaining uncovered branches surfaced by the v8 coverage
  * report: the semgrep directive parser, the public-API reachability

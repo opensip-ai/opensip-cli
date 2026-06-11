@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Parametric coverage for every check in this pack.
+ * @fileoverview Parametric execution for every check in this pack.
  *
  * Drives each check's `run()` method against a fixture project that
  * contains content likely to trip its detection (e.g. an `EXAMPLE_TODO`

@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- Coverage-driven aggregate fixture file (sibling of coverage-branch-push.test.ts); per-branch fixtures must stay co-located to keep the coverage gate per-push owned by a single file.
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Second branch-coverage push: targeted scenarios for the
+ * @fileoverview Second branch-behavior fixture suite: targeted scenarios for the
  * highest-impact remaining branches.
  */
 

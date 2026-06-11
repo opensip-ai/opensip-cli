@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Branch-coverage tests for medium-coverage checks (round 11).
+ * @fileoverview Branch-behavior tests for medium-coverage checks (round 11).
  *
  * Targets the fitness/TypeScript directive parsers (direct unit tests)
  * and the public-api-jsdoc analyzer's export-kind / lookback branches.

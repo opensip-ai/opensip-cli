@@ -1,9 +1,9 @@
-// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview More targeted fixture-based coverage tests.
+ * @fileoverview More targeted fixture-based behavior tests.
  *
- * Continues from coverage-extension.test.ts to drive remaining low-coverage
- * branches in error-handling-quality, result-pattern-consistency, fastify
+ * Continues the behavior fixture suite for check branches in
+ * error-handling-quality, result-pattern-consistency, fastify
  * checks, security checks, and frontend checks.
  */
 

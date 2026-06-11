@@ -1,5 +1,5 @@
 /**
- * @fileoverview Targeted coverage push for the lowest-coverage checks.
+ * @fileoverview Targeted behavior fixture suite for the lowest-coverage checks.
  *
  * These tests exercise specific analyze()/analyzeAll() branches that the
  * broad fixture-driven suites don't reach:

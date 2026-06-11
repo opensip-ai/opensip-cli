@@ -10,7 +10,7 @@ import { fitBaseline } from './schema.js';
 
 const MODULE_NAME = 'fitness:baseline-repo';
 
-/** Repository for the single-row SARIF baseline used by --gate-compare. */
+/** Repository for the single-row SignalEnvelope baseline used by --gate-compare. */
 export class FitBaselineRepo {
   private readonly datastore: DrizzleDataStore;
 
@@ -18,18 +18,18 @@ export class FitBaselineRepo {
     this.datastore = requireDrizzleDataStore(datastore);
   }
 
-  /** Persist a SARIF document as the baseline. Overwrites any prior row. */
-  save(sarif: unknown, findingCount: number): void {
+  /** Persist a SignalEnvelope as the baseline. Overwrites any prior row. */
+  save(payload: unknown, findingCount: number): void {
     try {
       const capturedAt = Date.now();
       this.datastore.db
         .insert(fitBaseline)
-        .values({ id: 1, capturedAt, sarifPayload: sarif })
+        .values({ id: 1, capturedAt, payload })
         .onConflictDoUpdate({
           target: fitBaseline.id,
           set: {
             capturedAt: sql`excluded.captured_at`,
-            sarifPayload: sql`excluded.sarif_payload`,
+            payload: sql`excluded.payload`,
           },
         })
         .run();
@@ -51,7 +51,7 @@ export class FitBaselineRepo {
     }
   }
 
-  /** Load the SARIF baseline. Returns `null` if no row is present. */
+  /** Load the SignalEnvelope baseline. Returns `null` if no row is present. */
   load(): unknown {
     try {
       const row = this.datastore.db
@@ -71,7 +71,7 @@ export class FitBaselineRepo {
         evt: 'fit.baseline.load.complete',
         module: MODULE_NAME,
       });
-      return row.sarifPayload;
+      return row.payload;
     } catch (error) {
       logger.error({
         evt: 'fit.baseline.load.error',

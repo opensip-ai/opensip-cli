@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- Coverage-driven aggregate fixture file: each describe block targets a specific low-coverage check via temp-dir fixtures; splitting fragments the per-check coverage push.
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Targeted fixture-based coverage tests for low-coverage checks.
+ * @fileoverview Targeted fixture-based behavior tests for TypeScript checks.
  *
  * Each `describe` block creates fixtures in a per-test temp directory and
  * exercises the check end-to-end through `check.run()`. The fixtures are

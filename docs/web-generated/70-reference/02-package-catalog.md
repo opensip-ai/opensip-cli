@@ -105,7 +105,7 @@ Each pack implements the `FitPluginExports` contract: a required `checks: Check[
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape) | `checks` (each carrying display), plus per-check named exports |
+| `@opensip-tools/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape) | `checks` (each carrying display) |
 | `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript/` | TypeScript/Node.js checks | `checks` (display folded on) |
 | `@opensip-tools/checks-python` | `packages/fitness/checks-python/` | Python checks | `checks` (display folded on) |
 | `@opensip-tools/checks-java` | `packages/fitness/checks-java/` | Java checks | `checks` (display folded on) |

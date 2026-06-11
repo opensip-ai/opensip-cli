@@ -100,8 +100,8 @@ export class GateBaselineMissingError extends ConfigurationError {
 }
 
 /**
- * Thrown when the baseline payload exists but isn't a parseable SARIF
- * document. Extends `SystemError` — a corrupted baseline is data
+ * Thrown when the baseline payload exists but isn't a parseable
+ * `SignalEnvelope`. Extends `SystemError` — a corrupted baseline is data
  * integrity, not user-input configuration. The CLI maps it through the
  * standard fatal-runtime path.
  */

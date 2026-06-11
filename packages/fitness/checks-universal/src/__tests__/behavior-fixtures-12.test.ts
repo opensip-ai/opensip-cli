@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Branch-coverage tests for medium-coverage checks (round 12).
+ * @fileoverview Branch-behavior tests for medium-coverage checks (round 12).
  *
  * Targets the dangerous-config-defaults value extractors (config, TLS,
  * pool-size) and the exit-code-correctness catch-block analyzer.

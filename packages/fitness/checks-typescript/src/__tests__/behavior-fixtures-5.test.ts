@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Final coverage push to >= 90%: targets the remaining gap
+ * @fileoverview Behavior fixture suite for remaining TypeScript check branches.
  * with focused tests across openapi-type-source, api-contract-validation,
  * array-validation, detached-promises, and other sub-90% checks.
  */

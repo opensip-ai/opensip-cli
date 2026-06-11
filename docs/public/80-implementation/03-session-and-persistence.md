@@ -164,7 +164,7 @@ The `--no-cache` flag forces a cache miss; the existing fingerprint-based invali
 
 Two baselines live in the SQLite store:
 
-- **Fitness baseline** (`fit_baseline`) — the SARIF document produced by `opensip-tools fit --gate-save`. Single-row table; `--gate-compare` reads it and diffs against the current SARIF by `(filePath, ruleId, message)` hash.
+- **Fitness baseline** (`fit_baseline`) — the `SignalEnvelope` produced by `opensip-tools fit --gate-save`. Single-row table; `--gate-compare` reads it and diffs against the current envelope by `(filePath, ruleId, message)` hash.
 - **Graph baseline** (`graph_baseline_signals` + `graph_baseline_meta`) — the fingerprint set produced by `opensip-tools graph --gate-save`. The `meta` row marks "a baseline exists" so an empty-but-saved baseline (a clean codebase) reports `exists() === true`.
 
 ### v1 → v2: the `--baseline <path>` flag is gone

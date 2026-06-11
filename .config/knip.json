@@ -1,33 +1,24 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignore": [".claude/**", "**/__fixtures__/**", "**/fixtures/**"],
+  "ignore": ["**/__fixtures__/**"],
   "rules": {
     "duplicates": "off"
   },
   "workspaces": {
     ".": {
-      "entry": ["opensip-tools/fit/checks/*.mjs", "opensip-tools/fit/recipes/*.mjs"],
+      "entry": ["opensip-tools/fit/checks/*.mjs"],
       "ignoreDependencies": [
-        "@opensip-tools/checks-typescript",
-        "@opensip-tools/checks-universal",
         "@opensip-tools/checks-cpp",
         "@opensip-tools/checks-go",
         "@opensip-tools/checks-java",
         "@opensip-tools/checks-python",
-        "@opensip-tools/checks-rust",
-        "@opensip-tools/fitness",
-        "vite"
+        "@opensip-tools/checks-rust"
       ]
     },
     "packages/cli": {
       "entry": ["src/__tests__/fixtures/**/*.{ts,js}"],
       "ignoreDependencies": [
-        "@opensip-tools/fitness",
-        "@opensip-tools/graph",
-        "@opensip-tools/simulation",
-        "@opensip-tools/checks-typescript",
-        "@opensip-tools/checks-universal",
         "@opensip-tools/checks-cpp",
         "@opensip-tools/checks-go",
         "@opensip-tools/checks-java",

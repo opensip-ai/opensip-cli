@@ -1,8 +1,7 @@
-// @fitness-ignore-file file-length-limit -- Coverage-driven aggregate fixture file: each describe targets a specific uncovered branch and must stay co-located with sibling fixtures so the >=90% branch-coverage gate has a single owner per push.
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Branch-coverage push: targets high-impact uncovered branches
- * across many checks via rich, realistic source fixtures. The objective is
- * to lift the package's overall branch coverage to >= 90%.
+ * @fileoverview Branch-behavior fixture suite: targets high-impact uncovered branches
+ * across many checks via rich, realistic source fixtures.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

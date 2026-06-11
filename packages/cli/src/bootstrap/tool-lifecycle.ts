@@ -20,11 +20,9 @@
  *      package's entry, then VALIDATE the exported `tool` shape
  *      (`isValidTool`) and REGISTER it into the `ToolRegistry`
  *      (first-writer-wins). Steps 1-4 all complete inside {@link bootstrapCli}.
- *   8. MOUNT     — walk the registry and mount each tool's commands
- *      ({@link mountAllToolCommands}): the declarative `commandSpecs` path
- *      (preferred) or the deprecated `register()` fallback. **This is the new
- *      step formalized by release 2.11.0** — provenance stops mattering here,
- *      so bundled and installed tools share the identical mount path.
+ *   8. MOUNT     — walk the registry and mount each tool's declared
+ *      `commandSpecs` ({@link mountAllToolCommands}). Provenance stops mattering
+ *      here, so bundled and installed tools share the identical mount path.
  *
  *   ── PER-RUN (per invocation, pre-action hook) ─────────────────────────────
  *   5. CONFIG    — compose every tool's `config` Zod block into one strict
@@ -78,7 +76,7 @@ export const TOOL_LIFECYCLE_STEPS = {
   scope: 6,
   /** 7 — wire the per-run capability registry (manifest domains → registrars). */
   capabilities: 7,
-  /** 8 — mount each tool's commands (commandSpecs or deprecated register()). */
+  /** 8 — mount each tool's declared commandSpecs. */
   mount: 8,
   /** 9 — lazy, memoized initialize() for the invoked subcommand's owner. */
   initialize: 9,
