@@ -121,3 +121,24 @@ Implements the `graph-resolution-correctness` plan (local). Residual diagnosis +
 the `GRAPH_SITE_LOG` harness recorded in
 `docs/internal/graph-resolution-trace.md` and
 `docs/internal/graph-false-findings-incident-log.md`.
+
+**Amendment (2026-06-11) — the "conflict" class was MISDIAGNOSED; re-diagnosed +
+fixed (divergence 12 → 1).** This ADR's body calls the 11 conflicts
+"cross-package same-name registry-method mis-narrowing." Measurement (mapping each
+divergent site's target hash to its source occurrence) **falsified that**: every
+one was a **chained-call position collision**. For `recv(...).method(...)` the
+inner CallExpression `recv()` and the outer CallExpression `recv().method()` BOTH
+start at `recv`, so a call edge keyed by the expression-start `(owner, line,
+column)` collapses two *real, distinct* edges onto one identity — and the exact
+and sharded engines each kept a different member (exact the innermost, sharded the
+outermost). It was never a same-name disambiguation problem; it is the same family
+as Phase 0.2 (column-misaligned duplicates). **Fix:** anchor a call edge at its
+CALLEE token (method name / class / callee identifier) via `calleeAnchorNode`
+(`graph-typescript/src/edge-resolvers/syntactic.ts`), used by BOTH `tsPosition`
+(in-shard/exact) and `positionOf` (cross-shard) so the engines stay consistent and
+both real edges survive at distinct columns. Result: conflict 11 → 0 (and the
+previously-shadowed edges are recovered — a completeness gain). The directional
+guardrail is unchanged; only the budget floor tightens to `conflictDivergences:0`.
+**Remaining residual = 1 phantom** (the `dashboard-data.ts:44`
+`scope.graph?.rules.getAll()` optional-chain method call exact under-resolves) —
+the genuine, separate exact-resolver gap, tracked.

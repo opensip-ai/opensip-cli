@@ -200,6 +200,31 @@ function expressionSimpleName(expr: ts.Expression): string | null {
   return null;
 }
 
+/**
+ * The node whose start position anchors a call/new edge's `(line, column)`
+ * identity — the CALLEE token, not the whole expression's start:
+ *   - `x.m()`        → `m`   (the method name)
+ *   - `f()`          → `f`   (the callee identifier — unchanged for plain calls)
+ *   - `new C()`      → `C`   (the class name, not the `new` keyword)
+ *   - `new ns.C()`   → `C`
+ *
+ * WHY: a chained call `a().b()` (or `new A().b()`) has its inner CallExpression
+ * `a()` and its outer CallExpression `a().b()` BOTH starting at `a`, so keying an
+ * edge by the expression start collapses the two DISTINCT, REAL edges onto one
+ * `(owner, line, column)` identity — one shadows the other, and the exact and
+ * sharded engines keep different members of the pair (a spurious "conflict"
+ * divergence; see ADR-0033 follow-up). Anchoring at the callee token gives every
+ * call in a chain a distinct column, so both real edges survive in both engines.
+ * Non-call/new nodes (JSX elements, identifiers) keep their own start.
+ */
+export function calleeAnchorNode(node: ts.Node): ts.Node {
+  if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
+    const callee = node.expression;
+    return ts.isPropertyAccessExpression(callee) ? callee.name : callee;
+  }
+  return node;
+}
+
 /** Rightmost simple name of a JSX tag (`Foo` or `A.B.Foo`). */
 function jsxTagSimpleName(tag: ts.JsxTagNameExpression): string | null {
   if (ts.isIdentifier(tag)) return tag.text;

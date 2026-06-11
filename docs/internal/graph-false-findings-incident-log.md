@@ -365,11 +365,34 @@ worsening) — it is a ratchet on an imperfect baseline, not a proof of equivale
   scc=0); full `pnpm test:coverage` + `graph`/`fit` dogfood + lint + typecheck +
   `docs:check` green.
 
+### 2026-06-11 (later) — the "conflict 11" was MISDIAGNOSED; root-caused + fixed (12 → 1)
+- **Observed:** the follow-up diagnosis mapped each of the 12 divergent sites' target
+  hashes to their source occurrences (via the persisted catalog), instead of trusting
+  the "same-name registry-method" label.
+- **Found:** every one of the 11 conflicts is a **chained-call position collision**.
+  For `recv(...).method(...)` the inner CallExpression `recv()` and the outer
+  `recv().method()` BOTH start at `recv`, so an edge keyed by the expression-start
+  `(owner,line,column)` collapses two REAL distinct edges onto one identity — exact
+  kept the innermost (e.g. `currentRulesRegistry`, `new CatalogRepo`), sharded kept
+  the outermost (`getAll`, `loadCatalogContract`). NOT same-name disambiguation; the
+  same family as Phase 0.2. (Ground-truth table: registry.ts:115
+  `currentRulesRegistry().getAll()`; tool.ts:215 `new CatalogRepo(ds).loadCatalogContract()`;
+  check-loader.ts:56 `currentCheckRegistry().listEnabled()`; define-check.ts:156
+  `ResultBuilder.create({…})…`; loader.ts:49 `currentSimulationRecipeRegistry().register(…)`.)
+- **Changed:** anchor a call edge at its CALLEE token via `calleeAnchorNode`
+  (graph-typescript/src/edge-resolvers/syntactic.ts), used by BOTH `tsPosition`
+  (in-shard/exact) and `positionOf` (cross-shard). Every call in a chain now gets a
+  distinct column → both real edges survive in both engines → agreement, and the
+  previously-shadowed edges are RECOVERED (a completeness gain). Regression test
+  `callee-anchor.test.ts`.
+- **Verified:** `graph-equivalence-check` total 12 → **1** (phantom=1, decline=0,
+  conflict **11 → 0**); budget floor tightened to `conflictDivergences:0`; 768+330
+  graph tests green; graph+fit dogfood 0; completeness floor still ≥7.
+
 ### Still open after 2026-06-11
-- **Conflict class (the 11).** Cross-package same-name registry-method
-  disambiguation — needs the linker to pick the import-attested occurrence over a
-  same-name sibling. The load-bearing residual.
-- **Phantom (the 1).** Exact optional-chain (`?.`) property-access resolution.
+- **Phantom (the 1).** Exact optional-chain (`?.`) property-access method resolution
+  — `scope.graph?.rules.getAll()` (dashboard-data.ts:44). The only remaining
+  divergence; sharded resolves it correctly, exact declines through the `?.`.
 - **Clean-checkout parity for WORKSPACE imports.** Exact still reaches the linker
   via the dep's built `dist/*.d.ts`; relative imports are clean-safe (file+name
   pin). Source-as-surface program change deferred.

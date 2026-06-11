@@ -26,7 +26,7 @@ import { ownerEdgeKey } from '@opensip-tools/graph';
 
 import { isReturnValueDiscarded } from '../edges.js';
 
-import { calleeSimpleName, buildImportSpecifierIndex } from './syntactic.js';
+import { calleeAnchorNode, calleeSimpleName, buildImportSpecifierIndex } from './syntactic.js';
 
 import type { CallSiteRecord } from '../walk.js';
 import type { CallEdge, CrossBoundaryCall } from '@opensip-tools/graph';
@@ -109,9 +109,12 @@ function positionOf(
   node: ts.Node,
   sourceFile: ts.SourceFile,
 ): { readonly line: number; readonly column: number; readonly text: string } {
-  const start = node.getStart(sourceFile);
-  const lc = sourceFile.getLineAndCharacterOfPosition(start);
-  const raw = sourceFile.text.slice(start, node.getEnd());
+  // Anchor at the CALLEE token (see edges.ts tsPosition + syntactic.calleeAnchorNode)
+  // so the cross-shard edge identity matches the in-shard pass for the SAME call
+  // and chained calls don't collide. TEXT stays the whole expression.
+  const anchor = calleeAnchorNode(node).getStart(sourceFile);
+  const lc = sourceFile.getLineAndCharacterOfPosition(anchor);
+  const raw = sourceFile.text.slice(node.getStart(sourceFile), node.getEnd());
   return {
     line: lc.line + 1,
     column: lc.character,

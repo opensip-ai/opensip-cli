@@ -38,6 +38,7 @@ import { resolvePropertyAccessCall } from './edge-resolvers/property-access.js';
 import {
   buildImportIndex,
   buildImportSpecifierIndex,
+  calleeAnchorNode,
   collectKnownFiles,
   resolveSyntactic,
   type ImportIndex,
@@ -80,12 +81,15 @@ function tsPosition(
   readonly column: number;
   readonly text: string;
 } {
-  const start = node.getStart(sourceFile);
-  const startLC = sourceFile.getLineAndCharacterOfPosition(start);
+  // Anchor the edge identity at the CALLEE token (method name / callee / class),
+  // not the whole expression's start — so chained calls `a().b()` don't collide
+  // on one (line,column) key. The display TEXT stays the whole expression.
+  const anchor = calleeAnchorNode(node).getStart(sourceFile);
+  const anchorLC = sourceFile.getLineAndCharacterOfPosition(anchor);
   return {
-    line: startLC.line + 1,
-    column: startLC.character,
-    text: sourceFile.text.slice(start, node.getEnd()),
+    line: anchorLC.line + 1,
+    column: anchorLC.character,
+    text: sourceFile.text.slice(node.getStart(sourceFile), node.getEnd()),
   };
 }
 
