@@ -56,21 +56,14 @@ import {
 
 import { getToolProvenanceForRun } from '../cli-context.js';
 
-import {
-  addToConfigPluginList,
-  removeFromConfigPluginList,
-} from './plugin/config-edit.js';
+import { addToConfigPluginList, removeFromConfigPluginList } from './plugin/config-edit.js';
 import {
   domainNames,
   isToolTarget,
   resolveDomain,
   TOOL_DOMAIN,
 } from './plugin/domain-resolution.js';
-import {
-  ensurePluginHostDir,
-  HOST_PACKAGE_JSON,
-  isSafeNpmSpec,
-} from './plugin/host-dir.js';
+import { ensurePluginHostDir, HOST_PACKAGE_JSON, isSafeNpmSpec } from './plugin/host-dir.js';
 import {
   addToolPlugin,
   editPluginList,
