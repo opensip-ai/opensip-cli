@@ -220,6 +220,28 @@ distinct from:
   failed scenario** (it emits none today — an ADR-0011 currency violation) before
   it can migrate. Exit semantics behavior-preserving + verified per tool; headline
   is a deliberate change
+- [ADR-0036](./ADR-0036-host-owned-baseline-ratchet-plane.md) — **Baseline capture +
+  net-new ratchet + baseline export are a host-owned plane**, keyed on a first-class
+  `Signal.fingerprint` each tool populates via a tool-declared strategy. One generic
+  `tool_baseline_entries`+`tool_baseline_meta` table pair, one pure
+  `added/resolved/unchanged` diff, and four `cli` seams replace fitness's + graph's
+  bespoke gate/baseline/fingerprint/export (~500 LOC). A new tool gets a CI ratchet
+  for free. Complements ADR-0035 (threshold verdict) by owning the orthogonal
+  net-new gate it deferred; sequences **after** that work (shared files)
+- [ADR-0037](./ADR-0037-generic-targeting-runtime.md) — **File-targeting resolution
+  is a host runtime substrate** (`@opensip-tools/targeting`, exposed as
+  `scope.targets`), finishing ADR-0023 which moved the targeting *types* host-side
+  for cross-tool use but left the *runtime* in fitness. The generic half (named
+  file-sets, `globalExcludes`, glob expansion, tag matching) moves down; the
+  check-domain half (`checkOverrides`, the 3-tier precedence, the content
+  `fileCache`, `findByScope`) stays in fitness as a thin consumer. Any tool resolves
+  named targets without importing fitness
+- [ADR-0038](./ADR-0038-registry-driven-init-scaffolding.md) — **`init` scaffolds the
+  *registered* tools**, off each tool's `pluginLayout` + a new
+  `Tool.scaffoldExamples(ctx)` hook, instead of the CLI hardcoding fit/sim dirs and
+  owning the example `.mjs` source. Applies ADR-0009 (kernel carries no tool
+  vocabulary) to the last place it leaks. A new tool scaffolds with zero CLI edits;
+  `graph` (no `pluginLayout`) gets no dir. Byte-identical fit+sim output preserved
 
 ### Superseded
 
