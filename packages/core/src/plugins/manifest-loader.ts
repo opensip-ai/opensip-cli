@@ -177,7 +177,7 @@ export function admitTool(args: {
   if (verdict.kind === 'compatible') {
     const admittedManifest: ToolPluginManifest = {
       ...manifest,
-      apiVersion: manifest.apiVersion as number,
+      apiVersion: manifest.apiVersion!,
     };
     logger.info({
       evt: 'plugin.manifest.loaded',

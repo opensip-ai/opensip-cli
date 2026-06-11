@@ -137,7 +137,7 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
     expect((MARKER_KINDS as readonly string[]).includes('audit-rule')).toBe(false);
 
     const registry = new CapabilityRegistry();
-    const registered = registerCapabilityDomainsFromManifest(manifest!, registry);
+    const registered = registerCapabilityDomainsFromManifest(manifest, registry);
 
     expect(registered).toEqual([
       {

@@ -122,6 +122,15 @@ function resolveBundledPackageDir(packageName: string): string | undefined {
   return undefined;
 }
 
+function resolveRequiredBundledPackageDir(packageName: string): string {
+  const dir = resolveBundledPackageDir(packageName);
+  if (dir !== undefined) return dir;
+  throw new PluginIncompatibleError(
+    `bundled tool '${packageName}' could not be resolved on disk; its manifest is unreadable`,
+    { diagnostic: 'package directory not resolvable' },
+  );
+}
+
 /**
  * The outcome of importing a tool package's runtime module. A discriminated
  * result (never throws) so each caller maps it to its own policy — bundled
@@ -198,13 +207,7 @@ export async function registerFirstPartyTools(
   packages: readonly string[] = BUNDLED_TOOL_PACKAGES,
 ): Promise<void> {
   for (const packageName of packages) {
-    const dir = resolveBundledPackageDir(packageName);
-    if (dir === undefined) {
-      throw new PluginIncompatibleError(
-        `bundled tool '${packageName}' could not be resolved on disk; its manifest is unreadable`,
-        { diagnostic: 'package directory not resolvable' },
-      );
-    }
+    const dir = resolveRequiredBundledPackageDir(packageName);
 
     const rawManifest = loadToolManifest('bundled', dir);
     if (rawManifest === undefined) {
