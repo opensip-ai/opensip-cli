@@ -15,7 +15,8 @@ set -eu
 PACKAGE_NAME="${OPENSIP_TOOLS_PACKAGE:-opensip-tools}"
 PACKAGE_VERSION="${OPENSIP_TOOLS_VERSION:-latest}"
 INSTALL_SPEC="${PACKAGE_NAME}@${PACKAGE_VERSION}"
-MIN_NODE_MAJOR=22
+MIN_NODE_MAJOR=24
+SMOKE_DIR=""
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   BOLD="$(printf '\033[1m')"
@@ -80,6 +81,9 @@ info "Installing ${INSTALL_SPEC}..."
 LOG_FILE="$(mktemp -t opensip-tools-install.XXXXXX)"
 cleanup() {
   rm -f "$LOG_FILE"
+  if [ -n "$SMOKE_DIR" ]; then
+    rm -rf "$SMOKE_DIR"
+  fi
 }
 trap cleanup EXIT
 trap 'cleanup; exit 1' INT TERM
@@ -101,12 +105,47 @@ if [ -n "$GLOBAL_PREFIX" ]; then
   GLOBAL_BIN="${GLOBAL_PREFIX%/}/bin"
 fi
 
+OPEN_CMD=""
 if command -v opensip-tools >/dev/null 2>&1; then
-  INSTALLED_VERSION="$(opensip-tools --version 2>/dev/null || true)"
+  OPEN_CMD="$(command -v opensip-tools)"
+elif [ -n "$GLOBAL_BIN" ] && [ -x "${GLOBAL_BIN%/}/opensip-tools" ]; then
+  OPEN_CMD="${GLOBAL_BIN%/}/opensip-tools"
+fi
+
+if [ -n "$OPEN_CMD" ]; then
+  INSTALLED_VERSION="$("$OPEN_CMD" --version 2>/dev/null || true)"
   if [ -n "$INSTALLED_VERSION" ]; then
     ok "opensip-tools ${INSTALLED_VERSION} is installed."
   else
     ok "opensip-tools is installed."
+  fi
+
+  if [ "${OPENSIP_TOOLS_SKIP_SMOKE:-}" != "1" ]; then
+    info "Running install smoke test..."
+    SMOKE_DIR="$(mktemp -d -t opensip-tools-smoke.XXXXXX)"
+    if ! "$OPEN_CMD" init --cwd "$SMOKE_DIR" --language typescript --json >"$LOG_FILE" 2>&1; then
+      error "Smoke test failed while scaffolding a temporary project."
+      if [ -s "$LOG_FILE" ]; then
+        printf '\n%s\n' "opensip-tools output:" >&2
+        cat "$LOG_FILE" >&2
+      fi
+      printf '\n%s\n' "You can skip the smoke test with OPENSIP_TOOLS_SKIP_SMOKE=1, but the CLI may not be usable until this is resolved." >&2
+      exit 1
+    fi
+    if ! (cd "$SMOKE_DIR" && "$OPEN_CMD" sessions list --json >"$LOG_FILE" 2>&1); then
+      error "Smoke test failed while opening the SQLite data store."
+      if [ -s "$LOG_FILE" ]; then
+        printf '\n%s\n' "opensip-tools output:" >&2
+        cat "$LOG_FILE" >&2
+      fi
+      printf '\n%s\n' "Verify Node.js ${MIN_NODE_MAJOR}+ is first on PATH, then retry the installer." >&2
+      exit 1
+    fi
+    rm -rf "$SMOKE_DIR"
+    SMOKE_DIR=""
+    ok "Install smoke test passed."
+  else
+    warn "Skipping install smoke test because OPENSIP_TOOLS_SKIP_SMOKE=1."
   fi
 else
   ok "opensip-tools is installed."

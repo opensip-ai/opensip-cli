@@ -151,7 +151,7 @@ The full command tree is at [`../70-reference/01-cli-commands.md`](../70-referen
 | `command not found: opensip-tools` | The shell has not picked up the global command yet | Open a new shell and try again; if it still fails, rerun `curl -fsSL https://opensip.ai/cli/install.sh \| bash` |
 | `init` says it detected no language | No supported language marker found (no `package.json`, `Cargo.toml`, etc.) | Pass `--language <name>` explicitly: `opensip-tools init --language typescript` |
 | `fit --recipe example` says "0 checks ran" | Targets in `opensip-tools.config.yml` don't match any files | Open the config; widen `targets.<your-language>-source.include` to cover where your code actually lives |
-| Errors from `Node.js engine` | Node version is below 22 | Upgrade Node — opensip-tools uses ES2022 + Node16 module resolution |
+| Errors from `Node.js engine` | Node version is below 24 | Upgrade Node — opensip-tools uses ES2022 + Node16 module resolution |
 
 ---
 
