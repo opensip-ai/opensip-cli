@@ -229,67 +229,80 @@ function collectReExports(
   out: ReExportRecord[],
 ): void {
   const fromFile = relative(projectDirAbs, sourceFile.fileName).split(sep).join('/');
+  const imported = buildImportSourceMap(sourceFile);
+  for (const stmt of sourceFile.statements) {
+    if (ts.isExportDeclaration(stmt)) pushReExportsFromStmt(stmt, fromFile, imported, out);
+  }
+}
 
-  // First pass: this file's named imports → { binding → (specifier, source name) }.
-  // Needed for the no-`from` re-export form (`export { childrenOf }`).
-  const imported = new Map<string, { specifier: string; importedName: string }>();
+/** A named import's source: `binding → (specifier, the name in the source module)`.
+ *  Drives the no-`from` re-export form (`export { childrenOf }`). */
+interface ImportSource {
+  readonly specifier: string;
+  readonly importedName: string;
+}
+
+function buildImportSourceMap(sourceFile: ts.SourceFile): ReadonlyMap<string, ImportSource> {
+  const imported = new Map<string, ImportSource>();
   for (const stmt of sourceFile.statements) {
     if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
     const named = stmt.importClause?.namedBindings;
-    if (named && ts.isNamedImports(named)) {
-      for (const el of named.elements) {
-        imported.set(el.name.text, {
-          specifier: stmt.moduleSpecifier.text,
-          importedName: (el.propertyName ?? el.name).text,
-        });
-      }
+    if (!named || !ts.isNamedImports(named)) continue;
+    for (const el of named.elements) {
+      imported.set(el.name.text, {
+        specifier: stmt.moduleSpecifier.text,
+        importedName: (el.propertyName ?? el.name).text,
+      });
     }
   }
+  return imported;
+}
 
-  // Second pass: export declarations.
-  for (const stmt of sourceFile.statements) {
-    if (!ts.isExportDeclaration(stmt)) continue;
-    const spec =
-      stmt.moduleSpecifier && ts.isStringLiteral(stmt.moduleSpecifier)
-        ? stmt.moduleSpecifier.text
-        : undefined;
-    const clause = stmt.exportClause;
+/** Push the {@link ReExportRecord}s for one `ExportDeclaration` (both forms). */
+function pushReExportsFromStmt(
+  stmt: ts.ExportDeclaration,
+  fromFile: string,
+  imported: ReadonlyMap<string, ImportSource>,
+  out: ReExportRecord[],
+): void {
+  const spec =
+    stmt.moduleSpecifier && ts.isStringLiteral(stmt.moduleSpecifier)
+      ? stmt.moduleSpecifier.text
+      : undefined;
+  const clause = stmt.exportClause;
 
-    if (spec !== undefined) {
-      // Form 1: `export … from 'spec'`.
-      if (clause === undefined) {
-        // `export * from 'spec'` — re-exports every exported name of `spec`.
-        out.push({ fromFile, exportedName: '*', sourceName: '*', specifier: spec });
-      } else if (ts.isNamedExports(clause)) {
-        for (const el of clause.elements) {
-          out.push({
-            fromFile,
-            exportedName: el.name.text,
-            sourceName: (el.propertyName ?? el.name).text,
-            specifier: spec,
-          });
-        }
-      }
-      // NamespaceExport (`export * as ns from 'spec'`) is left to a follow-up:
-      // it binds a namespace object, not a directly-callable name.
-      continue;
-    }
-
-    // Form 2: `export { a, b as c }` with NO `from` — a re-export only when the
-    // local binding was IMPORTED (otherwise it's a local definition's export).
-    if (clause !== undefined && ts.isNamedExports(clause)) {
+  // Form 1: `export … from 'spec'`.
+  if (spec !== undefined) {
+    if (clause === undefined) {
+      // `export * from 'spec'` — re-exports every exported name of `spec`.
+      out.push({ fromFile, exportedName: '*', sourceName: '*', specifier: spec });
+    } else if (ts.isNamedExports(clause)) {
       for (const el of clause.elements) {
-        const localBinding = (el.propertyName ?? el.name).text;
-        const imp = imported.get(localBinding);
-        if (imp === undefined) continue; // local definition → already an occurrence
         out.push({
           fromFile,
           exportedName: el.name.text,
-          sourceName: imp.importedName,
-          specifier: imp.specifier,
+          sourceName: (el.propertyName ?? el.name).text,
+          specifier: spec,
         });
       }
     }
+    // NamespaceExport (`export * as ns from 'spec'`) — a namespace object, not a
+    // directly-callable name; left to a follow-up.
+    return;
+  }
+
+  // Form 2: `export { a, b as c }` with NO `from` — a re-export only when the
+  // local binding was IMPORTED (otherwise it's a local definition's export).
+  if (clause === undefined || !ts.isNamedExports(clause)) return;
+  for (const el of clause.elements) {
+    const imp = imported.get((el.propertyName ?? el.name).text);
+    if (imp === undefined) continue; // local definition → already an occurrence
+    out.push({
+      fromFile,
+      exportedName: el.name.text,
+      sourceName: imp.importedName,
+      specifier: imp.specifier,
+    });
   }
 }
 

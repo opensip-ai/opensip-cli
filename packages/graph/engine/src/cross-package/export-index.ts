@@ -120,35 +120,61 @@ function applyReExports(
   for (let pass = 0; pass < MAX_PASSES; pass++) {
     let changed = false;
     for (const r of reExports) {
-      const fromPkg = packageOf(r.fromFile);
-      const sourcePkg = r.specifier.startsWith('.')
-        ? fromPkg // relative re-export stays in-package (already indexed)
-        : resolveSpecifierToPackage(r.specifier, manifestIndex)?.packageGroup;
-      if (sourcePkg === undefined) continue; // external / untracked dep
-      const sourceBucket = index.get(sourcePkg);
-      if (sourceBucket === undefined) continue;
-      const fromBucket = getOrCreateMap(index, fromPkg);
-
-      if (r.exportedName === '*') {
-        // `export * from sourcePkg` — expose every source export not already
-        // defined/owned by the re-exporting package.
-        for (const [name, occs] of sourceBucket) {
-          if (!fromBucket.has(name)) {
-            fromBucket.set(name, occs);
-            changed = true;
-          }
-        }
-        continue;
-      }
-      if (fromBucket.has(r.exportedName)) continue; // local def / earlier re-export wins
-      const occs = sourceBucket.get(r.sourceName);
-      if (occs && occs.length > 0) {
-        fromBucket.set(r.exportedName, occs);
-        changed = true;
-      }
+      if (applyOneReExport(index, r, manifestIndex)) changed = true;
     }
     if (!changed) break;
   }
+}
+
+/** Apply one re-export fact; returns whether it added any new index entry. */
+function applyOneReExport(
+  index: Map<string, Map<string, FunctionOccurrence[]>>,
+  r: ReExportRecord,
+  manifestIndex: PackageManifestIndex,
+): boolean {
+  // Relative re-export stays in-package (already indexed); workspace specifier
+  // resolves to its package group. External / untracked → skip.
+  const sourcePkg = r.specifier.startsWith('.')
+    ? packageOf(r.fromFile)
+    : resolveSpecifierToPackage(r.specifier, manifestIndex)?.packageGroup;
+  if (sourcePkg === undefined) return false;
+  const sourceBucket = index.get(sourcePkg);
+  if (sourceBucket === undefined) return false;
+  const fromBucket = getOrCreateMap(index, packageOf(r.fromFile));
+  return r.exportedName === '*'
+    ? expandStarReExport(sourceBucket, fromBucket)
+    : addNamedReExport(r, sourceBucket, fromBucket);
+}
+
+/** `export * from src` — expose every source export the re-exporting package
+ *  does not already own. Returns whether anything was added. */
+function expandStarReExport(
+  sourceBucket: ReadonlyMap<string, FunctionOccurrence[]>,
+  fromBucket: Map<string, FunctionOccurrence[]>,
+): boolean {
+  let changed = false;
+  for (const [name, occs] of sourceBucket) {
+    if (!fromBucket.has(name)) {
+      fromBucket.set(name, occs);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/** `export { sourceName as exportedName } from src` — point the re-exporting
+ *  package's bucket at the source occurrence (never overriding a local def /
+ *  earlier re-export). Returns whether it was added. */
+function addNamedReExport(
+  r: ReExportRecord,
+  sourceBucket: ReadonlyMap<string, FunctionOccurrence[]>,
+  fromBucket: Map<string, FunctionOccurrence[]>,
+): boolean {
+  if (fromBucket.has(r.exportedName)) return false;
+  const occs = sourceBucket.get(r.sourceName);
+  if (occs === undefined || occs.length === 0) return false;
+  fromBucket.set(r.exportedName, occs);
+  return true;
 }
 
 /**
