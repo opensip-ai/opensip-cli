@@ -139,6 +139,33 @@ function linesView(lines: readonly string[]): ViewNode {
   return group(lines.map((l) => line([{ text: l }])));
 }
 
+function titledLinesView(title: string | undefined, lines: readonly string[]): ViewNode {
+  const children: ViewNode[] = [];
+  if (title !== undefined && title.length > 0) {
+    children.push(line([{ text: title, bold: true }]));
+    if (lines.length > 0) children.push(SPACER);
+  }
+  children.push(...lines.map((l) => line([{ text: l }])));
+  return group(children);
+}
+
+function unknownResultView(result: unknown): ViewNode {
+  const type =
+    typeof result === 'object' &&
+    result !== null &&
+    'type' in result &&
+    typeof result.type === 'string'
+      ? result.type
+      : 'unknown';
+  return group(
+    [
+      line([{ text: `Unsupported command result '${type}'`, tone: 'warning' }]),
+      line([{ text: 'Use --json to inspect the raw result payload.', dim: true }]),
+    ],
+    2,
+  );
+}
+
 // --- Envelope-derived terminal table (ADR-0011) -----------------------------
 //
 // The single, tool-agnostic table derivation: every migrated tool's result
@@ -335,6 +362,9 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'graph-status': {
       return linesView(result.lines);
     }
+    case 'text-lines': {
+      return titledLinesView(result.title, result.lines);
+    }
     case 'list-checks': {
       return viewListChecks(result);
     }
@@ -373,6 +403,9 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'help': {
       return viewHelp();
+    }
+    default: {
+      return unknownResultView(result);
     }
   }
 }

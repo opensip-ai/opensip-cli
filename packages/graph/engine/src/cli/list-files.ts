@@ -33,7 +33,8 @@ import { resolve, sep } from 'node:path';
 import { EXIT_CODES } from '@opensip-tools/contracts';
 import { ConfigurationError, logger } from '@opensip-tools/core';
 
-import { currentAdapterRegistry, pickAdapter } from '../lang-adapter/registry.js';
+import { currentAdapterRegistry } from '../lang-adapter/registry.js';
+import { GraphAdapterSelector } from '../lang-adapter/selector.js';
 
 import { handleGraphError } from './graph.js';
 import { resolvePositionalPaths } from './positional-paths.js';
@@ -41,6 +42,7 @@ import { resolveAdaptersForRun } from './resolve-adapters.js';
 import { discoverPolyglotUnits } from './workspace-runner.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
+import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
 import type { ToolCliContext } from '@opensip-tools/core';
 
 const MODULE_GRAPH_CLI = 'graph:cli';
@@ -129,7 +131,7 @@ async function discoverWorkspaceFiles(
       `--workspace: no workspace units detected for [${adapterLabel}]. Use 'opensip-tools graph --list-files' for whole-project analysis.`,
     );
   }
-  const adapter = pickAdapter(opts.cwd);
+  const adapter = resolveDiscoveryAdapter(opts);
   const all: string[] = [];
   for (const unit of units) {
     try {
@@ -150,12 +152,11 @@ async function discoverWorkspaceFiles(
  * (`pickAdapterFor` in orchestrate.ts): `--language` names it explicitly,
  * otherwise the file-extension dominance heuristic chooses.
  */
-function resolveDiscoveryAdapter(opts: GraphCommandOptions): ReturnType<typeof pickAdapter> {
-  if (typeof opts.language === 'string' && opts.language.length > 0) {
-    const entry = currentAdapterRegistry().getById(opts.language);
-    if (entry) return entry.adapter;
-  }
-  return pickAdapter(opts.cwd);
+function resolveDiscoveryAdapter(opts: GraphCommandOptions): GraphLanguageAdapter {
+  return new GraphAdapterSelector(currentAdapterRegistry()).pick({
+    cwd: opts.cwd,
+    language: opts.language,
+  });
 }
 
 /** Resolve `cwd` to an absolute, realpath'd root (matching the realpath'd

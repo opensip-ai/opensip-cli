@@ -25,7 +25,8 @@
 
 import { withSpanAsync, type Signal } from '@opensip-tools/core';
 
-import { currentAdapterRegistry, pickAdapter } from '../lang-adapter/registry.js';
+import { currentAdapterRegistry } from '../lang-adapter/registry.js';
+import { GraphAdapterSelector } from '../lang-adapter/selector.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { unionFeatureDeps } from '../pipeline/feature-deps.js';
 import {
@@ -53,6 +54,7 @@ import type {
 } from '../types.js';
 import type { RunStageArgs } from './orchestrate/catalog-builder.js';
 import type { GraphProgressCallback } from './orchestrate/types.js';
+import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
 import type { DataStore } from '@opensip-tools/datastore';
 
 // Re-export the orchestration types so existing callers (the engine's
@@ -314,17 +316,13 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
 }
 
 /**
- * Pick a graph language adapter for the run. When `language` is set,
- * look up that adapter directly via the registry; otherwise fall back
- * to the file-extension dominance heuristic in `pickAdapter`. If the
- * named language isn't registered, fall through to `pickAdapter` so
- * the caller's CLI gets a clearer error path (D14 / "no adapter
- * registered").
+ * Pick a graph language adapter for the run. When `language` is set, the
+ * selector fails immediately if that adapter is not registered; implicit runs
+ * still use file-extension dominance plus the deterministic fallback.
  */
-function pickAdapterFor(input: RunGraphInput): ReturnType<typeof pickAdapter> {
-  if (typeof input.language === 'string' && input.language.length > 0) {
-    const entry = currentAdapterRegistry().getById(input.language);
-    if (entry) return entry.adapter;
-  }
-  return pickAdapter(input.cwd);
+function pickAdapterFor(input: RunGraphInput): GraphLanguageAdapter {
+  return new GraphAdapterSelector(currentAdapterRegistry()).pick({
+    cwd: input.cwd,
+    language: input.language,
+  });
 }

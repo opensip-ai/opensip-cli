@@ -15,26 +15,17 @@
  *   - `GraphAdapterRegistry`         — the registry class.
  *   - `createAdapterRegistry()`      — factory used by `contributeScope`.
  *   - `currentAdapterRegistry()`     — reads the scope-bound instance.
- *   - `pickAdapter()`                — thin helper that routes through
- *     the scope-bound instance to select the adapter for the run.
- *
- * Future PRs may auto-detect the right adapter from project files;
- * for now `pickAdapter()` returns the only registered adapter so the
- * orchestrator behaves identically to today.
+ *   - `pickAdapter()`                — compatibility helper that routes the
+ *     scope-bound instance through GraphAdapterSelector.
  */
 
-import {
-  ConfigurationError,
-  Registry,
-  currentScope,
-  logger,
-  type Registerable,
-} from '@opensip-tools/core';
-import { globSync } from 'glob';
+import { Registry, currentScope, type Registerable } from '@opensip-tools/core';
+
+import { GraphAdapterSelector } from './selector.js';
 
 import type { GraphLanguageAdapter } from './types.js';
 
-interface RegisterableAdapter extends Registerable {
+export interface RegisterableAdapter extends Registerable {
   readonly id: string;
   readonly name: string;
   readonly adapter: GraphLanguageAdapter;
@@ -60,64 +51,6 @@ export class GraphAdapterRegistry {
     this.inner.register({ id: adapter.id, name: adapter.id, adapter });
   }
 
-  /**
-   * Pick the adapter for the current run.
-   *
-   * - Zero registered adapters → fail with a configuration error.
-   * - One registered adapter   → return it.
-   * - Multiple adapters        → choose by file-extension dominance in
-   *   `cwd` when supplied; fall back to a deterministic preference order
-   *   (TypeScript first, then Python, then alphabetical).
-   *
-   * The dominance heuristic is intentionally simple: count files for
-   * each adapter's `fileExtensions` (recursive, ignoring common
-   * non-source dirs), pick whichever has the most matches. Ties prefer
-   * TypeScript so the legacy TS-only behavior is preserved when a repo
-   * has both. A real `--language` CLI flag is the right long-term
-   * answer; until it lands, this heuristic is the best the registry can
-   * do without inspecting tool config.
-   */
-  pick(cwd?: string): GraphLanguageAdapter {
-    if (this.inner.size === 0) {
-      throw new ConfigurationError(
-        'graph: no language adapter is registered. Graph adapters ship as ' +
-          'separate packages (@opensip-tools/graph-typescript, -python, ' +
-          '-rust, -go, -java) and are auto-discovered from node_modules. ' +
-          "Install the adapter for your project's language, or list it under " +
-          'plugins.graphAdapters in opensip-tools.config.yml.',
-      );
-    }
-    if (this.inner.size === 1) {
-      const only = this.inner.getAll()[0];
-      if (!only) throw new ConfigurationError('graph: registry corrupted');
-      return only.adapter;
-    }
-    if (cwd !== undefined && cwd.length > 0) {
-      const dominant = this.pickByFileDominance(cwd);
-      if (dominant) return dominant;
-      // None of the installed adapters matched a single source file under
-      // `cwd`. We still fall back (below) so the run doesn't hard-fail,
-      // but a silent empty catalog reads as "no findings" when the real
-      // cause is a missing adapter for the project's language. Surface it.
-      this.warnNoMatchingAdapter(cwd);
-    }
-    // Deterministic fallback: prefer TypeScript when present; otherwise
-    // the first id alphabetically.
-    const ts = this.inner.getById('typescript');
-    if (ts) return ts.adapter;
-    /* v8 ignore start */
-    const ids = this.inner
-      .getAll()
-      .map((r) => r.id)
-      .sort();
-    const id = ids[0];
-    if (!id) throw new ConfigurationError('graph: registry corrupted');
-    const entry = this.inner.getById(id);
-    if (!entry) throw new ConfigurationError('graph: registry corrupted');
-    return entry.adapter;
-    /* v8 ignore stop */
-  }
-
   clear(): void {
     this.inner.clear();
   }
@@ -132,67 +65,6 @@ export class GraphAdapterRegistry {
 
   getById(id: string): RegisterableAdapter | undefined {
     return this.inner.getById(id);
-  }
-
-  /**
-   * Emit an actionable warning when no installed adapter matched any
-   * source file under `cwd`. Names the registered adapters and points at
-   * the per-language packages so a Go/Java (or any unsupported-language)
-   * repo gets "install @opensip-tools/graph-<lang>" instead of a silent
-   * empty result. Audit 2026-05-29 (#4 fix 3).
-   */
-  private warnNoMatchingAdapter(cwd: string): void {
-    logger.warn({
-      evt: 'graph.lang_adapter.no_match',
-      module: 'graph:lang-adapter',
-      msg:
-        'No installed graph adapter matched any source files under the ' +
-        'target; falling back to TypeScript, which may yield an empty ' +
-        'result. If this project is in another language, install its ' +
-        'adapter (e.g. @opensip-tools/graph-go, @opensip-tools/graph-java) ' +
-        'or list it under plugins.graphAdapters in opensip-tools.config.yml.',
-      registered: this.inner.getAll().map((entry) => entry.id),
-      cwd,
-    });
-  }
-
-  private pickByFileDominance(cwd: string): GraphLanguageAdapter | undefined {
-    const counts = this.countFilesPerAdapter(cwd);
-    const best = findMaxCount(counts);
-    if (!best) return undefined;
-    const tied = collectTies(counts, best.count);
-    if (tied.length > 1) return this.resolveTie(tied);
-    return this.inner.getById(best.id)?.adapter;
-  }
-
-  private countFilesPerAdapter(cwd: string): Map<string, number> {
-    const counts = new Map<string, number>();
-    for (const entry of this.inner.getAll()) {
-      const adapter = entry.adapter;
-      if (adapter.fileExtensions.length === 0) continue;
-      let total = 0;
-      for (const ext of adapter.fileExtensions) {
-        const trimmed = ext.startsWith('.') ? ext.slice(1) : ext;
-        const matches = globSync(`**/*.${trimmed}`, {
-          cwd,
-          ignore: [...COUNT_EXCLUDES],
-          nodir: true,
-          follow: false,
-        });
-        total += matches.length;
-      }
-      counts.set(adapter.id, total);
-    }
-    return counts;
-  }
-
-  private resolveTie(tied: readonly string[]): GraphLanguageAdapter | undefined {
-    const preference = ['typescript', 'python', 'rust'];
-    for (const pref of preference)
-      if (tied.includes(pref)) return this.inner.getById(pref)?.adapter;
-    /* v8 ignore next 2 */
-    const sorted = [...tied].sort();
-    return this.inner.getById(sorted[0] ?? '')?.adapter;
   }
 }
 
@@ -244,28 +116,5 @@ export function currentAdapterRegistry(): GraphAdapterRegistry {
 
 /** Pick the adapter for the current run. See `GraphAdapterRegistry.pick`. */
 export function pickAdapter(cwd?: string): GraphLanguageAdapter {
-  return currentAdapterRegistry().pick(cwd);
-}
-
-const COUNT_EXCLUDES: readonly string[] = [
-  '**/.venv/**',
-  '**/venv/**',
-  '**/__pycache__/**',
-  '**/node_modules/**',
-  '**/dist/**',
-  '**/build/**',
-  '**/target/**',
-];
-
-function findMaxCount(counts: ReadonlyMap<string, number>): { id: string; count: number } | null {
-  let best: { id: string; count: number } | null = null;
-  for (const [id, count] of counts) {
-    if (count === 0) continue;
-    if (best === null || count > best.count) best = { id, count };
-  }
-  return best;
-}
-
-function collectTies(counts: ReadonlyMap<string, number>, target: number): readonly string[] {
-  return [...counts.entries()].filter(([, c]) => c === target).map(([id]) => id);
+  return new GraphAdapterSelector(currentAdapterRegistry()).pick({ cwd });
 }

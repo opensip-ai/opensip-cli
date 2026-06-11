@@ -12,15 +12,16 @@
  *     static render — the latter masked bugs where a tool mistyped its
  *     view key.
  *
- *  2. `setCliRegistriesForRun` — invoked by `main()` once per
- *     invocation, after the `LanguageRegistry` and `ToolRegistry` are
- *     constructed locally. The pre-action-hook reads them via
- *     `getCurrentRegistriesForScope()` when it builds the per-run
- *     `RunScope`. Module-level holders are kept narrowly: only the two
- *     registries (`languages`, `tools`) and the *constructed* RunScope
- *     itself live here. The legacy `currentProjectContext` and
- *     `datastoreCache` module globals retired in T1 deferred Item D —
- *     project + datastore now hang off the entered RunScope.
+ *  2. `setCliRuntimeContextForRun` — invoked by `main()` once per
+ *     invocation, after the `LanguageRegistry`, `ToolRegistry`, and
+ *     plugin-admission metadata are constructed locally. The pre-action-hook
+ *     reads them via `getCurrentRegistriesForScope()` /
+ *     `getToolManifestsForRun()` when it builds the per-run `RunScope`.
+ *     A single runtime-context holder keeps those pre-scope values together
+ *     with the mirrored constructed `RunScope`. The legacy
+ *     `currentProjectContext` and `datastoreCache` module globals retired in
+ *     T1 deferred Item D — project + datastore now hang off the entered
+ *     RunScope.
  *
  *  3. `buildToolCliContext` — assembles the `ToolCliContext` the
  *     dispatcher hands to each tool. Captures the exit code through a
@@ -64,13 +65,13 @@ import { renderOutcome } from './commands/render-outcome.js';
 import type { CommandResult, SignalEnvelope } from '@opensip-tools/contracts';
 
 // ---------------------------------------------------------------------------
-// Per-invocation holders.
+// Per-invocation runtime context.
 //
-// The two registries are constructed in `main()` and need to be visible to
-// pre-action-hook (which builds the scope). They CAN'T live on the entered
-// scope because they're needed BEFORE the scope is built.
+// The registries and admitted plugin metadata are constructed in `main()` and
+// need to be visible to pre-action-hook (which builds the scope). They CAN'T
+// live on the entered scope because they're needed BEFORE the scope is built.
 //
-// The `currentRunScope` holder mirrors the entered AsyncLocalStorage scope.
+// The `runScope` holder mirrors the entered AsyncLocalStorage scope.
 // It's strictly redundant with `currentScope()` for tools (which always
 // read via ALS), but the CLI's non-action paths — `maybeOpenDashboard`,
 // the host `sessions` command — call `getCurrentProjectRoot()` /
@@ -80,56 +81,69 @@ import type { CommandResult, SignalEnvelope } from '@opensip-tools/contracts';
 // `cli` through every signature.
 // ---------------------------------------------------------------------------
 
-let currentLanguageRegistry: LanguageRegistry | undefined;
-let currentToolRegistry: ToolRegistry | undefined;
-let currentRunScope: RunScope | undefined;
-// Provenance for the tools admitted through the 2.8.0 compatibility gate
-// (bundled + installed). Set once per invocation by main() from the
-// bootstrap result; read by `plugin list` (Phase 4). Same per-run-holder
-// pattern as the registries above — needed before the RunScope is built,
-// so it can't hang off the scope.
-let currentToolProvenance: readonly ToolProvenance[] = [];
-// Manifests for the tools admitted this invocation (release 2.10.0, §5.3).
-// Set once per invocation by main() from the bootstrap result; read by the
-// pre-action-hook to register each tool's manifest-declared capability domains
-// into the per-run capability registry. Same per-run-holder pattern as the
-// registries/provenance above — the manifests are read at bootstrap (before
-// any scope exists) but consumed when the scope is built.
-let currentToolManifests: readonly ToolPluginManifest[] = [];
+interface CliRuntimeContext {
+  readonly languages?: LanguageRegistry;
+  readonly tools?: ToolRegistry;
+  readonly runScope?: RunScope;
+  readonly toolProvenance: readonly ToolProvenance[];
+  readonly toolManifests: readonly ToolPluginManifest[];
+}
+
+let currentRuntimeContext: CliRuntimeContext = {
+  toolProvenance: [],
+  toolManifests: [],
+};
+
+function updateRuntimeContext(patch: Partial<CliRuntimeContext>): void {
+  currentRuntimeContext = { ...currentRuntimeContext, ...patch };
+}
+
+export function setCliRuntimeContextForRun(opts: {
+  readonly languages: LanguageRegistry;
+  readonly tools: ToolRegistry;
+  readonly toolProvenance?: readonly ToolProvenance[];
+  readonly toolManifests?: readonly ToolPluginManifest[];
+}): void {
+  currentRuntimeContext = {
+    languages: opts.languages,
+    tools: opts.tools,
+    toolProvenance: opts.toolProvenance ?? [],
+    toolManifests: opts.toolManifests ?? [],
+  };
+}
 
 /**
- * Called by `main()` after constructing the per-invocation registries so
- * the pre-action-hook can build a scope that points at them. Replaces
- * the previously-exported `defaultLanguageRegistry` /
- * `defaultToolRegistry` module globals (T1 Item A).
+ * Back-compat helper for isolated tests that set only the registries. `main()`
+ * uses `setCliRuntimeContextForRun` so all pre-scope CLI runtime state is
+ * installed as one cohesive value.
  */
 export function setCliRegistriesForRun(opts: {
   readonly languages: LanguageRegistry;
   readonly tools: ToolRegistry;
 }): void {
-  currentLanguageRegistry = opts.languages;
-  currentToolRegistry = opts.tools;
+  updateRuntimeContext({ languages: opts.languages, tools: opts.tools });
 }
 
 /**
- * Read the per-run registries set by `setCliRegistriesForRun`. Throws
- * when the registries have not been set — that indicates a bootstrap
- * ordering bug (the CLI composition root must call
- * `setCliRegistriesForRun` before any preAction hook fires).
+ * Read the per-run registries set by `setCliRuntimeContextForRun`. Throws when
+ * the registries have not been set — that indicates a bootstrap ordering bug
+ * (the CLI composition root must install its runtime context before any
+ * preAction hook fires).
  */
 export function getCurrentRegistriesForScope(): {
   readonly languages: LanguageRegistry;
   readonly tools: ToolRegistry;
 } {
-  if (!currentLanguageRegistry || !currentToolRegistry) {
+  const { languages, tools } = currentRuntimeContext;
+  if (!languages || !tools) {
     throw new SystemError(
-      'getCurrentRegistriesForScope() called before setCliRegistriesForRun(). ' +
-        'main() must construct LanguageRegistry/ToolRegistry and call ' +
-        'setCliRegistriesForRun before any preAction hook runs.',
+      'getCurrentRegistriesForScope() called before setCliRuntimeContextForRun(). ' +
+        'main() must construct LanguageRegistry/ToolRegistry and install the ' +
+        'CLI runtime context before any preAction hook runs.',
       { code: 'SYSTEM.BOOTSTRAP.REGISTRIES_UNSET' },
     );
   }
-  return { languages: currentLanguageRegistry, tools: currentToolRegistry };
+  return { languages, tools };
 }
 
 /**
@@ -139,7 +153,7 @@ export function getCurrentRegistriesForScope(): {
  * (Phase 4) via {@link getToolProvenanceForRun}.
  */
 export function setToolProvenanceForRun(records: readonly ToolProvenance[]): void {
-  currentToolProvenance = records;
+  updateRuntimeContext({ toolProvenance: records });
 }
 
 /**
@@ -148,7 +162,7 @@ export function setToolProvenanceForRun(records: readonly ToolProvenance[]): voi
  * isolated unit tests that never bootstrap).
  */
 export function getToolProvenanceForRun(): readonly ToolProvenance[] {
-  return currentToolProvenance;
+  return currentRuntimeContext.toolProvenance;
 }
 
 /**
@@ -160,7 +174,7 @@ export function getToolProvenanceForRun(): readonly ToolProvenance[] {
  * tool's real registrar).
  */
 export function setToolManifestsForRun(manifests: readonly ToolPluginManifest[]): void {
-  currentToolManifests = manifests;
+  updateRuntimeContext({ toolManifests: manifests });
 }
 
 /**
@@ -169,7 +183,7 @@ export function setToolManifestsForRun(manifests: readonly ToolPluginManifest[])
  * bootstrap) — the pre-action-hook then registers no manifest domains.
  */
 export function getToolManifestsForRun(): readonly ToolPluginManifest[] {
-  return currentToolManifests;
+  return currentRuntimeContext.toolManifests;
 }
 
 /**
@@ -179,11 +193,11 @@ export function getToolManifestsForRun(): readonly ToolPluginManifest[] {
  * reach ALS (post-action callbacks, error printers).
  */
 export function setCurrentRunScope(scope: RunScope): void {
-  currentRunScope = scope;
+  updateRuntimeContext({ runScope: scope });
 }
 
 function readScope(): RunScope {
-  const bound = currentScope() ?? currentRunScope;
+  const bound = currentScope() ?? currentRuntimeContext.runScope;
   if (!bound) {
     throw new SystemError(
       'CLI scope accessed before pre-action-hook constructed it. ' +

@@ -30,7 +30,7 @@ import type { ToolCliContext } from '@opensip-tools/core';
 
 function emptyAdapter(projectDir: string): GraphLanguageAdapter {
   return {
-    id: 'fake',
+    id: 'typescript',
     fileExtensions: ['.ts'],
     displayName: 'Fake',
     // Returns NO files — D14 test: catalog ends up with zero entries.
@@ -60,7 +60,7 @@ function emptyAdapter(projectDir: string): GraphLanguageAdapter {
 
 function populatedAdapter(projectDir: string): GraphLanguageAdapter {
   return {
-    id: 'fake',
+    id: 'typescript',
     fileExtensions: ['.ts'],
     displayName: 'Fake',
     discoverFiles: (): DiscoverOutput => ({

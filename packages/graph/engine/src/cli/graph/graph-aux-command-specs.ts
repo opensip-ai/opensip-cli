@@ -68,6 +68,7 @@ export const graphLookupCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   args: [{ name: 'name', description: 'Function simple name to look up (e.g. "saveBaseline")' }],
   scope: 'project',
   output: RAW_STREAM,
+  rawStreamReason: 'lookup',
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as { json?: boolean } & Record<string, unknown>;
     await executeLookup({ name: firstArg(opts), json: opts.json }, cli);
@@ -86,6 +87,7 @@ export const graphShardWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> =
   args: [{ name: 'specPath', description: 'Path to a JSON ShardWorkerSpec file' }],
   scope: 'project',
   output: RAW_STREAM,
+  rawStreamReason: 'worker-ipc',
   handler: async (rawOpts, cli): Promise<void> => {
     await executeShardWorker(firstArg(rawOpts as Record<string, unknown>), cli);
   },
@@ -127,6 +129,7 @@ export const graphEquivalenceCheckCommandSpec: CommandSpec<unknown, ToolCliConte
   ],
   scope: 'project',
   output: RAW_STREAM,
+  rawStreamReason: 'diagnostic-gate',
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as { cwd: string; budget?: string; updateBudget?: boolean };
     await executeEquivalenceCheck(
@@ -164,6 +167,7 @@ export const graphSymbolIndexCommandSpec: CommandSpec<unknown, ToolCliContext> =
   ],
   scope: 'project',
   output: RAW_STREAM,
+  rawStreamReason: 'file-export',
   handler: (rawOpts, cli): void => {
     const opts = rawOpts as { cwd: string; out: string };
     executeSymbolIndex({ cwd: opts.cwd, out: opts.out }, cli);
@@ -188,6 +192,7 @@ export const graphBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext
   ],
   scope: 'project',
   output: RAW_STREAM,
+  rawStreamReason: 'file-export',
   handler: (rawOpts, cli): void => {
     const opts = rawOpts as { cwd: string; out: string; json?: boolean };
     const datastore = cli.scope.datastore() as DataStore;
@@ -289,6 +294,7 @@ export const graphCatalogExportCommandSpec: CommandSpec<unknown, ToolCliContext>
   ],
   scope: 'project',
   output: RAW_STREAM,
+  rawStreamReason: 'file-export',
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as {
       catalogOutput: string;
@@ -393,6 +399,7 @@ export const graphSarifExportCommandSpec: CommandSpec<unknown, ToolCliContext> =
   ],
   scope: 'project',
   output: RAW_STREAM,
+  rawStreamReason: 'file-export',
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as {
       outputSarif: string;

@@ -7,8 +7,6 @@ import { line, group, type Span, type ViewNode } from '@opensip-tools/cli-ui';
 
 import type { PluginInfo, PluginResult, ToolProvenance } from '@opensip-tools/contracts';
 
-const DOMAINS = ['fit', 'sim'] as const;
-
 /** A short, stable prefix of the manifest hash — full hash stays in `--json`. */
 function shortHash(manifestHash: string): string {
   return manifestHash.slice(0, 12);
@@ -64,14 +62,16 @@ function domainSection(domain: string, plugins: readonly PluginInfo[]): ViewNode
 }
 
 function listView(
+  domains: readonly string[],
   plugins: readonly PluginInfo[],
   totalCount: number,
   toolProvenance: readonly ToolProvenance[],
 ): ViewNode {
+  const orderedDomains = orderedPluginDomains(domains, plugins);
   const children: ViewNode[] = [
     line([{ text: 'Installed Plugins', bold: true }]),
     { kind: 'spacer' },
-    ...DOMAINS.flatMap((domain) => domainSection(domain, plugins)),
+    ...orderedDomains.flatMap((domain) => domainSection(domain, plugins)),
   ];
   if (totalCount === 0) {
     children.push(
@@ -86,6 +86,20 @@ function listView(
   }
   children.push(...provenanceSection(toolProvenance));
   return group(children);
+}
+
+function orderedPluginDomains(
+  declared: readonly string[],
+  plugins: readonly PluginInfo[],
+): readonly string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const domain of [...declared, ...plugins.map((plugin) => plugin.domain)]) {
+    if (seen.has(domain)) continue;
+    seen.add(domain);
+    ordered.push(domain);
+  }
+  return ordered;
 }
 
 function addRemoveView(
@@ -147,7 +161,7 @@ function syncView(
 export function viewPlugin(result: PluginResult): ViewNode {
   switch (result.type) {
     case 'plugin-list': {
-      return listView(result.plugins, result.totalCount, result.toolProvenance);
+      return listView(result.domains, result.plugins, result.totalCount, result.toolProvenance);
     }
     case 'plugin-add': {
       return addRemoveView(

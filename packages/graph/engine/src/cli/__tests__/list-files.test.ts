@@ -19,8 +19,7 @@ import type { ToolCliContext } from '@opensip-tools/core';
 
 const h = vi.hoisted(() => ({
   discoverFiles: vi.fn(),
-  pickAdapter: vi.fn(),
-  getById: vi.fn(),
+  selectAdapter: vi.fn(),
   resolvePositionalPaths: vi.fn(),
   discoverPolyglotUnits: vi.fn(),
   resolveAdaptersForRun: vi.fn(),
@@ -28,8 +27,12 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('../../lang-adapter/registry.js', () => ({
-  pickAdapter: h.pickAdapter,
-  currentAdapterRegistry: () => ({ getById: h.getById }),
+  currentAdapterRegistry: () => ({}),
+}));
+vi.mock('../../lang-adapter/selector.js', () => ({
+  GraphAdapterSelector: vi.fn().mockImplementation(function () {
+    return { pick: h.selectAdapter };
+  }),
 }));
 vi.mock('../positional-paths.js', () => ({ resolvePositionalPaths: h.resolvePositionalPaths }));
 vi.mock('../workspace-runner.js', () => ({ discoverPolyglotUnits: h.discoverPolyglotUnits }));
@@ -55,8 +58,7 @@ const opts = (o: Partial<GraphCommandOptions>): GraphCommandOptions => ({ cwd: '
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.pickAdapter.mockReturnValue(adapter);
-  h.getById.mockReturnValue({ adapter });
+  h.selectAdapter.mockReturnValue(adapter);
   h.discoverFiles.mockReturnValue({ files: ['/proj/b.ts', '/proj/a.ts'] });
 });
 
@@ -69,7 +71,7 @@ describe('executeListFiles — whole-project scope', () => {
     await executeListFiles(opts({ json: true }), cli);
     expect(cli.emitJson).toHaveBeenCalledWith({ count: 2, files: ['a.ts', 'b.ts'] });
     expect(cli.setExitCode).toHaveBeenCalledWith(EXIT_CODES.SUCCESS);
-    expect(h.pickAdapter).toHaveBeenCalledWith('/proj');
+    expect(h.selectAdapter).toHaveBeenCalledWith({ cwd: '/proj', language: undefined });
   });
 
   it('renders graph-status lines (paths only, no header) without --json', async () => {
@@ -97,15 +99,17 @@ describe('executeListFiles — --language', () => {
   it('uses the named adapter from the registry', async () => {
     const cli = mockCli();
     await executeListFiles(opts({ json: true, language: 'typescript' }), cli);
-    expect(h.getById).toHaveBeenCalledWith('typescript');
+    expect(h.selectAdapter).toHaveBeenCalledWith({ cwd: '/proj', language: 'typescript' });
     expect(cli.emitJson).toHaveBeenCalledWith({ count: 2, files: ['a.ts', 'b.ts'] });
   });
 
-  it('falls back to pickAdapter when the named adapter is unregistered', async () => {
-    h.getById.mockReturnValue(undefined);
+  it('routes an unregistered named adapter through handleGraphError', async () => {
+    h.selectAdapter.mockImplementation(() => {
+      throw new Error('graph: language adapter klingon is not registered');
+    });
     const cli = mockCli();
     await executeListFiles(opts({ json: true, language: 'klingon' }), cli);
-    expect(h.pickAdapter).toHaveBeenCalledWith('/proj');
+    expect(h.handleGraphError).toHaveBeenCalledTimes(1);
   });
 });
 

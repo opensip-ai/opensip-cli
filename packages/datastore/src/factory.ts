@@ -8,7 +8,7 @@ import { openMemoryBackend } from './backends/memory.js';
 import { openSqliteBackend } from './backends/sqlite.js';
 import { DataStoreMigrationError } from './data-store.js';
 
-import type { DataStore, DataStoreOpenOptions } from './data-store.js';
+import type { DataStoreOpenOptions, DrizzleDataStore } from './data-store.js';
 
 function defaultMigrationsFolder(): string {
   return join(fileURLToPath(new URL('.', import.meta.url)), '..', 'migrations');
@@ -23,8 +23,8 @@ export const DataStoreFactory = {
    *   running the migrations folder fails. The original cause is preserved
    *   via the `cause` field.
    */
-  open(opts: DataStoreOpenOptions & { migrationsFolder?: string }): DataStore {
-    let datastore: DataStore;
+  open(opts: DataStoreOpenOptions & { migrationsFolder?: string }): DrizzleDataStore {
+    let datastore: DrizzleDataStore;
     try {
       datastore =
         opts.backend === 'memory'

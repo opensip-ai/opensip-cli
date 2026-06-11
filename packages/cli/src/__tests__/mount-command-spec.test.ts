@@ -202,6 +202,7 @@ describe('mountCommandSpec — wiring', () => {
       options: [{ flag: '--out', value: '<path>', description: 'output path', required: true }],
       scope: 'none',
       output: 'raw-stream',
+      rawStreamReason: 'file-export',
       handler: () => undefined,
     });
     mountCommandSpec(program, spec, ctx);
@@ -247,6 +248,7 @@ describe('mountCommandSpec — wiring', () => {
       options: [{ flag: '--force', description: 'force it', required: true }],
       scope: 'none',
       output: 'raw-stream',
+      rawStreamReason: 'diagnostic-gate',
       handler: () => undefined,
     });
 
@@ -318,6 +320,7 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
       commonFlags: [],
       scope: 'none',
       output: 'raw-stream',
+      rawStreamReason: 'file-export',
       handler: () => {
         sideEffect();
         return undefined;
@@ -451,6 +454,7 @@ describe('mountCommandSpec — leaner host CommandMountContext', () => {
       commonFlags: [],
       scope: 'none',
       output: 'raw-stream',
+      rawStreamReason: 'file-export',
       handler: () => {
         ran = true;
       },

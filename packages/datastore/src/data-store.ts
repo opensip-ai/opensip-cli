@@ -3,11 +3,40 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 export type DrizzleHandle<TSchema extends Record<string, unknown> = Record<string, unknown>> =
   BetterSQLite3Database<TSchema>;
 
-/** Persistence handle exposing a typed Drizzle DB and a transaction runner. */
+/** Public persistence handle: lifecycle plus transaction, but no raw query escape hatch. */
 export interface DataStore<TSchema extends Record<string, unknown> = Record<string, unknown>> {
-  readonly db: DrizzleHandle<TSchema>;
   close(): void;
   transaction<T>(fn: (tx: DrizzleHandle<TSchema>) => T): T;
+}
+
+/**
+ * Persistence-layer handle that exposes the raw Drizzle DB. Repository modules
+ * can narrow to this shape when they own the table boundary; general consumers
+ * should stay on {@link DataStore}.
+ */
+export interface DrizzleDataStore<
+  TSchema extends Record<string, unknown> = Record<string, unknown>,
+> extends DataStore<TSchema> {
+  readonly db: DrizzleHandle<TSchema>;
+}
+
+export function isDrizzleDataStore(value: unknown): value is DrizzleDataStore {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'db' in value &&
+    'transaction' in value &&
+    typeof value.transaction === 'function' &&
+    'close' in value &&
+    typeof value.close === 'function'
+  );
+}
+
+export function requireDrizzleDataStore(datastore: DataStore): DrizzleDataStore {
+  if (isDrizzleDataStore(datastore)) return datastore;
+  throw new Error(
+    'A Drizzle-backed DataStore is required for repository access. General callers should use repository APIs instead of the raw datastore handle.',
+  );
 }
 
 /** Options for opening a {@link DataStore}: backend choice and optional file path. */

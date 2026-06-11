@@ -12,6 +12,11 @@
  */
 
 import { logger } from '@opensip-tools/core';
+import {
+  requireDrizzleDataStore,
+  type DataStore,
+  type DrizzleDataStore,
+} from '@opensip-tools/datastore';
 import { sql } from 'drizzle-orm';
 
 import { graphCatalog, graphShardFragment } from './schema.js';
@@ -19,7 +24,6 @@ import { graphCatalog, graphShardFragment } from './schema.js';
 import type { ShardBuildResult } from '../cli/orchestrate/shard-model.js';
 import type { Catalog, PersistedFeatures, ResolutionMode } from '../types.js';
 import type { GraphCatalog } from '@opensip-tools/contracts';
-import type { DataStore } from '@opensip-tools/datastore';
 
 const MODULE_NAME = 'graph:catalog-repo';
 
@@ -61,7 +65,11 @@ interface CatalogRowPayload {
  * fingerprint-match for cache validity without parsing the full payload.
  */
 export class CatalogRepo {
-  constructor(private readonly datastore: DataStore) {}
+  private readonly datastore: DrizzleDataStore;
+
+  constructor(datastore: DataStore) {
+    this.datastore = requireDrizzleDataStore(datastore);
+  }
 
   /**
    * Replace the catalog with a fresh value. Mirrors v1's atomic

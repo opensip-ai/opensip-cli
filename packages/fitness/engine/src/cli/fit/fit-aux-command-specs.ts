@@ -89,6 +89,7 @@ export const fitBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext> 
   ],
   scope: 'project',
   output: 'raw-stream',
+  rawStreamReason: 'file-export',
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as ToolOptions & { out: string };
     const datastore = cli.scope.datastore() as DataStore;

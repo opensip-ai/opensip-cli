@@ -1,15 +1,22 @@
 import { logger } from '@opensip-tools/core';
+import {
+  requireDrizzleDataStore,
+  type DataStore,
+  type DrizzleDataStore,
+} from '@opensip-tools/datastore';
 import { sql } from 'drizzle-orm';
 
 import { fitBaseline } from './schema.js';
-
-import type { DataStore } from '@opensip-tools/datastore';
 
 const MODULE_NAME = 'fitness:baseline-repo';
 
 /** Repository for the single-row SARIF baseline used by --gate-compare. */
 export class FitBaselineRepo {
-  constructor(private readonly datastore: DataStore) {}
+  private readonly datastore: DrizzleDataStore;
+
+  constructor(datastore: DataStore) {
+    this.datastore = requireDrizzleDataStore(datastore);
+  }
 
   /** Persist a SARIF document as the baseline. Overwrites any prior row. */
   save(sarif: unknown, findingCount: number): void {

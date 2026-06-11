@@ -46,6 +46,7 @@ export type {
   GraphDoneResult,
   GateDoneResult,
   GraphStatusResult,
+  TextLinesResult,
   ListChecksResult,
   ListRecipesResult,
   HistorySession,
@@ -129,7 +130,7 @@ export type {
 // re-exported here for the public Tool↔runner surface. `CommonFlagKey` is also
 // re-exported from ./cli-flags (which now sources it from core) — both paths
 // resolve to the same kernel type.
-export { defineCommand, COMMON_FLAG_KEYS } from '@opensip-tools/core';
+export { defineCommand, COMMON_FLAG_KEYS, RAW_STREAM_REASONS } from '@opensip-tools/core';
 export type {
   CommandSpec,
   OptionSpec,
@@ -138,6 +139,7 @@ export type {
   CommandContext,
   CommandOutputMode,
   CommandScopeRequirement,
+  RawStreamReason,
 } from '@opensip-tools/core';
 
 // Tool-scoped recipe-default resolution (ADR-0022). The pure resolver every

@@ -142,10 +142,15 @@ export async function pluginList(
 
   return {
     type: 'plugin-list',
+    domains: [...domainsForList(layouts), TOOL_DOMAIN],
     plugins,
     totalCount: plugins.length,
     toolProvenance,
   };
+}
+
+function domainsForList(layouts: readonly PluginLayout[]): string[] {
+  return layouts.map((layout) => layout.domain);
 }
 
 // =============================================================================

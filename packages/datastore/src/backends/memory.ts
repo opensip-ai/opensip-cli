@@ -1,7 +1,7 @@
 import { buildSqliteDataStore } from './shared.js';
 
-import type { DataStore } from '../data-store.js';
+import type { DrizzleDataStore } from '../data-store.js';
 
-export function openMemoryBackend(): DataStore {
+export function openMemoryBackend(): DrizzleDataStore {
   return buildSqliteDataStore(':memory:');
 }

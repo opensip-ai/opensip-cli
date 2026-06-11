@@ -29,6 +29,7 @@ const EXPECTED_VALUE_EXPORTS = [
   // the env-surface reference doc.
   'GRAPH_ENV_SPECS',
   'GraphAdapterRegistry',
+  'GraphAdapterSelector',
   'GraphRecipeRegistry',
   'appendEdge',
   'builtInGraphRecipes',
