@@ -21,7 +21,8 @@ import {
   resolveSpecifierToPackage,
 } from '../../../cross-package/export-index.js';
 
-import type { Catalog, FunctionOccurrence, Visibility } from '../../../types.js';
+import type { PackageManifestIndex } from '../../../cross-package/export-index.js';
+import type { Catalog, FunctionOccurrence, ReExportRecord, Visibility } from '../../../types.js';
 import type { Shard } from '../shard-model.js';
 
 function occ(
@@ -147,6 +148,98 @@ describe('buildExportIndex', () => {
     ).toEqual(['B']);
   });
 });
+
+/** Inline {@link PackageManifestIndex} — `dir` is what `packageOf` maps to a group. */
+function manifest(...entries: readonly (readonly [string, string])[]): PackageManifestIndex {
+  return new Map(entries.map(([name, dir]) => [name, { name, dir }]));
+}
+function withReExports(cat: Catalog, reExports: readonly ReExportRecord[]): Catalog {
+  return { ...cat, reExports };
+}
+
+describe('buildExportIndex — re-export following', () => {
+  it('does NOTHING without a manifest index (back-compatible base behavior)', () => {
+    const cat = withReExports(occCat(), [reexp('packages/graph/graph-adapter-common/src/index.ts', 'childrenOf', 'childrenOf', '@opensip-tools/tree-sitter')]);
+    const index = buildExportIndex(cat); // no manifest → no re-export pass
+    expect(index.get('graph')?.get('childrenOf')).toBeUndefined();
+    expect(index.get('tree-sitter')?.get('childrenOf')?.map((o) => o.bodyHash)).toEqual(['TS']);
+  });
+
+  it('resolves a name under the package that re-exports it from a workspace dep', () => {
+    const cat = withReExports(occCat(), [reexp('packages/graph/graph-adapter-common/src/index.ts', 'childrenOf', 'childrenOf', '@opensip-tools/tree-sitter')]);
+    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const index = buildExportIndex(cat, mi);
+    // still defined under tree-sitter AND now reachable under the re-exporting group (graph)
+    expect(index.get('tree-sitter')?.get('childrenOf')?.map((o) => o.bodyHash)).toEqual(['TS']);
+    expect(index.get('graph')?.get('childrenOf')?.map((o) => o.bodyHash)).toEqual(['TS']);
+  });
+
+  it('handles an aliased re-export (export { x as y } from)', () => {
+    const cat = withReExports(occCat(), [reexp('packages/graph/graph-adapter-common/src/index.ts', 'kids', 'childrenOf', '@opensip-tools/tree-sitter')]);
+    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const index = buildExportIndex(cat, mi);
+    expect(index.get('graph')?.get('kids')?.map((o) => o.bodyHash)).toEqual(['TS']);
+    expect(index.get('graph')?.get('childrenOf')).toBeUndefined(); // exposed only as the alias
+  });
+
+  it('follows a chain to a fixpoint (A re-exports from B which re-exports from C)', () => {
+    // C=tree-sitter defines childrenOf; B=core re-exports it; A=graph re-exports from B.
+    const cat = withReExports(occCat(), [
+      reexp('packages/core/src/index.ts', 'childrenOf', 'childrenOf', '@opensip-tools/tree-sitter'),
+      reexp('packages/graph/engine/src/index.ts', 'childrenOf', 'childrenOf', '@opensip-tools/core'),
+    ]);
+    const mi = manifest(
+      ['@opensip-tools/tree-sitter', 'packages/tree-sitter'],
+      ['@opensip-tools/core', 'packages/core'],
+    );
+    const index = buildExportIndex(cat, mi);
+    expect(index.get('core')?.get('childrenOf')?.map((o) => o.bodyHash)).toEqual(['TS']);
+    expect(index.get('graph')?.get('childrenOf')?.map((o) => o.bodyHash)).toEqual(['TS']);
+  });
+
+  it('never overrides a local definition with a re-export (decline-beats-guess)', () => {
+    const cat = withReExports(
+      catalog(
+        occ('childrenOf', 'packages/tree-sitter/src/walk.ts', 'TS'),
+        occ('childrenOf', 'packages/graph/engine/src/local.ts', 'LOCAL'), // graph's OWN childrenOf
+      ),
+      [reexp('packages/graph/engine/src/index.ts', 'childrenOf', 'childrenOf', '@opensip-tools/tree-sitter')],
+    );
+    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const index = buildExportIndex(cat, mi);
+    // graph keeps its own; the re-export does not clobber it.
+    expect(index.get('graph')?.get('childrenOf')?.map((o) => o.bodyHash)).toEqual(['LOCAL']);
+  });
+
+  it('expands a star re-export (export * from) over the source package exports', () => {
+    const cat = withReExports(
+      catalog(
+        occ('childrenOf', 'packages/tree-sitter/src/walk.ts', 'TS'),
+        occ('nameOf', 'packages/tree-sitter/src/walk.ts', 'NM'),
+      ),
+      [reexp('packages/graph/engine/src/index.ts', '*', '*', '@opensip-tools/tree-sitter')],
+    );
+    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const index = buildExportIndex(cat, mi);
+    expect(index.get('graph')?.get('childrenOf')?.map((o) => o.bodyHash)).toEqual(['TS']);
+    expect(index.get('graph')?.get('nameOf')?.map((o) => o.bodyHash)).toEqual(['NM']);
+  });
+
+  it('declines an unresolvable (external) re-export specifier', () => {
+    const cat = withReExports(occCat(), [reexp('packages/graph/engine/src/index.ts', 'debounce', 'debounce', 'lodash')]);
+    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']); // no lodash
+    const index = buildExportIndex(cat, mi);
+    expect(index.get('graph')?.get('debounce')).toBeUndefined();
+  });
+});
+
+/** A catalog with a single exported `childrenOf` in the tree-sitter package. */
+function occCat(): Catalog {
+  return catalog(occ('childrenOf', 'packages/tree-sitter/src/walk.ts', 'TS'));
+}
+function reexp(fromFile: string, exportedName: string, sourceName: string, specifier: string): ReExportRecord {
+  return { fromFile, exportedName, sourceName, specifier };
+}
 
 describe('buildPackageManifestIndex + resolveSpecifierToPackage', () => {
   let projectRoot: string;
