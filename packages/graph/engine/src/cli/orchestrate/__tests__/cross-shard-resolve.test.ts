@@ -311,6 +311,44 @@ describe('resolveCrossBoundaryCalls — cross-package method (targetFile pin)', 
     const { catalog } = resolveCrossBoundaryCalls(merged, [bc], EMPTY_MANIFESTS);
     expect(catalog.functions.caller?.[0]?.calls.find((e) => e.crossShard)?.to ?? []).toEqual([]);
   });
+
+  it('declines an INTERFACE-attested method even when an implementor exists elsewhere (polymorphic dispatch stays declined)', () => {
+    // The dominant proven-correct decline class (ADR-0033 amendment #3/#4): the
+    // checker attests `ctx.setExitCode()` to an interface/type SIGNATURE, so the
+    // attested target file holds NO concrete occurrence of the name — while a
+    // concrete IMPLEMENTOR of the interface lives in a different file/package.
+    // The pin is FILE-scoped unique-or-decline: it must DECLINE, never fall back
+    // to "unique name repo-wide" and silently link one implementor (the unsound
+    // resolveByCatalogFallback failure mode). Resolving this class correctly
+    // means cross-package POLYMORPHIC dispatch — multi-target fan-out to EVERY
+    // implementor, a deliberate edge-model revision (explicitly deferred) that
+    // must consciously revise this test.
+    const merged = mergeShardFragments(
+      [
+        fragment('typescript', occ('caller', 'packages/pkg-a/index.ts', 'A')),
+        fragment(
+          'typescript',
+          // The interface's mapped source file IS in the catalog (it has another
+          // concrete function) — distinct from the file-absent decline above.
+          occ('makeContext', 'packages/pkg-b/context.ts', 'B'),
+          // The lone implementor: same method name, DIFFERENT file. Must not link.
+          occ('setExitCode', 'packages/pkg-c/cli-context.ts', 'IMPL'),
+        ),
+      ],
+      ['packages/pkg-a/index.ts', 'packages/pkg-b/context.ts', 'packages/pkg-c/cli-context.ts'],
+    );
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
+      calleeName: 'setExitCode',
+      targetFile: 'packages/pkg-b/context.ts', // the interface's file — no body here
+      line: 2,
+      column: 9,
+      text: 'ctx.setExitCode(0)',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(merged, [bc], EMPTY_MANIFESTS);
+    expect(catalog.functions.caller?.[0]?.calls.find((e) => e.crossShard)?.to ?? []).toEqual([]);
+  });
 });
 
 describe('mergeShardFragments — edge cases', () => {

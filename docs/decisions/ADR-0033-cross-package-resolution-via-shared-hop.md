@@ -188,3 +188,49 @@ fan-out to every implementor), a separate larger feature, out of scope. So
 cross-package method resolution is COMPLETE for concrete unique targets.
 Regression tests: `method-target.test.ts` (the resolver) + the `method-target`
 cases in `cross-shard-resolve.test.ts` (the linker pin).
+
+**Amendment (2026-06-11, #4) — COMPLETION POINT declared; the two remaining
+items are EXPLICITLY DEFERRED (a recorded fork, not a silent descope).** With
+amendment #3 the resolution program reached a stable completion state: all four
+directional budget floors are 0 (the true zero-divergence soundness invariant),
+cross-package FUNCTIONS and METHODS resolve through the one shared hop in both
+engines, and every remaining decline is proven correct (dominantly
+interface/polymorphic dispatch, plus same-name ambiguity and no-occurrence).
+The defining property of this state: **every emitted edge is true and every
+decline is diagnosed** — work that would spend that property must clear a
+higher bar than work that extended it. Two candidate follow-ups were evaluated
+and deferred:
+
+1. *Cross-package polymorphic dispatch* (resolve interface-attested methods by
+   fan-out to every implementor; would recover the ~208 declines as multi-target
+   edges). **Deferred.** It is a semantic regime change, not an increment: a
+   fan-out edge is an OVER-approximation (the call could hit any implementor, so
+   most fan-out targets are false at runtime), which forfeits the
+   every-edge-is-true property; ADR-0001's precision bar already demotes
+   dynamic-dispatch findings as a noise class; and ADR-0003's per-occurrence
+   identity assumes one occurrence → one target, so the edge model, BOTH
+   engines, and the differential gate (which would need fan-out equivalence)
+   must change in lockstep. **Design constraint recorded for any future
+   implementation:** model it as a DISTINCT edge kind (e.g. `dispatch`:
+   multi-target, explicitly marked over-approximate), never a widening of
+   `call`-edge semantics — preserving the zero-divergence invariant on call
+   edges. Pick it up only when a concrete consumer needs over-approximate
+   reachability (e.g. dead-code/impact analysis), not speculatively.
+   **Executable guard:** the interface-decline locks (the INTERFACE-attested
+   cases in `cross-shard-resolve.test.ts` and `method-target.test.ts`) pin the
+   decline behavior — including that a lone implementor elsewhere in the catalog
+   is NEVER silently linked (the unsound single-target shortcut). That feature
+   must consciously revise those tests.
+2. *Clean-checkout parity for WORKSPACE imports* (source-as-surface program
+   resolution; see Consequences). **Deferred, unchanged.** The tool analyzes
+   built repos, the default (sharded) engine is dist-independent, and the
+   failure mode of a dist-less `--exact` run is FEWER edges (completeness),
+   never false ones (soundness preserved). If exposure materializes (e.g. a
+   SaaS clean-clone path), the right-sized first step is a loud preflight
+   diagnostic when a workspace dep's `dist` is absent — not a
+   program-resolution rewrite.
+
+The frozen baseline this amendment locks: directional floors `{phantom: 0,
+decline: 0, conflict: 0, scc: 0}`; pinned-corpus completeness floor 7
+(`resolution-completeness-floor.test.ts`); decline-class locks above. Raising
+any of these is a deliberate act with an ADR trail, not drift.
