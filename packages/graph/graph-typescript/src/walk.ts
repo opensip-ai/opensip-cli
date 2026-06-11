@@ -365,10 +365,31 @@ function isLikelyValueReference(node: ts.Identifier): boolean {
   const parent = node.parent;
   if (!parent) return false;
   if (isStructuralParent(parent)) return false;
+  if (isJsxTagName(node, parent)) return false;
   if (isDeclarationName(node, parent)) return false;
   if (isPropertyOrLabelName(node, parent)) return false;
   if (isCallTargetIdentifier(node, parent)) return false;
   return true;
+}
+
+/**
+ * The identifier IS the tag name of a JSX element (`<Banner/>`, `</Banner>`).
+ * The JSX element node is its own resolver candidate
+ * ({@link isResolverCandidate}) and `resolveJsxElement` owns the edge — so the
+ * tag-name identifier must NOT also be admitted as a standalone value
+ * reference, or the sharded boundary extractor recovers BOTH (element + tag
+ * name) and emits a duplicate cross-package edge at the adjacent column. (Exact
+ * silently drops the redundant value-ref; sharded did not — the source of the
+ * 36 sharded-only column-twin divergences.) A qualified tag (`<A.B/>`) is a
+ * PropertyAccess/QualifiedName and is already excluded by `isStructuralParent`.
+ */
+function isJsxTagName(node: ts.Identifier, parent: ts.Node): boolean {
+  return (
+    (ts.isJsxOpeningElement(parent) ||
+      ts.isJsxSelfClosingElement(parent) ||
+      ts.isJsxClosingElement(parent)) &&
+    parent.tagName === node
+  );
 }
 
 /** Parents that make the identifier a type or import position. */
