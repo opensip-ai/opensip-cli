@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildEquivalenceReport,
+  countResolvedCrossPackageEdges,
   isTestOrFixturePath,
   judgeEquivalence,
   type EquivalenceReport,
@@ -280,5 +281,60 @@ describe('judgeEquivalence directional ratchet', () => {
     expect(v.failed).toBe(true);
     expect(v.functionSetBreached).toBe(true);
     expect(v.lines.join('\n')).toContain('function-set divergence');
+  });
+});
+
+// ── completeness floor (countResolvedCrossPackageEdges) ─────────────
+
+/** A catalog whose single occurrence carries the given edges. */
+function catalogWithEdges(edges: { to: string[]; crossShard?: boolean }[]): Catalog {
+  return {
+    version: '3.0',
+    tool: 'graph',
+    language: 'typescript',
+    builtAt: '2026-01-01T00:00:00.000Z',
+    cacheKey: 'test',
+    functions: {
+      owner: [
+        {
+          bodyHash: 'H',
+          simpleName: 'owner',
+          qualifiedName: 'f.owner',
+          filePath: 'packages/x/src/a.ts',
+          line: 1,
+          column: 0,
+          calls: edges.map((e, i) => ({
+            to: e.to,
+            line: 10 + i,
+            column: 0,
+            resolution: 'semantic',
+            confidence: 'high',
+            text: 'call()',
+            ...(e.crossShard === undefined ? {} : { crossShard: e.crossShard }),
+          })),
+        },
+      ],
+    },
+  } as unknown as Catalog;
+}
+
+describe('countResolvedCrossPackageEdges (completeness metric)', () => {
+  it('counts ONLY resolved crossShard edges (excludes intra + declined)', () => {
+    const cat = catalogWithEdges([
+      { to: ['T1'], crossShard: true }, // resolved cross-package ✓
+      { to: ['T2'], crossShard: true }, // resolved cross-package ✓
+      { to: ['LOCAL'] }, // intra (no crossShard) ✗
+      { to: [], crossShard: true }, // declined crossShard placeholder ✗
+    ]);
+    expect(countResolvedCrossPackageEdges(cat)).toBe(2);
+  });
+
+  it('a both-engine drop falls below a floor the differential gate cannot see', () => {
+    // Both "engines" would produce this same degraded catalog ⇒ ZERO differential
+    // divergence, yet the resolved cross-package count collapsed. The floor is the
+    // only guard for this case.
+    const FLOOR_EXAMPLE = 2;
+    const degraded = catalogWithEdges([{ to: [], crossShard: true }]); // both declined
+    expect(countResolvedCrossPackageEdges(degraded)).toBeLessThan(FLOOR_EXAMPLE);
   });
 });
