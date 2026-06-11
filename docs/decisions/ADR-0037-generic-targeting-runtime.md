@@ -75,7 +75,9 @@ not fixed.
 **Consequences:**
 
 - **New `@opensip-tools/targeting` package** (peer of `lang-*`/`output`; deps:
-  `config` types + `glob`/`minimatch`). Holds `TargetRegistry` (register/get/byTag),
+  `core` — the generic `Registry<T>` base only, NOT its tool vocabulary (the
+  enforcement gate above forbids the latter) — plus `config` types and
+  `glob`/`minimatch`). Holds `TargetRegistry` (register/get/byTag),
   `resolveTargets(names) → files`, `applyGlobalExcludes`, `preResolveAllTargets`.
 - **`scope.targets`** — the host builds the registry once per run from the loaded
   config document and exposes it on `RunScope`, mirroring `scope.toolConfig` /
