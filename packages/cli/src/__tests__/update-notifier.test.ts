@@ -138,7 +138,7 @@ describe('formatUpdateNag', () => {
   it('renders the current → latest line with the install command and silence hint', () => {
     const nag = formatUpdateNag('2.2.1', '2.3.0');
     expect(nag).toContain('opensip-tools 2.2.1 → 2.3.0 available');
-    expect(nag).toContain('npm install -g opensip-tools');
+    expect(nag).toContain('curl -fsSL https://opensip.ai/cli/install.sh | bash');
     expect(nag).toContain('OPENSIP_NO_UPDATE=1');
   });
 });

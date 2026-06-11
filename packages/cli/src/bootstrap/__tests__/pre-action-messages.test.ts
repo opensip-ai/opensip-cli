@@ -17,7 +17,7 @@ describe('formatCliTooOldMessage', () => {
     expect(msg).toContain('Config schema:  v4');
     expect(msg).toContain('CLI supports:   v2');
     // Direction-correct: upgrade the CLI, NOT "run migrate".
-    expect(msg).toContain('npm install -g opensip-tools@latest');
+    expect(msg).toContain('curl -fsSL https://opensip.ai/cli/install.sh | bash');
     expect(msg).not.toContain('migrate');
   });
 });

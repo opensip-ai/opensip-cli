@@ -174,7 +174,7 @@ export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined 
 export function formatUpdateNag(current: string, latest: string): string {
   return (
     `\nopensip-tools ${current} → ${latest} available. ` +
-    `Run \`npm install -g opensip-tools\` to update.\n` +
+    `Run \`curl -fsSL https://opensip.ai/cli/install.sh | bash\` to update.\n` +
     `(Silence with OPENSIP_NO_UPDATE=1.)\n\n`
   );
 }
@@ -202,7 +202,7 @@ export function maybeNotify(opts: NotifyOptions): UpdateNotifier | null {
     const write = opts.write ?? ((s: string) => process.stderr.write(s));
     const line =
       `\nopensip-tools ${update.current} \u2192 ${update.latest} available. ` +
-      `Run \`npm install -g opensip-tools\` to update.\n` +
+      `Run \`curl -fsSL https://opensip.ai/cli/install.sh | bash\` to update.\n` +
       `(Silence with OPENSIP_NO_UPDATE=1.)\n\n`;
     write(line);
   }

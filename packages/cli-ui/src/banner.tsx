@@ -36,8 +36,8 @@ const BANNER_SIZES: ReadonlySet<string> = new Set<BannerSize>(['lg', 'md', 'sm',
 /** Product tagline shown in the `mini` banner — mirrors the welcome screen. */
 const MINI_TAGLINE = 'codebase analysis toolkit';
 
-/** The npm command that upgrades a global install. */
-const UPGRADE_COMMAND = 'npm install -g opensip-tools';
+/** The command that installs/upgrades the CLI via the hosted install script. */
+const UPGRADE_COMMAND = 'curl -fsSL https://opensip.ai/cli/install.sh | bash';
 
 /**
  * UpdateHint — a single dim line printed UNDER the `mini` banner box when an

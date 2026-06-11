@@ -214,7 +214,7 @@ describe('schema-version skew', () => {
     const { stderr, exitCode } = runCli(['fit-list'], testDir);
     expect(exitCode).toBe(2);
     expect(stderr).toContain('uses a newer schema than your CLI supports');
-    expect(stderr).toContain('npm install -g opensip-tools@latest');
+    expect(stderr).toContain('curl -fsSL https://opensip.ai/cli/install.sh | bash');
     // Critical: must NOT say "migrate" — direction was previously wrong.
     expect(stderr.toLowerCase()).not.toContain('opensip-tools migrate');
   });

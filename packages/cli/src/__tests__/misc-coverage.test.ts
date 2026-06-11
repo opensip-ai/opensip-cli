@@ -134,7 +134,7 @@ describe('update-notifier default write fallback', () => {
       spy.mockRestore();
     }
     expect(writes.join('')).toMatch(/0\.0\.1.*9\.9\.9/);
-    expect(writes.join('')).toContain('npm install -g opensip-tools');
+    expect(writes.join('')).toContain('curl -fsSL https://opensip.ai/cli/install.sh | bash');
   });
 });
 

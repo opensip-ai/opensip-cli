@@ -31,7 +31,7 @@ export function formatCliTooOldMessage(input: CliTooOldInput): string {
     `  CLI supports:   v${input.cliVersion}`,
     ``,
     `  Update your CLI to continue:`,
-    `    npm install -g opensip-tools@latest`,
+    `    curl -fsSL https://opensip.ai/cli/install.sh | bash`,
     ``,
     `  (Or, if installed locally to the project: pnpm up opensip-tools@latest)`,
   ].join('\n');

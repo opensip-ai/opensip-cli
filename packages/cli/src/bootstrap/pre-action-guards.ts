@@ -74,7 +74,7 @@ export function checkSchemaVersionAndBailout(project: ProjectContext, runId: str
     throw new BootstrapError({
       message: `This project's opensip-tools.config.yml uses a newer schema (v${compat.configVersion}) than this CLI supports (v${compat.cliVersion}).`,
       humanMessage: msg,
-      suggestion: 'Update your CLI: npm install -g opensip-tools@latest',
+      suggestion: 'Update your CLI: curl -fsSL https://opensip.ai/cli/install.sh | bash',
       exitCode: 2,
     });
   }
