@@ -1,5 +1,6 @@
 import { renderToText } from '@opensip-tools/cli-ui';
 import { buildSignalEnvelope } from '@opensip-tools/contracts';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
 import { describe, it, expect } from 'vitest';
 
 import { resultToView } from '../result-to-view.js';
@@ -101,6 +102,8 @@ describe('session-replay view', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
       units: [{ slug: 'graph:cycle', passed: false, violationCount: 2, durationMs: 0 }],
       signals: [],
+      policy: HOST_VERDICT_POLICY_FALLBACK,
+      runFaulted: false,
     });
     const out = text({
       type: 'session-replay',

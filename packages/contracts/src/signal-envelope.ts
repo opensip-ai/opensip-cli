@@ -20,11 +20,11 @@
  * version. It is `2`, succeeding the implicit `CliOutput` "1.0" husk this
  * envelope replaces.
  */
-import { SeverityPolicy } from '@opensip-tools/core';
+import { policyPasses, SeverityPolicy } from '@opensip-tools/core';
 
 import { passRate } from './score.js';
 
-import type { Signal, ToolShortId } from '@opensip-tools/core';
+import type { Signal, ToolShortId, VerdictPolicy } from '@opensip-tools/core';
 
 /**
  * Run-level verdict header. `passed` ⇔ "no `critical`/`high` signals";
@@ -101,6 +101,18 @@ export interface BuildEnvelopeInput {
   readonly units: readonly UnitResult[];
   readonly signals: readonly Signal[];
   readonly resolutionMode?: 'exact' | 'fast';
+  /**
+   * The tool's resolved findings policy (ADR-0035). `verdict.passed` is computed
+   * from `(errors, warnings)` against this — replacing the old `errors === 0`.
+   */
+  readonly policy: VerdictPolicy;
+  /**
+   * `true` when the run faulted OUTSIDE its units — e.g. fit's plugin-load
+   * errors, which occur before any unit exists. Unit-level faults are derived
+   * from `UnitResult.error` and need not be passed here. A faulted run always
+   * FAILs, independent of the findings policy (a crash ≠ "0 errors found").
+   */
+  readonly runFaulted: boolean;
 }
 
 /**
@@ -113,7 +125,10 @@ export interface BuildEnvelopeInput {
  * - `summary.total/passed/failed` come from `units` (units are what "ran").
  * - `summary.errors/warnings` come from `signals` (critical|high → error,
  *   else warning).
- * - `score = passRate(summary)`; `passed = errors === 0`.
+ * - `score = passRate(summary)`.
+ * - `verdict.passed` (ADR-0035) ⇔ the run did not fault, no unit errored, AND
+ *   the error/warning counts pass the tool's findings `policy`. This is the
+ *   single verdict that drives both the exit code and the headline.
  */
 export function buildSignalEnvelope(input: BuildEnvelopeInput): SignalEnvelope {
   const total = input.units.length;
@@ -131,9 +146,14 @@ export function buildSignalEnvelope(input: BuildEnvelopeInput): SignalEnvelope {
 
   const summary = { total, passed, failed, errors, warnings };
 
+  // A unit that errored (a check that threw / timed out) is a fault, not a
+  // finding — it FAILs the run regardless of the findings policy. Pre-unit
+  // faults (e.g. fit plugin-load) arrive on `runFaulted` since no unit exists.
+  const unitFaulted = input.units.some((u) => u.error !== undefined);
+
   const verdict: RunVerdict = {
     score: passRate(summary),
-    passed: errors === 0,
+    passed: !input.runFaulted && !unitFaulted && policyPasses({ errors, warnings }, input.policy),
     summary,
   };
 

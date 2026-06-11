@@ -33,6 +33,7 @@ import {
   loadCapabilityDomain,
   logger,
   resolveScopes,
+  resolveVerdictPolicy,
 } from '@opensip-tools/core';
 import { SessionRepo } from '@opensip-tools/session-store';
 
@@ -299,6 +300,12 @@ export async function executeSim(
     createdAt: new Date().toISOString(),
     units,
     signals,
+    // ADR-0035: sim declares no failOn* keys, so it inherits the host fallback
+    // {1,0}. With Phase 0 (a failed scenario emits an error signal), this
+    // reproduces sim's historical `failed > 0` exit exactly. Scenario throws land
+    // in UnitResult.error (a unit fault), so runFaulted stays false here.
+    policy: resolveVerdictPolicy('simulation'),
+    runFaulted: false,
   });
 
   // ADR-0021: on --verbose, carry the per-scenario detail body so the shared
@@ -315,7 +322,11 @@ export async function executeSim(
     recipeName,
     cwd: args.cwd,
     durationMs: recipeResult.durationMs,
-    shouldFail: failed > 0,
+    // ADR-0035 Phase 2 bridge: the run verdict is now the single host verdict.
+    // With Phase 0, a failed scenario emits an error signal, so the {1,0} policy
+    // makes `!envelope.verdict.passed` exactly equal the old `failed > 0`. Phase 3
+    // deletes this field and derives the exit in the host.
+    shouldFail: !envelope.verdict.passed,
     envelope,
     ...(verboseDetail === undefined ? {} : { verboseDetail }),
   };

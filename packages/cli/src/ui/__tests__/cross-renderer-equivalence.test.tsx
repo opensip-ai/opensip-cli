@@ -13,6 +13,7 @@
 
 import { renderToText, renderToInk, ThemeProvider } from '@opensip-tools/cli-ui';
 import { buildSignalEnvelope } from '@opensip-tools/contracts';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
@@ -62,6 +63,8 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
         { slug: 'b', passed: false, durationMs: 20, error: 'broke' },
       ],
       signals: [],
+      policy: HOST_VERDICT_POLICY_FALLBACK,
+      runFaulted: false,
     }),
   },
   'graph-done': {
@@ -148,6 +151,8 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
           createdAt: '2026-06-04T00:00:00.000Z',
         },
       ],
+      policy: HOST_VERDICT_POLICY_FALLBACK,
+      runFaulted: false,
     }),
   },
 };

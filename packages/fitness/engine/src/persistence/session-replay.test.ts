@@ -8,7 +8,7 @@
  */
 
 import { buildSignalEnvelope } from '@opensip-tools/contracts';
-import { createSignal } from '@opensip-tools/core';
+import { createSignal, HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
 import { buildFitnessSessionPayload } from './session-payload.js';
@@ -39,6 +39,8 @@ function realPayload() {
       { slug: 'a', passed: false, violationCount: 1, durationMs: 10 },
       { slug: 'clean', passed: true, durationMs: 3 },
     ],
+    policy: HOST_VERDICT_POLICY_FALLBACK,
+    runFaulted: false,
     signals: [
       createSignal({
         source: 'a',

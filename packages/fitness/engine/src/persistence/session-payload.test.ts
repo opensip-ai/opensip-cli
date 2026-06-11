@@ -9,7 +9,7 @@
  */
 
 import { buildSignalEnvelope } from '@opensip-tools/contracts';
-import { createSignal } from '@opensip-tools/core';
+import { createSignal, HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
 import { buildFitnessSessionPayload } from './session-payload.js';
@@ -42,6 +42,8 @@ function envelope(
       durationMs: u.durationMs ?? 10,
     })),
     signals,
+    policy: HOST_VERDICT_POLICY_FALLBACK,
+    runFaulted: false,
   });
 }
 

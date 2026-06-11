@@ -30,7 +30,25 @@ import { resolvedFitnessConfig } from './resolved-fitness-config.js';
 import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../../recipes/service-types.js';
 import type { FitnessRecipeResult, RecipeCheckResult } from '../../recipes/types.js';
 import type { SignalersConfig } from '../../signalers/types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal, VerdictPolicy } from '@opensip-tools/core';
+
+/**
+ * Resolve fit's findings policy (ADR-0035). Reserved keys
+ * `failOnErrors`/`failOnWarnings` come from the host-RESOLVED
+ * `scope.toolConfig.fitness` (flag>env>file>defaults, ADR-0023), falling back to
+ * the file-sourced `signalersConfig.fitness` when no scope/toolConfig is present
+ * (a config-less project, or `executeFit` invoked off the CLI dispatch path),
+ * then to the host default `{1, 0}`. This is fit's historical gate resolution,
+ * now expressed as a VerdictPolicy the host verdict consumes — so
+ * `envelope.verdict.passed` is the single exit driver.
+ */
+export function resolveFitVerdictPolicy(signalersConfig: SignalersConfig): VerdictPolicy {
+  const resolved = resolvedFitnessConfig();
+  return {
+    failOnErrors: resolved?.failOnErrors ?? signalersConfig.fitness.failOnErrors ?? 1,
+    failOnWarnings: resolved?.failOnWarnings ?? signalersConfig.fitness.failOnWarnings ?? 0,
+  };
+}
 import type { DataStore } from '@opensip-tools/datastore';
 
 // ---------------------------------------------------------------------------
@@ -64,6 +82,7 @@ function unitError(cr: RecipeCheckResult): string | undefined {
 export function buildFitEnvelope(
   fitnessResult: FitnessRecipeResult,
   recipeName: string | undefined,
+  signalersConfig: SignalersConfig,
 ): SignalEnvelope {
   const { checkResults } = fitnessResult;
 
@@ -92,6 +111,12 @@ export function buildFitEnvelope(
     createdAt: new Date().toISOString(),
     units,
     signals,
+    // ADR-0035: the host-owned verdict reads fit's resolved
+    // failOnErrors/failOnWarnings (scope.toolConfig.fitness, signalersConfig
+    // fallback, then {1,0}). Plugin-load errors occur before any unit exists, so
+    // they ride runFaulted.
+    policy: resolveFitVerdictPolicy(signalersConfig),
+    runFaulted: getPluginLoadErrors().length > 0,
   });
 }
 
@@ -122,31 +147,16 @@ export interface BuildFitDoneArgs {
  */
 export function buildFitDoneResult({
   args,
-  fitnessResult,
   envelope,
-  signalersConfig,
   recipeName,
   warnings,
 }: BuildFitDoneArgs): FitDoneResult {
-  const { summary } = fitnessResult;
-
-  // Determine exit code from the RESOLVED config thresholds (ADR-0023, Phase 4).
-  // The host already merged flag > env > file > defaults into
-  // `scope.toolConfig.fitness`, so reading it here is what makes the declared
-  // env bindings (OPENSIP_FIT_FAIL_ON_ERRORS / OPENSIP_FIT_FAIL_ON_WARNINGS)
-  // actually drive the gate — they were no-ops while this read the re-parsed
-  // `signalersConfig.fitness.*`. Fall back to the file-sourced signalersConfig
-  // (then the historical literal defaults) when no scope/toolConfig is present
-  // (a config-less project, or a unit test not wrapped in runWithScope).
-  // failOnErrors: fail if total errors >= this value (default: 1, 0 = never fail on errors)
-  // failOnWarnings: fail if total warnings >= this value (default: 0 = never fail on warnings)
-  const resolved = resolvedFitnessConfig();
-  const failOnErrors = resolved?.failOnErrors ?? signalersConfig.fitness.failOnErrors ?? 1;
-  const failOnWarnings = resolved?.failOnWarnings ?? signalersConfig.fitness.failOnWarnings ?? 0;
-  const shouldFail =
-    getPluginLoadErrors().length > 0 ||
-    (failOnErrors > 0 && summary.totalErrors >= failOnErrors) ||
-    (failOnWarnings > 0 && summary.totalWarnings >= failOnWarnings);
+  // ADR-0035 Phase 2 bridge: the exit decision is now the single host verdict.
+  // `envelope.verdict.passed` already folds in the policy (failOnErrors/
+  // failOnWarnings resolved from scope.toolConfig.fitness) AND plugin-load faults
+  // (carried on the envelope's `runFaulted`), so `shouldFail` is exactly its
+  // negation. Phase 3 deletes this field and derives the exit in the host.
+  const shouldFail = !envelope.verdict.passed;
 
   const label = args.tags ? `tags: ${args.tags}` : `recipe ${recipeName ?? 'default'}`;
 

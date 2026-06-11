@@ -14,7 +14,12 @@
  * (formatter-purity contract — those arrive on the input).
  */
 import { buildSignalEnvelope, type SignalEnvelope } from '@opensip-tools/contracts';
-import { createSignal, type Signal, type ToolShortId } from '@opensip-tools/core';
+import {
+  createSignal,
+  HOST_VERDICT_POLICY_FALLBACK,
+  type Signal,
+  type ToolShortId,
+} from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
 const RUN = { runId: 'run_shape0001', createdAt: '2026-06-04T00:00:00.000Z' };
@@ -42,6 +47,8 @@ function envelopeFor(tool: ToolShortId, slugA: string, slugB: string): SignalEnv
       { slug: slugB, passed: true, violationCount: 0, durationMs: 4 },
     ],
     signals: [signalFor(slugA, 'high')],
+    policy: HOST_VERDICT_POLICY_FALLBACK,
+    runFaulted: false,
   });
 }
 

@@ -25,7 +25,7 @@
  */
 
 import { buildSignalEnvelope } from '@opensip-tools/contracts';
-import { isErrorSignal } from '@opensip-tools/core';
+import { isErrorSignal, resolveVerdictPolicy } from '@opensip-tools/core';
 
 import { mapEngineSlugToOpenSipRuleId } from '../render/rule-id-mapping.js';
 
@@ -84,6 +84,11 @@ export function buildGraphEnvelope(input: BuildGraphEnvelopeInput): SignalEnvelo
     createdAt: input.createdAt,
     units,
     signals: mapped,
+    // ADR-0035: graph declares no failOn* keys, so it inherits the host fallback
+    // {1,0} — reproducing gate-save's "any error-level finding fails" exactly.
+    // Graph has no pre-unit fault concept, so runFaulted stays false.
+    policy: resolveVerdictPolicy('graph'),
+    runFaulted: false,
     // Honest-approximation marker: surfaced ONLY when the run was fast, so
     // machine consumers see that edges are syntactic/approximate. An exact
     // (or absent) tier carries no marker — parity with the prior CliOutput.

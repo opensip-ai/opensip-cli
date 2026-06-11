@@ -1,56 +1,28 @@
 /**
- * gate-resolved-config — proves the fit gate (`shouldFail`, the exit-code
- * driver) reads its `failOnErrors` / `failOnWarnings` thresholds off the
- * host-RESOLVED config block (`scope.toolConfig.fitness`), NOT the re-parsed
- * `signalersConfig.fitness.*` (ADR-0023, Phase 4).
+ * gate-resolved-config — proves fit's findings policy (ADR-0035) reads its
+ * `failOnErrors` / `failOnWarnings` thresholds off the host-RESOLVED config block
+ * (`scope.toolConfig.fitness`), NOT the re-parsed `signalersConfig.fitness.*`
+ * (ADR-0023, Phase 4), and falls back to `signalersConfig` (then `{1,0}`) when no
+ * toolConfig is present (config-less / off-CLI).
  *
- * The declared env bindings OPENSIP_FIT_FAIL_ON_ERRORS / OPENSIP_FIT_FAIL_ON_WARNINGS
- * are resolved into `scope.toolConfig.fitness` by the host's precedence resolver
- * (flag > env > file > defaults). These tests drive `buildFitDoneResult` with a
- * scope whose `toolConfig.fitness` holds the resolved thresholds and assert
- * `shouldFail` follows the RESOLVED values — overriding what `signalersConfig`
- * (the file source) says. This is the regression guard that env bindings are no
- * longer no-ops at the gate.
+ * Post-ADR-0035, this resolution lives in `resolveFitVerdictPolicy` and feeds
+ * `envelope.verdict.passed` — the single exit driver. The declared env bindings
+ * OPENSIP_FIT_FAIL_ON_ERRORS / OPENSIP_FIT_FAIL_ON_WARNINGS resolve into
+ * `scope.toolConfig.fitness`; these tests pin that they drive the policy
+ * (overriding the file source) and that the fallback chain holds. This is the
+ * regression guard that env bindings are no longer no-ops at the gate.
  */
 
-import { runWithScopeSync } from '@opensip-tools/core';
+import { policyPasses, runWithScopeSync } from '@opensip-tools/core';
 import { makeTestScope } from '@opensip-tools/core/test-utils/with-scope.js';
 import { describe, expect, it } from 'vitest';
 
-import { fitnessTool } from '../../../tool.js';
-import { buildFitDoneResult } from '../result-builders.js';
+import { resolveFitVerdictPolicy } from '../result-builders.js';
 
-import type { FitnessRecipeResult } from '../../../recipes/types.js';
 import type { SignalersConfig } from '../../../signalers/types.js';
-import type { BuildFitDoneArgs } from '../result-builders.js';
-import type { ResolvedToolConfig } from '@opensip-tools/core';
+import type { ResolvedToolConfig, VerdictPolicy } from '@opensip-tools/core';
 
-/** A FitnessRecipeResult with a controllable error/warning summary, no findings detail. */
-function makeFitnessResult(totalErrors: number, totalWarnings: number): FitnessRecipeResult {
-  return {
-    recipeId: 'r',
-    recipeName: 'default',
-    sessionId: 's',
-    success: totalErrors === 0 && totalWarnings === 0,
-    startedAt: new Date(0),
-    completedAt: new Date(1),
-    durationMs: 1,
-    checkResults: [],
-    summary: {
-      totalChecks: 1,
-      passedChecks: totalErrors === 0 ? 1 : 0,
-      failedChecks: totalErrors === 0 ? 0 : 1,
-      skippedChecks: 0,
-      erroredChecks: 0,
-      totalViolations: totalErrors + totalWarnings,
-      totalErrors,
-      totalWarnings,
-      totalIgnored: 0,
-    },
-  };
-}
-
-/** The minimal `signalersConfig` shape `buildFitDoneResult` reads as the FALLBACK source. */
+/** The minimal `signalersConfig` shape `resolveFitVerdictPolicy` reads as the FALLBACK source. */
 function makeSignalersConfig(failOnErrors: number, failOnWarnings: number): SignalersConfig {
   return {
     fitness: { failOnErrors, failOnWarnings, disabledChecks: [] },
@@ -58,74 +30,40 @@ function makeSignalersConfig(failOnErrors: number, failOnWarnings: number): Sign
   } as unknown as SignalersConfig;
 }
 
-/** Build the buildFitDoneResult args bundle. */
-function makeArgs(
-  fitnessResult: FitnessRecipeResult,
-  signalersConfig: SignalersConfig,
-): BuildFitDoneArgs {
-  return {
-    args: { cwd: '/work/project' } as BuildFitDoneArgs['args'],
-    fitnessResult,
-    // buildFitDoneResult only reads envelope through buildFitVerboseDetail (no
-    // verbose flag here) — a minimal stub suffices for the gate logic.
-    envelope: {
-      tool: 'fit',
-      runId: '',
-      createdAt: '1970-01-01T00:00:00.000Z',
-      units: [],
-      signals: [],
-      verdict: { passed: true, score: 100 },
-      summary: {},
-    } as unknown as BuildFitDoneArgs['envelope'],
-    signalersConfig,
-    recipeName: 'default',
-  };
-}
-
-/** Run `buildFitDoneResult` inside a scope carrying the given resolved toolConfig. */
-function gateWithResolvedConfig(
-  args: BuildFitDoneArgs,
+/** Resolve fit's policy inside a scope carrying the given resolved toolConfig. */
+function policyWith(
+  signalers: SignalersConfig,
   toolConfig: ResolvedToolConfig | undefined,
-): boolean {
+): VerdictPolicy {
   const scope = makeTestScope();
-  // Install fitness's subscope (checks/recipes/load) — buildFitDoneResult reads
-  // getPluginLoadErrors() off scope.fitness.load, so it must be present.
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
   if (toolConfig !== undefined) Object.assign(scope, { toolConfig });
-  return runWithScopeSync(scope, () => buildFitDoneResult(args).shouldFail === true);
+  return runWithScopeSync(scope, () => resolveFitVerdictPolicy(signalers));
 }
 
-describe('fit gate reads thresholds off scope.toolConfig.fitness (ADR-0023, Phase 4)', () => {
-  it('OPENSIP_FIT_FAIL_ON_ERRORS=0 (resolved) makes an error-emitting run NOT fail, even though the file says failOnErrors:1', () => {
+describe('fit findings policy reads thresholds off scope.toolConfig.fitness (ADR-0023 / ADR-0035)', () => {
+  it('OPENSIP_FIT_FAIL_ON_ERRORS=0 (resolved) → an error-emitting run does NOT fail, even though the file says failOnErrors:1', () => {
     // File source says fail-on-errors:1 — the OLD behaviour would fail here.
-    const signalers = makeSignalersConfig(1, 0);
-    const fitnessResult = makeFitnessResult(/* errors */ 3, /* warnings */ 0);
-
-    // Resolved config (env OPENSIP_FIT_FAIL_ON_ERRORS=0 folded in) → 0 = never fail on errors.
-    const resolved: ResolvedToolConfig = { fitness: { failOnErrors: 0, failOnWarnings: 0 } };
-
-    const shouldFail = gateWithResolvedConfig(makeArgs(fitnessResult, signalers), resolved);
-    expect(shouldFail).toBe(false);
+    const policy = policyWith(makeSignalersConfig(1, 0), {
+      fitness: { failOnErrors: 0, failOnWarnings: 0 },
+    });
+    expect(policy.failOnErrors).toBe(0);
+    // 0 = never fail on errors → a 3-error run passes.
+    expect(policyPasses({ errors: 3, warnings: 0 }, policy)).toBe(true);
   });
 
-  it('OPENSIP_FIT_FAIL_ON_WARNINGS=1 (resolved) flips a warning-only run to FAIL, even though the file says failOnWarnings:0', () => {
+  it('OPENSIP_FIT_FAIL_ON_WARNINGS=1 (resolved) → a warning-only run FAILs, even though the file says failOnWarnings:0', () => {
     // File source says fail-on-warnings:0 — the OLD behaviour would pass here.
-    const signalers = makeSignalersConfig(1, 0);
-    const fitnessResult = makeFitnessResult(/* errors */ 0, /* warnings */ 2);
-
-    // Resolved config (env OPENSIP_FIT_FAIL_ON_WARNINGS=1 folded in) → fail on any warning.
-    const resolved: ResolvedToolConfig = { fitness: { failOnErrors: 1, failOnWarnings: 1 } };
-
-    const shouldFail = gateWithResolvedConfig(makeArgs(fitnessResult, signalers), resolved);
-    expect(shouldFail).toBe(true);
+    const policy = policyWith(makeSignalersConfig(1, 0), {
+      fitness: { failOnErrors: 1, failOnWarnings: 1 },
+    });
+    expect(policy.failOnWarnings).toBe(1);
+    expect(policyPasses({ errors: 0, warnings: 2 }, policy)).toBe(false);
   });
 
   it('falls back to signalersConfig when the scope carries no toolConfig (config-less / off-CLI)', () => {
-    // No resolved block on the scope → the file source drives the gate.
-    const signalers = makeSignalersConfig(/* failOnErrors */ 1, /* failOnWarnings */ 0);
-    const fitnessResult = makeFitnessResult(/* errors */ 2, /* warnings */ 0);
-
-    const shouldFail = gateWithResolvedConfig(makeArgs(fitnessResult, signalers), undefined);
-    expect(shouldFail).toBe(true);
+    // No resolved block on the scope → the file source drives the policy.
+    const policy = policyWith(makeSignalersConfig(1, 0), undefined);
+    expect(policy.failOnErrors).toBe(1);
+    expect(policyPasses({ errors: 2, warnings: 0 }, policy)).toBe(false);
   });
 });

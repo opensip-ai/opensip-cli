@@ -11,7 +11,7 @@
  */
 
 import { buildSignalEnvelope, type SignalEnvelope } from '@opensip-tools/contracts';
-import { createSignal, type Signal } from '@opensip-tools/core';
+import { createSignal, HOST_VERDICT_POLICY_FALLBACK, type Signal } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -64,6 +64,8 @@ function makeOutput(findings: Signal[] = [makeFinding()]): SignalEnvelope {
     createdAt: '2026-05-03T00:00:00.000Z',
     units: [{ slug: 'no-console-log', passed: false, durationMs: 50 }],
     signals: findings,
+    policy: HOST_VERDICT_POLICY_FALLBACK,
+    runFaulted: false,
   });
 }
 
@@ -91,6 +93,8 @@ function emptyOutput(): SignalEnvelope {
     createdAt: '2026-05-03T00:00:00.000Z',
     units: [],
     signals: [],
+    policy: HOST_VERDICT_POLICY_FALLBACK,
+    runFaulted: false,
   });
 }
 

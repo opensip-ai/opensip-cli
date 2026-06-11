@@ -10,6 +10,7 @@ import {
   type CommandOutcome,
   type CommandResult,
 } from '@opensip-tools/contracts';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import { renderOutcome } from '../commands/render-outcome.js';
@@ -20,6 +21,8 @@ const ENVELOPE = buildSignalEnvelope({
   createdAt: '2026-06-07T00:00:00.000Z',
   units: [{ slug: 'a', passed: true, durationMs: 1 }],
   signals: [],
+  policy: HOST_VERDICT_POLICY_FALLBACK,
+  runFaulted: false,
 });
 
 let stdout: string[];

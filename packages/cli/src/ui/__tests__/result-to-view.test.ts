@@ -1,5 +1,6 @@
 import { renderToText } from '@opensip-tools/cli-ui';
 import { buildSignalEnvelope } from '@opensip-tools/contracts';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
 import { describe, it, expect } from 'vitest';
 
 import { resultToView } from '../result-to-view.js';
@@ -82,6 +83,8 @@ describe('resultToView', () => {
           }),
           fitSignal({ source: 'naming', severity: 'medium', message: 'bad name' }),
         ],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
       }),
     });
     // Table: FAIL sorts above PASS, header + the fitness columns present.
@@ -114,6 +117,8 @@ describe('resultToView', () => {
             line: 3,
           }),
         ],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
       }),
       verboseDetail: {
         kind: 'findings',
@@ -146,6 +151,8 @@ describe('resultToView', () => {
         createdAt: '2026-06-04T00:00:00.000Z',
         units: [{ slug: 'naming', passed: true, durationMs: 3 }],
         signals: [],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
       }),
     });
     expect(out).toContain('Use --verbose for detailed results');
@@ -175,6 +182,8 @@ describe('resultToView', () => {
         signals: [
           fitSignal({ source: 'naming', severity: 'medium', message: 'w0', filePath: 'b.ts' }),
         ],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
       }),
     });
     expect(out).toContain('ERROR'); // errored unit status
@@ -253,6 +262,8 @@ describe('resultToView', () => {
         { slug: 'b', passed: false, durationMs: 20 },
       ],
       signals: [bSignal],
+      policy: HOST_VERDICT_POLICY_FALLBACK,
+      runFaulted: false,
     }),
   };
 
@@ -279,6 +290,8 @@ describe('resultToView', () => {
         createdAt: '2026-06-04T00:00:00.000Z',
         units: [],
         signals: [],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
       }),
     });
     expect(out).toContain('0 Passed, 0 Failed (0 Errors, 0 Warnings)');

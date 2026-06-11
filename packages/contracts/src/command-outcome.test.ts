@@ -7,6 +7,7 @@
  * payload, only `errors` (+ diagnostics). All three JSON round-trip.
  */
 
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
 import { describe, it, expect } from 'vitest';
 
 import { buildSignalEnvelope } from './signal-envelope.js';
@@ -24,6 +25,8 @@ describe('CommandOutcome', () => {
       createdAt: '2026-06-07T00:00:00.000Z',
       units: [{ slug: 'a', passed: true, durationMs: 1 }],
       signals: [],
+      policy: HOST_VERDICT_POLICY_FALLBACK,
+      runFaulted: false,
     });
     const outcome: CommandOutcome = {
       kind: 'fit.run',

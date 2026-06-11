@@ -170,7 +170,7 @@ export async function executeFit(
   // (`--json`), and delivers (cloud + `--report-to`). Cloud egress no longer
   // happens here: the root's `deliverSignals` owns it (engines dropped their
   // `@opensip-tools/output` dependency in Phase 6).
-  const envelope = buildFitEnvelope(fitnessResult, recipeName);
+  const envelope = buildFitEnvelope(fitnessResult, recipeName, signalersConfig);
 
   // Persistence is the CALLER's job (ADR-0028 — worker-safe engine). `executeFit`
   // returns `durationMs` so the caller can `persistFitSession(datastore, args,

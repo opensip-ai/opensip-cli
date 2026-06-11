@@ -8,7 +8,7 @@
  */
 
 import { buildSignalEnvelope } from '@opensip-tools/contracts';
-import { createSignal } from '@opensip-tools/core';
+import { createSignal, HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
 import { buildSimulationSessionPayload } from './session-payload.js';
@@ -35,6 +35,8 @@ function realPayload() {
     tool: 'sim',
     runId: 'RUN_test',
     createdAt: '2026-06-08T00:00:00.000Z',
+    policy: HOST_VERDICT_POLICY_FALLBACK,
+    runFaulted: false,
     units: [
       { slug: 'latency', passed: false, violationCount: 1, durationMs: 10 },
       { slug: 'clean', passed: true, durationMs: 2 },

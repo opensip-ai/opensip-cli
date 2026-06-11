@@ -11,6 +11,7 @@
  */
 
 import { EXIT_CODES, buildSignalEnvelope } from '@opensip-tools/contracts';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { runJsonMode, runLiveMode } from '../fit-modes.js';
@@ -77,6 +78,8 @@ function envelope(): SignalEnvelope {
     createdAt: '2026-06-04T00:00:00.000Z',
     units: [],
     signals: [],
+    policy: HOST_VERDICT_POLICY_FALLBACK,
+    runFaulted: false,
   });
 }
 

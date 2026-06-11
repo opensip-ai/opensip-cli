@@ -1,4 +1,9 @@
-import { createSignal, type Signal, type SignalSeverity } from '@opensip-tools/core';
+import {
+  createSignal,
+  HOST_VERDICT_POLICY_FALLBACK,
+  type Signal,
+  type SignalSeverity,
+} from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
 import { buildSignalEnvelope, type UnitResult } from './signal-envelope.js';
@@ -20,6 +25,11 @@ const BASE = {
   tool: 'fit' as const,
   runId: 'run-1',
   createdAt: '2026-01-01T00:00:00.000Z',
+  // ADR-0035: verdict is policy-driven. The {1,0} fallback (fail on any error,
+  // warnings informational) reproduces the pre-ADR `errors === 0` behavior these
+  // baseline cases assert. The full policy matrix lives in verdict-envelope.test.ts.
+  policy: HOST_VERDICT_POLICY_FALLBACK,
+  runFaulted: false,
 };
 
 describe('buildSignalEnvelope', () => {
