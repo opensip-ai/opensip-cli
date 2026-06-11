@@ -14,6 +14,14 @@ export { createSignal, isErrorSeverity, isErrorSignal } from './types/signal.js'
 // (so tools stamp source/ruleId/severity instead of retyping them).
 export { SeverityPolicy } from './lib/severity-policy.js';
 export type { AuthorSeverity } from './lib/severity-policy.js';
+// Host-owned findings verdict policy (ADR-0035): the reserved
+// failOnErrors/failOnWarnings gate, its pure predicate, and the per-tool resolver.
+export {
+  HOST_VERDICT_POLICY_FALLBACK,
+  policyPasses,
+  resolveVerdictPolicy,
+} from './lib/verdict-policy.js';
+export type { VerdictPolicy } from './lib/verdict-policy.js';
 export { createSignalFromViolation } from './signals/create-signal-from-violation.js';
 export type { ViolationInput } from './signals/create-signal-from-violation.js';
 // Cloud signal egress envelope (ADR-0008)
