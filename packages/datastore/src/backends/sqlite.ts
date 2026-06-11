@@ -3,9 +3,9 @@ import { dirname } from 'node:path';
 
 import { buildSqliteDataStore } from './shared.js';
 
-import type { DrizzleDataStore } from '../data-store.js';
+import type { SqliteBackendHandle } from '../data-store.js';
 
-export function openSqliteBackend(opts: { path: string }): DrizzleDataStore {
+export function openSqliteBackend(opts: { path: string }): SqliteBackendHandle {
   mkdirSync(dirname(opts.path), { recursive: true });
   return buildSqliteDataStore(opts.path);
 }

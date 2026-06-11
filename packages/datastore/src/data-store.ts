@@ -24,6 +24,21 @@ export interface DrizzleDataStore<
   readonly db: DrizzleHandle<TSchema>;
 }
 
+/**
+ * A SQLite-backed {@link DrizzleDataStore} that also exposes its built-in
+ * `PRAGMA user_version` schema-stamp. Internal to the datastore package — the
+ * factory uses it to read/write the version guard before and after migrating.
+ * General consumers stay on {@link DataStore} / {@link DrizzleDataStore}.
+ */
+export interface SqliteBackendHandle<
+  TSchema extends Record<string, unknown> = Record<string, unknown>,
+> extends DrizzleDataStore<TSchema> {
+  /** Read SQLite's `PRAGMA user_version` (0 on a fresh or pre-guard database). */
+  readUserVersion(): number;
+  /** Write SQLite's `PRAGMA user_version` schema-stamp. */
+  writeUserVersion(version: number): void;
+}
+
 export function isDrizzleDataStore(value: unknown): value is DrizzleDataStore {
   return (
     typeof value === 'object' &&
@@ -68,4 +83,53 @@ export class DataStoreMigrationError extends Error {
     this.name = 'DataStoreMigrationError';
     this.migrationFile = options.migrationFile;
   }
+}
+
+/** Inputs describing an incompatible (future) on-disk database. */
+export interface DataStoreVersionMismatch {
+  readonly path: string;
+  /** The `user_version` stamp found on disk. */
+  readonly dbVersion: number;
+  /** The highest schema version this CLI supports. */
+  readonly supportedVersion: number;
+}
+
+/**
+ * Thrown when the on-disk SQLite cache was written by a NEWER opensip-tools than
+ * the one now opening it (`dbVersion > supportedVersion`). Drizzle's migrator
+ * cannot detect this direction — the older CLI's migrations are all a prefix of
+ * what was applied, so `migrate()` would no-op and later queries would hit
+ * missing/renamed columns with a confusing error. This guard fails fast instead,
+ * with an actionable message symmetric to the config-schema "upgrade your CLI"
+ * bailout. The `.runtime/` cache is disposable, so deleting it is offered as the
+ * fallback for users who intend to stay on the older CLI.
+ */
+export class DataStoreVersionError extends Error {
+  readonly path: string;
+  readonly dbVersion: number;
+  readonly supportedVersion: number;
+
+  constructor(mismatch: DataStoreVersionMismatch) {
+    super(formatVersionErrorMessage(mismatch));
+    this.name = 'DataStoreVersionError';
+    this.path = mismatch.path;
+    this.dbVersion = mismatch.dbVersion;
+    this.supportedVersion = mismatch.supportedVersion;
+  }
+}
+
+function formatVersionErrorMessage(mismatch: DataStoreVersionMismatch): string {
+  return [
+    `This project's opensip-tools cache was written by a newer version of opensip-tools than this CLI supports.`,
+    ``,
+    `  Cache:          ${mismatch.path}`,
+    `  Cache schema:   v${mismatch.dbVersion}`,
+    `  CLI supports:   v${mismatch.supportedVersion}`,
+    ``,
+    `  Update your CLI to continue:`,
+    `    curl -fsSL https://opensip.ai/cli/install.sh | bash`,
+    ``,
+    `  (Or delete ${mismatch.path} to discard the local cache and continue with`,
+    `  this older CLI — session history will be lost; the cache rebuilds on next run.)`,
+  ].join('\n');
 }

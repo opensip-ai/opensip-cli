@@ -4,18 +4,16 @@
  * These checks intentionally encode opensip-tools-specific workflow names,
  * command files, config-loader bridge files, and recipe module layout.
  */
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 
-import { defineCheck } from "@opensip-tools/fitness";
+import { defineCheck } from '@opensip-tools/fitness';
 
 const ROOT = process.cwd();
 
 function relPath(filePath) {
-  const raw = path.isAbsolute(filePath)
-    ? path.relative(ROOT, filePath)
-    : filePath;
-  return raw.replaceAll("\\", "/");
+  const raw = path.isAbsolute(filePath) ? path.relative(ROOT, filePath) : filePath;
+  return raw.replaceAll('\\', '/');
 }
 
 function absPath(relativePath) {
@@ -35,7 +33,7 @@ function isTestOrFixture(filePath) {
 function lineOf(content, index) {
   let line = 1;
   for (let i = 0; i < index && i < content.length; i++) {
-    if (content[i] === "\n") line++;
+    if (content[i] === '\n') line++;
   }
   return line;
 }
@@ -46,12 +44,12 @@ function lineOfNeedle(content, needle) {
 }
 
 function violation(filePath, line, type, message, suggestion) {
-  return { filePath, line, type, message, severity: "error", suggestion };
+  return { filePath, line, type, message, severity: 'error', suggestion };
 }
 
 function readWorkspaceFile(relativePath) {
   const fullPath = absPath(relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, "utf8") : undefined;
+  return existsSync(fullPath) ? readFileSync(fullPath, 'utf8') : undefined;
 }
 
 async function readAccessorFile(files, relativePath) {
@@ -66,18 +64,18 @@ async function readAccessorFile(files, relativePath) {
 // ---------------------------------------------------------------------------
 
 const RELEASE_GATE_COMMANDS = [
-  { release: "pnpm lint", ci: ["pnpm lint"] },
-  { release: "pnpm test:coverage", ci: ["pnpm test:coverage"] },
-  { release: "pnpm fit:ci", ci: ["pnpm fit:ci"] },
+  { release: 'pnpm lint', ci: ['pnpm lint'] },
+  { release: 'pnpm test:coverage', ci: ['pnpm test:coverage'] },
+  { release: 'pnpm fit:ci', ci: ['pnpm fit:ci'] },
   {
-    release: "pnpm graph:ci",
-    ci: ["pnpm graph:ci", "node packages/cli/dist/index.js graph --gate-save"],
+    release: 'pnpm graph:ci',
+    ci: ['pnpm graph:ci', 'node packages/cli/dist/index.js graph --gate-save'],
   },
 ];
 
 function analyzeReleaseGateParity() {
-  const releaseRel = ".github/workflows/release.yml";
-  const ciRel = ".github/workflows/ci.yml";
+  const releaseRel = '.github/workflows/release.yml';
+  const ciRel = '.github/workflows/ci.yml';
   const release = readWorkspaceFile(releaseRel);
   const ci = readWorkspaceFile(ciRel);
   const releasePath = absPath(releaseRel);
@@ -87,14 +85,14 @@ function analyzeReleaseGateParity() {
       violation(
         releasePath,
         1,
-        "release-workflow-missing",
-        "Release workflow is missing; ADR-0017 requires a release lane gate.",
-        "Restore .github/workflows/release.yml with the correctness gates before pack/publish.",
+        'release-workflow-missing',
+        'Release workflow is missing; ADR-0017 requires a release lane gate.',
+        'Restore .github/workflows/release.yml with the correctness gates before pack/publish.',
       ),
     ];
   }
 
-  const packIndex = release.indexOf("Pack all workspace packages");
+  const packIndex = release.indexOf('Pack all workspace packages');
   const beforePack = packIndex < 0 ? release.length : packIndex;
   for (const command of RELEASE_GATE_COMMANDS) {
     const releaseIndex = release.indexOf(`run: ${command.release}`);
@@ -103,23 +101,20 @@ function analyzeReleaseGateParity() {
         violation(
           releasePath,
           packIndex < 0 ? 1 : lineOf(release, packIndex),
-          "release-gate-missing-before-pack",
+          'release-gate-missing-before-pack',
           `Release workflow must run '${command.release}' before packing packages (ADR-0017).`,
-          "Mirror the CI correctness gate before pack/publish so immutable npm artifacts cannot bypass PR-lane checks.",
+          'Mirror the CI correctness gate before pack/publish so immutable npm artifacts cannot bypass PR-lane checks.',
         ),
       );
     }
-    if (
-      ci !== undefined &&
-      !command.ci.some((ciCommand) => ci.includes(`run: ${ciCommand}`))
-    ) {
+    if (ci !== undefined && !command.ci.some((ciCommand) => ci.includes(`run: ${ciCommand}`))) {
       violations.push(
         violation(
           absPath(ciRel),
           1,
-          "ci-release-gate-drift",
+          'ci-release-gate-drift',
           `CI workflow no longer contains a counterpart for '${command.release}', so release parity cannot be established (ADR-0017).`,
-          "Keep the PR-lane and release-lane correctness gates aligned, or update this local check with the new canonical command.",
+          'Keep the PR-lane and release-lane correctness gates aligned, or update this local check with the new canonical command.',
         ),
       );
     }
@@ -135,20 +130,20 @@ const YAML_READER_RE =
   /\breadYamlFile(?:OrThrow)?\s*\(|^\s*import\s+\{[^}]*\bparse\s+as\s+parseYaml\b[^}]*\}\s+from\s+['"]yaml['"]|^\s*import\s+\{[^}]*\bparseDocument\b[^}]*\}\s+from\s+['"]yaml['"]/m;
 
 const CONFIG_READER_ALLOWLIST = new Set([
-  "packages/config/src/document/cli-config.ts",
-  "packages/config/src/document/global-config.ts",
-  "packages/core/src/lib/config-version.ts",
-  "packages/core/src/lib/yaml.ts",
-  "packages/core/src/plugins/discover.ts",
-  "packages/cli/src/bootstrap/config-and-capabilities.ts",
-  "packages/cli/src/bootstrap/load-tool-capabilities.ts",
-  "packages/cli/src/commands/plugin/config-edit.ts",
-  "packages/fitness/engine/src/plugins/check-package-discovery.ts",
-  "packages/fitness/engine/src/signalers/loader.ts",
-  "packages/fitness/engine/src/targets/loader.ts",
-  "packages/graph/engine/src/cli/graph-config.ts",
-  "packages/simulation/engine/src/cli/sim-config.ts",
-  "packages/simulation/engine/src/plugins/scenario-package-discovery.ts",
+  'packages/config/src/document/cli-config.ts',
+  'packages/config/src/document/global-config.ts',
+  'packages/core/src/lib/config-version.ts',
+  'packages/core/src/lib/yaml.ts',
+  'packages/core/src/plugins/discover.ts',
+  'packages/cli/src/bootstrap/config-and-capabilities.ts',
+  'packages/cli/src/bootstrap/load-tool-capabilities.ts',
+  'packages/cli/src/commands/plugin/config-edit.ts',
+  'packages/fitness/engine/src/plugins/check-package-discovery.ts',
+  'packages/fitness/engine/src/signalers/loader.ts',
+  'packages/fitness/engine/src/targets/loader.ts',
+  'packages/graph/engine/src/cli/graph-config.ts',
+  'packages/simulation/engine/src/cli/sim-config.ts',
+  'packages/simulation/engine/src/plugins/scenario-package-discovery.ts',
 ]);
 
 function analyzeOneConfigDocumentRatchet(content, filePath) {
@@ -159,10 +154,10 @@ function analyzeOneConfigDocumentRatchet(content, filePath) {
   return [
     violation(
       filePath,
-      lineOfNeedle(content, "readYamlFile"),
-      "config-yaml-reader-outside-allowlist",
-      "New opensip-tools.config.yml readers must not appear outside the sanctioned config/loading seams (ADR-0023).",
-      "Route config through the composed document loader or add a narrow allowlist entry here with the ADR-specific bridge justification.",
+      lineOfNeedle(content, 'readYamlFile'),
+      'config-yaml-reader-outside-allowlist',
+      'New opensip-tools.config.yml readers must not appear outside the sanctioned config/loading seams (ADR-0023).',
+      'Route config through the composed document loader or add a narrow allowlist entry here with the ADR-specific bridge justification.',
     ),
   ];
 }
@@ -172,9 +167,9 @@ function analyzeOneConfigDocumentRatchet(content, filePath) {
 // ---------------------------------------------------------------------------
 
 const PRIMARY_COMMAND_SPEC_FILES = {
-  fit: "packages/fitness/engine/src/cli/fit/fit-command-spec.ts",
-  graph: "packages/graph/engine/src/cli/graph/graph-command-spec.ts",
-  simulation: "packages/simulation/engine/src/tool.ts",
+  fit: 'packages/fitness/engine/src/cli/fit/fit-command-spec.ts',
+  graph: 'packages/graph/engine/src/cli/graph/graph-command-spec.ts',
+  simulation: 'packages/simulation/engine/src/tool.ts',
 };
 
 function extractStringArray(source, bindingRegex) {
@@ -188,10 +183,7 @@ function extractStringArray(source, bindingRegex) {
 }
 
 function extractMandatoryCommonFlags(content) {
-  return extractStringArray(
-    content,
-    /MANDATORY_COMMON_FLAGS[^=]*=\s*\[([\s\S]*?)\]\s*as\s+const/,
-  );
+  return extractStringArray(content, /MANDATORY_COMMON_FLAGS[^=]*=\s*\[([\s\S]*?)\]\s*as\s+const/);
 }
 
 function extractCommonFlags(content) {
@@ -199,10 +191,7 @@ function extractCommonFlags(content) {
 }
 
 async function analyzeCrossToolFlagParity(files) {
-  const contract = await readAccessorFile(
-    files,
-    "packages/contracts/src/cli-flags.ts",
-  );
+  const contract = await readAccessorFile(files, 'packages/contracts/src/cli-flags.ts');
   if (contract === undefined) return [];
   const mandatory = extractMandatoryCommonFlags(contract[1]);
   if (mandatory === undefined || mandatory.length === 0) {
@@ -210,26 +199,24 @@ async function analyzeCrossToolFlagParity(files) {
       violation(
         contract[0],
         1,
-        "common-flags-unreadable",
-        "Could not read MANDATORY_COMMON_FLAGS from the common flag registry (ADR-0021).",
-        "Keep MANDATORY_COMMON_FLAGS as the single literal array the tools can be checked against.",
+        'common-flags-unreadable',
+        'Could not read MANDATORY_COMMON_FLAGS from the common flag registry (ADR-0021).',
+        'Keep MANDATORY_COMMON_FLAGS as the single literal array the tools can be checked against.',
       ),
     ];
   }
 
   const violations = [];
-  for (const [tool, relativePath] of Object.entries(
-    PRIMARY_COMMAND_SPEC_FILES,
-  )) {
+  for (const [tool, relativePath] of Object.entries(PRIMARY_COMMAND_SPEC_FILES)) {
     const file = await readAccessorFile(files, relativePath);
     if (file === undefined) {
       violations.push(
         violation(
           absPath(relativePath),
           1,
-          "primary-command-spec-missing",
+          'primary-command-spec-missing',
           `${tool} primary command spec could not be read for ADR-0021 flag parity.`,
-          "Keep each primary run command in the expected tool-owned spec file, or update this dogfood check with the new location.",
+          'Keep each primary run command in the expected tool-owned spec file, or update this dogfood check with the new location.',
         ),
       );
       continue;
@@ -240,9 +227,9 @@ async function analyzeCrossToolFlagParity(files) {
         violation(
           file[0],
           1,
-          "common-flags-missing",
+          'common-flags-missing',
           `${tool} primary command does not declare a commonFlags array (ADR-0021).`,
-          "Declare commonFlags from the registry on the primary run command spec.",
+          'Declare commonFlags from the registry on the primary run command spec.',
         ),
       );
       continue;
@@ -253,10 +240,10 @@ async function analyzeCrossToolFlagParity(files) {
         violations.push(
           violation(
             file[0],
-            lineOfNeedle(file[1], "commonFlags"),
-            "mandatory-common-flag-missing",
+            lineOfNeedle(file[1], 'commonFlags'),
+            'mandatory-common-flag-missing',
             `${tool} primary command is missing mandatory common flag '${flag}' (ADR-0021).`,
-            "Add the flag key to the command spec commonFlags array; flag spelling and help text stay in contracts/src/cli-flags.ts.",
+            'Add the flag key to the command spec commonFlags array; flag spelling and help text stay in contracts/src/cli-flags.ts.',
           ),
         );
       }
@@ -272,20 +259,20 @@ async function analyzeCrossToolFlagParity(files) {
 async function analyzeRecipeSemantics(files) {
   const violations = [];
   const schedulerFiles = [
-    "packages/fitness/engine/src/recipes/parallel-execution.ts",
-    "packages/fitness/engine/src/recipes/sequential-execution.ts",
-    "packages/simulation/engine/src/recipes/service.ts",
+    'packages/fitness/engine/src/recipes/parallel-execution.ts',
+    'packages/fitness/engine/src/recipes/sequential-execution.ts',
+    'packages/simulation/engine/src/recipes/service.ts',
   ];
   for (const relativePath of schedulerFiles) {
     const file = await readAccessorFile(files, relativePath);
-    if (file === undefined || !file[1].includes("scheduleUnits")) {
+    if (file === undefined || !file[1].includes('scheduleUnits')) {
       violations.push(
         violation(
           absPath(relativePath),
           1,
-          "recipe-scheduler-not-shared",
+          'recipe-scheduler-not-shared',
           `${relativePath} must route execution scheduling through core scheduleUnits (ADR-0026).`,
-          "Keep shared recipe execution semantics in @opensip-tools/core and tool-specific setup in the tool package.",
+          'Keep shared recipe execution semantics in @opensip-tools/core and tool-specific setup in the tool package.',
         ),
       );
     }
@@ -305,9 +292,9 @@ function analyzeGraphRecipeSelectionOnly(content, filePath) {
         violation(
           filePath,
           lineOf(content, match.index ?? 0),
-          "graph-recipe-execution-block",
-          "Graph recipes must stay selection-only; graph execution is tool-owned (ADR-0026).",
-          "Keep execution/reporting blocks out of GraphRecipe. Select rules with the recipe; run/evaluate semantics stay in the graph engine.",
+          'graph-recipe-execution-block',
+          'Graph recipes must stay selection-only; graph execution is tool-owned (ADR-0026).',
+          'Keep execution/reporting blocks out of GraphRecipe. Select rules with the recipe; run/evaluate semantics stay in the graph engine.',
         ),
       );
     }
@@ -317,60 +304,60 @@ function analyzeGraphRecipeSelectionOnly(content, filePath) {
 
 export const checks = [
   defineCheck({
-    id: "490678ef-729f-423d-bffa-5b9acca74d20",
-    slug: "dogfood-release-gate-parity",
+    id: '490678ef-729f-423d-bffa-5b9acca74d20',
+    slug: 'dogfood-release-gate-parity',
     description:
-      "release workflow must run the PR-lane correctness gates before pack/publish (ADR-0017/0020)",
-    scope: { languages: ["typescript"], concerns: ["config"] },
-    tags: ["architecture", "release", "dogfood"],
-    contentFilter: "raw",
+      'release workflow must run the PR-lane correctness gates before pack/publish (ADR-0017/0020)',
+    scope: { languages: ['typescript'], concerns: ['config'] },
+    tags: ['architecture', 'release', 'dogfood'],
+    contentFilter: 'raw',
     analyzeAll: async () => analyzeReleaseGateParity(),
   }),
   defineCheck({
-    id: "f41b930f-f9d4-46a4-8629-e7e65faa4d72",
-    slug: "dogfood-one-config-document-ratchet",
+    id: 'f41b930f-f9d4-46a4-8629-e7e65faa4d72',
+    slug: 'dogfood-one-config-document-ratchet',
     description:
-      "new YAML config readers must stay behind the sanctioned config/loading seams (ADR-0023)",
+      'new YAML config readers must stay behind the sanctioned config/loading seams (ADR-0023)',
     scope: {
-      languages: ["typescript"],
-      concerns: ["backend", "cli", "config"],
+      languages: ['typescript'],
+      concerns: ['backend', 'cli', 'config'],
     },
-    tags: ["architecture", "dogfood"],
-    fileTypes: ["ts"],
-    contentFilter: "raw",
+    tags: ['architecture', 'dogfood'],
+    fileTypes: ['ts'],
+    contentFilter: 'raw',
     analyze: analyzeOneConfigDocumentRatchet,
   }),
   defineCheck({
-    id: "3481575e-91e9-49dc-91a5-77c147e5f16d",
-    slug: "dogfood-cross-tool-flag-parity",
+    id: '3481575e-91e9-49dc-91a5-77c147e5f16d',
+    slug: 'dogfood-cross-tool-flag-parity',
     description:
-      "primary fit/graph/sim run commands must include every mandatory common flag from the shared registry (ADR-0021)",
-    scope: { languages: ["typescript"], concerns: ["backend", "cli"] },
-    tags: ["architecture", "dogfood"],
-    fileTypes: ["ts"],
-    contentFilter: "raw",
+      'primary fit/graph/sim run commands must include every mandatory common flag from the shared registry (ADR-0021)',
+    scope: { languages: ['typescript'], concerns: ['backend', 'cli'] },
+    tags: ['architecture', 'dogfood'],
+    fileTypes: ['ts'],
+    contentFilter: 'raw',
     analyzeAll: analyzeCrossToolFlagParity,
   }),
   defineCheck({
-    id: "af337d9c-5853-43da-8715-1b77d0ba4aca",
-    slug: "dogfood-graph-recipes-selection-only",
+    id: 'af337d9c-5853-43da-8715-1b77d0ba4aca',
+    slug: 'dogfood-graph-recipes-selection-only',
     description:
-      "graph recipes select rules only; shared execution semantics stay in scheduleUnits and tool-owned runners (ADR-0026)",
-    scope: { languages: ["typescript"], concerns: ["backend"] },
-    tags: ["architecture", "dogfood"],
-    fileTypes: ["ts"],
-    contentFilter: "strip-strings-and-comments",
+      'graph recipes select rules only; shared execution semantics stay in scheduleUnits and tool-owned runners (ADR-0026)',
+    scope: { languages: ['typescript'], concerns: ['backend'] },
+    tags: ['architecture', 'dogfood'],
+    fileTypes: ['ts'],
+    contentFilter: 'strip-strings-and-comments',
     analyze: analyzeGraphRecipeSelectionOnly,
   }),
   defineCheck({
-    id: "1f068b65-3b33-40b8-b366-72c7f586414a",
-    slug: "dogfood-shared-recipe-scheduler",
+    id: '1f068b65-3b33-40b8-b366-72c7f586414a',
+    slug: 'dogfood-shared-recipe-scheduler',
     description:
-      "fitness and simulation recipe execution must route through the shared scheduleUnits substrate (ADR-0026)",
-    scope: { languages: ["typescript"], concerns: ["backend"] },
-    tags: ["architecture", "dogfood"],
-    fileTypes: ["ts"],
-    contentFilter: "raw",
+      'fitness and simulation recipe execution must route through the shared scheduleUnits substrate (ADR-0026)',
+    scope: { languages: ['typescript'], concerns: ['backend'] },
+    tags: ['architecture', 'dogfood'],
+    fileTypes: ['ts'],
+    contentFilter: 'raw',
     analyzeAll: analyzeRecipeSemantics,
   }),
 ];

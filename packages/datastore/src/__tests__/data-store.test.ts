@@ -37,7 +37,9 @@ describe('isDrizzleDataStore', () => {
   });
 
   it('rejects when `db` is absent', () => {
-    expect(isDrizzleDataStore({ transaction: () => undefined, close: () => undefined })).toBe(false);
+    expect(isDrizzleDataStore({ transaction: () => undefined, close: () => undefined })).toBe(
+      false,
+    );
   });
 
   it('rejects when `transaction` is absent or not a function', () => {

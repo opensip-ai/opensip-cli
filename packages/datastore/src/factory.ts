@@ -6,7 +6,8 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
 import { openMemoryBackend } from './backends/memory.js';
 import { openSqliteBackend } from './backends/sqlite.js';
-import { DataStoreMigrationError } from './data-store.js';
+import { DataStoreMigrationError, DataStoreVersionError } from './data-store.js';
+import { isDbNewerThanCli, readSupportedDbVersion } from './schema-version.js';
 
 import type { DataStoreOpenOptions, DrizzleDataStore } from './data-store.js';
 
@@ -18,33 +19,84 @@ export const DataStoreFactory = {
   /**
    * Open a DataStore (SQLite or in-memory) and run pending migrations.
    *
+   * For SQLite, a version guard runs first: if the file was stamped by a NEWER
+   * CLI than this one (`PRAGMA user_version` ahead of the bundled migration
+   * count), it throws {@link DataStoreVersionError} instead of letting Drizzle
+   * silently no-op into a runtime column error. After a successful migrate, the
+   * stamp is refreshed to this CLI's supported version.
+   *
+   * @throws {DataStoreVersionError} When the SQLite file was written by a newer
+   *   opensip-tools than this CLI supports (the downgrade direction).
    * @throws {DataStoreMigrationError} When the SQLite file cannot be opened
    *   (corrupt header, missing parent directory, permission errors) or when
    *   running the migrations folder fails. The original cause is preserved
    *   via the `cause` field.
    */
   open(opts: DataStoreOpenOptions & { migrationsFolder?: string }): DrizzleDataStore {
-    let datastore: DrizzleDataStore;
+    const migrationsFolder = opts.migrationsFolder ?? defaultMigrationsFolder();
+
+    if (opts.backend === 'memory') {
+      return openAndMigrate(opts, migrationsFolder, () => openMemoryBackend());
+    }
+
+    const path = requireSqlitePath(opts);
+    let handle;
     try {
-      datastore =
-        opts.backend === 'memory'
-          ? openMemoryBackend()
-          : openSqliteBackend({ path: requireSqlitePath(opts) });
+      handle = openSqliteBackend({ path });
     } catch (error) {
       // Corrupted file (bad SQLite header), missing dir, permission errors, etc.
       throw new DataStoreMigrationError(openFailureMessage(opts), { cause: error });
     }
 
-    const migrationsFolder = opts.migrationsFolder ?? defaultMigrationsFolder();
+    // `undefined` (unreadable journal) means "skip the guard" — migrate() reads
+    // the same journal and will surface the canonical failure loudly.
+    const supportedVersion = readSupportedDbVersion(migrationsFolder);
+    if (supportedVersion !== undefined) {
+      const dbVersion = handle.readUserVersion();
+      if (isDbNewerThanCli(dbVersion, supportedVersion)) {
+        handle.close();
+        throw new DataStoreVersionError({ path, dbVersion, supportedVersion });
+      }
+    }
+
     try {
-      migrate(datastore.db, { migrationsFolder });
+      migrate(handle.db, { migrationsFolder });
     } catch (error) {
-      datastore.close();
+      handle.close();
       throw new DataStoreMigrationError(migrateFailureMessage(opts), { cause: error });
     }
-    return datastore;
+
+    // Re-stamp on every successful open: a fresh (0) or pre-guard "legacy" DB
+    // gets adopted to the current version; an already-current DB is a no-op write.
+    if (supportedVersion !== undefined) handle.writeUserVersion(supportedVersion);
+    return handle;
   },
 };
+
+/**
+ * Open a backend and run migrations, mapping both failures to
+ * {@link DataStoreMigrationError}. Used for the in-memory path (which needs no
+ * version guard — it is ephemeral) and shared message handling.
+ */
+function openAndMigrate(
+  opts: DataStoreOpenOptions,
+  migrationsFolder: string,
+  openBackend: () => DrizzleDataStore,
+): DrizzleDataStore {
+  let datastore: DrizzleDataStore;
+  try {
+    datastore = openBackend();
+  } catch (error) {
+    throw new DataStoreMigrationError(openFailureMessage(opts), { cause: error });
+  }
+  try {
+    migrate(datastore.db, { migrationsFolder });
+  } catch (error) {
+    datastore.close();
+    throw new DataStoreMigrationError(migrateFailureMessage(opts), { cause: error });
+  }
+  return datastore;
+}
 
 function openFailureMessage(opts: DataStoreOpenOptions): string {
   if (opts.backend === 'sqlite' && opts.path) {

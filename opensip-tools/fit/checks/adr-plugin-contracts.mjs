@@ -4,17 +4,15 @@
  * These are opensip-tools self-checks: they know the first-party package names,
  * marker kinds, command-surface migration, and curated public barrel policy.
  */
-import path from "node:path";
+import path from 'node:path';
 
-import { defineCheck } from "@opensip-tools/fitness";
+import { defineCheck } from '@opensip-tools/fitness';
 
 const ROOT = process.cwd();
 
 function relPath(filePath) {
-  const raw = path.isAbsolute(filePath)
-    ? path.relative(ROOT, filePath)
-    : filePath;
-  return raw.replaceAll("\\", "/");
+  const raw = path.isAbsolute(filePath) ? path.relative(ROOT, filePath) : filePath;
+  return raw.replaceAll('\\', '/');
 }
 
 function isTestOrFixture(filePath) {
@@ -30,7 +28,7 @@ function isTestOrFixture(filePath) {
 function lineOf(content, index) {
   let line = 1;
   for (let i = 0; i < index && i < content.length; i++) {
-    if (content[i] === "\n") line++;
+    if (content[i] === '\n') line++;
   }
   return line;
 }
@@ -41,15 +39,15 @@ function lineOfNeedle(content, needle) {
 }
 
 function violation(filePath, line, type, message, suggestion) {
-  return { filePath, line, type, message, severity: "error", suggestion };
+  return { filePath, line, type, message, severity: 'error', suggestion };
 }
 
 function jsonObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function stringSet(values) {
-  return new Set(values.filter((v) => typeof v === "string"));
+  return new Set(values.filter((v) => typeof v === 'string'));
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +61,7 @@ function analyzeNoBootstrapToolImport(content, filePath) {
   const rel = relPath(filePath);
   if (isTestOrFixture(rel)) return [];
   if (!/^packages\/(?:cli|core)\/src\//.test(rel)) return [];
-  if (rel === "packages/cli/src/commands/init/config-templates.ts") return [];
+  if (rel === 'packages/cli/src/commands/init/config-templates.ts') return [];
 
   const violations = [];
   for (const match of content.matchAll(HOST_STATIC_TOOL_IMPORT_RE)) {
@@ -71,9 +69,9 @@ function analyzeNoBootstrapToolImport(content, filePath) {
       violation(
         filePath,
         lineOf(content, match.index ?? 0),
-        "bootstrap-static-tool-import",
-        "CLI/core production code must not statically import bundled tools or check packs (ADR-0009/0027/0029).",
-        "Resolve the package manifest on disk and load the tool or contribution through the shared manifest/import path.",
+        'bootstrap-static-tool-import',
+        'CLI/core production code must not statically import bundled tools or check packs (ADR-0009/0027/0029).',
+        'Resolve the package manifest on disk and load the tool or contribution through the shared manifest/import path.',
       ),
     );
   }
@@ -85,34 +83,33 @@ function analyzeNoBootstrapToolImport(content, filePath) {
 // ---------------------------------------------------------------------------
 
 function expectedPackageKind(pkgName) {
-  if (pkgName.startsWith("@opensip-tools/checks-")) return "fit-pack";
+  if (pkgName.startsWith('@opensip-tools/checks-')) return 'fit-pack';
   if (
-    pkgName.startsWith("@opensip-tools/graph-") &&
-    pkgName !== "@opensip-tools/graph" &&
-    pkgName !== "@opensip-tools/graph-adapter-common"
+    pkgName.startsWith('@opensip-tools/graph-') &&
+    pkgName !== '@opensip-tools/graph' &&
+    pkgName !== '@opensip-tools/graph-adapter-common'
   ) {
-    return "graph-adapter";
+    return 'graph-adapter';
   }
   if (
-    pkgName === "@opensip-tools/fitness" ||
-    pkgName === "@opensip-tools/graph" ||
-    pkgName === "@opensip-tools/simulation"
+    pkgName === '@opensip-tools/fitness' ||
+    pkgName === '@opensip-tools/graph' ||
+    pkgName === '@opensip-tools/simulation'
   ) {
-    return "tool";
+    return 'tool';
   }
   return undefined;
 }
 
 function expectedCapabilityIds(pkgName) {
-  if (pkgName === "@opensip-tools/fitness") return ["fit-pack", "fit-recipe"];
-  if (pkgName === "@opensip-tools/graph") return ["graph-adapter"];
-  if (pkgName === "@opensip-tools/simulation")
-    return ["sim-pack", "sim-recipe"];
+  if (pkgName === '@opensip-tools/fitness') return ['fit-pack', 'fit-recipe'];
+  if (pkgName === '@opensip-tools/graph') return ['graph-adapter'];
+  if (pkgName === '@opensip-tools/simulation') return ['sim-pack', 'sim-recipe'];
   return [];
 }
 
 function analyzePackageManifest(pkg, filePath) {
-  if (typeof pkg.name !== "string") return [];
+  if (typeof pkg.name !== 'string') return [];
   const expectedKind = expectedPackageKind(pkg.name);
   if (expectedKind === undefined) return [];
 
@@ -124,9 +121,9 @@ function analyzePackageManifest(pkg, filePath) {
       violation(
         filePath,
         1,
-        "opensip-tools-manifest-missing",
+        'opensip-tools-manifest-missing',
         `${rel}: ${pkg.name} must declare package.json#opensipTools.kind='${expectedKind}'.`,
-        "Add the static opensipTools manifest so discovery/admission can classify the package before importing runtime code.",
+        'Add the static opensipTools manifest so discovery/admission can classify the package before importing runtime code.',
       ),
     ];
   }
@@ -135,33 +132,33 @@ function analyzePackageManifest(pkg, filePath) {
       violation(
         filePath,
         1,
-        "opensip-tools-kind-drift",
+        'opensip-tools-kind-drift',
         `${rel}: ${pkg.name} must use opensipTools.kind='${expectedKind}' (got ${JSON.stringify(block.kind)}).`,
-        "Keep first-party marker kinds in package.json so plugin discovery stays data-driven and source-independent.",
+        'Keep first-party marker kinds in package.json so plugin discovery stays data-driven and source-independent.',
       ),
     );
   }
 
-  if (expectedKind === "tool") {
-    if (typeof block.id !== "string" || block.id.length === 0) {
+  if (expectedKind === 'tool') {
+    if (typeof block.id !== 'string' || block.id.length === 0) {
       violations.push(
         violation(
           filePath,
           1,
-          "tool-manifest-id-missing",
+          'tool-manifest-id-missing',
           `${rel}: tool manifest must declare a non-empty opensipTools.id.`,
-          "The host admission gate needs a stable tool id before importing runtime code.",
+          'The host admission gate needs a stable tool id before importing runtime code.',
         ),
       );
     }
-    if (typeof block.apiVersion !== "number") {
+    if (typeof block.apiVersion !== 'number') {
       violations.push(
         violation(
           filePath,
           1,
-          "tool-manifest-api-version-missing",
+          'tool-manifest-api-version-missing',
           `${rel}: tool manifest must declare numeric opensipTools.apiVersion.`,
-          "The host admission gate needs the API epoch before importing runtime code.",
+          'The host admission gate needs the API epoch before importing runtime code.',
         ),
       );
     }
@@ -170,16 +167,14 @@ function analyzePackageManifest(pkg, filePath) {
         violation(
           filePath,
           1,
-          "tool-manifest-commands-missing",
+          'tool-manifest-commands-missing',
           `${rel}: tool manifest must declare a non-empty opensipTools.commands array.`,
-          "Keep command identity in the static manifest so the host can reason about command surface before loading the tool.",
+          'Keep command identity in the static manifest so the host can reason about command surface before loading the tool.',
         ),
       );
     }
     const actualIds = stringSet(
-      (Array.isArray(block.capabilities) ? block.capabilities : []).map(
-        (c) => c?.id,
-      ),
+      (Array.isArray(block.capabilities) ? block.capabilities : []).map((c) => c?.id),
     );
     for (const capabilityId of expectedCapabilityIds(pkg.name)) {
       if (!actualIds.has(capabilityId)) {
@@ -187,9 +182,9 @@ function analyzePackageManifest(pkg, filePath) {
           violation(
             filePath,
             1,
-            "tool-manifest-capability-missing",
+            'tool-manifest-capability-missing',
             `${rel}: ${pkg.name} manifest must declare capability '${capabilityId}'.`,
-            "Capability domains are manifest data, not host-compiled constants (ADR-0023).",
+            'Capability domains are manifest data, not host-compiled constants (ADR-0023).',
           ),
         );
       }
@@ -201,10 +196,7 @@ function analyzePackageManifest(pkg, filePath) {
 async function analyzeToolManifestContract(files) {
   const violations = [];
   for (const filePath of files.paths) {
-    if (
-      relPath(filePath).endsWith("/package.json") ||
-      relPath(filePath) === "package.json"
-    ) {
+    if (relPath(filePath).endsWith('/package.json') || relPath(filePath) === 'package.json') {
       try {
         const pkg = JSON.parse(await files.read(filePath));
         violations.push(...analyzePackageManifest(pkg, filePath));
@@ -220,8 +212,7 @@ async function analyzeToolManifestContract(files) {
 // ADR-0023: capability domains are manifest data, not inline host literals.
 // ---------------------------------------------------------------------------
 
-const HARDCODED_CAPABILITY_DOMAIN_RE =
-  /\b[A-Za-z_$][\w$]*\.registerDomain\s*\(\s*\{/g;
+const HARDCODED_CAPABILITY_DOMAIN_RE = /\b[A-Za-z_$][\w$]*\.registerDomain\s*\(\s*\{/g;
 
 function analyzeCapabilityByManifest(content, filePath) {
   const rel = relPath(filePath);
@@ -233,9 +224,9 @@ function analyzeCapabilityByManifest(content, filePath) {
       violation(
         filePath,
         lineOf(content, match.index ?? 0),
-        "hardcoded-capability-domain",
-        "Capability domains must be registered from tool manifests, not inline host literals (ADR-0023).",
-        "Declare the domain under package.json#opensipTools.capabilities and route it through registerCapabilityDomainsFromManifest.",
+        'hardcoded-capability-domain',
+        'Capability domains must be registered from tool manifests, not inline host literals (ADR-0023).',
+        'Declare the domain under package.json#opensipTools.capabilities and route it through registerCapabilityDomainsFromManifest.',
       ),
     );
   }
@@ -247,9 +238,9 @@ function analyzeCapabilityByManifest(content, filePath) {
 // ---------------------------------------------------------------------------
 
 const TOOL_DESCRIPTOR_FILES = new Set([
-  "packages/fitness/engine/src/tool.ts",
-  "packages/graph/engine/src/tool.ts",
-  "packages/simulation/engine/src/tool.ts",
+  'packages/fitness/engine/src/tool.ts',
+  'packages/graph/engine/src/tool.ts',
+  'packages/simulation/engine/src/tool.ts',
 ]);
 
 function analyzeCommandSurfaceParity(content, filePath) {
@@ -263,10 +254,10 @@ function analyzeCommandSurfaceParity(content, filePath) {
     violations.push(
       violation(
         filePath,
-        lineOfNeedle(content, "program.command"),
-        "tool-raw-commander-command",
-        "Tool packages must not mount raw Commander commands; the host mounts CommandSpec objects (ADR-0021).",
-        "Move option/argument declarations into defineCommand(...) and expose the spec through the tool descriptor.",
+        lineOfNeedle(content, 'program.command'),
+        'tool-raw-commander-command',
+        'Tool packages must not mount raw Commander commands; the host mounts CommandSpec objects (ADR-0021).',
+        'Move option/argument declarations into defineCommand(...) and expose the spec through the tool descriptor.',
       ),
     );
   }
@@ -276,9 +267,9 @@ function analyzeCommandSurfaceParity(content, filePath) {
         violation(
           filePath,
           1,
-          "tool-command-specs-missing",
-          "Tool descriptors must expose commandSpecs as the single command surface (ADR-0021).",
-          "Assemble tool command specs in tool.ts and let the CLI host mount them through mountCommandSpec.",
+          'tool-command-specs-missing',
+          'Tool descriptors must expose commandSpecs as the single command surface (ADR-0021).',
+          'Assemble tool command specs in tool.ts and let the CLI host mount them through mountCommandSpec.',
         ),
       );
     }
@@ -286,10 +277,10 @@ function analyzeCommandSurfaceParity(content, filePath) {
       violations.push(
         violation(
           filePath,
-          lineOfNeedle(content, "register:"),
-          "tool-register-hook-returned",
-          "The deprecated Tool.register command hook must not return (ADR-0021).",
-          "Use commandSpecs; tool registrars are only for capability contributions, not Commander wiring.",
+          lineOfNeedle(content, 'register:'),
+          'tool-register-hook-returned',
+          'The deprecated Tool.register command hook must not return (ADR-0021).',
+          'Use commandSpecs; tool registrars are only for capability contributions, not Commander wiring.',
         ),
       );
     }
@@ -302,28 +293,25 @@ function analyzeCommandSurfaceParity(content, filePath) {
 // ---------------------------------------------------------------------------
 
 const PUBLIC_BARREL_FORBIDDEN_EXPORTS = {
-  "packages/fitness/engine/src/index.ts": [
-    "FitBaselineRepo",
-    "RecipeService",
-    "ExecutionContext",
-    "CheckConfig",
-    "FitnessRecipe",
-    "RecipeCheckResult",
-    "executeFit",
+  'packages/fitness/engine/src/index.ts': [
+    'FitBaselineRepo',
+    'RecipeService',
+    'ExecutionContext',
+    'CheckConfig',
+    'FitnessRecipe',
+    'RecipeCheckResult',
+    'executeFit',
   ],
-  "packages/graph/engine/src/index.ts": [
-    "runGraph",
-    "executeGraph",
-    "CatalogRepo",
-    "GraphConfig",
-    "GRAPH_STAGES",
-    "MemoryPressureError",
-    "ShardBuildResult",
+  'packages/graph/engine/src/index.ts': [
+    'runGraph',
+    'executeGraph',
+    'CatalogRepo',
+    'GraphConfig',
+    'GRAPH_STAGES',
+    'MemoryPressureError',
+    'ShardBuildResult',
   ],
-  "packages/simulation/engine/src/index.ts": [
-    "executeSim",
-    "persistSimSession",
-  ],
+  'packages/simulation/engine/src/index.ts': ['executeSim', 'persistSimSession'],
 };
 
 function analyzePublicApiSurface(content, filePath) {
@@ -340,9 +328,9 @@ function analyzePublicApiSurface(content, filePath) {
         violation(
           filePath,
           lineOf(content, match.index),
-          "public-barrel-internal-export",
+          'public-barrel-internal-export',
           `Public barrel must not export internal symbol '${symbol}' (ADR-0009/0013).`,
-          "Move engine-only and cross-package-test-only symbols to the package ./internal export, or add the symbol through an explicit public API review.",
+          'Move engine-only and cross-package-test-only symbols to the package ./internal export, or add the symbol through an explicit public API review.',
         ),
       );
     }
@@ -352,58 +340,58 @@ function analyzePublicApiSurface(content, filePath) {
 
 export const checks = [
   defineCheck({
-    id: "974e1f80-08c6-4a06-864c-9d56bae24979",
-    slug: "dogfood-no-bootstrap-tool-import",
+    id: '974e1f80-08c6-4a06-864c-9d56bae24979',
+    slug: 'dogfood-no-bootstrap-tool-import',
     description:
-      "CLI/core bootstrap must load tools/check packs by manifest and dynamic import, not static runtime imports (ADR-0009/0027/0029)",
-    scope: { languages: ["typescript"], concerns: ["backend", "cli"] },
-    tags: ["architecture", "dogfood"],
-    fileTypes: ["ts"],
-    contentFilter: "raw",
+      'CLI/core bootstrap must load tools/check packs by manifest and dynamic import, not static runtime imports (ADR-0009/0027/0029)',
+    scope: { languages: ['typescript'], concerns: ['backend', 'cli'] },
+    tags: ['architecture', 'dogfood'],
+    fileTypes: ['ts'],
+    contentFilter: 'raw',
     analyze: analyzeNoBootstrapToolImport,
   }),
   defineCheck({
-    id: "fb02c22b-7ae5-4f8a-abe6-35b8a12f1874",
-    slug: "dogfood-tool-manifest-contract",
+    id: 'fb02c22b-7ae5-4f8a-abe6-35b8a12f1874',
+    slug: 'dogfood-tool-manifest-contract',
     description:
-      "first-party tools, fit packs, and graph adapters must declare the expected opensipTools manifest marker",
-    scope: { languages: ["typescript"], concerns: ["config"] },
-    tags: ["architecture", "dogfood"],
-    fileTypes: ["json"],
-    contentFilter: "raw",
+      'first-party tools, fit packs, and graph adapters must declare the expected opensipTools manifest marker',
+    scope: { languages: ['typescript'], concerns: ['config'] },
+    tags: ['architecture', 'dogfood'],
+    fileTypes: ['json'],
+    contentFilter: 'raw',
     analyzeAll: analyzeToolManifestContract,
   }),
   defineCheck({
-    id: "37383417-c4b6-45f0-bea6-8f427d309bd1",
-    slug: "dogfood-capability-by-manifest",
+    id: '37383417-c4b6-45f0-bea6-8f427d309bd1',
+    slug: 'dogfood-capability-by-manifest',
     description:
-      "capability domains must be declared by tool manifests rather than inline host registerDomain literals (ADR-0023)",
-    scope: { languages: ["typescript"], concerns: ["backend", "cli"] },
-    tags: ["architecture", "dogfood"],
-    fileTypes: ["ts"],
-    contentFilter: "raw",
+      'capability domains must be declared by tool manifests rather than inline host registerDomain literals (ADR-0023)',
+    scope: { languages: ['typescript'], concerns: ['backend', 'cli'] },
+    tags: ['architecture', 'dogfood'],
+    fileTypes: ['ts'],
+    contentFilter: 'raw',
     analyze: analyzeCapabilityByManifest,
   }),
   defineCheck({
-    id: "5cf0e867-f3aa-4e98-b3c2-810801edbd86",
-    slug: "dogfood-command-surface-parity",
+    id: '5cf0e867-f3aa-4e98-b3c2-810801edbd86',
+    slug: 'dogfood-command-surface-parity',
     description:
-      "tool packages expose declarative commandSpecs and never mount raw Commander commands (ADR-0021)",
-    scope: { languages: ["typescript"], concerns: ["backend", "cli"] },
-    tags: ["architecture", "dogfood"],
-    fileTypes: ["ts"],
-    contentFilter: "raw",
+      'tool packages expose declarative commandSpecs and never mount raw Commander commands (ADR-0021)',
+    scope: { languages: ['typescript'], concerns: ['backend', 'cli'] },
+    tags: ['architecture', 'dogfood'],
+    fileTypes: ['ts'],
+    contentFilter: 'raw',
     analyze: analyzeCommandSurfaceParity,
   }),
   defineCheck({
-    id: "69a62dfe-9385-4415-8e18-394444ca65bb",
-    slug: "dogfood-public-api-surface",
+    id: '69a62dfe-9385-4415-8e18-394444ca65bb',
+    slug: 'dogfood-public-api-surface',
     description:
-      "public package barrels must not re-export known engine internals; use ./internal for cross-package tests (ADR-0009/0013)",
-    scope: { languages: ["typescript"], concerns: ["backend"] },
-    tags: ["architecture", "dogfood"],
-    fileTypes: ["ts"],
-    contentFilter: "strip-strings-and-comments",
+      'public package barrels must not re-export known engine internals; use ./internal for cross-package tests (ADR-0009/0013)',
+    scope: { languages: ['typescript'], concerns: ['backend'] },
+    tags: ['architecture', 'dogfood'],
+    fileTypes: ['ts'],
+    contentFilter: 'strip-strings-and-comments',
     analyze: analyzePublicApiSurface,
   }),
 ];

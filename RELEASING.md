@@ -324,10 +324,19 @@ workflow needs a fresh migration. Steps:
    applied migrations by content hash; editing one in place leaves users
    in undefined state. Add a new migration instead.
 
-Downgrades across schema changes are unsupported. A user who downgrades
-will see `DataStoreMigrationError` on next run; the recovery message
-points them at deleting `<project>/opensip-tools/.runtime/datastore.sqlite`
-(cache rebuilds; session history is lost).
+Downgrades across schema changes are unsupported. The datastore stamps
+its SQLite header (`PRAGMA user_version`) with the bundled migration count
+after each successful migrate; on open, a CLI whose supported version is
+**behind** the on-disk stamp fails fast with `DataStoreVersionError`
+(direction Drizzle's migrator cannot detect on its own — the older CLI's
+migrations are a prefix of what was applied, so `migrate()` would no-op and
+later queries would hit missing columns). The message points the user at the
+install script to upgrade, or at deleting
+`<project>/opensip-tools/.runtime/datastore.sqlite` to continue on the older
+CLI (cache rebuilds; session history is lost). The forward direction (newer
+CLI, older or pre-guard `user_version 0` DB) auto-migrates and re-stamps with
+no user action. Because the stamp is derived from the journal entry count,
+adding a migration advances it automatically — there is no constant to bump.
 
 ## Why the workflow looks the way it does
 

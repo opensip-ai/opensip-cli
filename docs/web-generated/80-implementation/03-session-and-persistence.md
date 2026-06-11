@@ -205,9 +205,11 @@ The dashboard auto-open hook fires after a run if (a) `--open` was requested or 
 
 ## Upgrade behavior
 
-`DataStoreFactory.open()` applies any pending Drizzle migrations on every CLI invocation. Migrations are content-hashed and idempotent. Users see no extra step; first run of a new opensip-tools version brings the schema up to date in milliseconds.
+`DataStoreFactory.open()` applies any pending Drizzle migrations on every CLI invocation. Migrations are content-hashed and idempotent. Users see no extra step; first run of a new opensip-tools version brings the schema up to date in milliseconds. After a successful migrate it stamps the SQLite header (`PRAGMA user_version`) with the number of migrations this build ships.
 
-If migration fails (corrupted DB, downgrade across schema changes), the CLI surfaces a `DataStoreMigrationError` with a recovery hint pointing at deleting `<project>/opensip-tools/.runtime/datastore.sqlite`. Cache rebuilds on next run; session history is lost. **Downgrades across schema changes are unsupported** — Drizzle has no down-migration concept.
+**Downgrades across schema changes are unsupported** — Drizzle has no down-migration concept, and an older CLI cannot detect a newer schema on its own (its migrations are a prefix of what was applied, so `migrate()` no-ops and later queries hit missing columns). The version stamp closes that gap: on open, a CLI whose supported version is behind the on-disk stamp fails fast with `DataStoreVersionError`, whose message offers two recoveries — upgrade the CLI (`curl -fsSL https://opensip.ai/cli/install.sh | bash`), or delete `<project>/opensip-tools/.runtime/datastore.sqlite` to continue on the older CLI (cache rebuilds on next run; session history is lost). The forward direction (newer CLI, older or pre-guard `user_version 0` DB) auto-migrates and re-stamps with no user action.
+
+If opening or migrating fails for other reasons (corrupted DB header, unwritable directory), the CLI surfaces a `DataStoreMigrationError` with the same delete-to-recover hint.
 
 ---
 
