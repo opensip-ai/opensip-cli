@@ -27,6 +27,7 @@
 
 import type { RecipeBase, RecipeRegistry } from '../recipes/registry.js';
 
+/** Options for {@link registerRecipesFromMod}: the warning namespace, warn callback, and an optional duplicate observer. */
 export interface RegisterRecipesOptions<R extends RecipeBase> {
   /** Package name (or plugin namespace) used in warning messages. */
   readonly namespace: string;
@@ -43,6 +44,7 @@ export interface RegisterRecipesOptions<R extends RecipeBase> {
   readonly onDuplicate?: (recipe: R) => void;
 }
 
+/** Result of {@link registerRecipesFromMod}: how many recipes actually entered the registry. */
 export interface RegisterRecipesResult {
   /** Count of recipes that actually entered the registry. */
   readonly recipesRegistered: number;

@@ -27,8 +27,11 @@ export default mergeConfig(vitestBase, defineConfig({
         // The plugin command shells out to `npm install/uninstall` and
         // edits opensip-tools.config.yml. The dispatch is exercised by
         // `e2e.test.ts > plugin list`; deeper add/remove/sync flows are
-        // tested in `plugin-config.test.ts`.
+        // tested in `plugin-config.test.ts`. `plugin-host-ops.ts` holds the
+        // npm/host-mutation helpers extracted out of `plugin.ts` — same
+        // unobservable-shell-out rationale, so it is excluded alongside it.
         'src/commands/plugin.ts',
+        'src/commands/plugin-host-ops.ts',
         // Two-line dynamic-import wrapper around `ui/render.tsx`. Excluded
         // alongside its target.
         'src/bootstrap/render.ts',
