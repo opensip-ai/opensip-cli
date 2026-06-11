@@ -302,6 +302,7 @@ const simCommand: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, 
   ],
   scope: 'project',
   output: 'raw-stream',
+  rawStreamReason: 'runtime-render-dispatch',
   handler: runSim,
 });
 

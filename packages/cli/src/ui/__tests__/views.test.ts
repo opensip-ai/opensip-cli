@@ -252,6 +252,7 @@ describe('plugin view', () => {
   it('list: with plugins and the empty domains', () => {
     const out = text({
       type: 'plugin-list',
+      domains: ['fit', 'sim'],
       totalCount: 1,
       plugins: [{ domain: 'fit', namespace: 'acme', pluginType: 'package' }],
       toolProvenance: [],
@@ -263,14 +264,21 @@ describe('plugin view', () => {
   });
 
   it('list: totally empty shows the get-started hint', () => {
-    expect(text({ type: 'plugin-list', totalCount: 0, plugins: [], toolProvenance: [] })).toContain(
-      'No plugins installed',
-    );
+    expect(
+      text({
+        type: 'plugin-list',
+        domains: ['fit', 'sim', 'tool'],
+        totalCount: 0,
+        plugins: [],
+        toolProvenance: [],
+      }),
+    ).toContain('No plugins installed');
   });
 
   it('list: renders the tool-provenance section (source + short manifestHash)', () => {
     const out = text({
       type: 'plugin-list',
+      domains: ['fit', 'sim', 'tool'],
       totalCount: 0,
       plugins: [],
       toolProvenance: [
@@ -289,6 +297,24 @@ describe('plugin view', () => {
     expect(out).toContain('[bundled]');
     expect(out).toContain('abcdef012345'); // 12-char short hash
     expect(out).toContain('@opensip-tools/fitness');
+  });
+
+  it('list: renders dynamically contributed domains and tool plugins', () => {
+    const out = text({
+      type: 'plugin-list',
+      domains: ['graph-adapter', 'tool'],
+      totalCount: 2,
+      plugins: [
+        { domain: 'graph-adapter', namespace: '@acme/graph-go', pluginType: 'package' },
+        { domain: 'tool', namespace: '@acme/custom-tool', pluginType: 'package' },
+      ],
+      toolProvenance: [],
+    });
+
+    expect(out).toContain('graph-adapter/');
+    expect(out).toContain('@acme/graph-go');
+    expect(out).toContain('tool/');
+    expect(out).toContain('@acme/custom-tool');
   });
 
   it('add / remove success and failure', () => {

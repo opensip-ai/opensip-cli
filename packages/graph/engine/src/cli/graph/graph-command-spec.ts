@@ -507,5 +507,6 @@ export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineComm
   ],
   scope: 'project',
   output: 'raw-stream',
+  rawStreamReason: 'runtime-render-dispatch',
   handler: runGraphCommand,
 });

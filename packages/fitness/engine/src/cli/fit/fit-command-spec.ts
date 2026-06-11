@@ -138,6 +138,7 @@ export function buildFitCommandSpec(
     ],
     scope: 'project',
     output: 'raw-stream',
+    rawStreamReason: 'runtime-render-dispatch',
     handler: (opts, cli) => runFit(opts, cli, setUpLiveView),
   });
 }

@@ -170,6 +170,7 @@ function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
     // The handler writes the completion script straight to stdout (no Ink) and
     // owns its own exit-code decision — the documented raw-stream exception.
     output: 'raw-stream',
+    rawStreamReason: 'completion-script',
     handler: (rawOpts) => {
       const opts = rawOpts as { _args: string[] };
       const shell = opts._args[0];

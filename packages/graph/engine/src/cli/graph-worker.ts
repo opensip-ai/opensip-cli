@@ -102,6 +102,7 @@ export const graphRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = d
   args: [{ name: 'specPath', description: 'Path to a JSON graph build-spec file' }],
   scope: 'project',
   output: 'raw-stream',
+  rawStreamReason: 'worker-ipc',
   handler: async (rawOpts, cli): Promise<void> => {
     const specPath = (rawOpts as { _args?: readonly string[] })._args?.[0] ?? '';
     await executeGraphWorker(specPath, cli);

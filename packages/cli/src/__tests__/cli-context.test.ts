@@ -2,7 +2,13 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { UnknownLiveViewError, type LiveViewRenderer, type Logger } from '@opensip-tools/core';
+import {
+  UnknownLiveViewError,
+  type LiveViewRenderer,
+  type Logger,
+  type ToolPluginManifest,
+  type ToolProvenance,
+} from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildToolCliContext, createLiveViewRegistry } from '../cli-context.js';
@@ -211,7 +217,7 @@ describe('setCliRegistriesForRun / getCurrentRegistriesForScope', () => {
   it('throws when read before write — bootstrap-ordering safety', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    expect(() => mod.getCurrentRegistriesForScope()).toThrow(/setCliRegistriesForRun/);
+    expect(() => mod.getCurrentRegistriesForScope()).toThrow(/setCliRuntimeContextForRun/);
   });
 
   it('round-trips the registries set by main()', async () => {
@@ -224,6 +230,47 @@ describe('setCliRegistriesForRun / getCurrentRegistriesForScope', () => {
     const out = mod.getCurrentRegistriesForScope();
     expect(out.languages).toBe(languages);
     expect(out.tools).toBe(tools);
+  });
+
+  it('installs registries and plugin metadata as one runtime context', async () => {
+    vi.resetModules();
+    const mod = await import('../cli-context.js');
+    const core = await import('@opensip-tools/core');
+    const languages = new core.LanguageRegistry();
+    const tools = new core.ToolRegistry();
+    const provenance: ToolProvenance[] = [
+      {
+        id: 'plugin-a',
+        version: '1.0.0',
+        source: 'bundled',
+        packageName: '@opensip-tools/plugin-a',
+        resolvedPath: '/plugins/a/package.json',
+        manifestHash: 'hash-a',
+      },
+    ];
+    const manifests: ToolPluginManifest[] = [
+      {
+        kind: 'tool',
+        apiVersion: core.PLUGIN_API_VERSION,
+        id: 'plugin-a',
+        name: 'Plugin A',
+        version: '1.0.0',
+        commands: [],
+      },
+    ];
+
+    mod.setCliRuntimeContextForRun({
+      languages,
+      tools,
+      toolProvenance: provenance,
+      toolManifests: manifests,
+    });
+
+    const out = mod.getCurrentRegistriesForScope();
+    expect(out.languages).toBe(languages);
+    expect(out.tools).toBe(tools);
+    expect(mod.getToolProvenanceForRun()).toBe(provenance);
+    expect(mod.getToolManifestsForRun()).toBe(manifests);
   });
 });
 

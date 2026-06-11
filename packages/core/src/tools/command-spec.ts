@@ -152,6 +152,29 @@ export interface ArgSpec {
 export type CommandOutputMode = 'signal-envelope' | 'command-result' | 'raw-stream' | 'live-view';
 
 /**
+ * Narrow categories for the `raw-stream` escape hatch. A raw-stream command must
+ * explain why the host-owned render seam cannot handle its output.
+ */
+export type RawStreamReason =
+  | 'completion-script'
+  | 'file-export'
+  | 'worker-ipc'
+  | 'runtime-render-dispatch'
+  | 'session-replay'
+  | 'diagnostic-gate'
+  | 'lookup';
+
+export const RAW_STREAM_REASONS: readonly RawStreamReason[] = [
+  'completion-script',
+  'file-export',
+  'worker-ipc',
+  'runtime-render-dispatch',
+  'session-replay',
+  'diagnostic-gate',
+  'lookup',
+];
+
+/**
  * Whether the command needs a resolved project scope (RunScope project context,
  * datastore, recipe config) entered before the handler runs.
  *
@@ -207,6 +230,8 @@ export interface CommandSpec<TOpts = unknown, TCtx = CommandContext> {
   readonly scope: CommandScopeRequirement;
   /** How the host dispatches the handler's return value. */
   readonly output: CommandOutputMode;
+  /** Required when `output` is `raw-stream`, forbidden otherwise. */
+  readonly rawStreamReason?: RawStreamReason;
   /** The business-logic handler the host invokes after parse. */
   readonly handler: CommandHandler<TOpts, TCtx>;
 }
@@ -241,6 +266,7 @@ export function defineCommand<TOpts = unknown, TCtx = CommandContext>(
   if (typeof spec.handler !== 'function') {
     throw new TypeError(`defineCommand: command '${spec.name}' must have a function handler.`);
   }
+  validateRawStreamDeclaration(spec);
   const seen = new Set<CommonFlagKey>();
   for (const key of spec.commonFlags) {
     if (!COMMON_FLAG_KEYS.includes(key)) {
@@ -257,4 +283,33 @@ export function defineCommand<TOpts = unknown, TCtx = CommandContext>(
     seen.add(key);
   }
   return spec;
+}
+
+function validateRawStreamDeclaration(spec: {
+  readonly name: string;
+  readonly output: CommandOutputMode;
+  readonly rawStreamReason?: RawStreamReason;
+}): void {
+  if (spec.output === 'raw-stream') {
+    if (spec.rawStreamReason === undefined) {
+      throw new Error(
+        `defineCommand: command '${spec.name}' declares output 'raw-stream' without ` +
+          'rawStreamReason. Raw-stream commands must document why the host render seam ' +
+          'cannot own their output.',
+      );
+    }
+    if (!RAW_STREAM_REASONS.includes(spec.rawStreamReason)) {
+      throw new Error(
+        `defineCommand: command '${spec.name}' declares unknown rawStreamReason ` +
+          `'${String(spec.rawStreamReason)}'. Valid reasons: ${RAW_STREAM_REASONS.join(', ')}.`,
+      );
+    }
+    return;
+  }
+  if (spec.rawStreamReason !== undefined) {
+    throw new Error(
+      `defineCommand: command '${spec.name}' declares rawStreamReason but output is ` +
+        `'${spec.output}'. rawStreamReason is only valid for raw-stream commands.`,
+    );
+  }
 }

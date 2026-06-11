@@ -78,6 +78,7 @@ export const simRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = def
   args: [{ name: 'specPath', description: 'Path to a JSON sim-args spec file' }],
   scope: 'project',
   output: 'raw-stream',
+  rawStreamReason: 'worker-ipc',
   handler: async (rawOpts): Promise<void> => {
     const specPath = (rawOpts as { _args?: readonly string[] })._args?.[0] ?? '';
     await executeSimWorker(specPath);

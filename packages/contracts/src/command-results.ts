@@ -70,6 +70,7 @@ export type CommandResult =
   | ClearDoneResult
   | ConfigureDoneResult
   | UninstallDoneResult
+  | TextLinesResult
   | SessionReplayResult
   | HelpResult
   | ErrorResult;
@@ -201,6 +202,19 @@ export interface GateDoneResult {
 export interface GraphStatusResult {
   type: 'graph-status';
   /** Pre-composed report lines, one string per line. */
+  readonly lines: readonly string[];
+}
+
+/**
+ * Generic human-readable line carrier for extension commands that do not need a
+ * bespoke first-party view. This keeps `command-result` usable without adding a
+ * new closed union member for every simple command shape.
+ */
+export interface TextLinesResult {
+  type: 'text-lines';
+  /** Optional heading rendered above the lines. */
+  readonly title?: string;
+  /** Pre-composed display lines, one string per line. */
   readonly lines: readonly string[];
 }
 
@@ -368,6 +382,11 @@ export interface SyncEntry {
 export type PluginResult =
   | {
       type: 'plugin-list';
+      /**
+       * Ordered plugin domains to render, sourced from registered tool
+       * `pluginLayout` descriptors plus the built-in Tool plugin domain.
+       */
+      domains: readonly string[];
       plugins: readonly PluginInfo[];
       totalCount: number;
       /**

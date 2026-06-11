@@ -70,6 +70,21 @@ describe('defineCommand', () => {
     defineCommand(baseSpec({ handler }));
     expect(handler).not.toHaveBeenCalled();
   });
+
+  it('requires raw-stream commands to declare why they bypass host rendering', () => {
+    expect(() => defineCommand(baseSpec({ output: 'raw-stream' }))).toThrow(/rawStreamReason/);
+  });
+
+  it('rejects rawStreamReason on non-raw-stream commands', () => {
+    expect(() =>
+      defineCommand(baseSpec({ output: 'command-result', rawStreamReason: 'file-export' })),
+    ).toThrow(/only valid for raw-stream/);
+  });
+
+  it('accepts documented raw-stream exceptions', () => {
+    const spec = defineCommand(baseSpec({ output: 'raw-stream', rawStreamReason: 'file-export' }));
+    expect(spec.rawStreamReason).toBe('file-export');
+  });
 });
 
 describe('OptionSpec corpus coverage', () => {

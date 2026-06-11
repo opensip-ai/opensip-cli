@@ -1,16 +1,23 @@
 import { logger, type Signal } from '@opensip-tools/core';
+import {
+  requireDrizzleDataStore,
+  type DataStore,
+  type DrizzleDataStore,
+} from '@opensip-tools/datastore';
 import { sql } from 'drizzle-orm';
 
 import { fingerprintSignal } from '../fingerprint-signal.js';
 
 import { graphBaselineMeta, graphBaselineSignals } from './schema.js';
 
-import type { DataStore } from '@opensip-tools/datastore';
-
 const MODULE_NAME = 'graph:baseline-repo';
 
 export class GraphBaselineRepo {
-  constructor(private readonly datastore: DataStore) {}
+  private readonly datastore: DrizzleDataStore;
+
+  constructor(datastore: DataStore) {
+    this.datastore = requireDrizzleDataStore(datastore);
+  }
 
   /**
    * Replace the entire baseline with a fresh fingerprint set in one

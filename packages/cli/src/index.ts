@@ -25,9 +25,7 @@ import {
   buildToolCliContext,
   createLiveViewRegistry,
   getOrOpenDatastore,
-  setCliRegistriesForRun,
-  setToolManifestsForRun,
-  setToolProvenanceForRun,
+  setCliRuntimeContextForRun,
 } from './cli-context.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
@@ -61,15 +59,11 @@ const program = new Command('opensip-tools')
 installPreActionHook(program, cliVersion);
 
 async function main(): Promise<void> {
-  // Fresh registries per CLI invocation — the previously-exported
-  // `defaultLanguageRegistry` / `defaultToolRegistry` module globals are
-  // gone (Phase 5 deferred Task 5.4). Tools read these via
-  // `cli.scope.languages` / `cli.scope.tools`; bootstrap populates them
-  // here and `setCliRegistriesForRun` makes them visible to the
-  // `ToolCliContext.scope` getter via cli-context's per-run holders.
+  // Fresh registries per CLI invocation. Tools read these via
+  // `cli.scope.languages` / `cli.scope.tools`; bootstrap populates them here
+  // and the runtime-context holder makes them visible to the pre-action hook.
   const langRegistry = new LanguageRegistry();
   const toolRegistry = new ToolRegistry();
-  setCliRegistriesForRun({ languages: langRegistry, tools: toolRegistry });
 
   // v2 persistence: datastore is opened LAZILY in cli-context.ts on
   // first access via getOrOpenDatastore. bootstrapCli just registers
@@ -81,13 +75,12 @@ async function main(): Promise<void> {
     cwd: process.cwd(),
     cliEntryUrl: import.meta.url,
   });
-  // Make the compatibility-gate provenance reachable by `plugin list`
-  // (Phase 4) via the cli-context per-run holder.
-  setToolProvenanceForRun(provenance);
-  // Make the admitted manifests reachable by the pre-action-hook so it can
-  // seed the per-run capability registry with each tool's declared domains
-  // (release 2.10.0, §5.3).
-  setToolManifestsForRun(manifests);
+  setCliRuntimeContextForRun({
+    languages: langRegistry,
+    tools: toolRegistry,
+    toolProvenance: provenance,
+    toolManifests: manifests,
+  });
 
   const { ctx } = buildToolCliContext({
     render: renderResult,

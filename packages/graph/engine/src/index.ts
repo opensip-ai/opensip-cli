@@ -111,6 +111,7 @@ export {
   currentAdapterRegistry,
   GraphAdapterRegistry,
 } from './lang-adapter/registry.js';
+export { GraphAdapterSelector } from './lang-adapter/selector.js';
 export {
   truncateForCallEdge,
   CALL_EDGE_TEXT_MAX,

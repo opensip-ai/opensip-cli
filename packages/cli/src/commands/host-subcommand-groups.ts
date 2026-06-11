@@ -103,6 +103,7 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
     ],
     scope: PROJECT_SCOPE,
     output: RAW_STREAM,
+    rawStreamReason: 'session-replay',
     handler: async (rawOpts) => {
       const opts = rawOpts as { _args: string[]; tool?: ToolShortId; json?: boolean };
       const ref = opts._args[0];

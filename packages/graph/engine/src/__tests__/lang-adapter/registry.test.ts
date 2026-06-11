@@ -14,6 +14,7 @@ import { ConfigurationError, enterScope, logger } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { currentAdapterRegistry, pickAdapter } from '../../lang-adapter/registry.js';
+import { GraphAdapterSelector } from '../../lang-adapter/selector.js';
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
@@ -82,6 +83,17 @@ describe('adapter registry register / pickAdapter', () => {
     const replacement = fakeAdapter('typescript', ['.tsx']);
     currentAdapterRegistry().register(replacement);
     expect(pickAdapter()).toBe(replacement);
+  });
+
+  it('fails when an explicit language names an unregistered adapter', () => {
+    currentAdapterRegistry().register(fakeAdapter('typescript', ['.ts']));
+
+    expect(() =>
+      new GraphAdapterSelector(currentAdapterRegistry()).pick({
+        cwd: '/tmp',
+        language: 'klingon',
+      }),
+    ).toThrow(/language adapter 'klingon' is not registered/);
   });
 });
 

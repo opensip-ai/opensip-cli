@@ -155,7 +155,7 @@ export type {
 // exports for the host to mount, plus the pure CommonFlagKey key type. The
 // Commander-touching applyCommonFlags runtime stays in @opensip-tools/contracts,
 // which re-exports CommonFlagKey from here. Re-exported by contracts.
-export { defineCommand, COMMON_FLAG_KEYS } from './tools/index.js';
+export { defineCommand, COMMON_FLAG_KEYS, RAW_STREAM_REASONS } from './tools/index.js';
 export type {
   CommandSpec,
   OptionSpec,
@@ -165,6 +165,7 @@ export type {
   CommandOutputMode,
   CommandScopeRequirement,
   CommonFlagKey,
+  RawStreamReason,
 } from './tools/index.js';
 // Capability domain model (release 2.10.0, §5.3): the data shape a tool
 // uses to declare an extension point it owns. The scope-owned runtime

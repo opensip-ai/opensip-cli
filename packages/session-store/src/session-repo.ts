@@ -1,11 +1,15 @@
 import { SystemError, isToolShortId, logger } from '@opensip-tools/core';
+import {
+  requireDrizzleDataStore,
+  type DataStore,
+  type DrizzleDataStore,
+} from '@opensip-tools/datastore';
 import { desc, eq, lt } from 'drizzle-orm';
 
 import { sessions, sessionToolPayload } from './schema/sessions.js';
 
 import type { StoredSession } from '@opensip-tools/contracts';
 import type { ToolShortId } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
 
 const MODULE_NAME = 'session-store:session-repo';
 
@@ -24,7 +28,11 @@ export interface SessionListOptions {
  * 2026-05-29, session split.)
  */
 export class SessionRepo {
-  constructor(private readonly datastore: DataStore) {}
+  private readonly datastore: DrizzleDataStore;
+
+  constructor(datastore: DataStore) {
+    this.datastore = requireDrizzleDataStore(datastore);
+  }
 
   save(session: StoredSession): void {
     try {

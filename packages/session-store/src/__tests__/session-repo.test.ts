@@ -1,4 +1,4 @@
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { DataStoreFactory, type DataStore, type DrizzleDataStore } from '@opensip-tools/datastore';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -47,7 +47,7 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   };
 }
 
-let datastore: DataStore;
+let datastore: DrizzleDataStore;
 let repo: SessionRepo;
 
 beforeEach(() => {
