@@ -13,6 +13,10 @@ export interface DataStore<TSchema extends Record<string, unknown> = Record<stri
  * Persistence-layer handle that exposes the raw Drizzle DB. Repository modules
  * can narrow to this shape when they own the table boundary; general consumers
  * should stay on {@link DataStore}.
+ *
+ * Direct query calls must stay inside `src/persistence/`, `session-store`, or
+ * `datastore`. Cross-module business code should go through the owning
+ * repository/API; `restrict-raw-db-access` guards that boundary.
  */
 export interface DrizzleDataStore<
   TSchema extends Record<string, unknown> = Record<string, unknown>,

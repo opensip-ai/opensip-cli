@@ -105,9 +105,7 @@ The layer rule — "dependencies flow up only" — is enforced by [dependency-cr
 // core imports nothing else from the workspace.
 { name: 'core-imports-nothing-workspace',
   from: { path: '^packages/core/src/' },
-  to:   { path: ['^@opensip-tools/contracts', '^opensip-tools($|/)',
-                 '^@opensip-tools/fitness',    '^@opensip-tools/simulation',
-                 '^@opensip-tools/lang-',      '^@opensip-tools/checks-'] },
+  to:   { path: '^packages/', pathNot: '^packages/core/' },
 }
 
 // contracts imports only core.
@@ -148,7 +146,7 @@ The upshot: there is **no** standing "you may `import type` upward" allowance. A
 
 ---
 
-## Why 30 packages and not 1
+## Why 32 packages and not 1
 
 A single mega-package was considered. It would compile faster, ship faster, and have a simpler `package.json`. We chose against it for three load-bearing reasons:
 
@@ -160,7 +158,7 @@ A check pack like `@opensip-tools/checks-python` has to be installable on its ow
 opensip-tools plugin add @opensip-tools/checks-python
 ```
 
-…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 30 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
+…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 32 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
 
 ### 2. The Tool contract's promise
 
@@ -168,13 +166,13 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 30 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 32 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 
 ## What this shape costs
 
-Trade-offs are real. The 30-package layout is more expensive in three places:
+Trade-offs are real. The 32-package layout is more expensive in three places:
 
 - **More `package.json` files to maintain.** Version bumps span 30 publishable files (plus the private workspace-root `package.json` for tooling versions). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and a release script bumps all 30 in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.

@@ -181,21 +181,12 @@ module.exports = {
       name: 'core-imports-nothing-workspace',
       severity: 'error',
       comment:
-        'core is the kernel. It must not depend on datastore, contracts, config, ' +
-        'cli, fitness, simulation, lang-*, or checks-*. Anything else inverts the ' +
-        'layering.',
+        'core is the kernel. It must not depend on any other workspace package. ' +
+        'Anything else inverts the layering.',
       from: { path: '^packages/core/src/' },
       to: {
-        path: [
-          '^packages/datastore/',
-          '^packages/contracts/',
-          '^packages/config/',
-          '^packages/cli/',
-          '^packages/fitness/engine/',
-          '^packages/simulation/engine/',
-          '^packages/languages/lang-',
-          '^packages/fitness/checks-',
-        ],
+        path: '^packages/',
+        pathNot: '^packages/core/',
       },
     },
 
