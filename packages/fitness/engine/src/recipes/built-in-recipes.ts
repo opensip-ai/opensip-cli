@@ -5,7 +5,7 @@
  * that ship with the fitness framework.
  */
 
-import { DEFAULT_MAX_PARALLEL, defineRecipe, type FitnessRecipe } from './types.js'
+import { DEFAULT_MAX_PARALLEL, defineRecipe, type FitnessRecipe } from './types.js';
 
 // =============================================================================
 // DEFAULT RECIPE
@@ -20,7 +20,7 @@ const defaultRecipe: FitnessRecipe = defineRecipe({
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
   reporting: { format: 'table', verbose: false },
   tags: ['comprehensive', 'default'],
-})
+});
 
 // =============================================================================
 // QUICK SMOKE RECIPE
@@ -51,7 +51,7 @@ const quickSmokeRecipe: FitnessRecipe = defineRecipe({
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 15_000 },
   reporting: { format: 'table', verbose: false },
   tags: ['fast', 'smoke', 'critical'],
-})
+});
 
 // =============================================================================
 // BACKEND RECIPE
@@ -89,7 +89,7 @@ const backendRecipe: FitnessRecipe = defineRecipe({
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
   reporting: { format: 'table', verbose: false },
   tags: ['backend', 'server', 'api'],
-})
+});
 
 // =============================================================================
 // FRONTEND RECIPE
@@ -119,7 +119,7 @@ const frontendRecipe: FitnessRecipe = defineRecipe({
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
   reporting: { format: 'table', verbose: false },
   tags: ['frontend', 'react', 'ui'],
-})
+});
 
 // =============================================================================
 // SECURITY RECIPE
@@ -147,7 +147,7 @@ const securityRecipe: FitnessRecipe = defineRecipe({
   execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 60_000 },
   reporting: { format: 'table', verbose: true },
   tags: ['security', 'audit', 'comprehensive'],
-})
+});
 
 // =============================================================================
 // PRE-COMMIT RECIPE
@@ -171,7 +171,7 @@ const preCommitRecipe: FitnessRecipe = defineRecipe({
   execution: { mode: 'parallel', stopOnFirstFailure: true, timeout: 10_000 },
   reporting: { format: 'table', verbose: false },
   tags: ['fast', 'hook', 'pre-commit'],
-})
+});
 
 // =============================================================================
 // PRE-RELEASE RECIPE
@@ -186,7 +186,7 @@ const preReleaseRecipe: FitnessRecipe = defineRecipe({
   execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 120_000 },
   reporting: { format: 'unified', verbose: true },
   tags: ['comprehensive', 'release', 'thorough'],
-})
+});
 
 // =============================================================================
 // NIGHTLY FULL RECIPE
@@ -206,7 +206,7 @@ const nightlyFullRecipe: FitnessRecipe = defineRecipe({
   },
   reporting: { format: 'unified', verbose: true, outputPath: 'fitness-nightly-report.json' },
   tags: ['nightly', 'comprehensive', 'scheduled'],
-})
+});
 
 // =============================================================================
 // CI RECIPE
@@ -221,7 +221,7 @@ const ciRecipe: FitnessRecipe = defineRecipe({
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 60_000 },
   reporting: { format: 'json', verbose: false },
   tags: ['ci', 'pipeline', 'automated'],
-})
+});
 
 // =============================================================================
 // ARCHITECTURE RECIPE
@@ -236,7 +236,7 @@ const architectureRecipe: FitnessRecipe = defineRecipe({
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
   reporting: { format: 'table', verbose: true },
   tags: ['architecture', 'structure'],
-})
+});
 
 // =============================================================================
 // EXPORTS
@@ -254,14 +254,14 @@ export const builtInRecipes: readonly FitnessRecipe[] = Object.freeze([
   nightlyFullRecipe,
   ciRecipe,
   architectureRecipe,
-])
+]);
 
 /** Map of built-in recipe name to recipe definition */
 export const builtInRecipesByName: ReadonlyMap<string, FitnessRecipe> = new Map(
   builtInRecipes.map((recipe) => [recipe.name, recipe]),
-)
+);
 
 /** Check whether a recipe name corresponds to a built-in recipe */
 export function isBuiltInRecipe(name: string): boolean {
-  return builtInRecipesByName.has(name)
+  return builtInRecipesByName.has(name);
 }

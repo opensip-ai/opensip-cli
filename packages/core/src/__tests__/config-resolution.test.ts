@@ -10,7 +10,6 @@ import { ValidationError } from '../lib/errors.js';
 let testDir: string;
 
 beforeEach(() => {
-   
   testDir = mkdtempSync(join(tmpdir(), 'opensip-config-resolve-'));
 });
 
@@ -90,7 +89,9 @@ describe('resolveProjectConfigPath', () => {
         join(testDir, 'package.json'),
         JSON.stringify({ 'opensip-tools': { configPath: 'nope/missing.yml' } }),
       );
-      expect(() => resolveProjectConfigPath(testDir)).toThrow(/points to a file that does not exist/);
+      expect(() => resolveProjectConfigPath(testDir)).toThrow(
+        /points to a file that does not exist/,
+      );
     });
 
     it('falls through to default when package.json is malformed', () => {

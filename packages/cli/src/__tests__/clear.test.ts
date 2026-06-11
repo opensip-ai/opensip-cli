@@ -54,7 +54,12 @@ describe('executeClear', () => {
   it('returns "empty" action when there are no sessions', async () => {
     const { executeClear } = await loadModule();
     const result = await executeClear({ yes: true, datastore: ds });
-    expect(result).toEqual({ type: 'clear-done', action: 'empty', deletedCount: 0, sessionCount: 0 });
+    expect(result).toEqual({
+      type: 'clear-done',
+      action: 'empty',
+      deletedCount: 0,
+      sessionCount: 0,
+    });
   });
 
   it('deletes all sessions when --yes is passed and olderThan is omitted', async () => {

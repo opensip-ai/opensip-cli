@@ -93,15 +93,22 @@ function mockCli(): ToolCliContext {
 /** The live-view producer's single seam → its waived signals. */
 async function liveSignals(signals: readonly Signal[], root: string): Promise<readonly Signal[]> {
   const out = await runWithScope(makeGraphTestScope(), () =>
-    buildLiveGraphOutput({ catalog: emptyCatalog(), indexes: null, signals, cacheHit: false }, root),
+    buildLiveGraphOutput(
+      { catalog: emptyCatalog(), indexes: null, signals, cacheHit: false },
+      root,
+    ),
   );
   return out.signals;
 }
 
 /** The static dispatch path's waived signals (captured at the gate sink). */
 async function staticSignals(signals: readonly Signal[], root: string): Promise<readonly Signal[]> {
-  const opts = { gateSave: true, cwd: root } as unknown as Parameters<typeof dispatchGraphResult>[0];
-  const result = { signals, catalog: emptyCatalog() } as unknown as Parameters<typeof dispatchGraphResult>[1];
+  const opts = { gateSave: true, cwd: root } as unknown as Parameters<
+    typeof dispatchGraphResult
+  >[0];
+  const result = { signals, catalog: emptyCatalog() } as unknown as Parameters<
+    typeof dispatchGraphResult
+  >[1];
   await runWithScope(makeGraphTestScope(), () =>
     dispatchGraphResult(opts, result, mockCli(), '2026-06-09T00:00:00.000Z', root),
   );
@@ -116,7 +123,9 @@ describe('live-view suppression parity', () => {
   it('LIVE seam suppresses a signal whose @graph-ignore directive lives under the build root', async () => {
     await writeFile(
       join(buildRoot, 'walk.ts'),
-      ['// @graph-ignore-next-line graph:large-function -- intentional', 'function big() {}'].join('\n'),
+      ['// @graph-ignore-next-line graph:large-function -- intentional', 'function big() {}'].join(
+        '\n',
+      ),
       'utf8',
     );
 
@@ -134,7 +143,9 @@ describe('live-view suppression parity', () => {
   it('LIVE and STATIC seams produce the SAME waived set for the same directive + root', async () => {
     await writeFile(
       join(buildRoot, 'walk.ts'),
-      ['// @graph-ignore-next-line graph:large-function -- intentional', 'function big() {}'].join('\n'),
+      ['// @graph-ignore-next-line graph:large-function -- intentional', 'function big() {}'].join(
+        '\n',
+      ),
       'utf8',
     );
     const signals = [sig('walk.ts', 2), sig('other.ts', 9)];
@@ -161,7 +172,12 @@ describe('live-view suppression parity', () => {
 
     // The ONLY way in is via the finalize seam (or its post-IPC re-brand assert),
     // which type-checks cleanly. `datastore: undefined` makes this a no-op call.
-    const ok = persistSession({ cwd: buildRoot }, assertFinalizedAcrossBoundary(raw, 0), undefined, 0);
+    const ok = persistSession(
+      { cwd: buildRoot },
+      assertFinalizedAcrossBoundary(raw, 0),
+      undefined,
+      0,
+    );
 
     // The real assertion of this test is the `@ts-expect-error` above (a
     // compile-time guarantee). This runtime check just confirms the branded

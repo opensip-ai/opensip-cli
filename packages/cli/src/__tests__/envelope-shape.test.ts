@@ -68,7 +68,16 @@ describe('cross-tool envelope shape', () => {
       expect(shape).toEqual(shapes[0]);
     }
     // The contracted shape, explicitly.
-    expect(shapes[0]).toEqual(['createdAt', 'recipe', 'runId', 'schemaVersion', 'signals', 'tool', 'units', 'verdict']);
+    expect(shapes[0]).toEqual([
+      'createdAt',
+      'recipe',
+      'runId',
+      'schemaVersion',
+      'signals',
+      'tool',
+      'units',
+      'verdict',
+    ]);
   });
 
   it.each(tools)('%s envelope is schemaVersion 2 with verdict / units[] / signals[]', (tool) => {

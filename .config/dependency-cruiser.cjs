@@ -106,7 +106,7 @@ module.exports = {
     {
       name: 'not-to-spec',
       severity: 'error',
-      comment: "Production code must not import test specs",
+      comment: 'Production code must not import test specs',
       from: { pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`] },
       to: { path: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`] },
     },
@@ -585,10 +585,7 @@ module.exports = {
         'errors). They must not depend on the CLI or contracts.',
       from: { path: '^packages/fitness/checks-' },
       to: {
-        path: [
-          '^packages/cli/',
-          '^packages/contracts/',
-        ],
+        path: ['^packages/cli/', '^packages/contracts/'],
       },
     },
     // `check-pack-no-core-subpath` was retired here (gate-activation, 2026-05-30)
@@ -649,8 +646,7 @@ module.exports = {
     {
       name: 'graph-no-check-packs',
       severity: 'error',
-      comment:
-        'Graph sits in the tools/lang peer layer. It must not import any check pack.',
+      comment: 'Graph sits in the tools/lang peer layer. It must not import any check pack.',
       from: { path: '^packages/graph/engine/src/' },
       to: { path: '^packages/fitness/checks-' },
     },
@@ -688,8 +684,7 @@ module.exports = {
     {
       name: 'graph-resolvers-visitors-disjoint',
       severity: 'error',
-      comment:
-        'Symmetric counterpart of graph-visitors-resolvers-disjoint.',
+      comment: 'Symmetric counterpart of graph-visitors-resolvers-disjoint.',
       from: { path: '^packages/graph/graph-typescript/src/edge-resolvers/' },
       to: { path: '^packages/graph/graph-typescript/src/inventory-visitors/' },
     },
@@ -958,8 +953,7 @@ module.exports = {
     {
       name: 'dashboard-no-ui-framework',
       severity: 'error',
-      comment:
-        'AI-2: dashboard must not depend on any UI framework or visualization library.',
+      comment: 'AI-2: dashboard must not depend on any UI framework or visualization library.',
       from: { path: '^packages/dashboard/src/' },
       to: {
         path: '^(react|preact|vue|svelte|@?solidjs|d3|d3-.+|three|cytoscape|sigma|vis-network|@?angular)(/|$)',

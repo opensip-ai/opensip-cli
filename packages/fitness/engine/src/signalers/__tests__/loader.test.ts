@@ -10,7 +10,6 @@ import { loadSignalersConfig } from '../loader.js';
 let testDir: string;
 
 beforeEach(() => {
-   
   testDir = mkdtempSync(join(tmpdir(), 'opensip-signalers-loader-'));
 });
 
@@ -20,10 +19,7 @@ afterEach(() => {
 
 describe('loadSignalersConfig', () => {
   it('loads a minimal valid config', () => {
-    writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
-      'targets: {}\n',
-    );
+    writeFileSync(join(testDir, 'opensip-tools.config.yml'), 'targets: {}\n');
     const cfg = loadSignalersConfig(testDir);
     expect(cfg.targets).toEqual({});
     expect(cfg.fitness.failOnErrors).toBe(1);
@@ -83,10 +79,7 @@ describe('loadSignalersConfig', () => {
   });
 
   it('respects an explicit --config path', () => {
-    writeFileSync(
-      join(testDir, 'custom.yml'),
-      'targets: {}\n',
-    );
+    writeFileSync(join(testDir, 'custom.yml'), 'targets: {}\n');
     const cfg = loadSignalersConfig(testDir, join(testDir, 'custom.yml'));
     expect(cfg.targets).toEqual({});
   });
@@ -100,9 +93,7 @@ describe('loadSignalersConfig', () => {
   it('throws ValidationError when an explicit path points to a non-existent file', () => {
     // resolveProjectConfigPath throws when --config points at a missing
     // file. This validates that error path propagates cleanly.
-    expect(() =>
-      loadSignalersConfig(testDir, join(testDir, 'does-not-exist.yml')),
-    ).toThrow();
+    expect(() => loadSignalersConfig(testDir, join(testDir, 'does-not-exist.yml'))).toThrow();
   });
 
   it('throws ValidationError when the resolved path is a directory (readFileSync EISDIR)', () => {

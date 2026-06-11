@@ -36,7 +36,12 @@ async function fixture(file: string, content: string): Promise<void> {
 }
 
 /** Build a graph Signal anchored at `file:line`, optionally with metadata. */
-function sig(ruleId: string, file: string, line: number, metadata?: Record<string, unknown>): Signal {
+function sig(
+  ruleId: string,
+  file: string,
+  line: number,
+  metadata?: Record<string, unknown>,
+): Signal {
   return createSignal({
     source: 'graph',
     severity: 'medium',
@@ -52,7 +57,10 @@ describe('applyGraphSuppressions', () => {
   it('removes a signal waived by a matching next-line directive', async () => {
     await fixture(
       'a.ts',
-      ['// @graph-ignore-next-line graph:large-function -- intentionally long', 'function big() {}'].join('\n'),
+      [
+        '// @graph-ignore-next-line graph:large-function -- intentionally long',
+        'function big() {}',
+      ].join('\n'),
     );
     const res = await applyGraphSuppressions([sig('graph:large-function', 'a.ts', 2)], root);
     expect(res.kept).toHaveLength(0);
@@ -76,7 +84,9 @@ describe('applyGraphSuppressions', () => {
     await fixture('anchor.ts', 'function a() {}');
     await fixture(
       'member.ts',
-      ['// @graph-ignore-next-line graph:cycle -- intentional recursion', 'function b() {}'].join('\n'),
+      ['// @graph-ignore-next-line graph:cycle -- intentional recursion', 'function b() {}'].join(
+        '\n',
+      ),
     );
     const signal = sig('graph:cycle', 'anchor.ts', 1, {
       memberLocations: [
@@ -90,7 +100,10 @@ describe('applyGraphSuppressions', () => {
   });
 
   it('suppresses unconditionally — a directive with no -- reason still waives', async () => {
-    await fixture('a.ts', ['// @graph-ignore-next-line graph:cycle', 'function visit() {}'].join('\n'));
+    await fixture(
+      'a.ts',
+      ['// @graph-ignore-next-line graph:cycle', 'function visit() {}'].join('\n'),
+    );
     const res = await applyGraphSuppressions([sig('graph:cycle', 'a.ts', 2)], root);
     expect(res.kept).toHaveLength(0);
     expect(res.suppressedCount).toBe(1);

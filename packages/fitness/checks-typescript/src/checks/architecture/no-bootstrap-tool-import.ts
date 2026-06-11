@@ -21,38 +21,38 @@
  * declaration. Test code (`__tests__/`) is exempt: a white-box test may import a
  * tool runtime directly (see `cli/.../__tests__/test-utils/bundled-tools.ts`).
  */
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /** The CLI host source tree this check guards (the loader + composition root). */
-const CLI_HOST_PATH = 'packages/cli/src/'
+const CLI_HOST_PATH = 'packages/cli/src/';
 
 /** Tool packages whose runtime export must not be statically imported by the host. */
-const TOOL_PACKAGE_RE = /^@opensip-tools\/(?:fitness|graph|simulation)(?:\/.*)?$/
+const TOOL_PACKAGE_RE = /^@opensip-tools\/(?:fitness|graph|simulation)(?:\/.*)?$/;
 
 /** The tool-RUNTIME exports — importing any of these is the load-path privilege. */
 const TOOL_RUNTIME_SYMBOLS: ReadonlySet<string> = new Set([
   'fitnessTool',
   'graphTool',
   'simulationTool',
-])
+]);
 
 /** Pure analysis over a parsed source file. Exported for unit tests. */
 export function analyzeBootstrapToolImport(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const sourceFile = getSharedSourceFile(filePath, content)
-  if (!sourceFile) return violations
+  const violations: CheckViolation[] = [];
+  const sourceFile = getSharedSourceFile(filePath, content);
+  if (!sourceFile) return violations;
   for (const stmt of sourceFile.statements) {
-    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue
-    if (!TOOL_PACKAGE_RE.test(stmt.moduleSpecifier.text)) continue
-    const named = stmt.importClause?.namedBindings
-    if (named === undefined || !ts.isNamedImports(named)) continue
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+    if (!TOOL_PACKAGE_RE.test(stmt.moduleSpecifier.text)) continue;
+    const named = stmt.importClause?.namedBindings;
+    if (named === undefined || !ts.isNamedImports(named)) continue;
     for (const element of named.elements) {
       // The ORIGINAL imported name (`{ graphTool as gt }` → `graphTool`).
-      const imported = (element.propertyName ?? element.name).text
-      if (!TOOL_RUNTIME_SYMBOLS.has(imported)) continue
-      const line = sourceFile.getLineAndCharacterOfPosition(element.getStart(sourceFile)).line + 1
+      const imported = (element.propertyName ?? element.name).text;
+      if (!TOOL_RUNTIME_SYMBOLS.has(imported)) continue;
+      const line = sourceFile.getLineAndCharacterOfPosition(element.getStart(sourceFile)).line + 1;
       violations.push({
         message:
           `The CLI host must not statically import the tool runtime '${imported}' from ` +
@@ -64,10 +64,10 @@ export function analyzeBootstrapToolImport(content: string, filePath: string): C
         suggestion:
           'Load bundled tools via BUNDLED_TOOL_PACKAGES + importToolRuntime ' +
           '(bootstrap/register-tools.ts). Test code may import a tool runtime directly.',
-      })
+      });
     }
   }
-  return violations
+  return violations;
 }
 
 export const noBootstrapToolImport = defineCheck({
@@ -79,7 +79,7 @@ export const noBootstrapToolImport = defineCheck({
   tags: ['architecture'],
   fileTypes: ['ts', 'tsx'],
   analyze: (content, filePath) => {
-    if (!filePath.includes(CLI_HOST_PATH) || isTestFile(filePath)) return []
-    return analyzeBootstrapToolImport(content, filePath)
+    if (!filePath.includes(CLI_HOST_PATH) || isTestFile(filePath)) return [];
+    return analyzeBootstrapToolImport(content, filePath);
   },
-})
+});

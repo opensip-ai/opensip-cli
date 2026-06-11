@@ -52,51 +52,212 @@ const SCOPE = '@opensip-tools/';
  */
 export const RELEASE_PACKAGE_ORDER = [
   // Layer 1 — kernel
-  { unscoped: 'core',                 name: '@opensip-tools/core',                 dir: 'packages/core',                          filter: '@opensip-tools/core' },
+  {
+    unscoped: 'core',
+    name: '@opensip-tools/core',
+    dir: 'packages/core',
+    filter: '@opensip-tools/core',
+  },
   // Layer 2 — datastore (SQLite + Drizzle persistence)
-  { unscoped: 'datastore',            name: '@opensip-tools/datastore',            dir: 'packages/datastore',                     filter: '@opensip-tools/datastore' },
+  {
+    unscoped: 'datastore',
+    name: '@opensip-tools/datastore',
+    dir: 'packages/datastore',
+    filter: '@opensip-tools/datastore',
+  },
   // Layer 2 — shared CLI contract types
-  { unscoped: 'contracts',            name: '@opensip-tools/contracts',            dir: 'packages/contracts',                     filter: '@opensip-tools/contracts' },
+  {
+    unscoped: 'contracts',
+    name: '@opensip-tools/contracts',
+    dir: 'packages/contracts',
+    filter: '@opensip-tools/contracts',
+  },
   // Layer 2 — session-store + output (extracted from contracts in the 2.1.0 split)
-  { unscoped: 'session-store',        name: '@opensip-tools/session-store',        dir: 'packages/session-store',                 filter: '@opensip-tools/session-store' },
-  { unscoped: 'output',               name: '@opensip-tools/output',               dir: 'packages/output',                        filter: '@opensip-tools/output' },
+  {
+    unscoped: 'session-store',
+    name: '@opensip-tools/session-store',
+    dir: 'packages/session-store',
+    filter: '@opensip-tools/session-store',
+  },
+  {
+    unscoped: 'output',
+    name: '@opensip-tools/output',
+    dir: 'packages/output',
+    filter: '@opensip-tools/output',
+  },
   // Layer 2 — capability-configuration layer (config composer + schema registry; depends on core)
-  { unscoped: 'config',               name: '@opensip-tools/config',               dir: 'packages/config',                        filter: '@opensip-tools/config' },
+  {
+    unscoped: 'config',
+    name: '@opensip-tools/config',
+    dir: 'packages/config',
+    filter: '@opensip-tools/config',
+  },
   // Layer 3 — shared Ink/React UI primitives
-  { unscoped: 'cli-ui',               name: '@opensip-tools/cli-ui',               dir: 'packages/cli-ui',                        filter: '@opensip-tools/cli-ui' },
+  {
+    unscoped: 'cli-ui',
+    name: '@opensip-tools/cli-ui',
+    dir: 'packages/cli-ui',
+    filter: '@opensip-tools/cli-ui',
+  },
   // Layer 3 — tree-sitter parse substrate (ADR-0010)
-  { unscoped: 'tree-sitter',          name: '@opensip-tools/tree-sitter',          dir: 'packages/tree-sitter',                   filter: '@opensip-tools/tree-sitter' },
+  {
+    unscoped: 'tree-sitter',
+    name: '@opensip-tools/tree-sitter',
+    dir: 'packages/tree-sitter',
+    filter: '@opensip-tools/tree-sitter',
+  },
   // Layer 3 — language adapters (lang-typescript first; downstream check packs depend on it)
-  { unscoped: 'lang-typescript',      name: '@opensip-tools/lang-typescript',      dir: 'packages/languages/lang-typescript',     filter: '@opensip-tools/lang-typescript' },
-  { unscoped: 'lang-rust',            name: '@opensip-tools/lang-rust',            dir: 'packages/languages/lang-rust',           filter: '@opensip-tools/lang-rust' },
-  { unscoped: 'lang-python',          name: '@opensip-tools/lang-python',          dir: 'packages/languages/lang-python',         filter: '@opensip-tools/lang-python' },
-  { unscoped: 'lang-go',              name: '@opensip-tools/lang-go',              dir: 'packages/languages/lang-go',             filter: '@opensip-tools/lang-go' },
-  { unscoped: 'lang-java',            name: '@opensip-tools/lang-java',            dir: 'packages/languages/lang-java',           filter: '@opensip-tools/lang-java' },
-  { unscoped: 'lang-cpp',             name: '@opensip-tools/lang-cpp',             dir: 'packages/languages/lang-cpp',            filter: '@opensip-tools/lang-cpp' },
+  {
+    unscoped: 'lang-typescript',
+    name: '@opensip-tools/lang-typescript',
+    dir: 'packages/languages/lang-typescript',
+    filter: '@opensip-tools/lang-typescript',
+  },
+  {
+    unscoped: 'lang-rust',
+    name: '@opensip-tools/lang-rust',
+    dir: 'packages/languages/lang-rust',
+    filter: '@opensip-tools/lang-rust',
+  },
+  {
+    unscoped: 'lang-python',
+    name: '@opensip-tools/lang-python',
+    dir: 'packages/languages/lang-python',
+    filter: '@opensip-tools/lang-python',
+  },
+  {
+    unscoped: 'lang-go',
+    name: '@opensip-tools/lang-go',
+    dir: 'packages/languages/lang-go',
+    filter: '@opensip-tools/lang-go',
+  },
+  {
+    unscoped: 'lang-java',
+    name: '@opensip-tools/lang-java',
+    dir: 'packages/languages/lang-java',
+    filter: '@opensip-tools/lang-java',
+  },
+  {
+    unscoped: 'lang-cpp',
+    name: '@opensip-tools/lang-cpp',
+    dir: 'packages/languages/lang-cpp',
+    filter: '@opensip-tools/lang-cpp',
+  },
   // Layer 3 — dashboard (depends on core + contracts only; consumed by fitness)
-  { unscoped: 'dashboard',            name: '@opensip-tools/dashboard',            dir: 'packages/dashboard',                     filter: '@opensip-tools/dashboard' },
+  {
+    unscoped: 'dashboard',
+    name: '@opensip-tools/dashboard',
+    dir: 'packages/dashboard',
+    filter: '@opensip-tools/dashboard',
+  },
   // Layer 3 — tools
-  { unscoped: 'fitness',              name: '@opensip-tools/fitness',              dir: 'packages/fitness/engine',                filter: '@opensip-tools/fitness' },
-  { unscoped: 'simulation',           name: '@opensip-tools/simulation',           dir: 'packages/simulation/engine',             filter: '@opensip-tools/simulation' },
-  { unscoped: 'graph',                name: '@opensip-tools/graph',                dir: 'packages/graph/engine',                  filter: '@opensip-tools/graph' },
+  {
+    unscoped: 'fitness',
+    name: '@opensip-tools/fitness',
+    dir: 'packages/fitness/engine',
+    filter: '@opensip-tools/fitness',
+  },
+  {
+    unscoped: 'simulation',
+    name: '@opensip-tools/simulation',
+    dir: 'packages/simulation/engine',
+    filter: '@opensip-tools/simulation',
+  },
+  {
+    unscoped: 'graph',
+    name: '@opensip-tools/graph',
+    dir: 'packages/graph/engine',
+    filter: '@opensip-tools/graph',
+  },
   // Layer 3.5 — shared tree-sitter adapter scaffolding (before the 4 tree-sitter packs)
-  { unscoped: 'graph-adapter-common', name: '@opensip-tools/graph-adapter-common', dir: 'packages/graph/graph-adapter-common',    filter: '@opensip-tools/graph-adapter-common' },
+  {
+    unscoped: 'graph-adapter-common',
+    name: '@opensip-tools/graph-adapter-common',
+    dir: 'packages/graph/graph-adapter-common',
+    filter: '@opensip-tools/graph-adapter-common',
+  },
   // Layer 3.6 — graph adapter packs
-  { unscoped: 'graph-typescript',     name: '@opensip-tools/graph-typescript',     dir: 'packages/graph/graph-typescript',        filter: '@opensip-tools/graph-typescript' },
-  { unscoped: 'graph-python',         name: '@opensip-tools/graph-python',         dir: 'packages/graph/graph-python',            filter: '@opensip-tools/graph-python' },
-  { unscoped: 'graph-rust',           name: '@opensip-tools/graph-rust',           dir: 'packages/graph/graph-rust',              filter: '@opensip-tools/graph-rust' },
-  { unscoped: 'graph-go',             name: '@opensip-tools/graph-go',             dir: 'packages/graph/graph-go',                filter: '@opensip-tools/graph-go' },
-  { unscoped: 'graph-java',           name: '@opensip-tools/graph-java',           dir: 'packages/graph/graph-java',              filter: '@opensip-tools/graph-java' },
+  {
+    unscoped: 'graph-typescript',
+    name: '@opensip-tools/graph-typescript',
+    dir: 'packages/graph/graph-typescript',
+    filter: '@opensip-tools/graph-typescript',
+  },
+  {
+    unscoped: 'graph-python',
+    name: '@opensip-tools/graph-python',
+    dir: 'packages/graph/graph-python',
+    filter: '@opensip-tools/graph-python',
+  },
+  {
+    unscoped: 'graph-rust',
+    name: '@opensip-tools/graph-rust',
+    dir: 'packages/graph/graph-rust',
+    filter: '@opensip-tools/graph-rust',
+  },
+  {
+    unscoped: 'graph-go',
+    name: '@opensip-tools/graph-go',
+    dir: 'packages/graph/graph-go',
+    filter: '@opensip-tools/graph-go',
+  },
+  {
+    unscoped: 'graph-java',
+    name: '@opensip-tools/graph-java',
+    dir: 'packages/graph/graph-java',
+    filter: '@opensip-tools/graph-java',
+  },
   // Layer 4 — check packs
-  { unscoped: 'checks-universal',     name: '@opensip-tools/checks-universal',     dir: 'packages/fitness/checks-universal',      filter: '@opensip-tools/checks-universal' },
-  { unscoped: 'checks-typescript',    name: '@opensip-tools/checks-typescript',    dir: 'packages/fitness/checks-typescript',     filter: '@opensip-tools/checks-typescript' },
-  { unscoped: 'checks-python',        name: '@opensip-tools/checks-python',        dir: 'packages/fitness/checks-python',         filter: '@opensip-tools/checks-python' },
-  { unscoped: 'checks-go',            name: '@opensip-tools/checks-go',            dir: 'packages/fitness/checks-go',             filter: '@opensip-tools/checks-go' },
-  { unscoped: 'checks-java',          name: '@opensip-tools/checks-java',          dir: 'packages/fitness/checks-java',           filter: '@opensip-tools/checks-java' },
-  { unscoped: 'checks-cpp',           name: '@opensip-tools/checks-cpp',           dir: 'packages/fitness/checks-cpp',            filter: '@opensip-tools/checks-cpp' },
-  { unscoped: 'checks-rust',          name: '@opensip-tools/checks-rust',          dir: 'packages/fitness/checks-rust',           filter: '@opensip-tools/checks-rust' },
+  {
+    unscoped: 'checks-universal',
+    name: '@opensip-tools/checks-universal',
+    dir: 'packages/fitness/checks-universal',
+    filter: '@opensip-tools/checks-universal',
+  },
+  {
+    unscoped: 'checks-typescript',
+    name: '@opensip-tools/checks-typescript',
+    dir: 'packages/fitness/checks-typescript',
+    filter: '@opensip-tools/checks-typescript',
+  },
+  {
+    unscoped: 'checks-python',
+    name: '@opensip-tools/checks-python',
+    dir: 'packages/fitness/checks-python',
+    filter: '@opensip-tools/checks-python',
+  },
+  {
+    unscoped: 'checks-go',
+    name: '@opensip-tools/checks-go',
+    dir: 'packages/fitness/checks-go',
+    filter: '@opensip-tools/checks-go',
+  },
+  {
+    unscoped: 'checks-java',
+    name: '@opensip-tools/checks-java',
+    dir: 'packages/fitness/checks-java',
+    filter: '@opensip-tools/checks-java',
+  },
+  {
+    unscoped: 'checks-cpp',
+    name: '@opensip-tools/checks-cpp',
+    dir: 'packages/fitness/checks-cpp',
+    filter: '@opensip-tools/checks-cpp',
+  },
+  {
+    unscoped: 'checks-rust',
+    name: '@opensip-tools/checks-rust',
+    dir: 'packages/fitness/checks-rust',
+    filter: '@opensip-tools/checks-rust',
+  },
   // Layer 5 — composition root (unscoped name → opensip-tools-<ver>.tgz)
-  { unscoped: 'opensip-tools',        name: 'opensip-tools',                       dir: 'packages/cli',                           filter: 'opensip-tools',                  layer: 'cli' },
+  {
+    unscoped: 'opensip-tools',
+    name: 'opensip-tools',
+    dir: 'packages/cli',
+    filter: 'opensip-tools',
+    layer: 'cli',
+  },
 ];
 
 // ---------------------------------------------------------------------
@@ -117,7 +278,8 @@ async function maybeAdd(list, pkgPath, dir) {
   if (!(await pathExists(pkgPath))) return;
   const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8'));
   // Publishable = unscoped CLI name or @opensip-tools/* scope, AND not private.
-  const isScoped = typeof pkg.name === 'string' && (pkg.name === 'opensip-tools' || pkg.name.startsWith(SCOPE));
+  const isScoped =
+    typeof pkg.name === 'string' && (pkg.name === 'opensip-tools' || pkg.name.startsWith(SCOPE));
   if (isScoped && pkg.private !== true) {
     list.push({ name: pkg.name, dir });
   }
@@ -180,13 +342,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
   const printIdx = args.indexOf('--print');
   if (printIdx === -1) {
-    console.error('usage: node scripts/release-package-order.mjs --print <pack|names|publish|bootstrap>');
+    console.error(
+      'usage: node scripts/release-package-order.mjs --print <pack|names|publish|bootstrap>',
+    );
     process.exit(2);
   }
   const mode = args[printIdx + 1];
   const out = printMode(mode);
   if (out === null) {
-    console.error(`unknown --print mode: ${mode ?? '<missing>'} (expected pack|names|publish|bootstrap)`);
+    console.error(
+      `unknown --print mode: ${mode ?? '<missing>'} (expected pack|names|publish|bootstrap)`,
+    );
     process.exit(2);
   }
   console.log(out);

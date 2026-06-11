@@ -14,7 +14,6 @@ import { buildSignalEnvelope } from './signal-envelope.js';
 import type { CommandOutcome } from './command-outcome.js';
 import type { RunDiagnostics } from '@opensip-tools/core';
 
-
 const DIAGNOSTICS: RunDiagnostics = { runId: 'run_1', events: [] };
 
 describe('CommandOutcome', () => {
@@ -56,7 +55,13 @@ describe('CommandOutcome', () => {
       kind: 'bootstrap.error',
       status: 'error',
       exitCode: 2,
-      errors: [{ message: 'No opensip-tools project found.', suggestion: 'Run opensip-tools init.', code: 'CONFIGURATION_ERROR' }],
+      errors: [
+        {
+          message: 'No opensip-tools project found.',
+          suggestion: 'Run opensip-tools init.',
+          code: 'CONFIGURATION_ERROR',
+        },
+      ],
       diagnostics: DIAGNOSTICS,
     };
     expect(outcome.data).toBeUndefined();

@@ -7,11 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { logger } from '../../lib/logger.js';
 import { PLUGIN_API_VERSION } from '../../tools/manifest.js';
-import {
-  admitTool,
-  loadToolManifest,
-  PROJECT_LOCAL_MANIFEST_FILE,
-} from '../manifest-loader.js';
+import { admitTool, loadToolManifest, PROJECT_LOCAL_MANIFEST_FILE } from '../manifest-loader.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const THROW_ON_IMPORT_DIR = join(HERE, '__fixtures__', 'throw-on-import');
@@ -274,11 +270,13 @@ describe('capability discovery descriptor (§5.3)', () => {
       exportShape: 'array',
       configKeys: { packages: 'p', autoDiscover: 'a', scopes: 's' },
     });
-    expect(loadToolManifest('installed', testDir)?.capabilities?.[0]?.discovery?.discovery).toEqual({
-      mode: 'name-pattern',
-      prefix: 'items-',
-      defaultScopes: ['@opensip-tools'],
-    });
+    expect(loadToolManifest('installed', testDir)?.capabilities?.[0]?.discovery?.discovery).toEqual(
+      {
+        mode: 'name-pattern',
+        prefix: 'items-',
+        defaultScopes: ['@opensip-tools'],
+      },
+    );
   });
 
   it('a capability with NO discovery is valid (no auto-discovery)', () => {
@@ -290,7 +288,12 @@ describe('capability discovery descriptor (§5.3)', () => {
 
   it('a malformed descriptor fails the whole manifest', () => {
     // bad mode → the manifest is rejected (mirrors the strict contributionKind check)
-    withCapability({ discovery: { mode: 'bogus' }, exportName: 'items', exportShape: 'array', configKeys: {} });
+    withCapability({
+      discovery: { mode: 'bogus' },
+      exportName: 'items',
+      exportShape: 'array',
+      configKeys: {},
+    });
     expect(loadToolManifest('installed', testDir)).toBeUndefined();
   });
 });
@@ -431,7 +434,9 @@ describe('admitTool — structured admission diagnostics (Phase 4.2)', () => {
       apiVersion: PLUGIN_API_VERSION,
       decision: 'admit',
     });
-    expect((info.mock.calls[0]?.[0] as { manifestHash: string }).manifestHash).toMatch(/^[0-9a-f]{64}$/);
+    expect((info.mock.calls[0]?.[0] as { manifestHash: string }).manifestHash).toMatch(
+      /^[0-9a-f]{64}$/,
+    );
   });
 
   it('emits one `plugin.incompatible.skipped` warn evt with the decision fields on skip', () => {

@@ -13,7 +13,13 @@
  */
 
 import { BUILTIN_DEFAULT_RECIPE } from '@opensip-tools/contracts';
-import { ConfigurationError, currentScope, logger, resolveSelector, setCurrentRecipeUnitConfig } from '@opensip-tools/core';
+import {
+  ConfigurationError,
+  currentScope,
+  logger,
+  resolveSelector,
+  setCurrentRecipeUnitConfig,
+} from '@opensip-tools/core';
 
 import { currentRules } from '../rules/registry.js';
 
@@ -68,7 +74,11 @@ export function resolveRecipeToRules(
     );
   }
 
-  const views: RuleView[] = currentRules().map((rule) => ({ id: rule.slug, name: rule.slug, rule }));
+  const views: RuleView[] = currentRules().map((rule) => ({
+    id: rule.slug,
+    name: rule.slug,
+    rule,
+  }));
   const selected = resolveSelector<RuleView, RuleSelector>(recipe.rules, views, {
     keysOf: (item) => [item.id],
   });

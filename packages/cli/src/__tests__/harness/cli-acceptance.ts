@@ -10,8 +10,8 @@
  * consume it. `smoke-pack.mjs` imports the `.mjs` core directly (no TS).
  */
 
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import {
   expectEnvelope,
@@ -22,11 +22,11 @@ import {
   type ScenarioResult,
   type SpawnOptions,
   type SpawnResult,
-} from '../../../../../scripts/cli-acceptance-core.mjs'
+} from '../../../../../scripts/cli-acceptance-core.mjs';
 
 // Re-export the core surfaces consumers need directly from the core module
 // (export…from, per unicorn/prefer-export-from).
-export { checkScenario, expectEnvelope } from '../../../../../scripts/cli-acceptance-core.mjs'
+export { checkScenario, expectEnvelope } from '../../../../../scripts/cli-acceptance-core.mjs';
 export type {
   BinaryDescriptor,
   Scenario,
@@ -34,20 +34,20 @@ export type {
   ScenarioResult,
   SpawnOptions,
   SpawnResult,
-} from '../../../../../scripts/cli-acceptance-core.mjs'
+} from '../../../../../scripts/cli-acceptance-core.mjs';
 
 /** Absolute path to the built CLI entry (this file is at src/__tests__/harness/). */
-const DIST_CLI = fileURLToPath(new URL('../../../dist/index.js', import.meta.url))
+const DIST_CLI = fileURLToPath(new URL('../../../dist/index.js', import.meta.url));
 
 /**
  * The CLI package version, read from package.json so `--version` scenarios
  * never drift from source (lifted from e2e.test.ts).
  */
 export const CLI_PKG_VERSION: string = (() => {
-  const pkgUrl = new URL('../../../package.json', import.meta.url)
-  const pkg = JSON.parse(readFileSync(fileURLToPath(pkgUrl), 'utf8')) as { version: string }
-  return pkg.version
-})()
+  const pkgUrl = new URL('../../../package.json', import.meta.url);
+  const pkg = JSON.parse(readFileSync(fileURLToPath(pkgUrl), 'utf8')) as { version: string };
+  return pkg.version;
+})();
 
 /** A binary-bound CLI runner. The binary is a parameter, never hardcoded. */
 export class CliRunner {
@@ -55,18 +55,18 @@ export class CliRunner {
 
   /** Run the CLI once; never throws on non-zero exit. */
   run(args: readonly string[], opts: SpawnOptions = {}): SpawnResult {
-    return spawnCli(this.descriptor, args, opts)
+    return spawnCli(this.descriptor, args, opts);
   }
 
   /** Run a scenario list against this binary. */
   runScenarios(scenarios: readonly Scenario[]): ScenarioResult[] {
-    return runScenarios(this.descriptor, scenarios).results
+    return runScenarios(this.descriptor, scenarios).results;
   }
 }
 
 /** Runner against the source-tree build (`packages/cli/dist/index.js`). */
 export function distRunner(): CliRunner {
-  return new CliRunner({ kind: 'node-script', script: DIST_CLI })
+  return new CliRunner({ kind: 'node-script', script: DIST_CLI });
 }
 
 /**
@@ -75,16 +75,16 @@ export function distRunner(): CliRunner {
  * carries the signal/unit projection, not the raw catalog).
  */
 function graphCatalogNonEmpty(parsed: unknown): string[] {
-  const failures = expectEnvelope({ tool: 'graph' })(parsed)
-  const env = parsed as { signals?: unknown; units?: unknown }
-  const signals = Array.isArray(env.signals) ? env.signals : []
-  const units = Array.isArray(env.units) ? env.units : []
+  const failures = expectEnvelope({ tool: 'graph' })(parsed);
+  const env = parsed as { signals?: unknown; units?: unknown };
+  const signals = Array.isArray(env.signals) ? env.signals : [];
+  const units = Array.isArray(env.units) ? env.units : [];
   if (signals.length === 0 && units.length === 0) {
-    failures.push('graph envelope has neither signals nor units (empty catalog)')
+    failures.push('graph envelope has neither signals nor units (empty catalog)');
   }
-  return failures
+  return failures;
 }
 
 export function expectGraphCatalogNonEmpty(): (parsed: unknown) => string[] {
-  return graphCatalogNonEmpty
+  return graphCatalogNonEmpty;
 }

@@ -9,13 +9,13 @@
  * - Console disabled
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 interface RequiredSetting {
-  envVar: string
-  expectedValue: string
-  description: string
+  envVar: string;
+  expectedValue: string;
+  description: string;
 }
 
 const REQUIRED_SETTINGS: RequiredSetting[] = [
@@ -39,28 +39,26 @@ const REQUIRED_SETTINGS: RequiredSetting[] = [
     expectedValue: '"false"',
     description: 'Console must be disabled in production to prevent unauthorized schema access',
   },
-]
+];
 
 function findHasuraEnvLine(content: string): number {
-  const lines = content.split('\n')
+  const lines = content.split('\n');
   for (const [i, line] of lines.entries()) {
     if ((line ?? '').includes('HASURA_GRAPHQL_')) {
-      return i + 1
+      return i + 1;
     }
   }
-  return 1
+  return 1;
 }
 
 function checkMissingSettings(filePath: string, content: string): CheckViolation[] {
-  if (!content.includes('hasura') || !content.includes('HASURA_GRAPHQL_')) return []
+  if (!content.includes('hasura') || !content.includes('HASURA_GRAPHQL_')) return [];
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
   for (const setting of REQUIRED_SETTINGS) {
-    const presencePattern = new RegExp(String.raw`${setting.envVar}\s*:`)
-    const escapedValue = setting.expectedValue.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
-    const correctValuePattern = new RegExp(
-      String.raw`${setting.envVar}\s*:\s*${escapedValue}`
-    )
+    const presencePattern = new RegExp(String.raw`${setting.envVar}\s*:`);
+    const escapedValue = setting.expectedValue.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+    const correctValuePattern = new RegExp(String.raw`${setting.envVar}\s*:\s*${escapedValue}`);
 
     if (!presencePattern.test(content)) {
       violations.push({
@@ -69,20 +67,20 @@ function checkMissingSettings(filePath: string, content: string): CheckViolation
         severity: 'warning',
         message: `Missing ${setting.envVar}: ${setting.expectedValue}. ${setting.description}.`,
         suggestion: `Add \`${setting.envVar}: ${setting.expectedValue}\` to the hasura environment section.`,
-      })
+      });
     } else if (!correctValuePattern.test(content)) {
-      const lines = content.split('\n')
-      const settingLine = lines.findIndex(l => presencePattern.test(l))
+      const lines = content.split('\n');
+      const settingLine = lines.findIndex((l) => presencePattern.test(l));
       violations.push({
         filePath,
         line: settingLine === -1 ? findHasuraEnvLine(content) : settingLine + 1,
         severity: 'warning',
         message: `${setting.envVar} has incorrect value. Expected: ${setting.expectedValue}. ${setting.description}.`,
         suggestion: `Change to \`${setting.envVar}: ${setting.expectedValue}\`.`,
-      })
+      });
     }
   }
-  return violations
+  return violations;
 }
 
 export const hasuraProductionConfig = defineCheck({
@@ -111,30 +109,30 @@ export const hasuraProductionConfig = defineCheck({
     logger.debug({
       evt: 'fitness.checks.hasura_production_config.analyze_all',
       msg: 'Analyzing production docker-compose files for Hasura security settings',
-    })
+    });
     const prodFiles = files.paths.filter((p) => {
       /* v8 ignore next -- defensive: split + pop on a non-empty string never returns undefined */
-      const filename = p.split('/').pop() ?? ''
-      return filename.includes('prod')
-    })
+      const filename = p.split('/').pop() ?? '';
+      return filename.includes('prod');
+    });
 
     // Read all prod files in parallel to avoid sequential async in loop
     // @fitness-ignore-next-line no-unbounded-concurrency -- Bounded to production docker-compose files (typically 1-3)
     const fileEntries = await Promise.all(
       prodFiles.map(async (filePath) => {
-        const content = await files.read(filePath)
-        return { filePath, content }
+        const content = await files.read(filePath);
+        return { filePath, content };
       }),
-    )
+    );
 
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     for (const { filePath, content } of fileEntries) {
       // @lazy-ok -- result validation depends on preceding file read operation
-      if (!content) continue
-      violations.push(...checkMissingSettings(filePath, content))
+      if (!content) continue;
+      violations.push(...checkMissingSettings(filePath, content));
     }
 
-    return violations
+    return violations;
   },
-})
+});

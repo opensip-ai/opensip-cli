@@ -8,7 +8,7 @@
  * Extracted from the former `no-legacy-code` umbrella in Phase C4.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 const EXCLUDE_PATTERNS = [
   /fitness/,
@@ -18,10 +18,10 @@ const EXCLUDE_PATTERNS = [
   /reports/,
   // Schema-migration utilities legitimately mark superseded versions
   /versioning/,
-]
+];
 
 function shouldExcludeFile(relativePath: string): boolean {
-  return EXCLUDE_PATTERNS.some((pattern) => pattern.test(relativePath))
+  return EXCLUDE_PATTERNS.some((pattern) => pattern.test(relativePath));
 }
 
 /**
@@ -29,11 +29,11 @@ function shouldExcludeFile(relativePath: string): boolean {
  * avoid regex complexity and ReDoS.
  */
 function isDeprecatedJsdocLine(line: string): boolean {
-  const trimmed = line.trim()
-  const normalized = trimmed.startsWith('*') ? trimmed.slice(1).trim() : trimmed
+  const trimmed = line.trim();
+  const normalized = trimmed.startsWith('*') ? trimmed.slice(1).trim() : trimmed;
   // Defensive concatenation — avoids accidental self-detection in this file's source.
-  const marker = '@' + 'deprecated'
-  return normalized.toLowerCase().startsWith(marker)
+  const marker = '@' + 'deprecated';
+  return normalized.toLowerCase().startsWith(marker);
 }
 
 export const noDeprecatedTags = defineCheck({
@@ -55,14 +55,14 @@ export const noDeprecatedTags = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze(content, filePath): CheckViolation[] {
-    if (shouldExcludeFile(filePath)) return []
-    if (!content.toLowerCase().includes('deprecated')) return []
+    if (shouldExcludeFile(filePath)) return [];
+    if (!content.toLowerCase().includes('deprecated')) return [];
 
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (const [i, line] of lines.entries()) {
-      if (!line) continue
+      if (!line) continue;
       if (isDeprecatedJsdocLine(line)) {
         violations.push({
           line: i + 1,
@@ -71,12 +71,13 @@ export const noDeprecatedTags = defineCheck({
             'Found @deprecated JSDoc tag - remove this deprecated code and update all callers in the same PR',
           severity: 'error',
           type: 'deprecated-tag',
-          suggestion: 'Remove the deprecated code entirely and update all call sites in the same PR',
+          suggestion:
+            'Remove the deprecated code entirely and update all call sites in the same PR',
           match: line.trim(),
-        })
+        });
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

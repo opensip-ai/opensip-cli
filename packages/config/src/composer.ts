@@ -56,9 +56,7 @@ function strictenNamespace(schema: ZodType): ZodType {
  * @param declarations The tool declarations to compose. Duplicate namespaces
  *   are rejected — two tools may not own the same top-level key.
  */
-export function composeConfigSchema(
-  declarations: readonly ToolConfigDeclaration[],
-): ZodType {
+export function composeConfigSchema(declarations: readonly ToolConfigDeclaration[]): ZodType {
   const shape: Record<string, ZodType> = {};
   for (const decl of declarations) {
     if (Object.prototype.hasOwnProperty.call(shape, decl.namespace)) {

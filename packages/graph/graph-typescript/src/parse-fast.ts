@@ -50,9 +50,7 @@ interface SourceFileWithParseDiagnostics extends ts.SourceFile {
  * Parse each input file into a standalone `ts.SourceFile` with parent
  * pointers, building no Program and constructing no type checker.
  */
-export function parseProjectFast(
-  input: ParseInput,
-): ParseOutput<TypescriptFastParsedProject> {
+export function parseProjectFast(input: ParseInput): ParseOutput<TypescriptFastParsedProject> {
   const compilerOptions = (input.compilerOptions ?? {}) as ts.CompilerOptions;
   const scriptTarget = compilerOptions.target ?? ts.ScriptTarget.Latest;
 

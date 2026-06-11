@@ -3,33 +3,31 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-release-set
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js'
+import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js';
 
 function analyze(content: string, _filePath: string): CheckViolation[] {
-  if (!hasSentryInit(content)) return []
+  if (!hasSentryInit(content)) return [];
 
-  const initBlock = extractSentryInitBlock(content)
-  if (!initBlock) return []
+  const initBlock = extractSentryInitBlock(content);
+  if (!initBlock) return [];
 
   const hasRelease =
-    initBlock.block.includes('release') ||
-    initBlock.block.includes('SENTRY_RELEASE')
+    initBlock.block.includes('release') || initBlock.block.includes('SENTRY_RELEASE');
 
-  if (hasRelease) return []
+  if (hasRelease) return [];
 
   return [
     {
       line: initBlock.startLine + 1,
-      message:
-        'Sentry.init() called without release — cannot link errors to deploys or commits',
+      message: 'Sentry.init() called without release — cannot link errors to deploys or commits',
       severity: 'warning',
       suggestion:
         'Add release to Sentry.init(): Sentry.init({ release: process.env.SENTRY_RELEASE || "1.0.0", ... }). Pair with @sentry/webpack-plugin or @sentry/vite-plugin for automatic release creation.',
       type: 'sentry-missing-release',
     },
-  ]
+  ];
 }
 
 /**
@@ -56,4 +54,4 @@ export const sentryReleaseSet = defineCheck({
   fileTypes: ['ts', 'js', 'tsx', 'jsx', 'mjs'],
   confidence: 'high',
   analyze,
-})
+});

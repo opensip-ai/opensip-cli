@@ -1,4 +1,3 @@
- 
 // @fitness-ignore-file fitness-check-standards -- Uses fs for README existence checking, not source file content
 /**
  * @fileoverview Project README existence check
@@ -6,10 +5,10 @@
  * Ensures every package, app, CLI, and service has a README.md file.
  */
 
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 /**
  * Check: architecture/project-readme-existence
@@ -39,14 +38,14 @@ export const projectReadmeExistence = defineCheck({
   // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
   // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Only check directories that contain a package.json (actual packages)
-    const packageJsonPaths = files.paths.filter((fp) => path.basename(fp) === 'package.json')
+    const packageJsonPaths = files.paths.filter((fp) => path.basename(fp) === 'package.json');
 
     for (const packageJsonPath of packageJsonPaths) {
-      const dirPath = path.dirname(packageJsonPath)
-      const readmePath = path.join(dirPath, 'README.md')
+      const dirPath = path.dirname(packageJsonPath);
+      const readmePath = path.join(dirPath, 'README.md');
 
       if (!fs.existsSync(readmePath)) {
         violations.push({
@@ -56,10 +55,10 @@ export const projectReadmeExistence = defineCheck({
           severity: 'warning',
           suggestion:
             'Create a README.md file with package description, usage, and API documentation',
-        })
+        });
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

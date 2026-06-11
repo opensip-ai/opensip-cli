@@ -7,14 +7,14 @@
  * It also reads the REAL `.github/workflows/release.yml` to prove the live
  * workflow currently satisfies ADR-0017 (0 violations).
  */
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest';
 
-import { analyzeReleaseGateParity } from '../release-gate-parity.js'
+import { analyzeReleaseGateParity } from '../release-gate-parity.js';
 
-const RELEASE_PATH = '.github/workflows/release.yml'
+const RELEASE_PATH = '.github/workflows/release.yml';
 
 /** A well-formed release.yml: all four gates present, all BEFORE the pack step. */
 const GOOD_RELEASE = `name: Release
@@ -41,24 +41,24 @@ jobs:
           pnpm --filter "$filter" pack --pack-destination /tmp/tarballs
       - name: Publish via npm
         run: npm publish /tmp/tarballs/*.tgz --provenance
-`
+`;
 
 describe('analyzeReleaseGateParity', () => {
   it('returns 0 violations for a well-formed release.yml (all four gates before pack)', () => {
-    expect(analyzeReleaseGateParity(GOOD_RELEASE, RELEASE_PATH)).toEqual([])
-  })
+    expect(analyzeReleaseGateParity(GOOD_RELEASE, RELEASE_PATH)).toEqual([]);
+  });
 
   it('flags a missing gate (pnpm test:coverage absent)', () => {
     const missing = GOOD_RELEASE.replace(
       `      - name: Test with coverage thresholds\n        run: pnpm test:coverage\n`,
       '',
-    )
-    const violations = analyzeReleaseGateParity(missing, RELEASE_PATH)
-    expect(violations).toHaveLength(1)
-    expect(violations[0]?.severity).toBe('error')
-    expect(violations[0]?.message).toContain('pnpm test:coverage')
-    expect(violations[0]?.message).toContain('missing')
-  })
+    );
+    const violations = analyzeReleaseGateParity(missing, RELEASE_PATH);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.severity).toBe('error');
+    expect(violations[0]?.message).toContain('pnpm test:coverage');
+    expect(violations[0]?.message).toContain('missing');
+  });
 
   it('flags every required gate when none are present', () => {
     const noGates = `name: Release
@@ -68,11 +68,11 @@ jobs:
       - run: pnpm build
       - name: Pack
         run: pnpm --filter "$f" pack --pack-destination /tmp/t
-`
-    const violations = analyzeReleaseGateParity(noGates, RELEASE_PATH)
-    expect(violations).toHaveLength(4)
-    expect(violations.every((v) => v.severity === 'error')).toBe(true)
-  })
+`;
+    const violations = analyzeReleaseGateParity(noGates, RELEASE_PATH);
+    expect(violations).toHaveLength(4);
+    expect(violations.every((v) => v.severity === 'error')).toBe(true);
+  });
 
   it('flags a gate that runs AFTER the pack step (ordering violation)', () => {
     // graph:ci moved below the pack step.
@@ -88,34 +88,36 @@ jobs:
         run: pnpm --filter "$f" pack --pack-destination /tmp/t
       - name: Graph (too late!)
         run: pnpm graph:ci
-`
-    const violations = analyzeReleaseGateParity(afterPack, RELEASE_PATH)
-    expect(violations).toHaveLength(1)
-    expect(violations[0]?.message).toContain('pnpm graph:ci')
-    expect(violations[0]?.message).toContain('at or after the pack step')
-    expect(violations[0]?.severity).toBe('error')
-  })
+`;
+    const violations = analyzeReleaseGateParity(afterPack, RELEASE_PATH);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain('pnpm graph:ci');
+    expect(violations[0]?.message).toContain('at or after the pack step');
+    expect(violations[0]?.severity).toBe('error');
+  });
 
   it('does NOT act on a non-release file path (scope guard)', () => {
     // Same offending content, but not release.yml → ignored entirely.
-    const ciYml = '.github/workflows/ci.yml'
-    expect(analyzeReleaseGateParity('jobs:\n  build:\n    steps:\n      - run: echo hi\n', ciYml)).toEqual([])
+    const ciYml = '.github/workflows/ci.yml';
+    expect(
+      analyzeReleaseGateParity('jobs:\n  build:\n    steps:\n      - run: echo hi\n', ciYml),
+    ).toEqual([]);
     // Even a Windows-style path to a non-release workflow is ignored.
-    expect(analyzeReleaseGateParity('no gates here', String.raw`src\release.yml`)).toEqual([])
-  })
+    expect(analyzeReleaseGateParity('no gates here', String.raw`src\release.yml`)).toEqual([]);
+  });
 
   it('matches a Windows-style path to the real release workflow', () => {
     // The scope guard normalises backslashes, so a CRLF/Windows checkout path
     // still resolves to the release workflow and the gates are enforced.
-    const winPath = String.raw`repo\.github\workflows\release.yml`
-    expect(analyzeReleaseGateParity(GOOD_RELEASE, winPath)).toEqual([])
-  })
+    const winPath = String.raw`repo\.github\workflows\release.yml`;
+    expect(analyzeReleaseGateParity(GOOD_RELEASE, winPath)).toEqual([]);
+  });
 
   it('passes clean against the REAL .github/workflows/release.yml (ADR-0017 satisfied)', () => {
     // __tests__ dir → up to repo root: ../../../../../../../ from
     // packages/fitness/checks-universal/src/checks/architecture/__tests__/
-    const repoRoot = fileURLToPath(new URL('../../../../../../../', import.meta.url))
-    const realContent = readFileSync(`${repoRoot}.github/workflows/release.yml`, 'utf8')
-    expect(analyzeReleaseGateParity(realContent, RELEASE_PATH)).toEqual([])
-  })
-})
+    const repoRoot = fileURLToPath(new URL('../../../../../../../', import.meta.url));
+    const realContent = readFileSync(`${repoRoot}.github/workflows/release.yml`, 'utf8');
+    expect(analyzeReleaseGateParity(realContent, RELEASE_PATH)).toEqual([]);
+  });
+});

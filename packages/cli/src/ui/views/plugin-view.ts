@@ -47,10 +47,18 @@ function pluginLine(p: PluginInfo): ViewNode {
 function domainSection(domain: string, plugins: readonly PluginInfo[]): ViewNode[] {
   const domainPlugins = plugins.filter((p) => p.domain === domain);
   if (domainPlugins.length === 0) {
-    return [line([{ text: `  ${domain}/`, dim: true }, { text: ' — no plugins installed', dim: true }])];
+    return [
+      line([
+        { text: `  ${domain}/`, dim: true },
+        { text: ' — no plugins installed', dim: true },
+      ]),
+    ];
   }
   return [
-    line([{ text: `  ${domain}/`, tone: 'brand' }, { text: ` (${domainPlugins.length})`, dim: true }]),
+    line([
+      { text: `  ${domain}/`, tone: 'brand' },
+      { text: ` (${domainPlugins.length})`, dim: true },
+    ]),
     ...domainPlugins.map(pluginLine),
   ];
 }
@@ -68,14 +76,25 @@ function listView(
   if (totalCount === 0) {
     children.push(
       { kind: 'spacer' },
-      line([{ text: '  No plugins installed. Run opensip-tools plugin add <package> to get started.', dim: true }]),
+      line([
+        {
+          text: '  No plugins installed. Run opensip-tools plugin add <package> to get started.',
+          dim: true,
+        },
+      ]),
     );
   }
   children.push(...provenanceSection(toolProvenance));
   return group(children);
 }
 
-function addRemoveView(verb: string, failVerb: string, packageName: string, success: boolean, error?: string): ViewNode {
+function addRemoveView(
+  verb: string,
+  failVerb: string,
+  packageName: string,
+  success: boolean,
+  error?: string,
+): ViewNode {
   if (success) {
     return group([line([{ text: '✔', tone: 'success' }, { text: ` ${verb} ${packageName}` }])], 2);
   }
@@ -88,12 +107,19 @@ function addRemoveView(verb: string, failVerb: string, packageName: string, succ
 }
 
 function syncView(
-  synced: readonly { readonly domain: string; readonly package: string; readonly installed: boolean }[],
+  synced: readonly {
+    readonly domain: string;
+    readonly package: string;
+    readonly installed: boolean;
+  }[],
   success: boolean,
   errors?: readonly string[],
 ): ViewNode {
   if (synced.length === 0) {
-    return group([line([{ text: 'No plugins declared in opensip-tools.config.yml.', dim: true }])], 2);
+    return group(
+      [line([{ text: 'No plugins declared in opensip-tools.config.yml.', dim: true }])],
+      2,
+    );
   }
   const children: ViewNode[] = [
     line([{ text: 'Plugin sync', bold: true }]),
@@ -124,7 +150,13 @@ export function viewPlugin(result: PluginResult): ViewNode {
       return listView(result.plugins, result.totalCount, result.toolProvenance);
     }
     case 'plugin-add': {
-      return addRemoveView('Installed', 'install', result.packageName, result.success, result.error);
+      return addRemoveView(
+        'Installed',
+        'install',
+        result.packageName,
+        result.success,
+        result.error,
+      );
     }
     case 'plugin-remove': {
       return addRemoveView('Removed', 'remove', result.packageName, result.success, result.error);

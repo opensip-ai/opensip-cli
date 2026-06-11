@@ -33,10 +33,10 @@
  * trip the check; the allow-list is documented here for the reviewer and asserted
  * by the test.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /** Resolved-path fragment identifying a first-party TOOL registration file. */
-const TOOL_REGISTRATION_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/src\/tool\.ts$/
+const TOOL_REGISTRATION_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/src\/tool\.ts$/;
 
 /**
  * The documented host-command exceptions — the action-less Commander subcommand
@@ -47,7 +47,7 @@ const TOOL_REGISTRATION_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/
  * inspected — the list is the finite, named justification a reviewer can audit,
  * and the test asserts it stays exactly these two.
  */
-export const HOST_SUBCOMMAND_GROUP_EXCEPTIONS: readonly string[] = ['sessions', 'plugin']
+export const HOST_SUBCOMMAND_GROUP_EXCEPTIONS: readonly string[] = ['sessions', 'plugin'];
 
 /**
  * Raw-Commander access patterns a tool file must never contain. Each entry is a
@@ -57,19 +57,22 @@ export const HOST_SUBCOMMAND_GROUP_EXCEPTIONS: readonly string[] = ['sessions', 
  * downstream uses that a cast enables.
  */
 interface RawCommanderPattern {
-  readonly re: RegExp
-  readonly label: string
+  readonly re: RegExp;
+  readonly label: string;
 }
 
 const RAW_COMMANDER_PATTERNS: readonly RawCommanderPattern[] = [
   // `const program = cli.program as CliProgram` — re-acquiring the typed program
   // off the context. This is the one the 2.11.0 command plane removed.
-  { re: /\bcli\.program\s+as\b/, label: 'a `cli.program as` cast (re-acquiring the raw Commander program)' },
+  {
+    re: /\bcli\.program\s+as\b/,
+    label: 'a `cli.program as` cast (re-acquiring the raw Commander program)',
+  },
   { re: /\bprogram\.command\(/, label: 'a raw `program.command(...)` call' },
   { re: /\.requiredOption\(/, label: 'a raw `.requiredOption(...)` call' },
   { re: /\.option\(/, label: 'a raw `.option(...)` call' },
   { re: /\.argument\(/, label: 'a raw `.argument(...)` call' },
-]
+];
 
 /**
  * Matches a `register` mount-hook DECLARATION — either the method/call form
@@ -78,10 +81,10 @@ const RAW_COMMANDER_PATTERNS: readonly RawCommanderPattern[] = [
  * branch is anchored on a single literal token after the optional whitespace, so
  * the pattern is linear (no nested quantifier that could backtrack).
  */
-const REGISTER_BODY_RE = /\bregister\s*[(?:=]/
+const REGISTER_BODY_RE = /\bregister\s*[(?:=]/;
 
 /** Detects a declared `commandSpecs` surface anywhere in the file. */
-const COMMAND_SPECS_RE = /\bcommandSpecs\b/
+const COMMAND_SPECS_RE = /\bcommandSpecs\b/;
 
 /**
  * Pure analysis function. Exported so unit tests can exercise detection without
@@ -89,32 +92,32 @@ const COMMAND_SPECS_RE = /\bcommandSpecs\b/
  * pattern, and (2) a `register()` body in a file that declares no `commandSpecs`.
  */
 export function analyzeCommandSurfaceParity(content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
 
   for (const [i, line] of lines.entries()) {
     for (const pattern of RAW_COMMANDER_PATTERNS) {
-      if (!pattern.re.test(line)) continue
+      if (!pattern.re.test(line)) continue;
       violations.push({
         message: `Tool registration file reaches back to raw Commander via ${pattern.label}; every command must be a declared CommandSpec mounted by the host (release 2.11.0 command plane).`,
         severity: 'error',
         line: i + 1,
         suggestion:
           'Declare the command as a CommandSpec (defineCommand) on the tool’s `commandSpecs` and let `mountCommandSpec` wire Commander. Tools must not touch the program.',
-      })
+      });
       // One finding per line is enough — a `.option(` line need not also report
       // the `program.command(` substring it may contain.
-      break
+      break;
     }
   }
 
   // A `register()` body with no `commandSpecs` declaration = the deprecated mount
   // hook reintroduced. (A file that has BOTH is a tolerated transitional shape;
   // a file with neither — prose mentioning `register` — is also fine.)
-  const hasRegisterBody = lines.some((line) => REGISTER_BODY_RE.test(line))
-  const declaresCommandSpecs = COMMAND_SPECS_RE.test(content)
+  const hasRegisterBody = lines.some((line) => REGISTER_BODY_RE.test(line));
+  const declaresCommandSpecs = COMMAND_SPECS_RE.test(content);
   if (hasRegisterBody && !declaresCommandSpecs) {
-    const registerLine = lines.findIndex((line) => REGISTER_BODY_RE.test(line))
+    const registerLine = lines.findIndex((line) => REGISTER_BODY_RE.test(line));
     violations.push({
       message:
         'Tool defines a `register()` body but declares no `commandSpecs`; the deprecated Commander mount hook must not be reintroduced (release 2.11.0 command plane).',
@@ -122,10 +125,10 @@ export function analyzeCommandSurfaceParity(content: string): CheckViolation[] {
       line: registerLine + 1,
       suggestion:
         'Replace the `register()` body with a `commandSpecs` array of CommandSpecs; the host mounts them via `mountCommandSpec`.',
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 export const commandSurfaceParity = defineCheck({
@@ -142,7 +145,7 @@ export const commandSurfaceParity = defineCheck({
   // commented-out re-acquisition of the program.
   contentFilter: 'raw',
   analyze: (content, filePath) => {
-    if (!TOOL_REGISTRATION_PATH.test(filePath)) return []
-    return analyzeCommandSurfaceParity(content)
+    if (!TOOL_REGISTRATION_PATH.test(filePath)) return [];
+    return analyzeCommandSurfaceParity(content);
   },
-})
+});

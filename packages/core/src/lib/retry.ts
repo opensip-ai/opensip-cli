@@ -25,10 +25,7 @@ export interface RetryOptions {
  *   `effectiveMaxAttempts` attempts. Non-Error throws are wrapped in
  *   an `Error` whose message is `String(value)`.
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {},
-): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
   const {
     maxAttempts = 3,
     initialDelayMs = 500,
@@ -62,7 +59,7 @@ export async function withRetry<T>(
 
       onRetry?.(attempt, lastError, delay);
 
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 

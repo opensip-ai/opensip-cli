@@ -56,7 +56,16 @@ function mockCli(): MockCliBag {
     logger: console,
     scope: { datastore: () => undefined },
   } as unknown as ToolCliContext;
-  return { cli, renderLive, render, setExitCode, maybeOpenDashboard, emitEnvelope, emitError, deliverSignals };
+  return {
+    cli,
+    renderLive,
+    render,
+    setExitCode,
+    maybeOpenDashboard,
+    emitEnvelope,
+    emitError,
+    deliverSignals,
+  };
 }
 
 const args = { cwd: '/x' } as unknown as Parameters<typeof runLiveMode>[0];
@@ -115,14 +124,17 @@ describe('runLiveMode', () => {
 
   it('exits RUNTIME_ERROR on a non-TTY run that breached the fail threshold', async () => {
     setTTY(false);
-    executeFitMock.mockResolvedValue({ result: { type: 'fit-done', shouldFail: true }, envelope: envelope() });
+    executeFitMock.mockResolvedValue({
+      result: { type: 'fit-done', shouldFail: true },
+      envelope: envelope(),
+    });
     const { cli, setExitCode, render } = mockCli();
     await runLiveMode(args, cli, 'fit', false);
     expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
     expect(render).toHaveBeenCalled();
   });
 
-  it('propagates an error result\'s exit code on a non-TTY run (no delivery)', async () => {
+  it("propagates an error result's exit code on a non-TTY run (no delivery)", async () => {
     setTTY(false);
     const result = { type: 'error', exitCode: 2, message: 'no config' };
     executeFitMock.mockResolvedValue({ result });
@@ -143,7 +155,10 @@ describe('runJsonMode', () => {
 
   it('emits the envelope and delivers signals once', async () => {
     const env = envelope();
-    executeFitMock.mockResolvedValue({ result: { type: 'fit-done', shouldFail: false }, envelope: env });
+    executeFitMock.mockResolvedValue({
+      result: { type: 'fit-done', shouldFail: false },
+      envelope: env,
+    });
     const { cli, emitEnvelope, deliverSignals } = mockCli();
     await runJsonMode(reportArgs, cli);
     expect(emitEnvelope).toHaveBeenCalledWith(env);
@@ -158,7 +173,10 @@ describe('runJsonMode', () => {
 
   it('passes runFailed=true to deliverSignals on a failing run (root owns exit 4)', async () => {
     const env = envelope();
-    executeFitMock.mockResolvedValue({ result: { type: 'fit-done', shouldFail: true }, envelope: env });
+    executeFitMock.mockResolvedValue({
+      result: { type: 'fit-done', shouldFail: true },
+      envelope: env,
+    });
     const { cli, setExitCode, deliverSignals } = mockCli();
     await runJsonMode(reportArgs, cli);
     expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
@@ -166,7 +184,9 @@ describe('runJsonMode', () => {
   });
 
   it('emits an error payload and does not deliver on an error result', async () => {
-    executeFitMock.mockResolvedValue({ result: { type: 'error', exitCode: 2, message: 'no config' } });
+    executeFitMock.mockResolvedValue({
+      result: { type: 'error', exitCode: 2, message: 'no config' },
+    });
     const { cli, emitEnvelope, emitError, deliverSignals, setExitCode } = mockCli();
     await runJsonMode(args, cli);
     // 2.12.0 (§5.5): a failed --json run emits a structured error through the

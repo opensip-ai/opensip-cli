@@ -46,7 +46,15 @@ describe('isValidTool', () => {
     expect(
       isValidTool({
         metadata: { id: 'fake' },
-        commandSpecs: [{ name: 'fake', description: 'fake', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }],
+        commandSpecs: [
+          {
+            name: 'fake',
+            description: 'fake',
+            commonFlags: [],
+            output: 'command-result',
+            handler: () => Promise.resolve({}),
+          },
+        ],
         commands: [],
       }),
     ).toBe(true);
@@ -67,7 +75,9 @@ describe('isValidTool', () => {
 
   it('rejects when metadata.id is missing or non-string', () => {
     expect(isValidTool({ metadata: {}, register: () => undefined, commands: [] })).toBe(false);
-    expect(isValidTool({ metadata: { id: 123 }, register: () => undefined, commands: [] })).toBe(false);
+    expect(isValidTool({ metadata: { id: 123 }, register: () => undefined, commands: [] })).toBe(
+      false,
+    );
   });
 
   it('rejects when register is missing or non-function', () => {
@@ -77,7 +87,9 @@ describe('isValidTool', () => {
 
   it('rejects when commands is missing or non-array', () => {
     expect(isValidTool({ metadata: { id: 'x' }, register: () => undefined })).toBe(false);
-    expect(isValidTool({ metadata: { id: 'x' }, register: () => undefined, commands: {} })).toBe(false);
+    expect(isValidTool({ metadata: { id: 'x' }, register: () => undefined, commands: {} })).toBe(
+      false,
+    );
   });
 });
 
@@ -182,7 +194,11 @@ describe('uninstall.ts — default I/O fallbacks', () => {
       expect(result.action).toBe('cancelled');
     } finally {
       writeSpy.mockRestore();
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
     }
   });
 });

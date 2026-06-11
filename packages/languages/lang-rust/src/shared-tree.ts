@@ -6,13 +6,13 @@
  * is parsed once; falls back to a direct parse when no cache is active.
  */
 
-import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js'
+import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js';
 
-import { rustAdapter } from './adapter.js'
+import { rustAdapter } from './adapter.js';
 
-import type { RustTree } from './parse.js'
+import type { RustTree } from './parse.js';
 
 /** Returns the shared (cached) Rust parse tree for `filePath`, or null when unparseable. */
 export function getSharedTree(filePath: string, content: string): RustTree | null {
-  return getParseTree(rustAdapter, filePath, content)
+  return getParseTree(rustAdapter, filePath, content);
 }

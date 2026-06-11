@@ -50,8 +50,14 @@ describe('composed whole-document validation', () => {
 
   it.each([
     ['cli', { ...WHOLE_DOCUMENT, cli: { recipe: 'x', reprtTo: 'oops' } }],
-    ['targets (non-kebab key)', { ...WHOLE_DOCUMENT, targets: { Backend: { description: 'x', include: ['a'] } } }],
-    ['targets (missing description)', { ...WHOLE_DOCUMENT, targets: { backend: { include: ['a'] } } }],
+    [
+      'targets (non-kebab key)',
+      { ...WHOLE_DOCUMENT, targets: { Backend: { description: 'x', include: ['a'] } } },
+    ],
+    [
+      'targets (missing description)',
+      { ...WHOLE_DOCUMENT, targets: { backend: { include: ['a'] } } },
+    ],
     ['fitness', { ...WHOLE_DOCUMENT, fitness: { faliOnErrors: 1 } }],
     ['graph', { ...WHOLE_DOCUMENT, graph: { minDuplicateBodyLine: 10 } }],
   ])('throws one ConfigurationError on a typo in the %s block', (_label, doc) => {

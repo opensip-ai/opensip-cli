@@ -3,17 +3,22 @@
  * @fileoverview Enforce use of centralized crypto module
  */
 
-import { logger } from '@opensip-tools/core'
-import { createPathMatcher, defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import {
+  createPathMatcher,
+  defineCheck,
+  isCommentLine,
+  type CheckViolation,
+} from '@opensip-tools/fitness';
 
 /**
  * Pattern configuration for detecting direct crypto usage
  */
 interface CryptoPattern {
-  regex: RegExp
-  message: string
-  suggestion: string
-  severity: 'error' | 'warning'
+  regex: RegExp;
+  message: string;
+  suggestion: string;
+  severity: 'error' | 'warning';
 }
 
 /**
@@ -32,7 +37,7 @@ function createCryptoPattern(
   severity: 'error' | 'warning',
 ): CryptoPattern {
   // @fitness-ignore-next-line semgrep-scan -- non-literal RegExp is intentional; patterns are hardcoded string constants for code analysis, not user input
-  return { regex: new RegExp(pattern, 'g'), message, suggestion, severity }
+  return { regex: new RegExp(pattern, 'g'), message, suggestion, severity };
 }
 
 // Patterns indicating direct crypto usage
@@ -147,7 +152,7 @@ const DIRECT_CRYPTO_PATTERNS: CryptoPattern[] = [
     'Use a centralized crypto utility for JWT operations instead of direct jose imports.',
     'warning',
   ),
-]
+];
 
 // Paths to exclude from checking
 const CRYPTO_IMPL_PATTERNS = [
@@ -166,9 +171,9 @@ const CRYPTO_IMPL_PATTERNS = [
   '/webhooks/verifiers/',
   // Fitness check definitions contain pattern strings, not actual crypto usage
   '/fitness/src/checks/',
-]
+];
 
-const isExcludedCryptoPath = createPathMatcher(CRYPTO_IMPL_PATTERNS)
+const isExcludedCryptoPath = createPathMatcher(CRYPTO_IMPL_PATTERNS);
 
 /**
  * Check: security/use-centralized-crypto
@@ -204,24 +209,24 @@ export const useCentralizedCrypto = defineCheck({
     logger.debug({
       evt: 'fitness.checks.centralized_crypto.analyze',
       msg: 'Analyzing file for direct crypto usage',
-    })
+    });
     if (isExcludedCryptoPath(filePath)) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (const [lineNum, line_] of lines.entries()) {
-      const line = line_ ?? ''
+      const line = line_ ?? '';
 
       if (isCommentLine(line)) {
-        continue
+        continue;
       }
 
       for (const pattern of DIRECT_CRYPTO_PATTERNS) {
-        pattern.regex.lastIndex = 0
-        const match = pattern.regex.exec(line)
+        pattern.regex.lastIndex = 0;
+        const match = pattern.regex.exec(line);
         if (match) {
           violations.push({
             line: lineNum + 1,
@@ -231,11 +236,11 @@ export const useCentralizedCrypto = defineCheck({
             suggestion: pattern.suggestion,
             match: match[0],
             filePath,
-          })
+          });
         }
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

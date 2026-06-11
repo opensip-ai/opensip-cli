@@ -19,22 +19,22 @@
  * signal as a timeout.
  */
 
-import { TimeoutError, logger, runWithTimeout } from '@opensip-tools/core'
+import { TimeoutError, logger, runWithTimeout } from '@opensip-tools/core';
 
-import { CheckAbortedError } from '../framework/execution-context.js'
-import { memoryProfiler } from '../framework/memory-profiler.js'
+import { CheckAbortedError } from '../framework/execution-context.js';
+import { memoryProfiler } from '../framework/memory-profiler.js';
 
 import {
   processSuccessResult,
   processErrorResult,
   type ProcessorContext,
   type ProcessResultOutput,
-} from './check-result-processor.js'
+} from './check-result-processor.js';
 
-import type { Check } from '../framework/check-types.js'
+import type { Check } from '../framework/check-types.js';
 
 /** Logger module tag used by every event emitted from per-check execution. */
-const MODULE_TAG = 'fitness:execution'
+const MODULE_TAG = 'fitness:execution';
 
 // =============================================================================
 // TYPES
@@ -42,14 +42,14 @@ const MODULE_TAG = 'fitness:execution'
 
 /** Per-call options for `runOneCheck`. */
 export interface RunOneCheckOptions {
-  readonly cwd: string
-  readonly checkIndex: number
-  readonly totalChecks: number
-  readonly recipeTimeoutMs: number
-  readonly retryEnabled: boolean
-  readonly maxRetries: number
-  readonly checkTargetFiles?: ReadonlyMap<string, readonly string[]>
-  readonly globalExcludes?: readonly string[]
+  readonly cwd: string;
+  readonly checkIndex: number;
+  readonly totalChecks: number;
+  readonly recipeTimeoutMs: number;
+  readonly retryEnabled: boolean;
+  readonly maxRetries: number;
+  readonly checkTargetFiles?: ReadonlyMap<string, readonly string[]>;
+  readonly globalExcludes?: readonly string[];
 }
 
 /** Outcome of running a single check. */
@@ -60,9 +60,9 @@ export interface RunOneCheckOutcome {
    * `ProcessResultOutput`; `false` when no result was processed
    * (e.g. nothing to record because the call short-circuited).
    */
-  readonly shouldStop: boolean
+  readonly shouldStop: boolean;
   /** Defined when a result was successfully processed (may be a pass or a fail). */
-  readonly processOutput?: ProcessResultOutput
+  readonly processOutput?: ProcessResultOutput;
 }
 
 // =============================================================================
@@ -83,12 +83,12 @@ export async function runOneCheck(
   opts: RunOneCheckOptions,
   ctx: ProcessorContext,
 ): Promise<RunOneCheckOutcome> {
-  const checkId = check.config.id
-  const checkSlug = check.config.slug
-  const checkTimeout = check.config.timeout ?? opts.recipeTimeoutMs
+  const checkId = check.config.id;
+  const checkSlug = check.config.slug;
+  const checkTimeout = check.config.timeout ?? opts.recipeTimeoutMs;
 
-  const memoryBeforeMB = memoryProfiler.recordCheckStart()
-  ctx.callbacks.onCheckStart?.(checkSlug, opts.checkIndex, opts.totalChecks)
+  const memoryBeforeMB = memoryProfiler.recordCheckStart();
+  ctx.callbacks.onCheckStart?.(checkSlug, opts.checkIndex, opts.totalChecks);
   logger.info({
     evt: 'fitness.check.start',
     module: MODULE_TAG,
@@ -96,9 +96,9 @@ export async function runOneCheck(
     index: opts.checkIndex,
     total: opts.totalChecks,
     timeoutMs: checkTimeout,
-  })
+  });
 
-  const targetFiles = opts.checkTargetFiles?.get(checkSlug)
+  const targetFiles = opts.checkTargetFiles?.get(checkSlug);
 
   // Run on the shared execution substrate (release 2.13.0, §5.8): per-check
   // timeout/abort + retry. The single-source abort invariant is preserved by
@@ -107,19 +107,20 @@ export async function runOneCheck(
   // AbortController+setTimeout body computed it. `CheckAbortedError` is never
   // retried (the timeout abort surfaces as a `timeout` outcome, not a retry).
   const outcome = await runWithTimeout({
-    run: (signal) => check.run(opts.cwd, {
-      signal,
-      ...(targetFiles ? { targetFiles } : {}),
-      ...(opts.globalExcludes ? { globalExcludes: opts.globalExcludes } : {}),
-    }),
+    run: (signal) =>
+      check.run(opts.cwd, {
+        signal,
+        ...(targetFiles ? { targetFiles } : {}),
+        ...(opts.globalExcludes ? { globalExcludes: opts.globalExcludes } : {}),
+      }),
     timeoutMs: checkTimeout,
     retry: {
       enabled: opts.retryEnabled,
       maxRetries: opts.maxRetries,
       shouldNotRetry: (error) => error instanceof CheckAbortedError,
     },
-  })
-  const { durationMs } = outcome
+  });
+  const { durationMs } = outcome;
 
   // The result PROCESSING (which fires user callbacks like onCheckComplete) is
   // wrapped so a throw from a callback is recovered into a non-timeout error
@@ -134,7 +135,7 @@ export async function runOneCheck(
         checkSlug,
         durationMs,
         timeoutMs: checkTimeout,
-      })
+      });
       const processOutput = processErrorResult(ctx, {
         checkId,
         checkSlug,
@@ -145,8 +146,8 @@ export async function runOneCheck(
         memoryBeforeMB,
         timedOut: true,
         timeoutMs: checkTimeout,
-      })
-      return { shouldStop: processOutput.shouldStop, processOutput }
+      });
+      return { shouldStop: processOutput.shouldStop, processOutput };
     }
 
     if (outcome.status === 'error') {
@@ -157,7 +158,7 @@ export async function runOneCheck(
         durationMs,
         timedOut: false,
         error: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
-      })
+      });
       const processOutput = processErrorResult(ctx, {
         checkId,
         checkSlug,
@@ -167,8 +168,8 @@ export async function runOneCheck(
         durationMs,
         memoryBeforeMB,
         timedOut: false,
-      })
-      return { shouldStop: processOutput.shouldStop, processOutput }
+      });
+      return { shouldStop: processOutput.shouldStop, processOutput };
     }
 
     logger.info({
@@ -177,7 +178,7 @@ export async function runOneCheck(
       checkSlug,
       durationMs,
       signals: outcome.result.signals.length,
-    })
+    });
     const processOutput = processSuccessResult(ctx, {
       checkId,
       checkSlug,
@@ -187,12 +188,12 @@ export async function runOneCheck(
       result: outcome.result,
       durationMs,
       memoryBeforeMB,
-    })
-    return { shouldStop: processOutput.shouldStop, processOutput }
+    });
+    return { shouldStop: processOutput.shouldStop, processOutput };
   } catch (error) {
     // A user callback inside the result processing threw. Recover it into an
     // error result — non-timeout unless the unit itself timed out.
-    const isTimeout = outcome.status === 'timeout'
+    const isTimeout = outcome.status === 'timeout';
     logger.info({
       evt: 'fitness.check.error',
       module: MODULE_TAG,
@@ -200,7 +201,7 @@ export async function runOneCheck(
       durationMs,
       timedOut: isTimeout,
       error: error instanceof Error ? error.message : String(error),
-    })
+    });
     const processOutput = processErrorResult(ctx, {
       checkId,
       checkSlug,
@@ -211,7 +212,7 @@ export async function runOneCheck(
       memoryBeforeMB,
       timedOut: isTimeout,
       ...(isTimeout ? { timeoutMs: checkTimeout } : {}),
-    })
-    return { shouldStop: processOutput.shouldStop, processOutput }
+    });
+    return { shouldStop: processOutput.shouldStop, processOutput };
   }
 }

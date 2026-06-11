@@ -49,7 +49,6 @@ export interface PartitionInput {
   readonly rootConfigPathAbs?: string;
 }
 
-
 /**
  * True when `dir` is a path-prefix of `file` at a SEGMENT boundary — i.e. `file`
  * is `dir` itself or lives under it. Avoids the `/foo` ⊂ `/foobar` false match

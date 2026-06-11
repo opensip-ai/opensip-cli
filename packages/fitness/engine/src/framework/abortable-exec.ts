@@ -7,29 +7,29 @@
  * Child processes are properly cleaned up on abort.
  */
 
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process';
 
-import { SystemError } from '@opensip-tools/core'
+import { SystemError } from '@opensip-tools/core';
 
 /**
  * Options for abortable command execution
  */
 export interface AbortableExecOptions {
-  cwd?: string | undefined
-  signal?: AbortSignal | undefined
-  maxBuffer?: number | undefined
-  env?: NodeJS.ProcessEnv | undefined
-  timeout?: number | undefined
+  cwd?: string | undefined;
+  signal?: AbortSignal | undefined;
+  maxBuffer?: number | undefined;
+  env?: NodeJS.ProcessEnv | undefined;
+  timeout?: number | undefined;
 }
 
 /**
  * Result of command execution
  */
 export interface ExecResult {
-  stdout: string
-  stderr: string
-  exitCode: number | null
-  aborted: boolean
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  aborted: boolean;
 }
 
 /**
@@ -43,12 +43,12 @@ class ExecError extends SystemError {
     public readonly exitCode: number | null,
     public readonly aborted: boolean,
   ) {
-    super(message, { code: 'SYSTEM.FITNESS.EXEC_FAILED' })
-    this.name = 'ExecError'
+    super(message, { code: 'SYSTEM.FITNESS.EXEC_FAILED' });
+    this.name = 'ExecError';
   }
 }
 
-const DEFAULT_MAX_BUFFER_BYTES = 10 * 1024 * 1024 // 10 MB
+const DEFAULT_MAX_BUFFER_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /**
  * Execute a command with abort support.
@@ -67,15 +67,15 @@ export function execAbortable(
     maxBuffer = DEFAULT_MAX_BUFFER_BYTES,
     env = process.env,
     timeout,
-  } = options
+  } = options;
 
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      resolve({ stdout: '', stderr: '', exitCode: null, aborted: true })
-      return
+      resolve({ stdout: '', stderr: '', exitCode: null, aborted: true });
+      return;
     }
 
-    let child: ChildProcess
+    let child: ChildProcess;
     if (typeof command === 'string') {
       // Shell mode (string command) — callers pass hardcoded commands (e.g., lint/test runners).
       // Array overload is preferred for untrusted input (no shell, no injection risk).
@@ -87,80 +87,84 @@ export function execAbortable(
         shell: true,
         stdio: ['pipe', 'pipe', 'pipe'],
         detached: true,
-      })
+      });
     } else {
       // Array mode (no shell, safer)
       if (command.length === 0) {
-        reject(new SystemError('Command array must not be empty', { code: 'SYSTEM.FITNESS.EXEC_EMPTY_COMMAND' }))
-        return
+        reject(
+          new SystemError('Command array must not be empty', {
+            code: 'SYSTEM.FITNESS.EXEC_EMPTY_COMMAND',
+          }),
+        );
+        return;
       }
-      const [bin, ...args] = command
+      const [bin, ...args] = command;
       // @fitness-ignore-next-line no-non-null-assertions -- command length validated above
       child = spawn(bin ?? '', args, {
         cwd,
         env,
         stdio: ['pipe', 'pipe', 'pipe'],
         detached: true,
-      })
+      });
     }
 
-    let stdout = ''
-    let stderr = ''
-    let aborted = false
-    let timeoutId: NodeJS.Timeout | undefined
+    let stdout = '';
+    let stderr = '';
+    let aborted = false;
+    let timeoutId: NodeJS.Timeout | undefined;
 
     // setEncoding routes chunks through a StringDecoder that buffers
     // partial multi-byte UTF-8 sequences across 'data' chunk boundaries.
     // Without it, a non-ASCII char (unicode in a file path, an error
     // message) split across two chunks decodes to replacement chars and
     // corrupts the captured output used for downstream text matching.
-    child.stdout?.setEncoding('utf8')
-    child.stderr?.setEncoding('utf8')
+    child.stdout?.setEncoding('utf8');
+    child.stderr?.setEncoding('utf8');
 
     child.stdout?.on('data', (chunk: string) => {
       if (stdout.length + chunk.length <= maxBuffer) {
-        stdout += chunk
+        stdout += chunk;
       }
-    })
+    });
 
     child.stderr?.on('data', (chunk: string) => {
       if (stderr.length + chunk.length <= maxBuffer) {
-        stderr += chunk
+        stderr += chunk;
       }
-    })
+    });
 
     const abortHandler = (): void => {
       if (!aborted) {
-        aborted = true
-        killProcess(child)
+        aborted = true;
+        killProcess(child);
       }
-    }
+    };
 
-    signal?.addEventListener('abort', abortHandler)
+    signal?.addEventListener('abort', abortHandler);
 
     if (timeout && timeout > 0) {
       timeoutId = setTimeout(() => {
         if (!aborted) {
-          aborted = true
-          killProcess(child)
+          aborted = true;
+          killProcess(child);
         }
-      }, timeout)
+      }, timeout);
     }
 
     child.on('close', (code: number | null) => {
-      signal?.removeEventListener('abort', abortHandler)
-      if (timeoutId) clearTimeout(timeoutId)
-      resolve({ stdout, stderr, exitCode: code, aborted })
-    })
+      signal?.removeEventListener('abort', abortHandler);
+      if (timeoutId) clearTimeout(timeoutId);
+      resolve({ stdout, stderr, exitCode: code, aborted });
+    });
 
     child.on('error', (err: Error) => {
-      signal?.removeEventListener('abort', abortHandler)
-      if (timeoutId) clearTimeout(timeoutId)
+      signal?.removeEventListener('abort', abortHandler);
+      if (timeoutId) clearTimeout(timeoutId);
       reject(
         new ExecError(`Failed to spawn process: ${err.message}`, stdout, stderr, null, aborted),
-      )
-    })
-  })
+      );
+    });
+  });
 }
 
 /**
@@ -169,15 +173,14 @@ export function execAbortable(
 function killProcess(child: ChildProcess): void {
   if (child.pid) {
     try {
-      process.kill(-child.pid, 'SIGKILL')
+      process.kill(-child.pid, 'SIGKILL');
     } catch {
       // @swallow-ok Process group kill failed, try direct kill
       try {
-        child.kill('SIGKILL')
+        child.kill('SIGKILL');
       } catch {
         // @swallow-ok Process already exited
       }
     }
   }
 }
-

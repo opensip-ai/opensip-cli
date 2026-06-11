@@ -11,7 +11,7 @@
 /**
  * A path pattern can be a string (for includes matching) or a RegExp (for test matching).
  */
-export type PathPattern = string | RegExp
+export type PathPattern = string | RegExp;
 
 /**
  * Creates a path matcher function from an array of patterns.
@@ -39,5 +39,5 @@ export type PathPattern = string | RegExp
  * ```
  */
 export function createPathMatcher(patterns: readonly PathPattern[]): (path: string) => boolean {
-  return (path) => patterns.some((p) => (typeof p === 'string' ? path.includes(p) : p.test(path)))
+  return (path) => patterns.some((p) => (typeof p === 'string' ? path.includes(p) : p.test(path)));
 }

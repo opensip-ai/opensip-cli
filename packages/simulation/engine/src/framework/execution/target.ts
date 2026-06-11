@@ -21,9 +21,9 @@
 /** Context handed to a `Target` for each request. */
 export interface TargetContext {
   /** Abort signal for the request; aborts on scenario abort or an `abort` fault. */
-  readonly signal: AbortSignal
+  readonly signal: AbortSignal;
   /** Correlation id for the enclosing scenario run. */
-  readonly correlationId: string
+  readonly correlationId: string;
 }
 
 /**
@@ -33,4 +33,4 @@ export interface TargetContext {
  * the request failed. The harness times the call and never inspects a return
  * value, so `Promise<void>` is the whole contract.
  */
-export type Target = (ctx: TargetContext) => Promise<void>
+export type Target = (ctx: TargetContext) => Promise<void>;

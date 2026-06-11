@@ -26,21 +26,16 @@
  * before, so existing callers (fit.ts) don't change.
  */
 
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL } from 'node:url';
 
-import { logger } from '../lib/logger.js'
+import { logger } from '../lib/logger.js';
 
-import { discoverPlugins } from './discover.js'
+import { discoverPlugins } from './discover.js';
 
-import type {
-  DiscoveredPlugin,
-  LoadedPlugin,
-  PluginLayout,
-  PluginLoadResult,
-} from './types.js'
+import type { DiscoveredPlugin, LoadedPlugin, PluginLayout, PluginLoadResult } from './types.js';
 
 /** Logger module tag used by every event emitted from the generic loader. */
-const MODULE_TAG = 'core:plugins'
+const MODULE_TAG = 'core:plugins';
 
 /**
  * Per-plugin context handed to a domain's `registerExports` callback.
@@ -48,11 +43,11 @@ const MODULE_TAG = 'core:plugins'
  * already filled in) without re-deriving plugin metadata.
  */
 export interface RegisterCtx {
-  readonly plugin: DiscoveredPlugin
+  readonly plugin: DiscoveredPlugin;
   /** Emit a structured warning about a malformed plugin export. */
-  readonly warn: (evt: string, msg: string, fields?: Record<string, unknown>) => void
+  readonly warn: (evt: string, msg: string, fields?: Record<string, unknown>) => void;
   /** Emit a structured debug event. */
-  readonly debug: (evt: string, fields?: Record<string, unknown>) => void
+  readonly debug: (evt: string, fields?: Record<string, unknown>) => void;
 }
 
 /**
@@ -61,7 +56,7 @@ export interface RegisterCtx {
  * `{ checks: 3, recipes: 1 }`, `{ scenarios: 2 }`, `{ adapters: 1 }`).
  * The kernel carries no tool-specific counter names (ADR-0009 M2).
  */
-export type RegisteredCounts = Readonly<Record<string, number>>
+export type RegisteredCounts = Readonly<Record<string, number>>;
 
 /**
  * Callback that registers a plugin's exports into the right registries
@@ -71,7 +66,7 @@ export type RegisteredCounts = Readonly<Record<string, number>>
 export type RegisterExportsFn = (
   mod: Record<string, unknown>,
   ctx: RegisterCtx,
-) => Promise<RegisteredCounts> | RegisteredCounts
+) => Promise<RegisteredCounts> | RegisteredCounts;
 
 /**
  * Load a single discovered plugin: dynamic-import its entry, run the
@@ -92,7 +87,7 @@ export async function loadPlugin(
         source: plugin.source,
         msg,
         ...fields,
-      })
+      });
     },
     debug: (evt, fields) => {
       logger.debug({
@@ -101,17 +96,17 @@ export async function loadPlugin(
         namespace: plugin.namespace,
         source: plugin.source,
         ...fields,
-      })
+      });
     },
-  }
+  };
 
   try {
-    const moduleUrl = pathToFileURL(plugin.entryPoint).href
-    const mod = (await import(moduleUrl)) as Record<string, unknown>
+    const moduleUrl = pathToFileURL(plugin.entryPoint).href;
+    const mod = (await import(moduleUrl)) as Record<string, unknown>;
 
-    const registered = await registerExports(mod, ctx)
+    const registered = await registerExports(mod, ctx);
 
-    const nothingRegistered = Object.values(registered).every((n) => n === 0)
+    const nothingRegistered = Object.values(registered).every((n) => n === 0);
 
     if (nothingRegistered) {
       logger.warn({
@@ -120,7 +115,7 @@ export async function loadPlugin(
         namespace: plugin.namespace,
         source: plugin.source,
         msg: `Plugin "${plugin.namespace}" registered nothing — nothing to run.`,
-      })
+      });
     }
 
     logger.info({
@@ -129,16 +124,16 @@ export async function loadPlugin(
       namespace: plugin.namespace,
       source: plugin.source,
       registered,
-    })
+    });
 
     return {
       namespace: plugin.namespace,
       source: plugin.source,
       type: plugin.type,
       registered,
-    }
+    };
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error)
+    const errorMsg = error instanceof Error ? error.message : String(error);
 
     logger.warn({
       evt: 'plugin.loader.load.error',
@@ -148,7 +143,7 @@ export async function loadPlugin(
       error: errorMsg,
       err: error instanceof Error ? error : undefined,
       msg: `Plugin "${plugin.namespace}" failed to load: ${errorMsg}. Continuing without this plugin.`,
-    })
+    });
 
     return {
       namespace: plugin.namespace,
@@ -156,7 +151,7 @@ export async function loadPlugin(
       type: plugin.type,
       registered: {},
       error: errorMsg,
-    }
+    };
   }
 }
 
@@ -172,27 +167,27 @@ export async function loadAllPlugins(
   projectDir: string | undefined,
   registerExports: RegisterExportsFn,
 ): Promise<PluginLoadResult> {
-  const discovered = discoverPlugins(layout, projectDir)
+  const discovered = discoverPlugins(layout, projectDir);
 
-  const plugins: LoadedPlugin[] = []
-  const errors: string[] = []
+  const plugins: LoadedPlugin[] = [];
+  const errors: string[] = [];
 
   for (const plugin of discovered) {
-    const result = await loadPlugin(plugin, registerExports)
-    plugins.push(result)
+    const result = await loadPlugin(plugin, registerExports);
+    plugins.push(result);
     if (result.error) {
-      errors.push(`${result.source}: ${result.error}`)
+      errors.push(`${result.source}: ${result.error}`);
     }
   }
 
   // Sum each plugin's per-kind counts into generic totals. No tool
   // vocabulary here — whatever keys the domain reported roll up.
-  const totals: Record<string, number> = {}
+  const totals: Record<string, number> = {};
   for (const plugin of plugins) {
     for (const [kind, count] of Object.entries(plugin.registered)) {
-      totals[kind] = (totals[kind] ?? 0) + count
+      totals[kind] = (totals[kind] ?? 0) + count;
     }
   }
 
-  return { plugins, totals, errors }
+  return { plugins, totals, errors };
 }

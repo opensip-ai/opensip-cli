@@ -7,7 +7,7 @@
  * moved, renamed, or deleted. Use stable identifiers instead.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Pattern to match .md file references in comments
@@ -17,7 +17,7 @@ import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
  *   - ../docs/guide.md
  *   - CHANGELOG.md
  */
-const MARKDOWN_REFERENCE_PATTERN = /(?:^|[\s(])([./\w-]+\.md)(?:[\s)]|$)/g
+const MARKDOWN_REFERENCE_PATTERN = /(?:^|[\s(])([./\w-]+\.md)(?:[\s)]|$)/g;
 
 /**
  * Pattern to detect if a line is likely a comment (not a template literal)
@@ -26,7 +26,7 @@ const COMMENT_PATTERNS = [
   /^\s*\/\//, // Single-line comment
   /^\s*\/\*/, // Multi-line comment start (/**)
   /^\s*\*(?!\*)/, // JSDoc continuation (* text) but NOT markdown bold (**text**)
-]
+];
 
 /**
  * Files/patterns to exclude from this check
@@ -38,7 +38,7 @@ const EXCLUDED_PATTERNS = [
   /__tests__/, // Test files may legitimately reference test fixtures
   /\.test\.ts$/, // Test files
   /\.spec\.ts$/, // Spec files
-]
+];
 
 /**
  * Well-known markdown file names that are stable references (not stale paths).
@@ -52,20 +52,20 @@ const STABLE_REFERENCE_PATTERNS = [
   /^LICENSE\.md$/i, // License file
   /^CODE_OF_CONDUCT\.md$/i, // Code of conduct
   /^SECURITY\.md$/i, // Security policy
-]
+];
 
 /**
  * Check if a line is a comment line
  */
 function isCommentLine(line: string): boolean {
-  return COMMENT_PATTERNS.some((pattern) => pattern.test(line))
+  return COMMENT_PATTERNS.some((pattern) => pattern.test(line));
 }
 
 /**
  * Check if a file should be excluded
  */
 function shouldExcludeFile(filePath: string): boolean {
-  return EXCLUDED_PATTERNS.some((pattern) => pattern.test(filePath))
+  return EXCLUDED_PATTERNS.some((pattern) => pattern.test(filePath));
 }
 
 /**
@@ -74,39 +74,39 @@ function shouldExcludeFile(filePath: string): boolean {
 function findMarkdownReferences(
   content: string,
 ): { lineNumber: number; line: string; reference: string }[] {
-  const references: { lineNumber: number; line: string; reference: string }[] = []
-  const lines = content.split('\n')
+  const references: { lineNumber: number; line: string; reference: string }[] = [];
+  const lines = content.split('\n');
 
   for (const [i, line] of lines.entries()) {
     /* v8 ignore next -- defensive: lines.entries() never yields undefined */
-    if (line === undefined) continue
+    if (line === undefined) continue;
 
     // Only check comment lines
-    if (!isCommentLine(line)) continue
+    if (!isCommentLine(line)) continue;
 
     // Find all .md references in this line
-    let match
-    MARKDOWN_REFERENCE_PATTERN.lastIndex = 0 // Reset regex state
+    let match;
+    MARKDOWN_REFERENCE_PATTERN.lastIndex = 0; // Reset regex state
     while ((match = MARKDOWN_REFERENCE_PATTERN.exec(line)) !== null) {
-      const reference = match[1]
+      const reference = match[1];
 
       // Skip if it's just mentioning the file extension generically or undefined
-      if (!reference || reference === '.md') continue
+      if (!reference || reference === '.md') continue;
 
       // Skip well-known stable markdown file names (e.g., CLAUDE.md, README.md)
       /* v8 ignore next -- defensive: split + pop on a non-empty string never returns undefined */
-      const basename = reference.split('/').pop() ?? reference
-      if (STABLE_REFERENCE_PATTERNS.some((pattern) => pattern.test(basename))) continue
+      const basename = reference.split('/').pop() ?? reference;
+      if (STABLE_REFERENCE_PATTERNS.some((pattern) => pattern.test(basename))) continue;
 
       references.push({
         lineNumber: i + 1,
         line,
         reference,
-      })
+      });
     }
   }
 
-  return references
+  return references;
 }
 
 /**
@@ -140,14 +140,14 @@ export const noMarkdownReferences = defineCheck({
   analyze(content, filePath): CheckViolation[] {
     // Skip excluded files
     if (shouldExcludeFile(filePath)) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
-    const references = findMarkdownReferences(content)
+    const violations: CheckViolation[] = [];
+    const references = findMarkdownReferences(content);
 
     for (const { lineNumber, reference } of references) {
-      const suggestion = `Remove or replace the markdown file reference '${reference}'. Use stable identifiers (e.g., document titles or IDs) instead of file paths that break when documents are moved.`
+      const suggestion = `Remove or replace the markdown file reference '${reference}'. Use stable identifiers (e.g., document titles or IDs) instead of file paths that break when documents are moved.`;
 
       violations.push({
         line: lineNumber,
@@ -156,9 +156,9 @@ export const noMarkdownReferences = defineCheck({
         severity: 'warning',
         suggestion,
         match: reference,
-      })
+      });
     }
 
-    return violations
+    return violations;
   },
-})
+});

@@ -47,7 +47,10 @@ function ProbeClock({ onTick }: Readonly<{ onTick: (n: number) => void }>): Reac
   return <Text>{String(tick)}</Text>;
 }
 
-function ProbeTick({ onTick, intervalMs }: Readonly<{ onTick: (n: number) => void; intervalMs?: number }>): React.ReactElement {
+function ProbeTick({
+  onTick,
+  intervalMs,
+}: Readonly<{ onTick: (n: number) => void; intervalMs?: number }>): React.ReactElement {
   const tick = useTick(intervalMs);
   onTick(tick);
   return <Text>{String(tick)}</Text>;

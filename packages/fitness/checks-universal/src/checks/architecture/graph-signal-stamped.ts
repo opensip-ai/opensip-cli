@@ -13,22 +13,22 @@
  * (`create-graph-signal.ts`), the rule infrastructure (`_`-prefixed helpers,
  * `define-rule.ts`, `registry.ts`), and tests are exempt.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /** Graph rule sources — where rules build their signals. */
-const GRAPH_RULES_PATH = 'packages/graph/engine/src/rules/'
+const GRAPH_RULES_PATH = 'packages/graph/engine/src/rules/';
 
 /** Tests + the factory + rule infrastructure may name the identity legitimately. */
-const TEST_PATH = /\.test\.tsx?$|\/__tests__\//
+const TEST_PATH = /\.test\.tsx?$|\/__tests__\//;
 const EXEMPT_BASENAMES: ReadonlySet<string> = new Set([
   'create-graph-signal.ts', // the factory that DOES stamp source/ruleId
   'define-rule.ts', // the Rule adapter (carries the slug as metadata)
   'registry.ts', // lists the rules
-])
+]);
 
 interface StampRule {
-  readonly re: RegExp
-  readonly message: string
+  readonly re: RegExp;
+  readonly message: string;
 }
 
 const RULES: readonly StampRule[] = [
@@ -40,17 +40,19 @@ const RULES: readonly StampRule[] = [
   },
   {
     re: /\bsource:\s*['"]graph['"]/,
-    message: "Graph rules must not hand-type `source: 'graph'` — createGraphSignal stamps it (§5.9).",
+    message:
+      "Graph rules must not hand-type `source: 'graph'` — createGraphSignal stamps it (§5.9).",
   },
   {
     re: /\bruleId:\s*/,
-    message: 'Graph rules must not hand-type `ruleId:` — createGraphSignal stamps it from the slug (§5.9).',
+    message:
+      'Graph rules must not hand-type `ruleId:` — createGraphSignal stamps it from the slug (§5.9).',
   },
-]
+];
 
 /** Pure analysis. Exported for unit tests. */
 export function analyzeGraphSignalStamped(content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
   for (const [i, line] of content.split('\n').entries()) {
     for (const rule of RULES) {
       if (rule.re.test(line)) {
@@ -58,26 +60,28 @@ export function analyzeGraphSignalStamped(content: string): CheckViolation[] {
           message: rule.message,
           severity: 'error',
           line: i + 1,
-          suggestion: 'Replace with createGraphSignal(slug, config, { severity, category, message, … }).',
-        })
+          suggestion:
+            'Replace with createGraphSignal(slug, config, { severity, category, message, … }).',
+        });
       }
     }
   }
-  return violations
+  return violations;
 }
 
 export const graphSignalStamped = defineCheck({
   id: 'b9572b0b-8693-4723-aaaa-9221105e4ebc',
   slug: 'graph-signal-stamped',
-  description: 'Graph rules must stamp identity via createGraphSignal, not hand-assemble source/ruleId/severity (§5.9)',
+  description:
+    'Graph rules must stamp identity via createGraphSignal, not hand-assemble source/ruleId/severity (§5.9)',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   tags: ['architecture', 'quality'],
   fileTypes: ['ts', 'tsx'],
   contentFilter: 'strip-strings-and-comments',
   analyze: (content, filePath) => {
-    if (!filePath.includes(GRAPH_RULES_PATH) || TEST_PATH.test(filePath)) return []
-    const basename = filePath.split('/').at(-1) ?? ''
-    if (basename.startsWith('_') || EXEMPT_BASENAMES.has(basename)) return []
-    return analyzeGraphSignalStamped(content)
+    if (!filePath.includes(GRAPH_RULES_PATH) || TEST_PATH.test(filePath)) return [];
+    const basename = filePath.split('/').at(-1) ?? '';
+    if (basename.startsWith('_') || EXEMPT_BASENAMES.has(basename)) return [];
+    return analyzeGraphSignalStamped(content);
   },
-})
+});

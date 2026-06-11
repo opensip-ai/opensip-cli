@@ -15,7 +15,11 @@ import type { ShardBoundary } from '../partition-files.js';
 
 const UNITS: ShardBoundary[] = [
   { id: 'pkg:core', rootDir: 'packages/core', configPathAbs: 'packages/core/tsconfig.json' },
-  { id: 'pkg:core-extra', rootDir: 'packages/core/extra', configPathAbs: 'packages/core/extra/tsconfig.json' },
+  {
+    id: 'pkg:core-extra',
+    rootDir: 'packages/core/extra',
+    configPathAbs: 'packages/core/extra/tsconfig.json',
+  },
 ];
 
 describe('partitionFilesIntoShards', () => {
@@ -55,9 +59,7 @@ describe('partitionFilesIntoShards', () => {
     // `packages/foo` is NOT a prefix of `packages/foobar/...` at a boundary, so
     // the file is unowned → root shard, and `pkg:foo` is pruned (empty).
     expect(shards.find((s) => s.id === 'pkg:foo')).toBeUndefined();
-    expect(shards.find((s) => s.id === ROOT_SHARD_ID)?.files).toEqual([
-      'packages/foobar/src/x.ts',
-    ]);
+    expect(shards.find((s) => s.id === ROOT_SHARD_ID)?.files).toEqual(['packages/foobar/src/x.ts']);
   });
 
   it('prunes empty unit shards and omits the root shard when nothing is unowned', () => {
@@ -98,7 +100,9 @@ describe('partitionFilesIntoShards', () => {
       units: [{ id: 'pkg:core', rootDir: String.raw`packages\core` }],
       projectRoot: '',
     });
-    expect(shards.find((s) => s.id === 'pkg:core')?.files).toEqual([String.raw`packages\core\src\a.ts`]);
+    expect(shards.find((s) => s.id === 'pkg:core')?.files).toEqual([
+      String.raw`packages\core\src\a.ts`,
+    ]);
   });
 
   it('matches a file that equals a unit rootDir exactly', () => {

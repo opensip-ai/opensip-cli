@@ -127,12 +127,10 @@ describe('pushCreationEdge', () => {
   it('prefixes [creates] and bumps total+high counters', () => {
     const map = new Map<string, CallEdge[]>();
     const stats = createMutableStats();
-    pushCreationEdge(
-      { line: 10, column: 4, text: '() => {}' },
-      'owner-1',
-      'child-1',
-      { edgesByOwner: map, stats },
-    );
+    pushCreationEdge({ line: 10, column: 4, text: '() => {}' }, 'owner-1', 'child-1', {
+      edgesByOwner: map,
+      stats,
+    });
     const edges = map.get('owner-1');
     expect(edges).toBeDefined();
     expect(edges).toHaveLength(1);
@@ -150,12 +148,10 @@ describe('pushCreationEdge', () => {
     const map = new Map<string, CallEdge[]>();
     const stats = createMutableStats();
     const inner = 'x'.repeat(CREATION_EDGE_TEXT_MAX + 50);
-    pushCreationEdge(
-      { line: 1, column: 0, text: inner },
-      'owner-1',
-      'child-1',
-      { edgesByOwner: map, stats },
-    );
+    pushCreationEdge({ line: 1, column: 0, text: inner }, 'owner-1', 'child-1', {
+      edgesByOwner: map,
+      stats,
+    });
     const edge = map.get('owner-1')?.[0];
     expect(edge).toBeDefined();
     // total length always ≤ CALL_EDGE_TEXT_MAX
@@ -167,12 +163,10 @@ describe('pushCreationEdge', () => {
   it('forwards line/column from the position callback', () => {
     const map = new Map<string, CallEdge[]>();
     const stats = createMutableStats();
-    pushCreationEdge(
-      { line: 42, column: 7, text: '() => null' },
-      'owner-1',
-      'child-1',
-      { edgesByOwner: map, stats },
-    );
+    pushCreationEdge({ line: 42, column: 7, text: '() => null' }, 'owner-1', 'child-1', {
+      edgesByOwner: map,
+      stats,
+    });
     const edge = map.get('owner-1')?.[0];
     expect(edge?.line).toBe(42);
     expect(edge?.column).toBe(7);

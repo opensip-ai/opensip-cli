@@ -12,12 +12,12 @@
  * Genuine unguarded access on a call/element result must still fire.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest';
 
-import { analyzeNullSafety } from '../null-safety.js'
+import { analyzeNullSafety } from '../null-safety.js';
 
 function analyze(src: string): readonly { line: number }[] {
-  return analyzeNullSafety(src, 'src/svc/sample.ts')
+  return analyzeNullSafety(src, 'src/svc/sample.ts');
 }
 
 describe('null-safety — FP regression suite', () => {
@@ -29,9 +29,9 @@ describe('null-safety — FP regression suite', () => {
         }
         return [];
       }
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 
   it('does NOT flag `.merge(...)` chained on a factory call result', () => {
     const src = `
@@ -41,16 +41,16 @@ describe('null-safety — FP regression suite', () => {
         );
         return resource;
       }
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 
   it('STILL flags an unguarded property access on an element-access result', () => {
     const src = `
       function firstHash(rows: { bodyHash: string }[]) {
         return rows[0].bodyHash;
       }
-    `
-    expect(analyze(src).length).toBeGreaterThan(0)
-  })
-})
+    `;
+    expect(analyze(src).length).toBeGreaterThan(0);
+  });
+});

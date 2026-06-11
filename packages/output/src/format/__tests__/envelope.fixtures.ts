@@ -65,7 +65,11 @@ export const EMPTY_ENVELOPE: SignalEnvelope = {
   tool: 'fit',
   runId: 'run_fixture0002',
   createdAt: '2026-06-04T00:00:00.000Z',
-  verdict: { score: 100, passed: true, summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } },
+  verdict: {
+    score: 100,
+    passed: true,
+    summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+  },
   units: [],
   signals: [],
 };

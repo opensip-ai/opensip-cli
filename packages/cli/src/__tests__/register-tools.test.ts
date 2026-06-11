@@ -128,7 +128,12 @@ describe('registerFirstPartyTools', () => {
   it('fails closed (throws) when a bundled package cannot be resolved on disk', async () => {
     const registry = new ToolRegistryClass();
     await expect(
-      registerFirstPartyTools(registry, [], [], ['@opensip-tools/__definitely-not-a-real-package__']),
+      registerFirstPartyTools(
+        registry,
+        [],
+        [],
+        ['@opensip-tools/__definitely-not-a-real-package__'],
+      ),
     ).rejects.toBeInstanceOf(PluginIncompatibleError);
     expect(registry.list()).toHaveLength(0);
   });
@@ -247,7 +252,7 @@ describe('mountAllToolCommands', () => {
     const program = new Command('opensip-tools');
 
     const origWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = (() => true);
+    process.stderr.write = () => true;
     try {
       mountAllToolCommands(registry, program, makeStubContext());
     } finally {
@@ -280,7 +285,7 @@ describe('mountAllToolCommands', () => {
     const program = new Command('opensip-tools');
 
     const origWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = (() => true);
+    process.stderr.write = () => true;
     try {
       expect(() => mountAllToolCommands(registry, program, makeStubContext())).not.toThrow();
     } finally {
@@ -299,7 +304,11 @@ describe('discoverAndRegisterToolPackages', () => {
     const empty = mkdtempSync(join(tmpdir(), 'opensip-discover-test-'));
     try {
       await expect(
-        discoverAndRegisterToolPackages(registry, { sources: [{ dir: empty, mode: 'walkUp' }] }, new Set()),
+        discoverAndRegisterToolPackages(
+          registry,
+          { sources: [{ dir: empty, mode: 'walkUp' }] },
+          new Set(),
+        ),
       ).resolves.toBeUndefined();
     } finally {
       rmSync(empty, { recursive: true, force: true });
@@ -334,7 +343,7 @@ function stageFixture(shortName: string, files: { packageJson: object; indexJs: 
 
 function silenceStderr(): () => void {
   const orig = process.stderr.write.bind(process.stderr);
-  process.stderr.write = (() => true);
+  process.stderr.write = () => true;
   return () => {
     process.stderr.write = orig;
   };
@@ -356,14 +365,23 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           version: '0.0.0',
           type: 'module',
           main: './index.js',
-          opensipTools: { kind: 'tool', id: 'fixture-valid', apiVersion: 1, commands: [{ name: 'fixture-valid', description: 'x' }] },
+          opensipTools: {
+            kind: 'tool',
+            id: 'fixture-valid',
+            apiVersion: 1,
+            commands: [{ name: 'fixture-valid', description: 'x' }],
+          },
         },
         indexJs:
           "export const tool = { metadata: { id: 'fixture-valid', name: 'Fixture', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();
-    await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS);
+    await discoverAndRegisterToolPackages(
+      registry,
+      { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+      BUILTIN_IDS,
+    );
     expect(registry.get('fixture-valid')).toBeDefined();
   });
 
@@ -375,7 +393,12 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           version: '0.0.0',
           type: 'module',
           main: './index.js',
-          opensipTools: { kind: 'tool', id: 'fixture-bad', apiVersion: 1, commands: [{ name: 'fixture-bad', description: 'x' }] },
+          opensipTools: {
+            kind: 'tool',
+            id: 'fixture-bad',
+            apiVersion: 1,
+            commands: [{ name: 'fixture-bad', description: 'x' }],
+          },
         },
         indexJs: "export const tool = { not: 'a tool' };",
       }),
@@ -383,7 +406,11 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const registry = new ToolRegistryClass();
     const restore = silenceStderr();
     try {
-      await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS);
+      await discoverAndRegisterToolPackages(
+        registry,
+        { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+        BUILTIN_IDS,
+      );
     } finally {
       restore();
     }
@@ -402,7 +429,12 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
         name: '@opensip-tools-fixture/no-entry',
         version: '0.0.0',
         type: 'module',
-        opensipTools: { kind: 'tool', id: 'fixture-no-entry', apiVersion: 1, commands: [{ name: 'fixture-no-entry', description: 'x' }] },
+        opensipTools: {
+          kind: 'tool',
+          id: 'fixture-no-entry',
+          apiVersion: 1,
+          commands: [{ name: 'fixture-no-entry', description: 'x' }],
+        },
       }),
       'utf8',
     );
@@ -410,7 +442,11 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const registry = new ToolRegistryClass();
     const restore = silenceStderr();
     try {
-      await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS);
+      await discoverAndRegisterToolPackages(
+        registry,
+        { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+        BUILTIN_IDS,
+      );
     } finally {
       restore();
     }
@@ -425,14 +461,23 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           version: '0.0.0',
           type: 'module',
           main: './index.js',
-          opensipTools: { kind: 'tool', id: 'fitness', apiVersion: 1, commands: [{ name: 'fitness', description: 'x' }] },
+          opensipTools: {
+            kind: 'tool',
+            id: 'fitness',
+            apiVersion: 1,
+            commands: [{ name: 'fitness', description: 'x' }],
+          },
         },
         indexJs:
           "export const tool = { metadata: { id: 'fitness', name: 'Shadow', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();
-    await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS);
+    await discoverAndRegisterToolPackages(
+      registry,
+      { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+      BUILTIN_IDS,
+    );
     // The built-in id is skipped before registration ⇒ nothing added.
     expect(registry.list()).toHaveLength(0);
   });
@@ -468,7 +513,8 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       await expect(
         discoverAndRegisterToolPackages(
           registry,
-          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS,
+          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          BUILTIN_IDS,
           provenance,
         ),
       ).resolves.toBeUndefined();
@@ -495,7 +541,9 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           opensipTools: {
             kind: 'tool',
             id: 'fixture-no-apiv',
-            commands: [{ name: 'fixture-no-apiv', description: 'a tool with no declared apiVersion' }],
+            commands: [
+              { name: 'fixture-no-apiv', description: 'a tool with no declared apiVersion' },
+            ],
           },
         },
         indexJs: "throw new Error('no-apiversion tool must never be imported');",
@@ -507,7 +555,8 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       await expect(
         discoverAndRegisterToolPackages(
           registry,
-          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS,
+          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          BUILTIN_IDS,
         ),
       ).resolves.toBeUndefined();
     } finally {
@@ -524,7 +573,12 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           version: '0.0.0',
           type: 'module',
           main: './index.js',
-          opensipTools: { kind: 'tool', id: 'fixture-throws', apiVersion: 1, commands: [{ name: 'fixture-throws', description: 'x' }] },
+          opensipTools: {
+            kind: 'tool',
+            id: 'fixture-throws',
+            apiVersion: 1,
+            commands: [{ name: 'fixture-throws', description: 'x' }],
+          },
         },
         indexJs: "throw new Error('boom on import');",
       }),
@@ -533,7 +587,11 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const restore = silenceStderr();
     try {
       await expect(
-        discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }, BUILTIN_IDS),
+        discoverAndRegisterToolPackages(
+          registry,
+          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          BUILTIN_IDS,
+        ),
       ).resolves.toBeUndefined();
     } finally {
       restore();

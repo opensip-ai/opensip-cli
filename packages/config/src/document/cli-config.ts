@@ -82,22 +82,26 @@ export interface CliDefaults {
  * so nested `ui`/`cloud` objects stay lenient — matching prior behaviour.
  */
 export const cliConfigSchema = z.object({
-  recipe:    z.string().min(1).max(128).optional(),
-  exclude:   z.array(z.string()).optional(),
-  verbose:   z.boolean().optional(),
-  json:      z.boolean().optional(),
-  reportTo:  z.url().optional(),
-  apiKey:    z.string().min(1).optional(),
+  recipe: z.string().min(1).max(128).optional(),
+  exclude: z.array(z.string()).optional(),
+  verbose: z.boolean().optional(),
+  json: z.boolean().optional(),
+  reportTo: z.url().optional(),
+  apiKey: z.string().min(1).optional(),
   fileTypes: z.array(z.string()).optional(),
-  ignore:    z.array(z.string()).optional(),
-  debug:     z.boolean().optional(),
-  ui:        z.object({
-    banner: z.enum(['lg', 'md', 'sm', 'mini']).optional(),
-  }).optional(),
-  cloud:     z.object({
-    sync:     z.boolean().optional(),
-    endpoint: z.string().optional(),
-  }).optional(),
+  ignore: z.array(z.string()).optional(),
+  debug: z.boolean().optional(),
+  ui: z
+    .object({
+      banner: z.enum(['lg', 'md', 'sm', 'mini']).optional(),
+    })
+    .optional(),
+  cloud: z
+    .object({
+      sync: z.boolean().optional(),
+      endpoint: z.string().optional(),
+    })
+    .optional(),
 });
 
 /** Valid `ui.banner` values; anything else is dropped (→ default applies). */
@@ -144,7 +148,9 @@ function projectCliDefaults(raw: Record<string, unknown>): CliDefaults {
 /** Project the `cli.cloud:` sub-block (sync flag + endpoint override) into the typed shape. */
 function projectCloudDefaults(raw: unknown): CliDefaults['cloud'] | undefined {
   if (!isPlainObject(raw)) return undefined;
-  const out: { -readonly [K in keyof NonNullable<CliDefaults['cloud']>]: NonNullable<CliDefaults['cloud']>[K] } = {};
+  const out: {
+    -readonly [K in keyof NonNullable<CliDefaults['cloud']>]: NonNullable<CliDefaults['cloud']>[K];
+  } = {};
   if (typeof raw.sync === 'boolean') out.sync = raw.sync;
   if (typeof raw.endpoint === 'string') out.endpoint = raw.endpoint;
   return out.sync === undefined && out.endpoint === undefined ? undefined : out;

@@ -46,17 +46,29 @@ describe('resolveScopes', () => {
   });
 
   it('deduplicates extra scopes that match the default', () => {
-    const out = resolveScopes('@opensip-tools', ['@opensip-tools', '@other'], 'plugin.invalid_scope');
+    const out = resolveScopes(
+      '@opensip-tools',
+      ['@opensip-tools', '@other'],
+      'plugin.invalid_scope',
+    );
     expect(out).toEqual(['@opensip-tools', '@other']);
   });
 
   it('deduplicates duplicate extra scopes', () => {
-    const out = resolveScopes('@opensip-tools', ['@other', '@other', '@third'], 'plugin.invalid_scope');
+    const out = resolveScopes(
+      '@opensip-tools',
+      ['@other', '@other', '@third'],
+      'plugin.invalid_scope',
+    );
     expect(out).toEqual(['@opensip-tools', '@other', '@third']);
   });
 
   it('drops invalid scopes with a structured warning', () => {
-    const out = resolveScopes('@opensip-tools', ['@valid', 'no-at-sign', '@Bad'], 'plugin.invalid_scope');
+    const out = resolveScopes(
+      '@opensip-tools',
+      ['@valid', 'no-at-sign', '@Bad'],
+      'plugin.invalid_scope',
+    );
     expect(out).toEqual(['@opensip-tools', '@valid']);
     expect(warnSpy).toHaveBeenCalledTimes(2);
     expect(warnSpy.mock.calls[0]?.[0]).toMatchObject({

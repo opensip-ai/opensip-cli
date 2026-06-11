@@ -118,10 +118,7 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
   it('resolves a nested module import — `crate::foo::sub`', () => {
     writeFile('Cargo.toml', CARGO_TOML);
-    writeFile(
-      'src/lib.rs',
-      `pub mod foo;\n\nuse crate::foo::sub::Item;\n\nfn _use(_: Item) {}\n`,
-    );
+    writeFile('src/lib.rs', `pub mod foo;\n\nuse crate::foo::sub::Item;\n\nfn _use(_: Item) {}\n`);
     writeFile('src/foo.rs', `pub mod sub;\n`);
     writeFile('src/foo/sub.rs', `pub struct Item;\n`);
 
@@ -161,7 +158,10 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
   it('resolves `self::child` from a parent module file', () => {
     writeFile('Cargo.toml', CARGO_TOML);
     writeFile('src/lib.rs', `pub mod a;\n`);
-    writeFile('src/a/mod.rs', `pub mod child;\n\nuse self::child::Thing;\n\nfn _use(_: Thing) {}\n`);
+    writeFile(
+      'src/a/mod.rs',
+      `pub mod child;\n\nuse self::child::Thing;\n\nfn _use(_: Thing) {}\n`,
+    );
     writeFile('src/a/child.rs', `pub struct Thing;\n`);
 
     const { catalog, dependenciesByOwner } = runAdapter();
@@ -210,10 +210,7 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
   it('handles grouped imports — emits one dep site per terminal path', () => {
     writeFile('Cargo.toml', CARGO_TOML);
-    writeFile(
-      'src/lib.rs',
-      `use std::{io::Read, fs::File};\n\npub fn run() {}\n`,
-    );
+    writeFile('src/lib.rs', `use std::{io::Read, fs::File};\n\npub fn run() {}\n`);
 
     const { catalog, dependenciesByOwner } = runAdapter();
     const libInit = findModuleInit(catalog, 'src/lib.rs');
@@ -230,10 +227,7 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
   it('treats `self` inside a group as a reference to the parent path', () => {
     writeFile('Cargo.toml', CARGO_TOML);
-    writeFile(
-      'src/lib.rs',
-      `use std::io::{self, Read};\n\npub fn run() {}\n`,
-    );
+    writeFile('src/lib.rs', `use std::io::{self, Read};\n\npub fn run() {}\n`);
 
     const { catalog, dependenciesByOwner } = runAdapter();
     const libInit = findModuleInit(catalog, 'src/lib.rs');

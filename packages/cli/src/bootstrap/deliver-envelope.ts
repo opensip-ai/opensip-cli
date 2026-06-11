@@ -79,10 +79,7 @@ export interface DeliverEnvelopeResult {
  * Map a {@link SignalEnvelope} to the cloud {@link SignalBatch} wire shape:
  * add repo identity, preserve the run identity, drop `verdict`/`units`.
  */
-export function envelopeToSignalBatch(
-  envelope: SignalEnvelope,
-  repo: RepoIdentity,
-): SignalBatch {
+export function envelopeToSignalBatch(envelope: SignalEnvelope, repo: RepoIdentity): SignalBatch {
   return buildSignalBatch({
     tool: envelope.tool,
     recipe: envelope.recipe,

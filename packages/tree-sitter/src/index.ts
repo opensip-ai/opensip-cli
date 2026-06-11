@@ -11,6 +11,6 @@
  * predicates live in each `lang-*` package.
  */
 
-export * from './types.js'
-export * from './lifecycle.js'
-export * from './nodes.js'
+export * from './types.js';
+export * from './lifecycle.js';
+export * from './nodes.js';

@@ -6,13 +6,13 @@
  * is parsed once; falls back to a direct parse when no cache is active.
  */
 
-import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js'
+import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js';
 
-import { javaAdapter } from './adapter.js'
+import { javaAdapter } from './adapter.js';
 
-import type { JavaTree } from './parse.js'
+import type { JavaTree } from './parse.js';
 
 /** Returns the shared (cached) Java parse tree for `filePath`, or null when unparseable. */
 export function getSharedTree(filePath: string, content: string): JavaTree | null {
-  return getParseTree(javaAdapter, filePath, content)
+  return getParseTree(javaAdapter, filePath, content);
 }

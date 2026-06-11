@@ -3,7 +3,12 @@
  * use a wrapped HTTP client.
  */
 
-import { defineCheck, isCommentLine, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
+import {
+  defineCheck,
+  isCommentLine,
+  isTestFile,
+  type CheckViolation,
+} from '@opensip-tools/fitness';
 
 /**
  * Pattern for detecting raw fetch() calls.
@@ -19,7 +24,7 @@ import { defineCheck, isCommentLine, isTestFile, type CheckViolation } from '@op
  * left, so anything ending in `fetch(` matched (false positives on
  * `prefetch(`, `recordReconcilerPrefetch(`, etc.).
  */
-const RAW_FETCH_PATTERN = /(?<![\w$.])fetch\s{0,10}\(/g
+const RAW_FETCH_PATTERN = /(?<![\w$.])fetch\s{0,10}\(/g;
 
 /**
  * Check: resilience/no-raw-fetch
@@ -43,33 +48,33 @@ export const noRawFetch = defineCheck({
   tags: ['resilience', 'http', 'fetch'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Quick check: skip files that don't contain fetch
     if (!content.includes('fetch(')) {
-      return violations
+      return violations;
     }
 
     // Skip the resilient fetch wrapper itself — this IS the raw fetch implementation
     if (filePath.includes('resilient-fetch') || filePath.includes('resilient_fetch')) {
-      return violations
+      return violations;
     }
 
     // Skip test files — tests legitimately invoke `fetch(` directly to
     // exercise the wrapper, mock the global, or hit a localhost test
     // server. Routing those through the wrapper would defeat the test.
     if (isTestFile(filePath)) {
-      return violations
+      return violations;
     }
 
     // Skip fitness check definitions that reference fetch in string/regex patterns
     if (filePath.includes('/fitness/src/checks/')) {
-      return violations
+      return violations;
     }
 
     // Skip LLM adapter files — infrastructure boundary making direct API calls
     if (filePath.includes('/llm/') || filePath.includes('/llm-adapter')) {
-      return violations
+      return violations;
     }
 
     // Skip SSE/streaming implementations that require raw fetch for stream parsing
@@ -79,7 +84,7 @@ export const noRawFetch = defineCheck({
       content.includes('EventSource') ||
       content.includes('getReader()')
     ) {
-      return violations
+      return violations;
     }
 
     // Skip files where fetch() is invoked through a retry wrapper AND
@@ -88,41 +93,42 @@ export const noRawFetch = defineCheck({
     // AbortSignal.timeout(...) }))`. The check exists to flag the bare
     // primitive, not legitimate library code that already adds the
     // missing affordances around it.
-    const fetchCallCount = (content.match(/(?<![\w$.])fetch\s{0,10}\(/g) ?? []).length
-    const signalCount = (content.match(/\bsignal\s*:/g) ?? []).length
+    const fetchCallCount = (content.match(/(?<![\w$.])fetch\s{0,10}\(/g) ?? []).length;
+    const signalCount = (content.match(/\bsignal\s*:/g) ?? []).length;
     const usesRetryWrapper =
       content.includes('withRetry(') ||
       content.includes('withRetries(') ||
-      content.includes('retryFetch(')
+      content.includes('retryFetch(');
     if (usesRetryWrapper && signalCount >= fetchCallCount) {
-      return violations
+      return violations;
     }
 
-    const lines = content.split('\n')
+    const lines = content.split('\n');
 
     for (const [lineNum, line_] of lines.entries()) {
-      const line = line_ ?? ''
+      const line = line_ ?? '';
 
       // Skip comment lines
       if (isCommentLine(line)) {
-        continue
+        continue;
       }
 
-      RAW_FETCH_PATTERN.lastIndex = 0
-      let match
+      RAW_FETCH_PATTERN.lastIndex = 0;
+      let match;
       while ((match = RAW_FETCH_PATTERN.exec(line)) !== null) {
         violations.push({
           line: lineNum + 1,
           column: match.index,
           message: 'Raw fetch() usage detected',
           severity: 'warning',
-          suggestion: 'Use a shared HTTP client wrapper with built-in retry, timeout, and error handling instead of raw fetch()',
+          suggestion:
+            'Use a shared HTTP client wrapper with built-in retry, timeout, and error handling instead of raw fetch()',
           match: match[0],
           filePath,
-        })
+        });
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

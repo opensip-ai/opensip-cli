@@ -26,12 +26,16 @@ describe('graph-java cacheKey — branches', () => {
   });
 
   it('returns java-no-config when configPathAbs is empty string', () => {
-    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe('java-no-config');
+    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe(
+      'java-no-config',
+    );
   });
 
   it('returns java-missing:<path> when the config file does not exist', () => {
     const fake = join(dir, 'no-such.xml');
-    expect(cacheKey({ projectDirAbs: dir, configPathAbs: fake, resolutionMode: 'exact' })).toContain('missing:');
+    expect(
+      cacheKey({ projectDirAbs: dir, configPathAbs: fake, resolutionMode: 'exact' }),
+    ).toContain('missing:');
   });
 
   it('returns a stable java-<hash> when the config file is readable', () => {

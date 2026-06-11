@@ -98,10 +98,7 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
       'com/example/Main.java',
       `package com.example;\n\nimport com.example.foo.Bar;\n\nclass Main { void run(Bar b) {} }\n`,
     );
-    writeFile(
-      'com/example/foo/Bar.java',
-      `package com.example.foo;\n\npublic class Bar {}\n`,
-    );
+    writeFile('com/example/foo/Bar.java', `package com.example.foo;\n\npublic class Bar {}\n`);
 
     const { catalog, dependenciesByOwner } = runAdapter();
     const mainInit = findModuleInit(catalog, 'com/example/Main.java');
@@ -329,10 +326,7 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
       'src/com/example/Main.java',
       `package com.example;\n\nimport com.example.foo.Bar;\n\nclass Main {}\n`,
     );
-    writeFile(
-      'src/com/example/foo/Bar.java',
-      `package com.example.foo;\n\npublic class Bar {}\n`,
-    );
+    writeFile('src/com/example/foo/Bar.java', `package com.example.foo;\n\npublic class Bar {}\n`);
 
     const { catalog, dependenciesByOwner } = runAdapter();
     const mainInit = findModuleInit(catalog, 'src/com/example/Main.java');

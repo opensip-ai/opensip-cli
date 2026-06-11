@@ -249,7 +249,7 @@ function isInterestingForDup(
   // pipeline/features.ts). The inline `endLine − line + 1` here is the single
   // sanctioned graceful-degrade fallback for features-absent calls (3/4-arg
   // test evaluate), not a duplicate of the engine derivation.
-  const span = features?.function.get(occ.bodyHash)?.bodyLines ?? (occ.endLine - occ.line + 1);
+  const span = features?.function.get(occ.bodyHash)?.bodyLines ?? occ.endLine - occ.line + 1;
   if (span < minLines) return false;
   if (occ.bodySize !== undefined && occ.bodySize < minBodySize) return false;
   return true;

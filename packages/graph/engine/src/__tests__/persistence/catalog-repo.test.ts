@@ -98,7 +98,9 @@ describe('CatalogRepo', () => {
   });
 });
 
-function fnOcc(over: Partial<FunctionOccurrence> & { bodyHash: string; simpleName: string }): FunctionOccurrence {
+function fnOcc(
+  over: Partial<FunctionOccurrence> & { bodyHash: string; simpleName: string },
+): FunctionOccurrence {
   return {
     qualifiedName: over.simpleName,
     filePath: `packages/core/src/${over.simpleName}.ts`,
@@ -120,8 +122,16 @@ function fnOcc(over: Partial<FunctionOccurrence> & { bodyHash: string; simpleNam
 
 function featuresPayload(): PersistedFeatures {
   const functions = {
-    a: [fnOcc({ bodyHash: 'a', simpleName: 'a', endLine: 12,
-      calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
+    a: [
+      fnOcc({
+        bodyHash: 'a',
+        simpleName: 'a',
+        endLine: 12,
+        calls: [
+          { to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' },
+        ],
+      }),
+    ],
     b: [fnOcc({ bodyHash: 'b', simpleName: 'b' })],
   };
   const catalog = makeCatalog({ functions });
@@ -134,14 +144,31 @@ function featuresPayload(): PersistedFeatures {
 describe('CatalogRepo — features (Plan C)', () => {
   it('round-trips a features payload (Maps→records intact)', () => {
     const features = featuresPayload();
-    repo.replaceAll(makeCatalog({
-      functions: {
-        a: [fnOcc({ bodyHash: 'a', simpleName: 'a', endLine: 12,
-          calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
-        b: [fnOcc({ bodyHash: 'b', simpleName: 'b' })],
-      },
-      features,
-    }));
+    repo.replaceAll(
+      makeCatalog({
+        functions: {
+          a: [
+            fnOcc({
+              bodyHash: 'a',
+              simpleName: 'a',
+              endLine: 12,
+              calls: [
+                {
+                  to: ['b'],
+                  line: 1,
+                  column: 0,
+                  resolution: 'static',
+                  confidence: 'high',
+                  text: 'b()',
+                },
+              ],
+            }),
+          ],
+          b: [fnOcc({ bodyHash: 'b', simpleName: 'b' })],
+        },
+        features,
+      }),
+    );
     const loaded = repo.loadFullCatalog();
     expect(loaded?.features).toEqual(features);
     expect(loaded?.features?.function?.a?.bodyLines).toBe(12);
@@ -149,14 +176,31 @@ describe('CatalogRepo — features (Plan C)', () => {
 
   it('exposes the same features through the GraphCatalog contract', () => {
     const features = featuresPayload();
-    repo.replaceAll(makeCatalog({
-      functions: {
-        a: [fnOcc({ bodyHash: 'a', simpleName: 'a', endLine: 12,
-          calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
-        b: [fnOcc({ bodyHash: 'b', simpleName: 'b' })],
-      },
-      features,
-    }));
+    repo.replaceAll(
+      makeCatalog({
+        functions: {
+          a: [
+            fnOcc({
+              bodyHash: 'a',
+              simpleName: 'a',
+              endLine: 12,
+              calls: [
+                {
+                  to: ['b'],
+                  line: 1,
+                  column: 0,
+                  resolution: 'static',
+                  confidence: 'high',
+                  text: 'b()',
+                },
+              ],
+            }),
+          ],
+          b: [fnOcc({ bodyHash: 'b', simpleName: 'b' })],
+        },
+        features,
+      }),
+    );
     const contract = repo.loadCatalogContract();
     expect(contract?.features).toEqual(features);
   });

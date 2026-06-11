@@ -98,9 +98,7 @@ describe('composeConfigSchema', () => {
       schema: z.record(z.string(), z.string()),
     };
     const schema = composeConfigSchema([recordDecl]);
-    expect(() =>
-      validateConfigDocument(schema, { overrides: { a: 'x', b: 'y' } }),
-    ).not.toThrow();
+    expect(() => validateConfigDocument(schema, { overrides: { a: 'x', b: 'y' } })).not.toThrow();
     expect(() => validateConfigDocument(schema, { overrides: { a: 1 } })).toThrow(
       ConfigurationError,
     );

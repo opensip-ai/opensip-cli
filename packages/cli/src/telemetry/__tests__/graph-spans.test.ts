@@ -31,11 +31,7 @@ import { join } from 'node:path';
 
 import { runWithScope, type RunScope } from '@opensip-tools/core';
 import { makeTestScope } from '@opensip-tools/core/test-utils/with-scope.js';
-import {
-  currentAdapterRegistry,
-  graphTool,
-  type GraphLanguageAdapter,
-} from '@opensip-tools/graph';
+import { currentAdapterRegistry, graphTool, type GraphLanguageAdapter } from '@opensip-tools/graph';
 import { runGraph, GRAPH_STAGES } from '@opensip-tools/graph/internal';
 import {
   ROOT_CONTEXT,
@@ -94,8 +90,7 @@ const FIXTURE_DIR = join(tmpdir(), 'graph-spans-fixture');
 async function runOverFixture(parent?: Context): Promise<void> {
   await runWithScope(makeGraphScope(), async () => {
     currentAdapterRegistry().register(fakeAdapter(FIXTURE_DIR));
-    const exec = (): Promise<unknown> =>
-      runGraph({ cwd: FIXTURE_DIR, noCache: true, rules: [] });
+    const exec = (): Promise<unknown> => runGraph({ cwd: FIXTURE_DIR, noCache: true, rules: [] });
     await (parent ? otelContext.with(parent, exec) : exec());
   });
 }
@@ -133,9 +128,7 @@ describe('graph stage spans — in-process capture (in-memory exporter)', () => 
 
   it('attaches orchestrator-level attributes (file_count, cache_hit, rule/signal counts)', async () => {
     await runOverFixture();
-    const byName = new Map(
-      exporter.getFinishedSpans().map((s) => [s.name, s.attributes] as const),
-    );
+    const byName = new Map(exporter.getFinishedSpans().map((s) => [s.name, s.attributes] as const));
 
     expect(byName.get('opensip_tools.graph.discover')?.['opensip_tools.graph.file_count']).toBe(2);
     expect(byName.get('opensip_tools.graph.index')?.['opensip_tools.graph.cache_hit']).toBe(false);

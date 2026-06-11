@@ -6,9 +6,8 @@
  * the kernel doesn't know about.
  */
 
-
-import type { Check } from '../framework/check-types.js'
-import type { FitnessRecipe } from '../recipes/types.js'
+import type { Check } from '../framework/check-types.js';
+import type { FitnessRecipe } from '../recipes/types.js';
 
 /**
  * Display entry for a fitness check: `[icon, displayName]`.
@@ -23,10 +22,10 @@ import type { FitnessRecipe } from '../recipes/types.js'
  * Owned by fitness (ADR-0009): this is tool-specific vocabulary that used to
  * live in the kernel; check packs import it from `@opensip-tools/fitness`.
  */
-export type CheckDisplayEntry = readonly [icon: string, displayName: string]
+export type CheckDisplayEntry = readonly [icon: string, displayName: string];
 
 /** What a fitness plugin package/file exports */
 export interface FitPluginExports {
-  readonly checks?: readonly Check[]
-  readonly recipes?: readonly FitnessRecipe[]
+  readonly checks?: readonly Check[];
+  readonly recipes?: readonly FitnessRecipe[];
 }

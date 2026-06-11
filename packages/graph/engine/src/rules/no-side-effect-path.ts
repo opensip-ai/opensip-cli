@@ -194,7 +194,7 @@ function isPureCandidate(
   // bodyLines feature column is the canonical span; the inline
   // `endLine − line + 1` is the single sanctioned graceful-degrade fallback
   // for features-absent calls, not a duplicate of the engine derivation.
-  const span = features?.function.get(occ.bodyHash)?.bodyLines ?? (occ.endLine - occ.line + 1);
+  const span = features?.function.get(occ.bodyHash)?.bodyLines ?? occ.endLine - occ.line + 1;
   if (span < 10) return false;
   if (occ.calls.some((e) => e.to.length === 0)) return false;
   if (sideEffecting.has(occ.bodyHash)) return false;
@@ -205,10 +205,7 @@ function isPureCandidate(
   return true;
 }
 
-function computeSideEffecting(
-  indexes: Indexes,
-  detector: SideEffectDetector,
-): Set<string> {
+function computeSideEffecting(indexes: Indexes, detector: SideEffectDetector): Set<string> {
   const set = new Set<string>();
   for (const occ of indexes.byBodyHash.values()) {
     if (textualSideEffect(occ, detector)) set.add(occ.bodyHash);
@@ -216,10 +213,7 @@ function computeSideEffecting(
   return set;
 }
 
-function textualSideEffect(
-  occ: FunctionOccurrence,
-  detector: SideEffectDetector,
-): boolean {
+function textualSideEffect(occ: FunctionOccurrence, detector: SideEffectDetector): boolean {
   for (const edge of occ.calls) {
     if (detector(edge.text)) return true;
   }

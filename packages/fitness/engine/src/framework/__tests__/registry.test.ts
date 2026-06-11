@@ -98,7 +98,7 @@ describe('CheckRegistry', () => {
 
       const enabled = registry.listEnabled();
       expect(enabled).toHaveLength(2);
-      expect(enabled.map(c => c.config.slug)).toEqual(['active', 'also-active']);
+      expect(enabled.map((c) => c.config.slug)).toEqual(['active', 'also-active']);
     });
 
     it('returns all checks when none are disabled', () => {
@@ -119,7 +119,7 @@ describe('CheckRegistry', () => {
 
       const securityChecks = registry.byTag('security');
       expect(securityChecks).toHaveLength(2);
-      expect(securityChecks.map(c => c.config.slug)).toEqual(['sec1', 'sec2']);
+      expect(securityChecks.map((c) => c.config.slug)).toEqual(['sec1', 'sec2']);
     });
 
     it('returns empty array for unknown tag', () => {
@@ -231,7 +231,7 @@ describe('CheckRegistry', () => {
       registry.register(makeCheck({ slug: 'other' }), 'ns-a');
       const results = registry.listByBareSlug('check');
       expect(results).toHaveLength(2);
-      expect(results.map(c => c.config.id)).toEqual(['1', '2']);
+      expect(results.map((c) => c.config.id)).toEqual(['1', '2']);
     });
 
     it('returns undefined for unknown namespaced slug', () => {

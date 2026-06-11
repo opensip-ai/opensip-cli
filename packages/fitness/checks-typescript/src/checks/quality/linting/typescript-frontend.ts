@@ -9,9 +9,9 @@
  * using the same `sh -c` orchestration idiom as `dependency-vulnerability-audit`.
  */
 
-import { join } from 'node:path'
+import { join } from 'node:path';
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Shell program run from the project root (the command's cwd). For each
@@ -29,24 +29,24 @@ for d in apps/*/; do
   echo "::exit::$?"
 done
 exit 0
-`
+`;
 
 // Markers emitted by the shell program.
-const APP_MARKER_PATTERN = /^::app::(.+)$/
-const EXIT_MARKER_PATTERN = /^::exit::(\d+)$/
+const APP_MARKER_PATTERN = /^::app::(.+)$/;
+const EXIT_MARKER_PATTERN = /^::exit::(\d+)$/;
 /**
  * A single tsc diagnostic line: `file(line,col): error TSxxxx: message`.
  * ReDoS-safe: `[^(]+` is bounded by the `(` delimiter, the numeric groups match
  * digits only, and each group has a distinct fixed delimiter.
  */
 // eslint-disable-next-line sonarjs/slow-regex -- [^(]+ bounded by '(' delimiter; each group has distinct delimiters
-const TS_ERROR_LINE_PATTERN = /^([^(]+)\((\d+),(\d+)\):\s*(error|warning)\s+(TS\d+):\s*(.+)$/
+const TS_ERROR_LINE_PATTERN = /^([^(]+)\((\d+),(\d+)\):\s*(error|warning)\s+(TS\d+):\s*(.+)$/;
 
 interface ParsedError {
-  file: string
-  line: number
-  code: string
-  message: string
+  file: string;
+  line: number;
+  code: string;
+  message: string;
 }
 
 /**
@@ -61,7 +61,7 @@ function createGenericFailure(appPath: string, app: string): CheckViolation {
     severity: 'error',
     suggestion: `Run \`cd apps/${app} && npx tsc --noEmit\` to see the full error output`,
     match: app,
-  }
+  };
 }
 
 /**
@@ -77,7 +77,7 @@ function errorsToViolations(appPath: string, errors: readonly ParsedError[]): Ch
     suggestion: `Fix the TypeScript error: ${err.message}. See https://typescript.tv/errors/#${err.code.toLowerCase()} for explanation`,
     type: err.code,
     match: err.code,
-  }))
+  }));
 }
 
 /**
@@ -85,7 +85,7 @@ function errorsToViolations(appPath: string, errors: readonly ParsedError[]): Ch
  * shell glob (`apps/<name>/`) yields exactly one trailing slash.
  */
 function appNameFromDir(appDir: string): string {
-  return appDir.replace(/^apps\//, '').replace(/\/$/, '')
+  return appDir.replace(/^apps\//, '').replace(/\/$/, '');
 }
 
 /**
@@ -95,39 +95,39 @@ function appNameFromDir(appDir: string): string {
  * parseable diagnostics yields a single generic failure; a zero exit yields none.
  */
 export function parseTscOutput(stdout: string, cwd: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  let currentApp: string | null = null
-  let buffer: ParsedError[] = []
+  const violations: CheckViolation[] = [];
+  let currentApp: string | null = null;
+  let buffer: ParsedError[] = [];
 
   const finalize = (appDir: string, exitCode: number): void => {
     if (exitCode !== 0) {
-      const appPath = join(cwd, appDir)
+      const appPath = join(cwd, appDir);
       if (buffer.length > 0) {
-        violations.push(...errorsToViolations(appPath, buffer))
+        violations.push(...errorsToViolations(appPath, buffer));
       } else {
-        violations.push(createGenericFailure(appPath, appNameFromDir(appDir)))
+        violations.push(createGenericFailure(appPath, appNameFromDir(appDir)));
       }
     }
-    buffer = []
-  }
+    buffer = [];
+  };
 
   for (const line of stdout.split('\n')) {
-    const appMatch = APP_MARKER_PATTERN.exec(line)
+    const appMatch = APP_MARKER_PATTERN.exec(line);
     if (appMatch?.[1]) {
-      currentApp = appMatch[1]
-      buffer = []
-      continue
+      currentApp = appMatch[1];
+      buffer = [];
+      continue;
     }
 
-    const exitMatch = EXIT_MARKER_PATTERN.exec(line)
+    const exitMatch = EXIT_MARKER_PATTERN.exec(line);
     if (exitMatch?.[1] && currentApp) {
-      finalize(currentApp, Number.parseInt(exitMatch[1], 10))
-      currentApp = null
-      continue
+      finalize(currentApp, Number.parseInt(exitMatch[1], 10));
+      currentApp = null;
+      continue;
     }
 
-    if (!currentApp) continue
-    const errMatch = TS_ERROR_LINE_PATTERN.exec(line)
+    if (!currentApp) continue;
+    const errMatch = TS_ERROR_LINE_PATTERN.exec(line);
     if (errMatch) {
       buffer.push({
         file: errMatch[1] ?? '',
@@ -135,11 +135,11 @@ export function parseTscOutput(stdout: string, cwd: string): CheckViolation[] {
         line: Number.parseInt(errMatch[2] ?? '0', 10),
         code: errMatch[5] ?? '',
         message: errMatch[6] ?? '',
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -173,7 +173,7 @@ export const typescriptFrontend = defineCheck({
     // The shell program always exits 0; per-app status is carried inline.
     expectedExitCodes: [0],
     parseOutput(stdout, _stderr, _exitCode, _files, cwd): CheckViolation[] {
-      return parseTscOutput(stdout, cwd)
+      return parseTscOutput(stdout, cwd);
     },
   },
-})
+});

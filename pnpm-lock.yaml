@@ -55,6 +55,9 @@ importers:
       eslint:
         specifier: ^10.4.0
         version: 10.4.0(jiti@2.7.0)
+      eslint-config-prettier:
+        specifier: ^10.1.8
+        version: 10.1.8(eslint@10.4.0(jiti@2.7.0))
       eslint-import-resolver-typescript:
         specifier: ^4.4.4
         version: 4.4.4(eslint-plugin-import-x@4.16.2(@typescript-eslint/utils@8.60.0(eslint@10.4.0(jiti@2.7.0))(typescript@6.0.3))(eslint-import-resolver-node@0.3.10)(eslint@10.4.0(jiti@2.7.0)))(eslint-plugin-import@2.32.0)(eslint@10.4.0(jiti@2.7.0))
@@ -73,6 +76,9 @@ importers:
       knip:
         specifier: ^6.14.2
         version: 6.14.2(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
+      prettier:
+        specifier: ^3.8.4
+        version: 3.8.4
       turbo:
         specifier: ^2.9.16
         version: 2.9.16
@@ -2966,6 +2972,12 @@ packages:
     resolution: {integrity: sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==}
     engines: {node: '>=10'}
 
+  eslint-config-prettier@10.1.8:
+    resolution: {integrity: sha512-82GZUjRS0p/jganf6q1rEO25VSoHH0hKPCTrgillPjdI/3bgBhAE1QzHrHTizjpRvy6pGAvKjDJtk2pF9NDq8w==}
+    hasBin: true
+    peerDependencies:
+      eslint: '>=7.0.0'
+
   eslint-import-context@0.1.9:
     resolution: {integrity: sha512-K9Hb+yRaGAGUbwjhFNHvSmmkZs9+zbuoe3kFQ4V1wYjrepUFYM2dZAfNtjbbj3qsPfUfsA68Bx/ICWQMi+C8Eg==}
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
@@ -3851,6 +3863,11 @@ packages:
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
+
+  prettier@3.8.4:
+    resolution: {integrity: sha512-N2MylSdi48+5N/6S5j+maeHbUSIzzZ5uOcX5Hm4QpV8Dkb1HFjfAKTKX6yNPJQD9AhcT3ifHNB66tWTTJDi11Q==}
+    engines: {node: '>=14'}
+    hasBin: true
 
   prompts@2.4.2:
     resolution: {integrity: sha512-NxNv/kLguCA7p3jE8oL2aEBsrJWgAakBpgmgK6lpPWV+WuOmY6r2/zbAVnP+T8bQlA0nzHXSJSJW0Hq7ylaD2Q==}
@@ -6191,6 +6208,10 @@ snapshots:
 
   escape-string-regexp@4.0.0: {}
 
+  eslint-config-prettier@10.1.8(eslint@10.4.0(jiti@2.7.0)):
+    dependencies:
+      eslint: 10.4.0(jiti@2.7.0)
+
   eslint-import-context@0.1.9(unrs-resolver@1.11.1):
     dependencies:
       get-tsconfig: 4.14.0
@@ -7220,6 +7241,8 @@ snapshots:
       tunnel-agent: 0.6.0
 
   prelude-ls@1.2.1: {}
+
+  prettier@3.8.4: {}
 
   prompts@2.4.2:
     dependencies:

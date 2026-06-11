@@ -16,21 +16,22 @@ import type {
   CommandExemptions,
   CoverageAllowlist,
   FilenameOverrides,
-} from '@opensip-tools/fitness/internal'
+} from '@opensip-tools/fitness/internal';
 
-export const ALLOWLIST: CoverageAllowlist = []
+export const ALLOWLIST: CoverageAllowlist = [];
 
 export const COMMAND_EXEMPTIONS: CommandExemptions = {
   // Runs `tsc --noEmit` in each discovered apps/* directory (an external
   // toolchain invocation) and parses the output — now correctly modelled as
   // analysisMode:'command'. Covered by the live dogfood run.
-  'typescript-frontend': "analysisMode:'command' — runs tsc --noEmit per apps/* dir; covered by the dogfood run",
-}
+  'typescript-frontend':
+    "analysisMode:'command' — runs tsc --noEmit per apps/* dir; covered by the dogfood run",
+};
 
-export const KNOWN_UNFIXTURABLE: CommandExemptions = {}
+export const KNOWN_UNFIXTURABLE: CommandExemptions = {};
 
 export const FILENAME_OVERRIDES: FilenameOverrides = {
   // Universal-domain checks (no checkScope.languages / fileTypes) default to a
   // `.txt` fixture; these analyze TypeScript, so pin the fixture extension to ts.
   'no-unbounded-concurrency': 'ts',
-}
+};

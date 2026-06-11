@@ -7,8 +7,8 @@
  * the graph tool's duplicated-function-body rule.
  */
 
-import type { Check } from '../framework/check-types.js'
-import type { CheckDisplayEntry } from '../plugins/types.js'
+import type { Check } from '../framework/check-types.js';
+import type { CheckDisplayEntry } from '../plugins/types.js';
 
 /**
  * Fold a pack's `slug -> [icon, displayName]` map ONTO its checks (§5.3 fold):
@@ -26,14 +26,14 @@ export function applyCheckDisplay(
   displayMap: Readonly<Record<string, CheckDisplayEntry>>,
 ): Check[] {
   return checks.map((check) => {
-    const entry = displayMap[check.config.slug]
-    if (!entry) return check
-    return { ...check, config: { ...check.config, icon: entry[0], displayName: entry[1] } }
-  })
+    const entry = displayMap[check.config.slug];
+    if (!entry) return check;
+    return { ...check, config: { ...check.config, icon: entry[0], displayName: entry[1] } };
+  });
 }
 
 /** Default fallback icon when a slug isn't in the display map. */
-const DEFAULT_ICON = '🔍'
+const DEFAULT_ICON = '🔍';
 
 /**
  * Get the icon for a check by slug. Falls back to the magnifying-glass emoji
@@ -43,8 +43,8 @@ export function getCheckIcon(
   displayMap: Readonly<Record<string, CheckDisplayEntry>>,
   checkSlug: string,
 ): string {
-  const display = displayMap[checkSlug]
-  return display ? display[0] : DEFAULT_ICON
+  const display = displayMap[checkSlug];
+  return display ? display[0] : DEFAULT_ICON;
 }
 
 /**
@@ -55,12 +55,12 @@ export function getCheckDisplayName(
   displayMap: Readonly<Record<string, CheckDisplayEntry>>,
   checkSlug: string,
 ): string {
-  const display = displayMap[checkSlug]
-  if (display) return display[1]
+  const display = displayMap[checkSlug];
+  if (display) return display[1];
   return checkSlug
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
+    .join(' ');
 }
 
 /**
@@ -68,9 +68,9 @@ export function getCheckDisplayName(
  */
 export interface DisplayHelpers {
   /** Get the icon for a check by slug. Falls back to the magnifying-glass emoji. */
-  getCheckIcon: (checkSlug: string) => string
+  getCheckIcon: (checkSlug: string) => string;
   /** Get the display name for a check by slug. Falls back to kebab-to-title-case. */
-  getCheckDisplayName: (checkSlug: string) => string
+  getCheckDisplayName: (checkSlug: string) => string;
 }
 
 /**
@@ -88,5 +88,5 @@ export function makeDisplayHelpers(
   return {
     getCheckIcon: (checkSlug) => getCheckIcon(displayMap, checkSlug),
     getCheckDisplayName: (checkSlug) => getCheckDisplayName(displayMap, checkSlug),
-  }
+  };
 }

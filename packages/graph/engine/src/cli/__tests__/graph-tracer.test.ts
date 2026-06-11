@@ -15,7 +15,12 @@ import { spanRunStage } from '../graph-tracer.js';
 describe('spanRunStage (sharded-worker stage spans)', () => {
   it('runs fn and returns its value with no SDK registered (no-op span)', async () => {
     const run = spanRunStage({ 'opensip_tools.graph.shard_id': 's1' });
-    const result = await run({ stage: 'parse', onProgress: undefined, monitor: undefined, fn: () => 'OUT' });
+    const result = await run({
+      stage: 'parse',
+      onProgress: undefined,
+      monitor: undefined,
+      fn: () => 'OUT',
+    });
     expect(result).toBe('OUT');
   });
 
@@ -23,7 +28,13 @@ describe('spanRunStage (sharded-worker stage spans)', () => {
     const run = spanRunStage();
     const attrsFn = vi.fn(() => ({ 'opensip_tools.graph.file_count': 3 }));
     const out = { files: [1, 2, 3] };
-    await run({ stage: 'discover', onProgress: undefined, monitor: undefined, fn: () => out, attrsFn });
+    await run({
+      stage: 'discover',
+      onProgress: undefined,
+      monitor: undefined,
+      fn: () => out,
+      attrsFn,
+    });
     expect(attrsFn).toHaveBeenCalledWith(out);
   });
 

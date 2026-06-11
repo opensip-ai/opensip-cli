@@ -37,11 +37,7 @@ export function occ(over: OccOverride): FunctionOccurrence {
   return { ...base, ...over };
 }
 
-export function edge(
-  text: string,
-  to: readonly string[] = [],
-  discarded?: boolean,
-): CallEdge {
+export function edge(text: string, to: readonly string[] = [], discarded?: boolean): CallEdge {
   return {
     to,
     line: 2,

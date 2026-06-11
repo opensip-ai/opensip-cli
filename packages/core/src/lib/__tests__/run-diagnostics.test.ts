@@ -8,11 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import type {
-  RunDiagnostics,
-  DiagnosticEvent,
-  DiagnosticPhase,
-} from '../run-diagnostics.js';
+import type { RunDiagnostics, DiagnosticEvent, DiagnosticPhase } from '../run-diagnostics.js';
 
 const ALL_PHASES: readonly DiagnosticPhase[] = [
   'discover',
@@ -40,8 +36,19 @@ describe('RunDiagnostics', () => {
     const diagnostics: RunDiagnostics = {
       runId: 'run_abc',
       events: [
-        { phase: 'load', level: 'debug', message: 'loaded 3 plugins', at: '2026-06-07T00:00:00.000Z', data: { count: 3 } },
-        { phase: 'validate', level: 'warn', message: 'unknown key ignored', at: '2026-06-07T00:00:01.000Z' },
+        {
+          phase: 'load',
+          level: 'debug',
+          message: 'loaded 3 plugins',
+          at: '2026-06-07T00:00:00.000Z',
+          data: { count: 3 },
+        },
+        {
+          phase: 'validate',
+          level: 'warn',
+          message: 'unknown key ignored',
+          at: '2026-06-07T00:00:01.000Z',
+        },
       ],
       metrics: { 'plugins.loaded': 3 },
       trace: { traceId: 'abcd', spanId: 'ef01' },

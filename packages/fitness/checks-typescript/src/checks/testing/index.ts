@@ -1,1 +1,1 @@
-export * from './mock-implementations-in-production.js'
+export * from './mock-implementations-in-production.js';

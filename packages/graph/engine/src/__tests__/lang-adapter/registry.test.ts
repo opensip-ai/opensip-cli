@@ -13,10 +13,7 @@ import { join } from 'node:path';
 import { ConfigurationError, enterScope, logger } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  currentAdapterRegistry,
-  pickAdapter,
-} from '../../lang-adapter/registry.js';
+import { currentAdapterRegistry, pickAdapter } from '../../lang-adapter/registry.js';
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {

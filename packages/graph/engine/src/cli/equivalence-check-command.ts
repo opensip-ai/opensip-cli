@@ -81,7 +81,8 @@ function loadBudget(path: string): EquivalenceBudget {
   if (
     typeof parsed !== 'object' ||
     parsed === null ||
-    typeof (parsed as { productionResolvedEdgeDivergences?: unknown }).productionResolvedEdgeDivergences !== 'number' ||
+    typeof (parsed as { productionResolvedEdgeDivergences?: unknown })
+      .productionResolvedEdgeDivergences !== 'number' ||
     typeof (parsed as { sccDivergences?: unknown }).sccDivergences !== 'number'
   ) {
     throw new Error(
@@ -89,7 +90,11 @@ function loadBudget(path: string): EquivalenceBudget {
         `{ "productionResolvedEdgeDivergences": <number>, "sccDivergences": <number> }.`,
     );
   }
-  const obj = parsed as { productionResolvedEdgeDivergences: number; sccDivergences: number; note?: string };
+  const obj = parsed as {
+    productionResolvedEdgeDivergences: number;
+    sccDivergences: number;
+    note?: string;
+  };
   return {
     productionResolvedEdgeDivergences: obj.productionResolvedEdgeDivergences,
     sccDivergences: obj.sccDivergences,
@@ -147,9 +152,7 @@ export async function executeEquivalenceCheck(
   cli: ToolCliContext,
 ): Promise<void> {
   const cwd = resolve(opts.cwd);
-  const budgetPath = opts.budget
-    ? resolve(cwd, opts.budget)
-    : resolve(cwd, DEFAULT_BUDGET_REL);
+  const budgetPath = opts.budget ? resolve(cwd, opts.budget) : resolve(cwd, DEFAULT_BUDGET_REL);
   logger.info({ evt: 'graph.cli.equivalence_check.start', module: MODULE, cwd, budgetPath });
   try {
     const cliScript = process.argv[1] ?? '';

@@ -67,7 +67,10 @@ export function mergeAndResolveShards(
   allFiles: readonly string[],
   manifestIndex: PackageManifestIndex,
 ): CrossShardOutput {
-  const merged = mergeShardFragments(fragments.map((f) => f.fragment), allFiles);
+  const merged = mergeShardFragments(
+    fragments.map((f) => f.fragment),
+    allFiles,
+  );
   const boundaryCalls = fragments.flatMap((f) => f.boundaryCalls);
   return resolveCrossBoundaryCalls(merged, boundaryCalls, manifestIndex);
 }
@@ -179,9 +182,7 @@ function canonicalizeFunctions(
 /** Stable occurrence order: filePath, then line, then bodyHash. */
 function compareOccurrences(a: FunctionOccurrence, b: FunctionOccurrence): number {
   return (
-    a.filePath.localeCompare(b.filePath) ||
-    a.line - b.line ||
-    a.bodyHash.localeCompare(b.bodyHash)
+    a.filePath.localeCompare(b.filePath) || a.line - b.line || a.bodyHash.localeCompare(b.bodyHash)
   );
 }
 
@@ -191,7 +192,10 @@ function sortCalls(calls: readonly CallEdge[]): CallEdge[] {
     (a, b) =>
       a.line - b.line ||
       a.column - b.column ||
-      [...a.to].sort().join(',').localeCompare([...b.to].sort().join(',')),
+      [...a.to]
+        .sort()
+        .join(',')
+        .localeCompare([...b.to].sort().join(',')),
   );
 }
 
@@ -240,7 +244,11 @@ export function resolveCrossBoundaryCalls(
 ): CrossShardOutput {
   const exportIndex = buildExportIndex(merged);
   const nameIndex = buildNameIndex(merged);
-  const knownFiles = new Set<string>(Object.values(merged.functions).flat().map((o) => o.filePath));
+  const knownFiles = new Set<string>(
+    Object.values(merged.functions)
+      .flat()
+      .map((o) => o.filePath),
+  );
 
   const ctx: ResolveContext = { exportIndex, manifestIndex, nameIndex, knownFiles };
   const stats = createMutableStats();
@@ -321,9 +329,7 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
   if (spec?.startsWith('.')) {
     const candidates = ctx.nameIndex.get(bc.calleeName) ?? [];
     const pinned = pinBySpecifier(bc, candidates, ctx.knownFiles);
-    return pinned.length > 0
-      ? { ...base, to: pinned.map((o) => o.bodyHash) }
-      : { ...base, to: [] };
+    return pinned.length > 0 ? { ...base, to: pinned.map((o) => o.bodyHash) } : { ...base, to: [] };
   }
 
   // (b)/(c) Bare or workspace specifier → resolve to a package and link by export
@@ -528,10 +534,7 @@ function occurrenceIdentity(o: FunctionOccurrence, simpleName: string): string {
 function diffSccs(a: Catalog, b: Catalog): readonly string[] {
   const sigA = sccSignatures(a);
   const sigB = sccSignatures(b);
-  const diff = [
-    ...[...sigA].filter((s) => !sigB.has(s)),
-    ...[...sigB].filter((s) => !sigA.has(s)),
-  ];
+  const diff = [...[...sigA].filter((s) => !sigB.has(s)), ...[...sigB].filter((s) => !sigA.has(s))];
   return [...new Set(diff)].sort();
 }
 

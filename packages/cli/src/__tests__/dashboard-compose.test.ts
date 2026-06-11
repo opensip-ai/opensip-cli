@@ -48,9 +48,7 @@ function makeTool(id: string, contribution?: Record<string, unknown>): Tool {
     metadata: { id, version: '0.0.0', description: id },
     commands: [],
     register: () => undefined,
-    ...(contribution
-      ? { collectDashboardData: (_scope: ToolScope) => contribution }
-      : {}),
+    ...(contribution ? { collectDashboardData: (_scope: ToolScope) => contribution } : {}),
   };
 }
 
@@ -88,9 +86,7 @@ describe('composeAndWriteDashboard', () => {
       makeTool('simulation'), // no collectDashboardData — must be skipped
     ]);
 
-    const result = await runWithScope(scope, () =>
-      composeAndWriteDashboard({ open: false }),
-    );
+    const result = await runWithScope(scope, () => composeAndWriteDashboard({ open: false }));
 
     const expectedPath = join(resolveProjectPaths(projectRoot).reportsDir, 'latest.html');
     expect(result).toEqual({ type: 'dashboard', path: expectedPath, opened: false });
@@ -107,15 +103,11 @@ describe('composeAndWriteDashboard', () => {
     const launch = vi.spyOn(openDashboardMod, 'launchBrowser').mockResolvedValue(true);
     const scope = makeScope([makeTool('fitness', { checkCatalog: [] })]);
 
-    const noOpen = await runWithScope(scope, () =>
-      composeAndWriteDashboard({ open: false }),
-    );
+    const noOpen = await runWithScope(scope, () => composeAndWriteDashboard({ open: false }));
     expect(launch).not.toHaveBeenCalled();
     expect(noOpen.opened).toBe(false);
 
-    const opened = await runWithScope(scope, () =>
-      composeAndWriteDashboard({ open: true }),
-    );
+    const opened = await runWithScope(scope, () => composeAndWriteDashboard({ open: true }));
     expect(launch).toHaveBeenCalledTimes(1);
     expect(opened.opened).toBe(true);
   });
@@ -132,9 +124,7 @@ describe('composeAndWriteDashboard', () => {
     vi.spyOn(openDashboardMod, 'launchBrowser').mockResolvedValue(true);
     const scope = makeScope([makeTool('simulation')]);
 
-    const result = await runWithScope(scope, () =>
-      composeAndWriteDashboard({ open: false }),
-    );
+    const result = await runWithScope(scope, () => composeAndWriteDashboard({ open: false }));
 
     const html = readFileSync(result.path, 'utf8');
     expect(html).toContain('id="panel-fitness"');

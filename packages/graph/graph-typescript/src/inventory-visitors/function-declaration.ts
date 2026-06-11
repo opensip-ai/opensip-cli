@@ -2,7 +2,6 @@
  * Visitor for `function foo() {}` declarations.
  */
 
-
 import ts from 'typescript';
 
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
@@ -55,7 +54,8 @@ export const visitFunctionDeclaration: InventoryVisitor<ts.FunctionDeclaration> 
  */
 function resolveFunctionName(node: ts.FunctionDeclaration): string | null {
   if (node.name) return node.name.text;
-  const isDefaultExport = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) === true;
+  const isDefaultExport =
+    node.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) === true;
   if (isDefaultExport) return '<default>';
   return null;
 }

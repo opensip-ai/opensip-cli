@@ -4,4 +4,4 @@
  */
 
 /** Display entry for a fitness check: [icon, displayName] */
-export type CheckDisplayEntry = [icon: string, displayName: string]
+export type CheckDisplayEntry = [icon: string, displayName: string];

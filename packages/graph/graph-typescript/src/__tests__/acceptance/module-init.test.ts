@@ -17,17 +17,20 @@ import { findOccurrence, runFixture, writeFixture } from './_fixture-runner.js';
 
 import type { Catalog } from '@opensip-tools/graph';
 
-
 describe('module-init acceptance fixture', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-modinit-'));
-  afterAll(() => { rmSync(fixtureDir, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(fixtureDir, { recursive: true, force: true });
+  });
 
   writeFixture(fixtureDir, {
     'lib.ts': `export function helper(): number { return 1; }\n`,
     'init.ts': `import { helper } from './lib.js';\nexport const result = helper();\nhelper();\n`,
   });
   let catalog!: Catalog;
-  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
+  beforeAll(async () => {
+    catalog = await runFixture(fixtureDir);
+  });
 
   it('synthesizes a <module-init> occurrence for init.ts', () => {
     const modInit = findOccurrence(

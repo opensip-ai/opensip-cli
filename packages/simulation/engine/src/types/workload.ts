@@ -11,14 +11,14 @@
 /** Author-facing workload for a load/chaos scenario. */
 export interface Workload {
   /** Target requests per second the driver paces toward. */
-  readonly rps: number
+  readonly rps: number;
   /**
    * Maximum in-flight requests. When omitted, derived from `rps` via
    * {@link resolveConcurrency} so authors need only specify `rps`.
    */
-  readonly concurrency?: number
+  readonly concurrency?: number;
   /** Linear ramp-up from 0 to `rps`, in seconds. Defaults to 0 (no ramp). */
-  readonly rampUp?: number
+  readonly rampUp?: number;
 }
 
 /**
@@ -29,5 +29,5 @@ export interface Workload {
  * from issuing an unbounded burst while still letting real latency overlap.
  */
 export function resolveConcurrency(workload: Workload): number {
-  return workload.concurrency ?? Math.max(1, Math.ceil(workload.rps / 5))
+  return workload.concurrency ?? Math.max(1, Math.ceil(workload.rps / 5));
 }

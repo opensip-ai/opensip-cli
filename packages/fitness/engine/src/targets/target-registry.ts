@@ -15,9 +15,9 @@
  * practical benefit and would complicate every call site that queries targets.
  */
 
-import { Registry, currentScope, type Registerable } from '@opensip-tools/core'
+import { Registry, currentScope, type Registerable } from '@opensip-tools/core';
 
-import type { Target } from './types.js'
+import type { Target } from './types.js';
 
 /**
  * Map a language string (canonical id or alias) to its canonical adapter id.
@@ -28,11 +28,11 @@ import type { Target } from './types.js'
  * of treating unknown adapters as themselves.
  */
 function toCanonical(lang: string): string {
-  return currentScope()?.languages.canonicalize(lang) ?? lang.toLowerCase()
+  return currentScope()?.languages.canonicalize(lang) ?? lang.toLowerCase();
 }
 
 interface RegisterableTarget extends Registerable {
-  readonly id: string;   // same as target.config.name (Target has no id today)
+  readonly id: string; // same as target.config.name (Target has no id today)
   readonly name: string;
   readonly target: Target;
   readonly tags?: readonly string[];
@@ -44,7 +44,7 @@ export class TargetRegistry {
     module: 'fitness:targets',
     duplicatePolicy: 'silent-skip',
     evtPrefix: 'target.registry',
-  })
+  });
 
   /**
    * Register a target. Silently skips if a target with the same name already exists.
@@ -52,14 +52,14 @@ export class TargetRegistry {
    * @returns This registry instance for chaining
    */
   register(target: Target): this {
-    const name = target.config.name
+    const name = target.config.name;
     this.inner.register({
       id: name,
       name,
       target,
       tags: target.config.tags,
-    })
-    return this
+    });
+    return this;
   }
 
   /**
@@ -68,12 +68,12 @@ export class TargetRegistry {
    * @returns The matching target, or undefined if not found
    */
   getByName(name: string): Target | undefined {
-    return this.inner.getById(name)?.target
+    return this.inner.getById(name)?.target;
   }
 
   /** Return all registered targets. */
   getAll(): readonly Target[] {
-    return this.inner.getAll().map((r) => r.target)
+    return this.inner.getAll().map((r) => r.target);
   }
 
   /**
@@ -82,7 +82,7 @@ export class TargetRegistry {
    * @returns Targets whose config.tags contain the tag
    */
   getByTag(tag: string): readonly Target[] {
-    return this.inner.getByTag(tag).map((r) => r.target)
+    return this.inner.getByTag(tag).map((r) => r.target);
   }
 
   /**
@@ -91,7 +91,7 @@ export class TargetRegistry {
    * @returns True if the target exists in the registry
    */
   has(name: string): boolean {
-    return this.inner.has(name)
+    return this.inner.has(name);
   }
 
   /**
@@ -111,35 +111,37 @@ export class TargetRegistry {
    * @returns Targets that match both dimensions
    */
   findByScope(languages: readonly string[], concerns: readonly string[]): readonly Target[] {
-    const scopeLangs = languages.map(toCanonical)
+    const scopeLangs = languages.map(toCanonical);
     return this.getAll().filter((target) => {
-      const targetLangs = target.config.languages
-      const targetConcerns = target.config.concerns
-      const targetLangsCanonical = targetLangs?.map(toCanonical)
+      const targetLangs = target.config.languages;
+      const targetConcerns = target.config.concerns;
+      const targetLangsCanonical = targetLangs?.map(toCanonical);
 
       // Language matching: if either side has no languages, treat as "matches any"
       const languageMatch =
         scopeLangs.length === 0 ||
-        !targetLangsCanonical || targetLangsCanonical.length === 0 ||
-        scopeLangs.some((lang) => targetLangsCanonical.includes(lang))
+        !targetLangsCanonical ||
+        targetLangsCanonical.length === 0 ||
+        scopeLangs.some((lang) => targetLangsCanonical.includes(lang));
 
       // Concern matching: if either side has no concerns, treat as "matches any"
       const concernMatch =
         concerns.length === 0 ||
-        !targetConcerns || targetConcerns.length === 0 ||
-        concerns.some((concern) => targetConcerns.includes(concern))
+        !targetConcerns ||
+        targetConcerns.length === 0 ||
+        concerns.some((concern) => targetConcerns.includes(concern));
 
-      return languageMatch && concernMatch
-    })
+      return languageMatch && concernMatch;
+    });
   }
 
   /** Number of registered targets. */
   get size(): number {
-    return this.inner.size
+    return this.inner.size;
   }
 
   /** Remove all targets from the registry. */
   clear(): void {
-    this.inner.clear()
+    this.inner.clear();
   }
 }

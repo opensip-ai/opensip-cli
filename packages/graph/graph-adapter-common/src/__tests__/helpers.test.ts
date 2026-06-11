@@ -23,8 +23,7 @@ import type { Node } from '@opensip-tools/tree-sitter';
 
 // Minimal fake of the web-tree-sitter `Node` shape `isReturnValueDiscarded`
 // reads: it only ever inspects `.parent` and `.type`.
-const mk = (type: string, parent: unknown = null): never =>
-  ({ type, parent }) as never;
+const mk = (type: string, parent: unknown = null): never => ({ type, parent }) as never;
 
 // Minimal fake of the node shape `nameOf` reads: only
 // `childForFieldName('name')` and the returned node's `.text`.

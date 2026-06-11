@@ -64,11 +64,7 @@ import type { DataStore } from '@opensip-tools/datastore';
 // `orchestrate → cache-orchestrator → catalog-builder → orchestrate`
 // file-level cycle the `circular-import-detection` check flagged.
 export { GRAPH_STAGES } from './orchestrate/types.js';
-export type {
-  GraphProgressCallback,
-  GraphProgressEvent,
-  GraphStage,
-} from './orchestrate/types.js';
+export type { GraphProgressCallback, GraphProgressEvent, GraphStage } from './orchestrate/types.js';
 
 // The sharded build is an orchestration mode; expose it from the same
 // orchestration facade so dispatchers reach both `runGraph` and
@@ -166,11 +162,16 @@ async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
   const startedAt = Date.now();
   // Emit one span per stage. withSpanAsync keeps the span open across the
   // (possibly async) stage work and is a no-op when no SDK is registered.
-  const result = await withSpanAsync(GRAPH_TRACER, `opensip_tools.graph.${stage}`, async (span) => {
-    const out = await fn();
-    if (attrsFn) span.setAttributes(attrsFn(out));
-    return out;
-  }, { 'opensip_tools.graph.stage': stage });
+  const result = await withSpanAsync(
+    GRAPH_TRACER,
+    `opensip_tools.graph.${stage}`,
+    async (span) => {
+      const out = await fn();
+      if (attrsFn) span.setAttributes(attrsFn(out));
+      return out;
+    },
+    { 'opensip_tools.graph.stage': stage },
+  );
   const durationMs = Date.now() - startedAt;
   onProgress?.({
     type: 'stage-done',
@@ -186,7 +187,7 @@ async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
  * orchestrator wires their outputs together and consults the cache
  * before redoing stages 1+2.
  */
- 
+
 export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const config: GraphConfig = input.config ?? {};
   const ruleSet: readonly Rule[] = input.rules ?? currentRules();

@@ -24,7 +24,12 @@ function makeTempDir(): string {
 /** Build a captured-output writer that also exposes the accumulated text. */
 function captureWrite(): { write: (s: string) => void; text: () => string } {
   let buf = '';
-  return { write: (s) => { buf += s; }, text: () => buf };
+  return {
+    write: (s) => {
+      buf += s;
+    },
+    text: () => buf,
+  };
 }
 
 /** Discard sink for tests that don't care about output. */
@@ -41,7 +46,11 @@ describe('executeUninstall — user mode', () => {
   });
 
   afterEach(() => {
-    try { rmSync(rootDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try {
+      rmSync(rootDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   });
 
   it('removes the user-level root dir when confirmed', async () => {
@@ -125,7 +134,11 @@ describe('executeUninstall — project mode', () => {
   });
 
   afterEach(() => {
-    try { rmSync(projectDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try {
+      rmSync(projectDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   });
 
   describe('default (no --purge): safe-by-default', () => {

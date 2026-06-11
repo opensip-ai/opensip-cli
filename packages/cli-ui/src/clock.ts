@@ -26,7 +26,10 @@ export interface ClockProviderProps {
 }
 
 /** React provider that broadcasts a tick counter to descendants via {@link useClock}. */
-export function ClockProvider({ intervalMs = TICK_INTERVAL_MS, children }: ClockProviderProps): ReactElement {
+export function ClockProvider({
+  intervalMs = TICK_INTERVAL_MS,
+  children,
+}: ClockProviderProps): ReactElement {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {

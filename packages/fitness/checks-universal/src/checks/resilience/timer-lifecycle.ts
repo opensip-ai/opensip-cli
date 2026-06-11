@@ -2,42 +2,42 @@
  * @fileoverview Timer lifecycle check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Analyze a file for setInterval without corresponding clearInterval
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Inherent complexity: line-by-line detection of setInterval/clearInterval pairs with variable capture tracking
 function analyzeTimerLifecycle(content: string, _filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
 
   // Quick check: skip files without setInterval
-  if (!content.includes('setInterval')) return violations
+  if (!content.includes('setInterval')) return violations;
 
-  const intervalCreations: { line: number; varName: string | null }[] = []
-  let hasClearInterval = false
+  const intervalCreations: { line: number; varName: string | null }[] = [];
+  let hasClearInterval = false;
 
   for (const [i, line_] of lines.entries()) {
     /* v8 ignore next -- defensive: lines.entries() never yields undefined */
-    const line = line_ ?? ''
-    const trimmed = line.trim()
+    const line = line_ ?? '';
+    const trimmed = line.trim();
 
     // Skip comments
-    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
     // Detect setInterval with variable capture
-    const intervalMatch = /(?:const|let|var)\s+(\w+)\s*=\s*setInterval\s*\(/.exec(line)
+    const intervalMatch = /(?:const|let|var)\s+(\w+)\s*=\s*setInterval\s*\(/.exec(line);
     if (intervalMatch) {
       /* v8 ignore next -- defensive: regex (\w+) capture group always yields a string */
-      intervalCreations.push({ line: i + 1, varName: intervalMatch[1] ?? null })
+      intervalCreations.push({ line: i + 1, varName: intervalMatch[1] ?? null });
     } else if (/\bsetInterval\s*\(/.test(line) && !line.includes('clearInterval')) {
       // setInterval without variable capture
-      intervalCreations.push({ line: i + 1, varName: null })
+      intervalCreations.push({ line: i + 1, varName: null });
     }
 
     // Detect cleanup
-    if (/\bclearInterval\s*\(/.test(line)) hasClearInterval = true
+    if (/\bclearInterval\s*\(/.test(line)) hasClearInterval = true;
   }
 
   // Flag intervals without corresponding cleanup
@@ -51,11 +51,11 @@ function analyzeTimerLifecycle(content: string, _filePath: string): CheckViolati
         suggestion:
           'Store the timer ID and call clearInterval() in a cleanup/dispose/shutdown handler',
         type: 'interval-without-cleanup',
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -83,4 +83,4 @@ export const timerLifecycle = defineCheck({
   contentFilter: 'strip-strings',
   confidence: 'medium',
   analyze: analyzeTimerLifecycle,
-})
+});

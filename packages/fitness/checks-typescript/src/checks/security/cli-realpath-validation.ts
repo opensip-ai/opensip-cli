@@ -23,23 +23,21 @@
  * Inspired by `opensip-ai/opensip/opensip-tools` `arch-cli-realpath-validation`.
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
 
-const SCOPED_PATH_SEGMENTS: readonly string[] = [
-  'packages/cli/src/',
-  'packages/core/src/plugins/',
-]
+const SCOPED_PATH_SEGMENTS: readonly string[] = ['packages/cli/src/', 'packages/core/src/plugins/'];
 
 // `<root-name>.startsWith(...)` or `someVar.startsWith(<root-name>)` where
 // the root-name is one of the conventional filesystem-root identifiers.
 const ROOT_NAMES =
-  /(projectRoot|rootDir|repoRoot|baseDir|cwd|workspaceRoot|packageDir|nodeModulesDir|parent)/.source
+  /(projectRoot|rootDir|repoRoot|baseDir|cwd|workspaceRoot|packageDir|nodeModulesDir|parent)/
+    .source;
 
 // `<x>.startsWith(<root-name>...)`
 const STARTSWITH_OF_ROOT_RE = new RegExp(
   String.raw`\.startsWith\s*\(\s*` + ROOT_NAMES + String.raw`\b`,
   'g',
-)
+);
 
 // `<root-name>.startsWith(...)` is less common in path-guard code (the
 // other direction), but worth catching for symmetry. The match captures
@@ -47,33 +45,30 @@ const STARTSWITH_OF_ROOT_RE = new RegExp(
 const ROOT_DOT_STARTSWITH_RE = new RegExp(
   String.raw`\b` + ROOT_NAMES + String.raw`\s*\.\s*startsWith\s*\(`,
   'g',
-)
+);
 
-const FILE_IGNORE_RE = /@fitness-ignore-file\s+cli-realpath-validation/
+const FILE_IGNORE_RE = /@fitness-ignore-file\s+cli-realpath-validation/;
 
 /** Exported for unit tests. */
-export function analyzeCliRealpathValidation(
-  content: string,
-  filePath: string,
-): CheckViolation[] {
-  if (!filePath.endsWith('.ts') && !filePath.endsWith('.tsx')) return []
-  if (filePath.endsWith('.d.ts')) return []
-  if (isTestFile(filePath)) return []
-  const normalized = filePath.replaceAll('\\', '/')
-  if (!SCOPED_PATH_SEGMENTS.some((seg) => normalized.includes(seg))) return []
+export function analyzeCliRealpathValidation(content: string, filePath: string): CheckViolation[] {
+  if (!filePath.endsWith('.ts') && !filePath.endsWith('.tsx')) return [];
+  if (filePath.endsWith('.d.ts')) return [];
+  if (isTestFile(filePath)) return [];
+  const normalized = filePath.replaceAll('\\', '/');
+  if (!SCOPED_PATH_SEGMENTS.some((seg) => normalized.includes(seg))) return [];
 
   // Fast path: nothing to do if startsWith is absent.
-  if (!content.includes('startsWith')) return []
+  if (!content.includes('startsWith')) return [];
 
-  const rawLines = content.split('\n')
-  if (rawLines.slice(0, 50).some((line) => FILE_IGNORE_RE.test(line))) return []
+  const rawLines = content.split('\n');
+  if (rawLines.slice(0, 50).some((line) => FILE_IGNORE_RE.test(line))) return [];
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Pattern 1: `<x>.startsWith(<root-name>...)`
   for (const m of content.matchAll(STARTSWITH_OF_ROOT_RE)) {
-    const idx = m.index ?? 0
-    const rootName = m[1] ?? '<root>'
+    const idx = m.index ?? 0;
+    const rootName = m[1] ?? '<root>';
     violations.push({
       line: lineNumberOfIndex(content, idx),
       severity: 'error',
@@ -85,13 +80,13 @@ export function analyzeCliRealpathValidation(
       suggestion:
         `Use \`isPathInside(child, ${rootName})\` from packages/core/src/plugins/discover.ts ` +
         `(or an equivalent realpathSync-based check) — it resolves symlinks before comparing.`,
-    })
+    });
   }
 
   // Pattern 2: `<root-name>.startsWith(...)`
   for (const m of content.matchAll(ROOT_DOT_STARTSWITH_RE)) {
-    const idx = m.index ?? 0
-    const rootName = m[1] ?? '<root>'
+    const idx = m.index ?? 0;
+    const rootName = m[1] ?? '<root>';
     violations.push({
       line: lineNumberOfIndex(content, idx),
       severity: 'error',
@@ -101,18 +96,18 @@ export function analyzeCliRealpathValidation(
       suggestion:
         `Use \`isPathInside(<candidate>, ${rootName})\` or \`realpathSync\` + ` +
         `\`path.relative\` instead.`,
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 function lineNumberOfIndex(content: string, index: number): number {
-  let line = 1
+  let line = 1;
   for (let i = 0; i < index && i < content.length; i++) {
-    if (content[i] === '\n') line++
+    if (content[i] === '\n') line++;
   }
-  return line
+  return line;
 }
 
 export const cliRealpathValidation = defineCheck({
@@ -137,4 +132,4 @@ export const cliRealpathValidation = defineCheck({
   tags: ['security', 'cli', 'path-traversal'],
   fileTypes: ['ts', 'tsx'],
   analyze: analyzeCliRealpathValidation,
-})
+});

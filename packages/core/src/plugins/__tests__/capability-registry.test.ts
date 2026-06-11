@@ -153,8 +153,7 @@ describe('CapabilityRegistry', () => {
       const registrar = vi.fn();
       reg.registerDomain(
         domain({
-          contributionSchema: (c: unknown) =>
-            typeof c === 'number' ? true : 'expected a number',
+          contributionSchema: (c: unknown) => (typeof c === 'number' ? true : 'expected a number'),
         }),
         registrar,
       );

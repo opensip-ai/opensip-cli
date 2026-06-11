@@ -69,14 +69,46 @@ export function normalizeBannerSize(value: string | undefined): BannerSize {
 
 // --- lg: full 3-D banner. Each entry: [cup, openPart, sipPart] ---
 const BANNER_LG: readonly [string, string, string][] = [
-  ['   ░       ░             ',  '  ██████   ████████  █████████ ████  ███', ' ███████   █████ ████████ '],
-  ['    ░     ░              ',  ' ███░░░███░███░░░░██░███░░░░░░░░███  ███', '███░░░░███░░███ ░███░░░░██'],
-  ['   ░       ░             ',  '███   ░███░███   ░██░███       ░████ ███', '░███   ░░░ ░███ ░███   ░██'],
-  ['███████████████          ',  '███   ░███░████████░░██████    ░██░█████', '░░███████  ░███ ░████████░'],
-  ['███████████████  █████   ',  '███   ░███░███░░░░  ░███░░░    ░██ ░████', ' ░░░░░░███ ░███ ░███░░░░  '],
-  ['███████████████ ░░░░███  ',  '░███  ████░███      ░███       ░██  ░███', ' ███   ███ ░███ ░███      '],
-  ['███████████████  █████   ',  ' ░██████░  ████      █████████ ████  ███', '░░███████  █████ ████     '],
-  ['░█████████████░ ░░░      ',  '  ░░░░░░  ░░░░░     ░░░░░░░░░░░░░░  ░░░', ' ░░░░░░░  ░░░░░ ░░░░░     '],
+  [
+    '   ░       ░             ',
+    '  ██████   ████████  █████████ ████  ███',
+    ' ███████   █████ ████████ ',
+  ],
+  [
+    '    ░     ░              ',
+    ' ███░░░███░███░░░░██░███░░░░░░░░███  ███',
+    '███░░░░███░░███ ░███░░░░██',
+  ],
+  [
+    '   ░       ░             ',
+    '███   ░███░███   ░██░███       ░████ ███',
+    '░███   ░░░ ░███ ░███   ░██',
+  ],
+  [
+    '███████████████          ',
+    '███   ░███░████████░░██████    ░██░█████',
+    '░░███████  ░███ ░████████░',
+  ],
+  [
+    '███████████████  █████   ',
+    '███   ░███░███░░░░  ░███░░░    ░██ ░████',
+    ' ░░░░░░███ ░███ ░███░░░░  ',
+  ],
+  [
+    '███████████████ ░░░░███  ',
+    '░███  ████░███      ░███       ░██  ░███',
+    ' ███   ███ ░███ ░███      ',
+  ],
+  [
+    '███████████████  █████   ',
+    ' ░██████░  ████      █████████ ████  ███',
+    '░░███████  █████ ████     ',
+  ],
+  [
+    '░█████████████░ ░░░      ',
+    '  ░░░░░░  ░░░░░     ░░░░░░░░░░░░░░  ░░░',
+    ' ░░░░░░░  ░░░░░ ░░░░░     ',
+  ],
 ];
 
 const BANNER_SAUCER = ' ░███████████░';
@@ -95,14 +127,7 @@ interface CompactBanner {
 }
 
 const BANNER_MD: CompactBanner = {
-  cup: [
-    ' ░    ░',
-    '  ░  ░',
-    '▟████████▙',
-    '█████████▐▀▙',
-    '█████████▐▄▟',
-    '▝▀▀█████▀▀▘',
-  ],
+  cup: [' ░    ░', '  ░  ░', '▟████████▙', '█████████▐▀▙', '█████████▐▄▟', '▝▀▀█████▀▀▘'],
   open: [
     '██▀▀█▄▄███▀▀▀█ ██▀▀▀▀▀ ▀██  ██ ',
     '█   ██████▄▄▄█ ██▄▄▄    █▀█▄██ ',
@@ -118,25 +143,14 @@ const BANNER_MD: CompactBanner = {
 };
 
 const BANNER_SM: CompactBanner = {
-  cup: [
-    ' ░  ░',
-    '  ░',
-    '▟████▙',
-    '█████▐▌',
-    '▝▀██▀▀',
-  ],
+  cup: [' ░  ░', '  ░', '▟████▙', '█████▐▌', '▝▀██▀▀'],
   open: [
     '▗█▀▜▄▐█▀▀▙▐█▀▀▀▝█▌▐█▗',
     '█▌ ▐█▐█▄▄▛▐█▄▖  █▜▟█ ',
     '▜▙ ▟█▐█   ▐█    █ ▜█ ',
     ' ▀▀▀ ▝▀▘  ▝▀▀▀▀▝▀▘▝▀ ',
   ],
-  sip: [
-    '█▀▀▙▖▜█▘█▛▀▜▖',
-    '▜▙▄▄ ▐█ █▙▄▟▘',
-    '▄▖ █▌▐█ █▌   ',
-    '▝▀▀▀ ▀▀▘▀▀   ',
-  ],
+  sip: ['█▀▀▙▖▜█▘█▛▀▜▖', '▜▙▄▄ ▐█ █▙▄▟▘', '▄▖ █▌▐█ █▌   ', '▝▀▀▀ ▀▀▘▀▀   '],
 };
 
 /**
@@ -148,12 +162,7 @@ const BANNER_SM: CompactBanner = {
  * dark terminals and auto-contrast (rather than vanishing) on light
  * backgrounds — see {@link MiniBanner}.
  */
-const BANNER_MINI_CUP: readonly string[] = [
-  ' ⋮ ⋮ ',
-  '▟███▙',
-  '▐███▌',
-  ' ▀▀▀ ',
-];
+const BANNER_MINI_CUP: readonly string[] = [' ⋮ ⋮ ', '▟███▙', '▐███▌', ' ▀▀▀ '];
 
 /**
  * Rows of {@link BANNER_MINI_CUP} rendered in the default foreground (no
@@ -210,12 +219,7 @@ function MiniBanner({
 }): React.ReactElement {
   const theme = useTheme();
   return (
-    <Box
-      borderStyle="round"
-      borderColor={theme.brand}
-      paddingX={1}
-      alignSelf="flex-start"
-    >
+    <Box borderStyle="round" borderColor={theme.brand} paddingX={1} alignSelf="flex-start">
       <Box flexDirection="column" marginRight={2}>
         {BANNER_MINI_CUP.map((line, i) => (
           // Steam + lid render in the default terminal foreground (no color) so
@@ -229,17 +233,16 @@ function MiniBanner({
       </Box>
       <Box flexDirection="column">
         <Text>
-          <Text bold>opensip-tools</Text>
-          {' '}
-          <Text dimColor>v{version}</Text>
-          {update !== undefined && (
-            <Text color={theme.success}>{' '}(v{update} available)</Text>
-          )}
+          <Text bold>opensip-tools</Text> <Text dimColor>v{version}</Text>
+          {update !== undefined && <Text color={theme.success}> (v{update} available)</Text>}
         </Text>
         <Text dimColor>{MINI_TAGLINE}</Text>
         <Text color={theme.brand}>{MINI_URL}</Text>
         {projectPath !== undefined && (
-          <Text dimColor>{projectPath}{walkedUpSuffix(walkedUp)}</Text>
+          <Text dimColor>
+            {projectPath}
+            {walkedUpSuffix(walkedUp)}
+          </Text>
         )}
       </Box>
     </Box>
@@ -253,9 +256,7 @@ function LargeBanner(): React.ReactElement {
       {BANNER_LG.map(([cup, openPart, sipPart], i) => (
         <Text key={i}>
           {cup}
-          <Text color={theme.brand}>{openPart}</Text>
-          {' '}
-          <Text bold>{sipPart}</Text>
+          <Text color={theme.brand}>{openPart}</Text> <Text bold>{sipPart}</Text>
         </Text>
       ))}
       <Text>{BANNER_SAUCER}</Text>

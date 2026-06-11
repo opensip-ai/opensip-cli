@@ -21,8 +21,19 @@ function targetTemplate(lang: SupportedLanguage): TargetTemplate {
         name: 'typescript-source',
         description: 'TypeScript / TSX source code',
         languages: ['typescript'],
-        include: ['src/**/*.ts', 'src/**/*.tsx', 'packages/*/src/**/*.ts', 'packages/*/src/**/*.tsx'],
-        exclude: ['**/*.test.ts', '**/*.test.tsx', '**/__tests__/**', '**/node_modules/**', '**/dist/**'],
+        include: [
+          'src/**/*.ts',
+          'src/**/*.tsx',
+          'packages/*/src/**/*.ts',
+          'packages/*/src/**/*.tsx',
+        ],
+        exclude: [
+          '**/*.test.ts',
+          '**/*.test.tsx',
+          '**/__tests__/**',
+          '**/node_modules/**',
+          '**/dist/**',
+        ],
       };
     }
     case 'rust': {
@@ -40,7 +51,14 @@ function targetTemplate(lang: SupportedLanguage): TargetTemplate {
         description: 'Python source code',
         languages: ['python'],
         include: ['src/**/*.py', '**/*.py'],
-        exclude: ['**/__pycache__/**', '**/.venv/**', '**/venv/**', '**/dist/**', '**/build/**', '**/*.egg-info/**'],
+        exclude: [
+          '**/__pycache__/**',
+          '**/.venv/**',
+          '**/venv/**',
+          '**/dist/**',
+          '**/build/**',
+          '**/*.egg-info/**',
+        ],
       };
     }
     case 'go': {
@@ -114,11 +132,11 @@ export function generateConfig(languages: readonly SupportedLanguage[]): string 
 // `--keep`.
 export const EXAMPLE_CHECK_IDS: Record<SupportedLanguage, string> = {
   typescript: 'a3e1f8c4-9b2d-4f5a-8e6c-7d1a2b3c4d5e',
-  rust:       'b4f2e9d5-8c3e-4a6b-9f7d-8e2b3c4d5e6f',
-  python:     'c5a3f0e6-7d4f-4b7c-a08e-9f3c4d5e6f70',
-  go:         'd6b4a1f7-6e5a-4c8d-b19f-a04d5e6f7081',
-  java:       'e7c5b2a8-5f6b-4d9e-c2af-b15e6f708192',
-  cpp:        'f8d6c3b9-4a7c-4ea0-d3b0-c26f708192a3',
+  rust: 'b4f2e9d5-8c3e-4a6b-9f7d-8e2b3c4d5e6f',
+  python: 'c5a3f0e6-7d4f-4b7c-a08e-9f3c4d5e6f70',
+  go: 'd6b4a1f7-6e5a-4c8d-b19f-a04d5e6f7081',
+  java: 'e7c5b2a8-5f6b-4d9e-c2af-b15e6f708192',
+  cpp: 'f8d6c3b9-4a7c-4ea0-d3b0-c26f708192a3',
 };
 
 export function exampleCheckSource(language: SupportedLanguage, polyglotSuffix = ''): string {

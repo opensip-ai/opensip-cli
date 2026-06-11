@@ -20,7 +20,6 @@ import { resolveProjectContext } from '../project-context.js';
 let testDir: string;
 
 beforeEach(() => {
-
   testDir = mkdtempSync(join(tmpdir(), 'opensip-project-context-'));
   vi.restoreAllMocks();
 });
@@ -245,7 +244,8 @@ describe('resolveProjectContext', () => {
         stopAt: testDir,
       });
       const resolvedCall = debugSpy.mock.calls.find(
-        (c) => typeof c[0] === 'object' && (c[0] as { evt?: string }).evt === 'project.root.resolved',
+        (c) =>
+          typeof c[0] === 'object' && (c[0] as { evt?: string }).evt === 'project.root.resolved',
       );
       expect(resolvedCall).toBeDefined();
       const payload = resolvedCall![0] as Record<string, unknown>;
@@ -262,7 +262,8 @@ describe('resolveProjectContext', () => {
         stopAt: testDir,
       });
       const notFoundCall = debugSpy.mock.calls.find(
-        (c) => typeof c[0] === 'object' && (c[0] as { evt?: string }).evt === 'project.root.not-found',
+        (c) =>
+          typeof c[0] === 'object' && (c[0] as { evt?: string }).evt === 'project.root.not-found',
       );
       expect(notFoundCall).toBeDefined();
     });

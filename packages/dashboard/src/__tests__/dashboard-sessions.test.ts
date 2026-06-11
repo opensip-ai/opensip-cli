@@ -47,11 +47,11 @@ return {
 `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own emitted dashboard JS.
   const factory = new Function(
-    dashboardElJs()
-      + dashboardPaginationJs()
-      + dashboardSortableJs()
-      + dashboardSessionsJs()
-      + tail,
+    dashboardElJs() +
+      dashboardPaginationJs() +
+      dashboardSortableJs() +
+      dashboardSessionsJs() +
+      tail,
   );
   return factory() as Env;
 }
@@ -73,10 +73,14 @@ function makeSession(over: Partial<StoredSessionLike> = {}): StoredSessionLike {
 /** The detail panel is the `.section` whose heading starts "Session Detail". */
 function detailSection(panel: HTMLElement): HTMLElement | null {
   const sections = [...panel.querySelectorAll<HTMLElement>('.section')];
-  return sections.find(s => s.querySelector('h3')?.textContent?.startsWith('Session Detail')) ?? null;
+  return (
+    sections.find((s) => s.querySelector('h3')?.textContent?.startsWith('Session Detail')) ?? null
+  );
 }
 
-beforeEach(() => { document.body.innerHTML = ''; });
+beforeEach(() => {
+  document.body.innerHTML = '';
+});
 
 describe('renderSessionTable / renderDetail', () => {
   it('renders per-check detail with a "Check" column for a fitness payload', () => {
@@ -91,7 +95,15 @@ describe('renderSessionTable / renderDetail', () => {
               passed: false,
               violationCount: 1,
               durationMs: 5,
-              findings: [{ ruleId: 'no-console-log', message: 'console.log left in', severity: 'error', filePath: 'src/a.ts', line: 3 }],
+              findings: [
+                {
+                  ruleId: 'no-console-log',
+                  message: 'console.log left in',
+                  severity: 'error',
+                  filePath: 'src/a.ts',
+                  line: 3,
+                },
+              ],
             },
           ],
         },
@@ -100,7 +112,7 @@ describe('renderSessionTable / renderDetail', () => {
 
     const detail = detailSection(panel);
     expect(detail).not.toBeNull();
-    const headers = [...detail!.querySelectorAll('thead th')].map(th => th.textContent);
+    const headers = [...detail!.querySelectorAll('thead th')].map((th) => th.textContent);
     expect(headers).toContain('Check');
     expect(headers).not.toContain('Rule');
     // The check's slug renders in a row.
@@ -122,8 +134,20 @@ describe('renderSessionTable / renderDetail', () => {
               violationCount: 2,
               durationMs: 0,
               findings: [
-                { ruleId: 'graph:duplicated-function-body', message: 'dup body', severity: 'warning', filePath: 'src/x.ts', line: 1 },
-                { ruleId: 'graph:duplicated-function-body', message: 'dup body', severity: 'warning', filePath: 'src/y.ts', line: 9 },
+                {
+                  ruleId: 'graph:duplicated-function-body',
+                  message: 'dup body',
+                  severity: 'warning',
+                  filePath: 'src/x.ts',
+                  line: 1,
+                },
+                {
+                  ruleId: 'graph:duplicated-function-body',
+                  message: 'dup body',
+                  severity: 'warning',
+                  filePath: 'src/y.ts',
+                  line: 9,
+                },
               ],
             },
           ],
@@ -133,7 +157,7 @@ describe('renderSessionTable / renderDetail', () => {
 
     const detail = detailSection(panel);
     expect(detail).not.toBeNull();
-    const headers = [...detail!.querySelectorAll('thead th')].map(th => th.textContent);
+    const headers = [...detail!.querySelectorAll('thead th')].map((th) => th.textContent);
     expect(headers).toContain('Rule');
     expect(headers).not.toContain('Check');
     expect(detail!.textContent).toContain('graph:duplicated-function-body');
@@ -151,18 +175,34 @@ describe('renderSessionTable / renderDetail', () => {
   it('omits the per-rule Duration column for a graph session', () => {
     const panel = loadEnv().render([
       makeSession({
-        id: 'g2', tool: 'graph', recipe: 'graph',
+        id: 'g2',
+        tool: 'graph',
+        recipe: 'graph',
         payload: {
           summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 1 },
           checks: [
-            { checkSlug: 'graph:cycle', passed: true, violationCount: 1, durationMs: 0,
-              findings: [{ ruleId: 'graph:cycle', message: 'cycle', severity: 'warning', filePath: 'src/x.ts', line: 1, metadata: { sccSize: 4 } }] },
+            {
+              checkSlug: 'graph:cycle',
+              passed: true,
+              violationCount: 1,
+              durationMs: 0,
+              findings: [
+                {
+                  ruleId: 'graph:cycle',
+                  message: 'cycle',
+                  severity: 'warning',
+                  filePath: 'src/x.ts',
+                  line: 1,
+                  metadata: { sccSize: 4 },
+                },
+              ],
+            },
           ],
         },
       }),
     ]);
     const detail = detailSection(panel);
-    const headers = [...detail!.querySelectorAll('thead th')].map(th => th.textContent);
+    const headers = [...detail!.querySelectorAll('thead th')].map((th) => th.textContent);
     expect(headers).not.toContain('Duration');
   });
 
@@ -173,26 +213,55 @@ describe('renderSessionTable / renderDetail', () => {
         payload: {
           summary: { total: 1, passed: 0, failed: 1, errors: 1, warnings: 0 },
           checks: [
-            { checkSlug: 'no-console-log', passed: false, violationCount: 1, durationMs: 5,
-              findings: [{ ruleId: 'no-console-log', message: 'm', severity: 'error', filePath: 'src/a.ts', line: 3 }] },
+            {
+              checkSlug: 'no-console-log',
+              passed: false,
+              violationCount: 1,
+              durationMs: 5,
+              findings: [
+                {
+                  ruleId: 'no-console-log',
+                  message: 'm',
+                  severity: 'error',
+                  filePath: 'src/a.ts',
+                  line: 3,
+                },
+              ],
+            },
           ],
         },
       }),
     ]);
     const detail = detailSection(panel);
-    const headers = [...detail!.querySelectorAll('thead th')].map(th => th.textContent);
+    const headers = [...detail!.querySelectorAll('thead th')].map((th) => th.textContent);
     expect(headers).toContain('Duration');
   });
 
   it('renders the per-rule metric column (Lines from metadata.bodyLines) for graph:large-function, dropping Message', () => {
     const panel = loadEnv().render([
       makeSession({
-        id: 'g3', tool: 'graph', recipe: 'graph',
+        id: 'g3',
+        tool: 'graph',
+        recipe: 'graph',
         payload: {
           summary: { total: 1, passed: 0, failed: 1, errors: 1, warnings: 0 },
           checks: [
-            { checkSlug: 'graph:large-function', passed: false, violationCount: 1, durationMs: 0,
-              findings: [{ ruleId: 'graph:large-function', message: 'foo is 321 lines long.', severity: 'error', filePath: 'src/big.ts', line: 10, metadata: { bodyLines: 321 } }] },
+            {
+              checkSlug: 'graph:large-function',
+              passed: false,
+              violationCount: 1,
+              durationMs: 0,
+              findings: [
+                {
+                  ruleId: 'graph:large-function',
+                  message: 'foo is 321 lines long.',
+                  severity: 'error',
+                  filePath: 'src/big.ts',
+                  line: 10,
+                  metadata: { bodyLines: 321 },
+                },
+              ],
+            },
           ],
         },
       }),
@@ -200,55 +269,105 @@ describe('renderSessionTable / renderDetail', () => {
     const detail = detailSection(panel);
     // Expand the rule row to reveal the findings table.
     detail!.querySelector<HTMLElement>('tbody tr.clickable')!.click();
-    const findingsHeaders = [...detail!.querySelectorAll('.expander-content thead th')].map(th => th.textContent);
+    const findingsHeaders = [...detail!.querySelectorAll('.expander-content thead th')].map(
+      (th) => th.textContent,
+    );
     expect(findingsHeaders).toEqual(['Severity', 'File', 'Lines', 'Suggestion']);
     expect(detail!.querySelector('.expander-content')!.textContent).toContain('321');
     // Message column is dropped — the verbose message must not appear.
-    expect(detail!.querySelector('.expander-content')!.textContent).not.toContain('is 321 lines long');
+    expect(detail!.querySelector('.expander-content')!.textContent).not.toContain(
+      'is 321 lines long',
+    );
   });
 
   it('falls back to a dash when the metric metadata is missing', () => {
     const panel = loadEnv().render([
       makeSession({
-        id: 'g4', tool: 'graph', recipe: 'graph',
+        id: 'g4',
+        tool: 'graph',
+        recipe: 'graph',
         payload: {
           summary: { total: 1, passed: 0, failed: 1, errors: 1, warnings: 0 },
           checks: [
-            { checkSlug: 'graph:wide-function', passed: false, violationCount: 1, durationMs: 0,
-              findings: [{ ruleId: 'graph:wide-function', message: 'wide', severity: 'error', filePath: 'src/w.ts', line: 2 }] },
+            {
+              checkSlug: 'graph:wide-function',
+              passed: false,
+              violationCount: 1,
+              durationMs: 0,
+              findings: [
+                {
+                  ruleId: 'graph:wide-function',
+                  message: 'wide',
+                  severity: 'error',
+                  filePath: 'src/w.ts',
+                  line: 2,
+                },
+              ],
+            },
           ],
         },
       }),
     ]);
     const detail = detailSection(panel);
     detail!.querySelector<HTMLElement>('tbody tr.clickable')!.click();
-    const headers = [...detail!.querySelectorAll('.expander-content thead th')].map(th => th.textContent);
+    const headers = [...detail!.querySelectorAll('.expander-content thead th')].map(
+      (th) => th.textContent,
+    );
     expect(headers).toEqual(['Severity', 'File', 'Parameters', 'Suggestion']);
     // The Parameters cell shows the em-dash fallback.
-    const cells = [...detail!.querySelectorAll('.expander-content tbody td')].map(td => td.textContent);
+    const cells = [...detail!.querySelectorAll('.expander-content tbody td')].map(
+      (td) => td.textContent,
+    );
     expect(cells).toContain('—');
   });
 
   it('sorts findings within a rule errors-first', () => {
     const panel = loadEnv().render([
       makeSession({
-        id: 'g5', tool: 'graph', recipe: 'graph',
+        id: 'g5',
+        tool: 'graph',
+        recipe: 'graph',
         payload: {
           summary: { total: 1, passed: 0, failed: 1, errors: 1, warnings: 2 },
           checks: [
-            { checkSlug: 'graph:duplicated-function-body', passed: false, violationCount: 3, durationMs: 0,
+            {
+              checkSlug: 'graph:duplicated-function-body',
+              passed: false,
+              violationCount: 3,
+              durationMs: 0,
               findings: [
-                { ruleId: 'graph:duplicated-function-body', message: 'w1', severity: 'warning', filePath: 'src/a.ts', line: 1 },
-                { ruleId: 'graph:duplicated-function-body', message: 'e1', severity: 'error', filePath: 'src/b.ts', line: 2 },
-                { ruleId: 'graph:duplicated-function-body', message: 'w2', severity: 'warning', filePath: 'src/c.ts', line: 3 },
-              ] },
+                {
+                  ruleId: 'graph:duplicated-function-body',
+                  message: 'w1',
+                  severity: 'warning',
+                  filePath: 'src/a.ts',
+                  line: 1,
+                },
+                {
+                  ruleId: 'graph:duplicated-function-body',
+                  message: 'e1',
+                  severity: 'error',
+                  filePath: 'src/b.ts',
+                  line: 2,
+                },
+                {
+                  ruleId: 'graph:duplicated-function-body',
+                  message: 'w2',
+                  severity: 'warning',
+                  filePath: 'src/c.ts',
+                  line: 3,
+                },
+              ],
+            },
           ],
         },
       }),
     ]);
     const detail = detailSection(panel);
     detail!.querySelector<HTMLElement>('tbody tr.clickable')!.click();
-    const sevs = [...detail!.querySelectorAll('.expander-content tbody .finding-sev')].map(s => s.textContent);
+    const sevs = [...detail!.querySelectorAll('.expander-content tbody .finding-sev')].map(
+      (s) => s.textContent,
+    );
     expect(sevs[0]).toBe('error');
     expect(sevs.slice(1)).toEqual(['warning', 'warning']);
   });

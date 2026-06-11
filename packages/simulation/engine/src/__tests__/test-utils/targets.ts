@@ -6,22 +6,21 @@
  * times it was invoked (and how many were concurrent) for driver assertions.
  */
 
-import type { Target } from '../../framework/execution/target.js'
+import type { Target } from '../../framework/execution/target.js';
 
 /** A target that always succeeds immediately. */
-export const noopTarget: Target = () => Promise.resolve()
+export const noopTarget: Target = () => Promise.resolve();
 
 /** A target that always fails (throws) immediately. */
-export const failingTarget: Target = () =>
-  Promise.reject(new Error('test-target: forced failure'))
+export const failingTarget: Target = () => Promise.reject(new Error('test-target: forced failure'));
 
 /** A counting target plus its observed call/concurrency stats. */
 export interface CountingTarget {
-  readonly target: Target
+  readonly target: Target;
   /** Total invocations. */
-  calls(): number
+  calls(): number;
   /** Peak simultaneous in-flight invocations observed. */
-  maxConcurrent(): number
+  maxConcurrent(): number;
 }
 
 /**
@@ -29,23 +28,23 @@ export interface CountingTarget {
  * peak concurrency. `delayMs` defaults to 0 (resolve on the next microtask).
  */
 export function countingTarget(delayMs = 0): CountingTarget {
-  let calls = 0
-  let inFlight = 0
-  let peak = 0
+  let calls = 0;
+  let inFlight = 0;
+  let peak = 0;
   return {
     target: async () => {
-      calls++
-      inFlight++
-      peak = Math.max(peak, inFlight)
+      calls++;
+      inFlight++;
+      peak = Math.max(peak, inFlight);
       try {
         if (delayMs > 0) {
-          await new Promise((resolve) => setTimeout(resolve, delayMs))
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
       } finally {
-        inFlight--
+        inFlight--;
       }
     },
     calls: () => calls,
     maxConcurrent: () => peak,
-  }
+  };
 }

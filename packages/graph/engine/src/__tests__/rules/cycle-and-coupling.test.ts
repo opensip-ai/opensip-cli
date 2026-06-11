@@ -95,10 +95,34 @@ describe('graph:cycle test-file exclusion', () => {
   const EMPTY: GraphConfig = {};
   // t1/t2/t3 live in test files; p1 is production.
   const catalog = makeCatalog([
-    occ({ bodyHash: 't1', simpleName: 't1', qualifiedName: 't1', filePath: 'src/a.test.ts', inTestFile: true }),
-    occ({ bodyHash: 't2', simpleName: 't2', qualifiedName: 't2', filePath: 'src/b.test.ts', inTestFile: true }),
-    occ({ bodyHash: 't3', simpleName: 't3', qualifiedName: 't3', filePath: 'src/c.test.ts', inTestFile: true }),
-    occ({ bodyHash: 'p1', simpleName: 'p1', qualifiedName: 'p1', filePath: 'src/p.ts', inTestFile: false }),
+    occ({
+      bodyHash: 't1',
+      simpleName: 't1',
+      qualifiedName: 't1',
+      filePath: 'src/a.test.ts',
+      inTestFile: true,
+    }),
+    occ({
+      bodyHash: 't2',
+      simpleName: 't2',
+      qualifiedName: 't2',
+      filePath: 'src/b.test.ts',
+      inTestFile: true,
+    }),
+    occ({
+      bodyHash: 't3',
+      simpleName: 't3',
+      qualifiedName: 't3',
+      filePath: 'src/c.test.ts',
+      inTestFile: true,
+    }),
+    occ({
+      bodyHash: 'p1',
+      simpleName: 'p1',
+      qualifiedName: 'p1',
+      filePath: 'src/p.ts',
+      inTestFile: false,
+    }),
   ]);
   const indexes = buildIndexes(catalog);
   // SCC members are occIds (`${filePath}:${line}:${column}`).
@@ -123,8 +147,20 @@ describe('graph:cycle test-file exclusion', () => {
 describe('graph:unexpected-coupling package cycles', () => {
   // Two packages A and B with occurrences (so the rule can anchor a location).
   const catalog = makeCatalog([
-    occ({ bodyHash: 'a-init', simpleName: '<module-init:a>', kind: 'module-init', package: 'pkg-a', filePath: 'packages/a/src/index.ts' }),
-    occ({ bodyHash: 'b-init', simpleName: '<module-init:b>', kind: 'module-init', package: 'pkg-b', filePath: 'packages/b/src/index.ts' }),
+    occ({
+      bodyHash: 'a-init',
+      simpleName: '<module-init:a>',
+      kind: 'module-init',
+      package: 'pkg-a',
+      filePath: 'packages/a/src/index.ts',
+    }),
+    occ({
+      bodyHash: 'b-init',
+      simpleName: '<module-init:b>',
+      kind: 'module-init',
+      package: 'pkg-b',
+      filePath: 'packages/b/src/index.ts',
+    }),
   ]);
   const indexes = buildIndexes(catalog);
 
@@ -147,16 +183,32 @@ describe('graph:unexpected-coupling package cycles', () => {
   });
 
   it('emits nothing when there is no reverse edge (no cycle)', () => {
-    const oneWay: PackageEdgeFeature[] = [{ callerPackage: 'pkg-a', calleePackage: 'pkg-b', count: 3 }];
+    const oneWay: PackageEdgeFeature[] = [
+      { callerPackage: 'pkg-a', calleePackage: 'pkg-b', count: 3 },
+    ];
     expect(
-      unexpectedCouplingRule.evaluate(catalog, indexes, {}, undefined, featureTable({ edge: oneWay })),
+      unexpectedCouplingRule.evaluate(
+        catalog,
+        indexes,
+        {},
+        undefined,
+        featureTable({ edge: oneWay }),
+      ),
     ).toEqual([]);
   });
 
   it('ignores package self-loops (A→A is not a pair cycle)', () => {
-    const selfLoop: PackageEdgeFeature[] = [{ callerPackage: 'pkg-a', calleePackage: 'pkg-a', count: 5 }];
+    const selfLoop: PackageEdgeFeature[] = [
+      { callerPackage: 'pkg-a', calleePackage: 'pkg-a', count: 5 },
+    ];
     expect(
-      unexpectedCouplingRule.evaluate(catalog, indexes, {}, undefined, featureTable({ edge: selfLoop })),
+      unexpectedCouplingRule.evaluate(
+        catalog,
+        indexes,
+        {},
+        undefined,
+        featureTable({ edge: selfLoop }),
+      ),
     ).toEqual([]);
   });
 
@@ -183,8 +235,20 @@ describe('graph:cycle ↔ graph:unexpected-coupling non-overlap', () => {
   it('a single cross-package tangle yields one cycle signal + at most one coupling signal, distinct fingerprints', () => {
     // Two functions in packages A and B that form one cross-package SCC, with
     // the matching package edges A↔B.
-    const fnA = occ({ bodyHash: 'fa', simpleName: 'fa', qualifiedName: 'a.fa', package: 'pkg-a', filePath: 'packages/a/src/x.ts' });
-    const fnB = occ({ bodyHash: 'fb', simpleName: 'fb', qualifiedName: 'b.fb', package: 'pkg-b', filePath: 'packages/b/src/y.ts' });
+    const fnA = occ({
+      bodyHash: 'fa',
+      simpleName: 'fa',
+      qualifiedName: 'a.fa',
+      package: 'pkg-a',
+      filePath: 'packages/a/src/x.ts',
+    });
+    const fnB = occ({
+      bodyHash: 'fb',
+      simpleName: 'fb',
+      qualifiedName: 'b.fb',
+      package: 'pkg-b',
+      filePath: 'packages/b/src/y.ts',
+    });
     const catalog = makeCatalog([fnA, fnB]);
     const indexes = buildIndexes(catalog);
 
@@ -197,7 +261,13 @@ describe('graph:cycle ↔ graph:unexpected-coupling non-overlap', () => {
     const features = featureTable({ scc: [scc], edge: edges });
 
     const cycleSignals = cycleRule.evaluate(catalog, indexes, EMPTY, undefined, features);
-    const couplingSignals = unexpectedCouplingRule.evaluate(catalog, indexes, {}, undefined, features);
+    const couplingSignals = unexpectedCouplingRule.evaluate(
+      catalog,
+      indexes,
+      {},
+      undefined,
+      features,
+    );
 
     expect(cycleSignals).toHaveLength(1);
     expect(couplingSignals).toHaveLength(1);
@@ -220,7 +290,17 @@ describe('graph:cycle ↔ graph:unexpected-coupling non-overlap', () => {
 
   it('both rules return [] for an empty catalog', () => {
     const empty = featureTable({});
-    expect(cycleRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([])), EMPTY, undefined, empty)).toEqual([]);
-    expect(unexpectedCouplingRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([])), {}, undefined, empty)).toEqual([]);
+    expect(
+      cycleRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([])), EMPTY, undefined, empty),
+    ).toEqual([]);
+    expect(
+      unexpectedCouplingRule.evaluate(
+        makeCatalog([]),
+        buildIndexes(makeCatalog([])),
+        {},
+        undefined,
+        empty,
+      ),
+    ).toEqual([]);
   });
 });

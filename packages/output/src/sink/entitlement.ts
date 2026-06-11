@@ -124,7 +124,10 @@ export async function checkEntitlement(input: CheckEntitlementInput): Promise<En
 
 /** Delete the cached entitlement for a key — called after a 401/403 at emit so a
  *  revoked plan re-checks on the next run rather than waiting out the TTL. */
-export async function invalidateEntitlement(input: { apiKey: string; cacheDir: string }): Promise<void> {
+export async function invalidateEntitlement(input: {
+  apiKey: string;
+  cacheDir: string;
+}): Promise<void> {
   try {
     await rm(cacheFileFor(input.cacheDir, input.apiKey), { force: true });
   } catch {

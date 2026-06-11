@@ -15,17 +15,20 @@ import { findOccurrence, runFixture, writeFixture } from './_fixture-runner.js';
 
 import type { Catalog } from '@opensip-tools/graph';
 
-
 describe('interface-dispatch acceptance fixture', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-iface-'));
-  afterAll(() => { rmSync(fixtureDir, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(fixtureDir, { recursive: true, force: true });
+  });
 
   writeFixture(fixtureDir, {
     'iface.ts': `export interface Greeter { greet(): string; }\nexport const englishGreeter: Greeter = {\n  greet(): string { return 'hello'; }\n};\n`,
     'caller.ts': `import { englishGreeter } from './iface.js';\nimport type { Greeter } from './iface.js';\nexport function callGreet(g: Greeter): string {\n  return g.greet();\n}\nexport function callConcrete(): string {\n  return englishGreeter.greet();\n}\n`,
   });
   let catalog!: Catalog;
-  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
+  beforeAll(async () => {
+    catalog = await runFixture(fixtureDir);
+  });
 
   it('records a method-dispatch edge for g.greet()', () => {
     const callGreetOcc = findOccurrence(catalog, (o) => o.simpleName === 'callGreet');

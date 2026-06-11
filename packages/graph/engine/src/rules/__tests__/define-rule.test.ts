@@ -89,13 +89,21 @@ describe('defineRule', () => {
 
   it('passes through the signals the author returns', () => {
     const sig = { ruleId: 'graph:demo' } as unknown as Signal;
-    const rule = defineRule({ slug: 'graph:demo', defaultSeverity: 'error', evaluate: () => [sig] });
+    const rule = defineRule({
+      slug: 'graph:demo',
+      defaultSeverity: 'error',
+      evaluate: () => [sig],
+    });
     expect(rule.evaluate(CATALOG, INDEXES, CONFIG, undefined)).toEqual([sig]);
   });
 
   it('throws ValidationError on an invalid slug', () => {
-    expect(() => defineRule({ slug: 'demo', defaultSeverity: 'warning', evaluate: () => [] })).toThrow(ValidationError);
-    expect(() => defineRule({ slug: '', defaultSeverity: 'warning', evaluate: () => [] })).toThrow(ValidationError);
+    expect(() =>
+      defineRule({ slug: 'demo', defaultSeverity: 'warning', evaluate: () => [] }),
+    ).toThrow(ValidationError);
+    expect(() => defineRule({ slug: '', defaultSeverity: 'warning', evaluate: () => [] })).toThrow(
+      ValidationError,
+    );
   });
 
   it('throws ValidationError on an invalid defaultSeverity', () => {
@@ -106,7 +114,11 @@ describe('defineRule', () => {
 
   it('throws ValidationError when evaluate is not a function', () => {
     expect(() =>
-      defineRule({ slug: 'graph:demo', defaultSeverity: 'warning', evaluate: undefined as unknown as () => Signal[] }),
+      defineRule({
+        slug: 'graph:demo',
+        defaultSeverity: 'warning',
+        evaluate: undefined as unknown as () => Signal[],
+      }),
     ).toThrow(ValidationError);
   });
 });

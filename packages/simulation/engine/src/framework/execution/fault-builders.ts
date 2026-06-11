@@ -8,7 +8,7 @@
  * ```
  */
 
-import type { Fault, FaultSpec } from './fault-spec.js'
+import type { Fault, FaultSpec } from './fault-spec.js';
 
 /** Builders for the client-side fault vocabulary + a `FaultSpec` assembler. */
 export const fault = {
@@ -23,4 +23,4 @@ export const fault = {
     faults,
     probability: o.probability,
   }),
-} as const
+} as const;

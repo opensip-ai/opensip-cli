@@ -27,12 +27,20 @@ function sig(source: string, severity: SignalSeverity, ruleId = `fit:${source}`)
   });
 }
 
-function envelope(units: { slug: string; passed: boolean; violationCount?: number; durationMs?: number }[], signals: ReturnType<typeof sig>[]) {
+function envelope(
+  units: { slug: string; passed: boolean; violationCount?: number; durationMs?: number }[],
+  signals: ReturnType<typeof sig>[],
+) {
   return buildSignalEnvelope({
     tool: 'fit',
     runId: 'RUN_test',
     createdAt: '2026-06-05T00:00:00.000Z',
-    units: units.map((u) => ({ slug: u.slug, passed: u.passed, violationCount: u.violationCount, durationMs: u.durationMs ?? 10 })),
+    units: units.map((u) => ({
+      slug: u.slug,
+      passed: u.passed,
+      violationCount: u.violationCount,
+      durationMs: u.durationMs ?? 10,
+    })),
     signals,
   });
 }
@@ -52,7 +60,10 @@ describe('buildFitnessSessionPayload', () => {
 
   it('collapses 4-level severity to 2-level (critical|high → error, else warning)', () => {
     const env = envelope(
-      [{ slug: 'a', passed: false }, { slug: 'b', passed: false }],
+      [
+        { slug: 'a', passed: false },
+        { slug: 'b', passed: false },
+      ],
       [sig('a', 'high'), sig('b', 'medium')],
     );
     const payload = buildFitnessSessionPayload(env);
@@ -71,7 +82,10 @@ describe('buildFitnessSessionPayload', () => {
 
   it('carries the envelope verdict summary through and preserves finding location fields', () => {
     const env = envelope(
-      [{ slug: 'a', passed: false }, { slug: 'ok', passed: true }],
+      [
+        { slug: 'a', passed: false },
+        { slug: 'ok', passed: true },
+      ],
       [sig('a', 'critical')],
     );
     const payload = buildFitnessSessionPayload(env);

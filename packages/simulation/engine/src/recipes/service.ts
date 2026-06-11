@@ -76,9 +76,7 @@ export class SimulationRecipeService {
    * Run a recipe by resolving its scenario selector against the live
    * scenario registry and executing the matched set.
    */
-  async runRecipe(
-    recipe: SimulationRecipe,
-  ): Promise<SimulationRecipeResult> {
+  async runRecipe(recipe: SimulationRecipe): Promise<SimulationRecipeResult> {
     const startedAt = Date.now();
     const selected = resolveSelector(recipe.scenarios);
 

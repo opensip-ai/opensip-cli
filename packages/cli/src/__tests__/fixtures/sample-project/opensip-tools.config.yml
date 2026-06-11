@@ -3,8 +3,8 @@
 # target so scope-based checks have something to scan.
 targets:
   backend:
-    description: "Sample project source"
+    description: 'Sample project source'
     languages: [typescript]
     concerns: [backend]
     include:
-      - "src/**/*.ts"
+      - 'src/**/*.ts'

@@ -40,7 +40,13 @@ describe('isTestOrFixturePath', () => {
 // ── catalog fixtures ───────────────────────────────────────────────
 
 /** Build a one-occurrence catalog where `owner` (in `file`) calls `to` at line. */
-function occ(file: string, bodyHash: string, to: string[], line = 10, column = 4): FunctionOccurrence {
+function occ(
+  file: string,
+  bodyHash: string,
+  to: string[],
+  line = 10,
+  column = 4,
+): FunctionOccurrence {
   return {
     bodyHash,
     simpleName: 'owner',
@@ -152,7 +158,10 @@ const diff = (owner: string): EquivalenceReport['productionResolvedDifferences']
 describe('judgeEquivalence ratchet', () => {
   it('PASSES when production + SCC match the budget', () => {
     const v = judgeEquivalence(
-      reportWith({ productionResolvedDifferences: [diff('p/a.ts'), diff('p/b.ts')], sccDifferences: ['s'] }),
+      reportWith({
+        productionResolvedDifferences: [diff('p/a.ts'), diff('p/b.ts')],
+        sccDifferences: ['s'],
+      }),
       { productionResolvedEdgeDivergences: 2, sccDivergences: 1 },
     );
     expect(v.failed).toBe(false);
@@ -160,7 +169,9 @@ describe('judgeEquivalence ratchet', () => {
 
   it('FAILS when production EXCEEDS budget (a regression spike) and prints offenders', () => {
     const v = judgeEquivalence(
-      reportWith({ productionResolvedDifferences: [diff('p/a.ts'), diff('p/b.ts'), diff('p/c.ts')] }),
+      reportWith({
+        productionResolvedDifferences: [diff('p/a.ts'), diff('p/b.ts'), diff('p/c.ts')],
+      }),
       { productionResolvedEdgeDivergences: 1, sccDivergences: 0 },
     );
     expect(v.failed).toBe(true);
@@ -169,27 +180,27 @@ describe('judgeEquivalence ratchet', () => {
   });
 
   it('FAILS when SCC divergence EXCEEDS its budget', () => {
-    const v = judgeEquivalence(
-      reportWith({ sccDifferences: ['s1', 's2'] }),
-      { productionResolvedEdgeDivergences: 0, sccDivergences: 1 },
-    );
+    const v = judgeEquivalence(reportWith({ sccDifferences: ['s1', 's2'] }), {
+      productionResolvedEdgeDivergences: 0,
+      sccDivergences: 1,
+    });
     expect(v.failed).toBe(true);
   });
 
   it('PASSES with a tighten hint when production is BELOW budget', () => {
-    const v = judgeEquivalence(
-      reportWith({ productionResolvedDifferences: [diff('p/a.ts')] }),
-      { productionResolvedEdgeDivergences: 5, sccDivergences: 0 },
-    );
+    const v = judgeEquivalence(reportWith({ productionResolvedDifferences: [diff('p/a.ts')] }), {
+      productionResolvedEdgeDivergences: 5,
+      sccDivergences: 0,
+    });
     expect(v.failed).toBe(false);
     expect(v.lines.join('\n')).toContain('tighten the ratchet');
   });
 
   it('HARD-FAILS on a function-set breach regardless of budget', () => {
-    const v = judgeEquivalence(
-      reportWith({ functionsOnlyInExact: ['ghost'] }),
-      { productionResolvedEdgeDivergences: 1000, sccDivergences: 1000 },
-    );
+    const v = judgeEquivalence(reportWith({ functionsOnlyInExact: ['ghost'] }), {
+      productionResolvedEdgeDivergences: 1000,
+      sccDivergences: 1000,
+    });
     expect(v.failed).toBe(true);
     expect(v.functionSetBreached).toBe(true);
     expect(v.lines.join('\n')).toContain('function-set divergence');

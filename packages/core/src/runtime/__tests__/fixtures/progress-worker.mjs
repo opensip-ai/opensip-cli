@@ -10,34 +10,34 @@
  *   exit-clean      — exit 0 without ever sending a result (premature exit).
  *   map-result      — a `result` whose value carries a Map (advanced-serialization proof).
  */
-const mode = process.argv[2]
-const send = (msg) => process.send?.(msg)
+const mode = process.argv[2];
+const send = (msg) => process.send?.(msg);
 
 switch (mode) {
   case 'emit-and-result': {
-    send({ kind: 'progress', event: 1 })
-    send({ kind: 'progress', event: 2 })
-    send({ kind: 'progress', event: 3 })
-    send({ kind: 'result', value: 'done' })
-    break
+    send({ kind: 'progress', event: 1 });
+    send({ kind: 'progress', event: 2 });
+    send({ kind: 'progress', event: 3 });
+    send({ kind: 'result', value: 'done' });
+    break;
   }
   case 'error-message': {
-    send({ kind: 'error', message: 'worker blew up', stack: 'worker blew up\n  at fixture' })
-    break
+    send({ kind: 'error', message: 'worker blew up', stack: 'worker blew up\n  at fixture' });
+    break;
   }
   case 'throw': {
-    throw new Error('uncaught in worker')
+    throw new Error('uncaught in worker');
   }
   case 'exit-clean': {
-    process.exit(0)
-    break
+    process.exit(0);
+    break;
   }
   case 'map-result': {
-    send({ kind: 'progress', event: 1 })
-    send({ kind: 'result', value: { tag: 'm', map: new Map([['a', 1]]) } })
-    break
+    send({ kind: 'progress', event: 1 });
+    send({ kind: 'result', value: { tag: 'm', map: new Map([['a', 1]]) } });
+    break;
   }
   default: {
-    send({ kind: 'error', message: `unknown fixture mode: ${String(mode)}` })
+    send({ kind: 'error', message: `unknown fixture mode: ${String(mode)}` });
   }
 }

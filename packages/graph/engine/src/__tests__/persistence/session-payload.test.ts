@@ -30,7 +30,13 @@ function sig(over: {
 describe('buildGraphSessionPayload', () => {
   it('persists the full rule-grouped detail from the signals (no cap; engine slugs)', () => {
     const payload = buildGraphSessionPayload([
-      sig({ ruleId: 'graph:god-file', message: 'too big', severity: 'high', filePath: 'a.ts', line: 1 }),
+      sig({
+        ruleId: 'graph:god-file',
+        message: 'too big',
+        severity: 'high',
+        filePath: 'a.ts',
+        line: 1,
+      }),
       sig({ ruleId: 'graph:dup-body', message: 'dup', severity: 'low', filePath: 'b.ts', line: 2 }),
       sig({ ruleId: 'graph:dup-body', message: 'dup', severity: 'low', filePath: 'c.ts', line: 3 }),
     ]);

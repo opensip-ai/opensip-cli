@@ -9,15 +9,15 @@
  *
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { parseSource, walkNodes, getLineNumber } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { parseSource, walkNodes, getLineNumber } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /** Names of user input sources on request objects */
-const USER_INPUT_PROPERTIES = new Set(['body', 'params', 'query'])
+const USER_INPUT_PROPERTIES = new Set(['body', 'params', 'query']);
 
 /** Names of request objects */
-const REQUEST_OBJECT_NAMES = new Set(['request', 'req'])
+const REQUEST_OBJECT_NAMES = new Set(['request', 'req']);
 
 /** Dangerous command execution function names */
 const EXEC_FUNCTIONS = new Set([
@@ -27,7 +27,7 @@ const EXEC_FUNCTIONS = new Set([
   'spawnSync',
   'execFile',
   'execFileSync',
-])
+]);
 
 /** Dangerous file system function names */
 const FS_FUNCTIONS = new Set([
@@ -41,7 +41,7 @@ const FS_FUNCTIONS = new Set([
   'rmdirSync',
   'mkdir',
   'mkdirSync',
-])
+]);
 
 /**
  * Check if an expression tree references user input (req.body, req.params, req.query).
@@ -56,22 +56,22 @@ function referencesUserInput(node: ts.Node): boolean {
       ts.isIdentifier(node.expression) &&
       REQUEST_OBJECT_NAMES.has(node.expression.text)
     ) {
-      return true
+      return true;
     }
     // Check for deeper access: req.body.field
     if (ts.isPropertyAccessExpression(node.expression)) {
-      return referencesUserInput(node.expression)
+      return referencesUserInput(node.expression);
     }
   }
 
   // Check children
-  let found = false
+  let found = false;
   ts.forEachChild(node, (child) => {
     if (!found && referencesUserInput(child)) {
-      found = true
+      found = true;
     }
-  })
-  return found
+  });
+  return found;
 }
 
 /**
@@ -79,21 +79,21 @@ function referencesUserInput(node: ts.Node): boolean {
  * which would indicate this is a pattern definition, not actual code.
  */
 function isInStringOrRegex(node: ts.Node): boolean {
-  let current = node.parent
+  let current = node.parent;
   while (!ts.isSourceFile(current)) {
     /* v8 ignore next -- defensive AST/type guard */
-    if (ts.isStringLiteral(current) || ts.isRegularExpressionLiteral(current)) return true
+    if (ts.isStringLiteral(current) || ts.isRegularExpressionLiteral(current)) return true;
     /* v8 ignore next -- defensive AST/type guard */
-    if (ts.isNoSubstitutionTemplateLiteral(current)) return true
-    current = current.parent
+    if (ts.isNoSubstitutionTemplateLiteral(current)) return true;
+    current = current.parent;
   }
-  return false
+  return false;
 }
 
 function truncateMatch(node: ts.Node, maxLength = 200): string {
-  const text = node.getText()
+  const text = node.getText();
   /* v8 ignore next -- defensive AST/type guard */
-  return text.length > maxLength ? text.slice(0, maxLength) + '...' : text
+  return text.length > maxLength ? text.slice(0, maxLength) + '...' : text;
 }
 
 function checkInnerHtmlAssignment(
@@ -118,9 +118,9 @@ function checkInnerHtmlAssignment(
         'Use textContent for plain text: element.textContent = userInput. For HTML, use DOMPurify: element.innerHTML = DOMPurify.sanitize(userInput);',
       match: node.getText(),
       filePath,
-    }
+    };
   }
-  return null
+  return null;
 }
 
 function checkDangerouslySetInnerHTML(
@@ -142,23 +142,23 @@ function checkDangerouslySetInnerHTML(
         'Sanitize content before using dangerouslySetInnerHTML: dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}. Consider using markdown renderers with XSS protection.',
       match: node.getText(),
       filePath,
-    }
+    };
   }
-  return null
+  return null;
 }
 
 function getCallFunctionName(node: ts.CallExpression): string {
-  const callee = node.expression
-  if (ts.isIdentifier(callee)) return callee.text
+  const callee = node.expression;
+  if (ts.isIdentifier(callee)) return callee.text;
   /* v8 ignore next -- defensive AST/type guard */
-  if (ts.isPropertyAccessExpression(callee)) return callee.name.text
-  return ''
+  if (ts.isPropertyAccessExpression(callee)) return callee.name.text;
+  return '';
 }
 
 interface UnsanitizedCallRule {
-  readonly functionNames: Set<string>
-  readonly message: string
-  readonly suggestion: string
+  readonly functionNames: Set<string>;
+  readonly message: string;
+  readonly suggestion: string;
 }
 
 function checkUnsanitizedCallArgs(
@@ -167,11 +167,11 @@ function checkUnsanitizedCallArgs(
   filePath: string,
   rule: UnsanitizedCallRule,
 ): CheckViolation | null {
-  const { functionNames, message, suggestion } = rule
-  const functionName = getCallFunctionName(node)
-  if (!functionNames.has(functionName)) return null
+  const { functionNames, message, suggestion } = rule;
+  const functionName = getCallFunctionName(node);
+  if (!functionNames.has(functionName)) return null;
   /* v8 ignore next -- defensive AST/type guard */
-  if (isInStringOrRegex(node)) return null
+  if (isInStringOrRegex(node)) return null;
   for (const arg of node.arguments) {
     if (referencesUserInput(arg)) {
       return {
@@ -182,10 +182,10 @@ function checkUnsanitizedCallArgs(
         suggestion,
         match: truncateMatch(node),
         filePath,
-      }
+      };
     }
   }
-  return null
+  return null;
 }
 
 function checkHtmlTemplateInterpolation(
@@ -193,8 +193,8 @@ function checkHtmlTemplateInterpolation(
   sourceFile: ts.SourceFile,
   filePath: string,
 ): CheckViolation | null {
-  if (!ts.isTemplateExpression(node)) return null
-  if (!/^\s*<[a-zA-Z]/.test(node.head.text)) return null
+  if (!ts.isTemplateExpression(node)) return null;
+  if (!/^\s*<[a-zA-Z]/.test(node.head.text)) return null;
   for (const span of node.templateSpans) {
     if (referencesUserInput(span.expression)) {
       return {
@@ -206,10 +206,10 @@ function checkHtmlTemplateInterpolation(
           'Use html-escaper or DOMPurify to sanitize user input before inserting into HTML: import { escape } from "html-escaper"; const safeHtml = escape(userInput);',
         match: truncateMatch(node),
         filePath,
-      }
+      };
     }
   }
-  return null
+  return null;
 }
 
 /**
@@ -244,23 +244,23 @@ export const inputSanitization = defineCheck({
   confidence: 'high',
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const sourceFile = parseSource(content, filePath)
+    const sourceFile = parseSource(content, filePath);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     walkNodes(sourceFile, (node) => {
-      const innerHtml = checkInnerHtmlAssignment(node, sourceFile, filePath)
+      const innerHtml = checkInnerHtmlAssignment(node, sourceFile, filePath);
       if (innerHtml) {
-        violations.push(innerHtml)
-        return
+        violations.push(innerHtml);
+        return;
       }
 
-      const dangerousHtml = checkDangerouslySetInnerHTML(node, sourceFile, filePath)
+      const dangerousHtml = checkDangerouslySetInnerHTML(node, sourceFile, filePath);
       if (dangerousHtml) {
-        violations.push(dangerousHtml)
-        return
+        violations.push(dangerousHtml);
+        return;
       }
 
       if (ts.isCallExpression(node)) {
@@ -269,10 +269,10 @@ export const inputSanitization = defineCheck({
           message: 'User input passed to shell command - potential command injection',
           suggestion:
             'Never pass user input directly to shell commands. Use execFile with separate arguments array, or validate input against a strict allowlist. Consider using child_process.spawn with shell: false.',
-        })
+        });
         if (cmdInjection) {
-          violations.push(cmdInjection)
-          return
+          violations.push(cmdInjection);
+          return;
         }
 
         const pathTraversal = checkUnsanitizedCallArgs(node, sourceFile, filePath, {
@@ -280,19 +280,19 @@ export const inputSanitization = defineCheck({
           message: 'User input in file path - potential path traversal vulnerability',
           suggestion:
             'Validate file paths with path.resolve and ensure they stay within allowed directories: const safePath = path.resolve(baseDir, userInput); if (!safePath.startsWith(baseDir)) throw new Error("Invalid path");',
-        })
+        });
         if (pathTraversal) {
-          violations.push(pathTraversal)
-          return
+          violations.push(pathTraversal);
+          return;
         }
       }
 
-      const htmlTemplate = checkHtmlTemplateInterpolation(node, sourceFile, filePath)
+      const htmlTemplate = checkHtmlTemplateInterpolation(node, sourceFile, filePath);
       if (htmlTemplate) {
-        violations.push(htmlTemplate)
+        violations.push(htmlTemplate);
       }
-    })
+    });
 
-    return violations
+    return violations;
   },
-})
+});

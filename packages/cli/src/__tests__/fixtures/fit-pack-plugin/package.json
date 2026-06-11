@@ -4,5 +4,7 @@
   "private": true,
   "type": "module",
   "main": "./index.js",
-  "opensipTools": { "kind": "fit-pack" }
+  "opensipTools": {
+    "kind": "fit-pack"
+  }
 }

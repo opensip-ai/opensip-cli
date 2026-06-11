@@ -11,13 +11,13 @@
  * read-then-update on shared persistent state still fires.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest';
 
-import { analyzeFileForToctou } from '../toctou-race-condition.js'
+import { analyzeFileForToctou } from '../toctou-race-condition.js';
 
 function analyze(src: string): readonly { line: number }[] {
   // src/svc/* avoids the cache/cli/config/etc. safe-path skips.
-  return analyzeFileForToctou('src/svc/sample.ts', src)
+  return analyzeFileForToctou('src/svc/sample.ts', src);
 }
 
 describe('toctou-race-condition — state-bag-of-Maps FP regression', () => {
@@ -34,9 +34,9 @@ describe('toctou-race-condition — state-bag-of-Maps FP regression', () => {
         if (iv !== undefined) state.lowlink.set(v, iv);
         state.onStack.has(v);
       }
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 
   it('recognizes the same pattern for a locally-declared state variable', () => {
     const src = `
@@ -49,9 +49,9 @@ describe('toctou-race-condition — state-bag-of-Maps FP regression', () => {
         }
         return acc;
       }
-    `
-    expect(analyze(src)).toHaveLength(0)
-  })
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 
   it('STILL flags genuine read-then-update on a shared persistent receiver', () => {
     const src = `
@@ -60,7 +60,7 @@ describe('toctou-race-condition — state-bag-of-Maps FP regression', () => {
         user.lastSeen = Date.now();
         await userRepo.save(user);
       }
-    `
-    expect(analyze(src).length).toBeGreaterThan(0)
-  })
-})
+    `;
+    expect(analyze(src).length).toBeGreaterThan(0);
+  });
+});

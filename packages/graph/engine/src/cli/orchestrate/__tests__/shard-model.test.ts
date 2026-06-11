@@ -36,14 +36,31 @@ const RESULT: ShardBuildResult = {
           visibility: 'exported',
           inTestFile: false,
           definedInGenerated: false,
-          calls: [{ to: ['h2'], line: 1, column: 4, resolution: 'static', confidence: 'high', text: 'foo()' }],
+          calls: [
+            {
+              to: ['h2'],
+              line: 1,
+              column: 4,
+              resolution: 'static',
+              confidence: 'high',
+              text: 'foo()',
+            },
+          ],
         },
       ],
     },
   },
   fingerprint: 'fp-abc',
   boundaryCalls: [
-    { ownerHash: 'h1', ownerFile: 'core/index.ts', calleeName: 'dep', importSpecifier: '@scope/dep', line: 3, column: 2, text: 'dep()' },
+    {
+      ownerHash: 'h1',
+      ownerFile: 'core/index.ts',
+      calleeName: 'dep',
+      importSpecifier: '@scope/dep',
+      line: 3,
+      column: 2,
+      text: 'dep()',
+    },
   ],
   parseErrors: [],
 };

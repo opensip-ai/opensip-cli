@@ -6,17 +6,17 @@
  * predicates.ts; this module composes the enclosing-function lookups.
  */
 
-import { findEnclosing, nameOf, type Node } from '@opensip-tools/tree-sitter'
+import { findEnclosing, nameOf, type Node } from '@opensip-tools/tree-sitter';
 
-import { isFunction } from './predicates.js'
+import { isFunction } from './predicates.js';
 
 /** The nearest enclosing func/method of `node`, or `null` at file scope. */
 export function findEnclosingFunction(node: Node): Node | null {
-  return findEnclosing(node, isFunction)
+  return findEnclosing(node, isFunction);
 }
 
 /** The name of the nearest enclosing func/method, or `null`. */
 export function getEnclosingFunctionName(node: Node): string | null {
-  const fn = findEnclosingFunction(node)
-  return fn ? nameOf(fn) : null
+  const fn = findEnclosingFunction(node);
+  return fn ? nameOf(fn) : null;
 }

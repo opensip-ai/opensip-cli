@@ -11,12 +11,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { runFixture, writeFixture } from '../acceptance/_fixture-runner.js';
 
-
-
-
 describe('orphan-subtree rule', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-orphan-rule-'));
-  afterAll(() => { rmSync(fixtureDir, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(fixtureDir, { recursive: true, force: true });
+  });
 
   writeFixture(fixtureDir, {
     'index.ts': `function unusedHelper() { return 1; }\nexport function entry(): number {\n  return helper();\n}\nfunction helper(): number { return 42; }\n`,
@@ -52,7 +51,9 @@ describe('orphan-subtree rule — exported recursive renderer (D2 + D3)', () => 
   // entry point and the helper is reached transitively; D3 also suppresses
   // the exported renderer directly.
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-orphan-recursive-'));
-  afterAll(() => { rmSync(fixtureDir, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(fixtureDir, { recursive: true, force: true });
+  });
 
   writeFixture(fixtureDir, {
     'render.ts': [

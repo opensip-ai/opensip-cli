@@ -5,16 +5,15 @@
  * Supports React Native and Tamagui form components.
  */
 
-
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Form input components that should have accessibility labels.
  * Includes React Native and common UI library form components.
  */
-const FORM_INPUT_COMPONENTS = new Set(['TextInput', 'Input', 'Select', 'Picker'])
+const FORM_INPUT_COMPONENTS = new Set(['TextInput', 'Input', 'Select', 'Picker']);
 
 /**
  * Props that satisfy the accessibility label requirement.
@@ -25,7 +24,7 @@ const ACCESSIBILITY_LABEL_PROPS = new Set([
   'accessibilityLabelledBy',
   'aria-label',
   'aria-labelledby',
-])
+]);
 
 /**
  * Analyze a TSX file for form accessibility issues
@@ -36,29 +35,28 @@ const ACCESSIBILITY_LABEL_PROPS = new Set([
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
   // Only check TSX files
   if (!filePath.endsWith('.tsx')) {
-    return []
+    return [];
   }
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
-  const sourceFile = getSharedSourceFile(filePath, content)
+  const sourceFile = getSharedSourceFile(filePath, content);
   /* v8 ignore next -- defensive guard */
-  if (!sourceFile) return violations
+  if (!sourceFile) return violations;
 
   const visit = (node: ts.Node): void => {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-      const tagName = ts.isIdentifier(node.tagName) ? node.tagName.text : ''
+      const tagName = ts.isIdentifier(node.tagName) ? node.tagName.text : '';
 
       if (FORM_INPUT_COMPONENTS.has(tagName)) {
         const hasA11yLabel = node.attributes.properties.some(
-          (attr) =>
-            ts.isJsxAttribute(attr) && ACCESSIBILITY_LABEL_PROPS.has(attr.name.getText()),
-        )
+          (attr) => ts.isJsxAttribute(attr) && ACCESSIBILITY_LABEL_PROPS.has(attr.name.getText()),
+        );
 
         if (!hasA11yLabel) {
-          const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-          const lineNum = line + 1
-          const matchText = node.getText(sourceFile).slice(0, 100)
+          const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+          const lineNum = line + 1;
+          const matchText = node.getText(sourceFile).slice(0, 100);
 
           violations.push({
             filePath,
@@ -69,15 +67,15 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
             suggestion: `Add accessibilityLabel="description" or link to a label with accessibilityLabelledBy`,
             type: 'missing-form-label',
             match: matchText,
-          })
+          });
         }
       }
     }
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
 
-  visit(sourceFile)
-  return violations
+  visit(sourceFile);
+  return violations;
 }
 
 /**
@@ -106,4 +104,4 @@ export const a11yFormLabels = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze: analyzeFile,
-})
+});

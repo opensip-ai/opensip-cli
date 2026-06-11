@@ -1,13 +1,13 @@
 globalExcludes:
-  - "node_modules/**"
+  - 'node_modules/**'
 
 targets:
   java-source:
-    description: "Java acceptance source"
+    description: 'Java acceptance source'
     languages: [java]
     concerns: [backend]
     include:
-      - "src/**/*.java"
+      - 'src/**/*.java'
 
 fitness:
   failOnErrors: 0

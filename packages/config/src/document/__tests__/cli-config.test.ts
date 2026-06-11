@@ -146,7 +146,10 @@ describe('loadCliDefaults', () => {
 
   it('reads the cloud.sync flag and endpoint override', () => {
     writeConfig('cli:\n  cloud:\n    sync: false\n    endpoint: https://cloud.test/api\n');
-    expect(loadCliDefaults(testDir).cloud).toEqual({ sync: false, endpoint: 'https://cloud.test/api' });
+    expect(loadCliDefaults(testDir).cloud).toEqual({
+      sync: false,
+      endpoint: 'https://cloud.test/api',
+    });
   });
 
   it('drops a cloud block with no recognized keys', () => {

@@ -5,10 +5,10 @@
  * Detects unused files, exports, types, and dependencies using Knip.
  */
 
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Locations Knip does NOT auto-discover but many repos use for tool configs.
@@ -20,41 +20,41 @@ const NON_DEFAULT_KNIP_CONFIG_PATHS = [
   '.config/knip.jsonc',
   '.config/knip.ts',
   '.config/knip.js',
-]
+];
 
 /* v8 ignore start -- knip parsing logic is exercised in integration tests, not unit tests */
 function findKnipConfig(projectRoot: string): string | null {
   for (const candidate of NON_DEFAULT_KNIP_CONFIG_PATHS) {
-    const full = path.join(projectRoot, candidate)
-    if (fs.existsSync(full)) return candidate
+    const full = path.join(projectRoot, candidate);
+    if (fs.existsSync(full)) return candidate;
   }
-  return null
+  return null;
 }
 
 /**
  * Knip JSON output structure
  */
 interface KnipOutput {
-  files?: string[]
+  files?: string[];
   issues?: {
-    file: string
-    exports?: { name?: string; symbol?: string; line?: number }[]
-    types?: { name?: string; symbol?: string; line?: number }[]
-    dependencies?: { name?: string; line?: number }[]
-    devDependencies?: { name?: string; line?: number }[]
-    unlisted?: { name?: string; line?: number }[]
-    enumMembers?: Record<string, { name?: string; line?: number }[]>
-    classMembers?: Record<string, { name?: string; line?: number }[]>
-    duplicates?: string[]
-  }[]
+    file: string;
+    exports?: { name?: string; symbol?: string; line?: number }[];
+    types?: { name?: string; symbol?: string; line?: number }[];
+    dependencies?: { name?: string; line?: number }[];
+    devDependencies?: { name?: string; line?: number }[];
+    unlisted?: { name?: string; line?: number }[];
+    enumMembers?: Record<string, { name?: string; line?: number }[]>;
+    classMembers?: Record<string, { name?: string; line?: number }[]>;
+    duplicates?: string[];
+  }[];
 }
 
 /**
  * Create violation for unused file
  */
 function createUnusedFileViolation(file: string, cwd: string): CheckViolation {
-  const filePath = file.startsWith('/') ? file : `${cwd}/${file}`
-  const fileName = file.split('/').pop() ?? file
+  const filePath = file.startsWith('/') ? file : `${cwd}/${file}`;
+  const fileName = file.split('/').pop() ?? file;
   return {
     line: 1,
     message: `Unused file: ${file}`,
@@ -63,7 +63,7 @@ function createUnusedFileViolation(file: string, cwd: string): CheckViolation {
     suggestion: `Delete unused file '${fileName}' or add it to Knip's ignore configuration if intentionally kept`,
     match: fileName,
     filePath,
-  }
+  };
 }
 
 /**
@@ -73,10 +73,10 @@ function processExportsAndTypes(
   issue: NonNullable<KnipOutput['issues']>[number],
   filePath: string,
 ): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   for (const exp of issue.exports ?? []) {
-    const exportName = exp.symbol ?? exp.name ?? 'unknown'
+    const exportName = exp.symbol ?? exp.name ?? 'unknown';
     violations.push({
       line: exp.line ?? 1,
       message: `Unused export '${exportName}'`,
@@ -85,11 +85,11 @@ function processExportsAndTypes(
       suggestion: `Remove unused export '${exportName}' or use it somewhere in the codebase`,
       match: exportName,
       filePath,
-    })
+    });
   }
 
   for (const type of issue.types ?? []) {
-    const typeName = type.symbol ?? type.name ?? 'unknown'
+    const typeName = type.symbol ?? type.name ?? 'unknown';
     violations.push({
       line: type.line ?? 1,
       message: `Unused type '${typeName}'`,
@@ -98,10 +98,10 @@ function processExportsAndTypes(
       suggestion: `Remove unused type '${typeName}' or import it where needed`,
       match: typeName,
       filePath,
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -112,10 +112,10 @@ function processDependencies(
   filePath: string,
   _cwd: string,
 ): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   for (const dep of [...(issue.dependencies ?? []), ...(issue.devDependencies ?? [])]) {
-    const depName = dep.name ?? 'unknown'
+    const depName = dep.name ?? 'unknown';
     violations.push({
       line: dep.line ?? 1,
       message: `Unused dependency '${depName}'`,
@@ -127,11 +127,11 @@ function processDependencies(
       // In a monorepo, each workspace has its own package.json — pointing to the
       // root masked which sub-package owned the unused dep.
       filePath,
-    })
+    });
   }
 
   for (const dep of issue.unlisted ?? []) {
-    const depName = dep.name ?? 'unknown'
+    const depName = dep.name ?? 'unknown';
     violations.push({
       line: dep.line ?? 1,
       message: `Unlisted dependency '${depName}'`,
@@ -140,10 +140,10 @@ function processDependencies(
       type: 'unlisted-dependency',
       match: depName,
       filePath,
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -153,11 +153,11 @@ function processMembers(
   issue: NonNullable<KnipOutput['issues']>[number],
   filePath: string,
 ): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   for (const [enumName, members] of Object.entries(issue.enumMembers ?? {})) {
     for (const member of members) {
-      const memberName = member.name ?? 'unknown'
+      const memberName = member.name ?? 'unknown';
       violations.push({
         line: member.line ?? 1,
         message: `Unused enum member '${memberName}' in ${enumName}`,
@@ -166,13 +166,13 @@ function processMembers(
         suggestion: `Remove unused enum member '${memberName}' from ${enumName} or use it in the codebase`,
         match: memberName,
         filePath,
-      })
+      });
     }
   }
 
   for (const [className, members] of Object.entries(issue.classMembers ?? {})) {
     for (const member of members) {
-      const memberName = member.name ?? 'unknown'
+      const memberName = member.name ?? 'unknown';
       violations.push({
         line: member.line ?? 1,
         message: `Unused class member '${memberName}' in ${className}`,
@@ -181,37 +181,37 @@ function processMembers(
         suggestion: `Remove unused method/property '${memberName}' from ${className} or make it public if it should be used externally`,
         match: memberName,
         filePath,
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
  * Parse Knip JSON output into violations
  */
 function parseKnipOutput(output: string, cwd: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const data = JSON.parse(output) as KnipOutput
+  const violations: CheckViolation[] = [];
+  const data = JSON.parse(output) as KnipOutput;
 
   // Process unused files
   for (const file of data.files ?? []) {
-    violations.push(createUnusedFileViolation(file, cwd))
+    violations.push(createUnusedFileViolation(file, cwd));
   }
 
   // Process issues
   for (const issue of data.issues ?? []) {
-    const filePath = issue.file.startsWith('/') ? issue.file : `${cwd}/${issue.file}`
+    const filePath = issue.file.startsWith('/') ? issue.file : `${cwd}/${issue.file}`;
 
     violations.push(
       ...processExportsAndTypes(issue, filePath),
       ...processDependencies(issue, filePath, cwd),
       ...processMembers(issue, filePath),
-    )
+    );
   }
 
-  return violations
+  return violations;
 }
 /* v8 ignore stop */
 
@@ -248,9 +248,9 @@ export const deadCode = defineCheck({
     // Callable so config discovery runs at check execution time
     // (when process.cwd() is the project root), not at import time.
     args: (): readonly string[] => {
-      const base = ['knip', '--reporter', 'json']
-      const configPath = findKnipConfig(process.cwd())
-      return configPath ? [...base, '--config', configPath] : base
+      const base = ['knip', '--reporter', 'json'];
+      const configPath = findKnipConfig(process.cwd());
+      return configPath ? [...base, '--config', configPath] : base;
     },
     expectedExitCodes: [0, 1], // 0 = no issues, 1 = issues found
 
@@ -261,7 +261,6 @@ export const deadCode = defineCheck({
       _files: readonly string[],
       cwd: string,
     ): CheckViolation[] {
-
       if (!stdout) {
         // No output - likely a configuration error
         return [
@@ -276,12 +275,12 @@ export const deadCode = defineCheck({
             match: 'knip',
             filePath: cwd,
           },
-        ]
+        ];
       }
 
       /* v8 ignore start -- knip-success path requires knip CLI + valid JSON; covered in integration */
       try {
-        return parseKnipOutput(stdout, cwd)
+        return parseKnipOutput(stdout, cwd);
       } catch {
         // @swallow-ok If parsing fails, report the error
         return [
@@ -294,9 +293,9 @@ export const deadCode = defineCheck({
             match: 'knip',
             filePath: cwd,
           },
-        ]
+        ];
       }
       /* v8 ignore stop */
     },
   },
-})
+});

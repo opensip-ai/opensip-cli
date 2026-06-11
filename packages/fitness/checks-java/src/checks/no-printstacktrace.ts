@@ -11,9 +11,9 @@
  * the literal token "printStackTrace()" inside a string literal or
  * comment isn't reported.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-const PRINT_STACK_TRACE_PATTERN = /\.printStackTrace\s*\(\s*\)/g
+const PRINT_STACK_TRACE_PATTERN = /\.printStackTrace\s*\(\s*\)/g;
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the
@@ -22,34 +22,31 @@ const PRINT_STACK_TRACE_PATTERN = /\.printStackTrace\s*\(\s*\)/g
  * requires an ExecutionContext to invoke).
  */
 export function analyzePrintStackTrace(content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
   for (const [i, line_] of lines.entries()) {
-    const line = line_
-    PRINT_STACK_TRACE_PATTERN.lastIndex = 0
+    const line = line_;
+    PRINT_STACK_TRACE_PATTERN.lastIndex = 0;
     while (PRINT_STACK_TRACE_PATTERN.exec(line) !== null) {
       violations.push({
-        message:
-          'e.printStackTrace() bypasses the logging framework — use a logger instead',
+        message: 'e.printStackTrace() bypasses the logging framework — use a logger instead',
         severity: 'warning',
         line: i + 1,
-        suggestion:
-          'Replace with logger.error("...", e) so the trace lands in centralized logs',
-      })
+        suggestion: 'Replace with logger.error("...", e) so the trace lands in centralized logs',
+      });
     }
   }
-  return violations
+  return violations;
 }
 
 export const noPrintStackTrace = defineCheck({
   id: 'c1d2e3f4-9876-4321-cccc-300000000001',
   slug: 'java-no-print-stack-trace',
-  description:
-    'e.printStackTrace() bypasses the logging framework — use a logger instead',
+  description: 'e.printStackTrace() bypasses the logging framework — use a logger instead',
   scope: { languages: ['java'], concerns: [] },
   tags: ['quality', 'observability', 'java'],
   // Strip strings AND comments so the literal token inside a docstring
   // or example comment isn't false-flagged.
   contentFilter: 'strip-strings-and-comments',
   analyze: (content) => analyzePrintStackTrace(content),
-})
+});

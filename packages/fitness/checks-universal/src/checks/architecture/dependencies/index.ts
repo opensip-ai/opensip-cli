@@ -1,1 +1,1 @@
-export * from './no-duplicate-packages.js'
+export * from './no-duplicate-packages.js';

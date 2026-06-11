@@ -22,7 +22,6 @@ let tempDir: string;
 let configPath: string;
 
 beforeEach(() => {
-
   tempDir = mkdtempSync(join(tmpdir(), 'plugin-yaml-test-'));
   configPath = join(tempDir, 'opensip-tools.config.yml');
 });
@@ -151,8 +150,6 @@ describe('editPluginList — failure modes', () => {
 
   it('refuses to edit a non-mapping top-level document', () => {
     writeFileSync(configPath, '- one\n- two\n', 'utf8');
-    expect(() => editPluginList(configPath, 'fit', '@org/foo', 'add')).toThrow(
-      /not a mapping/,
-    );
+    expect(() => editPluginList(configPath, 'fit', '@org/foo', 'add')).toThrow(/not a mapping/);
   });
 });

@@ -36,16 +36,16 @@
  * exempted per-file via `@fitness-ignore-file live-runs-off-thread` with a
  * justification comment.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /** Test-file fragments — skipped (fixtures may exercise either transport). */
-const TEST_PATH = /(?:\.test\.tsx?$|\/__tests__\/)/
+const TEST_PATH = /(?:\.test\.tsx?$|\/__tests__\/)/;
 
 /** A tool's live-view renderer: `<tool>-runner.tsx`. */
-const RUNNER_SUFFIX = '-runner.tsx'
+const RUNNER_SUFFIX = '-runner.tsx';
 
 /** A tool's headless engine worker entry: `<tool>-worker.ts`. */
-const WORKER_SUFFIX = '-worker.ts'
+const WORKER_SUFFIX = '-worker.ts';
 
 /**
  * A direct call to the bare in-process transport. A live runner must drive the
@@ -53,7 +53,7 @@ const WORKER_SUFFIX = '-worker.ts'
  * internally); calling `createInProcessTransport()` from a runner forces the
  * engine onto the render thread — the exact regression ADR-0028 forbids.
  */
-const IN_PROCESS_TRANSPORT_CALL = /\bcreateInProcessTransport\s*\(/
+const IN_PROCESS_TRANSPORT_CALL = /\bcreateInProcessTransport\s*\(/;
 
 /**
  * A persistence call (`persistSession(` / `persistFitSession(` /
@@ -61,7 +61,7 @@ const IN_PROCESS_TRANSPORT_CALL = /\bcreateInProcessTransport\s*\(/
  * prose like "the parent persists" (already blanked by the content filter) and
  * an unrelated `persistence` identifier never match.
  */
-const PERSIST_CALL = /\bpersist[A-Z]\w*\s*\(/
+const PERSIST_CALL = /\bpersist[A-Z]\w*\s*\(/;
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the detection
@@ -70,14 +70,14 @@ const PERSIST_CALL = /\bpersist[A-Z]\w*\s*\(/
  * call-shape rule applies (runner vs worker).
  */
 export function analyzeLiveRunsOffThread(content: string, filePath: string): CheckViolation[] {
-  if (TEST_PATH.test(filePath)) return []
+  if (TEST_PATH.test(filePath)) return [];
 
-  const isRunner = filePath.endsWith(RUNNER_SUFFIX)
-  const isWorker = filePath.endsWith(WORKER_SUFFIX)
-  if (!isRunner && !isWorker) return []
+  const isRunner = filePath.endsWith(RUNNER_SUFFIX);
+  const isWorker = filePath.endsWith(WORKER_SUFFIX);
+  if (!isRunner && !isWorker) return [];
 
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
   for (const [i, line] of lines.entries()) {
     if (isRunner && IN_PROCESS_TRANSPORT_CALL.test(line)) {
       violations.push({
@@ -93,7 +93,7 @@ export function analyzeLiveRunsOffThread(content: string, filePath: string): Che
           'falls back to in-process itself (OPENSIP_TOOLS_NO_WORKER / fork failure). ' +
           'If this runner is genuinely a light, in-process-only view, add ' +
           '`@fitness-ignore-file live-runs-off-thread` with a justification comment.',
-      })
+      });
     }
     if (isWorker && PERSIST_CALL.test(line)) {
       violations.push({
@@ -108,10 +108,10 @@ export function analyzeLiveRunsOffThread(content: string, filePath: string): Che
           'live runner (e.g. `persistFitSession` / `persistSession` after `run.result`). ' +
           'Reading the scope datastore for an in-build cache is fine — writing a session ' +
           'is not.',
-      })
+      });
     }
   }
-  return violations
+  return violations;
 }
 
 export const liveRunsOffThread = defineCheck({
@@ -127,4 +127,4 @@ export const liveRunsOffThread = defineCheck({
   // never false-fire; only real call expressions survive.
   contentFilter: 'strip-strings-and-comments',
   analyze: (content, filePath) => analyzeLiveRunsOffThread(content, filePath),
-})
+});

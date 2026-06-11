@@ -6,12 +6,13 @@
  * config (if present) controls which lints fire — we don't override
  * it. Use `--checks=...` in the args if you want a fixed lint set.
  */
-import * as path from 'node:path'
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-// eslint-disable-next-line sonarjs/slow-regex -- input is one bounded line of clang-tidy output; no real ReDoS exposure
-const CLANG_TIDY_LINE = /^(.+?):(\d+):(\d+):\s+(warning|error|note):\s+(.+?)(?:\s+\[([\w\-,.]+)\])?$/
+const CLANG_TIDY_LINE =
+  // eslint-disable-next-line sonarjs/slow-regex -- input is one bounded line of clang-tidy output; no real ReDoS exposure
+  /^(.+?):(\d+):(\d+):\s+(warning|error|note):\s+(.+?)(?:\s+\[([\w\-,.]+)\])?$/;
 
 /**
  * Resolve a captured clang-tidy file path against `cwd` and convert it
@@ -27,14 +28,14 @@ const CLANG_TIDY_LINE = /^(.+?):(\d+):(\d+):\s+(warning|error|note):\s+(.+?)(?:\
  * not part of the public surface.
  */
 function resolveFilePath(capturedPath: string, cwd: string): string {
-  const absolute = path.resolve(cwd, capturedPath)
-  const relative = path.relative(cwd, absolute)
+  const absolute = path.resolve(cwd, capturedPath);
+  const relative = path.relative(cwd, absolute);
   // `path.relative` returns a `..`-prefixed path (or absolute on Windows
   // when drives differ) when the resolved path is outside `cwd`.
   if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
-    return absolute
+    return absolute;
   }
-  return relative
+  return relative;
 }
 
 /**
@@ -52,18 +53,18 @@ export function parseClangTidyOutput(
   _files: readonly string[],
   cwd: string,
 ): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = stdout.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = stdout.split('\n');
   for (const line of lines) {
-    const match = CLANG_TIDY_LINE.exec(line)
-    if (!match) continue
-    const filePath = match[1]
-    const lineStr = match[2]
-    const colStr = match[3]
-    const severity = match[4]
-    const message = match[5]
-    const lintName = match[6]
-    if (severity === 'note') continue
+    const match = CLANG_TIDY_LINE.exec(line);
+    if (!match) continue;
+    const filePath = match[1];
+    const lineStr = match[2];
+    const colStr = match[3];
+    const severity = match[4];
+    const message = match[5];
+    const lintName = match[6];
+    if (severity === 'note') continue;
     // The regex guarantees groups 1 (filePath), 2 (lineStr), 3 (colStr), 4
     // (severity) and 5 (message) are non-empty captures when it matches; the
     // `?` / `??` fallbacks below exist for type-narrowing of `match[n]` (which
@@ -71,7 +72,7 @@ export function parseClangTidyOutput(
     // group 6 (lintName) is optional in the pattern and is exercised by tests.
     violations.push({
       /* v8 ignore next */
-      message: lintName ? `[${lintName}] ${message}` : message ?? 'clang-tidy diagnostic',
+      message: lintName ? `[${lintName}] ${message}` : (message ?? 'clang-tidy diagnostic'),
       severity: severity === 'error' ? 'error' : 'warning',
       /* v8 ignore next */
       line: lineStr ? Number.parseInt(lineStr, 10) : 1,
@@ -80,9 +81,9 @@ export function parseClangTidyOutput(
       /* v8 ignore next */
       filePath: filePath ? resolveFilePath(filePath, cwd) : undefined,
       suggestion: 'See clang-tidy docs for the named lint',
-    })
+    });
   }
-  return violations
+  return violations;
 }
 
 export const clangTidyPassthrough = defineCheck({
@@ -105,4 +106,4 @@ export const clangTidyPassthrough = defineCheck({
     // Diagnostics are present on stdout regardless.
     expectedExitCodes: [0, 1],
   },
-})
+});

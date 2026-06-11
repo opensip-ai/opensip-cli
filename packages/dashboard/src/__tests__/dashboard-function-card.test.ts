@@ -19,7 +19,9 @@ import { dashboardTraceJs } from '../code-paths/trace.js';
 
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
 
-function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string }): GraphFunctionOccurrence {
+function makeOcc(
+  over: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string },
+): GraphFunctionOccurrence {
   return {
     qualifiedName: over.simpleName,
     filePath: 'packages/x/src/x.ts',
@@ -82,7 +84,10 @@ window.graphIndexes = graphIndexes;
 interface DashboardWindow extends Window {
   openFunctionCard: (h: string) => void;
   closeFunctionCard: () => void;
-  graphIndexes: { callers: Map<string, string[]>; byBodyHash: Map<string, GraphFunctionOccurrence> };
+  graphIndexes: {
+    callers: Map<string, string[]>;
+    byBodyHash: Map<string, GraphFunctionOccurrence>;
+  };
 }
 
 function w(): DashboardWindow {
@@ -96,8 +101,21 @@ beforeEach(() => {
 describe('Function Card overlay', () => {
   it('opens with name + location for a function-declaration occurrence', () => {
     bootDashboard({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
-      functions: { resolveProjectPaths: [makeOcc({ bodyHash: 'h1', simpleName: 'resolveProjectPaths', filePath: 'packages/core/src/lib/paths.ts', line: 78, endLine: 96 })] },
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        resolveProjectPaths: [
+          makeOcc({
+            bodyHash: 'h1',
+            simpleName: 'resolveProjectPaths',
+            filePath: 'packages/core/src/lib/paths.ts',
+            line: 78,
+            endLine: 96,
+          }),
+        ],
+      },
     });
     w().openFunctionCard('h1');
     const overlay = document.querySelector('.function-card-overlay');
@@ -109,8 +127,20 @@ describe('Function Card overlay', () => {
 
   it('renders a method shape (kind=method) correctly', () => {
     bootDashboard({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
-      functions: { format: [makeOcc({ bodyHash: 'm1', simpleName: 'format', kind: 'method', enclosingClass: 'Logger' })] },
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        format: [
+          makeOcc({
+            bodyHash: 'm1',
+            simpleName: 'format',
+            kind: 'method',
+            enclosingClass: 'Logger',
+          }),
+        ],
+      },
     });
     w().openFunctionCard('m1');
     expect(document.querySelector('.function-card-overlay')!.textContent).toContain('method');
@@ -118,8 +148,15 @@ describe('Function Card overlay', () => {
 
   it('renders an arrow shape', () => {
     bootDashboard({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
-      functions: { '<arrow:foo.ts:1:1>': [makeOcc({ bodyHash: 'a1', simpleName: '<arrow:foo.ts:1:1>', kind: 'arrow' })] },
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        '<arrow:foo.ts:1:1>': [
+          makeOcc({ bodyHash: 'a1', simpleName: '<arrow:foo.ts:1:1>', kind: 'arrow' }),
+        ],
+      },
     });
     w().openFunctionCard('a1');
     const overlay = document.querySelector('.function-card-overlay')!;
@@ -133,7 +170,10 @@ describe('Function Card overlay', () => {
 
   it('renders a getter and constructor with the right kind label', () => {
     bootDashboard({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
         size: [makeOcc({ bodyHash: 'g1', simpleName: 'size', kind: 'getter' })],
         constructor: [makeOcc({ bodyHash: 'c1', simpleName: 'constructor', kind: 'constructor' })],
@@ -147,16 +187,131 @@ describe('Function Card overlay', () => {
 
   it('groups callers by package and shows the right count', () => {
     bootDashboard({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
         target: [makeOcc({ bodyHash: 't1', simpleName: 'target' })],
-        a: [makeOcc({ bodyHash: 'ca', simpleName: 'a', filePath: 'packages/cli/src/a.ts', calls: [{ to: ['t1'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'target()' }] })],
-        b: [makeOcc({ bodyHash: 'cb', simpleName: 'b', filePath: 'packages/cli/src/b.ts', calls: [{ to: ['t1'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'target()' }] })],
-        c: [makeOcc({ bodyHash: 'cc', simpleName: 'c', filePath: 'packages/contracts/src/c.ts', calls: [{ to: ['t1'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'target()' }] })],
-        d: [makeOcc({ bodyHash: 'cd', simpleName: 'd', filePath: 'packages/contracts/src/d.ts', calls: [{ to: ['t1'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'target()' }] })],
-        e: [makeOcc({ bodyHash: 'ce', simpleName: 'e', filePath: 'packages/contracts/src/e.ts', calls: [{ to: ['t1'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'target()' }] })],
-        f: [makeOcc({ bodyHash: 'cf', simpleName: 'f', filePath: 'packages/contracts/src/f.ts', calls: [{ to: ['t1'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'target()' }] })],
-        g: [makeOcc({ bodyHash: 'cg', simpleName: 'g', filePath: 'packages/contracts/src/g.ts', calls: [{ to: ['t1'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'target()' }] })],
+        a: [
+          makeOcc({
+            bodyHash: 'ca',
+            simpleName: 'a',
+            filePath: 'packages/cli/src/a.ts',
+            calls: [
+              {
+                to: ['t1'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+        b: [
+          makeOcc({
+            bodyHash: 'cb',
+            simpleName: 'b',
+            filePath: 'packages/cli/src/b.ts',
+            calls: [
+              {
+                to: ['t1'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+        c: [
+          makeOcc({
+            bodyHash: 'cc',
+            simpleName: 'c',
+            filePath: 'packages/contracts/src/c.ts',
+            calls: [
+              {
+                to: ['t1'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+        d: [
+          makeOcc({
+            bodyHash: 'cd',
+            simpleName: 'd',
+            filePath: 'packages/contracts/src/d.ts',
+            calls: [
+              {
+                to: ['t1'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+        e: [
+          makeOcc({
+            bodyHash: 'ce',
+            simpleName: 'e',
+            filePath: 'packages/contracts/src/e.ts',
+            calls: [
+              {
+                to: ['t1'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+        f: [
+          makeOcc({
+            bodyHash: 'cf',
+            simpleName: 'f',
+            filePath: 'packages/contracts/src/f.ts',
+            calls: [
+              {
+                to: ['t1'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+        g: [
+          makeOcc({
+            bodyHash: 'cg',
+            simpleName: 'g',
+            filePath: 'packages/contracts/src/g.ts',
+            calls: [
+              {
+                to: ['t1'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
       },
     });
     w().openFunctionCard('t1');
@@ -168,34 +323,77 @@ describe('Function Card overlay', () => {
 
   it('shows "No callers in catalog." when there are zero callers', () => {
     bootDashboard({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: { lonely: [makeOcc({ bodyHash: 'l1', simpleName: 'lonely' })] },
     });
     w().openFunctionCard('l1');
-    expect(document.querySelector('.function-card-overlay')!.textContent).toContain('No callers in catalog.');
+    expect(document.querySelector('.function-card-overlay')!.textContent).toContain(
+      'No callers in catalog.',
+    );
   });
 
   it('shows polymorphic callees as three resolved entries', () => {
     bootDashboard({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        f: [makeOcc({ bodyHash: 'fh', simpleName: 'f', calls: [{ to: ['h1', 'h2', 'h3'], line: 2, column: 0, resolution: 'method-dispatch', confidence: 'medium', text: 'x.foo()' }] })],
+        f: [
+          makeOcc({
+            bodyHash: 'fh',
+            simpleName: 'f',
+            calls: [
+              {
+                to: ['h1', 'h2', 'h3'],
+                line: 2,
+                column: 0,
+                resolution: 'method-dispatch',
+                confidence: 'medium',
+                text: 'x.foo()',
+              },
+            ],
+          }),
+        ],
         a: [makeOcc({ bodyHash: 'h1', simpleName: 'a' })],
         b: [makeOcc({ bodyHash: 'h2', simpleName: 'b' })],
         c: [makeOcc({ bodyHash: 'h3', simpleName: 'c' })],
       },
     });
     w().openFunctionCard('fh');
-    const list = document.querySelectorAll('.function-card .fc-section')[1].querySelectorAll('li[data-body-hash]');
+    const list = document
+      .querySelectorAll('.function-card .fc-section')[1]
+      .querySelectorAll('li[data-body-hash]');
     expect(list.length).toBe(3);
   });
 
   it('opening a caller swaps the overlay content (recursion uses a single overlay)', () => {
     bootDashboard({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
         target: [makeOcc({ bodyHash: 't1', simpleName: 'target' })],
-        caller: [makeOcc({ bodyHash: 'cr', simpleName: 'caller', calls: [{ to: ['t1'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'target()' }] })],
+        caller: [
+          makeOcc({
+            bodyHash: 'cr',
+            simpleName: 'caller',
+            calls: [
+              {
+                to: ['t1'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
       },
     });
     w().openFunctionCard('t1');
@@ -207,7 +405,10 @@ describe('Function Card overlay', () => {
 
   it('closeFunctionCard removes the overlay node', () => {
     bootDashboard({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: { f: [makeOcc({ bodyHash: 'h', simpleName: 'f' })] },
     });
     w().openFunctionCard('h');
@@ -218,7 +419,10 @@ describe('Function Card overlay', () => {
 
   it('clicking the overlay backdrop closes the card', () => {
     bootDashboard({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: { f: [makeOcc({ bodyHash: 'h', simpleName: 'f' })] },
     });
     w().openFunctionCard('h');

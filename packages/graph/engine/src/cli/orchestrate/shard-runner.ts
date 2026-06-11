@@ -191,8 +191,12 @@ function spawnShardWorker(
     // chars and corrupts the JSON parsed in the close handler.
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (c: string) => { stdout += c; });
-    child.stderr.on('data', (c: string) => { stderr += c; });
+    child.stdout.on('data', (c: string) => {
+      stdout += c;
+    });
+    child.stderr.on('data', (c: string) => {
+      stderr += c;
+    });
     child.on('error', (err) => {
       /* v8 ignore start */
       cleanup();

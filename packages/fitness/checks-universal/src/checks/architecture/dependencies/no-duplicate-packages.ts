@@ -4,30 +4,30 @@
  * @fileoverview No Duplicate Packages check
  */
 
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 interface PackageInfo {
-  name: string
-  path: string
-  keywords?: string[]
+  name: string;
+  path: string;
+  keywords?: string[];
 }
 
 interface DuplicateGroup {
-  category: string
-  reason: string
-  packages: PackageInfo[]
-  severity: 'error' | 'warning'
+  category: string;
+  reason: string;
+  packages: PackageInfo[];
+  severity: 'error' | 'warning';
 }
 
 interface DuplicatePattern {
-  category: string
-  namePatterns: RegExp[]
-  minForWarning: number
-  minForError: number
-  reason: string
+  category: string;
+  namePatterns: RegExp[];
+  minForWarning: number;
+  minForError: number;
+  reason: string;
 }
 
 const DUPLICATE_PATTERNS: DuplicatePattern[] = [
@@ -66,29 +66,29 @@ const DUPLICATE_PATTERNS: DuplicatePattern[] = [
     minForError: 2,
     reason: 'Multiple logging packages lead to inconsistent log formats',
   },
-]
+];
 
-const EXCLUDED_PACKAGES = [/__fixtures__/, /__mocks__/, /examples?$/, /-test$/, /-mock$/]
+const EXCLUDED_PACKAGES = [/__fixtures__/, /__mocks__/, /examples?$/, /-test$/, /-mock$/];
 
 function getPackageInfo(packageJsonPath: string, projectRoot: string): PackageInfo | null {
   try {
-    const content = fs.readFileSync(packageJsonPath, 'utf8')
-    const pkg = JSON.parse(content) as { name?: string; keywords?: string[] }
-    const packageDir = path.dirname(packageJsonPath)
-    const relativePath = path.relative(projectRoot, packageDir)
+    const content = fs.readFileSync(packageJsonPath, 'utf8');
+    const pkg = JSON.parse(content) as { name?: string; keywords?: string[] };
+    const packageDir = path.dirname(packageJsonPath);
+    const relativePath = path.relative(projectRoot, packageDir);
 
     if (EXCLUDED_PACKAGES.some((p) => p.test(relativePath))) {
-      return null
+      return null;
     }
 
     return {
       name: pkg.name ?? path.basename(packageDir),
       path: relativePath,
       keywords: pkg.keywords,
-    }
+    };
   } catch {
     // @swallow-ok graceful degradation - return sentinel on failure
-    return null
+    return null;
   }
 }
 
@@ -96,55 +96,57 @@ function matchesPattern(pkg: PackageInfo, patterns: RegExp[]): boolean {
   /* v8 ignore next 4 -- defensive: callers always pass an array */
   // Validate array parameter
   if (!Array.isArray(patterns)) {
-    return false
+    return false;
   }
 
   /* v8 ignore next -- defensive: split + pop on a non-empty string never returns undefined */
-  const namePart = pkg.name.split('/').pop() ?? pkg.name
-  if (patterns.some((p) => p.test(namePart))) return true
+  const namePart = pkg.name.split('/').pop() ?? pkg.name;
+  if (patterns.some((p) => p.test(namePart))) return true;
   if (pkg.keywords) {
     for (const keyword of pkg.keywords) {
-      if (patterns.some((p) => p.test(keyword))) return true
+      if (patterns.some((p) => p.test(keyword))) return true;
     }
   }
-  return false
+  return false;
 }
 
 /** Deduplicate packages by their unscoped name part to avoid counting @scope/foo and foo as separate entries */
 function deduplicateByNamePart(packages: PackageInfo[]): PackageInfo[] {
-  const seen = new Map<string, PackageInfo>()
+  const seen = new Map<string, PackageInfo>();
   for (const pkg of packages) {
     /* v8 ignore next -- defensive: split + pop on a non-empty string never returns undefined */
-    const namePart = pkg.name.split('/').pop() ?? pkg.name
+    const namePart = pkg.name.split('/').pop() ?? pkg.name;
     if (!seen.has(namePart)) {
-      seen.set(namePart, pkg)
+      seen.set(namePart, pkg);
     }
   }
-  return [...seen.values()]
+  return [...seen.values()];
 }
 
 function detectDuplicates(packages: PackageInfo[]): DuplicateGroup[] {
   /* v8 ignore next 4 -- defensive: callers always pass an array */
   // Validate array parameter
   if (!Array.isArray(packages)) {
-    return []
+    return [];
   }
 
-  const groups: DuplicateGroup[] = []
+  const groups: DuplicateGroup[] = [];
 
   for (const pattern of DUPLICATE_PATTERNS) {
-    const matching = deduplicateByNamePart(packages.filter((pkg) => matchesPattern(pkg, pattern.namePatterns)))
+    const matching = deduplicateByNamePart(
+      packages.filter((pkg) => matchesPattern(pkg, pattern.namePatterns)),
+    );
     if (matching.length >= pattern.minForWarning) {
       groups.push({
         category: pattern.category,
         reason: pattern.reason,
         packages: matching,
         severity: matching.length >= pattern.minForError ? 'error' : 'warning',
-      })
+      });
     }
   }
 
-  return groups
+  return groups;
 }
 
 /**
@@ -177,22 +179,22 @@ export const noDuplicatePackages = defineCheck({
   // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     // Get the cwd from the first file path
-    const firstFile = files.paths[0]
-    const cwd = firstFile ? path.dirname(path.dirname(path.dirname(firstFile))) : process.cwd()
+    const firstFile = files.paths[0];
+    const cwd = firstFile ? path.dirname(path.dirname(path.dirname(firstFile))) : process.cwd();
 
-    const packages: PackageInfo[] = []
+    const packages: PackageInfo[] = [];
 
     for (const packageJsonPath of files.paths) {
-      const info = getPackageInfo(packageJsonPath, cwd)
-      if (info) packages.push(info)
+      const info = getPackageInfo(packageJsonPath, cwd);
+      if (info) packages.push(info);
     }
 
-    const duplicateGroups = detectDuplicates(packages)
-    const violations: CheckViolation[] = []
+    const duplicateGroups = detectDuplicates(packages);
+    const violations: CheckViolation[] = [];
 
     for (const group of duplicateGroups) {
-      const packageNames = group.packages.map((p) => p.name)
-      const firstPath = group.packages[0]?.path || 'packages'
+      const packageNames = group.packages.map((p) => p.name);
+      const firstPath = group.packages[0]?.path || 'packages';
 
       violations.push({
         filePath: path.join(cwd, firstPath, 'package.json'),
@@ -202,9 +204,9 @@ export const noDuplicatePackages = defineCheck({
         suggestion: `Consolidate ${group.category} packages into a single canonical package. Remove duplicates and update all consumers to use the canonical package.`,
         match: group.category,
         type: 'duplicate-package',
-      })
+      });
     }
 
-    return violations
+    return violations;
   },
-})
+});

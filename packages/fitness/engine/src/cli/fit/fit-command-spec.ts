@@ -96,7 +96,11 @@ export function buildFitCommandSpec(
     // seeded with process.cwd() by the mounter. fit-specific flags below.
     commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
     options: [
-      { flag: '--recipe', value: '<name>', description: 'Use a named recipe (default, quick-smoke, backend, etc.)' },
+      {
+        flag: '--recipe',
+        value: '<name>',
+        description: 'Use a named recipe (default, quick-smoke, backend, etc.)',
+      },
       { flag: '--check', value: '<slug>', description: 'Run a single check by slug' },
       { flag: '--tags', value: '<tags>', description: 'Filter checks by tags (comma-separated)' },
       { flag: '--list', description: 'List available checks', default: false },
@@ -111,7 +115,8 @@ export function buildFitCommandSpec(
       {
         flag: '--config',
         value: '<path>',
-        description: 'Path to opensip-tools.config.yml (overrides package.json pointer and default)',
+        description:
+          'Path to opensip-tools.config.yml (overrides package.json pointer and default)',
       },
       {
         flag: '--show',

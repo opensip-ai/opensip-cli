@@ -65,9 +65,15 @@ async function checkNoPublishedInstallHooks() {
     }
   }
   if (offenders.length === 0) {
-    pass(1, `publishable packages (${publishable.length}) declare no install-time lifecycle scripts.`);
+    pass(
+      1,
+      `publishable packages (${publishable.length}) declare no install-time lifecycle scripts.`,
+    );
   } else {
-    fail(1, `install-time lifecycle scripts found in publishable packages:\n    ${offenders.join('\n    ')}`);
+    fail(
+      1,
+      `install-time lifecycle scripts found in publishable packages:\n    ${offenders.join('\n    ')}`,
+    );
   }
 }
 
@@ -77,7 +83,10 @@ async function checkPackageManagerPin() {
   if (/^pnpm@\d+\.\d+\.\d+\+sha512\./.test(pin)) {
     pass(2, `root packageManager is integrity-pinned (${pin.split('+')[0]}).`);
   } else {
-    fail(2, `root packageManager must be an exact pnpm pin with +sha512 integrity; got "${pin || '<missing>'}".`);
+    fail(
+      2,
+      `root packageManager must be an exact pnpm pin with +sha512 integrity; got "${pin || '<missing>'}".`,
+    );
   }
 }
 
@@ -85,13 +94,20 @@ function checkPnpmPolicy() {
   const workspace = readText('pnpm-workspace.yaml');
   const problems = [];
   if (!/^allowBuilds:/m.test(workspace)) problems.push('allowBuilds map is missing');
-  if (positiveNumber(workspace, 'minimumReleaseAge') <= 0) problems.push('minimumReleaseAge must be positive');
-  if (!hasScalarValue(workspace, 'minimumReleaseAgeStrict', 'true')) problems.push('minimumReleaseAgeStrict must be true');
-  if (!hasScalarValue(workspace, 'minimumReleaseAgeIgnoreMissingTime', 'false')) problems.push('minimumReleaseAgeIgnoreMissingTime must be false');
-  if (!hasScalarValue(workspace, 'trustPolicy', 'no-downgrade')) problems.push('trustPolicy must be no-downgrade');
-  if (!hasScalarValue(workspace, 'trustLockfile', 'false')) problems.push('trustLockfile must be false');
-  if (!hasScalarValue(workspace, 'blockExoticSubdeps', 'true')) problems.push('blockExoticSubdeps must be true');
-  if (hasScalarValue(workspace, 'dangerouslyAllowAllBuilds', 'true')) problems.push('dangerouslyAllowAllBuilds must not be true');
+  if (positiveNumber(workspace, 'minimumReleaseAge') <= 0)
+    problems.push('minimumReleaseAge must be positive');
+  if (!hasScalarValue(workspace, 'minimumReleaseAgeStrict', 'true'))
+    problems.push('minimumReleaseAgeStrict must be true');
+  if (!hasScalarValue(workspace, 'minimumReleaseAgeIgnoreMissingTime', 'false'))
+    problems.push('minimumReleaseAgeIgnoreMissingTime must be false');
+  if (!hasScalarValue(workspace, 'trustPolicy', 'no-downgrade'))
+    problems.push('trustPolicy must be no-downgrade');
+  if (!hasScalarValue(workspace, 'trustLockfile', 'false'))
+    problems.push('trustLockfile must be false');
+  if (!hasScalarValue(workspace, 'blockExoticSubdeps', 'true'))
+    problems.push('blockExoticSubdeps must be true');
+  if (hasScalarValue(workspace, 'dangerouslyAllowAllBuilds', 'true'))
+    problems.push('dangerouslyAllowAllBuilds must not be true');
 
   if (problems.length === 0) {
     pass(3, 'pnpm supply-chain policy is explicit and fail-closed.');
@@ -116,23 +132,29 @@ function readWorkflowFiles() {
 }
 
 function isFrozenInstall(line) {
-  return /\bnpm\s+ci\b/.test(line) ||
+  return (
+    /\bnpm\s+ci\b/.test(line) ||
     /\bpnpm\s+(?:install|i)\b.*--frozen-lockfile/.test(line) ||
     /\bpnpm\s+ci\b/.test(line) ||
     /\bbun\s+install\b.*--frozen-lockfile/.test(line) ||
-    /\bbun\s+ci\b/.test(line);
+    /\bbun\s+ci\b/.test(line)
+  );
 }
 
 function isPackageManagerBootstrap(line) {
-  return /\bnpm\s+install\b.*\s--prefix\b.*\bnpm@\d+/.test(line) ||
-    /\bnpm\s+install\s+--prefix\b.*\bnpm@\d+/.test(line);
+  return (
+    /\bnpm\s+install\b.*\s--prefix\b.*\bnpm@\d+/.test(line) ||
+    /\bnpm\s+install\s+--prefix\b.*\bnpm@\d+/.test(line)
+  );
 }
 
 function isMutableInstall(line) {
   if (isPackageManagerBootstrap(line)) return false;
-  return /\bnpm\s+install\b/.test(line) ||
+  return (
+    /\bnpm\s+install\b/.test(line) ||
     (/\bpnpm\s+(?:install|i)\b/.test(line) && !line.includes('--frozen-lockfile')) ||
-    (/\bbun\s+install\b/.test(line) && !line.includes('--frozen-lockfile'));
+    (/\bbun\s+install\b/.test(line) && !line.includes('--frozen-lockfile'))
+  );
 }
 
 function checkFrozenInstalls(workflows) {
@@ -164,7 +186,11 @@ function checkTrustedPublish(workflows) {
     if (!/id-token:\s*write/.test(workflow.content)) {
       problems.push(`${workflow.relPath}: npm publish without permissions.id-token: write`);
     }
-    if (!/(--provenance|NPM_CONFIG_PROVENANCE\s*[:=]\s*true|provenance:\s*true)/.test(workflow.content)) {
+    if (
+      !/(--provenance|NPM_CONFIG_PROVENANCE\s*[:=]\s*true|provenance:\s*true)/.test(
+        workflow.content,
+      )
+    ) {
       problems.push(`${workflow.relPath}: npm publish without provenance`);
     }
     if (/(NPM_TOKEN|NODE_AUTH_TOKEN)/.test(workflow.content)) {

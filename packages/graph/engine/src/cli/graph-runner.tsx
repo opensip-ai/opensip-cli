@@ -121,7 +121,12 @@ interface RunSummaryShape {
 type ViewState =
   | { phase: 'loading' }
   | { phase: 'running'; subscribe: (cb: ProgressCallback) => void }
-  | { phase: 'done'; subscribe: (cb: ProgressCallback) => void; reportLines: readonly string[]; summary: RunSummaryShape }
+  | {
+      phase: 'done';
+      subscribe: (cb: ProgressCallback) => void;
+      reportLines: readonly string[];
+      summary: RunSummaryShape;
+    }
   | { phase: 'error'; message: string };
 
 interface GraphRunnerArgs {
@@ -250,12 +255,16 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
     // single suppression chokepoint (`buildLiveGraphOutput` → `finalizeGraphSignals`).
     const specDir = mkdtempSync(join(tmpdir(), 'graph-worker-'));
     const specPath = join(specDir, 'spec.json');
-    writeFileSync(specPath, JSON.stringify({
-      cwd: args.cwd,
-      noCache: args.noCache,
-      resolution: args.resolution,
-      ...(args.recipe === undefined ? {} : { recipe: args.recipe }),
-    }), 'utf8');
+    writeFileSync(
+      specPath,
+      JSON.stringify({
+        cwd: args.cwd,
+        noCache: args.noCache,
+        resolution: args.resolution,
+        ...(args.recipe === undefined ? {} : { recipe: args.recipe }),
+      }),
+      'utf8',
+    );
     const run = runOffThreadOrInProcess<ProgressEvent, LiveGraphOutput>({
       // Sharded runs in-process (shards are already subprocesses); exact forks the
       // off-process worker. `preferWorker:false` forces the in-process arm for the
@@ -337,7 +346,9 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
         setTimeout(() => exit(), 50);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Presentation settings resolved once in the pre-action hook; the live view
@@ -349,14 +360,21 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
   const walkedUp = scope?.projectContext?.walkedUp;
   const bannerSize = normalizeBannerSize(ui?.bannerSize);
   // --quiet suppresses the banner/header chrome (parity with fit/sim).
-  const header = args.quiet === true ? null : (
-    <>
-      <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} update={ui?.update} />
-      {bannerSize === 'mini' && ui?.update !== undefined && <UpdateHint />}
-      {bannerSize !== 'mini' && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
-      <RunHeader tool={GRAPH_TOOL_TITLE} description={GRAPH_TOOL_DESCRIPTION} />
-    </>
-  );
+  const header =
+    args.quiet === true ? null : (
+      <>
+        <Banner
+          size={bannerSize}
+          version={ui?.version}
+          projectPath={args.cwd}
+          walkedUp={walkedUp}
+          update={ui?.update}
+        />
+        {bannerSize === 'mini' && ui?.update !== undefined && <UpdateHint />}
+        {bannerSize !== 'mini' && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
+        <RunHeader tool={GRAPH_TOOL_TITLE} description={GRAPH_TOOL_DESCRIPTION} />
+      </>
+    );
 
   if (state.phase === 'error') {
     return (
@@ -403,7 +421,10 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
             <RunFooterHints
               hints={[
                 VERBOSE_DETAIL_HINT,
-                { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
+                {
+                  text: 'opensip-tools dashboard for HTML report',
+                  bold: ['opensip-tools dashboard'],
+                },
               ]}
             />
           )}

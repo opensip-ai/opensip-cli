@@ -7,7 +7,7 @@
 // @fitness-ignore-next-line no-markdown-references -- rule provenance reference for developer context
 // Rule source: .augment/rules/ui-patterns.md
 
-import { defineCheck, type CheckViolation, extractSnippet } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, extractSnippet } from '@opensip-tools/fitness';
 
 /**
  * Paths to exclude from checking
@@ -18,7 +18,7 @@ const NON_SCREEN_PATTERNS = [
   /\.test\./,
   /\.spec\./,
   /components\/patterns\//, // The pattern components themselves
-]
+];
 
 /**
  * Check: quality/async-state-pattern
@@ -51,30 +51,30 @@ export const asyncStatePattern = defineCheck({
       !filePath.includes('/screens/') ||
       (!filePath.endsWith('.ts') && !filePath.endsWith('.tsx'))
     ) {
-      return []
+      return [];
     }
 
     // Skip excluded paths
     if (NON_SCREEN_PATTERNS.some((pattern) => pattern.test(filePath))) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Check if file uses TanStack Query (useQuery, useMutation)
-    const usesQuery = /use(Query|Mutation|InfiniteQuery)\s*\(/.test(content)
+    const usesQuery = /use(Query|Mutation|InfiniteQuery)\s*\(/.test(content);
     if (!usesQuery) {
-      return violations // Not a data-driven screen
+      return violations; // Not a data-driven screen
     }
 
     // Check if file imports or uses AsyncState pattern
-    const hasAsyncState = /AsyncState|<AsyncState/.test(content)
+    const hasAsyncState = /AsyncState|<AsyncState/.test(content);
     if (!hasAsyncState) {
       // Find the useQuery line for better context
-      const queryMatch = /use(Query|Mutation|InfiniteQuery)\s*\(/.exec(content)
-      const queryLine = queryMatch ? content.slice(0, queryMatch.index).split('\n').length : 1
-      extractSnippet(content, queryLine, 3)
-      const matchText = queryMatch?.[0] ?? 'useQuery'
+      const queryMatch = /use(Query|Mutation|InfiniteQuery)\s*\(/.exec(content);
+      const queryLine = queryMatch ? content.slice(0, queryMatch.index).split('\n').length : 1;
+      extractSnippet(content, queryLine, 3);
+      const matchText = queryMatch?.[0] ?? 'useQuery';
 
       violations.push({
         line: queryLine,
@@ -85,9 +85,9 @@ export const asyncStatePattern = defineCheck({
           "Import AsyncState from 'components/patterns/' and wrap data display: <AsyncState isLoading={isLoading} error={error} data={data}>{...}</AsyncState>",
         type: 'missing-async-state',
         match: matchText,
-      })
+      });
     }
 
-    return violations
+    return violations;
   },
-})
+});

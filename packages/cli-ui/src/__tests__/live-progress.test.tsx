@@ -21,15 +21,23 @@ import type { ProgressCallback, ProgressEvent, ProgressSurface } from '../progre
 
 /** A subscribe fn that captures the renderer's listener so the test can push
  *  events into <LiveProgress> after it mounts. */
-function controllable(): { subscribe: (cb: ProgressCallback) => void; emit: (e: ProgressEvent) => void } {
+function controllable(): {
+  subscribe: (cb: ProgressCallback) => void;
+  emit: (e: ProgressEvent) => void;
+} {
   let listener: ProgressCallback | undefined;
   return {
-    subscribe: (cb) => { listener = cb; },
+    subscribe: (cb) => {
+      listener = cb;
+    },
     emit: (e) => listener?.(e),
   };
 }
 
-function mount(surface: ProgressSurface, subscribe: (cb: ProgressCallback) => void): ReturnType<typeof render> {
+function mount(
+  surface: ProgressSurface,
+  subscribe: (cb: ProgressCallback) => void,
+): ReturnType<typeof render> {
   return render(
     <ThemeProvider>
       <ClockProvider>
@@ -44,7 +52,9 @@ function mount(surface: ProgressSurface, subscribe: (cb: ProgressCallback) => vo
 async function waitForFrame(lastFrame: () => string | undefined, substr: string): Promise<void> {
   for (let i = 0; i < 100; i++) {
     if ((lastFrame() ?? '').includes(substr)) return;
-    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5);
+    });
   }
 }
 
@@ -92,7 +102,12 @@ describe('<LiveProgress> — phases mode', () => {
     const { lastFrame, unmount } = mount(PHASES, subscribe);
     await waitForFrame(lastFrame, 'Discover files');
 
-    emit({ type: 'stage-done', stage: 'rules', durationMs: 1_471_600, detail: '318541 call site(s)' });
+    emit({
+      type: 'stage-done',
+      stage: 'rules',
+      durationMs: 1_471_600,
+      detail: '318541 call site(s)',
+    });
     await waitForFrame(lastFrame, '318541 call site(s) (24m 31.6s)');
     expect(lastFrame()).toContain('✓ Evaluate rules');
     unmount();

@@ -14,8 +14,8 @@
  * smaller change.
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Creates a pre-compiled RegExp for pattern matching.
@@ -27,7 +27,7 @@ import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
  */
 function createPattern(pattern: string, flags?: string): RegExp {
   // @fitness-ignore-next-line semgrep-scan -- non-literal RegExp is intentional; patterns are hardcoded string constants for code analysis, not user input
-  return new RegExp(pattern, flags)
+  return new RegExp(pattern, flags);
 }
 
 // Patterns that indicate hardcoded secrets
@@ -102,8 +102,7 @@ const SECRET_PATTERNS = [
     suggestion:
       'Remove hardcoded bearer token. Tokens should be obtained at runtime through authentication flows, not stored in code.',
   },
-]
-
+];
 
 /**
  * Check: security/no-hardcoded-secrets
@@ -137,9 +136,9 @@ export const noHardcodedSecrets = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    return analyzeHardcodedSecrets(content, filePath)
+    return analyzeHardcodedSecrets(content, filePath);
   },
-})
+});
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the
@@ -149,16 +148,16 @@ export function analyzeHardcodedSecrets(content: string, filePath: string): Chec
   logger.debug({
     evt: 'fitness.checks.no_hardcoded_secrets.analyze',
     msg: 'Analyzing file for hardcoded secrets and credentials',
-  })
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  });
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
 
   for (const [lineNum, line_] of lines.entries()) {
-    const line = line_ ?? ''
-    analyzeLine(line, lineNum + 1, filePath, violations)
+    const line = line_ ?? '';
+    analyzeLine(line, lineNum + 1, filePath, violations);
   }
 
-  return violations
+  return violations;
 }
 
 function analyzeLine(
@@ -167,15 +166,15 @@ function analyzeLine(
   filePath: string,
   violations: CheckViolation[],
 ): void {
-  const trimmed = line.trim()
-  if (trimmed.startsWith('//') || trimmed.startsWith('*')) return
+  const trimmed = line.trim();
+  if (trimmed.startsWith('//') || trimmed.startsWith('*')) return;
 
   for (const pattern of SECRET_PATTERNS) {
-    pattern.regex.lastIndex = 0
-    const matched = pattern.regex.exec(line)
-    if (!matched) continue
-    if (isInsideRegexLiteral(line, matched.index)) continue
-    if (lineHasRedactionPlaceholder(line)) continue
+    pattern.regex.lastIndex = 0;
+    const matched = pattern.regex.exec(line);
+    if (!matched) continue;
+    if (isInsideRegexLiteral(line, matched.index)) continue;
+    if (lineHasRedactionPlaceholder(line)) continue;
     violations.push({
       line: lineNumber,
       column: matched.index,
@@ -184,7 +183,7 @@ function analyzeLine(
       suggestion: pattern.suggestion,
       match: matched[0],
       filePath,
-    })
+    });
   }
 }
 
@@ -200,16 +199,16 @@ function analyzeLine(
  */
 function isInsideRegexLiteral(line: string, pos: number): boolean {
   // Count unescaped slashes before pos.
-  let slashesBefore = 0
+  let slashesBefore = 0;
   for (let i = 0; i < pos; i++) {
-    if (line[i] === '/' && line[i - 1] !== '\\') slashesBefore++
+    if (line[i] === '/' && line[i - 1] !== '\\') slashesBefore++;
   }
-  if (slashesBefore % 2 !== 1) return false
+  if (slashesBefore % 2 !== 1) return false;
   // Check at least one unescaped slash follows.
   for (let i = pos; i < line.length; i++) {
-    if (line[i] === '/' && line[i - 1] !== '\\') return true
+    if (line[i] === '/' && line[i - 1] !== '\\') return true;
   }
-  return false
+  return false;
 }
 
 /**
@@ -227,5 +226,5 @@ function lineHasRedactionPlaceholder(line: string): boolean {
     line.includes('[REDACTED]') ||
     line.includes('<REDACTED>') ||
     /X{4,}/.test(line)
-  )
+  );
 }

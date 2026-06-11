@@ -23,7 +23,7 @@
  * (they DESCRIBE env patterns, they don't read env); tests are excluded (they
  * legitimately drive code under test via process.env).
  */
-import { defineCheck } from '@opensip-tools/fitness'
+import { defineCheck } from '@opensip-tools/fitness';
 
 /**
  * A real read of a SPECIFIC variable: `process.env.<NAME>` or `process.env[...]`.
@@ -31,13 +31,13 @@ import { defineCheck } from '@opensip-tools/fitness'
  * subprocess (`env: process.env`, `...process.env`, `env = process.env`) is
  * legitimate passthrough, not a governed variable read.
  */
-const PROCESS_ENV_RE = /\bprocess\.env\s*(?:\.\w|\[)/
+const PROCESS_ENV_RE = /\bprocess\.env\s*(?:\.\w|\[)/;
 
 /** Check packs describe env patterns; they do not read env. Excluded wholesale. */
-const CHECK_PACK_PATH = /packages\/[^/]+\/checks-/
+const CHECK_PACK_PATH = /packages\/[^/]+\/checks-/;
 
 /** Tests legitimately set/read process.env to drive the code under test. */
-const TEST_PATH = /\.test\.tsx?$|\/__tests__\//
+const TEST_PATH = /\.test\.tsx?$|\/__tests__\//;
 
 /**
  * Files where a raw `process.env` read is sanctioned: the registry primitive and
@@ -53,11 +53,11 @@ const ALLOWLISTED_BASENAMES = new Set([
   'theme.ts',
   'welcome.ts',
   'heap-preflight.ts',
-])
+]);
 
 /** Pure analysis. Exported so the dogfood-integration test can exercise it. */
 export function analyzeEnvViaRegistry(content) {
-  const violations = []
+  const violations = [];
   for (const [i, line] of content.split('\n').entries()) {
     if (PROCESS_ENV_RE.test(line)) {
       violations.push({
@@ -71,10 +71,10 @@ export function analyzeEnvViaRegistry(content) {
           'Declare an EnvVarSpec and read it via EnvRegistry.get(). If this is a ' +
           'genuine pre-scope reader that cannot reach a registry, allow-list it ' +
           'here with a justification (see env-registry / host-env-specs / theme).',
-      })
+      });
     }
   }
-  return violations
+  return violations;
 }
 
 export const checks = [
@@ -87,10 +87,10 @@ export const checks = [
     fileTypes: ['ts', 'tsx'],
     contentFilter: 'strip-strings-and-comments',
     analyze: (content, filePath) => {
-      if (CHECK_PACK_PATH.test(filePath) || TEST_PATH.test(filePath)) return []
-      const basename = filePath.split('/').at(-1) ?? ''
-      if (ALLOWLISTED_BASENAMES.has(basename)) return []
-      return analyzeEnvViaRegistry(content)
+      if (CHECK_PACK_PATH.test(filePath) || TEST_PATH.test(filePath)) return [];
+      const basename = filePath.split('/').at(-1) ?? '';
+      if (ALLOWLISTED_BASENAMES.has(basename)) return [];
+      return analyzeEnvViaRegistry(content);
     },
   }),
-]
+];

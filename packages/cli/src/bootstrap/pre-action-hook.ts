@@ -320,7 +320,11 @@ export function installPreActionHook(program: Command, version: string): void {
     // capability health (how many tools loaded; the resolved project scope).
     scope.diagnostics.event('load', 'debug', `${tools.list().length} tool(s) loaded`);
     scope.diagnostics.counter('tools.loaded', tools.list().length);
-    scope.diagnostics.event('validate', 'debug', `project config resolved (scope: ${project.scope})`);
+    scope.diagnostics.event(
+      'validate',
+      'debug',
+      `project config resolved (scope: ${project.scope})`,
+    );
 
     // The `ℹ Project:` location line is rendered once, under the banner,
     // by cli-ui's ProjectHeader — mounted by the App shell (static

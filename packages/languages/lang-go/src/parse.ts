@@ -10,20 +10,25 @@
  * (non-null) rather than throwing.
  */
 
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath } from 'node:url';
 
-import { loadGrammar, createParser, parseToTree, type ParsedFile } from '@opensip-tools/tree-sitter'
+import {
+  loadGrammar,
+  createParser,
+  parseToTree,
+  type ParsedFile,
+} from '@opensip-tools/tree-sitter';
 
 const grammar = await loadGrammar(
   fileURLToPath(new URL('../wasm/tree-sitter-go.wasm', import.meta.url)),
-)
-const parser = createParser(grammar)
+);
+const parser = createParser(grammar);
 
 /** Parsed Go source: tree-sitter parse tree plus the original source text. */
-export type GoTree = ParsedFile
+export type GoTree = ParsedFile;
 
 /** Parses Go source into a {@link GoTree}, or null when no tree is produced. */
 export function parseGo(content: string, _filePath: string): GoTree | null {
-  const tree = parseToTree(parser, content)
-  return tree ? { tree, source: content } : null
+  const tree = parseToTree(parser, content);
+  return tree ? { tree, source: content } : null;
 }

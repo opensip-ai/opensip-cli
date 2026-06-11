@@ -9,12 +9,12 @@
  * its tests depend on. No scanning logic is duplicated here.
  */
 
-import { scanSuppressionDirectives, type SuppressionKeywords } from '@opensip-tools/core'
+import { scanSuppressionDirectives, type SuppressionKeywords } from '@opensip-tools/core';
 
 export const FITNESS_KEYWORDS: SuppressionKeywords = {
   file: '@fitness-ignore-file',
   nextLine: '@fitness-ignore-next-line',
-}
+};
 
 /**
  * Parse file-level ignore directive from file content.
@@ -24,9 +24,9 @@ export function parseFileIgnoreDirective(
   content: string,
   checkId: string | readonly string[],
 ): boolean {
-  const checkIds: readonly string[] = Array.isArray(checkId) ? checkId : [checkId]
-  const { fileIgnoredIds } = scanSuppressionDirectives(content, FITNESS_KEYWORDS)
-  return checkIds.some((id) => fileIgnoredIds.has(id))
+  const checkIds: readonly string[] = Array.isArray(checkId) ? checkId : [checkId];
+  const { fileIgnoredIds } = scanSuppressionDirectives(content, FITNESS_KEYWORDS);
+  return checkIds.some((id) => fileIgnoredIds.has(id));
 }
 
 /**
@@ -37,11 +37,11 @@ export function parseIgnoreDirectives(
   content: string,
   checkId: string | readonly string[],
 ): Set<number> {
-  const checkIds: readonly string[] = Array.isArray(checkId) ? checkId : [checkId]
-  const { lineIgnoredIds } = scanSuppressionDirectives(content, FITNESS_KEYWORDS)
-  const ignoredLines = new Set<number>()
+  const checkIds: readonly string[] = Array.isArray(checkId) ? checkId : [checkId];
+  const { lineIgnoredIds } = scanSuppressionDirectives(content, FITNESS_KEYWORDS);
+  const ignoredLines = new Set<number>();
   for (const [line, ids] of lineIgnoredIds) {
-    if (checkIds.some((id) => ids.has(id))) ignoredLines.add(line)
+    if (checkIds.some((id) => ids.has(id))) ignoredLines.add(line);
   }
-  return ignoredLines
+  return ignoredLines;
 }

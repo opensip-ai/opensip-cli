@@ -7,10 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  formatCliTooOldMessage,
-  formatNoProjectFoundMessage,
-} from '../pre-action-messages.js';
+import { formatCliTooOldMessage, formatNoProjectFoundMessage } from '../pre-action-messages.js';
 
 describe('formatCliTooOldMessage', () => {
   it('renders the upgrade-the-CLI message with the version mismatch', () => {

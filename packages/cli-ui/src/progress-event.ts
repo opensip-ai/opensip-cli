@@ -21,8 +21,18 @@
 /** A single live-progress event emitted by a running tool. */
 export type ProgressEvent =
   | { readonly type: 'stage-start'; readonly stage: string; readonly label: string }
-  | { readonly type: 'stage-progress'; readonly stage: string; readonly completed: number; readonly total: number }
-  | { readonly type: 'stage-done'; readonly stage: string; readonly durationMs: number; readonly detail?: string }
+  | {
+      readonly type: 'stage-progress';
+      readonly stage: string;
+      readonly completed: number;
+      readonly total: number;
+    }
+  | {
+      readonly type: 'stage-done';
+      readonly stage: string;
+      readonly durationMs: number;
+      readonly detail?: string;
+    }
   /** Phases-mode only: a cache hit satisfied this stage (graph parse/walk/resolve). */
   | { readonly type: 'stage-cached'; readonly stage: string };
 

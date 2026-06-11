@@ -80,7 +80,10 @@ export function buildCatalog(input: PipelineInput): PipelineResult {
  * `resolveEdgesFromRecords` entry the orchestrator's `resolveCallSitesAdapter`
  * uses. Returns the catalog with edges populated.
  */
-export async function resolveCatalogEdges(result: PipelineResult, projectDirAbs: string): Promise<Catalog> {
+export async function resolveCatalogEdges(
+  result: PipelineResult,
+  projectDirAbs: string,
+): Promise<Catalog> {
   const resolved = await resolveEdgesFromRecords({
     catalog: result.catalog,
     program: result.program,

@@ -252,7 +252,13 @@ describe('defineRegexListCheck', () => {
         tags: ['demo'],
         fileTypes: ['ts'],
         patterns: [
-          { id: PATTERN_ID_A, slug: 'console-debug', regex: /console\.debug/g, message: 'console.debug detected', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'console-debug',
+            regex: /console\.debug/g,
+            message: 'console.debug detected',
+            severity: 'error',
+          },
         ],
       });
       const signals = await runOnContent(check, 'console.debug("hi")\n');

@@ -15,14 +15,14 @@
  * the `Target`, the framework owns the loop lifecycle).
  */
 
-import { resolveConcurrency } from '../../types/workload.js'
+import { resolveConcurrency } from '../../types/workload.js';
 
-import { LatencyTracker } from './latency-tracker.js'
+import { LatencyTracker } from './latency-tracker.js';
 
-import type { Target } from './target.js'
-import type { SimulationMetrics } from '../../types/base-types.js'
-import type { ScenarioExecutionContext } from '../../types/framework-types.js'
-import type { Workload } from '../../types/workload.js'
+import type { Target } from './target.js';
+import type { SimulationMetrics } from '../../types/base-types.js';
+import type { ScenarioExecutionContext } from '../../types/framework-types.js';
+import type { Workload } from '../../types/workload.js';
 
 // =============================================================================
 // PUBLIC TYPES
@@ -30,27 +30,27 @@ import type { Workload } from '../../types/workload.js'
 
 /** Subset of a kind config the load-window driver actually consumes. */
 export interface LoadWindowConfig {
-  readonly workload: Workload
+  readonly workload: Workload;
 }
 
 /** Options passed to `runLoadWindow`. */
 export interface RunLoadWindowOptions {
   /** Duration the window runs for, in milliseconds. */
-  readonly windowMs: number
+  readonly windowMs: number;
   /** The (possibly fault-decorated) target driven once per request. */
-  readonly target: Target
+  readonly target: Target;
 }
 
 /** Aggregated outcome of a single load window. */
 export interface LoadWindowResult {
-  readonly metrics: SimulationMetrics
+  readonly metrics: SimulationMetrics;
 }
 
 // =============================================================================
 // IMPLEMENTATION
 // =============================================================================
 
-const TICK_INTERVAL_MS = 100
+const TICK_INTERVAL_MS = 100;
 
 function createMetrics(): SimulationMetrics {
   return {
@@ -62,54 +62,54 @@ function createMetrics(): SimulationMetrics {
     p95LatencyMs: 0,
     p99LatencyMs: 0,
     errorsGenerated: 0,
-  }
+  };
 }
 
 function sleepTick(intervalMs: number, signal: AbortSignal): Promise<void> {
   return new Promise<void>((resolve) => {
     if (signal.aborted) {
-      resolve()
-      return
+      resolve();
+      return;
     }
     const timeout = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort)
-      resolve()
-    }, intervalMs)
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, intervalMs);
     const onAbort = (): void => {
-      clearTimeout(timeout)
-      resolve()
-    }
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
+      clearTimeout(timeout);
+      resolve();
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 /** State the dispatch loop threads through to each in-flight request. */
 interface DispatchState {
-  readonly target: Target
-  readonly context: ScenarioExecutionContext
-  readonly metrics: SimulationMetrics
-  readonly latencyTracker: LatencyTracker
-  readonly inFlight: Set<Promise<void>>
+  readonly target: Target;
+  readonly context: ScenarioExecutionContext;
+  readonly metrics: SimulationMetrics;
+  readonly latencyTracker: LatencyTracker;
+  readonly inFlight: Set<Promise<void>>;
 }
 
 /** Issue one request: time it, classify resolve/throw, track it in-flight. */
 function dispatchRequest(state: DispatchState): void {
-  const { target, context, metrics, latencyTracker, inFlight } = state
-  const t0 = Date.now()
-  metrics.totalRequests++
+  const { target, context, metrics, latencyTracker, inFlight } = state;
+  const t0 = Date.now();
+  metrics.totalRequests++;
   const run = (async (): Promise<void> => {
     try {
-      await target({ signal: context.abortSignal, correlationId: context.correlationId })
-      metrics.successfulRequests++
+      await target({ signal: context.abortSignal, correlationId: context.correlationId });
+      metrics.successfulRequests++;
     } catch {
-      metrics.failedRequests++
-      metrics.errorsGenerated++
+      metrics.failedRequests++;
+      metrics.errorsGenerated++;
     } finally {
-      latencyTracker.record(Date.now() - t0)
+      latencyTracker.record(Date.now() - t0);
     }
-  })()
-  inFlight.add(run)
-  void run.finally(() => inFlight.delete(run))
+  })();
+  inFlight.add(run);
+  void run.finally(() => inFlight.delete(run));
 }
 
 /** Block until fewer than `cap` requests are in flight (or the run aborts). */
@@ -120,7 +120,7 @@ async function awaitBelowCap(
 ): Promise<void> {
   while (inFlight.size >= cap && !signal.aborted) {
     // @fitness-ignore-next-line performance-anti-patterns -- back-pressure gate: blocks until the fastest in-flight request settles to free a concurrency slot; parallelizing defeats the cap
-    await Promise.race(inFlight)
+    await Promise.race(inFlight);
   }
 }
 
@@ -138,40 +138,46 @@ export async function runLoadWindow(
   context: ScenarioExecutionContext,
   options: RunLoadWindowOptions,
 ): Promise<LoadWindowResult> {
-  const { workload } = config
-  const targetRps = workload.rps
-  const maxInFlight = resolveConcurrency(workload)
-  const metrics = createMetrics()
-  const latencyTracker = new LatencyTracker()
-  const inFlight = new Set<Promise<void>>()
-  const state: DispatchState = { target: options.target, context, metrics, latencyTracker, inFlight }
-  const start = Date.now()
-  const rampUpMs = (workload.rampUp ?? 0) * 1000
+  const { workload } = config;
+  const targetRps = workload.rps;
+  const maxInFlight = resolveConcurrency(workload);
+  const metrics = createMetrics();
+  const latencyTracker = new LatencyTracker();
+  const inFlight = new Set<Promise<void>>();
+  const state: DispatchState = {
+    target: options.target,
+    context,
+    metrics,
+    latencyTracker,
+    inFlight,
+  };
+  const start = Date.now();
+  const rampUpMs = (workload.rampUp ?? 0) * 1000;
 
   while (Date.now() - start < options.windowMs && !context.abortSignal.aborted) {
-    const elapsed = Date.now() - start
-    const rampUpProgress = rampUpMs > 0 ? Math.min(1, elapsed / rampUpMs) : 1
-    const requestsThisTick = Math.floor((targetRps * rampUpProgress) / (1000 / TICK_INTERVAL_MS))
+    const elapsed = Date.now() - start;
+    const rampUpProgress = rampUpMs > 0 ? Math.min(1, elapsed / rampUpMs) : 1;
+    const requestsThisTick = Math.floor((targetRps * rampUpProgress) / (1000 / TICK_INTERVAL_MS));
 
     for (let i = 0; i < requestsThisTick; i++) {
       // Backpressure: block until below the in-flight cap, which paces RPS
       // toward what latency + concurrency actually allow.
-      await awaitBelowCap(inFlight, maxInFlight, context.abortSignal)
-      if (context.abortSignal.aborted) break
-      dispatchRequest(state)
+      await awaitBelowCap(inFlight, maxInFlight, context.abortSignal);
+      if (context.abortSignal.aborted) break;
+      dispatchRequest(state);
     }
 
-    await sleepTick(TICK_INTERVAL_MS, context.abortSignal)
+    await sleepTick(TICK_INTERVAL_MS, context.abortSignal);
   }
 
   // Drain any still-in-flight requests so the latency snapshot covers them.
-  await Promise.allSettled(inFlight)
+  await Promise.allSettled(inFlight);
 
-  const snapshot = latencyTracker.getLatencySnapshot()
-  metrics.avgLatencyMs = snapshot.avgLatencyMs
-  metrics.p50LatencyMs = snapshot.p50LatencyMs
-  metrics.p95LatencyMs = snapshot.p95LatencyMs
-  metrics.p99LatencyMs = snapshot.p99LatencyMs
+  const snapshot = latencyTracker.getLatencySnapshot();
+  metrics.avgLatencyMs = snapshot.avgLatencyMs;
+  metrics.p50LatencyMs = snapshot.p50LatencyMs;
+  metrics.p95LatencyMs = snapshot.p95LatencyMs;
+  metrics.p99LatencyMs = snapshot.p99LatencyMs;
 
-  return { metrics }
+  return { metrics };
 }

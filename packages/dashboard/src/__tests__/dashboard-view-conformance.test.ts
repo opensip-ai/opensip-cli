@@ -61,7 +61,7 @@ describe('view conformance — §10.1', () => {
 
   it('all expected ids are present', () => {
     const views = loadViews();
-    const ids = new Set(views.map(v => v.id));
+    const ids = new Set(views.map((v) => v.id));
     for (const id of expectedIds) expect(ids.has(id)).toBe(true);
   });
 });

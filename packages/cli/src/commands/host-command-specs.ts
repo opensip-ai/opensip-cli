@@ -63,8 +63,7 @@ interface InitOpts extends InitOptions {
 function buildInitSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'init',
-    description:
-      'Scaffold opensip-tools.config.yml + example checks/scenarios for your project',
+    description: 'Scaffold opensip-tools.config.yml + example checks/scenarios for your project',
     // `--cwd` here matches the registry text ("Target directory"); `--json` /
     // `--debug` match the registry too, so they ride the common-flag path.
     commonFlags: ['cwd', 'json', 'debug'],
@@ -176,9 +175,7 @@ function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
       const shell = opts._args[0];
       const normalized = shell.toLowerCase();
       if (normalized !== 'bash' && normalized !== 'zsh' && normalized !== 'fish') {
-        process.stderr.write(
-          `Unsupported shell: ${shell}. Expected one of: bash, zsh, fish.\n`,
-        );
+        process.stderr.write(`Unsupported shell: ${shell}. Expected one of: bash, zsh, fish.\n`);
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
         return;
       }
@@ -226,7 +223,11 @@ function buildUninstallSpec(): HostSpec {
     commonFlags: [],
     options: [
       { flag: '-y, --yes', description: 'Skip confirmation prompt', default: false },
-      { flag: '--dry-run', description: 'Print what would be removed; take no action', default: false },
+      {
+        flag: '--dry-run',
+        description: 'Print what would be removed; take no action',
+        default: false,
+      },
       {
         flag: '--project',
         value: '[path]',

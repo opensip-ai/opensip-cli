@@ -8,7 +8,6 @@
 
 import { describe, expect, it } from 'vitest';
 
-
 import { visitArrowFunction } from '../../inventory-visitors/arrow-function.js';
 import { visitConstructorDeclaration } from '../../inventory-visitors/constructor-declaration.js';
 import { visitFunctionDeclaration } from '../../inventory-visitors/function-declaration.js';

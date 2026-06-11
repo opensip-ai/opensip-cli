@@ -10,19 +10,18 @@
  * - Recognizes Zod .parse()/.safeParse() on request properties as equivalent coverage
  */
 
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
-
-const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH'])
+const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH']);
 
 interface CheckRouteSchemaOptions {
-  routeText: string
-  method: string
-  line: number
-  filePath: string
-  routePath: string
+  routeText: string;
+  method: string;
+  line: number;
+  filePath: string;
+  routePath: string;
 }
 
 function createSchemaViolation(
@@ -31,7 +30,7 @@ function createSchemaViolation(
   message: string,
   suggestion: string,
 ): CheckViolation {
-  const { method, line, filePath, routePath } = options
+  const { method, line, filePath, routePath } = options;
   return {
     filePath,
     line,
@@ -41,33 +40,33 @@ function createSchemaViolation(
     type,
     suggestion,
     match: `${method} ${routePath}`,
-  }
+  };
 }
 
 function hasProperty(routeText: string, propertyName: string): boolean {
-  return routeText.includes(`${propertyName}:`) || routeText.includes(`${propertyName} :`)
+  return routeText.includes(`${propertyName}:`) || routeText.includes(`${propertyName} :`);
 }
 
 interface ZodValidationResult {
-  hasAny: boolean
-  hasBody: boolean
-  hasQuery: boolean
-  hasParams: boolean
-  hasResponse: boolean
+  hasAny: boolean;
+  hasBody: boolean;
+  hasQuery: boolean;
+  hasParams: boolean;
+  hasResponse: boolean;
 }
 
 function detectZodValidation(routeText: string): ZodValidationResult {
-  const bodyPattern = /\.(?:safe)?[Pp]arse\(\s{0,5}(?:request|req)\.body\s{0,5}\)/
-  const queryPattern = /\.(?:safe)?[Pp]arse\(\s{0,5}(?:request|req)\.query\s{0,5}\)/
-  const paramsPattern = /\.(?:safe)?[Pp]arse\(\s{0,5}(?:request|req)\.params\s{0,5}\)/
-  const responsePattern = /[A-Z]\w{0,60}Schema\.parse\(/
-  const generalPattern = /[A-Z]\w{0,60}Schema\.(?:safe)?[Pp]arse\(/
+  const bodyPattern = /\.(?:safe)?[Pp]arse\(\s{0,5}(?:request|req)\.body\s{0,5}\)/;
+  const queryPattern = /\.(?:safe)?[Pp]arse\(\s{0,5}(?:request|req)\.query\s{0,5}\)/;
+  const paramsPattern = /\.(?:safe)?[Pp]arse\(\s{0,5}(?:request|req)\.params\s{0,5}\)/;
+  const responsePattern = /[A-Z]\w{0,60}Schema\.parse\(/;
+  const generalPattern = /[A-Z]\w{0,60}Schema\.(?:safe)?[Pp]arse\(/;
 
-  const hasBody = bodyPattern.test(routeText)
-  const hasQuery = queryPattern.test(routeText)
-  const hasParams = paramsPattern.test(routeText)
-  const hasResponse = responsePattern.test(routeText)
-  const hasGeneral = generalPattern.test(routeText)
+  const hasBody = bodyPattern.test(routeText);
+  const hasQuery = queryPattern.test(routeText);
+  const hasParams = paramsPattern.test(routeText);
+  const hasResponse = responsePattern.test(routeText);
+  const hasGeneral = generalPattern.test(routeText);
 
   return {
     hasAny: hasBody || hasQuery || hasParams || hasResponse || hasGeneral,
@@ -75,7 +74,7 @@ function detectZodValidation(routeText: string): ZodValidationResult {
     hasQuery,
     hasParams,
     hasResponse,
-  }
+  };
 }
 
 function checkMissingSchema(
@@ -83,17 +82,17 @@ function checkMissingSchema(
   zodResult: ZodValidationResult,
 ): CheckViolation | null {
   if (hasProperty(options.routeText, 'schema')) {
-    return null
+    return null;
   }
   if (zodResult.hasAny) {
-    return null
+    return null;
   }
   return createSchemaViolation(
     options,
     'missing-schema',
     `Route ${options.method} ${options.routePath} has no schema option`,
     'Add schema option with body, response, params, and querystring as needed for request validation and OpenAPI documentation. Alternatively, use Zod Schema.parse() or Schema.safeParse() on request properties in the handler.',
-  )
+  );
 }
 
 function handlerReadsBody(routeText: string): boolean {
@@ -103,7 +102,7 @@ function handlerReadsBody(routeText: string): boolean {
   // routes triggered purely by URL params (state-transition actions like
   // `/dispatch`, `/replay`, `/dismiss`) legitimately have no body schema
   // because there is no body. Flagging those is a false positive.
-  return routeText.includes('request.body') || routeText.includes('req.body')
+  return routeText.includes('request.body') || routeText.includes('req.body');
 }
 
 function checkMissingBodySchema(
@@ -111,23 +110,23 @@ function checkMissingBodySchema(
   zodResult: ZodValidationResult,
 ): CheckViolation | null {
   if (!BODY_METHODS.has(options.method)) {
-    return null
+    return null;
   }
   if (hasProperty(options.routeText, 'body')) {
-    return null
+    return null;
   }
   if (zodResult.hasBody) {
-    return null
+    return null;
   }
   if (!handlerReadsBody(options.routeText)) {
-    return null
+    return null;
   }
   return createSchemaViolation(
     options,
     'missing-body-schema',
     `Route ${options.method} ${options.routePath} missing body schema`,
     'Add body schema to validate request payload. Use Zod schema from shared contract schemas.',
-  )
+  );
 }
 
 function checkMissingResponseSchema(
@@ -135,39 +134,39 @@ function checkMissingResponseSchema(
   zodResult: ZodValidationResult,
 ): CheckViolation | null {
   if (hasProperty(options.routeText, 'response')) {
-    return null
+    return null;
   }
   if (zodResult.hasResponse) {
-    return null
+    return null;
   }
   return createSchemaViolation(
     options,
     'missing-response-schema',
     `Route ${options.method} ${options.routePath} missing response schema`,
     'Add response schema for proper API documentation and type safety. Define schemas for 200, 400, 500 status codes.',
-  )
+  );
 }
 
 function checkMissingParamsSchema(
   options: CheckRouteSchemaOptions,
   zodResult: ZodValidationResult,
 ): CheckViolation | null {
-  const hasParams = options.routePath.includes(':')
+  const hasParams = options.routePath.includes(':');
   if (!hasParams) {
-    return null
+    return null;
   }
   if (hasProperty(options.routeText, 'params')) {
-    return null
+    return null;
   }
   if (zodResult.hasParams) {
-    return null
+    return null;
   }
   return createSchemaViolation(
     options,
     'missing-params-schema',
     `Route ${options.method} ${options.routePath} has path params but no params schema`,
     'Add params schema to validate path parameters. Use Zod schema to validate param types.',
-  )
+  );
 }
 
 function checkMissingQuerySchema(
@@ -175,77 +174,77 @@ function checkMissingQuerySchema(
   zodResult: ZodValidationResult,
 ): CheckViolation | null {
   const accessesQuery =
-    options.routeText.includes('request.query') || options.routeText.includes('req.query')
+    options.routeText.includes('request.query') || options.routeText.includes('req.query');
   if (!accessesQuery) {
-    return null
+    return null;
   }
   if (hasProperty(options.routeText, 'querystring')) {
-    return null
+    return null;
   }
   if (zodResult.hasQuery) {
-    return null
+    return null;
   }
   return createSchemaViolation(
     options,
     'missing-querystring-schema',
     `Route ${options.method} ${options.routePath} accesses query but no querystring schema`,
     'Add querystring schema to validate query parameters. Use Zod schema to validate and coerce query string values.',
-  )
+  );
 }
 
 function checkRouteSchema(options: CheckRouteSchemaOptions): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
-  const zodResult = detectZodValidation(options.routeText)
+  const zodResult = detectZodValidation(options.routeText);
 
-  const missingSchemaViolation = checkMissingSchema(options, zodResult)
+  const missingSchemaViolation = checkMissingSchema(options, zodResult);
   if (missingSchemaViolation) {
-    violations.push(missingSchemaViolation)
-    return violations
+    violations.push(missingSchemaViolation);
+    return violations;
   }
 
-  const bodyViolation = checkMissingBodySchema(options, zodResult)
+  const bodyViolation = checkMissingBodySchema(options, zodResult);
   if (bodyViolation) {
-    violations.push(bodyViolation)
+    violations.push(bodyViolation);
   }
 
-  const responseViolation = checkMissingResponseSchema(options, zodResult)
+  const responseViolation = checkMissingResponseSchema(options, zodResult);
   if (responseViolation) {
-    violations.push(responseViolation)
+    violations.push(responseViolation);
   }
 
-  const paramsViolation = checkMissingParamsSchema(options, zodResult)
+  const paramsViolation = checkMissingParamsSchema(options, zodResult);
   if (paramsViolation) {
-    violations.push(paramsViolation)
+    violations.push(paramsViolation);
   }
 
-  const queryViolation = checkMissingQuerySchema(options, zodResult)
+  const queryViolation = checkMissingQuerySchema(options, zodResult);
   if (queryViolation) {
-    violations.push(queryViolation)
+    violations.push(queryViolation);
   }
 
-  return violations
+  return violations;
 }
 
 function matchObjectMethod(nodeText: string): string | null {
-  const match = /method\s{0,5}:\s{0,5}['"]?(GET|POST|PUT|PATCH|DELETE)['"]?/i.exec(nodeText)
-  return match?.[1]?.toUpperCase() ?? null
+  const match = /method\s{0,5}:\s{0,5}['"]?(GET|POST|PUT|PATCH|DELETE)['"]?/i.exec(nodeText);
+  return match?.[1]?.toUpperCase() ?? null;
 }
 
 function matchObjectUrl(nodeText: string): string | null {
-  const match = /url\s{0,5}:\s{0,5}['"`]([^'"`]{1,200})['"`]/.exec(nodeText)
-  return match?.[1] ?? null
+  const match = /url\s{0,5}:\s{0,5}['"`]([^'"`]{1,200})['"`]/.exec(nodeText);
+  return match?.[1] ?? null;
 }
 
 function matchShorthandMethod(callText: string): string | null {
-  const match = /(?:fastify|app|server)\.(get|post|put|patch|delete)\s{0,5}\(/i.exec(callText)
-  return match?.[1]?.toUpperCase() ?? null
+  const match = /(?:fastify|app|server)\.(get|post|put|patch|delete)\s{0,5}\(/i.exec(callText);
+  return match?.[1]?.toUpperCase() ?? null;
 }
 
 function matchPathArgument(callText: string): string | null {
-  const match = /\(\s{0,5}['"`]([^'"`]{1,200})['"`]/.exec(callText)
+  const match = /\(\s{0,5}['"`]([^'"`]{1,200})['"`]/.exec(callText);
   /* v8 ignore next -- defensive AST/type guard */
-  return match?.[1] ?? null
+  return match?.[1] ?? null;
 }
 
 function analyzeObjectLiteral(
@@ -253,15 +252,15 @@ function analyzeObjectLiteral(
   sourceFile: ts.SourceFile,
   filePath: string,
 ): CheckViolation[] {
-  const nodeText = node.getText(sourceFile)
-  const method = matchObjectMethod(nodeText)
-  const routePath = matchObjectUrl(nodeText)
+  const nodeText = node.getText(sourceFile);
+  const method = matchObjectMethod(nodeText);
+  const routePath = matchObjectUrl(nodeText);
 
   if (!method || !routePath) {
-    return []
+    return [];
   }
 
-  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
 
   return checkRouteSchema({
     routeText: nodeText,
@@ -269,7 +268,7 @@ function analyzeObjectLiteral(
     line: line + 1,
     filePath,
     routePath,
-  })
+  });
 }
 
 function analyzeCallExpression(
@@ -277,16 +276,16 @@ function analyzeCallExpression(
   sourceFile: ts.SourceFile,
   filePath: string,
 ): CheckViolation[] {
-  const callText = node.getText(sourceFile)
-  const method = matchShorthandMethod(callText)
+  const callText = node.getText(sourceFile);
+  const method = matchShorthandMethod(callText);
 
   if (!method) {
-    return []
+    return [];
   }
 
-  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+  const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
   /* v8 ignore next -- defensive nullish fallback */
-  const routePath = matchPathArgument(callText) ?? ''
+  const routePath = matchPathArgument(callText) ?? '';
 
   return checkRouteSchema({
     routeText: callText,
@@ -294,41 +293,41 @@ function analyzeCallExpression(
     line: line + 1,
     filePath,
     routePath,
-  })
+  });
 }
 
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   try {
-    const sourceFile = getSharedSourceFile(filePath, content)
+    const sourceFile = getSharedSourceFile(filePath, content);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
     const visit = (node: ts.Node): void => {
       if (ts.isObjectLiteralExpression(node)) {
-        violations.push(...analyzeObjectLiteral(node, sourceFile, filePath))
+        violations.push(...analyzeObjectLiteral(node, sourceFile, filePath));
       } else if (ts.isCallExpression(node)) {
-        violations.push(...analyzeCallExpression(node, sourceFile, filePath))
+        violations.push(...analyzeCallExpression(node, sourceFile, filePath));
       }
 
-      ts.forEachChild(node, visit)
-    }
+      ts.forEachChild(node, visit);
+    };
 
-    visit(sourceFile)
-  /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+    visit(sourceFile);
+    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
   } catch {
     // @swallow-ok Skip files that fail to parse
   }
 
-  return violations
+  return violations;
 }
 
 function isRouteFile(file: string): boolean {
   const hasRouteKeyword =
-    file.includes('route') || file.includes('controller') || file.includes('endpoint')
-  const isTypeFile = file.endsWith('.d.ts')
-  return hasRouteKeyword && !isTestFile(file) && !isTypeFile
+    file.includes('route') || file.includes('controller') || file.includes('endpoint');
+  const isTypeFile = file.endsWith('.d.ts');
+  return hasRouteKeyword && !isTestFile(file) && !isTypeFile;
 }
 
 export const fastifySchemaCoverage = defineCheck({
@@ -362,13 +361,13 @@ export const fastifySchemaCoverage = defineCheck({
 
   analyze(content, filePath) {
     if (!isRouteFile(filePath)) {
-      return []
+      return [];
     }
 
     if (!content.includes('fastify') && !content.includes('route')) {
-      return []
+      return [];
     }
 
-    return analyzeFile(content, filePath)
+    return analyzeFile(content, filePath);
   },
-})
+});

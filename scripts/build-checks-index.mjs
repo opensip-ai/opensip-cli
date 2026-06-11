@@ -26,13 +26,19 @@ const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const INDEX_DOC = join(REPO_ROOT, 'docs/public/70-reference/05-checks-index.md');
 
 const PACK_DISPLAY = {
-  'checks-universal':  { title: 'Universal',  scope: 'Language-agnostic; runs against every project.' },
-  'checks-typescript': { title: 'TypeScript', scope: 'TypeScript/JavaScript projects; uses TS-AST analysis.' },
-  'checks-python':     { title: 'Python',     scope: 'Python projects.' },
-  'checks-go':         { title: 'Go',         scope: 'Go projects.' },
-  'checks-java':       { title: 'Java',       scope: 'Java projects.' },
-  'checks-cpp':        { title: 'C / C++',    scope: 'C/C++ projects.' },
-  'checks-rust':       { title: 'Rust',       scope: 'Rust projects.' },
+  'checks-universal': {
+    title: 'Universal',
+    scope: 'Language-agnostic; runs against every project.',
+  },
+  'checks-typescript': {
+    title: 'TypeScript',
+    scope: 'TypeScript/JavaScript projects; uses TS-AST analysis.',
+  },
+  'checks-python': { title: 'Python', scope: 'Python projects.' },
+  'checks-go': { title: 'Go', scope: 'Go projects.' },
+  'checks-java': { title: 'Java', scope: 'Java projects.' },
+  'checks-cpp': { title: 'C / C++', scope: 'C/C++ projects.' },
+  'checks-rust': { title: 'Rust', scope: 'Rust projects.' },
 };
 
 const PACK_ORDER = [
@@ -70,7 +76,10 @@ function primaryTag(check) {
 function escapeMd(s) {
   if (!s) return '';
   // Escape pipe and backtick within table cells; collapse newlines.
-  return s.replaceAll('|', String.raw`\|`).replaceAll('\n', ' ').trim();
+  return s
+    .replaceAll('|', String.raw`\|`)
+    .replaceAll('\n', ' ')
+    .trim();
 }
 
 function checkLabel(count) {
@@ -102,11 +111,40 @@ async function main() {
 
   // Derive the release line from the published version (the `MAJOR.MINOR.x`
   // train) rather than hard-coding it, so it never goes stale on a bump.
-  const corePkg = JSON.parse(await fs.readFile(join(REPO_ROOT, 'packages/core/package.json'), 'utf8'));
+  const corePkg = JSON.parse(
+    await fs.readFile(join(REPO_ROOT, 'packages/core/package.json'), 'utf8'),
+  );
   const [maj, min] = String(corePkg.version).split('.');
   const releaseLine = `release: v${maj}.${min}.x`;
 
-  const out = [ '---', 'status: current', `last_verified: ${today}`, releaseLine, 'title: "Checks reference"', 'audience: [getting-started, ci-integrators, plugin-authors]', 'purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."', 'source-files:', '  - packages/fitness/checks-universal/src/checks/', '  - packages/fitness/checks-typescript/src/checks/', '  - packages/fitness/checks-python/src/checks/', '  - packages/fitness/checks-go/src/checks/', '  - packages/fitness/checks-java/src/checks/', '  - packages/fitness/checks-cpp/src/checks/', '  - packages/fitness/checks-rust/src/checks/', 'related-docs:', '  - ../00-start/02-show-me-the-loops.md', '  - ../50-extend/01-plugin-authoring.md', '  - ../50-extend/04-check-pack-architecture.md', '---', '# Checks reference', '', `opensip-tools ships **${total}+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from \`defineCheck\`.`, '', '> This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check\'s source file (the link in each row), then re-run the generator.', ''];
+  const out = [
+    '---',
+    'status: current',
+    `last_verified: ${today}`,
+    releaseLine,
+    'title: "Checks reference"',
+    'audience: [getting-started, ci-integrators, plugin-authors]',
+    'purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."',
+    'source-files:',
+    '  - packages/fitness/checks-universal/src/checks/',
+    '  - packages/fitness/checks-typescript/src/checks/',
+    '  - packages/fitness/checks-python/src/checks/',
+    '  - packages/fitness/checks-go/src/checks/',
+    '  - packages/fitness/checks-java/src/checks/',
+    '  - packages/fitness/checks-cpp/src/checks/',
+    '  - packages/fitness/checks-rust/src/checks/',
+    'related-docs:',
+    '  - ../00-start/02-show-me-the-loops.md',
+    '  - ../50-extend/01-plugin-authoring.md',
+    '  - ../50-extend/04-check-pack-architecture.md',
+    '---',
+    '# Checks reference',
+    '',
+    `opensip-tools ships **${total}+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from \`defineCheck\`.`,
+    '',
+    "> This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.",
+    '',
+  ];
 
   // Per-pack section
   for (const pack of PACK_ORDER) {
@@ -114,8 +152,12 @@ async function main() {
     if (inPack.length === 0) continue;
     const display = PACK_DISPLAY[pack];
     out.push(
-      '---', '',
-      `## ${display.title}  *(${inPack.length} ${checkLabel(inPack.length)})*`, '', display.scope, '',
+      '---',
+      '',
+      `## ${display.title}  *(${inPack.length} ${checkLabel(inPack.length)})*`,
+      '',
+      display.scope,
+      '',
     );
 
     // Group by primary tag
@@ -130,7 +172,12 @@ async function main() {
 
     for (const tag of tagOrder) {
       const items = byTag.get(tag).sort((a, b) => a.slug.localeCompare(b.slug));
-      out.push(`### ${tag.charAt(0).toUpperCase()}${tag.slice(1)}  *(${items.length})*`, '', '| Slug | Description |', '|---|---|');
+      out.push(
+        `### ${tag.charAt(0).toUpperCase()}${tag.slice(1)}  *(${items.length})*`,
+        '',
+        '| Slug | Description |',
+        '|---|---|',
+      );
       for (const c of items) {
         const slugCell = `[\`${c.slug}\`](https://github.com/opensip-ai/opensip-tools/blob/main/${c.file})`;
         const descCell = escapeMd(c.description ?? '*(no description; see source)*');
@@ -140,7 +187,23 @@ async function main() {
     }
   }
 
-  out.push('---', '', '## How to use a check', '', 'Every check above is loaded automatically when its pack is in your project\'s `node_modules/`. To target one explicitly:', '', '```bash', 'opensip-tools fit --check <slug>           # run one check', 'opensip-tools fit --tags security          # run all checks tagged security', 'opensip-tools fit --recipe quick-smoke     # run a named lineup', '```', '', 'Per-check parameter overrides go in your recipe under `config:` — see [recipes and checks](../20-fit/01-recipes-and-checks.md).', '', 'To write your own check, see [plugin authoring](../50-extend/01-plugin-authoring.md).');
+  out.push(
+    '---',
+    '',
+    '## How to use a check',
+    '',
+    "Every check above is loaded automatically when its pack is in your project's `node_modules/`. To target one explicitly:",
+    '',
+    '```bash',
+    'opensip-tools fit --check <slug>           # run one check',
+    'opensip-tools fit --tags security          # run all checks tagged security',
+    'opensip-tools fit --recipe quick-smoke     # run a named lineup',
+    '```',
+    '',
+    'Per-check parameter overrides go in your recipe under `config:` — see [recipes and checks](../20-fit/01-recipes-and-checks.md).',
+    '',
+    'To write your own check, see [plugin authoring](../50-extend/01-plugin-authoring.md).',
+  );
 
   const generated = out.join('\n') + '\n';
 

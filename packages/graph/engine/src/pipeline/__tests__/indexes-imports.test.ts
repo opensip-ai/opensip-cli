@@ -4,7 +4,9 @@ import { buildIndexes } from '../indexes.js';
 
 import type { Catalog, FunctionOccurrence } from '../../types.js';
 
-function occ(over: Partial<FunctionOccurrence> & { bodyHash: string; filePath: string }): FunctionOccurrence {
+function occ(
+  over: Partial<FunctionOccurrence> & { bodyHash: string; filePath: string },
+): FunctionOccurrence {
   return {
     simpleName: 'f',
     qualifiedName: `${over.filePath}.f`,
@@ -25,7 +27,14 @@ function occ(over: Partial<FunctionOccurrence> & { bodyHash: string; filePath: s
 }
 
 function catalogOf(functions: Record<string, FunctionOccurrence[]>): Catalog {
-  return { version: '3.0', tool: 'graph', language: 'typescript', builtAt: 'x', cacheKey: 'k', functions };
+  return {
+    version: '3.0',
+    tool: 'graph',
+    language: 'typescript',
+    builtAt: 'x',
+    cacheKey: 'k',
+    functions,
+  };
 }
 
 function call(to: string): NonNullable<FunctionOccurrence['calls']>[number] {
@@ -43,21 +52,41 @@ describe('buildIndexes — occurrencesByHash + importedPackagesByFile', () => {
 
   it('derives imported packages from module-init dependencies', () => {
     const callerMi: FunctionOccurrence = {
-      ...occ({ bodyHash: 'MI_A', filePath: 'packages/pkg-a/src/index.ts', simpleName: '<module-init>' }),
+      ...occ({
+        bodyHash: 'MI_A',
+        filePath: 'packages/pkg-a/src/index.ts',
+        simpleName: '<module-init>',
+      }),
       kind: 'module-init',
       dependencies: [{ to: ['MI_B'], specifier: '@scope/pkgb', line: 1, column: 0 }],
     };
-    const targetMi = occ({ bodyHash: 'MI_B', filePath: 'packages/pkg-b/src/index.ts', simpleName: '<module-init>' });
+    const targetMi = occ({
+      bodyHash: 'MI_B',
+      filePath: 'packages/pkg-b/src/index.ts',
+      simpleName: '<module-init>',
+    });
     const idx = buildIndexes(catalogOf({ '<module-init>': [callerMi, targetMi] }));
-    expect([...(idx.importedPackagesByFile.get('packages/pkg-a/src/index.ts') ?? [])]).toEqual(['pkg-b']);
+    expect([...(idx.importedPackagesByFile.get('packages/pkg-a/src/index.ts') ?? [])]).toEqual([
+      'pkg-b',
+    ]);
     // a file with no resolved imports gets no entry
     expect(idx.importedPackagesByFile.has('packages/pkg-b/src/index.ts')).toBe(false);
   });
 
   it('unions call-edge adjacency across body-twins (ADR-0003 reachability)', () => {
     // Same body hash H in two files, each calling a DIFFERENT in-catalog target.
-    const twinA = occ({ bodyHash: 'H', filePath: 'packages/a/src/x.ts', simpleName: 'twin', calls: [call('TA')] });
-    const twinB = occ({ bodyHash: 'H', filePath: 'packages/b/src/x.ts', simpleName: 'twin', calls: [call('TB')] });
+    const twinA = occ({
+      bodyHash: 'H',
+      filePath: 'packages/a/src/x.ts',
+      simpleName: 'twin',
+      calls: [call('TA')],
+    });
+    const twinB = occ({
+      bodyHash: 'H',
+      filePath: 'packages/b/src/x.ts',
+      simpleName: 'twin',
+      calls: [call('TB')],
+    });
     const ta = occ({ bodyHash: 'TA', filePath: 'packages/a/src/y.ts', simpleName: 'ta' });
     const tb = occ({ bodyHash: 'TB', filePath: 'packages/b/src/y.ts', simpleName: 'tb' });
     const idx = buildIndexes(catalogOf({ twin: [twinA, twinB], ta: [ta], tb: [tb] }));
@@ -69,16 +98,30 @@ describe('buildIndexes — occurrencesByHash + importedPackagesByFile', () => {
 
   it('unions imports when a file has multiple dependency targets', () => {
     const callerMi: FunctionOccurrence = {
-      ...occ({ bodyHash: 'MI_A', filePath: 'packages/pkg-a/src/index.ts', simpleName: '<module-init>' }),
+      ...occ({
+        bodyHash: 'MI_A',
+        filePath: 'packages/pkg-a/src/index.ts',
+        simpleName: '<module-init>',
+      }),
       kind: 'module-init',
       dependencies: [
         { to: ['MI_B'], specifier: '@scope/pkgb', line: 1, column: 0 },
         { to: ['MI_C'], specifier: '@scope/pkgc', line: 2, column: 0 },
       ],
     };
-    const miB = occ({ bodyHash: 'MI_B', filePath: 'packages/pkg-b/src/index.ts', simpleName: '<module-init>' });
-    const miC = occ({ bodyHash: 'MI_C', filePath: 'packages/pkg-c/src/index.ts', simpleName: '<module-init>' });
+    const miB = occ({
+      bodyHash: 'MI_B',
+      filePath: 'packages/pkg-b/src/index.ts',
+      simpleName: '<module-init>',
+    });
+    const miC = occ({
+      bodyHash: 'MI_C',
+      filePath: 'packages/pkg-c/src/index.ts',
+      simpleName: '<module-init>',
+    });
     const idx = buildIndexes(catalogOf({ '<module-init>': [callerMi, miB, miC] }));
-    expect([...(idx.importedPackagesByFile.get('packages/pkg-a/src/index.ts') ?? [])].sort()).toEqual(['pkg-b', 'pkg-c']);
+    expect(
+      [...(idx.importedPackagesByFile.get('packages/pkg-a/src/index.ts') ?? [])].sort(),
+    ).toEqual(['pkg-b', 'pkg-c']);
   });
 });

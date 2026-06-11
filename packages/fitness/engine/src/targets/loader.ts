@@ -10,17 +10,21 @@ import {
   checkOverridesSchema,
   globalExcludesSchema,
   targetsRecordSchema,
-} from '@opensip-tools/config'
-import { PROJECT_CONFIG_FILENAME, ValidationError, readYamlFileOrThrow, resolveProjectConfigPath } from '@opensip-tools/core'
-import { z } from 'zod'
+} from '@opensip-tools/config';
+import {
+  PROJECT_CONFIG_FILENAME,
+  ValidationError,
+  readYamlFileOrThrow,
+  resolveProjectConfigPath,
+} from '@opensip-tools/core';
+import { z } from 'zod';
 
+import { TargetRegistry } from './target-registry.js';
 
-import { TargetRegistry } from './target-registry.js'
+import type { TargetConfig, TargetsConfig } from './types.js';
 
-import type { TargetConfig, TargetsConfig } from './types.js'
-
-const YAML_FILENAME = PROJECT_CONFIG_FILENAME
-const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**']
+const YAML_FILENAME = PROJECT_CONFIG_FILENAME;
+const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**'];
 
 // =============================================================================
 // YAML schemas
@@ -31,20 +35,22 @@ const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**']
 // registers as document-level declarations. This loader composes them with the
 // fitness-local `plugins` block (a discovery concern, out of the targeting
 // migration) and adds the registry build + cross-validation runtime below.
-const PluginsSchema = z.object({
-  fit: z.array(z.string()).optional(),
-  sim: z.array(z.string()).optional(),
-  lang: z.array(z.string()).optional(),
-  checkPackages: z.array(z.string()).optional(),
-  packageScopes: z.array(z.string()).optional(),
-}).optional()
+const PluginsSchema = z
+  .object({
+    fit: z.array(z.string()).optional(),
+    sim: z.array(z.string()).optional(),
+    lang: z.array(z.string()).optional(),
+    checkPackages: z.array(z.string()).optional(),
+    packageScopes: z.array(z.string()).optional(),
+  })
+  .optional();
 
 const TargetsFileSchema = z.object({
   targets: targetsRecordSchema,
   globalExcludes: globalExcludesSchema.optional(),
   checkOverrides: checkOverridesSchema.optional(),
   plugins: PluginsSchema,
-})
+});
 
 // =============================================================================
 // Build registry + config from parsed data
@@ -53,19 +59,29 @@ const TargetsFileSchema = z.object({
 /** @throws {ValidationError} When checkOverrides references an unknown target */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- inherent complexity: registry population + cross-validation
 function buildFromParsed(
-  targets: Record<string, { description: string; include: readonly string[]; exclude?: readonly string[]; tags?: readonly string[]; languages?: readonly string[]; concerns?: readonly string[] }>,
+  targets: Record<
+    string,
+    {
+      description: string;
+      include: readonly string[];
+      exclude?: readonly string[];
+      tags?: readonly string[];
+      languages?: readonly string[];
+      concerns?: readonly string[];
+    }
+  >,
   rawGlobalExcludes: readonly string[] | undefined,
   rawCheckOverrides: Record<string, string | readonly string[]> | undefined,
   sourceLabel: string,
   rawPlugins?: {
-    fit?: readonly string[]
-    sim?: readonly string[]
-    lang?: readonly string[]
-    checkPackages?: readonly string[]
-    packageScopes?: readonly string[]
+    fit?: readonly string[];
+    sim?: readonly string[];
+    lang?: readonly string[];
+    checkPackages?: readonly string[];
+    packageScopes?: readonly string[];
   },
 ): { registry: TargetRegistry; config: TargetsConfig } {
-  const registry = new TargetRegistry()
+  const registry = new TargetRegistry();
 
   for (const [name, entry] of Object.entries(targets)) {
     const config: TargetConfig = Object.freeze({
@@ -76,25 +92,29 @@ function buildFromParsed(
       ...(entry.tags && { tags: Object.freeze([...entry.tags]) }),
       ...(entry.languages && { languages: Object.freeze([...entry.languages]) }),
       ...(entry.concerns && { concerns: Object.freeze([...entry.concerns]) }),
-    })
-    registry.register(Object.freeze({ config }))
+    });
+    registry.register(Object.freeze({ config }));
   }
 
-  const checkOverrides: Record<string, string | readonly string[]> = {}
+  const checkOverrides: Record<string, string | readonly string[]> = {};
   if (rawCheckOverrides) {
     for (const [checkSlug, targetRef] of Object.entries(rawCheckOverrides)) {
-      const targetNames = typeof targetRef === 'string' ? [targetRef] : targetRef
+      const targetNames = typeof targetRef === 'string' ? [targetRef] : targetRef;
       for (const name of targetNames) {
         if (!registry.has(name)) {
           // @fitness-ignore-next-line result-pattern-consistency -- infrastructure boundary, throw is appropriate
           throw new ValidationError(
             `${sourceLabel}: checkOverrides['${checkSlug}'] references unknown target '${name}'. ` +
-            `Available targets: ${registry.getAll().map((t) => t.config.name).join(', ')}`,
+              `Available targets: ${registry
+                .getAll()
+                .map((t) => t.config.name)
+                .join(', ')}`,
             { code: 'ERRORS.TARGETS.UNKNOWN_TARGET' },
-          )
+          );
         }
       }
-      checkOverrides[checkSlug] = typeof targetRef === 'string' ? targetRef : Object.freeze([...targetRef])
+      checkOverrides[checkSlug] =
+        typeof targetRef === 'string' ? targetRef : Object.freeze([...targetRef]);
     }
   }
 
@@ -103,18 +123,22 @@ function buildFromParsed(
         ...(rawPlugins.fit && { fit: Object.freeze([...rawPlugins.fit]) }),
         ...(rawPlugins.sim && { sim: Object.freeze([...rawPlugins.sim]) }),
         ...(rawPlugins.lang && { lang: Object.freeze([...rawPlugins.lang]) }),
-        ...(rawPlugins.checkPackages && { checkPackages: Object.freeze([...rawPlugins.checkPackages]) }),
-        ...(rawPlugins.packageScopes && { packageScopes: Object.freeze([...rawPlugins.packageScopes]) }),
+        ...(rawPlugins.checkPackages && {
+          checkPackages: Object.freeze([...rawPlugins.checkPackages]),
+        }),
+        ...(rawPlugins.packageScopes && {
+          packageScopes: Object.freeze([...rawPlugins.packageScopes]),
+        }),
       })
-    : undefined
+    : undefined;
 
   const config: TargetsConfig = Object.freeze({
     globalExcludes: Object.freeze(rawGlobalExcludes ? [...rawGlobalExcludes] : []),
     checkOverrides: Object.freeze(checkOverrides),
     ...(plugins && { plugins }),
-  })
+  });
 
-  return { registry, config }
+  return { registry, config };
 }
 
 // =============================================================================
@@ -131,17 +155,15 @@ function loadYamlConfig(filePath: string): { registry: TargetRegistry; config: T
   // Finding G — completes the round-2 migration that signalers/loader
   // already adopted). Raises `SystemError` for oversized files and
   // `ValidationError` for missing / unreadable / malformed YAML.
-  const parsed = readYamlFileOrThrow(filePath, { loader: 'targets' })
+  const parsed = readYamlFileOrThrow(filePath, { loader: 'targets' });
 
-  const result = TargetsFileSchema.safeParse(parsed)
+  const result = TargetsFileSchema.safeParse(parsed);
   if (!result.success) {
-    const issues = result.error.issues
-      .map((i) => `  ${i.path.join('.')}: ${i.message}`)
-      .join('\n')
+    const issues = result.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
     // @fitness-ignore-next-line result-pattern-consistency -- infrastructure boundary, throw is appropriate
     throw new ValidationError(`${YAML_FILENAME} validation failed:\n${issues}`, {
       code: 'ERRORS.TARGETS.VALIDATION_FAILED',
-    })
+    });
   }
 
   return buildFromParsed(
@@ -150,7 +172,7 @@ function loadYamlConfig(filePath: string): { registry: TargetRegistry; config: T
     result.data.checkOverrides,
     YAML_FILENAME,
     result.data.plugins,
-  )
+  );
 }
 
 // =============================================================================
@@ -167,6 +189,6 @@ export function loadTargetsConfig(
   rootDir: string,
   explicitPath?: string,
 ): { registry: TargetRegistry; config: TargetsConfig } {
-  const yamlPath = resolveProjectConfigPath(rootDir, explicitPath)
-  return loadYamlConfig(yamlPath)
+  const yamlPath = resolveProjectConfigPath(rootDir, explicitPath);
+  return loadYamlConfig(yamlPath);
 }

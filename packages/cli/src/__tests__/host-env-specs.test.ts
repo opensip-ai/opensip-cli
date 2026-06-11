@@ -7,7 +7,13 @@
 import { GRAPH_ENV_SPECS } from '@opensip-tools/graph';
 import { afterEach, describe, it, expect } from 'vitest';
 
-import { BUNDLED_TOOL_ENV_SPECS, CLI_ENV_SPECS, PRE_SCOPE_ENV_SPECS, describeHostEnv, hostEnv } from '../env/host-env-specs.js';
+import {
+  BUNDLED_TOOL_ENV_SPECS,
+  CLI_ENV_SPECS,
+  PRE_SCOPE_ENV_SPECS,
+  describeHostEnv,
+  hostEnv,
+} from '../env/host-env-specs.js';
 
 const TOUCHED = ['OPENSIP_NO_UPDATE', 'NO_UPDATE_NOTIFIER', 'OTEL_EXPORTER_OTLP_ENDPOINT'];
 
@@ -50,7 +56,14 @@ describe('describeHostEnv', () => {
 
   it('declares the pre-scope allowance vars (theme colours + NODE_OPTIONS)', () => {
     const c = PRE_SCOPE_ENV_SPECS.map((s) => s.canonical);
-    expect(c).toEqual(['NO_COLOR', 'FORCE_COLOR', 'COLORTERM', 'TERM', 'TERM_PROGRAM', 'NODE_OPTIONS']);
+    expect(c).toEqual([
+      'NO_COLOR',
+      'FORCE_COLOR',
+      'COLORTERM',
+      'TERM',
+      'TERM_PROGRAM',
+      'NODE_OPTIONS',
+    ]);
   });
 });
 
@@ -83,7 +96,10 @@ describe('hostEnv reads (CLI infra)', () => {
   it('OPENSIP_TOOLS_SKIP_BUNDLED coerces to a trimmed id list (default empty)', () => {
     expect(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_SKIP_BUNDLED')).toEqual([]);
     process.env.OPENSIP_TOOLS_SKIP_BUNDLED = ' fitness , graph ';
-    expect(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_SKIP_BUNDLED')).toEqual(['fitness', 'graph']);
+    expect(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_SKIP_BUNDLED')).toEqual([
+      'fitness',
+      'graph',
+    ]);
     delete process.env.OPENSIP_TOOLS_SKIP_BUNDLED;
   });
 

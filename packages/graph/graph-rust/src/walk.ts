@@ -68,7 +68,6 @@ import type {
 } from '@opensip-tools/graph';
 import type { Node } from '@opensip-tools/tree-sitter';
 
-
 const TEST_PATH_RE = /(?:^|\/)tests?\//;
 const TEST_FILE_NAME_RE = /(?:^|\/)[^/]*_test\.rs$/;
 const GENERATED_PATH_RE = /\btarget\/|\.generated\./;
@@ -226,11 +225,7 @@ function pickUsePathNode(decl: Node): Node | null {
  * groups. The function dispatches by node type and emits one
  * `DependencySiteRecord` per terminal path.
  */
-function emitFromUseSegment(
-  node: Node,
-  prefix: readonly string[],
-  ctx: UseSiteContext,
-): void {
+function emitFromUseSegment(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
   switch (node.type) {
     case 'scoped_identifier':
     case 'identifier':
@@ -298,9 +293,10 @@ function emitFromScopedUseList(node: Node, prefix: readonly string[], ctx: UseSi
   emitUseListItems(split.list, newPrefix, ctx);
 }
 
-function splitScopedUseListChildren(
-  node: Node,
-): { readonly pathSegs: readonly string[]; readonly list: Node | null } {
+function splitScopedUseListChildren(node: Node): {
+  readonly pathSegs: readonly string[];
+  readonly list: Node | null;
+} {
   let pathSegs: readonly string[] = [];
   let list: Node | null = null;
   for (const c of namedChildrenOf(node)) {
@@ -347,7 +343,12 @@ function emitFromUnknownUseShape(node: Node, prefix: readonly string[], ctx: Use
  * `super`, `self`. Returns `[]` for unknown shapes (caller skips).
  */
 function decodePathSegments(node: Node): readonly string[] {
-  if (node.type === 'identifier' || node.type === 'crate' || node.type === 'super' || node.type === 'self') {
+  if (
+    node.type === 'identifier' ||
+    node.type === 'crate' ||
+    node.type === 'super' ||
+    node.type === 'self'
+  ) {
     return [node.text];
   }
   if (node.type === 'scoped_identifier') {
@@ -488,9 +489,10 @@ function buildFunctionOccurrence(
   const isTest = ctx.fileInTestFile || hasTestAttribute(node);
   const kind = classifyRustFunctionKind(name, frame.enclosingImpl);
   const qualifiedBase = ctx.filePathProjectRel.replace(/\.rs$/, '').split('/').join('::');
-  const qualifiedName = frame.enclosingImpl === null
-    ? `${qualifiedBase}::${name}`
-    : `${qualifiedBase}::${frame.enclosingImpl}::${name}`;
+  const qualifiedName =
+    frame.enclosingImpl === null
+      ? `${qualifiedBase}::${name}`
+      : `${qualifiedBase}::${frame.enclosingImpl}::${name}`;
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
@@ -512,10 +514,7 @@ function buildFunctionOccurrence(
   };
 }
 
-function buildClosureOccurrence(
-  node: Node,
-  ctx: WalkCtx,
-): FunctionOccurrence | null {
+function buildClosureOccurrence(node: Node, ctx: WalkCtx): FunctionOccurrence | null {
   const digest = digestRustBody(ctx.file.source.slice(node.startIndex, node.endIndex));
   const startLine = node.startPosition.row + 1;
   const startCol = node.startPosition.column;
@@ -576,7 +575,9 @@ function extractParams(node: Node): readonly { name: string; optional: boolean; 
 // (sonarjs/no-identical-functions).
 const extractClosureParams = extractParams;
 
-function collectParamEntries(params: Node): readonly { name: string; optional: boolean; rest: boolean }[] {
+function collectParamEntries(
+  params: Node,
+): readonly { name: string; optional: boolean; rest: boolean }[] {
   const out: { name: string; optional: boolean; rest: boolean }[] = [];
   for (const child of namedChildrenOf(params)) {
     const param = decodeParam(child);
@@ -663,4 +664,3 @@ function classifyRustFunctionKind(
   if (name === 'new') return 'constructor';
   return 'method';
 }
-

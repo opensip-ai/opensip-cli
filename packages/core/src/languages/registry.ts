@@ -1,10 +1,10 @@
 // @fitness-ignore-file batch-operation-limits -- iterates bounded collections (registered language adapters and the small file-extension lookup map)
-import { extname } from 'node:path'
+import { extname } from 'node:path';
 
-import { logger } from '../lib/logger.js'
-import { Registry, type Registerable } from '../lib/registry.js'
+import { logger } from '../lib/logger.js';
+import { Registry, type Registerable } from '../lib/registry.js';
 
-import type { LanguageAdapter } from './adapter.js'
+import type { LanguageAdapter } from './adapter.js';
 
 /**
  * Registry of language adapters. Mirrors the shape of `ToolRegistry`:
@@ -19,9 +19,9 @@ import type { LanguageAdapter } from './adapter.js'
  * `{ id, name: id, adapter }` envelopes (same pattern as ToolRegistry).
  */
 interface RegisterableLanguageAdapter extends Registerable {
-  readonly id: string
-  readonly name: string
-  readonly adapter: LanguageAdapter
+  readonly id: string;
+  readonly name: string;
+  readonly adapter: LanguageAdapter;
 }
 
 /** Per-run registry of language adapters, indexed by id and file extension. */
@@ -30,29 +30,29 @@ export class LanguageRegistry {
     module: 'core:languages',
     duplicatePolicy: 'warn-first-wins',
     evtPrefix: 'lang.registry',
-  })
-  private readonly byExtension = new Map<string, LanguageAdapter>()
+  });
+  private readonly byExtension = new Map<string, LanguageAdapter>();
   /**
    * Alias → canonical id index. Populated alongside the inner registry
    * during `register`. Lets `canonicalize` map an alias like `'c'` or
    * `'rs'` back to the registered adapter id (`'cpp'`, `'rust'`).
    */
-  private readonly aliasIndex = new Map<string, string>()
+  private readonly aliasIndex = new Map<string, string>();
 
   register(adapter: LanguageAdapter): void {
-    const isDuplicate = this.inner.getById(adapter.id) !== undefined
+    const isDuplicate = this.inner.getById(adapter.id) !== undefined;
     // Inner registry emits the structured warn event on duplicate;
     // it returns silently after the warn (warn-first-wins policy).
-    this.inner.register({ id: adapter.id, name: adapter.id, adapter })
-    if (isDuplicate) return
-    this.indexExtensions(adapter)
-    this.indexAliases(adapter)
+    this.inner.register({ id: adapter.id, name: adapter.id, adapter });
+    if (isDuplicate) return;
+    this.indexExtensions(adapter);
+    this.indexAliases(adapter);
   }
 
   private indexExtensions(adapter: LanguageAdapter): void {
     for (const ext of adapter.fileExtensions) {
-      const normalized = ext.toLowerCase()
-      const existing = this.byExtension.get(normalized)
+      const normalized = ext.toLowerCase();
+      const existing = this.byExtension.get(normalized);
       if (existing && existing.id !== adapter.id) {
         logger.warn({
           evt: 'lang.registry.extension.collision',
@@ -61,17 +61,17 @@ export class LanguageRegistry {
           incumbent: existing.id,
           challenger: adapter.id,
           msg: `Extension ${normalized} already claimed by ${existing.id} — keeping incumbent`,
-        })
-        continue
+        });
+        continue;
       }
-      this.byExtension.set(normalized, adapter)
+      this.byExtension.set(normalized, adapter);
     }
   }
 
   private indexAliases(adapter: LanguageAdapter): void {
-    if (!adapter.aliases) return
+    if (!adapter.aliases) return;
     for (const alias of adapter.aliases) {
-      const normalized = alias.toLowerCase()
+      const normalized = alias.toLowerCase();
       // An alias that collides with another adapter's canonical id is
       // ignored — the canonical id always wins. Same for an alias
       // already claimed by a previously-registered adapter.
@@ -83,10 +83,10 @@ export class LanguageRegistry {
           incumbent: normalized,
           challenger: adapter.id,
           msg: `Alias ${normalized} already used as a canonical id — ignoring on ${adapter.id}`,
-        })
-        continue
+        });
+        continue;
       }
-      const existing = this.aliasIndex.get(normalized)
+      const existing = this.aliasIndex.get(normalized);
       if (existing && existing !== adapter.id) {
         logger.warn({
           evt: 'lang.registry.alias.collision',
@@ -95,21 +95,21 @@ export class LanguageRegistry {
           incumbent: existing,
           challenger: adapter.id,
           msg: `Alias ${normalized} already claimed by ${existing} — keeping incumbent`,
-        })
-        continue
+        });
+        continue;
       }
-      this.aliasIndex.set(normalized, adapter.id)
+      this.aliasIndex.set(normalized, adapter.id);
     }
   }
 
   get(id: string): LanguageAdapter | undefined {
-    return this.inner.getById(id)?.adapter
+    return this.inner.getById(id)?.adapter;
   }
 
   forFile(filePath: string): LanguageAdapter | undefined {
-    const ext = extname(filePath).toLowerCase()
-    if (!ext) return undefined
-    return this.byExtension.get(ext)
+    const ext = extname(filePath).toLowerCase();
+    if (!ext) return undefined;
+    return this.byExtension.get(ext);
   }
 
   /**
@@ -125,26 +125,26 @@ export class LanguageRegistry {
    * `languages: ['c']` matches a check scoped to `cpp`.
    */
   canonicalize(idOrAlias: string): string | undefined {
-    const normalized = idOrAlias.toLowerCase()
-    if (this.inner.getById(normalized)) return normalized
-    return this.aliasIndex.get(normalized)
+    const normalized = idOrAlias.toLowerCase();
+    if (this.inner.getById(normalized)) return normalized;
+    return this.aliasIndex.get(normalized);
   }
 
   list(): readonly LanguageAdapter[] {
-    return this.inner.getAll().map((r) => r.adapter)
+    return this.inner.getAll().map((r) => r.adapter);
   }
 
   has(id: string): boolean {
-    return this.inner.getById(id) !== undefined
+    return this.inner.getById(id) !== undefined;
   }
 
   get size(): number {
-    return this.inner.size
+    return this.inner.size;
   }
 
   clear(): void {
-    this.inner.clear()
-    this.byExtension.clear()
-    this.aliasIndex.clear()
+    this.inner.clear();
+    this.byExtension.clear();
+    this.aliasIndex.clear();
   }
 }

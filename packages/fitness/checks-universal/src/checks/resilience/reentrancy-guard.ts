@@ -4,20 +4,21 @@
  * @fileoverview Detects boolean flag reentrancy guards that should use counters or mutexes
  */
 
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness';
 
 /**
  * Pattern for detecting module-scoped boolean state flags used as reentrancy guards.
  * Matches: let serverRunning = false, let isRunning = false, etc.
  */
-const BOOLEAN_FLAG_PATTERN = /^(?:let|var)\s+(\w+(?:Running|Started|Active|Initialized|Locked))\s*(?::\s*boolean\s*)?=\s*false/gm
+const BOOLEAN_FLAG_PATTERN =
+  /^(?:let|var)\s+(\w+(?:Running|Started|Active|Initialized|Locked))\s*(?::\s*boolean\s*)?=\s*false/gm;
 
 /**
  * Pattern for early return based on the flag (reentrancy guard)
  */
 function createFlagCheckPattern(flagName: string): RegExp {
   // @fitness-ignore-next-line semgrep-scan -- non-literal RegExp is intentional; flagName is extracted from regex match on source code identifiers (\w+), not user input
-  return new RegExp(String.raw`if\s*\(\s*${flagName}\s*\)\s*(?:return|\{)`)
+  return new RegExp(String.raw`if\s*\(\s*${flagName}\s*\)\s*(?:return|\{)`);
 }
 
 /**
@@ -49,29 +50,39 @@ export const reentrancyGuard = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Skip test files
-    if (filePath.includes('.test.') || filePath.includes('.spec.') || filePath.includes('__tests__')) {
-      return violations
+    if (
+      filePath.includes('.test.') ||
+      filePath.includes('.spec.') ||
+      filePath.includes('__tests__')
+    ) {
+      return violations;
     }
 
     // Quick check
-    if (!content.includes('Running') && !content.includes('Started') && !content.includes('Active') && !content.includes('Initialized') && !content.includes('Locked')) {
-      return violations
+    if (
+      !content.includes('Running') &&
+      !content.includes('Started') &&
+      !content.includes('Active') &&
+      !content.includes('Initialized') &&
+      !content.includes('Locked')
+    ) {
+      return violations;
     }
 
-    BOOLEAN_FLAG_PATTERN.lastIndex = 0
-    let match
+    BOOLEAN_FLAG_PATTERN.lastIndex = 0;
+    let match;
     while ((match = BOOLEAN_FLAG_PATTERN.exec(content)) !== null) {
-      const flagName = match[1]
-      if (!flagName) continue
+      const flagName = match[1];
+      if (!flagName) continue;
 
       // Check if there's a corresponding guard pattern
-      const guardPattern = createFlagCheckPattern(flagName)
-      if (!guardPattern.test(content)) continue
+      const guardPattern = createFlagCheckPattern(flagName);
+      if (!guardPattern.test(content)) continue;
 
-      const lineNumber = getLineNumber(content, match.index)
+      const lineNumber = getLineNumber(content, match.index);
 
       violations.push({
         line: lineNumber,
@@ -83,9 +94,9 @@ export const reentrancyGuard = defineCheck({
         match: match[0],
         type: 'boolean-reentrancy-guard',
         filePath,
-      })
+      });
     }
 
-    return violations
+    return violations;
   },
-})
+});

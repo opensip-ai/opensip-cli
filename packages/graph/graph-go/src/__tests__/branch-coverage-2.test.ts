@@ -56,7 +56,11 @@ function discoverAndParse(): {
     compilerOptions: discovery.compilerOptions,
     resolutionMode: 'exact',
   });
-  return { projectDirAbs: discovery.projectDirAbs, files: discovery.files, project: parsed.project };
+  return {
+    projectDirAbs: discovery.projectDirAbs,
+    files: discovery.files,
+    project: parsed.project,
+  };
 }
 
 function walk(): ReturnType<typeof goGraphAdapter.walkProject> {
@@ -98,11 +102,7 @@ describe('graph-go branch coverage (round 2)', () => {
     // A backtick-quoted import path is not a valid interpreted string,
     // so unquoteGoStringLiteral returns null and pushImportSpec bails out
     // via the `specifier === null` branch — no dependency site emitted.
-    writeFileSync(
-      join(dir, 'main.go'),
-      'package main\nimport `fmt`\nfunc main() {}\n',
-      'utf8',
-    );
+    writeFileSync(join(dir, 'main.go'), 'package main\nimport `fmt`\nfunc main() {}\n', 'utf8');
     const out = walk();
     // The malformed raw-string import yields zero dependency sites.
     expect(out.dependencySites).toEqual([]);

@@ -74,9 +74,7 @@ function makeFixtureTool(
     commands: [{ name: cmdName, description: 'fixture command', aliases: opts.aliases }],
     initialize: () => {
       events.push(`initialize:${id}`);
-      return opts.throwOnInit
-        ? Promise.reject(new Error('init boom'))
-        : Promise.resolve();
+      return opts.throwOnInit ? Promise.reject(new Error('init boom')) : Promise.resolve();
     },
     // 3.0.0: the command surface is the declarative commandSpec (register() gone).
     // The handler records the action; the host mounts it + the `--cwd` common flag.
@@ -153,11 +151,7 @@ describe('Tool.initialize() wiring (preAction)', () => {
     await program.parseAsync(['node', 'cli', 'memo-cmd', '--cwd', FIXTURE], { from: 'node' });
 
     // initialize once total; action twice.
-    expect(events).toEqual([
-      'initialize:memo-tool',
-      'action:memo-cmd',
-      'action:memo-cmd',
-    ]);
+    expect(events).toEqual(['initialize:memo-tool', 'action:memo-cmd', 'action:memo-cmd']);
   });
 
   it('fails the run closed (exit 1) when initialize() throws, without running the action', async () => {
@@ -172,7 +166,11 @@ describe('Tool.initialize() wiring (preAction)', () => {
     // installs no catch boundary).
     await expect(
       program.parseAsync(['node', 'cli', 'boom-cmd', '--cwd', FIXTURE], { from: 'node' }),
-    ).rejects.toMatchObject({ name: 'BootstrapError', exitCode: 1, message: expect.stringContaining('failed to initialize') });
+    ).rejects.toMatchObject({
+      name: 'BootstrapError',
+      exitCode: 1,
+      message: expect.stringContaining('failed to initialize'),
+    });
 
     // initialize attempted, but the action never ran.
     expect(events).toEqual(['initialize:boom-tool']);

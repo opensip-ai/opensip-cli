@@ -6,22 +6,22 @@
  * Used by all checks during a run for efficient file access.
  */
 
-import * as fs from 'node:fs/promises'
-import * as path from 'node:path'
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 
-import { ValidationError } from '@opensip-tools/core'
-import { glob } from 'glob'
+import { ValidationError } from '@opensip-tools/core';
+import { glob } from 'glob';
 
 /**
  * Prewarm statistics.
  */
 interface PrewarmStats {
   /** Number of files loaded */
-  readonly filesLoaded: number
+  readonly filesLoaded: number;
   /** Duration in milliseconds */
-  readonly durationMs: number
+  readonly durationMs: number;
   /** Total bytes loaded */
-  readonly totalBytes: number
+  readonly totalBytes: number;
 }
 
 /**
@@ -32,13 +32,13 @@ interface PrewarmStats {
  * 2. Use get() to read file contents (falls back to disk if not cached)
  * 3. Call clear() after checks complete
  */
-const PREWARM_BATCH_SIZE = 100
+const PREWARM_BATCH_SIZE = 100;
 
 class FileCache {
-  private readonly cache = new Map<string, string>()
-  private _prewarmed = false
-  private _cleared = false
-  private _autoClearTimer: ReturnType<typeof setTimeout> | null = null
+  private readonly cache = new Map<string, string>();
+  private _prewarmed = false;
+  private _cleared = false;
+  private _autoClearTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Prewarm the cache by loading all files matching patterns.
@@ -47,11 +47,11 @@ class FileCache {
    * @returns Prewarm statistics
    */
   async prewarm(cwd: string, patterns: readonly string[]): Promise<PrewarmStats> {
-    const start = Date.now()
-    let totalBytes = 0
+    const start = Date.now();
+    let totalBytes = 0;
 
     // Find all matching files for content caching
-    const allFiles = new Set<string>()
+    const allFiles = new Set<string>();
     for (const pattern of patterns) {
       // @fitness-ignore-next-line performance-anti-patterns -- sequential glob calls: each pattern must resolve before deduplication
       const files = await glob(pattern, {
@@ -59,47 +59,47 @@ class FileCache {
         absolute: true,
         nodir: true,
         ignore: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
-      })
+      });
       for (const file of files) {
-        allFiles.add(file)
+        allFiles.add(file);
       }
     }
 
     // Load file contents in parallel batches
-    const files = [...allFiles]
+    const files = [...allFiles];
 
     for (let i = 0; i < files.length; i += PREWARM_BATCH_SIZE) {
-      const batch = files.slice(i, i + PREWARM_BATCH_SIZE)
+      const batch = files.slice(i, i + PREWARM_BATCH_SIZE);
       // @fitness-ignore-next-line performance-anti-patterns -- intentional batching: limits concurrent file reads to control memory pressure
       const results = await Promise.allSettled(
         batch.map(async (filePath) => {
-          const stats = await fs.stat(filePath)
+          const stats = await fs.stat(filePath);
           if (stats.isDirectory()) {
-            return null
+            return null;
           }
-          const content = await fs.readFile(filePath, 'utf8')
-          return { filePath, content }
+          const content = await fs.readFile(filePath, 'utf8');
+          return { filePath, content };
         }),
-      )
+      );
 
       for (const result of results) {
         if (result.status === 'fulfilled' && result.value !== null) {
-          this.cache.set(result.value.filePath, result.value.content)
-          totalBytes += result.value.content.length
+          this.cache.set(result.value.filePath, result.value.content);
+          totalBytes += result.value.content.length;
         }
       }
     }
 
-    this._prewarmed = true
-    this._cleared = false
-    this.scheduleAutoClear()
-    const durationMs = Date.now() - start
+    this._prewarmed = true;
+    this._cleared = false;
+    this.scheduleAutoClear();
+    const durationMs = Date.now() - start;
 
     return {
       filesLoaded: this.cache.size,
       durationMs,
       totalBytes,
-    }
+    };
   }
 
   /**
@@ -108,46 +108,48 @@ class FileCache {
    */
   /** Synchronously check if a file is in cache. Returns content or undefined. */
   getCached(filePath: string): string | undefined {
-    const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath)
-    return this.cache.get(absolutePath)
+    const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+    return this.cache.get(absolutePath);
   }
 
   async get(filePath: string): Promise<string> {
-    const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath)
+    const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
 
-    const cached = this.cache.get(absolutePath)
+    const cached = this.cache.get(absolutePath);
     if (cached !== undefined) {
-      return cached
+      return cached;
     }
 
-    const stats = await fs.stat(absolutePath)
+    const stats = await fs.stat(absolutePath);
     if (stats.isDirectory()) {
       // @fitness-ignore-next-line result-pattern-consistency -- internal method, exceptions propagate to public Result boundary
-      throw new ValidationError(`Cannot read directory as file: ${absolutePath}`, { code: 'VALIDATION.FITNESS.DIRECTORY_AS_FILE' })
+      throw new ValidationError(`Cannot read directory as file: ${absolutePath}`, {
+        code: 'VALIDATION.FITNESS.DIRECTORY_AS_FILE',
+      });
     }
-    const content = await fs.readFile(absolutePath, 'utf8')
+    const content = await fs.readFile(absolutePath, 'utf8');
 
-    this.cache.set(absolutePath, content)
+    this.cache.set(absolutePath, content);
 
-    return content
+    return content;
   }
 
   /**
    * Check if a file exists (in cache or on disk).
    */
   async exists(filePath: string): Promise<boolean> {
-    const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath)
+    const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
 
     if (this.cache.has(absolutePath)) {
-      return true
+      return true;
     }
 
     try {
-      await fs.access(absolutePath)
-      return true
+      await fs.access(absolutePath);
+      return true;
     } catch {
       // @swallow-ok File access check failed — treat as not accessible
-      return false
+      return false;
     }
   }
 
@@ -155,12 +157,12 @@ class FileCache {
    * Clear the cache. Must be called after checks complete.
    */
   clear(): void {
-    this.cache.clear()
-    this._prewarmed = false
-    this._cleared = true
+    this.cache.clear();
+    this._prewarmed = false;
+    this._cleared = true;
     if (this._autoClearTimer) {
-      clearTimeout(this._autoClearTimer)
-      this._autoClearTimer = null
+      clearTimeout(this._autoClearTimer);
+      this._autoClearTimer = null;
     }
   }
 
@@ -169,7 +171,7 @@ class FileCache {
    * Returns the paths of all files loaded during prewarm or on-demand reads.
    */
   paths(): readonly string[] {
-    return [...this.cache.keys()].sort()
+    return [...this.cache.keys()].sort();
   }
 
   /**
@@ -178,36 +180,39 @@ class FileCache {
   /** Auto-clear after timeout to prevent memory leaks from missed lifecycle cleanup */
   private scheduleAutoClear(): void {
     if (this._autoClearTimer) {
-      clearTimeout(this._autoClearTimer)
+      clearTimeout(this._autoClearTimer);
     }
-    this._autoClearTimer = setTimeout(() => {
-      /* v8 ignore start -- 10-minute auto-clear timer; not exercised in unit tests */
-      if (this.cache.size > 0) {
-        this.clear()
-      }
-      /* v8 ignore stop */
-    }, 10 * 60 * 1000) // 10 minutes
+    this._autoClearTimer = setTimeout(
+      () => {
+        /* v8 ignore start -- 10-minute auto-clear timer; not exercised in unit tests */
+        if (this.cache.size > 0) {
+          this.clear();
+        }
+        /* v8 ignore stop */
+      },
+      10 * 60 * 1000,
+    ); // 10 minutes
     // Unref so the timer doesn't keep the process alive
-    this._autoClearTimer.unref()
+    this._autoClearTimer.unref();
   }
 
   get stats(): {
-    size: number
-    prewarmed: boolean
-    cleared: boolean
+    size: number;
+    prewarmed: boolean;
+    cleared: boolean;
   } {
     return {
       size: this.cache.size,
       prewarmed: this._prewarmed,
       cleared: this._cleared,
-    }
+    };
   }
 }
 
 /**
  * Shared file cache instance.
  */
-export const fileCache = new FileCache()
+export const fileCache = new FileCache();
 
 /**
  * Default patterns to prewarm for fitness checks.
@@ -219,4 +224,4 @@ export const DEFAULT_PREWARM_PATTERNS = [
   '**/*.jsx',
   '**/*.json',
   '**/*.md',
-] as const
+] as const;

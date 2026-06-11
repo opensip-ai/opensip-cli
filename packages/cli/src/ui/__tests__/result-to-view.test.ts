@@ -12,7 +12,13 @@ function textOf(result: CommandResult): string {
 }
 
 /** Build a fit signal for the table-derivation tests (`source === ruleId === checkSlug`). */
-function fitSignal(over: { source: string; severity: Signal['severity']; message?: string; filePath?: string; line?: number }): Signal {
+function fitSignal(over: {
+  source: string;
+  severity: Signal['severity'];
+  message?: string;
+  filePath?: string;
+  line?: number;
+}): Signal {
   return {
     id: `sig_${over.source}_${String(over.line ?? 0)}`,
     source: over.source,
@@ -42,12 +48,38 @@ describe('resultToView', () => {
         runId: 'r',
         createdAt: '2026-06-04T00:00:00.000Z',
         units: [
-          { slug: 'no-console', passed: false, durationMs: 5, filesValidated: 10, itemType: 'files', ignoredCount: 0 },
-          { slug: 'naming', passed: true, durationMs: 3, filesValidated: 10, itemType: 'files', ignoredCount: 0 },
+          {
+            slug: 'no-console',
+            passed: false,
+            durationMs: 5,
+            filesValidated: 10,
+            itemType: 'files',
+            ignoredCount: 0,
+          },
+          {
+            slug: 'naming',
+            passed: true,
+            durationMs: 3,
+            filesValidated: 10,
+            itemType: 'files',
+            ignoredCount: 0,
+          },
         ],
         signals: [
-          fitSignal({ source: 'no-console', severity: 'high', message: 'console.log', filePath: 'a.ts', line: 3 }),
-          fitSignal({ source: 'no-console', severity: 'high', message: 'console.log', filePath: 'b.ts', line: 4 }),
+          fitSignal({
+            source: 'no-console',
+            severity: 'high',
+            message: 'console.log',
+            filePath: 'a.ts',
+            line: 3,
+          }),
+          fitSignal({
+            source: 'no-console',
+            severity: 'high',
+            message: 'console.log',
+            filePath: 'b.ts',
+            line: 4,
+          }),
           fitSignal({ source: 'naming', severity: 'medium', message: 'bad name' }),
         ],
       }),
@@ -73,12 +105,25 @@ describe('resultToView', () => {
         runId: 'r',
         createdAt: '2026-06-04T00:00:00.000Z',
         units: [{ slug: 'no-console', passed: false, durationMs: 5 }],
-        signals: [fitSignal({ source: 'no-console', severity: 'high', message: 'console.log', filePath: 'a.ts', line: 3 })],
+        signals: [
+          fitSignal({
+            source: 'no-console',
+            severity: 'high',
+            message: 'console.log',
+            filePath: 'a.ts',
+            line: 3,
+          }),
+        ],
       }),
       verboseDetail: {
         kind: 'findings',
         groups: [
-          { title: 'No Console', errorCount: 1, warningCount: 0, findings: [{ severity: 'error', message: 'console.log', location: 'a.ts:3' }] },
+          {
+            title: 'No Console',
+            errorCount: 1,
+            warningCount: 0,
+            findings: [{ severity: 'error', message: 'console.log', location: 'a.ts:3' }],
+          },
         ],
       },
     });
@@ -118,9 +163,18 @@ describe('resultToView', () => {
         createdAt: '2026-06-04T00:00:00.000Z',
         units: [
           { slug: 'loader', passed: false, durationMs: 1, error: 'failed to load' },
-          { slug: 'naming', passed: false, durationMs: 2, filesValidated: 5, itemType: 'files', ignoredCount: 3 },
+          {
+            slug: 'naming',
+            passed: false,
+            durationMs: 2,
+            filesValidated: 5,
+            itemType: 'files',
+            ignoredCount: 3,
+          },
         ],
-        signals: [fitSignal({ source: 'naming', severity: 'medium', message: 'w0', filePath: 'b.ts' })],
+        signals: [
+          fitSignal({ source: 'naming', severity: 'medium', message: 'w0', filePath: 'b.ts' }),
+        ],
       }),
     });
     expect(out).toContain('ERROR'); // errored unit status
@@ -130,7 +184,14 @@ describe('resultToView', () => {
 
   it('renders help and list views (every result type is now total)', () => {
     expect(renderToText(resultToView({ type: 'help' }))).toContain('Codebase analysis toolkit');
-    expect(renderToText(resultToView({ type: 'list-recipes', recipes: [{ name: 'example', description: 'demo', checkCount: '3 checks' }] }))).toContain('example');
+    expect(
+      renderToText(
+        resultToView({
+          type: 'list-recipes',
+          recipes: [{ name: 'example', description: 'demo', checkCount: '3 checks' }],
+        }),
+      ),
+    ).toContain('example');
   });
 
   it('renders an error with the ✗ marker and indented suggestion', () => {
@@ -232,7 +293,10 @@ describe('resultToView', () => {
     // seam renders it and suppresses the footer hints.
     const out = textOf({
       type: 'graph-done',
-      verboseDetail: { kind: 'lines', lines: ['== Catalog ==', '5 functions across 2 files (cacheHit=false)'] },
+      verboseDetail: {
+        kind: 'lines',
+        lines: ['== Catalog ==', '5 functions across 2 files (cacheHit=false)'],
+      },
       resolutionBanner: 'Resolution: fast (syntactic) — edges are approximate.',
       summary: { passed: 1, failed: 1, errors: 0, warnings: 0 },
       durationMs: 50,

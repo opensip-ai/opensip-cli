@@ -4,9 +4,9 @@
  * `@opensip-tools/graph` coupling (the reason this package exists, ADR-0010).
  */
 
-import type { Tree } from 'web-tree-sitter'
+import type { Tree } from 'web-tree-sitter';
 
-export type { Node, Tree, Language } from 'web-tree-sitter'
+export type { Node, Tree, Language } from 'web-tree-sitter';
 
 /**
  * The parsed-file shape every tree-sitter consumer uses: the parse tree
@@ -15,6 +15,6 @@ export type { Node, Tree, Language } from 'web-tree-sitter'
  * `{ tree, source }` record exactly.
  */
 export interface ParsedFile {
-  readonly tree: Tree
-  readonly source: string
+  readonly tree: Tree;
+  readonly source: string;
 }

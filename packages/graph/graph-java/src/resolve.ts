@@ -48,7 +48,10 @@ import type {
 } from '@opensip-tools/graph';
 import type { Node } from '@opensip-tools/tree-sitter';
 
-function javaPosition(node: Node, file: JavaParsedFile): {
+function javaPosition(
+  node: Node,
+  file: JavaParsedFile,
+): {
   readonly line: number;
   readonly column: number;
   readonly text: string;
@@ -99,7 +102,6 @@ export function resolveCallSites(input: ResolveInput<JavaParsedProject>): Resolv
     ? { edgesByOwner, stats: finalStats }
     : { edgesByOwner, dependenciesByOwner, stats: finalStats };
 }
-
 
 function pushCallEdge(
   node: Node,

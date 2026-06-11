@@ -48,6 +48,8 @@ describe('createSignalFromViolation', () => {
   });
 
   it('lifts a warning to medium', () => {
-    expect(createSignalFromViolation('x', 'x', { message: 'm', severity: 'warning' }).severity).toBe('medium');
+    expect(
+      createSignalFromViolation('x', 'x', { message: 'm', severity: 'warning' }).severity,
+    ).toBe('medium');
   });
 });

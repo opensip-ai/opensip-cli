@@ -78,10 +78,7 @@ function isFunctionInitializer(node: ts.Node | undefined): boolean {
  * declaration but NOT a `const foo = () => ...` (you'd need to OR
  * `VariableInitializer` for that).
  */
-export function functionLikeFromDeclaration(
-  d: ts.Declaration,
-  accept: number,
-): ts.Node | null {
+export function functionLikeFromDeclaration(d: ts.Declaration, accept: number): ts.Node | null {
   for (const [bit, predicate] of DIRECT_SHAPE_TABLE) {
     if ((accept & bit) !== 0 && predicate(d)) return d;
   }

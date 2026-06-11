@@ -5,10 +5,14 @@
  * Detects unsafe property and method access without null checks.
  */
 
-
-import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import {
+  defineCheck,
+  getCheckConfig,
+  isTestFile,
+  type CheckViolation,
+} from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Recipe-config shape for null-safety. Project-specific safe-by-construction
@@ -20,7 +24,7 @@ export interface NullSafetyConfig extends Record<string, unknown> {
    * Additional path patterns whose files are skipped entirely. Each entry
    * is compiled to a case-insensitive RegExp via `new RegExp(entry, 'i')`.
    */
-  additionalSafeNullPaths?: readonly string[]
+  additionalSafeNullPaths?: readonly string[];
 }
 
 /**
@@ -32,7 +36,7 @@ const SAFE_PATTERNS = [
   /\?\?/, // Nullish coalescing
   /if\s*\(/, // Conditional check
   /&&/, // Logical AND guard
-]
+];
 
 /**
  * Known builder pattern libraries whose method calls always return non-null objects.
@@ -127,7 +131,7 @@ const SAFE_BUILDER_PREFIXES = [
   'getStatus',
   'ensureError',
   'extractErrorMessage',
-]
+];
 
 /**
  * Known safe method names in fluent APIs that always return `this` or non-null values.
@@ -430,7 +434,7 @@ const SAFE_FLUENT_METHODS = new Set([
   'storeOptionsAsProperties',
   'copyInheritedSettings',
   'combineFlagAndOptionalValue',
-])
+]);
 
 /**
  * Common method name prefixes that indicate safe (non-null) return values.
@@ -477,7 +481,7 @@ const SAFE_METHOD_PREFIXES = [
   'current',
   'pick',
   'select',
-]
+];
 
 /**
  * Check if a call expression is a known safe builder pattern.
@@ -494,12 +498,12 @@ const SAFE_METHOD_PREFIXES = [
  *     "returns a value or throws" contract.
  */
 function isSafeBuilderPattern(expression: ts.CallExpression, sourceFile: ts.SourceFile): boolean {
-  const text = expression.getText(sourceFile)
-  if (SAFE_BUILDER_PREFIXES.some((prefix) => text.startsWith(prefix))) return true
+  const text = expression.getText(sourceFile);
+  if (SAFE_BUILDER_PREFIXES.some((prefix) => text.startsWith(prefix))) return true;
   if (ts.isIdentifier(expression.expression)) {
-    return isSafeFluentMethod(expression.expression.text)
+    return isSafeFluentMethod(expression.expression.text);
   }
-  return false
+  return false;
 }
 
 /**
@@ -508,8 +512,8 @@ function isSafeBuilderPattern(expression: ts.CallExpression, sourceFile: ts.Sour
  * starts with a common safe prefix (get, set, is, has, to, etc.).
  */
 function isSafeFluentMethod(methodName: string): boolean {
-  if (SAFE_FLUENT_METHODS.has(methodName)) return true
-  return SAFE_METHOD_PREFIXES.some((prefix) => methodName.startsWith(prefix))
+  if (SAFE_FLUENT_METHODS.has(methodName)) return true;
+  return SAFE_METHOD_PREFIXES.some((prefix) => methodName.startsWith(prefix));
 }
 
 /**
@@ -528,18 +532,18 @@ function isGuardedByEnclosingCondition(
   node: ts.PropertyAccessExpression,
   sourceFile: ts.SourceFile,
 ): boolean {
-  const baseText = node.expression.getText(sourceFile)
-  let current: ts.Node = node
-  let parent: ts.Node | undefined = node.parent
+  const baseText = node.expression.getText(sourceFile);
+  let current: ts.Node = node;
+  let parent: ts.Node | undefined = node.parent;
   while (parent) {
     if (ts.isIfStatement(parent) && parent.expression.getText(sourceFile).includes(baseText)) {
-      return true
+      return true;
     }
     if (
       ts.isConditionalExpression(parent) &&
       parent.condition.getText(sourceFile).includes(baseText)
     ) {
-      return true
+      return true;
     }
     if (
       ts.isBinaryExpression(parent) &&
@@ -547,12 +551,12 @@ function isGuardedByEnclosingCondition(
       parent.right === current &&
       parent.left.getText(sourceFile).includes(baseText)
     ) {
-      return true
+      return true;
     }
-    current = parent
-    parent = parent.parent
+    current = parent;
+    parent = parent.parent;
   }
-  return false
+  return false;
 }
 
 /**
@@ -560,11 +564,11 @@ function isGuardedByEnclosingCondition(
  * Accessing properties on `this` is always safe — the object exists within its own methods.
  */
 function isThisAccess(node: ts.PropertyAccessExpression): boolean {
-  let current: ts.Expression = node.expression
+  let current: ts.Expression = node.expression;
   while (ts.isCallExpression(current) || ts.isPropertyAccessExpression(current)) {
-    current = current.expression
+    current = current.expression;
   }
-  return current.kind === ts.SyntaxKind.ThisKeyword
+  return current.kind === ts.SyntaxKind.ThisKeyword;
 }
 
 /**
@@ -572,17 +576,17 @@ function isThisAccess(node: ts.PropertyAccessExpression): boolean {
  * e.g. `a.b().c().d` has depth 3.
  */
 function getChainDepth(node: ts.PropertyAccessExpression): number {
-  let depth = 0
-  let current: ts.Expression = node.expression
+  let depth = 0;
+  let current: ts.Expression = node.expression;
   while (ts.isCallExpression(current) || ts.isPropertyAccessExpression(current)) {
     if (ts.isCallExpression(current)) {
-      depth++
-      current = current.expression
+      depth++;
+      current = current.expression;
     } else {
-      current = current.expression
+      current = current.expression;
     }
   }
-  return depth
+  return depth;
 }
 
 /**
@@ -592,27 +596,26 @@ function getChainDepth(node: ts.PropertyAccessExpression): number {
 function isZodBuilderChain(node: ts.PropertyAccessExpression, sourceFile: ts.SourceFile): boolean {
   // Walk the full expression chain to find if it originates from z.xxx()
   // Handles arbitrary depth: z.string().regex().optional().superRefine().pipe()
-  let current: ts.Expression = node.expression
+  let current: ts.Expression = node.expression;
 
-   
   while (current) {
     if (ts.isCallExpression(current)) {
-      const result = checkZodCallExpression(current, sourceFile)
-      if (result.resolved) return result.isZod
-      current = result.next
-      continue
+      const result = checkZodCallExpression(current, sourceFile);
+      if (result.resolved) return result.isZod;
+      current = result.next;
+      continue;
     }
     if (ts.isPropertyAccessExpression(current)) {
-      if (current.expression.getText(sourceFile) === 'z') return true
-      current = current.expression
-      continue
+      if (current.expression.getText(sourceFile) === 'z') return true;
+      current = current.expression;
+      continue;
     }
     if (ts.isIdentifier(current)) {
-      return current.text === 'z'
+      return current.text === 'z';
     }
-    break
+    break;
   }
-  return false
+  return false;
 }
 
 /** Check if a call expression callee originates from z.xxx() */
@@ -620,15 +623,15 @@ function checkZodCallExpression(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,
 ): { resolved: true; isZod: boolean } | { resolved: false; next: ts.Expression } {
-  const callee = node.expression
+  const callee = node.expression;
   if (ts.isPropertyAccessExpression(callee)) {
-    if (callee.getText(sourceFile).startsWith('z.')) return { resolved: true, isZod: true }
-    return { resolved: false, next: callee.expression }
+    if (callee.getText(sourceFile).startsWith('z.')) return { resolved: true, isZod: true };
+    return { resolved: false, next: callee.expression };
   }
   if (ts.isIdentifier(callee)) {
-    return { resolved: true, isZod: callee.text === 'z' }
+    return { resolved: true, isZod: callee.text === 'z' };
   }
-  return { resolved: false, next: callee }
+  return { resolved: false, next: callee };
 }
 
 /**
@@ -636,28 +639,28 @@ function checkZodCallExpression(
  * Handles patterns like promise.then().catch() or queryBuilder.where().orderBy()
  */
 function isFluentChain(node: ts.PropertyAccessExpression): boolean {
-  const expression = node.expression
+  const expression = node.expression;
 
   // Check if we're accessing a property on a call expression
-  if (!ts.isCallExpression(expression)) return false
+  if (!ts.isCallExpression(expression)) return false;
 
   // Walk the chain — if ANY method in the chain is a known fluent method, the chain is safe
-  let current: ts.Expression = expression
+  let current: ts.Expression = expression;
 
   while (ts.isCallExpression(current)) {
     if (ts.isPropertyAccessExpression(current.expression)) {
-      const methodName = current.expression.name.text
+      const methodName = current.expression.name.text;
       if (isSafeFluentMethod(methodName)) {
-        return true
+        return true;
       }
       // Walk deeper into the chain
-      current = current.expression.expression
-      continue
+      current = current.expression.expression;
+      continue;
     }
-    break
+    break;
   }
 
-  return false
+  return false;
 }
 
 /**
@@ -681,17 +684,17 @@ const SAFE_NULL_PATHS: readonly RegExp[] = [
   // published library, but the path layout is opensip's convention. It
   // lives in opensip's recipe under
   // `checks.config['null-safety'].additionalSafeNullPaths`.
-]
+];
 
 /** Merge built-in defaults with the recipe-config slice. */
 function buildEffectiveSafePaths(): readonly RegExp[] {
-  const cfg = getCheckConfig<NullSafetyConfig>('null-safety')
-  const extras = (cfg.additionalSafeNullPaths ?? []).map((src) => new RegExp(src, 'i'))
-  return [...SAFE_NULL_PATHS, ...extras]
+  const cfg = getCheckConfig<NullSafetyConfig>('null-safety');
+  const extras = (cfg.additionalSafeNullPaths ?? []).map((src) => new RegExp(src, 'i'));
+  return [...SAFE_NULL_PATHS, ...extras];
 }
 
 function isSafeNullPath(filePath: string, paths: readonly RegExp[]): boolean {
-  return paths.some((p) => p.test(filePath))
+  return paths.some((p) => p.test(filePath));
 }
 
 /**
@@ -702,63 +705,63 @@ function isSafeNullPath(filePath: string, paths: readonly RegExp[]): boolean {
  * suite (see `__tests__/null-safety-fp.test.ts`).
  */
 export function analyzeNullSafety(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Skip safe-by-construction path families (DI fragments + schema declarations).
   // Built-in defaults are merged with the recipe-config slice once per file.
-  const safePaths = buildEffectiveSafePaths()
-  if (isSafeNullPath(filePath, safePaths)) return violations
+  const safePaths = buildEffectiveSafePaths();
+  if (isSafeNullPath(filePath, safePaths)) return violations;
 
   try {
-    const sourceFile = getSharedSourceFile(filePath, content)
-    if (!sourceFile) return []
+    const sourceFile = getSharedSourceFile(filePath, content);
+    if (!sourceFile) return [];
 
     const visit = (node: ts.Node): void => {
-      ts.forEachChild(node, visit)
+      ts.forEachChild(node, visit);
 
       // Only check property access expressions that aren't optional chains
-      if (!ts.isPropertyAccessExpression(node) || ts.isOptionalChain(node)) return
+      if (!ts.isPropertyAccessExpression(node) || ts.isOptionalChain(node)) return;
 
-      const expression = node.expression
+      const expression = node.expression;
 
       // Only flag call expressions or element access (potentially nullable)
-      if (!ts.isCallExpression(expression) && !ts.isElementAccessExpression(expression)) return
+      if (!ts.isCallExpression(expression) && !ts.isElementAccessExpression(expression)) return;
 
       // Skip property access on `this` — the object always exists in its own methods
-      if (isThisAccess(node)) return
+      if (isThisAccess(node)) return;
 
       // Skip method chains longer than 2 — fluent APIs are designed to return non-null
-      if (getChainDepth(node) > 2) return
+      if (getChainDepth(node) > 2) return;
 
       // Skip Zod builder pattern chains (z.string().min(1).optional())
-      if (isZodBuilderChain(node, sourceFile)) return
+      if (isZodBuilderChain(node, sourceFile)) return;
 
       // Skip known safe builder patterns
-      if (ts.isCallExpression(expression) && isSafeBuilderPattern(expression, sourceFile)) return
+      if (ts.isCallExpression(expression) && isSafeBuilderPattern(expression, sourceFile)) return;
 
       // Skip fluent API chains (promise.then().catch(), queryBuilder.where().orderBy())
-      if (isFluentChain(node)) return
+      if (isFluentChain(node)) return;
 
-      const propName = node.name.text
+      const propName = node.name.text;
 
       // Skip if accessing a known safe fluent method
-      if (isSafeFluentMethod(propName)) return
+      if (isSafeFluentMethod(propName)) return;
 
-      const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-      const lineText = content.split('\n')[line] ?? ''
+      const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+      const lineText = content.split('\n')[line] ?? '';
 
       // Skip if line has safety patterns
-      if (SAFE_PATTERNS.some((p) => p.test(lineText))) return
+      if (SAFE_PATTERNS.some((p) => p.test(lineText))) return;
 
       // Skip if guarded by an enclosing if / ternary / && condition on a
       // previous line (the line-local scan above only sees this line).
-      if (isGuardedByEnclosingCondition(node, sourceFile)) return
+      if (isGuardedByEnclosingCondition(node, sourceFile)) return;
 
       // Skip common safe cases
-      if (['length', 'toString', 'valueOf'].includes(propName)) return
+      if (['length', 'toString', 'valueOf'].includes(propName)) return;
 
-      const lineNum = line + 1
-      const matchText = node.getText(sourceFile)
+      const lineNum = line + 1;
+      const matchText = node.getText(sourceFile);
 
       violations.push({
         line: lineNum,
@@ -768,15 +771,15 @@ export function analyzeNullSafety(content: string, filePath: string): CheckViola
         type: 'unsafe-access',
         suggestion: `Use optional chaining: change '.${propName}' to '?.${propName}', or add an explicit null/undefined check before accessing the property`,
         match: matchText,
-      })
-    }
+      });
+    };
 
-    visit(sourceFile)
+    visit(sourceFile);
   } catch {
     // @swallow-ok Skip files that fail to parse
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -808,7 +811,7 @@ export const nullSafety = defineCheck({
 
   analyze(content: string, filePath: string): CheckViolation[] {
     // Skip test files — null safety in tests is low-risk due to controlled inputs
-    if (isTestFile(filePath)) return []
-    return analyzeNullSafety(content, filePath)
+    if (isTestFile(filePath)) return [];
+    return analyzeNullSafety(content, filePath);
   },
-})
+});

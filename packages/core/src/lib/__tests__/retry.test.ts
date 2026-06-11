@@ -11,9 +11,7 @@ describe('withRetry', () => {
   });
 
   it('retries on failure and succeeds', async () => {
-    const fn = vi.fn()
-      .mockRejectedValueOnce(new Error('fail1'))
-      .mockResolvedValue('ok');
+    const fn = vi.fn().mockRejectedValueOnce(new Error('fail1')).mockResolvedValue('ok');
 
     const result = await withRetry(fn, { maxAttempts: 3, initialDelayMs: 10 });
     expect(result).toBe('ok');
@@ -23,16 +21,17 @@ describe('withRetry', () => {
   it('throws after max attempts exhausted', async () => {
     const fn = vi.fn().mockRejectedValue(new Error('always fails'));
 
-    await expect(
-      withRetry(fn, { maxAttempts: 3, initialDelayMs: 10 }),
-    ).rejects.toThrow('always fails');
+    await expect(withRetry(fn, { maxAttempts: 3, initialDelayMs: 10 })).rejects.toThrow(
+      'always fails',
+    );
 
     expect(fn).toHaveBeenCalledTimes(3);
   });
 
   it('calls onRetry callback before each retry', async () => {
     const onRetry = vi.fn();
-    const fn = vi.fn()
+    const fn = vi
+      .fn()
       .mockRejectedValueOnce(new Error('fail1'))
       .mockRejectedValueOnce(new Error('fail2'))
       .mockResolvedValue('ok');
@@ -54,9 +53,7 @@ describe('withRetry', () => {
 
   it('respects maxDelayMs cap', async () => {
     const onRetry = vi.fn();
-    const fn = vi.fn()
-      .mockRejectedValueOnce(new Error('fail'))
-      .mockResolvedValue('ok');
+    const fn = vi.fn().mockRejectedValueOnce(new Error('fail')).mockResolvedValue('ok');
 
     await withRetry(fn, {
       maxAttempts: 3,
@@ -74,9 +71,7 @@ describe('withRetry', () => {
   it('wraps non-Error throws in Error', async () => {
     const fn = vi.fn().mockRejectedValue('string error');
 
-    await expect(
-      withRetry(fn, { maxAttempts: 1 }),
-    ).rejects.toThrow('string error');
+    await expect(withRetry(fn, { maxAttempts: 1 })).rejects.toThrow('string error');
   });
 
   it('runs at least once when maxAttempts is 0', async () => {
@@ -91,9 +86,9 @@ describe('withRetry', () => {
     // for-loop never ran and `throw lastError!` propagated `undefined`.
     const fn = vi.fn().mockRejectedValue(new Error('boom'));
 
-    await expect(
-      withRetry(fn, { maxAttempts: Number.NaN, initialDelayMs: 10 }),
-    ).rejects.toThrow('boom');
+    await expect(withRetry(fn, { maxAttempts: Number.NaN, initialDelayMs: 10 })).rejects.toThrow(
+      'boom',
+    );
 
     expect(fn).toHaveBeenCalledTimes(1);
   });

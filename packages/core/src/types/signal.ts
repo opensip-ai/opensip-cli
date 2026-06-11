@@ -3,53 +3,62 @@
  * Used by the check framework internally. Converted to Finding for output.
  */
 
-export type SignalSeverity = 'critical' | 'high' | 'medium' | 'low'
+export type SignalSeverity = 'critical' | 'high' | 'medium' | 'low';
 /** Canonical category labels a Signal may declare (open at the plugin layer). */
-export type SignalCategory = 'security' | 'quality' | 'architecture' | 'testing' | 'resilience' | 'documentation' | 'warning' | 'performance' | 'error'
+export type SignalCategory =
+  | 'security'
+  | 'quality'
+  | 'architecture'
+  | 'testing'
+  | 'resilience'
+  | 'documentation'
+  | 'warning'
+  | 'performance'
+  | 'error';
 
 /** A finding produced by any analyzer — file location, severity, message, and metadata. */
 export interface Signal {
-  readonly id: string
-  readonly source: string
-  readonly provider: string
-  readonly severity: SignalSeverity
+  readonly id: string;
+  readonly source: string;
+  readonly provider: string;
+  readonly severity: SignalSeverity;
   // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- documents the canonical set while leaving the field open for plugin-defined categories
-  readonly category: SignalCategory | string
-  readonly ruleId: string
-  readonly message: string
-  readonly suggestion?: string
-  readonly filePath: string
-  readonly line?: number
-  readonly column?: number
-  readonly code?: { file?: string; line?: number; column?: number }
-  readonly fixAction?: string
-  readonly fixConfidence?: number
-  readonly metadata: Record<string, unknown>
-  readonly strength?: number
-  readonly fingerprint?: string
-  readonly createdAt: string
+  readonly category: SignalCategory | string;
+  readonly ruleId: string;
+  readonly message: string;
+  readonly suggestion?: string;
+  readonly filePath: string;
+  readonly line?: number;
+  readonly column?: number;
+  readonly code?: { file?: string; line?: number; column?: number };
+  readonly fixAction?: string;
+  readonly fixConfidence?: number;
+  readonly metadata: Record<string, unknown>;
+  readonly strength?: number;
+  readonly fingerprint?: string;
+  readonly createdAt: string;
 }
 
 /** Input shape for {@link createSignal} — required fields plus optional fix hint. */
 export interface CreateSignalInput {
-  source: string
-  provider?: string
-  severity: SignalSeverity
+  source: string;
+  provider?: string;
+  severity: SignalSeverity;
   // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- documents the canonical set while leaving the field open for plugin-defined categories
-  category?: SignalCategory | string
-  ruleId: string
-  message: string
-  suggestion?: string
-  code?: { file?: string; line?: number; column?: number }
-  fix?: FixHint
-  metadata?: Record<string, unknown>
+  category?: SignalCategory | string;
+  ruleId: string;
+  message: string;
+  suggestion?: string;
+  code?: { file?: string; line?: number; column?: number };
+  fix?: FixHint;
+  metadata?: Record<string, unknown>;
 }
 
 /** Optional remediation hint attached to a Signal — action label and confidence. */
 export interface FixHint {
-  readonly action?: string
-  readonly confidence?: number
-  readonly description?: string
+  readonly action?: string;
+  readonly confidence?: number;
+  readonly description?: string;
 }
 
 /**
@@ -61,15 +70,15 @@ export interface FixHint {
  * consumers agree (it lives in core alongside {@link Signal}).
  */
 export function isErrorSeverity(severity: SignalSeverity): boolean {
-  return severity === 'critical' || severity === 'high'
+  return severity === 'critical' || severity === 'high';
 }
 
 /** True when a {@link Signal} is on the error rung. See {@link isErrorSeverity}. */
 export function isErrorSignal(signal: Signal): boolean {
-  return isErrorSeverity(signal.severity)
+  return isErrorSeverity(signal.severity);
 }
 
-import { randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto';
 
 /** Builds a {@link Signal} with default provider, generated id, and ISO timestamp. */
 export function createSignal(input: CreateSignalInput): Signal {
@@ -90,5 +99,5 @@ export function createSignal(input: CreateSignalInput): Signal {
     fixConfidence: input.fix?.confidence,
     metadata: input.metadata ?? {},
     createdAt: new Date().toISOString(),
-  }
+  };
 }

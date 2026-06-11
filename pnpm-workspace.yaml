@@ -1,11 +1,11 @@
 packages:
   # Top-level packages: cli, contracts, core
-  - "packages/*"
+  - 'packages/*'
   # Tool-grouped subdirectories: each tool's engine + sub-packages
-  - "packages/fitness/*"
-  - "packages/simulation/*"
-  - "packages/languages/*"
-  - "packages/graph/*"
+  - 'packages/fitness/*'
+  - 'packages/simulation/*'
+  - 'packages/languages/*'
+  - 'packages/graph/*'
 
 # --- Settings migrated from the package.json "pnpm" field ---
 # pnpm 11 no longer reads `pnpm.*` in package.json; this is the new home.
@@ -45,19 +45,19 @@ blockExoticSubdeps: true
 # inherited. Revisit when these publish a provenance-attested release we can
 # move to.
 trustPolicyExclude:
-  - "ast-v8-to-istanbul@1.0.2"  # vitest coverage transitive (via @vitest/coverage-v8)
-  - "dependency-cruiser@17.4.2" # direct devDep; latest release, no provenance attestation
-  - "semver@6.3.1"              # legacy v6 line pinned by older transitive tooling
-  - "tinyexec@1.2.2"            # transitive (tinyglobby / tooling)
-  - "undici-types@6.21.0"       # pinned by @types/node
+  - 'ast-v8-to-istanbul@1.0.2' # vitest coverage transitive (via @vitest/coverage-v8)
+  - 'dependency-cruiser@17.4.2' # direct devDep; latest release, no provenance attestation
+  - 'semver@6.3.1' # legacy v6 line pinned by older transitive tooling
+  - 'tinyexec@1.2.2' # transitive (tinyglobby / tooling)
+  - 'undici-types@6.21.0' # pinned by @types/node
 
 # Security pins — transitive-dependency version floors.
 overrides:
-  "postcss@<8.5.10": ">=8.5.10"
-  "ws@<8.21.0": ">=8.21.0"
-  "brace-expansion@1": "^1.1.12"
-  "brace-expansion@2": "^2.0.2"
-  "brace-expansion@4": "^4.0.2"
-  "brace-expansion@5": "^5.0.6"
-  "esbuild@<0.25.0": ">=0.25.0"
-  "vite@5": "^7.1.0"
+  'postcss@<8.5.10': '>=8.5.10'
+  'ws@<8.21.0': '>=8.21.0'
+  'brace-expansion@1': '^1.1.12'
+  'brace-expansion@2': '^2.0.2'
+  'brace-expansion@4': '^4.0.2'
+  'brace-expansion@5': '^5.0.6'
+  'esbuild@<0.25.0': '>=0.25.0'
+  'vite@5': '^7.1.0'

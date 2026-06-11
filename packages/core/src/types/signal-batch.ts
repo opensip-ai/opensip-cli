@@ -39,7 +39,10 @@ export interface SignalBatch {
   readonly repo: RepoIdentity;
   readonly runId: string;
   readonly createdAt: string;
-  readonly counts: { readonly total: number; readonly bySeverity: Readonly<Record<string, number>> };
+  readonly counts: {
+    readonly total: number;
+    readonly bySeverity: Readonly<Record<string, number>>;
+  };
   /** Present only when the run exceeded {@link MAX_SIGNALS_PER_BATCH}. */
   readonly truncated?: { readonly dropped: number };
   readonly signals: readonly Signal[];

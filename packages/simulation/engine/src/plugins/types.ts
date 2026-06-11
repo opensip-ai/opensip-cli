@@ -15,11 +15,11 @@
  * registered by the loader.
  */
 
-import type { RunnableScenario } from '../framework/runnable-scenario.js'
-import type { SimulationRecipe } from '../recipes/types.js'
+import type { RunnableScenario } from '../framework/runnable-scenario.js';
+import type { SimulationRecipe } from '../recipes/types.js';
 
 /** What a sim plugin package/file exports. */
 export interface SimPluginExports {
-  readonly scenarios?: readonly RunnableScenario[]
-  readonly recipes?: readonly SimulationRecipe[]
+  readonly scenarios?: readonly RunnableScenario[];
+  readonly recipes?: readonly SimulationRecipe[];
 }

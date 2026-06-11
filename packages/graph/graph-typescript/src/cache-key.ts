@@ -87,10 +87,7 @@ function hashResolvedTsconfig(configPathAbs: string | undefined): string {
     undefined,
     configPathAbs,
   );
-  return createHash('sha256')
-    .update(stableStringify(parsed.options))
-    .digest('hex')
-    .slice(0, 16);
+  return createHash('sha256').update(stableStringify(parsed.options)).digest('hex').slice(0, 16);
 }
 
 /**

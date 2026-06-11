@@ -173,9 +173,8 @@ async function reExecWithHeap(
 ): Promise<void> {
   const flag = `--max-old-space-size=${String(targetMb)}`;
   const existingNodeOptions = process.env.NODE_OPTIONS ?? '';
-  const mergedNodeOptions = existingNodeOptions.length > 0
-    ? `${existingNodeOptions} ${flag}`
-    : flag;
+  const mergedNodeOptions =
+    existingNodeOptions.length > 0 ? `${existingNodeOptions} ${flag}` : flag;
 
   // Structured log always fires — telemetry/log consumers see every
   // elevation regardless of verbosity.

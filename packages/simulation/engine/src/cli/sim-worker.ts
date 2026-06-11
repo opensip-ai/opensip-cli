@@ -16,7 +16,12 @@
 
 import { readFileSync } from 'node:fs';
 
-import { defineCommand, type CommandSpec, type ToolCliContext, type WorkerMessage } from '@opensip-tools/core';
+import {
+  defineCommand,
+  type CommandSpec,
+  type ToolCliContext,
+  type WorkerMessage,
+} from '@opensip-tools/core';
 
 import { executeSim } from './sim.js';
 
@@ -40,10 +45,16 @@ function send(msg: WorkerMessage<ProgressEvent, SimWorkerResult>): void {
 export async function executeSimWorker(specPath: string): Promise<void> {
   try {
     const args = JSON.parse(readFileSync(specPath, 'utf8')) as SimWorkerArgs;
-    send({ kind: 'progress', event: { type: 'stage-start', stage: 'scenarios', label: 'Running scenarios...' } });
+    send({
+      kind: 'progress',
+      event: { type: 'stage-start', stage: 'scenarios', label: 'Running scenarios...' },
+    });
     const simResult = await executeSim(args, {
       onProgress: (completed, total) =>
-        send({ kind: 'progress', event: { type: 'stage-progress', stage: 'scenarios', completed, total } }),
+        send({
+          kind: 'progress',
+          event: { type: 'stage-progress', stage: 'scenarios', completed, total },
+        }),
     });
     send({ kind: 'result', value: simResult });
   } catch (error) {
@@ -56,9 +67,13 @@ export async function executeSimWorker(specPath: string): Promise<void> {
 }
 
 /** `sim-run-worker` — [internal] headless sim run, IPC progress/result. */
-export const simRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const simRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'sim-run-worker',
-  description: '[internal] Run sim headless and stream progress + result over IPC (forked by the live view)',
+  description:
+    '[internal] Run sim headless and stream progress + result over IPC (forked by the live view)',
   commonFlags: [],
   args: [{ name: 'specPath', description: 'Path to a JSON sim-args spec file' }],
   scope: 'project',

@@ -4,9 +4,9 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-pii-scrubbing
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js'
+import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js';
 
 // PII-sensitive Sentry API calls — setting user context, extras, or tags
 // that commonly carry personal data
@@ -17,7 +17,7 @@ const PII_CONTEXT_PATTERNS = [
   'Sentry.setExtra(',
   'setContext(',
   'Sentry.setContext(',
-]
+];
 
 // Field names that suggest PII in Sentry context calls
 const PII_FIELD_NAMES = [
@@ -36,20 +36,20 @@ const PII_FIELD_NAMES = [
   'secret',
   'apiKey',
   'api_key',
-]
+];
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- tiered detector: 3 tiers (init-level, capture-level, key-name) all need a single pass for clear precedence
 function analyze(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // --- Tier 1: Missing beforeSend/beforeBreadcrumb in Sentry.init (high confidence) ---
 
   if (hasSentryInit(content)) {
-    const initBlock = extractSentryInitBlock(content)
+    const initBlock = extractSentryInitBlock(content);
     if (initBlock) {
-      const hasBeforeSend = initBlock.block.includes('beforeSend')
-      const hasBeforeBreadcrumb = initBlock.block.includes('beforeBreadcrumb')
-      const hasBeforeSendTransaction = initBlock.block.includes('beforeSendTransaction')
+      const hasBeforeSend = initBlock.block.includes('beforeSend');
+      const hasBeforeBreadcrumb = initBlock.block.includes('beforeBreadcrumb');
+      const hasBeforeSendTransaction = initBlock.block.includes('beforeSendTransaction');
 
       if (!hasBeforeSend && !hasBeforeBreadcrumb && !hasBeforeSendTransaction) {
         violations.push({
@@ -61,32 +61,32 @@ function analyze(content: string, filePath: string): CheckViolation[] {
             'Add a beforeSend callback to filter sensitive data: Sentry.init({ beforeSend(event) { /* scrub PII */ return event; }, ... })',
           type: 'sentry-no-pii-filter',
           filePath,
-        })
+        });
       }
     }
   }
 
   // --- Tier 2: PII field names in Sentry context calls (medium confidence) ---
 
-  const lines = content.split('\n')
+  const lines = content.split('\n');
   for (const [i, line_] of lines.entries()) {
-    const line = line_ ?? ''
-    const trimmed = line.trim()
+    const line = line_ ?? '';
+    const trimmed = line.trim();
 
     // Skip comments
-    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
     // Check if line has a Sentry context-setting call
-    const hasContextCall = PII_CONTEXT_PATTERNS.some((pattern) => line.includes(pattern))
-    if (!hasContextCall) continue
+    const hasContextCall = PII_CONTEXT_PATTERNS.some((pattern) => line.includes(pattern));
+    if (!hasContextCall) continue;
 
     // Check for PII field names in the call
     for (const field of PII_FIELD_NAMES) {
-      const fieldIdx = line.indexOf(field)
-      if (fieldIdx === -1) continue
+      const fieldIdx = line.indexOf(field);
+      if (fieldIdx === -1) continue;
 
       // Verify it looks like a property (followed by : or ,)
-      const afterField = line.slice(fieldIdx + field.length).trimStart()
+      const afterField = line.slice(fieldIdx + field.length).trimStart();
       if (afterField.startsWith(':') || afterField.startsWith(',') || afterField.startsWith('}')) {
         violations.push({
           line: i + 1,
@@ -97,13 +97,13 @@ function analyze(content: string, filePath: string): CheckViolation[] {
           type: 'sentry-pii-in-context',
           match: trimmed.slice(0, 120),
           filePath,
-        })
-        break // One violation per line is enough
+        });
+        break; // One violation per line is enough
       }
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -136,4 +136,4 @@ export const sentryPiiScrubbing = defineCheck({
   fileTypes: ['ts', 'js', 'tsx', 'jsx', 'mjs'],
   confidence: 'medium',
   analyze,
-})
+});

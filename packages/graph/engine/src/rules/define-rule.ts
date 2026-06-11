@@ -25,7 +25,15 @@
 
 import { ValidationError } from '@opensip-tools/core';
 
-import type { Catalog, FeatureColumn, FeatureTable, GraphConfig, Indexes, Rule, RuleHints } from '../types.js';
+import type {
+  Catalog,
+  FeatureColumn,
+  FeatureTable,
+  GraphConfig,
+  Indexes,
+  Rule,
+  RuleHints,
+} from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
 /**
@@ -73,23 +81,36 @@ const VALIDATION_CODE = 'VALIDATION.GRAPH.RULE';
  * author wrote. The adapter is the only behavioral code in the factory.
  */
 export function defineRule(config: DefineRuleConfig): Rule {
-  if (typeof config.slug !== 'string' || config.slug.length === 0 || !config.slug.startsWith('graph:')) {
+  if (
+    typeof config.slug !== 'string' ||
+    config.slug.length === 0 ||
+    !config.slug.startsWith('graph:')
+  ) {
     // @fitness-ignore-next-line result-pattern-consistency -- authoring-time programmer error: invalid rule metadata
-    throw new ValidationError(`defineRule: 'slug' must be a non-empty string starting with 'graph:' (got ${JSON.stringify(config.slug)})`, {
-      code: VALIDATION_CODE,
-    });
+    throw new ValidationError(
+      `defineRule: 'slug' must be a non-empty string starting with 'graph:' (got ${JSON.stringify(config.slug)})`,
+      {
+        code: VALIDATION_CODE,
+      },
+    );
   }
   if (config.defaultSeverity !== 'error' && config.defaultSeverity !== 'warning') {
     // @fitness-ignore-next-line result-pattern-consistency -- authoring-time programmer error: invalid rule metadata
-    throw new ValidationError(`defineRule: 'defaultSeverity' must be 'error' or 'warning' (got ${JSON.stringify(config.defaultSeverity)})`, {
-      code: VALIDATION_CODE,
-    });
+    throw new ValidationError(
+      `defineRule: 'defaultSeverity' must be 'error' or 'warning' (got ${JSON.stringify(config.defaultSeverity)})`,
+      {
+        code: VALIDATION_CODE,
+      },
+    );
   }
   if (typeof config.evaluate !== 'function') {
     // @fitness-ignore-next-line result-pattern-consistency -- authoring-time programmer error: invalid rule metadata
-    throw new ValidationError(`defineRule: 'evaluate' must be a function for rule '${config.slug}'`, {
-      code: VALIDATION_CODE,
-    });
+    throw new ValidationError(
+      `defineRule: 'evaluate' must be a function for rule '${config.slug}'`,
+      {
+        code: VALIDATION_CODE,
+      },
+    );
   }
 
   const rule: Rule = {

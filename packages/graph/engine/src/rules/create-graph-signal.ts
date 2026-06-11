@@ -14,7 +14,12 @@
  * the override (`GraphConfig.severityOverrides[slug]`) is applied on top here.
  */
 
-import { createSignal, type Signal, type SignalCategory, type SignalSeverity } from '@opensip-tools/core';
+import {
+  createSignal,
+  type Signal,
+  type SignalCategory,
+  type SignalSeverity,
+} from '@opensip-tools/core';
 
 import { applySeverityOverride } from './_severity-override.js';
 
@@ -37,7 +42,11 @@ export interface GraphSignalBody {
  * applying the per-slug severity override — the rule supplies only its slug, the
  * active config, and the per-signal body.
  */
-export function createGraphSignal(slug: string, config: GraphConfig, body: GraphSignalBody): Signal {
+export function createGraphSignal(
+  slug: string,
+  config: GraphConfig,
+  body: GraphSignalBody,
+): Signal {
   return createSignal({
     source: 'graph',
     ruleId: slug,

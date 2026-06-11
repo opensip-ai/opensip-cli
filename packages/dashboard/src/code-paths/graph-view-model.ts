@@ -153,10 +153,10 @@ export function projectCatalogToGraphViewModel(catalog: GraphCatalog): GraphView
   // cycles (A→B→A) earn an sccId.
   const adjacency = buildAdjacency(
     nodes,
-    edges.filter(e => e.source !== e.target),
+    edges.filter((e) => e.source !== e.target),
   );
   const sccByNode = tarjanSccIds(
-    nodes.map(n => n.id),
+    nodes.map((n) => n.id),
     adjacency,
   );
   for (const node of nodes) node.sccId = sccByNode.get(node.id) ?? null;
@@ -164,7 +164,7 @@ export function projectCatalogToGraphViewModel(catalog: GraphCatalog): GraphView
   return {
     language: catalog.language,
     nodes: nodes.map(toViewModelNode),
-    edges: edges.map(e => toViewModelEdge(e, sccByNode)),
+    edges: edges.map((e) => toViewModelEdge(e, sccByNode)),
   };
 }
 
@@ -287,7 +287,10 @@ function toViewModelNode(n: MutableNode): GraphViewModelNode {
   return { id: n.id, label: n.id, totalCoupling: n.totalCoupling, sccId: n.sccId };
 }
 
-function toViewModelEdge(e: MutableEdge, sccByNode: ReadonlyMap<string, string>): GraphViewModelEdge {
+function toViewModelEdge(
+  e: MutableEdge,
+  sccByNode: ReadonlyMap<string, string>,
+): GraphViewModelEdge {
   const sourceScc = sccByNode.get(e.source);
   const targetScc = sccByNode.get(e.target);
   return {

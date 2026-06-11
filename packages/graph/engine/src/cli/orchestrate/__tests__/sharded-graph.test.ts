@@ -148,7 +148,12 @@ describe('runShardedGraph', () => {
       useCache: false,
       catalogRepo: null,
       rules: [],
-      onProgress: (e) => events.push({ type: e.type, stage: e.stage, ...(e.detail === undefined ? {} : { detail: e.detail }) }),
+      onProgress: (e) =>
+        events.push({
+          type: e.type,
+          stage: e.stage,
+          ...(e.detail === undefined ? {} : { detail: e.detail }),
+        }),
     });
 
     // Each of the 7 stages fires exactly one start + one done, in canonical order.

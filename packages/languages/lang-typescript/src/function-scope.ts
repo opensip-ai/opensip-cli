@@ -12,7 +12,7 @@
  * the general-purpose `ast-utilities.ts` module.
  */
 
-import * as ts from 'typescript'
+import * as ts from 'typescript';
 
 // =============================================================================
 // FUNCTION-LIKE PREDICATES
@@ -29,7 +29,7 @@ export type FunctionLikeNode =
   | ts.MethodDeclaration
   | ts.FunctionExpression
   | ts.ArrowFunction
-  | ts.ConstructorDeclaration
+  | ts.ConstructorDeclaration;
 
 function isFunctionLike(node: ts.Node): node is FunctionLikeNode {
   return (
@@ -38,7 +38,7 @@ function isFunctionLike(node: ts.Node): node is FunctionLikeNode {
     ts.isFunctionExpression(node) ||
     ts.isArrowFunction(node) ||
     ts.isConstructorDeclaration(node)
-  )
+  );
 }
 
 // =============================================================================
@@ -51,12 +51,12 @@ function isFunctionLike(node: ts.Node): node is FunctionLikeNode {
  * module scope.
  */
 export function findEnclosingFunction(node: ts.Node): FunctionLikeNode | null {
-  let current: ts.Node | undefined = node.parent
+  let current: ts.Node | undefined = node.parent;
   while (current && !ts.isSourceFile(current)) {
-    if (isFunctionLike(current)) return current
-    current = current.parent
+    if (isFunctionLike(current)) return current;
+    current = current.parent;
   }
-  return null
+  return null;
 }
 
 /**
@@ -66,11 +66,11 @@ export function findEnclosingFunction(node: ts.Node): FunctionLikeNode | null {
  * expression body (e.g. an arrow function `() => x`) rather than a block.
  */
 export function findEnclosingFunctionBody(node: ts.Node): ts.Block | null {
-  const fn = findEnclosingFunction(node)
-  if (!fn) return null
-  const body = fn.body
-  if (body && ts.isBlock(body)) return body
-  return null
+  const fn = findEnclosingFunction(node);
+  if (!fn) return null;
+  const body = fn.body;
+  if (body && ts.isBlock(body)) return body;
+  return null;
 }
 
 /**
@@ -81,23 +81,23 @@ export function findEnclosingFunctionBody(node: ts.Node): ts.Block | null {
  * returns `'bar'`, not `null`.
  */
 export function getEnclosingFunctionName(node: ts.Node, sourceFile: ts.SourceFile): string | null {
-  let current: ts.Node | undefined = node.parent
+  let current: ts.Node | undefined = node.parent;
   while (current && !ts.isSourceFile(current)) {
     if (ts.isMethodDeclaration(current)) {
-      return current.name.getText(sourceFile)
+      return current.name.getText(sourceFile);
     }
     if (ts.isFunctionDeclaration(current) && current.name) {
-      return current.name.getText(sourceFile)
+      return current.name.getText(sourceFile);
     }
     // Named function expression: `const x = function namedFn() { … }`
     // — the name is part of the FunctionExpression, not its parent. Without
     // this branch the walker would skip past namedFn to its outer scope.
     if (ts.isFunctionExpression(current) && current.name) {
-      return current.name.getText(sourceFile)
+      return current.name.getText(sourceFile);
     }
-    current = current.parent
+    current = current.parent;
   }
-  return null
+  return null;
 }
 
 /**
@@ -107,12 +107,12 @@ export function getEnclosingFunctionName(node: ts.Node, sourceFile: ts.SourceFil
  * top-level scope.
  */
 export function findEnclosingScope(node: ts.Node): ts.Node {
-  let current: ts.Node | undefined = node.parent
+  let current: ts.Node | undefined = node.parent;
   while (current) {
-    if (isFunctionLike(current) || ts.isSourceFile(current)) return current
-    current = current.parent
+    if (isFunctionLike(current) || ts.isSourceFile(current)) return current;
+    current = current.parent;
   }
-  return node.getSourceFile()
+  return node.getSourceFile();
 }
 
 // =============================================================================
@@ -125,8 +125,8 @@ export function findEnclosingScope(node: ts.Node): ts.Node {
  * kind, not just function-likes.
  */
 export function isAsync(node: ts.Node): boolean {
-  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined
-  return modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ?? false
+  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+  return modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ?? false;
 }
 
 /**
@@ -136,9 +136,9 @@ export function isAsync(node: ts.Node): boolean {
  * false — there is no enclosing async context.
  */
 export function isInAsyncContext(node: ts.Node): boolean {
-  const fn = findEnclosingFunction(node)
-  if (!fn) return false
-  return isAsync(fn)
+  const fn = findEnclosingFunction(node);
+  if (!fn) return false;
+  return isAsync(fn);
 }
 
 /**
@@ -148,14 +148,14 @@ export function isInAsyncContext(node: ts.Node): boolean {
  * functions).
  */
 export function isInsideConditionalBlock(node: ts.Node): boolean {
-  let current: ts.Node | undefined = node.parent
+  let current: ts.Node | undefined = node.parent;
   while (current && !ts.isSourceFile(current)) {
-    if (isFunctionLike(current)) return false
-    if (ts.isIfStatement(current)) return true
-    if (ts.isSwitchStatement(current)) return true
-    if (ts.isCaseClause(current)) return true
-    if (ts.isConditionalExpression(current)) return true
-    current = current.parent
+    if (isFunctionLike(current)) return false;
+    if (ts.isIfStatement(current)) return true;
+    if (ts.isSwitchStatement(current)) return true;
+    if (ts.isCaseClause(current)) return true;
+    if (ts.isConditionalExpression(current)) return true;
+    current = current.parent;
   }
-  return false
+  return false;
 }

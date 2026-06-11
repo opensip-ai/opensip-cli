@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
-import { buildSignalBatch, noopSignalSink, LanguageRegistry, RunScope, ToolRegistry } from '../index.js';
+import {
+  buildSignalBatch,
+  noopSignalSink,
+  LanguageRegistry,
+  RunScope,
+  ToolRegistry,
+} from '../index.js';
 
 describe('noopSignalSink', () => {
   it('accepts nothing and never reports auth rejection', async () => {

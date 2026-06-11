@@ -53,7 +53,10 @@ describe('viewFindingsGroups', () => {
       title: 'big',
       errorCount: 30,
       warningCount: 0,
-      findings: Array.from({ length: 30 }, (_v, i) => ({ severity: 'error' as const, message: `m${String(i)}` })),
+      findings: Array.from({ length: 30 }, (_v, i) => ({
+        severity: 'error' as const,
+        message: `m${String(i)}`,
+      })),
     };
     const out = renderToText(viewFindingsGroups([many]));
     expect(out).toContain('m0');
@@ -64,7 +67,9 @@ describe('viewFindingsGroups', () => {
 
   it('renders a unit error line when the group itself errored', () => {
     const out = renderToText(
-      viewFindingsGroups([{ title: 'broken', error: 'timed out', errorCount: 0, warningCount: 0, findings: [] }]),
+      viewFindingsGroups([
+        { title: 'broken', error: 'timed out', errorCount: 0, warningCount: 0, findings: [] },
+      ]),
     );
     expect(out).toContain('broken');
     expect(out).toContain('timed out');

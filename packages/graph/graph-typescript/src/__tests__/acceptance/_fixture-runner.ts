@@ -64,4 +64,3 @@ export function findOccurrence(
   }
   return undefined;
 }
-

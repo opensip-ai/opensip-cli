@@ -222,7 +222,11 @@ export class LoggerImpl implements Logger {
     return LEVELS[level] >= LEVELS.info;
   }
 
-  private log(level: LogLevel, msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
+  private log(
+    level: LogLevel,
+    msgOrObj: string | Record<string, unknown>,
+    data?: Record<string, unknown>,
+  ): void {
     if (!this.shouldLog(level) && !this.logFilePath) return;
 
     // RunScope-bound runId wins over the instance-level field.
@@ -233,7 +237,8 @@ export class LoggerImpl implements Logger {
     // kernel field). Tests that construct an isolated `new LoggerImpl()`
     // outside any scope still get instance-level runId via the fallback.
     const scopedRunId = this.runIdProvider?.();
-    const effectiveRunId = (scopedRunId !== undefined && scopedRunId !== '') ? scopedRunId : this.runId;
+    const effectiveRunId =
+      scopedRunId !== undefined && scopedRunId !== '' ? scopedRunId : this.runId;
     const entry = formatEntry(level, msgOrObj, data, effectiveRunId);
 
     if (this.shouldWriteToFile(level)) {

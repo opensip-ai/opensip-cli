@@ -43,7 +43,9 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('dispatchGraphResult — envelope return contract (ADR-0011)', () => {
   it('returns the envelope in --gate-save mode (root delivers it)', async () => {
-    const opts = { gateSave: true, cwd: '/x' } as unknown as Parameters<typeof dispatchGraphResult>[0];
+    const opts = { gateSave: true, cwd: '/x' } as unknown as Parameters<
+      typeof dispatchGraphResult
+    >[0];
     const envelope = await dispatchGraphResult(opts, result, mockCli(), STARTED, '/x');
     expect(envelope?.tool).toBe('graph');
     expect(envelope?.schemaVersion).toBe(2);
@@ -52,7 +54,9 @@ describe('dispatchGraphResult — envelope return contract (ADR-0011)', () => {
   it('returns the envelope in --catalog-output mode', async () => {
     // runCatalogJsonMode is mocked, so the path is never written — any
     // non-empty string exercises the branch.
-    const opts = { catalogOutput: 'out/c.json', cwd: '/x' } as unknown as Parameters<typeof dispatchGraphResult>[0];
+    const opts = { catalogOutput: 'out/c.json', cwd: '/x' } as unknown as Parameters<
+      typeof dispatchGraphResult
+    >[0];
     const envelope = await dispatchGraphResult(opts, result, mockCli(), STARTED, '/x');
     expect(envelope?.tool).toBe('graph');
   });

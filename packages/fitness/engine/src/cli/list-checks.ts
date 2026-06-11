@@ -2,7 +2,6 @@
  * list-checks command — list all available fitness checks
  */
 
-
 import { currentCheckRegistry } from '../framework/scope-registry.js';
 
 import { ensureChecksLoaded } from './fit.js';
@@ -30,4 +29,3 @@ export async function listChecks(projectDir?: string): Promise<ListChecksResult>
     totalCount: checks.length,
   };
 }
-

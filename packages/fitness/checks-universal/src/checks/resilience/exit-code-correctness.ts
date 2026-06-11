@@ -4,20 +4,21 @@
  * @fileoverview Detects error branches that silently exit with success (exit 0)
  */
 
-import { defineCheck, isCommentLine, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import {
+  defineCheck,
+  isCommentLine,
+  type CheckViolation,
+  getLineNumber,
+} from '@opensip-tools/fitness';
 
 /**
  * Pattern for catch blocks that log errors but don't propagate failure.
  * Detects: catch blocks containing logger.error/console.error but no throw/process.exit(1)/return err
  */
-const CATCH_BLOCK_PATTERN = /\bcatch\s*\([^)]+\)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)}/g
+const CATCH_BLOCK_PATTERN = /\bcatch\s*\([^)]+\)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)}/g;
 
 /** Patterns indicating error is logged */
-const ERROR_LOG_PATTERNS = [
-  /logger\.error/,
-  /logger\.fatal/,
-  /console\.error/,
-]
+const ERROR_LOG_PATTERNS = [/logger\.error/, /logger\.fatal/, /console\.error/];
 
 /** Patterns indicating error is propagated or recorded for the caller */
 const ERROR_PROPAGATION_PATTERNS = [
@@ -38,7 +39,7 @@ const ERROR_PROPAGATION_PATTERNS = [
   // A zero literal is intentionally NOT matched — that would mask the very
   // "log error then exit 0" pattern this check exists to catch.
   /setExitCode\s*\(\s*[1-9]/,
-]
+];
 
 /**
  * Check: resilience/exit-code-correctness
@@ -68,39 +69,47 @@ export const exitCodeCorrectness = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Target CLI and command handler files
-    if (!filePath.includes('/cli/') && !filePath.includes('/commands/') && !filePath.includes('/bin/')) {
-      return violations
+    if (
+      !filePath.includes('/cli/') &&
+      !filePath.includes('/commands/') &&
+      !filePath.includes('/bin/')
+    ) {
+      return violations;
     }
 
     // Skip test files
-    if (filePath.includes('.test.') || filePath.includes('.spec.') || filePath.includes('__tests__')) {
-      return violations
+    if (
+      filePath.includes('.test.') ||
+      filePath.includes('.spec.') ||
+      filePath.includes('__tests__')
+    ) {
+      return violations;
     }
 
     // Quick check
     if (!content.includes('catch')) {
-      return violations
+      return violations;
     }
 
-    CATCH_BLOCK_PATTERN.lastIndex = 0
-    let match
+    CATCH_BLOCK_PATTERN.lastIndex = 0;
+    let match;
     while ((match = CATCH_BLOCK_PATTERN.exec(content)) !== null) {
-      const catchBody = match[1] ?? ''
+      const catchBody = match[1] ?? '';
 
       // Only flag if it logs an error
-      const logsError = ERROR_LOG_PATTERNS.some((p) => p.test(catchBody))
-      if (!logsError) continue
+      const logsError = ERROR_LOG_PATTERNS.some((p) => p.test(catchBody));
+      if (!logsError) continue;
 
       // Check if error is actually propagated
-      const propagatesError = ERROR_PROPAGATION_PATTERNS.some((p) => p.test(catchBody))
-      if (propagatesError) continue
+      const propagatesError = ERROR_PROPAGATION_PATTERNS.some((p) => p.test(catchBody));
+      if (propagatesError) continue;
 
-      const lineNumber = getLineNumber(content, match.index)
-      const line = content.split('\n')[lineNumber - 1] ?? ''
-      if (isCommentLine(line)) continue
+      const lineNumber = getLineNumber(content, match.index);
+      const line = content.split('\n')[lineNumber - 1] ?? '';
+      if (isCommentLine(line)) continue;
 
       violations.push({
         line: lineNumber,
@@ -112,9 +121,9 @@ export const exitCodeCorrectness = defineCheck({
         match: match[0].slice(0, 60),
         type: 'silent-failure-exit',
         filePath,
-      })
+      });
     }
 
-    return violations
+    return violations;
   },
-})
+});

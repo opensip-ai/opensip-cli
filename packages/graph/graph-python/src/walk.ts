@@ -120,7 +120,6 @@ function walkFile(
   for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
 }
 
-
 interface Frame {
   readonly ownerHash: string;
   readonly enclosingClass: string | null;
@@ -210,9 +209,10 @@ function visitFunctionDefinition(
   const digest = digestPythonBody(file.source.slice(node.startIndex, node.endIndex));
   const kind = classifyFunctionKind(name, enclosingClass);
   const qualifiedBase = filePathProjectRel.replace(/\.py$/, '').split('/').join('.');
-  const qualifiedName = enclosingClass === null
-    ? `${qualifiedBase}.${name}`
-    : `${qualifiedBase}.${enclosingClass}.${name}`;
+  const qualifiedName =
+    enclosingClass === null
+      ? `${qualifiedBase}.${name}`
+      : `${qualifiedBase}.${enclosingClass}.${name}`;
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,

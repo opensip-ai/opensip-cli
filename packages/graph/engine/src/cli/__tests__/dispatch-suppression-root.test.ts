@@ -77,7 +77,7 @@ function gateOpts(cwd: string) {
 }
 
 const result = (signals: readonly Signal[]): Parameters<typeof dispatchGraphResult>[1] =>
-  ({ signals, catalog: undefined } as unknown as Parameters<typeof dispatchGraphResult>[1]);
+  ({ signals, catalog: undefined }) as unknown as Parameters<typeof dispatchGraphResult>[1];
 
 const STARTED = '2026-06-07T00:00:00.000Z';
 
@@ -88,11 +88,19 @@ describe('dispatchGraphResult — waives against suppressionRoot, not opts.cwd',
     // still apply — it is resolved against suppressionRoot.
     await writeFile(
       join(buildRoot, 'walk.ts'),
-      ['// @graph-ignore-next-line graph:large-function -- intentional', 'function big() {}'].join('\n'),
+      ['// @graph-ignore-next-line graph:large-function -- intentional', 'function big() {}'].join(
+        '\n',
+      ),
       'utf8',
     );
 
-    await dispatchGraphResult(gateOpts(otherCwd), result([sig('walk.ts', 2)]), mockCli(), STARTED, buildRoot);
+    await dispatchGraphResult(
+      gateOpts(otherCwd),
+      result([sig('walk.ts', 2)]),
+      mockCli(),
+      STARTED,
+      buildRoot,
+    );
 
     expect(runGateMode).toHaveBeenCalledTimes(1);
     // arg[1] is the post-waiver signal array runGateMode receives.
@@ -105,11 +113,19 @@ describe('dispatchGraphResult — waives against suppressionRoot, not opts.cwd',
     // suppressionRoot (correct) must KEEP the signal — pinning the base used.
     await writeFile(
       join(otherCwd, 'walk.ts'),
-      ['// @graph-ignore-next-line graph:large-function -- wrong base', 'function big() {}'].join('\n'),
+      ['// @graph-ignore-next-line graph:large-function -- wrong base', 'function big() {}'].join(
+        '\n',
+      ),
       'utf8',
     );
 
-    await dispatchGraphResult(gateOpts(otherCwd), result([sig('walk.ts', 2)]), mockCli(), STARTED, buildRoot);
+    await dispatchGraphResult(
+      gateOpts(otherCwd),
+      result([sig('walk.ts', 2)]),
+      mockCli(),
+      STARTED,
+      buildRoot,
+    );
 
     expect(runGateMode).toHaveBeenCalledTimes(1);
     // The waiver under opts.cwd must NOT apply — the signal survives.

@@ -42,7 +42,10 @@ describe('registerRecipesFromMod', () => {
   it('returns zero when mod.recipes is not an array', () => {
     const registry = new RecipeRegistry<TestRecipe>();
     const onWarn = vi.fn();
-    const result = registerRecipesFromMod({ recipes: 'oops' }, registry, { namespace: 'test', onWarn });
+    const result = registerRecipesFromMod({ recipes: 'oops' }, registry, {
+      namespace: 'test',
+      onWarn,
+    });
     expect(result.recipesRegistered).toBe(0);
     expect(onWarn).not.toHaveBeenCalled();
   });
@@ -103,11 +106,10 @@ describe('registerRecipesFromMod', () => {
   it('warns on null / non-object recipe entries', () => {
     const registry = new RecipeRegistry<TestRecipe>();
     const onWarn = vi.fn();
-    const result = registerRecipesFromMod(
-      { recipes: [null, 42, 'string', undefined] },
-      registry,
-      { namespace: 'test', onWarn },
-    );
+    const result = registerRecipesFromMod({ recipes: [null, 42, 'string', undefined] }, registry, {
+      namespace: 'test',
+      onWarn,
+    });
     expect(result.recipesRegistered).toBe(0);
     expect(onWarn).toHaveBeenCalledTimes(4);
   });
@@ -152,10 +154,10 @@ describe('registerRecipesFromMod', () => {
     const result = registerRecipesFromMod(
       {
         recipes: [
-          makeRecipe('r1', 'first'),    // duplicate id
-          makeRecipe('r2', 'second'),   // valid
-          { id: 'r3' },                  // malformed (no name)
-          makeRecipe('r4', 'fourth'),   // valid
+          makeRecipe('r1', 'first'), // duplicate id
+          makeRecipe('r2', 'second'), // valid
+          { id: 'r3' }, // malformed (no name)
+          makeRecipe('r4', 'fourth'), // valid
         ],
       },
       registry,
@@ -173,11 +175,10 @@ describe('registerRecipesFromMod', () => {
     registry.register(makeRecipe('r1', 'incumbent'));
     // No onDuplicate callback — should not throw.
     expect(() =>
-      registerRecipesFromMod(
-        { recipes: [makeRecipe('r1', 'incumbent')] },
-        registry,
-        { namespace: 'test', onWarn },
-      ),
+      registerRecipesFromMod({ recipes: [makeRecipe('r1', 'incumbent')] }, registry, {
+        namespace: 'test',
+        onWarn,
+      }),
     ).not.toThrow();
   });
 });

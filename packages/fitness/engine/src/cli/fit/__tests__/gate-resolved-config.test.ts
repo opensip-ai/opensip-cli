@@ -59,7 +59,10 @@ function makeSignalersConfig(failOnErrors: number, failOnWarnings: number): Sign
 }
 
 /** Build the buildFitDoneResult args bundle. */
-function makeArgs(fitnessResult: FitnessRecipeResult, signalersConfig: SignalersConfig): BuildFitDoneArgs {
+function makeArgs(
+  fitnessResult: FitnessRecipeResult,
+  signalersConfig: SignalersConfig,
+): BuildFitDoneArgs {
   return {
     args: { cwd: '/work/project' } as BuildFitDoneArgs['args'],
     fitnessResult,

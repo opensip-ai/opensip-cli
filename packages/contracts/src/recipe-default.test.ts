@@ -5,7 +5,11 @@ import { BUILTIN_DEFAULT_RECIPE, resolveToolRecipeName } from './recipe-default.
 describe('resolveToolRecipeName (ADR-0022 precedence + tolerance)', () => {
   it('explicit --recipe wins over every config source and is strict', () => {
     expect(
-      resolveToolRecipeName({ explicit: 'backend', toolRecipe: 'graph-core', cliRecipe: 'opensip' }),
+      resolveToolRecipeName({
+        explicit: 'backend',
+        toolRecipe: 'graph-core',
+        cliRecipe: 'opensip',
+      }),
     ).toEqual({ name: 'backend', source: 'flag', tolerant: false, usedDeprecatedCliRecipe: false });
   });
 

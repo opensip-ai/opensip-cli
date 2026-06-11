@@ -9,7 +9,12 @@
  * root instead of by tool-local formatters.
  */
 import { renderToText } from '@opensip-tools/cli-ui';
-import { EXIT_CODES, type CommandOutcome, type FitDoneResult, type SignalEnvelope } from '@opensip-tools/contracts';
+import {
+  EXIT_CODES,
+  type CommandOutcome,
+  type FitDoneResult,
+  type SignalEnvelope,
+} from '@opensip-tools/contracts';
 import {
   LanguageRegistry,
   RunScope,
@@ -130,7 +135,12 @@ function buildEmitErrorCtx() {
 
 describe('root --json error path (emitError)', () => {
   it('emits a status:error CommandOutcome with the suggestion + code (2.12.0 seam)', () => {
-    buildEmitErrorCtx().emitError({ message: 'bad input', exitCode: 2, suggestion: 'fix it', code: 'CONFIG' });
+    buildEmitErrorCtx().emitError({
+      message: 'bad input',
+      exitCode: 2,
+      suggestion: 'fix it',
+      code: 'CONFIG',
+    });
     expect(stdout).toHaveLength(1);
     const outcome = JSON.parse(stdout[0]) as CommandOutcome;
     expect(outcome.status).toBe('error');

@@ -35,18 +35,32 @@ function buildScaffoldTemplates(
   const templates = new Map<string, string>();
   if (languages.length === 1) {
     const lang = languages[0] ?? 'typescript';
-    templates.set(join(paths.userPluginDir('fit', 'checks'), 'example-check.mjs'), exampleCheckSource(lang));
+    templates.set(
+      join(paths.userPluginDir('fit', 'checks'), 'example-check.mjs'),
+      exampleCheckSource(lang),
+    );
   } else {
     for (const lang of languages) {
-      templates.set(join(paths.userPluginDir('fit', 'checks'), `example-check-${lang}.mjs`), exampleCheckSource(lang, lang));
+      templates.set(
+        join(paths.userPluginDir('fit', 'checks'), `example-check-${lang}.mjs`),
+        exampleCheckSource(lang, lang),
+      );
     }
   }
-  const slugs = languages.length === 1
-    ? ['example-check']
-    : languages.map((lang) => `example-check-${lang}`);
-  templates.set(join(paths.userPluginDir('fit', 'recipes'), 'example-recipe.mjs'), exampleRecipeSource(slugs));
-  templates.set(join(paths.userPluginDir('sim', 'scenarios'), 'example-scenario.mjs'), exampleScenarioSource());
-  templates.set(join(paths.userPluginDir('sim', 'recipes'), 'example-recipe.mjs'), exampleSimRecipeSource());
+  const slugs =
+    languages.length === 1 ? ['example-check'] : languages.map((lang) => `example-check-${lang}`);
+  templates.set(
+    join(paths.userPluginDir('fit', 'recipes'), 'example-recipe.mjs'),
+    exampleRecipeSource(slugs),
+  );
+  templates.set(
+    join(paths.userPluginDir('sim', 'scenarios'), 'example-scenario.mjs'),
+    exampleScenarioSource(),
+  );
+  templates.set(
+    join(paths.userPluginDir('sim', 'recipes'), 'example-recipe.mjs'),
+    exampleSimRecipeSource(),
+  );
   return templates;
 }
 

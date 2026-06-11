@@ -24,20 +24,20 @@
  * deps) discovers nothing — an emergent property, not a special case.
  */
 
-import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
-import { join, basename, extname, sep } from 'node:path'
+import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { join, basename, extname, sep } from 'node:path';
 
-import { resolveProjectConfigPath } from '../config-resolution.js'
-import { logger } from '../lib/logger.js'
-import { resolveProjectPaths } from '../lib/paths.js'
-import { readYamlFile } from '../lib/yaml.js'
+import { resolveProjectConfigPath } from '../config-resolution.js';
+import { logger } from '../lib/logger.js';
+import { resolveProjectPaths } from '../lib/paths.js';
+import { readYamlFile } from '../lib/yaml.js';
 
-import { resolvePackageEntryPoint } from './package-entry.js'
+import { resolvePackageEntryPoint } from './package-entry.js';
 
-import type { DiscoveredPlugin, PluginLayout } from './types.js'
+import type { DiscoveredPlugin, PluginLayout } from './types.js';
 
 /** Logger module tag used by every event in this file. */
-const MODULE_TAG = 'core:plugins'
+const MODULE_TAG = 'core:plugins';
 
 // =============================================================================
 // PUBLIC ENTRY POINT
@@ -58,22 +58,19 @@ const MODULE_TAG = 'core:plugins'
  *                    (used by callers that don't have a project
  *                    context yet).
  */
-export function discoverPlugins(
-  layout: PluginLayout,
-  projectDir?: string,
-): DiscoveredPlugin[] {
-  if (!projectDir) return []
+export function discoverPlugins(layout: PluginLayout, projectDir?: string): DiscoveredPlugin[] {
+  if (!projectDir) return [];
 
-  const { domain, userSubdirs } = layout
-  const projectPaths = resolveProjectPaths(projectDir)
-  const plugins: DiscoveredPlugin[] = []
+  const { domain, userSubdirs } = layout;
+  const projectPaths = resolveProjectPaths(projectDir);
+  const plugins: DiscoveredPlugin[] = [];
 
   // 1. User-source loose files: opensip-tools/<domain>/<kind>/*.{js,mjs}
-  const toolDir = join(projectPaths.userSourceDir, domain)
+  const toolDir = join(projectPaths.userSourceDir, domain);
   for (const kind of userSubdirs) {
-    const kindDir = join(toolDir, kind)
-    if (!existsSync(kindDir)) continue
-    plugins.push(...discoverLooseFiles(kindDir, `${domain}/${kind}`))
+    const kindDir = join(toolDir, kind);
+    if (!existsSync(kindDir)) continue;
+    plugins.push(...discoverLooseFiles(kindDir, `${domain}/${kind}`));
   }
 
   // 2. Npm-installed plugins under .runtime/plugins/<domain>/.
@@ -82,12 +79,12 @@ export function discoverPlugins(
   //    silently auto-loading anything in it would be a recipe for
   //    "where did this check come from?" surprises. Explicit listing
   //    is the contract for npm plugins.
-  const declared = readProjectPluginsList(projectDir, domain)
+  const declared = readProjectPluginsList(projectDir, domain);
   if (declared && declared.length > 0) {
-    const pluginsDir = projectPaths.pluginsDir(domain)
-    const nodeModulesDir = join(pluginsDir, 'node_modules')
+    const pluginsDir = projectPaths.pluginsDir(domain);
+    const nodeModulesDir = join(pluginsDir, 'node_modules');
     if (existsSync(nodeModulesDir)) {
-      plugins.push(...discoverNpmPackages(nodeModulesDir, declared))
+      plugins.push(...discoverNpmPackages(nodeModulesDir, declared));
     }
   }
 
@@ -95,11 +92,11 @@ export function discoverPlugins(
     evt: 'plugin.loader.discover',
     module: MODULE_TAG,
     domain,
-    packageCount: plugins.filter(p => p.type === 'package').length,
-    fileCount: plugins.filter(p => p.type === 'file').length,
-  })
+    packageCount: plugins.filter((p) => p.type === 'package').length,
+    fileCount: plugins.filter((p) => p.type === 'file').length,
+  });
 
-  return plugins
+  return plugins;
 }
 
 // =============================================================================
@@ -130,26 +127,26 @@ export function readProjectPluginsList(
   projectDir: string,
   domain: string,
 ): readonly string[] | undefined {
-  let configPath: string
+  let configPath: string;
   try {
-    configPath = resolveProjectConfigPath(projectDir)
+    configPath = resolveProjectConfigPath(projectDir);
   } catch {
     // resolveProjectConfigPath throws on "no config found anywhere" —
     // discovery is implicit (no --config), so a missing config falls
     // through gracefully here (the explicit-path layer surfaces its own
     // error when the caller asked for one).
-    return undefined
+    return undefined;
   }
   // Parse YAML via the shared permissive helper to avoid a circular dep
   // between plugins/ and targets/. We only need the `plugins.<domain>`
   // array; anything else is validated by the targets loader.
-  const doc = readYamlFile(configPath)
-  if (!doc || typeof doc !== 'object') return undefined
-  const plugins = (doc as Record<string, unknown>).plugins
-  if (!plugins || typeof plugins !== 'object') return undefined
-  const list = (plugins as Record<string, unknown>)[domain]
-  if (!Array.isArray(list)) return undefined
-  return list.filter((v): v is string => typeof v === 'string')
+  const doc = readYamlFile(configPath);
+  if (!doc || typeof doc !== 'object') return undefined;
+  const plugins = (doc as Record<string, unknown>).plugins;
+  if (!plugins || typeof plugins !== 'object') return undefined;
+  const list = (plugins as Record<string, unknown>)[domain];
+  if (!Array.isArray(list)) return undefined;
+  return list.filter((v): v is string => typeof v === 'string');
 }
 
 // =============================================================================
@@ -160,7 +157,7 @@ function discoverNpmPackages(
   nodeModulesDir: string,
   declared: readonly string[],
 ): DiscoveredPlugin[] {
-  const plugins: DiscoveredPlugin[] = []
+  const plugins: DiscoveredPlugin[] = [];
 
   for (const name of declared) {
     // Reject names that could traverse before they ever touch the filesystem.
@@ -173,10 +170,10 @@ function discoverNpmPackages(
         module: MODULE_TAG,
         reason: 'invalid plugin name',
         name,
-      })
-      continue
+      });
+      continue;
     }
-    const packageDir = join(nodeModulesDir, name)
+    const packageDir = join(nodeModulesDir, name);
     // Containment check: the resolved real path (after symlinks) must
     // stay inside node_modules. Catches symlink-based escapes if an
     // attacker plants a symlink.
@@ -186,28 +183,28 @@ function discoverNpmPackages(
         module: MODULE_TAG,
         reason: 'package path resolves outside node_modules',
         name,
-      })
-      continue
+      });
+      continue;
     }
-    const plugin = tryDiscoverPackage(packageDir, name)
-    if (plugin) plugins.push(plugin)
+    const plugin = tryDiscoverPackage(packageDir, name);
+    if (plugin) plugins.push(plugin);
   }
 
-  return plugins
+  return plugins;
 }
 
 function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin | undefined {
-  if (!safeIsDirectory(packageDir)) return undefined
+  if (!safeIsDirectory(packageDir)) return undefined;
 
-  const resolved = resolvePackageEntryPoint(packageDir, name)
+  const resolved = resolvePackageEntryPoint(packageDir, name);
   if (!resolved) {
     logger.debug({
       evt: 'plugin.loader.discover.skip',
       module: MODULE_TAG,
       reason: 'invalid package.json',
       name,
-    })
-    return undefined
+    });
+    return undefined;
   }
 
   // Containment check: the resolved entry must stay inside `packageDir`
@@ -223,8 +220,8 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
       reason: 'entry point resolves outside package directory',
       name,
       entry: resolved.entry,
-    })
-    return undefined
+    });
+    return undefined;
   }
 
   if (!existsSync(resolved.entry)) {
@@ -234,8 +231,8 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
       reason: 'entry point not found',
       packageName: resolved.name,
       entryPoint: resolved.entry,
-    })
-    return undefined
+    });
+    return undefined;
   }
 
   return {
@@ -243,31 +240,31 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
     entryPoint: resolved.entry,
     namespace: resolved.name,
     source: resolved.name,
-  }
+  };
 }
 
 // =============================================================================
 // LOOSE FILE DISCOVERY
 // =============================================================================
 
-const LOOSE_FILE_EXTENSIONS = new Set(['.js', '.mjs'])
+const LOOSE_FILE_EXTENSIONS = new Set(['.js', '.mjs']);
 
 function discoverLooseFiles(dir: string, namespacePrefix: string): DiscoveredPlugin[] {
-  const plugins: DiscoveredPlugin[] = []
+  const plugins: DiscoveredPlugin[] = [];
 
-  let entries: string[]
+  let entries: string[];
   try {
-    entries = readdirSync(dir)
+    entries = readdirSync(dir);
   } catch {
-    return plugins
+    return plugins;
   }
 
   for (const entry of entries) {
-    const ext = extname(entry)
-    if (!LOOSE_FILE_EXTENSIONS.has(ext)) continue
+    const ext = extname(entry);
+    if (!LOOSE_FILE_EXTENSIONS.has(ext)) continue;
 
-    const fullPath = join(dir, entry)
-    if (!safeIsFile(fullPath)) continue
+    const fullPath = join(dir, entry);
+    if (!safeIsFile(fullPath)) continue;
 
     // Containment check: a symlink in the plugin dir pointing outside
     // it would otherwise be dynamically imported, executing arbitrary
@@ -281,21 +278,21 @@ function discoverLooseFiles(dir: string, namespacePrefix: string): DiscoveredPlu
         module: MODULE_TAG,
         reason: 'loose file resolves outside plugin dir',
         entry,
-      })
-      continue
+      });
+      continue;
     }
 
-    const baseName = basename(entry, ext)
+    const baseName = basename(entry, ext);
 
     plugins.push({
       type: 'file',
       entryPoint: fullPath,
       namespace: `${namespacePrefix}/${baseName}`,
       source: entry,
-    })
+    });
   }
 
-  return plugins
+  return plugins;
 }
 
 // =============================================================================
@@ -304,17 +301,17 @@ function discoverLooseFiles(dir: string, namespacePrefix: string): DiscoveredPlu
 
 function safeIsDirectory(path: string): boolean {
   try {
-    return statSync(path).isDirectory()
+    return statSync(path).isDirectory();
   } catch {
-    return false
+    return false;
   }
 }
 
 function safeIsFile(path: string): boolean {
   try {
-    return statSync(path).isFile()
+    return statSync(path).isFile();
   } catch {
-    return false
+    return false;
   }
 }
 
@@ -324,14 +321,14 @@ function safeIsFile(path: string): boolean {
  * against attacker-influenced paths in plugin discovery.
  */
 function isPathInside(child: string, parent: string): boolean {
-  let realChild: string
-  let realParent: string
+  let realChild: string;
+  let realParent: string;
   try {
-    realChild = realpathSync(child)
-    realParent = realpathSync(parent)
+    realChild = realpathSync(child);
+    realParent = realpathSync(parent);
   } catch {
-    return false
+    return false;
   }
-  if (realChild === realParent) return true
-  return realChild.startsWith(realParent + sep)
+  if (realChild === realParent) return true;
+  return realChild.startsWith(realParent + sep);
 }

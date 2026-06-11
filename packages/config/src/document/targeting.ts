@@ -122,10 +122,7 @@ export const targetDefinitionSchema = z.object({
 });
 
 /** A `checkOverrides` value: a single target name or a non-empty list of them. */
-export const checkTargetValueSchema = z.union([
-  z.string(),
-  z.array(z.string()).min(1),
-]);
+export const checkTargetValueSchema = z.union([z.string(), z.array(z.string()).min(1)]);
 
 /** The `targets:` block — a kebab-keyed record of target definitions. */
 export const targetsRecordSchema = z.record(

@@ -64,7 +64,10 @@ export const resolveJsxElement: EdgeResolver<JsxOpeningLike> = (node, ctx) => {
  * for `<Foo/>`, plus the leftmost identifier for a qualified `<A.B.C/>` tag (the
  * namespace import `A`). Deduped, binding candidates first.
  */
-function jsxBindingNames(tagName: ts.JsxTagNameExpression, candidateName: string): readonly string[] {
+function jsxBindingNames(
+  tagName: ts.JsxTagNameExpression,
+  candidateName: string,
+): readonly string[] {
   const names = new Set<string>([candidateName]);
   let cur: ts.Node = tagName;
   while (ts.isPropertyAccessExpression(cur)) cur = cur.expression;

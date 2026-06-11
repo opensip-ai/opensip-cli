@@ -8,58 +8,58 @@
  * inside the package, creating fragile coupling to internal structure.
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 // Match a `packages/` or `services/` workspace segment whether the path is
 // repo-relative (`packages/a/package.json`) or absolute (`/abs/packages/a/…`).
-const WORKSPACE_SEGMENT = /(?:^|\/)(?:packages|services)\//
-const PACKAGES_SEGMENT = /(?:^|\/)packages\//
+const WORKSPACE_SEGMENT = /(?:^|\/)(?:packages|services)\//;
+const PACKAGES_SEGMENT = /(?:^|\/)packages\//;
 
 export const packageJsonExportsField = defineCheck({
   id: 'e1f2a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b',
   slug: 'package-json-exports-field',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   confidence: 'high',
-  description: 'Ensures packages have an "exports" field in package.json for explicit module resolution',
+  description:
+    'Ensures packages have an "exports" field in package.json for explicit module resolution',
   tags: ['architecture', 'esm', 'monorepo'],
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const violations: CheckViolation[] = []
-    const packageJsonPaths = files.paths.filter(p =>
-      p.endsWith('package.json') &&
-      !p.includes('node_modules') &&
-      WORKSPACE_SEGMENT.test(p), // only workspace packages/services (excludes the root)
-    )
+    const violations: CheckViolation[] = [];
+    const packageJsonPaths = files.paths.filter(
+      (p) => p.endsWith('package.json') && !p.includes('node_modules') && WORKSPACE_SEGMENT.test(p), // only workspace packages/services (excludes the root)
+    );
 
     for (const filePath of packageJsonPaths) {
-      const content = await files.read(filePath)
+      const content = await files.read(filePath);
       /* v8 ignore next -- defensive guard */
-      if (!content) continue
+      if (!content) continue;
 
-      let parsed: Record<string, unknown>
+      let parsed: Record<string, unknown>;
       try {
-        parsed = JSON.parse(content) as Record<string, unknown>
-      /* v8 ignore next 1 -- defensive catch: parse failures already handled */
+        parsed = JSON.parse(content) as Record<string, unknown>;
+        /* v8 ignore next 1 -- defensive catch: parse failures already handled */
       } catch {
-        continue
+        continue;
       }
 
       // Skip private packages that aren't consumed by others
-      if (parsed.private === true && !PACKAGES_SEGMENT.test(filePath)) continue
+      if (parsed.private === true && !PACKAGES_SEGMENT.test(filePath)) continue;
 
       if (!parsed.exports) {
-        const name = (parsed.name as string) ?? filePath
+        const name = (parsed.name as string) ?? filePath;
         violations.push({
           filePath,
           line: 1,
           message: `Package "${name}" has no "exports" field. Consumers can import from any internal path, creating fragile coupling.`,
           severity: 'warning',
-          suggestion: 'Add an "exports" field to explicitly define public entry points. Example: "exports": { ".": "./dist/index.js" }',
+          suggestion:
+            'Add an "exports" field to explicitly define public entry points. Example: "exports": { ".": "./dist/index.js" }',
           type: 'MISSING_EXPORTS_FIELD',
-        })
+        });
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

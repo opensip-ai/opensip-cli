@@ -31,6 +31,7 @@ import tseslint from 'typescript-eslint';
 import sonarjs from 'eslint-plugin-sonarjs';
 import unicorn from 'eslint-plugin-unicorn';
 import { importX } from 'eslint-plugin-import-x';
+import eslintConfigPrettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 export default tseslint.config(
@@ -98,21 +99,27 @@ export default tseslint.config(
       // -- TypeScript fine-tuning -----------------------------------------
       // The codebase uses `_unused` arg conventions and intentional `void`
       // expressions for fire-and-forget promises.
-      '@typescript-eslint/no-unused-vars': ['error', {
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_',
-        caughtErrors: 'none',
-      }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'none',
+        },
+      ],
       // We accept `any` in tightly-scoped places (third-party JSON parsing,
       // Commander's loose option types). Prefer unknown but don't fail on any.
       '@typescript-eslint/no-explicit-any': 'warn',
       // Allow `Record<string, unknown>` over the more pedantic `object`.
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
       // Type-only imports — required for ESM-with-`type: module`.
-      '@typescript-eslint/consistent-type-imports': ['error', {
-        prefer: 'type-imports',
-        fixStyle: 'inline-type-imports',
-      }],
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        {
+          prefer: 'type-imports',
+          fixStyle: 'inline-type-imports',
+        },
+      ],
 
       // -- unicorn opinions we override -----------------------------------
       'unicorn/prevent-abbreviations': 'off',
@@ -172,11 +179,14 @@ export default tseslint.config(
       // Migrated 2026-05-29 — eslint-plugin-import@2.32 crashed ESLint 10's
       // import/order autofix (removed `sourceCode.getTokenOrCommentAfter`).
       'import-x/no-cycle': ['error', { maxDepth: 10 }],
-      'import-x/order': ['error', {
-        'groups': ['builtin', 'external', 'internal', 'parent', 'sibling', 'index', 'type'],
-        'newlines-between': 'always',
-        'alphabetize': { order: 'asc', caseInsensitive: true },
-      }],
+      'import-x/order': [
+        'error',
+        {
+          groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index', 'type'],
+          'newlines-between': 'always',
+          alphabetize: { order: 'asc', caseInsensitive: true },
+        },
+      ],
       'import-x/no-duplicates': 'error',
       // Default to off — the typescript resolver can't always see workspace
       // package mains before they're built. Type checker catches missing
@@ -193,18 +203,21 @@ export default tseslint.config(
       // also forbids `import type` of a devDep from production code; the
       // test/script/config globs below are where devDeps (vitest, etc.) are
       // legitimately allowed.
-      'import-x/no-extraneous-dependencies': ['error', {
-        devDependencies: [
-          '**/*.test.{ts,tsx}',
-          '**/__tests__/**',
-          '**/*.config.{ts,mts,cts}',
-          'scripts/**',
-          '.config/**',
-        ],
-        optionalDependencies: false,
-        peerDependencies: true,
-        includeTypes: true,
-      }],
+      'import-x/no-extraneous-dependencies': [
+        'error',
+        {
+          devDependencies: [
+            '**/*.test.{ts,tsx}',
+            '**/__tests__/**',
+            '**/*.config.{ts,mts,cts}',
+            'scripts/**',
+            '.config/**',
+          ],
+          optionalDependencies: false,
+          peerDependencies: true,
+          includeTypes: true,
+        },
+      ],
     },
   },
 
@@ -234,9 +247,12 @@ export default tseslint.config(
     files: ['packages/cli/src/ui/**/*.{ts,tsx}'],
     rules: {
       // React component filenames are PascalCase.
-      'unicorn/filename-case': ['error', {
-        cases: { kebabCase: true, pascalCase: true },
-      }],
+      'unicorn/filename-case': [
+        'error',
+        {
+          cases: { kebabCase: true, pascalCase: true },
+        },
+      ],
     },
   },
 
@@ -271,16 +287,21 @@ export default tseslint.config(
       'packages/graph/engine/src/**/*.test.ts',
     ],
     rules: {
-      'no-restricted-imports': ['error', {
-        paths: [{
-          name: 'typescript',
-          message:
-            'The graph engine must stay parser-agnostic. Route language ' +
-            'work through the GraphLanguageAdapter contract from ' +
-            'lang-adapter/; TypeScript compiler access belongs in the ' +
-            '@opensip-tools/graph-typescript adapter package.',
-        }],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'typescript',
+              message:
+                'The graph engine must stay parser-agnostic. Route language ' +
+                'work through the GraphLanguageAdapter contract from ' +
+                'lang-adapter/; TypeScript compiler access belongs in the ' +
+                '@opensip-tools/graph-typescript adapter package.',
+            },
+          ],
+        },
+      ],
     },
   },
 
@@ -301,16 +322,21 @@ export default tseslint.config(
       'packages/graph/graph-{python,rust,go,java}/src/**/*.test.ts',
     ],
     rules: {
-      'no-restricted-imports': ['error', {
-        paths: [{
-          name: 'web-tree-sitter',
-          message:
-            'ADR-0010: every tree-sitter graph adapter (python, rust, go, java) now ' +
-            'parses via its @opensip-tools/lang-* package and consumes the tree-sitter ' +
-            'substrate from @opensip-tools/tree-sitter. Production code must not import ' +
-            'web-tree-sitter directly (test fixtures that build trees are exempt).',
-        }],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'web-tree-sitter',
+              message:
+                'ADR-0010: every tree-sitter graph adapter (python, rust, go, java) now ' +
+                'parses via its @opensip-tools/lang-* package and consumes the tree-sitter ' +
+                'substrate from @opensip-tools/tree-sitter. Production code must not import ' +
+                'web-tree-sitter directly (test fixtures that build trees are exempt).',
+            },
+          ],
+        },
+      ],
     },
   },
 
@@ -331,18 +357,23 @@ export default tseslint.config(
       'packages/fitness/checks-*/src/**/*.test.ts',
     ],
     rules: {
-      'no-restricted-imports': ['error', {
-        patterns: [{
-          group: [
-            '@opensip-tools/core/*',
-            '!@opensip-tools/core/languages/*',
-            '!@opensip-tools/core/test-utils/*',
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@opensip-tools/core/*',
+                '!@opensip-tools/core/languages/*',
+                '!@opensip-tools/core/test-utils/*',
+              ],
+              message:
+                'Import @opensip-tools/core via the package barrel, not a ' +
+                'subpath. Sanctioned subpaths: languages/* and test-utils/*.',
+            },
           ],
-          message:
-            'Import @opensip-tools/core via the package barrel, not a ' +
-            'subpath. Sanctioned subpaths: languages/* and test-utils/*.',
-        }],
-      }],
+        },
+      ],
     },
   },
 
@@ -390,10 +421,17 @@ export default tseslint.config(
       // server-side-only no-os-command-from-path rule above.
       'sonarjs/slow-regex': 'off',
       // Build-script pragmatics.
-      'sonarjs/fixme-tag': 'off',              // tracked by fitness's todo-comments check, like todo-tag
-      'sonarjs/cognitive-complexity': 'off',   // procedural one-shot build scripts
+      'sonarjs/fixme-tag': 'off', // tracked by fitness's todo-comments check, like todo-tag
+      'sonarjs/cognitive-complexity': 'off', // procedural one-shot build scripts
       'unicorn/prefer-top-level-await': 'off', // .cjs can't TLA; .mjs scripts use an async main() by choice
       '@typescript-eslint/no-require-imports': 'off', // .cjs config files require() by definition
     },
   },
+
+  // ---------------------------------------------------------------------------
+  // MUST BE LAST — eslint-config-prettier turns off every ESLint rule that
+  // could conflict with Prettier's layout decisions, so ESLint owns quality
+  // and Prettier owns formatting with no overlap. See .config/prettier.config.mjs.
+  // ---------------------------------------------------------------------------
+  eslintConfigPrettier,
 );

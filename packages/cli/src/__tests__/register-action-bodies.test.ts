@@ -40,25 +40,30 @@ vi.mock('../commands/history.js', () => ({
 }));
 
 vi.mock('../commands/clear.js', () => ({
-  executeClear: vi.fn((opts: unknown) =>
-    Promise.resolve({ type: 'clear', opts } as never),
-  ),
+  executeClear: vi.fn((opts: unknown) => Promise.resolve({ type: 'clear', opts } as never)),
 }));
 
 vi.mock('../commands/configure.js', () => ({
   executeConfigure: vi.fn(() =>
-    Promise.resolve({ type: 'configure-done', action: 'cancelled', configPath: '/var/opt/x' } as never),
+    Promise.resolve({
+      type: 'configure-done',
+      action: 'cancelled',
+      configPath: '/var/opt/x',
+    } as never),
   ),
 }));
 
 vi.mock('../commands/init.js', () => ({
-  executeInit: vi.fn((args: { cwd: string }) => ({
-    type: 'init',
-    path: `${args.cwd}/opensip-tools.config.yml`,
-    cwd: args.cwd,
-    configFilename: 'opensip-tools.config.yml',
-    created: true,
-  } as never)),
+  executeInit: vi.fn(
+    (args: { cwd: string }) =>
+      ({
+        type: 'init',
+        path: `${args.cwd}/opensip-tools.config.yml`,
+        cwd: args.cwd,
+        configFilename: 'opensip-tools.config.yml',
+        created: true,
+      }) as never,
+  ),
 }));
 
 vi.mock('../commands/uninstall.js', () => ({
@@ -169,7 +174,9 @@ describe('plugin spec — action bodies', () => {
       return true;
     });
     try {
-      await program.parseAsync(['plugin', 'list', '--cwd', '/explicit/cwd', '--json'], { from: 'user' });
+      await program.parseAsync(['plugin', 'list', '--cwd', '/explicit/cwd', '--json'], {
+        from: 'user',
+      });
     } finally {
       spy.mockRestore();
     }
@@ -182,16 +189,24 @@ describe('plugin spec — action bodies', () => {
     const { ctx } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['plugin', 'add', '@my-co/foo', '--cwd', '/p', '--domain', 'fit'], { from: 'user' });
-    expect(pluginAdd).toHaveBeenCalledWith('@my-co/foo', '/p', 'fit', ctx.pluginLayouts, { project: false });
+    await program.parseAsync(['plugin', 'add', '@my-co/foo', '--cwd', '/p', '--domain', 'fit'], {
+      from: 'user',
+    });
+    expect(pluginAdd).toHaveBeenCalledWith('@my-co/foo', '/p', 'fit', ctx.pluginLayouts, {
+      project: false,
+    });
   });
 
   it('plugin remove: forwards the positional arg, --domain, and effectiveCwd', async () => {
     const { ctx } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['plugin', 'remove', '@my-co/foo', '--cwd', '/p', '--domain', 'sim'], { from: 'user' });
-    expect(pluginRemove).toHaveBeenCalledWith('@my-co/foo', '/p', 'sim', ctx.pluginLayouts, { project: false });
+    await program.parseAsync(['plugin', 'remove', '@my-co/foo', '--cwd', '/p', '--domain', 'sim'], {
+      from: 'user',
+    });
+    expect(pluginRemove).toHaveBeenCalledWith('@my-co/foo', '/p', 'sim', ctx.pluginLayouts, {
+      project: false,
+    });
   });
 
   it('plugin sync: forwards --domain and effectiveCwd', async () => {
@@ -223,9 +238,7 @@ describe('sessions spec — action bodies', () => {
 
     await program.parseAsync(['sessions', 'purge', '--older-than', '7', '--yes'], { from: 'user' });
 
-    expect(executeClear).toHaveBeenCalledWith(
-      expect.objectContaining({ olderThan: 7, yes: true }),
-    );
+    expect(executeClear).toHaveBeenCalledWith(expect.objectContaining({ olderThan: 7, yes: true }));
   });
 
   it('sessions purge --older-than rejects a non-integer value via the spec parser', async () => {
@@ -237,10 +250,12 @@ describe('sessions spec — action bodies', () => {
     // (parseOlderThanDays); a non-numeric value throws at parse time, before the
     // handler runs, so executeClear is never reached.
     const origWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = (() => true);
+    process.stderr.write = () => true;
     try {
       await expect(
-        program.parseAsync(['sessions', 'purge', '--older-than', 'soon', '--yes'], { from: 'user' }),
+        program.parseAsync(['sessions', 'purge', '--older-than', 'soon', '--yes'], {
+          from: 'user',
+        }),
       ).rejects.toThrow(/Invalid --older-than/);
     } finally {
       process.stderr.write = origWrite;
@@ -308,7 +323,10 @@ describe('init spec — action body', () => {
     await program.parseAsync(['init'], { from: 'user' });
     expect(executeInit).toHaveBeenCalledTimes(1);
     const callArgs = vi.mocked(executeInit).mock.calls[0]?.[0] as {
-      cwd: string; cwdExplicit: boolean; json: boolean; language?: string;
+      cwd: string;
+      cwdExplicit: boolean;
+      json: boolean;
+      language?: string;
     };
     expect(callArgs.json).toBe(false);
     expect(callArgs.cwdExplicit).toBe(false);
@@ -325,7 +343,8 @@ describe('init spec — action body', () => {
 
     await program.parseAsync(['init', '--cwd', '/explicit'], { from: 'user' });
     const callArgs = vi.mocked(executeInit).mock.calls.at(-1)?.[0] as {
-      cwd: string; cwdExplicit: boolean;
+      cwd: string;
+      cwdExplicit: boolean;
     };
     expect(callArgs.cwd).toBe('/explicit');
     expect(callArgs.cwdExplicit).toBe(true);
@@ -419,16 +438,16 @@ describe('uninstall spec — action body', () => {
     const program = mount(ctx);
 
     await program.parseAsync(['uninstall', '--project', '--yes'], { from: 'user' });
-    expect(executeUninstall).toHaveBeenCalledWith(
-      expect.objectContaining({ project: true }),
-    );
+    expect(executeUninstall).toHaveBeenCalledWith(expect.objectContaining({ project: true }));
   });
 
   it('uninstall --project <path>: forwards project=<path>', async () => {
     const { ctx } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['uninstall', '--project', '/var/opt/some-proj', '--yes'], { from: 'user' });
+    await program.parseAsync(['uninstall', '--project', '/var/opt/some-proj', '--yes'], {
+      from: 'user',
+    });
     expect(executeUninstall).toHaveBeenCalledWith(
       expect.objectContaining({ project: '/var/opt/some-proj' }),
     );

@@ -257,12 +257,7 @@ function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
   for (const child of childrenOf(node)) visit(child, frame, ctx);
 }
 
-function visitFunction(
-  node: Node,
-  frame: Frame,
-  ctx: WalkCtx,
-  receiverType: string | null,
-): void {
+function visitFunction(node: Node, frame: Frame, ctx: WalkCtx, receiverType: string | null): void {
   const occ = buildFunctionOccurrence(node, ctx, receiverType);
   if (!occ) return;
   record(ctx.out, occ);
@@ -300,11 +295,13 @@ function buildFunctionOccurrence(
 ): FunctionOccurrence | null {
   const name = nameOf(node) ?? '<anon-fn>';
   const digest = digestGoBody(ctx.file.source.slice(node.startIndex, node.endIndex));
-  const kind: FunctionOccurrence['kind'] = receiverType === null ? 'function-declaration' : 'method';
+  const kind: FunctionOccurrence['kind'] =
+    receiverType === null ? 'function-declaration' : 'method';
   const qualifiedBase = `${ctx.packageName}/${ctx.filePathProjectRel}`.replace(/\.go$/, '');
-  const qualifiedName = receiverType === null
-    ? `${qualifiedBase}.${name}`
-    : `${qualifiedBase}.(${receiverType}).${name}`;
+  const qualifiedName =
+    receiverType === null
+      ? `${qualifiedBase}.${name}`
+      : `${qualifiedBase}.(${receiverType}).${name}`;
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
@@ -326,10 +323,7 @@ function buildFunctionOccurrence(
   };
 }
 
-function buildClosureOccurrence(
-  node: Node,
-  ctx: WalkCtx,
-): FunctionOccurrence | null {
+function buildClosureOccurrence(node: Node, ctx: WalkCtx): FunctionOccurrence | null {
   const digest = digestGoBody(ctx.file.source.slice(node.startIndex, node.endIndex));
   const startLine = node.startPosition.row + 1;
   const startCol = node.startPosition.column;
@@ -355,4 +349,3 @@ function buildClosureOccurrence(
     calls: [],
   };
 }
-

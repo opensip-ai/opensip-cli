@@ -8,20 +8,21 @@
  * - Excessive named imports from a single module (>15 items)
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 interface HeavyLibrary {
-  pattern: RegExp
-  message: string
-  suggestion: string
-  deprecated?: boolean
+  pattern: RegExp;
+  message: string;
+  suggestion: string;
+  deprecated?: boolean;
 }
 
 const HEAVY_LIBRARIES: HeavyLibrary[] = [
   {
     pattern: /import\s+\*\s+as\s+\w+\s+from\s+['"]lodash['"]/,
     message: 'Namespace import of lodash pulls in the entire library (~70KB)',
-    suggestion: "Use named imports: import { debounce } from 'lodash' or import debounce from 'lodash/debounce'",
+    suggestion:
+      "Use named imports: import { debounce } from 'lodash' or import debounce from 'lodash/debounce'",
   },
   {
     pattern: /import\s+(?:\w+|\{[^}]+\})\s+from\s+['"]moment['"]/,
@@ -38,34 +39,36 @@ const HEAVY_LIBRARIES: HeavyLibrary[] = [
   {
     pattern: /import\s+\*\s+as\s+\w+\s+from\s+['"]rxjs['"]/,
     message: 'Namespace import of rxjs pulls in the entire library. Use specific imports',
-    suggestion: "Use: import { Observable, map } from 'rxjs' or import { map } from 'rxjs/operators'",
+    suggestion:
+      "Use: import { Observable, map } from 'rxjs' or import { map } from 'rxjs/operators'",
   },
-]
+];
 
-const EXCESSIVE_NAMED_IMPORT_THRESHOLD = 15
-const NAMED_IMPORT_PATTERN = /import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/
+const EXCESSIVE_NAMED_IMPORT_THRESHOLD = 15;
+const NAMED_IMPORT_PATTERN = /import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/;
 
 export const heavyImportDetection = defineCheck({
   id: 'f3a4b5c6-d7e8-9f0a-1b2c-3d4e5f6a7b8c',
   slug: 'heavy-import-detection',
   scope: { languages: ['typescript', 'javascript'], concerns: ['backend', 'frontend'] },
   confidence: 'high',
-  description: 'Detects heavy/deprecated library imports and excessive named imports that bloat bundle size',
+  description:
+    'Detects heavy/deprecated library imports and excessive named imports that bloat bundle size',
   tags: ['architecture', 'performance', 'bundle-size'],
   fileTypes: ['ts', 'tsx', 'js', 'jsx'],
 
   // eslint-disable-next-line sonarjs/cognitive-complexity -- bundler-aware heuristic: each branch detects a distinct heavy-import pattern (deprecated, namespace, deep-path, named-import-explosion)
   analyze(content: string, filePath: string): CheckViolation[] {
-    if (filePath.includes('.test.') || filePath.includes('__tests__')) return []
+    if (filePath.includes('.test.') || filePath.includes('__tests__')) return [];
 
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (const [i, line] of lines.entries()) {
-      if (!line) continue
+      if (!line) continue;
 
-      const trimmed = line.trim()
-      if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue
+      const trimmed = line.trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
       // Check heavy library patterns
       for (const lib of HEAVY_LIBRARIES) {
@@ -78,28 +81,29 @@ export const heavyImportDetection = defineCheck({
             type: lib.deprecated ? 'DEPRECATED_LIBRARY' : 'HEAVY_IMPORT',
             match: trimmed,
             filePath,
-          })
+          });
         }
       }
 
       // Check excessive named imports
-      const namedMatch = NAMED_IMPORT_PATTERN.exec(line)
+      const namedMatch = NAMED_IMPORT_PATTERN.exec(line);
       if (namedMatch?.[1]) {
-        const names = namedMatch[1].split(',').filter(n => n.trim().length > 0)
+        const names = namedMatch[1].split(',').filter((n) => n.trim().length > 0);
         if (names.length > EXCESSIVE_NAMED_IMPORT_THRESHOLD) {
           violations.push({
             line: i + 1,
             message: `Excessive named imports: ${names.length} items from '${namedMatch[2]}'. Consider splitting into multiple import groups.`,
             severity: 'warning',
-            suggestion: 'Split into multiple focused imports or evaluate if all imports are needed.',
+            suggestion:
+              'Split into multiple focused imports or evaluate if all imports are needed.',
             type: 'EXCESSIVE_NAMED_IMPORTS',
             match: `${names.length} imports from ${namedMatch[2]}`,
             filePath,
-          })
+          });
         }
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

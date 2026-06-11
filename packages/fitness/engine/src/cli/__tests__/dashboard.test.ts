@@ -24,11 +24,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { fitnessTool } from '../../tool.js';
 import { collectFitnessDashboardData } from '../dashboard.js';
 
-
-import type {
-  CheckCatalogEntry,
-  RecipeCatalogEntry,
-} from '../dashboard.js';
+import type { CheckCatalogEntry, RecipeCatalogEntry } from '../dashboard.js';
 
 /** The fitness engine package root (carries the manifest), 4 dirs up from this test. */
 const ENGINE_DIR = dirname(dirname(dirname(dirname(fileURLToPath(import.meta.url)))));
@@ -72,11 +68,7 @@ describe('collectFitnessDashboardData', () => {
     const scope = makeTestScope();
     const result = await collectFitnessDashboardData(scope);
 
-    expect(Object.keys(result).sort()).toEqual([
-      'checkCatalog',
-      'editorProtocol',
-      'recipeCatalog',
-    ]);
+    expect(Object.keys(result).sort()).toEqual(['checkCatalog', 'editorProtocol', 'recipeCatalog']);
   });
 
   it('does NOT contribute sessions or graphCatalog (CLI / graph own those)', async () => {

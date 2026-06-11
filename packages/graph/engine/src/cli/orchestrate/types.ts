@@ -13,14 +13,7 @@
  */
 
 /** Canonical pipeline stages, in execution order. */
-export type GraphStage =
-  | 'discover'
-  | 'parse'
-  | 'walk'
-  | 'resolve'
-  | 'index'
-  | 'features'
-  | 'rules';
+export type GraphStage = 'discover' | 'parse' | 'walk' | 'resolve' | 'index' | 'features' | 'rules';
 
 /** Stage order — consumed by the live view to render the checklist. */
 export const GRAPH_STAGES: readonly GraphStage[] = [

@@ -288,12 +288,18 @@ export interface DiscoveryOptions {
  * (e.g. running outside any project) simply contributes no `.runtime`
  * source.
  */
-export function buildToolDiscoverySources(cwd: string, cliInstallDir: string): ToolDiscoverySource[] {
+export function buildToolDiscoverySources(
+  cwd: string,
+  cliInstallDir: string,
+): ToolDiscoverySource[] {
   const sources: ToolDiscoverySource[] = [];
   try {
     const project = resolveProjectContext({ cwd, cwdExplicit: false });
     if (project.scope === 'project') {
-      sources.push({ dir: resolveProjectPaths(project.projectRoot).pluginsDir('tool'), mode: 'scanDir' });
+      sources.push({
+        dir: resolveProjectPaths(project.projectRoot).pluginsDir('tool'),
+        mode: 'scanDir',
+      });
     }
   } catch {
     // @swallow-ok no resolvable project context (e.g. running outside any
@@ -394,16 +400,22 @@ function emitInstalledLoadFailure(
   load: Extract<ToolRuntimeLoad, { ok: false }>,
 ): void {
   if (load.reason === 'no-entry') {
-    process.stderr.write(`opensip-tools: tool package ${name} has no resolvable entry point — skipping\n`);
+    process.stderr.write(
+      `opensip-tools: tool package ${name} has no resolvable entry point — skipping\n`,
+    );
     logger.warn({ evt: 'cli.tool.no_entry', module: BOOTSTRAP_MODULE, name });
     return;
   }
   if (load.reason === 'invalid-shape') {
-    process.stderr.write(`opensip-tools: tool package ${name} does not export a valid \`tool\` — skipping\n`);
+    process.stderr.write(
+      `opensip-tools: tool package ${name} does not export a valid \`tool\` — skipping\n`,
+    );
     logger.warn({ evt: 'cli.tool.invalid_shape', module: BOOTSTRAP_MODULE, name });
     return;
   }
-  process.stderr.write(`opensip-tools: failed to load tool ${name}: ${load.detail ?? 'import failed'}\n`);
+  process.stderr.write(
+    `opensip-tools: failed to load tool ${name}: ${load.detail ?? 'import failed'}\n`,
+  );
   logger.warn({ evt: 'cli.tool.load_failed', module: BOOTSTRAP_MODULE, name, error: load.detail });
 }
 

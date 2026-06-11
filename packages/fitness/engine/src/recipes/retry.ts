@@ -8,24 +8,24 @@
  * so call sites and tests are unchanged.
  */
 
-import { runWithRetry } from '@opensip-tools/core'
+import { runWithRetry } from '@opensip-tools/core';
 
-import { CheckAbortedError } from '../framework/execution-context.js'
+import { CheckAbortedError } from '../framework/execution-context.js';
 
 /** Configuration for retry behavior */
 export interface RetryOptions {
-  readonly enabled: boolean
-  readonly maxRetries: number
-  readonly checkId: string
-  readonly checkSlug: string
+  readonly enabled: boolean;
+  readonly maxRetries: number;
+  readonly checkId: string;
+  readonly checkSlug: string;
 }
 
 /** Result of a retry-wrapped function execution */
 export interface RetryResult<T> {
-  readonly result: T | undefined
-  readonly lastError: unknown
-  readonly retryCount: number
-  readonly wasRetried: boolean
+  readonly result: T | undefined;
+  readonly lastError: unknown;
+  readonly retryCount: number;
+  readonly wasRetried: boolean;
 }
 
 /**
@@ -40,5 +40,5 @@ export async function executeWithRetry<T>(
     enabled: options.enabled,
     maxRetries: options.maxRetries,
     shouldNotRetry: (error) => error instanceof CheckAbortedError,
-  })
+  });
 }

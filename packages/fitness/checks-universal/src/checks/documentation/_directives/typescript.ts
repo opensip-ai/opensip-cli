@@ -6,39 +6,37 @@
  * (and tested) as siblings.
  */
 
-import type { DirectiveInfo } from './types.js'
+import type { DirectiveInfo } from './types.js';
 
-const TS_DIRECTIVE_KEYWORD = '@ts-expect-error'
-const TS_EXPECT_ERROR_KEYWORD = '@ts-expect-error'
+const TS_DIRECTIVE_KEYWORD = '@ts-expect-error';
+const TS_EXPECT_ERROR_KEYWORD = '@ts-expect-error';
 
-function extractTsDirectiveAndReason(
-  line: string,
-): { directive: string; reason: string } | null {
-  let directiveStart = line.indexOf(TS_DIRECTIVE_KEYWORD)
-  let directive = TS_DIRECTIVE_KEYWORD
+function extractTsDirectiveAndReason(line: string): { directive: string; reason: string } | null {
+  let directiveStart = line.indexOf(TS_DIRECTIVE_KEYWORD);
+  let directive = TS_DIRECTIVE_KEYWORD;
 
   if (directiveStart === -1) {
-    directiveStart = line.indexOf(TS_EXPECT_ERROR_KEYWORD)
-    directive = TS_EXPECT_ERROR_KEYWORD
+    directiveStart = line.indexOf(TS_EXPECT_ERROR_KEYWORD);
+    directive = TS_EXPECT_ERROR_KEYWORD;
   }
 
   if (directiveStart === -1) {
-    return null
+    return null;
   }
 
   // Must be in a `//` comment.
-  const beforeDirective = line.slice(0, directiveStart)
+  const beforeDirective = line.slice(0, directiveStart);
   if (!beforeDirective.includes('//')) {
-    return null
+    return null;
   }
 
   // Extract reason after directive (after : or - or em-dash).
   // Bounded quantifiers prevent ReDoS.
-  const afterDirective = line.slice(directiveStart + directive.length)
-  const separatorMatch = /^\s{0,5}[:-—]\s{0,5}(.{0,500})/.exec(afterDirective)
-  const reason = separatorMatch?.[1]?.trim() ?? ''
+  const afterDirective = line.slice(directiveStart + directive.length);
+  const separatorMatch = /^\s{0,5}[:-—]\s{0,5}(.{0,500})/.exec(afterDirective);
+  const reason = separatorMatch?.[1]?.trim() ?? '';
 
-  return { directive, reason }
+  return { directive, reason };
 }
 
 export function parseTypeScriptDirectives(
@@ -46,13 +44,13 @@ export function parseTypeScriptDirectives(
   filePath: string,
   file: string,
 ): DirectiveInfo[] {
-  const directives: DirectiveInfo[] = []
-  const lines = content.split('\n')
+  const directives: DirectiveInfo[] = [];
+  const lines = content.split('\n');
 
   for (const [i, line] of lines.entries()) {
-    if (line === undefined) continue
+    if (line === undefined) continue;
 
-    const result = extractTsDirectiveAndReason(line)
+    const result = extractTsDirectiveAndReason(line);
     if (result) {
       directives.push({
         file,
@@ -63,9 +61,9 @@ export function parseTypeScriptDirectives(
         rule: result.directive,
         reason: result.reason,
         raw: line.trim(),
-      })
+      });
     }
   }
 
-  return directives
+  return directives;
 }

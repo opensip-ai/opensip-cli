@@ -3,35 +3,34 @@
  * @fileoverview Detects hardcoded correlation ID values
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { countUnescapedBackticks } from '@opensip-tools/lang-typescript'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { countUnescapedBackticks } from '@opensip-tools/lang-typescript';
 
 /**
  * Pattern for detecting hardcoded correlationId string literal assignments.
  * Matches: correlationId: 'something' or correlationId: "something"
  * Only matches single/double quotes, not backtick template literals.
  */
-const HARDCODED_CORR_ID_PATTERN =
-  /correlationId\s{0,5}:\s{0,5}['"]([a-zA-Z0-9_-]{1,100})['"]/g
+const HARDCODED_CORR_ID_PATTERN = /correlationId\s{0,5}:\s{0,5}['"]([a-zA-Z0-9_-]{1,100})['"]/g;
 
 function findHardcodedCorrelationIds(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
-  let inTemplateLiteral = false
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
+  let inTemplateLiteral = false;
 
   for (const [i, line] of lines.entries()) {
     /* v8 ignore next -- defensive guard */
-    if (!line) continue
+    if (!line) continue;
 
-    const backtickCount = countUnescapedBackticks(line)
-    if (backtickCount % 2 === 1) inTemplateLiteral = !inTemplateLiteral
-    if (inTemplateLiteral && backtickCount % 2 === 0) continue
+    const backtickCount = countUnescapedBackticks(line);
+    if (backtickCount % 2 === 1) inTemplateLiteral = !inTemplateLiteral;
+    if (inTemplateLiteral && backtickCount % 2 === 0) continue;
 
-    const trimmed = line.trim()
-    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue
+    const trimmed = line.trim();
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
-    HARDCODED_CORR_ID_PATTERN.lastIndex = 0
-    let match
+    HARDCODED_CORR_ID_PATTERN.lastIndex = 0;
+    let match;
     while ((match = HARDCODED_CORR_ID_PATTERN.exec(line)) !== null) {
       violations.push({
         line: i + 1,
@@ -43,11 +42,11 @@ function findHardcodedCorrelationIds(content: string, filePath: string): CheckVi
         match: match[0],
         type: 'hardcoded-correlation-id',
         filePath,
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 export const noHardcodedCorrelationId = defineCheck({
@@ -72,15 +71,15 @@ export const noHardcodedCorrelationId = defineCheck({
 
   analyze(content: string, filePath: string): CheckViolation[] {
     if (isTestFile(filePath)) {
-      return []
+      return [];
     }
     if (filePath.includes('/fitness/src/checks/')) {
-      return []
+      return [];
     }
     if (!content.includes('correlationId')) {
-      return []
+      return [];
     }
 
-    return findHardcodedCorrelationIds(content, filePath)
+    return findHardcodedCorrelationIds(content, filePath);
   },
-})
+});

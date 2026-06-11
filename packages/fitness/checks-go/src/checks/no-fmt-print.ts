@@ -10,9 +10,9 @@
  * the literal string `"fmt.Println("` inside a doc-string or comment
  * doesn't false-fire.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-const FMT_PRINT_PATTERN = /\bfmt\.(Print|Println|Printf)\s*\(/g
+const FMT_PRINT_PATTERN = /\bfmt\.(Print|Println|Printf)\s*\(/g;
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the
@@ -21,23 +21,23 @@ const FMT_PRINT_PATTERN = /\bfmt\.(Print|Println|Printf)\s*\(/g
  * requires an ExecutionContext to invoke).
  */
 export function analyzeFmtPrint(content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
   for (const [i, line_] of lines.entries()) {
-    const line = line_
-    let match: RegExpExecArray | null
-    FMT_PRINT_PATTERN.lastIndex = 0
+    const line = line_;
+    let match: RegExpExecArray | null;
+    FMT_PRINT_PATTERN.lastIndex = 0;
     while ((match = FMT_PRINT_PATTERN.exec(line)) !== null) {
-      const method = match[1]
+      const method = match[1];
       violations.push({
         message: `fmt.${method} bypasses the structured logger and shouldn't ship`,
         severity: 'warning',
         line: i + 1,
         suggestion: 'Use the structured logger (slog, zap, zerolog) instead of fmt.Print*',
-      })
+      });
     }
   }
-  return violations
+  return violations;
 }
 
 export const noFmtPrint = defineCheck({
@@ -50,4 +50,4 @@ export const noFmtPrint = defineCheck({
   // docstring or comment does not false-fire.
   contentFilter: 'strip-strings-and-comments',
   analyze: (content) => analyzeFmtPrint(content),
-})
+});

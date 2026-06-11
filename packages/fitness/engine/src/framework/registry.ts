@@ -13,13 +13,13 @@
  * structure not in the base's shape.
  */
 
-import { NotFoundError, Registry, logger , type Registerable } from '@opensip-tools/core';
+import { NotFoundError, Registry, logger, type Registerable } from '@opensip-tools/core';
 
 import type { Check } from './check-types.js';
 
 interface RegisterableCheck extends Registerable {
-  readonly id: string;       // key: `namespace:slug` or bare slug
-  readonly name: string;     // same as id (Check has no separate name)
+  readonly id: string; // key: `namespace:slug` or bare slug
+  readonly name: string; // same as id (Check has no separate name)
   readonly check: Check;
   readonly tags?: readonly string[];
 }
@@ -84,11 +84,11 @@ export class CheckRegistry {
   }
 
   listEnabled(): Check[] {
-    return this.list().filter(c => !c.config.disabled);
+    return this.list().filter((c) => !c.config.disabled);
   }
 
   byTag(tag: string): Check[] {
-    return this.listEnabled().filter(c => c.config.tags?.includes(tag));
+    return this.listEnabled().filter((c) => c.config.tags?.includes(tag));
   }
 
   /** Get a check by slug, returning undefined if not found. */
@@ -104,7 +104,7 @@ export class CheckRegistry {
   /** Return all checks with a given bare slug across all namespaces. */
   listByBareSlug(bareSlug: string): Check[] {
     const keys = this.bareSlugIndex.get(bareSlug) ?? [];
-    return keys.map(k => this.inner.getById(k)?.check).filter((c): c is Check => c !== undefined);
+    return keys.map((k) => this.inner.getById(k)?.check).filter((c): c is Check => c !== undefined);
   }
 
   get size(): number {

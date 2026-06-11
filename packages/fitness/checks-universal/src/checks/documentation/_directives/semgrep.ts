@@ -5,7 +5,7 @@
  * Extracted from `directive-audit.ts` in Phase C4.
  */
 
-import type { DirectiveInfo } from './types.js'
+import type { DirectiveInfo } from './types.js';
 
 /**
  * Extract semgrep rule ID and reason from a nosemgrep directive line.
@@ -21,40 +21,40 @@ function extractSemgrepDirective(
   filePath: string,
   file: string,
 ): DirectiveInfo | null {
-  const nosemgrepMarker = 'nosemgrep'
+  const nosemgrepMarker = 'nosemgrep';
 
   // Find the nosemgrep marker in a comment
-  const commentIdx = line.indexOf('//')
+  const commentIdx = line.indexOf('//');
   if (commentIdx === -1) {
-    return null
+    return null;
   }
 
-  const afterComment = line.slice(commentIdx + 2).trim()
+  const afterComment = line.slice(commentIdx + 2).trim();
   if (!afterComment.startsWith(nosemgrepMarker)) {
-    return null
+    return null;
   }
 
-  const afterMarker = afterComment.slice(nosemgrepMarker.length)
+  const afterMarker = afterComment.slice(nosemgrepMarker.length);
 
   // Extract rule ID and reason
-  let ruleId = '*' // Default to all rules
-  let reason = ''
+  let ruleId = '*'; // Default to all rules
+  let reason = '';
 
   // Check for : separator (rule ID follows)
   if (afterMarker.startsWith(':')) {
-    const afterColon = afterMarker.slice(1).trim()
+    const afterColon = afterMarker.slice(1).trim();
 
     // Check for -- separator (reason follows)
-    const reasonSeparator = afterColon.indexOf('--')
+    const reasonSeparator = afterColon.indexOf('--');
     if (reasonSeparator === -1) {
-      ruleId = afterColon.trim() || '*'
+      ruleId = afterColon.trim() || '*';
     } else {
-      ruleId = afterColon.slice(0, reasonSeparator).trim() || '*'
-      reason = afterColon.slice(reasonSeparator + 2).trim()
+      ruleId = afterColon.slice(0, reasonSeparator).trim() || '*';
+      reason = afterColon.slice(reasonSeparator + 2).trim();
     }
   } else if (afterMarker.trim().startsWith('--')) {
     // Just a reason, no rule ID
-    reason = afterMarker.trim().slice(2).trim()
+    reason = afterMarker.trim().slice(2).trim();
   }
 
   return {
@@ -66,7 +66,7 @@ function extractSemgrepDirective(
     rule: `semgrep/${ruleId}`,
     reason,
     raw: line.trim(),
-  }
+  };
 }
 
 export function parseSemgrepDirectives(
@@ -74,19 +74,19 @@ export function parseSemgrepDirectives(
   filePath: string,
   file: string,
 ): DirectiveInfo[] {
-  const directives: DirectiveInfo[] = []
-  const lines = content.split('\n')
+  const directives: DirectiveInfo[] = [];
+  const lines = content.split('\n');
 
   for (const [i, line] of lines.entries()) {
     if (line === undefined) {
-      continue
+      continue;
     }
 
-    const directive = extractSemgrepDirective(line, i, filePath, file)
+    const directive = extractSemgrepDirective(line, i, filePath, file);
     if (directive) {
-      directives.push(directive)
+      directives.push(directive);
     }
   }
 
-  return directives
+  return directives;
 }

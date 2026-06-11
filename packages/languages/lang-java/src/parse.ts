@@ -10,20 +10,25 @@
  * (non-null) rather than throwing.
  */
 
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath } from 'node:url';
 
-import { loadGrammar, createParser, parseToTree, type ParsedFile } from '@opensip-tools/tree-sitter'
+import {
+  loadGrammar,
+  createParser,
+  parseToTree,
+  type ParsedFile,
+} from '@opensip-tools/tree-sitter';
 
 const grammar = await loadGrammar(
   fileURLToPath(new URL('../wasm/tree-sitter-java.wasm', import.meta.url)),
-)
-const parser = createParser(grammar)
+);
+const parser = createParser(grammar);
 
 /** Parsed Java source: tree-sitter parse tree plus the original source text. */
-export type JavaTree = ParsedFile
+export type JavaTree = ParsedFile;
 
 /** Parses Java source into a {@link JavaTree}, or null when no tree is produced. */
 export function parseJava(content: string, _filePath: string): JavaTree | null {
-  const tree = parseToTree(parser, content)
-  return tree ? { tree, source: content } : null
+  const tree = parseToTree(parser, content);
+  return tree ? { tree, source: content } : null;
 }

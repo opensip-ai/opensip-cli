@@ -16,9 +16,9 @@
  * itself is language-agnostic — it only sees opaque `WorkspaceUnit`s.
  */
 
-import { spawn } from 'node:child_process'
-import { cpus } from 'node:os'
-import { relative } from 'node:path'
+import { spawn } from 'node:child_process';
+import { cpus } from 'node:os';
+import { relative } from 'node:path';
 
 import {
   ConfigurationError,
@@ -26,12 +26,12 @@ import {
   type LanguageAdapter,
   type Signal,
   type WorkspaceUnit,
-} from '@opensip-tools/core'
+} from '@opensip-tools/core';
 
-import { runWorkerPool } from './orchestrate/worker-pool.js'
+import { runWorkerPool } from './orchestrate/worker-pool.js';
 
-import type { ResolutionMode } from '../types.js'
-import type { SignalEnvelope } from '@opensip-tools/contracts'
+import type { ResolutionMode } from '../types.js';
+import type { SignalEnvelope } from '@opensip-tools/contracts';
 
 /**
  * Per-unit result from a `graph --workspace` fan-out — one entry per
@@ -39,23 +39,23 @@ import type { SignalEnvelope } from '@opensip-tools/contracts'
  */
 export interface WorkspaceUnitRunResult {
   /** Human-readable unit id (e.g. `core`, `cli`, `crate-foo`). */
-  readonly unitId: string
+  readonly unitId: string;
   /** Absolute root dir the child was spawned against. */
-  readonly rootDir: string
+  readonly rootDir: string;
   /**
    * Project-relative path for display. Empty string if `rootDir` isn't
    * under `cwd`.
    */
-  readonly displayPath: string
+  readonly displayPath: string;
   /**
    * The child run's signals, parsed from its `--json` {@link SignalEnvelope}
    * stdout (ADR-0011). These carry OpenSIP-mapped `ruleId`/`source` (the
    * child applies Option A); the parent reverse-maps to engine slugs only
    * where the dashboard session payload needs them.
    */
-  readonly signals: readonly Signal[]
-  readonly exitCode: number
-  readonly stderr: string
+  readonly signals: readonly Signal[];
+  readonly exitCode: number;
+  readonly stderr: string;
 }
 
 /**
@@ -63,24 +63,24 @@ export interface WorkspaceUnitRunResult {
  * polyglot list typically produced by `discoverPolyglotUnits`.
  */
 export interface RunWorkspaceUnitsInput {
-  readonly cwd: string
-  readonly units: readonly WorkspaceUnit[]
+  readonly cwd: string;
+  readonly units: readonly WorkspaceUnit[];
   /**
    * Path to the CLI entry script — typically `process.argv[1]` from
    * the parent. Children invoke `node <cliScript> graph <rootDir>
    * --json`.
    */
-  readonly cliScript: string
+  readonly cliScript: string;
   /** Override concurrency for tests. Default: cpus()-1, min 1. */
-  readonly concurrency?: number
+  readonly concurrency?: number;
   /** Forwarded to children if true. */
-  readonly noCache?: boolean
+  readonly noCache?: boolean;
   /**
    * Edge resolution tier. Forwarded to each child as `--resolution
    * <mode>` so a `--workspace --resolution fast` run is fast per unit,
    * not silently exact. Omitted/`'exact'` ⇒ children use their default.
    */
-  readonly resolution?: ResolutionMode
+  readonly resolution?: ResolutionMode;
   /**
    * `--recipe <name>`: forwarded to each child as `--recipe <name>` so a
    * `--workspace --recipe <name>` run selects the same rule subset per
@@ -88,7 +88,7 @@ export interface RunWorkspaceUnitsInput {
    * `Rule` objects can't cross the process boundary). Omitted ⇒ children
    * use the default recipe.
    */
-  readonly recipe?: string
+  readonly recipe?: string;
 }
 
 /**
@@ -96,8 +96,8 @@ export interface RunWorkspaceUnitsInput {
  * results plus a single boolean indicating whether any child failed.
  */
 export interface RunWorkspaceUnitsOutput {
-  readonly perUnit: readonly WorkspaceUnitRunResult[]
-  readonly anyChildFailed: boolean
+  readonly perUnit: readonly WorkspaceUnitRunResult[];
+  readonly anyChildFailed: boolean;
 }
 
 /**
@@ -112,14 +112,14 @@ export async function discoverPolyglotUnits(
   rootDir: string,
   adapters: readonly LanguageAdapter[],
 ): Promise<readonly WorkspaceUnit[]> {
-  const all: WorkspaceUnit[] = []
+  const all: WorkspaceUnit[] = [];
   for (const adapter of adapters) {
-    if (!adapter.discoverWorkspaceUnits) continue
-    const units = await adapter.discoverWorkspaceUnits(rootDir)
-    all.push(...units)
+    if (!adapter.discoverWorkspaceUnits) continue;
+    const units = await adapter.discoverWorkspaceUnits(rootDir);
+    all.push(...units);
   }
-  all.sort((a, b) => a.rootDir.localeCompare(b.rootDir))
-  return all
+  all.sort((a, b) => a.rootDir.localeCompare(b.rootDir));
+  return all;
 }
 
 /**
@@ -134,16 +134,16 @@ export async function runWorkspaceUnitsInParallel(
   if (input.units.length === 0) {
     throw new ConfigurationError(
       '--workspace: no workspace units found. Use `opensip-tools graph` for whole-project analysis.',
-    )
+    );
   }
 
-  const concurrency = Math.max(1, input.concurrency ?? Math.max(1, cpus().length - 1))
+  const concurrency = Math.max(1, input.concurrency ?? Math.max(1, cpus().length - 1));
   logger.info({
     evt: 'graph.cli.workspace.start',
     module: 'graph:cli',
     units: input.units.length,
     concurrency,
-  })
+  });
 
   // Shared bounded worker pool (also used by the shard runner). Each slot
   // spawns one child at a time and pulls the next unit when it finishes.
@@ -156,58 +156,58 @@ export async function runWorkspaceUnitsInParallel(
       resolution: input.resolution,
       recipe: input.recipe,
     }),
-  )
-  const anyChildFailed = results.some((r) => r.exitCode !== 0)
+  );
+  const anyChildFailed = results.some((r) => r.exitCode !== 0);
 
   // Sort for deterministic display order regardless of completion
   // order — units finish in unpredictable order under parallelism.
-  results.sort((a, b) => a.rootDir.localeCompare(b.rootDir))
+  results.sort((a, b) => a.rootDir.localeCompare(b.rootDir));
 
   logger.info({
     evt: 'graph.cli.workspace.complete',
     module: 'graph:cli',
     units: input.units.length,
     anyChildFailed,
-  })
+  });
 
-  return { perUnit: results, anyChildFailed }
+  return { perUnit: results, anyChildFailed };
 }
 
 interface SpawnInput {
-  readonly cliScript: string
-  readonly unit: WorkspaceUnit
-  readonly cwd: string
-  readonly noCache: boolean
-  readonly resolution?: ResolutionMode
-  readonly recipe?: string
+  readonly cliScript: string;
+  readonly unit: WorkspaceUnit;
+  readonly cwd: string;
+  readonly noCache: boolean;
+  readonly resolution?: ResolutionMode;
+  readonly recipe?: string;
 }
 
 function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
   return new Promise((resolvePromise) => {
-    const args: string[] = [input.cliScript, 'graph', input.unit.rootDir, '--json']
-    if (input.noCache) args.push('--no-cache')
-    if (input.resolution !== undefined) args.push('--resolution', input.resolution)
-    if (input.recipe !== undefined) args.push('--recipe', input.recipe)
+    const args: string[] = [input.cliScript, 'graph', input.unit.rootDir, '--json'];
+    if (input.noCache) args.push('--no-cache');
+    if (input.resolution !== undefined) args.push('--resolution', input.resolution);
+    if (input.recipe !== undefined) args.push('--recipe', input.recipe);
 
     const child = spawn(process.execPath, args, {
       cwd: input.cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: process.env,
-    })
-    let stdout = ''
-    let stderr = ''
+    });
+    let stdout = '';
+    let stderr = '';
     // setEncoding routes chunks through a StringDecoder that buffers
     // partial multi-byte UTF-8 sequences across 'data' chunk boundaries.
     // Without it, a non-ASCII char split across two chunks decodes to
     // replacement chars and corrupts the --json stdout parsed below.
-    child.stdout.setEncoding('utf8')
-    child.stderr.setEncoding('utf8')
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => {
-      stdout += chunk
-    })
+      stdout += chunk;
+    });
     child.stderr.on('data', (chunk: string) => {
-      stderr += chunk
-    })
+      stderr += chunk;
+    });
     child.on('error', (err) => {
       /* v8 ignore start */
       resolvePromise({
@@ -217,11 +217,11 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
         signals: [],
         exitCode: -1,
         stderr: `failed to spawn child: ${err.message}`,
-      })
+      });
       /* v8 ignore stop */
-    })
+    });
     child.on('close', (code) => {
-      const signals = parseChildSignals(stdout, input.unit.rootDir, stderr)
+      const signals = parseChildSignals(stdout, input.unit.rootDir, stderr);
       resolvePromise({
         unitId: input.unit.id,
         rootDir: input.unit.rootDir,
@@ -230,9 +230,9 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
         /* v8 ignore next */
         exitCode: code ?? -1,
         stderr,
-      })
-    })
-  })
+      });
+    });
+  });
 }
 
 /**
@@ -241,16 +241,12 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
  * legacy `CliOutput`). Returns an empty array on parse failure; the caller
  * surfaces the child's stderr separately.
  */
-function parseChildSignals(
-  stdout: string,
-  rootDir: string,
-  stderr: string,
-): readonly Signal[] {
-  const trimmed = stdout.trim()
-  if (trimmed.length === 0) return []
-  let parsed: SignalEnvelope
+function parseChildSignals(stdout: string, rootDir: string, stderr: string): readonly Signal[] {
+  const trimmed = stdout.trim();
+  if (trimmed.length === 0) return [];
+  let parsed: SignalEnvelope;
   try {
-    parsed = JSON.parse(trimmed) as SignalEnvelope
+    parsed = JSON.parse(trimmed) as SignalEnvelope;
   } catch (error) {
     /* v8 ignore start */
     logger.warn({
@@ -259,9 +255,9 @@ function parseChildSignals(
       rootDir,
       err: error instanceof Error ? error.message : String(error),
       stderrPreview: stderr.slice(0, 200),
-    })
-    return []
+    });
+    return [];
     /* v8 ignore stop */
   }
-  return parsed.signals ?? []
+  return parsed.signals ?? [];
 }

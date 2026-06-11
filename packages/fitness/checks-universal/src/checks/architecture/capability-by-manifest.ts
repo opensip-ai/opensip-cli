@@ -30,10 +30,10 @@
  * SCOPE — opensip-tools' own monorepo host packages. Inert in adopter repos
  * (whose code never calls the kernel's `registerDomain`).
  */
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 /** Host packages that own capability routing (core kernel + cli composition root). */
-const HOST_SRC_PATH = /packages\/(?:core|cli)\/(?:[^/]+\/)?src\//
+const HOST_SRC_PATH = /packages\/(?:core|cli)\/(?:[^/]+\/)?src\//;
 
 /**
  * A `<receiver>.registerDomain(` call whose FIRST argument opens an inline
@@ -45,15 +45,15 @@ const HOST_SRC_PATH = /packages\/(?:core|cli)\/(?:[^/]+\/)?src\//
  * `registerDomain(spec, …)` variable pass. The `g` flag drives an over-content
  * scan so the per-match line number is derived from the match index.
  */
-const HARDCODED_DOMAIN_RE = /\b[A-Za-z_$][\w$]*\.registerDomain\s*\(\s*\{/g
+const HARDCODED_DOMAIN_RE = /\b[A-Za-z_$][\w$]*\.registerDomain\s*\(\s*\{/g;
 
 /** 1-based line number of a character offset within `content`. */
 function lineOf(content: string, index: number): number {
-  let line = 1
+  let line = 1;
   for (let i = 0; i < index && i < content.length; i++) {
-    if (content[i] === '\n') line++
+    if (content[i] === '\n') line++;
   }
-  return line
+  return line;
 }
 
 /**
@@ -62,8 +62,8 @@ function lineOf(content: string, index: number): number {
  * bypasses the manifest declaration path. Exported for unit tests.
  */
 export function analyzeCapabilityByManifest(content: string, filePath: string): CheckViolation[] {
-  if (!HOST_SRC_PATH.test(filePath)) return []
-  const violations: CheckViolation[] = []
+  if (!HOST_SRC_PATH.test(filePath)) return [];
+  const violations: CheckViolation[] = [];
   for (const m of content.matchAll(HARDCODED_DOMAIN_RE)) {
     violations.push({
       line: lineOf(content, m.index ?? 0),
@@ -81,9 +81,9 @@ export function analyzeCapabilityByManifest(content: string, filePath: string): 
         `registrar via Tool.capabilityRegistrars. MARKER_KINDS is the only allowed ` +
         `bootstrap default — a new domain is DATA, not a host enum/literal.`,
       type: 'capability-by-manifest',
-    })
+    });
   }
-  return violations
+  return violations;
 }
 
 /**
@@ -91,16 +91,18 @@ export function analyzeCapabilityByManifest(content: string, filePath: string): 
  * {@link analyzeCapabilityByManifest}. Non-host files contribute nothing.
  * Exported so unit tests can drive it with an in-memory `FileAccessor`.
  */
-export async function analyzeAllCapabilityByManifest(files: FileAccessor): Promise<CheckViolation[]> {
-  const violations: CheckViolation[] = []
+export async function analyzeAllCapabilityByManifest(
+  files: FileAccessor,
+): Promise<CheckViolation[]> {
+  const violations: CheckViolation[] = [];
   const candidates = files.paths.filter(
     (p) => HOST_SRC_PATH.test(p) && p.endsWith('.ts') && !p.endsWith('.test.ts'),
-  )
-  const contents = await files.readMany(candidates)
+  );
+  const contents = await files.readMany(candidates);
   for (const [filePath, content] of contents) {
-    violations.push(...analyzeCapabilityByManifest(content, filePath))
+    violations.push(...analyzeCapabilityByManifest(content, filePath));
   }
-  return violations
+  return violations;
 }
 
 export const capabilityByManifest = defineCheck({
@@ -115,4 +117,4 @@ export const capabilityByManifest = defineCheck({
   // mentioning capability domains does not false-fire.
   contentFilter: 'raw',
   analyzeAll: analyzeAllCapabilityByManifest,
-})
+});

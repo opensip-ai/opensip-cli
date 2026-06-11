@@ -46,7 +46,6 @@ function makeConfig(overrides: Partial<TargetsConfig> = {}): TargetsConfig {
 }
 
 beforeEach(() => {
-   
   testDir = mkdtempSync(join(tmpdir(), 'opensip-scope-resolver-'));
 });
 
@@ -57,7 +56,11 @@ afterEach(() => {
 describe('buildScopeBasedFileMap', () => {
   it('returns an empty map when no checks have scopes or overrides', () => {
     const registry = makeRegistry([
-      makeTarget('src', { include: ['src/**/*.ts'], languages: ['typescript'], concerns: ['backend'] }),
+      makeTarget('src', {
+        include: ['src/**/*.ts'],
+        languages: ['typescript'],
+        concerns: ['backend'],
+      }),
     ]);
     const out = buildScopeBasedFileMap([], registry, makeConfig(), testDir);
     expect(out.size).toBe(0);
@@ -97,7 +100,11 @@ describe('buildScopeBasedFileMap', () => {
   it('returns empty when scope matches no targets', () => {
     fixture('src/a.ts');
     const registry = makeRegistry([
-      makeTarget('ts-src', { include: ['src/**/*.ts'], languages: ['typescript'], concerns: ['backend'] }),
+      makeTarget('ts-src', {
+        include: ['src/**/*.ts'],
+        languages: ['typescript'],
+        concerns: ['backend'],
+      }),
     ]);
 
     const out = buildScopeBasedFileMap(
@@ -152,7 +159,11 @@ describe('buildScopeBasedFileMap', () => {
     fixture('src/a.ts');
     fixture('src/ignore-me/b.ts');
     const registry = makeRegistry([
-      makeTarget('src', { include: ['src/**/*.ts'], languages: ['typescript'], concerns: ['backend'] }),
+      makeTarget('src', {
+        include: ['src/**/*.ts'],
+        languages: ['typescript'],
+        concerns: ['backend'],
+      }),
     ]);
 
     const out = buildScopeBasedFileMap(
@@ -192,16 +203,9 @@ describe('buildScopeBasedFileMap', () => {
 
   it('skips checks without a scope and without an override', () => {
     fixture('src/a.ts');
-    const registry = makeRegistry([
-      makeTarget('src', { include: ['src/**/*.ts'] }),
-    ]);
+    const registry = makeRegistry([makeTarget('src', { include: ['src/**/*.ts'] })]);
 
-    const out = buildScopeBasedFileMap(
-      [{ slug: 'unscoped' }],
-      registry,
-      makeConfig(),
-      testDir,
-    );
+    const out = buildScopeBasedFileMap([{ slug: 'unscoped' }], registry, makeConfig(), testDir);
 
     expect(out.has('unscoped')).toBe(false);
   });

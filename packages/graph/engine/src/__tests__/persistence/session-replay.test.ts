@@ -15,7 +15,9 @@ import { graphReplayFromSession } from '../../persistence/session-replay.js';
 import type { StoredSession } from '@opensip-tools/contracts';
 import type { Signal } from '@opensip-tools/core';
 
-function sig(over: Partial<Signal> & { ruleId: string; severity: Signal['severity']; filePath: string }): Signal {
+function sig(
+  over: Partial<Signal> & { ruleId: string; severity: Signal['severity']; filePath: string },
+): Signal {
   return {
     id: `sig_${over.ruleId}`,
     source: 'graph',
@@ -129,7 +131,10 @@ describe('graphReplayFromSession', () => {
       { name: 'missing summary', payload: { checks: [] }, message: /summary is missing/ },
       {
         name: 'non-number summary field',
-        payload: { summary: { total: 'x', passed: 0, failed: 0, errors: 0, warnings: 0 }, checks: [] },
+        payload: {
+          summary: { total: 'x', passed: 0, failed: 0, errors: 0, warnings: 0 },
+          checks: [],
+        },
         message: /total must be a number/,
       },
       {
@@ -139,7 +144,10 @@ describe('graphReplayFromSession', () => {
       },
       {
         name: 'invalid check row',
-        payload: { summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 }, checks: [null] },
+        payload: {
+          summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+          checks: [null],
+        },
         message: /check row is invalid/,
       },
       {
@@ -154,7 +162,9 @@ describe('graphReplayFromSession', () => {
         name: 'invalid finding row',
         payload: {
           summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
-          checks: [{ checkSlug: 'a', passed: true, violationCount: 1, durationMs: 0, findings: [42] }],
+          checks: [
+            { checkSlug: 'a', passed: true, violationCount: 1, durationMs: 0, findings: [42] },
+          ],
         },
         message: /finding is invalid/,
       },

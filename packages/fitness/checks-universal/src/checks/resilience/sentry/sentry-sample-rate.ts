@@ -3,26 +3,27 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-sample-rate
  */
 
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness';
 
-import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js'
+import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js';
 
 function analyze(content: string, filePath: string): CheckViolation[] {
-  if (!hasSentryInit(content)) return []
+  if (!hasSentryInit(content)) return [];
 
-  const initBlock = extractSentryInitBlock(content)
-  if (!initBlock) return []
+  const initBlock = extractSentryInitBlock(content);
+  if (!initBlock) return [];
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Check for tracesSampleRate: 1.0 (or 1) — expensive in production
-  const rateMatch = /tracesSampleRate\s*:\s*([\d.]+)/.exec(initBlock.block)
+  const rateMatch = /tracesSampleRate\s*:\s*([\d.]+)/.exec(initBlock.block);
   if (rateMatch) {
-    const rate = Number.parseFloat(rateMatch[1] ?? '0')
+    const rate = Number.parseFloat(rateMatch[1] ?? '0');
     if (rate === 1) {
-      const absoluteIndex = content.indexOf('tracesSampleRate', content.indexOf('Sentry.init'))
+      const absoluteIndex = content.indexOf('tracesSampleRate', content.indexOf('Sentry.init'));
       violations.push({
-        line: absoluteIndex === -1 ? initBlock.startLine + 1 : getLineNumber(content, absoluteIndex),
+        line:
+          absoluteIndex === -1 ? initBlock.startLine + 1 : getLineNumber(content, absoluteIndex),
         message:
           'tracesSampleRate is 1.0 — every transaction is traced, which is expensive at scale',
         severity: 'warning',
@@ -31,7 +32,7 @@ function analyze(content: string, filePath: string): CheckViolation[] {
         type: 'sentry-full-sample-rate',
         match: rateMatch[0],
         filePath,
-      })
+      });
     }
   }
 
@@ -43,7 +44,7 @@ function analyze(content: string, filePath: string): CheckViolation[] {
       content.includes('browserTracingIntegration') ||
       content.includes('@sentry/tracing') ||
       content.includes('httpIntegration') ||
-      content.includes('expressIntegration')
+      content.includes('expressIntegration');
 
     if (hasTracingImport) {
       violations.push({
@@ -55,11 +56,11 @@ function analyze(content: string, filePath: string): CheckViolation[] {
           'Add tracesSampleRate to Sentry.init(): Sentry.init({ tracesSampleRate: 0.1, ... }). Without it, the default is 0 (no traces captured).',
         type: 'sentry-missing-sample-rate',
         filePath,
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -87,4 +88,4 @@ export const sentrySampleRate = defineCheck({
   fileTypes: ['ts', 'js', 'tsx', 'jsx', 'mjs'],
   confidence: 'high',
   analyze,
-})
+});

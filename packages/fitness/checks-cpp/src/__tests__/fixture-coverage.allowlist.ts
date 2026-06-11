@@ -19,15 +19,15 @@ import type {
   CommandExemptions,
   CoverageAllowlist,
   FilenameOverrides,
-} from '@opensip-tools/fitness/internal'
+} from '@opensip-tools/fitness/internal';
 
-export const ALLOWLIST: CoverageAllowlist = []
+export const ALLOWLIST: CoverageAllowlist = [];
 
 export const COMMAND_EXEMPTIONS: CommandExemptions = {
   'cpp-clang-tidy':
     "analysisMode:'command' — shells to clang-tidy; covered by failure-mode + packed-smoke lanes",
-}
+};
 
-export const FILENAME_OVERRIDES: FilenameOverrides = {}
+export const FILENAME_OVERRIDES: FilenameOverrides = {};
 
-export const KNOWN_UNFIXTURABLE: CommandExemptions = {}
+export const KNOWN_UNFIXTURABLE: CommandExemptions = {};

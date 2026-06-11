@@ -11,11 +11,13 @@ describe('executeCommand', () => {
     const config: CommandConfig = {
       bin: 'echo',
       args: ['hello'],
-      parseOutput: (stdout) => [{
-        line: 1,
-        message: stdout.trim(),
-        severity: 'warning',
-      }],
+      parseOutput: (stdout) => [
+        {
+          line: 1,
+          message: stdout.trim(),
+          severity: 'warning',
+        },
+      ],
     };
     const result = await executeCommand(config, [], { cwd });
     expect(result.aborted).toBe(false);
@@ -28,11 +30,13 @@ describe('executeCommand', () => {
     const config: CommandConfig = {
       bin: 'echo',
       args: (files) => [`got-${files.length}`],
-      parseOutput: (stdout) => [{
-        line: 1,
-        message: stdout.trim(),
-        severity: 'warning',
-      }],
+      parseOutput: (stdout) => [
+        {
+          line: 1,
+          message: stdout.trim(),
+          severity: 'warning',
+        },
+      ],
     };
     const result = await executeCommand(config, ['a', 'b', 'c'], { cwd });
     expect(result.violations[0]?.message).toBe('got-3');
@@ -65,11 +69,13 @@ describe('executeCommand', () => {
     const config: CommandConfig = {
       bin: 'sh',
       args: ['-c', 'echo done; exit 1'],
-      parseOutput: (stdout) => [{
-        line: 1,
-        message: stdout.trim(),
-        severity: 'warning',
-      }],
+      parseOutput: (stdout) => [
+        {
+          line: 1,
+          message: stdout.trim(),
+          severity: 'warning',
+        },
+      ],
       expectedExitCodes: [0, 1],
     };
     const result = await executeCommand(config, [], { cwd });

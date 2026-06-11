@@ -5,24 +5,24 @@
  * Verifies that navigation params are properly typed for type-safe routing.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Analyzes a single file for navigation typing issues
  */
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Quick filter: skip files without navigation patterns
   if (!content.includes('useLocalSearchParams') && !content.includes('router.push')) {
-    return violations
+    return violations;
   }
 
   // Check for untyped useLocalSearchParams
-  const untypedParamsRegex = /useLocalSearchParams\s*\(\s*\)/g
-  let match
+  const untypedParamsRegex = /useLocalSearchParams\s*\(\s*\)/g;
+  let match;
   while ((match = untypedParamsRegex.exec(content)) !== null) {
-    const line = content.slice(0, Math.max(0, match.index)).split('\n').length
+    const line = content.slice(0, Math.max(0, match.index)).split('\n').length;
     violations.push({
       filePath,
       line,
@@ -33,13 +33,13 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
       suggestion:
         'Add type parameter: useLocalSearchParams<{ id: string }>() to get type-safe route params.',
       match: 'useLocalSearchParams()',
-    })
+    });
   }
 
   // Check for untyped router.push with params
-  const untypedPushRegex = /router\.push\(\s*['"`][^'"`]+['"`]\s*,\s*\{/g
+  const untypedPushRegex = /router\.push\(\s*['"`][^'"`]+['"`]\s*,\s*\{/g;
   while ((match = untypedPushRegex.exec(content)) !== null) {
-    const line = content.slice(0, Math.max(0, match.index)).split('\n').length
+    const line = content.slice(0, Math.max(0, match.index)).split('\n').length;
     violations.push({
       filePath,
       line,
@@ -49,10 +49,10 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
       type: 'untyped-push',
       suggestion: 'Use typed route helpers or define route types for type-safe navigation params.',
       match: 'router.push',
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -83,4 +83,4 @@ export const navigationTyping = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze: analyzeFile,
-})
+});

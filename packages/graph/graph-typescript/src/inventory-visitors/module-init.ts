@@ -23,9 +23,7 @@ export function synthesizeModuleInit(
   // Hash the file's top-level statement-text concatenation. Every
   // top-level statement contributes; per-function bodies do not (they
   // get their own occurrences).
-  const topLevelText = sourceFile.statements
-    .map((s) => s.getText(sourceFile))
-    .join('\n');
+  const topLevelText = sourceFile.statements.map((s) => s.getText(sourceFile)).join('\n');
   const name = synthesizeModuleInitName(ctx.filePathProjectRel);
   const digest = digestSyntheticBody(`${ctx.filePathProjectRel}\n${topLevelText}`);
   return {

@@ -6,7 +6,9 @@ import { createCloudSignalSink } from '../sink/cloud-signal-sink.js';
 import type { Signal } from '@opensip-tools/core';
 
 function sigs(n: number): Signal[] {
-  return Array.from({ length: n }, (_, i) => createSignal({ source: 't', severity: 'high', ruleId: `r${i}`, message: `m${i}` }));
+  return Array.from({ length: n }, (_, i) =>
+    createSignal({ source: 't', severity: 'high', ruleId: `r${i}`, message: `m${i}` }),
+  );
 }
 const batch = (n: number) => buildSignalBatch({ tool: 'fit', repo: {}, signals: sigs(n) });
 
@@ -19,7 +21,11 @@ describe('createCloudSignalSink', () => {
       return Promise.resolve(new Response(null, { status: 200 }));
     }) as unknown as typeof fetch;
 
-    const sink = createCloudSignalSink({ endpoint: 'https://x.test/api', apiKey: 'secret', fetchImpl });
+    const sink = createCloudSignalSink({
+      endpoint: 'https://x.test/api',
+      apiKey: 'secret',
+      fetchImpl,
+    });
     const b = batch(3);
     const r = await sink.emit(b);
     expect(r).toEqual({ accepted: 3, authRejected: false });
@@ -33,13 +39,19 @@ describe('createCloudSignalSink', () => {
       urls.push(String(url));
       return Promise.resolve(new Response(null, { status: 200 }));
     }) as unknown as typeof fetch;
-    const sink = createCloudSignalSink({ endpoint: 'https://x.test/api/signals', apiKey: 'k', fetchImpl });
+    const sink = createCloudSignalSink({
+      endpoint: 'https://x.test/api/signals',
+      apiKey: 'k',
+      fetchImpl,
+    });
     await sink.emit(batch(1));
     expect(urls[0]).toBe('https://x.test/api/signals');
   });
 
   it('chunks a large batch into multiple POSTs', async () => {
-    const fetchImpl = vi.fn(() => Promise.resolve(new Response(null, { status: 200 }))) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 200 })),
+    ) as unknown as typeof fetch;
     const sink = createCloudSignalSink({ endpoint: 'https://x.test/api', apiKey: 'k', fetchImpl });
     const r = await sink.emit(batch(600)); // > 500-per-chunk cap → 2 chunks
     expect(fetchImpl).toHaveBeenCalledTimes(2);
@@ -47,14 +59,18 @@ describe('createCloudSignalSink', () => {
   });
 
   it('returns authRejected on a 403 (no accepted signals)', async () => {
-    const fetchImpl = vi.fn(() => Promise.resolve(new Response(null, { status: 403 }))) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 403 })),
+    ) as unknown as typeof fetch;
     const sink = createCloudSignalSink({ endpoint: 'https://x.test/api', apiKey: 'k', fetchImpl });
     const r = await sink.emit(batch(2));
     expect(r).toEqual({ accepted: 0, authRejected: true });
   });
 
   it('returns accepted:0 (never throws) when the endpoint is permanently unreachable', async () => {
-    const fetchImpl = vi.fn(() => Promise.reject(new Error('ECONNREFUSED'))) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(() =>
+      Promise.reject(new Error('ECONNREFUSED')),
+    ) as unknown as typeof fetch;
     const sink = createCloudSignalSink({ endpoint: 'https://x.test/api', apiKey: 'k', fetchImpl });
     const r = await sink.emit(batch(1));
     expect(r).toEqual({ accepted: 0, authRejected: false });
@@ -73,7 +89,9 @@ describe('createCloudSignalSink', () => {
     // unexpected error too. A non-string endpoint makes the internal
     // `.endsWith` URL-normalization throw synchronously inside emit's try.
     const badEndpoint = { endsWith: undefined } as unknown as string;
-    const fetchImpl = vi.fn(() => Promise.resolve(new Response(null, { status: 200 }))) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 200 })),
+    ) as unknown as typeof fetch;
     const sink = createCloudSignalSink({ endpoint: badEndpoint, apiKey: 'k', fetchImpl });
     const r = await sink.emit(batch(2));
     expect(r).toEqual({ accepted: 0, authRejected: false });

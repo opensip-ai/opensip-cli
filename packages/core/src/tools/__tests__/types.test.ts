@@ -36,11 +36,8 @@ const fixtureRenderer: LiveViewRenderer = () => Promise.resolve();
 describe('LiveViewRenderer', () => {
   it('is exported as a structural type that accepts an unknown args payload', () => {
     expectTypeOf<LiveViewRenderer>().toBeFunction();
-    expectTypeOf<LiveViewRenderer>()
-      .parameter(0)
-      .toBeUnknown();
-    expectTypeOf<LiveViewRenderer>()
-      .returns.resolves.toBeVoid();
+    expectTypeOf<LiveViewRenderer>().parameter(0).toBeUnknown();
+    expectTypeOf<LiveViewRenderer>().returns.resolves.toBeVoid();
   });
 
   it('accepts a function value at runtime', () => {

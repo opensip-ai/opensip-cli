@@ -23,11 +23,7 @@
 
 import { createDiscover } from '@opensip-tools/graph-adapter-common';
 
-const EXCLUDED_DIR_GLOBS: readonly string[] = [
-  '**/vendor/**',
-  '**/node_modules/**',
-  '**/.git/**',
-];
+const EXCLUDED_DIR_GLOBS: readonly string[] = ['**/vendor/**', '**/node_modules/**', '**/.git/**'];
 
 // Prefer go.sum (resolved deps with hashes) over go.mod (intent).
 const CONFIG_CANDIDATES: readonly string[] = ['go.sum', 'go.mod'];

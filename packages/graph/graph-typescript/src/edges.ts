@@ -71,7 +71,10 @@ function yieldToEventLoop(): Promise<void> {
   });
 }
 
-function tsPosition(node: ts.Node, sourceFile: ts.SourceFile): {
+function tsPosition(
+  node: ts.Node,
+  sourceFile: ts.SourceFile,
+): {
   readonly line: number;
   readonly column: number;
   readonly text: string;
@@ -138,7 +141,10 @@ export async function resolveEdgesFromRecords(
     // Bucket edges per OWNER OCCURRENCE (bodyHash + file), not bodyHash alone:
     // body-twin functions in different files share a hash, and a hash-only
     // bucket would union their edges into phantom cross-package calls.
-    const ownerKey = ownerEdgeKey(r.ownerHash, relative(input.projectDirAbs, r.sourceFile.fileName));
+    const ownerKey = ownerEdgeKey(
+      r.ownerHash,
+      relative(input.projectDirAbs, r.sourceFile.fileName),
+    );
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
       // @fitness-ignore-next-line detached-promises -- pushCallEdge/pushSharedCreationEdge return void (synchronous edge-sink writes), not promises
@@ -217,7 +223,10 @@ export async function resolveEdgesSyntactic(
     if (processed > 0 && processed % YIELD_EVERY_CALL_SITES === 0) await yieldToEventLoop();
     processed += 1;
     // Per-owner-occurrence bucket key (see resolveEdgesFromRecords).
-    const ownerKey = ownerEdgeKey(r.ownerHash, relative(input.projectDirAbs, r.sourceFile.fileName));
+    const ownerKey = ownerEdgeKey(
+      r.ownerHash,
+      relative(input.projectDirAbs, r.sourceFile.fileName),
+    );
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
       // @fitness-ignore-next-line detached-promises -- pushCallEdge/pushSharedCreationEdge return void (synchronous edge-sink writes), not promises
@@ -313,9 +322,7 @@ function verdictEntry<N extends ts.Node>(
   return { predicate, resolve: (n, c) => resolve(n as N, c) };
 }
 
-const isJsxLikeOpening = (
-  n: ts.Node,
-): n is ts.JsxOpeningElement | ts.JsxSelfClosingElement =>
+const isJsxLikeOpening = (n: ts.Node): n is ts.JsxOpeningElement | ts.JsxSelfClosingElement =>
   ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n);
 
 const isValueRefIdentifier = (n: ts.Node): n is ts.Identifier =>
@@ -343,10 +350,7 @@ function computeVerdict(node: ts.Node, ctx: ResolverContext): ResolverVerdict | 
   return null;
 }
 
-function dispatchCall(
-  node: ts.CallExpression,
-  ctx: ResolverContext,
-): ResolverVerdict {
+function dispatchCall(node: ts.CallExpression, ctx: ResolverContext): ResolverVerdict {
   // Direct identifier call: foo()
   if (ts.isIdentifier(node.expression)) {
     const direct = resolveDirectCall(node, ctx);

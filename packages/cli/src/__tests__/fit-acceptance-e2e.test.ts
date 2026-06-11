@@ -46,7 +46,11 @@ beforeEach(() => {
     'schemaVersion: 1\ntargets:\n  src:\n    description: source\n    languages: [typescript]\n    concerns: [backend]\n    include: ["**/*.ts"]\n',
     'utf8',
   );
-  writeFileSync(join(testDir, 'sample.ts'), 'export const x = 1; // EXAMPLE_TODO left in source\n', 'utf8');
+  writeFileSync(
+    join(testDir, 'sample.ts'),
+    'export const x = 1; // EXAMPLE_TODO left in source\n',
+    'utf8',
+  );
 });
 
 afterEach(() => {
@@ -61,9 +65,7 @@ afterEach(() => {
  */
 function normalize(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return value
-      .map(normalize)
-      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    return value.map(normalize).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   }
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {};
@@ -78,8 +80,15 @@ function normalize(value: unknown): unknown {
 
 describe('fit acceptance — bundled ≡ installed, through the real binary (§1/§8)', () => {
   it('loads fit through the installed path when dropped from the bundled set (and it runs)', () => {
-    const installed = cli.run(['fit', '--json', '--cwd', testDir], { cwd: testDir, env: AS_INSTALLED });
-    const outcome = JSON.parse(installed.stdout) as { kind: string; status: string; envelope?: { tool?: string } };
+    const installed = cli.run(['fit', '--json', '--cwd', testDir], {
+      cwd: testDir,
+      env: AS_INSTALLED,
+    });
+    const outcome = JSON.parse(installed.stdout) as {
+      kind: string;
+      status: string;
+      envelope?: { tool?: string };
+    };
     // fit ran end-to-end via the EXTERNAL plugin path — not bundled.
     expect(outcome.kind).toBe('fit.run');
     expect(outcome.envelope?.tool).toBe('fit');
@@ -87,19 +96,33 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
 
   it('the check list is identical (fit-list)', () => {
     const bundled = cli.run(['fit-list', '--json', '--cwd', testDir], { cwd: testDir });
-    const installed = cli.run(['fit-list', '--json', '--cwd', testDir], { cwd: testDir, env: AS_INSTALLED });
+    const installed = cli.run(['fit-list', '--json', '--cwd', testDir], {
+      cwd: testDir,
+      env: AS_INSTALLED,
+    });
     expect(installed.exitCode).toBe(bundled.exitCode);
     expect(normalize(JSON.parse(installed.stdout))).toEqual(normalize(JSON.parse(bundled.stdout)));
   });
 
   it('the `fit --json` CommandOutcome is identical (volatile fields normalized) + same exit code', () => {
     const bundled = cli.run(['fit', '--json', '--cwd', testDir], { cwd: testDir });
-    const installed = cli.run(['fit', '--json', '--cwd', testDir], { cwd: testDir, env: AS_INSTALLED });
+    const installed = cli.run(['fit', '--json', '--cwd', testDir], {
+      cwd: testDir,
+      env: AS_INSTALLED,
+    });
 
     expect(installed.exitCode).toBe(bundled.exitCode);
 
-    const b = normalize(JSON.parse(bundled.stdout)) as { kind: string; status: string; envelope?: unknown };
-    const i = normalize(JSON.parse(installed.stdout)) as { kind: string; status: string; envelope?: unknown };
+    const b = normalize(JSON.parse(bundled.stdout)) as {
+      kind: string;
+      status: string;
+      envelope?: unknown;
+    };
+    const i = normalize(JSON.parse(installed.stdout)) as {
+      kind: string;
+      status: string;
+      envelope?: unknown;
+    };
     expect(i.kind).toBe(b.kind);
     expect(i.status).toBe(b.status);
     // The whole normalized envelope (verdict, units, signals) is byte-identical:

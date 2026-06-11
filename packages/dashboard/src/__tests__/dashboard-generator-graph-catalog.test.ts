@@ -68,7 +68,11 @@ describe('generateDashboardHtml — graph catalog wiring', () => {
   });
 
   it('embeds EDITOR_PROTOCOL as a JS string constant when supplied', () => {
-    const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog, editorProtocol: 'vscode' });
+    const html = generateDashboardHtml({
+      sessions: [],
+      graphCatalog: minimalCatalog,
+      editorProtocol: 'vscode',
+    });
     expect(html).toContain('const EDITOR_PROTOCOL = "vscode";');
   });
 

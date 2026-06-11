@@ -19,9 +19,9 @@ function frame(node: ViewNode): string {
 
 describe('renderToInk — visible text', () => {
   it('renders line span text', () => {
-    expect(frame({ kind: 'line', spans: [{ text: 'hello ' }, { text: 'world', tone: 'success' }] })).toContain(
-      'hello world',
-    );
+    expect(
+      frame({ kind: 'line', spans: [{ text: 'hello ' }, { text: 'world', tone: 'success' }] }),
+    ).toContain('hello world');
   });
 
   it('renders headings with == fences == (matches renderToText)', () => {
@@ -29,7 +29,10 @@ describe('renderToInk — visible text', () => {
   });
 
   it('renders hints with pipe separators and two-space indent', () => {
-    const out = frame({ kind: 'hints', items: [{ text: 'use --verbose', bold: ['--verbose'] }, { text: 'dashboard' }] });
+    const out = frame({
+      kind: 'hints',
+      items: [{ text: 'use --verbose', bold: ['--verbose'] }, { text: 'dashboard' }],
+    });
     expect(out).toContain('use --verbose | dashboard');
     expect(out.startsWith('  ')).toBe(true);
   });

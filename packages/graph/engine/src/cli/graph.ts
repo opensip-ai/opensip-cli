@@ -68,7 +68,12 @@ import {
   selectStrategyForLayout,
 } from './orchestrate/flat-monorepo-strategy.js';
 import { partitionFilesIntoShards } from './orchestrate/partition-files.js';
-import { loadGraphConfig, resolveGraphRecipeSelection, runGraph, runShardedGraph } from './orchestrate.js';
+import {
+  loadGraphConfig,
+  resolveGraphRecipeSelection,
+  runGraph,
+  runShardedGraph,
+} from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
 import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
@@ -139,7 +144,9 @@ export async function executeGraph(
     // the `--workspace` path the parent resolves only to validate the name
     // (fail-fast); children re-resolve in their own scope.
     const recipeSelection = resolveGraphRecipeSelection(opts.cwd, opts.recipe);
-    const rules = resolveRecipeToRules(recipeSelection.name, { tolerant: recipeSelection.tolerant });
+    const rules = resolveRecipeToRules(recipeSelection.name, {
+      tolerant: recipeSelection.tolerant,
+    });
     // Normalize opts.recipe to the RESOLVED name so the envelope/run-header,
     // dashboard sessions, and any `--workspace` children report what actually
     // ran. Pre-ADR-0022 the generic `mergeConfigDefaults` set opts.recipe from
@@ -154,7 +161,10 @@ export async function executeGraph(
     }
     const positionalPaths = resolvePositionalScope(opts);
     if (positionalPaths.length > 1) {
-      const envelope = await executeMultiPathGraph({ opts, cli, rules, startedAt, profile }, positionalPaths);
+      const envelope = await executeMultiPathGraph(
+        { opts, cli, rules, startedAt, profile },
+        positionalPaths,
+      );
       writeProfileIfRequested(opts, profile);
       return envelope;
     }
@@ -199,19 +209,27 @@ export async function executeGraph(
       cwd: runCwd,
       mode: shards.length > 1 ? 'sharded' : 'single-process',
     });
-    const result = shards.length > 1
-      ? await runProfiledShardedBuild(profileRun, { opts, shards, projectRoot: runCwd, cli, config, rules })
-      : await runGraph({
-          cwd: runCwd,
-          noCache: opts.noCache,
-          resolution: opts.resolution,
-          language: opts.language,
-          config,
-          rules,
-          datastore: cli.scope.datastore() as DataStore | undefined,
-          emitFeatures: DASHBOARD_FEATURE_COLUMNS,
-          onProgress: profileRun?.onProgress,
-        });
+    const result =
+      shards.length > 1
+        ? await runProfiledShardedBuild(profileRun, {
+            opts,
+            shards,
+            projectRoot: runCwd,
+            cli,
+            config,
+            rules,
+          })
+        : await runGraph({
+            cwd: runCwd,
+            noCache: opts.noCache,
+            resolution: opts.resolution,
+            language: opts.language,
+            config,
+            rules,
+            datastore: cli.scope.datastore() as DataStore | undefined,
+            emitFeatures: DASHBOARD_FEATURE_COLUMNS,
+            onProgress: profileRun?.onProgress,
+          });
     profileRun?.finish(result);
     enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
     // `runCwd` (= positionalPaths[0] ?? opts.cwd) is the build root the signals
@@ -398,12 +416,14 @@ function resolveSyntheticFlatShards(opts: GraphCommandOptions): Shard[] {
   });
   const shards = partitions
     .filter((p) => p.files.length > 0)
-    .map((p): Shard => ({
-      id: `partition:${p.id}`,
-      rootDir: discovery.projectDirAbs,
-      files: p.files,
-      configPathAbs: discovery.configPathAbs,
-    }));
+    .map(
+      (p): Shard => ({
+        id: `partition:${p.id}`,
+        rootDir: discovery.projectDirAbs,
+        files: p.files,
+        configPathAbs: discovery.configPathAbs,
+      }),
+    );
   return shards.length > 1 ? shards : [];
 }
 
@@ -692,11 +712,7 @@ async function executeMultiPathGraph(
   }
   // D14: count files across every analyzed path. Zero files + a
   // `--language` override → exit 2 with the canonical message.
-  if (
-    typeof opts.language === 'string'
-    && opts.language.length > 0
-    && combinedFiles === 0
-  ) {
+  if (typeof opts.language === 'string' && opts.language.length > 0 && combinedFiles === 0) {
     throw new ConfigurationError(
       `--language ${opts.language} matched 0 files under ${paths.map((p) => positionalPathLabel(p, opts.cwd)).join(', ')}; check the flag or paths.`,
     );
@@ -776,7 +792,13 @@ export async function dispatchGraphResult(
   // (and, transitively, the verdict + render) will accept, so a future fourth
   // output path cannot deliver un-waived signals: the compiler rejects it.
   const finalized = await finalizeGraphSignals(rawResult.signals, suppressionRoot);
-  return deliverGraphResult(opts, { ...rawResult, signals: finalized.signals }, cli, startedAt, finalized);
+  return deliverGraphResult(
+    opts,
+    { ...rawResult, signals: finalized.signals },
+    cli,
+    startedAt,
+    finalized,
+  );
 }
 
 /**
@@ -923,8 +945,7 @@ async function executeWorkspaceGraph(
   const adapters = resolveAdaptersForRun(opts, cli);
   const units = await discoverPolyglotUnits(opts.cwd, adapters);
   if (units.length === 0) {
-    const adapterLabel =
-      adapters.map((a) => a.id).join(', ') || '(no language adapters available)';
+    const adapterLabel = adapters.map((a) => a.id).join(', ') || '(no language adapters available)';
     throw new ConfigurationError(
       `--workspace: no workspace units detected for [${adapterLabel}]. Use 'opensip-tools graph' for whole-project analysis.`,
     );
@@ -1091,4 +1112,4 @@ export function handleGraphError(label: string, error: unknown, cli: ToolCliCont
   process.stderr.write(`${label}: ${error instanceof Error ? error.message : String(error)}\n`);
 }
 
-export {buildUnifiedReportLines, buildLiveGraphOutput} from './graph-report.js';
+export { buildUnifiedReportLines, buildLiveGraphOutput } from './graph-report.js';

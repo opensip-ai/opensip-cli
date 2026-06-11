@@ -19,14 +19,14 @@ import {
   scanRegularString,
   type Region,
   type ScanResult,
-} from '@opensip-tools/core'
+} from '@opensip-tools/core';
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- token-state-machine: cyclomatic complexity is inherent to lexer-style scanners; splitting hurts readability
 function scan(src: string): ScanResult {
-  const stringRegions: Region[] = []
-  const commentRegions: Region[] = []
-  const len = src.length
-  let i = 0
+  const stringRegions: Region[] = [];
+  const commentRegions: Region[] = [];
+  const len = src.length;
+  let i = 0;
 
   // INVARIANT: every iteration of the outer loop MUST advance `i`. Each
   // branch either (a) sets `i = result.end` / `i = result.next` from a
@@ -36,25 +36,25 @@ function scan(src: string): ScanResult {
   // returns `start + 1` on overflow, which IS still an advance) — would
   // spin. Keep this invariant in mind when adding new token branches.
   while (i < len) {
-    const c = src[i]
-    const next = src[i + 1]
+    const c = src[i];
+    const next = src[i + 1];
 
     // Line comment: // ... \n
     if (c === '/' && next === '/') {
-      const start = i
-      const lc = scanLineComment(src, i)
-      i = lc.end
-      commentRegions.push({ start, end: i })
-      continue
+      const start = i;
+      const lc = scanLineComment(src, i);
+      i = lc.end;
+      commentRegions.push({ start, end: i });
+      continue;
     }
 
     // Block comment: /* ... */ (Java block comments do NOT nest)
     if (c === '/' && next === '*') {
-      const start = i
-      const bc = scanBlockCommentNonNesting(src, i)
-      i = bc.end
-      commentRegions.push({ start, end: i })
-      continue
+      const start = i;
+      const bc = scanBlockCommentNonNesting(src, i);
+      i = bc.end;
+      commentRegions.push({ start, end: i });
+      continue;
     }
 
     // Text block: """ followed by line terminator, ... """
@@ -63,44 +63,44 @@ function scan(src: string): ScanResult {
     // terminator and ends at the next `"""`.
     if (c === '"' && src[i + 1] === '"' && src[i + 2] === '"') {
       // Look past optional whitespace for a newline to confirm text block
-      let j = i + 3
-      while (j < len && (src[j] === ' ' || src[j] === '\t')) j++
+      let j = i + 3;
+      while (j < len && (src[j] === ' ' || src[j] === '\t')) j++;
       if (j < len && (src[j] === '\n' || src[j] === '\r')) {
         // It's a text block. Body starts after the line terminator.
         // Skip the line terminator (handle \r\n).
         j += src[j] === '\r' && src[j + 1] === '\n' ? 2 : 1;
-        const contentStart = j
+        const contentStart = j;
         // Scan to closing """ — track backslash escapes so a literal `\"""`
         // inside the body does not prematurely close the text block (JLS §3.10.6
         // honors the same escape sequences as regular string literals).
-        let bodyEscape = false
-        let closed = false
+        let bodyEscape = false;
+        let closed = false;
         while (j < len) {
           if (bodyEscape) {
-            bodyEscape = false
-            j++
-            continue
+            bodyEscape = false;
+            j++;
+            continue;
           }
           if (src[j] === '\\') {
-            bodyEscape = true
-            j++
-            continue
+            bodyEscape = true;
+            j++;
+            continue;
           }
           if (src[j] === '"' && src[j + 1] === '"' && src[j + 2] === '"') {
-            const contentEnd = j
-            stringRegions.push({ start: contentStart, end: contentEnd })
-            i = j + 3
-            closed = true
-            break
+            const contentEnd = j;
+            stringRegions.push({ start: contentStart, end: contentEnd });
+            i = j + 3;
+            closed = true;
+            break;
           }
-          j++
+          j++;
         }
         if (!closed) {
           // Unterminated text block — record what we have
-          stringRegions.push({ start: contentStart, end: len })
-          i = len
+          stringRegions.push({ start: contentStart, end: len });
+          i = len;
         }
-        continue
+        continue;
       }
       // Not a text block (e.g. `""` empty string followed by another `"`).
       // Fall through to regular string handling.
@@ -108,10 +108,10 @@ function scan(src: string): ScanResult {
 
     // Regular string: "..."
     if (c === '"') {
-      const result = scanRegularString(src, i)
-      stringRegions.push({ start: i + 1, end: result.contentEnd })
-      i = result.next
-      continue
+      const result = scanRegularString(src, i);
+      stringRegions.push({ start: i + 1, end: result.contentEnd });
+      i = result.next;
+      continue;
     }
 
     // Char literal: '...' — preserve as code (single character, not a string).
@@ -119,19 +119,19 @@ function scan(src: string): ScanResult {
     // matches the lang-cpp / lang-rust heuristic; branch order is
     // load-bearing — see core's scanCharLiteral docstring and lang-java F6).
     if (c === "'") {
-      const result = scanCharLiteral(src, i)
-      i = result.end
-      continue
+      const result = scanCharLiteral(src, i);
+      i = result.end;
+      continue;
     }
 
-    i++
+    i++;
   }
 
-  return { stringRegions, commentRegions }
+  return { stringRegions, commentRegions };
 }
 
-const stripper = makeStripper(scan)
+const stripper = makeStripper(scan);
 /** Replace string literal content with whitespace; preserves length. */
-export const stripStrings = stripper.stripStrings
+export const stripStrings = stripper.stripStrings;
 /** Replace string literals AND comments with whitespace; preserves length. */
-export const stripComments = stripper.stripComments
+export const stripComments = stripper.stripComments;

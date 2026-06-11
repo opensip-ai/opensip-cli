@@ -107,10 +107,7 @@ export class GateBaselineMissingError extends ConfigurationError {
  */
 export class GateBaselineInvalidError extends SystemError {
   constructor(reason: string) {
-    super(
-      `Gate baseline is invalid: ${reason}`,
-      { code: 'SYSTEM.GATE.BASELINE_CORRUPT' },
-    );
+    super(`Gate baseline is invalid: ${reason}`, { code: 'SYSTEM.GATE.BASELINE_CORRUPT' });
     this.name = 'GateBaselineInvalidError';
   }
 }
@@ -249,9 +246,13 @@ export function renderGateCompareOutput(result: GateCompareResult): string {
   }
 
   if (result.degraded) {
-    lines.push(`✗ DEGRADED — ${result.added.length} new violation${result.added.length === 1 ? '' : 's'}`);
+    lines.push(
+      `✗ DEGRADED — ${result.added.length} new violation${result.added.length === 1 ? '' : 's'}`,
+    );
   } else if (result.resolved.length > 0) {
-    lines.push(`✓ IMPROVED — ${result.resolved.length} violation${result.resolved.length === 1 ? '' : 's'} resolved, none added`);
+    lines.push(
+      `✓ IMPROVED — ${result.resolved.length} violation${result.resolved.length === 1 ? '' : 's'} resolved, none added`,
+    );
   } else {
     lines.push(`✓ STABLE — no change`);
   }
@@ -275,7 +276,10 @@ function signalGateSeverity(signal: Signal): 'error' | 'warning' {
  * the CliOutput→envelope migration. `ruleId` is `signal.ruleId` (the check
  * slug, the same value the old `FindingOutput.ruleId` carried).
  */
-function extractViolationsFromEnvelope(envelope: SignalEnvelope, identity: ViolationIdentity): GateViolation[] {
+function extractViolationsFromEnvelope(
+  envelope: SignalEnvelope,
+  identity: ViolationIdentity,
+): GateViolation[] {
   const violations: GateViolation[] = [];
   for (const signal of envelope.signals) {
     const filePath = signal.filePath;
@@ -318,7 +322,10 @@ function extractViolationsFromStoredBaseline(
   if (baseline.signals === undefined || !Array.isArray(baseline.signals)) {
     throw new GateBaselineInvalidError('missing or non-array `signals`');
   }
-  return extractViolationsFromEnvelope({ signals: baseline.signals } as unknown as SignalEnvelope, identity);
+  return extractViolationsFromEnvelope(
+    { signals: baseline.signals } as unknown as SignalEnvelope,
+    identity,
+  );
 }
 
 function formatLocation(v: GateViolation): string {

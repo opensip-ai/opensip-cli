@@ -15,17 +15,20 @@ import { findOccurrence, runFixture, writeFixture } from './_fixture-runner.js';
 
 import type { Catalog } from '@opensip-tools/graph';
 
-
 describe('alias-resolution acceptance fixture', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-alias-'));
-  afterAll(() => { rmSync(fixtureDir, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(fixtureDir, { recursive: true, force: true });
+  });
 
   writeFixture(fixtureDir, {
     'x.ts': `export function foo(): number { return 42; }\n`,
     'caller.ts': `import { foo } from './x.js';\nexport function caller(): number { return foo(); }\n`,
   });
   let catalog!: Catalog;
-  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
+  beforeAll(async () => {
+    catalog = await runFixture(fixtureDir);
+  });
 
   it('resolves the imported call to the foreign declaration', () => {
     const callerOcc = findOccurrence(catalog, (o) => o.simpleName === 'caller');
@@ -37,7 +40,10 @@ describe('alias-resolution acceptance fixture', () => {
     expect(fooEdge!.resolution).toBe('static');
     expect(fooEdge!.confidence).toBe('high');
 
-    const fooOcc = findOccurrence(catalog, (o) => o.simpleName === 'foo' && o.kind === 'function-declaration');
+    const fooOcc = findOccurrence(
+      catalog,
+      (o) => o.simpleName === 'foo' && o.kind === 'function-declaration',
+    );
     expect(fooOcc).toBeDefined();
     expect(fooEdge!.to[0]).toBe(fooOcc!.bodyHash);
   });

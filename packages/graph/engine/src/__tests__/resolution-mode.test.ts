@@ -93,7 +93,9 @@ describe('resolution-mode contract', () => {
 
     it('omits resolutionMode for exact / undefined', () => {
       expect(buildGraphEnvelope(RUN).resolutionMode).toBeUndefined();
-      expect(buildGraphEnvelope({ ...RUN, resolutionMode: 'exact' }).resolutionMode).toBeUndefined();
+      expect(
+        buildGraphEnvelope({ ...RUN, resolutionMode: 'exact' }).resolutionMode,
+      ).toBeUndefined();
     });
 
     it('includes resolutionMode for fast', () => {

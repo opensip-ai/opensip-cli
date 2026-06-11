@@ -62,15 +62,15 @@
  * the looser, more-permissive choice and is the one being tightened.
  */
 
-import type { ScenarioMetricKey } from './scenario-metric-key.js'
-import type { SimulationMetrics } from '../types/base-types.js'
+import type { ScenarioMetricKey } from './scenario-metric-key.js';
+import type { SimulationMetrics } from '../types/base-types.js';
 
 // `ScenarioMetricKey` moved to `./scenario-metric-key.ts` (a leaf
 // module) to break the `resolve-metric.ts ↔ base-types.ts` file-level
 // cycle. Re-exported here so existing callers (the engine barrel,
 // downstream tools that build `ScenarioAssertion` values) keep their
 // import paths.
-export type { ScenarioMetricKey } from './scenario-metric-key.js'
+export type { ScenarioMetricKey } from './scenario-metric-key.js';
 
 /**
  * Resolve a metric key to its numeric value.
@@ -90,66 +90,60 @@ export function resolveMetric(
 ): number {
   switch (metric) {
     case 'error_rate': {
-      return metrics.totalRequests > 0
-        ? metrics.failedRequests / metrics.totalRequests
-        : 0
+      return metrics.totalRequests > 0 ? metrics.failedRequests / metrics.totalRequests : 0;
     }
     case 'success_rate': {
       // See module-level docs: `0` when totalRequests === 0 (tightening choice).
-      return metrics.totalRequests > 0
-        ? metrics.successfulRequests / metrics.totalRequests
-        : 0
+      return metrics.totalRequests > 0 ? metrics.successfulRequests / metrics.totalRequests : 0;
     }
     case 'recovery_rate': {
       // No errors to recover from ⇒ trivially fully recovered (1).
-      return metrics.errorsGenerated > 0
-        ? 1 - metrics.failedRequests / metrics.errorsGenerated
-        : 1
+      return metrics.errorsGenerated > 0 ? 1 - metrics.failedRequests / metrics.errorsGenerated : 1;
     }
     case 'requests_per_second': {
       if (durationSeconds === undefined || durationSeconds <= 0) {
-        return 0
+        return 0;
       }
-      return metrics.totalRequests / durationSeconds
+      return metrics.totalRequests / durationSeconds;
     }
     case 'avg_latency':
     case 'avg_latency_ms': {
-      return metrics.avgLatencyMs
+      return metrics.avgLatencyMs;
     }
     case 'p50_latency':
     case 'p50_latency_ms': {
-      return metrics.p50LatencyMs
+      return metrics.p50LatencyMs;
     }
     case 'p95_latency':
     case 'p95_latency_ms': {
-      return metrics.p95LatencyMs
+      return metrics.p95LatencyMs;
     }
     case 'p99_latency':
     case 'p99_latency_ms': {
-      return metrics.p99LatencyMs
+      return metrics.p99LatencyMs;
     }
     case 'total_requests': {
-      return metrics.totalRequests
+      return metrics.totalRequests;
     }
     case 'successful_requests': {
-      return metrics.successfulRequests
+      return metrics.successfulRequests;
     }
     case 'failed_requests': {
-      return metrics.failedRequests
+      return metrics.failedRequests;
     }
     case 'errors_generated': {
-      return metrics.errorsGenerated
+      return metrics.errorsGenerated;
     }
     case 'max_latency_ms':
     case 'memory_mb':
     case 'cpu_percent': {
       // Reserved: no underlying field on SimulationMetrics yet.
-      return 0
+      return 0;
     }
     default: {
       // Exhaustive — `ScenarioMetricKey` should narrow to never here. This
       // branch only fires if a caller deliberately bypasses the type check.
-      return 0
+      return 0;
     }
   }
 }

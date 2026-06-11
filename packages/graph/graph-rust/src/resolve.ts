@@ -69,7 +69,10 @@ interface NameIndex {
   readonly methods: ReadonlyMap<string, readonly FunctionOccurrence[]>;
 }
 
-function rustPosition(node: Node, file: RustParsedFile): {
+function rustPosition(
+  node: Node,
+  file: RustParsedFile,
+): {
   readonly line: number;
   readonly column: number;
   readonly text: string;
@@ -123,10 +126,7 @@ export function resolveCallSites(input: ResolveInput<RustParsedProject>): Resolv
     : { edgesByOwner, dependenciesByOwner, stats: finalStats };
 }
 
-
-function buildIndex(
-  functions: Readonly<Record<string, readonly FunctionOccurrence[]>>,
-): NameIndex {
+function buildIndex(functions: Readonly<Record<string, readonly FunctionOccurrence[]>>): NameIndex {
   const all = new Map<string, FunctionOccurrence[]>();
   const methods = new Map<string, FunctionOccurrence[]>();
   for (const [name, occs] of Object.entries(functions)) {
@@ -224,10 +224,23 @@ function decodeReceiverPath(path: Node | null): string | null {
 function resolveTarget(
   target: CallTarget | null,
   index: NameIndex,
-  loc: { readonly line: number; readonly column: number; readonly text: string; readonly discarded: boolean },
+  loc: {
+    readonly line: number;
+    readonly column: number;
+    readonly text: string;
+    readonly discarded: boolean;
+  },
 ): CallEdge {
   if (target === null) {
-    return { to: [], line: loc.line, column: loc.column, resolution: 'unknown', confidence: 'low', text: loc.text, discarded: loc.discarded };
+    return {
+      to: [],
+      line: loc.line,
+      column: loc.column,
+      resolution: 'unknown',
+      confidence: 'low',
+      text: loc.text,
+      discarded: loc.discarded,
+    };
   }
   // Macros: tag the edge for side-effect detection but mark unresolved.
   // The edge text carries `name!` so rules can match against the
@@ -262,12 +275,28 @@ function resolveTarget(
   }
   const matches = index.all.get(target.name);
   if (!matches || matches.length === 0) {
-    return { to: [], line: loc.line, column: loc.column, resolution: 'unknown', confidence: 'low', text: loc.text, discarded: loc.discarded };
+    return {
+      to: [],
+      line: loc.line,
+      column: loc.column,
+      resolution: 'unknown',
+      confidence: 'low',
+      text: loc.text,
+      discarded: loc.discarded,
+    };
   }
   if (matches.length === 1) {
     const only = matches[0];
     if (!only) {
-      return { to: [], line: loc.line, column: loc.column, resolution: 'unknown', confidence: 'low', text: loc.text, discarded: loc.discarded };
+      return {
+        to: [],
+        line: loc.line,
+        column: loc.column,
+        resolution: 'unknown',
+        confidence: 'low',
+        text: loc.text,
+        discarded: loc.discarded,
+      };
     }
     return {
       to: [only.bodyHash],

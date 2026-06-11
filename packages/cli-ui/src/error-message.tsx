@@ -20,12 +20,13 @@ export function ErrorMessage({ message, suggestion }: ErrorMessageProps): React.
   return (
     <Box flexDirection="column" paddingLeft={2}>
       <Text>
-        <Text color={theme.error}>{'✗'}</Text>
-        {' '}
-        {message}
+        <Text color={theme.error}>{'✗'}</Text> {message}
       </Text>
       {suggestion !== undefined && (
-        <Text dimColor>{'    '}{suggestion}</Text>
+        <Text dimColor>
+          {'    '}
+          {suggestion}
+        </Text>
       )}
     </Box>
   );

@@ -12,7 +12,7 @@
  * preserved via `skipLine`.
  */
 
-import { defineRegexListCheck } from '@opensip-tools/fitness'
+import { defineRegexListCheck } from '@opensip-tools/fitness';
 
 /**
  * Check: quality/no-window-alert
@@ -73,4 +73,4 @@ export const noWindowAlert = defineRegexListCheck({
       suggestion: 'Use a form input in a modal dialog instead of window.prompt()',
     },
   ],
-})
+});

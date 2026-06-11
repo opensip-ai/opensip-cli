@@ -12,7 +12,13 @@
  * by the boundary pass and labeled `crossShard: true` / `'syntactic'`.
  */
 
-import { logger, ValidationError, withSpanAsync, type Signal, type Span } from '@opensip-tools/core';
+import {
+  logger,
+  ValidationError,
+  withSpanAsync,
+  type Signal,
+  type Span,
+} from '@opensip-tools/core';
 
 import { buildPackageManifestIndex } from '../../cross-package/export-index.js';
 import { unionFeatureDeps } from '../../pipeline/feature-deps.js';
@@ -183,8 +189,16 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   const manifestIndex = buildPackageManifestIndex(shards, projectRoot);
   const walkStart = Date.now();
   emitStageStart(onProgress, 'walk');
-  const merged = mergeShardFragments(fragments.map((f) => f.fragment), allFiles);
-  emitStage(onProgress, 'walk', Date.now() - walkStart, `${String(countCatalogFunctions(merged))} functions`);
+  const merged = mergeShardFragments(
+    fragments.map((f) => f.fragment),
+    allFiles,
+  );
+  emitStage(
+    onProgress,
+    'walk',
+    Date.now() - walkStart,
+    `${String(countCatalogFunctions(merged))} functions`,
+  );
 
   // 3b. Resolve the cross-shard boundary calls against the export index — graph's
   //     main-thread analogue of the single-program `resolve` stage — then stamp
@@ -314,7 +328,12 @@ function emitStage(
   durationMs: number,
   detail?: string,
 ): void {
-  onProgress?.({ type: 'stage-done', stage, durationMs, ...(detail === undefined ? {} : { detail }) });
+  onProgress?.({
+    type: 'stage-done',
+    stage,
+    durationMs,
+    ...(detail === undefined ? {} : { detail }),
+  });
 }
 
 /**

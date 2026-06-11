@@ -53,7 +53,10 @@ import type {
 } from '@opensip-tools/graph';
 import type { Node } from '@opensip-tools/tree-sitter';
 
-function goPosition(node: Node, file: GoParsedFile): {
+function goPosition(
+  node: Node,
+  file: GoParsedFile,
+): {
   readonly line: number;
   readonly column: number;
   readonly text: string;
@@ -166,8 +169,11 @@ function resolveDependencies(
       specifier: site.specifier,
     };
     const existing = out.get(site.ownerHash);
-    if (existing === undefined) {out.set(site.ownerHash, [edge]);}
-    else {existing.push(edge);}
+    if (existing === undefined) {
+      out.set(site.ownerHash, [edge]);
+    } else {
+      existing.push(edge);
+    }
   }
   return out;
 }

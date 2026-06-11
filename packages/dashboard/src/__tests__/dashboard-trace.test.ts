@@ -20,11 +20,15 @@ interface Env {
 
 function loadEnv(): Env {
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
-  const fn = new Function(dashboardIndexesJs() + dashboardTraceJs() + '\nreturn { buildIndexes, traceFromEntry };')();
+  const fn = new Function(
+    dashboardIndexesJs() + dashboardTraceJs() + '\nreturn { buildIndexes, traceFromEntry };',
+  )();
   return fn as Env;
 }
 
-function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string }): GraphFunctionOccurrence {
+function makeOcc(
+  over: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string },
+): GraphFunctionOccurrence {
   return {
     qualifiedName: over.simpleName,
     filePath: 'packages/x/src/x.ts',
@@ -49,16 +53,76 @@ describe('traceFromEntry', () => {
     const env = loadEnv();
     // entry (cli) → mid → target. Plus a longer path entry → a → b → mid.
     const cat: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        entry: [makeOcc({ bodyHash: 'he', simpleName: 'entry', filePath: 'packages/cli/src/index.ts',
-          calls: [{ to: ['hm', 'ha'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: '...' }] })],
-        a: [makeOcc({ bodyHash: 'ha', simpleName: 'a',
-          calls: [{ to: ['hb'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
-        b: [makeOcc({ bodyHash: 'hb', simpleName: 'b',
-          calls: [{ to: ['hm'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'mid()' }] })],
-        mid: [makeOcc({ bodyHash: 'hm', simpleName: 'mid',
-          calls: [{ to: ['ht'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'target()' }] })],
+        entry: [
+          makeOcc({
+            bodyHash: 'he',
+            simpleName: 'entry',
+            filePath: 'packages/cli/src/index.ts',
+            calls: [
+              {
+                to: ['hm', 'ha'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: '...',
+              },
+            ],
+          }),
+        ],
+        a: [
+          makeOcc({
+            bodyHash: 'ha',
+            simpleName: 'a',
+            calls: [
+              {
+                to: ['hb'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'b()',
+              },
+            ],
+          }),
+        ],
+        b: [
+          makeOcc({
+            bodyHash: 'hb',
+            simpleName: 'b',
+            calls: [
+              {
+                to: ['hm'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'mid()',
+              },
+            ],
+          }),
+        ],
+        mid: [
+          makeOcc({
+            bodyHash: 'hm',
+            simpleName: 'mid',
+            calls: [
+              {
+                to: ['ht'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
         target: [makeOcc({ bodyHash: 'ht', simpleName: 'target' })],
       },
     };
@@ -70,9 +134,14 @@ describe('traceFromEntry', () => {
   it('returns null when no entry reaches the target', () => {
     const env = loadEnv();
     const cat: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        entry: [makeOcc({ bodyHash: 'he', simpleName: 'entry', filePath: 'packages/cli/src/index.ts' })],
+        entry: [
+          makeOcc({ bodyHash: 'he', simpleName: 'entry', filePath: 'packages/cli/src/index.ts' }),
+        ],
         // 'orphan' has callers, so it's not an entry; nothing else points at it.
         target: [makeOcc({ bodyHash: 'ht', simpleName: 'target', visibility: 'module-local' })],
       },
@@ -85,8 +154,13 @@ describe('traceFromEntry', () => {
   it('returns null for an unknown target hash', () => {
     const env = loadEnv();
     const cat: GraphCatalog = {
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
-      functions: { e: [makeOcc({ bodyHash: 'e', simpleName: 'e', filePath: 'packages/cli/src/index.ts' })] },
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        e: [makeOcc({ bodyHash: 'e', simpleName: 'e', filePath: 'packages/cli/src/index.ts' })],
+      },
     };
     const idx = env.buildIndexes(cat);
     expect(env.traceFromEntry('nonexistent', cat, idx)).toBeNull();

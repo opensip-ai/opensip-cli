@@ -14,19 +14,19 @@
  * Graph is exempt by ADR-0026 (selection-only execution — it has no `execution`
  * block to schedule). `strip-strings-and-comments`; tests are exempt.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /** Fitness + simulation recipe-execution sources (graph is selection-only, ADR-0026). */
-const RECIPE_EXEC_PATH = /packages\/(?:fitness|simulation)\/engine\/src\/recipes\//
+const RECIPE_EXEC_PATH = /packages\/(?:fitness|simulation)\/engine\/src\/recipes\//;
 
-const TEST_PATH = /\.test\.tsx?$|\/__tests__\//
+const TEST_PATH = /\.test\.tsx?$|\/__tests__\//;
 
 /** A raw timer install — the per-unit timeout reimplementation the substrate replaced. */
-const SET_TIMEOUT_RE = /\bsetTimeout\s*\(/
+const SET_TIMEOUT_RE = /\bsetTimeout\s*\(/;
 
 /** Pure analysis. Exported for unit tests. */
 export function analyzeSameRecipeSemantics(content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
   for (const [i, line] of content.split('\n').entries()) {
     if (SET_TIMEOUT_RE.test(line)) {
       violations.push({
@@ -40,22 +40,23 @@ export function analyzeSameRecipeSemantics(content: string): CheckViolation[] {
           'Route the unit run through runWithTimeout / scheduleUnits / executePipeline ' +
           '(@opensip-tools/core), or — for a deliberate per-domain difference — document it ' +
           'in an ADR (the same-recipe-semantics exception, e.g. ADR-0026 for graph).',
-      })
+      });
     }
   }
-  return violations
+  return violations;
 }
 
 export const sameRecipeSemantics = defineCheck({
   id: 'e24d2dce-cd2a-40d7-9fe9-955023888929',
   slug: 'same-recipe-semantics',
-  description: 'Recipe execution must run on the shared substrate; no per-tool scheduler reimplementation (§5.8/§4.3)',
+  description:
+    'Recipe execution must run on the shared substrate; no per-tool scheduler reimplementation (§5.8/§4.3)',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   tags: ['architecture', 'quality'],
   fileTypes: ['ts', 'tsx'],
   contentFilter: 'strip-strings-and-comments',
   analyze: (content, filePath) => {
-    if (!RECIPE_EXEC_PATH.test(filePath) || TEST_PATH.test(filePath)) return []
-    return analyzeSameRecipeSemantics(content)
+    if (!RECIPE_EXEC_PATH.test(filePath) || TEST_PATH.test(filePath)) return [];
+    return analyzeSameRecipeSemantics(content);
   },
-})
+});

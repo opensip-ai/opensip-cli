@@ -169,7 +169,16 @@ describe('no-side-effect-path rule', () => {
       bodyHash: 'c',
       simpleName: 'caller',
       ...exportedDefaults,
-      calls: [{ to: ['p'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'oldCatalog()' }],
+      calls: [
+        {
+          to: ['p'],
+          line: 1,
+          column: 0,
+          resolution: 'static',
+          confidence: 'high',
+          text: 'oldCatalog()',
+        },
+      ],
     });
     const catalog = makeCatalog([pure, helperA, helperB, caller]);
     const indexes = buildIndexes(catalog);

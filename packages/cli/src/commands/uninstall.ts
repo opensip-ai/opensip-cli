@@ -52,12 +52,12 @@
  * - `uninstall/targets.ts` owns Target collection + pre-prompt display.
  */
 
-import { existsSync, rmSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
-import { createInterface } from 'node:readline/promises'
+import { existsSync, rmSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 
-import { resolveProjectPaths } from '@opensip-tools/core'
+import { resolveProjectPaths } from '@opensip-tools/core';
 
 import {
   collectTargets,
@@ -66,30 +66,30 @@ import {
   printUserModeTargets,
   type Target,
   type UninstallMode,
-} from './uninstall/targets.js'
+} from './uninstall/targets.js';
 
-import type { UninstallDoneResult } from '@opensip-tools/contracts'
-import type { ProjectContext } from '@opensip-tools/core'
+import type { UninstallDoneResult } from '@opensip-tools/contracts';
+import type { ProjectContext } from '@opensip-tools/core';
 
 export interface UninstallOptions {
-  readonly yes?: boolean
-  readonly dryRun?: boolean
+  readonly yes?: boolean;
+  readonly dryRun?: boolean;
   /**
    * If set, run in project mode and target this path. If `true`, use
    * cwd. If `undefined`, run in user-level mode.
    */
-  readonly project?: string | true
+  readonly project?: string | true;
   /** Override the user-level root dir (primarily for tests). */
-  readonly rootDir?: string
+  readonly rootDir?: string;
   /** Override cwd resolution for `--project` with no arg (tests). */
-  readonly cwd?: string
+  readonly cwd?: string;
   /**
    * Resolved ProjectContext from pre-action-hook. Used as the primary
    * source for `resolveProjectDir` when `--project` wasn't passed —
    * without it, `uninstall` run from a subdir would target the wrong
    * .runtime/.
    */
-  readonly projectContext?: ProjectContext
+  readonly projectContext?: ProjectContext;
   /**
    * When true, in project mode also remove user-authored content and the
    * config file (DESTRUCTIVE). Default (false) only removes the
@@ -97,41 +97,43 @@ export interface UninstallOptions {
    * scenarios/config. `--purge` is the explicit opt-in for the old
    * destructive behavior.
    */
-  readonly purge?: boolean
+  readonly purge?: boolean;
   /** Override stdout (primarily for tests). */
-  readonly write?: (s: string) => void
+  readonly write?: (s: string) => void;
   /** Override the confirmation prompt (primarily for tests). */
-  readonly prompt?: (question: string) => Promise<string>
+  readonly prompt?: (question: string) => Promise<string>;
 }
 
-const DEFAULT_USER_ROOT = join(homedir(), '.opensip-tools')
+const DEFAULT_USER_ROOT = join(homedir(), '.opensip-tools');
 
 async function confirm(
   prompt: (question: string) => Promise<string>,
   message: string,
 ): Promise<boolean> {
-  const raw = await prompt(message)
-  const answer = raw.trim().toLowerCase()
-  return answer === 'y' || answer === 'yes'
+  const raw = await prompt(message);
+  const answer = raw.trim().toLowerCase();
+  return answer === 'y' || answer === 'yes';
 }
 
 function defaultPrompt(question: string): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout })
-  return rl.question(question).finally(() => rl.close())
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return rl.question(question).finally(() => rl.close());
 }
 
 /** Resolve the project directory for `--project [path]`. */
 function resolveProjectDir(opts: UninstallOptions): string {
-  if (typeof opts.project === 'string') return resolve(opts.project)
+  if (typeof opts.project === 'string') return resolve(opts.project);
   // Prefer the discovered project root (set by pre-action-hook). Falls
   // back to literal cwd, then process.cwd(). Without the discovered
   // root, `uninstall` from a subdir would target the wrong .runtime/.
-  return opts.projectContext?.projectRoot ?? opts.cwd ?? process.cwd()
+  return opts.projectContext?.projectRoot ?? opts.cwd ?? process.cwd();
 }
 
 /** Project a `Target[]` into the result-shape `{path, kind}[]`. */
-function targetsForResult(targets: readonly Target[]): readonly { readonly path: string; readonly kind: 'file' | 'dir' }[] {
-  return targets.map(t => ({ path: t.path, kind: t.kind }))
+function targetsForResult(
+  targets: readonly Target[],
+): readonly { readonly path: string; readonly kind: 'file' | 'dir' }[] {
+  return targets.map((t) => ({ path: t.path, kind: t.kind }));
 }
 
 /**
@@ -164,79 +166,80 @@ function filterTargetsForAction(
   allTargets: readonly Target[],
 ): { toDelete: readonly Target[]; toKeep: readonly Target[] } {
   if (mode === 'user' || purge) {
-    return { toDelete: allTargets, toKeep: [] }
+    return { toDelete: allTargets, toKeep: [] };
   }
   return {
     toDelete: allTargets.filter((t) => t.bucket === 'runtime'),
     toKeep: allTargets.filter((t) => t.bucket !== 'runtime'),
-  }
+  };
 }
 
 /** The resolved uninstall plan a preamble summarizes. */
 interface PreambleInput {
-  mode: UninstallMode
-  purge: boolean
-  toDelete: readonly Target[]
-  toKeep: readonly Target[]
-  rootPath: string
+  mode: UninstallMode;
+  purge: boolean;
+  toDelete: readonly Target[];
+  toKeep: readonly Target[];
+  rootPath: string;
 }
 
 /** Print the pre-prompt summary appropriate to mode + purge state. */
 function printPreambleForRun(write: (s: string) => void, input: PreambleInput): void {
-  const { mode, purge, toDelete, toKeep, rootPath } = input
+  const { mode, purge, toDelete, toKeep, rootPath } = input;
   if (mode === 'user') {
-    printUserModeTargets(write, toDelete)
+    printUserModeTargets(write, toDelete);
   } else if (purge) {
-    printProjectPurge(write, toDelete, rootPath)
+    printProjectPurge(write, toDelete, rootPath);
   } else {
-    printProjectDefault(write, toDelete, toKeep, rootPath)
+    printProjectDefault(write, toDelete, toKeep, rootPath);
   }
 }
 
 export async function executeUninstall(opts: UninstallOptions = {}): Promise<UninstallDoneResult> {
-  const mode: UninstallMode = opts.project === undefined ? 'user' : 'project'
-  const userRoot = opts.rootDir ?? DEFAULT_USER_ROOT
-  const projectDir = resolveProjectDir(opts)
-  const rootPath = mode === 'user' ? userRoot : projectDir
-  const write = opts.write ?? ((s: string) => process.stdout.write(s))
-  const purge = opts.purge === true
+  const mode: UninstallMode = opts.project === undefined ? 'user' : 'project';
+  const userRoot = opts.rootDir ?? DEFAULT_USER_ROOT;
+  const projectDir = resolveProjectDir(opts);
+  const rootPath = mode === 'user' ? userRoot : projectDir;
+  const write = opts.write ?? ((s: string) => process.stdout.write(s));
+  const purge = opts.purge === true;
 
-  const allTargets = collectTargets(mode, userRoot, projectDir)
+  const allTargets = collectTargets(mode, userRoot, projectDir);
   if (allTargets.length === 0) {
-    const where = mode === 'user' ? userRoot : projectDir
-    const note = mode === 'project'
-      ? `\nNothing to remove — no opensip-tools state found at ${where}.\n\n`
-      : `\nNothing to remove — ${where} does not exist.\n\n`
-    write(note)
-    return buildResult({ action: 'empty', mode, targets: [], rootPath })
+    const where = mode === 'user' ? userRoot : projectDir;
+    const note =
+      mode === 'project'
+        ? `\nNothing to remove — no opensip-tools state found at ${where}.\n\n`
+        : `\nNothing to remove — ${where} does not exist.\n\n`;
+    write(note);
+    return buildResult({ action: 'empty', mode, targets: [], rootPath });
   }
 
-  const { toDelete, toKeep } = filterTargetsForAction(mode, purge, allTargets)
+  const { toDelete, toKeep } = filterTargetsForAction(mode, purge, allTargets);
 
   // Empty-after-filter (project default with no .runtime/ but existing
   // user content). Print the KEPT block so the user sees what survived.
   if (mode === 'project' && toDelete.length === 0) {
-    printProjectDefault(write, [], toKeep, rootPath)
-    return buildResult({ action: 'empty', mode, targets: [], rootPath })
+    printProjectDefault(write, [], toKeep, rootPath);
+    return buildResult({ action: 'empty', mode, targets: [], rootPath });
   }
 
-  printPreambleForRun(write, { mode, purge, toDelete, toKeep, rootPath })
+  printPreambleForRun(write, { mode, purge, toDelete, toKeep, rootPath });
 
   if (opts.dryRun) {
-    return buildResult({ action: 'dry-run', mode, targets: toDelete, rootPath })
+    return buildResult({ action: 'dry-run', mode, targets: toDelete, rootPath });
   }
 
   if (opts.yes !== true) {
-    const prompt = opts.prompt ?? defaultPrompt
-    const ok = await confirm(prompt, `Proceed? [y/N] `)
+    const prompt = opts.prompt ?? defaultPrompt;
+    const ok = await confirm(prompt, `Proceed? [y/N] `);
     if (!ok) {
-      return buildResult({ action: 'cancelled', mode, targets: toDelete, rootPath })
+      return buildResult({ action: 'cancelled', mode, targets: toDelete, rootPath });
     }
   }
 
-  performRemoval(toDelete, mode, purge, projectDir)
+  performRemoval(toDelete, mode, purge, projectDir);
 
-  return buildResult({ action: 'removed', mode, targets: toDelete, rootPath })
+  return buildResult({ action: 'removed', mode, targets: toDelete, rootPath });
 }
 
 /**
@@ -251,13 +254,17 @@ function performRemoval(
   projectDir: string,
 ): void {
   for (const t of toDelete) {
-    rmSync(t.path, { recursive: true, force: true })
+    rmSync(t.path, { recursive: true, force: true });
   }
-  if (mode !== 'project' || !purge) return
+  if (mode !== 'project' || !purge) return;
   // --purge removed children individually (each enumerated for display).
   // Tidy the parent shell so --purge matches "removes EVERYTHING."
-  const paths = resolveProjectPaths(projectDir)
+  const paths = resolveProjectPaths(projectDir);
   if (existsSync(paths.userSourceDir)) {
-    try { rmSync(paths.userSourceDir, { recursive: true, force: true }) } catch { /* ignore */ }
+    try {
+      rmSync(paths.userSourceDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   }
 }

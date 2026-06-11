@@ -33,7 +33,11 @@ function signal(over: Partial<Parameters<typeof createSignal>[0]> = {}): Signal 
   });
 }
 
-function mockCli(): { cli: ToolCliContext; setExitCode: ReturnType<typeof vi.fn>; render: ReturnType<typeof vi.fn> } {
+function mockCli(): {
+  cli: ToolCliContext;
+  setExitCode: ReturnType<typeof vi.fn>;
+  render: ReturnType<typeof vi.fn>;
+} {
   const setExitCode = vi.fn();
   const render = vi.fn(() => Promise.resolve());
   const cli = {

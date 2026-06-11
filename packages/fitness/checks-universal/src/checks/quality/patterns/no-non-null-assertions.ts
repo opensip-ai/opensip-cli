@@ -2,7 +2,7 @@
  * @fileoverview No non-null assertions check
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Regex to detect non-null assertion operator usage.
@@ -10,54 +10,54 @@ import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fit
  * Avoids matching !== and != comparisons.
  */
 // eslint-disable-next-line sonarjs/slow-regex -- character class has no overlap; '!' acts as fixed delimiter
-const NON_NULL_ASSERTION_REGEX = /([\w.[\]]+)!\s*[.[;,)]/g
+const NON_NULL_ASSERTION_REGEX = /([\w.[\]]+)!\s*[.[;,)]/g;
 
 /**
  * Analyze a file for non-null assertion operator usage
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Inherent complexity: template literal tracking + regex matching + multiple skip conditions
 function analyzeNonNullAssertions(content: string, _filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
 
   // Track template literal nesting to skip lines inside multi-line template literals
-  let inTemplateLiteral = false
+  let inTemplateLiteral = false;
 
   for (const [i, line_] of lines.entries()) {
-    const line = line_ ?? ''
-    const trimmed = line.trim()
+    const line = line_ ?? '';
+    const trimmed = line.trim();
 
     // Track template literal boundaries (count unescaped backticks)
-    let backtickCount = 0
+    let backtickCount = 0;
     for (let c = 0; c < line.length; c++) {
-      if (line[c] === '`' && (c === 0 || line[c - 1] !== '\\')) backtickCount++
+      if (line[c] === '`' && (c === 0 || line[c - 1] !== '\\')) backtickCount++;
     }
-    if (backtickCount % 2 === 1) inTemplateLiteral = !inTemplateLiteral
+    if (backtickCount % 2 === 1) inTemplateLiteral = !inTemplateLiteral;
 
     // Skip lines inside multi-line template literals (e.g., longDescription text)
-    if (inTemplateLiteral && backtickCount % 2 === 0) continue
+    if (inTemplateLiteral && backtickCount % 2 === 0) continue;
 
     // Skip comments, imports, and type declarations
     if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('import '))
-      continue
+      continue;
     if (
       trimmed.startsWith('type ') ||
       trimmed.startsWith('interface ') ||
       trimmed.startsWith('export type ') ||
       trimmed.startsWith('export interface ')
     )
-      continue
+      continue;
 
     // Skip lines that are string literals (rough heuristic)
-    if (trimmed.startsWith("'") || trimmed.startsWith('"') || trimmed.startsWith('`')) continue
+    if (trimmed.startsWith("'") || trimmed.startsWith('"') || trimmed.startsWith('`')) continue;
 
-    NON_NULL_ASSERTION_REGEX.lastIndex = 0
-    let match
+    NON_NULL_ASSERTION_REGEX.lastIndex = 0;
+    let match;
     while ((match = NON_NULL_ASSERTION_REGEX.exec(line)) !== null) {
       // Make sure this isn't part of !== or !=
-      const bangPos = match.index + (match[1]?.length ?? 0)
-      const nextChar = line[bangPos + 1]
-      if (nextChar === '=') continue
+      const bangPos = match.index + (match[1]?.length ?? 0);
+      const nextChar = line[bangPos + 1];
+      if (nextChar === '=') continue;
 
       violations.push({
         line: i + 1,
@@ -67,11 +67,11 @@ function analyzeNonNullAssertions(content: string, _filePath: string): CheckViol
           'Use optional chaining (?.), nullish coalescing (??), or a proper null guard instead of the ! operator',
         type: 'non-null-assertion',
         match: trimmed.slice(0, 120),
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -102,7 +102,7 @@ export const noNonNullAssertions = defineCheck({
   fileTypes: ['ts', 'tsx'],
   analyze(content: string, filePath: string): CheckViolation[] {
     // Skip test files — non-null assertions in tests are low-risk due to controlled inputs
-    if (isTestFile(filePath)) return []
-    return analyzeNonNullAssertions(content, filePath)
+    if (isTestFile(filePath)) return [];
+    return analyzeNonNullAssertions(content, filePath);
   },
-})
+});

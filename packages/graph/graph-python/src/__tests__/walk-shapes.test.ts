@@ -120,11 +120,7 @@ describe('lang-python walk.ts — function/param shapes', () => {
     // Lambda assigned at module level: parent frame is module-init.
     // The creation edge IS emitted because module-init's bodyHash !=
     // the lambda's bodyHash.
-    writeFileSync(
-      join(dir, 'main.py'),
-      `add = lambda a, b: a + b\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'main.py'), `add = lambda a, b: a + b\n`, 'utf8');
     const walk = runWalk(dir);
     const arrowNames = Object.keys(walk.occurrences).filter((k) => k.startsWith('<arrow:'));
     expect(arrowNames.length).toBe(1);
@@ -134,46 +130,32 @@ describe('lang-python walk.ts — function/param shapes', () => {
 
   it('flags tests/ files as inTestFile', () => {
     mkdirSync(join(dir, 'tests'), { recursive: true });
-    writeFileSync(
-      join(dir, 'tests/test_foo.py'),
-      `def test_a():\n    assert True\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'tests/test_foo.py'), `def test_a():\n    assert True\n`, 'utf8');
     const walk = runWalk(dir);
     const a = walk.occurrences.test_a?.[0];
     expect(a?.inTestFile).toBe(true);
   });
 
   it('flags _test.py files as inTestFile', () => {
-    writeFileSync(
-      join(dir, 'foo_test.py'),
-      `def t():\n    assert True\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'foo_test.py'), `def t():\n    assert True\n`, 'utf8');
     const walk = runWalk(dir);
     const t = walk.occurrences.t?.[0];
     expect(t?.inTestFile).toBe(true);
   });
 
   it('flags .generated. files as definedInGenerated', () => {
-    writeFileSync(
-      join(dir, 'foo.generated.py'),
-      `def x():\n    return 1\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'foo.generated.py'), `def x():\n    return 1\n`, 'utf8');
     const walk = runWalk(dir);
     const x = walk.occurrences.x?.[0];
     expect(x?.definedInGenerated).toBe(true);
   });
 
   it('includes synthetic <module-init> occurrence for each file', () => {
-    writeFileSync(
-      join(dir, 'a.py'),
-      `def foo():\n    return 1\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'a.py'), `def foo():\n    return 1\n`, 'utf8');
     const walk = runWalk(dir);
-    const moduleInitKeys = Object.keys(walk.occurrences).filter((k) => k.startsWith('<module-init:'));
+    const moduleInitKeys = Object.keys(walk.occurrences).filter((k) =>
+      k.startsWith('<module-init:'),
+    );
     expect(moduleInitKeys.length).toBe(1);
     const moduleInit = walk.occurrences[moduleInitKeys[0]]?.[0];
     expect(moduleInit?.kind).toBe('module-init');
@@ -181,11 +163,7 @@ describe('lang-python walk.ts — function/param shapes', () => {
   });
 
   it('skips files in input.files that are missing from project.files', () => {
-    writeFileSync(
-      join(dir, 'a.py'),
-      `def f():\n    return 1\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'a.py'), `def f():\n    return 1\n`, 'utf8');
     const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
     const parsed = pythonGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,

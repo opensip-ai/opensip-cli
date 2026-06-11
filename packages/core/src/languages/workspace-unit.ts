@@ -9,9 +9,9 @@
  */
 export interface WorkspaceUnit {
   /** Stable, human-readable id (e.g. `@opensip-tools/core`, `crate-foo`). */
-  readonly id: string
+  readonly id: string;
   /** Absolute path to the unit's root directory. */
-  readonly rootDir: string
+  readonly rootDir: string;
   /** Adapter-specific marker file (tsconfig.json, Cargo.toml, etc.), if any. */
-  readonly configPath?: string
+  readonly configPath?: string;
 }

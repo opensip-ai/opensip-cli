@@ -14,12 +14,12 @@ import type {
   CommandExemptions,
   CoverageAllowlist,
   FilenameOverrides,
-} from '@opensip-tools/fitness/internal'
+} from '@opensip-tools/fitness/internal';
 
-export const ALLOWLIST: CoverageAllowlist = []
+export const ALLOWLIST: CoverageAllowlist = [];
 
-export const COMMAND_EXEMPTIONS: CommandExemptions = {}
+export const COMMAND_EXEMPTIONS: CommandExemptions = {};
 
-export const FILENAME_OVERRIDES: FilenameOverrides = {}
+export const FILENAME_OVERRIDES: FilenameOverrides = {};
 
-export const KNOWN_UNFIXTURABLE: CommandExemptions = {}
+export const KNOWN_UNFIXTURABLE: CommandExemptions = {};

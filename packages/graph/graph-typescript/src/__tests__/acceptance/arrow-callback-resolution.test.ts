@@ -15,17 +15,20 @@ import { findOccurrence, runFixture, writeFixture } from './_fixture-runner.js';
 
 import type { Catalog } from '@opensip-tools/graph';
 
-
 describe('arrow-callback-resolution acceptance fixture', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-arrow-'));
-  afterAll(() => { rmSync(fixtureDir, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(fixtureDir, { recursive: true, force: true });
+  });
 
   writeFixture(fixtureDir, {
     'lib.ts': `export function helper(): number { return 1; }\n`,
     'caller.ts': `import { helper } from './lib.js';\nexport function caller(): readonly number[] {\n  const xs = [1, 2, 3];\n  return xs.map((n) => n * helper());\n}\n`,
   });
   let catalog!: Catalog;
-  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
+  beforeAll(async () => {
+    catalog = await runFixture(fixtureDir);
+  });
 
   it('synthesizes an <arrow:...> occurrence with calls', () => {
     const arrowOcc = findOccurrence(

@@ -4,7 +4,6 @@ import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
-
 describe('ErrorMessage', () => {
   it('renders the error message', () => {
     const { lastFrame } = render(

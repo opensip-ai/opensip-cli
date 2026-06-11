@@ -15,9 +15,8 @@
 import type {
   SimulationMetrics,
   ScenarioAssertion as MutableScenarioAssertion,
-} from './base-types.js'
-import type { Signal } from '@opensip-tools/core'
-
+} from './base-types.js';
+import type { Signal } from '@opensip-tools/core';
 
 // =============================================================================
 // ASSERTION TYPES
@@ -26,13 +25,13 @@ import type { Signal } from '@opensip-tools/core'
 /**
  * A scenario assertion definition (readonly variant for framework use).
  */
-export type ScenarioAssertion = Readonly<MutableScenarioAssertion>
+export type ScenarioAssertion = Readonly<MutableScenarioAssertion>;
 
 /**
  * A failed assertion with actual value.
  */
 export interface FailedAssertion extends ScenarioAssertion {
-  readonly actual: number
+  readonly actual: number;
 }
 
 // =============================================================================
@@ -43,20 +42,20 @@ export interface FailedAssertion extends ScenarioAssertion {
  * Context passed to scenario executors.
  */
 export interface ScenarioExecutionContext {
-  readonly scenarioId: string
-  readonly correlationId: string
-  readonly abortSignal: AbortSignal
-  readonly logger: ScenarioLogger
+  readonly scenarioId: string;
+  readonly correlationId: string;
+  readonly abortSignal: AbortSignal;
+  readonly logger: ScenarioLogger;
 }
 
 /**
  * Logger interface for scenarios.
  */
 export interface ScenarioLogger {
-  info(message: string, data?: Record<string, unknown>): void
-  warn(message: string, data?: Record<string, unknown>): void
-  error(message: string, data?: Record<string, unknown>): void
-  debug(message: string, data?: Record<string, unknown>): void
+  info(message: string, data?: Record<string, unknown>): void;
+  warn(message: string, data?: Record<string, unknown>): void;
+  error(message: string, data?: Record<string, unknown>): void;
+  debug(message: string, data?: Record<string, unknown>): void;
 }
 
 /**
@@ -68,17 +67,17 @@ export interface ScenarioLogger {
  * `framework/scenario-executor-result.ts`).
  */
 export interface LoadResultPayload {
-  readonly passed: boolean
-  readonly metrics: SimulationMetrics
+  readonly passed: boolean;
+  readonly metrics: SimulationMetrics;
   readonly assertions: {
-    readonly passed: readonly ScenarioAssertion[]
-    readonly failed: readonly FailedAssertion[]
-  }
-  readonly signals: readonly Signal[]
+    readonly passed: readonly ScenarioAssertion[];
+    readonly failed: readonly FailedAssertion[];
+  };
+  readonly signals: readonly Signal[];
 }
 
 // =============================================================================
 // RE-EXPORTS
 // =============================================================================
 
-export { type AssertionOperator, type SimulationMetrics } from './base-types.js'
+export { type AssertionOperator, type SimulationMetrics } from './base-types.js';

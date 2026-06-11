@@ -72,7 +72,11 @@ import { resolveProjectPaths, type ProjectContext } from '@opensip-tools/core';
 import { classifyFiles } from './init/file-classifier.js';
 import { resolveLanguages } from './init/language-detection.js';
 import { runScaffold } from './init/scaffold-writer.js';
-import { buildPartialStateMessage, classifyWorkingDir, formatInsideExistingProjectMessage } from './init/state-machine.js';
+import {
+  buildPartialStateMessage,
+  classifyWorkingDir,
+  formatInsideExistingProjectMessage,
+} from './init/state-machine.js';
 
 import type { InitOptions, InitResult } from '@opensip-tools/contracts';
 
@@ -85,7 +89,9 @@ export type { SupportedLanguage } from './init/language-detection.js';
  * Run init for the given args. Returns an InitResult — the caller
  * (CLI render layer) prints it.
  */
-export function executeInit(args: InitOptions & { projectContext?: ProjectContext; cwdExplicit?: boolean }): InitResult {
+export function executeInit(
+  args: InitOptions & { projectContext?: ProjectContext; cwdExplicit?: boolean },
+): InitResult {
   const cwd = args.cwd;
   const keep = args.keep === true;
   const remove = args.remove === true;

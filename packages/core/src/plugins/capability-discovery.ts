@@ -143,7 +143,8 @@ function selectPackages(options: DiscoverCapabilityContributionsOptions): Select
   const explicit = hasExplicit ? resolveExplicit(preferences.packages ?? [], options) : [];
   // 'replace' + an explicit list → skip auto-discovery; otherwise auto-discover
   // (unless opted out). 'augment' always auto-discovers and adds the explicit list.
-  const includeAuto = preferences.autoDiscover !== false && !(hasExplicit && explicitMode === 'replace');
+  const includeAuto =
+    preferences.autoDiscover !== false && !(hasExplicit && explicitMode === 'replace');
   const auto = includeAuto ? autoDiscover(options) : [];
 
   // Explicit config wins on a name collision (listed first).
@@ -172,7 +173,10 @@ function resolveExplicit(
   const scope = descriptor.builtinScope;
   const out: SelectedPackage[] = [];
   for (const name of names) {
-    const anchor = scope !== undefined && cliDir !== undefined && isUnderScope(name, scope) ? cliDir : projectDir;
+    const anchor =
+      scope !== undefined && cliDir !== undefined && isUnderScope(name, scope)
+        ? cliDir
+        : projectDir;
     const packageDir = resolvePackageDir(anchor, name);
     if (packageDir) {
       out.push({ name, packageDir });
@@ -378,7 +382,11 @@ function readOneExport(
       }
       return [];
     }
-    return (value as readonly unknown[]).map((contribution) => ({ contribution, sourcePackage, ...tag }));
+    return (value as readonly unknown[]).map((contribution) => ({
+      contribution,
+      sourcePackage,
+      ...tag,
+    }));
   }
   if (value === undefined) {
     if (required) {

@@ -131,8 +131,7 @@ export class Registry<T extends Registerable> {
     // can't have two entries sharing the byName slot).
     const idIncumbent = byId.get(item.id);
     const isDup =
-      idIncumbent !== undefined ||
-      (nameIncumbent !== undefined && nameIncumbent.id !== item.id);
+      idIncumbent !== undefined || (nameIncumbent !== undefined && nameIncumbent.id !== item.id);
 
     if (isDup && !internal) {
       switch (this.duplicatePolicy) {

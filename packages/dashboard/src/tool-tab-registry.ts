@@ -82,4 +82,3 @@ export function defineToolTab(descriptor: ToolTabDescriptor): void {
 export function listToolTabs(): ToolTabDescriptor[] {
   return [...registry];
 }
-

@@ -24,7 +24,10 @@ import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
 
 interface Env {
-  views: { id: string; render: (c: HTMLElement, cat: GraphCatalog, idx: unknown, fs: unknown) => void }[];
+  views: {
+    id: string;
+    render: (c: HTMLElement, cat: GraphCatalog, idx: unknown, fs: unknown) => void;
+  }[];
   graphCatalog: GraphCatalog;
   graphIndexes: { byBodyHash: Map<string, GraphFunctionOccurrence> };
   filterState: { packages: Set<string>; kinds: Set<string>; includeTests: boolean };
@@ -52,23 +55,29 @@ return { views, graphCatalog, graphIndexes, filterState };
 `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
   const factory = new Function(
-    elSrc
-      + dashboardPathUtilsJs()
-      + dashboardIndexesJs()
-      + dashboardViewsRegistryJs()
-      + dashboardFiltersJs()
-      + dashboardFunctionRowJs()
-      + dashboardHelpDrawerJs()
-      + dashboardEditorLinkJs()
-      + dashboardTraceJs()
-      + dashboardFunctionCardJs()
-      + dashboardViewDistributionJs()
-      + tail,
+    elSrc +
+      dashboardPathUtilsJs() +
+      dashboardIndexesJs() +
+      dashboardViewsRegistryJs() +
+      dashboardFiltersJs() +
+      dashboardFunctionRowJs() +
+      dashboardHelpDrawerJs() +
+      dashboardEditorLinkJs() +
+      dashboardTraceJs() +
+      dashboardFunctionCardJs() +
+      dashboardViewDistributionJs() +
+      tail,
   );
   return factory() as Env;
 }
 
-function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string; filePath: string }): GraphFunctionOccurrence {
+function makeOcc(
+  over: Partial<GraphFunctionOccurrence> & {
+    bodyHash: string;
+    simpleName: string;
+    filePath: string;
+  },
+): GraphFunctionOccurrence {
   return {
     qualifiedName: over.simpleName,
     line: 1,
@@ -88,7 +97,10 @@ function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; si
 }
 
 const catalog: GraphCatalog = {
-  version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+  version: '2.0',
+  tool: 'graph',
+  language: 'typescript',
+  builtAt: 'now',
   functions: {
     a: [makeOcc({ bodyHash: 'a', simpleName: 'validateInput', filePath: 'packages/cli/src/a.ts' })],
     b: [makeOcc({ bodyHash: 'b', simpleName: 'renderTable', filePath: 'packages/cli/src/b.ts' })],
@@ -99,11 +111,15 @@ const catalog: GraphCatalog = {
 function renderDistribution(): { view: HTMLElement } {
   const env = loadEnv(catalog);
   const view = document.createElement('div');
-  env.views.find(v => v.id === 'distribution')!.render(view, env.graphCatalog, env.graphIndexes, env.filterState);
+  env.views
+    .find((v) => v.id === 'distribution')!
+    .render(view, env.graphCatalog, env.graphIndexes, env.filterState);
   return { view };
 }
 
-beforeEach(() => { document.body.innerHTML = ''; });
+beforeEach(() => {
+  document.body.innerHTML = '';
+});
 
 describe('Functions (distribution) view', () => {
   it('renders a name-filter search input above the table', () => {
@@ -113,7 +129,9 @@ describe('Functions (distribution) view', () => {
     // The input must precede the rendered table in document order.
     const firstRow = view.querySelector('[data-body-hash]');
     expect(firstRow).not.toBeNull();
-    expect(input!.compareDocumentPosition(firstRow!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      input!.compareDocumentPosition(firstRow!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('shows every function before any filtering', () => {
@@ -154,7 +172,9 @@ describe('Functions (distribution) view', () => {
     expect(info).not.toBeNull();
     expect(controls).not.toBeNull();
     // The heading must precede the controls row in document order.
-    expect(heading!.compareDocumentPosition(controls!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      heading!.compareDocumentPosition(controls!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('updates the heading count as the filter narrows the rows', () => {
@@ -184,14 +204,31 @@ describe('Functions (distribution) view', () => {
 
   it('filters the table by the selected Package', () => {
     const env = loadEnv({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
-        a: [makeOcc({ bodyHash: 'a', simpleName: 'validateInput', filePath: 'packages/cli/src/a.ts' })],
-        z: [makeOcc({ bodyHash: 'z', simpleName: 'ztarget', filePath: 'packages/contracts/src/z.ts' })],
+        a: [
+          makeOcc({
+            bodyHash: 'a',
+            simpleName: 'validateInput',
+            filePath: 'packages/cli/src/a.ts',
+          }),
+        ],
+        z: [
+          makeOcc({
+            bodyHash: 'z',
+            simpleName: 'ztarget',
+            filePath: 'packages/contracts/src/z.ts',
+          }),
+        ],
       },
     });
     const view = document.createElement('div');
-    env.views.find(v => v.id === 'distribution')!.render(view, env.graphCatalog, env.graphIndexes, env.filterState);
+    env.views
+      .find((v) => v.id === 'distribution')!
+      .render(view, env.graphCatalog, env.graphIndexes, env.filterState);
     expect(view.querySelectorAll('[data-body-hash]').length).toBe(2);
     const pkg = view.querySelector<HTMLSelectElement>('select[data-control="fn-package"]')!;
     pkg.value = 'contracts';
@@ -204,26 +241,60 @@ describe('Functions (distribution) view', () => {
 
   it('no longer renders a "Test-only" column', () => {
     const { view } = renderDistribution();
-    const headers = [...view.querySelectorAll('th')].map(th => th.textContent);
+    const headers = [...view.querySelectorAll('th')].map((th) => th.textContent);
     expect(headers).not.toContain('Test-only');
   });
 
   it('the "Test-only" toggle narrows the table to test-only functions', () => {
-    const edge = { line: 1, column: 0, resolution: 'static' as const, confidence: 'high' as const, text: 'x()' };
+    const edge = {
+      line: 1,
+      column: 0,
+      resolution: 'static' as const,
+      confidence: 'high' as const,
+      text: 'x()',
+    };
     const env = loadEnv({
-      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
       functions: {
         // Production fn reached ONLY from a test file → test-only.
-        prod: [makeOcc({ bodyHash: 'prod', simpleName: 'prodFn', filePath: 'packages/cli/src/prod.ts' })],
+        prod: [
+          makeOcc({ bodyHash: 'prod', simpleName: 'prodFn', filePath: 'packages/cli/src/prod.ts' }),
+        ],
         // Production fn reached from production code → not test-only.
-        normal: [makeOcc({ bodyHash: 'normal', simpleName: 'normalFn', filePath: 'packages/cli/src/normal.ts' })],
-        normalCaller: [makeOcc({ bodyHash: 'normalCaller', simpleName: 'callerFn', filePath: 'packages/cli/src/nc.ts', calls: [{ to: ['normal'], ...edge }] })],
+        normal: [
+          makeOcc({
+            bodyHash: 'normal',
+            simpleName: 'normalFn',
+            filePath: 'packages/cli/src/normal.ts',
+          }),
+        ],
+        normalCaller: [
+          makeOcc({
+            bodyHash: 'normalCaller',
+            simpleName: 'callerFn',
+            filePath: 'packages/cli/src/nc.ts',
+            calls: [{ to: ['normal'], ...edge }],
+          }),
+        ],
         // A test-file fn that calls prod (excluded from the table by production-only default).
-        testFn: [makeOcc({ bodyHash: 'testFn', simpleName: 'testFn', filePath: 'packages/cli/src/__tests__/t.test.ts', inTestFile: true, calls: [{ to: ['prod'], ...edge }] })],
+        testFn: [
+          makeOcc({
+            bodyHash: 'testFn',
+            simpleName: 'testFn',
+            filePath: 'packages/cli/src/__tests__/t.test.ts',
+            inTestFile: true,
+            calls: [{ to: ['prod'], ...edge }],
+          }),
+        ],
       },
     });
     const view = document.createElement('div');
-    env.views.find(v => v.id === 'distribution')!.render(view, env.graphCatalog, env.graphIndexes, env.filterState);
+    env.views
+      .find((v) => v.id === 'distribution')!
+      .render(view, env.graphCatalog, env.graphIndexes, env.filterState);
     // Production-only by default (testFn lives in a test file) → 3 rows.
     expect(view.querySelectorAll('[data-body-hash]').length).toBe(3);
     const toggle = view.querySelector<HTMLInputElement>('input[data-control="fn-toggle"]')!;

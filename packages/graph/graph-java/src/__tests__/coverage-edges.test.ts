@@ -19,7 +19,6 @@
 import { parseJava } from '@opensip-tools/lang-java';
 import { describe, expect, it } from 'vitest';
 
-
 import { digestJavaBody } from '../body-digest.js';
 import { resolveDependencies } from '../resolve-dependencies.js';
 import { resolveCallSites } from '../resolve.js';

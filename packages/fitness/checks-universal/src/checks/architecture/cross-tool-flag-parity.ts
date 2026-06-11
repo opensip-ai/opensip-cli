@@ -21,10 +21,10 @@
  * `--json` etc.) — it enforces THIS platform's architecture, not a universal
  * rule.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /** Resolved-path fragment identifying a first-party tool registration file. */
-const TOOL_REGISTRATION_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/src\/tool\.ts$/
+const TOOL_REGISTRATION_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/src\/tool\.ts$/;
 
 /** Long flags owned by the ADR-0021 registry — a raw `.option(...)` for any of
  *  these bypasses `applyCommonFlags`. */
@@ -37,10 +37,10 @@ const REGISTRY_LONG_FLAGS: ReadonlySet<string> = new Set([
   '--report-to',
   '--api-key',
   '--open',
-])
+]);
 
 /** Captures the first string argument of a `.option(...)` call (the flag spec). */
-const OPTION_LITERAL_RE = /\.option\(\s*['"]([^'"]+)['"]/
+const OPTION_LITERAL_RE = /\.option\(\s*['"]([^'"]+)['"]/;
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the detection
@@ -48,21 +48,21 @@ const OPTION_LITERAL_RE = /\.option\(\s*['"]([^'"]+)['"]/
  * whose long flag is registry-owned.
  */
 export function analyzeCrossToolFlagParity(content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
   for (const [i, line] of lines.entries()) {
-    const match = OPTION_LITERAL_RE.exec(line)
-    if (!match) continue
-    const longFlag = /--[a-z][a-z-]*/.exec(match[1])?.[0]
-    if (longFlag === undefined || !REGISTRY_LONG_FLAGS.has(longFlag)) continue
+    const match = OPTION_LITERAL_RE.exec(line);
+    if (!match) continue;
+    const longFlag = /--[a-z][a-z-]*/.exec(match[1])?.[0];
+    if (longFlag === undefined || !REGISTRY_LONG_FLAGS.has(longFlag)) continue;
     violations.push({
       message: `Common flag '${longFlag}' is hand-declared via .option(...); cross-tool flags must come from the shared registry (ADR-0021).`,
       severity: 'error',
       line: i + 1,
       suggestion: `Apply it via applyCommonFlags(cmd, [...keys]) from @opensip-tools/contracts instead of a raw .option('${longFlag}' ...).`,
-    })
+    });
   }
-  return violations
+  return violations;
 }
 
 export const crossToolFlagParity = defineCheck({
@@ -78,7 +78,7 @@ export const crossToolFlagParity = defineCheck({
   // so prose mentioning a flag does not false-fire.
   contentFilter: 'raw',
   analyze: (content, filePath) => {
-    if (!TOOL_REGISTRATION_PATH.test(filePath)) return []
-    return analyzeCrossToolFlagParity(content)
+    if (!TOOL_REGISTRATION_PATH.test(filePath)) return [];
+    return analyzeCrossToolFlagParity(content);
   },
-})
+});

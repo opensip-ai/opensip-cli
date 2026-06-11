@@ -13,13 +13,13 @@
  * floor, letting coverage silently drift. This check catches that drift.
  */
 
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 /** Per-package vitest config filenames that satisfy the requirement. */
-const PACKAGE_CONFIG_FILES = ['vitest.config.ts', 'vitest.config.mts'] as const
+const PACKAGE_CONFIG_FILES = ['vitest.config.ts', 'vitest.config.mts'] as const;
 
 /**
  * Workspace-root config filenames that, when present, satisfy the
@@ -29,7 +29,7 @@ const WORKSPACE_CONFIG_FILES = [
   'vitest.config.ts',
   'vitest.config.mts',
   'vitest.workspace.ts',
-] as const
+] as const;
 
 /** Directory names never descended into when scanning for test files. */
 const SKIP_DIRS = new Set([
@@ -41,7 +41,7 @@ const SKIP_DIRS = new Set([
   'build',
   'coverage',
   '.git',
-])
+]);
 
 /**
  * Filesystem port. Injected so the pure detector can be unit-tested
@@ -49,33 +49,33 @@ const SKIP_DIRS = new Set([
  */
 export interface VitestConfigFsPort {
   /** True if `filePath` exists. */
-  exists(filePath: string): boolean
+  exists(filePath: string): boolean;
   /**
    * True if at least one `*.test.ts` / `*.test.tsx` file exists anywhere
    * under `packageDir` (excluding nested package roots, node_modules,
    * fixtures, and build output).
    */
-  hasTestFiles(packageDir: string): boolean
+  hasTestFiles(packageDir: string): boolean;
 }
 
 /** Is this filename a test file we care about? */
 function isTestFile(name: string): boolean {
-  return name.endsWith('.test.ts') || name.endsWith('.test.tsx')
+  return name.endsWith('.test.ts') || name.endsWith('.test.tsx');
 }
 
 /** Read directory entries, returning `null` when the directory is unreadable. */
 function readEntries(dir: string): fs.Dirent[] | null {
   try {
-    return fs.readdirSync(dir, { withFileTypes: true })
+    return fs.readdirSync(dir, { withFileTypes: true });
   } catch {
     // @swallow-ok unreadable directory -> treat as no tests
-    return null
+    return null;
   }
 }
 
 /** True if a directory entry is a subdirectory we should descend into. */
 function isDescendableDir(entry: fs.Dirent): boolean {
-  return entry.isDirectory() && !SKIP_DIRS.has(entry.name)
+  return entry.isDirectory() && !SKIP_DIRS.has(entry.name);
 }
 
 /**
@@ -85,26 +85,26 @@ function isDescendableDir(entry: fs.Dirent): boolean {
  * nor into skip dirs (node_modules, fixtures, build output).
  */
 function hasTestFilesIn(dir: string, isRoot: boolean): boolean {
-  const entries = readEntries(dir)
-  if (entries === null) return false
+  const entries = readEntries(dir);
+  if (entries === null) return false;
 
   // A nested package root owns its own tests; don't count them here.
   const isNestedPackageRoot =
-    !isRoot && entries.some((e) => e.isFile() && e.name === 'package.json')
-  if (isNestedPackageRoot) return false
+    !isRoot && entries.some((e) => e.isFile() && e.name === 'package.json');
+  if (isNestedPackageRoot) return false;
 
-  if (entries.some((e) => e.isFile() && isTestFile(e.name))) return true
+  if (entries.some((e) => e.isFile() && isTestFile(e.name))) return true;
 
   return entries
     .filter(isDescendableDir)
-    .some((e) => hasTestFilesIn(path.join(dir, e.name), false))
+    .some((e) => hasTestFilesIn(path.join(dir, e.name), false));
 }
 
 /** Default filesystem port backed by `node:fs`. */
 export const nodeFsPort: VitestConfigFsPort = {
   exists: (filePath) => fs.existsSync(filePath),
   hasTestFiles: (packageDir) => hasTestFilesIn(packageDir, true),
-}
+};
 
 /**
  * The directory shared by every input path. For a single path this is its
@@ -113,19 +113,19 @@ export const nodeFsPort: VitestConfigFsPort = {
  * the runner's directory, not the project being analyzed).
  */
 function commonAncestorDir(paths: readonly string[]): string | null {
-  if (paths.length === 0) return null
-  const segmentLists = paths.map((p) => path.dirname(p).split(path.sep))
-  const [first, ...rest] = segmentLists
-  if (!first) return null
+  if (paths.length === 0) return null;
+  const segmentLists = paths.map((p) => path.dirname(p).split(path.sep));
+  const [first, ...rest] = segmentLists;
+  if (!first) return null;
 
-  const common: string[] = []
+  const common: string[] = [];
   for (const [index, seg] of first.entries()) {
-    if (!rest.every((segs) => segs[index] === seg)) break
-    common.push(seg)
+    if (!rest.every((segs) => segs[index] === seg)) break;
+    common.push(seg);
   }
 
-  const joined = common.join(path.sep)
-  return joined === '' ? path.sep : joined
+  const joined = common.join(path.sep);
+  return joined === '' ? path.sep : joined;
 }
 
 /**
@@ -135,10 +135,10 @@ function commonAncestorDir(paths: readonly string[]): string | null {
  * above the shared `packages/` ancestor).
  */
 function workspaceRootCandidates(packageDirs: readonly string[]): string[] {
-  const ancestor = commonAncestorDir(packageDirs.map((d) => path.join(d, 'x')))
-  if (ancestor === null) return []
-  const parent = path.dirname(ancestor)
-  return parent === ancestor ? [ancestor] : [ancestor, parent]
+  const ancestor = commonAncestorDir(packageDirs.map((d) => path.join(d, 'x')));
+  if (ancestor === null) return [];
+  const parent = path.dirname(ancestor);
+  return parent === ancestor ? [ancestor] : [ancestor, parent];
 }
 
 /**
@@ -154,40 +154,40 @@ export function detectMissingVitestConfig(
   packageJsonPaths: readonly string[],
   port: VitestConfigFsPort,
 ): CheckViolation[] {
-  const packageDirs = packageJsonPaths.map((p) => path.dirname(p))
+  const packageDirs = packageJsonPaths.map((p) => path.dirname(p));
 
   // A centralized workspace-root config satisfies every package.
-  const rootCandidates = workspaceRootCandidates(packageDirs)
+  const rootCandidates = workspaceRootCandidates(packageDirs);
   const workspaceConfigSatisfies = rootCandidates.some((root) =>
     WORKSPACE_CONFIG_FILES.some((f) => port.exists(path.join(root, f))),
-  )
+  );
   if (workspaceConfigSatisfies) {
-    return []
+    return [];
   }
 
-  const violations: CheckViolation[] = []
-  const rootSet = new Set(rootCandidates.map((r) => path.resolve(r)))
+  const violations: CheckViolation[] = [];
+  const rootSet = new Set(rootCandidates.map((r) => path.resolve(r)));
 
   for (const packageJsonPath of packageJsonPaths) {
-    const packageDir = path.dirname(packageJsonPath)
+    const packageDir = path.dirname(packageJsonPath);
 
     // Skip a workspace-root package.json — it is not a leaf package, and the
     // centralized-config branch above already covered its only satisfy path.
     // (Only meaningful when there are multiple packages; with a single
     // package its dir IS the ancestor and we must still evaluate it.)
     if (packageDirs.length > 1 && rootSet.has(path.resolve(packageDir))) {
-      continue
+      continue;
     }
 
     if (!port.hasTestFiles(packageDir)) {
-      continue
+      continue;
     }
 
     const hasPackageConfig = PACKAGE_CONFIG_FILES.some((f) =>
       port.exists(path.join(packageDir, f)),
-    )
+    );
     if (hasPackageConfig) {
-      continue
+      continue;
     }
 
     violations.push({
@@ -199,10 +199,10 @@ export function detectMissingVitestConfig(
         'Add a vitest.config.ts (or vitest.config.mts) at the package root with explicit coverage thresholds, or centralize one at the workspace root. Without it, tests run config-less with no coverage floor and coverage can silently drift.',
       match: path.basename(packageDir),
       type: 'missing-vitest-config',
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -237,7 +237,7 @@ export const vitestConfigRequiredWithTests = defineCheck({
   // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
   // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const packageJsonPaths = files.paths.filter((fp) => path.basename(fp) === 'package.json')
-    return detectMissingVitestConfig(packageJsonPaths, nodeFsPort)
+    const packageJsonPaths = files.paths.filter((fp) => path.basename(fp) === 'package.json');
+    return detectMissingVitestConfig(packageJsonPaths, nodeFsPort);
   },
-})
+});

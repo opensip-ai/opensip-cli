@@ -18,9 +18,7 @@ export const sessions = sqliteTable(
     passed: integer('passed', { mode: 'boolean' }).notNull(),
     durationMs: integer('duration_ms').notNull(),
   },
-  (table) => [
-    index('sessions_tool_timestamp_idx').on(table.tool, sql`${table.timestamp} DESC`),
-  ],
+  (table) => [index('sessions_tool_timestamp_idx').on(table.tool, sql`${table.timestamp} DESC`)],
 );
 
 /**

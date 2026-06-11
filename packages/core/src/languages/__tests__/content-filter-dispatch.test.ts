@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { logger } from '../../lib/logger.js';
 import { RunScope, runWithScopeSync } from '../../lib/run-scope.js';
-import { applyContentFilter, resetContentFilterWarningForTests } from '../content-filter-dispatch.js';
+import {
+  applyContentFilter,
+  resetContentFilterWarningForTests,
+} from '../content-filter-dispatch.js';
 import { LanguageRegistry } from '../registry.js';
 
 import type { LanguageAdapter } from '../adapter.js';
@@ -30,20 +33,29 @@ function inScope<T>(fn: () => T): T {
 
 describe('applyContentFilter', () => {
   it('returns content unchanged for "raw" mode', () => {
-    expect(inScope(() => applyContentFilter('a.fake', 'const x = "hi" // c', 'raw'))).toBe('const x = "hi" // c');
+    expect(inScope(() => applyContentFilter('a.fake', 'const x = "hi" // c', 'raw'))).toBe(
+      'const x = "hi" // c',
+    );
   });
 
   it('returns content unchanged for "none" mode', () => {
-    expect(inScope(() => applyContentFilter('a.fake', 'const x = "hi" // c', 'none'))).toBe('const x = "hi" // c');
+    expect(inScope(() => applyContentFilter('a.fake', 'const x = "hi" // c', 'none'))).toBe(
+      'const x = "hi" // c',
+    );
   });
 
   it('dispatches to adapter.stripStrings for "strip-strings" mode', () => {
-    expect(inScope(() => applyContentFilter('a.fake', 'const x = "hi"', 'strip-strings'))).toBe('const x = "___"');
+    expect(inScope(() => applyContentFilter('a.fake', 'const x = "hi"', 'strip-strings'))).toBe(
+      'const x = "___"',
+    );
   });
 
   it('dispatches to adapter.stripComments for "strip-strings-and-comments" mode', () => {
-    expect(inScope(() => applyContentFilter('a.fake', 'const x = 1 // c\nconst y = 2', 'strip-strings-and-comments')))
-      .toBe('const x = 1 \nconst y = 2');
+    expect(
+      inScope(() =>
+        applyContentFilter('a.fake', 'const x = 1 // c\nconst y = 2', 'strip-strings-and-comments'),
+      ),
+    ).toBe('const x = 1 \nconst y = 2');
   });
 
   it('returns raw content when no adapter matches the extension', () => {
@@ -77,7 +89,9 @@ describe('applyContentFilter', () => {
       try {
         // Two no-scope strip calls — the warning must fire exactly once.
         expect(applyContentFilter('a.fake', 'x = "hi"', 'strip-strings')).toBe('x = "hi"');
-        expect(applyContentFilter('b.fake', 'y = "yo"', 'strip-strings-and-comments')).toBe('y = "yo"');
+        expect(applyContentFilter('b.fake', 'y = "yo"', 'strip-strings-and-comments')).toBe(
+          'y = "yo"',
+        );
         expect(warn).toHaveBeenCalledTimes(1);
         expect(warn).toHaveBeenCalledWith(
           expect.any(String),
@@ -95,7 +109,9 @@ describe('applyContentFilter', () => {
       try {
         // Scope is active but no adapter owns `.unknown` — returning raw is
         // correct and expected here, so it must stay silent.
-        expect(inScope(() => applyContentFilter('a.unknown', 'x = "hi"', 'strip-strings'))).toBe('x = "hi"');
+        expect(inScope(() => applyContentFilter('a.unknown', 'x = "hi"', 'strip-strings'))).toBe(
+          'x = "hi"',
+        );
         expect(warn).not.toHaveBeenCalled();
       } finally {
         warn.mockRestore();

@@ -75,9 +75,6 @@ const ENGINE_MODE_PREFIX = 'mode=';
  * invalidate logs (`cached:`/`current:`) so a version- or mode-driven
  * rebuild is diagnosable.
  */
-export function stampEngineVersion(
-  adapterCacheKey: string,
-  mode: EngineMode = 'exact',
-): string {
+export function stampEngineVersion(adapterCacheKey: string, mode: EngineMode = 'exact'): string {
   return `${ENGINE_VERSION_PREFIX}${ENGINE_VERSION}|${ENGINE_MODE_PREFIX}${mode}|${adapterCacheKey}`;
 }

@@ -51,7 +51,7 @@
       },
       {
         "name": "graph-symbol-index",
-        "description": "Emit a symbolindex.json artifact (name\u2192file:line and file\u2192names) from the persisted catalog"
+        "description": "Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog"
       },
       {
         "name": "graph-baseline-export",

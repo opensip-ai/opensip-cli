@@ -50,11 +50,26 @@ describe('orphan-subtree config behavior', () => {
     // `twin` (body hash T) exists in two files; each twin calls a different
     // private helper. byBodyHash keeps one winner — without twin-aware
     // adjacency the losing twin's helper would be a false orphan.
-    const twinA = occ({ bodyHash: 'T', simpleName: 'twin', filePath: 'src/a.ts', calls: [staticCall('privA')] });
-    const twinB = occ({ bodyHash: 'T', simpleName: 'twin', filePath: 'src/b.ts', calls: [staticCall('privB')] });
+    const twinA = occ({
+      bodyHash: 'T',
+      simpleName: 'twin',
+      filePath: 'src/a.ts',
+      calls: [staticCall('privA')],
+    });
+    const twinB = occ({
+      bodyHash: 'T',
+      simpleName: 'twin',
+      filePath: 'src/b.ts',
+      calls: [staticCall('privB')],
+    });
     const privA = occ({ bodyHash: 'privA', simpleName: 'privA', filePath: 'src/a.ts' });
     const privB = occ({ bodyHash: 'privB', simpleName: 'privB', filePath: 'src/b.ts' });
-    const mi = occ({ bodyHash: 'mi', simpleName: '<module-init:a.ts>', kind: 'module-init', calls: [staticCall('T')] });
+    const mi = occ({
+      bodyHash: 'mi',
+      simpleName: '<module-init:a.ts>',
+      kind: 'module-init',
+      calls: [staticCall('T')],
+    });
     const catalog = makeCatalog([mi, twinA, twinB, privA, privB]);
     const orphans = orphanSubtreeRule
       .evaluate(catalog, buildIndexes(catalog), {})

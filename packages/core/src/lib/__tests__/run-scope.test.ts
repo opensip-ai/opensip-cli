@@ -174,10 +174,10 @@ describe('runId — scope-bound propagation to logger event-stamping', () => {
   });
 
   it('scope.runId is stamped on log entries inside runWithScope', async () => {
-    vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
       stderrCalls.push(String(chunk));
       return true;
-    }));
+    });
     // Enable stderr output by turning on debugMode. Reset runId on the
     // singleton so the fallback isn't shadowing the scope-bound value.
     configureLogger({ debugMode: true, silent: false, runId: '' });
@@ -189,24 +189,24 @@ describe('runId — scope-bound propagation to logger event-stamping', () => {
     });
 
     const matched = stderrCalls
-      .map(c => JSON.parse(c.trim()) as { evt?: string; runId?: string })
-      .find(e => e.evt === 'test.event');
+      .map((c) => JSON.parse(c.trim()) as { evt?: string; runId?: string })
+      .find((e) => e.evt === 'test.event');
     expect(matched?.runId).toBe('RUN_scope_xyz');
     scope.dispose();
   });
 
   it('outside any scope, the logger falls back to its singleton-level runId', () => {
-    vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
       stderrCalls.push(String(chunk));
       return true;
-    }));
+    });
     configureLogger({ debugMode: true, silent: false, runId: 'RUN_singleton' });
 
     defaultLogger.info({ evt: 'test.outside', msg: 'no-scope-here' });
 
     const matched = stderrCalls
-      .map(c => JSON.parse(c.trim()) as { evt?: string; runId?: string })
-      .find(e => e.evt === 'test.outside');
+      .map((c) => JSON.parse(c.trim()) as { evt?: string; runId?: string })
+      .find((e) => e.evt === 'test.outside');
     expect(matched?.runId).toBe('RUN_singleton');
   });
 });

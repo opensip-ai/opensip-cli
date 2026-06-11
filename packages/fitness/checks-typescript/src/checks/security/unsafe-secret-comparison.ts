@@ -7,9 +7,16 @@
  * constant-time comparison function like safeCompare().
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { parseSource, walkNodes, getIdentifierName, isLiteral, isPropertyAccess, getLineNumber } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import {
+  parseSource,
+  walkNodes,
+  getIdentifierName,
+  isLiteral,
+  isPropertyAccess,
+  getLineNumber,
+} from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Identifier patterns that indicate a secret value.
@@ -40,67 +47,115 @@ import * as ts from 'typescript'
  * count was tripping `sonarjs/regex-complexity` (≤ 20 alternatives).
  */
 const STANDALONE_SECRET_NAMES: ReadonlySet<string> = new Set([
-  'secret', 'password', 'token', 'signature', 'jwt', 'hmac', 'bearer',
-  'sessionid', 'csrftoken', 'sessiontoken', 'accesstoken', 'refreshtoken',
-  'idtoken', 'bearertoken', 'apikey', 'apitoken', 'apisecret', 'signingkey',
-  'encryptionkey', 'privatekey', 'publickey', 'secretkey', 'hmackey',
-  'cookiesecret', 'webhooksignature', 'paymentsignature', 'passwordhash',
+  'secret',
+  'password',
+  'token',
+  'signature',
+  'jwt',
+  'hmac',
+  'bearer',
+  'sessionid',
+  'csrftoken',
+  'sessiontoken',
+  'accesstoken',
+  'refreshtoken',
+  'idtoken',
+  'bearertoken',
+  'apikey',
+  'apitoken',
+  'apisecret',
+  'signingkey',
+  'encryptionkey',
+  'privatekey',
+  'publickey',
+  'secretkey',
+  'hmackey',
+  'cookiesecret',
+  'webhooksignature',
+  'paymentsignature',
+  'passwordhash',
   'authtoken',
-])
+]);
 
 const SECRET_PREFIXES: ReadonlySet<string> = new Set([
-  'secret', 'api', 'access', 'refresh', 'id', 'bearer', 'csrf', 'session',
-  'signing', 'encryption', 'private', 'public', 'password', 'jwt', 'oauth',
-  'auth', 'cookie', 'webhook', 'payment', 'hmac', 'otp', 'mfa',
-])
+  'secret',
+  'api',
+  'access',
+  'refresh',
+  'id',
+  'bearer',
+  'csrf',
+  'session',
+  'signing',
+  'encryption',
+  'private',
+  'public',
+  'password',
+  'jwt',
+  'oauth',
+  'auth',
+  'cookie',
+  'webhook',
+  'payment',
+  'hmac',
+  'otp',
+  'mfa',
+]);
 
 const SECRET_SUFFIXES: ReadonlySet<string> = new Set([
-  'Key', 'Token', 'Secret', 'Hash', 'Hmac', 'Digest', 'Signature', 'Code',
+  'Key',
+  'Token',
+  'Secret',
+  'Hash',
+  'Hmac',
+  'Digest',
+  'Signature',
+  'Code',
   'Cookie',
-])
+]);
 
 /** Split `apiKey` → `['api', 'Key']`; `accessRefreshToken` → `['access', 'Refresh', 'Token']`. */
-const CAMEL_SPLIT_PATTERN = /(?=[A-Z])/
+const CAMEL_SPLIT_PATTERN = /(?=[A-Z])/;
 
 function looksLikeSecret(name: string): boolean {
-  if (!name) return false
-  if (STANDALONE_SECRET_NAMES.has(name.toLowerCase())) return true
+  if (!name) return false;
+  if (STANDALONE_SECRET_NAMES.has(name.toLowerCase())) return true;
   // Compound: first word is a security prefix; final word is a sensitive suffix.
-  const parts = name.split(CAMEL_SPLIT_PATTERN)
-  const last = parts.at(-1)
+  const parts = name.split(CAMEL_SPLIT_PATTERN);
+  const last = parts.at(-1);
   return (
     parts.length >= 2 &&
     SECRET_PREFIXES.has(parts[0]) &&
     last !== undefined &&
     SECRET_SUFFIXES.has(last)
-  )
+  );
 }
 
 /**
  * Names that look like secrets but are actually safe to compare with ===.
  * E.g. `key.length`, `token !== undefined`, `tokenType === 'bearer'`.
  */
-const SAFE_COMPARAND_PATTERNS = [/^undefined$/, /^null$/, /^true$/, /^false$/]
+const SAFE_COMPARAND_PATTERNS = [/^undefined$/, /^null$/, /^true$/, /^false$/];
 
 /** Properties that don't carry secret data */
-const SAFE_PROPERTY_NAMES = ['length', 'type', 'status', 'kind', 'name', 'id', 'count', 'size']
+const SAFE_PROPERTY_NAMES = ['length', 'type', 'status', 'kind', 'name', 'id', 'count', 'size'];
 
 /**
  * Check if a comparand is a literal value or safe property access,
  * which would make the comparison safe (not comparing two secret values).
  */
 function isLiteralOrSafe(node: ts.Node): boolean {
-  if (isLiteral(node)) return true
+  if (isLiteral(node)) return true;
   /* v8 ignore next -- defensive AST/type guard */
-  if (ts.isTypeOfExpression(node)) return true
+  if (ts.isTypeOfExpression(node)) return true;
   /* v8 ignore next -- defensive AST/type guard */
-  if (SAFE_PROPERTY_NAMES.some((prop) => isPropertyAccess(node, prop))) return true
+  if (SAFE_PROPERTY_NAMES.some((prop) => isPropertyAccess(node, prop))) return true;
 
-  const text = getIdentifierName(node)
+  const text = getIdentifierName(node);
   /* v8 ignore next -- defensive AST/type guard */
-  if (text && SAFE_COMPARAND_PATTERNS.some((p) => p.test(text))) return true
+  if (text && SAFE_COMPARAND_PATTERNS.some((p) => p.test(text))) return true;
 
-  return false
+  return false;
 }
 
 /**
@@ -108,21 +163,21 @@ function isLiteralOrSafe(node: ts.Node): boolean {
  * Returns the secret-bearing operand name for the violation message, or null.
  */
 function findSecretOperand(left: ts.Node, right: ts.Node): string | null {
-  const leftName = getIdentifierName(left)
-  const rightName = getIdentifierName(right)
+  const leftName = getIdentifierName(left);
+  const rightName = getIdentifierName(right);
 
-  const leftIsSecret = looksLikeSecret(leftName)
-  const rightIsSecret = looksLikeSecret(rightName)
+  const leftIsSecret = looksLikeSecret(leftName);
+  const rightIsSecret = looksLikeSecret(rightName);
 
-  if (!leftIsSecret && !rightIsSecret) return null
+  if (!leftIsSecret && !rightIsSecret) return null;
 
   // If one side is secret but the other is a literal/safe value, skip
-  if (leftIsSecret && isLiteralOrSafe(right)) return null
+  if (leftIsSecret && isLiteralOrSafe(right)) return null;
   /* v8 ignore next -- defensive AST/type guard */
-  if (rightIsSecret && isLiteralOrSafe(left)) return null
+  if (rightIsSecret && isLiteralOrSafe(left)) return null;
 
   /* v8 ignore next -- defensive AST/type guard */
-  return leftIsSecret ? leftName : rightName
+  return leftIsSecret ? leftName : rightName;
 }
 
 /**
@@ -159,11 +214,11 @@ export const unsafeSecretComparison = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const sourceFile = parseSource(content, filePath)
+    const sourceFile = parseSource(content, filePath);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     walkNodes(sourceFile, (node) => {
       if (
@@ -171,11 +226,11 @@ export const unsafeSecretComparison = defineCheck({
         (node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken ||
           node.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken)
       ) {
-        const secretName = findSecretOperand(node.left, node.right)
+        const secretName = findSecretOperand(node.left, node.right);
         if (secretName) {
-          const line = getLineNumber(node, sourceFile)
+          const line = getLineNumber(node, sourceFile);
           const operator =
-            node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken ? '===' : '!=='
+            node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken ? '===' : '!==';
           violations.push({
             line,
             column: node.operatorToken.getStart() - node.getStart(),
@@ -184,11 +239,11 @@ export const unsafeSecretComparison = defineCheck({
             suggestion: `Replace \`a ${operator} b\` with \`${operator === '!==' ? '!' : ''}safeCompare(a, b)\` to prevent timing side-channel attacks.`,
             match: node.getText(),
             filePath,
-          })
+          });
         }
       }
-    })
+    });
 
-    return violations
+    return violations;
   },
-})
+});

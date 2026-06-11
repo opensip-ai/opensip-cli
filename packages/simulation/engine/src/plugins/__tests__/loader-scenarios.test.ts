@@ -44,7 +44,7 @@ describe('loadAllSimPlugins — scenario registration', () => {
     writeScenarioPlugin(
       'export const scenarios = [' +
         '{ id: "plug-load-1", name: "plug-load-1", kind: "load", tags: [], run: async () => ({ kind: "load", scenarioId: "plug-load-1", passed: true, durationMs: 0, signals: [] }) }' +
-      '];\n',
+        '];\n',
     );
 
     const result = await loadAllSimPlugins(testDir);
@@ -58,7 +58,7 @@ describe('loadAllSimPlugins — scenario registration', () => {
       'export const scenarios = [' +
         '{ id: "missing-run" },' + // not a valid RunnableScenario (no kind/run) → skipped
         '{ id: "plug-load-2", name: "plug-load-2", kind: "load", tags: [], run: async () => ({ kind: "load", scenarioId: "plug-load-2", passed: true, durationMs: 0, signals: [] }) }' +
-      '];\n',
+        '];\n',
     );
 
     const result = await loadAllSimPlugins(testDir);

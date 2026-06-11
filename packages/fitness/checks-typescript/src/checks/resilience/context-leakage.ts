@@ -3,10 +3,10 @@
  * in module or class scope that can leak between concurrent requests.
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 // =============================================================================
 // REQUEST CONTEXT LEAKAGE (AST-based)
@@ -19,7 +19,7 @@ import * as ts from 'typescript'
  * is still flagged, but that is fine — it's evaluated together with the type).
  */
 function variableNameLooksContextual(name: string): boolean {
-  const lower = name.toLowerCase()
+  const lower = name.toLowerCase();
   // Whole-word: ends with "context"/"ctx" or starts with "request"/"req"
   return (
     lower.endsWith('context') ||
@@ -27,8 +27,8 @@ function variableNameLooksContextual(name: string): boolean {
     lower === 'request' ||
     lower === 'req' ||
     lower.startsWith('request') ||
-    lower.startsWith('req') && lower.length <= 12
-  )
+    (lower.startsWith('req') && lower.length <= 12)
+  );
 }
 
 /**
@@ -39,7 +39,7 @@ function variableNameLooksContextual(name: string): boolean {
  * and refusing to recurse into its generic arguments.
  */
 function isContextTypeName(name: string): boolean {
-  return /(?:Context|Ctx)$/.test(name)
+  return /(?:Context|Ctx)$/.test(name);
 }
 
 /**
@@ -71,7 +71,7 @@ const PROCESS_SCOPED_WRAPPER_TYPES = new Set([
   'Iterable',
   'WeakMap',
   'WeakSet',
-])
+]);
 
 /**
  * OTel and project metric instrument type names. A module-level
@@ -90,17 +90,17 @@ const METRIC_INSTRUMENT_TYPES = new Set([
   'Tracer',
   'TracerProvider',
   'MeterProvider',
-])
+]);
 
 /**
  * Path patterns where the check is structurally inappropriate.
  * - DBOS steps register process-scoped DI via `static ctx`; that's the framework's
  *   contract, not request leakage.
  */
-const SKIP_PATH_PATTERNS: RegExp[] = [/[/\\]dbos[/\\]steps[/\\]/]
+const SKIP_PATH_PATTERNS: RegExp[] = [/[/\\]dbos[/\\]steps[/\\]/];
 
 function isSkippedPath(filePath: string): boolean {
-  return SKIP_PATH_PATTERNS.some((p) => p.test(filePath))
+  return SKIP_PATH_PATTERNS.some((p) => p.test(filePath));
 }
 
 /**
@@ -110,17 +110,17 @@ function isSkippedPath(filePath: string): boolean {
  */
 /** Get the simple name of a type reference's `typeName` (handles qualified names). */
 function getTypeRefName(typeName: ts.EntityName): string {
-  if (ts.isIdentifier(typeName)) return typeName.text
-  if (ts.isQualifiedName(typeName)) return typeName.right.text
-  return ''
+  if (ts.isIdentifier(typeName)) return typeName.text;
+  if (ts.isQualifiedName(typeName)) return typeName.right.text;
+  return '';
 }
 
 /** Outer type-reference name(s) of a TypeNode, including each union branch. */
 function typeRefNames(type: ts.TypeNode | undefined): string[] {
-  if (!type) return []
-  if (ts.isUnionTypeNode(type)) return type.types.flatMap((t) => typeRefNames(t))
-  if (ts.isTypeReferenceNode(type)) return [getTypeRefName(type.typeName)]
-  return []
+  if (!type) return [];
+  if (ts.isUnionTypeNode(type)) return type.types.flatMap((t) => typeRefNames(t));
+  if (ts.isTypeReferenceNode(type)) return [getTypeRefName(type.typeName)];
+  return [];
 }
 
 /**
@@ -137,51 +137,51 @@ function isOtelImport(stmt: ts.Statement): stmt is ts.ImportDeclaration {
     ts.isImportDeclaration(stmt) &&
     ts.isStringLiteral(stmt.moduleSpecifier) &&
     stmt.moduleSpecifier.text.startsWith('@opentelemetry/')
-  )
+  );
 }
 
 /** Names bound by an import clause (default + named bindings). */
 function importClauseNames(clause: ts.ImportClause): string[] {
-  const names: string[] = []
-  if (clause.name) names.push(clause.name.text)
-  const bindings = clause.namedBindings
+  const names: string[] = [];
+  if (clause.name) names.push(clause.name.text);
+  const bindings = clause.namedBindings;
   if (bindings && ts.isNamedImports(bindings)) {
-    for (const el of bindings.elements) names.push(el.name.text)
+    for (const el of bindings.elements) names.push(el.name.text);
   }
-  return names
+  return names;
 }
 
 function collectOtelImportedNames(sourceFile: ts.SourceFile): Set<string> {
-  const names = new Set<string>()
+  const names = new Set<string>();
   for (const stmt of sourceFile.statements) {
-    if (!isOtelImport(stmt) || !stmt.importClause) continue
-    for (const name of importClauseNames(stmt.importClause)) names.add(name)
+    if (!isOtelImport(stmt) || !stmt.importClause) continue;
+    for (const name of importClauseNames(stmt.importClause)) names.add(name);
   }
-  return names
+  return names;
 }
 
 function typeLooksLikeRequestContext(type: ts.TypeNode | undefined): boolean {
-  if (!type) return false
+  if (!type) return false;
 
   // Union: any branch that looks like context counts (excluding `null`/`undefined`)
   if (ts.isUnionTypeNode(type)) {
-    return type.types.some((t) => typeLooksLikeRequestContext(t))
+    return type.types.some((t) => typeLooksLikeRequestContext(t));
   }
 
   if (ts.isTypeReferenceNode(type)) {
-    const name = getTypeRefName(type.typeName)
+    const name = getTypeRefName(type.typeName);
     // @fitness-ignore-next-line silent-early-returns -- boolean predicate function: `false` IS the contract value meaning "this wrapper is process-scoped, not request-scoped"; the caller branches on it.
     if (PROCESS_SCOPED_WRAPPER_TYPES.has(name)) {
       // The outer wrapper is process-scoped; ignore its generic arguments.
-      return false
+      return false;
     }
-    return isContextTypeName(name)
+    return isContextTypeName(name);
   }
 
   // Other shapes (TypeLiteral, intersection of inline shapes, etc.) — be lenient
   // and don't flag. Inline-typed module-level state would still be caught if
   // the variable name itself is contextual (handled separately).
-  return false
+  return false;
 }
 
 /**
@@ -190,24 +190,24 @@ function typeLooksLikeRequestContext(type: ts.TypeNode | undefined): boolean {
  * metric, not request state, so we skip them.
  */
 function isMetricLazyInit(decl: ts.VariableDeclaration): boolean {
-  const t = decl.type
-  if (!t) return false
-  if (decl.initializer?.kind !== ts.SyntaxKind.NullKeyword) return false
+  const t = decl.type;
+  if (!t) return false;
+  if (decl.initializer?.kind !== ts.SyntaxKind.NullKeyword) return false;
 
   // Require a `<Something> | null` (or `<Something> | undefined`) shape.
-  const candidates: ts.TypeNode[] = ts.isUnionTypeNode(t) ? [...t.types] : [t]
+  const candidates: ts.TypeNode[] = ts.isUnionTypeNode(t) ? [...t.types] : [t];
   const hasNullBranch = candidates.some(
     (c) =>
       c.kind === ts.SyntaxKind.NullKeyword ||
       c.kind === ts.SyntaxKind.UndefinedKeyword ||
       (ts.isLiteralTypeNode(c) && c.literal.kind === ts.SyntaxKind.NullKeyword),
-  )
-  if (!hasNullBranch) return false
+  );
+  if (!hasNullBranch) return false;
 
   return candidates.some((c) => {
-    if (!ts.isTypeReferenceNode(c)) return false
-    return METRIC_INSTRUMENT_TYPES.has(getTypeRefName(c.typeName))
-  })
+    if (!ts.isTypeReferenceNode(c)) return false;
+    return METRIC_INSTRUMENT_TYPES.has(getTypeRefName(c.typeName));
+  });
 }
 
 /**
@@ -215,14 +215,14 @@ function isMetricLazyInit(decl: ts.VariableDeclaration): boolean {
  * store request-scoped state and should never be flagged.
  */
 function isAsyncLocalStorageType(type: ts.TypeNode | undefined): boolean {
-  if (!type) return false
+  if (!type) return false;
   if (ts.isTypeReferenceNode(type)) {
-    return getTypeRefName(type.typeName) === 'AsyncLocalStorage'
+    return getTypeRefName(type.typeName) === 'AsyncLocalStorage';
   }
   if (ts.isUnionTypeNode(type)) {
-    return type.types.some(isAsyncLocalStorageType)
+    return type.types.some(isAsyncLocalStorageType);
   }
-  return false
+  return false;
 }
 
 /**
@@ -235,20 +235,21 @@ function classLooksRequestScoped(cls: ts.ClassDeclaration): boolean {
   for (const member of cls.members) {
     // Field named requestId / correlationId
     if (ts.isPropertyDeclaration(member) && ts.isIdentifier(member.name)) {
-      const fieldName = member.name.text
-      if (fieldName === 'requestId' || fieldName === 'correlationId') return true
+      const fieldName = member.name.text;
+      if (fieldName === 'requestId' || fieldName === 'correlationId') return true;
     }
     // Method with `tenantId` parameter
     if (
       (ts.isMethodDeclaration(member) || ts.isConstructorDeclaration(member)) &&
       member.parameters.some(
-        (p) => ts.isIdentifier(p.name) && (p.name.text === 'tenantId' || p.name.text === 'tenant_id'),
+        (p) =>
+          ts.isIdentifier(p.name) && (p.name.text === 'tenantId' || p.name.text === 'tenant_id'),
       )
     ) {
-      return true
+      return true;
     }
   }
-  return false
+  return false;
 }
 
 /**
@@ -257,30 +258,27 @@ function classLooksRequestScoped(cls: ts.ClassDeclaration): boolean {
  */
 function classIsDbosStepHost(cls: ts.ClassDeclaration): boolean {
   const checkDecorators = (mods: readonly ts.ModifierLike[] | undefined): boolean => {
-    if (!mods) return false
+    if (!mods) return false;
     for (const m of mods) {
-      if (!ts.isDecorator(m)) continue
-      const exprText = m.expression.getText()
-      if (exprText.startsWith('DBOS.step') || exprText.startsWith('DBOS.workflow')) return true
+      if (!ts.isDecorator(m)) continue;
+      const exprText = m.expression.getText();
+      if (exprText.startsWith('DBOS.step') || exprText.startsWith('DBOS.workflow')) return true;
     }
-    return false
-  }
-  if (checkDecorators(ts.getModifiers(cls))) return true
+    return false;
+  };
+  if (checkDecorators(ts.getModifiers(cls))) return true;
   for (const member of cls.members) {
-    if (
-      ts.canHaveDecorators(member) &&
-      checkDecorators(ts.getDecorators(member))
-    ) {
-      return true
+    if (ts.canHaveDecorators(member) && checkDecorators(ts.getDecorators(member))) {
+      return true;
     }
   }
-  return false
+  return false;
 }
 
 interface ContextLeakageFinding {
-  line: number
-  column: number
-  match: string
+  line: number;
+  column: number;
+  match: string;
 }
 
 /**
@@ -289,38 +287,38 @@ interface ContextLeakageFinding {
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- module/class-level walk; branches map to AST node kinds and are easier to read inline than as a fragmented dispatcher
 function collectContextLeakage(sourceFile: ts.SourceFile): ContextLeakageFinding[] {
-  const findings: ContextLeakageFinding[] = []
-  const otelImportedNames = collectOtelImportedNames(sourceFile)
+  const findings: ContextLeakageFinding[] = [];
+  const otelImportedNames = collectOtelImportedNames(sourceFile);
 
   // 1. Module-level `let`/`var` declarations
   for (const stmt of sourceFile.statements) {
-    if (!ts.isVariableStatement(stmt)) continue
+    if (!ts.isVariableStatement(stmt)) continue;
 
-    const flags = stmt.declarationList.flags
+    const flags = stmt.declarationList.flags;
     // Skip `const` — request-scoped state cannot be assigned more than once
     // anyway. The leakage shape requires a re-assignable binding.
-    if (flags & ts.NodeFlags.Const) continue
+    if (flags & ts.NodeFlags.Const) continue;
 
     for (const decl of stmt.declarationList.declarations) {
-      if (!ts.isIdentifier(decl.name)) continue
-      const varName = decl.name.text
+      if (!ts.isIdentifier(decl.name)) continue;
+      const varName = decl.name.text;
 
       // AsyncLocalStorage — the correct request-scoping primitive
-      if (isAsyncLocalStorageType(decl.type)) continue
+      if (isAsyncLocalStorageType(decl.type)) continue;
 
       // Lazy-init metric instrument: process-scoped per metric, not per request
-      if (isMetricLazyInit(decl)) continue
+      if (isMetricLazyInit(decl)) continue;
 
       // OTel SDK types (Context, Span, …) are process/propagation scoped.
-      if (typeRefNames(decl.type).some((n) => otelImportedNames.has(n))) continue
+      if (typeRefNames(decl.type).some((n) => otelImportedNames.has(n))) continue;
 
-      const typeIsContextual = typeLooksLikeRequestContext(decl.type)
-      const nameIsContextual = variableNameLooksContextual(varName)
+      const typeIsContextual = typeLooksLikeRequestContext(decl.type);
+      const nameIsContextual = variableNameLooksContextual(varName);
 
       // Require BOTH name AND type to point at request context (or at least the
       // type — the regex check used to flag "request" in metric names; we now
       // require an explicit type-shape signal).
-      if (!typeIsContextual && !nameIsContextual) continue
+      if (!typeIsContextual && !nameIsContextual) continue;
 
       // If the variable has a non-null initializer that's an object literal /
       // function call producing a known process-scoped value (e.g. `new Map()`),
@@ -329,51 +327,51 @@ function collectContextLeakage(sourceFile: ts.SourceFile): ContextLeakageFinding
         // Name-only signal is too weak by itself — require initializer to be `null`
         // and a contextual-looking type. If the user wrote `let req = …` without a
         // type, modern TS will infer it; we don't have type info here, so we punt.
-        continue
+        continue;
       }
 
-      const start = decl.getStart(sourceFile)
-      const { line, character } = sourceFile.getLineAndCharacterOfPosition(start)
+      const start = decl.getStart(sourceFile);
+      const { line, character } = sourceFile.getLineAndCharacterOfPosition(start);
       findings.push({
         line: line + 1,
         column: character + 1,
         match: `let ${varName}: <Context>`,
-      })
+      });
     }
   }
 
   // 2. Class fields — non-readonly, non-static `PropertyDeclaration` whose
   //    type is a request-scoped context AND the class itself is request-scoped.
   for (const stmt of sourceFile.statements) {
-    if (!ts.isClassDeclaration(stmt)) continue
-    if (classIsDbosStepHost(stmt)) continue
-    if (!classLooksRequestScoped(stmt)) continue
+    if (!ts.isClassDeclaration(stmt)) continue;
+    if (classIsDbosStepHost(stmt)) continue;
+    if (!classLooksRequestScoped(stmt)) continue;
 
     for (const member of stmt.members) {
-      if (!ts.isPropertyDeclaration(member)) continue
-      if (!ts.isIdentifier(member.name)) continue
+      if (!ts.isPropertyDeclaration(member)) continue;
+      if (!ts.isIdentifier(member.name)) continue;
 
-      const mods = ts.getModifiers(member)
-      const isReadonly = mods?.some((m) => m.kind === ts.SyntaxKind.ReadonlyKeyword) ?? false
-      const isStatic = mods?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword) ?? false
-      if (isReadonly || isStatic) continue
+      const mods = ts.getModifiers(member);
+      const isReadonly = mods?.some((m) => m.kind === ts.SyntaxKind.ReadonlyKeyword) ?? false;
+      const isStatic = mods?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword) ?? false;
+      if (isReadonly || isStatic) continue;
 
       // OTel SDK types are process/propagation scoped, not request state.
-      if (typeRefNames(member.type).some((n) => otelImportedNames.has(n))) continue
+      if (typeRefNames(member.type).some((n) => otelImportedNames.has(n))) continue;
 
-      if (!typeLooksLikeRequestContext(member.type)) continue
+      if (!typeLooksLikeRequestContext(member.type)) continue;
 
-      const start = member.getStart(sourceFile)
-      const { line, character } = sourceFile.getLineAndCharacterOfPosition(start)
+      const start = member.getStart(sourceFile);
+      const { line, character } = sourceFile.getLineAndCharacterOfPosition(start);
       findings.push({
         line: line + 1,
         column: character + 1,
         match: `private ${member.name.text}: <Context>`,
-      })
+      });
     }
   }
 
-  return findings
+  return findings;
 }
 
 /**
@@ -419,36 +417,36 @@ export const contextLeakage = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze: analyzeContextLeakage,
-})
+});
 
 /**
  * Analyze a file for request-context leakage. Exported for the FP-regression
  * suite (see `__tests__/context-leakage-fp.test.ts`).
  */
 export function analyzeContextLeakage(content: string, filePath: string): CheckViolation[] {
-  if (isTestFile(filePath)) return []
-  if (isSkippedPath(filePath)) return []
+  if (isTestFile(filePath)) return [];
+  if (isSkippedPath(filePath)) return [];
 
   logger.debug({
     evt: 'fitness.checks.context_leakage.context_leakage_analyze',
     msg: 'Analyzing file for request context leakage (AST)',
-  })
+  });
 
   // Quick text bail-out: if the file mentions neither "context" nor "ctx",
   // there is nothing to find. Saves the parse-cache hit.
-  const lower = content.toLowerCase()
-  if (!lower.includes('context') && !lower.includes('ctx')) return []
+  const lower = content.toLowerCase();
+  if (!lower.includes('context') && !lower.includes('ctx')) return [];
 
-  let sourceFile: ts.SourceFile | null
+  let sourceFile: ts.SourceFile | null;
   try {
-    sourceFile = getSharedSourceFile(filePath, content)
+    sourceFile = getSharedSourceFile(filePath, content);
   } catch {
     // @swallow-ok Skip files that fail to parse — no signal to emit.
-    return []
+    return [];
   }
-  if (!sourceFile) return []
+  if (!sourceFile) return [];
 
-  const findings = collectContextLeakage(sourceFile)
+  const findings = collectContextLeakage(sourceFile);
   return findings.map<CheckViolation>((f) => ({
     line: f.line,
     column: f.column,
@@ -459,5 +457,5 @@ export function analyzeContextLeakage(content: string, filePath: string): CheckV
     match: f.match,
     type: 'context-leakage',
     filePath,
-  }))
+  }));
 }

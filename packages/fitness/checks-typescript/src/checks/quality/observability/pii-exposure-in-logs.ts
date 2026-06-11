@@ -10,9 +10,14 @@
  * @see Logging Standards
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { parseSource, walkNodes, getPropertyChain, getLineNumber } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import {
+  parseSource,
+  walkNodes,
+  getPropertyChain,
+  getLineNumber,
+} from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 // PII field names that should never be logged directly
 const PII_FIELD_NAMES = new Set([
@@ -49,13 +54,13 @@ const PII_FIELD_NAMES = new Set([
   'dateofbirth',
   'date_of_birth',
   'dob',
-])
+]);
 
 /** Logger method names that indicate a log call */
-const LOG_METHOD_NAMES = new Set(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
+const LOG_METHOD_NAMES = new Set(['trace', 'debug', 'info', 'warn', 'error', 'fatal']);
 
 /** Logger object names (L is our shorthand, logger is standard) */
-const LOGGER_OBJECT_NAMES = new Set(['L', 'logger', 'log'])
+const LOGGER_OBJECT_NAMES = new Set(['L', 'logger', 'log']);
 
 /** Safe function calls that indicate the PII field value is sanitized */
 const SAFE_WRAPPER_FUNCTIONS = new Set([
@@ -68,24 +73,24 @@ const SAFE_WRAPPER_FUNCTIONS = new Set([
   'hashpiifield',
   'redactfield',
   'maskfield',
-])
+]);
 
 /**
  * Check if a node is a logger call expression.
  * Matches: logger.info(...), L.warn(...), log.error(...), this.logger.debug(...)
  */
 function isLoggerCall(node: ts.CallExpression): boolean {
-  const expr = node.expression
-  if (!ts.isPropertyAccessExpression(expr)) return false
-  if (!LOG_METHOD_NAMES.has(expr.name.text)) return false
+  const expr = node.expression;
+  if (!ts.isPropertyAccessExpression(expr)) return false;
+  if (!LOG_METHOD_NAMES.has(expr.name.text)) return false;
 
-  const chain = getPropertyChain(expr.expression)
+  const chain = getPropertyChain(expr.expression);
   // Direct logger call: logger.info, L.warn
-  if (LOGGER_OBJECT_NAMES.has(chain)) return true
+  if (LOGGER_OBJECT_NAMES.has(chain)) return true;
   // Nested: this.logger.info, context.logger.warn
-  if (chain.endsWith('.logger') || chain.endsWith('.L') || chain.endsWith('.log')) return true
+  if (chain.endsWith('.logger') || chain.endsWith('.L') || chain.endsWith('.log')) return true;
 
-  return false
+  return false;
 }
 
 /**
@@ -94,18 +99,18 @@ function isLoggerCall(node: ts.CallExpression): boolean {
  */
 function isWrappedInSafeCall(node: ts.Expression): boolean {
   if (ts.isCallExpression(node)) {
-    const callee = node.expression
+    const callee = node.expression;
     if (ts.isIdentifier(callee) && SAFE_WRAPPER_FUNCTIONS.has(callee.text.toLowerCase())) {
-      return true
+      return true;
     }
     if (
       ts.isPropertyAccessExpression(callee) &&
       SAFE_WRAPPER_FUNCTIONS.has(callee.name.text.toLowerCase())
     ) {
-      return true
+      return true;
     }
   }
-  return false
+  return false;
 }
 
 /**
@@ -116,29 +121,29 @@ function findPiiFieldInObject(
   obj: ts.ObjectLiteralExpression,
 ): { fieldName: string; safe: boolean } | null {
   for (const prop of obj.properties) {
-    if (!ts.isPropertyAssignment(prop)) continue
+    if (!ts.isPropertyAssignment(prop)) continue;
 
-    let propName = ''
+    let propName = '';
     if (ts.isIdentifier(prop.name)) {
-      propName = prop.name.text
+      propName = prop.name.text;
     } else if (ts.isStringLiteral(prop.name)) {
-      propName = prop.name.text
+      propName = prop.name.text;
     } else if (ts.isComputedPropertyName(prop.name)) {
-      continue // skip computed properties
+      continue; // skip computed properties
     }
 
     if (PII_FIELD_NAMES.has(propName.toLowerCase())) {
-      const safe = isWrappedInSafeCall(prop.initializer)
-      return { fieldName: propName, safe }
+      const safe = isWrappedInSafeCall(prop.initializer);
+      return { fieldName: propName, safe };
     }
 
     // Check nested object literals
     if (ts.isObjectLiteralExpression(prop.initializer)) {
-      const nested = findPiiFieldInObject(prop.initializer)
-      if (nested) return nested
+      const nested = findPiiFieldInObject(prop.initializer);
+      if (nested) return nested;
     }
   }
-  return null
+  return null;
 }
 
 /**
@@ -176,23 +181,23 @@ export const piiExposureInLogs = defineCheck({
   analyze(content: string, filePath: string): CheckViolation[] {
     // Quick filter: skip files without logger patterns
     if (!content.includes('logger.') && !content.includes('L.') && !content.includes('log.')) {
-      return []
+      return [];
     }
 
-    const sourceFile = parseSource(content, filePath)
+    const sourceFile = parseSource(content, filePath);
     /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+    if (!sourceFile) return [];
 
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     walkNodes(sourceFile, (node) => {
-      if (!ts.isCallExpression(node)) return
-      if (!isLoggerCall(node)) return
+      if (!ts.isCallExpression(node)) return;
+      if (!isLoggerCall(node)) return;
 
       // Inspect each argument for PII fields
       for (const arg of node.arguments) {
         if (ts.isObjectLiteralExpression(arg)) {
-          const piiField = findPiiFieldInObject(arg)
+          const piiField = findPiiFieldInObject(arg);
           if (piiField && !piiField.safe) {
             violations.push({
               line: getLineNumber(node, sourceFile),
@@ -203,13 +208,13 @@ export const piiExposureInLogs = defineCheck({
               match:
                 node.getText().length > 200 ? node.getText().slice(0, 200) + '...' : node.getText(),
               filePath,
-            })
-            break // one violation per log call is sufficient
+            });
+            break; // one violation per log call is sufficient
           }
         }
       }
-    })
+    });
 
-    return violations
+    return violations;
   },
-})
+});

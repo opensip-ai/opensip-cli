@@ -68,7 +68,10 @@ function firstCall(source: string): ts.CallExpression {
   let found: ts.CallExpression | undefined;
   const visit = (n: ts.Node): void => {
     if (found) return;
-    if (ts.isCallExpression(n)) { found = n; return; }
+    if (ts.isCallExpression(n)) {
+      found = n;
+      return;
+    }
     ts.forEachChild(n, visit);
   };
   visit(sf);
@@ -113,7 +116,11 @@ describe('resolveSyntactic', () => {
     const catalog = catalogOf(occ('local', 'app.ts', 'L'), occ('local', 'far.ts', 'F'));
     const node = firstCall('local()');
 
-    const v = resolveSyntactic(node, { catalog, currentFileRel: 'app.ts', importIndex: NO_IMPORTS });
+    const v = resolveSyntactic(node, {
+      catalog,
+      currentFileRel: 'app.ts',
+      importIndex: NO_IMPORTS,
+    });
     expect(v!.confidence).toBe('medium');
     expect(v!.to).toEqual(['L']);
   });
@@ -122,7 +129,11 @@ describe('resolveSyntactic', () => {
     const catalog = catalogOf(occ('only', 'somewhere.ts', 'O'));
     const node = firstCall('only()');
 
-    const v = resolveSyntactic(node, { catalog, currentFileRel: 'app.ts', importIndex: NO_IMPORTS });
+    const v = resolveSyntactic(node, {
+      catalog,
+      currentFileRel: 'app.ts',
+      importIndex: NO_IMPORTS,
+    });
     expect(v!.confidence).toBe('low');
     expect(v!.to).toEqual(['O']);
   });
@@ -131,7 +142,11 @@ describe('resolveSyntactic', () => {
     const catalog = catalogOf(occ('amb', 'a.ts', 'A'), occ('amb', 'b.ts', 'B'));
     const node = firstCall('amb()');
 
-    const v = resolveSyntactic(node, { catalog, currentFileRel: 'app.ts', importIndex: NO_IMPORTS });
+    const v = resolveSyntactic(node, {
+      catalog,
+      currentFileRel: 'app.ts',
+      importIndex: NO_IMPORTS,
+    });
     expect(v!.to).toEqual([]); // declines rather than guessing
     expect(v!.confidence).toBe('low');
   });

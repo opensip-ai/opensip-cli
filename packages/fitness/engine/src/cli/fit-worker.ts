@@ -18,7 +18,12 @@
 
 import { readFileSync } from 'node:fs';
 
-import { defineCommand, type CommandSpec, type ToolCliContext, type WorkerMessage } from '@opensip-tools/core';
+import {
+  defineCommand,
+  type CommandSpec,
+  type ToolCliContext,
+  type WorkerMessage,
+} from '@opensip-tools/core';
 
 import { executeFit } from './fit.js';
 
@@ -42,10 +47,16 @@ function send(msg: WorkerMessage<ProgressEvent, FitWorkerResult>): void {
 export async function executeFitWorker(specPath: string): Promise<void> {
   try {
     const args = JSON.parse(readFileSync(specPath, 'utf8')) as FitOptions;
-    send({ kind: 'progress', event: { type: 'stage-start', stage: 'checks', label: 'Running checks...' } });
+    send({
+      kind: 'progress',
+      event: { type: 'stage-start', stage: 'checks', label: 'Running checks...' },
+    });
     const fitResult = await executeFit(args, {
       onProgress: (completed, total) =>
-        send({ kind: 'progress', event: { type: 'stage-progress', stage: 'checks', completed, total } }),
+        send({
+          kind: 'progress',
+          event: { type: 'stage-progress', stage: 'checks', completed, total },
+        }),
     });
     send({ kind: 'result', value: fitResult });
   } catch (error) {
@@ -58,9 +69,13 @@ export async function executeFitWorker(specPath: string): Promise<void> {
 }
 
 /** `fit-run-worker` — [internal] headless fit run, IPC progress/result. */
-export const fitRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const fitRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'fit-run-worker',
-  description: '[internal] Run fit headless and stream progress + result over IPC (forked by the live view)',
+  description:
+    '[internal] Run fit headless and stream progress + result over IPC (forked by the live view)',
   commonFlags: [],
   args: [{ name: 'specPath', description: 'Path to a JSON FitOptions spec file' }],
   scope: 'project',

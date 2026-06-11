@@ -2,30 +2,30 @@
  * @fileoverview Detect webhook endpoints without signature verification
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Security pattern configuration
  */
 interface SecurityPattern {
-  regex: RegExp
-  message: string
-  suggestion: string
-  severity: 'error' | 'warning'
-  category: string
+  regex: RegExp;
+  message: string;
+  suggestion: string;
+  severity: 'error' | 'warning';
+  category: string;
 }
 
 /**
  * Options for creating a security pattern
  */
 interface CreateSecurityPatternOptions {
-  pattern: string
-  flags: string
-  message: string
-  suggestion: string
-  severity: 'error' | 'warning'
-  category: string
+  pattern: string;
+  flags: string;
+  message: string;
+  suggestion: string;
+  severity: 'error' | 'warning';
+  category: string;
 }
 
 /**
@@ -35,9 +35,9 @@ interface CreateSecurityPatternOptions {
  * @returns Security pattern configuration
  */
 function createSecurityPattern(options: CreateSecurityPatternOptions): SecurityPattern {
-  const { pattern, flags, message, suggestion, severity, category } = options
+  const { pattern, flags, message, suggestion, severity, category } = options;
   // @fitness-ignore-next-line semgrep-scan -- non-literal RegExp is intentional; patterns are hardcoded string constants for code analysis, not user input
-  return { regex: new RegExp(pattern, flags), message, suggestion, severity, category }
+  return { regex: new RegExp(pattern, flags), message, suggestion, severity, category };
 }
 
 /**
@@ -49,14 +49,14 @@ function isWebhookRelatedFile(filePath: string): boolean {
   logger.debug({
     evt: 'fitness.checks.webhook_signature.is_webhook_related_file',
     msg: 'Checking if file is webhook-related',
-  })
-  const lowerPath = filePath.toLowerCase()
+  });
+  const lowerPath = filePath.toLowerCase();
   // Simple checks that are safe from ReDoS
   if (lowerPath.includes('webhook')) {
-    return true
+    return true;
   }
   // Check for /hook/ or /hooks/ path segments
-  return lowerPath.includes('/hook/') || lowerPath.includes('/hooks/')
+  return lowerPath.includes('/hook/') || lowerPath.includes('/hooks/');
 }
 
 // Patterns indicating proper verifier usage - simple string checks
@@ -68,7 +68,7 @@ const VERIFIER_STRINGS = [
   'createSendGridVerifier',
   'verifySignature',
   'validateSignature',
-]
+];
 
 /**
  * Check if content has proper verifier imports
@@ -79,8 +79,8 @@ function hasVerifierImport(content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.webhook_signature.has_verifier_import',
     msg: 'Checking if content has verifier imports',
-  })
-  return VERIFIER_STRINGS.some((str) => content.includes(str))
+  });
+  return VERIFIER_STRINGS.some((str) => content.includes(str));
 }
 
 // Security issue patterns - using RegExp constructor to avoid sonarjs warnings
@@ -116,7 +116,7 @@ const SECURITY_ISSUE_PATTERNS: SecurityPattern[] = [
     severity: 'warning',
     category: 'insecure-signature',
   }),
-]
+];
 
 // Patterns indicating JSON parsing without verification - simplified
 const UNSAFE_JSON_PATTERNS: SecurityPattern[] = [
@@ -130,7 +130,7 @@ const UNSAFE_JSON_PATTERNS: SecurityPattern[] = [
     severity: 'error',
     category: 'missing-verification',
   }),
-]
+];
 
 /**
  * Check if file should be skipped
@@ -141,8 +141,8 @@ function shouldSkipFile(filePath: string): boolean {
   logger.debug({
     evt: 'fitness.checks.webhook_signature.should_skip_file',
     msg: 'Checking if file should be skipped',
-  })
-  return !isWebhookRelatedFile(filePath)
+  });
+  return !isWebhookRelatedFile(filePath);
 }
 
 function checkPatterns(
@@ -154,12 +154,12 @@ function checkPatterns(
   logger.debug({
     evt: 'fitness.checks.webhook_signature.check_patterns',
     msg: 'Checking line against security patterns',
-  })
-  const violations: CheckViolation[] = []
+  });
+  const violations: CheckViolation[] = [];
 
   for (const pattern of patterns) {
-    pattern.regex.lastIndex = 0
-    const match = pattern.regex.exec(line)
+    pattern.regex.lastIndex = 0;
+    const match = pattern.regex.exec(line);
     if (match) {
       violations.push({
         line: lineNum + 1,
@@ -170,11 +170,11 @@ function checkPatterns(
         match: match[0],
         type: pattern.category,
         filePath,
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -208,29 +208,29 @@ export const webhookSignatureVerification = defineCheck({
     logger.debug({
       evt: 'fitness.checks.webhook_signature.analyze',
       msg: 'Analyzing file for webhook signature verification',
-    })
+    });
     if (shouldSkipFile(filePath)) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
-    const fileHasVerifierImport = hasVerifierImport(content)
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const fileHasVerifierImport = hasVerifierImport(content);
+    const lines = content.split('\n');
 
     for (const [lineNum, line_] of lines.entries()) {
-      const line = line_ ?? ''
+      const line = line_ ?? '';
 
       if (isCommentLine(line)) {
-        continue
+        continue;
       }
 
-      violations.push(...checkPatterns(SECURITY_ISSUE_PATTERNS, line, lineNum, filePath))
+      violations.push(...checkPatterns(SECURITY_ISSUE_PATTERNS, line, lineNum, filePath));
 
       if (!fileHasVerifierImport) {
-        violations.push(...checkPatterns(UNSAFE_JSON_PATTERNS, line, lineNum, filePath))
+        violations.push(...checkPatterns(UNSAFE_JSON_PATTERNS, line, lineNum, filePath));
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

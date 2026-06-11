@@ -30,154 +30,154 @@
  * Inspired by `opensip-ai/opensip/opensip-tools` `arch-callback-invocation-safe`.
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
 
-const SCOPE_PREFIXES = ['packages/'] as const
+const SCOPE_PREFIXES = ['packages/'] as const;
 
-const PRAGMA_RE = /@callback-invocation-safe-by-caller\s*--\s*\S+/
-const PRAGMA_BARE_RE = /@callback-invocation-safe-by-caller\b(?!\s*--\s*\S)/
+const PRAGMA_RE = /@callback-invocation-safe-by-caller\s*--\s*\S+/;
+const PRAGMA_BARE_RE = /@callback-invocation-safe-by-caller\b(?!\s*--\s*\S)/;
 
-const COLLECTION_NAMES = new Set(['subscribers', 'listeners', 'observers', 'callbacks', 'handlers'])
+const COLLECTION_NAMES = new Set([
+  'subscribers',
+  'listeners',
+  'observers',
+  'callbacks',
+  'handlers',
+]);
 
 // Two-step match — first the receiver + `.forEach(`, then the arrow
 // parameter. Splitting the original mega-regex avoids the
 // sonarjs/regex-complexity ceiling and makes each step easier to reason
 // about. Both regexes are bounded — they only consume identifier chars
 // and a few whitespace boundaries, never backtrack on user input.
-const FOREACH_HEAD_RE = /\b([A-Za-z_$][\w$]*)\s*\.\s*forEach\s*\(\s*/g
+const FOREACH_HEAD_RE = /\b([A-Za-z_$][\w$]*)\s*\.\s*forEach\s*\(\s*/g;
 // eslint-disable-next-line sonarjs/slow-regex -- arrow header; bounded prefix optional groups, anchored at slice start
-const FOREACH_ARROW_RE = /^(?:async\s+)?\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>\s*\{?\s*/
+const FOREACH_ARROW_RE = /^(?:async\s+)?\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>\s*\{?\s*/;
 
 // `for (const <ident> of <receiver>) { ... }`
 const FOR_OF_INVOCATION_RE =
-  /\bfor\s*\(\s*(?:const|let)\s+([A-Za-z_$][\w$]*)\s+of\s+(?:this\s*\.\s*)?([A-Za-z_$][\w$]*)\s*\)\s*\{/g
+  /\bfor\s*\(\s*(?:const|let)\s+([A-Za-z_$][\w$]*)\s+of\s+(?:this\s*\.\s*)?([A-Za-z_$][\w$]*)\s*\)\s*\{/g;
 
 function collectionNameMatches(name: string): boolean {
-  const lower = name.toLowerCase()
+  const lower = name.toLowerCase();
   for (const n of COLLECTION_NAMES) {
-    if (lower === n || lower.endsWith(n)) return true
+    if (lower === n || lower.endsWith(n)) return true;
   }
-  return false
+  return false;
 }
 
 function lineNumberOfIndex(content: string, index: number): number {
-  let line = 1
+  let line = 1;
   for (let i = 0; i < index && i < content.length; i++) {
-    if (content[i] === '\n') line++
+    if (content[i] === '\n') line++;
   }
-  return line
+  return line;
 }
 
 function inScope(normalized: string): boolean {
-  return SCOPE_PREFIXES.some((p) => normalized.startsWith(p) || normalized.includes(`/${p}`))
+  return SCOPE_PREFIXES.some((p) => normalized.startsWith(p) || normalized.includes(`/${p}`));
 }
 
 function bodyInvokesIdent(body: string, ident: string): boolean {
-  const re = new RegExp(String.raw`(?<![A-Za-z0-9_$.])` + ident + String.raw`\s*\(`)
-  return re.test(body)
+  const re = new RegExp(String.raw`(?<![A-Za-z0-9_$.])` + ident + String.raw`\s*\(`);
+  return re.test(body);
 }
 
 function bodyHasSafeWrapper(body: string): boolean {
-  return /\bsafe[A-Z][\w$]*\s*\(/.test(body)
+  return /\bsafe[A-Z][\w$]*\s*\(/.test(body);
 }
 
 function isInsideTryBlock(stripped: string, idx: number): boolean {
-  const start = Math.max(0, idx - 400)
-  const slice = stripped.slice(start, idx)
-  const lastTry = slice.lastIndexOf('try')
-  if (lastTry === -1) return false
-  let depth = 0
-  let saw = false
+  const start = Math.max(0, idx - 400);
+  const slice = stripped.slice(start, idx);
+  const lastTry = slice.lastIndexOf('try');
+  if (lastTry === -1) return false;
+  let depth = 0;
+  let saw = false;
   for (let i = lastTry; i < slice.length; i++) {
-    const ch = slice[i]
+    const ch = slice[i];
     if (ch === '{') {
-      depth++
-      saw = true
+      depth++;
+      saw = true;
     } else if (ch === '}') {
-      depth--
-      if (saw && depth <= 0) return false
+      depth--;
+      if (saw && depth <= 0) return false;
     }
   }
-  return saw && depth > 0
+  return saw && depth > 0;
 }
 
 function pragmaAt(lines: readonly string[], callLine: number): 'honored' | 'bare' | 'absent' {
   for (const offset of [0, -1]) {
-    const idx = callLine - 1 + offset
-    if (idx < 0 || idx >= lines.length) continue
-    const line = lines[idx] ?? ''
-    if (PRAGMA_RE.test(line)) return 'honored'
-    if (PRAGMA_BARE_RE.test(line)) return 'bare'
+    const idx = callLine - 1 + offset;
+    if (idx < 0 || idx >= lines.length) continue;
+    const line = lines[idx] ?? '';
+    if (PRAGMA_RE.test(line)) return 'honored';
+    if (PRAGMA_BARE_RE.test(line)) return 'bare';
   }
-  return 'absent'
+  return 'absent';
 }
 
 interface CallSite {
-  readonly callLine: number
-  readonly receiver: string
-  readonly ident: string
+  readonly callLine: number;
+  readonly receiver: string;
+  readonly ident: string;
 }
 
 function fileIsInScope(filePath: string): boolean {
-  if (!filePath.endsWith('.ts') && !filePath.endsWith('.tsx')) return false
-  if (filePath.endsWith('.d.ts')) return false
-  if (isTestFile(filePath)) return false
-  return inScope(filePath.replaceAll('\\', '/'))
+  if (!filePath.endsWith('.ts') && !filePath.endsWith('.tsx')) return false;
+  if (filePath.endsWith('.d.ts')) return false;
+  if (isTestFile(filePath)) return false;
+  return inScope(filePath.replaceAll('\\', '/'));
 }
 
 function contentMentionsCollection(content: string): boolean {
   for (const name of COLLECTION_NAMES) {
-    if (content.includes(name)) return true
+    if (content.includes(name)) return true;
   }
-  return false
+  return false;
 }
 
-function shouldEmitForEachSite(
-  content: string,
-  m: RegExpMatchArray,
-): CallSite | null {
-  const receiver = m[1] ?? ''
-  if (!collectionNameMatches(receiver)) return null
-  const idx = m.index ?? 0
+function shouldEmitForEachSite(content: string, m: RegExpMatchArray): CallSite | null {
+  const receiver = m[1] ?? '';
+  if (!collectionNameMatches(receiver)) return null;
+  const idx = m.index ?? 0;
   // The match consumed up to and including the `(` of forEach; parse the
   // arrow parameter from the slice that follows.
-  const afterParen = content.slice(idx + m[0].length, idx + m[0].length + 200)
-  const arrowMatch = FOREACH_ARROW_RE.exec(afterParen)
-  if (!arrowMatch) return null
-  const ident = arrowMatch[1] ?? ''
-  const bodyTail = afterParen.slice(arrowMatch[0].length, arrowMatch[0].length + 200)
-  if (!bodyInvokesIdent(bodyTail, ident)) return null
-  if (bodyHasSafeWrapper(bodyTail)) return null
-  if (isInsideTryBlock(content, idx)) return null
-  return { callLine: lineNumberOfIndex(content, idx), receiver, ident }
+  const afterParen = content.slice(idx + m[0].length, idx + m[0].length + 200);
+  const arrowMatch = FOREACH_ARROW_RE.exec(afterParen);
+  if (!arrowMatch) return null;
+  const ident = arrowMatch[1] ?? '';
+  const bodyTail = afterParen.slice(arrowMatch[0].length, arrowMatch[0].length + 200);
+  if (!bodyInvokesIdent(bodyTail, ident)) return null;
+  if (bodyHasSafeWrapper(bodyTail)) return null;
+  if (isInsideTryBlock(content, idx)) return null;
+  return { callLine: lineNumberOfIndex(content, idx), receiver, ident };
 }
 
-function shouldEmitForOfSite(
-  content: string,
-  m: RegExpMatchArray,
-): CallSite | null {
-  const ident = m[1] ?? ''
-  const receiver = m[2] ?? ''
-  if (!collectionNameMatches(receiver)) return null
-  const idx = m.index ?? 0
-  const blockBody = content.slice(idx, Math.min(content.length, idx + 400))
-  if (!bodyInvokesIdent(blockBody, ident)) return null
-  if (bodyHasSafeWrapper(blockBody)) return null
-  if (isInsideTryBlock(content, idx)) return null
-  return { callLine: lineNumberOfIndex(content, idx), receiver, ident }
+function shouldEmitForOfSite(content: string, m: RegExpMatchArray): CallSite | null {
+  const ident = m[1] ?? '';
+  const receiver = m[2] ?? '';
+  if (!collectionNameMatches(receiver)) return null;
+  const idx = m.index ?? 0;
+  const blockBody = content.slice(idx, Math.min(content.length, idx + 400));
+  if (!bodyInvokesIdent(blockBody, ident)) return null;
+  if (bodyHasSafeWrapper(blockBody)) return null;
+  if (isInsideTryBlock(content, idx)) return null;
+  return { callLine: lineNumberOfIndex(content, idx), receiver, ident };
 }
 
 function findCallSites(content: string): CallSite[] {
-  const sites: CallSite[] = []
+  const sites: CallSite[] = [];
   for (const m of content.matchAll(FOREACH_HEAD_RE)) {
-    const site = shouldEmitForEachSite(content, m)
-    if (site) sites.push(site)
+    const site = shouldEmitForEachSite(content, m);
+    if (site) sites.push(site);
   }
   for (const m of content.matchAll(FOR_OF_INVOCATION_RE)) {
-    const site = shouldEmitForOfSite(content, m)
-    if (site) sites.push(site)
+    const site = shouldEmitForOfSite(content, m);
+    if (site) sites.push(site);
   }
-  return sites
+  return sites;
 }
 
 function barePragmaViolation(line: number): CheckViolation {
@@ -188,46 +188,41 @@ function barePragmaViolation(line: number): CheckViolation {
       `Pragma '@callback-invocation-safe-by-caller' requires a '-- <rationale>' suffix. ` +
       `Bare pragmas are rejected so reviewers can grep the rationale on every opt-out.`,
     suggestion: `Change to '// @callback-invocation-safe-by-caller -- <one-line rationale>'.`,
-  }
+  };
 }
 
 /** Exported for unit tests. */
-export function analyzeCallbackInvocationSafe(
-  content: string,
-  filePath: string,
-): CheckViolation[] {
-  if (!fileIsInScope(filePath)) return []
-  if (!contentMentionsCollection(content)) return []
+export function analyzeCallbackInvocationSafe(content: string, filePath: string): CheckViolation[] {
+  if (!fileIsInScope(filePath)) return [];
+  if (!contentMentionsCollection(content)) return [];
 
-  const sites = findCallSites(content)
-  if (sites.length === 0) return []
+  const sites = findCallSites(content);
+  if (sites.length === 0) return [];
 
-  const lines = content.split('\n')
-  const violations: CheckViolation[] = []
-  const seen = new Set<number>()
+  const lines = content.split('\n');
+  const violations: CheckViolation[] = [];
+  const seen = new Set<number>();
   for (const site of sites) {
-    if (seen.has(site.callLine)) continue
-    seen.add(site.callLine)
+    if (seen.has(site.callLine)) continue;
+    seen.add(site.callLine);
 
-    const pragma = pragmaAt(lines, site.callLine)
-    if (pragma === 'honored') continue
+    const pragma = pragmaAt(lines, site.callLine);
+    if (pragma === 'honored') continue;
     if (pragma === 'bare') {
-      violations.push(barePragmaViolation(site.callLine))
-      continue
+      violations.push(barePragmaViolation(site.callLine));
+      continue;
     }
 
-    const capIdent = site.ident.charAt(0).toUpperCase() + site.ident.slice(1)
+    const capIdent = site.ident.charAt(0).toUpperCase() + site.ident.slice(1);
     violations.push({
       line: site.callLine,
       severity: 'error',
-      message:
-        `Direct callback invocation \`${site.ident}(...)\` inside iteration over \`${site.receiver}\` is not wrapped in try/catch or a safe<Name>(...) helper. A throw from a single subscriber will propagate out of the producer loop, dropping subsequent subscribers and (under setInterval/async drain) surfacing as uncaughtException.`,
-      suggestion:
-        `Wrap the invocation in a private safe${capIdent}(cb, ...args) helper that catches and logs at warn, then call this.safe${capIdent}(cb, ...) instead. Per-site opt-out: '// @callback-invocation-safe-by-caller -- <rationale>'.`,
-    })
+      message: `Direct callback invocation \`${site.ident}(...)\` inside iteration over \`${site.receiver}\` is not wrapped in try/catch or a safe<Name>(...) helper. A throw from a single subscriber will propagate out of the producer loop, dropping subsequent subscribers and (under setInterval/async drain) surfacing as uncaughtException.`,
+      suggestion: `Wrap the invocation in a private safe${capIdent}(cb, ...args) helper that catches and logs at warn, then call this.safe${capIdent}(cb, ...) instead. Per-site opt-out: '// @callback-invocation-safe-by-caller -- <rationale>'.`,
+    });
   }
 
-  return violations
+  return violations;
 }
 
 export const callbackInvocationSafe = defineCheck({
@@ -255,4 +250,4 @@ export const callbackInvocationSafe = defineCheck({
   tags: ['architecture', 'resilience'],
   fileTypes: ['ts', 'tsx'],
   analyze: analyzeCallbackInvocationSafe,
-})
+});

@@ -18,7 +18,11 @@ const SIM: CapabilityDiscoveryDescriptor = {
   discovery: { mode: 'name-pattern', prefix: 'scenarios-', defaultScopes: ['@opensip-tools'] },
   exportName: 'scenarios',
   exportShape: 'array',
-  configKeys: { packages: 'scenarioPackages', autoDiscover: 'autoDiscoverScenarios', scopes: 'packageScopes' },
+  configKeys: {
+    packages: 'scenarioPackages',
+    autoDiscover: 'autoDiscoverScenarios',
+    scopes: 'packageScopes',
+  },
 };
 
 const GRAPH: CapabilityDiscoveryDescriptor = {
@@ -35,7 +39,9 @@ describe('resolveCapabilityPreferences', () => {
   });
 
   it('reads fit checkPackages as the explicit list (marker mode, no scopes)', () => {
-    const prefs = resolveCapabilityPreferences(FIT, { checkPackages: ['@acme/checks-x', 42, '@acme/checks-y'] });
+    const prefs = resolveCapabilityPreferences(FIT, {
+      checkPackages: ['@acme/checks-x', 42, '@acme/checks-y'],
+    });
     expect(prefs).toEqual({ packages: ['@acme/checks-x', '@acme/checks-y'], autoDiscover: true });
   });
 
@@ -53,7 +59,9 @@ describe('resolveCapabilityPreferences', () => {
   });
 
   it('a non-boolean autoDiscover value falls back to the ON default', () => {
-    expect(resolveCapabilityPreferences(SIM, { autoDiscoverScenarios: 'nope' }).autoDiscover).toBe(true);
+    expect(resolveCapabilityPreferences(SIM, { autoDiscoverScenarios: 'nope' }).autoDiscover).toBe(
+      true,
+    );
   });
 
   it('sim name-pattern: no customer scopes resolves to just the default scope', () => {

@@ -3,9 +3,9 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-source-maps
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-import { hasSentryUsage } from './_helpers/sentry.js'
+import { hasSentryUsage } from './_helpers/sentry.js';
 
 // Sentry bundler plugins that handle source map upload
 const SOURCE_MAP_PLUGINS = [
@@ -20,7 +20,7 @@ const SOURCE_MAP_PLUGINS = [
   'sentryVitePlugin',
   'sentryEsbuildPlugin',
   'sentryRollupPlugin',
-]
+];
 
 // File name patterns that indicate a bundler config
 const BUNDLER_CONFIG_PATTERNS = [
@@ -31,24 +31,24 @@ const BUNDLER_CONFIG_PATTERNS = [
   'next.config',
   'nuxt.config',
   'astro.config',
-]
+];
 
 function isBundlerConfig(filePath: string): boolean {
-  const lower = filePath.toLowerCase()
-  return BUNDLER_CONFIG_PATTERNS.some((pattern) => lower.includes(pattern))
+  const lower = filePath.toLowerCase();
+  return BUNDLER_CONFIG_PATTERNS.some((pattern) => lower.includes(pattern));
 }
 
 function analyze(content: string, filePath: string): CheckViolation[] {
   // Only check bundler config files
-  if (!isBundlerConfig(filePath)) return []
+  if (!isBundlerConfig(filePath)) return [];
 
   // Only relevant if the project uses Sentry (SDK import in this file or
   // Sentry plugin reference)
-  if (!hasSentryUsage(content) && !content.includes('sentry')) return []
+  if (!hasSentryUsage(content) && !content.includes('sentry')) return [];
 
   // Check if any Sentry source map plugin is configured
-  const hasSourceMapPlugin = SOURCE_MAP_PLUGINS.some((plugin) => content.includes(plugin))
-  if (hasSourceMapPlugin) return []
+  const hasSourceMapPlugin = SOURCE_MAP_PLUGINS.some((plugin) => content.includes(plugin));
+  if (hasSourceMapPlugin) return [];
 
   // The file mentions Sentry but has no source map plugin
   return [
@@ -62,7 +62,7 @@ function analyze(content: string, filePath: string): CheckViolation[] {
       type: 'sentry-missing-source-maps',
       filePath,
     },
-  ]
+  ];
 }
 
 /**
@@ -88,4 +88,4 @@ export const sentrySourceMaps = defineCheck({
   fileTypes: ['ts', 'js', 'mjs', 'cjs'],
   confidence: 'high',
   analyze,
-})
+});

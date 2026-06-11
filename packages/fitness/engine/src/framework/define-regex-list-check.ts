@@ -43,13 +43,13 @@
  * ```
  */
 
-import { isCommentLine } from '../check-utils/source-analysis.js'
-import { isTestFile } from '../check-utils/test-helpers.js'
+import { isCommentLine } from '../check-utils/source-analysis.js';
+import { isTestFile } from '../check-utils/test-helpers.js';
 
-import { defineCheck } from './define-check.js'
+import { defineCheck } from './define-check.js';
 
-import type { CheckScope, CheckViolation } from './check-config.js'
-import type { Check } from './check-types.js'
+import type { CheckScope, CheckViolation } from './check-config.js';
+import type { Check } from './check-types.js';
 
 /**
  * A single regex pattern entry consumed by {@link defineRegexListCheck}.
@@ -68,21 +68,21 @@ import type { Check } from './check-types.js'
  */
 export interface RegexListCheckPattern {
   /** Stable UUID identifying this pattern. Purely descriptive. */
-  readonly id: string
+  readonly id: string;
   /** Kebab-case slug for this pattern (e.g. `'console-log'`). Emitted as `type` on each violation. */
-  readonly slug: string
+  readonly slug: string;
   /** Regex executed against each (non-skipped) line. Global flag is recommended for multi-match-per-line behaviour. */
-  readonly regex: RegExp
+  readonly regex: RegExp;
   /** Violation message reported on a match. */
-  readonly message: string
+  readonly message: string;
   /** Optional suggestion text for the violation. */
-  readonly suggestion?: string
+  readonly suggestion?: string;
   /**
    * Per-pattern severity. Defaults to `'warning'`. Pattern-level severity
    * is preferred over a per-check default because most adopters mix
    * error-class and warning-class patterns inside the same regex list.
    */
-  readonly severity?: 'error' | 'warning'
+  readonly severity?: 'error' | 'warning';
 }
 
 /**
@@ -93,14 +93,14 @@ export interface RegexListCheckOptions {
    * Skip lines that {@link isCommentLine} reports as comments.
    * Default: `true`.
    */
-  readonly skipCommentLines?: boolean
+  readonly skipCommentLines?: boolean;
   /**
    * Skip files that {@link isTestFile} reports as test files. Useful for
    * checks that should not run against `*.test.ts` / `*.spec.ts` /
    * `__tests__/` paths.
    * Default: `false`.
    */
-  readonly skipTestFiles?: boolean
+  readonly skipTestFiles?: boolean;
   /**
    * Custom file-path predicate. When provided AND it returns `true`,
    * the file is skipped entirely. Used by sites with site-specific
@@ -109,14 +109,14 @@ export interface RegexListCheckOptions {
    *
    * The predicate runs once per file before any line iteration.
    */
-  readonly skipFile?: (filePath: string) => boolean
+  readonly skipFile?: (filePath: string) => boolean;
   /**
    * Additional per-line skip predicate evaluated AFTER comment/test
    * filters but BEFORE pattern matching. Use for site-specific filters
    * the helper doesn't model (e.g. `no-window-alert` skips lines
    * starting with `import `).
    */
-  readonly skipLine?: (trimmedLine: string, rawLine: string) => boolean
+  readonly skipLine?: (trimmedLine: string, rawLine: string) => boolean;
   /**
    * When `true`, after a violation is emitted on a line, skip remaining
    * patterns for that line — at most one violation per line in total.
@@ -130,7 +130,7 @@ export interface RegexListCheckOptions {
    *
    * Default: `false` (each matching pattern emits its own violation).
    */
-  readonly oneViolationPerLine?: boolean
+  readonly oneViolationPerLine?: boolean;
 }
 
 /**
@@ -140,29 +140,29 @@ export interface RegexListCheckOptions {
  * `BaseCheckConfig`. The `analyze` function is synthesised by this helper.
  */
 export interface DefineRegexListCheckConfig {
-  readonly id: string
-  readonly slug: string
-  readonly description: string
-  readonly longDescription?: string
-  readonly tags: readonly string[]
-  readonly scope?: CheckScope
-  readonly fileTypes?: readonly string[]
-  readonly contentFilter?: 'raw' | 'strip-strings' | 'strip-strings-and-comments'
-  readonly confidence?: 'high' | 'medium' | 'low'
-  readonly disabled?: boolean
-  readonly timeout?: number
-  readonly docs?: string
+  readonly id: string;
+  readonly slug: string;
+  readonly description: string;
+  readonly longDescription?: string;
+  readonly tags: readonly string[];
+  readonly scope?: CheckScope;
+  readonly fileTypes?: readonly string[];
+  readonly contentFilter?: 'raw' | 'strip-strings' | 'strip-strings-and-comments';
+  readonly confidence?: 'high' | 'medium' | 'low';
+  readonly disabled?: boolean;
+  readonly timeout?: number;
+  readonly docs?: string;
   /**
    * Aristotle SDO/SAX provider attribution applied to every pattern in
    * this check. **Check-level only** — there is no per-pattern override.
    * If two pattern subsets need distinct attribution, define them as two
    * separate checks (audit 2026-05-23 F1).
    */
-  readonly provider?: string
+  readonly provider?: string;
   /** The list of regex patterns to scan each line against. */
-  readonly patterns: readonly RegexListCheckPattern[]
+  readonly patterns: readonly RegexListCheckPattern[];
   /** Line- and file-level skip toggles. */
-  readonly options?: RegexListCheckOptions
+  readonly options?: RegexListCheckOptions;
 }
 
 /**
@@ -216,9 +216,9 @@ function matchPatternOnLine(
   // Reset lastIndex — pattern objects are reused across lines and files;
   // failing to reset would skip matches at low positions on subsequent
   // calls.
-  pattern.regex.lastIndex = 0
-  let pushed = false
-  let match = pattern.regex.exec(line)
+  pattern.regex.lastIndex = 0;
+  let pushed = false;
+  let match = pattern.regex.exec(line);
   while (match !== null) {
     violations.push({
       line: lineNum,
@@ -228,15 +228,15 @@ function matchPatternOnLine(
       suggestion: pattern.suggestion,
       match: match[0],
       type: pattern.slug,
-    })
-    pushed = true
+    });
+    pushed = true;
     // Non-global regex: stop after the first match. Otherwise exec
     // would loop forever (lastIndex stays at 0).
-    if (!pattern.regex.global) break
-    if (singleMatch) break
-    match = pattern.regex.exec(line)
+    if (!pattern.regex.global) break;
+    if (singleMatch) break;
+    match = pattern.regex.exec(line);
   }
-  return pushed
+  return pushed;
 }
 
 /**
@@ -246,23 +246,23 @@ function matchPatternOnLine(
  * threshold; pure logic.
  */
 interface ProcessFileOptions {
-  readonly content: string
-  readonly patterns: readonly RegexListCheckPattern[]
-  readonly skipComments: boolean
-  readonly skipLine?: (trimmedLine: string, rawLine: string) => boolean
-  readonly oneViolationPerLine: boolean
+  readonly content: string;
+  readonly patterns: readonly RegexListCheckPattern[];
+  readonly skipComments: boolean;
+  readonly skipLine?: (trimmedLine: string, rawLine: string) => boolean;
+  readonly oneViolationPerLine: boolean;
 }
 
 function processFile(opts: ProcessFileOptions): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = opts.content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = opts.content.split('\n');
   for (const [i, line_] of lines.entries()) {
-    const line = line_ ?? ''
-    if (opts.skipComments && isCommentLine(line)) continue
-    if (opts.skipLine?.(line.trim(), line) === true) continue
-    processLine(line, i + 1, opts.patterns, opts.oneViolationPerLine, violations)
+    const line = line_ ?? '';
+    if (opts.skipComments && isCommentLine(line)) continue;
+    if (opts.skipLine?.(line.trim(), line) === true) continue;
+    processLine(line, i + 1, opts.patterns, opts.oneViolationPerLine, violations);
   }
-  return violations
+  return violations;
 }
 
 function processLine(
@@ -272,22 +272,22 @@ function processLine(
   oneViolationPerLine: boolean,
   violations: CheckViolation[],
 ): void {
-  let lineHasViolation = false
+  let lineHasViolation = false;
   for (const pattern of patterns) {
-    if (oneViolationPerLine && lineHasViolation) break
-    const pushed = matchPatternOnLine(pattern, line, lineNum, violations, oneViolationPerLine)
-    if (pushed) lineHasViolation = true
+    if (oneViolationPerLine && lineHasViolation) break;
+    const pushed = matchPatternOnLine(pattern, line, lineNum, violations, oneViolationPerLine);
+    if (pushed) lineHasViolation = true;
   }
 }
 
 /** Factory for the common "scan each line against a regex list" check pattern. */
 export function defineRegexListCheck(config: DefineRegexListCheckConfig): Check {
-  const skipComments = config.options?.skipCommentLines ?? true
-  const skipTests = config.options?.skipTestFiles ?? false
-  const skipFile = config.options?.skipFile
-  const skipLine = config.options?.skipLine
-  const oneViolationPerLine = config.options?.oneViolationPerLine ?? false
-  const patterns = config.patterns
+  const skipComments = config.options?.skipCommentLines ?? true;
+  const skipTests = config.options?.skipTestFiles ?? false;
+  const skipFile = config.options?.skipFile;
+  const skipLine = config.options?.skipLine;
+  const oneViolationPerLine = config.options?.oneViolationPerLine ?? false;
+  const patterns = config.patterns;
 
   return defineCheck({
     id: config.id,
@@ -305,15 +305,15 @@ export function defineRegexListCheck(config: DefineRegexListCheckConfig): Check 
     provider: config.provider,
 
     analyze(content: string, filePath: string): CheckViolation[] {
-      if (skipTests && isTestFile(filePath)) return []
-      if (skipFile?.(filePath) === true) return []
+      if (skipTests && isTestFile(filePath)) return [];
+      if (skipFile?.(filePath) === true) return [];
       return processFile({
         content,
         patterns,
         skipComments,
         skipLine,
         oneViolationPerLine,
-      })
+      });
     },
-  })
+  });
 }

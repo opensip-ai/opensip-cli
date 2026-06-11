@@ -55,7 +55,12 @@ describe('outcomeFromResult', () => {
   });
 
   it('maps an ErrorResult to a status:error outcome carrying its own exit code + structured error', () => {
-    const result: ErrorResult = { type: 'error', message: 'boom', suggestion: 'try X', exitCode: 2 };
+    const result: ErrorResult = {
+      type: 'error',
+      message: 'boom',
+      suggestion: 'try X',
+      exitCode: 2,
+    };
     const outcome = outcomeFromResult(result, 0);
     expect(outcome.status).toBe('error');
     expect(outcome.exitCode).toBe(2);
@@ -65,7 +70,9 @@ describe('outcomeFromResult', () => {
 
 describe('outcomeFromError', () => {
   it('maps a typed ToolError to its canonical exit code + code', () => {
-    const outcome = outcomeFromError(new NotFoundError('Check not found: x'), { kind: 'bootstrap.error' });
+    const outcome = outcomeFromError(new NotFoundError('Check not found: x'), {
+      kind: 'bootstrap.error',
+    });
     expect(outcome.kind).toBe('bootstrap.error');
     expect(outcome.status).toBe('error');
     expect(outcome.exitCode).toBe(3); // CHECK_NOT_FOUND
@@ -88,7 +95,11 @@ describe('outcomeFromError', () => {
 
 describe('outcomeFromErrorMessage', () => {
   it('builds a status:error outcome from a resolved message + exit code', () => {
-    const outcome = outcomeFromErrorMessage({ message: 'no config', exitCode: 2, suggestion: 'init' });
+    const outcome = outcomeFromErrorMessage({
+      message: 'no config',
+      exitCode: 2,
+      suggestion: 'init',
+    });
     expect(outcome).toEqual({
       kind: 'command.error',
       status: 'error',

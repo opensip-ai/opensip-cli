@@ -11,20 +11,25 @@
  * tree (non-null) rather than throwing — callers can inspect `rootNode.hasError`.
  */
 
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath } from 'node:url';
 
-import { loadGrammar, createParser, parseToTree, type ParsedFile } from '@opensip-tools/tree-sitter'
+import {
+  loadGrammar,
+  createParser,
+  parseToTree,
+  type ParsedFile,
+} from '@opensip-tools/tree-sitter';
 
 const grammar = await loadGrammar(
   fileURLToPath(new URL('../wasm/tree-sitter-python.wasm', import.meta.url)),
-)
-const parser = createParser(grammar)
+);
+const parser = createParser(grammar);
 
 /** Parsed Python source: tree-sitter parse tree plus the original source text. */
-export type PythonTree = ParsedFile
+export type PythonTree = ParsedFile;
 
 /** Parses Python source into a {@link PythonTree}, or null when no tree is produced. */
 export function parsePython(content: string, _filePath: string): PythonTree | null {
-  const tree = parseToTree(parser, content)
-  return tree ? { tree, source: content } : null
+  const tree = parseToTree(parser, content);
+  return tree ? { tree, source: content } : null;
 }

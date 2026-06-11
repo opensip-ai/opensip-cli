@@ -15,16 +15,16 @@ import type {
   CommandExemptions,
   CoverageAllowlist,
   FilenameOverrides,
-} from '@opensip-tools/fitness/internal'
+} from '@opensip-tools/fitness/internal';
 
-export const ALLOWLIST: CoverageAllowlist = []
+export const ALLOWLIST: CoverageAllowlist = [];
 
 export const COMMAND_EXEMPTIONS: CommandExemptions = {
   'dead-code': "analysisMode:'command' — runs knip; covered by failure-mode + packed-smoke lanes",
   'dependency-vulnerability-audit':
     "analysisMode:'command' — runs the package-manager audit; covered by packed-smoke",
   'semgrep-scan': "analysisMode:'command' — shells to semgrep; covered by packed-smoke",
-}
+};
 
 // Non-command checks that cannot be exercised by an on-disk fixture. Empty:
 // every defect fixture-coverage surfaced in this pack (auth-middleware-coverage,
@@ -40,11 +40,11 @@ export const KNOWN_UNFIXTURABLE: CommandExemptions = {
   // never the thing it reads. Its teeth are proven by the analyzeBlessedSeam unit
   // test + the live dogfood run over the real extend-docs.
   'docs-teach-blessed-seam':
-    "analyzeAll self-reads docs/public/50-extend from cwd; exercised by its unit test + the dogfood",
-}
+    'analyzeAll self-reads docs/public/50-extend from cwd; exercised by its unit test + the dogfood',
+};
 
 export const FILENAME_OVERRIDES: FilenameOverrides = {
   // env-secret-exposure declares languages [json, typescript, yaml] but fileTypes
   // ['ts'] — only a .ts fixture is actually analysed, so pin a single ts pair.
   'env-secret-exposure': 'ts',
-}
+};

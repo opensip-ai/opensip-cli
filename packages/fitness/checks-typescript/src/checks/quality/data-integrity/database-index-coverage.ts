@@ -6,18 +6,17 @@
  * Detects queries that may cause full table scans.
  */
 
-
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Context for creating violations
  */
 interface ViolationContext {
-  absolutePath: string
-  content: string
-  sourceFile: ts.SourceFile
+  absolutePath: string;
+  content: string;
+  sourceFile: ts.SourceFile;
 }
 
 /**
@@ -31,14 +30,16 @@ function createViolation(
   ctx: ViolationContext,
   node: ts.Node,
   props: {
-    message: string
-    suggestion: string
-    type: string
-    match: string
+    message: string;
+    suggestion: string;
+    type: string;
+    match: string;
   },
 ): CheckViolation {
-  const { line: lineIdx, character } = ctx.sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const line = lineIdx + 1
+  const { line: lineIdx, character } = ctx.sourceFile.getLineAndCharacterOfPosition(
+    node.getStart(),
+  );
+  const line = lineIdx + 1;
 
   return {
     line,
@@ -48,7 +49,7 @@ function createViolation(
     suggestion: props.suggestion,
     type: props.type,
     match: props.match,
-  }
+  };
 }
 
 /**
@@ -60,7 +61,7 @@ function isRepositoryFile(filePath: string): boolean {
     filePath.includes('/database/') ||
     filePath.includes('-repository.ts') ||
     filePath.includes('.repository.ts')
-  )
+  );
 }
 
 /**
@@ -73,22 +74,22 @@ function checkFindOperationWhereClause(
   node: ts.CallExpression,
   ctx: ViolationContext,
 ): CheckViolation | null {
-  const whereArg = node.arguments[0]
+  const whereArg = node.arguments[0];
   if (!whereArg || !ts.isObjectLiteralExpression(whereArg)) {
-    return null
+    return null;
   }
 
   const whereClause = whereArg.properties.find(
     (p) => ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === 'where',
-  )
+  );
 
   if (!whereClause || !ts.isPropertyAssignment(whereClause)) {
-    return null
+    return null;
   }
 
-  const potentialIssues = checkWhereClause(whereClause.initializer)
+  const potentialIssues = checkWhereClause(whereClause.initializer);
   if (potentialIssues.length === 0) {
-    return null
+    return null;
   }
 
   return createViolation(ctx, node, {
@@ -96,7 +97,7 @@ function checkFindOperationWhereClause(
     suggestion: `Add database index for column(s) ${potentialIssues.join(', ')} or refactor query to use indexed columns like 'id', 'createdAt', or foreign keys`,
     type: 'potential-full-scan',
     match: node.getText(ctx.sourceFile).slice(0, 60),
-  })
+  });
 }
 
 /**
@@ -113,9 +114,9 @@ function checkLeadingWildcardLike(
   queryArg: ts.StringLiteral,
   ctx: ViolationContext,
 ): CheckViolation | null {
-  const hasLeadingWildcard = queryText.includes("like '%") || queryText.includes('like "%')
+  const hasLeadingWildcard = queryText.includes("like '%") || queryText.includes('like "%');
   if (!hasLeadingWildcard) {
-    return null
+    return null;
   }
 
   return createViolation(ctx, node, {
@@ -124,7 +125,7 @@ function checkLeadingWildcardLike(
       "Replace LIKE '%term%' with full-text search (OpenSearch) or use LIKE 'term%' (trailing wildcard only) to enable index usage",
     type: 'leading-wildcard-like',
     match: queryArg.text.slice(0, 60),
-  })
+  });
 }
 
 /**
@@ -141,10 +142,10 @@ function checkUnboundedSelect(
   queryArg: ts.StringLiteral,
   ctx: ViolationContext,
 ): CheckViolation | null {
-  const hasSelectStar = queryText.includes('select *')
-  const hasBound = queryText.includes('limit') || queryText.includes('top')
+  const hasSelectStar = queryText.includes('select *');
+  const hasBound = queryText.includes('limit') || queryText.includes('top');
   if (!hasSelectStar || hasBound) {
-    return null
+    return null;
   }
 
   return createViolation(ctx, node, {
@@ -153,7 +154,7 @@ function checkUnboundedSelect(
       "Add 'LIMIT n' clause to bound the result set, or select specific columns instead of '*'",
     type: 'unbounded-select',
     match: queryArg.text.slice(0, 60),
-  })
+  });
 }
 
 /**
@@ -163,26 +164,26 @@ function checkUnboundedSelect(
  * @returns Array of violations
  */
 function checkRawQueryMethod(node: ts.CallExpression, ctx: ViolationContext): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const queryArg = node.arguments[0]
+  const violations: CheckViolation[] = [];
+  const queryArg = node.arguments[0];
 
   if (!queryArg || !ts.isStringLiteral(queryArg)) {
-    return violations
+    return violations;
   }
 
-  const queryText = queryArg.text.toLowerCase()
+  const queryText = queryArg.text.toLowerCase();
 
-  const wildcardViolation = checkLeadingWildcardLike(node, queryText, queryArg, ctx)
+  const wildcardViolation = checkLeadingWildcardLike(node, queryText, queryArg, ctx);
   if (wildcardViolation) {
-    violations.push(wildcardViolation)
+    violations.push(wildcardViolation);
   }
 
-  const unboundedViolation = checkUnboundedSelect(node, queryText, queryArg, ctx)
+  const unboundedViolation = checkUnboundedSelect(node, queryText, queryArg, ctx);
   if (unboundedViolation) {
-    violations.push(unboundedViolation)
+    violations.push(unboundedViolation);
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -192,29 +193,29 @@ function checkRawQueryMethod(node: ts.CallExpression, ctx: ViolationContext): Ch
  * @returns Array of violations
  */
 function analyzeCallExpression(node: ts.CallExpression, ctx: ViolationContext): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   /* v8 ignore next -- defensive AST/type guard */
   if (!ts.isPropertyAccessExpression(node.expression)) {
-    return violations
+    return violations;
   }
 
-  const methodName = node.expression.name.getText(ctx.sourceFile)
-  const findMethods = ['find', 'findOne', 'findBy', 'findOneBy']
-  const rawQueryMethods = ['query', 'createQueryBuilder']
+  const methodName = node.expression.name.getText(ctx.sourceFile);
+  const findMethods = ['find', 'findOne', 'findBy', 'findOneBy'];
+  const rawQueryMethods = ['query', 'createQueryBuilder'];
 
   if (findMethods.includes(methodName)) {
-    const violation = checkFindOperationWhereClause(node, ctx)
+    const violation = checkFindOperationWhereClause(node, ctx);
     if (violation) {
-      violations.push(violation)
+      violations.push(violation);
     }
   } else if (rawQueryMethods.includes(methodName)) {
-    violations.push(...checkRawQueryMethod(node, ctx))
+    violations.push(...checkRawQueryMethod(node, ctx));
   } else {
     // Other method names - no index coverage check needed
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -224,28 +225,28 @@ function analyzeCallExpression(node: ts.CallExpression, ctx: ViolationContext): 
  * @returns Array of violations
  */
 function analyzeFile(content: string, absolutePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Filter to repository/database files
   if (!isRepositoryFile(absolutePath)) {
-    return violations
+    return violations;
   }
 
-  const sourceFile = getSharedSourceFile(absolutePath, content)
-    /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return []
+  const sourceFile = getSharedSourceFile(absolutePath, content);
+  /* v8 ignore next -- defensive guard */
+  if (!sourceFile) return [];
 
-  const ctx: ViolationContext = { absolutePath, content, sourceFile }
+  const ctx: ViolationContext = { absolutePath, content, sourceFile };
 
   const visit = (node: ts.Node) => {
     if (ts.isCallExpression(node)) {
-      violations.push(...analyzeCallExpression(node, ctx))
+      violations.push(...analyzeCallExpression(node, ctx));
     }
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
 
-  visit(sourceFile)
-  return violations
+  visit(sourceFile);
+  return violations;
 }
 
 /**
@@ -254,26 +255,26 @@ function analyzeFile(content: string, absolutePath: string): CheckViolation[] {
  * @returns Array of potentially problematic column names
  */
 function checkWhereClause(node: ts.Node): string[] {
-  const potentialIssues: string[] = []
+  const potentialIssues: string[] = [];
 
   // Columns that are commonly not indexed and should be flagged
-  const riskyColumns = ['description', 'notes', 'content', 'body', 'text', 'metadata']
+  const riskyColumns = ['description', 'notes', 'content', 'body', 'text', 'metadata'];
 
   if (!ts.isObjectLiteralExpression(node)) {
-    return potentialIssues
+    return potentialIssues;
   }
 
   for (const prop of node.properties) {
     if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) {
-      continue
+      continue;
     }
-    const columnName = prop.name.text.toLowerCase()
+    const columnName = prop.name.text.toLowerCase();
     if (riskyColumns.some((r) => columnName.includes(r))) {
-      potentialIssues.push(prop.name.text)
+      potentialIssues.push(prop.name.text);
     }
   }
 
-  return potentialIssues
+  return potentialIssues;
 }
 
 /**
@@ -304,4 +305,4 @@ export const databaseIndexCoverage = defineCheck({
   fileTypes: ['ts'],
 
   analyze: analyzeFile,
-})
+});

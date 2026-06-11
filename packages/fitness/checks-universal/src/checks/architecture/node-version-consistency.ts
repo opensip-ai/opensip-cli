@@ -10,9 +10,9 @@
  * - Dockerfiles are NOT checked (covered by docker-version-sync)
  */
 
-import * as path from 'node:path'
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 // =============================================================================
 // TYPES
@@ -20,18 +20,18 @@ import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-to
 
 interface RootPackageJson {
   engines?: {
-    node?: string
-  }
-  devDependencies?: Record<string, string>
+    node?: string;
+  };
+  devDependencies?: Record<string, string>;
 }
 
 interface WorkspacePackageJson {
-  name?: string
+  name?: string;
   engines?: {
-    node?: string
-  }
-  devDependencies?: Record<string, string>
-  dependencies?: Record<string, string>
+    node?: string;
+  };
+  devDependencies?: Record<string, string>;
+  dependencies?: Record<string, string>;
 }
 
 // =============================================================================
@@ -39,13 +39,13 @@ interface WorkspacePackageJson {
 // =============================================================================
 
 /** Extract major version from engines.node constraint like ">=22.0.0" → 22 */
-const ENGINES_NODE_MAJOR = /(\d+)/
+const ENGINES_NODE_MAJOR = /(\d+)/;
 
 /** Match @types/node version like "^22.0.0" → 22 */
-const TYPES_NODE_MAJOR = /\^(\d+)/
+const TYPES_NODE_MAJOR = /\^(\d+)/;
 
 /** Match node-version in CI workflow YAML */
-const CI_NODE_VERSION = /node-version:\s*['"]?(\d+)['"]?/
+const CI_NODE_VERSION = /node-version:\s*['"]?(\d+)['"]?/;
 
 // =============================================================================
 // HELPERS
@@ -56,11 +56,11 @@ const CI_NODE_VERSION = /node-version:\s*['"]?(\d+)['"]?/
  * e.g. ">=22.0.0" → 22
  */
 function extractNodeMajor(constraint: string): number | null {
-  const match = ENGINES_NODE_MAJOR.exec(constraint)
+  const match = ENGINES_NODE_MAJOR.exec(constraint);
   /* v8 ignore next 3 -- defensive: regex (\d+) ensures group [1] is set when match succeeds */
-  const digit = match?.[1]
+  const digit = match?.[1];
   // @fitness-ignore-next-line numeric-validation -- regex guarantees digit-only string; null guard above
-  return digit ? Number.parseInt(digit, 10) : null
+  return digit ? Number.parseInt(digit, 10) : null;
 }
 
 // =============================================================================
@@ -73,10 +73,10 @@ function checkNvmrc(
   expectedMajor: number,
   violations: CheckViolation[],
 ): void {
-  const trimmed = content.trim()
-  const nvmrcMajor = Number.parseInt(trimmed, 10)
+  const trimmed = content.trim();
+  const nvmrcMajor = Number.parseInt(trimmed, 10);
   /* v8 ignore next -- defensive: malformed .nvmrc not exercised in fixtures */
-  if (Number.isNaN(nvmrcMajor)) return
+  if (Number.isNaN(nvmrcMajor)) return;
 
   if (nvmrcMajor !== expectedMajor) {
     violations.push({
@@ -86,7 +86,7 @@ function checkNvmrc(
       severity: 'error',
       suggestion: `Change .nvmrc from "${trimmed}" to "${expectedMajor}"`,
       type: 'nvmrc-version-mismatch',
-    })
+    });
   }
 }
 
@@ -97,24 +97,24 @@ function checkWorkspaceEngines(
   rootConstraint: string,
   violations: CheckViolation[],
 ): void {
-  let pkg: WorkspacePackageJson
+  let pkg: WorkspacePackageJson;
   try {
-    pkg = JSON.parse(content) as WorkspacePackageJson
+    pkg = JSON.parse(content) as WorkspacePackageJson;
   } catch {
     /* v8 ignore next -- defensive: malformed workspace package.json not exercised in fixtures */
     // @swallow-ok expected for non-JSON files or malformed package.json
-    return
+    return;
   }
 
-  const enginesNode = pkg.engines?.node
-  if (!enginesNode) return
+  const enginesNode = pkg.engines?.node;
+  if (!enginesNode) return;
 
-  const workspaceMajor = extractNodeMajor(enginesNode)
+  const workspaceMajor = extractNodeMajor(enginesNode);
   /* v8 ignore next -- defensive: enginesNode already checked, regex match guaranteed */
-  if (workspaceMajor === null) return
+  if (workspaceMajor === null) return;
 
   if (workspaceMajor !== expectedMajor) {
-    const relPath = path.relative(process.cwd(), filePath)
+    const relPath = path.relative(process.cwd(), filePath);
     violations.push({
       line: 1,
       filePath,
@@ -122,7 +122,7 @@ function checkWorkspaceEngines(
       severity: 'error',
       suggestion: `Change engines.node from "${enginesNode}" to "${rootConstraint}"`,
       type: 'workspace-engines-mismatch',
-    })
+    });
   }
 }
 
@@ -132,28 +132,29 @@ function checkTypesNode(
   expectedMajor: number,
   violations: CheckViolation[],
 ): void {
-  let pkg: WorkspacePackageJson
+  let pkg: WorkspacePackageJson;
   try {
-    pkg = JSON.parse(content) as WorkspacePackageJson
+    pkg = JSON.parse(content) as WorkspacePackageJson;
   } catch {
     /* v8 ignore next -- defensive: malformed workspace package.json not exercised in fixtures */
     // @swallow-ok expected for non-JSON files or malformed package.json
-    return
+    return;
   }
 
   /* v8 ignore next -- defensive: pkg.dependencies fallback when devDependencies missing */
-  const typesNodeVersion = pkg.devDependencies?.['@types/node'] ?? pkg.dependencies?.['@types/node']
-  if (!typesNodeVersion) return
+  const typesNodeVersion =
+    pkg.devDependencies?.['@types/node'] ?? pkg.dependencies?.['@types/node'];
+  if (!typesNodeVersion) return;
 
-  const match = TYPES_NODE_MAJOR.exec(typesNodeVersion)
+  const match = TYPES_NODE_MAJOR.exec(typesNodeVersion);
   /* v8 ignore next 2 -- defensive: regex ^\d+ ensures group [1] is set when match succeeds */
-  const typesMajor = match?.[1]
-  if (!typesMajor) return
+  const typesMajor = match?.[1];
+  if (!typesMajor) return;
 
   // @fitness-ignore-next-line numeric-validation -- regex ^\d+ guarantees digit-only string
-  const typesMajorNum = Number.parseInt(typesMajor, 10)
+  const typesMajorNum = Number.parseInt(typesMajor, 10);
   if (typesMajorNum !== expectedMajor) {
-    const relPath = path.relative(process.cwd(), filePath)
+    const relPath = path.relative(process.cwd(), filePath);
     violations.push({
       line: 1,
       filePath,
@@ -161,7 +162,7 @@ function checkTypesNode(
       severity: 'error',
       suggestion: `Change @types/node from "${typesNodeVersion}" to "^${expectedMajor}.0.0"`,
       type: 'types-node-mismatch',
-    })
+    });
   }
 }
 
@@ -171,19 +172,19 @@ function checkCiWorkflow(
   expectedMajor: number,
   violations: CheckViolation[],
 ): void {
-  const lines = content.split('\n')
+  const lines = content.split('\n');
   for (const [i, rawLine] of lines.entries()) {
     /* v8 ignore next -- defensive: lines.entries() never yields undefined */
-    if (!rawLine) continue
-    const line = rawLine.trim()
+    if (!rawLine) continue;
+    const line = rawLine.trim();
 
-    const match = CI_NODE_VERSION.exec(line)
+    const match = CI_NODE_VERSION.exec(line);
     /* v8 ignore next 2 -- defensive: regex (\d+) ensures group [1] is set when match succeeds */
-    const ciVersion = match?.[1]
-    if (!ciVersion) continue
+    const ciVersion = match?.[1];
+    if (!ciVersion) continue;
 
     // @fitness-ignore-next-line numeric-validation -- regex (\d+) guarantees digit-only string
-    const ciMajor = Number.parseInt(ciVersion, 10)
+    const ciMajor = Number.parseInt(ciVersion, 10);
     if (ciMajor !== expectedMajor) {
       violations.push({
         line: i + 1,
@@ -192,7 +193,7 @@ function checkCiWorkflow(
         severity: 'error',
         suggestion: `Change node-version from '${ciVersion}' to '${expectedMajor}'`,
         type: 'ci-node-version-mismatch',
-      })
+      });
     }
   }
 }
@@ -234,51 +235,51 @@ export const nodeVersionConsistency = defineCheck({
   tags: ['node', 'version-sync', 'architecture'],
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Find the root package.json from the scanned file set.
     // The root is the shortest path (shallowest) package.json in the set.
-    const packageJsonPaths = files.paths.filter(p => path.basename(p) === 'package.json')
-    if (packageJsonPaths.length === 0) return violations
+    const packageJsonPaths = files.paths.filter((p) => path.basename(p) === 'package.json');
+    if (packageJsonPaths.length === 0) return violations;
 
     const rootPkgPath = packageJsonPaths.reduce(
       (shortest, p) => (p.length < shortest.length ? p : shortest),
       /* v8 ignore next -- defensive: packageJsonPaths.length checked above */
       packageJsonPaths[0],
-    )
+    );
     // Read root package.json for version truth
-    const rootContent = await files.read(rootPkgPath)
-    let rootPkg: RootPackageJson
+    const rootContent = await files.read(rootPkgPath);
+    let rootPkg: RootPackageJson;
     try {
-      rootPkg = JSON.parse(rootContent) as RootPackageJson
+      rootPkg = JSON.parse(rootContent) as RootPackageJson;
     } catch {
-      return violations
+      return violations;
     }
-    const rootConstraint = rootPkg.engines?.node
-    if (!rootConstraint) return violations
+    const rootConstraint = rootPkg.engines?.node;
+    if (!rootConstraint) return violations;
 
-    const expectedMajor = extractNodeMajor(rootConstraint)
+    const expectedMajor = extractNodeMajor(rootConstraint);
     /* v8 ignore next -- defensive: rootConstraint already checked, regex (\d+) ensures match */
-    if (expectedMajor === null) return violations
+    if (expectedMajor === null) return violations;
 
     for (const filePath of files.paths) {
       // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
-      const content = await files.read(filePath)
-      const basename = path.basename(filePath)
+      const content = await files.read(filePath);
+      const basename = path.basename(filePath);
 
       if (basename === '.nvmrc') {
-        checkNvmrc(content, filePath, expectedMajor, violations)
+        checkNvmrc(content, filePath, expectedMajor, violations);
       } else if (basename === 'package.json') {
         // Skip root package.json (it's the source of truth)
-        if (filePath === rootPkgPath) continue
+        if (filePath === rootPkgPath) continue;
 
-        checkWorkspaceEngines(content, filePath, expectedMajor, rootConstraint, violations)
-        checkTypesNode(content, filePath, expectedMajor, violations)
+        checkWorkspaceEngines(content, filePath, expectedMajor, rootConstraint, violations);
+        checkTypesNode(content, filePath, expectedMajor, violations);
       } else if (filePath.includes('.github/workflows/') && basename.endsWith('.yml')) {
-        checkCiWorkflow(content, filePath, expectedMajor, violations)
+        checkCiWorkflow(content, filePath, expectedMajor, violations);
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

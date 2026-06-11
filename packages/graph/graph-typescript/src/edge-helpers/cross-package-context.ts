@@ -31,7 +31,6 @@ import {
   type PackageManifestIndex,
 } from '@opensip-tools/graph';
 
-
 /** The two indexes the shared {@link resolveCrossPackageCall} resolver links against. */
 export interface CrossPackageContext {
   readonly exportIndex: ExportIndex;

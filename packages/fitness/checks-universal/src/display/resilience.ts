@@ -2,7 +2,7 @@
  * @fileoverview Display entries for cross-language resilience checks
  */
 
-import type { CheckDisplayEntry } from './types.js'
+import type { CheckDisplayEntry } from './types.js';
 
 /** Resilience check display entries (UNIVERSAL only) */
 export const RESILIENCE_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
@@ -35,4 +35,4 @@ export const RESILIENCE_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry
   'transaction-boundary-validation': ['💾', 'Transaction Boundary Validation'],
   'transaction-timeout': ['⏱️', 'Transaction Timeout'],
   'unbounded-memory': ['💾', 'Unbounded Memory Detection'],
-})
+});

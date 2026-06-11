@@ -67,7 +67,9 @@ describe('fit gate env precedence — through the real binary (ADR-0023, Phase 4
     );
 
     // Baseline: the gate fails (non-zero exit) — the error finding trips failOnErrors:1.
-    const failing = cli.run(['fit', '--check', 'env-secret-exposure', '--cwd', testDir], { cwd: testDir });
+    const failing = cli.run(['fit', '--check', 'env-secret-exposure', '--cwd', testDir], {
+      cwd: testDir,
+    });
     expect(failing.exitCode).not.toBe(0);
 
     // Same project, same config file — only the env var changes. The gate must
@@ -89,7 +91,9 @@ describe('fit gate env precedence — through the real binary (ADR-0023, Phase 4
     );
 
     // Baseline: the warning-only run passes (exit 0) — failOnWarnings:0.
-    const passing = cli.run(['fit', '--check', 'no-todo-comments', '--cwd', testDir], { cwd: testDir });
+    const passing = cli.run(['fit', '--check', 'no-todo-comments', '--cwd', testDir], {
+      cwd: testDir,
+    });
     expect(passing.exitCode).toBe(0);
 
     // Same project, same config — env OPENSIP_FIT_FAIL_ON_WARNINGS=1 makes the

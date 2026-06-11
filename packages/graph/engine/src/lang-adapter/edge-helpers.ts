@@ -43,8 +43,7 @@ export const CREATION_EDGE_PREFIX = '[creates] ';
  */
 export const CREATION_EDGE_TEXT_MAX = CALL_EDGE_TEXT_MAX - CREATION_EDGE_PREFIX.length;
 
-const CREATION_EDGE_TEXT_PAYLOAD_MAX =
-  CREATION_EDGE_TEXT_MAX - CALL_EDGE_TRUNCATION_SUFFIX.length;
+const CREATION_EDGE_TEXT_PAYLOAD_MAX = CREATION_EDGE_TEXT_MAX - CALL_EDGE_TRUNCATION_SUFFIX.length;
 
 /**
  * Truncate raw call-site source text to fit within `CallEdge.text`'s

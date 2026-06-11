@@ -107,12 +107,21 @@ export const BUNDLED_TOOL_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
  * allowance), declared here so the env-surface reference is complete.
  */
 export const PRE_SCOPE_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
-  { canonical: 'NO_COLOR', docs: 'Disable ANSI colours (https://no-color.org). Resolved by the terminal theme.' },
+  {
+    canonical: 'NO_COLOR',
+    docs: 'Disable ANSI colours (https://no-color.org). Resolved by the terminal theme.',
+  },
   { canonical: 'FORCE_COLOR', docs: 'Force ANSI colours even when the stream is not a TTY.' },
   { canonical: 'COLORTERM', docs: 'Terminal colour capability hint (e.g. truecolor).' },
   { canonical: 'TERM', docs: 'Terminal type; consulted for colour support.' },
-  { canonical: 'TERM_PROGRAM', docs: 'Terminal program (e.g. iTerm.app); consulted for colour support.' },
-  { canonical: 'NODE_OPTIONS', docs: 'Node flags; the graph heap-preflight reads/extends this before relaunch (pre-module).' },
+  {
+    canonical: 'TERM_PROGRAM',
+    docs: 'Terminal program (e.g. iTerm.app); consulted for colour support.',
+  },
+  {
+    canonical: 'NODE_OPTIONS',
+    docs: 'Node flags; the graph heap-preflight reads/extends this before relaunch (pre-module).',
+  },
 ];
 
 /**

@@ -170,16 +170,17 @@ function readUserCloudConfig(): { sync?: boolean; endpoint?: string } | undefine
  *   - the per-invocation `--no-cloud` flag overrides everything (applied
  *     separately, in resolveSignalSink's `noCloud`).
  */
-export function resolveEffectiveCloudConfig(
-  projectCloud?: { readonly sync?: boolean; readonly endpoint?: string },
-): { sync?: boolean; endpoint?: string } | undefined {
+export function resolveEffectiveCloudConfig(projectCloud?: {
+  readonly sync?: boolean;
+  readonly endpoint?: string;
+}): { sync?: boolean; endpoint?: string } | undefined {
   const userCloud = readUserCloudConfig();
   if (!userCloud && !projectCloud) return undefined;
   const out: { sync?: boolean; endpoint?: string } = {};
   const sync =
     userCloud?.sync === false || projectCloud?.sync === false
       ? false
-      : userCloud?.sync ?? projectCloud?.sync;
+      : (userCloud?.sync ?? projectCloud?.sync);
   const endpoint = userCloud?.endpoint ?? projectCloud?.endpoint;
   if (sync !== undefined) out.sync = sync;
   if (endpoint !== undefined) out.endpoint = endpoint;

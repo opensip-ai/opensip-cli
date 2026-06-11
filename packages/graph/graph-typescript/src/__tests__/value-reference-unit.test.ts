@@ -30,7 +30,10 @@ function ident(sf: ts.SourceFile, text: string): ts.Identifier {
   let found: ts.Identifier | undefined;
   const visit = (n: ts.Node): void => {
     if (found) return;
-    if (ts.isIdentifier(n) && n.text === text) { found = n; return; }
+    if (ts.isIdentifier(n) && n.text === text) {
+      found = n;
+      return;
+    }
     ts.forEachChild(n, visit);
   };
   visit(sf);
@@ -96,7 +99,9 @@ describe('isValueReference — structural-name branches', () => {
   });
 
   it('classifies a bare value use (function argument) as a value reference', () => {
-    const sf = parse('declare function take(cb: unknown): void; declare const handler: unknown; take(handler);');
+    const sf = parse(
+      'declare function take(cb: unknown): void; declare const handler: unknown; take(handler);',
+    );
     // `handler` inside `take(handler)` is a genuine value reference.
     const refs: ts.Identifier[] = [];
     const visit = (n: ts.Node): void => {
@@ -121,7 +126,9 @@ describe('isValueReference — call/new/JSX target branches', () => {
       ts.forEachChild(n, visit);
     };
     visit(sf);
-    const callTarget = refs.find((id) => ts.isCallExpression(id.parent) && id.parent.expression === id);
+    const callTarget = refs.find(
+      (id) => ts.isCallExpression(id.parent) && id.parent.expression === id,
+    );
     expect(callTarget).toBeDefined();
     expect(isValueReference(callTarget!)).toBe(false);
   });
@@ -134,7 +141,9 @@ describe('isValueReference — call/new/JSX target branches', () => {
       ts.forEachChild(n, visit);
     };
     visit(sf);
-    const newTarget = refs.find((id) => ts.isNewExpression(id.parent) && id.parent.expression === id);
+    const newTarget = refs.find(
+      (id) => ts.isNewExpression(id.parent) && id.parent.expression === id,
+    );
     expect(newTarget).toBeDefined();
     expect(isValueReference(newTarget!)).toBe(false);
   });
@@ -147,7 +156,9 @@ describe('isValueReference — call/new/JSX target branches', () => {
       ts.forEachChild(n, visit);
     };
     visit(sf);
-    const tag = refs.find((id) => ts.isJsxSelfClosingElement(id.parent) && id.parent.tagName === id);
+    const tag = refs.find(
+      (id) => ts.isJsxSelfClosingElement(id.parent) && id.parent.tagName === id,
+    );
     expect(tag).toBeDefined();
     expect(isValueReference(tag!)).toBe(false);
   });
@@ -230,7 +241,9 @@ describe('resolveValueReference — symbol resolution branches', () => {
   it('returns UNRESOLVED for a symbol whose declaration is not function-shaped', () => {
     // `ref` resolves to a plain number variable — no function-shaped
     // declaration → hashFromDeclaration returns null for every decl.
-    const { node, ctx } = programCtx('const num = 1; const ref = num; function use(): number { return ref; }');
+    const { node, ctx } = programCtx(
+      'const num = 1; const ref = num; function use(): number { return ref; }',
+    );
     const v = resolveValueReference(node, ctx);
     expect(v.to).toEqual([]);
     expect(v.resolution).toBe('unknown');

@@ -127,7 +127,11 @@ export class CatalogRepo {
    */
   loadFullCatalog(): Catalog | null {
     try {
-      const row = this.datastore.db.select().from(graphCatalog).where(sql`id = 1`).get();
+      const row = this.datastore.db
+        .select()
+        .from(graphCatalog)
+        .where(sql`id = 1`)
+        .get();
       if (!row) {
         logger.info({
           evt: 'graph.catalog.read.miss',
@@ -184,11 +188,7 @@ export class CatalogRepo {
    * circuit fingerprint mismatch checks when nothing is cached.
    */
   hasAnyCatalog(): boolean {
-    const row = this.datastore.db
-      .select({ id: graphCatalog.id })
-      .from(graphCatalog)
-      .limit(1)
-      .get();
+    const row = this.datastore.db.select({ id: graphCatalog.id }).from(graphCatalog).limit(1).get();
     return row !== undefined;
   }
 

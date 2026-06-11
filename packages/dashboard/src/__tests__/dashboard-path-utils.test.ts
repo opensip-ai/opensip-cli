@@ -7,7 +7,10 @@ import { describe, expect, it } from 'vitest';
 
 import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
 
-function loadHelpers(): { packageOfPath: (p: string) => string; displayName: (s: string) => string } {
+function loadHelpers(): {
+  packageOfPath: (p: string) => string;
+  displayName: (s: string) => string;
+} {
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
   return new Function(dashboardPathUtilsJs() + '\nreturn { packageOfPath, displayName };')() as {
     packageOfPath: (p: string) => string;
@@ -49,7 +52,11 @@ describe('displayName', () => {
 
   it('collapses synthetic arrow names to <arrow>', () => {
     const { displayName } = loadHelpers();
-    expect(displayName('<arrow:packages/fitness/checks-universal/src/checks/resilience/transaction-patterns.ts:234:45>')).toBe('<arrow>');
+    expect(
+      displayName(
+        '<arrow:packages/fitness/checks-universal/src/checks/resilience/transaction-patterns.ts:234:45>',
+      ),
+    ).toBe('<arrow>');
     expect(displayName('<arrow:src/foo.ts:1:1>')).toBe('<arrow>');
   });
 

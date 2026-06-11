@@ -23,7 +23,8 @@ import { typescriptGraphAdapter as adapter } from '../index.js';
 
 import type { CallEdge, Catalog, ResolutionMode } from '@opensip-tools/graph';
 
-const TSCONFIG = '{ "compilerOptions": { "target": "ES2022", "module": "Node16", "moduleResolution": "Node16" } }';
+const TSCONFIG =
+  '{ "compilerOptions": { "target": "ES2022", "module": "Node16", "moduleResolution": "Node16" } }';
 const UTIL = 'export function helper(x: number): number { return x + 1; }\n';
 const APP = [
   "import { helper } from './util.js';",
@@ -32,8 +33,20 @@ const APP = [
   'export function run(): number { return localOnly(); }',
 ].join('\n');
 
-async function buildBothTiers(dir: string): Promise<Record<ResolutionMode, { resolved: Awaited<ReturnType<typeof adapter.resolveCallSites>>; cacheKey: string }>> {
-  const run = async (resolutionMode: ResolutionMode): Promise<{ resolved: Awaited<ReturnType<typeof adapter.resolveCallSites>>; cacheKey: string }> => {
+async function buildBothTiers(
+  dir: string,
+): Promise<
+  Record<
+    ResolutionMode,
+    { resolved: Awaited<ReturnType<typeof adapter.resolveCallSites>>; cacheKey: string }
+  >
+> {
+  const run = async (
+    resolutionMode: ResolutionMode,
+  ): Promise<{
+    resolved: Awaited<ReturnType<typeof adapter.resolveCallSites>>;
+    cacheKey: string;
+  }> => {
     const disc = adapter.discoverFiles({ cwd: dir });
     const parsed = adapter.parseProject({
       projectDirAbs: disc.projectDirAbs,

@@ -10,14 +10,14 @@
  * class from here.
  */
 
-import type { LanguageAdapter } from './adapter.js'
+import type { LanguageAdapter } from './adapter.js';
 
 // 10 minutes — the cache is regenerated on every fitness run, so 10
 // minutes of staleness is the worst case for a check author who edits
 // a source file between runs in a long-lived process. Short enough to
 // avoid serving a tree that no longer matches the file on disk; long
 // enough that consecutive runs in a watch loop hit the cache.
-const AUTO_CLEAR_MS = 10 * 60 * 1000
+const AUTO_CLEAR_MS = 10 * 60 * 1000;
 
 /**
  * Fast content fingerprint for the parse-cache key (FNV-1a 32-bit over the FULL
@@ -29,12 +29,12 @@ const AUTO_CLEAR_MS = 10 * 60 * 1000
  * handful of content variants seen for one path.
  */
 export function fingerprintContent(content: string): string {
-  let hash = 0x81_1C_9D_C5
+  let hash = 0x81_1c_9d_c5;
   for (let i = 0; i < content.length; i += 1) {
-    hash ^= content.codePointAt(i) ?? 0
-    hash = Math.imul(hash, 0x01_00_01_93)
+    hash ^= content.codePointAt(i) ?? 0;
+    hash = Math.imul(hash, 0x01_00_01_93);
   }
-  return `${(hash >>> 0).toString(36)}:${String(content.length)}`
+  return `${(hash >>> 0).toString(36)}:${String(content.length)}`;
 }
 
 /**
@@ -52,7 +52,7 @@ export function fingerprintContent(content: string): string {
  * different identities.
  */
 export class LanguageParseCache {
-  private readonly cache = new Map<string, unknown>()
+  private readonly cache = new Map<string, unknown>();
   /**
    * Language-specific filtered-content cache. Keyed by raw content
    * string (no adapter or file path prefix) because the
@@ -60,8 +60,8 @@ export class LanguageParseCache {
    * is content-only. Phase 6 Task 6.4 moved this off a separate
    * module-level Map; the merge is by lifecycle, not by key shape.
    */
-  readonly filteredContent = new Map<string, unknown>()
-  private autoClearTimer: ReturnType<typeof setTimeout> | null = null
+  readonly filteredContent = new Map<string, unknown>();
+  private autoClearTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Start the auto-clear timer. Calling this twice resets the timer.
@@ -71,13 +71,13 @@ export class LanguageParseCache {
    * alive; `dispose()` clears it deterministically.
    */
   startAutoClear(): void {
-    if (this.autoClearTimer) clearTimeout(this.autoClearTimer)
+    if (this.autoClearTimer) clearTimeout(this.autoClearTimer);
     this.autoClearTimer = setTimeout(() => {
-      this.cache.clear()
-      this.filteredContent.clear()
-      this.autoClearTimer = null
-    }, AUTO_CLEAR_MS)
-    this.autoClearTimer.unref()
+      this.cache.clear();
+      this.filteredContent.clear();
+      this.autoClearTimer = null;
+    }, AUTO_CLEAR_MS);
+    this.autoClearTimer.unref();
   }
 
   getOrParse<TTree>(
@@ -93,19 +93,19 @@ export class LanguageParseCache {
     // needs raw source receive a strings-stripped tree (blanked module
     // specifiers), nondeterministically by check order. A full-content hash is
     // cheap relative to parsing and removes that cross-contamination.
-    const key = `${adapter.id}:${filePath}:${fingerprintContent(content)}`
-    const cached = this.cache.get(key) as TTree | undefined
-    if (cached !== undefined) return cached
+    const key = `${adapter.id}:${filePath}:${fingerprintContent(content)}`;
+    const cached = this.cache.get(key) as TTree | undefined;
+    if (cached !== undefined) return cached;
 
-    const tree = adapter.parse(content, filePath)
-    if (tree === null) return null
-    this.cache.set(key, tree)
-    return tree
+    const tree = adapter.parse(content, filePath);
+    if (tree === null) return null;
+    this.cache.set(key, tree);
+    return tree;
   }
 
   clear(): void {
-    this.cache.clear()
-    this.filteredContent.clear()
+    this.cache.clear();
+    this.filteredContent.clear();
   }
 
   /**
@@ -115,15 +115,15 @@ export class LanguageParseCache {
    * timer handle.
    */
   dispose(): void {
-    this.cache.clear()
-    this.filteredContent.clear()
+    this.cache.clear();
+    this.filteredContent.clear();
     if (this.autoClearTimer) {
-      clearTimeout(this.autoClearTimer)
-      this.autoClearTimer = null
+      clearTimeout(this.autoClearTimer);
+      this.autoClearTimer = null;
     }
   }
 
   get size(): number {
-    return this.cache.size
+    return this.cache.size;
   }
 }

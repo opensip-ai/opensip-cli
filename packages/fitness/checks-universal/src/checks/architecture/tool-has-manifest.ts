@@ -26,30 +26,30 @@
  * platform convention, so the check is inert in adopter repos whose packages
  * never declare it (zero `kind:'tool'` package.json → zero findings).
  */
-import path from 'node:path'
+import path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 /** A `commands[]` entry as declared in the static manifest. */
 interface ManifestCommand {
-  readonly name?: unknown
-  readonly description?: unknown
+  readonly name?: unknown;
+  readonly description?: unknown;
 }
 
 /** The `opensipTools` manifest block as declared in a tool's `package.json`. */
 interface OpensipToolsBlock {
-  readonly kind?: unknown
-  readonly id?: unknown
-  readonly apiVersion?: unknown
-  readonly commands?: unknown
+  readonly kind?: unknown;
+  readonly id?: unknown;
+  readonly apiVersion?: unknown;
+  readonly commands?: unknown;
 }
 
 interface PackageJson {
-  readonly opensipTools?: OpensipToolsBlock
+  readonly opensipTools?: OpensipToolsBlock;
 }
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -59,7 +59,7 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
  * guardrail and the runtime gate agree on what "conformant" means.
  */
 /** Emits a single `manifest-<field>` CheckViolation. */
-type PushViolation = (field: string, message: string) => void
+type PushViolation = (field: string, message: string) => void;
 
 /**
  * Validate the `commands` array (non-empty, each entry a `{ name, description }`
@@ -68,27 +68,27 @@ type PushViolation = (field: string, message: string) => void
  */
 function checkCommands(commands: unknown, push: PushViolation): void {
   if (!Array.isArray(commands) || commands.length === 0) {
-    push('commands', 'must be a non-empty array of { name, description }')
-    return
+    push('commands', 'must be a non-empty array of { name, description }');
+    return;
   }
   for (const [i, entry] of commands.entries()) {
     if (!isJsonObject(entry)) {
-      push('commands', `entry [${i}] must be an object with { name, description }`)
-      continue
+      push('commands', `entry [${i}] must be an object with { name, description }`);
+      continue;
     }
-    const cmd = entry as ManifestCommand
+    const cmd = entry as ManifestCommand;
     if (typeof cmd.name !== 'string' || cmd.name === '') {
-      push('commands', `entry [${i}] is missing a non-empty string "name"`)
+      push('commands', `entry [${i}] is missing a non-empty string "name"`);
     }
     if (typeof cmd.description !== 'string') {
-      push('commands', `entry [${i}] is missing a string "description"`)
+      push('commands', `entry [${i}] is missing a string "description"`);
     }
   }
 }
 
 function checkManifestBlock(block: OpensipToolsBlock, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const relPath = path.relative(process.cwd(), filePath)
+  const violations: CheckViolation[] = [];
+  const relPath = path.relative(process.cwd(), filePath);
   const push: PushViolation = (field, message) => {
     violations.push({
       line: 1,
@@ -100,26 +100,26 @@ function checkManifestBlock(block: OpensipToolsBlock, filePath: string): CheckVi
         'before importing it: { kind: "tool", id: "<id>", apiVersion: <number>, ' +
         'commands: [{ name, description }, ...] } (release 2.8.0).',
       type: `manifest-${field}`,
-    })
-  }
+    });
+  };
 
   // kind — already 'tool' by selection, but assert explicitly so a future
   // refactor of the selector cannot silently weaken the contract.
   if (block.kind !== 'tool') {
-    push('kind', `must be the literal "tool" (got ${JSON.stringify(block.kind)})`)
+    push('kind', `must be the literal "tool" (got ${JSON.stringify(block.kind)})`);
   }
 
   if (typeof block.id !== 'string' || block.id === '') {
-    push('id', 'must be a non-empty string identifying the tool')
+    push('id', 'must be a non-empty string identifying the tool');
   }
 
   if (typeof block.apiVersion !== 'number') {
-    push('apiVersion', 'must be a number (the plugin-API epoch the tool targets)')
+    push('apiVersion', 'must be a number (the plugin-API epoch the tool targets)');
   }
 
-  checkCommands(block.commands, push)
+  checkCommands(block.commands, push);
 
-  return violations
+  return violations;
 }
 
 /**
@@ -128,9 +128,9 @@ function checkManifestBlock(block: OpensipToolsBlock, filePath: string): CheckVi
  * so the check is self-targeting. Exported for unit tests.
  */
 export function analyzeToolHasManifest(pkg: PackageJson, filePath: string): CheckViolation[] {
-  const block = pkg.opensipTools
-  if (!isJsonObject(block) || block.kind !== 'tool') return []
-  return checkManifestBlock(block, filePath)
+  const block = pkg.opensipTools;
+  if (!isJsonObject(block) || block.kind !== 'tool') return [];
+  return checkManifestBlock(block, filePath);
 }
 
 /**
@@ -140,24 +140,24 @@ export function analyzeToolHasManifest(pkg: PackageJson, filePath: string): Chec
  * in-memory `FileAccessor` without standing up the full Check framework.
  */
 export async function analyzeAllToolManifests(files: FileAccessor): Promise<CheckViolation[]> {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
   // Sequential read over the analyzed workspace's package.json files (bounded by
   // package count); the file-level performance-anti-patterns waiver above covers
   // the await-in-loop — sequential avoids the no-unbounded-concurrency a
   // Promise.all(map) would trip, and the read count is tiny.
   for (const filePath of files.paths) {
-    if (path.basename(filePath) !== 'package.json') continue
-    let pkg: PackageJson
+    if (path.basename(filePath) !== 'package.json') continue;
+    let pkg: PackageJson;
     try {
-      pkg = JSON.parse(await files.read(filePath)) as PackageJson
+      pkg = JSON.parse(await files.read(filePath)) as PackageJson;
     } catch {
       // A malformed package.json is some other check's concern; a tool
       // manifest cannot be read from it either way, so skip silently.
-      continue
+      continue;
     }
-    violations.push(...analyzeToolHasManifest(pkg, filePath))
+    violations.push(...analyzeToolHasManifest(pkg, filePath));
   }
-  return violations
+  return violations;
 }
 
 export const toolHasManifest = defineCheck({
@@ -169,4 +169,4 @@ export const toolHasManifest = defineCheck({
   tags: ['architecture'],
   contentFilter: 'raw',
   analyzeAll: analyzeAllToolManifests,
-})
+});

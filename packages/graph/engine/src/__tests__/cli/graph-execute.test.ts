@@ -65,10 +65,20 @@ function populatedAdapter(): GraphLanguageAdapter {
       compilerOptions: undefined,
     }),
     parseProject: (): ParseOutput => ({ project: { x: 1 }, parseErrors: [] }),
-    walkProject: (): WalkOutput => ({ occurrences: { fn: [occ()] }, callSites: [], parseErrors: [] }),
+    walkProject: (): WalkOutput => ({
+      occurrences: { fn: [occ()] },
+      callSites: [],
+      parseErrors: [],
+    }),
     resolveCallSites: (): ResolveOutput => ({
       edgesByOwner: new Map([['h1', []]]),
-      stats: { totalCallSites: 0, resolvedHigh: 0, resolvedMedium: 0, resolvedLow: 0, unresolved: 0 },
+      stats: {
+        totalCallSites: 0,
+        resolvedHigh: 0,
+        resolvedMedium: 0,
+        resolvedLow: 0,
+        unresolved: 0,
+      },
     }),
     cacheKey: () => 'fake-v1',
   };
@@ -189,10 +199,7 @@ describe('executeGraph — mutually-exclusive flags', () => {
   it('rejects --gate-save together with --gate-compare (exit 2)', async () => {
     currentAdapterRegistry().register(populatedAdapter());
     const { cli, setExitCode } = mockCli();
-    await executeGraph(
-      { cwd: projectDir, noCache: true, gateSave: true, gateCompare: true },
-      cli,
-    );
+    await executeGraph({ cwd: projectDir, noCache: true, gateSave: true, gateCompare: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(2);
     expect(stderrSpy.mock.calls.map((c) => String(c[0])).join('')).toContain('mutually exclusive');
   });
@@ -269,15 +276,18 @@ describe('executeGraph — render dispatch', () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const { cli, setExitCode } = mockCli(datastore);
-      await executeGraph({
-        cwd: projectDir,
-        noCache: true,
-        // No `exact: true` — the default. A working worker script is present so
-        // the sharded build completes.
-        cliScript: fakeCliPath,
-        concurrency: 1,
-        profileOutput: profilePath,
-      }, cli);
+      await executeGraph(
+        {
+          cwd: projectDir,
+          noCache: true,
+          // No `exact: true` — the default. A working worker script is present so
+          // the sharded build completes.
+          cliScript: fakeCliPath,
+          concurrency: 1,
+          profileOutput: profilePath,
+        },
+        cli,
+      );
       expect(setExitCode).toHaveBeenCalledWith(0);
       const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
         runs: { mode: string; stages: { name: string; detail?: string }[] }[];
@@ -303,13 +313,16 @@ describe('executeGraph — render dispatch', () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const { cli, setExitCode } = mockCli(datastore);
-      await executeGraph({
-        cwd: projectDir,
-        noCache: true,
-        exact: true,
-        cliScript: fakeCliPath,
-        profileOutput: profilePath,
-      }, cli);
+      await executeGraph(
+        {
+          cwd: projectDir,
+          noCache: true,
+          exact: true,
+          cliScript: fakeCliPath,
+          profileOutput: profilePath,
+        },
+        cli,
+      );
       expect(setExitCode).toHaveBeenCalledWith(0);
       const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
         runs: { mode: string }[];
@@ -329,13 +342,16 @@ describe('executeGraph — render dispatch', () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const { cli, setExitCode } = mockCli(datastore);
-      await executeGraph({
-        cwd: projectDir,
-        noCache: true,
-        // No cliScript → resolveShards returns [] → exact fallback. No --exact.
-        cliScript: '',
-        profileOutput: profilePath,
-      }, cli);
+      await executeGraph(
+        {
+          cwd: projectDir,
+          noCache: true,
+          // No cliScript → resolveShards returns [] → exact fallback. No --exact.
+          cliScript: '',
+          profileOutput: profilePath,
+        },
+        cli,
+      );
       expect(setExitCode).toHaveBeenCalledWith(0);
       const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
         runs: { mode: string }[];
@@ -358,13 +374,16 @@ describe('executeGraph — render dispatch', () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const { cli, setExitCode } = mockCli(datastore);
-      await executeGraph({
-        cwd: projectDir,
-        noCache: true,
-        cliScript: fakeCliPath,
-        concurrency: 1,
-        profileOutput: profilePath,
-      }, cli);
+      await executeGraph(
+        {
+          cwd: projectDir,
+          noCache: true,
+          cliScript: fakeCliPath,
+          concurrency: 1,
+          profileOutput: profilePath,
+        },
+        cli,
+      );
       expect(setExitCode).toHaveBeenCalledWith(0);
       const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
         runs: { mode: string }[];
@@ -451,10 +470,7 @@ describe('executeGraph — --workspace guards', () => {
   it('errors when the CLI entry script cannot be determined (exit 2)', async () => {
     currentAdapterRegistry().register(populatedAdapter());
     const { cli, setExitCode } = mockCli();
-    await executeGraph(
-      { cwd: projectDir, noCache: true, workspace: true, cliScript: '' },
-      cli,
-    );
+    await executeGraph({ cwd: projectDir, noCache: true, workspace: true, cliScript: '' }, cli);
     expect(setExitCode).toHaveBeenCalledWith(2);
     expect(stderrSpy.mock.calls.map((c) => String(c[0])).join('')).toContain('CLI entry script');
   });
@@ -469,6 +485,8 @@ describe('executeGraph — --workspace guards', () => {
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
-    expect(stderrSpy.mock.calls.map((c) => String(c[0])).join('')).toContain('not a registered adapter');
+    expect(stderrSpy.mock.calls.map((c) => String(c[0])).join('')).toContain(
+      'not a registered adapter',
+    );
   });
 });

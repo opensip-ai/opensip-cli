@@ -3,8 +3,8 @@
  * @fileoverview Enforce use of canonical recovery patterns
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness';
 
 // =============================================================================
 // PATTERN DEFINITIONS (inlined from config/patterns.ts)
@@ -14,13 +14,13 @@ import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/
  * Pattern definition for detection.
  */
 interface PatternDefinition {
-  readonly id: string
-  readonly regex: RegExp
-  readonly message: string
-  readonly suggestion: string
-  readonly severity: 'error' | 'warning'
-  readonly skipInComments?: boolean
-  readonly multiline?: boolean
+  readonly id: string;
+  readonly regex: RegExp;
+  readonly message: string;
+  readonly suggestion: string;
+  readonly severity: 'error' | 'warning';
+  readonly skipInComments?: boolean;
+  readonly multiline?: boolean;
 }
 
 // Recovery patterns
@@ -30,7 +30,8 @@ const RECOVERY_PATTERNS: PatternDefinition[] = [
     // Pattern: for (let retry... or for (let numRetry...
     regex: /for\s{0,10}\(\s{0,10}let\s{1,10}\w{0,30}[Rr]etry/g,
     message: 'Manual retry loop detected',
-    suggestion: 'Use a shared recovery/retry utility with standardized backoff and jitter instead of manual retry loops',
+    suggestion:
+      'Use a shared recovery/retry utility with standardized backoff and jitter instead of manual retry loops',
     severity: 'error',
     skipInComments: true,
   },
@@ -39,7 +40,8 @@ const RECOVERY_PATTERNS: PatternDefinition[] = [
     // Pattern: while (x < retries) or while (x < maxRetries)
     regex: /while\s{0,10}\(\s{0,10}\w{1,30}\s{0,10}<\s{0,10}(?:max)?[Rr]etries?\s{0,10}\)/g,
     message: 'Manual retry while-loop detected',
-    suggestion: 'Use a shared recovery/retry utility with standardized backoff and jitter instead of manual retry loops',
+    suggestion:
+      'Use a shared recovery/retry utility with standardized backoff and jitter instead of manual retry loops',
     severity: 'error',
     skipInComments: true,
   },
@@ -64,7 +66,7 @@ const RECOVERY_PATTERNS: PatternDefinition[] = [
     skipInComments: true,
     multiline: true,
   },
-]
+];
 
 // Cache patterns
 const CACHE_PATTERNS: PatternDefinition[] = [
@@ -74,7 +76,8 @@ const CACHE_PATTERNS: PatternDefinition[] = [
     regex:
       /private\s{1,10}(?:readonly\s{1,10})?\w{0,30}[Cc]ache\s{0,10}[=:]\s{0,10}new\s{1,10}Map/g,
     message: 'Custom Map-based cache detected',
-    suggestion: 'Use a shared cache abstraction with TTL management and eviction policies instead of custom Map-based caches',
+    suggestion:
+      'Use a shared cache abstraction with TTL management and eviction policies instead of custom Map-based caches',
     severity: 'warning',
     skipInComments: true,
   },
@@ -83,11 +86,12 @@ const CACHE_PATTERNS: PatternDefinition[] = [
     // Pattern: private cache = {} or private readonly myCache: {}
     regex: /private\s{1,10}(?:readonly\s{1,10})?\w{0,30}[Cc]ache\s{0,10}[=:]\s{0,10}\{\s{0,10}\}/g,
     message: 'Custom object-based cache detected',
-    suggestion: 'Use a shared cache abstraction with TTL management and eviction policies instead of custom object-based caches',
+    suggestion:
+      'Use a shared cache abstraction with TTL management and eviction policies instead of custom object-based caches',
     severity: 'warning',
     skipInComments: true,
   },
-]
+];
 
 // Rate limiter patterns
 const RATE_LIMITER_PATTERNS: PatternDefinition[] = [
@@ -99,7 +103,7 @@ const RATE_LIMITER_PATTERNS: PatternDefinition[] = [
     severity: 'warning',
     skipInComments: true,
   },
-]
+];
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -110,15 +114,15 @@ function matchesExclusionPattern(filePath: string, patterns: readonly string[]):
   logger.debug({
     evt: 'fitness.checks.recovery_patterns.matches_exclusion_pattern',
     msg: 'Checking if file path matches exclusion pattern',
-  })
+  });
   for (const pattern of patterns) {
     // Convert glob pattern to simple substring match for common cases
-    const normalizedPattern = pattern.replaceAll('**', '').replaceAll('*', '')
+    const normalizedPattern = pattern.replaceAll('**', '').replaceAll('*', '');
     if (normalizedPattern && filePath.includes(normalizedPattern)) {
-      return true
+      return true;
     }
   }
-  return false
+  return false;
 }
 
 function createViolation(
@@ -129,7 +133,7 @@ function createViolation(
   logger.debug({
     evt: 'fitness.checks.recovery_patterns.create_violation',
     msg: 'Creating violation record for detected pattern',
-  })
+  });
   return {
     line: lineNumber,
     message: pattern.message,
@@ -137,49 +141,49 @@ function createViolation(
     suggestion: pattern.suggestion,
     match: matchText,
     type: pattern.id,
-  }
+  };
 }
 
 function detectMultilinePattern(content: string, pattern: PatternDefinition): CheckViolation[] {
   logger.debug({
     evt: 'fitness.checks.recovery_patterns.detect_multiline_pattern',
     msg: 'Detecting multiline pattern violations',
-  })
-  const violations: CheckViolation[] = []
-  pattern.regex.lastIndex = 0
+  });
+  const violations: CheckViolation[] = [];
+  pattern.regex.lastIndex = 0;
 
-  let match: RegExpExecArray | null
+  let match: RegExpExecArray | null;
   while ((match = pattern.regex.exec(content)) !== null) {
-    const lineNumber = content.slice(0, match.index).split('\n').length
-    violations.push(createViolation(pattern, lineNumber, match[0].slice(0, 100)))
+    const lineNumber = content.slice(0, match.index).split('\n').length;
+    violations.push(createViolation(pattern, lineNumber, match[0].slice(0, 100)));
   }
 
-  return violations
+  return violations;
 }
 
 function detectSingleLinePattern(lines: string[], pattern: PatternDefinition): CheckViolation[] {
   logger.debug({
     evt: 'fitness.checks.recovery_patterns.detect_single_line_pattern',
     msg: 'Detecting single line pattern violations',
-  })
-  const violations: CheckViolation[] = []
+  });
+  const violations: CheckViolation[] = [];
 
   for (const [i, line] of lines.entries()) {
     /* v8 ignore next -- defensive: lines.entries() never yields undefined */
-    if (line === undefined) continue
-    if (pattern.skipInComments && isCommentLine(line)) continue
+    if (line === undefined) continue;
+    if (pattern.skipInComments && isCommentLine(line)) continue;
 
     if (pattern.regex.global) {
-      pattern.regex.lastIndex = 0
+      pattern.regex.lastIndex = 0;
     }
 
-    const match = pattern.regex.exec(line)
+    const match = pattern.regex.exec(line);
     if (match) {
-      violations.push(createViolation(pattern, i + 1, match[0]))
+      violations.push(createViolation(pattern, i + 1, match[0]));
     }
   }
 
-  return violations
+  return violations;
 }
 
 function detectPatternViolations(
@@ -190,16 +194,16 @@ function detectPatternViolations(
   logger.debug({
     evt: 'fitness.checks.recovery_patterns.detect_pattern_violations',
     msg: 'Detecting pattern violations for content',
-  })
+  });
   if (pattern.regex.global) {
-    pattern.regex.lastIndex = 0
+    pattern.regex.lastIndex = 0;
   }
 
   if (pattern.multiline) {
-    return detectMultilinePattern(content, pattern)
+    return detectMultilinePattern(content, pattern);
   }
 
-  return detectSingleLinePattern(lines, pattern)
+  return detectSingleLinePattern(lines, pattern);
 }
 
 function detectPatterns(
@@ -211,22 +215,22 @@ function detectPatterns(
   logger.debug({
     evt: 'fitness.checks.recovery_patterns.detect_patterns',
     msg: 'Running pattern detection on file content',
-  })
+  });
   if (matchesExclusionPattern(filePath, excludePaths)) {
-    return []
+    return [];
   }
 
-  const lines = content.split('\n')
-  const violations: CheckViolation[] = []
+  const lines = content.split('\n');
+  const violations: CheckViolation[] = [];
 
   for (const pattern of patterns) {
-    const patternViolations = detectPatternViolations(content, lines, pattern)
+    const patternViolations = detectPatternViolations(content, lines, pattern);
     for (const violation of patternViolations) {
-      violations.push(violation)
+      violations.push(violation);
     }
   }
 
-  return violations
+  return violations;
 }
 
 // =============================================================================
@@ -247,8 +251,7 @@ export const recoveryPatterns = defineCheck({
   contentFilter: 'strip-strings',
 
   confidence: 'medium',
-  description:
-    'Enforce use of shared recovery/retry utilities instead of hand-rolled retry loops',
+  description: 'Enforce use of shared recovery/retry utilities instead of hand-rolled retry loops',
   longDescription: `**Purpose:** Prevents hand-rolled retry loops, circuit breakers, and timeout wrappers in favor of the canonical recovery module.
 
 **Detects:**
@@ -268,9 +271,9 @@ export const recoveryPatterns = defineCheck({
     return detectPatterns(content, filePath, RECOVERY_PATTERNS, [
       'foundation/src/recovery',
       '__tests__',
-    ])
+    ]);
   },
-})
+});
 
 /**
  * Check: resilience/no-custom-cache
@@ -299,9 +302,9 @@ export const noCustomCache = defineCheck({
     return detectPatterns(content, filePath, CACHE_PATTERNS, [
       'infrastructure/src/cache',
       '__tests__',
-    ])
+    ]);
   },
-})
+});
 
 /**
  * Check: resilience/no-custom-rate-limiter
@@ -330,6 +333,6 @@ export const noCustomRateLimiter = defineCheck({
     return detectPatterns(content, filePath, RATE_LIMITER_PATTERNS, [
       'infrastructure/src/rate-limiting',
       '__tests__',
-    ])
+    ]);
   },
-})
+});

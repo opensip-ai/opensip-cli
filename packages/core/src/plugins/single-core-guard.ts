@@ -57,10 +57,9 @@ export function foreignCorePath(packageDir: string): string | undefined {
  * (or none at all). `onForeign` is invoked for each dropped pack with the foreign
  * core path it resolved, for a caller-shaped diagnostic.
  */
-export function filterSameCorePackages<T extends { readonly name: string; readonly packageDir: string }>(
-  packages: readonly T[],
-  onForeign?: (pkg: T, foreignCore: string) => void,
-): T[] {
+export function filterSameCorePackages<
+  T extends { readonly name: string; readonly packageDir: string },
+>(packages: readonly T[], onForeign?: (pkg: T, foreignCore: string) => void): T[] {
   if (selfCorePath === undefined) return [...packages];
   return packages.filter((pkg) => {
     const foreign = foreignCorePath(pkg.packageDir);

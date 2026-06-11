@@ -4,10 +4,6 @@
     "outDir": "dist",
     "rootDir": "src"
   },
-  "include": [
-    "src"
-  ],
-  "exclude": [
-    "**/__fixtures__/**"
-  ]
+  "include": ["src"],
+  "exclude": ["**/__fixtures__/**"]
 }

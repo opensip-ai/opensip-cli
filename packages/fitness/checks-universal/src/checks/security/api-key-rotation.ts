@@ -4,9 +4,9 @@
  * @fileoverview Validate API key handling supports rotation
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness';
 
 /**
  * Checks if text contains a single API key equality comparison
@@ -16,19 +16,19 @@ function matchesSingleKeyEquality(text: string): RegExpExecArray | null {
   logger.debug({
     evt: 'fitness.checks.api_key_rotation.match_single_key_equality',
     msg: 'Checking for single key equality comparison',
-  })
+  });
   // Match comparison operators followed by process.env key access
   // Exclude keys with rotation suffixes (CURRENT, PREVIOUS, PRIMARY, SECONDARY)
   const match = /(?:===|!==|==|!=)\s*process\.env\.(API_?KEY|SECRET_?KEY|AUTH_?KEY)(\w*)/i.exec(
     text,
-  )
-  if (!match) return null
-  const suffix = match[2] ?? ''
-  const rotationSuffixes = ['CURRENT', 'PREVIOUS', 'PRIMARY', 'SECONDARY']
+  );
+  if (!match) return null;
+  const suffix = match[2] ?? '';
+  const rotationSuffixes = ['CURRENT', 'PREVIOUS', 'PRIMARY', 'SECONDARY'];
   if (rotationSuffixes.some((s) => suffix.toUpperCase().includes(s))) {
-    return null
+    return null;
   }
-  return match
+  return match;
 }
 
 /**
@@ -39,17 +39,17 @@ function matchesSingleKeyAssignment(text: string): RegExpExecArray | null {
   logger.debug({
     evt: 'fitness.checks.api_key_rotation.match_single_key_assignment',
     msg: 'Checking for single key assignment pattern',
-  })
+  });
   // Match const declaration with API key name
-  const match = /const\s+(API_?KEY|SECRET_?KEY|AUTH_?KEY)\s*=\s*process\.env\.(\w+)/i.exec(text)
-  if (!match) return null
+  const match = /const\s+(API_?KEY|SECRET_?KEY|AUTH_?KEY)\s*=\s*process\.env\.(\w+)/i.exec(text);
+  if (!match) return null;
   // Check if followed by function call (indicates wrapped/processed key)
-  const matchIndex = match.index
-  const afterMatch = text.slice(matchIndex + match[0].length)
+  const matchIndex = match.index;
+  const afterMatch = text.slice(matchIndex + match[0].length);
   if (/^\s*\(/.test(afterMatch)) {
-    return null
+    return null;
   }
-  return match
+  return match;
 }
 
 // Patterns that indicate single-key validation (no rotation support)
@@ -71,7 +71,7 @@ const SINGLE_KEY_PATTERNS = [
       'Load keys as an array: const VALID_KEYS = [process.env.API_KEY_CURRENT, process.env.API_KEY_PREVIOUS].filter(Boolean). Then use validKeys.includes(providedKey) for validation.',
     severity: 'warning' as const,
   },
-]
+];
 
 // Keywords that indicate rotation support is already implemented
 const ROTATION_SUPPORT_KEYWORDS = [
@@ -86,7 +86,7 @@ const ROTATION_SUPPORT_KEYWORDS = [
   'validkeys.includes',
   'keys.some',
   'keys.find',
-]
+];
 
 /**
  * Check if content already has rotation support indicators
@@ -95,9 +95,9 @@ function hasRotationSupport(content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.api_key_rotation.has_rotation_support',
     msg: 'Checking if content has rotation support indicators',
-  })
-  const lowerContent = content.toLowerCase()
-  return ROTATION_SUPPORT_KEYWORDS.some((kw) => lowerContent.includes(kw))
+  });
+  const lowerContent = content.toLowerCase();
+  return ROTATION_SUPPORT_KEYWORDS.some((kw) => lowerContent.includes(kw));
 }
 
 /**
@@ -107,21 +107,17 @@ function containsApiKeyReferences(content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.api_key_rotation.contains_api_key_references',
     msg: 'Checking if content contains API key references',
-  })
-  const stripped = stripStringsAndComments(content).toLowerCase()
+  });
+  const stripped = stripStringsAndComments(content).toLowerCase();
   const hasApiKeyTerms =
-    stripped.includes('api_key') ||
-    stripped.includes('apikey') ||
-    stripped.includes('api-key')
+    stripped.includes('api_key') || stripped.includes('apikey') || stripped.includes('api-key');
   const hasSecretKeyTerms =
     stripped.includes('secret_key') ||
     stripped.includes('secretkey') ||
-    stripped.includes('secret-key')
+    stripped.includes('secret-key');
   const hasAuthKeyTerms =
-    stripped.includes('auth_key') ||
-    stripped.includes('authkey') ||
-    stripped.includes('auth-key')
-  return hasApiKeyTerms || hasSecretKeyTerms || hasAuthKeyTerms
+    stripped.includes('auth_key') || stripped.includes('authkey') || stripped.includes('auth-key');
+  return hasApiKeyTerms || hasSecretKeyTerms || hasAuthKeyTerms;
 }
 
 /**
@@ -131,16 +127,16 @@ function shouldProcessFile(filePath: string, content: string): boolean {
   logger.debug({
     evt: 'fitness.checks.api_key_rotation.should_process_file',
     msg: 'Determining if file should be processed for API key rotation checks',
-  })
+  });
   // Only check files that deal with API keys
   if (!containsApiKeyReferences(content)) {
-    return false
+    return false;
   }
   // Skip if file already has rotation patterns
   if (hasRotationSupport(content)) {
-    return false
+    return false;
   }
-  return true
+  return true;
 }
 
 /**
@@ -172,26 +168,26 @@ export const apiKeyRotation = defineCheck({
     logger.debug({
       evt: 'fitness.checks.api_key_rotation.analyze',
       msg: 'Analyzing file for API key rotation support',
-    })
+    });
     if (!shouldProcessFile(filePath, content)) {
-      return []
+      return [];
     }
 
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
+    const violations: CheckViolation[] = [];
+    const lines = content.split('\n');
 
     for (const [lineNum, line_] of lines.entries()) {
-      const line = line_ ?? ''
+      const line = line_ ?? '';
 
       // Skip comments
-      const trimmed = line.trim()
+      const trimmed = line.trim();
       if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
-        continue
+        continue;
       }
 
-      const strippedLine = stripStringLiterals(line)
+      const strippedLine = stripStringLiterals(line);
       for (const pattern of SINGLE_KEY_PATTERNS) {
-        const match = pattern.match(strippedLine)
+        const match = pattern.match(strippedLine);
         if (match) {
           violations.push({
             line: lineNum + 1,
@@ -201,11 +197,11 @@ export const apiKeyRotation = defineCheck({
             suggestion: pattern.suggestion,
             match: match[0],
             filePath,
-          })
+          });
         }
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

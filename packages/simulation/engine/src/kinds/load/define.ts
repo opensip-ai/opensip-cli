@@ -14,28 +14,31 @@ import {
   validateScenarioMetadata,
   validateTargetAndWorkload,
   type ScenarioValidationError,
-} from '../../framework/validation.js'
+} from '../../framework/validation.js';
 
-import { createLoadScenarioRunner } from './executor.js'
+import { createLoadScenarioRunner } from './executor.js';
 
-import type { LoadScenarioConfig } from './config.js'
-import type { RunnableScenario } from '../../framework/runnable-scenario.js'
+import type { LoadScenarioConfig } from './config.js';
+import type { RunnableScenario } from '../../framework/runnable-scenario.js';
 
 // `LoadScenarioConfig` moved to `./config.ts` to break the
 // `define.ts ↔ executor.ts` file-level cycle. Re-exported here so
 // existing callers keep their import paths.
-export type { LoadScenarioConfig } from './config.js'
+export type { LoadScenarioConfig } from './config.js';
 
 function validateRampUp(config: LoadScenarioConfig, errors: ScenarioValidationError[]): void {
-  const { rampUp } = config.workload ?? {}
-  if (rampUp === undefined) return
+  const { rampUp } = config.workload ?? {};
+  if (rampUp === undefined) return;
 
   if (typeof rampUp !== 'number' || rampUp < 0) {
-    errors.push({ field: 'workload.rampUp', message: 'workload.rampUp must be a non-negative number' })
-    return
+    errors.push({
+      field: 'workload.rampUp',
+      message: 'workload.rampUp must be a non-negative number',
+    });
+    return;
   }
   if (rampUp > config.duration) {
-    errors.push({ field: 'workload.rampUp', message: 'workload.rampUp cannot exceed duration' })
+    errors.push({ field: 'workload.rampUp', message: 'workload.rampUp cannot exceed duration' });
   }
 }
 
@@ -50,22 +53,22 @@ function validateRampUp(config: LoadScenarioConfig, errors: ScenarioValidationEr
  * @throws {ValidationError} When the load scenario configuration is invalid
  */
 export function validateLoadScenarioConfig(config: LoadScenarioConfig): void {
-  const errors: ScenarioValidationError[] = []
+  const errors: ScenarioValidationError[] = [];
 
-  validateScenarioMetadata(config, errors)
-  validateTargetAndWorkload(config, errors)
+  validateScenarioMetadata(config, errors);
+  validateTargetAndWorkload(config, errors);
 
   if (typeof config.duration !== 'number' || config.duration <= 0) {
-    errors.push({ field: 'duration', message: 'duration must be a positive number' })
+    errors.push({ field: 'duration', message: 'duration must be a positive number' });
   }
 
-  validateRampUp(config, errors)
+  validateRampUp(config, errors);
 
   if (config.assertions.length === 0) {
-    errors.push({ field: 'assertions', message: 'at least one assertion is required' })
+    errors.push({ field: 'assertions', message: 'at least one assertion is required' });
   }
 
-  throwValidationErrors(errors, 'load')
+  throwValidationErrors(errors, 'load');
 }
 
 /**
@@ -90,7 +93,7 @@ export function validateLoadScenarioConfig(config: LoadScenarioConfig): void {
  * @throws {ValidationError} When the scenario configuration is invalid
  */
 export function defineLoadScenario(config: LoadScenarioConfig): RunnableScenario {
-  validateLoadScenarioConfig(config)
+  validateLoadScenarioConfig(config);
 
-  return createLoadScenarioRunner(config)
+  return createLoadScenarioRunner(config);
 }

@@ -6,8 +6,8 @@
  * Custom assertions allow escape hatch.
  */
 
-import type { ScenarioMetricKey } from './resolve-metric.js'
-import type { ScenarioAssertion, AssertionOperator } from '../types/framework-types.js'
+import type { ScenarioMetricKey } from './resolve-metric.js';
+import type { ScenarioAssertion, AssertionOperator } from '../types/framework-types.js';
 
 // =============================================================================
 // ASSERTION BUILDERS
@@ -195,12 +195,12 @@ export const ASSERTIONS = {
     value,
     message: message ?? `${metric} ${operator} ${value}`,
   }),
-} as const
+} as const;
 
 /**
  * Type for the ASSERTIONS object.
  */
-export type AssertionFactory = typeof ASSERTIONS
+export type AssertionFactory = typeof ASSERTIONS;
 
 // =============================================================================
 // ASSERTION EVALUATION
@@ -216,25 +216,25 @@ export function evaluateOperator(
 ): boolean {
   switch (operator) {
     case 'lt': {
-      return actual < expected
+      return actual < expected;
     }
     case 'lte': {
-      return actual <= expected
+      return actual <= expected;
     }
     case 'gt': {
-      return actual > expected
+      return actual > expected;
     }
     case 'gte': {
-      return actual >= expected
+      return actual >= expected;
     }
     case 'eq': {
-      return actual === expected
+      return actual === expected;
     }
     case 'neq': {
-      return actual !== expected
+      return actual !== expected;
     }
     default: {
-      return false
+      return false;
     }
   }
 }
@@ -245,25 +245,25 @@ export function evaluateOperator(
 export function evaluateAssertion(assertion: ScenarioAssertion, actual: number): boolean {
   switch (assertion.operator) {
     case 'lt': {
-      return actual < assertion.value
+      return actual < assertion.value;
     }
     case 'lte': {
-      return actual <= assertion.value
+      return actual <= assertion.value;
     }
     case 'gt': {
-      return actual > assertion.value
+      return actual > assertion.value;
     }
     case 'gte': {
-      return actual >= assertion.value
+      return actual >= assertion.value;
     }
     case 'eq': {
-      return actual === assertion.value
+      return actual === assertion.value;
     }
     case 'neq': {
-      return actual !== assertion.value
+      return actual !== assertion.value;
     }
     default: {
-      return false
+      return false;
     }
   }
 }
@@ -274,25 +274,25 @@ export function evaluateAssertion(assertion: ScenarioAssertion, actual: number):
 export function getOperatorDescription(operator: AssertionOperator): string {
   switch (operator) {
     case 'lt': {
-      return 'less than'
+      return 'less than';
     }
     case 'lte': {
-      return 'at most'
+      return 'at most';
     }
     case 'gt': {
-      return 'greater than'
+      return 'greater than';
     }
     case 'gte': {
-      return 'at least'
+      return 'at least';
     }
     case 'eq': {
-      return 'equal to'
+      return 'equal to';
     }
     case 'neq': {
-      return 'not equal to'
+      return 'not equal to';
     }
     default: {
-      return operator
+      return operator;
     }
   }
 }

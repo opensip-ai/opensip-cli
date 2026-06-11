@@ -38,7 +38,9 @@ export function RunHeader({
 
   return (
     <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
-      <Text bold color={theme.brand}>{tool}</Text>
+      <Text bold color={theme.brand}>
+        {tool}
+      </Text>
       {metadata.length > 0 && (
         <Text dimColor>{metadata.map((m) => `${m.label}: ${m.value}`).join('   ')}</Text>
       )}

@@ -126,8 +126,7 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
   // above runs first to avoid mis-routing the recipe variant.
   {
     match: (message) => {
-      const slugMatch =
-        /Check not found: (.+)/.exec(message) ?? /not found: (.+)/.exec(message);
+      const slugMatch = /Check not found: (.+)/.exec(message) ?? /not found: (.+)/.exec(message);
       if (slugMatch) {
         return { capture: slugMatch[1] };
       }
@@ -148,8 +147,7 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
   // Recipe not found — captures the verbatim error message so the
   // surfaced suggestion preserves the recipe name.
   {
-    match: (message) =>
-      containsAny(message, ['Unknown recipe']) ? { capture: message } : null,
+    match: (message) => (containsAny(message, ['Unknown recipe']) ? { capture: message } : null),
     suggest: (capture) => ({
       message: capture ?? 'Unknown recipe.',
       action: 'Run opensip-tools fit --recipes to see available recipes.',
@@ -170,8 +168,7 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
 
   // Config file error — YAML parse shape (paired with the file rule above).
   {
-    match: (message) =>
-      containsAny(message, ['YAML']) ? { capture: null } : null,
+    match: (message) => (containsAny(message, ['YAML']) ? { capture: null } : null),
     suggest: () => ({
       message: 'Configuration error.',
       action: 'Check opensip-tools.config.yml for syntax errors.',
@@ -182,9 +179,7 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
   // Permission denied
   {
     match: (message) =>
-      containsAny(message, ['EACCES', 'permission denied'])
-        ? { capture: null }
-        : null,
+      containsAny(message, ['EACCES', 'permission denied']) ? { capture: null } : null,
     suggest: () => ({
       message: 'Permission denied reading files.',
       action: 'Check file permissions in the target directory.',
@@ -195,9 +190,7 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
   // No checks available
   {
     match: (message) =>
-      containsAny(message, ['No checks registered', 'No checks to run'])
-        ? { capture: null }
-        : null,
+      containsAny(message, ['No checks registered', 'No checks to run']) ? { capture: null } : null,
     suggest: () => ({
       message: 'No checks available to run.',
       action:
@@ -209,9 +202,7 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
   // Network error (report-to)
   {
     match: (message) =>
-      containsAny(message, ['fetch', 'ECONNREFUSED', 'network'])
-        ? { capture: null }
-        : null,
+      containsAny(message, ['fetch', 'ECONNREFUSED', 'network']) ? { capture: null } : null,
     suggest: () => ({
       message: 'Network error sending report.',
       action: 'Check the --report-to URL and your network connection.',

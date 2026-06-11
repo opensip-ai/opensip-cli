@@ -35,7 +35,10 @@ export interface RunFooterHintsProps {
 
 /** The hint strip as a renderer-agnostic view-model node. */
 export function viewFooterHints(hints: readonly RunFooterHint[]): ViewNode {
-  return { kind: 'hints', items: hints.map((h) => (h.bold ? { text: h.text, bold: h.bold } : { text: h.text })) };
+  return {
+    kind: 'hints',
+    items: hints.map((h) => (h.bold ? { text: h.text, bold: h.bold } : { text: h.text })),
+  };
 }
 
 /** Ink view of {@link viewFooterHints}; renders nothing when there are no hints. */

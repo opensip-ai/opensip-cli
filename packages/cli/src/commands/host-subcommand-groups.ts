@@ -23,7 +23,8 @@ import {
   defineCommand,
   type CommandScopeRequirement,
   type CommandSpec,
-  type ProjectContext, type ToolShortId 
+  type ProjectContext,
+  type ToolShortId,
 } from '@opensip-tools/core';
 
 import { executeClear } from './clear.js';
@@ -228,8 +229,7 @@ function buildPluginAddSpec(ctx: CliCommandsContext): HostSpec {
       },
       {
         flag: '--project',
-        description:
-          'For a tool plugin, install project-local (.runtime/) instead of user-global',
+        description: 'For a tool plugin, install project-local (.runtime/) instead of user-global',
         default: false,
       },
       pluginCwdOption(),
@@ -241,7 +241,11 @@ function buildPluginAddSpec(ctx: CliCommandsContext): HostSpec {
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
-      const opts = rawOpts as PluginCwdOpts & { domain?: string; project?: boolean; _args: string[] };
+      const opts = rawOpts as PluginCwdOpts & {
+        domain?: string;
+        project?: boolean;
+        _args: string[];
+      };
       const packageName = opts._args[0];
       return pluginAdd(packageName, effectiveCwd(opts), opts.domain, ctx.pluginLayouts, {
         project: opts.project,
@@ -263,8 +267,7 @@ function buildPluginRemoveSpec(ctx: CliCommandsContext): HostSpec {
       },
       {
         flag: '--project',
-        description:
-          'For a tool plugin, target the project-local install instead of user-global',
+        description: 'For a tool plugin, target the project-local install instead of user-global',
         default: false,
       },
       pluginCwdOption(),
@@ -274,7 +277,11 @@ function buildPluginRemoveSpec(ctx: CliCommandsContext): HostSpec {
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
-      const opts = rawOpts as PluginCwdOpts & { domain?: string; project?: boolean; _args: string[] };
+      const opts = rawOpts as PluginCwdOpts & {
+        domain?: string;
+        project?: boolean;
+        _args: string[];
+      };
       const packageName = opts._args[0];
       return pluginRemove(packageName, effectiveCwd(opts), opts.domain, ctx.pluginLayouts, {
         project: opts.project,
@@ -286,8 +293,7 @@ function buildPluginRemoveSpec(ctx: CliCommandsContext): HostSpec {
 function buildPluginSyncSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'sync',
-    description:
-      'Install every plugin declared in opensip-tools.config.yml (post-clone bootstrap)',
+    description: 'Install every plugin declared in opensip-tools.config.yml (post-clone bootstrap)',
     commonFlags: ['json'],
     options: [
       { flag: '--domain', value: '<fit|sim>', description: 'Sync only one domain' },

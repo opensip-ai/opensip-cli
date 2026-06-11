@@ -45,7 +45,10 @@ function tableToText(
   const widths = tableColumnWidths(columns, rows);
   const alignOf = (i: number): 'left' | 'right' => align?.[i] ?? 'left';
   const renderRow = (cells: readonly { text: string }[]): string =>
-    widths.map((w, i) => padTableCell(cells[i]?.text ?? '', w, alignOf(i))).join('  ').trimEnd();
+    widths
+      .map((w, i) => padTableCell(cells[i]?.text ?? '', w, alignOf(i)))
+      .join('  ')
+      .trimEnd();
   const lines = showHeader ? [renderRow(columns.map((c) => ({ text: c })))] : [];
   for (const cells of rows) lines.push(renderRow(cells));
   return lines.join('\n');

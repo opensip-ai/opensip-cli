@@ -3,35 +3,35 @@
  * @fileoverview Fitness ignore hygiene check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /** Regex to match @fitness-ignore directives */
-const FITNESS_IGNORE_REGEX = /@fitness-ignore(?:-file|-next-line)?\s+(\S+)/g
+const FITNESS_IGNORE_REGEX = /@fitness-ignore(?:-file|-next-line)?\s+(\S+)/g;
 
 /** Valid check slug format: kebab-case */
-const VALID_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/
+const VALID_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
 
 /**
  * Analyze @fitness-ignore directives for hygiene issues
  */
 function analyzeIgnoreHygiene(content: string, _filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
 
-  let totalIgnoreDirectives = 0
+  let totalIgnoreDirectives = 0;
 
   for (const [i, line_] of lines.entries()) {
-    const line = line_ ?? ''
+    const line = line_ ?? '';
 
     // Only check actual comment lines — skip string literals, code, and template literals
     // that happen to contain ignore-directive text (e.g., regex patterns, suggestion strings)
-    if (!line.trim().startsWith('//')) continue
+    if (!line.trim().startsWith('//')) continue;
 
-    FITNESS_IGNORE_REGEX.lastIndex = 0
-    const ignoreMatches = [...line.matchAll(FITNESS_IGNORE_REGEX)]
+    FITNESS_IGNORE_REGEX.lastIndex = 0;
+    const ignoreMatches = [...line.matchAll(FITNESS_IGNORE_REGEX)];
     for (const match of ignoreMatches) {
-      totalIgnoreDirectives++
-      const checkSlug = match[1]
+      totalIgnoreDirectives++;
+      const checkSlug = match[1];
 
       // Validate check slug format
       if (checkSlug && !VALID_SLUG_PATTERN.test(checkSlug)) {
@@ -42,13 +42,13 @@ function analyzeIgnoreHygiene(content: string, _filePath: string): CheckViolatio
           suggestion: 'Use a valid check slug like "no-generic-error" or "file-length-limits"',
           type: 'invalid-ignore-slug',
           match: line.trim().slice(0, 120),
-        })
+        });
       }
 
       // Check for ignore directive without a reason comment
       // Expected format: @fitness-ignore slug -- reason
-      const afterMatch = line.slice(match.index + match[0].length)
-      const hasReason = afterMatch.includes('--')
+      const afterMatch = line.slice(match.index + match[0].length);
+      const hasReason = afterMatch.includes('--');
       if (!hasReason) {
         violations.push({
           line: i + 1,
@@ -57,7 +57,7 @@ function analyzeIgnoreHygiene(content: string, _filePath: string): CheckViolatio
           suggestion: 'Add a reason: @fitness-ignore check-slug -- Reason why this is suppressed',
           type: 'ignore-without-reason',
           match: line.trim().slice(0, 120),
-        })
+        });
       }
     }
   }
@@ -70,10 +70,10 @@ function analyzeIgnoreHygiene(content: string, _filePath: string): CheckViolatio
       severity: 'warning',
       suggestion: 'Review each suppression to determine if the underlying issue can be fixed',
       type: 'excessive-ignores',
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -102,4 +102,4 @@ export const fitnessIgnoreHygiene = defineCheck({
   fileTypes: ['ts'],
   confidence: 'medium',
   analyze: analyzeIgnoreHygiene,
-})
+});

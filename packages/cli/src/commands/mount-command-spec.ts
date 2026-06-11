@@ -33,12 +33,7 @@ import { Option } from 'commander';
 
 import { emitCommandResult } from './mount-result-command.js';
 
-import type {
-  ArgSpec,
-  CommandSpec,
-  OptionSpec,
-  ToolCliContext,
-} from '@opensip-tools/core';
+import type { ArgSpec, CommandSpec, OptionSpec, ToolCliContext } from '@opensip-tools/core';
 
 /**
  * A {@link CommandSpec} whose handler receives the concrete host

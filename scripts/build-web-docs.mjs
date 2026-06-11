@@ -62,16 +62,12 @@ const main = async () => {
   const releaseRef = await readReleaseRef();
   log(`Source ref for code links: ${releaseRef}`);
 
-  const sourceFiles = await collectMarkdownFiles(
-    join(REPO_ROOT, SOURCE_DOC_ROOT)
-  );
+  const sourceFiles = await collectMarkdownFiles(join(REPO_ROOT, SOURCE_DOC_ROOT));
   log(`Source files: ${sourceFiles.length}`);
 
   const results = [];
   for (const srcAbs of sourceFiles) {
-    const srcRel = relative(join(REPO_ROOT, SOURCE_DOC_ROOT), srcAbs)
-      .split(sep)
-      .join('/');
+    const srcRel = relative(join(REPO_ROOT, SOURCE_DOC_ROOT), srcAbs).split(sep).join('/');
     const dstAbs = join(REPO_ROOT, OUTPUT_DOC_ROOT, srcRel);
 
     const source = await fs.readFile(srcAbs, 'utf8');
@@ -93,8 +89,7 @@ const main = async () => {
 
     // Manifest must also stay in sync. Deterministic build means a
     // straight string compare suffices.
-    const expectedManifestText =
-      JSON.stringify(buildManifest(results, releaseRef), null, 2) + '\n';
+    const expectedManifestText = JSON.stringify(buildManifest(results, releaseRef), null, 2) + '\n';
     const manifestPath = join(REPO_ROOT, OUTPUT_DOC_ROOT, 'manifest.json');
     let existingManifestText = '';
     try {
@@ -108,11 +103,7 @@ const main = async () => {
 
     // Also flag files in OUTPUT_DOC_ROOT that have no corresponding source
     const expectedDsts = new Set(results.map((r) => r.dstAbs));
-    const actualDsts = (
-      await collectMarkdownFiles(join(REPO_ROOT, OUTPUT_DOC_ROOT)).catch(
-        () => []
-      )
-    );
+    const actualDsts = await collectMarkdownFiles(join(REPO_ROOT, OUTPUT_DOC_ROOT)).catch(() => []);
     const orphaned = actualDsts.filter((p) => !expectedDsts.has(p));
 
     if (stale.length === 0 && orphaned.length === 0) {
@@ -150,7 +141,7 @@ const main = async () => {
   const manifest = buildManifest(results, releaseRef);
   await fs.writeFile(
     join(REPO_ROOT, OUTPUT_DOC_ROOT, 'manifest.json'),
-    JSON.stringify(manifest, null, 2) + '\n'
+    JSON.stringify(manifest, null, 2) + '\n',
   );
 
   log(`Wrote ${results.length} file(s) + manifest.json to ${OUTPUT_DOC_ROOT}/`);
@@ -220,9 +211,9 @@ const buildManifest = (results, releaseRef) => {
 // pages within a tab follow `pages` array order (i.e. filesystem order).
 const AUDIENCE_TAB_ORDER = [
   { tag: 'getting-started', title: 'Start' },
-  { tag: 'plugin-authors',  title: 'Author plugins' },
-  { tag: 'ci-integrators',  title: 'Integrate with CI' },
-  { tag: 'contributors',    title: 'Contribute' },
+  { tag: 'plugin-authors', title: 'Author plugins' },
+  { tag: 'ci-integrators', title: 'Integrate with CI' },
+  { tag: 'contributors', title: 'Contribute' },
 ];
 
 const buildAudienceTabs = (pages) => {
@@ -284,9 +275,9 @@ const parseFrontmatter = (text) => {
     if (value.startsWith('[') && value.endsWith(']')) {
       try {
         // Convert YAML inline array to JSON: single-quoted -> double, no quotes around bare words
-        const jsonish = value.replaceAll('\'', '"').replaceAll(/([A-Za-z_-][\w-]*)/g, (m) =>
-          /^(true|false|null)$/.test(m) ? m : `"${m}"`
-        );
+        const jsonish = value
+          .replaceAll("'", '"')
+          .replaceAll(/([A-Za-z_-][\w-]*)/g, (m) => (/^(true|false|null)$/.test(m) ? m : `"${m}"`));
         out[key] = JSON.parse(jsonish);
         continue;
       } catch {
@@ -342,12 +333,7 @@ const sectionTitle = (section) => {
 // ---------------------------------------------------------------------
 
 const readReleaseRef = async () => {
-  const pkg = JSON.parse(
-    await fs.readFile(
-      join(REPO_ROOT, 'packages/core/package.json'),
-      'utf8'
-    )
-  );
+  const pkg = JSON.parse(await fs.readFile(join(REPO_ROOT, 'packages/core/package.json'), 'utf8'));
   return `v${pkg.version}`;
 };
 
@@ -384,15 +370,9 @@ const transformDoc = (source, srcRel, releaseRef) => {
 
 const applyWebMarkers = (text) => {
   // Remove web:skip blocks entirely
-  text = text.replaceAll(
-    /<!--\s*web:skip\s*-->[\s\S]*?<!--\s*\/web:skip\s*-->\n?/g,
-    ''
-  );
+  text = text.replaceAll(/<!--\s*web:skip\s*-->[\s\S]*?<!--\s*\/web:skip\s*-->\n?/g, '');
   // Unwrap web:only blocks (keep content, drop markers)
-  text = text.replaceAll(
-    /<!--\s*web:only\s*-->\n?([\s\S]*?)\n?<!--\s*\/web:only\s*-->\n?/g,
-    '$1'
-  );
+  text = text.replaceAll(/<!--\s*web:only\s*-->\n?([\s\S]*?)\n?<!--\s*\/web:only\s*-->\n?/g, '$1');
   return text;
 };
 
@@ -436,10 +416,7 @@ const rewriteTarget = (target, srcRel, releaseRef) => {
   const srcDir = posix.dirname(`${SOURCE_DOC_ROOT}/${srcRel}`);
   const resolved = posix.normalize(posix.join(srcDir, pathPart));
 
-  if (
-    resolved === SOURCE_DOC_ROOT ||
-    resolved.startsWith(`${SOURCE_DOC_ROOT}/`)
-  ) {
+  if (resolved === SOURCE_DOC_ROOT || resolved.startsWith(`${SOURCE_DOC_ROOT}/`)) {
     return rewriteToWebsitePath(resolved, anchor);
   }
   return rewriteToGithubUrl(resolved, anchor, releaseRef);
@@ -454,10 +431,7 @@ const rewriteToWebsitePath = (resolvedFromRepoRoot, anchor) => {
   }
   if (underRoot.endsWith('/README.md')) {
     underRoot = underRoot.slice(0, -'/README.md'.length);
-    return joinAnchor(
-      `${WEB_BASE_URL}/${underRoot}${TRAILING_SLASH ? '/' : ''}`,
-      anchor
-    );
+    return joinAnchor(`${WEB_BASE_URL}/${underRoot}${TRAILING_SLASH ? '/' : ''}`, anchor);
   }
   if (STRIP_MD_EXTENSION && underRoot.endsWith('.md')) {
     underRoot = underRoot.slice(0, -3);
@@ -466,16 +440,13 @@ const rewriteToWebsitePath = (resolvedFromRepoRoot, anchor) => {
   if (underRoot.endsWith('/')) {
     underRoot = underRoot.slice(0, -1);
   }
-  return joinAnchor(
-    `${WEB_BASE_URL}/${underRoot}${TRAILING_SLASH ? '/' : ''}`,
-    anchor
-  );
+  return joinAnchor(`${WEB_BASE_URL}/${underRoot}${TRAILING_SLASH ? '/' : ''}`, anchor);
 };
 
 const rewriteToGithubUrl = (resolvedFromRepoRoot, anchor, releaseRef) =>
   joinAnchor(
     `https://github.com/${REPO_OWNER}/${REPO_NAME}/blob/${releaseRef}/${resolvedFromRepoRoot}`,
-    anchor
+    anchor,
   );
 
 const joinAnchor = (path, anchor) => (anchor ? `${path}${anchor}` : path);

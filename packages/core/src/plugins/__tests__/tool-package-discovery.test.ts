@@ -19,7 +19,6 @@ function writePkg(dir: string, json: object): void {
 }
 
 beforeEach(() => {
-   
   testDir = mkdtempSync(join(tmpdir(), 'opensip-tool-discover-'));
 });
 
@@ -183,7 +182,10 @@ describe('readToolPackageMetadata', () => {
   });
 
   it('uses pkg.main when declared', () => {
-    writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ name: 'pkg', main: './lib/main.js' }));
+    writeFileSync(
+      join(pkgDir, 'package.json'),
+      JSON.stringify({ name: 'pkg', main: './lib/main.js' }),
+    );
     expect(readToolPackageMetadata(pkgDir)?.mainEntry).toBe(join(pkgDir, './lib/main.js'));
   });
 
@@ -229,7 +231,14 @@ describe('readToolPackageMetadata', () => {
   it("resolves an authored sidecar's `main` when there is no package.json", () => {
     writeFileSync(
       join(pkgDir, 'opensip-tool.manifest.json'),
-      JSON.stringify({ kind: 'tool', id: 'audit', name: '@my-co/audit', version: '1.0.0', main: './dist/audit.js', commands: [] }),
+      JSON.stringify({
+        kind: 'tool',
+        id: 'audit',
+        name: '@my-co/audit',
+        version: '1.0.0',
+        main: './dist/audit.js',
+        commands: [],
+      }),
     );
     expect(readToolPackageMetadata(pkgDir)).toEqual({
       name: '@my-co/audit',
@@ -249,7 +258,10 @@ describe('readToolPackageMetadata', () => {
   });
 
   it('prefers a real package.json over an authored sidecar when both exist', () => {
-    writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ name: 'pkg', main: './dist/pkg.js' }));
+    writeFileSync(
+      join(pkgDir, 'package.json'),
+      JSON.stringify({ name: 'pkg', main: './dist/pkg.js' }),
+    );
     writeFileSync(
       join(pkgDir, 'opensip-tool.manifest.json'),
       JSON.stringify({ kind: 'tool', id: 'audit', main: './dist/sidecar.js', commands: [] }),
@@ -263,7 +275,10 @@ describe('readToolPackageMetadata', () => {
   });
 
   it('returns undefined when the authored sidecar parses to a non-object (e.g. a JSON array)', () => {
-    writeFileSync(join(pkgDir, 'opensip-tool.manifest.json'), JSON.stringify(['not', 'an', 'object']));
+    writeFileSync(
+      join(pkgDir, 'opensip-tool.manifest.json'),
+      JSON.stringify(['not', 'an', 'object']),
+    );
     expect(readToolPackageMetadata(pkgDir)).toBeUndefined();
   });
 

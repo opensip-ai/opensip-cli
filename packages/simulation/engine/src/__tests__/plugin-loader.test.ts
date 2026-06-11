@@ -34,10 +34,7 @@ describe('loadAllSimPlugins', () => {
     // plugin file.
     const scenariosDir = join(testDir, 'opensip-tools', 'sim', 'scenarios');
     mkdirSync(scenariosDir, { recursive: true });
-    writeFileSync(
-      join(scenariosDir, 'a.mjs'),
-      'export const recipes = [];\n',
-    );
+    writeFileSync(join(scenariosDir, 'a.mjs'), 'export const recipes = [];\n');
 
     const result = await loadAllSimPlugins(testDir);
     expect(result.plugins.length).toBe(1);
@@ -48,10 +45,7 @@ describe('loadAllSimPlugins', () => {
   it('collects an error when a plugin file throws on import', async () => {
     const scenariosDir = join(testDir, 'opensip-tools', 'sim', 'scenarios');
     mkdirSync(scenariosDir, { recursive: true });
-    writeFileSync(
-      join(scenariosDir, 'bad.mjs'),
-      'throw new Error("boom on import");\n',
-    );
+    writeFileSync(join(scenariosDir, 'bad.mjs'), 'throw new Error("boom on import");\n');
 
     const result = await loadAllSimPlugins(testDir);
     expect(result.plugins.length).toBe(1);
@@ -62,10 +56,7 @@ describe('loadAllSimPlugins', () => {
   it('warns when recipes is not an array', async () => {
     const scenariosDir = join(testDir, 'opensip-tools', 'sim', 'scenarios');
     mkdirSync(scenariosDir, { recursive: true });
-    writeFileSync(
-      join(scenariosDir, 'a.mjs'),
-      'export const recipes = "not an array";\n',
-    );
+    writeFileSync(join(scenariosDir, 'a.mjs'), 'export const recipes = "not an array";\n');
 
     const result = await loadAllSimPlugins(testDir);
     expect(result.plugins.length).toBe(1);

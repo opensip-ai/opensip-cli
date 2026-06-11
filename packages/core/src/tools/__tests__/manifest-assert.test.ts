@@ -11,20 +11,14 @@ import type { ToolPluginManifest } from '../manifest.js';
 import type { Tool } from '../types.js';
 
 /** Minimal Tool stub — only the fields the guard inspects are meaningful. */
-function makeTool(
-  id: string,
-  commandNames: readonly string[],
-): Tool {
+function makeTool(id: string, commandNames: readonly string[]): Tool {
   return {
     metadata: { id, version: '0.0.0', description: 'test tool' },
     commands: commandNames.map((name) => ({ name, description: `${name} desc` })),
   };
 }
 
-function makeManifest(
-  id: string,
-  commandNames: readonly string[],
-): ToolPluginManifest {
+function makeManifest(id: string, commandNames: readonly string[]): ToolPluginManifest {
   return {
     kind: 'tool',
     id,
@@ -52,20 +46,26 @@ describe('assertManifestMatchesTool', () => {
     const tool = makeTool('fitness', ['fit']);
     const manifest = makeManifest('fit', ['fit']);
     expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(ValidationError);
-    expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(/manifest id 'fit'.*runtime tool id 'fitness'/);
+    expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(
+      /manifest id 'fit'.*runtime tool id 'fitness'/,
+    );
   });
 
   it('throws when a command is missing from the manifest', () => {
     const tool = makeTool('graph', ['graph', 'graph-lookup']);
     const manifest = makeManifest('graph', ['graph']);
     expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(ValidationError);
-    expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(/missing from manifest: \[graph-lookup\]/);
+    expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(
+      /missing from manifest: \[graph-lookup\]/,
+    );
   });
 
   it('throws when the manifest declares an extra command the tool lacks', () => {
     const tool = makeTool('graph', ['graph']);
     const manifest = makeManifest('graph', ['graph', 'graph-ghost']);
     expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(ValidationError);
-    expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(/declared in manifest but not in tool: \[graph-ghost\]/);
+    expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(
+      /declared in manifest but not in tool: \[graph-ghost\]/,
+    );
   });
 });

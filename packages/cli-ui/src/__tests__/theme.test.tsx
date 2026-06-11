@@ -3,12 +3,7 @@ import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import {
-  DEFAULT_THEME,
-  ThemeProvider,
-  detectTerminalCapabilities,
-  useTheme,
-} from '../theme.js';
+import { DEFAULT_THEME, ThemeProvider, detectTerminalCapabilities, useTheme } from '../theme.js';
 
 describe('DEFAULT_THEME', () => {
   it('exposes the canonical brand and status colors', () => {
@@ -103,7 +98,9 @@ describe('detectTerminalCapabilities', () => {
   });
 });
 
-function ProbeTheme({ onTheme }: Readonly<{ onTheme: (t: ReturnType<typeof useTheme>) => void }>): React.ReactElement {
+function ProbeTheme({
+  onTheme,
+}: Readonly<{ onTheme: (t: ReturnType<typeof useTheme>) => void }>): React.ReactElement {
   const t = useTheme();
   onTheme(t);
   return <Text>x</Text>;
@@ -115,7 +112,11 @@ describe('ThemeProvider / useTheme', () => {
     const custom = { ...DEFAULT_THEME, brand: '#000000' };
     render(
       <ThemeProvider theme={custom}>
-        <ProbeTheme onTheme={(t) => { captured = t; }} />
+        <ProbeTheme
+          onTheme={(t) => {
+            captured = t;
+          }}
+        />
       </ThemeProvider>,
     );
     expect(captured?.brand).toBe('#000000');
@@ -125,7 +126,11 @@ describe('ThemeProvider / useTheme', () => {
     let captured: ReturnType<typeof useTheme> | undefined;
     render(
       <ThemeProvider>
-        <ProbeTheme onTheme={(t) => { captured = t; }} />
+        <ProbeTheme
+          onTheme={(t) => {
+            captured = t;
+          }}
+        />
       </ThemeProvider>,
     );
     // The resolved theme depends on the test runner's terminal — we just
@@ -137,7 +142,13 @@ describe('ThemeProvider / useTheme', () => {
 
   it('returns DEFAULT_THEME outside any ThemeProvider', () => {
     let captured: ReturnType<typeof useTheme> | undefined;
-    render(<ProbeTheme onTheme={(t) => { captured = t; }} />);
+    render(
+      <ProbeTheme
+        onTheme={(t) => {
+          captured = t;
+        }}
+      />,
+    );
     expect(captured).toEqual(DEFAULT_THEME);
   });
 
@@ -156,7 +167,11 @@ describe('ThemeProvider / useTheme', () => {
       let captured: ReturnType<typeof useTheme> | undefined;
       render(
         <ThemeProvider>
-          <ProbeTheme onTheme={(t) => { captured = t; }} />
+          <ProbeTheme
+            onTheme={(t) => {
+              captured = t;
+            }}
+          />
         </ThemeProvider>,
       );
       expect(captured?.colorsEnabled).toBe(false);
@@ -170,7 +185,11 @@ describe('ThemeProvider / useTheme', () => {
       let captured: ReturnType<typeof useTheme> | undefined;
       render(
         <ThemeProvider>
-          <ProbeTheme onTheme={(t) => { captured = t; }} />
+          <ProbeTheme
+            onTheme={(t) => {
+              captured = t;
+            }}
+          />
         </ThemeProvider>,
       );
       expect(captured).toEqual(DEFAULT_THEME);

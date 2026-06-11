@@ -12,7 +12,6 @@
 import { EXIT_CODES } from '@opensip-tools/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-
 import { executeListFiles } from '../list-files.js';
 
 import type { GraphCommandOptions } from '../graph-options.js';
@@ -52,8 +51,7 @@ function mockCli(): ToolCliContext {
 // cwd `/proj` does not exist on disk, so realpathSync throws and the code
 // falls back to the resolved absolute path — exactly the symlink-probe
 // fallback branch, and a stable root for relativization assertions.
-const opts = (o: Partial<GraphCommandOptions>): GraphCommandOptions =>
-  ({ cwd: '/proj', ...o });
+const opts = (o: Partial<GraphCommandOptions>): GraphCommandOptions => ({ cwd: '/proj', ...o });
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -11,7 +11,6 @@ import { fileCache } from '../file-cache.js';
 let testDir: string;
 
 beforeEach(() => {
-   
   testDir = mkdtempSync(join(tmpdir(), 'opensip-fa-'));
   fileCache.clear();
 });
@@ -89,7 +88,11 @@ describe('createFileAccessor', () => {
   it('cachedCount reflects internal LRU size', async () => {
     const path = join(testDir, 'cnt.ts');
     writeFileSync(path, 'cnt');
-    const acc = createFileAccessor([path]) as unknown as { cachedCount: number; clearCache: () => void; read: (p: string) => Promise<string> };
+    const acc = createFileAccessor([path]) as unknown as {
+      cachedCount: number;
+      clearCache: () => void;
+      read: (p: string) => Promise<string>;
+    };
     expect(acc.cachedCount).toBe(0);
     await acc.read(path);
     expect(acc.cachedCount).toBe(1);
@@ -114,7 +117,10 @@ describe('createFileAccessor', () => {
       writeFileSync(p, String(i));
       paths.push(p);
     }
-    const acc = createFileAccessor(paths, { cacheCapacity: 2 }) as unknown as { cachedCount: number; read: (p: string) => Promise<string> };
+    const acc = createFileAccessor(paths, { cacheCapacity: 2 }) as unknown as {
+      cachedCount: number;
+      read: (p: string) => Promise<string>;
+    };
     for (const p of paths) await acc.read(p);
     expect(acc.cachedCount).toBe(2);
   });

@@ -128,20 +128,20 @@ export interface DetectMonorepoLayoutInput {
 export function detectMonorepoLayout(input: DetectMonorepoLayoutInput): MonorepoLayout {
   const threshold = input.heapElevationThreshold ?? DEFAULT_HEAP_ELEVATION_THRESHOLD;
   const nestedPackageDirs = input.nestedPackageDirs ?? findNestedPackageDirs(input.repoRoot);
-  const rootPkg = input.rootPackageJson === undefined
-    ? readRootPackageJson(input.repoRoot)
-    : input.rootPackageJson;
-  const hasWorkspaces = nestedPackageDirs.length > 0
-    || (Array.isArray(rootPkg?.workspaces) && rootPkg.workspaces.length > 0);
+  const rootPkg =
+    input.rootPackageJson === undefined
+      ? readRootPackageJson(input.repoRoot)
+      : input.rootPackageJson;
+  const hasWorkspaces =
+    nestedPackageDirs.length > 0 ||
+    (Array.isArray(rootPkg?.workspaces) && rootPkg.workspaces.length > 0);
 
   if (hasWorkspaces) {
     return { kind: 'workspaces', packageDirs: nestedPackageDirs };
   }
 
   const files = input.files ?? findSourceFiles(input.repoRoot);
-  return files.length > threshold
-    ? { kind: 'flat-large', files }
-    : { kind: 'flat-small', files };
+  return files.length > threshold ? { kind: 'flat-large', files } : { kind: 'flat-small', files };
 }
 
 export interface PartitionFlatRepoInput {
@@ -246,10 +246,7 @@ export function selectStrategyForLayout(layout: MonorepoLayout): StrategySelecti
 
 // ---------- private helpers ----------
 
-function chunkByCount(
-  files: readonly string[],
-  chunkSize: number,
-): readonly SyntheticPartition[] {
+function chunkByCount(files: readonly string[], chunkSize: number): readonly SyntheticPartition[] {
   const sorted = [...files].sort();
   const out: SyntheticPartition[] = [];
   for (let i = 0; i < sorted.length; i += chunkSize) {
@@ -349,9 +346,7 @@ function collectImmediatePackageDirs(dir: string, out: string[]): void {
   }
 }
 
-function readRootPackageJson(
-  repoRoot: string,
-): { readonly workspaces?: unknown } | null {
+function readRootPackageJson(repoRoot: string): { readonly workspaces?: unknown } | null {
   const path = join(repoRoot, 'package.json');
   if (!existsSync(path)) return null;
   try {

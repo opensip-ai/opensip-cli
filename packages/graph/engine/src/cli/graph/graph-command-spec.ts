@@ -224,9 +224,7 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
   // child processes per unit (workspace) and don't need the global
   // heap sizing.
   const hasExplicitScope =
-    paths.length > 0 ||
-    opts.workspace === true ||
-    typeof opts.language === 'string';
+    paths.length > 0 || opts.workspace === true || typeof opts.language === 'string';
   if (!hasExplicitScope) {
     const reExecing = await runHeapPreflight({ cwd: opts.cwd, verbose: opts.verbose === true });
     /* v8 ignore next */
@@ -244,16 +242,16 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
   // rendering run — there is no `--exact` gate. Every non-rendering mode (json/
   // gate/report/profile/workspace/positional-paths/language) is excluded.
   const isLiveViewEligible =
-    opts.json !== true
-    && opts.gateSave !== true
-    && opts.gateCompare !== true
+    opts.json !== true &&
+    opts.gateSave !== true &&
+    opts.gateCompare !== true &&
     /* v8 ignore next */
-    && (typeof opts.reportTo !== 'string' || opts.reportTo.length === 0)
-    && (typeof opts.profile !== 'string' || opts.profile.length === 0)
-    && opts.workspace !== true
-    && paths.length === 0
+    (typeof opts.reportTo !== 'string' || opts.reportTo.length === 0) &&
+    (typeof opts.profile !== 'string' || opts.profile.length === 0) &&
+    opts.workspace !== true &&
+    paths.length === 0 &&
     /* v8 ignore next */
-    && typeof opts.language !== 'string';
+    typeof opts.language !== 'string';
 
   // The animated live view is a TTY-only affordance (frame-driven Ink).
   // In a pipe / CI / redirected run (non-TTY) it would emit garbled or
@@ -322,7 +320,12 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
 async function runGraphShowMode(opts: GraphCommandOptions, cli: ToolCliContext): Promise<void> {
   const datastore = cli.scope.datastore() as DataStore | undefined;
   if (datastore === undefined) {
-    await emitGraphShowError(opts, cli, 'datastore-unavailable', 'session replay requires a datastore');
+    await emitGraphShowError(
+      opts,
+      cli,
+      'datastore-unavailable',
+      'session replay requires a datastore',
+    );
     return;
   }
   const resolved = resolveSession(datastore, { ref: opts.show ?? 'latest', tool: 'graph' });
@@ -414,7 +417,10 @@ function sessionReplayResult(
  * The host mounts this spec, applies the ADR-0021 common flags + graph's options
  * + the `[paths...]` variadic argument, and invokes {@link runGraphCommand}.
  */
-export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
+export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
   name: 'graph',
   description:
     'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
@@ -441,9 +447,21 @@ export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineComm
       value: '<session>',
       description: 'Replay a stored graph session by id, or latest for the latest graph session',
     },
-    { flag: '--gate-save', description: 'Save current Signal set as the gate baseline', default: false },
-    { flag: '--gate-compare', description: 'Compare current Signals to the gate baseline', default: false },
-    { flag: '--profile', value: '<path>', description: 'Write graph performance profile JSON to path' },
+    {
+      flag: '--gate-save',
+      description: 'Save current Signal set as the gate baseline',
+      default: false,
+    },
+    {
+      flag: '--gate-compare',
+      description: 'Compare current Signals to the gate baseline',
+      default: false,
+    },
+    {
+      flag: '--profile',
+      value: '<path>',
+      description: 'Write graph performance profile JSON to path',
+    },
     {
       flag: '--workspace',
       description: 'Fan out across detected workspace units (memory-isolated; polyglot)',
@@ -479,7 +497,14 @@ export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineComm
         'Also write this run’s findings as a SARIF 2.1.0 file (for GitHub Code Scanning). Composes with --gate-save; written even when the gate fails.',
     },
   ],
-  args: [{ name: 'paths', variadic: true, optional: true, description: 'Subtrees to analyze (default: whole project)' }],
+  args: [
+    {
+      name: 'paths',
+      variadic: true,
+      optional: true,
+      description: 'Subtrees to analyze (default: whole project)',
+    },
+  ],
   scope: 'project',
   output: 'raw-stream',
   handler: runGraphCommand,

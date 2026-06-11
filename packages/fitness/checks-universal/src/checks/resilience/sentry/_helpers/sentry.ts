@@ -8,7 +8,7 @@
  * All Sentry checks should call this first to avoid unnecessary work.
  */
 export function hasSentryUsage(content: string): boolean {
-  return content.includes('@sentry/') || content.includes('Sentry.')
+  return content.includes('@sentry/') || content.includes('Sentry.');
 }
 
 /**
@@ -16,7 +16,7 @@ export function hasSentryUsage(content: string): boolean {
  * Used by checks that validate init configuration.
  */
 export function hasSentryInit(content: string): boolean {
-  return content.includes('Sentry.init(') || content.includes('Sentry.init (')
+  return content.includes('Sentry.init(') || content.includes('Sentry.init (');
 }
 
 /**
@@ -28,35 +28,35 @@ export function hasSentryInit(content: string): boolean {
 export function extractSentryInitBlock(
   content: string,
 ): { startLine: number; endLine: number; block: string } | null {
-  const lines = content.split('\n')
+  const lines = content.split('\n');
 
-  let initLineIdx = -1
+  let initLineIdx = -1;
   for (const [i, line_] of lines.entries()) {
-    const line = line_ ?? ''
+    const line = line_ ?? '';
     if (line.includes('Sentry.init(') || line.includes('Sentry.init (')) {
-      initLineIdx = i
-      break
+      initLineIdx = i;
+      break;
     }
   }
 
-  if (initLineIdx === -1) return null
+  if (initLineIdx === -1) return null;
 
   // Collect the full init block by tracking parenthesis depth
-  let parenDepth = 0
-  let started = false
-  const blockLines: string[] = []
+  let parenDepth = 0;
+  let started = false;
+  const blockLines: string[] = [];
 
   for (let i = initLineIdx; i < lines.length; i++) {
-    const line = lines[i] ?? ''
-    blockLines.push(line)
+    const line = lines[i] ?? '';
+    blockLines.push(line);
 
     for (const char of line) {
       if (char === '(') {
-        parenDepth++
-        started = true
+        parenDepth++;
+        started = true;
       }
       if (char === ')') {
-        parenDepth--
+        parenDepth--;
       }
     }
 
@@ -65,7 +65,7 @@ export function extractSentryInitBlock(
         startLine: initLineIdx,
         endLine: i,
         block: blockLines.join('\n'),
-      }
+      };
     }
   }
 
@@ -74,5 +74,5 @@ export function extractSentryInitBlock(
     startLine: initLineIdx,
     endLine: lines.length - 1,
     block: blockLines.join('\n'),
-  }
+  };
 }

@@ -60,7 +60,10 @@ export function viewVerboseLines(lines: readonly string[]): ViewNode {
 function findingNode(f: FindingLineView): ViewNode {
   const spans: Span[] = [
     { text: '      ' },
-    { text: f.severity === 'error' ? 'error' : 'warn', tone: f.severity === 'error' ? 'error' : 'warning' },
+    {
+      text: f.severity === 'error' ? 'error' : 'warn',
+      tone: f.severity === 'error' ? 'error' : 'warning',
+    },
     { text: '  ' },
     { text: f.message },
   ];
@@ -82,10 +85,20 @@ function groupNode(g: FindingGroupView): ViewNode {
   const hidden = Math.max(0, g.findings.length - visible.length);
 
   const children: ViewNode[] = [
-    line([{ text: g.title, tone: 'brand' }, { text: ` (${String(count)})`, dim: true }]),
+    line([
+      { text: g.title, tone: 'brand' },
+      { text: ` (${String(count)})`, dim: true },
+    ]),
   ];
   if (g.error !== undefined) {
-    children.push(line([{ text: '      ' }, { text: 'error', tone: 'error' }, { text: '  ' }, { text: g.error }]));
+    children.push(
+      line([
+        { text: '      ' },
+        { text: 'error', tone: 'error' },
+        { text: '  ' },
+        { text: g.error },
+      ]),
+    );
   }
   for (const f of visible) children.push(findingNode(f));
   if (hidden > 0) {
@@ -114,7 +127,10 @@ export function viewFindingsGroups(groups: readonly FindingGroupView[]): ViewNod
     0,
   );
   const children: ViewNode[] = [
-    line([{ text: 'Findings', bold: true }, { text: ` (${String(total)}):`, dim: true }]),
+    line([
+      { text: 'Findings', bold: true },
+      { text: ` (${String(total)}):`, dim: true },
+    ]),
     { kind: 'spacer' },
     ...groups.map((g) => groupNode(g)),
   ];

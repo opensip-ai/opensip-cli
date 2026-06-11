@@ -4,7 +4,7 @@
  * Filters matched files by extension based on a check's declared fileTypes.
  */
 
-import * as path from 'node:path'
+import * as path from 'node:path';
 
 /**
  * Filter files by extension based on a check's declared fileTypes.
@@ -15,11 +15,11 @@ export function filterFilesByType(
   fileTypes: readonly string[] | undefined,
 ): string[] {
   if (!fileTypes || fileTypes.length === 0) {
-    return [...files]
+    return [...files];
   }
-  const extensions = new Set(fileTypes)
+  const extensions = new Set(fileTypes);
   return files.filter((f) => {
-    const ext = path.extname(f).slice(1) // remove leading dot
-    return extensions.has(ext)
-  })
+    const ext = path.extname(f).slice(1); // remove leading dot
+    return extensions.has(ext);
+  });
 }

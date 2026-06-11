@@ -9,14 +9,14 @@
  * to it.
  */
 
-import { makeDisplayHelpers } from '@opensip-tools/fitness'
+import { makeDisplayHelpers } from '@opensip-tools/fitness';
 
-import { ARCHITECTURE_DISPLAY, DOCUMENTATION_DISPLAY } from './architecture.js'
-import { QUALITY_DISPLAY } from './quality.js'
-import { RESILIENCE_DISPLAY } from './resilience.js'
-import { SECURITY_DISPLAY, TESTING_DISPLAY } from './security-testing.js'
+import { ARCHITECTURE_DISPLAY, DOCUMENTATION_DISPLAY } from './architecture.js';
+import { QUALITY_DISPLAY } from './quality.js';
+import { RESILIENCE_DISPLAY } from './resilience.js';
+import { SECURITY_DISPLAY, TESTING_DISPLAY } from './security-testing.js';
 
-import type { CheckDisplayEntry } from './types.js'
+import type { CheckDisplayEntry } from './types.js';
 
 /** Combined check display configuration */
 export const CHECK_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
@@ -26,12 +26,12 @@ export const CHECK_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
   ...RESILIENCE_DISPLAY,
   ...SECURITY_DISPLAY,
   ...TESTING_DISPLAY,
-})
+});
 
 /**
  * Slug-only display lookups bound to this pack's CHECK_DISPLAY map. The lookup
  * logic lives in @opensip-tools/fitness; this file owns only the data.
  */
-export const { getCheckIcon, getCheckDisplayName } = makeDisplayHelpers(CHECK_DISPLAY)
+export const { getCheckIcon, getCheckDisplayName } = makeDisplayHelpers(CHECK_DISPLAY);
 
-export { type CheckDisplayEntry } from './types.js'
+export { type CheckDisplayEntry } from './types.js';

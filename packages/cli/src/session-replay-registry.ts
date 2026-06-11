@@ -13,7 +13,9 @@ export interface CliSessionReplayContribution {
 }
 
 export class SessionReplayRegistry {
-  private constructor(private readonly byTool: ReadonlyMap<ToolShortId, CliSessionReplayContribution>) {}
+  private constructor(
+    private readonly byTool: ReadonlyMap<ToolShortId, CliSessionReplayContribution>,
+  ) {}
 
   static empty(): SessionReplayRegistry {
     return new SessionReplayRegistry(new Map());

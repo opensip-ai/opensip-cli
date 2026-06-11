@@ -3,23 +3,23 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-dsn-configured
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
-import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js'
+import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js';
 
 function analyze(content: string, _filePath: string): CheckViolation[] {
-  if (!hasSentryInit(content)) return []
+  if (!hasSentryInit(content)) return [];
 
-  const initBlock = extractSentryInitBlock(content)
-  if (!initBlock) return []
+  const initBlock = extractSentryInitBlock(content);
+  if (!initBlock) return [];
 
   // Check if DSN is present in the init block
   const hasDsn =
     initBlock.block.includes('dsn') ||
     initBlock.block.includes('DSN') ||
-    initBlock.block.includes('SENTRY_DSN')
+    initBlock.block.includes('SENTRY_DSN');
 
-  if (hasDsn) return []
+  if (hasDsn) return [];
 
   return [
     {
@@ -31,7 +31,7 @@ function analyze(content: string, _filePath: string): CheckViolation[] {
         'Add a dsn property to Sentry.init(): Sentry.init({ dsn: process.env.SENTRY_DSN, ... })',
       type: 'sentry-missing-dsn',
     },
-  ]
+  ];
 }
 
 /**
@@ -59,4 +59,4 @@ export const sentryDsnConfigured = defineCheck({
   fileTypes: ['ts', 'js', 'tsx', 'jsx', 'mjs'],
   confidence: 'high',
   analyze,
-})
+});

@@ -13,9 +13,13 @@
  * CheckViolation into a universal Signal via createSignal().
  */
 
-import { logger , SystemError , createSignal , applyContentFilter , currentScope } from '@opensip-tools/core'
-
-
+import {
+  logger,
+  SystemError,
+  createSignal,
+  applyContentFilter,
+  currentScope,
+} from '@opensip-tools/core';
 
 import {
   getAnalysisMode,
@@ -23,15 +27,15 @@ import {
   isAnalyzeAllConfig,
   isCommandConfig,
   validateCheckConfig,
-} from './check-config.js'
-import { executeCommand } from './command-executor.js'
-import { CheckAbortedError, createExecutionContext } from './execution-context.js'
-import { createFileAccessor } from './file-accessor.js'
-import { filterFilesByType } from './file-type-filter.js'
-import { filterSignalsByDirectives, buildFilteredResult } from './ignore-processing.js'
-import { PathMatcher } from './path-matcher.js'
-import { ResultBuilder } from './result-builder.js'
-import { mapFindingSeverity, mapTagsToSignalCategory } from './severity-mapping.js'
+} from './check-config.js';
+import { executeCommand } from './command-executor.js';
+import { CheckAbortedError, createExecutionContext } from './execution-context.js';
+import { createFileAccessor } from './file-accessor.js';
+import { filterFilesByType } from './file-type-filter.js';
+import { filterSignalsByDirectives, buildFilteredResult } from './ignore-processing.js';
+import { PathMatcher } from './path-matcher.js';
+import { ResultBuilder } from './result-builder.js';
+import { mapFindingSeverity, mapTagsToSignalCategory } from './severity-mapping.js';
 
 import type {
   UnifiedCheckConfig,
@@ -39,11 +43,11 @@ import type {
   AnalyzeCheckConfig,
   AnalyzeAllCheckConfig,
   CommandCheckConfig,
-} from './check-config.js'
-import type { Check } from './check-types.js'
-import type { ExecutionContext, RunOptions } from './execution-context.js'
-import type { CheckResult } from '../types/findings.js'
-import type { Signal } from '@opensip-tools/core'
+} from './check-config.js';
+import type { Check } from './check-types.js';
+import type { ExecutionContext, RunOptions } from './execution-context.js';
+import type { CheckResult } from '../types/findings.js';
+import type { Signal } from '@opensip-tools/core';
 
 // =============================================================================
 // VIOLATION → SIGNAL CONVERSION
@@ -56,7 +60,7 @@ function toSignal(
   defaultFilePath?: string,
   provider = 'opensip',
 ): Signal {
-  const filePath = violation.filePath ?? defaultFilePath ?? ''
+  const filePath = violation.filePath ?? defaultFilePath ?? '';
   return createSignal({
     source: 'fitness',
     provider,
@@ -66,8 +70,9 @@ function toSignal(
     message: violation.message,
     suggestion: violation.suggestion,
     code: { file: filePath, line: violation.line, column: violation.column },
-    fix: violation.fix
-      ?? (violation.suggestion ? { action: 'refactor' as const, confidence: 0.5 } : undefined),
+    fix:
+      violation.fix ??
+      (violation.suggestion ? { action: 'refactor' as const, confidence: 0.5 } : undefined),
     metadata: Object.fromEntries(
       Object.entries({
         match: violation.match,
@@ -76,7 +81,7 @@ function toSignal(
         checkTags: checkTags.length > 0 ? checkTags.join(',') : undefined,
       }).filter(([, v]) => v != null && v !== ''),
     ),
-  })
+  });
 }
 
 // =============================================================================
@@ -94,31 +99,38 @@ async function executeAnalyzeMode(
     itemType: config.itemType ?? 'files',
   })
     .totalItems(files.length)
-    .filesScanned(files.length)
+    .filesScanned(files.length);
 
   for (const filePath of files) {
     if (ctx.signal?.aborted) {
-      throw new CheckAbortedError(config.slug)
+      throw new CheckAbortedError(config.slug);
     }
 
     try {
-      const rawContent = await ctx.readFile(filePath)
+      const rawContent = await ctx.readFile(filePath);
       // Dispatch the content filter through the LanguageAdapter for the
       // file's extension. Falls back to raw content when no adapter is
       // registered. See languages/content-filter-dispatch.ts.
-      const content = applyContentFilter(filePath, rawContent, config.contentFilter ?? 'none')
-      const violations = config.analyze(content, filePath)
+      const content = applyContentFilter(filePath, rawContent, config.contentFilter ?? 'none');
+      const violations = config.analyze(content, filePath);
 
       for (const violation of violations) {
-        void builder.addSignal(toSignal(violation, config.slug, config.tags ?? [], filePath, config.provider))
+        void builder.addSignal(
+          toSignal(violation, config.slug, config.tags ?? [], filePath, config.provider),
+        );
       }
     } catch (error) {
-      if (error instanceof CheckAbortedError) throw error
-      logger.debug('Skipping unreadable file', { evt: 'fitness.check.file.skip', module: 'fitness:framework', filePath, checkSlug: config.slug })
+      if (error instanceof CheckAbortedError) throw error;
+      logger.debug('Skipping unreadable file', {
+        evt: 'fitness.check.file.skip',
+        module: 'fitness:framework',
+        filePath,
+        checkSlug: config.slug,
+      });
     }
   }
 
-  return builder.build()
+  return builder.build();
 }
 
 /** @throws {CheckAbortedError} When the check is aborted via AbortSignal */
@@ -128,14 +140,17 @@ async function executeAnalyzeAllMode(
   ctx: ExecutionContext,
 ): Promise<CheckResult> {
   if (ctx.signal?.aborted) {
-    throw new CheckAbortedError(config.slug)
+    throw new CheckAbortedError(config.slug);
   }
 
-  const fileAccessor = createFileAccessor(files, { signal: ctx.signal, contentFilter: config.contentFilter })
-  const violations = await config.analyzeAll(fileAccessor)
+  const fileAccessor = createFileAccessor(files, {
+    signal: ctx.signal,
+    contentFilter: config.contentFilter,
+  });
+  const violations = await config.analyzeAll(fileAccessor);
 
   if (ctx.signal?.aborted) {
-    throw new CheckAbortedError(config.slug)
+    throw new CheckAbortedError(config.slug);
   }
 
   const builder = ResultBuilder.create({
@@ -143,16 +158,18 @@ async function executeAnalyzeAllMode(
     itemType: config.itemType ?? 'files',
   })
     .totalItems(files.length)
-    .filesScanned(files.length)
+    .filesScanned(files.length);
 
   for (const violation of violations) {
     if (!violation.filePath) {
-      ctx.log(`Warning: violation missing filePath in analyzeAll mode`)
+      ctx.log(`Warning: violation missing filePath in analyzeAll mode`);
     }
-    void builder.addSignal(toSignal(violation, config.slug, config.tags ?? [], undefined, config.provider))
+    void builder.addSignal(
+      toSignal(violation, config.slug, config.tags ?? [], undefined, config.provider),
+    );
   }
 
-  return builder.build()
+  return builder.build();
 }
 
 /** @throws {CheckAbortedError} When the check is aborted via AbortSignal */
@@ -165,11 +182,11 @@ async function executeCommandMode(
     cwd: ctx.cwd,
     signal: ctx.signal,
     timeout: config.timeout,
-  })
+  });
 
   /* v8 ignore start -- defensive: command-mode tests cover the non-aborted path; abort during external command execution requires a long-running subprocess that's intentionally not unit-testable */
   if (result.aborted) {
-    throw new CheckAbortedError(config.slug)
+    throw new CheckAbortedError(config.slug);
   }
   /* v8 ignore stop */
 
@@ -178,17 +195,19 @@ async function executeCommandMode(
     itemType: config.itemType ?? 'files',
   })
     .totalItems(files.length)
-    .filesScanned(0)
+    .filesScanned(0);
 
   if (result.error) {
-    return builder.buildError(result.error)
+    return builder.buildError(result.error);
   }
 
   for (const violation of result.violations) {
-    void builder.addSignal(toSignal(violation, config.slug, config.tags ?? [], undefined, config.provider))
+    void builder.addSignal(
+      toSignal(violation, config.slug, config.tags ?? [], undefined, config.provider),
+    );
   }
 
-  return builder.build()
+  return builder.build();
 }
 
 // =============================================================================
@@ -219,7 +238,7 @@ async function executeCommandMode(
  * @throws {ValidationError} When the check config is invalid
  */
 export function defineCheck(config: UnifiedCheckConfig): Check {
-  validateCheckConfig(config)
+  validateCheckConfig(config);
 
   // Canonicalise scope languages through the current scope's language
   // registry so a check declared with `scope: { languages: ['c'] }` is
@@ -231,10 +250,10 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
   // defineCheck(...)`), we cannot canonicalise — just lowercase. The
   // engine canonicalises again at scope-match time, so any miss here
   // is recovered there.
-  const scope = currentScope()
+  const scope = currentScope();
   const canonicalLanguages = config.scope
     ? config.scope.languages.map((lang) => {
-        const canonical = scope?.languages.canonicalize(lang)
+        const canonical = scope?.languages.canonicalize(lang);
         if (canonical === undefined) {
           logger.debug({
             evt: 'fitness.check.scope.unknown_language',
@@ -242,12 +261,12 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
             checkSlug: config.slug,
             language: lang,
             msg: `Check ${config.slug} declared scope language ${lang} which is not registered (or no scope at definition time)`,
-          })
-          return lang.toLowerCase()
+          });
+          return lang.toLowerCase();
         }
-        return canonical
+        return canonical;
       })
-    : undefined
+    : undefined;
 
   const check: Check = {
     config: {
@@ -265,7 +284,10 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
       timeout: config.timeout,
       scansFiles: !isCommandConfig(config),
       fileTypes: config.fileTypes ? [...config.fileTypes] : undefined,
-      checkScope: config.scope && canonicalLanguages ? { languages: canonicalLanguages, concerns: [...config.scope.concerns] } : undefined,
+      checkScope:
+        config.scope && canonicalLanguages
+          ? { languages: canonicalLanguages, concerns: [...config.scope.concerns] }
+          : undefined,
       // Display metadata travels WITH the check (§5.3 fold) — no separate
       // per-process display sidecar/singleton. Authors set these inline, or a
       // pack's display map is applied via applyCheckDisplay().
@@ -276,7 +298,7 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
     },
 
     getScope() {
-      return { include: [], exclude: [], description: 'target-based scope' }
+      return { include: [], exclude: [], description: 'target-based scope' };
     },
 
     getMatcher(cwd: string): PathMatcher {
@@ -284,62 +306,63 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
         include: [],
         exclude: [],
         cwd,
-      })
+      });
     },
 
     async run(cwd: string, options?: RunOptions): Promise<CheckResult> {
-      const start = Date.now()
+      const start = Date.now();
 
       const matcher = PathMatcher.create({
         include: [],
         exclude: [],
         cwd,
-      })
+      });
 
       const legacyConfig = {
         id: config.id,
         slug: config.slug,
         tags: config.tags ? [...config.tags] : [],
         description: config.description,
-        scope: { include: [] as readonly string[], exclude: [] as readonly string[], description: '' },
-        itemType: (config.itemType ?? 'files'),
+        scope: {
+          include: [] as readonly string[],
+          exclude: [] as readonly string[],
+          description: '',
+        },
+        itemType: config.itemType ?? 'files',
         docs: config.docs,
         disabled: config.disabled,
         timeout: config.timeout,
         scansFiles: !isCommandConfig(config),
         // @fitness-ignore-next-line concurrency-safety -- async arrow delegates to executeUnifiedCheck which is async; needed for type compatibility
         execute: async (ctx: ExecutionContext) => executeUnifiedCheck(config, ctx),
-      }
+      };
 
-      const ctx = createExecutionContext(legacyConfig, cwd, matcher, options)
+      const ctx = createExecutionContext(legacyConfig, cwd, matcher, options);
 
       try {
-        const result = await executeUnifiedCheck(config, ctx)
+        const result = await executeUnifiedCheck(config, ctx);
 
-        const { filteredSignals, ignoredCount, appliedDirectives } = await filterSignalsByDirectives(
-          result.signals,
-          config.slug,
-          result.ignoredCount ?? 0,
-        )
+        const { filteredSignals, ignoredCount, appliedDirectives } =
+          await filterSignalsByDirectives(result.signals, config.slug, result.ignoredCount ?? 0);
 
-        const filtered = buildFilteredResult(result, filteredSignals, ignoredCount, start)
-        return appliedDirectives.length > 0 ? { ...filtered, appliedDirectives } : filtered
+        const filtered = buildFilteredResult(result, filteredSignals, ignoredCount, start);
+        return appliedDirectives.length > 0 ? { ...filtered, appliedDirectives } : filtered;
       } catch (error) {
-        if (error instanceof CheckAbortedError) throw error
+        if (error instanceof CheckAbortedError) throw error;
 
         const builder = ResultBuilder.create({
           checkId: config.id,
           itemType: config.itemType ?? 'files',
-        })
+        });
         return builder.buildError(
           `Check ${config.slug} threw an error: ${error instanceof Error ? error.message : String(error)}`,
           error instanceof Error ? error : undefined,
-        )
+        );
       }
     },
-  }
+  };
 
-  return check
+  return check;
 }
 
 /**
@@ -352,23 +375,25 @@ async function executeUnifiedCheck(
   config: UnifiedCheckConfig,
   ctx: ExecutionContext,
 ): Promise<CheckResult> {
-  const matchedFiles = await ctx.matchFiles()
+  const matchedFiles = await ctx.matchFiles();
 
   // Filter by check's declared file types
-  const files = filterFilesByType(matchedFiles, config.fileTypes)
+  const files = filterFilesByType(matchedFiles, config.fileTypes);
 
-  ctx.log(`Matched ${files.length} files`)
+  ctx.log(`Matched ${files.length} files`);
 
   if (isAnalyzeConfig(config)) {
-    return executeAnalyzeMode(config, files, ctx)
+    return executeAnalyzeMode(config, files, ctx);
   } else if (isAnalyzeAllConfig(config)) {
-    return executeAnalyzeAllMode(config, files, ctx)
+    return executeAnalyzeAllMode(config, files, ctx);
   } else if (isCommandConfig(config)) {
-    return executeCommandMode(config, files, ctx)
+    return executeCommandMode(config, files, ctx);
   }
 
   /* v8 ignore start -- exhaustive check: all UnifiedCheckConfig variants are handled above; this throw fires only if someone introduces a new variant without updating this switch */
-  const _exhaustiveCheck: never = config
-  throw new SystemError(`Unknown analysis mode: ${JSON.stringify(_exhaustiveCheck)}`, { code: 'SYSTEM.FITNESS.UNKNOWN_MODE' })
+  const _exhaustiveCheck: never = config;
+  throw new SystemError(`Unknown analysis mode: ${JSON.stringify(_exhaustiveCheck)}`, {
+    code: 'SYSTEM.FITNESS.UNKNOWN_MODE',
+  });
   /* v8 ignore stop */
 }

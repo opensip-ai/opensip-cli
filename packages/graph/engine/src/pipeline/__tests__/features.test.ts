@@ -40,7 +40,14 @@ function call(to: string): NonNullable<FunctionOccurrence['calls']>[number] {
 }
 
 function catalogOf(functions: Record<string, FunctionOccurrence[]>): Catalog {
-  return { version: '3.0', tool: 'graph', language: 'typescript', builtAt: 'x', cacheKey: 'k', functions };
+  return {
+    version: '3.0',
+    tool: 'graph',
+    language: 'typescript',
+    builtAt: 'x',
+    cacheKey: 'k',
+    functions,
+  };
 }
 
 const CONFIG: GraphConfig = {};
@@ -58,7 +65,13 @@ const CONFIG: GraphConfig = {};
  *  - testOnly: production fn whose only caller lives in a test file.
  */
 function makeFixture(): { catalog: Catalog; indexes: Indexes } {
-  const entry = occ({ bodyHash: 'entry', simpleName: 'main', package: 'cli', visibility: 'exported', calls: [call('hub')] });
+  const entry = occ({
+    bodyHash: 'entry',
+    simpleName: 'main',
+    package: 'cli',
+    visibility: 'exported',
+    calls: [call('hub')],
+  });
   const hub = occ({ bodyHash: 'hub', simpleName: 'hub', package: 'core', endLine: 20 }); // bodyLines 20
   const d1 = occ({ bodyHash: 'd1', simpleName: 'd1', package: 'core', calls: [call('hub')] });
   const d2 = occ({ bodyHash: 'd2', simpleName: 'd2', package: 'core', calls: [call('hub')] });
@@ -73,18 +86,44 @@ function makeFixture(): { catalog: Catalog; indexes: Indexes } {
   const c3b = occ({ bodyHash: 'c3b', simpleName: 'c3b', package: 'core', calls: [call('c3c')] });
   const c3c = occ({ bodyHash: 'c3c', simpleName: 'c3c', package: 'cli', calls: [call('c3a')] });
 
-  const orphan = occ({ bodyHash: 'orphan', simpleName: 'orphan', package: 'core', visibility: 'module-local' });
+  const orphan = occ({
+    bodyHash: 'orphan',
+    simpleName: 'orphan',
+    package: 'core',
+    visibility: 'module-local',
+  });
 
-  const prod = occ({ bodyHash: 'prod', simpleName: 'prod', package: 'core', visibility: 'module-local' });
+  const prod = occ({
+    bodyHash: 'prod',
+    simpleName: 'prod',
+    package: 'core',
+    visibility: 'module-local',
+  });
   const testCaller = occ({
-    bodyHash: 'tc', simpleName: 'tc', package: 'core',
-    filePath: 'packages/core/src/__tests__/tc.test.ts', inTestFile: true, calls: [call('prod')],
+    bodyHash: 'tc',
+    simpleName: 'tc',
+    package: 'core',
+    filePath: 'packages/core/src/__tests__/tc.test.ts',
+    inTestFile: true,
+    calls: [call('prod')],
   });
 
   const catalog = catalogOf({
-    main: [entry], hub: [hub], d1: [d1], d2: [d2], d3: [d3], t1: [t1], t2: [t2],
-    c2a: [c2a], c2b: [c2b], c3a: [c3a], c3b: [c3b], c3c: [c3c],
-    orphan: [orphan], prod: [prod], tc: [testCaller],
+    main: [entry],
+    hub: [hub],
+    d1: [d1],
+    d2: [d2],
+    d3: [d3],
+    t1: [t1],
+    t2: [t2],
+    c2a: [c2a],
+    c2b: [c2b],
+    c3a: [c3a],
+    c3b: [c3b],
+    c3c: [c3c],
+    orphan: [orphan],
+    prod: [prod],
+    tc: [testCaller],
   });
   return { catalog, indexes: buildIndexes(catalog) };
 }
@@ -148,20 +187,32 @@ describe('buildFeatures — scc (golden + determinism)', () => {
     // The occId-keyed graph + resolveCallee disambiguation must keep them as TWO
     // separate intra-package SCCs (crossesPackages: false).
     const auditCanon = occ({
-      bodyHash: 'CANON', simpleName: 'canonicalize', package: 'audit',
-      filePath: 'packages/audit/src/canonicalize.ts', calls: [call('hA')],
+      bodyHash: 'CANON',
+      simpleName: 'canonicalize',
+      package: 'audit',
+      filePath: 'packages/audit/src/canonicalize.ts',
+      calls: [call('hA')],
     });
     const helperA = occ({
-      bodyHash: 'hA', simpleName: 'helperA', package: 'audit',
-      filePath: 'packages/audit/src/helperA.ts', calls: [call('CANON')],
+      bodyHash: 'hA',
+      simpleName: 'helperA',
+      package: 'audit',
+      filePath: 'packages/audit/src/helperA.ts',
+      calls: [call('CANON')],
     });
     const complianceCanon = occ({
-      bodyHash: 'CANON', simpleName: 'canonicalize', package: 'compliance',
-      filePath: 'packages/compliance/src/canonicalize.ts', calls: [call('hB')],
+      bodyHash: 'CANON',
+      simpleName: 'canonicalize',
+      package: 'compliance',
+      filePath: 'packages/compliance/src/canonicalize.ts',
+      calls: [call('hB')],
     });
     const helperB = occ({
-      bodyHash: 'hB', simpleName: 'helperB', package: 'compliance',
-      filePath: 'packages/compliance/src/helperB.ts', calls: [call('CANON')],
+      bodyHash: 'hB',
+      simpleName: 'helperB',
+      package: 'compliance',
+      filePath: 'packages/compliance/src/helperB.ts',
+      calls: [call('CANON')],
     });
     // Both canonicalize occurrences share the simpleName bucket (collision-real).
     const catalog = catalogOf({
@@ -247,11 +298,21 @@ describe('buildFeatures — reachability', () => {
     // `p` is production-reachable (main → p) AND called by a test (t → p). The
     // old definition (`!prodReachable`) wrongly reported testReachable=false
     // here; it must be true (a test reaches it).
-    const entry = occ({ bodyHash: 'e', simpleName: 'main', package: 'cli', visibility: 'exported', calls: [call('p')] });
+    const entry = occ({
+      bodyHash: 'e',
+      simpleName: 'main',
+      package: 'cli',
+      visibility: 'exported',
+      calls: [call('p')],
+    });
     const p = occ({ bodyHash: 'p', simpleName: 'p', package: 'core' });
     const t = occ({
-      bodyHash: 't', simpleName: 't', package: 'core',
-      filePath: 'packages/core/src/__tests__/p.test.ts', inTestFile: true, calls: [call('p')],
+      bodyHash: 't',
+      simpleName: 't',
+      package: 'core',
+      filePath: 'packages/core/src/__tests__/p.test.ts',
+      inTestFile: true,
+      calls: [call('p')],
     });
     const catalog = catalogOf({ main: [entry], p: [p], t: [t] });
     const f = buildFeatures(catalog, buildIndexes(catalog), CONFIG, ['reachableOnlyFromTests']);
@@ -259,7 +320,13 @@ describe('buildFeatures — reachability', () => {
   });
 
   it('testReachable is false for a production-reachable fn no test exercises', () => {
-    const entry = occ({ bodyHash: 'e', simpleName: 'main', package: 'cli', visibility: 'exported', calls: [call('p')] });
+    const entry = occ({
+      bodyHash: 'e',
+      simpleName: 'main',
+      package: 'cli',
+      visibility: 'exported',
+      calls: [call('p')],
+    });
     const p = occ({ bodyHash: 'p', simpleName: 'p', package: 'core' });
     const catalog = catalogOf({ main: [entry], p: [p] });
     const f = buildFeatures(catalog, buildIndexes(catalog), CONFIG, ['reachableOnlyFromTests']);
@@ -305,8 +372,13 @@ describe('buildFeatures — lazy union', () => {
 //    dashboard client JS). Engine computors must equal these on the fixture. ──
 
 const BLAST_MAX_DEPTH = 5;
-function referenceBlast(start: string, callers: ReadonlyMap<string, readonly string[]>): {
-  direct: number; transitive: number; score: number;
+function referenceBlast(
+  start: string,
+  callers: ReadonlyMap<string, readonly string[]>,
+): {
+  direct: number;
+  transitive: number;
+  score: number;
 } {
   const directCallers = callers.get(start) ?? [];
   const directSet = new Set(directCallers);

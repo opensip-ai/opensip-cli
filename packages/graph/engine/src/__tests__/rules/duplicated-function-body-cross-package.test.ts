@@ -74,8 +74,22 @@ describe('duplicated-function-body aggregate cross-package path', () => {
     // even though it spans 3 packages (and the per-instance path is floored too).
     const trivial = { bodySize: 50, line: 1, endLine: 2 };
     const a = occ({ bodyHash: 'h', simpleName: 'get', package: 'pkg-a', ...trivial });
-    const b = occ({ bodyHash: 'h', simpleName: 'get', package: 'pkg-b', filePath: 'src/b.ts', qualifiedName: 'src/b.get', ...trivial });
-    const c = occ({ bodyHash: 'h', simpleName: 'get', package: 'pkg-c', filePath: 'src/c.ts', qualifiedName: 'src/c.get', ...trivial });
+    const b = occ({
+      bodyHash: 'h',
+      simpleName: 'get',
+      package: 'pkg-b',
+      filePath: 'src/b.ts',
+      qualifiedName: 'src/b.get',
+      ...trivial,
+    });
+    const c = occ({
+      bodyHash: 'h',
+      simpleName: 'get',
+      package: 'pkg-c',
+      filePath: 'src/c.ts',
+      qualifiedName: 'src/c.get',
+      ...trivial,
+    });
     const catalog = makeCatalog([a, b, c]);
     expect(evaluate(catalog, buildIndexes(catalog), {})).toHaveLength(0);
   });
@@ -87,8 +101,22 @@ describe('duplicated-function-body aggregate cross-package path', () => {
     // copied across packages).
     const smallReal = { bodySize: 120, line: 1, endLine: 2 };
     const a = occ({ bodyHash: 'h', simpleName: 'parseRange', package: 'pkg-a', ...smallReal });
-    const b = occ({ bodyHash: 'h', simpleName: 'parseRange', package: 'pkg-b', filePath: 'src/b.ts', qualifiedName: 'src/b.parseRange', ...smallReal });
-    const c = occ({ bodyHash: 'h', simpleName: 'parseRange', package: 'pkg-c', filePath: 'src/c.ts', qualifiedName: 'src/c.parseRange', ...smallReal });
+    const b = occ({
+      bodyHash: 'h',
+      simpleName: 'parseRange',
+      package: 'pkg-b',
+      filePath: 'src/b.ts',
+      qualifiedName: 'src/b.parseRange',
+      ...smallReal,
+    });
+    const c = occ({
+      bodyHash: 'h',
+      simpleName: 'parseRange',
+      package: 'pkg-c',
+      filePath: 'src/c.ts',
+      qualifiedName: 'src/c.parseRange',
+      ...smallReal,
+    });
     const catalog = makeCatalog([a, b, c]);
     const signals = evaluate(catalog, buildIndexes(catalog), {});
     expect(aggregates(signals)).toHaveLength(1);
@@ -98,13 +126,29 @@ describe('duplicated-function-body aggregate cross-package path', () => {
   it('honors a custom minCrossPackageDuplicateBodySize override', () => {
     const body90 = { bodySize: 90, line: 1, endLine: 2 };
     const a = occ({ bodyHash: 'h', simpleName: 'a', package: 'pkg-a', ...body90 });
-    const b = occ({ bodyHash: 'h', simpleName: 'b', package: 'pkg-b', filePath: 'src/b.ts', qualifiedName: 'src/b.b', ...body90 });
-    const c = occ({ bodyHash: 'h', simpleName: 'c', package: 'pkg-c', filePath: 'src/c.ts', qualifiedName: 'src/c.c', ...body90 });
+    const b = occ({
+      bodyHash: 'h',
+      simpleName: 'b',
+      package: 'pkg-b',
+      filePath: 'src/b.ts',
+      qualifiedName: 'src/b.b',
+      ...body90,
+    });
+    const c = occ({
+      bodyHash: 'h',
+      simpleName: 'c',
+      package: 'pkg-c',
+      filePath: 'src/c.ts',
+      qualifiedName: 'src/c.c',
+      ...body90,
+    });
     const catalog = makeCatalog([a, b, c]);
     // Default floor (80): 90 ≥ 80 → fires.
     expect(aggregates(evaluate(catalog, buildIndexes(catalog), {}))).toHaveLength(1);
     // Raised to 100: 90 < 100 → suppressed.
-    expect(evaluate(catalog, buildIndexes(catalog), { minCrossPackageDuplicateBodySize: 100 })).toHaveLength(0);
+    expect(
+      evaluate(catalog, buildIndexes(catalog), { minCrossPackageDuplicateBodySize: 100 }),
+    ).toHaveLength(0);
   });
 
   it('does NOT fire for a within-package small dup (1 package)', () => {

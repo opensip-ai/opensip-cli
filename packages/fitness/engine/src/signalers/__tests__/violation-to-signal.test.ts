@@ -52,7 +52,10 @@ describe('violationToSignal', () => {
   });
 
   it('preserves the message and the optional suggestion', () => {
-    const signal = violationToSignal('s', violation({ message: 'Bad import', suggestion: 'Use the barrel' }));
+    const signal = violationToSignal(
+      's',
+      violation({ message: 'Bad import', suggestion: 'Use the barrel' }),
+    );
     expect(signal.message).toBe('Bad import');
     expect(signal.suggestion).toBe('Use the barrel');
   });

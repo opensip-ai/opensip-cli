@@ -15,20 +15,20 @@ import {
   validateScenarioMetadata,
   validateTargetAndWorkload,
   type ScenarioValidationError,
-} from '../../framework/validation.js'
+} from '../../framework/validation.js';
 
-import { createChaosScenarioRunner } from './executor.js'
+import { createChaosScenarioRunner } from './executor.js';
 
-import type { ChaosScenarioConfig } from './config.js'
-import type { RunnableScenario } from '../../framework/runnable-scenario.js'
+import type { ChaosScenarioConfig } from './config.js';
+import type { RunnableScenario } from '../../framework/runnable-scenario.js';
 
 // `ChaosScenarioConfig` moved to `./config.ts` to break the
 // `define.ts ↔ executor.ts` file-level cycle. Re-exported here so
 // callers (the engine barrel, downstream tools) continue to import
 // the config shape from `'./define.js'` without churn.
-export type { ChaosScenarioConfig } from './config.js'
+export type { ChaosScenarioConfig } from './config.js';
 
-const VALID_FAULT_KINDS = new Set(['latency', 'abort', 'drop'])
+const VALID_FAULT_KINDS = new Set(['latency', 'abort', 'drop']);
 
 /**
  * Chaos-specific workload-timing checks: `rampUp` must be non-negative and
@@ -43,17 +43,17 @@ function validateChaosWorkloadTiming(
   errors: ScenarioValidationError[],
 ): void {
   if (config.workload?.rampUp !== undefined && config.workload.rampUp < 0) {
-    errors.push({ field: 'workload.rampUp', message: 'workload.rampUp must be non-negative' })
+    errors.push({ field: 'workload.rampUp', message: 'workload.rampUp must be non-negative' });
   }
   if (typeof config.duration !== 'number' || config.duration <= 0) {
-    errors.push({ field: 'duration', message: 'duration must be a positive number' })
+    errors.push({ field: 'duration', message: 'duration must be a positive number' });
   }
 }
 
 function validateFault(config: ChaosScenarioConfig, errors: ScenarioValidationError[]): void {
   if (!config.fault) {
-    errors.push({ field: 'fault', message: 'fault spec is required for chaos scenarios' })
-    return
+    errors.push({ field: 'fault', message: 'fault spec is required for chaos scenarios' });
+    return;
   }
   if (
     typeof config.fault.probability !== 'number' ||
@@ -63,49 +63,46 @@ function validateFault(config: ChaosScenarioConfig, errors: ScenarioValidationEr
     errors.push({
       field: 'fault.probability',
       message: 'fault.probability must be in [0, 1]',
-    })
+    });
   }
   if (config.fault.faults.length === 0) {
-    errors.push({ field: 'fault.faults', message: 'fault.faults must be a non-empty array' })
-    return
+    errors.push({ field: 'fault.faults', message: 'fault.faults must be a non-empty array' });
+    return;
   }
   for (const [i, f] of config.fault.faults.entries()) {
     if (!VALID_FAULT_KINDS.has(f.kind)) {
       errors.push({
         field: `fault.faults[${i}].kind`,
         message: "fault kind must be one of 'latency' | 'abort' | 'drop'",
-      })
+      });
     }
     if (f.kind === 'latency' && (typeof f.ms !== 'number' || f.ms < 0)) {
       errors.push({
         field: `fault.faults[${i}].ms`,
         message: 'latency fault requires a non-negative ms',
-      })
+      });
     }
   }
 }
 
-function validateAssertions(
-  config: ChaosScenarioConfig,
-  errors: ScenarioValidationError[],
-): void {
+function validateAssertions(config: ChaosScenarioConfig, errors: ScenarioValidationError[]): void {
   if (config.steadyStateAssertions.length === 0) {
     errors.push({
       field: 'steadyStateAssertions',
       message: 'at least one steady-state assertion is required',
-    })
+    });
   }
   if (config.recoveryAssertions.length === 0) {
     errors.push({
       field: 'recoveryAssertions',
       message: 'at least one recovery assertion is required',
-    })
+    });
   }
   if (typeof config.recoveryWindow !== 'number' || config.recoveryWindow < 0) {
     errors.push({
       field: 'recoveryWindow',
       message: 'recoveryWindow must be a non-negative number (milliseconds)',
-    })
+    });
   }
 }
 
@@ -118,14 +115,14 @@ function validateAssertions(
  * @throws {ValidationError} When the chaos scenario configuration is invalid
  */
 export function validateChaosScenarioConfig(config: ChaosScenarioConfig): void {
-  const errors: ScenarioValidationError[] = []
-  validateScenarioMetadata(config, errors)
-  validateTargetAndWorkload(config, errors)
-  validateChaosWorkloadTiming(config, errors)
-  validateFault(config, errors)
-  validateAssertions(config, errors)
+  const errors: ScenarioValidationError[] = [];
+  validateScenarioMetadata(config, errors);
+  validateTargetAndWorkload(config, errors);
+  validateChaosWorkloadTiming(config, errors);
+  validateFault(config, errors);
+  validateAssertions(config, errors);
 
-  throwValidationErrors(errors, 'chaos')
+  throwValidationErrors(errors, 'chaos');
 }
 
 /**
@@ -136,6 +133,6 @@ export function validateChaosScenarioConfig(config: ChaosScenarioConfig): void {
  * @throws {ValidationError} When the scenario configuration is invalid
  */
 export function defineChaosScenario(config: ChaosScenarioConfig): RunnableScenario {
-  validateChaosScenarioConfig(config)
-  return createChaosScenarioRunner(config)
+  validateChaosScenarioConfig(config);
+  return createChaosScenarioRunner(config);
 }

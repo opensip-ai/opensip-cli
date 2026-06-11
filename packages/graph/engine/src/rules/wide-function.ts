@@ -48,8 +48,7 @@ export const wideFunctionRule = defineRule({
           category: 'quality',
           message: `${occ.simpleName} takes ${String(n)} parameters.`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
-          suggestion:
-            'Group related parameters into an options object or split the function.',
+          suggestion: 'Group related parameters into an options object or split the function.',
           metadata: {
             paramCount: n,
             params: occ.params.map((p) => p.name),

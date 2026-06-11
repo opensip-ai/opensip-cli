@@ -16,16 +16,16 @@
  * routed through the helper's `skipLine` predicate.
  */
 
-import { defineRegexListCheck } from '@opensip-tools/fitness'
+import { defineRegexListCheck } from '@opensip-tools/fitness';
 
 // Exclusion: algorithm step comments like "Phase 1: Try primary
 // operation" are allowed and should not fire the Phase pattern.
-const ALGORITHM_PHASE_PATTERN = /\/\/\s{0,5}Phase\s{1,5}\d{1,3}\s{0,5}:\s{0,5}\w{1,50}/i
+const ALGORITHM_PHASE_PATTERN = /\/\/\s{0,5}Phase\s{1,5}\d{1,3}\s{0,5}:\s{0,5}\w{1,50}/i;
 
-const PHASE_FIX = 'Remove planning artifact; use backlog for tracking future work'
-const SPRINT_FIX = 'Remove planning artifact; sprint references are not useful to code readers'
-const VERSION_FIX = 'Remove version stamp; git history tracks this information'
-const DATE_FIX = 'Remove date stamp; git history tracks this information'
+const PHASE_FIX = 'Remove planning artifact; use backlog for tracking future work';
+const SPRINT_FIX = 'Remove planning artifact; sprint references are not useful to code readers';
+const VERSION_FIX = 'Remove version stamp; git history tracks this information';
+const DATE_FIX = 'Remove date stamp; git history tracks this information';
 
 /**
  * Check: quality/no-process-artifacts
@@ -104,4 +104,4 @@ export const noProcessArtifacts = defineRegexListCheck({
       suggestion: DATE_FIX,
     },
   ],
-})
+});

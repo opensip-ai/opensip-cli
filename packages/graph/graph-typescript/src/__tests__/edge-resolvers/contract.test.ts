@@ -7,7 +7,6 @@
 
 import { describe, expect, it } from 'vitest';
 
-
 import { resolveDirectCall } from '../../edge-resolvers/direct-call.js';
 import { resolveJsxElement } from '../../edge-resolvers/jsx-element.js';
 import { resolveNewExpression } from '../../edge-resolvers/new-expression.js';

@@ -2,7 +2,7 @@
  * @fileoverview Display entries for TypeScript-specific quality checks
  */
 
-import type { CheckDisplayEntry } from './types.js'
+import type { CheckDisplayEntry } from './types.js';
 
 /** Quality check display entries (TS_AST only, sorted alphabetically by slug) */
 export const QUALITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
@@ -38,4 +38,4 @@ export const QUALITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>(
   'toctou-race-condition': ['⚡', 'TOCTOU Race Condition Detection'],
   'typescript-frontend': ['📘', 'TypeScript Frontend'],
   'unused-config-options': ['⚙️', 'Unused Configuration Options'],
-})
+});

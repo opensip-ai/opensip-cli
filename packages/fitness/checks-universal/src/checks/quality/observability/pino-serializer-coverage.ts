@@ -7,16 +7,16 @@
  * - Large objects need truncation
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Pre-compiled patterns for complex objects that need serializers.
  * These patterns are intentional and safe for static code analysis.
  * They detect object references in log statements, not user input.
  */
-const REQUEST_PATTERN = new RegExp(String.raw`\breq\s*[,}]`)
-const QUERY_RUNNER_PATTERN = new RegExp(String.raw`queryRunner\s*[,}]`, 'i')
-const ENTITY_PATTERN = new RegExp(String.raw`\bentity\s*[,}]`, 'i')
+const REQUEST_PATTERN = new RegExp(String.raw`\breq\s*[,}]`);
+const QUERY_RUNNER_PATTERN = new RegExp(String.raw`queryRunner\s*[,}]`, 'i');
+const ENTITY_PATTERN = new RegExp(String.raw`\bentity\s*[,}]`, 'i');
 
 /**
  * Known complex objects that need serializers
@@ -25,18 +25,18 @@ const COMPLEX_OBJECTS = [
   { pattern: REQUEST_PATTERN, name: 'Request' },
   { pattern: QUERY_RUNNER_PATTERN, name: 'QueryRunner' },
   { pattern: ENTITY_PATTERN, name: 'Entity' },
-]
+];
 
 /**
  * Pre-compiled patterns for safe serialization indicators.
  * These patterns are intentional and safe for static code analysis.
  * Using escaped dot (\\.) instead of character class [.] per sonarjs/single-char-in-character-classes.
  */
-const SAFE_ID_PATTERN = /\.id\s{0,10}[,}]/
-const SAFE_NAME_PATTERN = /\.name\s{0,10}[,}]/
-const SAFE_TO_STRING_PATTERN = /\.toString\s{0,10}\(\)/
-const SAFE_JSON_STRINGIFY_PATTERN = /JSON\.stringify/
-const SAFE_TO_JSON_PATTERN = /\.toJSON\s{0,10}\(\)/
+const SAFE_ID_PATTERN = /\.id\s{0,10}[,}]/;
+const SAFE_NAME_PATTERN = /\.name\s{0,10}[,}]/;
+const SAFE_TO_STRING_PATTERN = /\.toString\s{0,10}\(\)/;
+const SAFE_JSON_STRINGIFY_PATTERN = /JSON\.stringify/;
+const SAFE_TO_JSON_PATTERN = /\.toJSON\s{0,10}\(\)/;
 
 /**
  * Safe patterns that indicate proper serialization
@@ -47,21 +47,21 @@ const SAFE_PATTERNS = [
   SAFE_TO_STRING_PATTERN,
   SAFE_JSON_STRINGIFY_PATTERN,
   SAFE_TO_JSON_PATTERN,
-]
+];
 
 /**
  * Pre-compiled pattern for detecting logger calls with objects.
  * This pattern is intentional and safe for static code analysis.
  * Using bounded quantifiers for safety.
  */
-const LOG_CALL_PATTERN = /logger\.(info|warn|error|debug|trace)\s{0,10}\(\s{0,10}\{/
+const LOG_CALL_PATTERN = /logger\.(info|warn|error|debug|trace)\s{0,10}\(\s{0,10}\{/;
 
 /**
  * Pre-compiled pattern for detecting circular reference issues.
  * This pattern is intentional and safe for static code analysis.
  * Using bounded quantifiers for safety.
  */
-const THIS_PATTERN = /:\s{0,10}this\s{0,10}[,}]/
+const THIS_PATTERN = /:\s{0,10}this\s{0,10}[,}]/;
 
 /**
  * Counts brackets in a line
@@ -69,13 +69,13 @@ const THIS_PATTERN = /:\s{0,10}this\s{0,10}[,}]/
  * @returns The net bracket count (open minus close)
  */
 function countBrackets(line: string): number {
-  let openCount = 0
-  let closeCount = 0
+  let openCount = 0;
+  let closeCount = 0;
   for (const char of line) {
-    if (char === '{') openCount++
-    if (char === '}') closeCount++
+    if (char === '{') openCount++;
+    if (char === '}') closeCount++;
   }
-  return openCount - closeCount
+  return openCount - closeCount;
 }
 
 /**
@@ -85,30 +85,30 @@ function countBrackets(line: string): number {
  * @returns The complete log statement
  */
 function buildLogStatement(lines: string[], startIndex: number): string {
-  const firstLine = lines[startIndex]
-  if (!firstLine) return ''
+  const firstLine = lines[startIndex];
+  if (!firstLine) return '';
 
-  let logStatement = firstLine
-  let bracketCount = countBrackets(firstLine)
-  let j = startIndex + 1
+  let logStatement = firstLine;
+  let bracketCount = countBrackets(firstLine);
+  let j = startIndex + 1;
 
   while (bracketCount > 0 && j < lines.length) {
-    const nextLine = lines[j]
+    const nextLine = lines[j];
     if (nextLine) {
-      logStatement += '\n' + nextLine
-      bracketCount += countBrackets(nextLine)
+      logStatement += '\n' + nextLine;
+      bracketCount += countBrackets(nextLine);
     }
-    j++
+    j++;
   }
 
-  return logStatement
+  return logStatement;
 }
 
 interface ViolationInfo {
-  lineNum: number
-  message: string
-  suggestion: string
-  match: string
+  lineNum: number;
+  message: string;
+  suggestion: string;
+  match: string;
 }
 
 /**
@@ -119,13 +119,13 @@ function createComplexObjectViolation(
   objectName: string,
   match: string,
 ): ViolationInfo {
-  const lowerName = objectName.toLowerCase()
+  const lowerName = objectName.toLowerCase();
   return {
     lineNum,
     message: `Logging ${objectName} object without serializer`,
     suggestion: `Register a Pino serializer for ${objectName} objects, or extract specific fields: { ${lowerName}Id: ${lowerName}.id, ${lowerName}Name: ${lowerName}.name }`,
     match,
-  }
+  };
 }
 
 /**
@@ -138,7 +138,7 @@ function createCircularReferenceViolation(lineNum: number, match: string): Viola
     suggestion:
       'Extract specific properties from "this" instead of logging the entire object: { className: this.constructor.name, id: this.id }',
     match,
-  }
+  };
 }
 
 /**
@@ -152,7 +152,7 @@ function checkComplexObjects(
 ): void {
   for (const { pattern, name } of COMPLEX_OBJECTS) {
     if (pattern.test(logStatement)) {
-      violationInfos.push(createComplexObjectViolation(lineNum, name, match))
+      violationInfos.push(createComplexObjectViolation(lineNum, name, match));
     }
   }
 }
@@ -167,7 +167,7 @@ function checkCircularReferences(
   violationInfos: ViolationInfo[],
 ): void {
   if (THIS_PATTERN.test(logStatement)) {
-    violationInfos.push(createCircularReferenceViolation(lineNum, match))
+    violationInfos.push(createCircularReferenceViolation(lineNum, match));
   }
 }
 
@@ -175,7 +175,7 @@ function checkCircularReferences(
  * Analyze a file for Pino serializer coverage issues
  */
 function analyzeFile(content: string, _filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   // Quick filter: skip files without logger patterns
   if (
@@ -184,30 +184,30 @@ function analyzeFile(content: string, _filePath: string): CheckViolation[] {
     !content.includes('logger.error') &&
     !content.includes('logger.debug')
   ) {
-    return violations
+    return violations;
   }
 
-  const lines = content.split('\n')
+  const lines = content.split('\n');
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    if (!line) continue
+    const line = lines[i];
+    if (!line) continue;
 
     // Check for logger calls with objects
-    if (!LOG_CALL_PATTERN.test(line)) continue
+    if (!LOG_CALL_PATTERN.test(line)) continue;
 
     // Get the full log statement (may span multiple lines)
-    const logStatement = buildLogStatement(lines, i)
+    const logStatement = buildLogStatement(lines, i);
 
     // Check if any safe patterns are used
-    const isSafe = SAFE_PATTERNS.some((p) => p.test(logStatement))
-    if (isSafe) continue
+    const isSafe = SAFE_PATTERNS.some((p) => p.test(logStatement));
+    if (isSafe) continue;
 
-    const lineNum = i + 1
-    const violationInfos: ViolationInfo[] = []
+    const lineNum = i + 1;
+    const violationInfos: ViolationInfo[] = [];
 
-    checkComplexObjects(logStatement, lineNum, line, violationInfos)
-    checkCircularReferences(logStatement, lineNum, line, violationInfos)
+    checkComplexObjects(logStatement, lineNum, line, violationInfos);
+    checkCircularReferences(logStatement, lineNum, line, violationInfos);
 
     for (const info of violationInfos) {
       violations.push({
@@ -217,11 +217,11 @@ function analyzeFile(content: string, _filePath: string): CheckViolation[] {
         severity: 'warning',
         suggestion: info.suggestion,
         match: info.match,
-      })
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 /**
@@ -253,4 +253,4 @@ export const pinoSerializerCoverage = defineCheck({
   timeout: 180_000, // 3 minutes - scans log statements across codebase
 
   analyze: analyzeFile,
-})
+});

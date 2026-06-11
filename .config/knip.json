@@ -36,30 +36,17 @@
       ]
     },
     "packages/dashboard": {
-      "ignore": [
-        "src/vendor/cytoscape-bundle.js"
-      ],
-      "ignoreDependencies": [
-        "cytoscape",
-        "cytoscape-dagre"
-      ]
+      "ignore": ["src/vendor/cytoscape-bundle.js"],
+      "ignoreDependencies": ["cytoscape", "cytoscape-dagre"]
     },
     "packages/fitness/checks-cpp": {
-      "ignoreDependencies": [
-        "@opensip-tools/core"
-      ]
+      "ignoreDependencies": ["@opensip-tools/core"]
     },
     "packages/fitness/engine": {
-      "entry": [
-        "src/tool.ts",
-        "src/cli/{fit,dashboard,list-checks,list-recipes}.ts"
-      ]
+      "entry": ["src/tool.ts", "src/cli/{fit,dashboard,list-checks,list-recipes}.ts"]
     },
     "packages/simulation/engine": {
-      "entry": [
-        "src/tool.ts",
-        "src/cli/sim.ts"
-      ]
+      "entry": ["src/tool.ts", "src/cli/sim.ts"]
     }
   }
 }

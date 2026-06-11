@@ -29,9 +29,7 @@ export interface LoadedFitConfig {
  * missing/invalid config is a HARD error (otherwise file-based checks
  * silently produce zero findings).
  */
-export function loadFitConfig(
-  args: FitOptions,
-): LoadedFitConfig | { error: ErrorResult } {
+export function loadFitConfig(args: FitOptions): LoadedFitConfig | { error: ErrorResult } {
   try {
     const signalersConfig = loadSignalersConfig(args.cwd, args.config);
     const targetsResult = loadTargetsConfig(args.cwd, args.config);
@@ -47,7 +45,8 @@ export function loadFitConfig(
       error: {
         type: 'error',
         message,
-        suggestion: "Run 'opensip-tools init' to scaffold a config, or pass --config <path> to point at an existing one.",
+        suggestion:
+          "Run 'opensip-tools init' to scaffold a config, or pass --config <path> to point at an existing one.",
         exitCode: EXIT_CODES.CONFIGURATION_ERROR,
       },
     };
@@ -91,7 +90,9 @@ export async function validateLanguagesAgainstAdapters(
     );
   }
   const langRegistry = scope.languages;
-  const knownLanguages = new Set<string>(langRegistry.list().flatMap((a) => [a.id, ...(a.aliases ?? [])]));
+  const knownLanguages = new Set<string>(
+    langRegistry.list().flatMap((a) => [a.id, ...(a.aliases ?? [])]),
+  );
   const unknownLanguages = new Set<string>();
   for (const target of targetRegistry.getAll()) {
     const langs = target.config.languages ?? [];
@@ -114,8 +115,8 @@ export async function validateLanguagesAgainstAdapters(
   });
   return [
     `target config declares unrecognized language tag(s): ${list}. ` +
-    `These match no content-filter adapter and are not a recognized non-code ` +
-    `format — likely a typo. Known code languages: ${[...knownLanguages].sort().join(', ')}. ` +
-    `Files under an unrecognized tag scan with no string/comment filtering.`,
+      `These match no content-filter adapter and are not a recognized non-code ` +
+      `format — likely a typo. Known code languages: ${[...knownLanguages].sort().join(', ')}. ` +
+      `Files under an unrecognized tag scan with no string/comment filtering.`,
   ];
 }

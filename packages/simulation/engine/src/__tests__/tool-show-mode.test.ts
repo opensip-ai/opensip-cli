@@ -54,14 +54,23 @@ function makeContext(datastore: DataStore | undefined): {
   Object.assign(scope, simulationTool.contributeScope?.() ?? {});
   const ctx: ToolCliContext = {
     scope,
-    render: vi.fn((result: unknown) => { rendered.push(result); return Promise.resolve(); }),
+    render: vi.fn((result: unknown) => {
+      rendered.push(result);
+      return Promise.resolve();
+    }),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    setExitCode: (code: number) => { exitCodes.push(code); },
-    emitJson: (value: unknown) => { emitted.push(value); },
-    emitEnvelope: (value: unknown) => { emitted.push(value); },
+    setExitCode: (code: number) => {
+      exitCodes.push(code);
+    },
+    emitJson: (value: unknown) => {
+      emitted.push(value);
+    },
+    emitEnvelope: (value: unknown) => {
+      emitted.push(value);
+    },
     emitError: (detail: { message: string; exitCode: number; suggestion?: string }) => {
       exitCodes.push(detail.exitCode);
       emitted.push(detail);

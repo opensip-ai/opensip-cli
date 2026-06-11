@@ -8,6 +8,11 @@
     "kind": "tool",
     "id": "audit-demo-tool",
     "apiVersion": 1,
-    "commands": [{ "name": "audit-demo", "description": "Demo audit command contributed by a tool plugin" }]
+    "commands": [
+      {
+        "name": "audit-demo",
+        "description": "Demo audit command contributed by a tool plugin"
+      }
+    ]
   }
 }

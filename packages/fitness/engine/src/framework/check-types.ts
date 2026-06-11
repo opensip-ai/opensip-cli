@@ -6,58 +6,55 @@
  * CheckResult carries Signal[].
  */
 
-
-import type { CheckScope, ResolvedScope } from './check-config.js'
-import type { ExecutionContext, RunOptions } from './execution-context.js'
-import type { PathMatcher } from './path-matcher.js'
-import type { CheckResult, ItemType } from '../types/findings.js'
-
-
+import type { CheckScope, ResolvedScope } from './check-config.js';
+import type { ExecutionContext, RunOptions } from './execution-context.js';
+import type { PathMatcher } from './path-matcher.js';
+import type { CheckResult, ItemType } from '../types/findings.js';
 
 /**
  * Check configuration options.
  */
 export interface CheckConfig {
-  readonly id: string
-  readonly slug: string
-  readonly tags: readonly string[]
-  readonly description: string
-  readonly longDescription?: string | undefined
-  readonly analysisMode: 'analyze' | 'analyzeAll' | 'command'
-  readonly scope: ResolvedScope
-  readonly itemType: ItemType
-  readonly unit?: string | undefined
-  readonly additionalExcludes?: readonly string[] | undefined
-  readonly docs?: string | undefined
-  readonly disabled?: boolean | undefined
-  readonly confidence?: 'high' | 'medium' | 'low' | undefined
-  readonly timeout?: number | undefined
-  readonly scansFiles?: boolean | undefined
-  readonly fileTypes?: readonly string[] | undefined
+  readonly id: string;
+  readonly slug: string;
+  readonly tags: readonly string[];
+  readonly description: string;
+  readonly longDescription?: string | undefined;
+  readonly analysisMode: 'analyze' | 'analyzeAll' | 'command';
+  readonly scope: ResolvedScope;
+  readonly itemType: ItemType;
+  readonly unit?: string | undefined;
+  readonly additionalExcludes?: readonly string[] | undefined;
+  readonly docs?: string | undefined;
+  readonly disabled?: boolean | undefined;
+  readonly confidence?: 'high' | 'medium' | 'low' | undefined;
+  readonly timeout?: number | undefined;
+  readonly scansFiles?: boolean | undefined;
+  readonly fileTypes?: readonly string[] | undefined;
   /** Portable scope declaration for marketplace-ready target matching. */
-  readonly checkScope?: CheckScope | undefined
+  readonly checkScope?: CheckScope | undefined;
   /**
    * Display icon (an emoji) for CLI/dashboard output. Travels WITH the check
    * (§5.3 separate-domains fold) — there is no separate per-process display
    * sidecar map. Absent → consumers fall back to a default icon.
    */
-  readonly icon?: string | undefined
+  readonly icon?: string | undefined;
   /**
    * Human-readable display name for CLI/dashboard output. Absent → consumers
    * fall back to kebab-to-title-case of the slug.
    */
-  readonly displayName?: string | undefined
-  readonly execute: (ctx: ExecutionContext) => Promise<CheckResult>
+  readonly displayName?: string | undefined;
+  readonly execute: (ctx: ExecutionContext) => Promise<CheckResult>;
 }
 
 /**
  * A defined check, ready to run.
  */
 export interface Check {
-  readonly config: CheckConfig
-  readonly run: (cwd: string, options?: RunOptions) => Promise<CheckResult>
-  readonly getScope: () => ResolvedScope
-  readonly getMatcher: (cwd: string) => PathMatcher
+  readonly config: CheckConfig;
+  readonly run: (cwd: string, options?: RunOptions) => Promise<CheckResult>;
+  readonly getScope: () => ResolvedScope;
+  readonly getMatcher: (cwd: string) => PathMatcher;
 }
 
 /**
@@ -71,18 +68,18 @@ export interface Check {
  * - Has a `run` property that is a function
  */
 export function isCheck(value: unknown): value is Check {
-  if (value === null || typeof value !== 'object') return false
+  if (value === null || typeof value !== 'object') return false;
 
-  const obj = value as Record<string, unknown>
-  if (!obj.config || typeof obj.config !== 'object') return false
+  const obj = value as Record<string, unknown>;
+  if (!obj.config || typeof obj.config !== 'object') return false;
 
-  const config = obj.config as Record<string, unknown>
-  if (typeof config.id !== 'string') return false
-  if (typeof config.slug !== 'string') return false
-  if (typeof config.execute !== 'function') return false
-  if (typeof obj.run !== 'function') return false
+  const config = obj.config as Record<string, unknown>;
+  if (typeof config.id !== 'string') return false;
+  if (typeof config.slug !== 'string') return false;
+  if (typeof config.execute !== 'function') return false;
+  if (typeof obj.run !== 'function') return false;
 
-  return true
+  return true;
 }
 
 /**
@@ -102,18 +99,18 @@ export function collectCheckObjects(
   obj: Record<string, unknown>,
   seen: Set<string> = new Set<string>(),
 ): Check[] {
-  const result: Check[] = []
+  const result: Check[] = [];
   for (const value of Object.values(obj)) {
     if (isCheck(value)) {
       if (!seen.has(value.config.id)) {
-        seen.add(value.config.id)
-        result.push(value)
+        seen.add(value.config.id);
+        result.push(value);
       }
     } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      result.push(...collectCheckObjects(value as Record<string, unknown>, seen))
+      result.push(...collectCheckObjects(value as Record<string, unknown>, seen));
     }
   }
-  return result
+  return result;
 }
 
-export {type ResolvedScope} from './check-config.js'
+export { type ResolvedScope } from './check-config.js';

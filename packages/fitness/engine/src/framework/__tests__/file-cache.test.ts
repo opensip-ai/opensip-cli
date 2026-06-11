@@ -10,7 +10,6 @@ import { DEFAULT_PREWARM_PATTERNS, fileCache } from '../file-cache.js';
 let testDir: string;
 
 beforeEach(() => {
-   
   testDir = mkdtempSync(join(tmpdir(), 'opensip-fc-'));
   fileCache.clear();
 });

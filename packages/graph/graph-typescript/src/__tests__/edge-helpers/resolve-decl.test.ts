@@ -14,10 +14,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  buildExportIndex,
-  buildPackageManifestIndexFromRoots,
-} from '@opensip-tools/graph';
+import { buildExportIndex, buildPackageManifestIndexFromRoots } from '@opensip-tools/graph';
 import ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -95,7 +92,9 @@ describe('resolveDeclToHash — cross-package (.d.ts) boundary resolution', () =
     };
   });
 
-  afterAll(() => { rmSync(root, { recursive: true, force: true }); });
+  afterAll(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
 
   function ctxWith(importSpecifiers: ReadonlyMap<string, string>): ResolverContext {
     return {

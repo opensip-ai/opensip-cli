@@ -15,7 +15,6 @@ const stub = (include: string[], exclude: string[] = []): Target => ({
 });
 
 beforeEach(() => {
-   
   testDir = mkdtempSync(join(tmpdir(), 'opensip-resolver-'));
   mkdirSync(join(testDir, 'src'), { recursive: true });
   mkdirSync(join(testDir, 'src', 'sub'), { recursive: true });
@@ -45,10 +44,7 @@ describe('resolveTargetFiles', () => {
   });
 
   it('deduplicates files matching multiple targets', () => {
-    const files = resolveTargetFiles(
-      [stub(['src/*.ts']), stub(['src/**/*.ts'])],
-      testDir,
-    );
+    const files = resolveTargetFiles([stub(['src/*.ts']), stub(['src/**/*.ts'])], testDir);
     const unique = new Set(files);
     expect(files.length).toBe(unique.size);
   });
@@ -64,10 +60,7 @@ describe('resolveTargetFiles', () => {
   });
 
   it('combines results across multiple targets', () => {
-    const files = resolveTargetFiles(
-      [stub(['src/a.ts']), stub(['tests/d.ts'])],
-      testDir,
-    );
+    const files = resolveTargetFiles([stub(['src/a.ts']), stub(['tests/d.ts'])], testDir);
     expect(files.some((f) => f.endsWith('a.ts'))).toBe(true);
     expect(files.some((f) => f.endsWith('d.ts'))).toBe(true);
   });

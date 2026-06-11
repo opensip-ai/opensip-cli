@@ -8,17 +8,17 @@
  * - Node-based Dockerfiles must also include node_modules pattern
  */
 
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
 
 // =============================================================================
 // REGEX PATTERNS
 // =============================================================================
 
 /** Matches FROM node:XX or FROM node:XX-alpine etc. */
-const FROM_NODE_PATTERN = /^FROM\s+node:/im
+const FROM_NODE_PATTERN = /^FROM\s+node:/im;
 
 // =============================================================================
 // HELPERS
@@ -29,15 +29,15 @@ const FROM_NODE_PATTERN = /^FROM\s+node:/im
  * Matches exact lines (trimmed), not substrings.
  */
 function hasPattern(dockerignoreContent: string, pattern: string): boolean {
-  const lines = dockerignoreContent.split('\n').map((l) => l.trim())
-  return lines.includes(pattern)
+  const lines = dockerignoreContent.split('\n').map((l) => l.trim());
+  return lines.includes(pattern);
 }
 
 /**
  * Determine if a Dockerfile is Node-based by checking for FROM node: directives.
  */
 function isNodeDockerfile(content: string): boolean {
-  return FROM_NODE_PATTERN.test(content)
+  return FROM_NODE_PATTERN.test(content);
 }
 
 // =============================================================================
@@ -76,12 +76,12 @@ export const dockerIgnoreValidation = defineCheck({
 
   /** @throws {Error} When file system operations fail */
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     for (const filePath of files.paths) {
-      const dockerfileDir = path.dirname(filePath)
-      const dockerignorePath = path.join(dockerfileDir, '.dockerignore')
-      const relPath = path.relative(process.cwd(), filePath)
+      const dockerfileDir = path.dirname(filePath);
+      const dockerignorePath = path.join(dockerfileDir, '.dockerignore');
+      const relPath = path.relative(process.cwd(), filePath);
 
       // Check if .dockerignore exists
       if (!fs.existsSync(dockerignorePath)) {
@@ -92,15 +92,16 @@ export const dockerIgnoreValidation = defineCheck({
           severity: 'warning',
           suggestion: `Create a .dockerignore file in ${path.relative(process.cwd(), dockerfileDir)} with at least .git pattern`,
           type: 'missing-dockerignore',
-        })
-        continue
+        });
+        continue;
       }
 
       // Read .dockerignore and validate required patterns
-      const dockerignoreStats = fs.statSync(dockerignorePath)
-      if (dockerignoreStats.size > 10_000_000) throw new Error(`File too large: ${dockerignorePath}`)
-      const dockerignoreContent = fs.readFileSync(dockerignorePath, 'utf8')
-      const content = await files.read(filePath)
+      const dockerignoreStats = fs.statSync(dockerignorePath);
+      if (dockerignoreStats.size > 10_000_000)
+        throw new Error(`File too large: ${dockerignorePath}`);
+      const dockerignoreContent = fs.readFileSync(dockerignorePath, 'utf8');
+      const content = await files.read(filePath);
 
       // .git is always required
       if (!hasPattern(dockerignoreContent, '.git')) {
@@ -112,7 +113,7 @@ export const dockerIgnoreValidation = defineCheck({
           suggestion:
             'Add .git to .dockerignore to exclude version control data from build context',
           type: 'missing-pattern',
-        })
+        });
       }
 
       // node_modules is required for Node-based Dockerfiles
@@ -125,10 +126,10 @@ export const dockerIgnoreValidation = defineCheck({
           suggestion:
             'Add node_modules to .dockerignore to exclude local dependencies from build context',
           type: 'missing-pattern',
-        })
+        });
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

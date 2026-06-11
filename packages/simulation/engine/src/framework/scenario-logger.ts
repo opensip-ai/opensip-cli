@@ -14,17 +14,17 @@
  * rather than being duplicated into each kinds/<kind>/executor.ts.
  */
 
-import { logger } from '@opensip-tools/core'
+import { logger } from '@opensip-tools/core';
 
-import type { ScenarioLogger } from '../types/framework-types.js'
+import type { ScenarioLogger } from '../types/framework-types.js';
 
 export function createScenarioLogger(scenarioId: string): ScenarioLogger {
   return {
     info: (message, data) => {
-      logger.info({ evt: 'simulation.scenario.info', scenarioId, msg: message, ...data })
+      logger.info({ evt: 'simulation.scenario.info', scenarioId, msg: message, ...data });
     },
     warn: (message, data) => {
-      logger.warn({ evt: 'simulation.scenario.warn', scenarioId, msg: message, ...data })
+      logger.warn({ evt: 'simulation.scenario.warn', scenarioId, msg: message, ...data });
     },
     error: (message, data) => {
       logger.error({
@@ -33,10 +33,10 @@ export function createScenarioLogger(scenarioId: string): ScenarioLogger {
         scenarioId,
         msg: message,
         ...data,
-      })
+      });
     },
     debug: (message, data) => {
-      logger.debug({ evt: 'simulation.scenario.debug', scenarioId, msg: message, ...data })
+      logger.debug({ evt: 'simulation.scenario.debug', scenarioId, msg: message, ...data });
     },
-  }
+  };
 }

@@ -8,19 +8,19 @@
 # =============================================================================
 
 globalExcludes:
-  - "docs/**"
+  - 'docs/**'
   # Historical changelog — append-only by definition, expected to grow.
   # Not source; source-shape checks (file length, complexity) do not apply.
-  - "CHANGELOG.md"
+  - 'CHANGELOG.md'
   # Test fixtures intentionally contain stub patterns, TODO markers,
   # and other shapes that exercise checks; excluding them prevents
   # fixture content from being analyzed as production code.
-  - "**/__tests__/fixtures/**"
-  - "**/__fixtures__/**"
-  - "**/fixtures/**"
+  - '**/__tests__/fixtures/**'
+  - '**/__fixtures__/**'
+  - '**/fixtures/**'
   # Drizzle-generated migration snapshots are data, not source. They have
   # no comment syntax for inline directives and grow with schema changes.
-  - "packages/datastore/migrations/**"
+  - 'packages/datastore/migrations/**'
 
 targets:
   backend:
@@ -28,12 +28,12 @@ targets:
     languages: [typescript]
     concerns: [backend, server, api]
     include:
-      - "packages/*/src/**/*.ts"
+      - 'packages/*/src/**/*.ts'
     exclude:
-      - "**/*.test.ts"
-      - "**/__tests__/**"
-      - "**/node_modules/**"
-      - "**/dist/**"
+      - '**/*.test.ts'
+      - '**/__tests__/**'
+      - '**/node_modules/**'
+      - '**/dist/**'
     tags:
       - production
       - node
@@ -44,12 +44,12 @@ targets:
     languages: [typescript]
     concerns: [cli]
     include:
-      - "packages/cli/src/**/*.ts"
+      - 'packages/cli/src/**/*.ts'
     exclude:
-      - "**/*.test.ts"
-      - "**/__tests__/**"
-      - "**/node_modules/**"
-      - "**/dist/**"
+      - '**/*.test.ts'
+      - '**/__tests__/**'
+      - '**/node_modules/**'
+      - '**/dist/**'
     tags:
       - production
       - node
@@ -60,11 +60,11 @@ targets:
     languages: [typescript]
     concerns: [testing]
     include:
-      - "**/*.test.ts"
-      - "**/__tests__/**/*.ts"
+      - '**/*.test.ts'
+      - '**/__tests__/**/*.ts'
     exclude:
-      - "**/node_modules/**"
-      - "**/dist/**"
+      - '**/node_modules/**'
+      - '**/dist/**'
     tags:
       - testing
       - typescript
@@ -73,10 +73,10 @@ targets:
     description: All TypeScript files
     languages: [typescript]
     include:
-      - "**/*.ts"
+      - '**/*.ts'
     exclude:
-      - "**/node_modules/**"
-      - "**/dist/**"
+      - '**/node_modules/**'
+      - '**/dist/**'
     tags:
       - typescript
 
@@ -85,13 +85,13 @@ targets:
     languages: [typescript]
     concerns: [fitness]
     include:
-      - "packages/fitness/checks-*/src/checks/**/*.ts"
+      - 'packages/fitness/checks-*/src/checks/**/*.ts'
     exclude:
-      - "**/*.test.ts"
-      - "**/__tests__/**"
-      - "**/index.ts"
-      - "**/node_modules/**"
-      - "**/dist/**"
+      - '**/*.test.ts'
+      - '**/__tests__/**'
+      - '**/index.ts'
+      - '**/node_modules/**'
+      - '**/dist/**'
     tags:
       - fitness
       - typescript
@@ -101,12 +101,12 @@ targets:
     languages: [typescript]
     concerns: [config]
     include:
-      - "**/tsconfig.json"
-      - "**/package.json"
-      - "**/vitest.config.ts"
-      - "turbo.json"
+      - '**/tsconfig.json'
+      - '**/package.json'
+      - '**/vitest.config.ts'
+      - 'turbo.json'
     exclude:
-      - "**/node_modules/**"
+      - '**/node_modules/**'
     tags:
       - config
 

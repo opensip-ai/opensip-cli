@@ -80,7 +80,12 @@ export const fitBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext> 
   description: 'Export the fit gate baseline (SARIF) from the datastore to a file',
   commonFlags: ['cwd', 'json'],
   options: [
-    { flag: '--out', value: '<path>', description: 'Output file path for the SARIF baseline', required: true },
+    {
+      flag: '--out',
+      value: '<path>',
+      description: 'Output file path for the SARIF baseline',
+      required: true,
+    },
   ],
   scope: 'project',
   output: 'raw-stream',

@@ -74,7 +74,13 @@ function fakeAdapter(): GraphLanguageAdapter {
     }),
     resolveCallSites: (): ResolveOutput => ({
       edgesByOwner: new Map([['h1', []]]),
-      stats: { totalCallSites: 0, resolvedHigh: 0, resolvedMedium: 0, resolvedLow: 0, unresolved: 0 },
+      stats: {
+        totalCallSites: 0,
+        resolvedHigh: 0,
+        resolvedMedium: 0,
+        resolvedLow: 0,
+        unresolved: 0,
+      },
     }),
     cacheKey: () => 'fake-graph-worker-v1',
   };
@@ -110,7 +116,11 @@ afterEach(() => {
 describe('executeGraphWorker', () => {
   it('runs the build and posts a slim LiveGraphOutput result over IPC', async () => {
     const specPath = join(dir, 'spec.json');
-    writeFileSync(specPath, JSON.stringify({ cwd: dir, resolution: 'exact', noCache: true }), 'utf8');
+    writeFileSync(
+      specPath,
+      JSON.stringify({ cwd: dir, resolution: 'exact', noCache: true }),
+      'utf8',
+    );
 
     await executeGraphWorker(specPath, mockCli());
 
@@ -128,7 +138,11 @@ describe('executeGraphWorker', () => {
 
   it('streams stage progress events before the result', async () => {
     const specPath = join(dir, 'spec.json');
-    writeFileSync(specPath, JSON.stringify({ cwd: dir, resolution: 'exact', noCache: true }), 'utf8');
+    writeFileSync(
+      specPath,
+      JSON.stringify({ cwd: dir, resolution: 'exact', noCache: true }),
+      'utf8',
+    );
 
     await executeGraphWorker(specPath, mockCli());
 

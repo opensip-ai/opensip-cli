@@ -50,7 +50,15 @@ describe('decodeSessionPayload — fit-style options (all relaxed)', () => {
           fitCheck({
             violationCount: 3,
             findings: [
-              { ruleId: 'r', message: 'm', severity: 'warning', filePath: 'x.ts', line: 4, column: 2, suggestion: 'fix' },
+              {
+                ruleId: 'r',
+                message: 'm',
+                severity: 'warning',
+                filePath: 'x.ts',
+                line: 4,
+                column: 2,
+                suggestion: 'fix',
+              },
             ],
           }),
         ],
@@ -59,7 +67,13 @@ describe('decodeSessionPayload — fit-style options (all relaxed)', () => {
     );
     expect(decoded.checks[0].violationCount).toBe(3);
     expect(decoded.checks[0].findings[0]).toEqual({
-      ruleId: 'r', message: 'm', severity: 'warning', filePath: 'x.ts', line: 4, column: 2, suggestion: 'fix',
+      ruleId: 'r',
+      message: 'm',
+      severity: 'warning',
+      filePath: 'x.ts',
+      line: 4,
+      column: 2,
+      suggestion: 'fix',
     });
   });
 
@@ -73,7 +87,14 @@ describe('decodeSessionPayload — fit-style options (all relaxed)', () => {
 
   it('drops metadata entirely when allowMetadata is off', () => {
     const decoded = decodeSessionPayload(
-      { summary: SUMMARY, checks: [fitCheck({ findings: [{ ruleId: 'r', message: 'm', severity: 'error', metadata: { a: 1 } }] })] },
+      {
+        summary: SUMMARY,
+        checks: [
+          fitCheck({
+            findings: [{ ruleId: 'r', message: 'm', severity: 'error', metadata: { a: 1 } }],
+          }),
+        ],
+      },
       { tool: 'fit' },
     );
     expect(decoded.checks[0].findings[0].metadata).toBeUndefined();
@@ -81,7 +102,12 @@ describe('decodeSessionPayload — fit-style options (all relaxed)', () => {
 });
 
 describe('decodeSessionPayload — graph-style options (all strict)', () => {
-  const graphOpts = { tool: 'graph', requireFilePath: true, requireViolationCount: true, allowMetadata: true } as const;
+  const graphOpts = {
+    tool: 'graph',
+    requireFilePath: true,
+    requireViolationCount: true,
+    allowMetadata: true,
+  } as const;
 
   it('decodes required filePath/violationCount and a scalar metadata bag', () => {
     const decoded = decodeSessionPayload(
@@ -89,8 +115,19 @@ describe('decodeSessionPayload — graph-style options (all strict)', () => {
         summary: SUMMARY,
         checks: [
           {
-            checkSlug: 'g', passed: false, violationCount: 2, durationMs: 0,
-            findings: [{ ruleId: 'r', message: 'm', severity: 'error', filePath: 'a.ts', metadata: { fanIn: 9, name: 'x', on: true, nested: { drop: 1 } } }],
+            checkSlug: 'g',
+            passed: false,
+            violationCount: 2,
+            durationMs: 0,
+            findings: [
+              {
+                ruleId: 'r',
+                message: 'm',
+                severity: 'error',
+                filePath: 'a.ts',
+                metadata: { fanIn: 9, name: 'x', on: true, nested: { drop: 1 } },
+              },
+            ],
           },
         ],
       },
@@ -103,7 +140,26 @@ describe('decodeSessionPayload — graph-style options (all strict)', () => {
 
   it('returns undefined metadata when the bag has no scalar entries', () => {
     const decoded = decodeSessionPayload(
-      { summary: SUMMARY, checks: [{ checkSlug: 'g', passed: true, violationCount: 0, durationMs: 0, findings: [{ ruleId: 'r', message: 'm', severity: 'error', filePath: 'a.ts', metadata: { nested: {} } }] }] },
+      {
+        summary: SUMMARY,
+        checks: [
+          {
+            checkSlug: 'g',
+            passed: true,
+            violationCount: 0,
+            durationMs: 0,
+            findings: [
+              {
+                ruleId: 'r',
+                message: 'm',
+                severity: 'error',
+                filePath: 'a.ts',
+                metadata: { nested: {} },
+              },
+            ],
+          },
+        ],
+      },
       graphOpts,
     );
     expect(decoded.checks[0].findings[0].metadata).toBeUndefined();
@@ -111,7 +167,20 @@ describe('decodeSessionPayload — graph-style options (all strict)', () => {
 
   it('treats null/non-object metadata as undefined', () => {
     const decoded = decodeSessionPayload(
-      { summary: SUMMARY, checks: [{ checkSlug: 'g', passed: true, violationCount: 0, durationMs: 0, findings: [{ ruleId: 'r', message: 'm', severity: 'error', filePath: 'a.ts', metadata: null }] }] },
+      {
+        summary: SUMMARY,
+        checks: [
+          {
+            checkSlug: 'g',
+            passed: true,
+            violationCount: 0,
+            durationMs: 0,
+            findings: [
+              { ruleId: 'r', message: 'm', severity: 'error', filePath: 'a.ts', metadata: null },
+            ],
+          },
+        ],
+      },
       graphOpts,
     );
     expect(decoded.checks[0].findings[0].metadata).toBeUndefined();
@@ -120,7 +189,18 @@ describe('decodeSessionPayload — graph-style options (all strict)', () => {
   it('throws when a required filePath is missing', () => {
     expect(() =>
       decodeSessionPayload(
-        { summary: SUMMARY, checks: [{ checkSlug: 'g', passed: true, violationCount: 0, durationMs: 0, findings: [{ ruleId: 'r', message: 'm', severity: 'error' }] }] },
+        {
+          summary: SUMMARY,
+          checks: [
+            {
+              checkSlug: 'g',
+              passed: true,
+              violationCount: 0,
+              durationMs: 0,
+              findings: [{ ruleId: 'r', message: 'm', severity: 'error' }],
+            },
+          ],
+        },
         graphOpts,
       ),
     ).toThrow(/graph session finding\.filePath must be a string/);
@@ -129,7 +209,10 @@ describe('decodeSessionPayload — graph-style options (all strict)', () => {
   it('throws when a required violationCount is missing', () => {
     expect(() =>
       decodeSessionPayload(
-        { summary: SUMMARY, checks: [{ checkSlug: 'g', passed: true, durationMs: 0, findings: [] }] },
+        {
+          summary: SUMMARY,
+          checks: [{ checkSlug: 'g', passed: true, durationMs: 0, findings: [] }],
+        },
         graphOpts,
       ),
     ).toThrow(/graph session check\.violationCount must be a number/);
@@ -142,15 +225,76 @@ describe('decodeSessionPayload — validation errors', () => {
     { name: 'non-object payload', payload: 'nope', message: /no replay payload/ },
     { name: 'missing summary', payload: { checks: [] }, message: /summary is missing/ },
     { name: 'null summary', payload: { summary: null, checks: [] }, message: /summary is missing/ },
-    { name: 'non-number summary field', payload: { summary: { ...SUMMARY, total: 'x' }, checks: [] }, message: /total must be a number/ },
+    {
+      name: 'non-number summary field',
+      payload: { summary: { ...SUMMARY, total: 'x' }, checks: [] },
+      message: /total must be a number/,
+    },
     { name: 'missing checks[]', payload: { summary: SUMMARY }, message: /missing checks\[\]/ },
-    { name: 'null check row', payload: { summary: SUMMARY, checks: [null] }, message: /check row is invalid/ },
-    { name: 'non-string checkSlug', payload: { summary: SUMMARY, checks: [{ checkSlug: 1, passed: true, durationMs: 0, findings: [] }] }, message: /checkSlug must be a string/ },
-    { name: 'non-boolean passed', payload: { summary: SUMMARY, checks: [{ checkSlug: 'a', passed: 'yes', durationMs: 0, findings: [] }] }, message: /passed must be a boolean/ },
-    { name: 'check missing findings[]', payload: { summary: SUMMARY, checks: [{ checkSlug: 'a', passed: true, durationMs: 0 }] }, message: /missing findings\[\]/ },
-    { name: 'null finding row', payload: { summary: SUMMARY, checks: [{ checkSlug: 'a', passed: true, durationMs: 0, findings: [null] }] }, message: /finding is invalid/ },
-    { name: 'invalid severity', payload: { summary: SUMMARY, checks: [{ checkSlug: 'a', passed: true, durationMs: 0, findings: [{ ruleId: 'r', message: 'm', severity: 'info' }] }] }, message: /invalid severity/ },
-    { name: 'non-string ruleId', payload: { summary: SUMMARY, checks: [{ checkSlug: 'a', passed: true, durationMs: 0, findings: [{ ruleId: 1, message: 'm', severity: 'error' }] }] }, message: /ruleId must be a string/ },
+    {
+      name: 'null check row',
+      payload: { summary: SUMMARY, checks: [null] },
+      message: /check row is invalid/,
+    },
+    {
+      name: 'non-string checkSlug',
+      payload: {
+        summary: SUMMARY,
+        checks: [{ checkSlug: 1, passed: true, durationMs: 0, findings: [] }],
+      },
+      message: /checkSlug must be a string/,
+    },
+    {
+      name: 'non-boolean passed',
+      payload: {
+        summary: SUMMARY,
+        checks: [{ checkSlug: 'a', passed: 'yes', durationMs: 0, findings: [] }],
+      },
+      message: /passed must be a boolean/,
+    },
+    {
+      name: 'check missing findings[]',
+      payload: { summary: SUMMARY, checks: [{ checkSlug: 'a', passed: true, durationMs: 0 }] },
+      message: /missing findings\[\]/,
+    },
+    {
+      name: 'null finding row',
+      payload: {
+        summary: SUMMARY,
+        checks: [{ checkSlug: 'a', passed: true, durationMs: 0, findings: [null] }],
+      },
+      message: /finding is invalid/,
+    },
+    {
+      name: 'invalid severity',
+      payload: {
+        summary: SUMMARY,
+        checks: [
+          {
+            checkSlug: 'a',
+            passed: true,
+            durationMs: 0,
+            findings: [{ ruleId: 'r', message: 'm', severity: 'info' }],
+          },
+        ],
+      },
+      message: /invalid severity/,
+    },
+    {
+      name: 'non-string ruleId',
+      payload: {
+        summary: SUMMARY,
+        checks: [
+          {
+            checkSlug: 'a',
+            passed: true,
+            durationMs: 0,
+            findings: [{ ruleId: 1, message: 'm', severity: 'error' }],
+          },
+        ],
+      },
+      message: /ruleId must be a string/,
+    },
   ];
 
   for (const { name, payload, message } of cases) {

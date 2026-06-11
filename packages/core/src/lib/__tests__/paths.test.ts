@@ -22,9 +22,15 @@ describe('resolveProjectPaths', () => {
     const p = resolveProjectPaths(PROJECT);
     expect(p.userSourceDir).toBe(join(PROJECT, 'opensip-tools'));
     expect(p.userPluginDir('fit', 'checks')).toBe(join(PROJECT, 'opensip-tools', 'fit', 'checks'));
-    expect(p.userPluginDir('fit', 'recipes')).toBe(join(PROJECT, 'opensip-tools', 'fit', 'recipes'));
-    expect(p.userPluginDir('sim', 'scenarios')).toBe(join(PROJECT, 'opensip-tools', 'sim', 'scenarios'));
-    expect(p.userPluginDir('sim', 'recipes')).toBe(join(PROJECT, 'opensip-tools', 'sim', 'recipes'));
+    expect(p.userPluginDir('fit', 'recipes')).toBe(
+      join(PROJECT, 'opensip-tools', 'fit', 'recipes'),
+    );
+    expect(p.userPluginDir('sim', 'scenarios')).toBe(
+      join(PROJECT, 'opensip-tools', 'sim', 'scenarios'),
+    );
+    expect(p.userPluginDir('sim', 'recipes')).toBe(
+      join(PROJECT, 'opensip-tools', 'sim', 'recipes'),
+    );
   });
 
   it('places runtime state under opensip-tools/.runtime', () => {
@@ -68,4 +74,3 @@ describe('resolveUserPaths', () => {
     expect(u.authoredToolsDir).toBe(join(u.userHomeDir, 'tools'));
   });
 });
-

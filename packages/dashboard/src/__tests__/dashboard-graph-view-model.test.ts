@@ -77,7 +77,16 @@ function twoPackageCatalog(): GraphCatalog {
           simpleName: 'a1',
           package: '@scope/pkg-a',
           filePath: 'packages/pkg-a/src/a1.ts',
-          calls: [{ to: ['a2', 'b1'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+          calls: [
+            {
+              to: ['a2', 'b1'],
+              line: 1,
+              column: 0,
+              resolution: 'static',
+              confidence: 'high',
+              text: 'c',
+            },
+          ],
         }),
       ],
       a2: [
@@ -86,7 +95,16 @@ function twoPackageCatalog(): GraphCatalog {
           simpleName: 'a2',
           package: '@scope/pkg-a',
           filePath: 'packages/pkg-a/src/a2.ts',
-          calls: [{ to: ['ext'], line: 2, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+          calls: [
+            {
+              to: ['ext'],
+              line: 2,
+              column: 0,
+              resolution: 'static',
+              confidence: 'high',
+              text: 'c',
+            },
+          ],
         }),
       ],
       b1: [
@@ -95,7 +113,9 @@ function twoPackageCatalog(): GraphCatalog {
           simpleName: 'b1',
           package: '@scope/pkg-b',
           filePath: 'packages/pkg-b/src/b1.ts',
-          calls: [{ to: ['a1'], line: 3, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+          calls: [
+            { to: ['a1'], line: 3, column: 0, resolution: 'static', confidence: 'high', text: 'c' },
+          ],
         }),
       ],
     },
@@ -104,19 +124,23 @@ function twoPackageCatalog(): GraphCatalog {
 
 describe('packageOf', () => {
   it('prefers the build-stamped package, scope-stripped', () => {
-    expect(packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', package: '@opensip-tools/lang-typescript' }))).toBe(
-      'lang-typescript',
-    );
+    expect(
+      packageOf(
+        makeOcc({ bodyHash: 'h', simpleName: 'f', package: '@opensip-tools/lang-typescript' }),
+      ),
+    ).toBe('lang-typescript');
   });
 
   it('falls back to the path heuristic when package is absent', () => {
-    expect(packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', filePath: 'packages/widget/src/x.ts' }))).toBe(
-      'widget',
-    );
+    expect(
+      packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', filePath: 'packages/widget/src/x.ts' })),
+    ).toBe('widget');
   });
 
   it('returns <unknown> for an unattributable path', () => {
-    expect(packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', filePath: 'random/x.ts' }))).toBe('<unknown>');
+    expect(packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', filePath: 'random/x.ts' }))).toBe(
+      '<unknown>',
+    );
   });
 
   it('returns <unknown> when the occurrence is null/undefined or has no usable path', () => {
@@ -128,7 +152,14 @@ describe('packageOf', () => {
   it('ignores a non-string package value and a non-string path', () => {
     // package is the wrong type → fall back to the path heuristic.
     expect(
-      packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', package: 42 as unknown as string, filePath: 'packages/widget/src/x.ts' })),
+      packageOf(
+        makeOcc({
+          bodyHash: 'h',
+          simpleName: 'f',
+          package: 42 as unknown as string,
+          filePath: 'packages/widget/src/x.ts',
+        }),
+      ),
     ).toBe('widget');
     // path is the wrong type → <unknown>.
     expect(
@@ -139,7 +170,9 @@ describe('packageOf', () => {
 
 describe('projectCatalogToGraphViewModel (package-level)', () => {
   it('throws GraphViewModelError on a missing functions map', () => {
-    expect(() => projectCatalogToGraphViewModel({} as unknown as GraphCatalog)).toThrow(GraphViewModelError);
+    expect(() => projectCatalogToGraphViewModel({} as unknown as GraphCatalog)).toThrow(
+      GraphViewModelError,
+    );
   });
 
   it('projects the real fixture into a stable view-model (snapshot)', () => {
@@ -154,7 +187,7 @@ describe('projectCatalogToGraphViewModel (package-level)', () => {
 
   it('emits PACKAGE nodes (id = label = package name) — not function nodes', () => {
     const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
-    const ids = vm.nodes.map(n => n.id).sort();
+    const ids = vm.nodes.map((n) => n.id).sort();
     expect(ids).toEqual(['pkg-a', 'pkg-b']);
     for (const node of vm.nodes) {
       expect(node.id).toBe(node.label);
@@ -168,7 +201,7 @@ describe('projectCatalogToGraphViewModel (package-level)', () => {
 
   it('emits package→package edges with a call-count weight', () => {
     const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
-    const byKey = new Map(vm.edges.map(e => [e.source + '->' + e.target, e]));
+    const byKey = new Map(vm.edges.map((e) => [e.source + '->' + e.target, e]));
     // a1→a2 is an internal package-a call → self-loop weight 1.
     expect(byKey.get('pkg-a->pkg-a')?.weight).toBe(1);
     // a1→b1 cross edge, weight 1.
@@ -190,42 +223,72 @@ describe('projectCatalogToGraphViewModel (package-level)', () => {
             simpleName: 'a',
             package: '@s/pa',
             filePath: 'packages/pa/src/a.ts',
-            calls: [{ to: ['x', 'y'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+            calls: [
+              {
+                to: ['x', 'y'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'c',
+              },
+            ],
           }),
         ],
-        x: [makeOcc({ bodyHash: 'x', simpleName: 'x', package: '@s/pb', filePath: 'packages/pb/src/x.ts' })],
-        y: [makeOcc({ bodyHash: 'y', simpleName: 'y', package: '@s/pb', filePath: 'packages/pb/src/y.ts' })],
+        x: [
+          makeOcc({
+            bodyHash: 'x',
+            simpleName: 'x',
+            package: '@s/pb',
+            filePath: 'packages/pb/src/x.ts',
+          }),
+        ],
+        y: [
+          makeOcc({
+            bodyHash: 'y',
+            simpleName: 'y',
+            package: '@s/pb',
+            filePath: 'packages/pb/src/y.ts',
+          }),
+        ],
       },
     };
     const vm = projectCatalogToGraphViewModel(catalog);
-    const edge = vm.edges.find(e => e.source === 'pa' && e.target === 'pb');
+    const edge = vm.edges.find((e) => e.source === 'pa' && e.target === 'pb');
     expect(edge?.weight).toBe(2);
   });
 
   it('drops calls whose target is not an in-project function (external)', () => {
     const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
     // a2 calls only an external 'ext' — it must NOT create any edge.
-    expect(vm.edges.some(e => e.target === '<unknown>' || e.target === 'ext')).toBe(false);
+    expect(vm.edges.some((e) => e.target === '<unknown>' || e.target === 'ext')).toBe(false);
   });
 
   it('sets totalCoupling = sum of incident edge weights (fan-in + fan-out)', () => {
     const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
     for (const node of vm.nodes) {
       const incident = vm.edges
-        .filter(e => e.source === node.id || e.target === node.id)
+        .filter((e) => e.source === node.id || e.target === node.id)
         // a self-loop contributes its weight to both fan-in and fan-out.
-        .reduce((sum, e) => sum + (e.source === node.id ? e.weight : 0) + (e.target === node.id ? e.weight : 0), 0);
+        .reduce(
+          (sum, e) =>
+            sum + (e.source === node.id ? e.weight : 0) + (e.target === node.id ? e.weight : 0),
+          0,
+        );
       expect(node.totalCoupling).toBe(incident);
     }
   });
 
   it('stamps a shared non-null sccId on a cross-package cycle (a↔b)', () => {
     const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
-    const sccIds = new Set(vm.nodes.map(n => n.sccId));
+    const sccIds = new Set(vm.nodes.map((n) => n.sccId));
     expect(sccIds.size).toBe(1);
     expect([...sccIds][0]).not.toBeNull();
     const crossCycleEdges = vm.edges.filter(
-      e => e.source !== e.target && ['pkg-a', 'pkg-b'].includes(e.source) && ['pkg-a', 'pkg-b'].includes(e.target),
+      (e) =>
+        e.source !== e.target &&
+        ['pkg-a', 'pkg-b'].includes(e.source) &&
+        ['pkg-a', 'pkg-b'].includes(e.target),
     );
     for (const e of crossCycleEdges) expect(e.isCycleEdge).toBe(true);
   });
@@ -243,10 +306,26 @@ describe('projectCatalogToGraphViewModel (package-level)', () => {
             simpleName: 'a',
             package: '@s/solo',
             filePath: 'packages/solo/src/a.ts',
-            calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+            calls: [
+              {
+                to: ['b'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'c',
+              },
+            ],
           }),
         ],
-        b: [makeOcc({ bodyHash: 'b', simpleName: 'b', package: '@s/solo', filePath: 'packages/solo/src/b.ts' })],
+        b: [
+          makeOcc({
+            bodyHash: 'b',
+            simpleName: 'b',
+            package: '@s/solo',
+            filePath: 'packages/solo/src/b.ts',
+          }),
+        ],
       },
     };
     const vm = projectCatalogToGraphViewModel(catalog);
@@ -263,7 +342,14 @@ describe('projectCatalogToGraphViewModel (package-level)', () => {
       builtAt: 'now',
       functions: {
         // No `calls` at all.
-        a: [makeOcc({ bodyHash: 'a', simpleName: 'a', package: '@s/pa', filePath: 'packages/pa/src/a.ts' })],
+        a: [
+          makeOcc({
+            bodyHash: 'a',
+            simpleName: 'a',
+            package: '@s/pa',
+            filePath: 'packages/pa/src/a.ts',
+          }),
+        ],
         // A call edge with an empty `to` array.
         b: [
           makeOcc({
@@ -271,7 +357,9 @@ describe('projectCatalogToGraphViewModel (package-level)', () => {
             simpleName: 'b',
             package: '@s/pa',
             filePath: 'packages/pa/src/b.ts',
-            calls: [{ to: [], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+            calls: [
+              { to: [], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'c' },
+            ],
           }),
         ],
         // An empty occurrences list for a function name.
@@ -279,7 +367,7 @@ describe('projectCatalogToGraphViewModel (package-level)', () => {
       },
     };
     const vm = projectCatalogToGraphViewModel(catalog);
-    expect(vm.nodes.map(n => n.id)).toEqual(['pa']);
+    expect(vm.nodes.map((n) => n.id)).toEqual(['pa']);
     expect(vm.edges).toHaveLength(0);
     expect(vm.nodes[0].totalCoupling).toBe(0);
     expect(vm.nodes[0].sccId).toBeNull();

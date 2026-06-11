@@ -76,6 +76,8 @@ describe('buildGraphEnvelope', () => {
 
   it('passes resolutionMode through only when set', () => {
     expect(buildGraphEnvelope({ ...BASE, signals: [] }).resolutionMode).toBeUndefined();
-    expect(buildGraphEnvelope({ ...BASE, signals: [], resolutionMode: 'fast' }).resolutionMode).toBe('fast');
+    expect(
+      buildGraphEnvelope({ ...BASE, signals: [], resolutionMode: 'fast' }).resolutionMode,
+    ).toBe('fast');
   });
 });

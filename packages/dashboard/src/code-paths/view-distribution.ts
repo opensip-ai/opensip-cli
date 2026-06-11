@@ -26,10 +26,22 @@ export function dashboardViewDistributionJs(): string {
     help: {
       title: 'Functions (distribution)',
       sections: [
-        { heading: 'What this is', body: 'Every function in the catalog in one sortable table. Columns cover the metrics the former single-metric tabs ranked individually: body length (lines), inbound callers, parameter count (width), and whether the function is reachable only from tests.' },
-        { heading: 'Why you care', body: 'Findings surface the rules that actually fired; this table is the raw distribution behind them. It is where you triage the sub-threshold tail — a 140-line function under a 150-line gate, a 3-param function just under a width rule — that a pass/fail findings list cannot show.' },
-        { heading: 'How to read it', body: 'Sort by any column (click the header). Lines descending is the default. Callers = 0 plus no test reachability is an orphan; Test-only = yes means production code reached only from tests. Use the filter chips above the tab bar to scope by package, kind, or test-file membership.' },
-        { heading: 'What to do', body: 'Click a row to open the Function Card and inspect callers/callees. Long bodies split along callee boundaries; wide signatures often want an options object; test-only functions usually belong in a __tests__/ helper.' },
+        {
+          heading: 'What this is',
+          body: 'Every function in the catalog in one sortable table. Columns cover the metrics the former single-metric tabs ranked individually: body length (lines), inbound callers, parameter count (width), and whether the function is reachable only from tests.',
+        },
+        {
+          heading: 'Why you care',
+          body: 'Findings surface the rules that actually fired; this table is the raw distribution behind them. It is where you triage the sub-threshold tail — a 140-line function under a 150-line gate, a 3-param function just under a width rule — that a pass/fail findings list cannot show.',
+        },
+        {
+          heading: 'How to read it',
+          body: 'Sort by any column (click the header). Lines descending is the default. Callers = 0 plus no test reachability is an orphan; Test-only = yes means production code reached only from tests. Use the filter chips above the tab bar to scope by package, kind, or test-file membership.',
+        },
+        {
+          heading: 'What to do',
+          body: 'Click a row to open the Function Card and inspect callers/callees. Long bodies split along callee boundaries; wide signatures often want an options object; test-only functions usually belong in a __tests__/ helper.',
+        },
       ],
     },
     // Default ranking metric: body length (lines). Re-sortable to any column.

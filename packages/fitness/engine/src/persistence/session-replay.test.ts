@@ -119,7 +119,10 @@ describe('fitReplayFromSession', () => {
       },
       {
         name: 'non-number summary field',
-        payload: { summary: { total: 'x', passed: 0, failed: 0, errors: 0, warnings: 0 }, checks: [] },
+        payload: {
+          summary: { total: 'x', passed: 0, failed: 0, errors: 0, warnings: 0 },
+          checks: [],
+        },
         message: /total must be a number/,
       },
       {
@@ -129,7 +132,10 @@ describe('fitReplayFromSession', () => {
       },
       {
         name: 'invalid check row',
-        payload: { summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 }, checks: [null] },
+        payload: {
+          summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+          checks: [null],
+        },
         message: /check row is invalid/,
       },
       {

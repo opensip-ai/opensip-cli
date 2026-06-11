@@ -17,7 +17,12 @@
 
 import v8 from 'node:v8';
 
-import { EnvRegistry, ToolError, type EnvVarSpec, type ToolErrorOptions } from '@opensip-tools/core';
+import {
+  EnvRegistry,
+  ToolError,
+  type EnvVarSpec,
+  type ToolErrorOptions,
+} from '@opensip-tools/core';
 
 /**
  * Graph-engine environment variables (release 2.12.0, §5.12). Read through the

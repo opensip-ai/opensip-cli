@@ -13,14 +13,17 @@ import {
   validateScenarioMetadata,
   validateTargetAndWorkload,
   throwValidationErrors,
-  type ScenarioValidationError, type TargetWorkloadInput 
+  type ScenarioValidationError,
+  type TargetWorkloadInput,
 } from '../validation.js';
-
 
 describe('validateScenarioMetadata', () => {
   it('accepts a fully-valid metadata block (no errors collected)', () => {
     const errors: ScenarioValidationError[] = [];
-    validateScenarioMetadata({ id: 'my-scenario', name: 'My Scenario', description: 'does a thing' }, errors);
+    validateScenarioMetadata(
+      { id: 'my-scenario', name: 'My Scenario', description: 'does a thing' },
+      errors,
+    );
     expect(errors).toEqual([]);
   });
 
@@ -47,11 +50,9 @@ describe('validateScenarioMetadata', () => {
 
   it("requireId: 'present-only' accepts a non-shaped but present id", () => {
     const errors: ScenarioValidationError[] = [];
-    validateScenarioMetadata(
-      { id: 'Has_Underscores', name: 'n', description: 'd' },
-      errors,
-      { requireId: 'present-only' },
-    );
+    validateScenarioMetadata({ id: 'Has_Underscores', name: 'n', description: 'd' }, errors, {
+      requireId: 'present-only',
+    });
     expect(errors).toEqual([]);
   });
 
@@ -82,7 +83,6 @@ const validInput = (): TargetWorkloadInput => ({
 });
 
 describe('validateTargetAndWorkload', () => {
-
   it('accepts a valid target + workload block', () => {
     const errors: ScenarioValidationError[] = [];
     validateTargetAndWorkload(validInput(), errors);
@@ -92,17 +92,26 @@ describe('validateTargetAndWorkload', () => {
   it('flags a non-function target (the BYO seam)', () => {
     const errors: ScenarioValidationError[] = [];
     validateTargetAndWorkload({ ...validInput(), target: 'not-a-fn' as never }, errors);
-    expect(errors).toContainEqual({ field: 'target', message: 'target must be a function (the BYO seam)' });
+    expect(errors).toContainEqual({
+      field: 'target',
+      message: 'target must be a function (the BYO seam)',
+    });
   });
 
   it('flags a non-positive rps', () => {
     const zero: ScenarioValidationError[] = [];
     validateTargetAndWorkload({ ...validInput(), workload: { rps: 0 } }, zero);
-    expect(zero).toContainEqual({ field: 'workload.rps', message: 'workload.rps must be a positive number' });
+    expect(zero).toContainEqual({
+      field: 'workload.rps',
+      message: 'workload.rps must be a positive number',
+    });
 
     const nonNumber: ScenarioValidationError[] = [];
     validateTargetAndWorkload({ ...validInput(), workload: { rps: 'x' } as never }, nonNumber);
-    expect(nonNumber).toContainEqual({ field: 'workload.rps', message: 'workload.rps must be a positive number' });
+    expect(nonNumber).toContainEqual({
+      field: 'workload.rps',
+      message: 'workload.rps must be a positive number',
+    });
   });
 
   it('flags concurrency < 1 but accepts an omitted concurrency', () => {

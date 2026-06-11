@@ -12,16 +12,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { ConfigurationError, enterScope, RunScope } from '@opensip-tools/core';
-import {
-  currentAdapterRegistry,
-  graphTool,
-  pickAdapter,
-} from '@opensip-tools/graph';
+import { currentAdapterRegistry, graphTool, pickAdapter } from '@opensip-tools/graph';
 import { pythonGraphAdapter } from '@opensip-tools/graph-python';
 import { rustGraphAdapter } from '@opensip-tools/graph-rust';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
-
 
 import { typescriptGraphAdapter } from '../index.js';
 

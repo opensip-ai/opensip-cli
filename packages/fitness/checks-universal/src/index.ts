@@ -12,22 +12,25 @@
  * They could apply to any codebase regardless of language.
  */
 
-import { applyCheckDisplay, collectCheckObjects } from '@opensip-tools/fitness'
+import { applyCheckDisplay, collectCheckObjects } from '@opensip-tools/fitness';
 
-import * as allChecks from './checks/index.js'
-import { CHECK_DISPLAY } from './display/index.js'
+import * as allChecks from './checks/index.js';
+import { CHECK_DISPLAY } from './display/index.js';
 
-import type { Check } from '@opensip-tools/fitness'
+import type { Check } from '@opensip-tools/fitness';
 
 /** All cross-language checks (display folded on from CHECK_DISPLAY), per plugin contract. */
-export const checks: readonly Check[] = applyCheckDisplay(collectCheckObjects(allChecks), CHECK_DISPLAY)
+export const checks: readonly Check[] = applyCheckDisplay(
+  collectCheckObjects(allChecks),
+  CHECK_DISPLAY,
+);
 
 // Display helpers + the authoring map (used by tests / external display lookups).
-export { getCheckDisplayName, getCheckIcon, CHECK_DISPLAY } from './display/index.js'
-export type { CheckDisplayEntry } from './display/types.js'
+export { getCheckDisplayName, getCheckIcon, CHECK_DISPLAY } from './display/index.js';
+export type { CheckDisplayEntry } from './display/types.js';
 
 // Direct exports of individual checks for convenience / backward compatibility
-export { fileLengthLimit } from './checks/file-length-limit.js'
-export { graphIgnoreHygiene } from './checks/quality/graph-ignore-hygiene.js'
-export { noTodoComments } from './checks/no-todo-comments.js'
-export { noUnimplementedMarkers } from './checks/no-unimplemented-markers.js'
+export { fileLengthLimit } from './checks/file-length-limit.js';
+export { graphIgnoreHygiene } from './checks/quality/graph-ignore-hygiene.js';
+export { noTodoComments } from './checks/no-todo-comments.js';
+export { noUnimplementedMarkers } from './checks/no-unimplemented-markers.js';

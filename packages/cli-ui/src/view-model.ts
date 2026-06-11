@@ -26,14 +26,7 @@
  * theme remains the single source of color truth — producers never name
  * raw colors.
  */
-export type Tone =
-  | 'brand'
-  | 'success'
-  | 'error'
-  | 'warning'
-  | 'info'
-  | 'muted'
-  | 'default';
+export type Tone = 'brand' | 'success' | 'error' | 'warning' | 'info' | 'muted' | 'default';
 
 /** An inline run of text within a line, optionally toned, bold, and/or dimmed. */
 export interface Span {
@@ -101,7 +94,9 @@ export function text(value: string): Span {
 /** A line node from spans (or a single string). */
 export function line(spans: readonly Span[] | string, dim?: boolean): ViewNode {
   const resolved = typeof spans === 'string' ? [text(spans)] : spans;
-  return dim === undefined ? { kind: 'line', spans: resolved } : { kind: 'line', spans: resolved, dim };
+  return dim === undefined
+    ? { kind: 'line', spans: resolved }
+    : { kind: 'line', spans: resolved, dim };
 }
 
 /** A group node from children, optionally indented. */

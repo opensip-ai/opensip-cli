@@ -82,7 +82,9 @@ export async function loadOwningToolCapabilities(
   // registrars register into this same scope's tool registries).
   const registry = currentCapabilityRegistry();
 
-  const ownedDomains = registry.listDomains().filter((d) => d.ownerToolId === owningTool.metadata.id);
+  const ownedDomains = registry
+    .listDomains()
+    .filter((d) => d.ownerToolId === owningTool.metadata.id);
   const pluginsConfig = readPluginsBlock(configPath);
 
   let driven = 0;

@@ -6,9 +6,9 @@
  * text, error messages, and comments.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { parseSource, walkNodes, getLineNumber } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { parseSource, walkNodes, getLineNumber } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * SQL structural patterns indicating actual SQL statements (not casual English).
@@ -16,10 +16,10 @@ import * as ts from 'typescript'
  */
 const SQL_STRUCTURE_PATTERN =
   // eslint-disable-next-line sonarjs/regex-complexity -- enumerates SQL DML/DDL shapes in a single bounded alternation; splitting fragments the rule's intent
-  /\b(?:SELECT\s+[\w.*]+\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|DROP\s+(?:TABLE|INDEX|DATABASE|VIEW)|ALTER\s+TABLE|CREATE\s+(?:TABLE|INDEX|DATABASE|VIEW)|TRUNCATE\s+(?:TABLE)?)\b/i
+  /\b(?:SELECT\s+[\w.*]+\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|DROP\s+(?:TABLE|INDEX|DATABASE|VIEW)|ALTER\s+TABLE|CREATE\s+(?:TABLE|INDEX|DATABASE|VIEW)|TRUNCATE\s+(?:TABLE)?)\b/i;
 
 /** Simpler pattern for SQL keywords at start of string concatenation */
-const SQL_KEYWORD_PATTERN = /^\s*(?:SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE)\b/i
+const SQL_KEYWORD_PATTERN = /^\s*(?:SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE)\b/i;
 
 /**
  * SQL clause keywords for detecting concatenation in WHERE/SET/VALUES clauses.
@@ -34,10 +34,10 @@ const SQL_KEYWORD_PATTERN = /^\s*(?:SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREAT
  * filter that prevents arm-3 from firing on incidental WHERE/AND inside
  * non-SQL text.)
  */
-const SQL_CLAUSE_PATTERN = /\b(?:WHERE|AND|OR|SET|VALUES)\b/
+const SQL_CLAUSE_PATTERN = /\b(?:WHERE|AND|OR|SET|VALUES)\b/;
 
 /** Safe tagged template tags that use parameterized queries */
-const SAFE_TEMPLATE_TAGS = new Set(['sql', 'query', 'raw'])
+const SAFE_TEMPLATE_TAGS = new Set(['sql', 'query', 'raw']);
 
 /** Safe object property names where SQL-like words are just messages */
 const SUGGESTION_PROPERTY_NAMES = new Set([
@@ -55,26 +55,26 @@ const SUGGESTION_PROPERTY_NAMES = new Set([
   'tooltip',
   'caption',
   'summary',
-])
+]);
 
 /**
  * Check if a template expression is inside a tagged template literal.
  * Tagged templates like sql`...` or db.query`...` use parameterized queries.
  */
 function isInTaggedTemplate(node: ts.Node): boolean {
-  let current = node.parent
+  let current = node.parent;
   while (!ts.isSourceFile(current)) {
     /* v8 ignore next -- defensive AST/type guard */
     if (ts.isTaggedTemplateExpression(current)) {
-      const tag = current.tag
-      if (ts.isIdentifier(tag) && SAFE_TEMPLATE_TAGS.has(tag.text)) return true
-      if (ts.isPropertyAccessExpression(tag) && SAFE_TEMPLATE_TAGS.has(tag.name.text)) return true
+      const tag = current.tag;
+      if (ts.isIdentifier(tag) && SAFE_TEMPLATE_TAGS.has(tag.text)) return true;
+      if (ts.isPropertyAccessExpression(tag) && SAFE_TEMPLATE_TAGS.has(tag.name.text)) return true;
       // Any tagged template is likely using parameterized queries
-      return true
+      return true;
     }
-    current = current.parent
+    current = current.parent;
   }
-  return false
+  return false;
 }
 
 /**
@@ -82,30 +82,30 @@ function isInTaggedTemplate(node: ts.Node): boolean {
  * Template literals in properties like { message: `...`, suggestion: `...` } are not SQL.
  */
 function isInSuggestionProperty(node: ts.Node): boolean {
-  let current = node.parent
+  let current = node.parent;
   while (!ts.isSourceFile(current)) {
     if (
       ts.isPropertyAssignment(current) &&
       ts.isIdentifier(current.name) &&
       SUGGESTION_PROPERTY_NAMES.has(current.name.text.toLowerCase())
     ) {
-      return true
+      return true;
     }
-    current = current.parent
+    current = current.parent;
   }
-  return false
+  return false;
 }
 
 /**
  * Check if a node is a direct argument to a .query() call.
  */
 function isInQueryCall(node: ts.Node): boolean {
-  const parent = node.parent
+  const parent = node.parent;
   return (
     ts.isCallExpression(parent) &&
     ts.isPropertyAccessExpression(parent.expression) &&
     parent.expression.name.text === 'query'
-  )
+  );
 }
 
 /**
@@ -126,31 +126,28 @@ function isInQueryCall(node: ts.Node): boolean {
  * mid-chain finding still sees the whole expression.
  */
 function collectConcatChainStrings(node: ts.BinaryExpression): string[] {
-  const strings: string[] = []
+  const strings: string[] = [];
   // Walk up to the root of the contiguous + chain.
-  let root: ts.Node = node
+  let root: ts.Node = node;
   while (
     ts.isBinaryExpression(root.parent) &&
     root.parent.operatorToken.kind === ts.SyntaxKind.PlusToken
   ) {
-    root = root.parent
+    root = root.parent;
   }
   // Walk down collecting every string-literal leaf.
   function collect(n: ts.Node): void {
-    if (
-      ts.isBinaryExpression(n) &&
-      n.operatorToken.kind === ts.SyntaxKind.PlusToken
-    ) {
-      collect(n.left)
-      collect(n.right)
-      return
+    if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+      collect(n.left);
+      collect(n.right);
+      return;
     }
     if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) {
-      strings.push(n.text)
+      strings.push(n.text);
     }
   }
-  collect(root)
-  return strings
+  collect(root);
+  return strings;
 }
 
 /**
@@ -161,9 +158,9 @@ function collectConcatChainStrings(node: ts.BinaryExpression): string[] {
  */
 function concatChainHasSqlKeyword(node: ts.BinaryExpression): boolean {
   for (const s of collectConcatChainStrings(node)) {
-    if (SQL_KEYWORD_PATTERN.test(s)) return true
+    if (SQL_KEYWORD_PATTERN.test(s)) return true;
   }
-  return false
+  return false;
 }
 
 /**
@@ -172,9 +169,19 @@ function concatChainHasSqlKeyword(node: ts.BinaryExpression): boolean {
  * Binary-string-concat arguments to these calls are never SQL.
  */
 const OUTPUT_METHOD_NAMES = new Set([
-  'log', 'info', 'warn', 'error', 'debug', 'trace', 'fatal',
-  'print', 'println', 'raw', 'write', 'writeln',
-])
+  'log',
+  'info',
+  'warn',
+  'error',
+  'debug',
+  'trace',
+  'fatal',
+  'print',
+  'println',
+  'raw',
+  'write',
+  'writeln',
+]);
 
 /**
  * True iff `node` is an argument (direct or wrapped) to an output-style
@@ -183,31 +190,31 @@ const OUTPUT_METHOD_NAMES = new Set([
  * inside them is help/status text composition.
  */
 function isInOutputCall(node: ts.Node): boolean {
-  let current = node.parent
+  let current = node.parent;
   while (!ts.isSourceFile(current)) {
     if (ts.isCallExpression(current)) {
-      const callee = current.expression
+      const callee = current.expression;
       return (
         ts.isPropertyAccessExpression(callee) &&
         ts.isIdentifier(callee.name) &&
         OUTPUT_METHOD_NAMES.has(callee.name.text)
-      )
+      );
     }
-    current = current.parent
+    current = current.parent;
   }
-  return false
+  return false;
 }
 
 /**
  * Get the full text content of a template expression (head + spans).
  */
 function getTemplateText(node: ts.TemplateExpression): string {
-  const parts: string[] = [node.head.text]
+  const parts: string[] = [node.head.text];
   for (const span of node.templateSpans) {
     // @fitness-ignore-next-line performance-anti-patterns -- string literal placeholder for template span, not a spread operator
-    parts.push('${...}', span.literal.text)
+    parts.push('${...}', span.literal.text);
   }
-  return parts.join('')
+  return parts.join('');
 }
 
 /**
@@ -219,20 +226,20 @@ function checkTemplateInjection(
   filePath: string,
   violations: CheckViolation[],
 ): void {
-  if (!ts.isTemplateExpression(node)) return
+  if (!ts.isTemplateExpression(node)) return;
   /* v8 ignore next -- defensive AST/type guard */
-  if (isInTaggedTemplate(node)) return
+  if (isInTaggedTemplate(node)) return;
   /* v8 ignore next -- defensive AST/type guard */
-  if (isInSuggestionProperty(node)) return
+  if (isInSuggestionProperty(node)) return;
   /* v8 ignore next -- defensive AST/type guard */
-  if (isInOutputCall(node)) return
+  if (isInOutputCall(node)) return;
 
-  const templateText = getTemplateText(node)
-  if (!SQL_STRUCTURE_PATTERN.test(templateText)) return
+  const templateText = getTemplateText(node);
+  if (!SQL_STRUCTURE_PATTERN.test(templateText)) return;
 
-  const line = getLineNumber(node, sourceFile)
-  const matchText = node.getText()
-  const isQueryArg = isInQueryCall(node)
+  const line = getLineNumber(node, sourceFile);
+  const matchText = node.getText();
+  const isQueryArg = isInQueryCall(node);
 
   violations.push({
     line,
@@ -245,7 +252,7 @@ function checkTemplateInjection(
       'Use parameterized queries: db.query("SELECT * FROM users WHERE id = $1", [userId]). Never interpolate user input directly into SQL strings.',
     match: matchText.length > 200 ? matchText.slice(0, 200) + '...' : matchText,
     filePath,
-  })
+  });
 }
 
 /**
@@ -257,17 +264,17 @@ function checkConcatenationInjection(
   filePath: string,
   violations: CheckViolation[],
 ): void {
-  if (!ts.isBinaryExpression(node)) return
-  if (node.operatorToken.kind !== ts.SyntaxKind.PlusToken) return
-  if (isInSuggestionProperty(node)) return
-  if (isInOutputCall(node)) return
+  if (!ts.isBinaryExpression(node)) return;
+  if (node.operatorToken.kind !== ts.SyntaxKind.PlusToken) return;
+  if (isInSuggestionProperty(node)) return;
+  if (isInOutputCall(node)) return;
 
-  const leftIsString = ts.isStringLiteral(node.left)
-  const rightIsString = ts.isStringLiteral(node.right)
-  if (!leftIsString && !rightIsString) return
+  const leftIsString = ts.isStringLiteral(node.left);
+  const rightIsString = ts.isStringLiteral(node.right);
+  if (!leftIsString && !rightIsString) return;
 
-  const leftText = leftIsString ? node.left.text : ''
-  const rightText = rightIsString ? node.right.text : ''
+  const leftText = leftIsString ? node.left.text : '';
+  const rightText = rightIsString ? node.right.text : '';
 
   if (leftIsString && SQL_KEYWORD_PATTERN.test(leftText) && !rightIsString) {
     violations.push({
@@ -279,7 +286,7 @@ function checkConcatenationInjection(
         'Use parameterized queries instead of string concatenation. With TypeORM: createQueryBuilder().where("id = :id", { id }). With raw queries: query("SELECT * FROM t WHERE x = $1", [x]).',
       match: node.getText(),
       filePath,
-    })
+    });
   }
 
   if (
@@ -301,7 +308,7 @@ function checkConcatenationInjection(
         'Use parameterized queries for all user-supplied values. Never concatenate strings to build WHERE, AND, OR, SET, or VALUES clauses.',
       match: node.getText(),
       filePath,
-    })
+    });
   }
 }
 
@@ -319,19 +326,19 @@ function checkConcatenationInjection(
  * requires an ExecutionContext to invoke).
  */
 export function analyzeSqlInjection(content: string, filePath: string): CheckViolation[] {
-  const sourceFile = parseSource(content, filePath)
+  const sourceFile = parseSource(content, filePath);
   /* v8 ignore next -- defensive guard */
-  if (!sourceFile) return []
+  if (!sourceFile) return [];
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   walkNodes(sourceFile, (node) => {
     // @lazy-ok -- synchronous callback; no awaits in analyze(); "resolved async result" in suggestion text triggers false positive
-    checkTemplateInjection(node, sourceFile, filePath, violations)
-    checkConcatenationInjection(node, sourceFile, filePath, violations)
-  })
+    checkTemplateInjection(node, sourceFile, filePath, violations);
+    checkConcatenationInjection(node, sourceFile, filePath, violations);
+  });
 
-  return violations
+  return violations;
 }
 
 export const sqlInjection = defineCheck({
@@ -355,6 +362,6 @@ export const sqlInjection = defineCheck({
   confidence: 'high',
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    return analyzeSqlInjection(content, filePath)
+    return analyzeSqlInjection(content, filePath);
   },
-})
+});

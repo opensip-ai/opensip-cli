@@ -79,7 +79,8 @@ const GRAPH_LOOKUP: ToolCommandDescriptor = {
 
 const GRAPH_SYMBOL_INDEX: ToolCommandDescriptor = {
   name: 'graph-symbol-index',
-  description: 'Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog',
+  description:
+    'Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog',
 };
 
 const GRAPH_BASELINE_EXPORT: ToolCommandDescriptor = {
@@ -101,7 +102,8 @@ const GRAPH_EQUIVALENCE_CHECK: ToolCommandDescriptor = {
 
 const GRAPH_RUN_WORKER: ToolCommandDescriptor = {
   name: 'graph-run-worker',
-  description: '[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)',
+  description:
+    '[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)',
 };
 
 const GRAPH_CATALOG_EXPORT: ToolCommandDescriptor = {
@@ -112,8 +114,7 @@ const GRAPH_CATALOG_EXPORT: ToolCommandDescriptor = {
 
 const GRAPH_SARIF_EXPORT: ToolCommandDescriptor = {
   name: 'sarif-export',
-  description:
-    'Run graph analysis and write OpenSIP-convention SARIF v2.1.0 findings to a file',
+  description: 'Run graph analysis and write OpenSIP-convention SARIF v2.1.0 findings to a file',
 };
 
 const GRAPH_RECIPES: ToolCommandDescriptor = {
@@ -234,7 +235,18 @@ export const graphTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },
-  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT, GRAPH_SHARD_WORKER, GRAPH_EQUIVALENCE_CHECK, GRAPH_RUN_WORKER, GRAPH_CATALOG_EXPORT, GRAPH_SARIF_EXPORT, GRAPH_RECIPES],
+  commands: [
+    GRAPH,
+    GRAPH_LOOKUP,
+    GRAPH_SYMBOL_INDEX,
+    GRAPH_BASELINE_EXPORT,
+    GRAPH_SHARD_WORKER,
+    GRAPH_EQUIVALENCE_CHECK,
+    GRAPH_RUN_WORKER,
+    GRAPH_CATALOG_EXPORT,
+    GRAPH_SARIF_EXPORT,
+    GRAPH_RECIPES,
+  ],
   // Release 2.11.0 Phase 5: graph declares its command surface; the host mounts
   // each spec via mountCommandSpec. The deprecated `register()` fallback is gone
   // — graph no longer touches Commander.

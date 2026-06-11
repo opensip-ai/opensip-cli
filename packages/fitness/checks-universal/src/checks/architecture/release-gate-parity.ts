@@ -36,7 +36,7 @@
  * immutable publish boundary, aligned with the sibling ADR-enforcing
  * architecture gates in this pack.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Path fragment that identifies the tag-driven release workflow. The check is
@@ -44,7 +44,7 @@ import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
  * any platform; `endsWith` keeps it anchored to the real workflow rather than a
  * lookalike elsewhere in the tree.
  */
-const RELEASE_WORKFLOW_SUFFIX = '.github/workflows/release.yml'
+const RELEASE_WORKFLOW_SUFFIX = '.github/workflows/release.yml';
 
 /**
  * The four PR-quality gates ADR-0017 requires `release.yml` to re-run, keyed by
@@ -57,7 +57,7 @@ const REQUIRED_GATES: readonly { command: string; pattern: RegExp }[] = [
   { command: 'pnpm test:coverage', pattern: /pnpm\s+test:coverage(?:\s|$)/m },
   { command: 'pnpm fit:ci', pattern: /pnpm\s+fit:ci(?:\s|$)/m },
   { command: 'pnpm graph:ci', pattern: /pnpm\s+graph:ci(?:\s|$)/m },
-]
+];
 
 /**
  * Identifies the pack step — the line that packs a workspace package into a
@@ -66,7 +66,7 @@ const REQUIRED_GATES: readonly { command: string; pattern: RegExp }[] = [
  * the pattern requires `pnpm` followed (allowing flags) by a `pack` word so a
  * stray "pack" in prose or a step NAME does not false-match.
  */
-const PACK_STEP = /pnpm\s+(?:--\S+\s+(?:"[^"]*"\s+)?)*pack(?:\s|$)/
+const PACK_STEP = /pnpm\s+(?:--\S+\s+(?:"[^"]*"\s+)?)*pack(?:\s|$)/;
 
 /**
  * Find the 1-based line number of the first line matching `pattern`, or `null`
@@ -75,9 +75,9 @@ const PACK_STEP = /pnpm\s+(?:--\S+\s+(?:"[^"]*"\s+)?)*pack(?:\s|$)/
  */
 function firstMatchingLine(lines: readonly string[], pattern: RegExp): number | null {
   for (const [i, line] of lines.entries()) {
-    if (pattern.test(line)) return i + 1
+    if (pattern.test(line)) return i + 1;
   }
-  return null
+  return null;
 }
 
 /**
@@ -87,14 +87,14 @@ function firstMatchingLine(lines: readonly string[], pattern: RegExp): number | 
  */
 export function analyzeReleaseGateParity(content: string, filePath: string): CheckViolation[] {
   // Scope guard: this check only ever applies to the release workflow.
-  if (!filePath.replaceAll('\\', '/').endsWith(RELEASE_WORKFLOW_SUFFIX)) return []
+  if (!filePath.replaceAll('\\', '/').endsWith(RELEASE_WORKFLOW_SUFFIX)) return [];
 
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
-  const packLine = firstMatchingLine(lines, PACK_STEP)
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
+  const packLine = firstMatchingLine(lines, PACK_STEP);
 
   for (const gate of REQUIRED_GATES) {
-    const gateLine = firstMatchingLine(lines, gate.pattern)
+    const gateLine = firstMatchingLine(lines, gate.pattern);
 
     if (gateLine === null) {
       // (1) ABSENCE — the gate never runs in the release lane.
@@ -110,8 +110,8 @@ export function analyzeReleaseGateParity(content: string, filePath: string): Che
         suggestion:
           `Add a step running \`${gate.command}\` to release.yml BEFORE the pack ` +
           'step, mirroring .github/workflows/ci.yml (ADR-0017).',
-      })
-      continue
+      });
+      continue;
     }
 
     // (2) ORDERING — a present gate that runs at or after the pack step could
@@ -126,13 +126,12 @@ export function analyzeReleaseGateParity(content: string, filePath: string): Che
           'would have failed PR CI.',
         severity: 'error',
         suggestion:
-          `Move the \`${gate.command}\` step above the pack step in release.yml ` +
-          '(ADR-0017).',
-      })
+          `Move the \`${gate.command}\` step above the pack step in release.yml ` + '(ADR-0017).',
+      });
     }
   }
 
-  return violations
+  return violations;
 }
 
 export const releaseGateParity = defineCheck({
@@ -144,4 +143,4 @@ export const releaseGateParity = defineCheck({
   tags: ['architecture', 'ci', 'release'],
   contentFilter: 'raw',
   analyze: (content, filePath) => analyzeReleaseGateParity(content, filePath),
-})
+});

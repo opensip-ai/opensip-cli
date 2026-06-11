@@ -69,7 +69,9 @@ describe('lang-python discover.ts — branches', () => {
     writeFileSync(join(dir, '__pycache__/cached.py'), 'pass\n', 'utf8');
     const out = discoverFiles({ cwd: dir });
     expect(out.files.length).toBe(2);
-    expect(out.files.every((f) => !f.includes('/.venv/') && !f.includes('/__pycache__/'))).toBe(true);
+    expect(out.files.every((f) => !f.includes('/.venv/') && !f.includes('/__pycache__/'))).toBe(
+      true,
+    );
     expect([...out.files]).toEqual([...out.files].sort());
   });
 });

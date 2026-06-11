@@ -33,12 +33,7 @@ import type {
 } from '../../lang-adapter/types.js';
 import type { Catalog, FunctionOccurrence, Indexes } from '../../types.js';
 import type { GraphDoneResult } from '@opensip-tools/contracts';
-import type {
-  LanguageAdapter,
-  Signal,
-  ToolCliContext,
-  WorkspaceUnit,
-} from '@opensip-tools/core';
+import type { LanguageAdapter, Signal, ToolCliContext, WorkspaceUnit } from '@opensip-tools/core';
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
   return {
@@ -102,10 +97,7 @@ interface MockCli {
   readonly emitJson: MockInstance;
 }
 
-function mockCli(
-  datastore: DataStore | undefined,
-  languages?: LanguageRegistry,
-): MockCli {
+function mockCli(datastore: DataStore | undefined, languages?: LanguageRegistry): MockCli {
   const setExitCode = vi.fn();
   const render = vi.fn(() => Promise.resolve());
   const emitEnvelope = vi.fn();
@@ -138,9 +130,7 @@ function renderedLines(render: MockInstance): string {
     .join('\n');
 }
 
-function makeWorkspaceLangRegistry(
-  units: readonly WorkspaceUnit[],
-): LanguageRegistry {
+function makeWorkspaceLangRegistry(units: readonly WorkspaceUnit[]): LanguageRegistry {
   const registry = new LanguageRegistry();
   const adapter: LanguageAdapter = {
     id: 'typescript',
@@ -282,10 +272,7 @@ describe('executeGraph — human / JSON modes', () => {
 
   it('emits a configuration error when --gate-save and --gate-compare are both set', async () => {
     const { cli, setExitCode } = mockCli(datastore);
-    await executeGraph(
-      { cwd: projectDir, noCache: true, gateSave: true, gateCompare: true },
-      cli,
-    );
+    await executeGraph({ cwd: projectDir, noCache: true, gateSave: true, gateCompare: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(2);
     const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
     expect(err).toContain('mutually exclusive');
@@ -293,10 +280,7 @@ describe('executeGraph — human / JSON modes', () => {
 
   it('emits a configuration error when --workspace and positional paths are both set', async () => {
     const { cli, setExitCode } = mockCli(datastore);
-    await executeGraph(
-      { cwd: projectDir, noCache: true, paths: ['foo'], workspace: true },
-      cli,
-    );
+    await executeGraph({ cwd: projectDir, noCache: true, paths: ['foo'], workspace: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(2);
     const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
     expect(err).toContain('mutually exclusive');
@@ -518,10 +502,7 @@ describe('executeGraph — --workspace aggregation', () => {
       // "could not determine the CLI entry script" branch.
       process.argv[1] = '';
       const { cli, setExitCode } = mockCli(datastore, makeWorkspaceLangRegistry([]));
-      await executeGraph(
-        { cwd: workDir, noCache: true, workspace: true },
-        cli,
-      );
+      await executeGraph({ cwd: workDir, noCache: true, workspace: true }, cli);
       expect(setExitCode).toHaveBeenCalledWith(2);
     } finally {
       process.argv[1] = prev ?? '';

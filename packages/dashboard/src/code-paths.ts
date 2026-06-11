@@ -134,11 +134,7 @@ export function dashboardCodePathsJs(_restructured: boolean = RESTRUCTURED_EXPLO
   // build the tab bar. Emission order here is also the runtime registry order;
   // the three view emitters have no cross-dependencies (each only references
   // prelude names), so this order is free to match the desired tab order.
-  const views = [
-    dashboardViewCouplingJs(),
-    dashboardViewDistributionJs(),
-    dashboardViewGraphJs(),
-  ];
+  const views = [dashboardViewCouplingJs(), dashboardViewDistributionJs(), dashboardViewGraphJs()];
 
   return [...prelude, ...views, panelOrchestratorJs()].join('\n');
 }

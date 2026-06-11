@@ -21,11 +21,7 @@ import { z } from 'zod';
 
 import { cliConfigSchema } from './cli-config.js';
 import { dashboardConfigSchema } from './dashboard.js';
-import {
-  checkOverridesSchema,
-  globalExcludesSchema,
-  targetsRecordSchema,
-} from './targeting.js';
+import { checkOverridesSchema, globalExcludesSchema, targetsRecordSchema } from './targeting.js';
 
 import type { ToolConfigDeclaration } from '../declaration.js';
 

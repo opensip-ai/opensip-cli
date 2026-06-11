@@ -118,7 +118,11 @@ export async function executeFit(
   logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
   const checkRegistry = currentCheckRegistry();
-  logger.info({ evt: 'cli.checks.loaded', module: 'cli:fit', checkCount: checkRegistry.listEnabled().length });
+  logger.info({
+    evt: 'cli.checks.loaded',
+    module: 'cli:fit',
+    checkCount: checkRegistry.listEnabled().length,
+  });
 
   const configResult = loadFitConfig(args);
   if ('error' in configResult) return { result: configResult.error };
@@ -181,9 +185,23 @@ export async function executeFit(
   // can surface them without breaking Ink's frame tracking.
   const warnings = [...getLoadWarnings(), ...validationWarnings];
 
-  const result = buildFitDoneResult({ args, fitnessResult, envelope, signalersConfig, recipeName, warnings });
+  const result = buildFitDoneResult({
+    args,
+    fitnessResult,
+    envelope,
+    signalersConfig,
+    recipeName,
+    warnings,
+  });
 
-  logger.info({ evt: 'cli.fit.complete', module: 'cli:fit', score: envelope.verdict.score, passed: fitnessResult.success, totalChecks: fitnessResult.summary.totalChecks, durationMs: fitnessResult.durationMs });
+  logger.info({
+    evt: 'cli.fit.complete',
+    module: 'cli:fit',
+    score: envelope.verdict.score,
+    passed: fitnessResult.success,
+    totalChecks: fitnessResult.summary.totalChecks,
+    durationMs: fitnessResult.durationMs,
+  });
 
   return { result, envelope, durationMs: fitnessResult.durationMs };
 }

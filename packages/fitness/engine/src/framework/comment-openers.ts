@@ -8,4 +8,4 @@
  * fitness consumers (`directive-inventory.ts`).
  */
 
-export { COMMENT_OPENERS, stripCommentOpener } from '@opensip-tools/core'
+export { COMMENT_OPENERS, stripCommentOpener } from '@opensip-tools/core';

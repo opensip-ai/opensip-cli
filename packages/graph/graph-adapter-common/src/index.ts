@@ -17,22 +17,13 @@
  * tree-sitter) shares none of this and must not depend on it.
  */
 
-export {
-  createDiscover,
-  type TreeSitterDiscoverConfig,
-} from './discover.js';
+export { createDiscover, type TreeSitterDiscoverConfig } from './discover.js';
 
-export {
-  type TreeSitterParsedFile,
-  type TreeSitterParsedProject,
-} from './parse.js';
+export { type TreeSitterParsedFile, type TreeSitterParsedProject } from './parse.js';
 
 export { createParseProjectFromAdapter } from './parse-from-adapter.js';
 
-export {
-  hashConfig,
-  makeConfigCacheKey,
-} from './cache-key.js';
+export { hashConfig, makeConfigCacheKey } from './cache-key.js';
 
 export { skipToEndOfLine, skipBlockComment } from './body-digest.js';
 

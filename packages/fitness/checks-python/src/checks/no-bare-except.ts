@@ -13,31 +13,31 @@
  * The check uses `strip-strings` content filtering so a literal like
  * `"except:"` inside a docstring or string doesn't false-fire.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 // eslint-disable-next-line sonarjs/slow-regex -- anchored, bounded line scan; \s* on bounded leading whitespace is safe
-const BARE_EXCEPT_PATTERN = /^\s*except\s*:/gm
+const BARE_EXCEPT_PATTERN = /^\s*except\s*:/gm;
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the
  * detection logic without standing up the full Check framework.
  */
 export function analyzeBareExcept(content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  BARE_EXCEPT_PATTERN.lastIndex = 0
-  let match: RegExpExecArray | null
+  const violations: CheckViolation[] = [];
+  BARE_EXCEPT_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
   while ((match = BARE_EXCEPT_PATTERN.exec(content)) !== null) {
     // Compute 1-based line number from match index.
-    const upto = content.slice(0, match.index)
-    const line = upto.split('\n').length
+    const upto = content.slice(0, match.index);
+    const line = upto.split('\n').length;
     violations.push({
       message: 'Bare `except:` catches BaseException — including KeyboardInterrupt and SystemExit',
       severity: 'warning',
       line,
       suggestion: 'Catch a specific exception (e.g. `except Exception:` or a narrower type)',
-    })
+    });
   }
-  return violations
+  return violations;
 }
 
 export const noBareExcept = defineCheck({
@@ -51,4 +51,4 @@ export const noBareExcept = defineCheck({
   // match the leading-whitespace anchor since `#` is in the way.
   contentFilter: 'strip-strings',
   analyze: (content) => analyzeBareExcept(content),
-})
+});

@@ -12,12 +12,12 @@
  *   literals (detection patterns, docs, fixtures) is never mistaken for a real import
  */
 
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
-import { getSharedSourceFile, walkNodes } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { getSharedSourceFile, walkNodes } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Packages that are always available (Node.js built-ins)
@@ -66,7 +66,7 @@ const NODE_BUILTINS = new Set([
   'vm',
   'worker_threads',
   'zlib',
-])
+]);
 
 /**
  * Patterns that indicate test-only imports (should check devDependencies)
@@ -77,7 +77,7 @@ const TEST_FILE_PATTERNS = [
   /\.spec\.(ts|tsx|js|jsx)$/,
   /test\//,
   /tests\//,
-]
+];
 
 /**
  * Build/tooling config files (e.g. `vitest.config.ts`, `drizzle.config.ts`,
@@ -85,19 +85,19 @@ const TEST_FILE_PATTERNS = [
  * are never part of the published package, so importing a `devDependency` from
  * them is legitimate — a genuinely undeclared import is still flagged.
  */
-const TOOLING_FILE_PATTERN = /(?:^|\/)[^/]+\.config\.(?:ts|tsx|js|jsx|mts|cts|mjs|cjs)$/
+const TOOLING_FILE_PATTERN = /(?:^|\/)[^/]+\.config\.(?:ts|tsx|js|jsx|mts|cts|mjs|cjs)$/;
 
 interface PackageJson {
-  name?: string
-  dependencies?: Record<string, string>
-  devDependencies?: Record<string, string>
-  peerDependencies?: Record<string, string>
-  optionalDependencies?: Record<string, string>
+  name?: string;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
 }
 
 interface ExtractedImport {
-  specifier: string
-  line: number
+  specifier: string;
+  line: number;
 }
 
 /**
@@ -107,28 +107,28 @@ interface ExtractedImport {
 function extractPackageName(importSpecifier: string): string | null {
   // Skip relative imports
   if (importSpecifier.startsWith('.') || importSpecifier.startsWith('/')) {
-    return null
+    return null;
   }
 
   // Strip the node: prefix before built-in / package detection
-  const bare = importSpecifier.startsWith('node:') ? importSpecifier.slice(5) : importSpecifier
+  const bare = importSpecifier.startsWith('node:') ? importSpecifier.slice(5) : importSpecifier;
 
   // Skip Node.js built-ins (with or without the node: prefix, and subpaths like fs/promises)
   if (NODE_BUILTINS.has(bare) || NODE_BUILTINS.has(bare.split('/')[0] ?? '')) {
-    return null
+    return null;
   }
 
   // Handle scoped packages (@org/pkg or @org/pkg/subpath)
   if (importSpecifier.startsWith('@')) {
-    const parts = importSpecifier.split('/')
+    const parts = importSpecifier.split('/');
     if (parts.length >= 2) {
-      return `${parts[0]}/${parts[1]}`
+      return `${parts[0]}/${parts[1]}`;
     }
-    return null
+    return null;
   }
 
   // Handle regular packages (pkg or pkg/subpath)
-  return importSpecifier.split('/')[0] ?? null
+  return importSpecifier.split('/')[0] ?? null;
 }
 
 /**
@@ -138,14 +138,14 @@ function extractPackageName(importSpecifier: string): string | null {
  * nodes, import-like text appearing inside string literals is never matched.
  */
 function extractImports(filePath: string, content: string): ExtractedImport[] {
-  const sourceFile = getSharedSourceFile(filePath, content)
-  if (!sourceFile) return []
+  const sourceFile = getSharedSourceFile(filePath, content);
+  if (!sourceFile) return [];
 
-  const imports: ExtractedImport[] = []
+  const imports: ExtractedImport[] = [];
   const push = (node: ts.Node, specifier: string): void => {
-    const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
-    imports.push({ specifier, line: line + 1 })
-  }
+    const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+    imports.push({ specifier, line: line + 1 });
+  };
 
   walkNodes(sourceFile, (node) => {
     // import ... from 'x'  /  export ... from 'x'
@@ -154,8 +154,8 @@ function extractImports(filePath: string, content: string): ExtractedImport[] {
       node.moduleSpecifier &&
       ts.isStringLiteral(node.moduleSpecifier)
     ) {
-      push(node, node.moduleSpecifier.text)
-      return
+      push(node, node.moduleSpecifier.text);
+      return;
     }
 
     // import x = require('x')
@@ -164,41 +164,41 @@ function extractImports(filePath: string, content: string): ExtractedImport[] {
       ts.isExternalModuleReference(node.moduleReference) &&
       ts.isStringLiteralLike(node.moduleReference.expression)
     ) {
-      push(node, node.moduleReference.expression.text)
-      return
+      push(node, node.moduleReference.expression.text);
+      return;
     }
 
     // dynamic import('x') and require('x')
     if (ts.isCallExpression(node)) {
-      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword
-      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === 'require'
-      const arg = node.arguments[0]
+      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
+      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === 'require';
+      const arg = node.arguments[0];
       if ((isDynamicImport || isRequire) && arg && ts.isStringLiteralLike(arg)) {
-        push(node, arg.text)
+        push(node, arg.text);
       }
     }
-  })
+  });
 
-  return imports
+  return imports;
 }
 
 /**
  * Find the nearest package.json for a file.
  */
 function findNearestPackageJson(filePath: string): string | null {
-  let dir = path.dirname(filePath)
+  let dir = path.dirname(filePath);
   // @fitness-ignore-next-line null-safety -- path.parse() always returns object with .root per Node.js API
-  const root = path.parse(dir).root
+  const root = path.parse(dir).root;
 
   while (dir !== root) {
-    const pkgPath = path.join(dir, 'package.json')
+    const pkgPath = path.join(dir, 'package.json');
     if (fs.existsSync(pkgPath)) {
-      return pkgPath
+      return pkgPath;
     }
-    dir = path.dirname(dir)
+    dir = path.dirname(dir);
   }
 
-  return null
+  return null;
 }
 
 /**
@@ -206,11 +206,11 @@ function findNearestPackageJson(filePath: string): string | null {
  */
 function readPackageJson(pkgPath: string): PackageJson | null {
   try {
-    const content = fs.readFileSync(pkgPath, 'utf8')
-    return JSON.parse(content) as PackageJson
+    const content = fs.readFileSync(pkgPath, 'utf8');
+    return JSON.parse(content) as PackageJson;
   } catch {
     // @swallow-ok graceful degradation - return sentinel on failure
-    return null
+    return null;
   }
 }
 
@@ -222,7 +222,7 @@ function allowsDevDependencies(filePath: string): boolean {
   return (
     TEST_FILE_PATTERNS.some((pattern) => pattern.test(filePath)) ||
     TOOLING_FILE_PATTERN.test(filePath)
-  )
+  );
 }
 
 /**
@@ -234,23 +234,23 @@ function isDeclaredDependency(
   allowDevDeps: boolean,
 ): { declared: boolean; section?: string } {
   if (pkg.dependencies?.[packageName]) {
-    return { declared: true, section: 'dependencies' }
+    return { declared: true, section: 'dependencies' };
   }
   if (pkg.peerDependencies?.[packageName]) {
-    return { declared: true, section: 'peerDependencies' }
+    return { declared: true, section: 'peerDependencies' };
   }
   if (pkg.optionalDependencies?.[packageName]) {
-    return { declared: true, section: 'optionalDependencies' }
+    return { declared: true, section: 'optionalDependencies' };
   }
   // In dev-only files (tests, build/tooling configs), devDependencies are valid.
   if (allowDevDeps && pkg.devDependencies?.[packageName]) {
-    return { declared: true, section: 'devDependencies' }
+    return { declared: true, section: 'devDependencies' };
   }
   // In shipped source, importing a devDependency is a problem (won't ship in prod).
   if (!allowDevDeps && pkg.devDependencies?.[packageName]) {
-    return { declared: false, section: 'devDependencies' }
+    return { declared: false, section: 'devDependencies' };
   }
-  return { declared: false }
+  return { declared: false };
 }
 
 /** Read + cache a package.json by its resolved path. */
@@ -258,12 +258,12 @@ function getCachedPackageJson(
   cache: Map<string, PackageJson | null>,
   pkgJsonPath: string,
 ): PackageJson | null {
-  let pkgJson = cache.get(pkgJsonPath)
+  let pkgJson = cache.get(pkgJsonPath);
   if (pkgJson === undefined) {
-    pkgJson = readPackageJson(pkgJsonPath)
-    cache.set(pkgJsonPath, pkgJson)
+    pkgJson = readPackageJson(pkgJsonPath);
+    cache.set(pkgJsonPath, pkgJson);
   }
-  return pkgJson
+  return pkgJson;
 }
 
 /**
@@ -272,32 +272,32 @@ function getCachedPackageJson(
  * `collectFileViolations` and threaded as one value (only `imp` varies per call).
  */
 interface FileDepContext {
-  pkgJson: PackageJson
-  allDeps: Record<string, string>
-  allowDevDeps: boolean
-  filePath: string
-  pkgJsonPath: string
+  pkgJson: PackageJson;
+  allDeps: Record<string, string>;
+  allowDevDeps: boolean;
+  filePath: string;
+  pkgJsonPath: string;
 }
 
 /** Build the violation for a single import, or null when it's fine. */
 function violationForImport(imp: ExtractedImport, ctx: FileDepContext): CheckViolation | null {
-  const { pkgJson, allDeps, allowDevDeps, filePath, pkgJsonPath } = ctx
-  const packageName = extractPackageName(imp.specifier)
-  if (!packageName) return null
+  const { pkgJson, allDeps, allowDevDeps, filePath, pkgJsonPath } = ctx;
+  const packageName = extractPackageName(imp.specifier);
+  if (!packageName) return null;
 
   // Skip workspace packages (declared via the workspace: protocol)
-  if (allDeps[packageName]?.startsWith('workspace:')) return null
+  if (allDeps[packageName]?.startsWith('workspace:')) return null;
 
-  const { declared, section } = isDeclaredDependency(pkgJson, packageName, allowDevDeps)
-  if (declared) return null
+  const { declared, section } = isDeclaredDependency(pkgJson, packageName, allowDevDeps);
+  if (declared) return null;
 
-  const isDevDep = section === 'devDependencies'
+  const isDevDep = section === 'devDependencies';
   const message = isDevDep
     ? `Source file imports "${packageName}" which is only in devDependencies`
-    : `Phantom dependency: "${packageName}" is used but not declared in package.json`
+    : `Phantom dependency: "${packageName}" is used but not declared in package.json`;
   const suggestion = isDevDep
     ? `Move "${packageName}" from devDependencies to dependencies in ${path.basename(pkgJsonPath)}`
-    : `Add "${packageName}" to dependencies in ${path.basename(pkgJsonPath)}`
+    : `Add "${packageName}" to dependencies in ${path.basename(pkgJsonPath)}`;
 
   return {
     filePath,
@@ -307,7 +307,7 @@ function violationForImport(imp: ExtractedImport, ctx: FileDepContext): CheckVio
     suggestion,
     match: packageName,
     type: 'phantom-dependency',
-  }
+  };
 }
 
 /** Collect all phantom/devDep violations for one already-read source file. */
@@ -316,30 +316,30 @@ function collectFileViolations(
   content: string,
   cache: Map<string, PackageJson | null>,
 ): CheckViolation[] {
-  const imports = extractImports(filePath, content)
-  if (imports.length === 0) return []
+  const imports = extractImports(filePath, content);
+  if (imports.length === 0) return [];
 
-  const pkgJsonPath = findNearestPackageJson(filePath)
-  if (!pkgJsonPath) return []
+  const pkgJsonPath = findNearestPackageJson(filePath);
+  if (!pkgJsonPath) return [];
 
-  const pkgJson = getCachedPackageJson(cache, pkgJsonPath)
-  if (!pkgJson) return []
+  const pkgJson = getCachedPackageJson(cache, pkgJsonPath);
+  if (!pkgJson) return [];
 
   const allDeps: Record<string, string> = {
     ...pkgJson.dependencies,
     ...pkgJson.devDependencies,
     ...pkgJson.peerDependencies,
     ...pkgJson.optionalDependencies,
-  }
-  const allowDevDeps = allowsDevDependencies(filePath)
+  };
+  const allowDevDeps = allowsDevDependencies(filePath);
 
-  const ctx: FileDepContext = { pkgJson, allDeps, allowDevDeps, filePath, pkgJsonPath }
-  const out: CheckViolation[] = []
+  const ctx: FileDepContext = { pkgJson, allDeps, allowDevDeps, filePath, pkgJsonPath };
+  const out: CheckViolation[] = [];
   for (const imp of imports) {
-    const violation = violationForImport(imp, ctx)
-    if (violation) out.push(violation)
+    const violation = violationForImport(imp, ctx);
+    if (violation) out.push(violation);
   }
-  return out
+  return out;
 }
 
 /**
@@ -377,24 +377,24 @@ export const phantomDependencyDetection = defineCheck({
   fileTypes: ['ts', 'tsx', 'js', 'jsx'],
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Cache for package.json contents, keyed by resolved package.json path
-    const pkgJsonCache = new Map<string, PackageJson | null>()
+    const pkgJsonCache = new Map<string, PackageJson | null>();
 
     // @lazy-ok -- validations inside loop depend on file content from await
     for (const filePath of files.paths) {
       try {
         // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
-        const content = await files.read(filePath)
-        if (!content) continue
-        violations.push(...collectFileViolations(filePath, content, pkgJsonCache))
+        const content = await files.read(filePath);
+        if (!content) continue;
+        violations.push(...collectFileViolations(filePath, content, pkgJsonCache));
       } catch {
         // @swallow-ok Skip files that can't be read
-        continue
+        continue;
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

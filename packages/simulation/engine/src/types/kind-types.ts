@@ -19,7 +19,7 @@
  */
 
 /** Scenario kind discriminator. */
-export type ScenarioKind = 'load' | 'chaos'
+export type ScenarioKind = 'load' | 'chaos';
 
 /** All scenario kinds, frozen for runtime iteration. */
-export const SCENARIO_KINDS: readonly ScenarioKind[] = Object.freeze(['load', 'chaos'])
+export const SCENARIO_KINDS: readonly ScenarioKind[] = Object.freeze(['load', 'chaos']);

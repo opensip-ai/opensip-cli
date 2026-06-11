@@ -45,7 +45,10 @@ describe('parity completion-invariant index (§8)', () => {
   it('maps every §8 invariant to at least one enforcing check', () => {
     expect(Object.keys(INVARIANT_CHECKS)).toHaveLength(9);
     for (const [invariant, slugs] of Object.entries(INVARIANT_CHECKS)) {
-      expect(slugs.length, `invariant '${invariant}' must name an enforcing check`).toBeGreaterThanOrEqual(1);
+      expect(
+        slugs.length,
+        `invariant '${invariant}' must name an enforcing check`,
+      ).toBeGreaterThanOrEqual(1);
     }
   });
 

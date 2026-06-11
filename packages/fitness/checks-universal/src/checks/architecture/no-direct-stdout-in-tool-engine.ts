@@ -32,14 +32,14 @@
  * no-direct-stdout-in-tool-engine` with a justification comment — e.g. the
  * shard-worker IPC protocol (`graph/engine/src/cli/shard-worker.ts`).
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Resolved-path fragment that identifies a tool-engine source file. The
  * check only applies inside the three tool engines; everything else (CLI
  * root, output package, dashboard, core) may own stdout.
  */
-const TOOL_ENGINE_PATH = /packages\/(fitness|graph|simulation)\/engine\/src\//
+const TOOL_ENGINE_PATH = /packages\/(fitness|graph|simulation)\/engine\/src\//;
 
 /**
  * stdout run-output call shapes. `process.stdout.write(` is the explicit
@@ -50,7 +50,7 @@ const TOOL_ENGINE_PATH = /packages\/(fitness|graph|simulation)\/engine\/src\//
 const STDOUT_PATTERNS: readonly RegExp[] = [
   /\bprocess\.stdout\.write\s*\(/,
   /\bconsole\.(?:log|info|debug)\s*\(/,
-]
+];
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the detection
@@ -60,8 +60,8 @@ const STDOUT_PATTERNS: readonly RegExp[] = [
  * are flagged.
  */
 export function analyzeDirectStdout(content: string): CheckViolation[] {
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
   for (const [i, line] of lines.entries()) {
     for (const pattern of STDOUT_PATTERNS) {
       if (pattern.test(line)) {
@@ -77,19 +77,18 @@ export function analyzeDirectStdout(content: string): CheckViolation[] {
             'subprocess IPC / a deliberate machine path — add ' +
             '`@fitness-ignore-file no-direct-stdout-in-tool-engine` with a ' +
             'justification comment.',
-        })
-        break
+        });
+        break;
       }
     }
   }
-  return violations
+  return violations;
 }
 
 export const noDirectStdoutInToolEngine = defineCheck({
   id: '9a2a9d7a-2e40-4adf-b682-534c3412d4da',
   slug: 'no-direct-stdout-in-tool-engine',
-  description:
-    'Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011)',
+  description: 'Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011)',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   tags: ['architecture', 'quality'],
   fileTypes: ['ts', 'tsx'],
@@ -100,7 +99,7 @@ export const noDirectStdoutInToolEngine = defineCheck({
   analyze: (content, filePath) => {
     // The contract is tool-engine-scoped. The dogfood `backend` target spans
     // every package's src; narrow to the three tool engines here.
-    if (!TOOL_ENGINE_PATH.test(filePath)) return []
-    return analyzeDirectStdout(content)
+    if (!TOOL_ENGINE_PATH.test(filePath)) return [];
+    return analyzeDirectStdout(content);
   },
-})
+});

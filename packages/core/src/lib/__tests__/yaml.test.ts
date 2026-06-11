@@ -62,9 +62,7 @@ describe('readYamlFileOrThrow (audit-round-2 Finding F)', () => {
 
   it('throws ValidationError for a missing file with loader attribution', () => {
     const path = join(testDir, 'missing.yml');
-    expect(() => readYamlFileOrThrow(path, { loader: 'signalers' })).toThrow(
-      ValidationError,
-    );
+    expect(() => readYamlFileOrThrow(path, { loader: 'signalers' })).toThrow(ValidationError);
   });
 
   it('throws ValidationError for malformed YAML', () => {

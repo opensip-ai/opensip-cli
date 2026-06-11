@@ -42,11 +42,7 @@ describe('graph-go walk.ts', () => {
   });
 
   it('emits function-declaration for top-level funcs', () => {
-    writeFileSync(
-      join(dir, 'main.go'),
-      `package main\nfunc topLevel() int { return 1 }\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'main.go'), `package main\nfunc topLevel() int { return 1 }\n`, 'utf8');
     const walk = run(dir);
     expect(Object.keys(walk.occurrences)).toContain('topLevel');
     const occs = walk.occurrences.topLevel;
@@ -105,11 +101,7 @@ describe('graph-go walk.ts', () => {
   });
 
   it('flags _test.go files as inTestFile', () => {
-    writeFileSync(
-      join(dir, 'thing_test.go'),
-      `package main\nfunc TestSomething() {}\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'thing_test.go'), `package main\nfunc TestSomething() {}\n`, 'utf8');
     const walk = run(dir);
     expect(walk.occurrences.TestSomething?.[0]?.inTestFile).toBe(true);
   });
@@ -172,31 +164,19 @@ describe('graph-go walk.ts', () => {
   });
 
   it('classifies *_generated.go files as definedInGenerated', () => {
-    writeFileSync(
-      join(dir, 'foo_generated.go'),
-      `package main\nfunc Gen() {}\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'foo_generated.go'), `package main\nfunc Gen() {}\n`, 'utf8');
     const walk = run(dir);
     expect(walk.occurrences.Gen?.[0]?.definedInGenerated).toBe(true);
   });
 
   it('classifies *.gen.go files as definedInGenerated', () => {
-    writeFileSync(
-      join(dir, 'queries.gen.go'),
-      `package main\nfunc GenQ() {}\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'queries.gen.go'), `package main\nfunc GenQ() {}\n`, 'utf8');
     const walk = run(dir);
     expect(walk.occurrences.GenQ?.[0]?.definedInGenerated).toBe(true);
   });
 
   it('classifies .pb.go files as definedInGenerated', () => {
-    writeFileSync(
-      join(dir, 'proto.pb.go'),
-      `package main\nfunc ProtoFunc() {}\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'proto.pb.go'), `package main\nfunc ProtoFunc() {}\n`, 'utf8');
     const walk = run(dir);
     expect(walk.occurrences.ProtoFunc?.[0]?.definedInGenerated).toBe(true);
   });

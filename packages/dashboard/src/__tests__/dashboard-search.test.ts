@@ -6,11 +6,17 @@ import { describe, expect, it } from 'vitest';
 
 import { dashboardSearchJs } from '../code-paths/search.js';
 
-interface Match { name: string; score: number }
+interface Match {
+  name: string;
+  score: number;
+}
 
 function loadFuzzyMatch(): (q: string, names: string[]) => Match[] {
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
-  const fn = new Function(dashboardSearchJs() + '\nreturn fuzzyMatch;')() as (q: string, n: string[]) => Match[];
+  const fn = new Function(dashboardSearchJs() + '\nreturn fuzzyMatch;')() as (
+    q: string,
+    n: string[],
+  ) => Match[];
   return fn;
 }
 
@@ -27,7 +33,7 @@ describe('fuzzyMatch', () => {
   it('matches mid-word when the chars appear in order', () => {
     const fn = loadFuzzyMatch();
     const out = fn('ger', ['logger', 'unrelated']);
-    expect(out.map(m => m.name)).toContain('logger');
+    expect(out.map((m) => m.name)).toContain('logger');
   });
 
   it('returns empty for queries with no characters in order', () => {
@@ -51,6 +57,6 @@ describe('fuzzyMatch', () => {
   it('matches non-contiguous chars (lgr → logger)', () => {
     const fn = loadFuzzyMatch();
     const out = fn('lgr', ['logger', 'unrelated']);
-    expect(out.map(m => m.name)).toContain('logger');
+    expect(out.map((m) => m.name)).toContain('logger');
   });
 });

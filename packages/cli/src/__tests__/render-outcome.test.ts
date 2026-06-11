@@ -5,7 +5,11 @@
  * nothing in human mode.
  */
 
-import { buildSignalEnvelope, type CommandOutcome, type CommandResult } from '@opensip-tools/contracts';
+import {
+  buildSignalEnvelope,
+  type CommandOutcome,
+  type CommandResult,
+} from '@opensip-tools/contracts';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import { renderOutcome } from '../commands/render-outcome.js';
@@ -36,7 +40,12 @@ describe('renderOutcome — --json', () => {
   it('writes the whole CommandOutcome wrapper with the byte-identical envelope under .envelope', async () => {
     spyStdout();
     const render = vi.fn<(r: CommandResult) => Promise<void>>().mockResolvedValue(undefined);
-    const outcome: CommandOutcome = { kind: 'fit.run', status: 'ok', exitCode: 0, envelope: ENVELOPE };
+    const outcome: CommandOutcome = {
+      kind: 'fit.run',
+      status: 'ok',
+      exitCode: 0,
+      envelope: ENVELOPE,
+    };
 
     await renderOutcome(outcome, { jsonRequested: true, render });
 
@@ -52,7 +61,12 @@ describe('renderOutcome — human', () => {
   it('renders the inner envelope and writes no JSON', async () => {
     spyStdout();
     const render = vi.fn<(r: CommandResult) => Promise<void>>().mockResolvedValue(undefined);
-    const outcome: CommandOutcome = { kind: 'fit.run', status: 'ok', exitCode: 0, envelope: ENVELOPE };
+    const outcome: CommandOutcome = {
+      kind: 'fit.run',
+      status: 'ok',
+      exitCode: 0,
+      envelope: ENVELOPE,
+    };
 
     await renderOutcome(outcome, { jsonRequested: false, render });
 

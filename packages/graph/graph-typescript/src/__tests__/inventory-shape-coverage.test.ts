@@ -86,7 +86,10 @@ function findByName(
  * tests stay independent without hammering the filesystem on every
  * `it()`.
  */
-function makeFixture(label: string, files: Readonly<Record<string, string>>): {
+function makeFixture(
+  label: string,
+  files: Readonly<Record<string, string>>,
+): {
   catalog: Catalog;
   cleanup: () => void;
   rootDir: string;
@@ -159,7 +162,10 @@ describe('Tier 1 — function-expression shapes', () => {
     // shape was detected; the kind must be 'function-expression'.
     const named = findByName(
       f.catalog,
-      (n, o) => o.filePath === 'named.ts' && o.kind === 'function-expression' && (n === 'named' || n === 'x'),
+      (n, o) =>
+        o.filePath === 'named.ts' &&
+        o.kind === 'function-expression' &&
+        (n === 'named' || n === 'x'),
     );
     expect(named).toBeDefined();
     expect(named!.kind).toBe('function-expression');
@@ -167,14 +173,20 @@ describe('Tier 1 — function-expression shapes', () => {
   });
 
   it('6. anonymous function expression assigned to const', () => {
-    const occ = findByName(f.catalog, (_n, o) => o.filePath === 'anon.ts' && o.kind === 'function-expression');
+    const occ = findByName(
+      f.catalog,
+      (_n, o) => o.filePath === 'anon.ts' && o.kind === 'function-expression',
+    );
     expect(occ).toBeDefined();
     // Visitor falls back to parent var name 'x' when the function has no name.
     expect(occ!.simpleName).toBe('x');
   });
 
   it('7. IIFE — inner function-expression is captured', () => {
-    const occ = findByName(f.catalog, (_n, o) => o.filePath === 'iife.ts' && o.kind === 'function-expression');
+    const occ = findByName(
+      f.catalog,
+      (_n, o) => o.filePath === 'iife.ts' && o.kind === 'function-expression',
+    );
     expect(occ).toBeDefined();
     // No parent VariableDeclaration → synthesized <fn-expr:...> name.
     expect(occ!.simpleName).toMatch(/^<fn-expr:iife\.ts:\d+:\d+>$/);
@@ -242,10 +254,7 @@ describe('Tier 1 — arrow function shapes', () => {
   });
 
   it('14. anonymous arrow as default export — captured as arrow', () => {
-    const occ = findByName(
-      f.catalog,
-      (_n, o) => o.filePath === 'default.ts' && o.kind === 'arrow',
-    );
+    const occ = findByName(f.catalog, (_n, o) => o.filePath === 'default.ts' && o.kind === 'arrow');
     expect(occ).toBeDefined();
     // No parent VariableDeclaration/PropertyAssignment → synthesized name.
     expect(occ!.simpleName).toMatch(/^<arrow:default\.ts:\d+:\d+>$/);
@@ -311,7 +320,10 @@ describe('Tier 1 — class member shapes', () => {
   });
 
   it('21. computed method name — kind is method even when name is computed', () => {
-    const occ = findByName(f.catalog, (_n, o) => o.filePath === 'computed.ts' && o.kind === 'method');
+    const occ = findByName(
+      f.catalog,
+      (_n, o) => o.filePath === 'computed.ts' && o.kind === 'method',
+    );
     expect(occ).toBeDefined();
     // The visitor returns expression.getText() for ComputedPropertyName.
     expect(occ!.simpleName).toContain('computed');
@@ -330,7 +342,10 @@ describe('Tier 1 — class member shapes', () => {
   });
 
   it('24. explicit constructor — kind: constructor', () => {
-    const occ = findByName(f.catalog, (_n, o) => o.filePath === 'ctor.ts' && o.kind === 'constructor');
+    const occ = findByName(
+      f.catalog,
+      (_n, o) => o.filePath === 'ctor.ts' && o.kind === 'constructor',
+    );
     expect(occ).toBeDefined();
     expect(occ!.simpleName).toBe('C');
     expect(occ!.enclosingClass).toBe('C');
@@ -390,10 +405,7 @@ describe('Tier 1 — namespaced and default-export functions', () => {
   let f: ReturnType<typeof makeFixture>;
   beforeAll(() => {
     f = makeFixture('namespace-default', {
-      'ns.ts':
-        `export namespace Ns {\n` +
-        `  export function foo() { return 1; }\n` +
-        `}\n`,
+      'ns.ts': `export namespace Ns {\n` + `  export function foo() { return 1; }\n` + `}\n`,
       'def.ts': `export default function() { return 1; }\n`,
     });
   });
@@ -599,7 +611,8 @@ describe('Tier 1 — additional class-member shapes', () => {
   it('44. private class field with arrow initializer takes the (#-prefixed) field name', () => {
     const occ = findByName(
       f.catalog,
-      (_n, o) => o.filePath === 'priv-field-arrow.ts' && o.kind === 'arrow' && o.enclosingClass === 'C',
+      (_n, o) =>
+        o.filePath === 'priv-field-arrow.ts' && o.kind === 'arrow' && o.enclosingClass === 'C',
     );
     expect(occ).toBeDefined();
     expect(occ!.simpleName).toBe('#h');
@@ -747,7 +760,8 @@ describe('Tier 1 — auto-accessor (must not crash)', () => {
       // synchronously and we'd never get here.
       const accessors = allOccurrences(f.catalog).filter(
         (o) =>
-          o.filePath === 'auto.ts' && (o.kind === 'getter' || o.kind === 'setter' || o.kind === 'method'),
+          o.filePath === 'auto.ts' &&
+          (o.kind === 'getter' || o.kind === 'setter' || o.kind === 'method'),
       );
       // No spurious entry should be emitted for a stored accessor field.
       expect(accessors).toHaveLength(0);

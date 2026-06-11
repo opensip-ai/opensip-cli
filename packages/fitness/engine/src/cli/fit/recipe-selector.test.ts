@@ -5,7 +5,6 @@ import { fitnessTool } from '../../tool.js';
 
 import { selectRecipe } from './recipe-selector.js';
 
-
 import type { FitOptions } from '@opensip-tools/contracts';
 
 /**
@@ -25,7 +24,9 @@ beforeEach(() => {
 
 describe('selectRecipe (ADR-0022 tool-scoped + tolerant)', () => {
   it('explicit --recipe wins and resolves a real recipe', () => {
-    expect(selectRecipe({ ...base, recipe: 'backend' }, { toolRecipe: 'default', cliRecipe: 'opensip' })).toEqual({
+    expect(
+      selectRecipe({ ...base, recipe: 'backend' }, { toolRecipe: 'default', cliRecipe: 'opensip' }),
+    ).toEqual({
       recipeName: 'backend',
     });
   });

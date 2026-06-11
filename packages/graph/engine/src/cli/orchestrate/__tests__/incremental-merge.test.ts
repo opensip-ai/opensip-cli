@@ -82,10 +82,20 @@ describe('mergeOccurrences', () => {
 describe('mergeResolvedAndCachedEdges', () => {
   it('applies freshly-resolved edges to closure files and restores cached edges elsewhere', () => {
     const cachedEdge: CallEdge = {
-      to: ['B1'], line: 2, column: 1, resolution: 'static', confidence: 'high', text: 'b()',
+      to: ['B1'],
+      line: 2,
+      column: 1,
+      resolution: 'static',
+      confidence: 'high',
+      text: 'b()',
     };
     const freshEdge: CallEdge = {
-      to: ['B1'], line: 3, column: 1, resolution: 'static', confidence: 'high', text: 'b()',
+      to: ['B1'],
+      line: 3,
+      column: 1,
+      resolution: 'static',
+      confidence: 'high',
+      text: 'b()',
     };
     const cached = catalogOf(occ('a', 'a.ts', 'A1', [cachedEdge]), occ('b', 'b.ts', 'B1'));
     // Merged catalog: a.ts (closure, hash A1) + unchanged b.ts (B1).

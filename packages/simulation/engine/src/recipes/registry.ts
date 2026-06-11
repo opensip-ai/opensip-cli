@@ -36,7 +36,10 @@ const BUILT_IN_NAMES = new Set(builtInSimulationRecipes.map((r) => r.name));
 /** Registry of simulation recipes — bootstraps built-ins and accepts user-defined additions. */
 export class SimulationRecipeRegistry extends RecipeRegistry<SimulationRecipe> {
   constructor() {
-    super({ module: 'simulation:recipes', validationCode: 'VALIDATION.SIMULATION.DUPLICATE_RECIPE' });
+    super({
+      module: 'simulation:recipes',
+      validationCode: 'VALIDATION.SIMULATION.DUPLICATE_RECIPE',
+    });
     // Built-ins bypass the duplicate guard via { internal: true } —
     // replaces the prior direct map writes (the LSP violation).
     this.registerAll(builtInSimulationRecipes, { internal: true });
@@ -47,10 +50,7 @@ export class SimulationRecipeRegistry extends RecipeRegistry<SimulationRecipe> {
    * `allowOverwrite: true` is passed — historical contract preserved
    * by routing through the kernel registry's `throwOnDuplicate` flag.
    */
-  override register(
-    recipe: SimulationRecipe,
-    options?: { allowOverwrite?: boolean },
-  ): void {
+  override register(recipe: SimulationRecipe, options?: { allowOverwrite?: boolean }): void {
     super.register(recipe, {
       allowOverwrite: options?.allowOverwrite ?? false,
       throwOnDuplicate: !(options?.allowOverwrite ?? false),

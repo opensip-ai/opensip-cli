@@ -66,9 +66,7 @@ describe('detectMonorepoLayout', () => {
 
   it('classifies a small flat repo (no workspaces) as flat-small', () => {
     // 100 synthetic .ts files — below the default 2500 threshold.
-    const files = Array.from({ length: 100 }, (_, i) =>
-      join(dir, 'src', `file-${String(i)}.ts`),
-    );
+    const files = Array.from({ length: 100 }, (_, i) => join(dir, 'src', `file-${String(i)}.ts`));
 
     const layout = detectMonorepoLayout({
       repoRoot: dir,
@@ -85,9 +83,7 @@ describe('detectMonorepoLayout', () => {
 
   it('classifies a large flat repo (no workspaces, > threshold) as flat-large', () => {
     // 3000 synthetic .ts files — above the default 2500 threshold.
-    const files = Array.from({ length: 3000 }, (_, i) =>
-      join(dir, 'src', `file-${String(i)}.ts`),
-    );
+    const files = Array.from({ length: 3000 }, (_, i) => join(dir, 'src', `file-${String(i)}.ts`));
 
     const layout = detectMonorepoLayout({
       repoRoot: dir,
@@ -103,9 +99,7 @@ describe('detectMonorepoLayout', () => {
   });
 
   it('respects a caller-supplied heap-elevation threshold', () => {
-    const files = Array.from({ length: 200 }, (_, i) =>
-      join(dir, 'src', `file-${String(i)}.ts`),
-    );
+    const files = Array.from({ length: 200 }, (_, i) => join(dir, 'src', `file-${String(i)}.ts`));
 
     const layout = detectMonorepoLayout({
       repoRoot: dir,
@@ -166,10 +160,7 @@ describe('partitionFlatRepo — directory-depth', () => {
   it('handles files shallower than the requested depth', () => {
     // `src/foo.ts` has only one directory segment (`src`) — should
     // bucket under `src`, not `src.<missing>`.
-    const files = [
-      `${repoRoot}/src/foo.ts`,
-      `${repoRoot}/src/bar.ts`,
-    ];
+    const files = [`${repoRoot}/src/foo.ts`, `${repoRoot}/src/bar.ts`];
 
     const partitions = partitionFlatRepo({
       files,
@@ -184,10 +175,7 @@ describe('partitionFlatRepo — directory-depth', () => {
   });
 
   it('buckets repo-root files under _root', () => {
-    const files = [
-      `${repoRoot}/foo.ts`,
-      `${repoRoot}/bar.ts`,
-    ];
+    const files = [`${repoRoot}/foo.ts`, `${repoRoot}/bar.ts`];
 
     const partitions = partitionFlatRepo({
       files,
@@ -201,11 +189,7 @@ describe('partitionFlatRepo — directory-depth', () => {
   });
 
   it('returns partitions in stable lexicographic order', () => {
-    const files = [
-      `${repoRoot}/z/foo.ts`,
-      `${repoRoot}/a/bar.ts`,
-      `${repoRoot}/m/baz.ts`,
-    ];
+    const files = [`${repoRoot}/z/foo.ts`, `${repoRoot}/a/bar.ts`, `${repoRoot}/m/baz.ts`];
 
     const partitions = partitionFlatRepo({
       files,
@@ -222,8 +206,9 @@ describe('partitionFlatRepo — file-count-chunks', () => {
   const repoRoot = '/repo';
 
   it('splits a flat list into fixed-size chunks', () => {
-    const files = Array.from({ length: 5000 }, (_, i) =>
-      `${repoRoot}/src/f-${String(i).padStart(5, '0')}.ts`,
+    const files = Array.from(
+      { length: 5000 },
+      (_, i) => `${repoRoot}/src/f-${String(i).padStart(5, '0')}.ts`,
     );
 
     const partitions = partitionFlatRepo({
@@ -243,9 +228,7 @@ describe('partitionFlatRepo — file-count-chunks', () => {
   });
 
   it('produces a single chunk when input ≤ chunkSize', () => {
-    const files = Array.from({ length: 100 }, (_, i) =>
-      `${repoRoot}/src/f-${String(i)}.ts`,
-    );
+    const files = Array.from({ length: 100 }, (_, i) => `${repoRoot}/src/f-${String(i)}.ts`);
 
     const partitions = partitionFlatRepo({
       files,
@@ -267,8 +250,9 @@ describe('partitionFlatRepo — hybrid', () => {
     // would yield ONE partition (`src.api`) with 5000 files, exceeding
     // the 2000-file chunk size. Hybrid sub-partitions that one bucket
     // into 3 chunks.
-    const files = Array.from({ length: 5000 }, (_, i) =>
-      `${repoRoot}/src/api/f-${String(i).padStart(5, '0')}.ts`,
+    const files = Array.from(
+      { length: 5000 },
+      (_, i) => `${repoRoot}/src/api/f-${String(i).padStart(5, '0')}.ts`,
     );
 
     const partitions = partitionFlatRepo({
@@ -291,8 +275,9 @@ describe('partitionFlatRepo — hybrid', () => {
 
   it('keeps small directory partitions intact', () => {
     // Mixed: one large directory + two small ones.
-    const large = Array.from({ length: 3000 }, (_, i) =>
-      `${repoRoot}/src/api/f-${String(i).padStart(5, '0')}.ts`,
+    const large = Array.from(
+      { length: 3000 },
+      (_, i) => `${repoRoot}/src/api/f-${String(i).padStart(5, '0')}.ts`,
     );
     const small1 = [`${repoRoot}/src/lib/a.ts`, `${repoRoot}/src/lib/b.ts`];
     const small2 = [`${repoRoot}/src/util/x.ts`];

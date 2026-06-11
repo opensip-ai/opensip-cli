@@ -9,7 +9,7 @@
  * loader can use without dragging in tool-specific symbols.
  */
 
-import type { LanguageAdapter } from '../languages/adapter.js'
+import type { LanguageAdapter } from '../languages/adapter.js';
 
 // =============================================================================
 // PLUGIN EXPORTS CONTRACT
@@ -17,7 +17,7 @@ import type { LanguageAdapter } from '../languages/adapter.js'
 
 /** What a language plugin package/file exports */
 export interface LangPluginExports {
-  readonly adapters?: readonly LanguageAdapter[]
+  readonly adapters?: readonly LanguageAdapter[];
 }
 
 /**
@@ -25,7 +25,7 @@ export interface LangPluginExports {
  * (e.g. fitness's FitPluginExports) can be assigned through structural
  * compatibility. Each tool owns its own export-shape interface.
  */
-export type PluginExports = LangPluginExports | Record<string, unknown>
+export type PluginExports = LangPluginExports | Record<string, unknown>;
 
 // =============================================================================
 // DISCOVERY TYPES
@@ -45,24 +45,24 @@ export interface PluginLayout {
    * `<project>/opensip-tools/.runtime/plugins/<domain>/`. Also the key
    * read from `opensip-tools.config.yml#plugins.<domain>`.
    */
-  readonly domain: string
+  readonly domain: string;
   /**
    * User-source subdirectories walked for loose `.mjs`/`.js` plugins —
    * e.g. `['checks', 'recipes']` for fitness, `['scenarios', 'recipes']`
    * for simulation. Empty means no loose-file layout (npm plugins only).
    */
-  readonly userSubdirs: readonly string[]
+  readonly userSubdirs: readonly string[];
 }
 
 /** Discovered plugin before loading */
 export interface DiscoveredPlugin {
-  readonly type: 'package' | 'file'
+  readonly type: 'package' | 'file';
   /** Absolute path to the entry point */
-  readonly entryPoint: string
+  readonly entryPoint: string;
   /** Namespace derived from package name or filename */
-  readonly namespace: string
+  readonly namespace: string;
   /** Package name (for npm packages) or filename (for loose files) */
-  readonly source: string
+  readonly source: string;
 }
 
 // =============================================================================
@@ -77,12 +77,12 @@ export interface DiscoveredPlugin {
  * (ADR-0009 M2) — it only sums the map.
  */
 export interface LoadedPlugin {
-  readonly namespace: string
-  readonly source: string
-  readonly type: 'package' | 'file'
+  readonly namespace: string;
+  readonly source: string;
+  readonly type: 'package' | 'file';
   /** Per-kind registration counts reported by the domain callback. */
-  readonly registered: Readonly<Record<string, number>>
-  readonly error?: string
+  readonly registered: Readonly<Record<string, number>>;
+  readonly error?: string;
 }
 
 /**
@@ -90,9 +90,9 @@ export interface LoadedPlugin {
  * per-kind sum across every loaded plugin's `registered` map.
  */
 export interface PluginLoadResult {
-  readonly plugins: readonly LoadedPlugin[]
-  readonly totals: Readonly<Record<string, number>>
-  readonly errors: readonly string[]
+  readonly plugins: readonly LoadedPlugin[];
+  readonly totals: Readonly<Record<string, number>>;
+  readonly errors: readonly string[];
 }
 
 // Note: there is deliberately NO `PluginDomain` type. A plugin domain is a

@@ -24,7 +24,6 @@ import { pythonGraphAdapter } from '@opensip-tools/graph-python';
 import { rustGraphAdapter } from '@opensip-tools/graph-rust';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-
 import { typescriptGraphAdapter } from '../index.js';
 
 describe('decideHeapTargetMb', () => {
@@ -127,7 +126,11 @@ describe('runHeapPreflight', () => {
     // shimming pickAdapter via a test util — but we don't have that.
     // Instead, write 1001 small files; small enough to be quick.
     for (let i = 0; i < 1001; i++) {
-      writeFileSync(join(dir, `f${String(i)}.ts`), `export const x${String(i)} = ${String(i)};\n`, 'utf8');
+      writeFileSync(
+        join(dir, `f${String(i)}.ts`),
+        `export const x${String(i)} = ${String(i)};\n`,
+        'utf8',
+      );
     }
     // Default Node test heap is ~4096MB which exceeds the 8192 target
     // ONLY if we crank it high. To force the "already elevated" branch,
@@ -163,7 +166,11 @@ describe('runHeapPreflight', () => {
     // 8192MB is decided. To force the "insufficient memory" branch,
     // mock os.totalmem to return very little.
     for (let i = 0; i < 1001; i++) {
-      writeFileSync(join(dir, `f${String(i)}.ts`), `export const x${String(i)} = ${String(i)};\n`, 'utf8');
+      writeFileSync(
+        join(dir, `f${String(i)}.ts`),
+        `export const x${String(i)} = ${String(i)};\n`,
+        'utf8',
+      );
     }
     const os = await import('node:os');
     const spy = vi.spyOn(os.default, 'totalmem').mockReturnValue(512 * 1024 * 1024); // 512 MB

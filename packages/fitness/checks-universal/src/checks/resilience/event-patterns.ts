@@ -4,8 +4,13 @@
  * @fileoverview Event handling resilience checks
  */
 
-import { logger } from '@opensip-tools/core'
-import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { logger } from '@opensip-tools/core';
+import {
+  defineCheck,
+  isTestFile,
+  type CheckViolation,
+  getLineNumber,
+} from '@opensip-tools/fitness';
 
 // =============================================================================
 // EVENT ARCHITECTURE
@@ -20,7 +25,7 @@ const EVENT_HANDLER_PATTERNS = [
   /EventHandler/i,
   /\.subscribe\s{0,10}\(/,
   /\.addListener\s{0,10}\(/,
-]
+];
 
 /**
  * Patterns indicating proper event handling
@@ -30,7 +35,7 @@ const PROPER_EVENT_PATTERNS = [
   /eventEmitter/i,
   /infrastructure\/events/,
   /EventPublisher/i,
-]
+];
 
 /**
  * Patterns indicating idempotency handling.
@@ -49,7 +54,7 @@ const IDEMPOTENCY_PATTERNS = [
   /eventId/i,
   /processedEvents/i,
   /alreadyProcessed/i,
-]
+];
 
 /**
  * Patterns indicating state-changing operations that need idempotency
@@ -61,7 +66,7 @@ const STATE_CHANGING_PATTERNS = [
   /\.insert\s*\(/,
   /\.delete\s*\(/,
   /transaction/i,
-]
+];
 
 /**
  * Check if content has direct EventEmitter usage.
@@ -72,19 +77,19 @@ function hasDirectEventEmitterPattern(line: string): boolean {
   logger.debug({
     evt: 'fitness.checks.event_patterns.has_direct_event_emitter_pattern',
     msg: 'Checking line for direct EventEmitter pattern',
-  })
+  });
   // Check for "new EventEmitter("
   if (line.includes('new EventEmitter(') || line.includes('new EventEmitter (')) {
-    return true
+    return true;
   }
 
   // Check for ".emit('event'" or '.emit("event"'
-  const emitIdx = line.indexOf('.emit(')
+  const emitIdx = line.indexOf('.emit(');
   if (emitIdx === -1) {
-    return false
+    return false;
   }
-  const afterEmit = line.slice(emitIdx + 6).trimStart()
-  return afterEmit.startsWith("'") || afterEmit.startsWith('"')
+  const afterEmit = line.slice(emitIdx + 6).trimStart();
+  return afterEmit.startsWith("'") || afterEmit.startsWith('"');
 }
 
 /**
@@ -94,15 +99,15 @@ function findFirstEventHandlerMatch(content: string): RegExpExecArray | null {
   logger.debug({
     evt: 'fitness.checks.event_patterns.find_first_event_handler_match',
     msg: 'Searching for first event handler pattern match',
-  })
+  });
   for (const pattern of EVENT_HANDLER_PATTERNS) {
-    pattern.lastIndex = 0
-    const match = pattern.exec(content)
+    pattern.lastIndex = 0;
+    const match = pattern.exec(content);
     if (match) {
-      return match
+      return match;
     }
   }
-  return null
+  return null;
 }
 
 /**
@@ -139,28 +144,28 @@ export const eventArchitecture = defineCheck({
     logger.debug({
       evt: 'fitness.checks.event_patterns.analyze_event_architecture',
       msg: 'Analyzing file for event architecture pattern violations',
-    })
-    const violations: CheckViolation[] = []
+    });
+    const violations: CheckViolation[] = [];
 
     // Skip files that don't have event patterns
     if (!content.includes('emit') && !content.includes('EventEmitter')) {
-      return violations
+      return violations;
     }
 
     // Skip if file uses proper infrastructure patterns
-    const usesProperPatterns = PROPER_EVENT_PATTERNS.some((p) => p.test(content))
+    const usesProperPatterns = PROPER_EVENT_PATTERNS.some((p) => p.test(content));
     if (usesProperPatterns) {
-      return violations
+      return violations;
     }
 
     // Check each line for direct EventEmitter usage
-    const lines = content.split('\n')
+    const lines = content.split('\n');
     for (const [i, line] of lines.entries()) {
       if (!line || !hasDirectEventEmitterPattern(line)) {
-        continue
+        continue;
       }
 
-      const lineNumber = i + 1
+      const lineNumber = i + 1;
       violations.push({
         line: lineNumber,
         column: 0,
@@ -171,12 +176,12 @@ export const eventArchitecture = defineCheck({
         match: line.trim().slice(0, 50),
         type: 'direct-event-emitter',
         filePath,
-      })
+      });
     }
 
-    return violations
+    return violations;
   },
-})
+});
 
 // =============================================================================
 // EVENT HANDLER IDEMPOTENCY
@@ -209,39 +214,39 @@ export const eventHandlerIdempotency = defineCheck({
     logger.debug({
       evt: 'fitness.checks.event_patterns.analyze_event_handler_idempotency',
       msg: 'Analyzing file for event handler idempotency',
-    })
-    const violations: CheckViolation[] = []
+    });
+    const violations: CheckViolation[] = [];
 
     // Test files routinely construct event-handler fixtures inline to
     // exercise checks like this one; the idempotency contract applies
     // to production handlers, not test scaffolding.
-    if (isTestFile(filePath)) return violations
+    if (isTestFile(filePath)) return violations;
 
     // Check if this is an event handler file
-    const isEventHandler = EVENT_HANDLER_PATTERNS.some((p) => p.test(content))
+    const isEventHandler = EVENT_HANDLER_PATTERNS.some((p) => p.test(content));
     if (!isEventHandler) {
-      return violations
+      return violations;
     }
 
     // Check if file has state-changing operations
-    const hasStateChanges = STATE_CHANGING_PATTERNS.some((p) => p.test(content))
+    const hasStateChanges = STATE_CHANGING_PATTERNS.some((p) => p.test(content));
     if (!hasStateChanges) {
-      return violations
+      return violations;
     }
 
     // Check for idempotency handling
-    const hasIdempotency = IDEMPOTENCY_PATTERNS.some((p) => p.test(content))
+    const hasIdempotency = IDEMPOTENCY_PATTERNS.some((p) => p.test(content));
     if (hasIdempotency) {
-      return violations
+      return violations;
     }
 
     // Find the handler definition for line number
-    const match = findFirstEventHandlerMatch(content)
+    const match = findFirstEventHandlerMatch(content);
     if (!match) {
-      return violations
+      return violations;
     }
 
-    const lineNumber = getLineNumber(content, match.index)
+    const lineNumber = getLineNumber(content, match.index);
     violations.push({
       line: lineNumber,
       column: 0,
@@ -252,8 +257,8 @@ export const eventHandlerIdempotency = defineCheck({
       match: match[0],
       type: 'non-idempotent-handler',
       filePath,
-    })
+    });
 
-    return violations
+    return violations;
   },
-})
+});

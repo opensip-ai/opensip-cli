@@ -228,7 +228,9 @@ describe('mapToolErrorToExitCode (Tool error contract — audit-round-2 Finding 
   });
 
   it('TimeoutError → RUNTIME_ERROR', () => {
-    expect(mapToolErrorToExitCode(new TimeoutError('took too long'))).toBe(EXIT_CODES.RUNTIME_ERROR);
+    expect(mapToolErrorToExitCode(new TimeoutError('took too long'))).toBe(
+      EXIT_CODES.RUNTIME_ERROR,
+    );
   });
 
   it('SystemError → RUNTIME_ERROR', () => {

@@ -92,12 +92,14 @@ function callRecords(sf: ts.SourceFile, ownerHash = 'owner'): CallSiteRecord[] {
 
 describe('extractBoundaryCalls', () => {
   it('emits a descriptor for an imported call absent from the shard catalog', () => {
-    const sf = parse([
-      "import { helper } from './other.js';",
-      'export function caller(): number {',
-      '  return helper();',
-      '}',
-    ].join('\n'));
+    const sf = parse(
+      [
+        "import { helper } from './other.js';",
+        'export function caller(): number {',
+        '  return helper();',
+        '}',
+      ].join('\n'),
+    );
     // The shard catalog knows `caller` but NOT `helper` (it lives in
     // another shard).
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
@@ -119,12 +121,14 @@ describe('extractBoundaryCalls', () => {
   });
 
   it('marks discarded when the call is a bare ExpressionStatement', () => {
-    const sf = parse([
-      "import { sideEffect } from './fx.js';",
-      'export function run(): void {',
-      '  sideEffect();',
-      '}',
-    ].join('\n'));
+    const sf = parse(
+      [
+        "import { sideEffect } from './fx.js';",
+        'export function run(): void {',
+        '  sideEffect();',
+        '}',
+      ].join('\n'),
+    );
     const catalog = catalogOf(occ('run', 'm.ts', 'owner'));
 
     const [call] = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
@@ -133,12 +137,14 @@ describe('extractBoundaryCalls', () => {
   });
 
   it('treats an awaited bare call as discarded (unwraps await/paren)', () => {
-    const sf = parse([
-      "import { flush } from './fx.js';",
-      'export async function run(): Promise<void> {',
-      '  await (flush());',
-      '}',
-    ].join('\n'));
+    const sf = parse(
+      [
+        "import { flush } from './fx.js';",
+        'export async function run(): Promise<void> {',
+        '  await (flush());',
+        '}',
+      ].join('\n'),
+    );
     const catalog = catalogOf(occ('run', 'm.ts', 'owner'));
 
     const [call] = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
@@ -147,12 +153,14 @@ describe('extractBoundaryCalls', () => {
   });
 
   it('skips a call whose callee name IS among the shard occurrences (intra-shard)', () => {
-    const sf = parse([
-      "import { helper } from './other.js';",
-      'export function caller(): number {',
-      '  return helper();',
-      '}',
-    ].join('\n'));
+    const sf = parse(
+      [
+        "import { helper } from './other.js';",
+        'export function caller(): number {',
+        '  return helper();',
+        '}',
+      ].join('\n'),
+    );
     // This time the shard DOES own `helper` → not a boundary call.
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'), occ('helper', 'm.ts', 'h2'));
 
@@ -161,12 +169,14 @@ describe('extractBoundaryCalls', () => {
   });
 
   it('skips a non-imported name (global / local, not a cross-module candidate)', () => {
-    const sf = parse([
-      'export function caller(): void {',
-      '  console.log(notImported());',
-      '}',
-      'function notImported(): number { return 1; }',
-    ].join('\n'));
+    const sf = parse(
+      [
+        'export function caller(): void {',
+        '  console.log(notImported());',
+        '}',
+        'function notImported(): number { return 1; }',
+      ].join('\n'),
+    );
     // Neither `log` nor `notImported` is imported → no boundary calls,
     // even though `log`/`notImported` are absent from the catalog.
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
@@ -176,12 +186,14 @@ describe('extractBoundaryCalls', () => {
   });
 
   it('skips a call with no extractable simple callee name (element-access call)', () => {
-    const sf = parse([
-      "import { table } from './t.js';",
-      'export function caller(): unknown {',
-      '  return table["dynamic"]();',
-      '}',
-    ].join('\n'));
+    const sf = parse(
+      [
+        "import { table } from './t.js';",
+        'export function caller(): unknown {',
+        '  return table["dynamic"]();',
+        '}',
+      ].join('\n'),
+    );
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
 
     // `table["dynamic"]()` has no simple callee name → calleeSimpleName
@@ -191,10 +203,12 @@ describe('extractBoundaryCalls', () => {
   });
 
   it('ignores creation-kind records entirely (always intra-shard)', () => {
-    const sf = parse([
-      "import { helper } from './other.js';",
-      'export function caller(): number { return helper(); }',
-    ].join('\n'));
+    const sf = parse(
+      [
+        "import { helper } from './other.js';",
+        'export function caller(): number { return helper(); }',
+      ].join('\n'),
+    );
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
 
     const creationRecords: CallSiteRecord[] = allCallNodes(sf).map((node) => ({
@@ -210,12 +224,14 @@ describe('extractBoundaryCalls', () => {
   });
 
   it('skips a property-access call whose rightmost name was not itself imported', () => {
-    const sf = parse([
-      "import { svc } from './svc.js';",
-      'export function caller(): number {',
-      '  return svc.method();',
-      '}',
-    ].join('\n'));
+    const sf = parse(
+      [
+        "import { svc } from './svc.js';",
+        'export function caller(): number {',
+        '  return svc.method();',
+        '}',
+      ].join('\n'),
+    );
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
 
     // The callee simple name is `method` (rightmost of `svc.method`), but
@@ -226,10 +242,12 @@ describe('extractBoundaryCalls', () => {
   });
 
   it('emits for an `import =` (ImportEqualsDeclaration) boundary call', () => {
-    const sf = parse([
-      "import legacy = require('./legacy.js');",
-      'export function caller(): unknown { return legacy(); }',
-    ].join('\n'));
+    const sf = parse(
+      [
+        "import legacy = require('./legacy.js');",
+        'export function caller(): unknown { return legacy(); }',
+      ].join('\n'),
+    );
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
 
     const [call] = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
@@ -239,10 +257,12 @@ describe('extractBoundaryCalls', () => {
 
   it('truncates display text to the 80-char CallEdge contract', () => {
     const longArg = 'x'.repeat(200);
-    const sf = parse([
-      "import { wide } from './wide.js';",
-      `export function caller(): unknown { return wide("${longArg}"); }`,
-    ].join('\n'));
+    const sf = parse(
+      [
+        "import { wide } from './wide.js';",
+        `export function caller(): unknown { return wide("${longArg}"); }`,
+      ].join('\n'),
+    );
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
 
     const [call] = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);
@@ -253,10 +273,12 @@ describe('extractBoundaryCalls', () => {
   it('caches the import-specifier index per source file across multiple sites', () => {
     // Two imported calls in the SAME source file exercise the
     // specifierIndexBySf cache-hit branch on the second site.
-    const sf = parse([
-      "import { a, b } from './ab.js';",
-      'export function caller(): number { return a() + b(); }',
-    ].join('\n'));
+    const sf = parse(
+      [
+        "import { a, b } from './ab.js';",
+        'export function caller(): number { return a() + b(); }',
+      ].join('\n'),
+    );
     const catalog = catalogOf(occ('caller', 'm.ts', 'owner'));
 
     const out = extractBoundaryCalls(callRecords(sf), catalog, PROJECT_DIR);

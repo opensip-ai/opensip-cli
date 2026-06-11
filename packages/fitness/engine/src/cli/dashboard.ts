@@ -106,7 +106,7 @@ export async function collectFitnessDashboardData(
   await ensureChecksLoaded(projectDir);
 
   const checkRegistry = currentCheckRegistry();
-  const checkCatalog: CheckCatalogEntry[] = checkRegistry.list().map(check => {
+  const checkCatalog: CheckCatalogEntry[] = checkRegistry.list().map((check) => {
     const namespace = checkRegistry.getNamespace(check.config.slug);
     return {
       slug: check.config.slug,
@@ -120,15 +120,17 @@ export async function collectFitnessDashboardData(
     };
   });
 
-  const recipeCatalog: RecipeCatalogEntry[] = [...currentRecipeRegistry().getAllRecipes()].map(r => ({
-    name: r.name,
-    displayName: r.displayName,
-    description: r.description,
-    tags: [...(r.tags ?? [])],
-    selectorType: r.checks.type,
-    mode: r.execution.mode,
-    timeout: r.execution.timeout ?? 30_000,
-  }));
+  const recipeCatalog: RecipeCatalogEntry[] = [...currentRecipeRegistry().getAllRecipes()].map(
+    (r) => ({
+      name: r.name,
+      displayName: r.displayName,
+      description: r.description,
+      tags: [...(r.tags ?? [])],
+      selectorType: r.checks.type,
+      mode: r.execution.mode,
+      timeout: r.execution.timeout ?? 30_000,
+    }),
+  );
 
   const editorProtocol = loadEditorProtocol(projectDir);
 

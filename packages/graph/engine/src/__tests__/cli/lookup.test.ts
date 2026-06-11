@@ -86,9 +86,7 @@ describe('graph lookup', () => {
     await executeLookup({ name: 'saveBaseline' }, cli.cli);
     expect(cli.setExitCode).toHaveBeenCalledWith(0);
     // Human output flows through cli.render (a graph-status result), not stdout.
-    expect(cli.render).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'graph-status' }),
-    );
+    expect(cli.render).toHaveBeenCalledWith(expect.objectContaining({ type: 'graph-status' }));
     const output = cli.renderedText();
     expect(output).toContain('saveBaseline');
     expect(output).toContain('1 occurrence');
@@ -96,9 +94,7 @@ describe('graph lookup', () => {
   });
 
   it('emits structured JSON to stdout when --json is set (bypasses the seam)', async () => {
-    new CatalogRepo(datastore).replaceAll(
-      makeCatalog([occ({ bodyHash: 'a1', simpleName: 'fn' })]),
-    );
+    new CatalogRepo(datastore).replaceAll(makeCatalog([occ({ bodyHash: 'a1', simpleName: 'fn' })]));
     const cli = mockCli(datastore);
     await executeLookup({ name: 'fn', json: true }, cli.cli);
     const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');

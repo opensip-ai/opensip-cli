@@ -17,30 +17,46 @@ let root: string;
 function installPkg(base: string, scope: string, name: string, withManifest = true): void {
   const dir = join(base, 'node_modules', scope, name);
   mkdirSync(dir, { recursive: true });
-  if (withManifest) writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: `${scope}/${name}` }), 'utf8');
+  if (withManifest)
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: `${scope}/${name}` }), 'utf8');
 }
 
-beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'opensip-nmw-')); });
-afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+beforeEach(() => {
+  root = mkdtempSync(join(tmpdir(), 'opensip-nmw-'));
+});
+afterEach(() => {
+  rmSync(root, { recursive: true, force: true });
+});
 
 describe('discoverScopedPackages', () => {
   it('returns prefix-matching packages with a package.json, skipping the rest', () => {
-    installPkg(root, '@scope', 'scenarios-a');        // matches
+    installPkg(root, '@scope', 'scenarios-a'); // matches
     installPkg(root, '@scope', 'scenarios-b', false); // no package.json → skip
-    installPkg(root, '@scope', 'lang-x');             // wrong prefix → skip
-    const found = discoverScopedPackages({ projectDir: root, scopes: ['@scope'], prefix: 'scenarios-' });
+    installPkg(root, '@scope', 'lang-x'); // wrong prefix → skip
+    const found = discoverScopedPackages({
+      projectDir: root,
+      scopes: ['@scope'],
+      prefix: 'scenarios-',
+    });
     expect(found.map((p) => p.name)).toEqual(['@scope/scenarios-a']);
     expect(found[0]?.packageDir).toBe(join(root, 'node_modules', '@scope', 'scenarios-a'));
   });
 
   it('walks ancestor node_modules and dedupes (nearest wins)', () => {
-    installPkg(root, '@scope', 'scenarios-a');               // ancestor copy
+    installPkg(root, '@scope', 'scenarios-a'); // ancestor copy
     const sub = join(root, 'apps', 'web');
     mkdirSync(sub, { recursive: true });
-    installPkg(sub, '@scope', 'scenarios-a');                // nearer copy (same name)
+    installPkg(sub, '@scope', 'scenarios-a'); // nearer copy (same name)
     installPkg(sub, '@scope', 'scenarios-near');
-    const found = discoverScopedPackages({ projectDir: sub, scopes: ['@scope'], prefix: 'scenarios-' });
-    expect(found.map((p) => p.name).sort()).toEqual(['@scope/scenarios-a', '@scope/scenarios-near']);
+    const found = discoverScopedPackages({
+      projectDir: sub,
+      scopes: ['@scope'],
+      prefix: 'scenarios-',
+    });
+    expect(found.map((p) => p.name).sort()).toEqual([
+      '@scope/scenarios-a',
+      '@scope/scenarios-near',
+    ]);
     // dedup: the nearer (sub) copy of scenarios-a wins
     expect(found.find((p) => p.name === '@scope/scenarios-a')?.packageDir).toBe(
       join(sub, 'node_modules', '@scope', 'scenarios-a'),
@@ -48,7 +64,9 @@ describe('discoverScopedPackages', () => {
   });
 
   it('returns [] when no scope directory exists', () => {
-    expect(discoverScopedPackages({ projectDir: root, scopes: ['@scope'], prefix: 'scenarios-' })).toEqual([]);
+    expect(
+      discoverScopedPackages({ projectDir: root, scopes: ['@scope'], prefix: 'scenarios-' }),
+    ).toEqual([]);
   });
 });
 
@@ -57,7 +75,9 @@ describe('resolvePackageDir', () => {
     installPkg(root, '@scope', 'scenarios-a');
     const sub = join(root, 'a', 'b');
     mkdirSync(sub, { recursive: true });
-    expect(resolvePackageDir(sub, '@scope/scenarios-a')).toBe(join(root, 'node_modules', '@scope', 'scenarios-a'));
+    expect(resolvePackageDir(sub, '@scope/scenarios-a')).toBe(
+      join(root, 'node_modules', '@scope', 'scenarios-a'),
+    );
     expect(resolvePackageDir(sub, '@scope/missing')).toBeUndefined();
   });
 });

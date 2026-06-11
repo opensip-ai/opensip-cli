@@ -60,17 +60,12 @@ interface SymbolIndexArtifact {
   readonly fileSymbols: Record<string, readonly string[]>;
 }
 
-export function executeSymbolIndex(
-  opts: SymbolIndexCommandOptions,
-  cli: ToolCliContext,
-): void {
+export function executeSymbolIndex(opts: SymbolIndexCommandOptions, cli: ToolCliContext): void {
   logger.info({ evt: 'graph.cli.symbol-index.start', module: 'graph:cli' });
   try {
     const datastore = cli.scope.datastore() as DataStore | undefined;
     if (!datastore) {
-      throw new ConfigurationError(
-        'graph symbol-index requires a DataStore on ToolCliContext.',
-      );
+      throw new ConfigurationError('graph symbol-index requires a DataStore on ToolCliContext.');
     }
     const catalog = new CatalogRepo(datastore).loadFullCatalog();
     if (!catalog) {
@@ -85,10 +80,7 @@ export function executeSymbolIndex(
     // the sibling writers (sarif-export, baseline-export, catalog-json).
     mkdirSync(dirname(outPath), { recursive: true });
     writeFileSync(outPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
-    const symbolCount = Object.values(artifact.symbols).reduce(
-      (n, arr) => n + arr.length,
-      0,
-    );
+    const symbolCount = Object.values(artifact.symbols).reduce((n, arr) => n + arr.length, 0);
     const fileCount = Object.keys(artifact.fileSymbols).length;
     process.stdout.write(
       `wrote ${String(symbolCount)} symbol(s) across ${String(fileCount)} file(s) to ${outPath}\n`,
@@ -136,9 +128,15 @@ export function buildArtifact(catalog: Catalog): SymbolIndexArtifact {
 }
 
 function collectEntriesForName(
-  bucket: readonly { readonly bodyHash: string; readonly qualifiedName: string;
-    readonly filePath: string; readonly line: number; readonly column: number;
-    readonly kind: string; readonly visibility: string }[],
+  bucket: readonly {
+    readonly bodyHash: string;
+    readonly qualifiedName: string;
+    readonly filePath: string;
+    readonly line: number;
+    readonly column: number;
+    readonly kind: string;
+    readonly visibility: string;
+  }[],
   name: string,
   fileSymbols: Record<string, string[]>,
 ): SymbolEntry[] {

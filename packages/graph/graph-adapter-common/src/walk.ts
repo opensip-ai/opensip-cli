@@ -38,10 +38,7 @@ import type { Node } from '@opensip-tools/tree-sitter';
 // ── output helpers ────────────────────────────────────────────────
 
 /** Append an occurrence into the by-simple-name occurrence sink. */
-export function record(
-  out: Record<string, FunctionOccurrence[]>,
-  occ: FunctionOccurrence,
-): void {
+export function record(out: Record<string, FunctionOccurrence[]>, occ: FunctionOccurrence): void {
   const list = out[occ.simpleName];
   if (list) list.push(occ);
   else out[occ.simpleName] = [occ];
@@ -74,9 +71,10 @@ export interface FileClassifier {
 export function makeFileClassifier(config: FileClassifierConfig): FileClassifier {
   const { testRe, generatedRe, testPathRe } = config;
   return {
-    isTestFile: testPathRe === undefined
-      ? (rel: string): boolean => testRe.test(rel)
-      : (rel: string): boolean => testPathRe.test(rel) || testRe.test(rel),
+    isTestFile:
+      testPathRe === undefined
+        ? (rel: string): boolean => testRe.test(rel)
+        : (rel: string): boolean => testPathRe.test(rel) || testRe.test(rel),
     isGeneratedFile: (rel: string): boolean => generatedRe.test(rel),
   };
 }
@@ -119,9 +117,7 @@ export interface RunWalkParams<P extends TreeSitterParsedProject> {
  * and run `walkFile` per file with a try/catch that records a
  * `ParseError` on failure.
  */
-export function runWalk<P extends TreeSitterParsedProject>(
-  params: RunWalkParams<P>,
-): WalkOutput {
+export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams<P>): WalkOutput {
   const { input, walkFile } = params;
   const occurrences: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
     string,
@@ -182,8 +178,14 @@ export interface SynthesizeModuleInitParams<F extends TreeSitterParsedFile> {
 export function synthesizeModuleInit<F extends TreeSitterParsedFile>(
   params: SynthesizeModuleInitParams<F>,
 ): FunctionOccurrence {
-  const { file, filePathProjectRel, inTestFile, definedInGenerated, digestSyntheticBody, qualifiedName } =
-    params;
+  const {
+    file,
+    filePathProjectRel,
+    inTestFile,
+    definedInGenerated,
+    digestSyntheticBody,
+    qualifiedName,
+  } = params;
   const root: Node = file.tree.rootNode;
   const topLevelText = childrenOf(root)
     .map((c) => file.source.slice(c.startIndex, c.endIndex))

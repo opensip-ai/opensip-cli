@@ -41,11 +41,11 @@ function sessionSummary(payload: unknown): HistorySession['summary'] | undefined
   if (summary === null || typeof summary !== 'object') return undefined;
   const { total, passed, failed, errors, warnings } = summary as Record<string, unknown>;
   if (
-    typeof total !== 'number'
-    || typeof passed !== 'number'
-    || typeof failed !== 'number'
-    || typeof errors !== 'number'
-    || typeof warnings !== 'number'
+    typeof total !== 'number' ||
+    typeof passed !== 'number' ||
+    typeof failed !== 'number' ||
+    typeof errors !== 'number' ||
+    typeof warnings !== 'number'
   ) {
     return undefined;
   }

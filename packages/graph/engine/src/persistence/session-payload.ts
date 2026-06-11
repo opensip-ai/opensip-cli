@@ -109,9 +109,7 @@ function projectMetadata(
  * @param signals - the run's raw engine signals.
  * @returns the opaque detail blob persisted for this graph session.
  */
-export function buildGraphSessionPayload(
-  signals: readonly Signal[],
-): GraphSessionPayload {
+export function buildGraphSessionPayload(signals: readonly Signal[]): GraphSessionPayload {
   const byRule = new Map<string, GraphSessionFinding[]>();
   for (const s of signals) {
     const metadata = projectMetadata(s.metadata);

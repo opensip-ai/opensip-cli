@@ -121,11 +121,7 @@ describe('graph-go resolve.ts', () => {
   });
 
   it('reports unknown/low when no catalog entry matches', () => {
-    writeFileSync(
-      join(dir, 'main.go'),
-      `package main\nfunc caller() { unknownFunc() }\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'main.go'), `package main\nfunc caller() { unknownFunc() }\n`, 'utf8');
     const { resolved } = pipeline(dir);
     const edge = allEdges(resolved).find((e) => e.text.startsWith('unknownFunc('));
     expect(edge).toBeDefined();
@@ -247,17 +243,15 @@ describe('graph-go resolve.ts', () => {
       'utf8',
     );
     const { resolved } = pipeline(dir);
-    const creation = allEdges(resolved).find((e) => e.resolution === 'static' && e.confidence === 'high');
+    const creation = allEdges(resolved).find(
+      (e) => e.resolution === 'static' && e.confidence === 'high',
+    );
     expect(creation).toBeDefined();
     expect(resolved.stats.resolvedHigh).toBeGreaterThan(0);
   });
 
   it('I-4 — resolveCallSites does not mutate the input catalog', () => {
-    writeFileSync(
-      join(dir, 'main.go'),
-      `package main\nfunc a() { b() }\nfunc b() {}\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'main.go'), `package main\nfunc a() { b() }\nfunc b() {}\n`, 'utf8');
     const { catalog, walk, project } = pipeline(dir);
     const before = JSON.stringify(catalog);
     goGraphAdapter.resolveCallSites({
@@ -271,16 +265,8 @@ describe('graph-go resolve.ts', () => {
   });
 
   it('skips synthetic <module-init> entries from the byName index', () => {
-    writeFileSync(
-      join(dir, 'a.go'),
-      `package main\nfunc m() {}\n`,
-      'utf8',
-    );
-    writeFileSync(
-      join(dir, 'b.go'),
-      `package main\nfunc m2() {}\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'a.go'), `package main\nfunc m() {}\n`, 'utf8');
+    writeFileSync(join(dir, 'b.go'), `package main\nfunc m2() {}\n`, 'utf8');
     const { resolved } = pipeline(dir);
     const edges = allEdges(resolved);
     // No call edge should reference the module-init synthetic name.
@@ -288,11 +274,7 @@ describe('graph-go resolve.ts', () => {
   });
 
   it('emits empty edge map when there are no call sites', () => {
-    writeFileSync(
-      join(dir, 'main.go'),
-      `package main\nfunc Empty() {}\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'main.go'), `package main\nfunc Empty() {}\n`, 'utf8');
     const { resolved } = pipeline(dir);
     expect(resolved.stats.totalCallSites).toBe(0);
     expect(resolved.edgesByOwner.size).toBe(0);

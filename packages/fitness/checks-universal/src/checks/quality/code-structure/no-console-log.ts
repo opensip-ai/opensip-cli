@@ -8,7 +8,7 @@
  * The per-pattern UUID + sub-slug shape is now the helper's default.
  */
 
-import { defineRegexListCheck } from '@opensip-tools/fitness'
+import { defineRegexListCheck } from '@opensip-tools/fitness';
 
 /**
  * Paths where console.* is the correct output mechanism (CLI tools, display modules, scripts).
@@ -20,13 +20,13 @@ const CLI_OUTPUT_PATTERNS = [
   /\/bin\//,
   /\/scripts\//,
   /\/cli\/.*\.ts$/,
-]
+];
 
 /**
  * Check if a file is a CLI output file where console.* is acceptable.
  */
 function isCliOutputFile(filePath: string): boolean {
-  return CLI_OUTPUT_PATTERNS.some((p) => p.test(filePath))
+  return CLI_OUTPUT_PATTERNS.some((p) => p.test(filePath));
 }
 
 /**
@@ -40,8 +40,7 @@ export const noConsoleLog = defineRegexListCheck({
   id: '86403377-5903-478a-bdf2-e4f2f17df39f',
   slug: 'no-console-log',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  description:
-    'Disallow console.log in production code - use a structured logger',
+  description: 'Disallow console.log in production code - use a structured logger',
   longDescription: `**Purpose:** Ensures production code uses a structured logger (e.g., pino, winston) instead of console methods, which lack structured fields and log levels.
 
 **Detects:** Analyzes each file individually via regex matching against each line.
@@ -107,4 +106,4 @@ export const noConsoleLog = defineRegexListCheck({
       suggestion: 'Use a structured logger (e.g., pino, winston) for errors',
     },
   ],
-})
+});

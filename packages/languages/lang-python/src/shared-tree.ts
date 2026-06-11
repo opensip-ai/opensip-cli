@@ -7,13 +7,13 @@
  * `adapter.parse` when no cache is active (single-check mode).
  */
 
-import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js'
+import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js';
 
-import { pythonAdapter } from './adapter.js'
+import { pythonAdapter } from './adapter.js';
 
-import type { PythonTree } from './parse.js'
+import type { PythonTree } from './parse.js';
 
 /** Returns the shared (cached) Python parse tree for `filePath`, or null when unparseable. */
 export function getSharedTree(filePath: string, content: string): PythonTree | null {
-  return getParseTree(pythonAdapter, filePath, content)
+  return getParseTree(pythonAdapter, filePath, content);
 }

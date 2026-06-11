@@ -35,7 +35,13 @@ export interface RunSummaryProps {
  * text concatenates to exactly:
  *   `{P} Passed, {F} Failed ({E} Errors, {W} Warnings) | Duration {dur}`
  */
-export function viewRunSummary({ passed, failed, errors, warnings, durationMs }: RunSummaryProps): ViewNode {
+export function viewRunSummary({
+  passed,
+  failed,
+  errors,
+  warnings,
+  durationMs,
+}: RunSummaryProps): ViewNode {
   const spans: Span[] = [
     { text: `${passed} Passed`, tone: 'success' },
     { text: ', ' },
@@ -56,5 +62,9 @@ export function viewRunSummary({ passed, failed, errors, warnings, durationMs }:
  *  live summary line aligns with the run header + footer hints (both also at 2)
  *  instead of sitting flush-left against the indented rest of the output. */
 export function RunSummary(props: RunSummaryProps): React.ReactElement {
-  return <Box paddingTop={1} paddingLeft={2}>{renderToInk(viewRunSummary(props))}</Box>;
+  return (
+    <Box paddingTop={1} paddingLeft={2}>
+      {renderToInk(viewRunSummary(props))}
+    </Box>
+  );
 }

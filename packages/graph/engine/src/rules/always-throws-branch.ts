@@ -55,7 +55,8 @@ export const alwaysThrowsBranchRule = defineRule({
           category: 'quality',
           message: `${occ.simpleName} appears to always throw.`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
-          suggestion: 'Inline the throw at every caller, or document the precondition this function enforces.',
+          suggestion:
+            'Inline the throw at every caller, or document the precondition this function enforces.',
           metadata: {
             qualifiedName: occ.qualifiedName,
             edgeCount: occ.calls.length,

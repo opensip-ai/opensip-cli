@@ -66,9 +66,8 @@ export async function executeListFiles(
       );
     }
 
-    const files = opts.workspace === true
-      ? await discoverWorkspaceFiles(opts, cli)
-      : discoverScopedFiles(opts);
+    const files =
+      opts.workspace === true ? await discoverWorkspaceFiles(opts, cli) : discoverScopedFiles(opts);
 
     const rel = relativizeSorted(files, realpathOrResolve(opts.cwd));
 
@@ -101,9 +100,8 @@ export async function executeListFiles(
  */
 function discoverScopedFiles(opts: GraphCommandOptions): readonly string[] {
   const adapter = resolveDiscoveryAdapter(opts);
-  const scopes = opts.paths && opts.paths.length > 0
-    ? resolvePositionalPaths(opts.paths, opts.cwd)
-    : [opts.cwd];
+  const scopes =
+    opts.paths && opts.paths.length > 0 ? resolvePositionalPaths(opts.paths, opts.cwd) : [opts.cwd];
   const all: string[] = [];
   for (const scope of scopes) {
     const discovered = adapter.discoverFiles({ cwd: scope });

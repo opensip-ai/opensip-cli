@@ -20,9 +20,7 @@ import type { Signal } from '@opensip-tools/core';
  * @throws {Error | TypeError} when the stored payload is not the expected shape
  *   (propagated from `decodeSessionPayload`).
  */
-export function fitReplayFromSession(
-  stored: StoredSession,
-): ToolSessionReplay<FitDoneResult> {
+export function fitReplayFromSession(stored: StoredSession): ToolSessionReplay<FitDoneResult> {
   const payload = decodeSessionPayload(stored.payload, { tool: 'fit' });
   const units: UnitResult[] = payload.checks.map((check) => ({
     slug: check.checkSlug,
@@ -81,13 +79,15 @@ function replaySignal(
     ...(finding.suggestion === undefined ? {} : { suggestion: finding.suggestion }),
     ...(finding.line === undefined ? {} : { line: finding.line }),
     ...(finding.column === undefined ? {} : { column: finding.column }),
-    ...(finding.filePath === undefined ? {} : {
-      code: {
-        file: finding.filePath,
-        ...(finding.line === undefined ? {} : { line: finding.line }),
-        ...(finding.column === undefined ? {} : { column: finding.column }),
-      },
-    }),
+    ...(finding.filePath === undefined
+      ? {}
+      : {
+          code: {
+            file: finding.filePath,
+            ...(finding.line === undefined ? {} : { line: finding.line }),
+            ...(finding.column === undefined ? {} : { column: finding.column }),
+          },
+        }),
     metadata: {},
     createdAt: stored.timestamp,
   };

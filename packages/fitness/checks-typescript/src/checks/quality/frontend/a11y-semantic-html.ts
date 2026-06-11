@@ -5,15 +5,14 @@
  * without proper accessibility role definitions.
  */
 
-
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import * as ts from 'typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Press handler props that indicate interactive behavior on View components.
  */
-const PRESS_HANDLER_PROPS = new Set(['onPress', 'onPressIn', 'onPressOut', 'onLongPress'])
+const PRESS_HANDLER_PROPS = new Set(['onPress', 'onPressIn', 'onPressOut', 'onLongPress']);
 
 /**
  * Analyze a TSX file for View components with press handlers missing accessibilityRole
@@ -24,37 +23,37 @@ const PRESS_HANDLER_PROPS = new Set(['onPress', 'onPressIn', 'onPressOut', 'onLo
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
   // Only check TSX files
   if (!filePath.endsWith('.tsx')) {
-    return []
+    return [];
   }
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
-  const sourceFile = getSharedSourceFile(filePath, content)
+  const sourceFile = getSharedSourceFile(filePath, content);
   /* v8 ignore next -- defensive guard */
-  if (!sourceFile) return violations
+  if (!sourceFile) return violations;
 
   const visit = (node: ts.Node): void => {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-      const tagName = ts.isIdentifier(node.tagName) ? node.tagName.text : ''
+      const tagName = ts.isIdentifier(node.tagName) ? node.tagName.text : '';
 
       if (tagName === 'View') {
-        const attributes = node.attributes.properties
+        const attributes = node.attributes.properties;
 
         // Check if View has any press handler props
         const hasPressHandler = attributes.some(
           (attr) => ts.isJsxAttribute(attr) && PRESS_HANDLER_PROPS.has(attr.name.getText()),
-        )
+        );
 
         if (hasPressHandler) {
           // Check if View has accessibilityRole
           const hasAccessibilityRole = attributes.some(
             (attr) => ts.isJsxAttribute(attr) && attr.name.getText() === 'accessibilityRole',
-          )
+          );
 
           if (!hasAccessibilityRole) {
-            const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-            const lineNum = line + 1
-            const matchText = node.getText(sourceFile).slice(0, 100)
+            const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+            const lineNum = line + 1;
+            const matchText = node.getText(sourceFile).slice(0, 100);
 
             violations.push({
               filePath,
@@ -65,16 +64,16 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
               suggestion: `Use <Pressable> instead of <View onPress>, or add accessibilityRole="button" for screen reader support`,
               type: 'missing-accessibility-role',
               match: matchText,
-            })
+            });
           }
         }
       }
     }
-    ts.forEachChild(node, visit)
-  }
+    ts.forEachChild(node, visit);
+  };
 
-  visit(sourceFile)
-  return violations
+  visit(sourceFile);
+  return violations;
 }
 
 /**
@@ -103,4 +102,4 @@ export const a11ySemanticHtml = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze: analyzeFile,
-})
+});

@@ -6,4 +6,4 @@
  */
 
 // Loader
-export { loadSignalersConfig } from './loader.js'
+export { loadSignalersConfig } from './loader.js';

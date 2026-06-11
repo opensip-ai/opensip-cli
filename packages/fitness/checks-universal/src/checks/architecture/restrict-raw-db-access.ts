@@ -50,7 +50,7 @@
  * exempted per-file via `@fitness-ignore-file restrict-raw-db-access` with a
  * justification comment.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 /**
  * Resolved-path fragments that identify a persistence-owned source file.
@@ -61,10 +61,10 @@ const PERSISTENCE_BOUNDARY: readonly RegExp[] = [
   /\/src\/persistence\//,
   /packages\/session-store\/src\//,
   /packages\/datastore\/src\//,
-]
+];
 
 /** Test-file fragments — skipped (fixtures legitimately reach the handle). */
-const TEST_PATH = /(?:\.test\.tsx?$|\/__tests__\/)/
+const TEST_PATH = /(?:\.test\.tsx?$|\/__tests__\/)/;
 
 /**
  * Drizzle query/builder methods. A `.db` access is only flagged when its
@@ -82,7 +82,7 @@ const DRIZZLE_METHODS = [
   'all',
   'values',
   'with',
-] as const
+] as const;
 
 /**
  * Matches a property-access whose member is `db` followed immediately by a
@@ -91,7 +91,7 @@ const DRIZZLE_METHODS = [
  * is intentionally NOT matched — the public handle is reached as a property
  * (`this.datastore.db`, `store.db`), which is the shape this seam protects.
  */
-const RAW_DB_QUERY = new RegExp(String.raw`\.db\.(?:${DRIZZLE_METHODS.join('|')})\s*\(`)
+const RAW_DB_QUERY = new RegExp(String.raw`\.db\.(?:${DRIZZLE_METHODS.join('|')})\s*\(`);
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the detection
@@ -102,11 +102,11 @@ const RAW_DB_QUERY = new RegExp(String.raw`\.db\.(?:${DRIZZLE_METHODS.join('|')}
  */
 export function analyzeRawDbAccess(content: string, filePath: string): CheckViolation[] {
   // Persistence-owned code and test fixtures legitimately reach the handle.
-  if (TEST_PATH.test(filePath)) return []
-  if (PERSISTENCE_BOUNDARY.some((re) => re.test(filePath))) return []
+  if (TEST_PATH.test(filePath)) return [];
+  if (PERSISTENCE_BOUNDARY.some((re) => re.test(filePath))) return [];
 
-  const violations: CheckViolation[] = []
-  const lines = content.split('\n')
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
   for (const [i, line] of lines.entries()) {
     if (RAW_DB_QUERY.test(line)) {
       violations.push({
@@ -123,10 +123,10 @@ export function analyzeRawDbAccess(content: string, filePath: string): CheckViol
           'genuinely persistence-owned, move the file into the boundary; if it ' +
           'is a deliberate exception, add `@fitness-ignore-file ' +
           'restrict-raw-db-access` with a justification comment.',
-      })
+      });
     }
   }
-  return violations
+  return violations;
 }
 
 export const restrictRawDbAccess = defineCheck({
@@ -142,4 +142,4 @@ export const restrictRawDbAccess = defineCheck({
   // not false-fire; only real call expressions survive.
   contentFilter: 'strip-strings-and-comments',
   analyze: (content, filePath) => analyzeRawDbAccess(content, filePath),
-})
+});

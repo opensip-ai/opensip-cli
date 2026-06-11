@@ -38,28 +38,28 @@ export * from './strip-scanners.js';
 
 /** Scanner→mechanics contract: a source's string + comment regions (the old per-pack `interface Scan`). */
 export interface ScanResult {
-  readonly stringRegions: Region[]
-  readonly commentRegions: Region[]
+  readonly stringRegions: Region[];
+  readonly commentRegions: Region[];
 }
 
 /** The `{ stripStrings, stripComments }` pair `makeStripper` returns. */
 export interface Stripper {
-  readonly stripStrings: (content: string) => string
-  readonly stripComments: (content: string) => string
+  readonly stripStrings: (content: string) => string;
+  readonly stripComments: (content: string) => string;
 }
 
 /** Bind a language-specific `scan` to the shared strip mechanics (see file header). */
 export function makeStripper(scan: (src: string) => ScanResult): Stripper {
   return {
     stripStrings(content: string): string {
-      const { stringRegions } = scan(content)
-      return applyRegions(content, stringRegions)
+      const { stringRegions } = scan(content);
+      return applyRegions(content, stringRegions);
     },
     stripComments(content: string): string {
-      const { stringRegions, commentRegions } = scan(content)
-      return applyRegions(content, [...stringRegions, ...commentRegions])
+      const { stringRegions, commentRegions } = scan(content);
+      return applyRegions(content, [...stringRegions, ...commentRegions]);
     },
-  }
+  };
 }
 
 /**
@@ -96,8 +96,8 @@ export function isIdentChar(ch: string | undefined): boolean {
   if (!ch) return false;
   const code = ch.codePointAt(0) ?? 0;
   return (
-    (code >= 0x41 && code <= 0x5A) ||
-    (code >= 0x61 && code <= 0x7A) ||
+    (code >= 0x41 && code <= 0x5a) ||
+    (code >= 0x61 && code <= 0x7a) ||
     (code >= 0x30 && code <= 0x39) ||
     ch === '_'
   );

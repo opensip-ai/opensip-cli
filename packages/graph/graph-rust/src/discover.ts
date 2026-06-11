@@ -21,11 +21,7 @@
 
 import { createDiscover } from '@opensip-tools/graph-adapter-common';
 
-const EXCLUDED_DIR_GLOBS: readonly string[] = [
-  '**/target/**',
-  '**/node_modules/**',
-  '**/.git/**',
-];
+const EXCLUDED_DIR_GLOBS: readonly string[] = ['**/target/**', '**/node_modules/**', '**/.git/**'];
 
 // Prefer Cargo.lock (resolved deps) over Cargo.toml (intent), since
 // changing a dep version invalidates the call-graph more reliably than

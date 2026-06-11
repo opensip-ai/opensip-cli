@@ -93,10 +93,7 @@ export function decodeSessionPayload(
  *
  * @throws {Error} when the value is missing or any count is not a number.
  */
-export function decodeSummary(
-  value: unknown,
-  label: string,
-): SignalEnvelope['verdict']['summary'] {
+export function decodeSummary(value: unknown, label: string): SignalEnvelope['verdict']['summary'] {
   if (value === null || typeof value !== 'object') {
     throw new Error(`${label} is missing`);
   }
@@ -177,7 +174,9 @@ function decodeFinding(value: unknown, opts: DecodeSessionPayloadOptions): Decod
 }
 
 /** Narrow an open metadata bag to its scalar subset; undefined when nothing survives. */
-function decodeMetadata(value: unknown): Readonly<Record<string, SessionPayloadScalar>> | undefined {
+function decodeMetadata(
+  value: unknown,
+): Readonly<Record<string, SessionPayloadScalar>> | undefined {
   if (value === null || typeof value !== 'object') return undefined;
   const out: Record<string, SessionPayloadScalar> = {};
   for (const [key, entry] of Object.entries(value)) {
@@ -203,7 +202,11 @@ export function stringField(source: Record<string, unknown>, field: string, labe
 }
 
 /** @throws {Error} when the field is not a boolean. */
-export function booleanField(source: Record<string, unknown>, field: string, label: string): boolean {
+export function booleanField(
+  source: Record<string, unknown>,
+  field: string,
+  label: string,
+): boolean {
   const value = source[field];
   if (typeof value !== 'boolean') throw new Error(`${label}.${field} must be a boolean`);
   return value;

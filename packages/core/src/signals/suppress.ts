@@ -337,9 +337,7 @@ export async function filterSignalsBySuppressions(
 /** True when `error` is a Node `ENOENT` (file genuinely absent). */
 function isEnoent(error: unknown): boolean {
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: unknown }).code === 'ENOENT'
+    typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ENOENT'
   );
 }
 

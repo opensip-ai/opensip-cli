@@ -10,10 +10,7 @@
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  mountResultCommand,
-  mountResultCommandWithArg,
-} from '../commands/mount-result-command.js';
+import { mountResultCommand, mountResultCommandWithArg } from '../commands/mount-result-command.js';
 
 import type { CliCommandsContext } from '../commands/index.js';
 import type { CommandResult } from '@opensip-tools/contracts';
@@ -37,11 +34,10 @@ describe('mountResultCommand', () => {
   it('runs the handler and renders the result via ctx.render', async () => {
     const { ctx, rendered } = makeCtx();
     const cmd = new Command('demo').option('--json', 'json', false);
-    mountResultCommand<{ json: boolean }>(
-      cmd,
-      () => ({ type: 'help' }),
-      { ctx, jsonFlag: (opts) => opts.json },
-    );
+    mountResultCommand<{ json: boolean }>(cmd, () => ({ type: 'help' }), {
+      ctx,
+      jsonFlag: (opts) => opts.json,
+    });
 
     await cmd.parseAsync([], { from: 'user' });
     expect(rendered).toEqual([{ type: 'help' }]);
@@ -56,11 +52,10 @@ describe('mountResultCommand', () => {
     });
 
     const cmd = new Command('demo').option('--json', 'json', false);
-    mountResultCommand<{ json: boolean }>(
-      cmd,
-      () => ({ type: 'help' }),
-      { ctx, jsonFlag: (opts) => opts.json },
-    );
+    mountResultCommand<{ json: boolean }>(cmd, () => ({ type: 'help' }), {
+      ctx,
+      jsonFlag: (opts) => opts.json,
+    });
 
     await cmd.parseAsync(['--json'], { from: 'user' });
 
@@ -92,15 +87,16 @@ describe('mountResultCommandWithArg', () => {
       .option('--flag <v>')
       .option('--json', 'json', false);
 
-    const handler = vi.fn((_arg: string, _opts: { flag?: string; json: boolean }): CommandResult => ({
-      type: 'help',
-    }));
-
-    mountResultCommandWithArg<string, { flag?: string; json: boolean }>(
-      cmd,
-      handler,
-      { ctx, jsonFlag: (opts) => opts.json },
+    const handler = vi.fn(
+      (_arg: string, _opts: { flag?: string; json: boolean }): CommandResult => ({
+        type: 'help',
+      }),
     );
+
+    mountResultCommandWithArg<string, { flag?: string; json: boolean }>(cmd, handler, {
+      ctx,
+      jsonFlag: (opts) => opts.json,
+    });
 
     await cmd.parseAsync(['pkg-a', '--flag', 'v1'], { from: 'user' });
 

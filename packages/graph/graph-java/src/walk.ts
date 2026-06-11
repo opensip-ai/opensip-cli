@@ -88,7 +88,8 @@ import type { Node } from '@opensip-tools/tree-sitter';
 
 const TEST_PATH_RE = /(?:^|\/)test\//;
 const TEST_FILE_NAME_RE = /(?:^|\/)[^/]*(?:Test|Tests|IT)\.java$/;
-const GENERATED_PATH_RE = /(?:\b(?:target|build|out|generated|generated-sources)\/)|(?:\$Pb\.java$)/;
+const GENERATED_PATH_RE =
+  /(?:\b(?:target|build|out|generated|generated-sources)\/)|(?:\$Pb\.java$)/;
 
 const { isTestFile, isGeneratedFile } = makeFileClassifier({
   testRe: TEST_FILE_NAME_RE,
@@ -160,7 +161,6 @@ function walkFile(
 
   for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
 }
-
 
 interface Frame {
   readonly ownerHash: string;
@@ -261,9 +261,10 @@ function buildMethodOccurrence(
   const inTest = ctx.fileInTestFile || hasTestAnnotation(decorators);
   const visibility = classifyVisibility(node);
   const qualifiedBase = packageQualifier(ctx.packageName, ctx.filePathProjectRel);
-  const qualifiedName = frame.enclosingClass === null
-    ? `${qualifiedBase}.${name}`
-    : `${qualifiedBase}.${frame.enclosingClass}.${name}`;
+  const qualifiedName =
+    frame.enclosingClass === null
+      ? `${qualifiedBase}.${name}`
+      : `${qualifiedBase}.${frame.enclosingClass}.${name}`;
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
@@ -285,10 +286,7 @@ function buildMethodOccurrence(
   };
 }
 
-function buildLambdaOccurrence(
-  node: Node,
-  ctx: WalkCtx,
-): FunctionOccurrence | null {
+function buildLambdaOccurrence(node: Node, ctx: WalkCtx): FunctionOccurrence | null {
   const digest = digestJavaBody(ctx.file.source.slice(node.startIndex, node.endIndex));
   const startLine = node.startPosition.row + 1;
   const startCol = node.startPosition.column;
@@ -314,4 +312,3 @@ function buildLambdaOccurrence(
     calls: [],
   };
 }
-

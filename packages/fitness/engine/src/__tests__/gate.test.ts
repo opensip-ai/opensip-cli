@@ -15,7 +15,6 @@ import { createSignal, type Signal } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-
 import {
   saveBaseline,
   compareToBaseline,
@@ -223,15 +222,11 @@ describe('compareToBaseline — line-number invariance (D3)', () => {
 
   it('treats different message on same (file, ruleId) as added+resolved', () => {
     saveBaseline(
-      makeOutput([
-        makeFinding({ ruleId: 'complex-function', filePath: 'x.ts', message: 'cc=22' }),
-      ]),
+      makeOutput([makeFinding({ ruleId: 'complex-function', filePath: 'x.ts', message: 'cc=22' })]),
       repo,
     );
     const result = compareToBaseline(
-      makeOutput([
-        makeFinding({ ruleId: 'complex-function', filePath: 'x.ts', message: 'cc=28' }),
-      ]),
+      makeOutput([makeFinding({ ruleId: 'complex-function', filePath: 'x.ts', message: 'cc=28' })]),
       repo,
     );
 
@@ -289,7 +284,11 @@ describe('compareToBaseline — stored-envelope round-trip', () => {
   });
 
   it('handles findings with no location (empty filePath)', () => {
-    const globalSig = makeFinding({ ruleId: 'global-rule', message: 'global issue', severity: 'warning' });
+    const globalSig = makeFinding({
+      ruleId: 'global-rule',
+      message: 'global issue',
+      severity: 'warning',
+    });
     // A check-wide finding with no file site: strip the location off the signal.
     const noLoc: Signal = { ...globalSig, filePath: '', line: undefined, code: undefined };
     saveBaseline(makeOutput([noLoc]), repo);
@@ -415,10 +414,7 @@ const identityIgnoringMessage: ViolationIdentity = ({ filePath, ruleId }) =>
 
 describe('compareToBaseline — custom violation-identity strategy', () => {
   it('treats two same-rule same-file findings as identical when identity ignores message', () => {
-    saveBaseline(
-      makeOutput([makeFinding({ filePath: 'a.ts', message: 'old phrasing' })]),
-      repo,
-    );
+    saveBaseline(makeOutput([makeFinding({ filePath: 'a.ts', message: 'old phrasing' })]), repo);
 
     // The default identity would mark this as `added` (different message).
     // The custom (filePath, ruleId) identity treats them as identical.
@@ -434,10 +430,7 @@ describe('compareToBaseline — custom violation-identity strategy', () => {
   });
 
   it('default identity preserves the (filePath, ruleId, message) semantics', () => {
-    saveBaseline(
-      makeOutput([makeFinding({ filePath: 'a.ts', message: 'old' })]),
-      repo,
-    );
+    saveBaseline(makeOutput([makeFinding({ filePath: 'a.ts', message: 'old' })]), repo);
 
     // Default identity sees a different message → that violation is
     // resolved (the baseline message no longer present), and the new

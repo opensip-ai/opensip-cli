@@ -130,8 +130,7 @@ export class EnvRegistry {
       );
     }
 
-    const coerce = (raw: string): T =>
-      spec.coerce ? spec.coerce(raw) : (raw as unknown as T);
+    const coerce = (raw: string): T => (spec.coerce ? spec.coerce(raw) : (raw as unknown as T));
 
     const canonicalRaw = process.env[spec.canonical];
     if (canonicalRaw !== undefined) {

@@ -1,13 +1,13 @@
 globalExcludes:
-  - "node_modules/**"
+  - 'node_modules/**'
 
 targets:
   ts-source:
-    description: "TypeScript acceptance source"
+    description: 'TypeScript acceptance source'
     languages: [typescript]
     concerns: [backend]
     include:
-      - "src/**/*.ts"
+      - 'src/**/*.ts'
 
 fitness:
   failOnErrors: 0

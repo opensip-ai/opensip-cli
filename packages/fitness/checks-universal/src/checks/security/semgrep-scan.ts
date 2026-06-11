@@ -6,37 +6,37 @@
  * code injection, and other issues across all supported languages.
  */
 
-import * as path from 'node:path'
+import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 // =============================================================================
 // SEMGREP JSON OUTPUT TYPES
 // =============================================================================
 
 interface SemgrepResult {
-  check_id: string
-  path: string
-  start: { line: number; col: number }
-  end: { line: number; col: number }
+  check_id: string;
+  path: string;
+  start: { line: number; col: number };
+  end: { line: number; col: number };
   extra: {
-    message: string
-    severity: 'ERROR' | 'WARNING' | 'INFO'
+    message: string;
+    severity: 'ERROR' | 'WARNING' | 'INFO';
     metadata?: {
-      cwe?: string[]
-      owasp?: string[]
-      confidence?: string
-      category?: string
-      subcategory?: string[]
-      impact?: string
-      likelihood?: string
-    }
-  }
+      cwe?: string[];
+      owasp?: string[];
+      confidence?: string;
+      category?: string;
+      subcategory?: string[];
+      impact?: string;
+      likelihood?: string;
+    };
+  };
 }
 
 interface SemgrepOutput {
-  results: SemgrepResult[]
-  errors: { message: string }[]
+  results: SemgrepResult[];
+  errors: { message: string }[];
 }
 
 // =============================================================================
@@ -45,7 +45,7 @@ interface SemgrepOutput {
 
 /* v8 ignore start -- semgrep parsing helpers exercised via integration tests (requires semgrep CLI) */
 function mapSeverity(semgrepSeverity: string): 'error' | 'warning' {
-  return semgrepSeverity === 'ERROR' ? 'error' : 'warning'
+  return semgrepSeverity === 'ERROR' ? 'error' : 'warning';
 }
 
 // =============================================================================
@@ -59,22 +59,22 @@ function parseSemgrepOutput(
   _files: readonly string[],
   cwd: string,
 ): CheckViolation[] {
-  if (!stdout.trim()) return []
+  if (!stdout.trim()) return [];
 
-  let output: SemgrepOutput
+  let output: SemgrepOutput;
   try {
-    output = JSON.parse(stdout) as SemgrepOutput
+    output = JSON.parse(stdout) as SemgrepOutput;
   } catch {
     // @swallow-ok Non-JSON output from semgrep (e.g. login prompts, version warnings)
-    return []
+    return [];
   }
 
-  const violations: CheckViolation[] = []
+  const violations: CheckViolation[] = [];
 
   for (const result of output.results) {
-    const meta = result.extra.metadata
-    const cwe = meta?.cwe?.[0] ?? ''
-    const prefix = cwe ? `[${cwe.split(':')[0]}] ` : ''
+    const meta = result.extra.metadata;
+    const cwe = meta?.cwe?.[0] ?? '';
+    const prefix = cwe ? `[${cwe.split(':')[0]}] ` : '';
 
     violations.push({
       filePath: path.isAbsolute(result.path) ? result.path : path.join(cwd, result.path),
@@ -85,10 +85,10 @@ function parseSemgrepOutput(
       suggestion: `Fix semgrep finding: ${result.check_id}`,
       type: result.check_id,
       match: result.check_id,
-    })
+    });
   }
 
-  return violations
+  return violations;
 }
 /* v8 ignore stop */
 
@@ -130,4 +130,4 @@ export const semgrepScan = defineCheck({
     expectedExitCodes: [0, 1], // 0 = clean, 1 = findings
     parseOutput: parseSemgrepOutput,
   },
-})
+});

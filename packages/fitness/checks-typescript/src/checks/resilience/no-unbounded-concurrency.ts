@@ -3,13 +3,19 @@
  * patterns without nearby concurrency controls.
  */
 
-import { defineCheck, getLineNumber, isTestFile, stripStringsAndCommentsPreservingPositions, type CheckViolation } from '@opensip-tools/fitness'
+import {
+  defineCheck,
+  getLineNumber,
+  isTestFile,
+  stripStringsAndCommentsPreservingPositions,
+  type CheckViolation,
+} from '@opensip-tools/fitness';
 
 /**
  * Pattern indicating unbounded Promise.all usage.
  * Safe regex: uses word boundaries and explicit character classes, no nested quantifiers.
  */
-const UNBOUNDED_PROMISE_ALL_PATTERN = /Promise\.all\s*\(\s*[a-zA-Z_$][a-zA-Z0-9_$]*\.map\s*\(/g
+const UNBOUNDED_PROMISE_ALL_PATTERN = /Promise\.all\s*\(\s*[a-zA-Z_$][a-zA-Z0-9_$]*\.map\s*\(/g;
 
 /**
  * Check if content contains bounded concurrency patterns.
@@ -17,16 +23,16 @@ const UNBOUNDED_PROMISE_ALL_PATTERN = /Promise\.all\s*\(\s*[a-zA-Z_$][a-zA-Z0-9_
  * @returns {boolean} True if bounded patterns found
  */
 function hasBoundedConcurrencyPattern(content: string): boolean {
-  const lowerContent = content.toLowerCase()
+  const lowerContent = content.toLowerCase();
   // Check simple string patterns first (faster)
-  if (lowerContent.includes('plimit')) return true
-  if (lowerContent.includes('p-limit')) return true
-  if (content.includes('Promise.allSettled')) return true
+  if (lowerContent.includes('plimit')) return true;
+  if (lowerContent.includes('p-limit')) return true;
+  if (content.includes('Promise.allSettled')) return true;
   // Check regex patterns
-  if (/concurrency:\s*\d+/i.test(content)) return true
-  if (/\b(?:chunk|batch)\b/i.test(content)) return true
-  if (/\b(?:throttle|rateLimit)\b/i.test(content)) return true
-  return false
+  if (/concurrency:\s*\d+/i.test(content)) return true;
+  if (/\b(?:chunk|batch)\b/i.test(content)) return true;
+  if (/\b(?:throttle|rateLimit)\b/i.test(content)) return true;
+  return false;
 }
 
 /**
@@ -50,17 +56,17 @@ export const noUnboundedConcurrency = defineCheck({
   tags: ['resilience', 'async', 'concurrency'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
+    const violations: CheckViolation[] = [];
 
     // Skip test files — bounded by fixture data, not external load. A
     // partial mock of bounded-concurrency helpers that fans out via
     // Promise.all is a deliberate test seam; the production callers it
     // replaces ARE bounded.
-    if (isTestFile(filePath)) return violations
+    if (isTestFile(filePath)) return violations;
 
     // Skip files that don't use Promise.all
     if (!content.includes('Promise.all')) {
-      return violations
+      return violations;
     }
 
     // Strip strings and comments before pattern-match scanning so
@@ -78,18 +84,18 @@ export const noUnboundedConcurrency = defineCheck({
     // would surface previously-passing files as new positives every
     // time we tighten the regex, so keep the file-level escape hatch
     // generous and only narrow the per-match scan.
-    const codeOnly = stripStringsAndCommentsPreservingPositions(content)
+    const codeOnly = stripStringsAndCommentsPreservingPositions(content);
     if (!codeOnly.includes('Promise.all')) {
-      return violations
+      return violations;
     }
 
     // Check if file has bounded concurrency patterns (uses original content)
     if (hasBoundedConcurrencyPattern(content)) {
-      return violations
+      return violations;
     }
 
-    UNBOUNDED_PROMISE_ALL_PATTERN.lastIndex = 0
-    let match
+    UNBOUNDED_PROMISE_ALL_PATTERN.lastIndex = 0;
+    let match;
     while ((match = UNBOUNDED_PROMISE_ALL_PATTERN.exec(codeOnly)) !== null) {
       // @lazy-ok -- 'await' appears in suggestion string literal, not actual await
       // Check context around match for bounded patterns. Use the
@@ -97,12 +103,12 @@ export const noUnboundedConcurrency = defineCheck({
       // `// chunked, batch=N` or `// see batchWithConcurrency above`
       // are deliberate hints that operators expect to suppress the
       // warning. Same rationale as the file-level bounded check.
-      const start = Math.max(0, match.index - 200)
-      const end = Math.min(content.length, match.index + 200)
-      const context = content.slice(start, end)
+      const start = Math.max(0, match.index - 200);
+      const end = Math.min(content.length, match.index + 200);
+      const context = content.slice(start, end);
 
       if (!hasBoundedConcurrencyPattern(context)) {
-        const lineNumber = getLineNumber(content, match.index)
+        const lineNumber = getLineNumber(content, match.index);
         violations.push({
           line: lineNumber,
           column: 0,
@@ -113,10 +119,10 @@ export const noUnboundedConcurrency = defineCheck({
           match: match[0],
           type: 'unbounded-promise-all',
           filePath,
-        })
+        });
       }
     }
 
-    return violations
+    return violations;
   },
-})
+});

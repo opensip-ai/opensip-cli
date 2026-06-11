@@ -60,9 +60,9 @@ describe('defineCommand', () => {
   });
 
   it('rejects duplicate common-flag keys', () => {
-    expect(() =>
-      defineCommand(baseSpec({ commonFlags: ['cwd', 'cwd'] })),
-    ).toThrow(/duplicate common flag 'cwd'/);
+    expect(() => defineCommand(baseSpec({ commonFlags: ['cwd', 'cwd'] }))).toThrow(
+      /duplicate common flag 'cwd'/,
+    );
   });
 
   it('does not invoke the handler at definition time', () => {
@@ -193,7 +193,10 @@ describe('core stays Commander-free (Phase 0 layering invariant)', () => {
         const full = join(dir, entry.name);
         if (entry.isDirectory()) {
           walk(full);
-        } else if (entry.name.endsWith('.ts') && COMMANDER_IMPORT.test(readFileSync(full, 'utf8'))) {
+        } else if (
+          entry.name.endsWith('.ts') &&
+          COMMANDER_IMPORT.test(readFileSync(full, 'utf8'))
+        ) {
           offenders.push(full);
         }
       }

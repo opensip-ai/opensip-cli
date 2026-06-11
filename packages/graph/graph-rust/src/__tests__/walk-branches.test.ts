@@ -77,11 +77,7 @@ function runAdapter(): {
 
 describe('lang-rust walk.ts — extern crate + pub use branches', () => {
   it('emits a dependency site for `extern crate foo;`', () => {
-    writeFileSync(
-      join(dir, 'lib.rs'),
-      `extern crate serde;\n\npub fn run() {}\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'lib.rs'), `extern crate serde;\n\npub fn run() {}\n`, 'utf8');
     const { catalog, dependenciesByOwner } = runAdapter();
     const init = findModuleInit(catalog, 'lib.rs');
     expect(init).toBeDefined();
@@ -93,11 +89,7 @@ describe('lang-rust walk.ts — extern crate + pub use branches', () => {
   });
 
   it('emits a dependency site for `extern crate foo as bar;` using the crate name', () => {
-    writeFileSync(
-      join(dir, 'lib.rs'),
-      `extern crate serde as s;\n\npub fn run() {}\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'lib.rs'), `extern crate serde as s;\n\npub fn run() {}\n`, 'utf8');
     const { catalog, dependenciesByOwner } = runAdapter();
     const init = findModuleInit(catalog, 'lib.rs');
     expect(init).toBeDefined();
@@ -128,11 +120,7 @@ describe('lang-rust walk.ts — extern crate + pub use branches', () => {
 describe('lang-rust walk.ts — attribute extraction', () => {
   it('extracts `#[inline]` attribute text onto the function occurrence decorators', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
-    writeFileSync(
-      join(dir, 'src/lib.rs'),
-      `#[inline]\npub fn fast() -> i32 { 1 }\n`,
-      'utf8',
-    );
+    writeFileSync(join(dir, 'src/lib.rs'), `#[inline]\npub fn fast() -> i32 { 1 }\n`, 'utf8');
     const { walk } = runAdapter();
     const fast = walk.occurrences.fast?.[0];
     expect(fast).toBeDefined();
@@ -148,9 +136,7 @@ describe('lang-rust walk.ts — trait method declarations', () => {
     // the method is recorded as a function-declaration owned by module-init.
     writeFileSync(
       join(dir, 'src/lib.rs'),
-      `pub trait Greeter {\n` +
-        `    fn greet(&self) -> i32 { 7 }\n` +
-        `}\n`,
+      `pub trait Greeter {\n` + `    fn greet(&self) -> i32 { 7 }\n` + `}\n`,
       'utf8',
     );
     const { walk } = runAdapter();

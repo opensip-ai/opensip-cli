@@ -21,9 +21,7 @@ import type { Signal } from '@opensip-tools/core';
  * @throws {Error | TypeError} when the stored payload is not the expected shape
  *   (propagated from `decodeSessionPayload`).
  */
-export function graphReplayFromSession(
-  stored: StoredSession,
-): ToolSessionReplay<GraphDoneResult> {
+export function graphReplayFromSession(stored: StoredSession): ToolSessionReplay<GraphDoneResult> {
   const payload = decodeSessionPayload(stored.payload, {
     tool: 'graph',
     requireFilePath: true,

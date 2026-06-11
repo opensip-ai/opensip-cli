@@ -9,12 +9,12 @@
  * `matchedMarkers` but excluded from `adapterIds`.
  */
 
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { logger, type LanguageRegistry } from '@opensip-tools/core'
+import { logger, type LanguageRegistry } from '@opensip-tools/core';
 
-const MODULE_GRAPH_CLI = 'graph:cli'
+const MODULE_GRAPH_CLI = 'graph:cli';
 
 /**
  * Marker-file → canonical adapter id. Order matters only for
@@ -33,11 +33,11 @@ const MARKER_MAP: readonly { readonly marker: string; readonly adapterId: string
   { marker: 'build.gradle.kts', adapterId: 'java' },
   { marker: 'CMakeLists.txt', adapterId: 'cpp' },
   { marker: 'meson.build', adapterId: 'cpp' },
-]
+];
 
 interface DetectionMatch {
-  readonly marker: string
-  readonly adapterId: string
+  readonly marker: string;
+  readonly adapterId: string;
 }
 
 /**
@@ -48,9 +48,9 @@ interface DetectionMatch {
  */
 export interface DetectionResult {
   /** Canonical adapter ids of the languages detected at `rootDir`. */
-  readonly adapterIds: readonly string[]
+  readonly adapterIds: readonly string[];
   /** Marker files actually found, paired with the adapter they identified. */
-  readonly matchedMarkers: readonly DetectionMatch[]
+  readonly matchedMarkers: readonly DetectionMatch[];
 }
 
 /**
@@ -61,20 +61,20 @@ export interface DetectionResult {
  * `adapterIds` (defensive against partial CLI bootstrap configurations).
  */
 export function detectLanguages(rootDir: string, registry: LanguageRegistry): DetectionResult {
-  logger.info({ evt: 'graph.cli.detect.start', module: MODULE_GRAPH_CLI, rootDir })
-  const matchedMarkers: DetectionMatch[] = []
-  const adapterIdSet = new Set<string>()
+  logger.info({ evt: 'graph.cli.detect.start', module: MODULE_GRAPH_CLI, rootDir });
+  const matchedMarkers: DetectionMatch[] = [];
+  const adapterIdSet = new Set<string>();
   for (const { marker, adapterId } of MARKER_MAP) {
-    if (!existsSync(join(rootDir, marker))) continue
-    matchedMarkers.push({ marker, adapterId })
-    if (registry.get(adapterId) === undefined) continue
-    adapterIdSet.add(adapterId)
+    if (!existsSync(join(rootDir, marker))) continue;
+    matchedMarkers.push({ marker, adapterId });
+    if (registry.get(adapterId) === undefined) continue;
+    adapterIdSet.add(adapterId);
   }
-  const adapterIds = [...adapterIdSet]
+  const adapterIds = [...adapterIdSet];
   logger.info({
     evt: adapterIds.length > 1 ? 'graph.cli.detect.polyglot' : 'graph.cli.detect.result',
     module: MODULE_GRAPH_CLI,
     adapterIds,
-  })
-  return { adapterIds, matchedMarkers }
+  });
+  return { adapterIds, matchedMarkers };
 }
