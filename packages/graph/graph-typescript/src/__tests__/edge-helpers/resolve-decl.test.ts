@@ -134,3 +134,77 @@ describe('resolveDeclToHash — cross-package (.d.ts) boundary resolution', () =
     expect(resolveDeclToHash(node, sf, ['helper'], ctx, ['helper', 'ns'])).toBe(EXPORTED_HASH);
   });
 });
+
+describe('resolveDeclToHash — intra-package .d.ts→source method pin', () => {
+  // A method call `recv.m()` whose receiver type flows through the OWNER
+  // package's OWN published `dist/*.d.ts` (so the checker attests the decl in the
+  // `.d.ts`, with NO import binding for the method name). The intra-package pin
+  // maps that dist decl back to its SOURCE occurrence — resolving in BOTH engines
+  // (the target is in-shard) — while a CROSS-package method target declines
+  // (symmetry: it lives in another shard the in-shard pass can't reach).
+  const root = mkdtempSync(join(tmpdir(), 'resolve-decl-dts-'));
+  const libDir = join(root, 'packages', 'lib');
+  const appDir = join(root, 'packages', 'app');
+  const GETALL_HASH = 'cccccccccccccccc';
+  let catalog: Catalog;
+  let crossPackage: CrossPackageContext;
+
+  beforeAll(() => {
+    mkdirSync(libDir, { recursive: true });
+    mkdirSync(appDir, { recursive: true });
+    writeFileSync(join(libDir, 'package.json'), JSON.stringify({ name: '@scope/lib' }));
+    writeFileSync(join(appDir, 'package.json'), JSON.stringify({ name: '@scope/app' }));
+    catalog = {
+      version: '3.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'x',
+      cacheKey: 'k',
+      functions: { getAll: [occ('getAll', 'packages/lib/src/registry.ts', GETALL_HASH)] },
+    };
+    crossPackage = {
+      exportIndex: buildExportIndex(catalog),
+      manifestIndex: buildPackageManifestIndexFromRoots([libDir, appDir], root),
+    };
+  });
+
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  /** A bodiless `dist/*.d.ts` decl at `lib`'s built output. */
+  function libDistDecl(): { node: ts.Node; sf: ts.SourceFile } {
+    const sf = ts.createSourceFile(
+      join(libDir, 'dist', 'registry.d.ts'),
+      'export declare class R { getAll(): void; }',
+      ts.ScriptTarget.ES2022,
+      true,
+    );
+    const [node] = sf.statements;
+    if (node === undefined) throw new Error('fixture parse produced no statement');
+    return { node, sf };
+  }
+
+  /** ctx whose OWNER file is `ownerAbs` (no import binding → boundary path declines). */
+  function ctxOwnedBy(ownerAbs: string): ResolverContext {
+    return {
+      catalog,
+      program: undefined as unknown as ts.Program,
+      typeChecker: undefined as unknown as ts.TypeChecker,
+      sourceFile: { fileName: ownerAbs } as ts.SourceFile,
+      projectDirAbs: root,
+      crossPackage,
+      importSpecifiers: new Map(),
+    };
+  }
+
+  it('resolves when the OWNER is in the SAME package as the dist decl', () => {
+    const { node, sf } = libDistDecl();
+    const ctx = ctxOwnedBy(join(libDir, 'src', 'caller.ts'));
+    expect(resolveDeclToHash(node, sf, ['getAll'], ctx)).toBe(GETALL_HASH);
+  });
+
+  it('declines when the OWNER is in a DIFFERENT package (cross-shard, left to the completeness floor)', () => {
+    const { node, sf } = libDistDecl();
+    const ctx = ctxOwnedBy(join(appDir, 'src', 'caller.ts'));
+    expect(resolveDeclToHash(node, sf, ['getAll'], ctx)).toBeNull();
+  });
+});

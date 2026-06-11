@@ -1,8 +1,11 @@
 # Graph False-Findings — Incident Log & Consolidation Plan
 
-**Status:** CONVERGED (2026-06-11 — 204 → 12 on one shared model, ADR-0033; the 12
-are documented directional residual classes, tracked. See the 2026-06-11 entry +
-"Still open after 2026-06-11" below.)
+**Status:** RESOLVED (2026-06-11 — production resolved-edge divergence 204 → 12 → 1
+→ **0** on one shared model, ADR-0033). The differential guardrail is now the true
+zero-divergence soundness invariant (all directional floors 0). Remaining gaps are
+both-engine-decline completeness items (cross-package + arrow-property method
+calls), guarded by the pinned-corpus completeness floor — see the 2026-06-11
+entries + "Still open" below.
 **Scope:** the `graph` tool reporting warnings/errors that are not real, recurring
 across multiple "fix" attempts.
 
@@ -389,10 +392,36 @@ worsening) — it is a ratchet on an imperfect baseline, not a proof of equivale
   conflict **11 → 0**); budget floor tightened to `conflictDivergences:0`; 768+330
   graph tests green; graph+fit dogfood 0; completeness floor still ≥7.
 
+### 2026-06-11 (later still) — the last phantom fixed; production divergence 1 → 0
+- **Observed:** GRAPH_SITE_LOG showed exact declining `getAll` at dashboard-data.ts:44
+  with `decl=packages/graph/engine/dist/rules/registry.d.ts dts=true spec=-
+  out=DECLINE-dts-hop` — the receiver type flows through `ToolScope` to the graph
+  package's OWN published `.d.ts`, and the `.d.ts` branch is binding-required (a
+  method call has no import binding). It was NOT an optional-chain bug as first
+  guessed: sharded "resolved" it only via the UNSOUND shard-scoped
+  `resolveByCatalogFallback` (resolves a name unique *within the shard's catalog*;
+  `getAll` is unique in the graph shard but ambiguous repo-wide → exact correctly
+  declined, sharded got lucky).
+- **Changed:** `pinByDtsDeclSource` (resolve-decl.ts) maps a checker-attested
+  `dist/*.d.ts` method decl → its SOURCE file and pins by (file + name),
+  type-anchored + catalog-scope-independent so both engines agree. RESTRICTED to
+  INTRA-package targets — an unrestricted pin made exact resolve 530 cross-package
+  method calls sharded can't reach (target in another shard; not a boundary call)
+  → measured 530 exact-only declines; the intra-package gate keeps it symmetric.
+- **Verified:** `graph-equivalence-check` total **1 → 0** (phantom=0, decline=0,
+  conflict=0, scc=0); budget floors ALL 0; 768+333 graph tests, full test:coverage
+  64/64, graph+fit dogfood, lint, typecheck, docs:check green; completeness floor
+  holds. Regression test in `resolve-decl.test.ts`.
+
 ### Still open after 2026-06-11
-- **Phantom (the 1).** Exact optional-chain (`?.`) property-access method resolution
-  — `scope.graph?.rules.getAll()` (dashboard-data.ts:44). The only remaining
-  divergence; sharded resolves it correctly, exact declines through the `?.`.
+- **Production divergence is 0.** The differential guardrail is now the true
+  zero-divergence soundness invariant (all directional floors 0).
+- **Cross-package method calls** (receiver typed via ANOTHER package's `.d.ts`).
+  Both engines decline (symmetric, invisible to the differential gate, guarded by
+  the completeness floor). Resolving them needs method calls to ride the
+  cross-shard boundary linker — a larger completeness item, deferred.
+- **Arrow-property method calls** (`logger.info()` where findCatalogEntry can't
+  reproduce the arrow occurrence's hash). Both decline.
 - **Clean-checkout parity for WORKSPACE imports.** Exact still reaches the linker
   via the dep's built `dist/*.d.ts`; relative imports are clean-safe (file+name
   pin). Source-as-surface program change deferred.

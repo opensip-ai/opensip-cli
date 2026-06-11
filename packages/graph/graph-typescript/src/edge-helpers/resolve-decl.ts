@@ -59,8 +59,17 @@ export function resolveDeclToHash(
   const dts = declSourceFile.isDeclarationFile;
   const out = dts
     ? // Boundary case: the alias led into a built `.d.ts`. Don't hash the bodiless
-      // signature; re-resolve through the export index, binding-required.
-      resolveAcrossPackageBoundary(candidateNames, bindingNames, ctx)
+      // signature. First try the export index (binding-required — for imported
+      // FUNCTIONS). If that declines (e.g. a METHOD call `recv.m()` carries no
+      // import binding for `m`), fall back to mapping the checker-attested
+      // `dist/*.d.ts` decl to its SOURCE file and pinning by (source file +
+      // name). The checker already disambiguated WHICH declaration (this class's
+      // method in this file), so the pin is type-anchored, not a name guess — and
+      // catalog-SCOPE-independent, so the exact (whole-repo) and sharded (per-
+      // shard) passes resolve it identically instead of one declining while the
+      // other resolves by an unsound unique-name-in-shard catalog fallback.
+      (resolveAcrossPackageBoundary(candidateNames, bindingNames, ctx) ??
+      pinByDtsDeclSource(declSourceFile, candidateNames, ctx))
     : // In-project source: hash the body and match it in the catalog; if the
       // body-hash match misses (e.g. arrow-property methods whose cataloged
       // occurrence the hasher can't reproduce from this decl node), fall back to
@@ -89,6 +98,20 @@ function pinByFileAndName(
   ctx: ResolverContext,
 ): string | null {
   const relPath = relative(ctx.projectDirAbs, declSourceFile.fileName).split(sep).join('/');
+  return pinBySourceRel(relPath, candidateNames, ctx);
+}
+
+/**
+ * The catalog occurrence in `relPath` (a project-relative SOURCE path) whose
+ * simpleName matches one of `candidateNames`. UNIQUE match → its bodyHash; zero
+ * or >1 DISTINCT → null (decline). The shared unique-or-decline core of the
+ * file+name pins.
+ */
+function pinBySourceRel(
+  relPath: string,
+  candidateNames: readonly string[],
+  ctx: ResolverContext,
+): string | null {
   let found: string | null = null;
   for (const name of candidateNames) {
     const occs = ctx.catalog.functions[name];
@@ -100,6 +123,47 @@ function pinByFileAndName(
     }
   }
   return found;
+}
+
+/**
+ * `.d.ts`→source pin: map the checker-attested `dist/*.d.ts` declaration file to
+ * its SOURCE counterpart (tsc `outDir:dist` / `rootDir:src` convention) and pin
+ * by (source file + name). Returns null when the path is not a `dist/*.d.ts`, or
+ * when the mapped source has no unique matching occurrence (decline). Guarded by
+ * the catalog match: a wrong mapping simply finds nothing and declines, so the
+ * heuristic never fabricates an edge.
+ *
+ * RESTRICTED TO INTRA-PACKAGE targets (owner's package === target's package). A
+ * method call whose receiver type flows through the OWNER package's OWN published
+ * `.d.ts` (e.g. `scope.graph?.rules.getAll()` where `scope`'s type references the
+ * graph package) resolves to a SOURCE occurrence in the same package — which is
+ * in-shard for the sharded engine too, so BOTH engines resolve it identically. A
+ * CROSS-package method target lives in another SHARD, which the sharded in-shard
+ * pass cannot reach (method calls carry no import binding, so they don't ride the
+ * cross-shard boundary linker); resolving those in exact alone would diverge.
+ * Cross-package method resolution is the separate, larger completeness item
+ * (guarded by the resolution-completeness floor), deliberately left declined in
+ * BOTH engines here.
+ */
+function pinByDtsDeclSource(
+  declSourceFile: ts.SourceFile,
+  candidateNames: readonly string[],
+  ctx: ResolverContext,
+): string | null {
+  const rel = relative(ctx.projectDirAbs, declSourceFile.fileName).split(sep).join('/');
+  if (!rel.endsWith('.d.ts') || !rel.includes('/dist/')) return null;
+  const srcRel = rel.replace('/dist/', '/src/').replace(/\.d\.ts$/, '.ts');
+  const ownerRel = relative(ctx.projectDirAbs, ctx.sourceFile.fileName).split(sep).join('/');
+  if (packageOf(srcRel) !== packageOf(ownerRel)) return null; // cross-package → decline (symmetry)
+  return pinBySourceRel(srcRel, candidateNames, ctx);
+}
+
+/** The package-root prefix of a project-relative source path — everything before
+ *  `/src/` (e.g. `packages/graph/engine/src/rules/registry.ts` → `packages/graph/engine`).
+ *  Used to gate the `.d.ts`→source pin to intra-package targets. */
+function packageOf(rel: string): string {
+  const i = rel.indexOf('/src/');
+  return i === -1 ? rel : rel.slice(0, i);
 }
 
 /**

@@ -142,3 +142,25 @@ guardrail is unchanged; only the budget floor tightens to `conflictDivergences:0
 **Remaining residual = 1 phantom** (the `dashboard-data.ts:44`
 `scope.graph?.rules.getAll()` optional-chain method call exact under-resolves) —
 the genuine, separate exact-resolver gap, tracked.
+
+**Amendment (2026-06-11, #2) — the last phantom fixed; production divergence 1 →
+0.** Diagnosis (GRAPH_SITE_LOG): exact's type checker attributes
+`scope.graph?.rules`'s `getAll` to the graph package's own published
+`dist/rules/registry.d.ts` (the receiver type flows through `ToolScope`), and the
+`.d.ts` branch is binding-required — a METHOD call has no import binding, so it
+declined. Sharded "resolved" it only by an UNSOUND shard-scoped fallback
+(`resolveByCatalogFallback` resolves a name that is unique *within the shard's
+catalog*; `getAll` is unique in the graph shard but ambiguous repo-wide, so exact
+correctly declined while sharded got lucky). **Fix:** `pinByDtsDeclSource`
+(`resolve-decl.ts`) maps a checker-attested `dist/*.d.ts` method decl to its
+SOURCE file (tsc `outDir:dist`/`rootDir:src`) and pins by (source file + name),
+unique-or-decline — type-anchored, catalog-scope-INDEPENDENT, so both engines
+resolve identically. **Restricted to INTRA-package targets**: an unrestricted pin
+made exact resolve 530 CROSS-package method calls the sharded in-shard pass cannot
+reach (target in another shard; method calls carry no import binding so they don't
+ride the cross-shard boundary linker) → 530 exact-only declines. Intra-package
+targets are in-shard for both engines → symmetric. Cross-package method resolution
+remains the separate, larger completeness item (guarded by the resolution-
+completeness floor), left declined in BOTH engines. Result: **all directional
+floors are now 0** — the guardrail is the true zero-divergence soundness
+invariant. Regression test in `resolve-decl.test.ts`.
