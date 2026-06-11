@@ -33,7 +33,8 @@ import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
 import { discoverFiles as discoverTypescriptFiles } from './discover.js';
-import { extractBoundaryCalls } from './edge-resolvers/boundary.js';
+import { methodTargetFile } from './edge-helpers/method-target.js';
+import { extractBoundaryCalls, type MethodTargetResolver } from './edge-resolvers/boundary.js';
 import { resolveEdgesFromRecords, resolveEdgesSyntactic } from './edges.js';
 import { parseProject as parseTypescriptProject } from './parse.js';
 import { isTypescriptTestFile } from './test-file.js';
@@ -178,10 +179,21 @@ async function resolveCallSitesAdapter(input: ResolveInput<TsParsed>): Promise<R
   // didn't land within this shard's own occurrences. Syntactic and
   // mode-independent, so it runs identically for both tiers.
   if (input.emitBoundaryCalls !== true) return base;
+  // Cross-package METHOD calls need a TYPE-attested target file — supply a
+  // checker-backed resolver on the exact tier. The fast tier has no `ts.Program`,
+  // so method boundary calls are exact-tier only (the equivalence gate runs in
+  // exact mode); imported-function boundary calls stay tier-independent.
+  let resolveMethodTarget: MethodTargetResolver | undefined;
+  if (input.project.kind !== 'fast') {
+    const checker = input.project.program.getTypeChecker();
+    resolveMethodTarget = (node): string | null =>
+      methodTargetFile(node, checker, input.projectDirAbs);
+  }
   const boundaryCalls = extractBoundaryCalls(
     toTsCallSites(input.callSites),
     base.edgesByOwner,
     input.projectDirAbs,
+    resolveMethodTarget,
   );
   return { ...base, boundaryCalls };
 }

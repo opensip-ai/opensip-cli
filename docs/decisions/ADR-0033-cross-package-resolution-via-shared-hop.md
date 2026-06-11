@@ -164,3 +164,22 @@ remains the separate, larger completeness item (guarded by the resolution-
 completeness floor), left declined in BOTH engines. Result: **all directional
 floors are now 0** — the guardrail is the true zero-divergence soundness
 invariant. Regression test in `resolve-decl.test.ts`.
+
+**Amendment (2026-06-11, #3) — cross-package METHOD resolution (a completeness
+gain, divergence stays 0).** The cross-package method class deferred in amendment
+#2 is now resolved through the boundary linker — the SAME place cross-package
+FUNCTIONS resolve — in both engines. Mechanism: a method call `recv.m()` the
+in-shard/inline pass leaves unresolved is emitted as a **type-attested boundary
+call** carrying `CrossBoundaryCall.targetFile` — the checker's `m` decl in a
+workspace `dist/*.d.ts` mapped to its source (`methodTargetFile`, supplied by the
+adapter from the `ts.Program`; exact tier only). The linker's new `method-target`
+branch (`resolveOne`) pins by (`targetFile` + `calleeName`) against the merged
+catalog, unique-or-decline. Exact's inline pass still declines cross-package
+methods (the intra-package pin restriction from #2), so BOTH engines route them
+through the linker → symmetric. Measured on this repo: ~185 cross-package method
+edges now resolved (incl. part of the `logger.info()` arrow-property class), ~208
+decline (ambiguous / unmapped), divergence stays **0**. Regression tests:
+`method-target.test.ts` (the resolver) + the `method-target` cases in
+`cross-shard-resolve.test.ts` (the linker pin). Residual completeness gaps remain
+(the ~208 declines + arrow-property hashes findCatalogEntry can't reproduce),
+guarded by the completeness floor.

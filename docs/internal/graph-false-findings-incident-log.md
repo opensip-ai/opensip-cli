@@ -413,15 +413,25 @@ worsening) — it is a ratchet on an imperfect baseline, not a proof of equivale
   64/64, graph+fit dogfood, lint, typecheck, docs:check green; completeness floor
   holds. Regression test in `resolve-decl.test.ts`.
 
+### 2026-06-11 (later still) — cross-package METHOD resolution (completeness gain, divergence stays 0)
+- **Done:** the deferred cross-package method class now resolves through the
+  boundary linker in BOTH engines. A `recv.m()` the in-shard pass leaves
+  unresolved is emitted as a TYPE-attested boundary call carrying `targetFile`
+  (the checker's `m` decl in a workspace `dist/*.d.ts` mapped to source —
+  `methodTargetFile`, exact tier); the linker's `method-target` branch pins by
+  (targetFile + name) post-merge, unique-or-decline. Exact still declines them
+  inline (the intra-package pin restriction), so both route through the linker →
+  symmetric. ~185 edges now resolved (incl. part of the `logger.info()` class),
+  ~208 decline; divergence stays 0. Tests: `method-target.test.ts` +
+  `cross-shard-resolve.test.ts` (method-target cases). ADR-0033 amendment #3.
+
 ### Still open after 2026-06-11
 - **Production divergence is 0.** The differential guardrail is now the true
   zero-divergence soundness invariant (all directional floors 0).
-- **Cross-package method calls** (receiver typed via ANOTHER package's `.d.ts`).
-  Both engines decline (symmetric, invisible to the differential gate, guarded by
-  the completeness floor). Resolving them needs method calls to ride the
-  cross-shard boundary linker — a larger completeness item, deferred.
-- **Arrow-property method calls** (`logger.info()` where findCatalogEntry can't
-  reproduce the arrow occurrence's hash). Both decline.
+- **The ~208 cross-package method declines** (unique-or-decline: ambiguous
+  name-in-target-file, or a dist→src mapping with no matching occurrence) +
+  **arrow-property hashes** findCatalogEntry can't reproduce. Both decline
+  (symmetric, guarded by the completeness floor).
 - **Clean-checkout parity for WORKSPACE imports.** Exact still reaches the linker
   via the dep's built `dist/*.d.ts`; relative imports are clean-safe (file+name
   pin). Source-as-surface program change deferred.

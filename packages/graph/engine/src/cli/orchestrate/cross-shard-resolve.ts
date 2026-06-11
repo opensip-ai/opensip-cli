@@ -354,6 +354,22 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
   };
   const spec = bc.importSpecifier;
 
+  // (a0) Type-attested cross-package METHOD: the checker resolved `recv.m()`'s
+  // method to a workspace `dist/*.d.ts` whose SOURCE lives in another shard, so
+  // the boundary extractor carried the mapped source file. Pin by (target file +
+  // method name) against the merged catalog. UNIQUE-or-decline, mirroring the
+  // exact engine's intra-package `pinByDtsDeclSource` — both engines route
+  // cross-package methods here, so they resolve identically.
+  if (bc.targetFile !== undefined) {
+    const candidates = ctx.nameIndex.get(bc.calleeName) ?? [];
+    const distinct = [
+      ...new Set(candidates.filter((o) => o.filePath === bc.targetFile).map((o) => o.bodyHash)),
+    ];
+    const edge = distinct.length === 1 ? { ...base, to: distinct } : { ...base, to: [] };
+    traceResolveOne(bc, 'method-target', edge.to);
+    return edge;
+  }
+
   // (a) Relative import → path-pin (intra-package). UNIQUE-or-decline: a single
   // distinct target bodyHash in the pinned file resolves; same-name ambiguity
   // declines — identical semantics to the exact engine's file+name pin

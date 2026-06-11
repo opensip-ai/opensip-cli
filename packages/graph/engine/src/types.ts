@@ -246,6 +246,17 @@ export interface CrossBoundaryCall {
   readonly calleeName: string;
   /** The raw import specifier the name came from, if imported (`'./x.js'`, `'@scope/pkg'`). */
   readonly importSpecifier?: string;
+  /**
+   * Type-attested target SOURCE file (project-relative) for a cross-package
+   * METHOD call `recv.m()` — the package's published `dist/*.d.ts` decl the
+   * checker resolved `m` to, mapped to its source. Set INSTEAD of
+   * `importSpecifier` (a method name is not an imported binding). The linker pins
+   * by (`targetFile` + `calleeName`) against the merged catalog, so cross-package
+   * methods resolve through the SAME post-merge linker as cross-package functions
+   * — identically in both engines (exact's inline pass declines them under the
+   * intra-package pin restriction, so both route here).
+   */
+  readonly targetFile?: string;
   /** 1-based line of the call site. */
   readonly line: number;
   /** 0-based column. */

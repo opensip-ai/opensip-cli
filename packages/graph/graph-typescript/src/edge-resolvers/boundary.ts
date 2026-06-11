@@ -23,6 +23,7 @@
 import { relative, sep } from 'node:path';
 
 import { ownerEdgeKey } from '@opensip-tools/graph';
+import ts from 'typescript';
 
 import { isReturnValueDiscarded } from '../edges.js';
 
@@ -30,22 +31,31 @@ import { calleeAnchorNode, calleeSimpleName, buildImportSpecifierIndex } from '.
 
 import type { CallSiteRecord } from '../walk.js';
 import type { CallEdge, CrossBoundaryCall } from '@opensip-tools/graph';
-import type ts from 'typescript';
 
 /** Max length of the descriptor's display text — the CallEdge.text contract. */
 const TEXT_MAX = 80;
 
 /**
+ * Resolve a method call's type-attested target SOURCE file (a cross-package
+ * `recv.m()` whose `m` decl is in a workspace `dist/*.d.ts`), or null. Supplied
+ * by the adapter (which owns the `ts.Program`/checker); absent in the fast tier.
+ */
+export type MethodTargetResolver = (node: ts.Node) => string | null;
+
+/**
  * Extract cross-boundary call descriptors from a shard's walked call sites. A
- * site is a boundary candidate when its callee name is imported but the in-shard
- * resolver left it unresolved at this exact site — see the module doc for why
- * this is keyed on the resolution outcome (`resolvedEdgesByOwner`) rather than
- * on whether the callee name exists among the shard's occurrences.
+ * site is a boundary candidate when the in-shard resolver left it unresolved AND
+ * either (a) its callee name is IMPORTED (a cross-package FUNCTION), or (b) it is
+ * a METHOD call `recv.m()` whose callee the checker resolves to a workspace
+ * `dist/*.d.ts` (`resolveMethodTarget` attests the target file — a cross-package
+ * METHOD). Both route through the same post-merge linker. Keyed on the resolution
+ * outcome (`resolvedEdgesByOwner`) — see the module doc.
  */
 export function extractBoundaryCalls(
   callSites: readonly CallSiteRecord[],
   resolvedEdgesByOwner: ReadonlyMap<string, readonly CallEdge[]>,
   projectDirAbs: string,
+  resolveMethodTarget?: MethodTargetResolver,
 ): CrossBoundaryCall[] {
   const out: CrossBoundaryCall[] = [];
   // One import-specifier index per source file, built lazily and cached.
@@ -65,8 +75,13 @@ export function extractBoundaryCalls(
       specifierIndexBySf.set(r.sourceFile, specifierIndex);
     }
     const importSpecifier = specifierIndex.get(callee.name);
-    // Only imported names are cross-module candidates; skip globals/locals.
-    if (importSpecifier === undefined) continue;
+    const methodEligible =
+      resolveMethodTarget !== undefined &&
+      ts.isCallExpression(r.node) &&
+      ts.isPropertyAccessExpression(r.node.expression);
+    // Candidate iff IMPORTED (function) or a METHOD call we can type-resolve.
+    // Everything else (globals/locals/intra) is skipped before the position math.
+    if (importSpecifier === undefined && !methodEligible) continue;
 
     let ownerFile = ownerFileBySf.get(r.sourceFile);
     if (ownerFile === undefined) {
@@ -77,28 +92,61 @@ export function extractBoundaryCalls(
       ownerFileBySf.set(r.sourceFile, ownerFile);
     }
 
-    const pos = positionOf(r.node, r.sourceFile);
-    // Skip a site the in-shard resolver already RESOLVED to a real target —
-    // emitting a boundary call for it would double the edge. (A `to: []`
-    // placeholder is NOT a resolution.) Keyed on the outcome at THIS site, so a
-    // local same-name occurrence elsewhere in the shard no longer suppresses it.
-    const resolvedHere = (
-      resolvedEdgesByOwner.get(ownerEdgeKey(r.ownerHash, ownerFile)) ?? []
-    ).some((e) => e.line === pos.line && e.column === pos.column && e.to.length > 0);
-    if (resolvedHere) continue;
-
-    out.push({
-      ownerHash: r.ownerHash,
-      ownerFile,
-      calleeName: callee.name,
-      importSpecifier,
-      line: pos.line,
-      column: pos.column,
-      text: pos.text,
-      discarded: isReturnValueDiscarded(r.node),
+    const bc = boundaryCallFor(r, callee.name, importSpecifier, ownerFile, {
+      resolvedEdgesByOwner,
+      resolveMethodTarget,
     });
+    if (bc !== null) out.push(bc);
   }
   return out;
+}
+
+interface BoundaryDeps {
+  readonly resolvedEdgesByOwner: ReadonlyMap<string, readonly CallEdge[]>;
+  readonly resolveMethodTarget?: MethodTargetResolver;
+}
+
+/**
+ * Finish classifying a candidate call site — its callee name, import specifier,
+ * and owner file already resolved by the caller — into a boundary descriptor, or
+ * `null` when the in-shard pass already resolved the site or it is not a
+ * cross-package method. Extracted from the loop to keep each piece simple.
+ */
+function boundaryCallFor(
+  r: CallSiteRecord,
+  calleeName: string,
+  importSpecifier: string | undefined,
+  ownerFile: string,
+  deps: BoundaryDeps,
+): CrossBoundaryCall | null {
+  const pos = positionOf(r.node, r.sourceFile);
+  // Skip a site the in-shard resolver already RESOLVED to a real target —
+  // emitting a boundary call for it would double the edge. (A `to: []`
+  // placeholder is NOT a resolution.) Keyed on the outcome at THIS site, so a
+  // local same-name occurrence elsewhere in the shard no longer suppresses it.
+  const resolvedHere = (
+    deps.resolvedEdgesByOwner.get(ownerEdgeKey(r.ownerHash, ownerFile)) ?? []
+  ).some((e) => e.line === pos.line && e.column === pos.column && e.to.length > 0);
+  if (resolvedHere) return null;
+
+  // For a non-imported (method) candidate, attest the target only NOW (after the
+  // cheap resolvedHere gate) to bound the checker calls. A method whose callee
+  // resolves to SOURCE / node_modules / a non-dist `.d.ts` declines.
+  const targetFile =
+    importSpecifier === undefined ? (deps.resolveMethodTarget?.(r.node) ?? undefined) : undefined;
+  if (importSpecifier === undefined && targetFile === undefined) return null;
+
+  return {
+    ownerHash: r.ownerHash,
+    ownerFile,
+    calleeName,
+    ...(importSpecifier === undefined ? {} : { importSpecifier }),
+    ...(targetFile === undefined ? {} : { targetFile }),
+    line: pos.line,
+    column: pos.column,
+    text: pos.text,
+    discarded: isReturnValueDiscarded(r.node),
+  };
 }
 
 /* `isReturnValueDiscarded` is imported from `../edges.js` so recovered

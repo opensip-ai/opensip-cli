@@ -243,6 +243,76 @@ describe('resolveCrossBoundaryCalls', () => {
   });
 });
 
+describe('resolveCrossBoundaryCalls — cross-package method (targetFile pin)', () => {
+  it('pins a method boundary call by (targetFile + calleeName) to the unique occurrence', () => {
+    const merged = mergeShardFragments(
+      [
+        fragment('typescript', occ('caller', 'packages/pkg-a/index.ts', 'A')),
+        fragment('typescript', occ('getAll', 'packages/pkg-b/registry.ts', 'B')),
+      ],
+      ['packages/pkg-a/index.ts', 'packages/pkg-b/registry.ts'],
+    );
+    // No importSpecifier — a method call. The checker attested the target file.
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
+      calleeName: 'getAll',
+      targetFile: 'packages/pkg-b/registry.ts',
+      line: 2,
+      column: 9,
+      text: 'recv.getAll()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(merged, [bc], EMPTY_MANIFESTS);
+    const edge = catalog.functions.caller?.[0]?.calls.find((e) => e.crossShard);
+    expect(edge?.to).toEqual(['B']);
+    expect(edge?.resolution).toBe('semantic');
+    expect(edge?.confidence).toBe('high');
+  });
+
+  it('declines when the target file holds NO occurrence of the method name', () => {
+    const merged = mergeShardFragments(
+      [fragment('typescript', occ('caller', 'packages/pkg-a/index.ts', 'A'))],
+      ['packages/pkg-a/index.ts'],
+    );
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
+      calleeName: 'getAll',
+      targetFile: 'packages/pkg-b/registry.ts', // not in the catalog
+      line: 2,
+      column: 9,
+      text: 'recv.getAll()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(merged, [bc], EMPTY_MANIFESTS);
+    expect(catalog.functions.caller?.[0]?.calls.find((e) => e.crossShard)?.to ?? []).toEqual([]);
+  });
+
+  it('declines on same-name ambiguity WITHIN the target file (>1 distinct bodyHash)', () => {
+    const merged = mergeShardFragments(
+      [
+        fragment('typescript', occ('caller', 'packages/pkg-a/index.ts', 'A')),
+        fragment(
+          'typescript',
+          occ('getAll', 'packages/pkg-b/registry.ts', 'B1'),
+          occ('getAll', 'packages/pkg-b/registry.ts', 'B2'),
+        ),
+      ],
+      ['packages/pkg-a/index.ts', 'packages/pkg-b/registry.ts'],
+    );
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
+      calleeName: 'getAll',
+      targetFile: 'packages/pkg-b/registry.ts',
+      line: 2,
+      column: 9,
+      text: 'recv.getAll()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(merged, [bc], EMPTY_MANIFESTS);
+    expect(catalog.functions.caller?.[0]?.calls.find((e) => e.crossShard)?.to ?? []).toEqual([]);
+  });
+});
+
 describe('mergeShardFragments — edge cases', () => {
   it('defaults the merged language to typescript for an empty fragment list', () => {
     const merged = mergeShardFragments([], []);
