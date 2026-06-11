@@ -86,7 +86,16 @@ export async function runGateMode(
     });
     return;
   }
-  // gate-compare
+  // gate-compare.
+  //
+  // ADR-0035 Phase 5 finding — RETAIN (not fold): `degraded` is "net-new findings
+  // since the saved baseline", a baseline-DIFF predicate that is NOT expressible
+  // over this run's own findings verdict (a run can have error-level findings yet
+  // be `degraded: false` if none are net-new, and vice versa). So gate-compare
+  // keeps its own exit here, distinct from the host's findings verdict. The host
+  // does not clobber it: graph-command-spec re-affirms this already-set exit as
+  // the `deliverSignals` runFailed override (via cli.getExitCode), and the run's
+  // verdict headline stays informational for the gate-compare mode.
   const result = compareToBaseline(signals, repo);
   if (result.degraded) {
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
