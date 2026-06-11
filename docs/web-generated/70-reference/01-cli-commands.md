@@ -475,7 +475,7 @@ Detects the project's primary language(s) from filesystem markers and writes:
 
 Plus appends `opensip-tools/.runtime/` to `<cwd>/.gitignore`.
 
-The scaffold output is loose `.mjs` files — the lightest-weight starting point. When a pack outgrows loose files (substantial helpers, tests, more than a dozen checks/scenarios), the customer graduates `opensip-tools/<domain>/` to a workspace npm package by adding a `package.json` with `opensipTools.kind: "fit-pack"` (or `"sim-pack"`) and an `index.ts`. Marker-based discovery picks up the workspace package automatically. See [`50-extend/01-plugin-authoring.md`](/docs/opensip-tools/50-extend/01-plugin-authoring/) for the graduation path.
+The scaffold output is loose `.mjs` files — the lightest-weight starting point. When a pack outgrows loose files (substantial helpers, tests, more than a dozen checks/scenarios), the customer graduates `opensip-tools/<domain>/` to a workspace npm package. Fit packs add `opensipTools.kind: "fit-pack"` and load through marker discovery; sim scenario packs use the `<scope>/scenarios-*` package-name pattern or an explicit `plugins.scenarioPackages:` pin. See [`50-extend/01-plugin-authoring.md`](/docs/opensip-tools/50-extend/01-plugin-authoring/) for the graduation path.
 
 | Flag | Effect |
 |---|---|
@@ -598,7 +598,7 @@ opensip-tools plugin sync
 
 There are **two plugin shapes** with different install models:
 
-- **fit/sim packs** (`kind: "fit-pack"` / `"sim-pack"`) are **project-committed**: `add` writes to `.runtime/plugins/<domain>/node_modules/<pkg>/` **and** appends to `plugins.<domain>:` in `opensip-tools.config.yml` so teammates reproduce them via `sync`. `remove` is the inverse.
+- **fit/sim packs** are **project-committed**: `add` writes to `.runtime/plugins/<domain>/node_modules/<pkg>/` **and** appends to `plugins.<domain>:` in `opensip-tools.config.yml` so teammates reproduce them via `sync`. Fit packs declare `kind: "fit-pack"`; sim packs are listed under `plugins.sim:` / `plugins.scenarioPackages:` or discovered by the `scenarios-*` package-name pattern. `remove` is the inverse.
 - **full Tool plugins** (`kind: "tool"`, whole subcommands) **auto-discover by marker — no config entry**. `add` detects the kind before installing (local `package.json`, or `npm view` for a registry spec) and installs **user-global** to `~/.opensip-tools/plugins/tool/` by default (available in every project), or project-local with `--project`. Force the tool path with `--domain tool` when detection can't reach the registry. Because there's no config record, tool plugins are **not** part of `sync`.
 
 **`list`** shows fit/sim packs (installed ∩ config-listed) plus every discovered tool plugin (under the `tool` domain). **`sync`** installs everything declared in the config — the post-clone bootstrap (fit/sim only).

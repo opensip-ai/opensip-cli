@@ -206,8 +206,8 @@ export async function registerFirstPartyTools(
       );
     }
 
-    const manifest = loadToolManifest('bundled', dir);
-    if (manifest === undefined) {
+    const rawManifest = loadToolManifest('bundled', dir);
+    if (rawManifest === undefined) {
       // A bundled tool MUST ship a conformant manifest (the tool-has-manifest
       // guardrail backstops this at CI; at runtime a missing manifest is
       // fail-closed, not a silent skip).
@@ -218,7 +218,7 @@ export async function registerFirstPartyTools(
     }
 
     const result = admitTool({
-      manifest,
+      manifest: rawManifest,
       source: 'bundled',
       dir,
       packageName,
@@ -229,7 +229,7 @@ export async function registerFirstPartyTools(
 
     if (result.decision === 'fail-closed') {
       throw new PluginIncompatibleError(
-        `bundled tool '${manifest.id}' is incompatible: ${result.diagnostic ?? 'compatibility gate rejected it'}`,
+        `bundled tool '${rawManifest.id}' is incompatible: ${result.diagnostic ?? 'compatibility gate rejected it'}`,
         { diagnostic: result.diagnostic },
       );
     }
@@ -237,10 +237,17 @@ export async function registerFirstPartyTools(
       // Should not happen for an in-range bundled tool, but never silently
       // drop a bundled tool — surface it loudly.
       throw new PluginIncompatibleError(
-        `bundled tool '${manifest.id}' was skipped by the compatibility gate: ${result.diagnostic ?? 'unknown reason'}`,
+        `bundled tool '${rawManifest.id}' was skipped by the compatibility gate: ${result.diagnostic ?? 'unknown reason'}`,
         { diagnostic: result.diagnostic },
       );
     }
+    if (result.decision !== 'admit') {
+      throw new PluginIncompatibleError(
+        `bundled tool '${rawManifest.id}' reached an unknown admission decision`,
+        { diagnostic: 'unknown admission decision' },
+      );
+    }
+    const { manifest } = result;
 
     // Load the runtime by DYNAMIC IMPORT — the same path installed tools use.
     // The host holds no static reference to fit/graph/sim (3.0.0). A bundled
@@ -369,7 +376,7 @@ function admitInstalledTool(
     explicitlyRequested: false,
   });
   if (result.decision !== 'admit') return undefined;
-  return { provenance: result.provenance, manifest };
+  return { provenance: result.provenance, manifest: result.manifest };
 }
 
 /**
@@ -517,8 +524,8 @@ export interface AuthoredAdmission {
  *   the tool is compatibility-incompatible.
  */
 function admitAuthoredTool(source: ToolSource, dir: string): AuthoredAdmission {
-  const manifest = loadToolManifest(source, dir);
-  if (manifest === undefined) {
+  const rawManifest = loadToolManifest(source, dir);
+  if (rawManifest === undefined) {
     throw new PluginIncompatibleError(
       `${source} tool at '${dir}' has no conformant ${PROJECT_LOCAL_MANIFEST_FILE} sidecar`,
       { diagnostic: 'manifest missing or malformed' },
@@ -526,7 +533,7 @@ function admitAuthoredTool(source: ToolSource, dir: string): AuthoredAdmission {
   }
 
   const result = admitTool({
-    manifest,
+    manifest: rawManifest,
     source,
     dir,
     // An authored tool (placed in the project tree or the user's home dir) was
@@ -536,11 +543,11 @@ function admitAuthoredTool(source: ToolSource, dir: string): AuthoredAdmission {
   });
   if (result.decision !== 'admit') {
     throw new PluginIncompatibleError(
-      `${source} tool '${manifest.id}' is incompatible: ${result.diagnostic ?? 'compatibility gate rejected it'}`,
+      `${source} tool '${rawManifest.id}' is incompatible: ${result.diagnostic ?? 'compatibility gate rejected it'}`,
       { diagnostic: result.diagnostic },
     );
   }
-  return { provenance: result.provenance, manifest };
+  return { provenance: result.provenance, manifest: result.manifest };
 }
 
 /**

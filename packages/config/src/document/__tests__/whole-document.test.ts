@@ -21,7 +21,7 @@ import type { ToolConfigDeclaration } from '../../declaration.js';
 // Stand-in tool declarations (config cannot import the real tools — upward edge).
 const fakeFitness: ToolConfigDeclaration = {
   namespace: 'fitness',
-  schema: z.object({ failOnErrors: z.number().int().optional() }),
+  schema: z.object({ failOnErrors: z.number().int().optional(), recipe: z.string().optional() }),
 };
 const fakeGraph: ToolConfigDeclaration = {
   namespace: 'graph',
@@ -37,9 +37,9 @@ const WHOLE_DOCUMENT = {
   globalExcludes: ['dist/**'],
   targets: { backend: { description: 'Backend', include: ['src/**'] } },
   checkOverrides: { 'some-check': 'backend' },
-  cli: { recipe: 'example', reportTo: 'https://cloud.test/api' },
+  cli: { reportTo: 'https://cloud.test/api' },
   dashboard: { editor: 'vscode' },
-  fitness: { failOnErrors: 1 },
+  fitness: { failOnErrors: 1, recipe: 'example' },
   graph: { minDuplicateBodyLines: 10 },
 };
 
@@ -49,7 +49,7 @@ describe('composed whole-document validation', () => {
   });
 
   it.each([
-    ['cli', { ...WHOLE_DOCUMENT, cli: { recipe: 'x', reprtTo: 'oops' } }],
+    ['cli', { ...WHOLE_DOCUMENT, cli: { reportTo: 'https://cloud.test/api', reprtTo: 'oops' } }],
     [
       'targets (non-kebab key)',
       { ...WHOLE_DOCUMENT, targets: { Backend: { description: 'x', include: ['a'] } } },
@@ -62,6 +62,15 @@ describe('composed whole-document validation', () => {
     ['graph', { ...WHOLE_DOCUMENT, graph: { minDuplicateBodyLine: 10 } }],
   ])('throws one ConfigurationError on a typo in the %s block', (_label, doc) => {
     expect(() => validateConfigDocument(schema(), doc)).toThrow(ConfigurationError);
+  });
+
+  it('rejects the removed cli.recipe fallback', () => {
+    expect(() =>
+      validateConfigDocument(schema(), {
+        ...WHOLE_DOCUMENT,
+        cli: { reportTo: 'https://cloud.test/api', recipe: 'example' },
+      }),
+    ).toThrow(ConfigurationError);
   });
 
   it('still tolerates a genuinely-unknown top-level key (forward-compat catchall)', () => {

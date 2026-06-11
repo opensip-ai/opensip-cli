@@ -323,7 +323,7 @@
       "audience": [
         "plugin-authors"
       ],
-      "purpose": "Author and publish a fit-pack or sim-pack: workspace package skeleton, the marker contract, four discovery paths, and the migration recipe from loose .mjs files."
+      "purpose": "Author and publish fit packs or sim scenario packs: workspace package skeleton, discovery contracts, and the migration recipe from loose .mjs files."
     },
     {
       "file": "docs/web-generated/50-extend/04-check-pack-architecture.md",
@@ -536,7 +536,7 @@
         "plugin-authors",
         "tool-authors"
       ],
-      "purpose": "What a tool/plugin author must change for the 3.0.0 GA cutover: register() is removed (declare commandSpecs), apiVersion is mandatory. CLI users need no changes."
+      "purpose": "What changes for the 3.0.0 GA cutover: register() is removed (declare commandSpecs), apiVersion is mandatory, and cli.recipe is removed."
     },
     {
       "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",

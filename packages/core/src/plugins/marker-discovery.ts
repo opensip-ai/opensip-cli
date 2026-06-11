@@ -184,9 +184,9 @@ function collectByDeclaredKind(
  * debug — a malformed package.json under node_modules is not a discovery
  * concern, just an entry to skip.
  *
- * Exported as the canonical marker reader: every discovery path (tool,
- * fit-pack, sim-pack, graph-adapter) reads the marker through this one
- * function, so there is no second implementation to drift.
+ * Exported as the canonical host-tool marker reader. Domain markers such as
+ * fit-pack and graph-adapter are descriptor-driven and use the string-typed
+ * `readDeclaredKind` / `discoverPackagesByDeclaredKind` path.
  */
 export function readMarkerKind(packageDir: string): MarkerKind | undefined {
   const kind = readDeclaredKind(packageDir);

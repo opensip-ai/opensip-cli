@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   createCapabilityRegistry,
+  admitTool,
   enterScope,
   loadToolManifest,
   registerCapabilityDomainsFromManifest,
@@ -38,7 +39,17 @@ const ENGINE_DIR = dirname(dirname(dirname(dirname(fileURLToPath(import.meta.url
 function wireFitnessCapabilities(scope: ReturnType<typeof makeTestScope>): void {
   const capabilities = createCapabilityRegistry();
   const manifest = loadToolManifest('bundled', ENGINE_DIR);
-  if (manifest) registerCapabilityDomainsFromManifest(manifest, capabilities);
+  if (manifest) {
+    const result = admitTool({
+      manifest,
+      source: 'bundled',
+      dir: ENGINE_DIR,
+      explicitlyRequested: true,
+    });
+    if (result.decision === 'admit') {
+      registerCapabilityDomainsFromManifest(result.manifest, capabilities);
+    }
+  }
   for (const [domainId, registrar] of Object.entries(fitnessTool.capabilityRegistrars ?? {})) {
     if (capabilities.hasDomain(domainId)) capabilities.setRegistrar(domainId, registrar);
   }

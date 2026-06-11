@@ -293,7 +293,7 @@ Run `opensip-tools fit` to scan your codebase. Default output is a compact summa
 120 Passed, 10 Failed (423 Errors, 227 Warnings) | Duration 8.1s
 ```
 
-Use `--verbose` for detailed violation output. `--findings` remains as a deprecated alias for older scripts.
+Use `--verbose` for detailed violation output.
 
 ### Options
 
@@ -493,10 +493,10 @@ won't need to.
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "peerDependencies": {
-    "@opensip-tools/fitness": "^2.8.0"
+    "@opensip-tools/fitness": "^3.0.0"
   },
   "devDependencies": {
-    "@opensip-tools/fitness": "^2.8.0",
+    "@opensip-tools/fitness": "^3.0.0",
     "typescript": "^5.7.0"
   }
 }

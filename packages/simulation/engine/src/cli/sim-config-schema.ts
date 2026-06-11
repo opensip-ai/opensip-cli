@@ -18,8 +18,7 @@ import type { ToolConfigDeclaration } from '@opensip-tools/config';
 
 /**
  * Zod object for the `simulation:` namespace. The `recipe` field is optional;
- * an absent block means sim falls back to the deprecated `cli.recipe` and then
- * the built-in `default` recipe.
+ * an absent block means sim falls back to the built-in `default` recipe.
  */
 export const SimulationNamespaceSchema = z.object({
   /** Tool-scoped default recipe for `sim` runs (ADR-0022). */

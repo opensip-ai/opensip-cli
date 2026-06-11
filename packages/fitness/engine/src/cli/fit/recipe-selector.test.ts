@@ -24,15 +24,13 @@ beforeEach(() => {
 
 describe('selectRecipe (ADR-0022 tool-scoped + tolerant)', () => {
   it('explicit --recipe wins and resolves a real recipe', () => {
-    expect(
-      selectRecipe({ ...base, recipe: 'backend' }, { toolRecipe: 'default', cliRecipe: 'opensip' }),
-    ).toEqual({
+    expect(selectRecipe({ ...base, recipe: 'backend' }, { toolRecipe: 'default' })).toEqual({
       recipeName: 'backend',
     });
   });
 
   it('explicit unknown --recipe hard-fails (typo protection)', () => {
-    const r = selectRecipe({ ...base, recipe: 'bogus-typo' }, { cliRecipe: 'opensip' });
+    const r = selectRecipe({ ...base, recipe: 'bogus-typo' });
     expect('error' in r && r.error.message).toContain("Unknown recipe 'bogus-typo'");
   });
 
@@ -40,14 +38,9 @@ describe('selectRecipe (ADR-0022 tool-scoped + tolerant)', () => {
     expect(selectRecipe(base, { toolRecipe: 'backend' })).toEqual({ recipeName: 'backend' });
   });
 
-  it('a known cli.recipe fallback resolves (deprecated but honored)', () => {
-    expect(selectRecipe(base, { cliRecipe: 'backend' })).toEqual({ recipeName: 'backend' });
-  });
-
   it('a config-sourced UNKNOWN recipe tolerantly falls back to default (the leak fix)', () => {
-    // cli.recipe: opensip is a fit recipe in the parent repo, but for a project
-    // whose registry lacks it, fit must not abort — it falls back to default.
-    expect(selectRecipe(base, { cliRecipe: 'opensip' })).toEqual({ recipeName: 'default' });
+    // A copied tool-scoped recipe name that is absent from this registry must not
+    // abort — it falls back to default.
     expect(selectRecipe(base, { toolRecipe: 'also-missing' })).toEqual({ recipeName: 'default' });
   });
 
@@ -55,7 +48,7 @@ describe('selectRecipe (ADR-0022 tool-scoped + tolerant)', () => {
     expect(selectRecipe({ ...base, check: 'some-check' }, { toolRecipe: 'backend' })).toEqual({
       recipeName: undefined,
     });
-    expect(selectRecipe({ ...base, tags: 'quality' }, { cliRecipe: 'opensip' })).toEqual({
+    expect(selectRecipe({ ...base, tags: 'quality' }, { toolRecipe: 'backend' })).toEqual({
       recipeName: undefined,
     });
   });

@@ -21,7 +21,6 @@
  * throws.
  */
 
-import { loadCliDefaults } from '@opensip-tools/config';
 import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
 import { currentScope, logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
 
@@ -98,11 +97,10 @@ export function loadGraphConfig(cwd: string, explicitPath?: string): GraphConfig
 
 /**
  * Resolve which recipe NAME a `graph` run should use (ADR-0022), applying the
- * tool-scoped precedence: explicit `--recipe` > `graph.recipe` > deprecated
- * `cli.recipe` > built-in `default`. Reads both the `graph:` block and the
- * `cli:` block and delegates the precedence/tolerance decision to the shared
+ * tool-scoped precedence: explicit `--recipe` > `graph.recipe` > built-in
+ * `default`. Delegates the precedence/tolerance decision to the shared
  * `resolveToolRecipeName`. The caller turns the returned `name` into rules via
- * `resolveRecipeToRules(name, { tolerant })` and warns on a deprecated fallback.
+ * `resolveRecipeToRules(name, { tolerant })`.
  *
  * @param cwd Project root for config resolution.
  * @param explicit The `--recipe <name>` flag value (undefined when absent).
@@ -114,20 +112,8 @@ export function resolveGraphRecipeSelection(
   explicitPath?: string,
 ): ResolvedRecipe {
   const graphConfig = loadGraphConfig(cwd, explicitPath);
-  const cliDefaults = loadCliDefaults(cwd, explicitPath);
-  const resolved = resolveToolRecipeName({
+  return resolveToolRecipeName({
     explicit,
     toolRecipe: graphConfig.recipe,
-    // eslint-disable-next-line sonarjs/deprecation -- ADR-0022: cli.recipe is deprecated but deliberately read here as the cross-tool FALLBACK; resolveToolRecipeName ranks it last and the fitness check drives migration.
-    cliRecipe: cliDefaults.recipe,
   });
-  if (resolved.usedDeprecatedCliRecipe) {
-    logger.warn({
-      evt: 'graph.recipe.cli_recipe_deprecated',
-      module: 'graph:config',
-      recipe: resolved.name,
-      msg: `cli.recipe is deprecated (ADR-0022); set graph.recipe instead. Using '${resolved.name}' as a fallback for graph.`,
-    });
-  }
-  return resolved;
 }

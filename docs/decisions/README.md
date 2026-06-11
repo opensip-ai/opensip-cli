@@ -143,10 +143,10 @@ distinct from:
 - [ADR-0022](./ADR-0022-tool-scoped-recipe-defaults.md) — Recipe defaults are
   tool-scoped: each tool reads `<tool>.recipe` from its own config block
   (recipe namespaces are disjoint), with precedence `--recipe` flag >
-  `<tool>.recipe` > deprecated `cli.recipe` > built-in `default`. A
-  config-sourced unknown recipe falls back to the tool's `default` (warn); an
-  explicit `--recipe` typo still hard-fails. Fixes a fit recipe default leaking
-  into `graph`/`sim`; `cli-recipe-deprecated` check drives migration
+  `<tool>.recipe` > built-in `default`. A config-sourced unknown recipe falls
+  back to the tool's `default` (warn); an explicit `--recipe` typo still
+  hard-fails. Fixes a fit recipe default leaking into `graph`/`sim`; the 3.0.0
+  config schema rejects the removed `cli.recipe` fallback
 - [ADR-0023](./ADR-0023-config-package-and-schema-registry.md) — A dedicated
   `@opensip-tools/config` package owns the config composer (namespaced Zod
   schemas → one validated whole-document schema, strict, with JSON-Schema

@@ -24,6 +24,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`fit --findings` removed.** The deprecated alias of `--verbose` (ADR-0021),
   kept through the 2.x line, is gone as of 3.0.0 — use `--verbose` / `-v`.
+- **`cli.recipe` removed.** The deprecated cross-tool recipe fallback from
+  ADR-0022 is gone as of 3.0.0. Move defaults to `fitness.recipe`,
+  `graph.recipe`, or `simulation.recipe`; the strict config schema now rejects a
+  remaining `cli.recipe` key.
 
 ### Fixed
 
@@ -52,23 +56,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pack holds only framework-agnostic checks. Consumers previously recipe-excluding
   these no longer need to.
 
-## [3.0.0] — 2026-06-08
+## [3.0.0] — 2026-06-12
 
 **GA — the tool-plugin parity cutover.** The platform's single acceptance test
 (north-star §1) now answers **yes**: a first-party tool loads through the plugin
 path with behaviour identical to the bundled build. The privileged first-party
-paths the 2.x ladder built *alongside* the parity planes are removed, so the only
+paths the 2.x ladder built _alongside_ the parity planes are removed, so the only
 thing distinguishing a bundled tool from an installed or project-local one is its
 **source of installation, never its lifecycle** (ADR-0027, realizing ADR-0012's
 3.0.0 reservation). All nine §8 completion invariants are live guardrails
 (`docs/internal/parity-invariant-index.md`).
 
-> **CLI users: nothing changes.** Every command, flag, `--json` shape (the 2.12.0
-> `CommandOutcome`), config file, and exit code is byte-identical to 2.13.0. The
-> breaking changes below are **author-facing only** — see
+> **Most CLI users: nothing changes.** Every command, flag, `--json` shape (the
+> 2.12.0 `CommandOutcome`), exit code, dashboard, and session shape is
+> byte-identical to 2.13.0. Projects that still set `cli.recipe` must move that
+> value under the owning tool block. See
 > [Migrating to 3.0](docs/public/70-reference/11-migrating-to-3.0.md).
 
-### Removed (BREAKING — plugin authors)
+### Removed (BREAKING)
 
 - **`Tool.register()` and the raw-Commander `program` handle** are gone from the
   tool contract. A tool declares typed `commandSpecs` and the host mounts them —
@@ -78,6 +83,9 @@ thing distinguishing a bundled tool from an installed or project-local one is it
 - **The `apiVersion` grace window.** A tool declaring no `apiVersion` is no longer
   admitted off the `kind:'tool'` marker alone — it fail-closes (explicitly run) or
   is skipped with a diagnostic (discovered). Declare `apiVersion` in the manifest.
+- **`cli.recipe` fallback.** Recipe defaults are now only tool-scoped:
+  `fitness.recipe`, `graph.recipe`, or `simulation.recipe`. A remaining
+  `cli.recipe` key is rejected by strict config validation.
 
 ### Changed
 
@@ -294,7 +302,7 @@ with a single sanctioned exception (below). Output currency stays handler-owned
 ## [2.10.1] — 2026-06-07
 
 **Config consolidation.** The fast-follow to 2.10.0 relocates the scattered
-*tool-agnostic* configuration into `@opensip-tools/config`, so the whole
+_tool-agnostic_ configuration into `@opensip-tools/config`, so the whole
 `opensip-tools.config.yml` document is defined, validated, and templated from one
 place. Hygiene + consolidation, no new behaviour beyond the strict validation
 2.10.0 introduced. See
@@ -350,7 +358,7 @@ release — there is no separate 2.9.0.) See
 > `opensip-tools.config.yml` (`graph:`, `fitness:`, `simulation:`) is validated
 > against a composed schema before a command runs; an **unknown key inside a tool
 > block now fails** (e.g. a typo'd knob) instead of silently defaulting. Unknown
-> *top-level* blocks (`cli:`, `targets:`, …) still pass through — they migrate in
+> _top-level_ blocks (`cli:`, `targets:`, …) still pass through — they migrate in
 > 2.10.1. CLI commands, flags, and `--json` output are otherwise unchanged.
 
 ### Added
@@ -424,7 +432,7 @@ per-tool keys (see below).
 ### Fixed
 
 - **`opensip-tools graph` (and `sim`) no longer abort with `Unknown graph
-  recipe '<name>'`** when a project sets a `fit` recipe as the (formerly
+recipe '<name>'`** when a project sets a `fit` recipe as the (formerly
   tool-agnostic) `cli.recipe` default. Each tool now resolves its own recipe and
   tolerates a config default it doesn't recognize.
 
@@ -441,8 +449,7 @@ fitness:
   recipe: my-fit-recipe
 ```
 
-`cli.recipe` continues to work until removed; the `cli-recipe-deprecated` check
-will remind you.
+`cli.recipe` continued to work through the 2.x line; it is removed in 3.0.0.
 
 ## [2.7.1] — 2026-06-06
 
@@ -518,9 +525,9 @@ release.
 
 - **Signals are the universal output currency (ADR-0011).** `--json` now emits a
   `SignalEnvelope` (`schemaVersion: 2`): `signals[]` + `verdict { score, passed,
-  summary }` + `units[]`, identical across `fit` / `sim` / `graph`. A `fit`
-  check, a `graph` rule, and a `sim` scenario are all **units** that *produce
-  signals*. See the
+summary }` + `units[]`, identical across `fit` / `sim` / `graph`. A `fit`
+  check, a `graph` rule, and a `sim` scenario are all **units** that _produce
+  signals_. See the
   [JSON output schema](docs/public/70-reference/04-json-output-schema.md).
 - **`@opensip-tools/tree-sitter` package (ADR-0010).** The new canonical
   tree-sitter parse substrate: wraps `web-tree-sitter` and hosts the relocated
@@ -600,7 +607,7 @@ OpenSIP Cloud signal sync, a two-audit remediation pass, and packaging polish.
 
 ### Fixed
 
-- **sim `--kind` no longer runs filtered-out scenarios.** It narrowed *after*
+- **sim `--kind` no longer runs filtered-out scenarios.** It narrowed _after_
   execution, so `--kind invariant` still ran load/chaos scenarios (with their
   side effects) and merely hid them; an invalid `--kind` ran everything. Now it
   filters before execution and fails fast on an unknown kind.
@@ -813,7 +820,7 @@ Five new structural graph rules ship on a new engine feature layer. See
   remaining false positives; `test-only-reachable` is unchanged.
 - **Blast radius is now a dashboard insight, not a gate rule.** The Hot
   Functions view ranks by the composite blast score (`direct + 0.5 ×
-  transitive`); the engine no longer emits per-function blast warnings.
+transitive`); the engine no longer emits per-function blast warnings.
 - **Duplicated code consolidated into shared homes:** language comment/string
   stripping → `@opensip-tools/core` `makeStripper`; plugin-discovery
   primitives → core; check-pack path/display helpers → the fitness engine;
@@ -952,7 +959,7 @@ Five new structural graph rules ship on a new engine feature layer. See
   packages, the single-core guard (2.3.1) refuses the project-local packs. That
   case now reports a single consolidated warning naming every skipped pack
   (instead of one paragraph per pack), and suppresses the misleading "install a
-  checks-* package" trailer — the packs ARE installed; they were refused.
+  checks-\* package" trailer — the packs ARE installed; they were refused.
 - **Mini banner refresh.** The coffee cup now reads as a branded to-go cup: the
   steam and lid render in the terminal's default foreground (≈white on dark,
   auto-contrast on light, colorless under `NO_COLOR`) while the cup body and
@@ -997,13 +1004,13 @@ are unchanged.
   shown across all commands, carrying `www.opensip.ai`. When a newer version
   is published to npm, it surfaces an inline "update available" notice with
   the exact upgrade command beneath the banner. The update-notifier no longer
-  nags on a local build that is *ahead* of the published version.
+  nags on a local build that is _ahead_ of the published version.
 - **`graph-catalog-export` and `graph-sarif-export` subcommands.** Catalog
   emission (previously reachable only as a `graph --catalog-output` mode)
   and OpenSIP-convention SARIF file output now have dedicated subcommands
   matching the `@opensip/code-intelligence` engine-subprocess contract.
   `catalog-export` takes `--catalog-output --tenant-id --repo-id --git-sha
-  --run-id --mode <initial|incremental> [--changed-file …]`; `sarif-export`
+--run-id --mode <initial|incremental> [--changed-file …]`; `sarif-export`
   takes `--output-sarif --tenant-id --repo-id --run-id`. Existing `graph`
   usage is unaffected.
 - **OpenTelemetry now covers the sharded (multi-package) build.** Previously
@@ -1106,7 +1113,7 @@ source behavior changes — this release exists only to repair a broken
 
 - **`opensip-tools` crashed on startup under 2.0.0** with
   `SyntaxError: The requested module '@opensip-tools/cli-ui' does not
-  provide an export named 'RunFooterHints'`. The 2.0.0 release was
+provide an export named 'RunFooterHints'`. The 2.0.0 release was
   non-atomic: `@opensip-tools/cli-ui@2.0.0` was published from an
   earlier build that predated the `RunFooterHints` export, while
   `@opensip-tools/fitness@2.0.0` (published ~11h later) imported it.
@@ -1197,7 +1204,7 @@ and breaks compatibility with v1.x runtime layouts.
   update to `--check context-mutation`. No alias.
 - **`PluginResult` discriminator lifted to `type`.** Plugin command
   results now use `type: 'plugin-list' | 'plugin-add' | 'plugin-remove'
-  | 'plugin-sync'` directly, instead of `type: 'plugin'` with an inner
+| 'plugin-sync'` directly, instead of `type: 'plugin'` with an inner
   `action` field. External consumers of `--json` output that switch on
   `result.type === 'plugin'` must update to one of the four new literals.
 
@@ -1257,9 +1264,9 @@ and breaks compatibility with v1.x runtime layouts.
   walking up to find some other ancestor's config.
 - **`@opensip-tools/datastore` package** — paradigm-agnostic SQLite +
   Drizzle persistence layer. Houses the `DataStore` interface, SQLite
-  + in-memory backends, factory, and the workspace-wide migration
-  store (`migrations/`). Tools own their domain schemas (sessions in
-  contracts; baseline/catalog in graph; baseline in fitness).
+  - in-memory backends, factory, and the workspace-wide migration
+    store (`migrations/`). Tools own their domain schemas (sessions in
+    contracts; baseline/catalog in graph; baseline in fitness).
 - **`@opensip-tools/dashboard` package** — extracted from contracts
   (see Changed). Holds `generateDashboardHtml`, the `DashboardInput`
   options shape, the ranked-view template, and the tab activator
@@ -1339,9 +1346,9 @@ and breaks compatibility with v1.x runtime layouts.
 - **`generateDashboardHtml` is now an options-object call.** The
   legacy positional signature
   (`generateDashboardHtml(sessions, checkCatalog, recipeCatalog,
-  graphCatalog, editorProtocol)`) is gone; the new signature is
+graphCatalog, editorProtocol)`) is gone; the new signature is
   `generateDashboardHtml({ sessions, checkCatalog?, recipeCatalog?,
-  graphCatalog?, editorProtocol? })`. `DashboardInput` is exported
+graphCatalog?, editorProtocol? })`. `DashboardInput` is exported
   from the package barrel so future tool-shaped data extends the
   interface instead of growing positional parameters.
 - **Dashboard ranked views adopt a shared `defineRankedView` helper.**
@@ -1477,6 +1484,7 @@ catalog output is byte-identical pre vs. post refactor.
   `test-only-reachable`, medium for `always-throws-branch`.
   Detected automatically when a project has more `.py` than `.ts`
   files; `pickAdapter()` resolves ties by language preference (TS
+
   > Python > Rust).
 
 - **Rust adapter**. Tree-sitter parser, name-based + impl-block
@@ -1779,7 +1787,7 @@ heap.
   declared safe call site despite the recipe authoring them.
 
   The fix hoists the slot onto a `Symbol.for('@opensip-tools/fitness/
-  currentRecipeCheckConfig')` entry on `globalThis`, so every loaded
+currentRecipeCheckConfig')` entry on `globalThis`, so every loaded
   copy reads + writes the same well-known slot regardless of which
   package instance imported the module. The single-session contract
   (recipe service throws SESSION_IN_PROGRESS for concurrent runs) is
@@ -1819,13 +1827,13 @@ without losing real-bug coverage; regression tests pin the FP cases.
 
 - **`sql-injection`** (`@opensip-tools/checks-typescript`)
   - `SQL_CLAUSE_PATTERN` was case-insensitive — `/\b(?:WHERE|AND|OR|
-    SET|VALUES)\b/i` matched the English words "and"/"or"/"set"/"where"
+SET|VALUES)\b/i` matched the English words "and"/"or"/"set"/"where"
     inside CLI help text (`cli.info('Usage: ...\n' + '...and continues
-    here\n')`), producing one error per concatenated help-string. Now
+here\n')`), producing one error per concatenated help-string. Now
     case-sensitive; real SQL conventionally uppercases these.
   - Arm-3 (right-side string + clause keyword) now requires the SAME
     `+` chain to contain a real SQL keyword (`SELECT|INSERT|UPDATE|
-    DELETE|...`) somewhere. Closes the residual FP where uppercase
+DELETE|...`) somewhere. Closes the residual FP where uppercase
     "AND" appears in non-SQL text.
   - Both template-literal and concat arms now skip arguments to
     output methods (`cli.info`, `console.log`, `logger.warn`, …).
@@ -1847,9 +1855,9 @@ without losing real-bug coverage; regression tests pin the FP cases.
   - Matched secret patterns inside REGEX LITERALS (the file IS the
     redactor — `[/-----BEGIN PRIVATE KEY-----.../g, replacement]`)
     and inside REDACTION PLACEHOLDERS (`'-----BEGIN PRIVATE KEY-----
-    ***-----END PRIVATE KEY-----'`). Now adds two filters:
+***-----END PRIVATE KEY-----'`). Now adds two filters:
     `isInsideRegexLiteral(line, pos)` and `lineHasRedactionPlaceholder
-    (line)` — the latter scans the whole line for `***`, `[REDACTED]`,
+(line)` — the latter scans the whole line for `***`, `[REDACTED]`,
     `<REDACTED>`, or `XXXX+` runs, since the project-defined patterns
     typically only match the header (e.g. `-----BEGIN PRIVATE KEY-----`)
     and the redacted value follows.
@@ -1860,7 +1868,7 @@ without losing real-bug coverage; regression tests pin the FP cases.
   - Reported "Malformed ESLint suppression comment" for rationales
     between 401 and 500 characters. The disable-pattern regex
     accepted bodies up to 500 chars (matching `MAX_JUSTIFICATION_
-    LENGTH`) but the rationale-extraction regex capped at 400 — so
+LENGTH`) but the rationale-extraction regex capped at 400 — so
     rationales in the 401–500 window matched the outer pattern but
     failed the inner parse, producing the wrong error message
     instead of the accurate "too long" one. Now both bounds are 500.
@@ -1914,7 +1922,7 @@ releases listed further down are the actual public history.
   by the CLI on startup; the walker matches Node's nearest-ancestor
   resolution.
 - **Layered architecture enforced by dependency-cruiser.** core →
-  contracts → fitness / simulation / lang-* (peers) → checks-* → cli.
+  contracts → fitness / simulation / lang-_ (peers) → checks-_ → cli.
   Forbidden edges fail CI.
 
 ### Packages (17)
@@ -2158,14 +2166,14 @@ reduce noise.
 - The deprecated `contentFilter: 'code-only'` and
   `contentFilter: 'no-strings-no-comments'` aliases are removed.
   Migrate to the canonical names introduced in 0.4.0:
-  - `'code-only'`              → `'strip-strings'`
+  - `'code-only'` → `'strip-strings'`
   - `'no-strings-no-comments'` → `'strip-strings-and-comments'`
-  Mapping is mechanical — same dispatch, same behaviour, just the
-  spelling changes.
+    Mapping is mechanical — same dispatch, same behaviour, just the
+    spelling changes.
 
   Consumers of `@opensip-tools/core` who passed either old name to
   `defineCheck({ contentFilter, ... })` or to `createFileAccessor(...,
-  { contentFilter })` will see a TypeScript narrowing error and a Zod
+{ contentFilter })` will see a TypeScript narrowing error and a Zod
   validation rejection at runtime.
 
   Why now: `code-only` described intent, not behaviour, and the
@@ -2312,8 +2320,8 @@ allowed code outside the plugin directory to be loaded and executed:
   plugins, surfacing install activity and per-domain failures in
   structured logs.
 
-
 ### Added
+
 - Ink-based CLI rendering with themed components (React for terminals)
 - Commander.js for argument parsing with auto-generated `--help`
 - `opensip-tools dashboard` — top-level HTML report command
@@ -2336,6 +2344,7 @@ allowed code outside the plugin directory to be loaded and executed:
 - ULID-based ID generation (`generatePrefixedId()`, `extractTimestamp()`)
 
 ### Changed
+
 - CLI output layer migrated from raw console.log to Ink components
 - Default `fit` output is now a single summary line (was full table)
 - Score and PASS/FAIL removed from summary — data speaks for itself
@@ -2347,6 +2356,7 @@ allowed code outside the plugin directory to be loaded and executed:
 - Missing tool detection: shows "{tool} is not installed" instead of cryptic errors
 
 ### Removed
+
 - `opensip-tools asm` command and `@opensip-tools/assess` package
 - 28 OpenSIP-specific fitness checks (moved to community plugin)
 - 6 OpenSIP-specific tool checks (hardcoded paths)

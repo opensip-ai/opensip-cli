@@ -106,7 +106,7 @@ describe('composeAndValidateToolConfig', () => {
     // validate through the composed schema; a truly-unclaimed top-level key
     // still rides the document `.catchall`.
     const configPath = writeConfig(
-      'cli:\n  recipe: example\ntargets:\n  app:\n    description: App\n    include: ["src/**"]\nfutureThing:\n  whatever: 1\n',
+      'cli:\n  verbose: true\ntargets:\n  app:\n    description: App\n    include: ["src/**"]\nfutureThing:\n  whatever: 1\n',
     );
     expect(() =>
       composeAndValidateToolConfig({
@@ -115,6 +115,17 @@ describe('composeAndValidateToolConfig', () => {
         env: {},
       }),
     ).not.toThrow();
+  });
+
+  it('strict-rejects the removed cli.recipe fallback', () => {
+    const configPath = writeConfig('cli:\n  recipe: example\n');
+    expect(() =>
+      composeAndValidateToolConfig({
+        tools: registryWith([graphTool, fitnessTool]),
+        configPath,
+        env: {},
+      }),
+    ).toThrow(ConfigurationError);
   });
 
   it('strict-rejects a malformed claimed host block (a target missing its description)', () => {

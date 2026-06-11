@@ -9,7 +9,7 @@ import {
   CapabilityRegistry,
   registerCapabilityDomainsFromManifest,
 } from '../capability-registry.js';
-import { loadToolManifest } from '../manifest-loader.js';
+import { admitTool, loadToolManifest } from '../manifest-loader.js';
 import { MARKER_KINDS } from '../marker-discovery.js';
 
 let testDir: string;
@@ -32,6 +32,21 @@ function fixturePackageJson(capabilities: unknown): object {
       capabilities,
     },
   };
+}
+
+function loadAdmittedManifest() {
+  const raw = loadToolManifest('installed', testDir);
+  expect(raw).toBeDefined();
+  if (raw === undefined) throw new Error('expected raw manifest');
+  const result = admitTool({
+    manifest: raw,
+    source: 'installed',
+    dir: testDir,
+    explicitlyRequested: true,
+  });
+  expect(result.decision).toBe('admit');
+  if (result.decision !== 'admit') throw new Error('expected admitted manifest');
+  return result.manifest;
 }
 
 beforeEach(() => {
@@ -115,8 +130,7 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
         },
       ]),
     );
-    const manifest = loadToolManifest('installed', testDir);
-    expect(manifest).toBeDefined();
+    const manifest = loadAdmittedManifest();
 
     // The new domain id is NOT in the compiled marker vocabulary — proving
     // discovery is additive and not gated by the enum.
@@ -147,8 +161,8 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
         { id: 'd2', apiVersion: 1, contributionSchema: {}, contributionKind: 'manifest-entry' },
       ]),
     );
-    const manifest = loadToolManifest('installed', testDir);
-    registerCapabilityDomainsFromManifest(manifest!, new CapabilityRegistry());
+    const manifest = loadAdmittedManifest();
+    registerCapabilityDomainsFromManifest(manifest, new CapabilityRegistry());
 
     const evts = infoSpy.mock.calls
       .map((c) => c[0] as Record<string, unknown>)
@@ -165,12 +179,13 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
       opensipTools: {
         kind: 'tool',
         id: 'audit',
+        apiVersion: 1,
         commands: [{ name: 'audit', description: 'Run audit rules' }],
       },
     });
-    const manifest = loadToolManifest('installed', testDir);
+    const manifest = loadAdmittedManifest();
     const registry = new CapabilityRegistry();
-    expect(registerCapabilityDomainsFromManifest(manifest!, registry)).toEqual([]);
+    expect(registerCapabilityDomainsFromManifest(manifest, registry)).toEqual([]);
     expect(registry.listDomains()).toEqual([]);
   });
 
@@ -186,9 +201,9 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
         },
       ]),
     );
-    const manifest = loadToolManifest('installed', testDir);
+    const manifest = loadAdmittedManifest();
     const registry = new CapabilityRegistry();
-    registerCapabilityDomainsFromManifest(manifest!, registry);
+    registerCapabilityDomainsFromManifest(manifest, registry);
 
     // Schema is unconstrained ({}), so it passes validation and reaches the
     // deferred registrar, which throws until the owning tool wires its real one.

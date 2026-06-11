@@ -50,7 +50,6 @@ describe('loadCliDefaults', () => {
   it('parses scalar string and boolean fields', () => {
     const reportPath = join(testDir, 'report.json');
     writeConfig(`cli:
-  recipe: example
   verbose: true
   json: false
   reportTo: ${reportPath}
@@ -58,7 +57,6 @@ describe('loadCliDefaults', () => {
   debug: true
 `);
     expect(loadCliDefaults(testDir)).toEqual({
-      recipe: 'example',
       verbose: true,
       json: false,
       reportTo: reportPath,
@@ -87,7 +85,6 @@ describe('loadCliDefaults', () => {
 
   it('drops fields with the wrong type', () => {
     writeConfig(`cli:
-  recipe: 123
   verbose: "yes"
   exclude: not-an-array
   fileTypes:
@@ -95,8 +92,6 @@ describe('loadCliDefaults', () => {
     - 7
 `);
     const out = loadCliDefaults(testDir);
-    // eslint-disable-next-line sonarjs/deprecation -- exercising the deprecated cli.recipe parser (ADR-0022); the loader must still read it.
-    expect(out.recipe).toBeUndefined();
     expect(out.verbose).toBeUndefined();
     expect(out.exclude).toBeUndefined();
     // fileTypes is dropped because one element is not a string.
@@ -107,10 +102,9 @@ describe('loadCliDefaults', () => {
     const customDir = mkdtempSync(join(tmpdir(), 'opensip-custom-'));
     try {
       const customPath = join(customDir, 'custom.yml');
-      writeFileSync(customPath, 'cli:\n  recipe: from-custom\n');
+      writeFileSync(customPath, 'cli:\n  verbose: true\n');
       const out = loadCliDefaults(testDir, customPath);
-      // eslint-disable-next-line sonarjs/deprecation -- exercising the deprecated cli.recipe parser (ADR-0022); the loader must still read it.
-      expect(out.recipe).toBe('from-custom');
+      expect(out.verbose).toBe(true);
     } finally {
       rmSync(customDir, { recursive: true, force: true });
     }

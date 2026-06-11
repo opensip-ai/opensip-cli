@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v2.8.0
+release: v3.0.0
 title: "Adding a language to graph"
 audience: [contributors, plugin-authors]
 purpose: "Step-by-step guide for writing a new GraphLanguageAdapter — C/C++, or anything else — without touching the engine."
@@ -78,11 +78,9 @@ packages/graph/graph-<id>/
                           (+ graph-adapter-common + web-tree-sitter for
                           tree-sitter adapters); `files` includes `wasm` }
                         (the `@opensip-tools/graph-*` name prefix is
-                        what the discovery walker keys off; first-party
-                        packages also include
-                        `opensipTools: { kind: "graph-adapter" }` as a
-                        descriptive marker, but it is not currently
-                        consulted by the discovery walker)
+                        the first-party naming convention; default
+                        discovery consults the
+                        `opensipTools: { kind: "graph-adapter" }` marker)
   tsconfig.json
   src/
     discover.ts      — discoverFiles implementation (reads pyproject.toml / Cargo.toml / go.mod / etc.)
@@ -168,6 +166,7 @@ First-party and third-party adapters use the same registration path: ship a pack
   "name": "@opensip-tools/graph-cpp",
   "main": "dist/index.js",
   "files": ["dist", "wasm"],
+  "opensipTools": { "kind": "graph-adapter" },
   "dependencies": {
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/graph": "workspace:*",
@@ -177,7 +176,7 @@ First-party and third-party adapters use the same registration path: ship a pack
 }
 ```
 
-(First-party packages also include `"opensipTools": { "kind": "graph-adapter" }` as a descriptive marker. It is forward-compatible metadata only — the discovery walker does not currently consult it.)
+The `opensipTools.kind` marker is what default graph-adapter discovery consults. An explicit `plugins.graphAdapters:` list can pin the adapter set instead.
 
 ```ts
 // packages/graph/graph-cpp/src/index.ts

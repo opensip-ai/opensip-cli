@@ -5,7 +5,7 @@
  *
  * Per north-star Principle 6, the guardrail is the definition of done: this
  * check is what prevents the next release from re-accumulating the
- * undeclared-input drift 2.8.0 paid down. A tool that the host admits through
+ * undeclared-input drift the 2.x ladder paid down. A tool that the host admits through
  * the single compatibility gate (`admitTool` in core) must first be readable
  * as a static `ToolPluginManifest` — `package.json#opensipTools` with
  * `kind:'tool'`, a non-empty `id`, a numeric `apiVersion`, and a non-empty
@@ -98,7 +98,7 @@ function checkManifestBlock(block: OpensipToolsBlock, filePath: string): CheckVi
       suggestion:
         'A first-party tool must declare a conformant manifest the host can read ' +
         'before importing it: { kind: "tool", id: "<id>", apiVersion: <number>, ' +
-        'commands: [{ name, description }, ...] } (release 2.8.0).',
+        'commands: [{ name, description }, ...] } (release 3.0.0).',
       type: `manifest-${field}`,
     });
   };
@@ -164,7 +164,7 @@ export const toolHasManifest = defineCheck({
   id: 'f1427a05-0d4d-4ad7-9077-c04292b630dc',
   slug: 'tool-has-manifest',
   description:
-    'Every first-party tool package must declare a conformant opensipTools manifest (kind/id/apiVersion/commands) the host can read before import (release 2.8.0)',
+    'Every first-party tool package must declare a conformant opensipTools manifest (kind/id/apiVersion/commands) the host can read before import (release 3.0.0)',
   scope: { languages: ['typescript'], concerns: ['config'] },
   tags: ['architecture'],
   contentFilter: 'raw',

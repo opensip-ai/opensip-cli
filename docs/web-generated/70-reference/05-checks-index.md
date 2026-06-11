@@ -20,22 +20,21 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **167+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **166+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(109 checks)*
+## Universal  *(108 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(30)*
+### Architecture  *(29)*
 
 | Slug | Description |
 |---|---|
 | [`capability-by-manifest`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/capability-by-manifest.ts) | A capability domain must be declared in a tool manifest and registered via registerCapabilityDomainsFromManifest, not host-compiled (ADR-0023, §5.3) |
-| [`cli-recipe-deprecated`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/cli-recipe-deprecated.ts) | Flag the deprecated tool-agnostic cli.recipe default; recipes are tool-scoped (ADR-0022) |
 | [`command-surface-parity`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/command-surface-parity.ts) | Every tool command resolves to a typed CommandSpec; no raw Commander access from a tool (release 2.11.0 command plane, Principle 6) |
 | [`cross-tool-flag-parity`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/cross-tool-flag-parity.ts) | Cross-tool common CLI flags must come from the shared registry, not be hand-declared (ADR-0021) |
 | [`docker-ignore-validation`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-ignore-validation.ts) | Validate .dockerignore files exist alongside Dockerfiles with required patterns |
@@ -61,7 +60,7 @@ Language-agnostic; runs against every project.
 | [`restrict-raw-db-access`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/restrict-raw-db-access.ts) | Confine the raw Drizzle handle (DataStore.db) to the persistence ownership boundary (ADR-0009) |
 | [`same-recipe-semantics`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/same-recipe-semantics.ts) | Recipe execution must run on the shared substrate; no per-tool scheduler reimplementation (§5.8/§4.3) |
 | [`stale-build-artifacts`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/stale-build-artifacts.ts) | Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/ |
-| [`tool-has-manifest`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-has-manifest.ts) | Every first-party tool package must declare a conformant opensipTools manifest (kind/id/apiVersion/commands) the host can read before import (release 2.8.0) |
+| [`tool-has-manifest`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-has-manifest.ts) | Every first-party tool package must declare a conformant opensipTools manifest (kind/id/apiVersion/commands) the host can read before import (release 3.0.0) |
 | [`vitest-config-extends-base`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-extends-base.ts) | Per-package vitest configs must extend the shared .config/vitest.base (when one exists) |
 | [`vitest-config-required-with-tests`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-required-with-tests.ts) | Ensures packages with tests have a vitest.config at the package root |
 

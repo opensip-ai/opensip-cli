@@ -35,8 +35,8 @@ These checks serve two audiences:
   does." A reader landing here is learning the pattern, not
   reviewing the implementation.
 - **Tests:** project-local checks don't get a per-file Vitest
-  config. Coverage comes from the integration test at
-  `packages/fitness/checks-typescript/src/__tests__/dogfood-integration.test.ts`.
+  config. Coverage comes from the dogfood `pnpm fit:ci` gate, which
+  auto-loads these files through the project-local plugin path.
 - **Slug naming:** project-local checks that demonstrate patterns also
   shipped as first-party (e.g. `no-focused-tests`, `no-console-log`
   exist in `@opensip-tools/checks-universal`) must use a distinct

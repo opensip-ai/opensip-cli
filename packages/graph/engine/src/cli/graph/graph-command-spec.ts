@@ -124,8 +124,8 @@ async function dispatchGraphLiveView(
   setUpGraphLiveView(cli);
   // Resolve the recipe here (the handler runs inside the entered RunScope
   // via the pre-action hook) for parity with `executeGraph`: tool-scoped
-  // precedence (`--recipe` > `graph.recipe` > deprecated `cli.recipe` >
-  // `default`, ADR-0022), with config-sourced unknown names tolerantly
+  // precedence (`--recipe` > `graph.recipe` > `default`, ADR-0022), with
+  // config-sourced unknown names tolerantly
   // falling back to `default` and explicit-flag typos still hard-failing.
   const recipeSelection = resolveGraphRecipeSelection(opts.cwd, opts.recipe);
   // Resolve the build engine HERE, on the dispatch seam — `resolveLiveEngineShards`

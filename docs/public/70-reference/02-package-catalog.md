@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-11
+release: v3.0.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-concepts/03-modular-monolith.md."
@@ -29,11 +29,15 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 |---|---|---|---|
 | `@opensip-tools/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, per-invocation execution scope | `Tool`, `ToolRegistry`, `LanguageAdapter`, `LanguageRegistry`, `RunScope`, `runWithScope`, `currentScope`, `Registry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `logger`, `ToolError`, `ValidationError` |
 
-## Layer 2 — datastore, contracts, session-store, output, and tree-sitter
+## Layer 2 — datastore, config, contracts, session-store, output, and tree-sitter
 
 `@opensip-tools/datastore` is the SQLite + Drizzle persistence kernel; it sits between `core` and the rest of this layer and depends only on `core`. Tools and `session-store` own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness). Adding a new tool means adding a new schema module — datastore is paradigm-agnostic infrastructure.
 
 `@opensip-tools/contracts` defines the contract layer between Tools and the runner — the `SignalEnvelope` output shape every tool returns, exit codes, the cross-tool `StoredSession` type, and the `GraphCatalog` surface. A types-and-constants package (no runtime persistence or rendering). Imports `core` only.
+
+`@opensip-tools/config` owns the composed, strict project-config document schema
+and namespace registry (ADR-0023). Tools contribute their own namespace schemas;
+the host validates one whole document before dispatch.
 
 `@opensip-tools/session-store` owns session persistence (the `SessionRepo` runtime and the sessions schema). `@opensip-tools/output` (renamed from `@opensip-tools/reporting`, ADR-0011) owns all machine output: pure `(envelope) => string` formatters under `format/` (json, sarif, table) and effectful delivery `sink/`s (cloud egress, entitlement). Both are Layer 2 siblings consumed by the tools above — though tools no longer import the formatters/sinks directly (the composition root does; see the dep-cruiser rules in [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md)).
 
@@ -42,6 +46,7 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 | Package | Path | Role | Key exports |
 |---|---|---|---|
 | `@opensip-tools/datastore` | `packages/datastore/` | SQLite + Drizzle persistence kernel — `DataStore` interface, factory, in-memory + on-disk backends, workspace migration store under `migrations/` | `DataStore`, `DataStoreFactory`, `DataStoreOpenOptions`, `DataStoreMigrationError` |
+| `@opensip-tools/config` | `packages/config/` | Project-config schema composer and document loaders — validates host-owned blocks plus tool-contributed namespaces as one strict document before dispatch | `composeProjectConfigSchema`, `registerConfigSchema`, `loadProjectConfig`, `loadCliDefaults`, `projectConfigSchema` |
 | `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — the `SignalEnvelope`/`CommandResult` shapes, exit codes, the cross-tool `StoredSession` type, `GraphCatalog` surface | `SignalEnvelope`, `RunVerdict`, `UnitResult`, `buildSignalEnvelope`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `StoredSession`, `GraphCatalog` |
 | `@opensip-tools/session-store` | `packages/session-store/` | Session persistence — `SessionRepo` runtime over the (package-internal) `sessions`/`session_tool_payload` schema, session-id helpers. Depends on `core`, `datastore`, `contracts` | `SessionRepo`, `SessionListOptions`, `generateSessionId`, `sanitizeForFilename` |
 | `@opensip-tools/output` | `packages/output/` | Machine output layer (renamed from `@opensip-tools/reporting`, ADR-0011): pure `format/` formatters + effectful `sink/` delivery. Depends on `core`, `contracts` | `formatSignalJson`, `formatSignalSarif`, `buildOpenSipSarif`, `formatSignalTableRows`, `formatSignalTableSummary`, `Formatter`, `postChunked`, `createCloudSignalSink`, `resolveSignalSink`, `resolveRepoIdentity`, `checkEntitlement` |
@@ -140,17 +145,17 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v2.8.0 against:
+Last verified at v3.0.0 against:
 
-- `packages/` directory listing — **31 publishable packages** total (all at `2.8.0`):
+- `packages/` directory listing — **32 publishable packages** total (all at `3.0.0`):
   - Layer 1 (kernel): 1 — `core`
-  - Layer 2 (datastore + contracts + session-store + output + tree-sitter): 5 — `datastore`, `contracts`, `session-store`, `output`, `tree-sitter`
+  - Layer 2 (datastore + config + contracts + session-store + output + tree-sitter): 6 — `datastore`, `config`, `contracts`, `session-store`, `output`, `tree-sitter`
   - Layer 3 Tools: 3 — `fitness`, `simulation`, `graph`
   - Layer 3 Shared libraries: 2 — `dashboard`, `cli-ui`
   - Layer 3 Fitness language adapters: 6 — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`
   - Layer 3 Graph language adapters + scaffolding: 6 — `graph-adapter-common`, `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`
   - Layer 4 (check packs): 7 — `checks-universal`, `checks-typescript`, `checks-python`, `checks-java`, `checks-go`, `checks-cpp`, `checks-rust`
   - Layer 5 (composition root): 1 — `cli`
-- v2.0.0 promoted graph language adapters from internal subdirs to publishable npm packages (`@opensip-tools/graph-*`), added `checks-rust` to the bundled check packs, and split `dashboard` and `cli-ui` into peer-layer libraries to keep Tool engines free of UI-kit and rendering dependencies. Since then the tree-sitter graph adapters moved to the WASM `web-tree-sitter` build and grew a shared `@opensip-tools/graph-adapter-common` scaffolding package, and the shared `@opensip-tools/tree-sitter` substrate (ADR-0010) was extracted as its own Layer 2 package (→ 31 packages). The fitness language adapters (`@opensip-tools/lang-*`) and the graph language adapters (`@opensip-tools/graph-*`) are unrelated siblings implementing different contracts (`LanguageAdapter` vs. `GraphLanguageAdapter`) — see [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md) for the distinction.
+- v2.0.0 promoted graph language adapters from internal subdirs to publishable npm packages (`@opensip-tools/graph-*`), added `checks-rust` to the bundled check packs, and split `dashboard` and `cli-ui` into peer-layer libraries to keep Tool engines free of UI-kit and rendering dependencies. Since then the tree-sitter graph adapters moved to the WASM `web-tree-sitter` build and grew a shared `@opensip-tools/graph-adapter-common` scaffolding package, the shared `@opensip-tools/tree-sitter` substrate (ADR-0010) was extracted as its own Layer 2 package, and `@opensip-tools/config` became the dedicated config composer/schema-registry package (ADR-0023) (→ 32 packages). The fitness language adapters (`@opensip-tools/lang-*`) and the graph language adapters (`@opensip-tools/graph-*`) are unrelated siblings implementing different contracts (`LanguageAdapter` vs. `GraphLanguageAdapter`) — see [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md) for the distinction.
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.

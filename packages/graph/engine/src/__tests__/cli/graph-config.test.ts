@@ -55,7 +55,7 @@ describe('loadGraphConfig', () => {
   });
 
   it('returns {} when there is no graph: block', () => {
-    writeConfig('cli:\n  recipe: example\n');
+    writeConfig('cli:\n  verbose: true\n');
     expect(loadGraphConfig(workDir)).toEqual({});
   });
 

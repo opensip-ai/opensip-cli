@@ -13,7 +13,7 @@ date: 2026-06-07
 status: active
 supersedes: []
 superseded_by: null
-related: [ADR-0011, ADR-0012, ADR-0021, ADR-0022]   # output currency; versioning; flag currency; cli.recipe deprecation
+related: [ADR-0011, ADR-0012, ADR-0021, ADR-0022]   # output currency; versioning; flag currency; tool-scoped recipes
 tags: [config, packaging, plugin-parity, contracts]
 enforcement: mechanizable
 enforcement-reason: >

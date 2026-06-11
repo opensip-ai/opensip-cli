@@ -2,13 +2,12 @@
  * sim-config — resolve the `sim` recipe default (ADR-0022).
  *
  * Recipes are tool-scoped: `sim` reads its own `simulation.recipe` block from
- * `opensip-tools.config.yml`, with the deprecated `cli.recipe` as a cross-tool
- * fallback. The `simulation:` block is read permissively here (mirroring graph's
- * `graph-config.ts`) — simulation must not depend on fitness, which owns the
- * strict Zod config schema, so it parses its own slice of the document.
+ * `opensip-tools.config.yml`. The `simulation:` block is read permissively here
+ * (mirroring graph's `graph-config.ts`) — simulation must not depend on fitness,
+ * which owns the strict Zod config schema, so it parses its own slice of the
+ * document.
  */
 
-import { loadCliDefaults } from '@opensip-tools/config';
 import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
 import { currentScope, logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
 
@@ -40,8 +39,8 @@ function readSimulationRecipe(cwd: string, explicitPath?: string): string | unde
     filePath = resolveProjectConfigPath(cwd, explicitPath);
   } catch (error) {
     // No config file found — expected on a config-less project; sim then uses
-    // the cli.recipe fallback or the built-in default. Debug-only so it never
-    // adds noise. Mirrors loadGraphConfig's not-found path.
+    // the built-in default. Debug-only so it never adds noise. Mirrors
+    // loadGraphConfig's not-found path.
     logger.debug({
       evt: 'sim.config.not_found',
       module: 'cli:sim',
@@ -58,9 +57,9 @@ function readSimulationRecipe(cwd: string, explicitPath?: string): string | unde
 
 /**
  * Resolve which recipe NAME a `sim` run should use, applying tool-scoped
- * precedence (ADR-0022): explicit `--recipe` > `simulation.recipe` > deprecated
- * `cli.recipe` > built-in `default`. The caller looks up the returned `name` in
- * the recipe registry and, when `tolerant`, falls back to `default` on a miss.
+ * precedence (ADR-0022): explicit `--recipe` > `simulation.recipe` > built-in
+ * `default`. The caller looks up the returned `name` in the recipe registry and,
+ * when `tolerant`, falls back to `default` on a miss.
  *
  * @param cwd Project root for config resolution.
  * @param explicit The `--recipe <name>` flag value (undefined when absent).
@@ -72,20 +71,8 @@ export function resolveSimRecipeSelection(
   explicitPath?: string,
 ): ResolvedRecipe {
   const toolRecipe = readSimulationRecipe(cwd, explicitPath);
-  const cliDefaults = loadCliDefaults(cwd, explicitPath);
-  const resolved = resolveToolRecipeName({
+  return resolveToolRecipeName({
     explicit,
     toolRecipe,
-    // eslint-disable-next-line sonarjs/deprecation -- ADR-0022: cli.recipe is deprecated but deliberately read here as the cross-tool FALLBACK; resolveToolRecipeName ranks it last and the fitness check drives migration.
-    cliRecipe: cliDefaults.recipe,
   });
-  if (resolved.usedDeprecatedCliRecipe) {
-    logger.warn({
-      evt: 'sim.recipe.cli_recipe_deprecated',
-      module: 'cli:sim',
-      recipe: resolved.name,
-      msg: `cli.recipe is deprecated (ADR-0022); set simulation.recipe instead. Using '${resolved.name}' as a fallback for sim.`,
-    });
-  }
-  return resolved;
 }

@@ -1,6 +1,6 @@
 /**
  * @fileoverview Static tool-plugin manifest + the plugin-API epoch +
- * provenance types (release 2.8.0, identity & compatibility).
+ * provenance types (release 3.0.0, raw-vs-admitted compatibility contract).
  *
  * The **manifest** is the static front matter the host reads *before*
  * importing a tool's runtime `Tool` module (north-star §5.1). It is
@@ -9,15 +9,15 @@
  *
  * `PLUGIN_API_VERSION` is a coarse integer **epoch** for the plugin
  * *input* contract. A tool declares the epoch it was compiled against
- * via `ToolPluginManifest.apiVersion`; the host's single
+ * via `RawToolPluginManifest.apiVersion`; the host's single
  * `checkCompatibility()` gate (see `compatibility.ts`) admits or rejects
- * on that integer alone — no semver range maths.
+ * on that integer alone — no semver range maths. Once admitted, the manifest is
+ * represented as `ToolPluginManifest`, whose `apiVersion` is required.
  *
- * For 2.8.0 only the **identity subset** (`kind`/`id`/`name`/`version`/
- * `apiVersion` + command metadata) is consumed. The richer fields
- * (`capabilities`/`config`/`dashboard`/…) are typed-but-not-consumed
- * placeholders for later releases (§5.3/§5.7 → 2.9.0+), so a manifest
- * authored today stays forward-shaped.
+ * The host consumes identity + command metadata and, as of ADR-0029, the
+ * concrete `capabilities` descriptor that declares owned capability domains.
+ * Remaining fields (`config`/`dashboard`/…) stay typed-but-not-consumed
+ * placeholders so a manifest authored today stays forward-shaped.
  *
  * These types live in **core** (next to the `Tool` contract). `contracts`
  * re-exports them for the public surface; core cannot import contracts.
@@ -30,8 +30,9 @@ import type { ToolCapabilityDeclaration } from './capability.js';
  *
  * A coarse integer, bumped only on a breaking change to the plugin
  * *input* contract. A tool manifest's `apiVersion` is compared against
- * this single value by `checkCompatibility()`; an omitted `apiVersion`
- * is treated as "current epoch" (the grace window).
+ * this single value by `checkCompatibility()`. A missing `apiVersion`
+ * is incompatible as of 3.0.0; raw manifests stay representable so the
+ * admission gate can diagnose unversioned inputs before rejecting them.
  */
 export const PLUGIN_API_VERSION = 1;
 
@@ -75,11 +76,12 @@ export interface ToolCommandManifest {
  * `package.json#opensipTools` or a JSON sidecar) so the host can inspect
  * its identity + contract epoch **without importing the runtime module**.
  *
- * For 2.8.0 the host consumes only the identity subset
- * (`kind`/`id`/`name`/`version`/`apiVersion`/`commands`). The remaining
- * fields are typed-but-not-consumed placeholders for later releases so a
- * manifest authored today is forward-shaped; they are deliberately
- * `unknown`-shaped until a release gives them concrete semantics.
+ * The host consumes the identity subset
+ * (`kind`/`id`/`name`/`version`/`apiVersion`/`commands`) plus the concrete
+ * `capabilities` descriptor. The remaining fields are typed-but-not-consumed
+ * placeholders for later releases so a manifest authored today is
+ * forward-shaped; they are deliberately `unknown`-shaped until a release gives
+ * them concrete semantics.
  *
  * Release 2.10.0 (§5.3) gives `capabilities` its concrete shape — an
  * array of {@link ToolCapabilityDeclaration} (the capability domains the
@@ -87,7 +89,7 @@ export interface ToolCommandManifest {
  * `capabilities` declares no domains, and `MARKER_KINDS` remains the
  * bootstrap-default domain vocabulary. The other slots stay `unknown`.
  */
-export interface ToolPluginManifest {
+interface ToolPluginManifestBase {
   /** Discriminator — always `'tool'` (matches `opensipTools.kind`). */
   readonly kind: 'tool';
   /** Stable identifier — e.g. 'fitness', 'simulation', 'graph'. */
@@ -96,16 +98,11 @@ export interface ToolPluginManifest {
   readonly name: string;
   /** Display semver of the tool itself (NOT the contract epoch). */
   readonly version: string;
-  /**
-   * The plugin-API epoch this tool was compiled against. Omitted ⇒
-   * grace window: the host treats it as the current `PLUGIN_API_VERSION`.
-   */
-  readonly apiVersion?: number;
   /** Command identities the tool contributes — `--help` / conflict detection. */
   readonly commands: readonly ToolCommandManifest[];
 
   // ── Typed-but-not-consumed until later releases ────────────────────
-  // These keep a 2.8.0-authored manifest forward-shaped. They are
+  // These keep a 3.0.0-authored manifest forward-shaped. They are
   // `unknown` (not concrete) on purpose: the release that consumes each
   // one defines its shape; declaring a shape now would over-commit.
   /**
@@ -126,6 +123,25 @@ export interface ToolPluginManifest {
   readonly pluginDomains?: readonly unknown[];
   /** Later: declared host/peer requirements. */
   readonly requires?: readonly unknown[];
+}
+
+/**
+ * Structurally valid manifest front matter before compatibility admission.
+ * `apiVersion` is optional here only so the loader can represent and diagnose
+ * 3.0.0-incompatible unversioned tools without pretending they are admitted.
+ */
+export interface RawToolPluginManifest extends ToolPluginManifestBase {
+  /** The plugin-API epoch this tool was compiled against, if declared. */
+  readonly apiVersion?: number;
+}
+
+/**
+ * A manifest that passed the compatibility gate and can seed runtime surfaces
+ * such as command mounting, provenance, and capability registration.
+ */
+export interface ToolPluginManifest extends ToolPluginManifestBase {
+  /** The plugin-API epoch this admitted tool was compiled against. */
+  readonly apiVersion: number;
 }
 
 /**

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v2.8.0
+release: v3.0.0
 title: "Adopt in a monorepo"
 audience: [plugin-authors, ci-integrators]
 purpose: "Task-led: introduce opensip-tools to a large polyglot monorepo. Workspace-package graduation, per-package targets, scoped baselines."
@@ -156,7 +156,7 @@ packages:
 
 Then `pnpm i`. The workspace symlinks `@your-scope/fit` into `node_modules/`. opensip-tools's marker-based discovery finds it via the `opensipTools.kind` field and loads it on the next `fit` run.
 
-The `kind` marker is what makes discovery work — your pack can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`). The kind tells opensip-tools "this is a fit-pack"; the rest is your naming. Same shape for sim packs with `"kind": "sim-pack"`.
+The `kind` marker is what makes fit-pack discovery work — your pack can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`). The kind tells opensip-tools "this is a fit-pack"; the rest is your naming. Sim scenario packs use the `<scope>/scenarios-*` package-name pattern or an explicit `plugins.scenarioPackages:` pin instead.
 
 For TS-based packs you also need to build (`pnpm -F @your-scope/fit build`) so the `main` field resolves to real JS. The runtime doesn't load TypeScript directly — it loads what your `package.json#main` points at.
 

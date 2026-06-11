@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v2.8.0
+last_verified: 2026-06-11
+release: v3.0.0
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-tools.config.yml schema, every field, defaults, and where each is read."
@@ -142,9 +142,13 @@ simulation:
 
 CLI-wide defaults that act as flag pre-fills. Each project's `cli` section is equivalent to a config-loaded set of flags applied to every invocation.
 
+`cli.recipe` was removed in 3.0.0. Recipe defaults are tool-scoped (ADR-0022),
+so set `fitness.recipe`, `graph.recipe`, or `simulation.recipe` instead. The
+`cli` namespace is strict; a remaining `cli.recipe` key is rejected as an
+unknown config field.
+
 | Field | Type | Effect |
 |---|---|---|
-| `recipe` | string | **Deprecated (ADR-0022).** Recipe defaults are tool-scoped — set `fitness.recipe` / `graph.recipe` / `simulation.recipe` instead. Still honoured as a cross-tool fallback (applied tolerantly: a tool that lacks the named recipe falls back to its own `default` rather than erroring), and flagged by the `cli-recipe-deprecated` check. |
 | `exclude` | string[] | Default exclusions. |
 | `verbose` / `json` | bool | Defaults for `--verbose` / `--json`. |
 | `debug` | bool | Default for `--debug`. |

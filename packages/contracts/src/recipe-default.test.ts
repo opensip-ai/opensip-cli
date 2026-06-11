@@ -8,26 +8,15 @@ describe('resolveToolRecipeName (ADR-0022 precedence + tolerance)', () => {
       resolveToolRecipeName({
         explicit: 'backend',
         toolRecipe: 'graph-core',
-        cliRecipe: 'opensip',
       }),
-    ).toEqual({ name: 'backend', source: 'flag', tolerant: false, usedDeprecatedCliRecipe: false });
+    ).toEqual({ name: 'backend', source: 'flag', tolerant: false });
   });
 
   it('falls to <tool>.recipe when no flag, and is tolerant', () => {
-    expect(resolveToolRecipeName({ toolRecipe: 'graph-core', cliRecipe: 'opensip' })).toEqual({
+    expect(resolveToolRecipeName({ toolRecipe: 'graph-core' })).toEqual({
       name: 'graph-core',
       source: 'tool-config',
       tolerant: true,
-      usedDeprecatedCliRecipe: false,
-    });
-  });
-
-  it('falls to the deprecated cli.recipe last, flagging the fallback', () => {
-    expect(resolveToolRecipeName({ cliRecipe: 'opensip' })).toEqual({
-      name: 'opensip',
-      source: 'cli-config',
-      tolerant: true,
-      usedDeprecatedCliRecipe: true,
     });
   });
 
@@ -36,16 +25,14 @@ describe('resolveToolRecipeName (ADR-0022 precedence + tolerance)', () => {
       name: BUILTIN_DEFAULT_RECIPE,
       source: 'builtin',
       tolerant: true,
-      usedDeprecatedCliRecipe: false,
     });
   });
 
   it('treats empty-string config values as unset (precedence skips them)', () => {
-    expect(resolveToolRecipeName({ explicit: '', toolRecipe: '', cliRecipe: 'opensip' })).toEqual({
-      name: 'opensip',
-      source: 'cli-config',
+    expect(resolveToolRecipeName({ explicit: '', toolRecipe: '' })).toEqual({
+      name: BUILTIN_DEFAULT_RECIPE,
+      source: 'builtin',
       tolerant: true,
-      usedDeprecatedCliRecipe: true,
     });
   });
 });

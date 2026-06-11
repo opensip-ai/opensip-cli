@@ -141,10 +141,11 @@ export type {
   LiveViewRenderer,
 } from './tools/index.js';
 // Static tool-plugin manifest + the plugin-API epoch + provenance types
-// (release 2.8.0, identity & compatibility). Re-exported by @opensip-tools/
-// contracts for the public surface; no runtime consumers until Phase 1+.
+// (release 3.0.0 raw-vs-admitted contract). Re-exported by @opensip-tools/
+// contracts for the public surface.
 export { PLUGIN_API_VERSION } from './tools/index.js';
 export type {
+  RawToolPluginManifest,
   ToolPluginManifest,
   ToolCommandManifest,
   ToolProvenance,
@@ -181,10 +182,10 @@ export type {
   ToolCapabilityDeclaration,
 } from './tools/index.js';
 // The single pure compatibility gate shared by the bundled + external
-// admission paths (release 2.8.0). Re-exported by @opensip-tools/contracts.
+// admission paths. Re-exported by @opensip-tools/contracts.
 export { checkCompatibility } from './tools/index.js';
 export type { CompatibilityVerdict } from './tools/index.js';
-// Load-time manifest⇔Tool drift guard (release 2.8.0, Phase 1).
+// Load-time manifest⇔Tool drift guard.
 export { assertManifestMatchesTool } from './tools/index.js';
 export {
   TOOL_LONG_IDS,

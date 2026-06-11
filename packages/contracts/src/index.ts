@@ -100,11 +100,12 @@ export { EXIT_CODES, getErrorSuggestion, mapToolErrorToExitCode } from './exit-c
 export type { ErrorSuggestion } from './exit-codes.js';
 
 // Static tool-plugin manifest + the plugin-API epoch + provenance types +
-// the pure compatibility gate (release 2.8.0, identity & compatibility).
+// the pure compatibility gate (release 3.0.0 raw-vs-admitted contract).
 // DEFINED in @opensip-tools/core (next to the Tool contract; core cannot
 // import contracts); re-exported here for the public Tool↔runner surface.
 export { PLUGIN_API_VERSION, checkCompatibility } from '@opensip-tools/core';
 export type {
+  RawToolPluginManifest,
   ToolPluginManifest,
   ToolCommandManifest,
   ToolProvenance,
@@ -120,8 +121,7 @@ export type {
 // The `cli:` block loader (`loadCliDefaults` / `CliDefaults`) moved to
 // `@opensip-tools/config` in 2.10.1 (ADR-0023) — its runtime YAML projection
 // was the standing "contracts is types-only" charter violation. Importers now
-// take it from the config layer. (`RecipeSource` below still names a
-// `'cli-config'` provenance string — that is a label, not an import.)
+// take it from the config layer.
 
 // Command-plane types (release 2.11.0, §5.4) — the declarative CommandSpec a
 // tool exports for the host to mount, replacing raw-Commander access. DEFINED in
@@ -141,8 +141,7 @@ export type {
 } from '@opensip-tools/core';
 
 // Tool-scoped recipe-default resolution (ADR-0022). The pure resolver every
-// tool uses to pick its recipe name from --recipe / <tool>.recipe / the
-// deprecated cli.recipe fallback.
+// tool uses to pick its recipe name from --recipe / <tool>.recipe / default.
 export { resolveToolRecipeName, BUILTIN_DEFAULT_RECIPE } from './recipe-default.js';
 export type { ResolvedRecipe, RecipeSource } from './recipe-default.js';
 

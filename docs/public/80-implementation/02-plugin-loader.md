@@ -60,8 +60,8 @@ flowchart TB
   FitExact["Exact check package pins<br/>plugins.checkPackages"]
 
   SimLocal["Project-local sim files<br/>opensip-tools/sim/scenarios<br/>opensip-tools/sim/recipes"]
-  SimMarker["Sim-pack marker scan<br/>opensipTools.kind = sim-pack"]
-  SimScope["Scoped scenario packages<br/>configured scope / scenarios-*"]
+  SimPattern["Name-pattern scenario packages<br/>configured scopes / scenarios-*"]
+  SimExact["Exact scenario package pins<br/>plugins.scenarioPackages"]
   SimPinned["Project-pinned sim packages<br/>.runtime/plugins/sim + plugins.sim"]
 
   Startup --> Tools
@@ -75,8 +75,8 @@ flowchart TB
   FitRun --> FitExact
 
   SimRun --> SimLocal
-  SimRun --> SimMarker
-  SimRun --> SimScope
+  SimRun --> SimPattern
+  SimRun --> SimExact
   SimRun --> SimPinned
 ```
 

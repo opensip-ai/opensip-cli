@@ -22,21 +22,19 @@ import type { ErrorResult, FitOptions } from '@opensip-tools/contracts';
 
 /**
  * Tool-scoped recipe defaults for `fit` (ADR-0022), read from the project
- * config by the caller: `toolRecipe` is `fitness.recipe`, `cliRecipe` is the
- * deprecated cross-tool `cli.recipe` fallback.
+ * config by the caller: `toolRecipe` is `fitness.recipe`.
  */
 export interface FitRecipeDefaults {
   readonly toolRecipe?: string;
-  readonly cliRecipe?: string;
 }
 
 /**
  * Decide which recipe to execute. `--check` and `--tags` each create an
  * ad-hoc recipe (recipeName=undefined); otherwise resolve a named recipe with
  * tool-scoped precedence (ADR-0022): `--recipe` flag > `fitness.recipe` >
- * deprecated `cli.recipe` > built-in `default`. A config-sourced unknown name
- * tolerantly falls back to `default` with a warning (the default may belong to
- * another tool); an explicit `--recipe` typo returns an `ErrorResult`.
+ * built-in `default`. A config-sourced unknown name tolerantly falls back to
+ * `default` with a warning (the default may belong to another tool); an explicit
+ * `--recipe` typo returns an `ErrorResult`.
  *
  * **Precondition:** must run *after* `ensureChecksLoaded` so that any
  * user-defined recipes (loaded as `.mjs` plugins under
@@ -54,16 +52,7 @@ export function selectRecipe(
   const resolved = resolveToolRecipeName({
     explicit: args.recipe,
     toolRecipe: defaults.toolRecipe,
-    cliRecipe: defaults.cliRecipe,
   });
-  if (resolved.usedDeprecatedCliRecipe) {
-    logger.warn({
-      evt: 'fit.recipe.cli_recipe_deprecated',
-      module: 'cli:fit',
-      recipe: resolved.name,
-      msg: `cli.recipe is deprecated (ADR-0022); set fitness.recipe instead. Using '${resolved.name}' as a fallback for fit.`,
-    });
-  }
 
   if (!currentRecipeRegistry().has(resolved.name)) {
     // Config-sourced unknown name → fall back to the built-in default rather

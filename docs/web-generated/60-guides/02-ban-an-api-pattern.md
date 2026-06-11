@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v2.8.0
+release: v3.0.0
 title: "Ban an API pattern"
 audience: [plugin-authors, getting-started]
 purpose: "Task-led: write a check that flags every use of a specific API — covering the regex shape, the AST shape, and the trade-offs between them."

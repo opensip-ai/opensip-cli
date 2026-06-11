@@ -1,6 +1,6 @@
 /**
  * @fileoverview Static manifest reader + the single admission gate
- * (release 2.8.0, identity & compatibility — Phase 2).
+ * (release 3.0.0, raw-vs-admitted compatibility contract).
  *
  * `loadToolManifest` reads a tool's static front matter **before**
  * importing its runtime `Tool` module:
@@ -15,11 +15,14 @@
  *     their trust posture differs (deny-by-default vs trusted-by-default),
  *     which is the admission caller's concern, not the loader's.
  *
- * It validates the identity subset (`kind: 'tool'`, `id`, `commands`),
+ * It validates the raw identity subset (`kind: 'tool'`, `id`, `commands`),
  * derives `name`/`version` from the package.json's own top-level fields
  * (the manifest block does NOT redeclare them — single source of truth),
- * and returns `undefined` (with a structured logger diagnostic) on a
- * malformed or missing manifest. It NEVER imports the tool module.
+ * validates concrete additive descriptors such as `capabilities`, and returns
+ * `undefined` (with a structured logger diagnostic) on a malformed or missing
+ * manifest. A missing `apiVersion` is still representable as a
+ * `RawToolPluginManifest` so `admitTool` can reject it with a compatibility
+ * diagnostic. It NEVER imports the tool module.
  *
  * `admitTool` is the single gate the bundled and external paths share: it
  * records `ToolProvenance` (incl. a `manifestHash` over the canonical
@@ -46,6 +49,7 @@ import { normalizeDiscovery } from './manifest-discovery.js';
 
 import type { CapabilityContributionKind, ToolCapabilityDeclaration } from '../tools/capability.js';
 import type {
+  RawToolPluginManifest,
   ToolCommandManifest,
   ToolPluginManifest,
   ToolProvenance,
@@ -81,7 +85,10 @@ const LOADER_MODULE = 'core:plugins';
  *   `plugin.manifest.read_failed` diagnostic) when the file is missing,
  *   unparseable, or fails identity validation.
  */
-export function loadToolManifest(source: ToolSource, dir: string): ToolPluginManifest | undefined {
+export function loadToolManifest(
+  source: ToolSource,
+  dir: string,
+): RawToolPluginManifest | undefined {
   // Both authored sources (project-local + user-global) declare identity via
   // the JSON sidecar; bundled/installed read package.json#opensipTools.
   const authored = source === 'project-local' || source === 'user-global';
@@ -110,12 +117,20 @@ export function loadToolManifest(source: ToolSource, dir: string): ToolPluginMan
  *   - `fail-closed`  — incompatible AND explicitly requested: the host must
  *                      fail with the Phase-0 incompatible exit code.
  */
-export interface AdmissionResult {
-  readonly decision: 'admit' | 'skip' | 'fail-closed';
-  readonly provenance: ToolProvenance;
-  readonly verdict: CompatibilityVerdict;
-  readonly diagnostic?: string;
-}
+export type AdmissionResult =
+  | {
+      readonly decision: 'admit';
+      readonly provenance: ToolProvenance;
+      readonly verdict: Extract<CompatibilityVerdict, { kind: 'compatible' }>;
+      readonly manifest: ToolPluginManifest;
+      readonly diagnostic?: undefined;
+    }
+  | {
+      readonly decision: 'skip' | 'fail-closed';
+      readonly provenance: ToolProvenance;
+      readonly verdict: CompatibilityVerdict;
+      readonly diagnostic?: string;
+    };
 
 /**
  * Run the single compatibility gate over a manifest and produce an
@@ -139,7 +154,7 @@ export interface AdmissionResult {
  *   (e.g. via a plugin pin) — promotes an incompatible `skip` to `fail-closed`.
  */
 export function admitTool(args: {
-  readonly manifest: ToolPluginManifest;
+  readonly manifest: RawToolPluginManifest;
   readonly source: ToolSource;
   readonly dir: string;
   readonly packageName?: string;
@@ -160,17 +175,21 @@ export function admitTool(args: {
   const verdict = checkCompatibility(manifest.apiVersion);
 
   if (verdict.kind === 'compatible') {
+    const admittedManifest: ToolPluginManifest = {
+      ...manifest,
+      apiVersion: manifest.apiVersion as number,
+    };
     logger.info({
       evt: 'plugin.manifest.loaded',
       module: LOADER_MODULE,
       id: manifest.id,
       source,
-      apiVersion: manifest.apiVersion,
+      apiVersion: admittedManifest.apiVersion,
       engine: undefined,
       manifestHash,
       decision: 'admit',
     });
-    return { decision: 'admit', provenance, verdict };
+    return { decision: 'admit', provenance, verdict, manifest: admittedManifest };
   }
 
   // incompatible
@@ -240,7 +259,7 @@ function readSidecar(dir: string): RawManifest | undefined {
 
 /**
  * Validate the identity subset of a manifest block and assemble a typed
- * `ToolPluginManifest`. `name`/`version` come from the package.json's own
+ * `RawToolPluginManifest`. `name`/`version` come from the package.json's own
  * fields (bundled/installed) or inline (sidecar). Returns `undefined` (with
  * a `reason` is reported by the caller) on any identity violation.
  */
@@ -248,7 +267,7 @@ function validateManifest(
   block: Record<string, unknown>,
   name: unknown,
   version: unknown,
-): ToolPluginManifest | undefined {
+): RawToolPluginManifest | undefined {
   if (block.kind !== 'tool') return undefined;
   if (typeof block.id !== 'string' || block.id === '') return undefined;
   if (typeof name !== 'string' || name === '') return undefined;
@@ -353,13 +372,7 @@ function normalizeCommands(value: unknown): readonly ToolCommandManifest[] | und
   return out;
 }
 
-/**
- * SHA-256 over the canonical JSON of the manifest's identity subset.
- * Keys are emitted in a fixed order (and commands canonicalized) so the
- * hash is stable across object-key ordering and absent optional fields —
- * a deterministic identity/tamper fingerprint for provenance.
- */
-function hashManifest(manifest: ToolPluginManifest): string {
+function hashManifest(manifest: RawToolPluginManifest): string {
   const canonical = JSON.stringify({
     kind: manifest.kind,
     id: manifest.id,

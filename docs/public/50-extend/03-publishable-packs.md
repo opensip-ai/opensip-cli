@@ -4,7 +4,7 @@ last_verified: 2026-06-09
 release: v3.0.0
 title: "Publishable packs"
 audience: [plugin-authors]
-purpose: "Author and publish a fit-pack or sim-pack: workspace package skeleton, the marker contract, four discovery paths, and the migration recipe from loose .mjs files."
+purpose: "Author and publish fit packs or sim scenario packs: workspace package skeleton, discovery contracts, and the migration recipe from loose .mjs files."
 source-files:
   - packages/core/src/plugins/types.ts
   - packages/core/src/plugins/marker-discovery.ts
@@ -199,7 +199,7 @@ A step-by-step you can follow when you've decided to graduate:
 
 1. **Pick the pack name and location.** For a workspace-only pack, `@your-scope/fit` works. For a publishable pack, use your own scope and pick one of the [discovery paths](#discovery-paths) above.
 2. **Add the directory as a workspace member.** Append `opensip-tools/*` to your `pnpm-workspace.yaml` (or yarn/npm equivalent).
-3. **Write `package.json`** with `opensipTools.kind: "fit-pack"` (or `"sim-pack"`), `main: "./dist/index.js"`, peer-dep on `@opensip-tools/fitness` and `@opensip-tools/core`.
+3. **Write `package.json`** with `opensipTools.kind: "fit-pack"`, `main: "./dist/index.js"`, peer-dep on `@opensip-tools/fitness` and `@opensip-tools/core`.
 4. **Convert each `.mjs` to a TypeScript module.** One `<slug>.ts` per check under `src/checks/`, each exporting a `defineCheck(...)` object. **Keep the same slug values** as the loose files used — recipes select by tag/slug, and `--check <slug>` invocations keep working across the move.
 5. **Create `src/register-checks.ts`** that imports every check and exports `allChecks` as a `readonly Check[]`.
 6. **Create `src/index.ts`** that folds the per-pack display map onto `allChecks` via `applyCheckDisplay` and exports the result as `checks`.

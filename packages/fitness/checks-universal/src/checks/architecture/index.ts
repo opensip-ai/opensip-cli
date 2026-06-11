@@ -1,5 +1,4 @@
 export * from './capability-by-manifest.js';
-export * from './cli-recipe-deprecated.js';
 export * from './command-surface-parity.js';
 export * from './cross-tool-flag-parity.js';
 export * from './dependencies/index.js';

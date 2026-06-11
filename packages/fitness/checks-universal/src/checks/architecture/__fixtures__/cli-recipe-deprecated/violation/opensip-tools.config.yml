@@ -1,9 +1,0 @@
-# Violation: deprecated tool-agnostic cli.recipe default (ADR-0022).
-schemaVersion: 1
-
-cli:
-  recipe: opensip
-  verbose: false
-
-fitness:
-  failOnErrors: 0

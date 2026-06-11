@@ -10,8 +10,8 @@ import { resolveSimRecipeSelection } from '../sim-config.js';
 
 /**
  * `resolveSimRecipeSelection` reads `simulation.recipe` from the project config
- * (permissively — sim must not depend on fitness's strict schema) plus the
- * deprecated `cli.recipe` fallback, and applies ADR-0022 precedence.
+ * (permissively — sim must not depend on fitness's strict schema) and applies
+ * ADR-0022 precedence.
  */
 describe('resolveSimRecipeSelection (ADR-0022)', () => {
   let dir: string;
@@ -42,17 +42,15 @@ describe('resolveSimRecipeSelection (ADR-0022)', () => {
       name: 'smoke',
       source: 'tool-config',
       tolerant: true,
-      usedDeprecatedCliRecipe: false,
     });
   });
 
-  it('falls back to the deprecated cli.recipe when simulation.recipe is absent', () => {
+  it('ignores cli.recipe now that the fallback was removed', () => {
     write('cli:\n  recipe: opensip\n');
     expect(resolveSimRecipeSelection(dir, undefined)).toMatchObject({
-      name: 'opensip',
-      source: 'cli-config',
+      name: 'default',
+      source: 'builtin',
       tolerant: true,
-      usedDeprecatedCliRecipe: true,
     });
   });
 
@@ -67,8 +65,8 @@ describe('resolveSimRecipeSelection (ADR-0022)', () => {
   it('ignores a non-string simulation.recipe (malformed) and falls through', () => {
     write('simulation:\n  recipe:\n    - not-a-string\ncli:\n  recipe: from-cli\n');
     expect(resolveSimRecipeSelection(dir, undefined)).toMatchObject({
-      name: 'from-cli',
-      source: 'cli-config',
+      name: 'default',
+      source: 'builtin',
     });
   });
 
@@ -96,15 +94,15 @@ describe('resolveSimRecipeSelection (ADR-0022)', () => {
       expect(resolved).toMatchObject({ name: 'from-scope', source: 'tool-config' });
     });
 
-    it('falls back to the cli.recipe document block when the scope simulation block has no recipe', () => {
-      // Scope simulation block is empty → no tool recipe; cli.recipe (a config-owned
-      // document-level block, read via loadCliDefaults) supplies the fallback.
+    it('returns builtin default when the scope simulation block has no recipe', () => {
+      // Scope simulation block is empty → no tool recipe, so the builtin default
+      // supplies the fallback.
       write('cli:\n  recipe: from-cli\n');
       const scope = makeSimTestScope();
       Object.assign(scope, { toolConfig: { simulation: {} } });
 
       const resolved = runWithScopeSync(scope, () => resolveSimRecipeSelection(dir, undefined));
-      expect(resolved).toMatchObject({ name: 'from-cli', source: 'cli-config' });
+      expect(resolved).toMatchObject({ name: 'default', source: 'builtin' });
     });
   });
 });

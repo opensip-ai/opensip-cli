@@ -42,12 +42,12 @@ interface RuleView {
  * built-in `default` recipe (all rules).
  *
  * Tolerance (ADR-0022): when `opts.tolerant` is true (the name came from
- * config — `graph.recipe` or the deprecated `cli.recipe` — not an explicit
- * `--recipe` flag) an unknown name falls back to the built-in `default` recipe
- * with a warning instead of aborting, because a shared/cross-tool default may
- * legitimately target another tool. When `opts.tolerant` is false (the default
- * — an explicit flag) an unknown name throws a `ConfigurationError` so the
- * CLI's `handleGraphError` maps it to `EXIT_CODES.CONFIGURATION_ERROR` (typo
+ * `graph.recipe`, not an explicit `--recipe` flag) an unknown name falls back
+ * to the built-in `default` recipe with a warning instead of aborting, because
+ * a copied config default may legitimately target another tool. When
+ * `opts.tolerant` is false (the default — an explicit flag) an unknown name
+ * throws a `ConfigurationError` so the CLI's `handleGraphError` maps it to
+ * `EXIT_CODES.CONFIGURATION_ERROR` (typo
  * protection).
  */
 export function resolveRecipeToRules(

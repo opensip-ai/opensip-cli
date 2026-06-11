@@ -213,8 +213,8 @@ export async function executeSim(
   // registry is read. Idempotent per project dir.
   await ensureScenariosLoaded(args.cwd);
 
-  // Tool-scoped recipe resolution (ADR-0022): explicit --recipe > simulation.recipe
-  // > deprecated cli.recipe > built-in default. A config-sourced unknown name
+  // Tool-scoped recipe resolution (ADR-0022): explicit --recipe >
+  // simulation.recipe > built-in default. A config-sourced unknown name
   // tolerantly falls back to `default`; an explicit --recipe typo hard-fails.
   const recipeSelection = resolveSimRecipeSelection(args.cwd, args.recipe);
   let recipeName = recipeSelection.name;

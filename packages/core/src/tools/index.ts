@@ -18,7 +18,7 @@ export type {
 export { UnknownLiveViewError } from './types.js';
 export { ToolRegistry } from './registry.js';
 // Static tool-plugin manifest + the plugin-API epoch + provenance types
-// (release 2.8.0). No runtime consumers yet — Phase 1+ wire these.
+// (release 3.0.0 raw-vs-admitted contract).
 export { PLUGIN_API_VERSION } from './manifest.js';
 // Command-plane types (release 2.11.0, §5.4): the declarative command surface a
 // tool exports for the host to mount, plus the CommonFlagKey key type (the pure
@@ -36,6 +36,7 @@ export type {
   CommonFlagKey,
 } from './command-spec.js';
 export type {
+  RawToolPluginManifest,
   ToolPluginManifest,
   ToolCommandManifest,
   ToolProvenance,
@@ -57,10 +58,10 @@ export type {
   ToolConfigContribution,
 } from './capability.js';
 // The single pure compatibility gate shared by the bundled + external
-// admission paths (release 2.8.0).
+// admission paths.
 export { checkCompatibility } from './compatibility.js';
 export type { CompatibilityVerdict } from './compatibility.js';
-// Load-time manifest⇔Tool drift guard (release 2.8.0, Phase 1).
+// Load-time manifest⇔Tool drift guard.
 export { assertManifestMatchesTool } from './manifest-assert.js';
 export {
   TOOL_LONG_IDS,

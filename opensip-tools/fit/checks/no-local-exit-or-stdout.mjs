@@ -41,7 +41,7 @@ const ALLOWLISTED_BASENAMES = new Set(['heap-preflight.ts']);
 /** Tests legitimately spy on / drive process.exit. */
 const TEST_PATH = /\.test\.tsx?$|\/__tests__\//;
 
-/** Pure analysis. Exported so the dogfood-integration test can exercise it. */
+/** Pure analysis. Exported for direct exercise if this check grows a test harness. */
 export function analyzeNoLocalExit(content) {
   const violations = [];
   for (const [i, line] of content.split('\n').entries()) {

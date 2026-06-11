@@ -44,7 +44,7 @@ describe('no-config-loader-outside-config', () => {
     const content = `
       const doc = readYamlFile(p);
       const cli = doc.cli;
-      const r = cli.recipe;
+      const v = cli.verbose;
     `;
     expect(analyzeNoConfigLoaderOutsideConfig(content, CONFIG_PATH)).toHaveLength(0);
   });

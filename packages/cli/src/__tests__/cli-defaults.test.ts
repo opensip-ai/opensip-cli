@@ -47,18 +47,18 @@ describe('loadCliDefaults', () => {
   });
 
   it('reads the cli: block when present', async () => {
-    writeProjectConfig(`cli:\n  recipe: my-recipe\n  verbose: true\n`);
+    writeProjectConfig(`cli:\n  verbose: true\n`);
     const { loadCliDefaults } = await loadModule();
-    expect(loadCliDefaults(projectDir)).toEqual({ recipe: 'my-recipe', verbose: true });
+    expect(loadCliDefaults(projectDir)).toEqual({ verbose: true });
   });
 
   it('respects an explicit config path', async () => {
     const customDir = mkdtempSync(join(tmpdir(), 'opensip-custom-'));
     try {
       const customPath = join(customDir, 'custom.yml');
-      writeFileSync(customPath, 'cli:\n  recipe: from-custom\n');
+      writeFileSync(customPath, 'cli:\n  verbose: true\n');
       const { loadCliDefaults } = await loadModule();
-      expect(loadCliDefaults(projectDir, customPath)).toEqual({ recipe: 'from-custom' });
+      expect(loadCliDefaults(projectDir, customPath)).toEqual({ verbose: true });
     } finally {
       rmSync(customDir, { recursive: true, force: true });
     }
@@ -66,22 +66,6 @@ describe('loadCliDefaults', () => {
 });
 
 describe('mergeConfigDefaults', () => {
-  // ADR-0022: recipe is no longer merged generically — it is tool-scoped and
-  // each tool resolves its own default via resolveToolRecipeName. The generic
-  // merge must leave `opts.recipe` untouched (explicit flag only).
-  it('does NOT merge cli.recipe onto opts (tool-scoped per ADR-0022)', async () => {
-    const { mergeConfigDefaults } = await loadModule();
-    const opts: Record<string, unknown> = {
-      recipe: undefined,
-      verbose: false,
-      json: false,
-      exclude: [],
-      apiKey: undefined,
-    };
-    mergeConfigDefaults(opts, { recipe: 'x' });
-    expect(opts.recipe).toBeUndefined();
-  });
-
   it('leaves an explicit --recipe untouched', async () => {
     const { mergeConfigDefaults } = await loadModule();
     const opts: Record<string, unknown> = {
@@ -91,7 +75,7 @@ describe('mergeConfigDefaults', () => {
       exclude: [],
       apiKey: undefined,
     };
-    mergeConfigDefaults(opts, { recipe: 'from-config' });
+    mergeConfigDefaults(opts, {});
     expect(opts.recipe).toBe('explicit');
   });
 

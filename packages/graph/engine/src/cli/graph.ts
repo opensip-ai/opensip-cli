@@ -137,7 +137,7 @@ export async function executeGraph(
     validateMutuallyExclusiveFlags(opts);
     // Resolve the recipe once at the top of the run (CLI layer owns selection;
     // the engine stays recipe-agnostic). Tool-scoped (ADR-0022): precedence is
-    // `--recipe` flag > `graph.recipe` > deprecated `cli.recipe` > `default`.
+    // `--recipe` flag > `graph.recipe` > `default`.
     // Threaded into every build path as `RunGraphInput.rules`. An explicit
     // unknown name throws a ConfigurationError here (caught by handleGraphError);
     // a config-sourced unknown name falls back to `default` with a warning. For

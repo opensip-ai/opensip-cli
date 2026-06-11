@@ -68,10 +68,8 @@ const SimulationSchema = z.object({
 // The `cli:` and `dashboard:` blocks are tool-agnostic document-level config;
 // their schemas moved to `@opensip-tools/config` in 2.10.1 (ADR-0023) and the
 // host registers them as document-level declarations for the composed STRICT
-// validation. This loader still reads them off the whole document (so
-// `signalersConfig.cli.recipe` / `.dashboard.editor` keep resolving) until
-// fitness is repointed to the composed scope config (Phase 4) — it imports the
-// schemas rather than re-defining them, so there is one definition of each.
+// validation. This loader imports the schemas rather than re-defining them, so
+// there is one definition of each.
 const CliDefaultsSchema = cliConfigSchema;
 const DashboardSchema = dashboardConfigSchema;
 

@@ -1,4 +1,3 @@
-// @fitness-ignore-file no-deprecated-tags -- the `@deprecated` on CliDefaults.recipe is a DELIBERATE, ADR-0022 graceful deprecation with a migration path (cli.recipe stays as a tolerant cross-tool fallback; the cli-recipe-deprecated check drives migration), not lingering dead code to delete.
 /**
  * cli-config — the tool-agnostic `cli:` block of `opensip-tools.config.yml`.
  *
@@ -31,17 +30,6 @@ import { z } from 'zod';
  * hook reads it. The structural mirror of {@link cliConfigSchema}.
  */
 export interface CliDefaults {
-  /**
-   * @deprecated (ADR-0022) Recipe defaults are tool-scoped — set
-   * `fit.recipe` / `graph.recipe` / `sim.recipe` instead. A `cli.recipe`
-   * value is still honoured as a cross-tool FALLBACK (applied tolerantly: a
-   * tool that lacks the named recipe falls back to its own `default` rather
-   * than erroring), but it predates the per-tool keys and is flagged by the
-   * `cli-recipe-deprecated` fitness check. It is no longer merged onto
-   * `opts.recipe` in the generic pre-action hook; each tool reads it via
-   * `resolveToolRecipeName`.
-   */
-  readonly recipe?: string;
   readonly exclude?: readonly string[];
   readonly verbose?: boolean;
   readonly json?: boolean;
@@ -82,7 +70,6 @@ export interface CliDefaults {
  * so nested `ui`/`cloud` objects stay lenient — matching prior behaviour.
  */
 export const cliConfigSchema = z.object({
-  recipe: z.string().min(1).max(128).optional(),
   exclude: z.array(z.string()).optional(),
   verbose: z.boolean().optional(),
   json: z.boolean().optional(),
@@ -125,8 +112,6 @@ function asStringArray(value: unknown): readonly string[] | undefined {
 /** Project an arbitrary YAML object into the typed `CliDefaults` shape. */
 function projectCliDefaults(raw: Record<string, unknown>): CliDefaults {
   const out: { -readonly [K in keyof CliDefaults]: CliDefaults[K] } = {};
-  // eslint-disable-next-line sonarjs/deprecation -- this loader is the canonical parser of the (deprecated, ADR-0022) cli.recipe fallback; it must still populate the field so resolveToolRecipeName can rank it last.
-  if (typeof raw.recipe === 'string') out.recipe = raw.recipe;
   const exclude = asStringArray(raw.exclude);
   if (exclude) out.exclude = exclude;
   if (typeof raw.verbose === 'boolean') out.verbose = raw.verbose;

@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-06-08
+last_verified: 2026-06-11
 release: v3.0.0
 title: "Migrating to 3.0 (GA)"
 audience: [plugin-authors, tool-authors]
-purpose: "What a tool/plugin author must change for the 3.0.0 GA cutover: register() is removed (declare commandSpecs), apiVersion is mandatory. CLI users need no changes."
+purpose: "What changes for the 3.0.0 GA cutover: register() is removed (declare commandSpecs), apiVersion is mandatory, and cli.recipe is removed."
 source-files:
   - packages/core/src/tools/types.ts
   - packages/core/src/tools/compatibility.ts
@@ -19,11 +19,13 @@ related-docs:
 2.x ladder built *alongside* the parity planes are removed, so a tool behaves
 identically whether it ships bundled, is installed from npm, or lives in a project
 ([ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md)). The breaking changes
-are **author-facing only**.
+are mostly **author-facing**; the one config-facing break is the removal of
+`cli.recipe`.
 
-> **CLI users: nothing changes.** Every command, flag, `--json` shape
-> (the 2.12.0 `CommandOutcome`), config file, and exit code is byte-identical to
-> 2.13.0. This page is for people who *write* a tool or plugin.
+> **Most CLI users: nothing changes.** Every command, flag, `--json` shape
+> (the 2.12.0 `CommandOutcome`), exit code, dashboard, and session shape is
+> byte-identical to 2.13.0. Projects that still set `cli.recipe` must move that
+> value under the owning tool block.
 
 If you author a third-party **Tool** (a package with `opensipTools.kind: "tool"`),
 two things changed. If you author a **check / scenario / adapter pack**, nothing
@@ -117,11 +119,35 @@ skipped with a diagnostic.
 your tool was built against (currently `1`); the CLI loads it when its epoch
 matches and rejects it — with a message — when it does not.
 
+## 3. `cli.recipe` is removed
+
+The 2.8.0 deprecation window for cross-tool recipe defaults is over. A recipe
+default belongs to the tool whose registry owns that recipe, and the `cli:`
+namespace is strict in 3.0.0, so a remaining `cli.recipe` key is rejected during
+config validation.
+
+**Before (2.x grace path):**
+
+```yaml
+cli:
+  recipe: opensip
+```
+
+**After (3.0.0):**
+
+```yaml
+fitness:
+  recipe: opensip
+```
+
+Use `graph.recipe` or `simulation.recipe` for graph or sim defaults. If a project
+needs different defaults for multiple tools, set each tool block independently.
+
 ## What did *not* change
 
 - **Check / scenario / adapter packs** — no command surface to migrate; they were
   always declarative.
 - **`--json` output shape** — still the 2.12.0 `CommandOutcome` wrapper.
-- **Config, env vars, exit codes, dashboards, sessions** — unchanged.
+- **Env vars, exit codes, dashboards, sessions** — unchanged.
 - **The bundled tools** (`fit`/`graph`/`sim`) — same commands, same behaviour;
   internally they now load through the same plugin path your tool does.
