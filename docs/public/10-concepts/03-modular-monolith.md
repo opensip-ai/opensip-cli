@@ -204,7 +204,7 @@ opensip-tools           ─── imports ───►  @opensip-tools/fitness
    the CLI's loaded check registry, populated at startup
 ```
 
-The `cli` imports `fitness` to get the `fitnessTool` (Layer 5 → Layer 3). It also imports the bundled language adapters to register them (Layer 5 → Layer 3). It does **not** import `checks-universal` directly — instead, the plugin loader walks `node_modules` at runtime and discovers any package declaring `opensipTools.kind: "fit-pack"` (or listed exactly in `plugins.checkPackages`). The check pack imports `fitness` (for `defineCheck`) and `core` (for `Signal`), both lower layers. Every arrow points up.
+The `cli` imports the bundled language adapters to register them (Layer 5 → Layer 3). First-party tools are not statically imported by runtime symbol: the CLI lists their package names, resolves their manifests on disk, admits them, and dynamic-imports the same `tool` export shape that installed tool plugins use. It does **not** import `checks-universal` directly — instead, the plugin loader walks `node_modules` at runtime and discovers any package declaring `opensipTools.kind: "fit-pack"` (or listed exactly in `plugins.checkPackages`). The check pack imports `fitness` (for `defineCheck`) and `core` (for `Signal`), both lower layers. Every arrow points up.
 
 ---
 

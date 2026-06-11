@@ -300,11 +300,12 @@ interface FitnessExecutionOptions {
 interface FitnessReportingOptions {
   readonly format: 'table' | 'json' | 'unified';   // default: table
   readonly verbose: boolean;                         // default: false
-  readonly outputPath?: string;                      // not currently honored
 }
 ```
 
 These set the *recipe's* default reporting. The CLI flag `--json` overrides whatever the recipe says — the user always wins. The `unified` format is a compact mode for verbose terminal output; `table` is the default human-readable shape.
+
+Recipe-owned file paths are not part of the supported reporting contract. If a recipe object carries a historical `outputPath` field, the CLI ignores it; use shell redirection with `--json`, `--report-to`, or `fit-baseline-export` for file artifacts.
 
 ---
 

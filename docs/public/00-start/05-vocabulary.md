@@ -108,7 +108,7 @@ Targets also carry semantic metadata: `languages` (`'typescript' | 'rust' | ...`
 
 ## Language adapter
 
-A **LanguageAdapter** is a per-language plugin that the framework dispatches to during content filtering. It implements one operation: given a file path and raw content, return content with comments and string literals stripped (so a check like `/TODO/` doesn't match the word "TODO" inside a comment that says "fix TODO bug").
+A **LanguageAdapter** is a bundled per-language adapter that the framework dispatches to during content filtering. It implements one operation: given a file path and raw content, return content with comments and string literals stripped (so a check like `/TODO/` doesn't match the word "TODO" inside a comment that says "fix TODO bug").
 
 The interface is in [`packages/core/src/languages/adapter.ts`](../../../packages/core/src/languages/adapter.ts). Six adapters ship today, one per language: `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`. The CLI registers all six at startup; the framework dispatches per-file based on extension.
 
@@ -120,7 +120,7 @@ A **plugin** is anything opensip-tools loads at runtime that wasn't compiled int
 
 1. **Source-file plugins.** `.mjs` files under `opensip-tools/{fit,sim}/{checks,recipes,scenarios}/`. The plugin loader auto-discovers them at startup. Adding a check is "drop a file in checks/" — no config change.
 2. **npm-package plugins.** **Tools** are any package whose `package.json` declares `opensipTools.kind === 'tool'`; **check packs** declare `opensipTools.kind === 'fit-pack'` (marker discovery). **Sim packs** are discovered by **name-pattern** (ADR-0029): any installed `<scope>/scenarios-*` package under `@opensip-tools` plus configured `plugins.packageScopes`. There is no `opensipTools.kind === 'sim-pack'` marker — sim marker discovery was retired in ADR-0029. See [`packages/core/src/plugins/tool-package-discovery.ts`](../../../packages/core/src/plugins/tool-package-discovery.ts), [`packages/fitness/engine/src/plugins/check-package-discovery.ts`](../../../packages/fitness/engine/src/plugins/check-package-discovery.ts), and [`packages/simulation/engine/src/plugins/scenario-package-discovery.ts`](../../../packages/simulation/engine/src/plugins/scenario-package-discovery.ts).
-3. **Project-pinned plugins.** Listed under `plugins.{fit,sim,asm,lang}:` in `opensip-tools.config.yml`. When this list is present, *only* those packages are loaded — auto-discovery is disabled, so no surprise plugin gets pulled in via a transitive dep.
+3. **Project-pinned tool-domain plugins.** Listed under `plugins.fit:` or `plugins.sim:` in `opensip-tools.config.yml`. When a project-pinned list is present for that domain, only those packages are loaded for the project-local plugin lane. Separate capability pins use `plugins.checkPackages:`, `plugins.scenarioPackages:`, and `plugins.graphAdapters:`. Language adapters are bundled by the CLI and are not project-discovered plugins.
 
 The `opensip-tools plugin` command surface (`add`/`remove`/`list`/`sync`) manages the project-pinned form. See [`packages/cli/src/commands/plugin.ts`](../../../packages/cli/src/commands/plugin.ts).
 
@@ -134,7 +134,7 @@ The runtime dir is gitignored — sessions are local artifacts, not source. The 
 
 ## Gate
 
-A **gate** is the architecture-baseline workflow. `opensip-tools fit --gate-save` writes the current findings to a SARIF baseline. `opensip-tools fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated).
+A **gate** is the architecture-baseline workflow. `opensip-tools fit --gate-save` stores the current run's `SignalEnvelope` in the project SQLite baseline. `opensip-tools fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated). Use `opensip-tools fit-baseline-export` when CI needs a SARIF file.
 
 The gate matches by `(filePath, ruleId, message)` — line numbers are deliberately excluded from the identity hash so unrelated line shifts don't register as added/resolved violations. See [`packages/fitness/engine/src/gate.ts`](../../../packages/fitness/engine/src/gate.ts) and [`../10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md).
 

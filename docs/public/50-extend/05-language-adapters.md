@@ -196,22 +196,9 @@ export const erlangAdapter: LanguageAdapter<ErlangTree, ErlangNode> = {
 export { erlangAdapter } from './adapter.js';
 ```
 
-Register it from the CLI (a future fix or a CLI-level config that adds the import) or via a `lang` plugin shape:
+Register it in the host composition root by adding the bundled package to the CLI's language-adapter imports. Language adapters are the canonical parse substrate, not runtime-discovered plugins: there is intentionally no `opensipTools.kind: "lang"` package marker or `plugins.lang` project config path. A future external-adapter model would need a new ADR that defines adapter-set identity and cache/baseline invalidation.
 
-```json
-{
-  "name": "@my-co/lang-erlang",
-  "main": "dist/index.js",
-  "opensipTools": { "kind": "lang" }
-}
-```
-
-```ts
-// dist/index.js
-export const adapters = [erlangAdapter];   // matches LangPluginExports
-```
-
-Then a project's targets can declare `languages: ['erlang']` and a check's `scope: { languages: ['erlang'] }` will match.
+Once the adapter is bundled and registered, a project's targets can declare `languages: ['erlang']` and a check's `scope: { languages: ['erlang'] }` will match.
 
 The tests for an adapter live in `packages/languages/lang-<name>/src/__tests__/`. Two shapes are essential:
 
