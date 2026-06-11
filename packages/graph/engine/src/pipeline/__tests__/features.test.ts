@@ -266,14 +266,36 @@ describe('buildFeatures — packageCoupling', () => {
       f.edge.find((e) => e.callerPackage === caller && e.calleePackage === callee)?.count;
     // cli→core: entry→hub, c3c→c3a = 2.
     expect(edgeOf('cli', 'core')).toBe(2);
-    // core→core: d1,d2,d3→hub (3), t1→d1, t2→d2 (2), c2a/c2b (2), c3a→c3b (1),
-    // tc→prod (1, the test caller lives in packages/core/src/__tests__) = 9.
-    expect(edgeOf('core', 'core')).toBe(9);
+    // core→core: d1,d2,d3→hub (3), t1→d1, t2→d2 (2), c2a/c2b (2), c3a→c3b (1) = 8.
+    // tc→prod is EXCLUDED: tc lives in a test file (inTestFile), and coupling is a
+    // production-architecture gate that skips test occurrences on both ends.
+    expect(edgeOf('core', 'core')).toBe(8);
     // core→cli: c3b→c3c = 1.
     expect(edgeOf('core', 'cli')).toBe(1);
     // package degrees: core calls into core + cli (2 out); cli + core call into core (2 in).
     expect(f.package.get('core')?.couplingOut).toBe(2);
     expect(f.package.get('core')?.couplingIn).toBe(2);
+  });
+
+  it('does not manufacture a cross-package edge from a test-file occurrence', () => {
+    // Regression: an anonymous body duplicated across packages can resolve to a
+    // same-hash occurrence in another package's TEST file, fabricating a phantom
+    // cross-package edge (and a phantom cycle). A test-file caller calling into a
+    // production occurrence of another package must NOT count.
+    const prod = occ({ bodyHash: 'p', simpleName: 'p', package: 'core' });
+    const testCaller = occ({
+      bodyHash: 'tcx',
+      simpleName: 'tcx',
+      package: 'output',
+      filePath: 'packages/output/src/__tests__/x.test.ts',
+      inTestFile: true,
+      calls: [call('p')],
+    });
+    const catalog = catalogOf({ p: [prod], tcx: [testCaller] });
+    const f = buildFeatures(catalog, buildIndexes(catalog), CONFIG, ['packageCoupling']);
+    expect(
+      f.edge.find((e) => e.callerPackage === 'output' && e.calleePackage === 'core'),
+    ).toBeUndefined();
   });
 });
 

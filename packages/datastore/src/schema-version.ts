@@ -13,6 +13,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { logger } from '@opensip-tools/core';
+
 /** Shape of the bits of Drizzle's `meta/_journal.json` we rely on. */
 interface DrizzleJournal {
   readonly entries?: readonly unknown[];
@@ -25,14 +27,21 @@ interface DrizzleJournal {
  * broken install). Callers treat `undefined` as "skip the version guard": the
  * subsequent `migrate()` reads the same journal and will surface the canonical
  * {@link DataStoreMigrationError} loudly, so skipping here hides nothing — it
- * just declines to invent a version we cannot determine.
+ * just declines to invent a version we cannot determine. We still warn so the
+ * anomaly is observable rather than silent.
  */
 export function readSupportedDbVersion(migrationsFolder: string): number | undefined {
+  const journalPath = join(migrationsFolder, 'meta', '_journal.json');
   try {
-    const journalPath = join(migrationsFolder, 'meta', '_journal.json');
     const parsed = JSON.parse(readFileSync(journalPath, 'utf8')) as DrizzleJournal;
     return Array.isArray(parsed.entries) ? parsed.entries.length : undefined;
-  } catch {
+  } catch (error) {
+    logger.warn({
+      evt: 'datastore.schema-version.journal-unreadable',
+      module: 'datastore:schema-version',
+      journalPath,
+      err: error,
+    });
     return undefined;
   }
 }

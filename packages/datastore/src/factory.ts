@@ -77,6 +77,9 @@ export const DataStoreFactory = {
  * Open a backend and run migrations, mapping both failures to
  * {@link DataStoreMigrationError}. Used for the in-memory path (which needs no
  * version guard — it is ephemeral) and shared message handling.
+ *
+ * @throws {DataStoreMigrationError} When the backend cannot be opened or the
+ *   migrations folder fails to apply; the original cause is preserved.
  */
 function openAndMigrate(
   opts: DataStoreOpenOptions,

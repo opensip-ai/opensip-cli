@@ -438,11 +438,19 @@ function computePackageCoupling(indexes: Indexes): {
 } {
   const counts = new Map<string, Map<string, number>>();
   for (const occ of indexes.byBodyHash.values()) {
+    // Package coupling is a PRODUCTION-architecture gate (graph:unexpected-coupling).
+    // Test-file occurrences are not production architecture — and, because an
+    // anonymous body duplicated between packages can resolve to a same-hash
+    // occurrence in another package's test file, counting them manufactures
+    // phantom cross-package edges (and phantom cycles). Skip test occurrences on
+    // BOTH ends, mirroring how every other production-gating rule skips
+    // `occ.inTestFile`.
+    if (occ.inTestFile) continue;
     const callerPkg = pkgOf(occ);
     for (const callEdge of occ.calls) {
       for (const target of callEdge.to) {
         const callee = resolveCallee(target, occ, indexes);
-        if (!callee) continue;
+        if (!callee || callee.inTestFile) continue;
         const calleePkg = pkgOf(callee);
         let row = counts.get(callerPkg);
         if (!row) {
