@@ -12,7 +12,10 @@
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js';
 import { createFaultModel } from '../../framework/execution/fault-model.js';
 import { runLoadWindow } from '../../framework/execution/run-load-window.js';
-import { ScenarioResultBuilder } from '../../framework/result-builder.js';
+import {
+  buildFailedScenarioSignal,
+  ScenarioResultBuilder,
+} from '../../framework/result-builder.js';
 import { createScenarioLogger } from '../../framework/scenario-logger.js';
 
 import type { ChaosScenarioConfig } from './config.js';
@@ -101,7 +104,8 @@ export function createChaosScenarioRunner(
             config.recoveryAssertions,
           );
 
-          const passed = steadyVerdict.failed.length === 0 && recoveryVerdict.failed.length === 0;
+          const failedAssertions = [...steadyVerdict.failed, ...recoveryVerdict.failed];
+          const passed = failedAssertions.length === 0;
 
           const chaosEvents: readonly ChaosEvent[] = Object.freeze(
             faultModel.drained().map((f) =>
@@ -118,7 +122,13 @@ export function createChaosScenarioRunner(
             scenarioId: config.id,
             passed,
             durationMs: Date.now() - startTime,
-            signals: Object.freeze([] as const),
+            // ADR-0035: surface a failed chaos scenario in the signal currency
+            // (steady- and recovery-window assertion failures), so the host
+            // verdict sees it. The load path emits via build(); chaos builds its
+            // own payload, so it must emit here.
+            signals: passed
+              ? Object.freeze([] as const)
+              : Object.freeze([buildFailedScenarioSignal(config.id, failedAssertions)]),
             outcome: Object.freeze({
               steadyStateMetrics: steady.metrics,
               recoveryMetrics: recovery.metrics,

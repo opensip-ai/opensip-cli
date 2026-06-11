@@ -6,7 +6,7 @@
  * Assertions are evaluated in order.
  */
 
-import { ValidationError } from '@opensip-tools/core';
+import { createSignal, isErrorSignal, ValidationError } from '@opensip-tools/core';
 
 import { evaluateAssertion } from './assertions.js';
 import { resolveMetric } from './resolve-metric.js';
@@ -18,6 +18,31 @@ import type {
   LoadResultPayload,
 } from '../types/framework-types.js';
 import type { Signal } from '@opensip-tools/core';
+
+/**
+ * Build the single error-severity signal that represents a failed scenario
+ * (ADR-0011 / ADR-0035). A failed scenario must surface in the signal currency
+ * so the host verdict — and every sink (`--json`, SARIF, cloud) — sees it; the
+ * pre-ADR-0035 sim emitted no signal on failure, leaving `errors === 0` for a
+ * run that should fail. One `high`-severity signal per failed scenario,
+ * attributed to its `scenarioId`, summarizing the failed assertions. Shared by
+ * the load path (via `build()`) and the chaos executor.
+ */
+export function buildFailedScenarioSignal(
+  scenarioId: string,
+  failedAssertions: readonly FailedAssertion[],
+): Signal {
+  const detail = failedAssertions
+    .map((a) => `${a.metric} ${a.operator} ${String(a.value)} (actual ${String(a.actual)})`)
+    .join('; ');
+  return createSignal({
+    source: scenarioId,
+    severity: 'high',
+    category: 'resilience',
+    ruleId: `sim:${scenarioId}`,
+    message: `Scenario '${scenarioId}' failed ${String(failedAssertions.length)} assertion(s): ${detail}`,
+  });
+}
 
 // =============================================================================
 // RESULT BUILDER
@@ -142,6 +167,14 @@ export class ScenarioResultBuilder {
       });
     }
 
+    // ADR-0035: a failed scenario must emit an error-severity signal so the host
+    // verdict sees the failure (the signal currency, not just `passed`). Append
+    // one unless the scenario already authored an error signal of its own.
+    const signals = [...this._signals];
+    if (this._failedAssertions.length > 0 && !signals.some(isErrorSignal)) {
+      signals.push(buildFailedScenarioSignal(this.scenarioId, this._failedAssertions));
+    }
+
     return Object.freeze({
       passed: this._failedAssertions.length === 0,
       metrics: this._metrics,
@@ -149,7 +182,7 @@ export class ScenarioResultBuilder {
         passed: Object.freeze([...this._passedAssertions]),
         failed: Object.freeze([...this._failedAssertions]),
       }),
-      signals: Object.freeze([...this._signals]),
+      signals: Object.freeze(signals),
     });
   }
 
