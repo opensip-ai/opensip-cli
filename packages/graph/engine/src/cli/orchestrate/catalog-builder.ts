@@ -135,14 +135,14 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
     detailFn: (w) => `${String(Object.keys(w.occurrences).length)} functions`,
   });
 
-  const initialCatalog = assembleCatalog(
+  const initialCatalog = assembleCatalog({
     adapter,
     discovery,
-    walked.occurrences,
+    occurrences: walked.occurrences,
     resolutionMode,
     engineMode,
-    walked.reExports ?? [],
-  );
+    reExports: walked.reExports ?? [],
+  });
 
   // Stitch inside the resolve stage so the checklist detail counts the
   // catalog's resolved call edges — the same catalog-derived
@@ -265,12 +265,12 @@ export async function buildAndResolveCatalogIncremental(
   const mergedFunctions = mergeOccurrences(cachedCatalog, walked.occurrences, closureRel);
   const mergedReExports = mergeReExports(cachedCatalog, walked.reExports ?? [], closureRel);
   const initialCatalog = {
-    ...assembleCatalog(
+    ...assembleCatalog({
       adapter,
       discovery,
-      mergedFunctions as Record<string, FunctionOccurrence[]>,
+      occurrences: mergedFunctions as Record<string, FunctionOccurrence[]>,
       resolutionMode,
-    ),
+    }),
     functions: mergedFunctions,
     ...(mergedReExports.length > 0 ? { reExports: mergedReExports } : {}),
   } as Catalog;
@@ -355,19 +355,30 @@ function attachDependenciesIncremental(
   return out;
 }
 
+/** Inputs for {@link assembleCatalog}. */
+interface AssembleCatalogInput {
+  readonly adapter: GraphLanguageAdapter;
+  readonly discovery: DiscoverOutput;
+  readonly occurrences: Record<string, FunctionOccurrence[]>;
+  readonly resolutionMode: ResolutionMode;
+  readonly engineMode?: EngineMode;
+  readonly reExports?: readonly ReExportRecord[];
+}
+
 /**
  * Build the catalog skeleton from walked occurrences. The catalog has
  * empty `calls` arrays at this point; `resolveCallSites` produces the
  * edges, and `stitchEdges` writes them in.
  */
-function assembleCatalog(
-  adapter: GraphLanguageAdapter,
-  discovery: DiscoverOutput,
-  occurrences: Record<string, FunctionOccurrence[]>,
-  resolutionMode: ResolutionMode,
-  engineMode: EngineMode = 'exact',
-  reExports: readonly ReExportRecord[] = [],
-): Catalog {
+function assembleCatalog(input: AssembleCatalogInput): Catalog {
+  const {
+    adapter,
+    discovery,
+    occurrences,
+    resolutionMode,
+    engineMode = 'exact',
+    reExports = [],
+  } = input;
   return {
     version: '3.0',
     tool: 'graph',

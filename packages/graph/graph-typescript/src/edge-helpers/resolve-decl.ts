@@ -79,7 +79,7 @@ export function resolveDeclToHash(
       pinByFileAndName(declSourceFile, candidateNames, ctx));
   // Per-site decl-file discriminator trace — no-op unless GRAPH_SITE_LOG is set
   // (debug-only; isolated in resolution-trace.ts so this resolver stays env-clean).
-  traceResolveDecl(ctx, candidateNames, bindingNames, declSourceFile, dts, out);
+  traceResolveDecl({ ctx, candidateNames, bindingNames, declSourceFile, dts, out });
   return out;
 }
 
