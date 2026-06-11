@@ -46,12 +46,15 @@ export function buildCrossPackageContext(
   catalog: Catalog,
   projectDirAbs: string,
 ): CrossPackageContext {
+  const manifestIndex = buildPackageManifestIndexFromRoots(
+    derivePackageRoots(catalog, projectDirAbs),
+    projectDirAbs,
+  );
   return {
-    exportIndex: buildExportIndex(catalog),
-    manifestIndex: buildPackageManifestIndexFromRoots(
-      derivePackageRoots(catalog, projectDirAbs),
-      projectDirAbs,
-    ),
+    // Pass the manifest index so the export index can follow re-export chains
+    // (a name re-exported by package A from package B resolves under A).
+    exportIndex: buildExportIndex(catalog, manifestIndex),
+    manifestIndex,
   };
 }
 

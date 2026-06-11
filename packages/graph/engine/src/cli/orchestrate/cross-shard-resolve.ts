@@ -270,7 +270,7 @@ export function resolveCrossBoundaryCalls(
   boundaryCalls: readonly CrossBoundaryCall[],
   manifestIndex: PackageManifestIndex,
 ): CrossShardOutput {
-  const exportIndex = buildExportIndex(merged);
+  const exportIndex = buildExportIndex(merged, manifestIndex);
   const nameIndex = buildNameIndex(merged);
   const knownFiles = new Set<string>(
     Object.values(merged.functions)

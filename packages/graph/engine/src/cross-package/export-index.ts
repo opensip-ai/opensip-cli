@@ -38,7 +38,7 @@ import { packageOf } from '../resolve-callee.js';
 import { toPosixPath } from './posix-path.js';
 
 import type { Shard } from '../cli/orchestrate/shard-model.js';
-import type { Catalog, FunctionOccurrence } from '../types.js';
+import type { Catalog, FunctionOccurrence, ReExportRecord } from '../types.js';
 
 // ── Task 1.1: per-package export symbol index ─────────────────────
 
@@ -69,7 +69,10 @@ export type ExportIndex = ReadonlyMap<
  * `exportIndex.get(packageGroup)` where `packageGroup` comes from
  * {@link resolveSpecifierToPackage}.
  */
-export function buildExportIndex(catalog: Catalog): ExportIndex {
+export function buildExportIndex(
+  catalog: Catalog,
+  manifestIndex?: PackageManifestIndex,
+): ExportIndex {
   const index = new Map<string, Map<string, FunctionOccurrence[]>>();
   for (const occs of Object.values(catalog.functions)) {
     if (!occs) continue;
@@ -82,7 +85,70 @@ export function buildExportIndex(catalog: Catalog): ExportIndex {
       else byName.set(occ.simpleName, [occ]);
     }
   }
+  // Re-export following: make a name reachable under the package that RE-EXPORTS
+  // it (not just its defining package). Needs the manifest index to turn a
+  // workspace specifier into a package group; callers without one get the
+  // base (defining-package-only) index — back-compatible.
+  if (manifestIndex !== undefined && catalog.reExports && catalog.reExports.length > 0) {
+    applyReExports(index, catalog.reExports, manifestIndex);
+  }
   return index;
+}
+
+/**
+ * Fold re-export facts into the export index: for each `(reExportingPackage,
+ * exportedName)`, point at the SOURCE occurrence the name is defined as in the
+ * package the specifier resolves to. Runs to a FIXPOINT so chains resolve (A
+ * re-exports from B which re-exports from C). Decline-beats-guess: a name already
+ * present in the re-exporting package's bucket (a local definition, or an earlier
+ * deterministic re-export) is never overwritten; an unresolvable specifier
+ * (external npm) or absent source name is skipped.
+ *
+ * Relative specifiers (`'./x'`) resolve within the SAME package — the name is
+ * already an occurrence there — so they are effectively no-ops; the load-bearing
+ * case is a WORKSPACE specifier (`'@scope/pkg'`) crossing a package boundary.
+ */
+function applyReExports(
+  index: Map<string, Map<string, FunctionOccurrence[]>>,
+  reExports: readonly ReExportRecord[],
+  manifestIndex: PackageManifestIndex,
+): void {
+  // Each (pkg, name) is added at most once (never overwritten), so the total
+  // number of additions is bounded and the fixpoint terminates; the cap is a
+  // belt-and-braces guard against a pathological re-export cycle.
+  const MAX_PASSES = 16;
+  for (let pass = 0; pass < MAX_PASSES; pass++) {
+    let changed = false;
+    for (const r of reExports) {
+      const fromPkg = packageOf(r.fromFile);
+      const sourcePkg = r.specifier.startsWith('.')
+        ? fromPkg // relative re-export stays in-package (already indexed)
+        : resolveSpecifierToPackage(r.specifier, manifestIndex)?.packageGroup;
+      if (sourcePkg === undefined) continue; // external / untracked dep
+      const sourceBucket = index.get(sourcePkg);
+      if (sourceBucket === undefined) continue;
+      const fromBucket = getOrCreateMap(index, fromPkg);
+
+      if (r.exportedName === '*') {
+        // `export * from sourcePkg` — expose every source export not already
+        // defined/owned by the re-exporting package.
+        for (const [name, occs] of sourceBucket) {
+          if (!fromBucket.has(name)) {
+            fromBucket.set(name, occs);
+            changed = true;
+          }
+        }
+        continue;
+      }
+      if (fromBucket.has(r.exportedName)) continue; // local def / earlier re-export wins
+      const occs = sourceBucket.get(r.sourceName);
+      if (occs && occs.length > 0) {
+        fromBucket.set(r.exportedName, occs);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
 }
 
 /**
