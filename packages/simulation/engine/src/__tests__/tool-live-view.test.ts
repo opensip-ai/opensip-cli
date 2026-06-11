@@ -123,7 +123,8 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     // handler's renderLive, once here via the direct callback invocation).
     expect(renderSimLive).toHaveBeenCalled();
     // The returned envelope was delivered to the composition root with egress
-    // options derived from the args; a failing run marks runFailed=true.
+    // options derived from the args. ADR-0035: a normal run does NOT pass
+    // `runFailed` — the host derives the findings exit from envelope.verdict.passed.
     expect(cap.delivered.length).toBeGreaterThanOrEqual(1);
     const last = cap.delivered.at(-1);
     expect(last?.envelope).toBe(fakeEnvelope);
@@ -131,8 +132,8 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
       cwd: '/proj',
       reportTo: 'https://cloud.example',
       apiKey: 'k',
-      runFailed: true,
     });
+    expect(last?.opts).not.toHaveProperty('runFailed');
   });
 
   it('does not deliver when the renderer returns no envelope', async () => {

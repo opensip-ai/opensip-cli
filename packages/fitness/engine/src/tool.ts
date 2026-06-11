@@ -147,11 +147,12 @@ function setUpFitLiveView(cli: ToolCliContext): void {
     // (critical/high signals) dominates a `--report-to` upload failure so a
     // real failure is never masked by exit 4.
     if (envelope !== undefined) {
+      // ADR-0035: the host derives the findings exit from envelope.verdict.passed
+      // inside deliverSignals — no runFailed override on a normal run.
       await cli.deliverSignals(envelope, {
         cwd: fitArgs.cwd,
         reportTo: fitArgs.reportTo,
         apiKey: fitArgs.apiKey,
-        runFailed: !envelope.verdict.passed,
       });
     }
   });

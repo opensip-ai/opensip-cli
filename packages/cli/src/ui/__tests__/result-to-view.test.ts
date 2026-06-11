@@ -251,7 +251,6 @@ describe('resultToView', () => {
     recipeName: 'example',
     cwd: '/x',
     durationMs: 1500,
-    shouldFail: true,
     envelope: buildSignalEnvelope({
       tool: 'sim',
       recipe: 'example',
@@ -282,7 +281,6 @@ describe('resultToView', () => {
   it('renders the empty-scenarios sim-done shape (no table, zeroed summary)', () => {
     const out = textOf({
       ...simBase,
-      shouldFail: false,
       envelope: buildSignalEnvelope({
         tool: 'sim',
         recipe: 'example',

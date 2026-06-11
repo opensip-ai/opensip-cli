@@ -76,22 +76,25 @@ function emitWarningsToStderr(result: { warnings?: readonly string[] }): void {
 /**
  * Deliver the run's signal envelope to the composition-root-owned effectful
  * sinks (ADR-0011 / ADR-0008): best-effort cloud sync + the `--report-to`
- * SARIF upload (which owns exit code 4). Called once per mode, after the
- * render/emit. `runFailed` is the real exit decision (`shouldFail` /
- * gate-degraded), so a `--report-to` upload failure never masks a genuine
- * check/gate failure. No-op when neither cloud nor `--report-to` is active.
+ * SARIF upload — and, since ADR-0035, the host-owned FINDINGS exit code.
+ *
+ * Normal runs OMIT `runFailed`: the host derives the findings exit from
+ * `envelope.verdict.passed` (the single verdict). The gate-COMPARE mode passes
+ * its baseline-diff predicate (`degraded`), which is not expressible over the
+ * run's verdict; the host honours that override and a `--report-to` upload
+ * failure never masks the gate verdict. No-op when neither sink is active.
  */
 async function deliverFitSignals(
   cli: ToolCliContext,
   envelope: SignalEnvelope,
   args: FitOptions,
-  runFailed: boolean,
+  runFailed?: boolean,
 ): Promise<void> {
   await cli.deliverSignals(envelope, {
     cwd: args.cwd,
     reportTo: args.reportTo,
     apiKey: args.apiKey,
-    runFailed,
+    ...(runFailed === undefined ? {} : { runFailed }),
   });
 }
 
@@ -160,19 +163,16 @@ export async function runJsonMode(args: FitOptions, cli: ToolCliContext): Promis
     cli.emitError({ message: fitResult.result.message, exitCode: fitResult.result.exitCode });
     return;
   }
-  const runFailed = fitResult.result.shouldFail === true;
-  if (runFailed) {
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-  }
   // ADR-0011: emit the signal envelope through the shared `formatSignalJson`
   // formatter (the root owns stdout). No per-tool re-stringification.
   cli.emitEnvelope(fitResult.envelope);
   // Warnings collected during the run go to stderr so JSON consumers still
   // see them without contaminating the structured stdout payload.
   emitWarningsToStderr(fitResult.result);
-  // Effectful egress lives at the composition root: cloud sync + `--report-to`
-  // (which owns exit 4). Called once, after the JSON is on stdout.
-  await deliverFitSignals(cli, fitResult.envelope, args, runFailed);
+  // ADR-0011/ADR-0035: the composition root owns effectful egress (cloud +
+  // `--report-to`, exit 4) AND the findings exit code (derived from the
+  // envelope verdict). Called once, after the JSON is on stdout.
+  await deliverFitSignals(cli, fitResult.envelope, args);
 }
 
 /**
@@ -205,14 +205,10 @@ export async function runLiveMode(
       cli.setExitCode(fitResult.result.exitCode);
       await cli.render(fitResult.result);
     } else {
-      const runFailed = fitResult.result.shouldFail === true;
-      if (runFailed) {
-        cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-      }
       await cli.render(fitResult.result);
-      // Effectful egress at the composition root (cloud + `--report-to`),
-      // composing with non-TTY runs (CI), not just the TTY live view.
-      await deliverFitSignals(cli, fitResult.envelope, args, runFailed);
+      // Effectful egress + host-owned findings exit at the composition root
+      // (ADR-0035), composing with non-TTY runs (CI), not just the TTY live view.
+      await deliverFitSignals(cli, fitResult.envelope, args);
     }
   }
   await cli.maybeOpenDashboard({
@@ -273,20 +269,18 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
       // branch protection (external config the release-gate ADR-0017 explicitly
       // declined to trust). The SARIF export runs in a separate `if: always()`
       // CI step, so the baseline + net-new PR annotations survive a failed gate.
-      // `runFailed` dominates a `--report-to` upload failure (exit 4) so a
-      // report failure never masks the gate verdict (same rule as gate-compare).
-      const runFailed = fitResult.result.shouldFail === true;
-      if (runFailed) {
-        cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-      }
-      await deliverFitSignals(cli, envelope, args, runFailed);
+      // ADR-0035: gate-save's findings gate IS the host verdict (fit's resolved
+      // failOnErrors/failOnWarnings), so the host sets the exit from the envelope
+      // verdict in deliverFitSignals — no per-path setExitCode needed.
+      await deliverFitSignals(cli, envelope, args);
       return;
     }
     const result = compareToBaseline(envelope, repo);
     await cli.render({ type: 'gate-done', lines: renderGateCompareOutput(result).split('\n') });
-    cli.setExitCode(result.degraded ? EXIT_CODES.RUNTIME_ERROR : EXIT_CODES.SUCCESS);
-    // A gate regression dominates a `--report-to` upload failure: pass
-    // `degraded` as runFailed so exit 4 never masks the gate verdict.
+    // gate-compare's verdict is the baseline-diff `degraded` predicate, NOT the
+    // findings policy — pass it as the host runFailed override (ADR-0035). The
+    // host sets the exit (degraded → RUNTIME_ERROR, else SUCCESS) and a
+    // `--report-to` upload failure never masks the gate verdict.
     await deliverFitSignals(cli, envelope, args, result.degraded);
     return;
   } catch (error) {

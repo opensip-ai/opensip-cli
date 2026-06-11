@@ -10,7 +10,7 @@
  * single `deliverSignals` egress call (the root owns exit 4, tested there).
  */
 
-import { EXIT_CODES, buildSignalEnvelope } from '@opensip-tools/contracts';
+import { buildSignalEnvelope } from '@opensip-tools/contracts';
 import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
@@ -113,7 +113,7 @@ describe('runLiveMode', () => {
 
   it('falls back to the static fit-done result + delivers once on non-TTY', async () => {
     setTTY(false);
-    const result = { type: 'fit-done', shouldFail: false };
+    const result = { type: 'fit-done' };
     executeFitMock.mockResolvedValue({ result, envelope: envelope() });
     const { cli, renderLive, render, setExitCode, deliverSignals } = mockCli();
     await runLiveMode(args, cli, 'fit', false);
@@ -121,20 +121,24 @@ describe('runLiveMode', () => {
     expect(executeFitMock).toHaveBeenCalledTimes(1);
     expect(render).toHaveBeenCalledWith(result);
     expect(deliverSignals).toHaveBeenCalledTimes(1);
-    // A passing run that didn't breach the fail threshold leaves the exit code alone.
+    // ADR-0035: the mode no longer sets the findings exit — the host derives it
+    // from envelope.verdict.passed inside deliverSignals (mocked here; the exit
+    // behaviour is covered in envelope-routing.test.ts).
     expect(setExitCode).not.toHaveBeenCalled();
   });
 
-  it('exits RUNTIME_ERROR on a non-TTY run that breached the fail threshold', async () => {
+  it('delivers the envelope on a non-TTY run; the host owns the findings exit (ADR-0035)', async () => {
     setTTY(false);
     executeFitMock.mockResolvedValue({
-      result: { type: 'fit-done', shouldFail: true },
+      result: { type: 'fit-done' },
       envelope: envelope(),
     });
-    const { cli, setExitCode, render } = mockCli();
+    const { cli, render, deliverSignals } = mockCli();
     await runLiveMode(args, cli, 'fit', false);
-    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
+    // The mode renders + delivers; deliverSignals (the host seam) owns the exit.
     expect(render).toHaveBeenCalled();
+    expect(deliverSignals).toHaveBeenCalledTimes(1);
+    expect(deliverSignals.mock.calls[0]?.[1]).not.toHaveProperty('runFailed');
   });
 
   it("propagates an error result's exit code on a non-TTY run (no delivery)", async () => {
@@ -156,34 +160,37 @@ describe('runJsonMode', () => {
     apiKey: 'k',
   } as unknown as Parameters<typeof runJsonMode>[0];
 
-  it('emits the envelope and delivers signals once', async () => {
+  it('emits the envelope and delivers signals once (no runFailed — host derives exit)', async () => {
     const env = envelope();
     executeFitMock.mockResolvedValue({
-      result: { type: 'fit-done', shouldFail: false },
+      result: { type: 'fit-done' },
       envelope: env,
     });
     const { cli, emitEnvelope, deliverSignals } = mockCli();
     await runJsonMode(reportArgs, cli);
     expect(emitEnvelope).toHaveBeenCalledWith(env);
     expect(deliverSignals).toHaveBeenCalledTimes(1);
+    // ADR-0035: a normal run delivers WITHOUT `runFailed`; the host derives the
+    // findings exit from envelope.verdict.passed.
     expect(deliverSignals).toHaveBeenCalledWith(env, {
       cwd: '/x',
       reportTo: 'https://sink.example',
       apiKey: 'k',
-      runFailed: false,
     });
   });
 
-  it('passes runFailed=true to deliverSignals on a failing run (root owns exit 4)', async () => {
+  it('delivers without runFailed on a failing run; the host owns the exit (ADR-0035)', async () => {
     const env = envelope();
     executeFitMock.mockResolvedValue({
-      result: { type: 'fit-done', shouldFail: true },
+      result: { type: 'fit-done' },
       envelope: env,
     });
     const { cli, setExitCode, deliverSignals } = mockCli();
     await runJsonMode(reportArgs, cli);
-    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
-    expect(deliverSignals).toHaveBeenCalledWith(env, expect.objectContaining({ runFailed: true }));
+    // The mode no longer computes shouldFail or sets the exit — deliverSignals
+    // (the host seam) owns it, derived from the envelope verdict.
+    expect(setExitCode).not.toHaveBeenCalled();
+    expect(deliverSignals.mock.calls[0]?.[1]).not.toHaveProperty('runFailed');
   });
 
   it('emits an error payload and does not deliver on an error result', async () => {

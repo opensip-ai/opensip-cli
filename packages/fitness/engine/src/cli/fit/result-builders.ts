@@ -133,12 +133,13 @@ export interface BuildFitDoneArgs {
 /**
  * Build the {@link FitDoneResult} the live renderer / non-TTY render path
  * consume. Carries the run's {@link SignalEnvelope} (the composition root
- * derives the terminal table + summary FROM it — one row per check unit) plus
- * the run label, the fail-threshold verdict, and non-fatal warnings.
+ * derives the terminal table + summary AND the findings exit code FROM it — one
+ * row per check unit, `envelope.verdict.passed` the single verdict) plus the run
+ * label and non-fatal warnings.
  *
- * `shouldFail` (the exit-code driver) is NOT envelope.verdict.passed: it folds
- * in the configured `failOnErrors`/`failOnWarnings` thresholds and the
- * plugin-load-error gate, which the pure signal verdict cannot express.
+ * ADR-0035: the exit code is no longer carried on the result. `verdict.passed`
+ * (computed with fit's resolved failOnErrors/failOnWarnings policy + plugin-load
+ * `runFaulted`) is the single exit driver; the host derives it in `deliverSignals`.
  *
  * Pure builder: session persistence (SessionRepo.save) lives at the
  * `executeFit` call site (post-call), not here. The envelope is assembled once
@@ -151,13 +152,6 @@ export function buildFitDoneResult({
   recipeName,
   warnings,
 }: BuildFitDoneArgs): FitDoneResult {
-  // ADR-0035 Phase 2 bridge: the exit decision is now the single host verdict.
-  // `envelope.verdict.passed` already folds in the policy (failOnErrors/
-  // failOnWarnings resolved from scope.toolConfig.fitness) AND plugin-load faults
-  // (carried on the envelope's `runFaulted`), so `shouldFail` is exactly its
-  // negation. Phase 3 deletes this field and derives the exit in the host.
-  const shouldFail = !envelope.verdict.passed;
-
   const label = args.tags ? `tags: ${args.tags}` : `recipe ${recipeName ?? 'default'}`;
 
   // ADR-0021: carry the verbose findings body on the result so the shared
@@ -170,7 +164,6 @@ export function buildFitDoneResult({
     label,
     cwd: args.cwd,
     envelope,
-    shouldFail,
     configFound: true,
     warnings: warnings && warnings.length > 0 ? warnings : undefined,
     ...(verboseDetail === undefined ? {} : { verboseDetail }),

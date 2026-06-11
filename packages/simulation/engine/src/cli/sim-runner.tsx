@@ -40,7 +40,6 @@ import {
   type ProgressSurface,
 } from '@opensip-tools/cli-ui';
 import {
-  EXIT_CODES,
   type ErrorResult,
   type SignalEnvelope,
   type ToolOptions,
@@ -148,7 +147,9 @@ export function SimRunner({
         setState({ phase: 'error', result });
         setExitCode?.(result.exitCode);
       } else {
-        if (result.shouldFail === true) setExitCode?.(EXIT_CODES.RUNTIME_ERROR);
+        // ADR-0035: the host owns the findings exit. The live renderer hands the
+        // envelope to `setUpSimLiveView` via `onEnvelope`, which calls
+        // `deliverSignals`; the root sets the exit from `envelope.verdict.passed`.
         // Persist on the MAIN thread (ADR-0028 — engine is persistence-free).
         if (datastore !== undefined) persistSimSession(datastore, result);
         onEnvelope?.(result.envelope);

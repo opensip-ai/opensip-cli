@@ -46,7 +46,6 @@ import {
   type ProgressSurface,
 } from '@opensip-tools/cli-ui';
 import {
-  EXIT_CODES,
   type FitOptions,
   type ErrorResult,
   type FitDoneResult,
@@ -170,9 +169,9 @@ function FitRunner({
 
       const { result } = fitResult as { result: FitDoneResult };
 
-      if (result.shouldFail) {
-        setExitCode?.(EXIT_CODES.RUNTIME_ERROR);
-      }
+      // ADR-0035: the host owns the findings exit. The live renderer returns the
+      // envelope to `setUpFitLiveView`, which calls `deliverSignals`; the root
+      // sets the exit from `envelope.verdict.passed` there. No setExitCode here.
 
       // Persist on the MAIN thread (ADR-0028 — the engine is persistence-free and
       // worker-safe; the datastore handle never crosses the worker boundary).

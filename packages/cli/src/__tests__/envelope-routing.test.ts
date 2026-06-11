@@ -305,7 +305,7 @@ describe('root --report-to (deliverEnvelope owns exit 4)', () => {
     expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
   });
 
-  it('does NOT set exit 4 when the run already failed (real failure dominates)', async () => {
+  it('sets the findings exit (RUNTIME_ERROR), not exit 4, when the run failed (real failure dominates)', async () => {
     const setExitCode = vi.fn();
     await runWithScope(makeScope(NOOP_SINK), () =>
       deliverEnvelope(ENVELOPE, {
@@ -317,13 +317,24 @@ describe('root --report-to (deliverEnvelope owns exit 4)', () => {
         fetchImpl: FAIL_400,
       }),
     );
-    expect(setExitCode).not.toHaveBeenCalled();
+    // ADR-0035: the host now owns the findings exit — a failed run sets
+    // RUNTIME_ERROR, and the report-upload failure (exit 4) is suppressed so the
+    // real failure dominates.
+    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
+    expect(setExitCode).not.toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
   });
 
   it('cloud sync stays best-effort and never affects exit code', async () => {
     const setExitCode = vi.fn();
+    // A PASSING envelope (no report-to) isolates cloud sync: the host only sets
+    // the findings exit when verdict.passed is false (ADR-0035), so with a passing
+    // verdict the cloud-only path must leave the exit code untouched.
+    const passing: SignalEnvelope = {
+      ...ENVELOPE,
+      verdict: { ...ENVELOPE.verdict, passed: true },
+    };
     await runWithScope(makeScope(NOOP_SINK), () =>
-      deliverEnvelope(ENVELOPE, { cwd: process.cwd(), repo: {}, setExitCode, fetchImpl: OK_200 }),
+      deliverEnvelope(passing, { cwd: process.cwd(), repo: {}, setExitCode, fetchImpl: OK_200 }),
     );
     expect(setExitCode).not.toHaveBeenCalled();
   });

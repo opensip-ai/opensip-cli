@@ -52,8 +52,11 @@ export interface DeliverEnvelopeOptions {
   /** Cloud API key for `--report-to` (read off the same flag as cloud sync). */
   readonly apiKey?: string;
   /**
-   * Whether the run already failed (gate regression / fail threshold). A real
-   * failure dominates the `--report-to` exit code (ADR-0008).
+   * Optional override for the findings-failure decision (ADR-0035). Normal runs
+   * OMIT this — the host derives the findings exit from `envelope.verdict.passed`
+   * (the single verdict). The gate-COMPARE modes pass their baseline-diff
+   * predicate (`degraded`): "net-new findings since baseline" is NOT expressible
+   * over the run's own verdict, so the host honours the override for that mode.
    */
   readonly runFailed?: boolean;
   /** Exit-code setter (the CLI's single write path). */
@@ -151,6 +154,14 @@ export async function deliverEnvelope(
   const log = opts.logger ?? defaultLogger;
   const repo = opts.repo ?? resolveRepoIdentity(opts.cwd);
 
+  // ADR-0035: the host owns the findings exit code. For a normal run it is a pure
+  // function of the run's single verdict — `envelope.verdict.passed` — so no tool
+  // computes its own exit; gate-compare overrides with its baseline-diff verdict.
+  // Set RUNTIME_ERROR first; the `--report-to` exit-4 below only applies when the
+  // run otherwise passed, so a real failure always dominates (last-write-wins).
+  const runFailed = opts.runFailed ?? !envelope.verdict.passed;
+  if (runFailed) opts.setExitCode?.(EXIT_CODES.RUNTIME_ERROR);
+
   const cloudAccepted = await emitToCloud(envelope, repo, log);
 
   if (opts.reportTo === undefined || opts.reportTo.length === 0) {
@@ -166,8 +177,9 @@ export async function deliverEnvelope(
     );
   }
   // Exit-code contract (ADR-0008): a report-upload failure exits 4 — but only
-  // when the run otherwise passed; a real failure (`runFailed`) dominates.
-  if (!reportSuccess && opts.runFailed !== true) {
+  // when the run otherwise passed; a real failure (`runFailed`, derived from the
+  // verdict above) dominates.
+  if (!reportSuccess && !runFailed) {
     opts.setExitCode?.(EXIT_CODES.REPORT_FAILED);
   }
 

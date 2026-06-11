@@ -92,11 +92,11 @@ function setUpSimLiveView(cli: ToolCliContext): void {
       datastore: cli.scope.datastore() as DataStore | undefined,
     });
     if (envelope !== undefined) {
+      // ADR-0035: the host derives the findings exit from envelope.verdict.passed.
       await cli.deliverSignals(envelope, {
         cwd: simArgs.cwd,
         reportTo: simArgs.reportTo,
         apiKey: simArgs.apiKey,
-        runFailed: !envelope.verdict.passed,
       });
     }
   });
@@ -146,8 +146,6 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
     return;
   }
 
-  if (result.shouldFail === true) cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-
   // ADR-0011: one render path per mode. `--json` emits the envelope
   // through the shared formatSignalJson; default renders the envelope-
   // derived per-scenario table.
@@ -157,13 +155,12 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
     await cli.render(result);
   }
 
-  // Effectful egress lives at the root (cloud sink + `--report-to`,
-  // which owns exit 4). Called once per run, after rendering.
+  // Effectful egress + host-owned findings exit live at the root (cloud sink +
+  // `--report-to` exit 4 + the verdict-derived exit, ADR-0035). Once per run.
   await cli.deliverSignals(result.envelope, {
     cwd: process.cwd(),
     reportTo: opts.reportTo,
     apiKey: opts.apiKey,
-    runFailed: result.shouldFail,
   });
 
   await cli.maybeOpenDashboard({

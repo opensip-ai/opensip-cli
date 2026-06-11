@@ -115,7 +115,7 @@ describe('executeSim', () => {
     }
   });
 
-  it('registers shouldFail=true when at least one scenario fails', async () => {
+  it('marks the run verdict failed when at least one scenario fails (ADR-0035)', async () => {
     // A bare RunnableScenario whose run() rejects to force a failure
     currentScenarioRegistry().register({
       id: 'crashes',
@@ -129,7 +129,9 @@ describe('executeSim', () => {
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
       expect(result.envelope.verdict.summary.failed).toBe(1);
-      expect(result.shouldFail).toBe(true);
+      // ADR-0035: the single host verdict drives the exit (no `shouldFail` field).
+      // A crashed scenario carries a unit error → the run verdict fails.
+      expect(result.envelope.verdict.passed).toBe(false);
     }
   });
 

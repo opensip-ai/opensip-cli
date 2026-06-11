@@ -322,11 +322,9 @@ export async function executeSim(
     recipeName,
     cwd: args.cwd,
     durationMs: recipeResult.durationMs,
-    // ADR-0035 Phase 2 bridge: the run verdict is now the single host verdict.
-    // With Phase 0, a failed scenario emits an error signal, so the {1,0} policy
-    // makes `!envelope.verdict.passed` exactly equal the old `failed > 0`. Phase 3
-    // deletes this field and derives the exit in the host.
-    shouldFail: !envelope.verdict.passed,
+    // ADR-0035: the run verdict is the single host verdict. With Phase 0 a failed
+    // scenario emits an error signal, so `envelope.verdict.passed` (with the {1,0}
+    // policy) is exactly the old `failed > 0`; the host derives the exit from it.
     envelope,
     ...(verboseDetail === undefined ? {} : { verboseDetail }),
   };

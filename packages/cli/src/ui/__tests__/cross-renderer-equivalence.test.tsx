@@ -52,7 +52,6 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
     recipeName: 'example',
     cwd: '/x',
     durationMs: 1500,
-    shouldFail: true,
     envelope: buildSignalEnvelope({
       tool: 'sim',
       recipe: 'example',

@@ -195,6 +195,15 @@ export interface ToolCliContext {
    */
   readonly setExitCode: (code: number) => void;
   /**
+   * Read the exit code set so far this run (`undefined` if none set yet). The
+   * host always provides it; it is optional only so the many inline test
+   * `ToolCliContext` stubs need not stub it. Used by gate COMPARE modes, which
+   * set their baseline-diff exit upstream and must re-affirm it when the host's
+   * `deliverSignals` would otherwise derive a findings exit from the run verdict
+   * (ADR-0035).
+   */
+  readonly getExitCode?: () => number | undefined;
+  /**
    * Emit a structured JSON value to the CLI's stdout. Centralises the
    * `process.stdout.write(JSON.stringify(value, null, 2) + '\n')` call
    * that every tool's `--json` mode would otherwise duplicate. The CLI

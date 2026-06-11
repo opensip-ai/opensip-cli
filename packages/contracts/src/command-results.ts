@@ -130,8 +130,6 @@ export interface FitDoneResult {
     chunksTotal?: number;
     chunksSucceeded?: number;
   };
-  /** Whether the run should cause a non-zero exit code (based on failOnErrors/failOnWarnings config) */
-  shouldFail?: boolean;
   /** Whether an opensip-tools.config.yml was found in the target directory */
   configFound?: boolean;
   /**
@@ -330,8 +328,6 @@ export interface SimDoneResult {
   recipeName: string;
   cwd: string;
   durationMs: number;
-  /** Whether the run should cause a non-zero exit code (any scenario failed). */
-  shouldFail?: boolean;
   /**
    * The run's signal envelope (ADR-0011). REQUIRED since Phase 4 (sim is
    * migrated): the composition root derives the terminal table (one row per

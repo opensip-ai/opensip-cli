@@ -136,7 +136,7 @@ describe('<SimRunner> — live-view state machine', () => {
     unmount();
   });
 
-  it('sets the runtime-error exit code when a scenario fails', async () => {
+  it('yields a failing-verdict envelope when a scenario fails (host owns the exit)', async () => {
     enterSimScope();
     // A scenario whose run() rejects → recorded as failed.
     currentScenarioRegistry().register({
@@ -161,13 +161,14 @@ describe('<SimRunner> — live-view state machine', () => {
     );
 
     await waitForFrame(lastFrame, 'Failed');
-    // EXIT_CODES.RUNTIME_ERROR === 1 (a failed scenario fails the run).
-    expect(exitCodes).toContain(1);
-    // The run still completes and yields an envelope; its summary records the
-    // failed unit (a thrown scenario fails its unit without emitting a
-    // critical/high signal, which is what drives shouldFail → the exit code).
+    // ADR-0035: the runner no longer sets the findings exit — it hands the
+    // envelope to the host (via onEnvelope → deliverSignals), which derives the
+    // exit from envelope.verdict.passed. The runner itself sets no findings code.
+    expect(exitCodes).not.toContain(1);
     expect(captured).toBeDefined();
     expect(captured?.verdict.summary.failed).toBe(1);
+    // A thrown scenario fails its unit → the run verdict fails → the host exits 1.
+    expect(captured?.verdict.passed).toBe(false);
 
     unmount();
   });
