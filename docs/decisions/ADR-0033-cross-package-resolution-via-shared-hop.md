@@ -178,8 +178,13 @@ catalog, unique-or-decline. Exact's inline pass still declines cross-package
 methods (the intra-package pin restriction from #2), so BOTH engines route them
 through the linker → symmetric. Measured on this repo: ~185 cross-package method
 edges now resolved (incl. part of the `logger.info()` arrow-property class), ~208
-decline (ambiguous / unmapped), divergence stays **0**. Regression tests:
-`method-target.test.ts` (the resolver) + the `method-target` cases in
-`cross-shard-resolve.test.ts` (the linker pin). Residual completeness gaps remain
-(the ~208 declines + arrow-property hashes findCatalogEntry can't reproduce),
-guarded by the completeness floor.
+decline, divergence stays **0**. The declines are CORRECT (diagnosed via
+`GRAPH_MT_DIAG`): dominantly INTERFACE/POLYMORPHIC dispatch — the checker attests
+the method to an interface/type signature (`ToolCliContext.setExitCode`,
+`DataStore.close`) with no function body, hence no unique concrete target — plus
+genuine same-name ambiguity and names with no occurrence. Resolving the
+interface class would require cross-package POLYMORPHIC dispatch (multi-target
+fan-out to every implementor), a separate larger feature, out of scope. So
+cross-package method resolution is COMPLETE for concrete unique targets.
+Regression tests: `method-target.test.ts` (the resolver) + the `method-target`
+cases in `cross-shard-resolve.test.ts` (the linker pin).

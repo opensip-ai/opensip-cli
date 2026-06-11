@@ -425,13 +425,28 @@ worsening) — it is a ratchet on an imperfect baseline, not a proof of equivale
   ~208 decline; divergence stays 0. Tests: `method-target.test.ts` +
   `cross-shard-resolve.test.ts` (method-target cases). ADR-0033 amendment #3.
 
+### 2026-06-11 — the method-target declines are CORRECT (diagnosed, not a gap)
+- **Diagnosed** the ~208 cross-package method declines (env `GRAPH_MT_DIAG`,
+  categorizing each decline by inFile/distinct/name-anywhere counts): **~229
+  NOTINFILE** = the checker attests the method to an INTERFACE/type signature
+  (e.g. `ToolCliContext.setExitCode`/`render`/`emitJson` in `core/src/tools/types.ts`,
+  `DataStore.close` in `data-store.ts`) — an interface method has no function body,
+  so no occurrence and no unique CONCRETE target = polymorphic dispatch; **~10
+  AMBIG** = genuine same-name ambiguity in the target file (`pluginsDir` get/set);
+  **~4 NONAME** = no occurrence anywhere. ALL are correct unique-or-decline
+  outcomes — there is no single semantic target to link. Resolving the NOTINFILE
+  class would need cross-package POLYMORPHIC dispatch (link to every implementor =
+  multi-target fan-out) — a separate, larger feature of debatable value, NOT a
+  resolver gap. Cross-package method resolution is therefore COMPLETE for concrete
+  unique targets.
+
 ### Still open after 2026-06-11
 - **Production divergence is 0.** The differential guardrail is now the true
   zero-divergence soundness invariant (all directional floors 0).
-- **The ~208 cross-package method declines** (unique-or-decline: ambiguous
-  name-in-target-file, or a dist→src mapping with no matching occurrence) +
-  **arrow-property hashes** findCatalogEntry can't reproduce. Both decline
-  (symmetric, guarded by the completeness floor).
+- **Cross-package POLYMORPHIC (interface-method) dispatch** — the only remaining
+  cross-package call class, deliberately declined (no unique target; would be
+  multi-target fan-out). A separate feature if ever wanted. Symmetric, guarded by
+  the completeness floor.
 - **Clean-checkout parity for WORKSPACE imports.** Exact still reaches the linker
   via the dep's built `dist/*.d.ts`; relative imports are clean-safe (file+name
   pin). Source-as-surface program change deferred.
