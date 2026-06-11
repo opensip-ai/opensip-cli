@@ -11,7 +11,7 @@
 import os from 'node:os';
 import v8 from 'node:v8';
 
-import { ConfigurationError, enterScope } from '@opensip-tools/core';
+import { ConfigurationError, runWithScope, runWithScopeSync } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -105,16 +105,17 @@ describe('totalSystemMemoryMb / systemHasMemoryFor', () => {
 
 describe('runHeapPreflight', () => {
   let prevSentinel: string | undefined;
+  let scope: ReturnType<typeof makeGraphTestScope>;
 
   beforeEach(() => {
     // Item 1: adapter registry is per-RunScope.
-    enterScope(makeGraphTestScope());
+    scope = makeGraphTestScope();
     prevSentinel = process.env.OPENSIP_HEAP_ELEVATED;
     delete process.env.OPENSIP_HEAP_ELEVATED;
   });
 
   afterEach(() => {
-    currentAdapterRegistry().clear();
+    runWithScopeSync(scope, () => currentAdapterRegistry().clear());
     vi.restoreAllMocks();
     if (prevSentinel === undefined) {
       delete process.env.OPENSIP_HEAP_ELEVATED;
@@ -123,19 +124,29 @@ describe('runHeapPreflight', () => {
     }
   });
 
+  function inGraphScope<T>(fn: () => Promise<T>): Promise<T> {
+    return runWithScope(scope, fn);
+  }
+
   it('throws ConfigurationError if no adapter is registered', async () => {
-    await expect(runHeapPreflight({ cwd: '/tmp' })).rejects.toThrow(ConfigurationError);
+    await inGraphScope(() =>
+      expect(runHeapPreflight({ cwd: '/tmp' })).rejects.toThrow(ConfigurationError),
+    );
   });
 
   it('short-circuits to false when running inside the elevated child', async () => {
-    currentAdapterRegistry().register(adapterWithFileCount(10_000));
-    process.env.OPENSIP_HEAP_ELEVATED = '1';
-    expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
+    await inGraphScope(async () => {
+      currentAdapterRegistry().register(adapterWithFileCount(10_000));
+      process.env.OPENSIP_HEAP_ELEVATED = '1';
+      expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
+    });
   });
 
   it('returns false when file count is below the smallest threshold', async () => {
-    currentAdapterRegistry().register(adapterWithFileCount(100));
-    expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
+    await inGraphScope(async () => {
+      currentAdapterRegistry().register(adapterWithFileCount(100));
+      expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
+    });
   });
 
   it('returns false when the current heap cap is already above the target', async () => {
@@ -143,11 +154,13 @@ describe('runHeapPreflight', () => {
     // above target by stubbing v8.getHeapStatistics; otherwise the test
     // falls through to the re-exec branch and spawns a real Node
     // process. heap_size_limit is in bytes — 10 GB > 8192 MB.
-    currentAdapterRegistry().register(adapterWithFileCount(1500));
-    vi.spyOn(v8, 'getHeapStatistics').mockReturnValue({
-      heap_size_limit: 10 * 1024 * 1024 * 1024,
-    } as ReturnType<typeof v8.getHeapStatistics>);
-    expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
+    await inGraphScope(async () => {
+      currentAdapterRegistry().register(adapterWithFileCount(1500));
+      vi.spyOn(v8, 'getHeapStatistics').mockReturnValue({
+        heap_size_limit: 10 * 1024 * 1024 * 1024,
+      } as ReturnType<typeof v8.getHeapStatistics>);
+      expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
+    });
   });
 
   it('returns false when system RAM is insufficient for the target heap', async () => {
@@ -155,12 +168,14 @@ describe('runHeapPreflight', () => {
     // OS_HEADROOM_MB). Pin currentHeap below target so the
     // already-elevated branch can't short-circuit, then stub
     // os.totalmem to 4 GB so systemHasMemoryFor() returns false.
-    currentAdapterRegistry().register(adapterWithFileCount(1500));
-    vi.spyOn(v8, 'getHeapStatistics').mockReturnValue({
-      heap_size_limit: 1024 * 1024 * 1024, // 1 GB — well below 8192 MB target
-    } as ReturnType<typeof v8.getHeapStatistics>);
-    vi.spyOn(os, 'totalmem').mockReturnValue(4 * 1024 * 1024 * 1024);
-    expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
+    await inGraphScope(async () => {
+      currentAdapterRegistry().register(adapterWithFileCount(1500));
+      vi.spyOn(v8, 'getHeapStatistics').mockReturnValue({
+        heap_size_limit: 1024 * 1024 * 1024, // 1 GB — well below 8192 MB target
+      } as ReturnType<typeof v8.getHeapStatistics>);
+      vi.spyOn(os, 'totalmem').mockReturnValue(4 * 1024 * 1024 * 1024);
+      expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
+    });
   });
 
   // The "elevate via re-exec" branch is intentionally not covered:

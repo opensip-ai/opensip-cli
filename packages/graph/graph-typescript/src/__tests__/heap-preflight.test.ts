@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, RunScope } from '@opensip-tools/core';
+import { RunScope, runWithScope, runWithScopeSync } from '@opensip-tools/core';
 import { currentAdapterRegistry, graphTool } from '@opensip-tools/graph';
 import {
   HEAP_TARGETS,
@@ -71,6 +71,7 @@ describe('systemHasMemoryFor', () => {
 describe('runHeapPreflight', () => {
   let dir: string;
   let originalSentinel: string | undefined;
+  let scope: RunScope;
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'graph-preflight-'));
@@ -87,15 +88,17 @@ describe('runHeapPreflight', () => {
     // Item 1: adapter registry is per-RunScope. Construct a fresh
     // scope, attach graph subscope, and register the adapters this test imports
     // so runHeapPreflight()'s pickAdapter() resolves them.
-    const scope = new RunScope();
+    scope = new RunScope();
     Object.assign(scope, graphTool.contributeScope?.() ?? {});
-    enterScope(scope);
-    currentAdapterRegistry().register(typescriptGraphAdapter);
-    currentAdapterRegistry().register(pythonGraphAdapter);
-    currentAdapterRegistry().register(rustGraphAdapter);
+    runWithScopeSync(scope, () => {
+      currentAdapterRegistry().register(typescriptGraphAdapter);
+      currentAdapterRegistry().register(pythonGraphAdapter);
+      currentAdapterRegistry().register(rustGraphAdapter);
+    });
   });
 
   afterEach(() => {
+    runWithScopeSync(scope, () => currentAdapterRegistry().clear());
     rmSync(dir, { recursive: true, force: true });
     if (originalSentinel === undefined) {
       delete process.env.OPENSIP_HEAP_ELEVATED;
@@ -104,16 +107,20 @@ describe('runHeapPreflight', () => {
     }
   });
 
+  function runScopedHeapPreflight(options: Parameters<typeof runHeapPreflight>[0]) {
+    return runWithScope(scope, () => runHeapPreflight(options));
+  }
+
   it('returns false (no-op) when SENTINEL is set (we are the elevated child)', async () => {
     process.env.OPENSIP_HEAP_ELEVATED = '1';
-    const out = await runHeapPreflight({ cwd: dir });
+    const out = await runScopedHeapPreflight({ cwd: dir });
     expect(out).toBe(false);
   });
 
   it('returns false when file count is below the lowest threshold', async () => {
     delete process.env.OPENSIP_HEAP_ELEVATED;
     // Fixture has zero .ts files so file count is 0.
-    const out = await runHeapPreflight({ cwd: dir });
+    const out = await runScopedHeapPreflight({ cwd: dir });
     expect(out).toBe(false);
   });
 
@@ -153,7 +160,7 @@ describe('runHeapPreflight', () => {
       external_memory: 0,
     });
     try {
-      const out = await runHeapPreflight({ cwd: dir });
+      const out = await runScopedHeapPreflight({ cwd: dir });
       expect(out).toBe(false); // already-elevated path
     } finally {
       spy.mockRestore();
@@ -180,7 +187,7 @@ describe('runHeapPreflight', () => {
       return true;
     });
     try {
-      const out = await runHeapPreflight({ cwd: dir });
+      const out = await runScopedHeapPreflight({ cwd: dir });
       expect(out).toBe(false);
       expect(stderr).toContain('Continuing with current heap');
     } finally {

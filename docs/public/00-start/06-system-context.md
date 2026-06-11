@@ -169,7 +169,7 @@ The exit code is your gate. The stdout shape is your data. The stderr stream is 
 
 ## What the binary needs to run
 
-A working Node.js 22+ runtime, a project root, and read access to the source files. That's it. (`packages/cli/package.json` declares `engines.node >= 22`.)
+A working Node.js 24+ runtime, a project root, and read access to the source files. That's it. (`packages/cli/package.json` declares `engines.node >= 24`.)
 
 Specifically, it does **not** need:
 

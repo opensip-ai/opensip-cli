@@ -61,7 +61,7 @@ describe('detectTerminalCapabilities', () => {
   it('reports truecolor for known TERM_PROGRAM values', () => {
     Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
     for (const tp of ['iTerm.app', 'WezTerm', 'Hyper']) {
-      process.env = { ...originalEnv, TERM_PROGRAM: tp };
+      process.env.TERM_PROGRAM = tp;
       expect(detectTerminalCapabilities().supportsTrueColor).toBe(true);
     }
   });

@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope } from '@opensip-tools/core';
+import { runWithScope, runWithScopeSync } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -105,153 +105,172 @@ function occurrence(over: Partial<FunctionOccurrence>): FunctionOccurrence {
 describe('runGraph orchestrator', () => {
   let datastore: DataStore;
   let projectDir: string;
+  let scope: ReturnType<typeof makeGraphTestScope>;
 
   beforeEach(() => {
     // Item 1: graph registries are per-RunScope.
-    enterScope(makeGraphTestScope());
+    scope = makeGraphTestScope();
     datastore = DataStoreFactory.open({ backend: 'memory' });
     projectDir = mkdtempSync(join(tmpdir(), 'orch-proj-'));
   });
 
   afterEach(() => {
-    currentAdapterRegistry().clear();
+    runWithScopeSync(scope, () => currentAdapterRegistry().clear());
     datastore.close();
     rmSync(projectDir, { recursive: true, force: true });
   });
 
+  function inGraphScope<T>(fn: () => Promise<T>): Promise<T> {
+    return runWithScope(scope, fn);
+  }
+
   it('runs every pipeline stage end-to-end and emits a catalog with no signals', async () => {
-    currentAdapterRegistry().register(
-      fakeAdapter({
-        projectDir,
-        occurrences: {
-          fn: [occurrence({ bodyHash: 'h1', simpleName: 'fn' })],
-        },
-      }),
-    );
-    const result = await runGraph({ cwd: projectDir, noCache: true, rules: [] });
-    expect(result.catalog).not.toBeNull();
-    expect(result.catalog?.language).toBe('fake');
-    expect(result.indexes).not.toBeNull();
-    expect(result.signals).toEqual([]);
-    expect(result.cacheHit).toBe(false);
-    expect(result.resolutionStats).not.toBeNull();
+    await inGraphScope(async () => {
+      currentAdapterRegistry().register(
+        fakeAdapter({
+          projectDir,
+          occurrences: {
+            fn: [occurrence({ bodyHash: 'h1', simpleName: 'fn' })],
+          },
+        }),
+      );
+      const result = await runGraph({ cwd: projectDir, noCache: true, rules: [] });
+      expect(result.catalog).not.toBeNull();
+      expect(result.catalog?.language).toBe('fake');
+      expect(result.indexes).not.toBeNull();
+      expect(result.signals).toEqual([]);
+      expect(result.cacheHit).toBe(false);
+      expect(result.resolutionStats).not.toBeNull();
+    });
   });
 
   it('emits stage-start / stage-done progress events in canonical order', async () => {
-    currentAdapterRegistry().register(fakeAdapter({ projectDir }));
-    const events: string[] = [];
-    await runGraph({
-      cwd: projectDir,
-      noCache: true,
-      rules: [],
-      onProgress: (e) => {
-        events.push(`${e.type}:${e.stage}`);
-      },
+    await inGraphScope(async () => {
+      currentAdapterRegistry().register(fakeAdapter({ projectDir }));
+      const events: string[] = [];
+      await runGraph({
+        cwd: projectDir,
+        noCache: true,
+        rules: [],
+        onProgress: (e) => {
+          events.push(`${e.type}:${e.stage}`);
+        },
+      });
+      const stageStarts = events.filter((e) => e.startsWith('stage-start:'));
+      const stageDones = events.filter((e) => e.startsWith('stage-done:'));
+      expect(stageStarts).toEqual([
+        'stage-start:discover',
+        'stage-start:parse',
+        'stage-start:walk',
+        'stage-start:resolve',
+        'stage-start:index',
+        'stage-start:features',
+        'stage-start:rules',
+      ]);
+      expect(stageDones).toEqual([
+        'stage-done:discover',
+        'stage-done:parse',
+        'stage-done:walk',
+        'stage-done:resolve',
+        'stage-done:index',
+        'stage-done:features',
+        'stage-done:rules',
+      ]);
     });
-    const stageStarts = events.filter((e) => e.startsWith('stage-start:'));
-    const stageDones = events.filter((e) => e.startsWith('stage-done:'));
-    expect(stageStarts).toEqual([
-      'stage-start:discover',
-      'stage-start:parse',
-      'stage-start:walk',
-      'stage-start:resolve',
-      'stage-start:index',
-      'stage-start:features',
-      'stage-start:rules',
-    ]);
-    expect(stageDones).toEqual([
-      'stage-done:discover',
-      'stage-done:parse',
-      'stage-done:walk',
-      'stage-done:resolve',
-      'stage-done:index',
-      'stage-done:features',
-      'stage-done:rules',
-    ]);
   });
 
   it('writes the catalog to the datastore when one is provided and cache is enabled', async () => {
-    currentAdapterRegistry().register(
-      fakeAdapter({
-        projectDir,
-        occurrences: {
-          fn: [occurrence({ bodyHash: 'h-persisted', simpleName: 'fn' })],
-        },
-      }),
-    );
-    const result = await runGraph({ cwd: projectDir, rules: [], datastore });
-    expect(result.cacheHit).toBe(false);
-    const persisted = new CatalogRepo(datastore).loadFullCatalog();
-    expect(persisted).not.toBeNull();
-    expect(persisted?.functions.fn?.[0]?.bodyHash).toBe('h-persisted');
+    await inGraphScope(async () => {
+      currentAdapterRegistry().register(
+        fakeAdapter({
+          projectDir,
+          occurrences: {
+            fn: [occurrence({ bodyHash: 'h-persisted', simpleName: 'fn' })],
+          },
+        }),
+      );
+      const result = await runGraph({ cwd: projectDir, rules: [], datastore });
+      expect(result.cacheHit).toBe(false);
+      const persisted = new CatalogRepo(datastore).loadFullCatalog();
+      expect(persisted).not.toBeNull();
+      expect(persisted?.functions.fn?.[0]?.bodyHash).toBe('h-persisted');
+    });
   });
 
   it('returns a cache hit when the persisted catalog matches the current key', async () => {
-    const adapter = fakeAdapter({
-      projectDir,
-      cacheKey: 'stable-key',
-      files: [join(projectDir, 'src', 'a.ts')],
-      occurrences: {
-        fn: [occurrence({ bodyHash: 'h-fresh', simpleName: 'fn' })],
-      },
-    });
-    currentAdapterRegistry().register(adapter);
+    await inGraphScope(async () => {
+      const adapter = fakeAdapter({
+        projectDir,
+        cacheKey: 'stable-key',
+        files: [join(projectDir, 'src', 'a.ts')],
+        occurrences: {
+          fn: [occurrence({ bodyHash: 'h-fresh', simpleName: 'fn' })],
+        },
+      });
+      currentAdapterRegistry().register(adapter);
 
-    await runGraph({ cwd: projectDir, rules: [], datastore });
+      await runGraph({ cwd: projectDir, rules: [], datastore });
 
-    const events: string[] = [];
-    const result = await runGraph({
-      cwd: projectDir,
-      rules: [],
-      datastore,
-      onProgress: (e) => {
-        if (e.type === 'stage-cached') events.push(e.stage);
-      },
+      const events: string[] = [];
+      const result = await runGraph({
+        cwd: projectDir,
+        rules: [],
+        datastore,
+        onProgress: (e) => {
+          if (e.type === 'stage-cached') events.push(e.stage);
+        },
+      });
+      expect(result.cacheHit).toBe(true);
+      expect(result.catalog).not.toBeNull();
+      expect(events).toEqual(['parse', 'walk', 'resolve']);
+      expect(result.resolutionStats).toBeNull();
     });
-    expect(result.cacheHit).toBe(true);
-    expect(result.catalog).not.toBeNull();
-    expect(events).toEqual(['parse', 'walk', 'resolve']);
-    expect(result.resolutionStats).toBeNull();
   });
 
   it('runs rules against the produced catalog + indexes', async () => {
-    currentAdapterRegistry().register(
-      fakeAdapter({
-        projectDir,
-        occurrences: {
-          fn: [occurrence({ bodyHash: 'h1', simpleName: 'fn' })],
-        },
-      }),
-    );
-    const evaluate = vi.fn().mockReturnValue([]);
-    const rule: Rule = { slug: 'graph:test', defaultSeverity: 'warning', evaluate };
-    const result = await runGraph({ cwd: projectDir, noCache: true, rules: [rule] });
-    expect(evaluate).toHaveBeenCalledTimes(1);
-    expect(result.signals).toEqual([]);
+    await inGraphScope(async () => {
+      currentAdapterRegistry().register(
+        fakeAdapter({
+          projectDir,
+          occurrences: {
+            fn: [occurrence({ bodyHash: 'h1', simpleName: 'fn' })],
+          },
+        }),
+      );
+      const evaluate = vi.fn().mockReturnValue([]);
+      const rule: Rule = { slug: 'graph:test', defaultSeverity: 'warning', evaluate };
+      const result = await runGraph({ cwd: projectDir, noCache: true, rules: [rule] });
+      expect(evaluate).toHaveBeenCalledTimes(1);
+      expect(result.signals).toEqual([]);
+    });
   });
 
   it('passes the runtime tsConfigPath override into adapter.discoverFiles', async () => {
-    const seen: string[] = [];
-    const a = fakeAdapter({ projectDir });
-    const spy = vi.spyOn(a, 'discoverFiles').mockImplementation((inp) => {
-      seen.push(inp.configPathOverride ?? 'absent');
-      return { projectDirAbs: projectDir, files: [join(projectDir, 'src', 'a.ts')] };
+    await inGraphScope(async () => {
+      const seen: string[] = [];
+      const a = fakeAdapter({ projectDir });
+      const spy = vi.spyOn(a, 'discoverFiles').mockImplementation((inp) => {
+        seen.push(inp.configPathOverride ?? 'absent');
+        return { projectDirAbs: projectDir, files: [join(projectDir, 'src', 'a.ts')] };
+      });
+      currentAdapterRegistry().register(a);
+      await runGraph({
+        cwd: projectDir,
+        noCache: true,
+        rules: [],
+        tsConfigPath: join(projectDir, 'tsconfig.json'),
+      });
+      expect(seen).toEqual([join(projectDir, 'tsconfig.json')]);
+      spy.mockRestore();
     });
-    currentAdapterRegistry().register(a);
-    await runGraph({
-      cwd: projectDir,
-      noCache: true,
-      rules: [],
-      tsConfigPath: join(projectDir, 'tsconfig.json'),
-    });
-    expect(seen).toEqual([join(projectDir, 'tsconfig.json')]);
-    spy.mockRestore();
   });
 
   it('skips writing to the datastore when noCache is true', async () => {
-    currentAdapterRegistry().register(fakeAdapter({ projectDir }));
-    await runGraph({ cwd: projectDir, noCache: true, rules: [], datastore });
-    expect(new CatalogRepo(datastore).hasAnyCatalog()).toBe(false);
+    await inGraphScope(async () => {
+      currentAdapterRegistry().register(fakeAdapter({ projectDir }));
+      await runGraph({ cwd: projectDir, noCache: true, rules: [], datastore });
+      expect(new CatalogRepo(datastore).hasAnyCatalog()).toBe(false);
+    });
   });
 
   // Guards a real correctness regression: prior to the fix the
@@ -260,89 +279,98 @@ describe('runGraph orchestrator', () => {
   // ruleHints (sideEffectPrimitives, throwSyntaxRegex, isTestFile,
   // generatedFilePatterns) silently fell back to TS-shaped regex.
   it("threads the active adapter's ruleHints into every rule's evaluate call", async () => {
-    const hints: RuleHints = {
-      sideEffectPrimitives: ['builtins.print', 'sys.exit'],
-      throwSyntaxRegex: /^\s*raise\s+\w+/,
-      generatedFilePatterns: ['**/_pb2.py'],
-      isTestFile: (p) => p.startsWith('tests/'),
-    };
-    currentAdapterRegistry().register(fakeAdapter({ projectDir, ruleHints: hints }));
+    await inGraphScope(async () => {
+      const hints: RuleHints = {
+        sideEffectPrimitives: ['builtins.print', 'sys.exit'],
+        throwSyntaxRegex: /^\s*raise\s+\w+/,
+        generatedFilePatterns: ['**/_pb2.py'],
+        isTestFile: (p) => p.startsWith('tests/'),
+      };
+      currentAdapterRegistry().register(fakeAdapter({ projectDir, ruleHints: hints }));
 
-    const seenHints: (RuleHints | undefined)[] = [];
-    const capturingRule: Rule = {
-      slug: 'graph:test-hints-capture',
-      defaultSeverity: 'warning',
-      evaluate: (_catalog, _indexes, _config, h) => {
-        seenHints.push(h);
-        return [];
-      },
-    };
+      const seenHints: (RuleHints | undefined)[] = [];
+      const capturingRule: Rule = {
+        slug: 'graph:test-hints-capture',
+        defaultSeverity: 'warning',
+        evaluate: (_catalog, _indexes, _config, h) => {
+          seenHints.push(h);
+          return [];
+        },
+      };
 
-    await runGraph({ cwd: projectDir, rules: [capturingRule], datastore });
+      await runGraph({ cwd: projectDir, rules: [capturingRule], datastore });
 
-    expect(seenHints).toHaveLength(1);
-    expect(seenHints[0]).toBe(hints);
+      expect(seenHints).toHaveLength(1);
+      expect(seenHints[0]).toBe(hints);
+    });
   });
 });
 
 describe('runGraph — incremental rebuild path', () => {
   let datastore: DataStore;
   let dir: string;
+  let scope: ReturnType<typeof makeGraphTestScope>;
 
   beforeEach(() => {
-    currentAdapterRegistry().clear();
+    scope = makeGraphTestScope();
     datastore = DataStoreFactory.open({ backend: 'memory' });
     dir = mkdtempSync(join(tmpdir(), 'orch-incr-'));
   });
 
   afterEach(() => {
-    currentAdapterRegistry().clear();
+    runWithScopeSync(scope, () => currentAdapterRegistry().clear());
     datastore.close();
     rmSync(dir, { recursive: true, force: true });
   });
 
+  function inGraphScope<T>(fn: () => Promise<T>): Promise<T> {
+    return runWithScope(scope, fn);
+  }
+
   it('completes the incremental branch when a single file changes', async () => {
-    const fileA = join(dir, 'src', 'a.ts');
-    const fileB = join(dir, 'src', 'b.ts');
-    mkdirSync(join(dir, 'src'), { recursive: true });
-    writeFileSync(fileA, 'v1');
-    writeFileSync(fileB, 'v1');
+    await inGraphScope(async () => {
+      const fileA = join(dir, 'src', 'a.ts');
+      const fileB = join(dir, 'src', 'b.ts');
+      mkdirSync(join(dir, 'src'), { recursive: true });
+      writeFileSync(fileA, 'v1');
+      writeFileSync(fileB, 'v1');
 
-    currentAdapterRegistry().register(
-      fakeAdapter({
-        projectDir: dir,
-        cacheKey: 'k1',
-        files: [fileA, fileB],
-        occurrences: {
-          fa: [occurrence({ bodyHash: 'hA', simpleName: 'fa', filePath: 'src/a.ts' })],
-          fb: [occurrence({ bodyHash: 'hB', simpleName: 'fb', filePath: 'src/b.ts' })],
-        },
-      }),
-    );
+      currentAdapterRegistry().register(
+        fakeAdapter({
+          projectDir: dir,
+          cacheKey: 'k1',
+          files: [fileA, fileB],
+          occurrences: {
+            fa: [occurrence({ bodyHash: 'hA', simpleName: 'fa', filePath: 'src/a.ts' })],
+            fb: [occurrence({ bodyHash: 'hB', simpleName: 'fb', filePath: 'src/b.ts' })],
+          },
+        }),
+      );
 
-    await runGraph({ cwd: dir, rules: [], datastore });
+      await runGraph({ cwd: dir, rules: [], datastore });
 
-    writeFileSync(fileB, 'v2-changed');
+      writeFileSync(fileB, 'v2-changed');
 
-    currentAdapterRegistry().clear();
-    currentAdapterRegistry().register(
-      fakeAdapter({
-        projectDir: dir,
-        cacheKey: 'k1',
-        files: [fileA, fileB],
-        occurrences: {
-          fa: [occurrence({ bodyHash: 'hA', simpleName: 'fa', filePath: 'src/a.ts' })],
-          fb: [occurrence({ bodyHash: 'hB-new', simpleName: 'fb', filePath: 'src/b.ts' })],
-        },
-      }),
-    );
+      currentAdapterRegistry().clear();
+      currentAdapterRegistry().register(
+        fakeAdapter({
+          projectDir: dir,
+          cacheKey: 'k1',
+          files: [fileA, fileB],
+          occurrences: {
+            fa: [occurrence({ bodyHash: 'hA', simpleName: 'fa', filePath: 'src/a.ts' })],
+            fb: [occurrence({ bodyHash: 'hB-new', simpleName: 'fb', filePath: 'src/b.ts' })],
+          },
+        }),
+      );
 
-    const result = await runGraph({ cwd: dir, rules: [], datastore });
-    expect(result.catalog).not.toBeNull();
-    // The incremental path completes and produces a catalog without
-    // throwing. The merge semantics are exercised in detail by other
-    // tests (`graph-catalog-drift`); here we just want to drive the
-    // 'incremental' verdict branch in obtainCatalog.
-    expect(result.cacheHit).toBe(false);
+      const result = await runGraph({ cwd: dir, rules: [], datastore });
+      expect(result.catalog).not.toBeNull();
+      // The incremental path completes and produces a catalog without
+      // throwing. The merge semantics are exercised in detail by other
+      // tests (`graph-catalog-drift`); here we just want to drive the
+      // 'incremental' verdict branch in obtainCatalog.
+      expect(result.cacheHit).toBe(false);
+    });
   });
 });

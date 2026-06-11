@@ -47,8 +47,8 @@ describe('node-version-consistency', () => {
       JSON.stringify(
         {
           name: 'root',
-          engines: { node: '>=22.0.0' },
-          devDependencies: { '@types/node': '^22.0.0' },
+          engines: { node: '>=24.0.0' },
+          devDependencies: { '@types/node': '^24.0.0' },
         },
         null,
         2,

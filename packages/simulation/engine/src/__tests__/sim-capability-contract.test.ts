@@ -8,7 +8,7 @@
  */
 
 import { commonFlags } from '@opensip-tools/contracts';
-import { enterScope } from '@opensip-tools/core';
+import { runWithScope, runWithScopeSync } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { clearScenarioRegistry, currentScenarioRegistry } from '../framework/registry.js';
@@ -94,48 +94,59 @@ function tripwire(
 }
 
 describe('sim scheduler — narrowing precedes execution', () => {
+  let scope: ReturnType<typeof makeSimTestScope>;
+
   beforeEach(() => {
-    enterScope(makeSimTestScope());
+    scope = makeSimTestScope();
   });
+
   afterEach(() => {
-    clearScenarioRegistry();
+    runWithScopeSync(scope, () => clearScenarioRegistry());
   });
+
+  function inSimScope<T>(fn: () => Promise<T>): Promise<T> {
+    return runWithScope(scope, fn);
+  }
 
   it('a recipe selector excludes scenarios before they run', async () => {
-    const fired = { ran: false };
-    currentScenarioRegistry().register(tripwire('excluded-by-selector', 'load', fired));
-    const recipe = defineSimulationRecipe({
-      id: 'URCP_sel_exclude',
-      name: 'sel-exclude',
-      displayName: 'Selector exclude',
-      description: 'x',
-      scenarios: { type: 'all', exclude: ['excluded-by-selector'] },
-      execution: { mode: 'sequential' },
+    await inSimScope(async () => {
+      const fired = { ran: false };
+      currentScenarioRegistry().register(tripwire('excluded-by-selector', 'load', fired));
+      const recipe = defineSimulationRecipe({
+        id: 'URCP_sel_exclude',
+        name: 'sel-exclude',
+        displayName: 'Selector exclude',
+        description: 'x',
+        scenarios: { type: 'all', exclude: ['excluded-by-selector'] },
+        execution: { mode: 'sequential' },
+      });
+
+      const result = await new SimulationRecipeService().runRecipe(recipe);
+
+      expect(fired.ran).toBe(false);
+      expect(result.totalScenarios).toBe(0);
     });
-
-    const result = await new SimulationRecipeService().runRecipe(recipe);
-
-    expect(fired.ran).toBe(false);
-    expect(result.totalScenarios).toBe(0);
   });
 
   it('a kind recipe selector excludes other-kind scenarios before they run', async () => {
-    const fired = { ran: false };
-    currentScenarioRegistry().register(tripwire('excluded-by-kind', 'load', fired));
-    const recipe = defineSimulationRecipe({
-      id: 'URCP_kind_exclude',
-      name: 'kind-exclude',
-      displayName: 'Kind exclude',
-      description: 'x',
-      // The recipe selects only chaos scenarios; the 'load' tripwire is dropped
-      // before execution.
-      scenarios: { type: 'kind', kinds: ['chaos'] },
-      execution: { mode: 'sequential' },
+    await inSimScope(async () => {
+      const fired = { ran: false };
+      currentScenarioRegistry().register(tripwire('excluded-by-kind', 'load', fired));
+      const recipe = defineSimulationRecipe({
+        id: 'URCP_kind_exclude',
+        name: 'kind-exclude',
+        displayName: 'Kind exclude',
+        description: 'x',
+        // The recipe selects only chaos scenarios; the 'load' tripwire is dropped
+        // before execution.
+        scenarios: { type: 'kind', kinds: ['chaos'] },
+        execution: { mode: 'sequential' },
+      });
+
+      const result = await new SimulationRecipeService().runRecipe(recipe);
+
+      expect(fired.ran).toBe(false);
+      expect(result.totalScenarios).toBe(0);
     });
-
-    const result = await new SimulationRecipeService().runRecipe(recipe);
-
-    expect(fired.ran).toBe(false);
-    expect(result.totalScenarios).toBe(0);
   });
 });

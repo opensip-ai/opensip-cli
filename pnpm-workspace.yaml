@@ -15,6 +15,10 @@ packages:
 # `pnpm fit` discovers 0 checks. See CLAUDE.md "Dogfood Gate".
 injectWorkspacePackages: true
 
+# Keep peer dependencies explicit. In particular, this avoids auto-installing
+# eslint-plugin-import when the workspace intentionally uses import-x instead.
+autoInstallPeers: false
+
 # Supply-chain guard: only these dependencies may run install/build scripts
 # (pnpm 11 renamed the array `onlyBuiltDependencies` to the `allowBuilds` map).
 # better-sqlite3 needs its native binary built/fetched; esbuild and
@@ -30,6 +34,20 @@ allowBuilds:
 minimumReleaseAge: 1440
 minimumReleaseAgeStrict: true
 minimumReleaseAgeIgnoreMissingTime: false
+# OpenTelemetry 2026-06-11 update was intentionally taken before the
+# 24-hour release-age window elapsed.
+minimumReleaseAgeExclude:
+  - '@opentelemetry/api-logs@0.219.0'
+  - '@opentelemetry/context-async-hooks@2.8.0'
+  - '@opentelemetry/core@2.8.0'
+  - '@opentelemetry/exporter-trace-otlp-http@0.219.0'
+  - '@opentelemetry/otlp-exporter-base@0.219.0'
+  - '@opentelemetry/otlp-transformer@0.219.0'
+  - '@opentelemetry/resources@2.8.0'
+  - '@opentelemetry/sdk-logs@0.219.0'
+  - '@opentelemetry/sdk-metrics@2.8.0'
+  - '@opentelemetry/sdk-trace-base@2.8.0'
+  - '@opentelemetry/sdk-trace-node@2.8.0'
 trustPolicy: no-downgrade
 trustLockfile: false
 blockExoticSubdeps: true
@@ -46,7 +64,7 @@ blockExoticSubdeps: true
 # move to.
 trustPolicyExclude:
   - 'ast-v8-to-istanbul@1.0.2' # vitest coverage transitive (via @vitest/coverage-v8)
-  - 'dependency-cruiser@17.4.2' # direct devDep; latest release, no provenance attestation
+  - 'dependency-cruiser@17.4.3' # direct devDep; no provenance attestation
   - 'semver@6.3.1' # legacy v6 line pinned by older transitive tooling
   - 'tinyexec@1.2.2' # transitive (tinyglobby / tooling)
   - 'undici-types@6.21.0' # pinned by @types/node

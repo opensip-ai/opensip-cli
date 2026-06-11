@@ -345,14 +345,14 @@ describe('node-version-consistency matching versions', () => {
       JSON.stringify(
         {
           name: 'root',
-          engines: { node: '>=22.0.0' },
+          engines: { node: '>=24.0.0' },
         },
         null,
         2,
       ),
     );
     // .nvmrc matches the root major -> no nvmrc violation.
-    writeFixture(cwd, '.nvmrc', '22');
+    writeFixture(cwd, '.nvmrc', '24');
     // Workspace engines + @types/node match -> no workspace/types violation.
     writeFixture(
       cwd,
@@ -360,8 +360,8 @@ describe('node-version-consistency matching versions', () => {
       JSON.stringify(
         {
           name: '@org/a',
-          engines: { node: '>=22.0.0' },
-          devDependencies: { '@types/node': '^22.0.0' },
+          engines: { node: '>=24.0.0' },
+          devDependencies: { '@types/node': '^24.0.0' },
         },
         null,
         2,
@@ -384,7 +384,7 @@ describe('node-version-consistency matching versions', () => {
     writeFixture(
       cwd,
       '.github/workflows/ci.yml',
-      ['jobs:', '  test:', '    steps:', "      - run: node-version: '22'"].join('\n'),
+      ['jobs:', '  test:', '    steps:', "      - run: node-version: '24'"].join('\n'),
     );
     // A non-workflow .yml file -> falls through every else-if.
     writeFixture(cwd, 'config/app.yml', 'setting: value');
@@ -428,7 +428,7 @@ describe('docker-version-sync dynamic and mismatch', () => {
       JSON.stringify(
         {
           name: 'root',
-          engines: { node: '>=22.0.0' },
+          engines: { node: '>=24.0.0' },
           packageManager: 'pnpm@10.0.0+sha512.abc',
         },
         null,
@@ -440,7 +440,7 @@ describe('docker-version-sync dynamic and mismatch', () => {
       cwd,
       'Dockerfile',
       [
-        'FROM node:22-alpine',
+        'FROM node:24-alpine',
         "RUN corepack prepare pnpm@10.0.0 --activate # require('./package.json').packageManager",
         '',
       ].join('\n'),

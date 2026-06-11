@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError, enterScope, logger } from '@opensip-tools/core';
+import { ConfigurationError, logger, runWithScopeSync } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { currentAdapterRegistry, pickAdapter } from '../../lang-adapter/registry.js';
@@ -55,60 +55,79 @@ function fakeAdapter(id: string, exts: readonly string[]): GraphLanguageAdapter 
 }
 
 describe('adapter registry register / pickAdapter', () => {
+  let scope: ReturnType<typeof makeGraphTestScope>;
+
   beforeEach(() => {
     // Item 1: adapter registry is per-RunScope. Each test enters a
     // fresh scope (with graph subscope) so `currentAdapterRegistry()`
     // resolves the scope-bound registry instance.
-    enterScope(makeGraphTestScope());
+    scope = makeGraphTestScope();
   });
 
   afterEach(() => {
-    currentAdapterRegistry().clear();
+    runWithScopeSync(scope, () => currentAdapterRegistry().clear());
   });
 
+  function inGraphScope<T>(fn: () => T): T {
+    return runWithScopeSync(scope, fn);
+  }
+
   it('throws ConfigurationError when no adapters are registered', () => {
-    expect(() => pickAdapter()).toThrow(ConfigurationError);
-    expect(() => pickAdapter('/tmp')).toThrow(/no language adapter is registered/);
+    inGraphScope(() => {
+      expect(() => pickAdapter()).toThrow(ConfigurationError);
+      expect(() => pickAdapter('/tmp')).toThrow(/no language adapter is registered/);
+    });
   });
 
   it('returns the only adapter when exactly one is registered', () => {
-    const ts = fakeAdapter('typescript', ['.ts']);
-    currentAdapterRegistry().register(ts);
-    expect(pickAdapter()).toBe(ts);
-    expect(pickAdapter('/tmp')).toBe(ts);
+    inGraphScope(() => {
+      const ts = fakeAdapter('typescript', ['.ts']);
+      currentAdapterRegistry().register(ts);
+      expect(pickAdapter()).toBe(ts);
+      expect(pickAdapter('/tmp')).toBe(ts);
+    });
   });
 
   it('re-registering an adapter with the same id replaces the previous one', () => {
-    currentAdapterRegistry().register(fakeAdapter('typescript', ['.ts']));
-    const replacement = fakeAdapter('typescript', ['.tsx']);
-    currentAdapterRegistry().register(replacement);
-    expect(pickAdapter()).toBe(replacement);
+    inGraphScope(() => {
+      currentAdapterRegistry().register(fakeAdapter('typescript', ['.ts']));
+      const replacement = fakeAdapter('typescript', ['.tsx']);
+      currentAdapterRegistry().register(replacement);
+      expect(pickAdapter()).toBe(replacement);
+    });
   });
 
   it('fails when an explicit language names an unregistered adapter', () => {
-    currentAdapterRegistry().register(fakeAdapter('typescript', ['.ts']));
+    inGraphScope(() => {
+      currentAdapterRegistry().register(fakeAdapter('typescript', ['.ts']));
 
-    expect(() =>
-      new GraphAdapterSelector(currentAdapterRegistry()).pick({
-        cwd: '/tmp',
-        language: 'klingon',
-      }),
-    ).toThrow(/language adapter 'klingon' is not registered/);
+      expect(() =>
+        new GraphAdapterSelector(currentAdapterRegistry()).pick({
+          cwd: '/tmp',
+          language: 'klingon',
+        }),
+      ).toThrow(/language adapter 'klingon' is not registered/);
+    });
   });
 });
 
 describe('pickAdapter — multi-adapter dominance', () => {
   let dir: string;
+  let scope: ReturnType<typeof makeGraphTestScope>;
 
   beforeEach(() => {
-    enterScope(makeGraphTestScope());
+    scope = makeGraphTestScope();
     dir = mkdtempSync(join(tmpdir(), 'graph-registry-'));
   });
 
   afterEach(() => {
-    currentAdapterRegistry().clear();
+    runWithScopeSync(scope, () => currentAdapterRegistry().clear());
     rmSync(dir, { recursive: true, force: true });
   });
+
+  function inGraphScope<T>(fn: () => T): T {
+    return runWithScopeSync(scope, fn);
+  }
 
   function writeFiles(rel: readonly string[]): void {
     for (const r of rel) {
@@ -119,107 +138,127 @@ describe('pickAdapter — multi-adapter dominance', () => {
   }
 
   it('picks by file-extension dominance', () => {
-    const ts = fakeAdapter('typescript', ['.ts']);
-    const py = fakeAdapter('python', ['.py']);
-    currentAdapterRegistry().register(ts);
-    currentAdapterRegistry().register(py);
-    writeFiles(['src/a.py', 'src/b.py', 'src/c.py', 'src/x.ts']);
-    expect(pickAdapter(dir)).toBe(py);
-  });
-
-  it('tie-breaks in favor of typescript', () => {
-    const ts = fakeAdapter('typescript', ['.ts']);
-    const py = fakeAdapter('python', ['.py']);
-    currentAdapterRegistry().register(ts);
-    currentAdapterRegistry().register(py);
-    writeFiles(['src/a.py', 'src/x.ts']);
-    expect(pickAdapter(dir)).toBe(ts);
-  });
-
-  it('tie-breaks in favor of python when typescript is not present', () => {
-    const py = fakeAdapter('python', ['.py']);
-    const rs = fakeAdapter('rust', ['.rs']);
-    currentAdapterRegistry().register(py);
-    currentAdapterRegistry().register(rs);
-    writeFiles(['src/a.py', 'src/x.rs']);
-    expect(pickAdapter(dir)).toBe(py);
-  });
-
-  it('falls back to typescript preference when no files match', () => {
-    const ts = fakeAdapter('typescript', ['.ts']);
-    const py = fakeAdapter('python', ['.py']);
-    currentAdapterRegistry().register(ts);
-    currentAdapterRegistry().register(py);
-    // Empty cwd, but no cwd-based override either
-    expect(pickAdapter()).toBe(ts);
-  });
-
-  it('falls back to typescript preference when cwd has zero matching files', () => {
-    const ts = fakeAdapter('typescript', ['.ts']);
-    const py = fakeAdapter('python', ['.py']);
-    currentAdapterRegistry().register(ts);
-    currentAdapterRegistry().register(py);
-    expect(pickAdapter(dir)).toBe(ts);
-  });
-
-  it('warns with an install hint when no installed adapter matches any file (#4 fix 3)', () => {
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
-    try {
+    inGraphScope(() => {
       const ts = fakeAdapter('typescript', ['.ts']);
       const py = fakeAdapter('python', ['.py']);
       currentAdapterRegistry().register(ts);
       currentAdapterRegistry().register(py);
-      // `dir` is empty — neither registered adapter matches a file, which
-      // is the "Go/Java repo but no Go/Java adapter installed" smell.
+      writeFiles(['src/a.py', 'src/b.py', 'src/c.py', 'src/x.ts']);
+      expect(pickAdapter(dir)).toBe(py);
+    });
+  });
+
+  it('tie-breaks in favor of typescript', () => {
+    inGraphScope(() => {
+      const ts = fakeAdapter('typescript', ['.ts']);
+      const py = fakeAdapter('python', ['.py']);
+      currentAdapterRegistry().register(ts);
+      currentAdapterRegistry().register(py);
+      writeFiles(['src/a.py', 'src/x.ts']);
       expect(pickAdapter(dir)).toBe(ts);
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      const payload = warnSpy.mock.calls[0]?.[0] as { evt: string; registered: string[] };
-      expect(payload.evt).toBe('graph.lang_adapter.no_match');
-      expect(payload.registered).toEqual(expect.arrayContaining(['typescript', 'python']));
-    } finally {
-      warnSpy.mockRestore();
-    }
+    });
+  });
+
+  it('tie-breaks in favor of python when typescript is not present', () => {
+    inGraphScope(() => {
+      const py = fakeAdapter('python', ['.py']);
+      const rs = fakeAdapter('rust', ['.rs']);
+      currentAdapterRegistry().register(py);
+      currentAdapterRegistry().register(rs);
+      writeFiles(['src/a.py', 'src/x.rs']);
+      expect(pickAdapter(dir)).toBe(py);
+    });
+  });
+
+  it('falls back to typescript preference when no files match', () => {
+    inGraphScope(() => {
+      const ts = fakeAdapter('typescript', ['.ts']);
+      const py = fakeAdapter('python', ['.py']);
+      currentAdapterRegistry().register(ts);
+      currentAdapterRegistry().register(py);
+      // Empty cwd, but no cwd-based override either
+      expect(pickAdapter()).toBe(ts);
+    });
+  });
+
+  it('falls back to typescript preference when cwd has zero matching files', () => {
+    inGraphScope(() => {
+      const ts = fakeAdapter('typescript', ['.ts']);
+      const py = fakeAdapter('python', ['.py']);
+      currentAdapterRegistry().register(ts);
+      currentAdapterRegistry().register(py);
+      expect(pickAdapter(dir)).toBe(ts);
+    });
+  });
+
+  it('warns with an install hint when no installed adapter matches any file (#4 fix 3)', () => {
+    inGraphScope(() => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      try {
+        const ts = fakeAdapter('typescript', ['.ts']);
+        const py = fakeAdapter('python', ['.py']);
+        currentAdapterRegistry().register(ts);
+        currentAdapterRegistry().register(py);
+        // `dir` is empty — neither registered adapter matches a file, which
+        // is the "Go/Java repo but no Go/Java adapter installed" smell.
+        expect(pickAdapter(dir)).toBe(ts);
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        const payload = warnSpy.mock.calls[0]?.[0] as { evt: string; registered: string[] };
+        expect(payload.evt).toBe('graph.lang_adapter.no_match');
+        expect(payload.registered).toEqual(expect.arrayContaining(['typescript', 'python']));
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
   });
 
   it('skips node_modules / dist / build when counting files', () => {
-    const py = fakeAdapter('python', ['.py']);
-    const ts = fakeAdapter('typescript', ['.ts']);
-    currentAdapterRegistry().register(py);
-    currentAdapterRegistry().register(ts);
-    writeFiles([
-      'node_modules/poison.py',
-      'node_modules/poison2.py',
-      'dist/poison.py',
-      'build/poison.py',
-      'src/real.ts',
-    ]);
-    expect(pickAdapter(dir)).toBe(ts);
+    inGraphScope(() => {
+      const py = fakeAdapter('python', ['.py']);
+      const ts = fakeAdapter('typescript', ['.ts']);
+      currentAdapterRegistry().register(py);
+      currentAdapterRegistry().register(ts);
+      writeFiles([
+        'node_modules/poison.py',
+        'node_modules/poison2.py',
+        'dist/poison.py',
+        'build/poison.py',
+        'src/real.ts',
+      ]);
+      expect(pickAdapter(dir)).toBe(ts);
+    });
   });
 
   it('handles adapters with multiple extensions', () => {
-    const ts = fakeAdapter('typescript', ['.ts', '.tsx']);
-    const py = fakeAdapter('python', ['.py']);
-    currentAdapterRegistry().register(ts);
-    currentAdapterRegistry().register(py);
-    writeFiles(['src/a.tsx', 'src/b.tsx', 'src/c.py']);
-    expect(pickAdapter(dir)).toBe(ts);
+    inGraphScope(() => {
+      const ts = fakeAdapter('typescript', ['.ts', '.tsx']);
+      const py = fakeAdapter('python', ['.py']);
+      currentAdapterRegistry().register(ts);
+      currentAdapterRegistry().register(py);
+      writeFiles(['src/a.tsx', 'src/b.tsx', 'src/c.py']);
+      expect(pickAdapter(dir)).toBe(ts);
+    });
   });
 
   it('ignores adapters with empty fileExtensions in dominance counting', () => {
-    const empty = fakeAdapter('empty', []);
-    const ts = fakeAdapter('typescript', ['.ts']);
-    currentAdapterRegistry().register(empty);
-    currentAdapterRegistry().register(ts);
-    writeFiles(['src/a.ts']);
-    expect(pickAdapter(dir)).toBe(ts);
+    inGraphScope(() => {
+      const empty = fakeAdapter('empty', []);
+      const ts = fakeAdapter('typescript', ['.ts']);
+      currentAdapterRegistry().register(empty);
+      currentAdapterRegistry().register(ts);
+      writeFiles(['src/a.ts']);
+      expect(pickAdapter(dir)).toBe(ts);
+    });
   });
 
   it('tolerates extension specs without a leading dot', () => {
-    const ts = fakeAdapter('typescript', ['ts']);
-    const py = fakeAdapter('python', ['py']);
-    currentAdapterRegistry().register(ts);
-    currentAdapterRegistry().register(py);
-    writeFiles(['src/a.py', 'src/b.py']);
-    expect(pickAdapter(dir)).toBe(py);
+    inGraphScope(() => {
+      const ts = fakeAdapter('typescript', ['ts']);
+      const py = fakeAdapter('python', ['py']);
+      currentAdapterRegistry().register(ts);
+      currentAdapterRegistry().register(py);
+      writeFiles(['src/a.py', 'src/b.py']);
+      expect(pickAdapter(dir)).toBe(py);
+    });
   });
 });

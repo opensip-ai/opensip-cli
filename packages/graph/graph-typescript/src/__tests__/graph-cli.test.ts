@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry, RunScope } from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, runWithScope, runWithScopeSync } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { currentAdapterRegistry, graphTool } from '@opensip-tools/graph';
 import { executeGraph } from '@opensip-tools/graph/internal';
@@ -53,6 +53,21 @@ function setupFixture(dir: string, files: Readonly<Record<string, string>>): voi
   }
 }
 
+function makeGraphScope(input: {
+  readonly project: ToolCliContext['scope']['projectContext'];
+  readonly datastore?: DataStore;
+  readonly languages?: LanguageRegistry;
+}): RunScope {
+  const scope = new RunScope({
+    projectContext: input.project,
+    ...(input.datastore ? { datastore: () => input.datastore } : {}),
+    ...(input.languages ? { languages: input.languages } : {}),
+  });
+  Object.assign(scope, graphTool.contributeScope?.() ?? {});
+  runWithScopeSync(scope, () => currentAdapterRegistry().register(typescriptGraphAdapter));
+  return scope;
+}
+
 interface CapturedCli {
   readonly cli: ToolCliContext;
   readonly exitCodes: number[];
@@ -78,12 +93,9 @@ function makeCli(): CapturedCli {
   // matches `tsconfig.json` markers and workspace fan-out (Phase 3)
   // can call `discoverWorkspaceUnits`.
   languages.register(typescriptAdapter);
+  const scope = makeGraphScope({ project, datastore, languages });
   const cli: ToolCliContext = {
-    scope: new RunScope({
-      projectContext: project,
-      datastore: () => datastore,
-      languages,
-    }),
+    scope,
     render,
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
@@ -115,6 +127,13 @@ function makeCli(): CapturedCli {
   return { cli, exitCodes, datastore, render };
 }
 
+async function runExecuteGraph(
+  options: Parameters<typeof executeGraph>[0],
+  cli: ToolCliContext,
+): Promise<Awaited<ReturnType<typeof executeGraph>>> {
+  return runWithScope(cli.scope as RunScope, () => executeGraph(options, cli));
+}
+
 /**
  * Concatenated text of every `gate-done` / `graph-status` result handed to
  * cli.render() — gate, report, and workspace human output flow through the
@@ -134,14 +153,6 @@ describe('executeGraph', () => {
   let stderr: string;
 
   beforeEach(() => {
-    // Item 1: graph registries are per-RunScope. Construct a scope
-    // with `scope.graph` populated, then register the typescript
-    // adapter into the scope's registry.
-    const scope = new RunScope();
-    Object.assign(scope, graphTool.contributeScope?.() ?? {});
-    enterScope(scope);
-    currentAdapterRegistry().register(typescriptGraphAdapter);
-
     dir = mkdtempSync(join(tmpdir(), 'graph-cli-'));
     stdout = '';
     stderr = '';
@@ -166,7 +177,7 @@ describe('executeGraph', () => {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
     const { cli, exitCodes, render } = makeCli();
-    await executeGraph({ cwd: dir }, cli);
+    await runExecuteGraph({ cwd: dir }, cli);
     // executeGraph hands a structured result to the render seam; the
     // Ink-vs-plain-text rendering is the CLI's concern (covered there).
     const done = render.mock.calls[0]?.[0] as GraphDoneLike;
@@ -183,7 +194,7 @@ describe('executeGraph', () => {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
     const { cli, exitCodes, render } = makeCli();
-    await executeGraph({ cwd: dir, verbose: true }, cli);
+    await runExecuteGraph({ cwd: dir, verbose: true }, cli);
     const done = render.mock.calls[0]?.[0] as GraphDoneLike;
     expect(done.type).toBe('graph-done');
     const body = done.verboseDetail?.kind === 'lines' ? done.verboseDetail.lines.join('\n') : '';
@@ -198,7 +209,7 @@ describe('executeGraph', () => {
   it('JSON mode emits the signal envelope', async () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes } = makeCli();
-    await executeGraph({ cwd: dir, json: true }, cli);
+    await runExecuteGraph({ cwd: dir, json: true }, cli);
     const parsed = JSON.parse(stdout) as {
       tool: string;
       schemaVersion: number;
@@ -217,7 +228,7 @@ describe('executeGraph', () => {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
     const { cli, exitCodes, render } = makeCli();
-    await executeGraph({ cwd: dir, gateSave: true }, cli);
+    await runExecuteGraph({ cwd: dir, gateSave: true }, cli);
     expect(renderedLines(render)).toContain(`Graph baseline saved`);
     expect(exitCodes).toContain(0);
   });
@@ -227,9 +238,9 @@ describe('executeGraph', () => {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
     const shared = makeCli();
-    await executeGraph({ cwd: dir, gateSave: true }, shared.cli);
+    await runExecuteGraph({ cwd: dir, gateSave: true }, shared.cli);
     shared.render.mockClear();
-    await executeGraph({ cwd: dir, gateCompare: true }, shared.cli);
+    await runExecuteGraph({ cwd: dir, gateCompare: true }, shared.cli);
     expect(renderedLines(shared.render)).toContain('Graph gate PASS');
     expect(shared.exitCodes).toContain(0);
   });
@@ -239,7 +250,7 @@ describe('executeGraph', () => {
       'index.ts': `export function main(): void {}\n`,
     });
     const shared = makeCli();
-    await executeGraph({ cwd: dir, gateSave: true }, shared.cli);
+    await runExecuteGraph({ cwd: dir, gateSave: true }, shared.cli);
     // Mutate fixture to add an orphan
     writeFileSync(
       join(dir, 'index.ts'),
@@ -247,7 +258,7 @@ describe('executeGraph', () => {
       'utf8',
     );
     shared.render.mockClear();
-    await executeGraph({ cwd: dir, gateCompare: true, noCache: true }, shared.cli);
+    await runExecuteGraph({ cwd: dir, gateCompare: true, noCache: true }, shared.cli);
     expect(renderedLines(shared.render)).toContain('Graph gate FAILED');
     expect(shared.exitCodes).toContain(1);
   });
@@ -255,7 +266,7 @@ describe('executeGraph', () => {
   it('errors when --gate-save and --gate-compare are passed together', async () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes } = makeCli();
-    await executeGraph({ cwd: dir, gateSave: true, gateCompare: true }, cli);
+    await runExecuteGraph({ cwd: dir, gateSave: true, gateCompare: true }, cli);
     expect(stderr).toContain('mutually exclusive');
     expect(exitCodes).toContain(2);
   });
@@ -264,7 +275,7 @@ describe('executeGraph', () => {
     // No tsconfig.json -> ConfigurationError surfaces
     mkdirSync(dir, { recursive: true });
     const { cli, exitCodes } = makeCli();
-    await executeGraph({ cwd: dir }, cli);
+    await runExecuteGraph({ cwd: dir }, cli);
     expect(stderr).toContain('graph:');
     expect(exitCodes).toContain(2);
   });
@@ -280,7 +291,7 @@ describe('executeGraph', () => {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
     const { cli, exitCodes } = makeCli();
-    const envelope = await executeGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
+    const envelope = await runExecuteGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
     expect(envelope?.tool).toBe('graph');
     expect(envelope?.schemaVersion).toBe(2);
     expect(exitCodes).toContain(0);
@@ -289,7 +300,7 @@ describe('executeGraph', () => {
   it('errors when --workspace and positional paths are passed together', async () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes } = makeCli();
-    await executeGraph({ cwd: dir, paths: ['foo'], workspace: true }, cli);
+    await runExecuteGraph({ cwd: dir, paths: ['foo'], workspace: true }, cli);
     expect(stderr).toContain('mutually exclusive');
     expect(exitCodes).toContain(2);
   });
@@ -297,7 +308,7 @@ describe('executeGraph', () => {
   it('errors when --workspace is passed but cliScript is empty', async () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes } = makeCli();
-    await executeGraph({ cwd: dir, workspace: true, cliScript: '' }, cli);
+    await runExecuteGraph({ cwd: dir, workspace: true, cliScript: '' }, cli);
     expect(stderr).toContain('CLI entry script');
     expect(exitCodes).toContain(2);
   });
@@ -306,7 +317,7 @@ describe('executeGraph', () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes } = makeCli();
     // No packages/** dir exists — discoverWorkspaceUnits returns [].
-    await executeGraph({ cwd: dir, workspace: true, cliScript: '/usr/bin/node' }, cli);
+    await runExecuteGraph({ cwd: dir, workspace: true, cliScript: '/usr/bin/node' }, cli);
     expect(stderr).toContain('no workspace units');
     expect(exitCodes).toContain(2);
   });
@@ -323,7 +334,7 @@ describe('executeGraph', () => {
       'utf8',
     );
     const { cli, exitCodes } = makeCli();
-    await executeGraph({ cwd: dir, paths: [join(dir, 'packages', 'inner')], json: true }, cli);
+    await runExecuteGraph({ cwd: dir, paths: [join(dir, 'packages', 'inner')], json: true }, cli);
     const parsed = JSON.parse(stdout) as { tool: string };
     expect(parsed.tool).toBe('graph');
     expect(exitCodes).toContain(0);
@@ -335,7 +346,7 @@ describe('executeGraph', () => {
     // "report sent" status line now that delivery lives at the root.
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes, render } = makeCli();
-    const envelope = await executeGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
+    const envelope = await runExecuteGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
     const done = render.mock.calls[0]?.[0] as GraphDoneLike;
     expect(done.type).toBe('graph-done');
     expect(envelope?.tool).toBe('graph');
@@ -380,7 +391,7 @@ describe('executeGraph', () => {
       'utf8',
     );
     const { cli, exitCodes } = makeCli();
-    await executeGraph(
+    await runExecuteGraph(
       {
         cwd: dir,
         workspace: true,
@@ -422,7 +433,7 @@ describe('executeGraph', () => {
       'utf8',
     );
     const { cli, exitCodes, render } = makeCli();
-    await executeGraph({ cwd: dir, workspace: true, cliScript: helper, concurrency: 1 }, cli);
+    await runExecuteGraph({ cwd: dir, workspace: true, cliScript: helper, concurrency: 1 }, cli);
     const out = renderedLines(render);
     expect(out).toContain('opensip-tools graph --workspace');
     expect(out).toContain('== Units');
@@ -444,7 +455,7 @@ describe('executeGraph', () => {
       scope: 'none' as const,
     };
     const cli: ToolCliContext = {
-      scope: new RunScope({ projectContext: projectNoStore }),
+      scope: makeGraphScope({ project: projectNoStore }),
       render: vi.fn(() => Promise.resolve()),
       renderLive: vi.fn(() => Promise.resolve()),
       maybeOpenDashboard: vi.fn(() => Promise.resolve()),
@@ -464,7 +475,7 @@ describe('executeGraph', () => {
       writeSarif: vi.fn(() => Promise.resolve()),
       registerLiveView: vi.fn(),
     };
-    await executeGraph({ cwd: dir, gateSave: true }, cli);
+    await runExecuteGraph({ cwd: dir, gateSave: true }, cli);
     expect(stderr).toContain('requires a DataStore');
     expect(exitCodes).toContain(2);
   });
@@ -482,7 +493,7 @@ describe('executeGraph', () => {
     const helper = join(dir, 'failing-cli.cjs');
     writeFileSync(helper, `process.stderr.write('boom\\n');\nprocess.exit(1);\n`, 'utf8');
     const { cli, exitCodes } = makeCli();
-    await executeGraph({ cwd: dir, workspace: true, cliScript: helper, concurrency: 1 }, cli);
+    await runExecuteGraph({ cwd: dir, workspace: true, cliScript: helper, concurrency: 1 }, cli);
     expect(exitCodes).toContain(1);
     expect(stderr).toContain('at least one unit run failed');
   });

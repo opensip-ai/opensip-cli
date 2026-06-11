@@ -38,10 +38,10 @@ interface WorkspacePackageJson {
 // REGEX PATTERNS
 // =============================================================================
 
-/** Extract major version from engines.node constraint like ">=22.0.0" → 22 */
+/** Extract major version from engines.node constraint like ">=24.0.0" -> 24 */
 const ENGINES_NODE_MAJOR = /(\d+)/;
 
-/** Match @types/node version like "^22.0.0" → 22 */
+/** Match @types/node version like "^24.0.0" -> 24 */
 const TYPES_NODE_MAJOR = /\^(\d+)/;
 
 /** Match node-version in CI workflow YAML */
@@ -53,7 +53,7 @@ const CI_NODE_VERSION = /node-version:\s*['"]?(\d+)['"]?/;
 
 /**
  * Extract major Node version from engines.node constraint.
- * e.g. ">=22.0.0" → 22
+ * e.g. ">=24.0.0" -> 24
  */
 function extractNodeMajor(constraint: string): number | null {
   const match = ENGINES_NODE_MAJOR.exec(constraint);

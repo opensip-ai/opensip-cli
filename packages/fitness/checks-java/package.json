@@ -43,7 +43,7 @@
   },
   "devDependencies": {
     "@opensip-tools/core": "workspace:*",
-    "@types/node": "^22.19.19",
-    "vitest": "^4.1.7"
+    "@types/node": "^24.13.2",
+    "vitest": "^4.1.8"
   }
 }

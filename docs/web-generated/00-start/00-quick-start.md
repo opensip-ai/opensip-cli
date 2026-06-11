@@ -48,7 +48,7 @@ For the full per-language breakdown, see [`../70-reference/02-package-catalog.md
 
 ## Prerequisites
 
-- **Node.js 22+** — `node --version` should print `v22.x` or higher.
+- **Node.js 24+** — `node --version` should print `v24.x` or higher.
 - A project directory you don't mind a scaffold landing in.
 - *(Optional)* `pnpm` if you're building from source. The curl installer handles global CLI setup.
 

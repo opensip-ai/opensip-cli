@@ -19,7 +19,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, getTracer } from '@opensip-tools/core';
+import { getTracer, runWithScope, runWithScopeSync } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
@@ -64,18 +64,23 @@ function fakeAdapter(projectDir: string): GraphLanguageAdapter {
 
 describe('graph stage spans — standalone no-op invariant', () => {
   let projectDir: string;
+  let scope: ReturnType<typeof makeGraphTestScope>;
 
   beforeEach(() => {
     // No SDK provider is ever registered in the graph package (it carries no
     // SDK), so the global tracer stays the API's no-op facade for these tests.
-    enterScope(makeGraphTestScope());
+    scope = makeGraphTestScope();
     projectDir = mkdtempSync(join(tmpdir(), 'orch-spans-'));
   });
 
   afterEach(() => {
-    currentAdapterRegistry().clear();
+    runWithScopeSync(scope, () => currentAdapterRegistry().clear());
     rmSync(projectDir, { recursive: true, force: true });
   });
+
+  function inGraphScope<T>(fn: () => Promise<T>): Promise<T> {
+    return runWithScope(scope, fn);
+  }
 
   it('GRAPH_STAGES is the canonical seven-stage set the spans are named after', () => {
     expect(GRAPH_STAGES).toEqual([
@@ -90,33 +95,35 @@ describe('graph stage spans — standalone no-op invariant', () => {
   });
 
   it('runGraph completes normally and the stage spans are non-recording (emit nothing) with no SDK', async () => {
-    currentAdapterRegistry().register(fakeAdapter(projectDir));
+    await inGraphScope(async () => {
+      currentAdapterRegistry().register(fakeAdapter(projectDir));
 
-    // Capture whether ANY span started during the run is recording. With no
-    // provider, every withSpan span is the no-op span → non-recording.
-    const recordingFlags: boolean[] = [];
-    const probeTracer = getTracer('probe');
+      // Capture whether ANY span started during the run is recording. With no
+      // provider, every withSpan span is the no-op span → non-recording.
+      const recordingFlags: boolean[] = [];
+      const probeTracer = getTracer('probe');
 
-    const result = await runGraph({
-      cwd: projectDir,
-      noCache: true,
-      rules: [],
-      onProgress: () => {
-        probeTracer.startActiveSpan('probe', (span) => {
-          recordingFlags.push(span.isRecording());
-          span.end();
-        });
-      },
+      const result = await runGraph({
+        cwd: projectDir,
+        noCache: true,
+        rules: [],
+        onProgress: () => {
+          probeTracer.startActiveSpan('probe', (span) => {
+            recordingFlags.push(span.isRecording());
+            span.end();
+          });
+        },
+      });
+
+      // Pipeline ran end-to-end, identical to the un-instrumented behavior.
+      expect(result.catalog).not.toBeNull();
+      expect(result.indexes).not.toBeNull();
+      expect(result.signals).toEqual([]);
+      expect(result.cacheHit).toBe(false);
+
+      // Every probed span was non-recording — the standalone no-op guarantee.
+      expect(recordingFlags.length).toBeGreaterThan(0);
+      expect(recordingFlags.every((r) => r === false)).toBe(true);
     });
-
-    // Pipeline ran end-to-end, identical to the un-instrumented behavior.
-    expect(result.catalog).not.toBeNull();
-    expect(result.indexes).not.toBeNull();
-    expect(result.signals).toEqual([]);
-    expect(result.cacheHit).toBe(false);
-
-    // Every probed span was non-recording — the standalone no-op guarantee.
-    expect(recordingFlags.length).toBeGreaterThan(0);
-    expect(recordingFlags.every((r) => r === false)).toBe(true);
   });
 });

@@ -40,11 +40,11 @@
     "@opensip-tools/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.19.19",
-    "cytoscape": "3.33.4",
-    "cytoscape-dagre": "3.0.0",
+    "@types/node": "^24.13.2",
+    "cytoscape": "3.34.0",
+    "cytoscape-dagre": "4.0.0",
     "jsdom": "^29.1.1",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   }
 }
