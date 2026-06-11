@@ -60,6 +60,30 @@ export default tseslint.config(
   unicorn.configs['flat/recommended'],
 
   {
+    rules: {
+      'unicorn/filename-case': [
+        'error',
+        {
+          cases: { kebabCase: true },
+          checkDirectories: false,
+        },
+      ],
+      // Unicorn 65 made these recommended. They are style-only in this
+      // codebase and would create broad churn unrelated to dependency updates.
+      'unicorn/no-duplicate-set-values': 'off',
+      'unicorn/no-exports-in-scripts': 'off',
+      'unicorn/no-this-outside-of-class': 'off',
+      'unicorn/prefer-https': 'off',
+      'unicorn/prefer-includes-over-repeated-comparisons': 'off',
+      'unicorn/prefer-set-has': 'off',
+      'unicorn/prefer-split-limit': 'off',
+      'unicorn/prefer-string-raw': 'off',
+      'unicorn/prefer-string-repeat': 'off',
+      'unicorn/prefer-string-replace-all': 'off',
+    },
+  },
+
+  {
     files: ['**/*.ts', '**/*.tsx'],
     plugins: {
       'import-x': importX,
@@ -124,7 +148,13 @@ export default tseslint.config(
       // -- unicorn opinions we override -----------------------------------
       'unicorn/prevent-abbreviations': 'off',
       'unicorn/no-null': 'off',
-      'unicorn/filename-case': ['error', { cases: { kebabCase: true } }],
+      'unicorn/filename-case': [
+        'error',
+        {
+          cases: { kebabCase: true },
+          checkDirectories: false,
+        },
+      ],
       'unicorn/no-array-callback-reference': 'off',
       // Allow process.exit() — used at CLI boundaries.
       'unicorn/no-process-exit': 'off',
@@ -143,6 +173,16 @@ export default tseslint.config(
       // auto-fix ignores some call sites (sort + spread, sort in-place
       // intent), producing churn for marginal gain. Off for now.
       'unicorn/no-array-sort': 'off',
+      // Unicorn 65 made these recommended. They are style-only in this
+      // codebase and would create broad churn unrelated to dependency updates.
+      'unicorn/no-exports-in-scripts': 'off',
+      'unicorn/prefer-https': 'off',
+      'unicorn/prefer-includes-over-repeated-comparisons': 'off',
+      'unicorn/prefer-set-has': 'off',
+      'unicorn/prefer-split-limit': 'off',
+      'unicorn/prefer-string-raw': 'off',
+      'unicorn/prefer-string-repeat': 'off',
+      'unicorn/prefer-string-replace-all': 'off',
 
       // -- sonarjs opinions we soften -------------------------------------
       // Cognitive complexity stays at 15; opt-out files use a per-file
@@ -251,6 +291,7 @@ export default tseslint.config(
         'error',
         {
           cases: { kebabCase: true, pascalCase: true },
+          checkDirectories: false,
         },
       ],
     },

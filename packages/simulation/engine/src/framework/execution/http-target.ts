@@ -2,7 +2,7 @@
  * @fileoverview `httpTarget` — an HTTP `Target` factory.
  *
  * The smallest BYO seam is a function, but most users point at an HTTP
- * endpoint. `httpTarget` wraps the built-in `fetch` (Node 22+) into a `Target`:
+ * endpoint. `httpTarget` wraps the built-in `fetch` (Node 24+) into a `Target`:
  * it forwards `ctx.signal` (so scenario abort + `abort` faults cancel the
  * request) and **throws on a non-OK status** so the driver classifies it as a
  * failure.

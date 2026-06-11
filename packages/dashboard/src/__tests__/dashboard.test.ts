@@ -104,7 +104,6 @@ describe('generateDashboardHtml', () => {
     // (`String.raw`<`` is the 1-char `<` because the JS lexer processes
     // Unicode escapes before String.raw sees them — a backslash literal
     // is required for the 6-character on-disk sequence.)
-    // eslint-disable-next-line unicorn/prefer-string-raw -- see comment above
     expect(literalLine ?? '').toContain('\\u003c');
   });
 

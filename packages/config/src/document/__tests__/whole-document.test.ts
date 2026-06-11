@@ -16,8 +16,8 @@ import { z } from 'zod';
 import { composeConfigSchema, validateConfigDocument } from '../../composer.js';
 import { hostConfigDeclarations } from '../host-declarations.js';
 
-import type { PluginConfigKeyDeclaration } from '../targeting.js';
 import type { ToolConfigDeclaration } from '../../declaration.js';
+import type { PluginConfigKeyDeclaration } from '../targeting.js';
 
 // Stand-in tool declarations (config cannot import the real tools — upward edge).
 const fakeFitness: ToolConfigDeclaration = {

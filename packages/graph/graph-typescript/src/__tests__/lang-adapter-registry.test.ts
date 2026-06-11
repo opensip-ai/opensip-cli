@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError, enterScope, RunScope } from '@opensip-tools/core';
+import { ConfigurationError, RunScope, runWithScopeSync } from '@opensip-tools/core';
 import { currentAdapterRegistry, graphTool, pickAdapter } from '@opensip-tools/graph';
 import { pythonGraphAdapter } from '@opensip-tools/graph-python';
 import { rustGraphAdapter } from '@opensip-tools/graph-rust';
@@ -19,26 +19,36 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';
 
+function makeGraphScope(): RunScope {
+  const scope = new RunScope();
+  Object.assign(scope, graphTool.contributeScope?.() ?? {});
+  return scope;
+}
+
 describe('pickAdapter — registry-size shortcuts', () => {
+  let scope: RunScope;
+
   beforeEach(() => {
     // Item 1: adapter registry is per-RunScope. Fresh scope per test.
-    const scope = new RunScope();
-    Object.assign(scope, graphTool.contributeScope?.() ?? {});
-    enterScope(scope);
+    scope = makeGraphScope();
   });
 
   afterEach(() => {
-    currentAdapterRegistry().clear();
+    runWithScopeSync(scope, () => currentAdapterRegistry().clear());
   });
 
   it('throws when no adapter is registered', () => {
-    expect(() => pickAdapter()).toThrow(ConfigurationError);
+    runWithScopeSync(scope, () => {
+      expect(() => pickAdapter()).toThrow(ConfigurationError);
+    });
   });
 
   it('returns the only adapter when exactly one is registered', () => {
-    currentAdapterRegistry().register(rustGraphAdapter);
-    const picked = pickAdapter('/tmp');
-    expect(picked.id).toBe('rust');
+    runWithScopeSync(scope, () => {
+      currentAdapterRegistry().register(rustGraphAdapter);
+      const picked = pickAdapter('/tmp');
+      expect(picked.id).toBe('rust');
+    });
   });
 
   it('falls back to alphabetical order when no preferred adapter is registered', () => {
@@ -48,12 +58,14 @@ describe('pickAdapter — registry-size shortcuts', () => {
     // alphabetical sort, picks rust.
     const dir = mkdtempSync(join(tmpdir(), 'graph-pick-fb-'));
     try {
-      currentAdapterRegistry().register(rustGraphAdapter);
-      // Write only an unrelated file so the dominance counter sees no
-      // matches and findMaxCount returns null.
-      writeFileSync(join(dir, 'README.md'), '', 'utf8');
-      const picked = pickAdapter(dir);
-      expect(picked.id).toBe('rust');
+      runWithScopeSync(scope, () => {
+        currentAdapterRegistry().register(rustGraphAdapter);
+        // Write only an unrelated file so the dominance counter sees no
+        // matches and findMaxCount returns null.
+        writeFileSync(join(dir, 'README.md'), '', 'utf8');
+        const picked = pickAdapter(dir);
+        expect(picked.id).toBe('rust');
+      });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -78,68 +90,80 @@ function registerAllThreeAdapters(): void {
 
 describe('pickAdapter — multi-adapter dominance heuristic', () => {
   let dir: string;
+  let scope: RunScope;
 
   beforeEach(() => {
     // Item 1: adapter registry is per-RunScope. Fresh scope per test.
-    const scope = new RunScope();
-    Object.assign(scope, graphTool.contributeScope?.() ?? {});
-    enterScope(scope);
+    scope = makeGraphScope();
     dir = mkdtempSync(join(tmpdir(), 'graph-pick-'));
   });
 
   afterEach(() => {
+    runWithScopeSync(scope, () => currentAdapterRegistry().clear());
     rmSync(dir, { recursive: true, force: true });
   });
 
   it('picks Python when only .py files are present', () => {
-    registerAllThreeAdapters();
-    writeFileSync(join(dir, 'a.py'), 'def foo(): pass\n', 'utf8');
-    writeFileSync(join(dir, 'b.py'), 'def bar(): pass\n', 'utf8');
-    const adapter = pickAdapter(dir);
-    expect(adapter.id).toBe('python');
+    runWithScopeSync(scope, () => {
+      registerAllThreeAdapters();
+      writeFileSync(join(dir, 'a.py'), 'def foo(): pass\n', 'utf8');
+      writeFileSync(join(dir, 'b.py'), 'def bar(): pass\n', 'utf8');
+      const adapter = pickAdapter(dir);
+      expect(adapter.id).toBe('python');
+    });
   });
 
   it('picks Rust when only .rs files are present', () => {
-    registerAllThreeAdapters();
-    mkdirSync(join(dir, 'src'), { recursive: true });
-    writeFileSync(join(dir, 'src/lib.rs'), 'fn foo() {}\n', 'utf8');
-    writeFileSync(join(dir, 'src/main.rs'), 'fn main() {}\n', 'utf8');
-    const adapter = pickAdapter(dir);
-    expect(adapter.id).toBe('rust');
+    runWithScopeSync(scope, () => {
+      registerAllThreeAdapters();
+      mkdirSync(join(dir, 'src'), { recursive: true });
+      writeFileSync(join(dir, 'src/lib.rs'), 'fn foo() {}\n', 'utf8');
+      writeFileSync(join(dir, 'src/main.rs'), 'fn main() {}\n', 'utf8');
+      const adapter = pickAdapter(dir);
+      expect(adapter.id).toBe('rust');
+    });
   });
 
   it('picks the dominant language when multiple are present', () => {
-    registerAllThreeAdapters();
-    // 3 .py files, 1 .rs file → Python wins.
-    writeFileSync(join(dir, 'a.py'), 'pass', 'utf8');
-    writeFileSync(join(dir, 'b.py'), 'pass', 'utf8');
-    writeFileSync(join(dir, 'c.py'), 'pass', 'utf8');
-    mkdirSync(join(dir, 'src'), { recursive: true });
-    writeFileSync(join(dir, 'src/lib.rs'), 'fn foo() {}', 'utf8');
-    expect(pickAdapter(dir).id).toBe('python');
+    runWithScopeSync(scope, () => {
+      registerAllThreeAdapters();
+      // 3 .py files, 1 .rs file -> Python wins.
+      writeFileSync(join(dir, 'a.py'), 'pass', 'utf8');
+      writeFileSync(join(dir, 'b.py'), 'pass', 'utf8');
+      writeFileSync(join(dir, 'c.py'), 'pass', 'utf8');
+      mkdirSync(join(dir, 'src'), { recursive: true });
+      writeFileSync(join(dir, 'src/lib.rs'), 'fn foo() {}', 'utf8');
+      expect(pickAdapter(dir).id).toBe('python');
+    });
   });
 
   it('breaks ties by preferring TypeScript', () => {
-    registerAllThreeAdapters();
-    // 1 .ts and 1 .py file → tie at 1; TypeScript wins.
-    writeFileSync(join(dir, 'tsconfig.json'), '{}', 'utf8');
-    mkdirSync(join(dir, 'src'), { recursive: true });
-    writeFileSync(join(dir, 'src/index.ts'), 'export {};\n', 'utf8');
-    writeFileSync(join(dir, 'a.py'), 'pass', 'utf8');
-    expect(pickAdapter(dir).id).toBe('typescript');
+    runWithScopeSync(scope, () => {
+      registerAllThreeAdapters();
+      // 1 .ts and 1 .py file -> tie at 1; TypeScript wins.
+      writeFileSync(join(dir, 'tsconfig.json'), '{}', 'utf8');
+      mkdirSync(join(dir, 'src'), { recursive: true });
+      writeFileSync(join(dir, 'src/index.ts'), 'export {};\n', 'utf8');
+      writeFileSync(join(dir, 'a.py'), 'pass', 'utf8');
+      expect(pickAdapter(dir).id).toBe('typescript');
+    });
   });
 
   it('falls back to TypeScript when no language files match', () => {
-    registerAllThreeAdapters();
-    // Empty dir — heuristic returns no winner; preference list picks TS.
-    expect(pickAdapter(dir).id).toBe('typescript');
+    runWithScopeSync(scope, () => {
+      registerAllThreeAdapters();
+      // Empty dir: heuristic returns no winner; preference list picks TS.
+      expect(pickAdapter(dir).id).toBe('typescript');
+    });
   });
 
   it('ignores excluded directories when counting', () => {
-    registerAllThreeAdapters();
-    mkdirSync(join(dir, 'target'), { recursive: true });
-    writeFileSync(join(dir, 'target/cached.rs'), 'fn x() {}', 'utf8');
-    writeFileSync(join(dir, 'a.py'), 'pass', 'utf8');
-    expect(pickAdapter(dir).id).toBe('python');
+    runWithScopeSync(scope, () => {
+      registerAllThreeAdapters();
+      mkdirSync(join(dir, 'target'), { recursive: true });
+      writeFileSync(join(dir, 'target/cached.rs'), 'fn x() {}', 'utf8');
+      writeFileSync(join(dir, 'a.py'), 'pass', 'utf8');
+      expect(pickAdapter(dir).id).toBe('python');
+    });
   });
 });

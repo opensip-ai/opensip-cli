@@ -18,15 +18,15 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
       # npm 11.5+ is required for the OIDC token-exchange handshake with
-      # GitHub Actions. Node 22 ships with npm 10. We install npm 11 to a
-      # separate prefix and prepend to $PATH because `npm install -g npm@11`
-      # corrupts mid-install on hosted runners (npm unlinks files of its
-      # own running process — "Cannot find module 'promise-retry'").
+      # GitHub Actions. Install npm 11 to a separate prefix and prepend to
+      # $PATH because `npm install -g npm@11` corrupts mid-install on hosted
+      # runners (npm unlinks files of its own running process: "Cannot find
+      # module 'promise-retry'").
       - name: Install npm 11 to separate prefix (avoids self-replace bug)
         run: |
           npm install --prefix "$HOME/.npm-cli" npm@11

@@ -36,10 +36,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "web-tree-sitter": "0.25.10"
+    "web-tree-sitter": "0.26.9"
   },
   "devDependencies": {
-    "@types/node": "^22.19.19",
-    "vitest": "^4.1.7"
+    "@types/node": "^24.13.2",
+    "vitest": "^4.1.8"
   }
 }

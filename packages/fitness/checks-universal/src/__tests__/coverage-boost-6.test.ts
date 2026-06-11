@@ -688,7 +688,7 @@ describe('node-version-consistency variants', () => {
       JSON.stringify(
         {
           name: 'root',
-          engines: { node: '>=22.0.0' },
+          engines: { node: '>=24.0.0' },
         },
         null,
         2,
@@ -767,7 +767,7 @@ describe('node-version-consistency early returns', () => {
         2,
       ),
     );
-    writeFixture(cwd, '.nvmrc', '22');
+    writeFixture(cwd, '.nvmrc', '24');
   });
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }));
@@ -804,7 +804,7 @@ describe('node-version-consistency no package.json at all', () => {
   beforeAll(() => {
     cwd = makeFixtureDir('node-ver-empty');
     // No package.json at all
-    writeFixture(cwd, '.nvmrc', '22');
+    writeFixture(cwd, '.nvmrc', '24');
   });
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }));
