@@ -31,6 +31,7 @@ import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../../recipes/
 import type { FitnessRecipeResult, RecipeCheckResult } from '../../recipes/types.js';
 import type { SignalersConfig } from '../../signalers/types.js';
 import type { Signal, VerdictPolicy } from '@opensip-tools/core';
+import type { DataStore } from '@opensip-tools/datastore';
 
 /**
  * Resolve fit's findings policy (ADR-0035). Reserved keys
@@ -49,7 +50,6 @@ export function resolveFitVerdictPolicy(signalersConfig: SignalersConfig): Verdi
     failOnWarnings: resolved?.failOnWarnings ?? signalersConfig.fitness.failOnWarnings ?? 0,
   };
 }
-import type { DataStore } from '@opensip-tools/datastore';
 
 // ---------------------------------------------------------------------------
 // Envelope builder (ADR-0011, Phase 6) — the canonical post-run transform

@@ -44,6 +44,13 @@ const EXPECTED_VALUE_EXPORTS = [
   'RunScope',
   'SeverityPolicy',
   'SystemError',
+  // ADR-0035: host-owned verdict policy surface.
+  'HOST_VERDICT_POLICY_FALLBACK',
+  'policyPasses',
+  'resolveVerdictPolicy',
+  // Upstream barrel export missing from this curated list (modular-monolith
+  // boundary commits added it to index.ts but not here); the barrel exports it.
+  'RAW_STREAM_REASONS',
   'TOOL_LONG_IDS',
   'TOOL_LONG_TO_SHORT',
   'TOOL_SHORT_IDS',
