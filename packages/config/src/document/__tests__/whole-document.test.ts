@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { composeConfigSchema, validateConfigDocument } from '../../composer.js';
 import { hostConfigDeclarations } from '../host-declarations.js';
 
+import type { PluginConfigKeyDeclaration } from '../targeting.js';
 import type { ToolConfigDeclaration } from '../../declaration.js';
 
 // Stand-in tool declarations (config cannot import the real tools — upward edge).
@@ -28,8 +29,21 @@ const fakeGraph: ToolConfigDeclaration = {
   schema: z.object({ minDuplicateBodyLines: z.number().int().optional() }),
 };
 
+const PLUGIN_CONFIG_KEYS: readonly PluginConfigKeyDeclaration[] = [
+  { key: 'checkPackages', kind: 'packages' },
+  { key: 'scenarioPackages', kind: 'packages' },
+  { key: 'autoDiscoverScenarios', kind: 'autoDiscover' },
+  { key: 'packageScopes', kind: 'scopes' },
+  { key: 'graphAdapters', kind: 'packages' },
+  { key: 'autoDiscoverGraphAdapters', kind: 'autoDiscover' },
+];
+
 function schema() {
-  return composeConfigSchema([...hostConfigDeclarations(), fakeFitness, fakeGraph]);
+  return composeConfigSchema([
+    ...hostConfigDeclarations({ pluginConfigKeys: PLUGIN_CONFIG_KEYS }),
+    fakeFitness,
+    fakeGraph,
+  ]);
 }
 
 const WHOLE_DOCUMENT = {
@@ -39,6 +53,15 @@ const WHOLE_DOCUMENT = {
   checkOverrides: { 'some-check': 'backend' },
   cli: { reportTo: 'https://cloud.test/api' },
   dashboard: { editor: 'vscode' },
+  plugins: {
+    fit: ['@acme/fit-pack'],
+    checkPackages: ['@acme/checks'],
+    scenarioPackages: ['@acme/scenarios-load'],
+    autoDiscoverScenarios: false,
+    packageScopes: ['@acme'],
+    graphAdapters: ['@acme/graph-cpp'],
+    autoDiscoverGraphAdapters: false,
+  },
   fitness: { failOnErrors: 1, recipe: 'example' },
   graph: { minDuplicateBodyLines: 10 },
 };
@@ -57,6 +80,11 @@ describe('composed whole-document validation', () => {
     [
       'targets (missing description)',
       { ...WHOLE_DOCUMENT, targets: { backend: { include: ['a'] } } },
+    ],
+    ['plugins (unknown key)', { ...WHOLE_DOCUMENT, plugins: { scenarioPackagez: ['oops'] } }],
+    [
+      'plugins (wrong auto-discovery type)',
+      { ...WHOLE_DOCUMENT, plugins: { autoDiscoverGraphAdapters: 'false' } },
     ],
     ['fitness', { ...WHOLE_DOCUMENT, fitness: { faliOnErrors: 1 } }],
     ['graph', { ...WHOLE_DOCUMENT, graph: { minDuplicateBodyLine: 10 } }],

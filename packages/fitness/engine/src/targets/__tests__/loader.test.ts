@@ -123,14 +123,39 @@ plugins:
   fit: ["@a/b"]
   sim: ["@c/d"]
   checkPackages: ["@e/f"]
+  scenarioPackages: ["@g/h"]
+  autoDiscoverScenarios: false
   packageScopes: ["@acme"]
+  graphAdapters: ["@i/j"]
+  autoDiscoverGraphAdapters: false
 `,
     );
     const { config } = loadTargetsConfig(testDir);
     expect(config.plugins?.fit).toEqual(['@a/b']);
     expect(config.plugins?.sim).toEqual(['@c/d']);
     expect(config.plugins?.checkPackages).toEqual(['@e/f']);
+    expect(config.plugins?.scenarioPackages).toEqual(['@g/h']);
+    expect(config.plugins?.autoDiscoverScenarios).toBe(false);
     expect(config.plugins?.packageScopes).toEqual(['@acme']);
+    expect(config.plugins?.graphAdapters).toEqual(['@i/j']);
+    expect(config.plugins?.autoDiscoverGraphAdapters).toBe(false);
+  });
+
+  it.each([
+    ['unknown key', 'scenarioPackagez: ["@g/h"]'],
+    ['wrong explicit-list type', 'graphAdapters: "@i/j"'],
+  ])('throws ValidationError on malformed plugins config: %s', (_label, pluginsBody) => {
+    writeFileSync(
+      join(testDir, 'opensip-tools.config.yml'),
+      `targets:
+  src:
+    description: x
+    include: ["src/**"]
+plugins:
+  ${pluginsBody}
+`,
+    );
+    expect(() => loadTargetsConfig(testDir)).toThrow(ValidationError);
   });
 
   it('throws ValidationError when target name is not kebab-case', () => {

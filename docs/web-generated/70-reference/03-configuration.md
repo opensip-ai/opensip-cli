@@ -11,7 +11,7 @@ source-files:
   - packages/fitness/engine/src/config/fitness-config-schema.ts
   - packages/simulation/engine/src/cli/sim-config-schema.ts
   - packages/graph/engine/src/cli/graph-config-schema.ts
-  - packages/cli/src/bootstrap/global-config.ts
+  - packages/config/src/document/global-config.ts
   - packages/cli/src/commands/init.ts
 related-docs:
   - ../00-start/06-system-context.md
@@ -180,21 +180,25 @@ CLI flags always override config — `--no-json` overrides a `cli.json: true` se
 
 ## `plugins`
 
-Plugin lists and discovery preferences. Scoped name-pattern discovery, explicit/project-pinned package lists, and project-local files layer:
+Plugin lists and discovery preferences. Scoped name-pattern discovery, explicit/project-pinned package lists, and project-local files layer. The `plugins:` block is a strict host-owned config namespace: unknown keys or wrong value types are rejected during the pre-dispatch config validation pass.
 
 | Field | Effect |
 |---|---|
 | `plugins.fit` | Arbitrary-scope fitness packs pinned into `.runtime/plugins/fit/`. Managed by `plugin add/remove/sync`. |
 | `plugins.sim` | Arbitrary-scope simulation packs pinned into `.runtime/plugins/sim/`. |
+| `plugins.lang` | Legacy language-pack pins consumed by language/fitness plugin discovery. |
 | `plugins.packageScopes` | Additional npm scopes to scan for `<scope>/scenarios-*` simulation packages. `@opensip-tools` is always scanned. |
 | `plugins.checkPackages` | Exact fitness package names to load from project `node_modules`. |
 | `plugins.scenarioPackages` | Exact simulation package names to load from project `node_modules`; when set, replaces the `<scope>/scenarios-*` name-pattern scan. |
 | `plugins.autoDiscoverScenarios` | `false` disables the `<scope>/scenarios-*` name-pattern scan for sim. Default `true`. Ignored when `scenarioPackages` is set. |
+| `plugins.graphAdapters` | Exact graph adapter package names to load from project `node_modules`; when set, replaces marker auto-discovery. |
+| `plugins.autoDiscoverGraphAdapters` | `false` disables graph-adapter marker auto-discovery. Default `true`. Ignored when `graphAdapters` is set. |
 
 ```yaml
 plugins:
   fit: ['@my-org/checks-internal']
   packageScopes: ['@acme']
+  graphAdapters: ['@my-org/graph-cpp']
 ```
 
 **Sim-pack discovery is by name-pattern** (ADR-0029): the simulation tool's manifest declares a `name-pattern` discovery mode (`prefix: "scenarios-"`, default scope `@opensip-tools`), so any installed `<scope>/scenarios-*` package is discovered automatically. There is **no** `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. The three layers that contribute scenario packs are: the `<scope>/scenarios-*` name-pattern scan (governed by `packageScopes` / `autoDiscoverScenarios`), explicit `scenarioPackages` pins, and project-local scenario files under `opensip-tools/sim/scenarios/`. See [plugin loader](/docs/opensip-tools/80-implementation/02-plugin-loader/).

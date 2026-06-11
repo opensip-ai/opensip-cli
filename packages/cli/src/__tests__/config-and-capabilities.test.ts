@@ -57,6 +57,65 @@ const fitnessTool = makeTool({
   },
 });
 
+const capabilityPreferenceManifest: ToolPluginManifest = {
+  kind: 'tool',
+  id: 'capability-owner',
+  name: 'capability-owner',
+  version: '0.0.0',
+  apiVersion: 1,
+  commands: [],
+  capabilities: [
+    {
+      id: 'fit-pack',
+      apiVersion: 1,
+      contributionSchema: { requiredKeys: ['id'] },
+      contributionKind: 'module-export',
+      discovery: {
+        discovery: { mode: 'marker', markerKind: 'fit-pack' },
+        exportName: 'checks',
+        exportShape: 'array',
+        configKeys: { packages: 'checkPackages' },
+        explicitListMode: 'augment',
+      },
+    },
+    {
+      id: 'sim-pack',
+      apiVersion: 1,
+      contributionSchema: { requiredKeys: ['id'] },
+      contributionKind: 'module-export',
+      discovery: {
+        discovery: {
+          mode: 'name-pattern',
+          prefix: 'scenarios-',
+          defaultScopes: ['@opensip-tools'],
+        },
+        exportName: 'scenarios',
+        exportShape: 'array',
+        configKeys: {
+          packages: 'scenarioPackages',
+          autoDiscover: 'autoDiscoverScenarios',
+          scopes: 'packageScopes',
+        },
+      },
+    },
+    {
+      id: 'graph-adapter',
+      apiVersion: 1,
+      contributionSchema: { requiredKeys: ['id'] },
+      contributionKind: 'module-export',
+      discovery: {
+        discovery: { mode: 'marker', markerKind: 'graph-adapter' },
+        exportName: 'adapter',
+        exportShape: 'single',
+        configKeys: {
+          packages: 'graphAdapters',
+          autoDiscover: 'autoDiscoverGraphAdapters',
+        },
+      },
+    },
+  ],
+};
+
 describe('composeAndValidateToolConfig', () => {
   let dir: string;
 
@@ -135,6 +194,58 @@ describe('composeAndValidateToolConfig', () => {
     expect(() =>
       composeAndValidateToolConfig({
         tools: registryWith([graphTool, fitnessTool]),
+        configPath,
+        env: {},
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
+  it('strict-validates plugins preferences declared by capability manifests', () => {
+    const configPath = writeConfig(
+      [
+        'plugins:',
+        '  fit: ["@acme/fit-pack"]',
+        '  sim: ["@acme/sim-pack"]',
+        '  lang: ["@acme/lang-pack"]',
+        '  checkPackages: ["@acme/checks"]',
+        '  scenarioPackages: ["@acme/scenarios-load"]',
+        '  autoDiscoverScenarios: false',
+        '  packageScopes: ["@acme"]',
+        '  graphAdapters: ["@acme/graph-cpp"]',
+        '  autoDiscoverGraphAdapters: false',
+        '',
+      ].join('\n'),
+    );
+    const result = composeAndValidateToolConfig({
+      tools: registryWith([graphTool, fitnessTool]),
+      manifests: [capabilityPreferenceManifest],
+      configPath,
+      env: {},
+    });
+
+    expect(result?.plugins).toMatchObject({
+      fit: ['@acme/fit-pack'],
+      sim: ['@acme/sim-pack'],
+      lang: ['@acme/lang-pack'],
+      checkPackages: ['@acme/checks'],
+      scenarioPackages: ['@acme/scenarios-load'],
+      autoDiscoverScenarios: false,
+      packageScopes: ['@acme'],
+      graphAdapters: ['@acme/graph-cpp'],
+      autoDiscoverGraphAdapters: false,
+    });
+  });
+
+  it.each([
+    ['unknown plugin key', 'plugins:\n  scenarioPackagez: ["@acme/scenarios-load"]\n'],
+    ['wrong explicit-list type', 'plugins:\n  graphAdapters: "@acme/graph-cpp"\n'],
+    ['wrong auto-discover type', 'plugins:\n  autoDiscoverScenarios: "false"\n'],
+  ])('strict-rejects malformed plugins config: %s', (_label, body) => {
+    const configPath = writeConfig(body);
+    expect(() =>
+      composeAndValidateToolConfig({
+        tools: registryWith([graphTool, fitnessTool]),
+        manifests: [capabilityPreferenceManifest],
         configPath,
         env: {},
       }),

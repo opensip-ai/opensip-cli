@@ -97,7 +97,7 @@ The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contr
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `score` | number (0..100) | yes | Pass percentage. Deterministic given the same set of units/signals. |
-| `passed` | boolean | yes | `true` ⇔ **no `critical`/`high` signals** (the "error rung"). This is the CI gate: `--json \| jq -e '.verdict.passed'`. |
+| `passed` | boolean | yes | `true` ⇔ **no `critical`/`high` signals** (the "error rung"). This is the CI gate: `--json \| jq -e '.envelope.verdict.passed'`. |
 | `summary.total` | number | yes | Total units that ran. |
 | `summary.passed` | number | yes | Units that passed (emitted no `critical`/`high` signals). |
 | `summary.failed` | number | yes | Units that failed. |

@@ -17,9 +17,9 @@
  *     import a fitness runtime type).
  *
  * The `plugins:` block type lives here too (it rides on the loaded
- * `TargetsConfig`), but its Zod validation + the plugin-discovery runtime stay
- * with fitness/the loader — plugins is a discovery concern, out of the 2.10.1
- * targeting migration.
+ * `TargetsConfig`). Config owns the document shape + Zod validation; the
+ * plugin-discovery runtime still lives with the generic capability loader and
+ * each owning tool.
  */
 
 import { z } from 'zod';
@@ -82,10 +82,35 @@ export interface PluginsConfig {
    */
   readonly checkPackages?: readonly string[];
   /**
+   * Exact simulation scenario package names to load from project `node_modules`.
+   * When present, capability discovery treats the explicit set as the pinned
+   * scenario source.
+   */
+  readonly scenarioPackages?: readonly string[];
+  /** Disable or enable simulation scenario name-pattern discovery. */
+  readonly autoDiscoverScenarios?: boolean;
+  /**
    * Additional npm scopes to include in simulation scenario-package
    * auto-discovery, on top of the platform default (`@opensip-tools`).
    */
   readonly packageScopes?: readonly string[];
+  /** Exact graph adapter package names to load from project `node_modules`. */
+  readonly graphAdapters?: readonly string[];
+  /** Disable or enable graph adapter marker discovery. */
+  readonly autoDiscoverGraphAdapters?: boolean;
+}
+
+/** The value shape expected for a capability discovery preference key. */
+export type PluginConfigKeyKind = 'packages' | 'autoDiscover' | 'scopes';
+
+/**
+ * One `plugins.<key>` declared by an admitted tool capability descriptor. The CLI
+ * maps manifest `capabilities[].discovery.configKeys` into this config-layer
+ * shape, keeping core manifest types out of `@opensip-tools/config`.
+ */
+export interface PluginConfigKeyDeclaration {
+  readonly key: string;
+  readonly kind: PluginConfigKeyKind;
 }
 
 /**
@@ -135,3 +160,35 @@ export const globalExcludesSchema = z.array(z.string());
 
 /** The `checkOverrides:` block — slug → target name(s). */
 export const checkOverridesSchema = z.record(z.string(), checkTargetValueSchema);
+
+const pluginStringArraySchema = z.array(z.string());
+
+/**
+ * Build the `plugins:` schema from the base project-local plugin domains plus
+ * the capability preference keys declared by admitted tool manifests.
+ */
+export function createPluginsConfigSchema(
+  keys: readonly PluginConfigKeyDeclaration[] = [],
+): z.ZodObject<Record<string, z.ZodType>> {
+  const shape: Record<string, z.ZodType> = {
+    fit: pluginStringArraySchema.optional(),
+    sim: pluginStringArraySchema.optional(),
+    lang: pluginStringArraySchema.optional(),
+  };
+
+  for (const { key, kind } of keys) {
+    shape[key] = (kind === 'autoDiscover' ? z.boolean() : pluginStringArraySchema).optional();
+  }
+
+  return z.object(shape).strict();
+}
+
+/** Base schema used by legacy loaders that do not have manifest context. */
+export const pluginsConfigSchema = createPluginsConfigSchema([
+  { key: 'checkPackages', kind: 'packages' },
+  { key: 'scenarioPackages', kind: 'packages' },
+  { key: 'autoDiscoverScenarios', kind: 'autoDiscover' },
+  { key: 'packageScopes', kind: 'scopes' },
+  { key: 'graphAdapters', kind: 'packages' },
+  { key: 'autoDiscoverGraphAdapters', kind: 'autoDiscover' },
+]);

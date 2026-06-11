@@ -268,6 +268,7 @@ export function installPreActionHook(program: Command, version: string): void {
     // config rides the scope (tools read scope.toolConfig.<namespace>).
     const toolConfig = composeAndValidateToolConfig({
       tools,
+      manifests: getToolManifestsForRun(),
       configPath: project.scope === 'project' ? project.configPath : undefined,
       env: process.env,
     });

@@ -45,12 +45,16 @@ export {
   targetsRecordSchema,
   globalExcludesSchema,
   checkOverridesSchema,
+  pluginsConfigSchema,
+  createPluginsConfigSchema,
 } from './document/targeting.js';
 export type {
   TargetConfig,
   Target,
   CheckTargetMap,
   PluginsConfig,
+  PluginConfigKeyKind,
+  PluginConfigKeyDeclaration,
   TargetsConfig,
 } from './document/targeting.js';
 export {

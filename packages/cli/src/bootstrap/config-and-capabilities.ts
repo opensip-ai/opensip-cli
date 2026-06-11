@@ -30,10 +30,12 @@ import {
   hostConfigDeclarations,
   resolveConfig,
   validateConfigDocument,
+  type PluginConfigKeyDeclaration,
   type ToolConfigDeclaration,
 } from '@opensip-tools/config';
 import {
   type CapabilityRegistry,
+  ConfigurationError,
   type ResolvedToolConfig,
   type ToolPluginManifest,
   type ToolRegistry,
@@ -61,6 +63,38 @@ function collectDeclarations(tools: ToolRegistry): readonly ToolConfigDeclaratio
     }
   }
   return declarations;
+}
+
+function addPluginConfigKey(
+  keys: Map<string, PluginConfigKeyDeclaration['kind']>,
+  key: string | undefined,
+  kind: PluginConfigKeyDeclaration['kind'],
+): void {
+  if (key === undefined) return;
+  const existing = keys.get(key);
+  if (existing !== undefined && existing !== kind) {
+    throw new ConfigurationError(
+      `Plugin config key '${key}' is declared with conflicting value kinds (${existing}, ${kind}).`,
+      { code: 'CONFIGURATION_ERROR', namespace: 'plugins' },
+    );
+  }
+  keys.set(key, kind);
+}
+
+function collectPluginConfigKeys(
+  manifests: readonly ToolPluginManifest[],
+): readonly PluginConfigKeyDeclaration[] {
+  const keys = new Map<string, PluginConfigKeyDeclaration['kind']>();
+  for (const manifest of manifests) {
+    for (const capability of manifest.capabilities ?? []) {
+      const configKeys = capability.discovery?.configKeys;
+      if (configKeys === undefined) continue;
+      addPluginConfigKey(keys, configKeys.packages, 'packages');
+      addPluginConfigKey(keys, configKeys.autoDiscover, 'autoDiscover');
+      addPluginConfigKey(keys, configKeys.scopes, 'scopes');
+    }
+  }
+  return [...keys.entries()].map(([key, kind]) => ({ key, kind }));
 }
 
 /**
@@ -103,10 +137,11 @@ function fileBlocksFor(
  */
 export function composeAndValidateToolConfig(args: {
   readonly tools: ToolRegistry;
+  readonly manifests?: readonly ToolPluginManifest[];
   readonly configPath: string | undefined;
   readonly env: Readonly<Record<string, string | undefined>>;
 }): ResolvedToolConfig | undefined {
-  const { tools, configPath, env } = args;
+  const { tools, configPath, env, manifests = [] } = args;
   const toolDeclarations = collectDeclarations(tools);
   // A run with no tools that declare config (e.g. a project-agnostic context)
   // carries no toolConfig — tools fall back to their in-tool defaults. The host
@@ -120,7 +155,7 @@ export function composeAndValidateToolConfig(args: {
   // whole document — not just the tool namespaces — validates STRICT through the
   // one composed schema (ADR-0023, the 2.10.1 seam).
   const declarations: readonly ToolConfigDeclaration[] = [
-    ...hostConfigDeclarations(),
+    ...hostConfigDeclarations({ pluginConfigKeys: collectPluginConfigKeys(manifests) }),
     ...toolDeclarations,
   ];
 

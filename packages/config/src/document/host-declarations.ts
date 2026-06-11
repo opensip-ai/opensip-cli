@@ -4,10 +4,10 @@
  *
  * 2.10.0 lets each tool contribute a namespaced {@link ToolConfigDeclaration}
  * (`fitness`/`graph`/`simulation`) that the composer strict-validates. The
- * tool-agnostic blocks — `cli`, `dashboard`, `schemaVersion`, and (from
- * Phase 1) `targets`/`globalExcludes`/`checkOverrides` — are owned by no tool.
- * They are returned here as `ToolConfigDeclaration`s and composed BESIDE the
- * tool declarations (the composer is namespace-agnostic), turning the
+ * tool-agnostic blocks — `cli`, `dashboard`, `schemaVersion`, `plugins`, and
+ * (from Phase 1) `targets`/`globalExcludes`/`checkOverrides` — are owned by no
+ * tool. They are returned here as `ToolConfigDeclaration`s and composed BESIDE
+ * the tool declarations (the composer is namespace-agnostic), turning the
  * previously-`.catchall`-tolerated top-level keys into claimed, strict
  * namespaces (ADR-0023, the 2.10.1 seam).
  *
@@ -21,9 +21,19 @@ import { z } from 'zod';
 
 import { cliConfigSchema } from './cli-config.js';
 import { dashboardConfigSchema } from './dashboard.js';
-import { checkOverridesSchema, globalExcludesSchema, targetsRecordSchema } from './targeting.js';
+import {
+  checkOverridesSchema,
+  createPluginsConfigSchema,
+  globalExcludesSchema,
+  targetsRecordSchema,
+  type PluginConfigKeyDeclaration,
+} from './targeting.js';
 
 import type { ToolConfigDeclaration } from '../declaration.js';
+
+export interface HostConfigDeclarationOptions {
+  readonly pluginConfigKeys?: readonly PluginConfigKeyDeclaration[];
+}
 
 /**
  * The host's document-level declarations. Grows in Phase 1 (targeting).
@@ -31,7 +41,9 @@ import type { ToolConfigDeclaration } from '../declaration.js';
  * Returned as a fresh array per call (no shared mutable state); the
  * composition root concatenates these with the per-tool declarations.
  */
-export function hostConfigDeclarations(): readonly ToolConfigDeclaration[] {
+export function hostConfigDeclarations(
+  options: HostConfigDeclarationOptions = {},
+): readonly ToolConfigDeclaration[] {
   return [
     { namespace: 'cli', schema: cliConfigSchema },
     { namespace: 'dashboard', schema: dashboardConfigSchema },
@@ -44,5 +56,9 @@ export function hostConfigDeclarations(): readonly ToolConfigDeclaration[] {
     { namespace: 'targets', schema: targetsRecordSchema },
     { namespace: 'globalExcludes', schema: globalExcludesSchema },
     { namespace: 'checkOverrides', schema: checkOverridesSchema },
+    {
+      namespace: 'plugins',
+      schema: createPluginsConfigSchema(options.pluginConfigKeys),
+    },
   ];
 }

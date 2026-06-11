@@ -9,6 +9,7 @@
 import {
   checkOverridesSchema,
   globalExcludesSchema,
+  pluginsConfigSchema,
   targetsRecordSchema,
 } from '@opensip-tools/config';
 import {
@@ -21,7 +22,7 @@ import { z } from 'zod';
 
 import { TargetRegistry } from './target-registry.js';
 
-import type { TargetConfig, TargetsConfig } from './types.js';
+import type { PluginsConfig, TargetConfig, TargetsConfig } from './types.js';
 
 const YAML_FILENAME = PROJECT_CONFIG_FILENAME;
 const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**'];
@@ -30,26 +31,15 @@ const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**']
 // YAML schemas
 // =============================================================================
 
-// The targets / globalExcludes / checkOverrides shapes are owned by
+// The targets / globalExcludes / checkOverrides / plugins shapes are owned by
 // @opensip-tools/config (2.10.1, ADR-0023) — the same schemas the host
-// registers as document-level declarations. This loader composes them with the
-// fitness-local `plugins` block (a discovery concern, out of the targeting
-// migration) and adds the registry build + cross-validation runtime below.
-const PluginsSchema = z
-  .object({
-    fit: z.array(z.string()).optional(),
-    sim: z.array(z.string()).optional(),
-    lang: z.array(z.string()).optional(),
-    checkPackages: z.array(z.string()).optional(),
-    packageScopes: z.array(z.string()).optional(),
-  })
-  .optional();
-
+// registers as document-level declarations. This loader adds the registry build
+// + cross-validation runtime below.
 const TargetsFileSchema = z.object({
   targets: targetsRecordSchema,
   globalExcludes: globalExcludesSchema.optional(),
   checkOverrides: checkOverridesSchema.optional(),
-  plugins: PluginsSchema,
+  plugins: pluginsConfigSchema.optional(),
 });
 
 // =============================================================================
@@ -73,13 +63,7 @@ function buildFromParsed(
   rawGlobalExcludes: readonly string[] | undefined,
   rawCheckOverrides: Record<string, string | readonly string[]> | undefined,
   sourceLabel: string,
-  rawPlugins?: {
-    fit?: readonly string[];
-    sim?: readonly string[];
-    lang?: readonly string[];
-    checkPackages?: readonly string[];
-    packageScopes?: readonly string[];
-  },
+  rawPlugins?: PluginsConfig,
 ): { registry: TargetRegistry; config: TargetsConfig } {
   const registry = new TargetRegistry();
 
@@ -126,9 +110,21 @@ function buildFromParsed(
         ...(rawPlugins.checkPackages && {
           checkPackages: Object.freeze([...rawPlugins.checkPackages]),
         }),
+        ...(rawPlugins.scenarioPackages && {
+          scenarioPackages: Object.freeze([...rawPlugins.scenarioPackages]),
+        }),
+        ...(rawPlugins.autoDiscoverScenarios === undefined
+          ? {}
+          : { autoDiscoverScenarios: rawPlugins.autoDiscoverScenarios }),
         ...(rawPlugins.packageScopes && {
           packageScopes: Object.freeze([...rawPlugins.packageScopes]),
         }),
+        ...(rawPlugins.graphAdapters && {
+          graphAdapters: Object.freeze([...rawPlugins.graphAdapters]),
+        }),
+        ...(rawPlugins.autoDiscoverGraphAdapters === undefined
+          ? {}
+          : { autoDiscoverGraphAdapters: rawPlugins.autoDiscoverGraphAdapters }),
       })
     : undefined;
 

@@ -147,21 +147,21 @@ tool dispatcher:
    the bundled language adapters (TypeScript, Rust, Python, Java, Go,
    C/C++) into it.
 2. Constructs a fresh per-invocation `ToolRegistry` and registers the
-   first-party tools — `fitnessTool`, `simulationTool`, and `graphTool`
-   (`FIRST_PARTY_TOOLS` in `bootstrap/register-tools.ts`) — into it.
-   Both registries are passed into `new RunScope({ tools, languages })`
-   — there are no module-singleton registries (see the RunScope section
-   below).
-3. Discovers third-party tools via `discoverToolPackages()` (any npm
-   package whose `package.json` declares `opensipTools.kind === 'tool'`).
-4. Walks the tool registry; each tool's `register(cli)` method mounts
-   its Commander subcommands using shared CLI infrastructure
-   (`ToolCliContext`).
+   bundled tool packages (`@opensip-tools/fitness`, `@opensip-tools/simulation`,
+   `@opensip-tools/graph`) through the manifest → compatibility gate → dynamic
+   import path in `bootstrap/register-tools.ts`. Both registries are passed into
+   `new RunScope({ tools, languages })` — there are no module-singleton
+   registries (see the RunScope section below).
+3. Discovers third-party tools via `discoverToolPackages()` (any npm package
+   whose `package.json` declares `opensipTools.kind === 'tool'`).
+4. Walks the tool registry and mounts each tool's declarative `commandSpecs`
+   through the host-owned `mountCommandSpec` infrastructure. Tools never receive
+   a raw Commander program.
 5. Adds CLI-only commands: `init`, `sessions`, `configure`, `plugin`,
    `completion`, `uninstall`.
 
-**The CLI source has zero direct imports from `@opensip-tools/fitness` or
-`@opensip-tools/simulation`** beyond the static `tool` exports.
+**The CLI source has zero static imports of first-party tool runtimes**; bundled
+tools load by package name through the same plugin path as installed tools.
 
 Subcommands available out of the box:
 
