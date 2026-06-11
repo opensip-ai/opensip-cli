@@ -31,6 +31,7 @@ export interface DiscoveredScopedPackage {
   readonly packageDir: string;
 }
 
+/** Inputs for {@link discoverScopedPackages}: the project root, the npm scopes to scan, and the package-name prefix to match. */
 export interface DiscoverScopedPackagesOptions {
   /** Absolute path to the project root. */
   readonly projectDir: string;
