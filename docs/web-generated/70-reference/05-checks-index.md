@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-10
+last_verified: 2026-06-11
 release: v3.0.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -20,13 +20,13 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **168+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **167+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(110 checks)*
+## Universal  *(109 checks)*
 
 Language-agnostic; runs against every project.
 
@@ -65,7 +65,7 @@ Language-agnostic; runs against every project.
 | [`vitest-config-extends-base`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-extends-base.ts) | Per-package vitest configs must extend the shared .config/vitest.base (when one exists) |
 | [`vitest-config-required-with-tests`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-required-with-tests.ts) | Ensures packages with tests have a vitest.config at the package root |
 
-### Security  *(19)*
+### Security  *(18)*
 
 | Slug | Description |
 |---|---|
@@ -82,7 +82,6 @@ Language-agnostic; runs against every project.
 | [`no-eval`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/no-eval.ts) | Detect dangerous eval and dynamic code execution |
 | [`no-hardcoded-secrets`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/no-hardcoded-secrets.ts) | Detect hardcoded secrets, API keys, and credentials in source code |
 | [`package-supply-chain-policy`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/package-supply-chain-policy.ts) | Validate npm/pnpm/Bun supply-chain guardrails |
-| [`pii-logging`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/pii-logging.ts) | Detect PII fields in log statements |
 | [`rate-limit-coverage`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/rate-limit-coverage.ts) | Validate routes have rate limiting configured |
 | [`semgrep-scan`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/semgrep-scan.ts) | Run Semgrep static analysis to detect security vulnerabilities |
 | [`sentry-pii-scrubbing`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/resilience/sentry/sentry-pii-scrubbing.ts) | Detects missing PII scrubbing in Sentry — personal data may leak to third party |

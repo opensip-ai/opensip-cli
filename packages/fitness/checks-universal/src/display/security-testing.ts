@@ -18,7 +18,6 @@ export const SECURITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>
   'no-eval': ['🔒', 'No Eval'],
   'no-hardcoded-secrets': ['🔐', 'No Hardcoded Secrets'],
   'package-supply-chain-policy': ['🔒', 'Package Supply Chain Policy'],
-  'pii-logging': ['🔒', 'PII Logging'],
   'rate-limit-coverage': ['🛡️', 'Rate Limit Coverage'],
   'semgrep-scan': ['🔍', 'Semgrep Security Scan'],
   'use-centralized-crypto': ['🔐', 'Centralized Crypto Usage'],

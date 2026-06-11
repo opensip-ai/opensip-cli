@@ -28,12 +28,23 @@ const PII_FIELD_NAMES = new Set([
   'phonenumber',
   'phone_number',
   'ssn',
+  'socialsecurity',
+  'social_security',
   'socialsecuritynumber',
   'social_security_number',
   'creditcard',
   'credit_card',
   'cardnumber',
   'card_number',
+  'cvv',
+  'cvc',
+  'passport',
+  'driverlicense',
+  'driver_license',
+  'bankaccount',
+  'bank_account',
+  'routingnumber',
+  'routing_number',
   'password',
   'passwd',
   'pwd',
@@ -165,7 +176,7 @@ export const piiExposureInLogs = defineCheck({
   longDescription: `**Purpose:** Detects potential PII (Personally Identifiable Information) exposure in log statements using TypeScript AST analysis, ensuring sensitive data is never logged in plaintext.
 
 **Detects:**
-- PII field names (\`email\`, \`phone\`, \`ssn\`, \`creditcard\`, \`password\`, \`apikey\`, \`accesstoken\`, \`address\`, \`dob\`, and variants) used as property keys in object literals passed to logger calls
+- PII field names (\`email\`, \`phone\`, \`ssn\`, \`creditcard\`, \`cvv\`, \`passport\`, \`driverLicense\`, \`bankAccount\`, \`routingNumber\`, \`password\`, \`apikey\`, \`accesstoken\`, \`address\`, \`dob\`, and variants) used as property keys in object literals passed to logger calls
 - Logger calls on objects named \`logger\`, \`L\`, or \`log\` with methods \`trace\`, \`debug\`, \`info\`, \`warn\`, \`error\`, \`fatal\`
 - Nested object literals containing PII fields within log arguments
 - Exempts fields wrapped in safe sanitization calls: \`hashPii\`, \`hash\`, \`redact\`, \`mask\`, \`sanitize\`, \`encrypt\`
