@@ -137,9 +137,9 @@ function applyOneReExport(
   const sourcePkg = r.specifier.startsWith('.')
     ? packageOf(r.fromFile)
     : resolveSpecifierToPackage(r.specifier, manifestIndex)?.packageGroup;
-  if (sourcePkg === undefined) return false;
+  if (sourcePkg === undefined) return false; // @silent-ok — external/untracked specifier; decline
   const sourceBucket = index.get(sourcePkg);
-  if (sourceBucket === undefined) return false;
+  if (sourceBucket === undefined) return false; // @silent-ok — source package has no indexed exports
   const fromBucket = getOrCreateMap(index, packageOf(r.fromFile));
   return r.exportedName === '*'
     ? expandStarReExport(sourceBucket, fromBucket)
@@ -170,9 +170,9 @@ function addNamedReExport(
   sourceBucket: ReadonlyMap<string, FunctionOccurrence[]>,
   fromBucket: Map<string, FunctionOccurrence[]>,
 ): boolean {
-  if (fromBucket.has(r.exportedName)) return false;
+  if (fromBucket.has(r.exportedName)) return false; // @silent-ok — local def / earlier re-export wins
   const occs = sourceBucket.get(r.sourceName);
-  if (occs === undefined || occs.length === 0) return false;
+  if (occs === undefined || occs.length === 0) return false; // @silent-ok — name not exported by source pkg
   fromBucket.set(r.exportedName, occs);
   return true;
 }

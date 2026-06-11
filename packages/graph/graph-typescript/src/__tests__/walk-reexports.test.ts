@@ -40,20 +40,44 @@ describe('walkProgram — re-export capture', () => {
 
   it('captures `export { x, y as z } from spec`', () => {
     expect(reExportsOf(`export { childrenOf, nameOf as renamed } from '@scope/ts';\n`)).toEqual([
-      { fromFile: 'index.ts', exportedName: 'childrenOf', sourceName: 'childrenOf', specifier: '@scope/ts' },
-      { fromFile: 'index.ts', exportedName: 'renamed', sourceName: 'nameOf', specifier: '@scope/ts' },
+      {
+        fromFile: 'index.ts',
+        exportedName: 'childrenOf',
+        sourceName: 'childrenOf',
+        specifier: '@scope/ts',
+      },
+      {
+        fromFile: 'index.ts',
+        exportedName: 'renamed',
+        sourceName: 'nameOf',
+        specifier: '@scope/ts',
+      },
     ]);
   });
 
   it('captures the import-then-re-export idiom `export { x }` (no `from`)', () => {
-    expect(reExportsOf(`import { childrenOf } from '@scope/ts';\nexport { childrenOf };\n`)).toEqual([
-      { fromFile: 'index.ts', exportedName: 'childrenOf', sourceName: 'childrenOf', specifier: '@scope/ts' },
+    expect(
+      reExportsOf(`import { childrenOf } from '@scope/ts';\nexport { childrenOf };\n`),
+    ).toEqual([
+      {
+        fromFile: 'index.ts',
+        exportedName: 'childrenOf',
+        sourceName: 'childrenOf',
+        specifier: '@scope/ts',
+      },
     ]);
   });
 
   it('captures an aliased import-then-re-export', () => {
-    expect(reExportsOf(`import { nameOf } from '@scope/ts';\nexport { nameOf as renamed };\n`)).toEqual([
-      { fromFile: 'index.ts', exportedName: 'renamed', sourceName: 'nameOf', specifier: '@scope/ts' },
+    expect(
+      reExportsOf(`import { nameOf } from '@scope/ts';\nexport { nameOf as renamed };\n`),
+    ).toEqual([
+      {
+        fromFile: 'index.ts',
+        exportedName: 'renamed',
+        sourceName: 'nameOf',
+        specifier: '@scope/ts',
+      },
     ]);
   });
 
