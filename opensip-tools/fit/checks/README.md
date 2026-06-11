@@ -43,6 +43,20 @@ These checks serve two audiences:
   slug — prefix with `dogfood-` so they don't shadow the shipped
   versions in the registry.
 
+## ADR dogfood guardrails
+
+The `adr-*.mjs` files hold opensip-tools-specific checks derived from
+`docs/decisions`. They intentionally encode local facts such as workflow
+names, first-party package names, manifest marker kinds, and known
+migration bridge files. Keep them here rather than in the shipped
+`packages/fitness/checks-*` packs, unless the rule is rewritten to apply
+cleanly to arbitrary customer codebases.
+
+The older `env-via-registry.mjs` and `no-local-exit-or-stdout.mjs`
+remain separate because they were previously promoted and then pulled
+back from shipped packs. Together with the ADR check files, they form
+the current local decision-enforcement set.
+
 ## Promoting to first-party
 
 If a check here proves valuable to other opensip-tools consumers,
