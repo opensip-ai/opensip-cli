@@ -15,9 +15,10 @@
  * `cli/fit-runner-views.tsx`; they're imported here so this module
  * stays focused on the state machine and entry point.
  *
- * Single exit-code write path: errors and shouldFail conditions route
- * through the supplied `setExitCode` callback (`ToolCliContext.setExitCode`)
- * so the CLI keeps its single `process.exitCode` mutator. The
+ * Single exit-code write path: error-result conditions route through the
+ * supplied `setExitCode` callback (`ToolCliContext.setExitCode`) so the CLI keeps
+ * its single `process.exitCode` mutator. The findings exit is host-owned
+ * (ADR-0035: derived from the envelope verdict in `deliverSignals`). The
  * historical `process.exitCode = N` writes that lived in FitView are
  * gone.
  */
@@ -365,8 +366,9 @@ export interface RenderFitLiveOptions {
  * `cli.registerLiveView('fit', (args) => renderFitLive(args, { ... }))`
  * lazily on the interactive path (there is no `register()` mount hook).
  * `setExitCode` is the single mutator path on `process.exitCode`; the
- * runner calls it for error and `shouldFail` outcomes so the CLI's
- * exit-code seam stays the only writer. The returned envelope lets the tool's
+ * runner calls it for error-result outcomes (the findings exit is host-owned via
+ * the delivered envelope verdict, ADR-0035) so the CLI's exit-code seam stays the
+ * only writer. The returned envelope lets the tool's
  * registration deliver signals (cloud + `--report-to`) at the composition
  * root after the interactive view exits (ADR-0011 — egress is not in-view).
  */

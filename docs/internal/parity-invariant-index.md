@@ -37,3 +37,16 @@ deliberately enforced by composition rather than a dedicated check — see its r
   table **and** the assertion test in the same change — that is the point of the
   index: the set's completeness is itself CI-checked (the §8 "guarded
   conventions" invariant, applied to the guardrails themselves).
+
+## ADR-0035 — host-owned verdict invariants
+
+Distinct from the nine tool-plugin-parity invariants above: ADR-0035 makes the
+pass/fail verdict a single host-owned value (`envelope.verdict.passed`) computed
+from a tool-declared findings policy. Its `enforcement: mechanizable` clause maps
+to these pinning tests.
+
+| Invariant | Pinning test(s) |
+| --- | --- |
+| **One verdict drives the findings exit** — the process exit is a pure function of `envelope.verdict.passed`; the host (`deliver-envelope.ts`) is the only writer of the findings exit, and `CommandResult.shouldFail` no longer exists. | `exit-parity.test.ts` (behavioural matrix for fit/sim/graph + the gate-compare override; structural guard that `shouldFail` is gone and no non-host file sets the findings RUNTIME_ERROR) |
+| **Verdict = policy over counts + faults** — `verdict.passed = !runFaulted && !unitErrored && policyPasses(errors, warnings, policy)`; the reserved `failOnErrors`/`failOnWarnings` keys resolve per-tool with a `{1,0}` host fallback. | `core/lib/__tests__/verdict-policy.test.ts` · `contracts/verdict-envelope.test.ts` |
+| **Sim failures are in the currency** — a failed sim scenario emits ≥1 error-severity signal (ADR-0011), so the policy verdict sees it (the Phase 0 precondition that makes sim's exit byte-equal its old `failed > 0`). | `simulation/__tests__/sim-failure-signal.test.ts` |

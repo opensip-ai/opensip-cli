@@ -62,8 +62,8 @@ export async function runGateMode(
     // error-rung finding. `signals` reaching this mode is the post-`@graph-ignore`
     // `kept` set (see `cli/graph.ts:484`), so this counts UNSUPPRESSED findings
     // only. The error rung is core's canonical `isErrorSignal` (`critical`/`high`)
-    // — the same predicate fit's `shouldFail`/`failOnErrors` threshold and graph's
-    // own envelope verdict (`build-envelope.ts`) use, so all consumers agree on
+    // — the same predicate fit's `failOnErrors` threshold and graph's own envelope
+    // verdict (`build-envelope.ts`) use, so all consumers agree on
     // what "error" means. The CI step (`pnpm graph:ci`) is therefore the honest
     // pass/fail signal — it no longer exits 0 while error-level graph findings
     // exist, so enforcement does not rely solely on the downstream Code Scanning
