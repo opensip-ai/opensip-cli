@@ -92,6 +92,34 @@ export interface DependencySiteRecord {
   readonly column: number;
 }
 
+/**
+ * One re-export the file declares, normalized to the data the engine's
+ * export index needs to make a re-exported name resolvable under the
+ * RE-EXPORTING package. Two TS forms produce these:
+ *
+ *   1. `export { a, b as c } from './y' | '@scope/pkg'` — an
+ *      `ExportDeclaration` WITH a `moduleSpecifier`.
+ *   2. `export { a, b }` (NO `from`) where `a`/`b` are bindings IMPORTED at
+ *      the top of the file — TS's import-then-re-export idiom (e.g.
+ *      `import { childrenOf } from '@opensip-tools/tree-sitter'; export
+ *      { childrenOf }`). Correlated against the file's named imports.
+ *
+ * A plain `export { localDef }` of a name DEFINED in this file is NOT a
+ * re-export — it is already an `'exported'` occurrence in the catalog — so it
+ * produces no record.
+ */
+export interface ReExportRecord {
+  /** Re-exporting file, project-relative POSIX (→ `packageOf` gives the group). */
+  readonly fromFile: string;
+  /** The name as exposed BY this module. `'*'` for `export * from`. */
+  readonly exportedName: string;
+  /** The name in the SOURCE module (== `exportedName` unless aliased via
+   *  `export { x as y }`; `'*'` for star). */
+  readonly sourceName: string;
+  /** The source module specifier — relative (`'./x'`) or workspace (`'@scope/pkg'`). */
+  readonly specifier: string;
+}
+
 export interface WalkInput {
   /**
    * The project's source files to walk. Supplied by the adapter from
@@ -110,6 +138,7 @@ export interface WalkOutput {
   readonly functions: Record<string, FunctionOccurrence[]>;
   readonly callSites: readonly CallSiteRecord[];
   readonly dependencySites: readonly DependencySiteRecord[];
+  readonly reExports: readonly ReExportRecord[];
   readonly parseErrors: readonly ParseError[];
 }
 
@@ -120,6 +149,7 @@ export function walkProgram(input: WalkInput): WalkOutput {
   >;
   const callSites: CallSiteRecord[] = [];
   const dependencySites: DependencySiteRecord[] = [];
+  const reExports: ReExportRecord[] = [];
   const parseErrors: ParseError[] = [];
   const filesSet = new Set(input.files.map(normalizeForCompare));
 
@@ -129,6 +159,7 @@ export function walkProgram(input: WalkInput): WalkOutput {
     if (!filesSet.has(sfPath)) continue;
     try {
       walkFile(sf, input.projectDirAbs, functions, callSites, dependencySites);
+      collectReExports(sf, input.projectDirAbs, reExports);
     } catch (error) {
       /* v8 ignore start */
       parseErrors.push({
@@ -139,7 +170,7 @@ export function walkProgram(input: WalkInput): WalkOutput {
     }
   }
 
-  return { functions, callSites, dependencySites, parseErrors };
+  return { functions, callSites, dependencySites, reExports, parseErrors };
 }
 
 /**
@@ -182,6 +213,83 @@ function collectDependencySites(
       line: lineChar.line + 1,
       column: lineChar.character,
     });
+  }
+}
+
+/**
+ * Collect the file's re-export declarations as {@link ReExportRecord}s. Two
+ * forms (see the type doc): `export … from 'spec'` (a re-export with a module
+ * specifier) and `export { x }` where `x` is an imported binding (correlated
+ * against the file's named imports). A plain `export { localDef }` of a name
+ * defined in this file is skipped — it is already an exported occurrence.
+ */
+function collectReExports(
+  sourceFile: ts.SourceFile,
+  projectDirAbs: string,
+  out: ReExportRecord[],
+): void {
+  const fromFile = relative(projectDirAbs, sourceFile.fileName).split(sep).join('/');
+
+  // First pass: this file's named imports → { binding → (specifier, source name) }.
+  // Needed for the no-`from` re-export form (`export { childrenOf }`).
+  const imported = new Map<string, { specifier: string; importedName: string }>();
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+    const named = stmt.importClause?.namedBindings;
+    if (named && ts.isNamedImports(named)) {
+      for (const el of named.elements) {
+        imported.set(el.name.text, {
+          specifier: stmt.moduleSpecifier.text,
+          importedName: (el.propertyName ?? el.name).text,
+        });
+      }
+    }
+  }
+
+  // Second pass: export declarations.
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isExportDeclaration(stmt)) continue;
+    const spec =
+      stmt.moduleSpecifier && ts.isStringLiteral(stmt.moduleSpecifier)
+        ? stmt.moduleSpecifier.text
+        : undefined;
+    const clause = stmt.exportClause;
+
+    if (spec !== undefined) {
+      // Form 1: `export … from 'spec'`.
+      if (clause === undefined) {
+        // `export * from 'spec'` — re-exports every exported name of `spec`.
+        out.push({ fromFile, exportedName: '*', sourceName: '*', specifier: spec });
+      } else if (ts.isNamedExports(clause)) {
+        for (const el of clause.elements) {
+          out.push({
+            fromFile,
+            exportedName: el.name.text,
+            sourceName: (el.propertyName ?? el.name).text,
+            specifier: spec,
+          });
+        }
+      }
+      // NamespaceExport (`export * as ns from 'spec'`) is left to a follow-up:
+      // it binds a namespace object, not a directly-callable name.
+      continue;
+    }
+
+    // Form 2: `export { a, b as c }` with NO `from` — a re-export only when the
+    // local binding was IMPORTED (otherwise it's a local definition's export).
+    if (clause !== undefined && ts.isNamedExports(clause)) {
+      for (const el of clause.elements) {
+        const localBinding = (el.propertyName ?? el.name).text;
+        const imp = imported.get(localBinding);
+        if (imp === undefined) continue; // local definition → already an occurrence
+        out.push({
+          fromFile,
+          exportedName: el.name.text,
+          sourceName: imp.importedName,
+          specifier: imp.specifier,
+        });
+      }
+    }
   }
 }
 
