@@ -5,8 +5,8 @@
  * expected set here, so the CLI's promised surface can't drift undocumented.
  *
  * This is the cross-tool counterpart to the sim-specific capability test; it
- * records flags via a chainable stand-in for commander's `Command`, so it needs
- * no commander dependency and never invokes a command action.
+ * derives flags directly from the declarative `CommandSpec`s, so it needs no
+ * commander dependency and never invokes a command action.
  */
 
 import { commonFlags } from '@opensip-tools/contracts';
@@ -14,13 +14,12 @@ import { describe, expect, it } from 'vitest';
 
 import { BUNDLED_TOOLS } from './test-utils/bundled-tools.js';
 
-import type { Tool, ToolCliContext } from '@opensip-tools/core';
+import type { Tool } from '@opensip-tools/core';
 
 /**
- * Derive a spec-mounted tool's long-flag set from its `CommandSpec`s (release
- * 2.11.0): the ADR-0021 `commonFlags` keys mapped to their registry `--long`
- * strings, plus each tool-specific `OptionSpec.flag`. Used for migrated tools
- * (sim today; fit/graph after Phases 4-5) that no longer expose `register()`.
+ * Derive a tool's long-flag set from its `CommandSpec`s: the ADR-0021
+ * `commonFlags` keys mapped to their registry `--long` strings, plus each
+ * tool-specific `OptionSpec.flag`.
  */
 function recordSpecFlags(tool: Tool): string[] {
   const flags = new Set<string>();
@@ -35,54 +34,6 @@ function recordSpecFlags(tool: Tool): string[] {
     }
   }
   return [...flags].sort();
-}
-
-/**
- * Run a tool's `register()` against a recorder that captures every long flag.
- * The recorder answers any method/property with itself (so chained
- * `.command(...).description(...).option(...).action(...)` etc. all work) and
- * records the `--flag` from each `.option(spec)` call.
- */
-function recordRegisterFlags(tool: Tool): string[] {
-  const flags = new Set<string>();
-
-  // Self-referential proxy: the traps return `recorder`, so it must be declared
-  // then assigned (a const cannot reference itself in its own initializer).
-  // eslint-disable-next-line prefer-const
-  let recorder: any;
-  const returnRecorder = (): unknown => recorder;
-  const recordOption = (spec: unknown): unknown => {
-    const match = /--[a-z][a-z-]*/.exec(String(spec));
-    if (match) flags.add(match[0]);
-    return recorder;
-  };
-  const handler: ProxyHandler<() => unknown> = {
-    get: (_target, prop) => (prop === 'option' ? recordOption : returnRecorder),
-    apply: returnRecorder,
-  };
-  recorder = new Proxy(function noop() {
-    return recorder;
-  }, handler);
-  // cli answers `program` with the recorder; any other method register() calls
-  // (registerLiveView, …) is a harmless no-op — we only care about the flags.
-  const cli = new Proxy(
-    {},
-    { get: (_t, prop) => (prop === 'program' ? recorder : () => undefined) },
-  ) as unknown as ToolCliContext;
-  tool.register!(cli);
-  return [...flags].sort();
-}
-
-/**
- * Record a tool's long-flag surface via whichever mount path it declares:
- * the declarative `commandSpecs` (preferred — sim, then fit/graph) or the
- * deprecated `register()` fallback (fit/graph until their Phase 4-5 cutover).
- */
-function recordToolFlags(tool: Tool): string[] {
-  if (tool.commandSpecs !== undefined && tool.commandSpecs.length > 0) {
-    return recordSpecFlags(tool);
-  }
-  return recordRegisterFlags(tool);
 }
 
 // The locked flag surface per tool (union across all of each tool's
@@ -186,7 +137,7 @@ describe('first-party tool flag-surface contract', () => {
     it(`${tool.metadata.id}: registers exactly its documented flag set`, () => {
       const expected = EXPECTED[tool.metadata.id];
       expect(expected, `no expected flag set for tool '${tool.metadata.id}'`).toBeDefined();
-      expect(recordToolFlags(tool)).toEqual([...expected].sort());
+      expect(recordSpecFlags(tool)).toEqual([...expected].sort());
     });
   }
 });

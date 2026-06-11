@@ -1,11 +1,11 @@
-// @fitness-ignore-file file-length-limit -- Coverage-driven aggregate fixture file: per-check fixtures target sub-75% statement coverage paths; splitting destroys the "raise this check's coverage" contract.
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Targeted fixture-based tests for low-coverage checks.
+ * @fileoverview Targeted fixture-based tests for universal check behavior.
  *
- * Each `describe` block targets a specific check whose statement coverage
- * was below ~75% from the all-checks-execute parametric run. The fixtures
- * are crafted to drive the analyze function past its bail-out conditions
- * and into its violation-creation branches.
+ * Each `describe` block targets a specific check behavior that the
+ * all-checks-execute parametric run does not assert directly. The fixtures are
+ * crafted to drive the analyze function past its bail-out conditions and into
+ * its violation-creation branches.
  *
  * Pattern: build a tmpdir cwd, write fixture files, run the check via
  * `check.run(cwd, { targetFiles })`, then assert on the structured

@@ -56,8 +56,6 @@
     "@opensip-tools/checks-java": "workspace:*",
     "@opensip-tools/checks-python": "workspace:*",
     "@opensip-tools/checks-rust": "workspace:*",
-    "@opensip-tools/checks-typescript": "workspace:*",
-    "@opensip-tools/checks-universal": "workspace:*",
     "@opensip-tools/fitness": "workspace:*",
     "@vitest/coverage-v8": "^4.1.8",
     "dependency-cruiser": "^17.4.3",

@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Branch-coverage tests for medium-coverage checks (round 10).
+ * @fileoverview Branch-behavior tests for medium-coverage checks (round 10).
  *
  * Targets the test-file-naming directory walker, the eslint-justifications
  * inline-suppression validator, and the sentry PII-scrubbing detector.

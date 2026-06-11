@@ -1,9 +1,9 @@
-// @fitness-ignore-file file-length-limit -- Coverage-driven aggregate fixture file (sibling of coverage-boost.test.ts); second-tier per-check fixtures stay co-located to keep the coverage push owned by a single file.
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Additional fixture tests for the second tier of low-coverage checks.
+ * @fileoverview Additional fixture tests for universal check behavior.
  *
- * Pattern matches `coverage-boost.test.ts`: per-check fixtures driven through
- * `check.run(cwd, { targetFiles })`.
+ * Pattern matches `behavior-fixtures.test.ts`: per-check fixtures driven
+ * through `check.run(cwd, { targetFiles })`.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

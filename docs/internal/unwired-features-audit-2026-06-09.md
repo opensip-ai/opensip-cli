@@ -1,16 +1,16 @@
 # Unwired Features Audit and Remediation Plan
 
-> **Resolution status (2026-06-09).** **P1-1 is FIXED**: `fit`/`graph`/`sim` now
+> **Resolution status (2026-06-11).** **P1-1 is FIXED**: `fit`/`graph`/`sim` now
 > read their resolved namespace off `scope.toolConfig` via `currentScope()`
 > (ADR-0023, Phase 4), and the declared env bindings
 > (`OPENSIP_FIT_FAIL_ON_ERRORS` / `OPENSIP_FIT_FAIL_ON_WARNINGS`) drive the gate
 > exit code — proven by `fit-env-precedence-e2e.test.ts`; guardrails
 > `no-config-loader-outside-config` + `one-config-document` enforce it.
-> **P2-1, P2-2, P3-2 are FIXED**: public `--json`/config-reference/CLI-dispatch
+> **P2-1, P2-2, P3-1, P3-2 are FIXED**: public `--json`/config-reference/CLI-dispatch
 > docs were corrected to the shipped `CommandOutcome` + strict-validation +
-> dynamic-`commandSpecs` surface. **P3-1 (completion flag drift) remains open**
-> as a deliberately deferred low-priority item. The findings below are retained
-> as the historical record.
+> dynamic-`commandSpecs` surface, and completion now derives per-command flags
+> from the live specs with a flag-parity test. The findings below are retained as
+> the historical record.
 
 ## 1. Purpose
 
@@ -184,7 +184,11 @@ The production validator is stricter than the reference. Reserved schedule keys 
 - A path checker for frontmatter `source-files`.
 - A generated schema/reference snapshot from `hostConfigDeclarations()` plus registered tool declarations.
 
-### P3-1: Shell completion omits wired public first-party flags
+### P3-1: Shell completion omitted wired public first-party flags (fixed)
+
+> **Resolved after this audit.** Completion now derives subcommands and
+> per-command flags from live `CommandSpec`s, and `completion-subcommands.test.ts`
+> includes flag-parity coverage for the historical gaps.
 
 **Impact**
 

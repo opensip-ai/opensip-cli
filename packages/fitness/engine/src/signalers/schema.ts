@@ -15,41 +15,35 @@ import {
 } from '@opensip-tools/config';
 import { z } from 'zod';
 
-// Inline defaults
-const DEFAULTS = {
-  signals: {
-    fitness: { failOnErrors: 1, failOnWarnings: 0 },
-  },
-} as const;
+import {
+  FITNESS_CONFIG_DEFAULTS,
+  FitnessNamespaceSchema,
+} from '../config/fitness-config-schema.js';
 
 // =============================================================================
 // Target Definition Schema — owned by @opensip-tools/config (2.10.1, ADR-0023)
 // =============================================================================
 
 // `targets` / `globalExcludes` / `checkOverrides` are the shared two-layer scope
-// model; their schemas moved to the config layer and the host registers them as
-// document-level declarations. This whole-document schema still validates them
-// (so `loadSignalersConfig` keeps reading targeting) until fitness reads
-// targeting off the composed scope config (Phase 4) — it imports the schemas
-// rather than re-defining them, so there is one definition.
+// model; their schemas live in the config layer and the host registers them as
+// document-level declarations. This whole-document loader still validates them
+// because the fit hot path consumes targeting through `loadSignalersConfig`.
 
 // =============================================================================
-// Producer Schemas (copied from config/schema.ts — removed from there in Phase 2)
+// Producer Schemas
 // =============================================================================
 
-/** Schema for fitness check configuration */
-const FitnessSchema = z.object({
-  defaultTarget: z.string().min(1).max(255).optional(),
-  maxParallel: z.number().int().min(1).optional(),
-  timeout: z.number().int().min(1000).optional(),
-  failOnErrors: z.number().int().min(0).default(DEFAULTS.signals.fitness.failOnErrors),
-  failOnWarnings: z.number().int().min(0).default(DEFAULTS.signals.fitness.failOnWarnings),
-  disabledChecks: z.array(z.string().min(1).max(255)).optional().default([]),
-  // Default recipe for `fit` runs when no `--recipe` flag is given (ADR-0022).
-  // Tool-scoped: distinct from `graph.recipe` / `simulation.recipe`. An unknown
-  // name here tolerantly falls back to the built-in `default` recipe; an
-  // explicit `--recipe` typo still hard-fails.
-  recipe: z.string().min(1).max(128).optional(),
+/** Fitness config parser: one field definition, parser defaults for this loader. */
+const FitnessSchema = FitnessNamespaceSchema.extend({
+  failOnErrors: FitnessNamespaceSchema.shape.failOnErrors.default(
+    FITNESS_CONFIG_DEFAULTS.failOnErrors,
+  ),
+  failOnWarnings: FitnessNamespaceSchema.shape.failOnWarnings.default(
+    FITNESS_CONFIG_DEFAULTS.failOnWarnings,
+  ),
+  disabledChecks: FitnessNamespaceSchema.shape.disabledChecks.default([
+    ...FITNESS_CONFIG_DEFAULTS.disabledChecks,
+  ]),
 });
 
 /** Schema for simulation engine configuration. */

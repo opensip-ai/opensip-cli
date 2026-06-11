@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-05-28
+last_verified: 2026-06-11
 ---
 # Consumer: opensip
 
@@ -16,11 +16,11 @@ opensip consumes opensip-tools in two structurally different ways. They have dif
 
 ### Mode 1 — content packs (existing, since v1.x)
 
-opensip's `package.json` includes entries like:
+opensip's `package.json` includes content-pack entries on the current major, for example:
 
 ```json
-"@opensip-tools/checks-typescript": "^1.3.1",
-"@opensip-tools/checks-universal": "^1.3.1"
+"@opensip-tools/checks-typescript": "^3.0.0",
+"@opensip-tools/checks-universal": "^3.0.0"
 ```
 
 These are **content packs** — the package ships YAML/JSON check definitions that opensip's `fit` tooling loads via `opensip-tools.config.yml` at runtime. opensip's source code never `import { ... }` from these packages; they are read as data files.
@@ -29,12 +29,12 @@ These are **content packs** — the package ships YAML/JSON check definitions th
 
 **Blast radius of a break:** opensip's fitness gate misreports — high-noise but not data-corrupting. Detectable in opensip's CI within minutes.
 
-### Mode 2 — CLI binary spawn (new, v2.x)
+### Mode 2 — CLI binary spawn (added in v2.x)
 
-opensip's `package.json` additionally pins:
+opensip's `package.json` additionally pins the CLI package on the current major:
 
 ```json
-"opensip-tools": "^2.0.0"
+"opensip-tools": "^3.0.0"
 ```
 
 opensip's catalog-ingestion path calls `spawn('opensip-tools', ['catalog-export', '--catalog-output', ...])` (the dedicated subcommand `EngineSubprocessPort.runCatalogExport` spawns, per DEC-498) to produce a JSON catalog file, which `CatalogIngestor` then upserts to Postgres. This is the first time opensip has had a **runtime production dependency** on opensip-tools (all prior deps were content packs loaded as data, not commands invoked at runtime).

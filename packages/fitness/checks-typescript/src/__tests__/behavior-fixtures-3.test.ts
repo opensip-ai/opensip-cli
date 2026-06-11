@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Targeted coverage tests for resilience and remaining
+ * @fileoverview Targeted behavior tests for resilience and remaining
  * mid-tier checks (context-leakage, async patterns, throws-documentation,
  * dispose-pattern-completeness, openapi-type-source, etc.).
  */

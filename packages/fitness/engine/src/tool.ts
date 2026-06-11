@@ -242,7 +242,8 @@ export const fitnessTool: Tool = {
   // (gate thresholds, disabledChecks, recipe) so the host composes +
   // strict-validates the whole config document before dispatch. Shared
   // targeting (targets/globalExcludes/checkOverrides) stays with
-  // SignalersConfigSchema until 2.10.1.
+  // SignalersConfigSchema because the fit hot path consumes target registries
+  // through that loader.
   config: fitnessConfigDeclaration,
   // §5.3 Phase 4: fitness owns the `fit-pack` capability domain (declared in
   // its manifest). It supplies the REAL registrar so the host can replace the

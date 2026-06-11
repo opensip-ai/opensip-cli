@@ -37,12 +37,6 @@ importers:
       '@opensip-tools/checks-rust':
         specifier: workspace:*
         version: link:packages/fitness/checks-rust
-      '@opensip-tools/checks-typescript':
-        specifier: workspace:*
-        version: link:packages/fitness/checks-typescript
-      '@opensip-tools/checks-universal':
-        specifier: workspace:*
-        version: link:packages/fitness/checks-universal
       '@opensip-tools/fitness':
         specifier: workspace:*
         version: link:packages/fitness/engine

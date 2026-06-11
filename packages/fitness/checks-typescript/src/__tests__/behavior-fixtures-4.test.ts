@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Final coverage push targeting the biggest remaining misses:
+ * @fileoverview Final behavior fixture suite targeting the biggest remaining misses:
  * duplicate-utility-functions, result-pattern-consistency,
  * openapi-response-coverage, fastify-schema-coverage, memo-list-items,
  * and other mid-sized checks.

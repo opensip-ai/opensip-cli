@@ -1,6 +1,6 @@
-// @fitness-ignore-file file-length-limit -- Parametric "every check executes" suite; per-check fixtures live in a single iteration block so splitting destroys the coverage contract.
+// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
- * @fileoverview Parametric coverage for every check in checks-typescript.
+ * @fileoverview Parametric execution for every check in checks-typescript.
  *
  * Runs each check against a curated TS-AST fixture set. The fixtures
  * include patterns each check is likely to inspect (drizzle-orm tables,

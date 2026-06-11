@@ -28,9 +28,3 @@ export const checks: readonly Check[] = applyCheckDisplay(
 // Display helpers + the authoring map (used by tests / external display lookups).
 export { getCheckDisplayName, getCheckIcon, CHECK_DISPLAY } from './display/index.js';
 export type { CheckDisplayEntry } from './display/types.js';
-
-// Direct exports of individual checks for convenience / backward compatibility
-export { fileLengthLimit } from './checks/file-length-limit.js';
-export { graphIgnoreHygiene } from './checks/quality/graph-ignore-hygiene.js';
-export { noTodoComments } from './checks/no-todo-comments.js';
-export { noUnimplementedMarkers } from './checks/no-unimplemented-markers.js';
