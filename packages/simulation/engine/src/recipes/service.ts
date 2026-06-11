@@ -50,6 +50,7 @@ export interface SimulationRecipeResult {
   readonly durationMs: number;
 }
 
+/** Construction config for {@link SimulationRecipeService}: working directory, abort signal, and an optional live-progress callback. */
 export interface SimulationRecipeServiceConfig {
   readonly cwd?: string;
   readonly abortSignal?: AbortSignal;
@@ -63,6 +64,7 @@ export interface SimulationRecipeServiceConfig {
   readonly onProgress?: (completed: number, total: number) => void;
 }
 
+/** Resolves a simulation recipe to its scenario set and runs them, returning an aggregate {@link SimulationRecipeResult}. */
 export class SimulationRecipeService {
   private readonly config: SimulationRecipeServiceConfig;
 

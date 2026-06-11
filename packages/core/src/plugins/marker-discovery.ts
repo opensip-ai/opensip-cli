@@ -38,8 +38,10 @@ import { safeReaddir } from './node-modules-walk.js';
  */
 export const MARKER_KINDS = ['tool'] as const;
 
+/** The closed union of HOST `opensipTools.kind` marker values — currently just `'tool'`. */
 export type MarkerKind = (typeof MARKER_KINDS)[number];
 
+/** Inputs for {@link discoverPackagesByMarker}: the project root to walk from and the marker kind to discover. */
 export interface MarkerDiscoveryOptions {
   /** Absolute path to the project root. */
   readonly projectDir: string;
@@ -47,6 +49,7 @@ export interface MarkerDiscoveryOptions {
   readonly kind: MarkerKind;
 }
 
+/** A package discovered by its closed-union marker kind, with name, on-disk directory, and the echoed kind. */
 export interface DiscoveredMarkerPackage {
   /** npm package name, e.g. '@opensip-tools/fitness' or '@my-co/fit'. */
   readonly name: string;

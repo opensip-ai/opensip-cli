@@ -58,7 +58,6 @@ import { getToolProvenanceForRun } from '../cli-context.js';
 
 import {
   addToConfigPluginList,
-  editPluginList,
   removeFromConfigPluginList,
 } from './plugin/config-edit.js';
 import {
@@ -69,13 +68,16 @@ import {
 } from './plugin/domain-resolution.js';
 import {
   ensurePluginHostDir,
-  ensureUserPluginHostDir,
-  findInstalledName,
   HOST_PACKAGE_JSON,
-  installMissingPeers,
   isSafeNpmSpec,
-  readHostDependencies,
 } from './plugin/host-dir.js';
+import {
+  addToolPlugin,
+  editPluginList,
+  npmInstallIntoHost,
+  npmUninstallFromHost,
+  removeToolPlugin,
+} from './plugin-host-ops.js';
 
 import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-tools/contracts';
 
@@ -91,62 +93,6 @@ const PLUGIN_REMOVE = 'plugin-remove' as const;
 export interface PluginScopeOpts {
   /** Install/remove a Tool plugin in the project-local host dir instead of user-global. */
   readonly project?: boolean;
-}
-
-type InstallOutcome =
-  | { readonly ok: true; readonly installedName: string }
-  | { readonly ok: false; readonly error: string };
-
-/**
- * `npm install --ignore-scripts <spec>` into a plugin host dir, then
- * resolve the real installed name and auto-install peers. Shared by the
- * fit/sim domain path and the Tool-plugin path.
- *
- * --ignore-scripts: plugins run via dynamic import() at tool time; they
- * don't legitimately need install-time code execution. Blocks supply-chain
- * attacks via postinstall hooks. npm's stdout is routed to stderr so JSON
- * renderers (which own process stdout) are not contaminated.
- */
-function npmInstallIntoHost(dir: string, packageName: string): InstallOutcome {
-  const depsBefore = readHostDependencies(dir);
-  try {
-    execFileSync('npm', ['install', '--ignore-scripts', packageName], {
-      cwd: dir,
-      stdio: ['ignore', process.stderr, process.stderr],
-    });
-    const resolvedName = findInstalledName(dir, packageName, depsBefore);
-    const isLocalPathSpec =
-      packageName.startsWith('/') || packageName.startsWith('.') || packageName.startsWith('file:');
-    if (!resolvedName && isLocalPathSpec) {
-      return {
-        ok: false,
-        error: `Installed '${packageName}' but could not resolve the installed package name from package.json. The install was not recorded; remove and retry.`,
-      };
-    }
-    installMissingPeers(dir, packageName, depsBefore);
-    return { ok: true, installedName: resolvedName ?? packageName };
-  } catch (error) {
-    return {
-      ok: false,
-      error: `Failed to add ${packageName}: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-}
-
-/**
- * Install a Tool plugin into its host dir (user-global by default,
- * project-local with `--project`). No `plugins.<domain>` config entry —
- * Tool plugins auto-discover by their `kind: "tool"` marker.
- */
-function addToolPlugin(packageName: string, cwd: string, project: boolean): PluginResult {
-  const dir = project
-    ? ensurePluginHostDir(TOOL_DOMAIN, cwd)
-    : ensureUserPluginHostDir(TOOL_DOMAIN);
-  const outcome = npmInstallIntoHost(dir, packageName);
-  if (!outcome.ok) {
-    return { type: PLUGIN_ADD, packageName, success: false, error: outcome.error };
-  }
-  return { type: PLUGIN_ADD, packageName: outcome.installedName, success: true };
 }
 
 /**
@@ -277,44 +223,6 @@ export async function pluginAdd(
 // =============================================================================
 // COMMAND: plugin remove <package>
 // =============================================================================
-
-/** npm-uninstall a package from a host dir. Pure of config concerns. */
-function npmUninstallFromHost(dir: string, packageName: string): boolean {
-  try {
-    execFileSync('npm', ['uninstall', packageName], {
-      cwd: dir,
-      stdio: ['ignore', process.stderr, process.stderr],
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Remove a Tool plugin from its host dir (user-global by default, --project otherwise). */
-function removeToolPlugin(packageName: string, cwd: string, project: boolean): PluginResult {
-  const dir = project
-    ? resolveProjectPaths(cwd).pluginsDir(TOOL_DOMAIN)
-    : resolveUserPaths().pluginsDir(TOOL_DOMAIN);
-  if (!existsSync(join(dir, HOST_PACKAGE_JSON))) {
-    return {
-      type: PLUGIN_REMOVE,
-      packageName,
-      success: false,
-      error: `No tool plugins installed in ${dir}`,
-    };
-  }
-  if (!npmUninstallFromHost(dir, packageName)) {
-    return {
-      type: PLUGIN_REMOVE,
-      packageName,
-      success: false,
-      error: `Failed to remove ${packageName}`,
-    };
-  }
-  // No config entry to clean up — tool plugins auto-discover by marker.
-  return { type: PLUGIN_REMOVE, packageName, success: true };
-}
 
 // eslint-disable-next-line @typescript-eslint/require-await -- async to keep the Promise<PluginResult> contract; npm uninstall is synchronous via execFileSync
 export async function pluginRemove(

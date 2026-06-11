@@ -21,6 +21,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+/** The result of {@link resolvePackageEntryPoint}: a package's resolved entry point plus its name. */
 export interface PackageEntryResolution {
   /** Package name from `pkg.name`. Falls back to caller-supplied default if absent. */
   readonly name: string;
