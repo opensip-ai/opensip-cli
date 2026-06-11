@@ -8,37 +8,43 @@
  * from) so the engine's cross-shard pass can re-resolve them against the
  * global merged catalog, where the target is present.
  *
- * Detection is purely syntactic and mode-independent: "did this resolve
- * within the shard?" is just "is the callee name among the shard's own
- * occurrences?". We only emit a boundary call when the name was
- * IMPORTED — an imported name absent from this shard is, by construction,
- * defined in another module; a non-imported absent name is a global
- * (`console`, `Promise`) or an unresolved local, neither of which is a
- * cross-shard edge.
+ * Detection is by RESOLUTION OUTCOME, not by name: a site is a boundary
+ * candidate when its callee name is IMPORTED (carries an import specifier) AND
+ * the in-shard resolver did NOT resolve THIS call site to a target. Keying on
+ * the per-site outcome (not "does the callee name exist among the shard's
+ * occurrences?") is what fixes the name-collision class: a name imported from
+ * another package is a cross-shard call even when a DIFFERENT local function in
+ * this shard happens to share the name (e.g. checks-universal has a local
+ * `isTestFile`, but a call to the IMPORTED `@opensip-tools/fitness` `isTestFile`
+ * still crosses the boundary). Conversely, a site the in-shard resolver already
+ * resolved is skipped, so a recovered boundary edge never double-counts.
  */
 
 import { relative, sep } from 'node:path';
+
+import { ownerEdgeKey } from '@opensip-tools/graph';
 
 import { isReturnValueDiscarded } from '../edges.js';
 
 import { calleeSimpleName, buildImportSpecifierIndex } from './syntactic.js';
 
 import type { CallSiteRecord } from '../walk.js';
-import type { Catalog, CrossBoundaryCall } from '@opensip-tools/graph';
+import type { CallEdge, CrossBoundaryCall } from '@opensip-tools/graph';
 import type ts from 'typescript';
 
 /** Max length of the descriptor's display text — the CallEdge.text contract. */
 const TEXT_MAX = 80;
 
 /**
- * Extract cross-boundary call descriptors from a shard's walked call
- * sites. A site is a boundary candidate when its callee name is imported
- * (carries an import specifier) but is not among the shard catalog's own
- * occurrences.
+ * Extract cross-boundary call descriptors from a shard's walked call sites. A
+ * site is a boundary candidate when its callee name is imported but the in-shard
+ * resolver left it unresolved at this exact site — see the module doc for why
+ * this is keyed on the resolution outcome (`resolvedEdgesByOwner`) rather than
+ * on whether the callee name exists among the shard's occurrences.
  */
 export function extractBoundaryCalls(
   callSites: readonly CallSiteRecord[],
-  catalog: Catalog,
+  resolvedEdgesByOwner: ReadonlyMap<string, readonly CallEdge[]>,
   projectDirAbs: string,
 ): CrossBoundaryCall[] {
   const out: CrossBoundaryCall[] = [];
@@ -52,9 +58,6 @@ export function extractBoundaryCalls(
     if (r.kind !== 'call') continue; // 'creation' edges are always intra-shard
     const callee = calleeSimpleName(r.node);
     if (callee === null) continue;
-    // Resolved within this shard's own occurrences → not a boundary call.
-    const own = catalog.functions[callee.name];
-    if (own && own.length > 0) continue;
 
     let specifierIndex = specifierIndexBySf.get(r.sourceFile);
     if (specifierIndex === undefined) {
@@ -75,6 +78,15 @@ export function extractBoundaryCalls(
     }
 
     const pos = positionOf(r.node, r.sourceFile);
+    // Skip a site the in-shard resolver already RESOLVED to a real target —
+    // emitting a boundary call for it would double the edge. (A `to: []`
+    // placeholder is NOT a resolution.) Keyed on the outcome at THIS site, so a
+    // local same-name occurrence elsewhere in the shard no longer suppresses it.
+    const resolvedHere = (
+      resolvedEdgesByOwner.get(ownerEdgeKey(r.ownerHash, ownerFile)) ?? []
+    ).some((e) => e.line === pos.line && e.column === pos.column && e.to.length > 0);
+    if (resolvedHere) continue;
+
     out.push({
       ownerHash: r.ownerHash,
       ownerFile,

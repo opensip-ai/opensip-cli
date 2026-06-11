@@ -208,11 +208,18 @@ export interface IncrementalCatalogBuildOptions {
   readonly resolutionMode: ResolutionMode;
   readonly onProgress?: GraphProgressCallback;
   readonly monitor?: PressureMonitor;
+  /** Emit cross-boundary descriptors for the re-walked closure (Phase 3
+   *  convergence — the exact path recovers them so warm == cold). */
+  readonly emitBoundaryCalls?: boolean;
 }
 
 export async function buildAndResolveCatalogIncremental(
   options: IncrementalCatalogBuildOptions,
-): Promise<{ readonly catalog: Catalog; readonly resolutionStats: ResolutionStats }> {
+): Promise<{
+  readonly catalog: Catalog;
+  readonly resolutionStats: ResolutionStats;
+  readonly boundaryCalls?: readonly CrossBoundaryCall[];
+}> {
   const {
     runStage,
     adapter,
@@ -222,6 +229,7 @@ export async function buildAndResolveCatalogIncremental(
     resolutionMode,
     onProgress,
     monitor,
+    emitBoundaryCalls,
   } = options;
   const parsed = await runStage({
     stage: 'parse',
@@ -292,6 +300,7 @@ export async function buildAndResolveCatalogIncremental(
         dependencySites: walked.dependencySites,
         projectDirAbs: discovery.projectDirAbs,
         resolutionMode,
+        emitBoundaryCalls,
       });
       const finalFunctions = mergeResolvedAndCachedEdges(
         initialCatalog,
@@ -309,7 +318,11 @@ export async function buildAndResolveCatalogIncremental(
     detailFn: (r) => `${String(countCatalogCallSites(r.catalog))} call site(s)`,
   });
 
-  return { catalog: resolved.catalog, resolutionStats: resolved.stats };
+  return {
+    catalog: resolved.catalog,
+    resolutionStats: resolved.stats,
+    boundaryCalls: resolved.boundaryCalls,
+  };
 }
 
 /**

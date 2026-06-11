@@ -18,6 +18,7 @@ import {
   type RunStage,
 } from './catalog-builder.js';
 import { stampAndConstrainPackages } from './cross-shard-resolve.js';
+import { recoverExactBoundaryEdges } from './exact-boundary-recovery.js';
 
 import type { GraphProgressCallback } from './types.js';
 import type { DiscoverOutput, GraphLanguageAdapter } from '../../lang-adapter/types.js';
@@ -90,6 +91,7 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
           resolutionMode: input.resolutionMode,
           onProgress: input.onProgress,
           monitor: input.monitor,
+          emitBoundaryCalls: true,
         })
       : await buildAndResolveCatalog({
           runStage: input.runStage,
@@ -98,14 +100,25 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
           resolutionMode: input.resolutionMode,
           onProgress: input.onProgress,
           monitor: input.monitor,
+          emitBoundaryCalls: true,
         });
+
+  // ONE resolution model (Phase 3, Option A): the single-program (exact) catalog
+  // IS the whole/merged catalog, so run the SAME cross-shard linker the sharded
+  // engine runs post-merge over its syntactic boundary calls. This converges the
+  // two engines — exact is the 1-shard case — resolving the cross-package call
+  // sites exact's type-checker-driven inline pass captures inconsistently (it
+  // only fires where `getSymbolAtLocation` succeeds and the reference kind
+  // dispatches; the syntactic boundary extractor captures every imported call
+  // site). The extractor already skips sites resolved inline, so no double edge.
+  const recovered = recoverExactBoundaryEdges(built, input.discovery.files, input.projectRoot);
 
   // Stamp packages (nearest package.json), then drop name-guessed edges that
   // contradict the import graph. Order matters: the constraint reads the
   // stamped `occurrence.package`.
   const catalog: Catalog = stampAndConstrainPackages(
     {
-      ...built.catalog,
+      ...recovered,
       filesFingerprint: computeFilesFingerprint(input.discovery.files),
     },
     input.projectRoot,

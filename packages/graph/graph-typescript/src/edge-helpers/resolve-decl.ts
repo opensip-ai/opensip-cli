@@ -24,9 +24,12 @@
  * resolves to nothing — exactly right: those are not project functions.
  */
 
+import { relative, sep } from 'node:path';
+
 import { resolveCrossPackageCall } from '@opensip-tools/graph';
 
 import { findCatalogEntry } from './find-catalog-entry.js';
+import { traceResolveDecl } from './resolution-trace.js';
 
 import type { ResolverContext } from '../edge-resolvers/types.js';
 import type ts from 'typescript';
@@ -53,13 +56,50 @@ export function resolveDeclToHash(
   ctx: ResolverContext,
   bindingNames: readonly string[] = candidateNames,
 ): string | null {
-  if (declSourceFile.isDeclarationFile) {
-    // Boundary case: the alias led into a built `.d.ts`. Don't hash the bodiless
-    // signature; re-resolve through the export index, binding-required.
-    return resolveAcrossPackageBoundary(candidateNames, bindingNames, ctx);
+  const dts = declSourceFile.isDeclarationFile;
+  const out = dts
+    ? // Boundary case: the alias led into a built `.d.ts`. Don't hash the bodiless
+      // signature; re-resolve through the export index, binding-required.
+      resolveAcrossPackageBoundary(candidateNames, bindingNames, ctx)
+    : // In-project source: hash the body and match it in the catalog; if the
+      // body-hash match misses (e.g. arrow-property methods whose cataloged
+      // occurrence the hasher can't reproduce from this decl node), fall back to
+      // a file+name pin — the SAME unique-or-decline semantics sharded's
+      // pinBySpecifier uses, so the two engines converge (Phase 3, Option A).
+      (findCatalogEntry(declNode, declSourceFile, ctx.catalog, candidateNames) ??
+      pinByFileAndName(declSourceFile, candidateNames, ctx));
+  // Per-site decl-file discriminator trace — no-op unless GRAPH_SITE_LOG is set
+  // (debug-only; isolated in resolution-trace.ts so this resolver stays env-clean).
+  traceResolveDecl(ctx, candidateNames, bindingNames, declSourceFile, dts, out);
+  return out;
+}
+
+/**
+ * File+name pin: the catalog occurrence in `declSourceFile` (the file the type
+ * checker attested the declaration lives in) whose simpleName matches one of
+ * `candidateNames`. UNIQUE match → its bodyHash; zero or >1 DISTINCT → null
+ * (decline). The lenient match sharded's `pinBySpecifier` uses, applied to the
+ * checker-attested file: it never guesses the file (only the matching step) and
+ * declines on same-name ambiguity — decline-beats-guess, identical semantics to
+ * the sharded engine.
+ */
+function pinByFileAndName(
+  declSourceFile: ts.SourceFile,
+  candidateNames: readonly string[],
+  ctx: ResolverContext,
+): string | null {
+  const relPath = relative(ctx.projectDirAbs, declSourceFile.fileName).split(sep).join('/');
+  let found: string | null = null;
+  for (const name of candidateNames) {
+    const occs = ctx.catalog.functions[name];
+    if (!occs) continue;
+    for (const o of occs) {
+      if (o.filePath !== relPath) continue;
+      if (found !== null && found !== o.bodyHash) return null; // >1 distinct → ambiguous → decline
+      found = o.bodyHash;
+    }
   }
-  // In-project source: hash the body and match it in the catalog.
-  return findCatalogEntry(declNode, declSourceFile, ctx.catalog, candidateNames);
+  return found;
 }
 
 /**

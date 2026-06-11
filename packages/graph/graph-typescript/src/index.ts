@@ -180,7 +180,7 @@ async function resolveCallSitesAdapter(input: ResolveInput<TsParsed>): Promise<R
   if (input.emitBoundaryCalls !== true) return base;
   const boundaryCalls = extractBoundaryCalls(
     toTsCallSites(input.callSites),
-    input.catalog,
+    base.edgesByOwner,
     input.projectDirAbs,
   );
   return { ...base, boundaryCalls };

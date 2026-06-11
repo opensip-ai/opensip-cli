@@ -41,6 +41,7 @@ import { computeSccs } from '../../pipeline/features.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
 
 import { bucketEdgesByOwner, stitchEdgesByOwner } from './edge-identity.js';
+import { traceResolveOne } from './resolution-trace.js';
 
 import type { ShardBuildResult } from './shard-model.js';
 import type { ExportIndex, PackageManifestIndex } from '../../cross-package/export-index.js';
@@ -353,11 +354,18 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
   };
   const spec = bc.importSpecifier;
 
-  // (a) Relative import → path-pin (intra-package, already exact).
+  // (a) Relative import → path-pin (intra-package). UNIQUE-or-decline: a single
+  // distinct target bodyHash in the pinned file resolves; same-name ambiguity
+  // declines — identical semantics to the exact engine's file+name pin
+  // (`pinByFileAndName`), so the two engines converge (Phase 3, Option A;
+  // decline-beats-guess). Previously emitted ALL matches as a multi-target edge.
   if (spec?.startsWith('.')) {
     const candidates = ctx.nameIndex.get(bc.calleeName) ?? [];
     const pinned = pinBySpecifier(bc, candidates, ctx.knownFiles);
-    return pinned.length > 0 ? { ...base, to: pinned.map((o) => o.bodyHash) } : { ...base, to: [] };
+    const distinct = [...new Set(pinned.map((o) => o.bodyHash))];
+    const edge = distinct.length === 1 ? { ...base, to: distinct } : { ...base, to: [] };
+    traceResolveOne(bc, 'relative-pin', edge.to);
+    return edge;
   }
 
   // (b)/(c) Bare or workspace specifier → resolve to a package and link by export
@@ -368,7 +376,9 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
     exportIndex: ctx.exportIndex,
     manifestIndex: ctx.manifestIndex,
   });
-  return linked === undefined ? { ...base, to: [] } : { ...base, to: [linked.bodyHash] };
+  const edge = linked === undefined ? { ...base, to: [] } : { ...base, to: [linked.bodyHash] };
+  traceResolveOne(bc, 'workspace-export', edge.to);
+  return edge;
 }
 
 /**

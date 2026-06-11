@@ -27,6 +27,7 @@ import {
 import ts from 'typescript';
 
 import { buildCrossPackageContext } from './edge-helpers/cross-package-context.js';
+import { DeclShape, functionLikeFromDeclaration } from './edge-helpers/declaration-to-node.js';
 import { unaliasSymbol } from './edge-helpers/unalias-symbol.js';
 import { resolveByCatalogFallback } from './edge-resolvers/catalog-fallback.js';
 import { resolveDirectCall } from './edge-resolvers/direct-call.js';
@@ -427,6 +428,20 @@ function hasProjectBinding(calleeExpr: ts.Expression, name: string, ctx: Resolve
   return false;
 }
 
+/** Concrete-callable declaration shapes a name-only fallback may resolve against
+ *  — excludes parameters / property- and method-signatures (a function-TYPED
+ *  binding whose actual target the fallback cannot know). Mirrors the
+ *  property-access resolver's ACCEPT set. */
+const CALLABLE_DECL =
+  DeclShape.FunctionDeclaration |
+  DeclShape.ArrowFunction |
+  DeclShape.FunctionExpression |
+  DeclShape.MethodDeclaration |
+  DeclShape.ConstructorDeclaration |
+  DeclShape.Accessor |
+  DeclShape.VariableInitializer |
+  DeclShape.PropertyAssignmentInitializer;
+
 /**
  * True when the callee expression's resolved symbol has at least one declaration
  * in an IN-PROJECT SOURCE file (a non-`.d.ts` source file in the program). This
@@ -441,7 +456,20 @@ function symbolHasInProjectSourceDecl(calleeExpr: ts.Expression, ctx: ResolverCo
   if (!symbol) return false;
   const real = unaliasSymbol(symbol, ctx.typeChecker);
   for (const d of real.getDeclarations() ?? []) {
-    if (!d.getSourceFile().isDeclarationFile) return true;
+    // Only a CONCRETE CALLABLE source declaration is a binding the name-only
+    // fallback may resolve against. A parameter / property-signature / method-
+    // signature (`options.shouldNotRetry?.()`, `push: PushViolation`) is NOT —
+    // the call's real target is whatever VALUE flows into it, which the shard-
+    // scoped name fallback cannot know, so it guesses a same-name occurrence
+    // (resolved when unique IN THE SHARD, declined when ambiguous WHOLE-PROGRAM
+    // — the exact↔sharded divergence). Gating to a callable decl declines those
+    // guesses in BOTH engines: decline-beats-guess, and convergent.
+    if (
+      !d.getSourceFile().isDeclarationFile &&
+      functionLikeFromDeclaration(d, CALLABLE_DECL) !== null
+    ) {
+      return true;
+    }
   }
   return false;
 }
