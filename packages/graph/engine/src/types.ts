@@ -261,6 +261,26 @@ export interface CrossBoundaryCall {
 }
 
 /**
+ * A name one module re-exports from another, normalized to the data the
+ * cross-package export index needs to make a re-exported name resolvable under
+ * the RE-EXPORTING package (not just its defining package). Captured by the
+ * language adapter's walk (TS: `export … from 'spec'` and the import-then-
+ * re-export idiom `export { x }`), carried on the catalog so the engine's
+ * cross-shard linker — which builds its index from the MERGED catalog — can
+ * follow re-export chains. Pure data (no AST handles); round-trips cache + merge.
+ */
+export interface ReExportRecord {
+  /** Re-exporting file, project-relative POSIX (→ `packageOf` gives the group). */
+  readonly fromFile: string;
+  /** The name as exposed BY this module. `'*'` for `export * from`. */
+  readonly exportedName: string;
+  /** The name in the SOURCE module (== `exportedName` unless aliased; `'*'` for star). */
+  readonly sourceName: string;
+  /** The source module specifier — relative (`'./x'`) or workspace (`'@scope/pkg'`). */
+  readonly specifier: string;
+}
+
+/**
  * The catalog: functions keyed by simple name. Multiple occurrences
  * per name.
  *
@@ -301,6 +321,14 @@ export interface Catalog {
    */
   readonly resolutionMode?: ResolutionMode;
   readonly functions: Readonly<Record<string, readonly FunctionOccurrence[]>>;
+  /**
+   * Re-export facts captured at walk time (see {@link ReExportRecord}). Present
+   * when the adapter emits them; consumed by `buildExportIndex` to resolve a
+   * name imported from the package that RE-EXPORTS it (the re-export-chain
+   * class). Optional so pre-feature catalogs and non-emitting adapters
+   * typecheck; absence means "no re-export following for this catalog."
+   */
+  readonly reExports?: readonly ReExportRecord[];
   /**
    * Derived feature columns materialized for the decoupled dashboard
    * (ADR-0006): present ONLY when the producing run requested columns via

@@ -40,6 +40,12 @@ interface CatalogRowPayload {
   readonly resolutionMode?: ResolutionMode;
   readonly functions: Catalog['functions'];
   /**
+   * Re-export facts (re-export-chain resolution). Present only when the adapter
+   * emitted them; omitted otherwise so lean payloads stay byte-unchanged. MUST
+   * round-trip so a warm (cached) build's catalog equals the cold one.
+   */
+  readonly reExports?: Catalog['reExports'];
+  /**
    * Materialized dashboard columns (ADR-0006); present ONLY when the producing
    * run requested `emitFeatures`. A lean default run omits this key entirely,
    * so the stored payload stays byte-unchanged for non-dashboard builds.
@@ -76,6 +82,7 @@ export class CatalogRepo {
         functions: catalog.functions,
         // Carries through whatever the caller attached; `undefined` when none
         // (a lean run) so the key is omitted from the persisted JSON.
+        reExports: catalog.reExports,
         features: catalog.features,
       };
       this.datastore.db
@@ -155,6 +162,7 @@ export class CatalogRepo {
         filesFingerprint: payload.filesFingerprint,
         resolutionMode: payload.resolutionMode,
         functions: payload.functions,
+        reExports: payload.reExports,
         features: payload.features,
       };
     } catch (error) {

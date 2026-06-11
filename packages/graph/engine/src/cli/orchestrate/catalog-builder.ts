@@ -29,6 +29,7 @@ import type {
   DependencyEdge,
   FunctionOccurrence,
   ParseError,
+  ReExportRecord,
   ResolutionMode,
   ResolutionStats,
 } from '../../types.js';
@@ -140,6 +141,7 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
     walked.occurrences,
     resolutionMode,
     engineMode,
+    walked.reExports ?? [],
   );
 
   // Stitch inside the resolve stage so the checklist detail counts the
@@ -253,6 +255,7 @@ export async function buildAndResolveCatalogIncremental(
   // Build the resolver-input catalog from the merged occurrence set
   // so name- and hash-based fallbacks see the full project.
   const mergedFunctions = mergeOccurrences(cachedCatalog, walked.occurrences, closureRel);
+  const mergedReExports = mergeReExports(cachedCatalog, walked.reExports ?? [], closureRel);
   const initialCatalog = {
     ...assembleCatalog(
       adapter,
@@ -261,6 +264,7 @@ export async function buildAndResolveCatalogIncremental(
       resolutionMode,
     ),
     functions: mergedFunctions,
+    ...(mergedReExports.length > 0 ? { reExports: mergedReExports } : {}),
   } as Catalog;
 
   // Merge the resolved closure edges into the final catalog inside the stage so
@@ -349,6 +353,7 @@ function assembleCatalog(
   occurrences: Record<string, FunctionOccurrence[]>,
   resolutionMode: ResolutionMode,
   engineMode: EngineMode = 'exact',
+  reExports: readonly ReExportRecord[] = [],
 ): Catalog {
   return {
     version: '3.0',
@@ -372,8 +377,37 @@ function assembleCatalog(
     // Self-describe the tier so loaded catalogs are honest about
     // approximation without re-deriving it from the cacheKey.
     resolutionMode,
+    // Re-export facts (omitted when none, mirroring `features`, to keep lean
+    // catalogs clean). Carried so the cross-shard export index can follow chains.
+    ...(reExports.length > 0 ? { reExports } : {}),
     functions: occurrences,
   };
+}
+
+/**
+ * Merge re-export facts for the incremental (warm-closure) build: keep the
+ * cached catalog's facts for files OUTSIDE the re-walked closure, and take the
+ * freshly-walked facts for files INSIDE it — the same incremental discipline
+ * `mergeOccurrences` applies to occurrences. Sorted for determinism so a
+ * warm-partial build's catalog is byte-identical to the cold one.
+ */
+function mergeReExports(
+  cached: Catalog,
+  walkedReExports: readonly ReExportRecord[],
+  closureRel: ReadonlySet<string>,
+): readonly ReExportRecord[] {
+  const keptCached = (cached.reExports ?? []).filter((r) => !closureRel.has(r.fromFile));
+  return sortReExports([...keptCached, ...walkedReExports]);
+}
+
+/** Stable order for re-export facts (fromFile, exportedName, specifier). */
+function sortReExports(reExports: readonly ReExportRecord[]): readonly ReExportRecord[] {
+  return [...reExports].sort(
+    (a, b) =>
+      a.fromFile.localeCompare(b.fromFile) ||
+      a.exportedName.localeCompare(b.exportedName) ||
+      a.specifier.localeCompare(b.specifier),
+  );
 }
 
 /**

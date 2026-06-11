@@ -49,6 +49,7 @@ import type {
   Catalog,
   CrossBoundaryCall,
   FunctionOccurrence,
+  ReExportRecord,
   ResolutionStats,
 } from '../../types.js';
 
@@ -126,6 +127,7 @@ export function mergeShardFragments(
   // cold, warm-all-cached, and warm-partial-rebuild produce a byte-identical
   // catalog (Phase 3).
   const canonicalFunctions = canonicalizeFunctions(functions);
+  const reExports = mergeFragmentReExports(fragments);
 
   const first = fragments[0];
   return {
@@ -150,8 +152,34 @@ export function mergeShardFragments(
     ),
     filesFingerprint: computeFilesFingerprint(allFiles),
     resolutionMode: first?.resolutionMode,
+    ...(reExports.length > 0 ? { reExports } : {}),
     functions: canonicalFunctions,
   };
+}
+
+/**
+ * Union the per-shard re-export facts into the merged catalog, deduped by full
+ * identity and sorted — so the merged set is a pure function of the fragment SET
+ * (order-independent across shard completion), keeping cold == warm. The engine's
+ * `buildExportIndex` reads these to follow cross-package re-export chains.
+ */
+function mergeFragmentReExports(fragments: readonly Catalog[]): readonly ReExportRecord[] {
+  const seen = new Set<string>();
+  const out: ReExportRecord[] = [];
+  for (const frag of fragments) {
+    for (const r of frag.reExports ?? []) {
+      const key = `${r.fromFile}|${r.exportedName}|${r.sourceName}|${r.specifier}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(r);
+    }
+  }
+  return out.sort(
+    (a, b) =>
+      a.fromFile.localeCompare(b.fromFile) ||
+      a.exportedName.localeCompare(b.exportedName) ||
+      a.specifier.localeCompare(b.specifier),
+  );
 }
 
 /**

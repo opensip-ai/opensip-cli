@@ -37,6 +37,7 @@ export { GRAPH_ENV_SPECS } from './cli/pressure-monitor.js';
 // `@opensip-tools/graph/internal` (boundary audit 2026-06-05).
 export type {
   Catalog,
+  ReExportRecord,
   FunctionOccurrence,
   CallEdge,
   DependencyEdge,

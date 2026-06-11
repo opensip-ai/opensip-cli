@@ -145,6 +145,8 @@ function walkProjectAdapter(input: WalkInput<TsParsed>): WalkOutput {
     occurrences: walked.functions,
     callSites,
     dependencySites,
+    // Re-export facts are pure data (no AST handles) — passed straight through.
+    reExports: walked.reExports,
     parseErrors: walked.parseErrors,
   };
 }

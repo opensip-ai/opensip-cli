@@ -22,6 +22,7 @@ import type {
   DependencyEdge,
   FunctionOccurrence,
   ParseError,
+  ReExportRecord,
   ResolutionMode,
   ResolutionStats,
   RuleHints,
@@ -154,6 +155,10 @@ export interface WalkOutput {
   /** Optional — Phase 4 (DEC-498) addition. Adapters that emit
    *  module-level dependency edges populate this; others may omit. */
   readonly dependencySites?: readonly DependencySiteRecord[];
+  /** Optional — re-export facts (see {@link ReExportRecord}). Adapters that
+   *  resolve re-export chains populate this; others may omit. Carried onto the
+   *  catalog so the engine's cross-shard export index can follow re-exports. */
+  readonly reExports?: readonly ReExportRecord[];
   readonly parseErrors: readonly ParseError[];
 }
 
