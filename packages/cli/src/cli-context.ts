@@ -89,6 +89,12 @@ interface CliRuntimeContext {
   readonly toolManifests: readonly ToolPluginManifest[];
 }
 
+// Not a request context: the CLI is one run per process. This module-level holder
+// carries pre-scope CLI runtime state (registries, provenance, manifests) for the
+// non-action paths that cannot reach AsyncLocalStorage (post-action callbacks,
+// error printers); it is fully reset per invocation by setCliRuntimeContextForRun,
+// so nothing leaks between runs.
+// @fitness-ignore-next-line context-leakage -- single-process CLI holder, reset per run (see above)
 let currentRuntimeContext: CliRuntimeContext = {
   toolProvenance: [],
   toolManifests: [],
@@ -166,21 +172,12 @@ export function getToolProvenanceForRun(): readonly ToolProvenance[] {
 }
 
 /**
- * Record the manifests for the tools admitted this invocation (release
- * 2.10.0, §5.3). Called by `main()` once per invocation from the bootstrap
- * result, BEFORE Commander dispatch. Read by the pre-action-hook to register
- * each tool's manifest-declared capability domains into the per-run
- * capability registry (the deferred placeholder is then replaced by the
- * tool's real registrar).
- */
-export function setToolManifestsForRun(manifests: readonly ToolPluginManifest[]): void {
-  updateRuntimeContext({ toolManifests: manifests });
-}
-
-/**
- * Read the admitted-tool manifests recorded by {@link setToolManifestsForRun}.
- * Empty until bootstrap has run (e.g. in isolated unit tests that never
- * bootstrap) — the pre-action-hook then registers no manifest domains.
+ * Read the admitted-tool manifests recorded for this invocation (release
+ * 2.10.0, §5.3) — installed cohesively by {@link setCliRuntimeContextForRun}.
+ * Read by the pre-action-hook to register each tool's manifest-declared
+ * capability domains into the per-run capability registry. Empty until
+ * bootstrap has run (e.g. in isolated unit tests that never bootstrap) — the
+ * pre-action-hook then registers no manifest domains.
  */
 export function getToolManifestsForRun(): readonly ToolPluginManifest[] {
   return currentRuntimeContext.toolManifests;

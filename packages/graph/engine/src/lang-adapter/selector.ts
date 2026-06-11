@@ -3,8 +3,14 @@ import { globSync } from 'glob';
 
 import type { GraphLanguageAdapter } from './types.js';
 
+/**
+ * Inputs that drive graph language-adapter selection: the project root to probe
+ * for language signals and an optional explicit language override.
+ */
 export interface GraphAdapterSelectionInput {
+  /** Project root to probe for language signals (defaults to the process cwd). */
   readonly cwd?: string;
+  /** Explicit language override; when set, skips signal-based detection. */
   readonly language?: string;
 }
 

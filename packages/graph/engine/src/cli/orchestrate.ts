@@ -1,4 +1,5 @@
 // @fitness-ignore-file detached-promises -- stage hooks (registry registration, logger.info) are synchronous; orchestrator threads them inside an async pipeline
+// @fitness-ignore-file module-coupling-fan-out -- this IS the graph pipeline's composition root: threading stages 0–5 together inherently imports each stage module plus the registries/persistence/rules/tracer they coordinate. High fan-out is the orchestrator's job, not accidental coupling.
 /**
  * Pipeline orchestrator — threads stages 0–5 together.
  *

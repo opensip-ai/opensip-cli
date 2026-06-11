@@ -285,6 +285,12 @@ export function defineCommand<TOpts = unknown, TCtx = CommandContext>(
   return spec;
 }
 
+/**
+ * Validate that a `raw-stream` command documents why it owns its own output.
+ *
+ * @throws {Error} when `output` is `'raw-stream'` but no `rawStreamReason` is
+ *   declared (or the reason is not a recognized value).
+ */
 function validateRawStreamDeclaration(spec: {
   readonly name: string;
   readonly output: CommandOutputMode;

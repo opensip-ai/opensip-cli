@@ -122,6 +122,12 @@ function resolveBundledPackageDir(packageName: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Resolve a bundled tool package's on-disk directory, requiring success.
+ *
+ * @throws {PluginIncompatibleError} when the package directory cannot be
+ *   resolved on disk (its manifest is unreadable).
+ */
 function resolveRequiredBundledPackageDir(packageName: string): string {
   const dir = resolveBundledPackageDir(packageName);
   if (dir !== undefined) return dir;

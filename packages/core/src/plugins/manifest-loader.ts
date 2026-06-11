@@ -43,6 +43,7 @@ import { join } from 'node:path';
 
 import { logger } from '../lib/logger.js';
 import { checkCompatibility, type CompatibilityVerdict } from '../tools/compatibility.js';
+import { PLUGIN_API_VERSION } from '../tools/manifest.js';
 
 import { isRecord, isStringArray } from './json-guards.js';
 import { normalizeDiscovery } from './manifest-discovery.js';
@@ -177,7 +178,11 @@ export function admitTool(args: {
   if (verdict.kind === 'compatible') {
     const admittedManifest: ToolPluginManifest = {
       ...manifest,
-      apiVersion: manifest.apiVersion!,
+      // `verdict.kind === 'compatible'` ⇒ apiVersion equals the engine epoch (a
+      // defined number); the `?? PLUGIN_API_VERSION` fallback is never reached
+      // when compatible — it only narrows the type to `number` without a
+      // non-null assertion.
+      apiVersion: manifest.apiVersion ?? PLUGIN_API_VERSION,
     };
     logger.info({
       evt: 'plugin.manifest.loaded',

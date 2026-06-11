@@ -59,6 +59,7 @@ export class GraphAdapterRegistry {
     return this.inner.size;
   }
 
+  // @fitness-ignore-next-line batch-operation-limits -- in-memory adapter registry: getAll() returns the handful of registered language adapters, not an unbounded data-store query.
   getAll(): readonly RegisterableAdapter[] {
     return this.inner.getAll();
   }

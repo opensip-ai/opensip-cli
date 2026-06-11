@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- one cohesive contract surface: the CommandResult discriminated union plus every per-command variant interface, each member carrying load-bearing JSDoc. Splitting the union across files would fragment the single type the host renders/dispatches. Sits just past the 400-line soft limit (and only shrank with the ADR-0035 shouldFail removal).
 /**
  * CommandResult — the discriminated union of every command outcome, plus its
  * per-command variant interfaces.

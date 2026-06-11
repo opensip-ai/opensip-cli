@@ -36,6 +36,13 @@ export function isDrizzleDataStore(value: unknown): value is DrizzleDataStore {
   );
 }
 
+/**
+ * Narrow a {@link DataStore} to a {@link DrizzleDataStore}, requiring the raw
+ * Drizzle handle to be present.
+ *
+ * @throws {Error} when `datastore` is not Drizzle-backed (general callers should
+ *   use repository APIs instead of the raw datastore handle).
+ */
 export function requireDrizzleDataStore(datastore: DataStore): DrizzleDataStore {
   if (isDrizzleDataStore(datastore)) return datastore;
   throw new Error(

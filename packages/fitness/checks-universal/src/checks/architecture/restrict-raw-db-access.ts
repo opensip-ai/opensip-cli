@@ -141,6 +141,7 @@ export function analyzeRawDbAccess(content: string, filePath: string): CheckViol
     for (const alias of collectRawDbAliases(line)) {
       rawDbAliases.add(alias);
     }
+    // @fitness-ignore-next-line null-safety -- rawDbAliasQuery returns a RegExp (never null/undefined), so .test is always safe; the heuristic can't see the return type through the call.
     const usesRawDbAlias = [...rawDbAliases].some((alias) => rawDbAliasQuery(alias).test(line));
     if (RAW_DB_QUERY.test(line) || usesRawDbAlias) {
       violations.push({
