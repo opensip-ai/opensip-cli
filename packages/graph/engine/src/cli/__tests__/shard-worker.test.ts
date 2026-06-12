@@ -28,10 +28,10 @@ import type {
 import type { ShardBuildResult, ShardWorkerSpec } from '../orchestrate/shard-model.js';
 import type { ToolCliContext } from '@opensip-tools/core';
 
-function fakeAdapter(): GraphLanguageAdapter {
+function fakeAdapter(id = 'typescript', fileExtension = '.ts'): GraphLanguageAdapter {
   return {
-    id: 'typescript',
-    fileExtensions: ['.ts'],
+    id,
+    fileExtensions: [fileExtension],
     displayName: 'Fake',
     discoverFiles: (): DiscoverOutput => ({
       projectDirAbs: '/unused',
@@ -46,8 +46,8 @@ function fakeAdapter(): GraphLanguageAdapter {
           {
             bodyHash: 'h1',
             simpleName: 'fn',
-            qualifiedName: 'pkg/a.fn',
-            filePath: 'pkg/a.ts',
+            qualifiedName: `pkg/a.${id}.fn`,
+            filePath: `pkg/a${fileExtension}`,
             line: 1,
             column: 0,
             endLine: 2,
@@ -76,7 +76,7 @@ function fakeAdapter(): GraphLanguageAdapter {
         unresolved: 0,
       },
     }),
-    cacheKey: () => 'fake-shard-v1',
+    cacheKey: () => `fake-shard-v1:${id}`,
   };
 }
 
@@ -136,10 +136,33 @@ describe('executeShardWorker', () => {
     expect(setExitCode).toHaveBeenCalledWith(0);
     const result = JSON.parse(stdout) as ShardBuildResult;
     expect(result.shardId).toBe('pkg:a');
+    expect(result.fragment.language).toBe('typescript');
     expect(result.fragment.functions.fn).toHaveLength(1);
     expect(result.fingerprint).toContain('pkg/a.ts');
     expect(result.boundaryCalls).toEqual([]);
     expect(result.parseErrors).toEqual([]);
+  });
+
+  it('honors the explicit language in the shard spec when selecting an adapter', async () => {
+    currentAdapterRegistry().register(fakeAdapter('typescript', '.ts'));
+    currentAdapterRegistry().register(fakeAdapter('python', '.py'));
+    const specPath = join(dir, 'spec.json');
+    const spec: ShardWorkerSpec = {
+      shard: { id: 'pkg:a', rootDir: dir, files: ['pkg/a.py'] },
+      projectRoot: dir,
+      language: 'python',
+      resolutionMode: 'exact',
+    };
+    writeFileSync(specPath, JSON.stringify(spec), 'utf8');
+
+    const { cli, setExitCode } = mockCli();
+    await executeShardWorker(specPath, cli);
+
+    expect(setExitCode).toHaveBeenCalledWith(0);
+    const result = JSON.parse(stdout) as ShardBuildResult;
+    expect(result.fragment.language).toBe('python');
+    expect(result.fragment.cacheKey).toContain('python');
+    expect(result.fingerprint).toContain('pkg/a.py');
   });
 
   it('attributes a read/parse failure to the shard: stderr names it, exit 1', async () => {

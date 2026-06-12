@@ -36,6 +36,8 @@ export interface RunShardsInput {
   readonly projectRoot: string;
   /** CLI entry script (`process.argv[1]`); children run `node <cliScript> graph-shard-worker <spec>`. */
   readonly cliScript: string;
+  /** Optional adapter id requested by the parent `graph --language <id>` run. */
+  readonly language?: string;
   readonly resolutionMode: ResolutionMode;
   /** Concurrency cap. Default: `max(1, cpus()-1)`. */
   readonly concurrency?: number;
@@ -68,7 +70,13 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
   });
 
   const outcomes = await runWorkerPool(input.shards, concurrency, (shard) =>
-    spawnShardWorker(shard, input.projectRoot, input.cliScript, input.resolutionMode),
+    spawnShardWorker(
+      shard,
+      input.projectRoot,
+      input.cliScript,
+      input.resolutionMode,
+      input.language,
+    ),
   );
 
   const fragments: ShardBuildResult[] = [];
@@ -155,11 +163,17 @@ function spawnShardWorker(
   projectRoot: string,
   cliScript: string,
   resolutionMode: ResolutionMode,
+  language?: string,
 ): Promise<ShardOutcome> {
   return new Promise((resolvePromise) => {
     const specDir = mkdtempSync(join(tmpdir(), 'graph-shard-'));
     const specPath = join(specDir, 'spec.json');
-    const spec: ShardWorkerSpec = { shard, projectRoot, resolutionMode };
+    const spec: ShardWorkerSpec = {
+      shard,
+      projectRoot,
+      resolutionMode,
+      ...(language ? { language } : {}),
+    };
     writeFileSync(specPath, JSON.stringify(spec), 'utf8');
 
     const cleanup = (): void => rmSync(specDir, { recursive: true, force: true });

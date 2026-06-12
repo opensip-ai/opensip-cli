@@ -120,7 +120,7 @@ describe('uninstall wiring', () => {
     expect(cmd).toBeDefined();
     const flagNames = cmd!.options.map((o) => o.long);
     expect(flagNames).toEqual(
-      expect.arrayContaining(['--yes', '--dry-run', '--project', '--purge', '--json']),
+      expect.arrayContaining(['--yes', '--dry-run', '--user', '--project', '--purge', '--json']),
     );
   });
 });

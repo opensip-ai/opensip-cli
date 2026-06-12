@@ -61,7 +61,7 @@ export async function executeShardWorker(specPath: string, cli: ToolCliContext):
 
 async function buildShard(spec: ShardWorkerSpec): Promise<ShardBuildResult> {
   const { shard, projectRoot, resolutionMode } = spec;
-  const adapter = pickAdapter(shard.rootDir);
+  const adapter = pickAdapter(shard.rootDir, spec.language);
 
   // Anchor compiler options to the shard's own config, but compute
   // occurrence filePaths against the COMMON project root so fragments

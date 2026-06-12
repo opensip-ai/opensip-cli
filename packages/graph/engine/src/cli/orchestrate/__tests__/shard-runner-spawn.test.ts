@@ -35,7 +35,7 @@ if (id.startsWith('fail:')) {
 const result = {
   shardId: id,
   fragment: {
-    version: '3.0', tool: 'graph', language: 'typescript',
+    version: '3.0', tool: 'graph', language: spec.language ?? 'typescript',
     builtAt: 'x', cacheKey: 'k-' + id, resolutionMode: 'exact', functions: {},
   },
   fingerprint: 'fp-' + id,
@@ -75,6 +75,19 @@ describe('runShardsInParallel', () => {
     expect(out.failures).toHaveLength(0);
     expect(out.fragments.map((f) => f.shardId)).toEqual(['pkg:a', 'pkg:b', 'pkg:c']);
     expect(out.fragments[0]?.fingerprint).toBe('fp-pkg:a');
+  });
+
+  it('serializes an explicit language into each shard worker spec', async () => {
+    const out = await runShardsInParallel({
+      shards: [shard('pkg:a')],
+      projectRoot: dir,
+      cliScript,
+      language: 'python',
+      resolutionMode: 'exact',
+    });
+
+    expect(out.failures).toHaveLength(0);
+    expect(out.fragments[0]?.fragment.language).toBe('python');
   });
 
   it('attributes a non-zero worker exit to its shard as a failure, not a throw', async () => {

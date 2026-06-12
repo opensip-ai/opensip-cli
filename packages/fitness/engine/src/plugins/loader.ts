@@ -46,8 +46,9 @@ export const FIT_PLUGIN_LAYOUT: PluginLayout = {
 
 /**
  * Language-adapter domain layout — adapters ship as direct CLI deps, so
- * there is no project-local loose-file layout. Discovery yields nothing
- * unless `plugins.lang` is declared.
+ * there is no project-local loose-file layout or `plugins.lang` config path.
+ * The direct lang-domain loader remains only for direct programmatic/plugin
+ * tests; production adapter registration happens in the CLI bootstrap.
  */
 const LANG_PLUGIN_LAYOUT: PluginLayout = { domain: 'lang', userSubdirs: [] };
 

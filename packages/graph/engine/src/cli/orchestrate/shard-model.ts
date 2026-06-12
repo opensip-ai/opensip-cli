@@ -66,6 +66,8 @@ export interface ShardWorkerSpec {
    * merged catalog.
    */
   readonly projectRoot: string;
+  /** Optional adapter id requested by the parent `graph --language <id>` run. */
+  readonly language?: string;
   readonly resolutionMode: ResolutionMode;
 }
 

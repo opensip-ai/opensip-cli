@@ -460,7 +460,7 @@ async function runShardedBuild(ctx: ShardedBuildContext): Promise<RunGraphResult
     shards,
     projectRoot,
     cliScript: opts.cliScript ?? process.argv[1] ?? '',
-    adapter: pickAdapter(projectRoot),
+    adapter: pickAdapter(projectRoot, opts.language),
     resolutionMode: opts.resolution ?? 'exact',
     concurrency: opts.concurrency,
     useCache: opts.noCache !== true,
@@ -469,6 +469,7 @@ async function runShardedBuild(ctx: ShardedBuildContext): Promise<RunGraphResult
     catalogRepo: datastore ? new CatalogRepo(datastore) : null,
     emitFeatures: DASHBOARD_FEATURE_COLUMNS,
     ...(ctx.onProgress === undefined ? {} : { onProgress: ctx.onProgress }),
+    ...(opts.language === undefined ? {} : { language: opts.language }),
   });
   return {
     catalog: sharded.catalog,
@@ -971,6 +972,7 @@ async function executeWorkspaceGraph(
     noCache: opts.noCache,
     resolution: opts.resolution,
     recipe: opts.recipe,
+    ...(opts.language === undefined ? {} : { language: opts.language }),
   });
   const durationMs = Date.now() - startedAt;
   profileRun?.recordStage('workspace-fanout', durationMs, `${String(units.length)} unit(s)`);

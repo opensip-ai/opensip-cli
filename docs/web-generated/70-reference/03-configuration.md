@@ -186,7 +186,6 @@ Plugin lists and discovery preferences. Scoped name-pattern discovery, explicit/
 |---|---|
 | `plugins.fit` | Arbitrary-scope fitness packs pinned into `.runtime/plugins/fit/`. Managed by `plugin add/remove/sync`. |
 | `plugins.sim` | Arbitrary-scope simulation packs pinned into `.runtime/plugins/sim/`. |
-| `plugins.lang` | Legacy language-pack pins consumed by language/fitness plugin discovery. |
 | `plugins.packageScopes` | Additional npm scopes to scan for `<scope>/scenarios-*` simulation packages. `@opensip-tools` is always scanned. |
 | `plugins.checkPackages` | Exact fitness package names to load from project `node_modules`. |
 | `plugins.scenarioPackages` | Exact simulation package names to load from project `node_modules`; when set, replaces the `<scope>/scenarios-*` name-pattern scan. |

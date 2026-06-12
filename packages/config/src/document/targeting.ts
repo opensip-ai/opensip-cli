@@ -71,7 +71,6 @@ export type CheckTargetMap = Readonly<Record<string, string | readonly string[]>
 export interface PluginsConfig {
   readonly fit?: readonly string[];
   readonly sim?: readonly string[];
-  readonly lang?: readonly string[];
   /**
    * Explicit list of npm package names to load as check providers
    * (e.g. ['@opensip-tools/checks-python', '@my-org/checks-internal']).
@@ -173,7 +172,6 @@ export function createPluginsConfigSchema(
   const shape: Record<string, z.ZodType> = {
     fit: pluginStringArraySchema.optional(),
     sim: pluginStringArraySchema.optional(),
-    lang: pluginStringArraySchema.optional(),
   };
 
   for (const { key, kind } of keys) {

@@ -55,12 +55,12 @@ related-docs:
         `<project>/opensip-tools/tools/` (deny-by-default). Each
         `<name>/opensip-tool.manifest.json` sidecar is admitted —
         trust decision FIRST — before its module is imported.
-3. mountAllToolCommands(toolRegistry, ctx)  ← iterate the tool
-                                              registry, call
-                                              tool.register(ctx) on
-                                              each (mounts Commander
-                                              subcommands).
-4. registerCliCommands()                    ← mount CLI-owned commands
+3. mountAllToolCommands(toolRegistry,
+                        program, ctx)       ← iterate the tool registry
+                                              and mount each
+                                              tool.commandSpecs entry
+                                              via mountCommandSpec().
+4. mountHostCommands()                      ← mount CLI-owned commands
                                               (init, configure,
                                               sessions, plugin,
                                               completion, uninstall).
@@ -110,14 +110,14 @@ A few of the constraints that pinned the order:
 - **Language adapters before any check ever runs.** The fitness tool's content filter dispatches per-file based on the language registry. A check that runs before any adapter is registered would treat every file as raw text and silently miss violations. The adapters are registered first inside `bootstrapCli()`, so they're in place before any tool is admitted and mounted.
 - **First-party tools before discovery.** `ToolRegistry.register()` is **first-writer-wins** (`warn-first-wins`). `bootstrapCli()` admits the bundled tools first, so a same-id third-party package can't clobber a built-in: the first-writer policy keeps the incumbent (and warns), and the discovery walk via `discoverToolPackages()` *also* explicitly skips packages whose `metadata.id` matches a bundled tool. Both guards point the same way — bundled `fit`/`sim`/`graph` win.
 - **Authored discovery is the third leg — bundled, then installed, then authored sidecars.** After the bundled + installed legs, `discoverAndRegisterAuthoredTools()` walks the two authored `tools/` roots and converges on the same `importToolRuntime` → `isValidTool` → `registry.register` path. It carries **two trust postures**: a global-authored tool (`~/.opensip-tools/tools/`) is trusted-by-default, while a project-authored tool (`<project>/opensip-tools/tools/`) is **deny-by-default** — admitted only when allowlisted via `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`. The **trust decision always precedes the dynamic import**: an un-allowlisted project tool throws `PluginIncompatibleError` (exit 5) before its module is ever loaded, so a `git clone`-borne tool cannot run code by mere presence ([ADR-0030](../../decisions/ADR-0030-authored-tool-discovery.md)).
-- **Tools mount before CLI-owned commands.** Tool subcommands (`fit`, `sim`, `graph`, `dashboard`, …) get mounted in `mountAllToolCommands()` first. CLI-owned commands (`init`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) are mounted afterwards in `registerCliCommands()`. The order avoids duplicate-name collisions (a tool can't squat a CLI-owned name) and keeps tool subcommands at the top of `--help`.
+- **Tools mount before CLI-owned commands.** Tool subcommands (`fit`, `sim`, `graph`, …) get mounted in `mountAllToolCommands()` first from each tool's `commandSpecs`. CLI-owned commands (`init`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) are mounted afterwards in `mountHostCommands()`, also through `mountCommandSpec()`. The order avoids duplicate-name collisions (a tool can't squat a CLI-owned name) and keeps tool subcommands at the top of `--help`.
 - **`parseAsync` last.** Commander parses argv synchronously but action handlers are async. `parseAsync` returns when the action handler resolves, which is what blocks Node's event loop until the run completes.
 
 ---
 
 ## CLI-owned commands
 
-Some commands belong to the CLI itself, not to any Tool. They live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/) and are mounted directly in `index.ts` (not via the Tool contract):
+Some commands belong to the CLI itself, not to any Tool. They live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/) and are assembled by `mountHostCommands()` as host-owned `CommandSpec`s:
 
 | Command | Owner | Why CLI-owned |
 |---|---|---|
@@ -189,7 +189,7 @@ Things that can go wrong, and what the CLI does:
 | Failure | When | What the CLI does |
 |---|---|---|
 | Invalid argv | Commander parse | Commander prints help; exit 1. |
-| Tool registration throws | `mountAllToolCommands()` | Logged at error level; the failing tool is skipped; CLI continues with remaining tools. |
+| Tool command mounting throws | `mountAllToolCommands()` | Logged at error level; the failing tool is skipped; CLI continues with remaining tools. |
 | Action handler throws | Inside Tool execution | Caught at the program level; rendered as `ErrorResult`; exit code from `error.exitCode` or 2. |
 | Missing config | Tool action calls `loadProjectConfig()` | Tool throws `ConfigurationError`; CLI surfaces the error and the suggestion. Exit 2. |
 | Plugin failed to load | Inside the Tool's lazy plugin loader (e.g. `ensureChecksLoaded` in fitness) | Logged; the failing plugin is skipped; CLI continues. |
@@ -209,7 +209,7 @@ For `acme-api` running `opensip-tools fit --gate-compare` from CI on 2026-05-17:
    - Resolves each name in `BUNDLED_TOOL_PACKAGES` (`@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/graph`) on disk, reads its manifest, admits it through `admitTool`, **dynamically imports** the tool runtime, and registers it into `toolRegistry` — the same path an installed tool takes; nothing is statically imported.
    - `discoverToolPackages()` walks `node_modules`. No third-party Tools installed. Returns empty.
 3. `mountAllToolCommands(toolRegistry, program, ctx)`: for each registered tool, `mountCommandSpec` mounts every entry in the tool's declared `commandSpecs`. fitness's specs mount `fit`, `fit-list`, `fit-recipes`, `fit-baseline-export`; simulation's mount `sim`; graph's mount `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (and its internal/export commands). There is no `register()` hook — `commandSpecs` is the only command surface (3.0.0 GA).
-4. `registerCliCommands()`: `init`, `dashboard`, `configure`, `uninstall`, `plugin`, `completion`, `sessions` mounted.
+4. `mountHostCommands()`: host-owned `CommandSpec`s mount `init`, `dashboard`, `configure`, `uninstall`, `plugin`, `completion`, and `sessions`.
 5. `argv = ['node', 'opensip-tools', 'fit', '--gate-compare']` — there's a subcommand, so the welcome banner is skipped.
 6. `parseAsync()` runs. The `preAction` hook enters a fresh `RunScope`, reads the `fit` command's `opts.debug` (false), and leaves the log level at `info`. It also runs the once-per-day update check and records the result on the scope for the banner / stderr nag (no-op when up-to-date or offline; never blocks). A runId like `RUN_01HXYZG9V8K1J7P3M2N0RQS5T6W` is generated (uppercase prefix + ULID); the day-level log file `<project>/opensip-tools/.runtime/logs/2026-05-17.jsonl` is opened on first write. Commander dispatches to `fitnessTool`'s `fit` action handler with `--gate-compare = true`. The Tool runs `executeFit` and the gate diff. Exit code 1 (regression detected).
 

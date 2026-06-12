@@ -645,6 +645,7 @@ CLI-owned: [`packages/cli/src/commands/uninstall.ts`](../../../packages/cli/src/
 
 ```
 opensip-tools uninstall                       # remove ~/.opensip-tools/
+opensip-tools uninstall --user                # explicitly remove ~/.opensip-tools/
 opensip-tools uninstall --project             # remove project runtime state at cwd
 opensip-tools uninstall --project /path/repo  # remove project runtime state at <path>
 opensip-tools uninstall --project --purge     # also remove authored content + config
@@ -656,12 +657,13 @@ Two modes:
 
 | Mode | Targets removed | When to use |
 |---|---|---|
-| Default | `~/.opensip-tools/` (user-level config dir) | Removing the cloud API key + per-user defaults; cleaning legacy cruft from earlier versions. |
+| Default / `--user` | `~/.opensip-tools/` (user-level config dir) | Removing the cloud API key + per-user defaults; cleaning legacy cruft from earlier versions. |
 | `--project [path]` | `<path>/opensip-tools/.runtime/` by default | Remove rebuildable session/cache/log/baseline state for one repo while preserving authored checks, recipes, scenarios, and config. |
 | `--project [path] --purge` | `<path>/opensip-tools/` (authored content included) and `<path>/opensip-tools.config.yml` | Fully disengage from opensip-tools in one repo. Destructive if custom checks/recipes are not committed. |
 
 | Flag | Effect |
 |---|---|
+| `--user` | Explicitly choose default user mode. Mutually exclusive with `--project`. |
 | `--project [path]` | Switch to project mode. Path defaults to cwd. |
 | `--purge` | In project mode, also remove user-authored content under `opensip-tools/` and `opensip-tools.config.yml`. |
 | `--yes`, `-y` | Skip the `[y/N]` confirmation prompt. |

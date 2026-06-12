@@ -128,7 +128,6 @@ function buildFromParsed(
     ? Object.freeze({
         ...(rawPlugins.fit && { fit: Object.freeze([...rawPlugins.fit]) }),
         ...(rawPlugins.sim && { sim: Object.freeze([...rawPlugins.sim]) }),
-        ...(rawPlugins.lang && { lang: Object.freeze([...rawPlugins.lang]) }),
         ...(rawPlugins.checkPackages && {
           checkPackages: Object.freeze([...rawPlugins.checkPackages]),
         }),

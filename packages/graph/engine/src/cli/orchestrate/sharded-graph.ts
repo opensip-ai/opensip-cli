@@ -66,6 +66,8 @@ export interface RunShardedInput {
   /** CLI entry script (`process.argv[1]`) for spawning shard workers. */
   readonly cliScript: string;
   readonly adapter: GraphLanguageAdapter;
+  /** Optional adapter id requested by the parent `graph --language <id>` run. */
+  readonly language?: string;
   readonly resolutionMode: ResolutionMode;
   readonly concurrency?: number;
   readonly useCache: boolean;
@@ -166,6 +168,7 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     cliScript,
     resolutionMode,
     concurrency: input.concurrency,
+    ...(input.language === undefined ? {} : { language: input.language }),
   });
   for (const failure of built.failures) {
     logger.error({

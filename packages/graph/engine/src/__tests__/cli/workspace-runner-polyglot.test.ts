@@ -7,9 +7,13 @@
  * Adapters without the hook contribute zero units but don't throw.
  */
 
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { discoverPolyglotUnits } from '../../cli/workspace-runner.js';
+import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from '../../cli/workspace-runner.js';
 
 import type { LanguageAdapter, WorkspaceUnit } from '@opensip-tools/core';
 
@@ -80,5 +84,54 @@ describe('discoverPolyglotUnits', () => {
     const a = await discoverPolyglotUnits('/root', [ts, rust]);
     const b = await discoverPolyglotUnits('/root', [rust, ts]);
     expect(a.map((u) => u.rootDir)).toEqual(b.map((u) => u.rootDir));
+  });
+});
+
+describe('runWorkspaceUnitsInParallel', () => {
+  it('forwards explicit language selection to graph child processes', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'workspace-runner-'));
+    try {
+      const unitRoot = join(root, 'packages', 'api');
+      mkdirSync(unitRoot, { recursive: true });
+      const argvPath = join(root, 'argv.jsonl');
+      const cliScript = join(root, 'fake-cli.cjs');
+      writeFileSync(
+        cliScript,
+        `
+const { appendFileSync } = require('node:fs');
+appendFileSync(${JSON.stringify(argvPath)}, JSON.stringify(process.argv.slice(2)) + '\\n');
+process.stdout.write(JSON.stringify({ signals: [] }));
+`,
+        'utf8',
+      );
+
+      const out = await runWorkspaceUnitsInParallel({
+        cwd: root,
+        units: [{ id: 'api', rootDir: unitRoot }],
+        cliScript,
+        concurrency: 1,
+        noCache: true,
+        resolution: 'fast',
+        language: 'python',
+        recipe: 'public-api',
+      });
+
+      const argv = JSON.parse(readFileSync(argvPath, 'utf8').trim()) as string[];
+      expect(out.anyChildFailed).toBe(false);
+      expect(argv).toEqual([
+        'graph',
+        unitRoot,
+        '--json',
+        '--no-cache',
+        '--resolution',
+        'fast',
+        '--language',
+        'python',
+        '--recipe',
+        'public-api',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

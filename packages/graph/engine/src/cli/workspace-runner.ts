@@ -82,6 +82,11 @@ export interface RunWorkspaceUnitsInput {
    */
   readonly resolution?: ResolutionMode;
   /**
+   * Optional adapter id. Forwarded to each child as `--language <id>` so
+   * workspace fan-out preserves the parent's explicit adapter selection.
+   */
+  readonly language?: string;
+  /**
    * `--recipe <name>`: forwarded to each child as `--recipe <name>` so a
    * `--workspace --recipe <name>` run selects the same rule subset per
    * unit. Children re-resolve the recipe in their own scope (resolved
@@ -155,6 +160,7 @@ export async function runWorkspaceUnitsInParallel(
       noCache: input.noCache === true,
       resolution: input.resolution,
       recipe: input.recipe,
+      ...(input.language === undefined ? {} : { language: input.language }),
     }),
   );
   const anyChildFailed = results.some((r) => r.exitCode !== 0);
@@ -179,6 +185,7 @@ interface SpawnInput {
   readonly cwd: string;
   readonly noCache: boolean;
   readonly resolution?: ResolutionMode;
+  readonly language?: string;
   readonly recipe?: string;
 }
 
@@ -187,6 +194,8 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
     const args: string[] = [input.cliScript, 'graph', input.unit.rootDir, '--json'];
     if (input.noCache) args.push('--no-cache');
     if (input.resolution !== undefined) args.push('--resolution', input.resolution);
+    if (input.language !== undefined && input.language.length > 0)
+      args.push('--language', input.language);
     if (input.recipe !== undefined) args.push('--recipe', input.recipe);
 
     const child = spawn(process.execPath, args, {

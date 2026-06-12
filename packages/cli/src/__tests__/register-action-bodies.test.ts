@@ -433,6 +433,25 @@ describe('uninstall spec — action body', () => {
     );
   });
 
+  it('uninstall --user: forwards explicit user mode', async () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+
+    await program.parseAsync(['uninstall', '--user', '--yes'], { from: 'user' });
+    expect(executeUninstall).toHaveBeenCalledWith(
+      expect.objectContaining({ yes: true, project: undefined }),
+    );
+  });
+
+  it('uninstall rejects conflicting --user and --project modes', async () => {
+    const { ctx, setExitCode } = makeCtx();
+    const program = mount(ctx);
+
+    await program.parseAsync(['uninstall', '--user', '--project', '--yes'], { from: 'user' });
+    expect(executeUninstall).not.toHaveBeenCalled();
+    expect(setExitCode).toHaveBeenCalledTimes(1);
+  });
+
   it('uninstall --project (no value): forwards project=true', async () => {
     const { ctx } = makeCtx();
     const program = mount(ctx);
