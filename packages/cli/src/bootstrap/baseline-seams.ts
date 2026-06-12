@@ -45,6 +45,7 @@ function missingBaseline(tool: string): ConfigurationError {
 }
 
 /** Assert each signal carries a fingerprint — the plane never stamps (ADR-0036). */
+// @graph-ignore-next-line graph:always-throws-branch -- not throw-dominated: returns the mapped entries; the throw is a guard fired only when a tool hands unstamped signals (a contract violation the plane must surface).
 function requireStampedEntries(
   tool: string,
   signals: readonly Signal[],
@@ -94,6 +95,8 @@ export function buildBaselineSeams(deps: {
       return Promise.resolve(diffBaseline(env.signals, repo.load(tool)));
     },
 
+    /** @throws {ConfigurationError} (→ exit 2) when no baseline exists for `tool`. */
+    // @fitness-ignore-next-line throws-documentation -- contract is in the @throws above + on the ToolCliContext.exportBaselineSarif seam; the check cannot read an object-property arrow's leading JSDoc.
     exportBaselineSarif: async (tool, path) => {
       const repo = repoFor();
       if (!repo.exists(tool)) throw missingBaseline(tool);
@@ -120,6 +123,8 @@ export function buildBaselineSeams(deps: {
       await writeEnvelopeSarif(synthetic, path);
     },
 
+    /** @throws {ConfigurationError} (→ exit 2) when no baseline exists for `tool`. */
+    // @fitness-ignore-next-line throws-documentation -- contract is in the @throws above + on the ToolCliContext.exportBaselineFingerprints seam; the check cannot read an object-property arrow's leading JSDoc.
     exportBaselineFingerprints: async (tool, path) => {
       const repo = repoFor();
       if (!repo.exists(tool)) throw missingBaseline(tool);

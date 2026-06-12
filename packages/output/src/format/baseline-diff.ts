@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- the for-of loops iterate the run's bounded finding set (a Map keyed by fingerprint); pure synchronous Map iteration, no async/IO per item.
 /**
  * @fileoverview Pure baseline diff — the generic net-new ratchet (ADR-0036).
  *

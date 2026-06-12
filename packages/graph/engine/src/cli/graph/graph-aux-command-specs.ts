@@ -205,6 +205,12 @@ export const graphBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext
         error instanceof ConfigurationError
           ? EXIT_CODES.CONFIGURATION_ERROR
           : EXIT_CODES.RUNTIME_ERROR;
+      logger.warn({
+        evt: 'cli.graph.baseline_export.failed',
+        module: 'graph:cli',
+        message,
+        exitCode,
+      });
       if (opts.json === true) {
         cli.emitError({ message, exitCode });
         return;

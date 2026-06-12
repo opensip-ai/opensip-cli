@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- the @opensip-tools/core public-API re-export barrel: pure re-exports that grow with the kernel surface; splitting it would fragment the one import surface every package consumes.
 // Types — internal signal (shared across tools)
 export type {
   Signal,

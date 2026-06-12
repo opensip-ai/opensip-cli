@@ -125,18 +125,6 @@ export class UnknownLiveViewError extends ToolError {
 }
 
 /**
- * Context the host hands to each command handler (and the tool's optional
- * lifecycle hooks): the shared CLI behaviour a handler calls back into — Ink
- * rendering, machine-output emit seams, dashboard auto-open, structured logging,
- * per-run scope — without depending on the CLI package directly.
- *
- * 3.0.0 GA: this context carries NO Commander `program`. Tools declare
- * `commandSpecs` and the host mounts them (`mountCommandSpec`); a handler has no
- * raw-Commander handle to reach, so the "one command surface" invariant (§8) is
- * structural, not merely guarded. The host owns the program internally and passes
- * it to its own mount step (`mountAllToolCommands(registry, program, ctx)`).
- */
-/**
  * Result of the host baseline/ratchet compare seam (ADR-0036) — three full-object
  * buckets + the gate decision. Core declares this thin shape for the
  * {@link ToolCliContext.compareBaseline} return so `core` need not import
@@ -155,6 +143,18 @@ export interface GateCompareResult {
   readonly degraded: boolean;
 }
 
+/**
+ * Context the host hands to each command handler (and the tool's optional
+ * lifecycle hooks): the shared CLI behaviour a handler calls back into — Ink
+ * rendering, machine-output emit seams, dashboard auto-open, structured logging,
+ * per-run scope — without depending on the CLI package directly.
+ *
+ * 3.0.0 GA: this context carries NO Commander `program`. Tools declare
+ * `commandSpecs` and the host mounts them (`mountCommandSpec`); a handler has no
+ * raw-Commander handle to reach, so the "one command surface" invariant (§8) is
+ * structural, not merely guarded. The host owns the program internally and passes
+ * it to its own mount step (`mountAllToolCommands(registry, program, ctx)`).
+ */
 export interface ToolCliContext {
   /**
    * Per-run resources (logger, parseCache, registries, datastore,
