@@ -61,6 +61,17 @@ import {
 // 2.11.0, §5.4); it delegates to `mountAllToolCommands` (kept exported for the
 // existing direct unit tests).
 export { mountAllToolCommands, EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
+// The shared admission callable (ADR-0041: one validator, four consumers) —
+// consumed by the tools command group (validate/install) and the
+// admission-parity / bundled-conformance tests.
+export {
+  admitToolPackage,
+  importToolRuntime,
+  type AdmissionReport,
+  type AdmissionSection,
+  type AdmissionSectionResult,
+  type AdmitToolPackageOptions,
+} from './admit-tool-package.js';
 export { mountToolCommands } from './tool-lifecycle.js';
 export { renderResult } from './render.js';
 export { maybeOpenDashboard } from './dashboard.js';

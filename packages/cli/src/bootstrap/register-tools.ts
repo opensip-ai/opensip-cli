@@ -16,8 +16,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-
 import { type CliProgram } from '@opensip-tools/contracts';
 import {
   admitTool,
@@ -28,7 +26,6 @@ import {
   logger,
   PluginIncompatibleError,
   PROJECT_LOCAL_MANIFEST_FILE,
-  readToolPackageMetadata,
   resolveProjectContext,
   resolveProjectPaths,
   resolveUserPaths,
@@ -43,8 +40,13 @@ import {
 
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
+import {
+  admitToolPackage,
+  importToolRuntime,
+  type AdmissionReport,
+  type ToolRuntimeLoad,
+} from './admit-tool-package.js';
 import { isProjectLocalToolTrusted } from './tool-trust.js';
-import { isValidTool } from './validate-tool.js';
 
 /** `module` field on every structured log event emitted from this file. */
 const BOOTSTRAP_MODULE = 'cli:bootstrap';
@@ -160,49 +162,11 @@ function resolveRequiredBundledPackageDir(packageName: string): string {
   );
 }
 
-/**
- * The outcome of importing a tool package's runtime module. A discriminated
- * result (never throws) so each caller maps it to its own policy — bundled
- * fails closed, installed skips-with-diagnostic.
- */
-type ToolRuntimeLoad =
-  | { readonly ok: true; readonly tool: Tool }
-  | {
-      readonly ok: false;
-      readonly reason: 'no-entry' | 'invalid-shape' | 'import-failed';
-      readonly detail?: string;
-    };
-
-/**
- * Resolve a tool package's entry, DYNAMIC-IMPORT it, and validate the exported
- * `tool` shape. This is the ONE runtime-load path every installation source
- * travels (3.0.0 GA, north-star Figure 7): no static `import` of a tool runtime
- * survives in the host — a bundled tool is imported by its resolved entry path
- * exactly as an installed one is. Import is by `pathToFileURL(meta.mainEntry)`,
- * not the bare package name, so a tool living in a host dir off the CLI's own
- * module-resolution path still loads. A third-party tool is an untrusted
- * boundary, so `isValidTool` gates the exported symbol before it is touched.
- *
- * Never throws: returns a discriminated result the caller acts on.
- */
-async function importToolRuntime(dir: string): Promise<ToolRuntimeLoad> {
-  const meta = readToolPackageMetadata(dir);
-  if (!meta) return { ok: false, reason: 'no-entry' };
-  let mod: { tool?: unknown };
-  try {
-    mod = (await import(pathToFileURL(meta.mainEntry).href)) as {
-      tool?: unknown;
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      reason: 'import-failed',
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
-  if (!isValidTool(mod.tool)) return { ok: false, reason: 'invalid-shape' };
-  return { ok: true, tool: mod.tool };
-}
+// The runtime-load primitive (`importToolRuntime` + `ToolRuntimeLoad`) and the
+// full admission SEQUENCE (`admitToolPackage`) live in `admit-tool-package.ts`
+// (ADR-0041: one validator, four consumers). This file keeps the per-source
+// POLICY: bundled fails closed below; the installed/authored legs skip with
+// diagnostics.
 
 /**
  * Register the bundled first-party tools into the supplied registry, each one
@@ -238,73 +202,99 @@ export async function registerFirstPartyTools(
   for (const packageName of packages) {
     const dir = resolveRequiredBundledPackageDir(packageName);
 
-    const rawManifest = loadToolManifest('bundled', dir);
-    if (rawManifest === undefined) {
-      // A bundled tool MUST ship a conformant manifest (the tool-has-manifest
-      // guardrail backstops this at CI; at runtime a missing manifest is
-      // fail-closed, not a silent skip).
-      throw new PluginIncompatibleError(
-        `bundled tool '${packageName}' has no conformant package.json#opensipTools manifest`,
-        { diagnostic: 'manifest missing or malformed' },
-      );
-    }
-
-    const result = admitTool({
-      manifest: rawManifest,
-      source: 'bundled',
+    // The shared admission SEQUENCE (ADR-0041). The bundled POLICY below maps
+    // each failed section to the exact fail-closed error this path always
+    // threw — a bundled tool ships with the CLI, so every failure is a
+    // packaging fault, never a silent skip.
+    const report = await admitToolPackage({
       dir,
+      source: 'bundled',
       packageName,
       // A bundled tool ships with the CLI; it is always explicitly present,
       // so an incompatible manifest fails the run rather than skipping.
       explicitlyRequested: true,
     });
 
-    if (result.decision === 'fail-closed') {
-      throw new PluginIncompatibleError(
-        `bundled tool '${rawManifest.id}' is incompatible: ${result.diagnostic ?? 'compatibility gate rejected it'}`,
-        { diagnostic: result.diagnostic },
-      );
+    if (!report.ok) {
+      throwBundledAdmissionFailure(packageName, report);
     }
-    if (result.decision === 'skip') {
-      // Should not happen for an in-range bundled tool, but never silently
-      // drop a bundled tool — surface it loudly.
+    /* v8 ignore next 3 -- throwBundledAdmissionFailure never returns on a failed report; this guard narrows types */
+    if (
+      report.tool === undefined ||
+      report.provenance === undefined ||
+      report.manifest === undefined
+    ) {
       throw new PluginIncompatibleError(
-        `bundled tool '${rawManifest.id}' was skipped by the compatibility gate: ${result.diagnostic ?? 'unknown reason'}`,
-        { diagnostic: result.diagnostic },
-      );
-    }
-    if (result.decision !== 'admit') {
-      throw new PluginIncompatibleError(
-        `bundled tool '${rawManifest.id}' reached an unknown admission decision`,
-        { diagnostic: 'unknown admission decision' },
-      );
-    }
-    const { manifest } = result;
-
-    // Load the runtime by DYNAMIC IMPORT — the same path installed tools use.
-    // The host holds no static reference to fit/graph/sim (3.0.0). A bundled
-    // tool that fails to load is a packaging fault → fail-closed.
-    const load = await importToolRuntime(dir);
-    if (!load.ok) {
-      const detailSuffix = load.detail ? `: ${load.detail}` : '';
-      throw new PluginIncompatibleError(
-        `bundled tool '${manifest.id}' failed to load via the plugin path (${load.reason}${detailSuffix})`,
-        { diagnostic: `bundled tool runtime load failed: ${load.reason}` },
+        `bundled tool '${packageName}' produced an incomplete admission report`,
+        { diagnostic: 'incomplete admission report' },
       );
     }
 
-    // Defensive drift guard: the static manifest and the runtime tool are two
-    // declarations of the same identity. Catch a manifest that fell out of sync
-    // with the tool's command surface before it confuses users.
-    assertManifestMatchesTool(manifest, load.tool);
-
-    registry.register(load.tool);
-    provenance.push(result.provenance);
+    registry.register(report.tool);
+    provenance.push(report.provenance);
     // Record the manifest so the pre-action-hook can register this tool's
     // declared capability domains into the per-run capability registry
     // (release 2.10.0, §5.3).
-    manifests.push(manifest);
+    manifests.push(report.manifest);
   }
+}
+
+/**
+ * The bundled FAIL-CLOSED policy: convert a failed {@link AdmissionReport}
+ * into the same `PluginIncompatibleError` (message + diagnostic) the inline
+ * pipeline threw before the ADR-0041 factoring. Never returns.
+ *
+ * @throws {PluginIncompatibleError} always (or rethrows the original
+ *   coherence error from `assertManifestMatchesTool`, preserving its type).
+ */
+function throwBundledAdmissionFailure(packageName: string, report: AdmissionReport): never {
+  const failed = report.sections.find((s) => !s.ok);
+  const failedSection = failed?.section;
+
+  if (failedSection === 'manifest') {
+    throw new PluginIncompatibleError(
+      `bundled tool '${packageName}' has no conformant package.json#opensipTools manifest`,
+      { diagnostic: 'manifest missing or malformed' },
+    );
+  }
+  const id = report.manifest?.id ?? packageName;
+  if (failedSection === 'compatibility') {
+    if (report.compatibilityDecision === 'fail-closed') {
+      throw new PluginIncompatibleError(
+        `bundled tool '${id}' is incompatible: ${failed?.diagnostic ?? 'compatibility gate rejected it'}`,
+        { diagnostic: failed?.diagnostic },
+      );
+    }
+    if (report.compatibilityDecision === 'skip') {
+      // Should not happen for an in-range bundled tool, but never silently
+      // drop a bundled tool — surface it loudly.
+      throw new PluginIncompatibleError(
+        `bundled tool '${id}' was skipped by the compatibility gate: ${failed?.diagnostic ?? 'unknown reason'}`,
+        { diagnostic: failed?.diagnostic },
+      );
+    }
+    throw new PluginIncompatibleError(
+      `bundled tool '${id}' reached an unknown admission decision`,
+      { diagnostic: 'unknown admission decision' },
+    );
+  }
+  if (failedSection === 'runtime-load' || failedSection === 'tool-shape') {
+    const reason = report.runtimeLoadReason ?? 'import-failed';
+    const detailSuffix = report.runtimeLoadDetail ? `: ${report.runtimeLoadDetail}` : '';
+    throw new PluginIncompatibleError(
+      `bundled tool '${id}' failed to load via the plugin path (${reason}${detailSuffix})`,
+      { diagnostic: `bundled tool runtime load failed: ${reason}` },
+    );
+  }
+  if (failedSection === 'manifest-runtime-coherence' && report.coherenceError !== undefined) {
+    // Preserve the original drift-guard error type + message untouched.
+    throw report.coherenceError;
+  }
+  /* v8 ignore next 4 -- defensive: a failed report always carries a failed section */
+  throw new PluginIncompatibleError(
+    `bundled tool '${packageName}' failed admission for an unknown reason`,
+    { diagnostic: 'unknown admission failure' },
+  );
 }
 
 export interface DiscoveryOptions {
