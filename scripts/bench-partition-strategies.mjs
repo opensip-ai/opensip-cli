@@ -168,7 +168,8 @@ if (isRealCorpus) {
   const sha = spawnSync('git', ['-C', corpusDir, 'rev-parse', '--short', 'HEAD'], {
     encoding: 'utf8',
   }).stdout?.trim();
-  corpusLabel = `${basename(corpusDir)} (real corpus${sha ? ` @ ${sha}` : ''})`;
+  const shaSuffix = sha ? ` @ ${sha}` : '';
+  corpusLabel = `${basename(corpusDir)} (real corpus${shaSuffix})`;
   console.error(`corpus: real repo at ${corpusDir} — ${corpusLabel}`);
 } else {
   if (args.fresh) {
@@ -379,10 +380,8 @@ const demotedRules = args.demote
   .filter((s) => s.length > 0);
 
 function writeCorpusConfig(strategy) {
-  const overrides =
-    demotedRules.length === 0
-      ? ''
-      : `  severityOverrides:\n${demotedRules.map((r) => `    '${r}': warning\n`).join('')}`;
+  const overrideLines = demotedRules.map((r) => `    '${r}': warning\n`).join('');
+  const overrides = demotedRules.length === 0 ? '' : `  severityOverrides:\n${overrideLines}`;
   writeFileSync(
     join(corpusDir, 'opensip-tools.config.yml'),
     `schemaVersion: 1\n` + `graph:\n` + `  partitionStrategy: ${strategy}\n` + overrides,
@@ -453,7 +452,10 @@ function benchStrategy(strategy) {
   writeCorpusConfig(strategy);
 
   // C (cold): empty runtime state, then --no-cache × runs.
-  rmSync(join(corpusDir, 'opensip-tools', '.runtime'), { recursive: true, force: true });
+  rmSync(join(corpusDir, 'opensip-tools', '.runtime'), {
+    recursive: true,
+    force: true,
+  });
   const colds = [];
   for (let i = 0; i < runs; i++) {
     console.error(`[${strategy}] cold run ${String(i + 1)}/${String(runs)}`);
