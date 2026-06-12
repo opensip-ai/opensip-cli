@@ -75,7 +75,7 @@ describe('loadToolManifest', () => {
     });
     const manifest = loadToolManifest('installed', testDir);
     expect(manifest?.id).toBe('installed');
-    // No apiVersion declared → omitted (grace window handled by the gate).
+    // No apiVersion declared → omitted so the compatibility gate can reject it.
     expect(manifest?.apiVersion).toBeUndefined();
   });
 

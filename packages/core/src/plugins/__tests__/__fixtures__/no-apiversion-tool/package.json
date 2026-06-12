@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "opensipTools": {
     "kind": "tool",
-    "id": "graceful",
-    "commands": [{ "name": "graceful", "description": "A tool that predates the apiVersion epoch (grace window)" }]
+    "id": "missing-api-version",
+    "commands": [{ "name": "missing-api-version", "description": "A tool manifest that omits apiVersion" }]
   }
 }
