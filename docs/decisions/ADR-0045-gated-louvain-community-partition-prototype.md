@@ -166,9 +166,14 @@ prototype deliverable, not a follow-up.
 
 ## Outcome (B2 — to be appended)
 
-**Verdict: pending orchestrator review** (B1 measured 2026-06-12; the numeric
-gate is **NOT MET** — measurement recommends discard. The verdict line is
-completed after the orchestrator's ruling.)
+**Verdict: discarded-and-removed (rejected by measurement)** — B1 measured
+2026-06-12; the numeric gate is **NOT MET** (real-corpus boundary reduction
+−4.7% vs ≥ 25% required; synthetic warm wall-time 1.94× hybrid's), and the
+orchestrator ruled DISCARD 2026-06-12. The discard path below was executed:
+prototype code, the `'community'` enum value, the `scanImports` seam, and the
+graphology dependencies removed; the `graph.partitionStrategy` knob, profile
+metric fields + partition stage timing, fixture generator, and bench script
+kept. The full prototype is recoverable at tag `prototype/louvain-partitioning`.
 
 **Corpora.** (1) The seeded synthetic fixture (3,000 files, 30 import
 clusters misaligned across 12 dirs, seed 0xf1a7). (2) A REAL flat repo —
