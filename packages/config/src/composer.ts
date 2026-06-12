@@ -11,14 +11,22 @@
  *      (e.g. `fitness.faliOnErrors`, a typo) is rejected. Achieved by making
  *      each namespace's object schema `.strict()`.
  *
- *   2. TOLERANT at the document level — an unknown *top-level* key not yet
- *      claimed by any registered namespace (e.g. `cli:`, `targets:`,
- *      `globalExcludes:`) is passed through, not rejected. This is the 2.10.1
- *      migration seam: those blocks have not been migrated to namespaced
- *      declarations in 2.10.0, so the composed document must not fail on them.
- *      Achieved by a `.catchall(z.unknown())` (a.k.a. passthrough) at the
- *      document level. When those blocks migrate to declarations in 2.10.1,
- *      they become known namespaces and gain the same strict treatment.
+ *   2. TOLERANT at the document level — a top-level key claimed by NO
+ *      registered declaration is passed through, not rejected. This is a
+ *      deliberate, permanent forward-compatibility contract, NOT migration
+ *      debt: a config document may carry a namespace block for a tool that is
+ *      not installed in this run (a third-party plugin missing from
+ *      `plugins.<domain>`, or one config shared across projects with
+ *      different tool sets). Rejecting it would make installing/uninstalling
+ *      a tool break the shared document. Achieved by a
+ *      `.catchall(z.unknown())` at the document level. The moment a namespace
+ *      IS claimed — by a tool declaration or a host declaration
+ *      (`document/host-declarations.ts` claims `cli`, `targets`,
+ *      `globalExcludes`, `checkOverrides`, `dashboard`, `plugins`,
+ *      `schemaVersion`) — it gains the strict treatment of rule 1.
+ *      (Historical note: pre-2.10.1 this catchall also covered the
+ *      then-unclaimed host blocks; that migration use ended when
+ *      host-declarations claimed them.)
  *
  * A validation failure in ANY namespace throws the same typed
  * {@link ConfigurationError} (→ `CONFIGURATION_ERROR` exit), so a typo in
@@ -51,7 +59,8 @@ function strictenNamespace(schema: ZodType): ZodType {
  * The result is a Zod object whose keys are the registered namespaces (each a
  * strict version of the tool's schema, made optional so a config omitting a
  * tool's block is valid) plus a catchall that tolerates unclaimed top-level
- * keys (the 2.10.1 seam).
+ * keys (the uninstalled-tool forward-compat contract — see the module
+ * docstring, rule 2).
  *
  * @param declarations The tool declarations to compose. Duplicate namespaces
  *   are rejected — two tools may not own the same top-level key.
@@ -69,9 +78,10 @@ export function composeConfigSchema(declarations: readonly ToolConfigDeclaration
     // typo *inside* the block is rejected.
     shape[decl.namespace] = strictenNamespace(decl.schema).optional();
   }
-  // `.catchall(z.unknown())` tolerates unclaimed top-level keys — the 2.10.1
-  // migration seam. Strictness lives inside each namespace, not at the document
-  // root.
+  // `.catchall(z.unknown())` tolerates unclaimed top-level keys — the
+  // namespace block of a tool not installed in this run must pass through
+  // (forward compat; module docstring rule 2). Strictness lives inside each
+  // claimed namespace, not at the document root.
   return z.object(shape).catchall(z.unknown());
 }
 

@@ -66,19 +66,32 @@ describe('composeConfigSchema', () => {
     expect((graphErr as ConfigurationError).code).toBe('CONFIGURATION_ERROR');
   });
 
-  it('TOLERATES an unclaimed top-level key (the 2.10.1 migration seam)', () => {
+  it('TOLERATES an unclaimed top-level key (uninstalled-tool forward compat)', () => {
     const schema = composeConfigSchema([fitnessDecl, graphDecl]);
     const doc = {
       fitness: { failOnErrors: 1 },
-      // Not-yet-migrated blocks must pass through untouched in 2.10.0.
-      cli: { verbose: true },
-      targets: { backend: { include: ['src/**'] } },
-      globalExcludes: ['dist/**'],
+      // A namespace block for a tool NOT registered in this run must pass
+      // through untouched — installing/uninstalling a tool must never make a
+      // shared config document invalid.
+      audit: { failOnFindings: true, rules: ['no-direct-db'] },
     };
     const parsed = validateConfigDocument(schema, doc) as Record<string, unknown>;
-    expect(parsed.cli).toEqual({ verbose: true });
-    expect(parsed.targets).toEqual({ backend: { include: ['src/**'] } });
-    expect(parsed.globalExcludes).toEqual(['dist/**']);
+    expect(parsed.audit).toEqual({ failOnFindings: true, rules: ['no-direct-db'] });
+  });
+
+  it('the SAME namespace flips from tolerated to strict the moment it is claimed', () => {
+    // Pin the contract boundary: `audit.faliOnFindings` (a typo) passes while
+    // `audit` is unclaimed, and is rejected once a declaration claims `audit`.
+    const typoDoc = { audit: { faliOnFindings: true } };
+    const unclaimed = composeConfigSchema([fitnessDecl]);
+    expect(() => validateConfigDocument(unclaimed, typoDoc)).not.toThrow();
+
+    const auditDecl: ToolConfigDeclaration = {
+      namespace: 'audit',
+      schema: z.object({ failOnFindings: z.boolean().optional() }),
+    };
+    const claimed = composeConfigSchema([fitnessDecl, auditDecl]);
+    expect(() => validateConfigDocument(claimed, typoDoc)).toThrow(ConfigurationError);
   });
 
   it('still validates field-level constraints inside a namespace', () => {

@@ -45,12 +45,12 @@ describe('toJsonSchema', () => {
     expect(schema.properties.graph.additionalProperties).toBe(false);
   });
 
-  it('renders the 2.10.1 seam (tolerant top-level keys) as a permissive additionalProperties', () => {
+  it('renders tolerant top-level keys (uninstalled-tool forward compat) as a permissive additionalProperties', () => {
     const schema = toJsonSchema(composeConfigSchema(declarations)) as {
       additionalProperties?: unknown;
     };
     // Document-level catchall(z.unknown()) → additionalProperties is not `false`,
-    // so an unclaimed top-level key (cli/targets/globalExcludes) stays allowed.
+    // so the namespace block of a tool not installed in this run stays allowed.
     expect(schema.additionalProperties).not.toBe(false);
   });
 
