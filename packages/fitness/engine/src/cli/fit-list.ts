@@ -1,5 +1,5 @@
 /**
- * list-checks command — list all available fitness checks
+ * fit-list command — list all available fitness checks
  */
 
 import { currentCheckRegistry } from '../framework/scope-registry.js';

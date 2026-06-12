@@ -281,8 +281,8 @@ These mirror the `fit --list` / `fit --recipes` flags but work as
 top-level commands too:
 
 ```bash
-opensip-tools fit-list              # alias: list-checks
-opensip-tools fit-recipes           # alias: list-recipes
+opensip-tools fit-list
+opensip-tools fit-recipes
 ```
 
 ## Fitness Checks
@@ -829,7 +829,7 @@ packages/
   cli/                     # opensip-tools — generic tool dispatcher
 
   fitness/                 # @opensip-tools/fitness namespace
-    engine/                # @opensip-tools/fitness — fit/list-checks/list-recipes/gate
+    engine/                # @opensip-tools/fitness — fit/fit-list/fit-recipes/gate
                            #   commands, recipe service, gate, SARIF
     checks-typescript/     # @opensip-tools/checks-typescript — TS-AST checks
     checks-universal/      # @opensip-tools/checks-universal — text/regex/glob checks

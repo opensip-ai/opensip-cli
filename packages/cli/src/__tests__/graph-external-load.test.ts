@@ -115,7 +115,7 @@ describe('graph externalization acceptance test (§1 / §8 — invariant 1, grap
     }
   });
 
-  it('the host mounts the externally-loaded graph to a Commander surface (names + aliases)', async () => {
+  it('the host mounts the externally-loaded graph to a Commander surface (names + flags)', async () => {
     const mod = (await import(pathToFileURL(join(GRAPH_DIR, 'dist', 'index.js')).href)) as {
       tool?: Tool;
     };
@@ -132,9 +132,8 @@ describe('graph externalization acceptance test (§1 / §8 — invariant 1, grap
     const flagNames = (graphCmd?.options ?? []).map((o) => o.long);
     expect(flagNames).toContain('--json');
 
-    // The aliases survive the mount: `graph-recipes` answers to
-    // `list-graph-recipes`.
+    // 3.0 GA dropped the pre-GA legacy command aliases.
     const recipesCmd = program.commands.find((c) => c.name() === 'graph-recipes');
-    expect(recipesCmd?.aliases()).toContain('list-graph-recipes');
+    expect(recipesCmd?.aliases()).toEqual([]);
   });
 });

@@ -437,9 +437,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "usage": "[options]",
     },
     {
-      "aliases": [
-        "list-checks",
-      ],
+      "aliases": [],
       "args": [],
       "name": "fit-list",
       "options": [
@@ -469,9 +467,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "usage": "[options]",
     },
     {
-      "aliases": [
-        "list-recipes",
-      ],
+      "aliases": [],
       "args": [],
       "name": "fit-recipes",
       "options": [
@@ -841,9 +837,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "usage": "[options] <name>",
     },
     {
-      "aliases": [
-        "list-graph-recipes",
-      ],
+      "aliases": [],
       "args": [],
       "name": "graph-recipes",
       "options": [

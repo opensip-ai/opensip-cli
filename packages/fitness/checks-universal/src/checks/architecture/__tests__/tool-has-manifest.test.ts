@@ -23,7 +23,7 @@ const CONFORMANT = {
     apiVersion: 1,
     commands: [
       { name: 'fit', description: 'Run fitness checks' },
-      { name: 'fit-list', description: 'List checks', aliases: ['list-checks'] },
+      { name: 'fit-list', description: 'List checks', aliases: ['checks'] },
     ],
   },
 };

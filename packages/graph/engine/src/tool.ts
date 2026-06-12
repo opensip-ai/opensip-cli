@@ -121,7 +121,6 @@ const GRAPH_SARIF_EXPORT: ToolCommandDescriptor = {
 const GRAPH_RECIPES: ToolCommandDescriptor = {
   name: 'graph-recipes',
   description: 'List available graph recipes',
-  aliases: ['list-graph-recipes'],
 };
 
 // =============================================================================

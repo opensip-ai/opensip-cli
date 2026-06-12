@@ -8,7 +8,7 @@ import { runWithScope } from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
-import { listGraphRecipes } from '../list-graph-recipes.js';
+import { listGraphRecipes } from '../graph-recipes.js';
 
 describe('listGraphRecipes', () => {
   it('returns a ListRecipesResult listing the default recipe as "all rules"', async () => {

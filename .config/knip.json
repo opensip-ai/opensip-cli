@@ -39,7 +39,7 @@
       "ignoreDependencies": ["@opensip-tools/core"]
     },
     "packages/fitness/engine": {
-      "entry": ["src/tool.ts", "src/cli/{fit,dashboard,list-checks,list-recipes}.ts"],
+      "entry": ["src/tool.ts", "src/cli/{fit,dashboard,fit-list,fit-recipes}.ts"],
       "ignoreDependencies": ["drizzle-orm"]
     },
     "packages/simulation/engine": {

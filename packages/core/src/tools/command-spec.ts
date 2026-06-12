@@ -218,7 +218,7 @@ export interface CommandSpec<TOpts = unknown, TCtx = CommandContext> {
   readonly name: string;
   /** One-line description shown in help. */
   readonly description: string;
-  /** Alternate names (`'list-checks'` for `'fit-list'`). */
+  /** Alternate names (`'inspect'` for `'analyze'`). */
   readonly aliases?: readonly string[];
   /** The common flags this command exposes, applied via `applyCommonFlags` at mount. */
   readonly commonFlags: readonly CommonFlagKey[];

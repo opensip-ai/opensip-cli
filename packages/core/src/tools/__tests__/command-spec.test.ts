@@ -225,14 +225,14 @@ describe('CommandSpec shape', () => {
   it('carries options, args, scope and output', () => {
     const spec = defineCommand(
       baseSpec({
-        aliases: ['list-checks'],
+        aliases: ['inspect'],
         options: [{ flag: '--no-cache', description: 'Skip cache', negatable: true }],
         args: [{ name: 'paths', description: 'Subtrees', variadic: true, optional: true }],
         output: 'live-view',
         scope: 'none',
       }),
     );
-    expect(spec.aliases).toEqual(['list-checks']);
+    expect(spec.aliases).toEqual(['inspect']);
     expect(spec.options).toHaveLength(1);
     expect(spec.args).toHaveLength(1);
     expect(spec.output).toBe('live-view');

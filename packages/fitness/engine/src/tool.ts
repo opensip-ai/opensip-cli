@@ -100,13 +100,11 @@ const FIT: ToolCommandDescriptor = {
 const FIT_LIST: ToolCommandDescriptor = {
   name: 'fit-list',
   description: 'List available fitness checks',
-  aliases: ['list-checks'],
 };
 
 const FIT_RECIPES: ToolCommandDescriptor = {
   name: 'fit-recipes',
   description: 'List available fitness recipes',
-  aliases: ['list-recipes'],
 };
 
 const FIT_BASELINE_EXPORT: ToolCommandDescriptor = {

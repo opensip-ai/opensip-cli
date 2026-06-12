@@ -79,10 +79,7 @@
       },
       {
         "name": "graph-recipes",
-        "description": "List available graph recipes",
-        "aliases": [
-          "list-graph-recipes"
-        ]
+        "description": "List available graph recipes"
       }
     ],
     "capabilities": [

@@ -60,9 +60,9 @@ describe('fitnessTool contract conformance', () => {
     ]);
   });
 
-  it('fit-list / fit-recipes carry their legacy aliases on the spec', () => {
+  it('fit-list / fit-recipes do not expose pre-GA legacy aliases', () => {
     const byName = new Map((fitnessTool.commandSpecs ?? []).map((s) => [s.name, s]));
-    expect(byName.get('fit-list')?.aliases).toEqual(['list-checks']);
-    expect(byName.get('fit-recipes')?.aliases).toEqual(['list-recipes']);
+    expect(byName.get('fit-list')?.aliases ?? []).toEqual([]);
+    expect(byName.get('fit-recipes')?.aliases ?? []).toEqual([]);
   });
 });

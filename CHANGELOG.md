@@ -686,8 +686,8 @@ Five new structural graph rules ship on a new engine feature layer. See
   - `graph:cycle` — strongly-connected-component size (cross-package → error).
   - `graph:unexpected-coupling` — package-level dependency cycles.
 - **Graph recipes.** `graph --recipe <name>` selects a rule subset (default:
-  all rules); `graph-recipes` (alias `list-graph-recipes`) lists them. Rules are
-  authored with the new `defineRule()` factory (the `defineCheck` analogue).
+  all rules); `graph-recipes` lists them. Rules are authored with the new
+  `defineRule()` factory (the `defineCheck` analogue).
 - **Graph engine feature layer** — blast radius, strongly-connected components,
   package coupling, test/entry reachability, and body length are computed in the
   engine and materialized into the catalog for the dashboard to consume.

@@ -1,7 +1,7 @@
 /**
  * graph-recipes command — list all available graph recipes.
  *
- * Mirrors fitness's `listRecipes` (`cli/list-recipes.ts`): maps the
+ * Mirrors fitness's `listRecipes` (`cli/fit-recipes.ts`): maps the
  * scope-bound recipe registry to the shared `ListRecipesResult` contract so
  * the existing CLI renderer (`viewListRecipes`) handles the output with no
  * contracts change. `checkCount` is a free-form label; graph reuses it as a

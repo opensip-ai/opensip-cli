@@ -333,21 +333,20 @@ Exit codes: 0 on success, non-zero with a `result.exitCode` if the baseline is m
 
 ---
 
-## `graph-recipes` (alias: `list-graph-recipes`) — catalog graph recipes
+## `graph-recipes` — catalog graph recipes
 
 Tool-owned (graph Tool). Mirrors `fit-recipes` for the graph tool: prints the loaded graph-recipe inventory (a graph recipe is a named subset of the graph rule set). Reuses the shared `ListRecipesResult` contract and renderer.
 
 ```
 opensip-tools graph-recipes
 opensip-tools graph-recipes --json
-opensip-tools list-graph-recipes        # alias
 ```
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
 | `--json` | bool | `false` | Output structured JSON instead of the human-readable list. |
 
-JSON shape (same `list-recipes` envelope as `fit-recipes`):
+JSON shape (same `list-recipes` result envelope as `fit-recipes`):
 
 ```json
 {
@@ -383,14 +382,13 @@ The dashboard is a single self-contained HTML file at `<project>/opensip-tools/.
 
 ---
 
-## `fit-list` (alias: `list-checks`) — catalog checks
+## `fit-list` — catalog checks
 
 Tool-owned. Prints the loaded check inventory: slug, description, tags.
 
 ```
 opensip-tools fit-list
 opensip-tools fit-list --json
-opensip-tools list-checks                # alias
 ```
 
 JSON shape:
@@ -407,14 +405,13 @@ Useful for scripting (`opensip-tools fit-list --json | jq '.checks[].slug'`) and
 
 ---
 
-## `fit-recipes` (alias: `list-recipes`) — catalog recipes
+## `fit-recipes` — catalog recipes
 
 Tool-owned. Prints the loaded recipe inventory.
 
 ```
 opensip-tools fit-recipes
 opensip-tools fit-recipes --json
-opensip-tools list-recipes               # alias
 ```
 
 JSON shape:

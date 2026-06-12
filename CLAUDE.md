@@ -70,7 +70,7 @@ opensip-tools/
 │   │
 │   ├── fitness/                 # fitness namespace
 │   │   ├── engine/              # @opensip-tools/fitness — fitness engine,
-│   │   │                        #   fit/dashboard/list-checks/list-recipes,
+│   │   │                        #   fit/dashboard/fit-list/fit-recipes,
 │   │   │                        #   gate, SARIF
 │   │   ├── checks-typescript/   # @opensip-tools/checks-typescript (~52 checks)
 │   │   ├── checks-universal/    # @opensip-tools/checks-universal (~109 checks)
@@ -181,8 +181,8 @@ Subcommands available out of the box:
 
 - `opensip-tools fit` — Run fitness checks (with --gate-save, --gate-compare,
   --recipe, --check, --tags, --json, --report-to)
-- `opensip-tools fit-list` (alias `list-checks`) — List available checks
-- `opensip-tools fit-recipes` (alias `list-recipes`) — List available recipes
+- `opensip-tools fit-list` — List available checks
+- `opensip-tools fit-recipes` — List available recipes
 - `opensip-tools fit-baseline-export` — Export fitness findings to SARIF
 - `opensip-tools dashboard` — Generate HTML report
 - `opensip-tools graph` — Build the static call graph
@@ -213,7 +213,7 @@ are approximate and drift as checks are added:
 - `packages/fitness/engine/src/framework/define-check.ts` — `defineCheck()` API
 - `packages/fitness/engine/src/framework/registry.ts` — `defaultRegistry`
 - `packages/fitness/engine/src/recipes/` — Recipe service, registry, types
-- `packages/fitness/engine/src/cli/` — fit/dashboard/list-checks/list-recipes
+- `packages/fitness/engine/src/cli/` — fit/dashboard/fit-list/fit-recipes
   command implementations
 - `packages/fitness/engine/src/tool.ts` — fitness's Tool plugin descriptor
 

@@ -47,17 +47,11 @@
       },
       {
         "name": "fit-list",
-        "description": "List available fitness checks",
-        "aliases": [
-          "list-checks"
-        ]
+        "description": "List available fitness checks"
       },
       {
         "name": "fit-recipes",
-        "description": "List available fitness recipes",
-        "aliases": [
-          "list-recipes"
-        ]
+        "description": "List available fitness recipes"
       },
       {
         "name": "fit-baseline-export",

@@ -25,8 +25,8 @@ import { ConfigurationError, defineCommand, logger } from '@opensip-tools/core';
 
 import { executeEquivalenceCheck } from '../equivalence-check-command.js';
 import { runCatalogJsonMode } from '../graph-modes.js';
+import { listGraphRecipes } from '../graph-recipes.js';
 import { handleGraphError } from '../graph.js';
-import { listGraphRecipes } from '../list-graph-recipes.js';
 import { executeLookup } from '../lookup.js';
 import { runGraph } from '../orchestrate.js';
 import { runSarifExportMode } from '../sarif-export.js';
@@ -446,10 +446,10 @@ export const graphSarifExportCommandSpec: CommandSpec<unknown, ToolCliContext> =
 });
 
 /**
- * `graph-recipes` (alias `list-graph-recipes`) — list available graph recipes
- * (mirrors fit-recipes). Reuses the shared ListRecipesResult contract +
- * viewListRecipes renderer. `command-result`: the host dispatches the returned
- * result through the shared seam (`--json` → JSON, else render).
+ * `graph-recipes` — list available graph recipes (mirrors fit-recipes). Reuses
+ * the shared ListRecipesResult contract + viewListRecipes renderer.
+ * `command-result`: the host dispatches the returned result through the shared
+ * seam (`--json` → JSON, else render).
  */
 export const graphRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
   unknown,
@@ -457,7 +457,6 @@ export const graphRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = def
 >({
   name: 'graph-recipes',
   description: 'List available graph recipes',
-  aliases: ['list-graph-recipes'],
   commonFlags: ['json'],
   scope: 'project',
   output: 'command-result',

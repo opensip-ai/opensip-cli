@@ -23,20 +23,19 @@
 import { EXIT_CODES } from '@opensip-tools/contracts';
 import { ConfigurationError, defineCommand, logger } from '@opensip-tools/core';
 
-import { listChecks } from '../list-checks.js';
-import { listRecipes } from '../list-recipes.js';
+import { listChecks } from '../fit-list.js';
+import { listRecipes } from '../fit-recipes.js';
 
 import type { ToolOptions } from '@opensip-tools/contracts';
 import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
 
-/** `fit-list` (alias `list-checks`) — list available fitness checks. */
+/** `fit-list` — list available fitness checks. */
 export const fitListCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
   unknown,
   ToolCliContext
 >({
   name: 'fit-list',
   description: 'List available fitness checks',
-  aliases: ['list-checks'],
   commonFlags: ['cwd', 'json'],
   scope: 'project',
   output: 'command-result',
@@ -46,14 +45,13 @@ export const fitListCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCo
   },
 });
 
-/** `fit-recipes` (alias `list-recipes`) — list available fitness recipes. */
+/** `fit-recipes` — list available fitness recipes. */
 export const fitRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
   unknown,
   ToolCliContext
 >({
   name: 'fit-recipes',
   description: 'List available fitness recipes',
-  aliases: ['list-recipes'],
   commonFlags: ['cwd', 'json'],
   scope: 'project',
   output: 'command-result',

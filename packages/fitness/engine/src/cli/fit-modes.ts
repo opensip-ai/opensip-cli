@@ -27,9 +27,9 @@ import { fitReplayFromSession } from '../persistence/session-replay.js';
 
 import { renderGateCompareOutput } from './fit/gate-compare-render.js';
 import { persistFitSession } from './fit/result-builders.js';
+import { listChecks } from './fit-list.js';
+import { listRecipes } from './fit-recipes.js';
 import { executeFit } from './fit.js';
-import { listChecks } from './list-checks.js';
-import { listRecipes } from './list-recipes.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';

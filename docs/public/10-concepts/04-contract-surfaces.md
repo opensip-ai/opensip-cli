@@ -81,13 +81,13 @@ opensip-tools
 ├── configure              (cloud API key)
 ├── completion             (shell completion script)
 ├── uninstall              (remove ~/.opensip-tools/)
-├── fit-list               (alias: list-checks)
-└── fit-recipes            (alias: list-recipes)
+├── fit-list
+└── fit-recipes
 ```
 
 Each command's flag list is owned by the Tool that registers it. `fit` flags live in [`packages/fitness/engine/src/tool.ts`](../../../packages/fitness/engine/src/tool.ts); `sim` flags in [`packages/simulation/engine/src/tool.ts`](../../../packages/simulation/engine/src/tool.ts); `graph` flags in [`packages/graph/engine/src/tool.ts`](../../../packages/graph/engine/src/tool.ts); top-level commands like `init`, `plugin`, and `configure` live in [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
 
-**Stability rule.** Removing a flag, removing a command, or changing a default value is a major-version change. Adding a flag with a safe default is a minor. Renaming a flag with an alias for the old name (the way `fit-list` aliases `list-checks`) is a minor; renaming without an alias is a major.
+**Stability rule.** Removing a flag, removing a command, or changing a default value is a major-version change. Adding a flag with a safe default is a minor. Adding a command alias is also a minor when it is additive and documented; renaming without an alias is a major.
 
 ---
 

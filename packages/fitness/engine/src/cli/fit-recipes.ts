@@ -1,5 +1,5 @@
 /**
- * list-recipes command — list all available fitness recipes
+ * fit-recipes command — list all available fitness recipes
  */
 
 import { currentRecipeRegistry } from '../framework/scope-registry.js';

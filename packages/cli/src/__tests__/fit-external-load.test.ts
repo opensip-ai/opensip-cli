@@ -12,8 +12,8 @@
  * is structural, not a special case. This test exercises that path on `fit` from
  * its package directory (as an installed plugin would), with NO reliance on the
  * static `fitnessTool` import for loading, and pins every one of fit's four
- * commands (fit, fit-list/list-checks, fit-recipes/list-recipes,
- * fit-baseline-export) to the bundled surface.
+ * commands (fit, fit-list, fit-recipes, fit-baseline-export) to the bundled
+ * surface.
  *
  * The full packed-install variant (`pnpm pack` fit + its check-pack deps into a
  * sandbox and run the binary) is the CI-gated escalation of the SAME mechanism
@@ -107,7 +107,7 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
     }
   });
 
-  it('the host mounts the externally-loaded fit to a Commander surface (names + aliases + flags)', async () => {
+  it('the host mounts the externally-loaded fit to a Commander surface (names + flags)', async () => {
     const mod = (await import(pathToFileURL(join(FIT_DIR, 'dist', 'index.js')).href)) as {
       tool?: Tool;
     };
@@ -127,8 +127,10 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
     expect(flagNames).toContain('--json');
     expect(flagNames).toContain('--recipe');
 
-    // The aliases survive the mount: `fit-list` answers to `list-checks`.
+    // 3.0 GA dropped the pre-GA legacy command aliases.
     const listCmd = program.commands.find((c) => c.name() === 'fit-list');
-    expect(listCmd?.aliases()).toContain('list-checks');
+    const recipesCmd = program.commands.find((c) => c.name() === 'fit-recipes');
+    expect(listCmd?.aliases()).toEqual([]);
+    expect(recipesCmd?.aliases()).toEqual([]);
   });
 });
