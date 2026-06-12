@@ -52,6 +52,9 @@ import {
   type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-tools/core';
+
+import { resetInitializedToolIdsForTest } from './bootstrap/pre-action-hook.js';
+import { resetTelemetryStartedForTest } from './telemetry/sdk-init.js';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
@@ -131,6 +134,8 @@ export function setCliRuntimeContextForRun(opts: {
   readonly toolManifests?: readonly ToolPluginManifest[];
 }): void {
   scopeEntered = false; // reset for new invocation
+  resetInitializedToolIdsForTest();
+  resetTelemetryStartedForTest();
   currentRuntimeContext = {
     languages: opts.languages,
     tools: opts.tools,
@@ -149,6 +154,8 @@ export function setCliRegistriesForRun(opts: {
   readonly tools: ToolRegistry;
 }): void {
   scopeEntered = false;
+  resetInitializedToolIdsForTest();
+  resetTelemetryStartedForTest();
   updateRuntimeContext({ languages: opts.languages, tools: opts.tools });
 }
 

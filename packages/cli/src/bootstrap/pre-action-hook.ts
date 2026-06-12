@@ -81,8 +81,18 @@ const MODULE_TAG = 'cli:bootstrap';
  * this set enforces that across multiple preAction firings (long-lived
  * hosts, tests). Process-scoped on purpose — a fresh CLI process starts
  * empty.
+ *
+ * GA Low hygiene: exported reset for test harnesses and per-invocation
+ * safety (aligns with scopeEntered / runtime context resets from prior
+ * architectural work). Prevents cross-run leakage in long-lived test
+ * processes.
  */
 const initializedToolIds = new Set<string>();
+
+/** Reset for test harnesses and fresh invocations. */
+export function resetInitializedToolIdsForTest(): void {
+  initializedToolIds.clear();
+}
 
 /**
  * Find the registered tool that owns the invoked subcommand, matching the

@@ -167,6 +167,16 @@ export interface SignalDeliveryResult {
 }
 
 /**
+ * Wire alias for run envelopes passed across the core ↔ cli seam.
+ *
+ * Typed `unknown` here because core must not depend on @opensip-tools/contracts
+ * (layering). The composition root (cli) narrows it to `SignalEnvelope`.
+ * This is the documented cost of strict kernel layering; shape-sync tests
+ * and the explicit `Wire*` aliases are the hygiene.
+ */
+type WireSignalEnvelope = unknown;
+
+/**
  * Context the host hands to each command handler (and the tool's optional
  * lifecycle hooks): the shared CLI behaviour a handler calls back into — Ink
  * rendering, machine-output emit seams, dashboard auto-open, structured logging,
@@ -284,8 +294,12 @@ export interface ToolCliContext {
    * `Tool` contract in core must not name the contracts-layer payload type
    * (that edge would invert the layer graph). The composition root narrows
    * it.
+   *
+   * Hygiene note (GA Low): this `unknown` + cast pattern is the cost of
+   * strict layering (core imports nothing workspace). See the shape-sync
+   * tests and `WireSignalEnvelope` alias below for the invariant.
    */
-  readonly emitEnvelope: (envelope: unknown) => void;
+  readonly emitEnvelope: (envelope: WireSignalEnvelope) => void;
   /**
    * Emit a **structured error** as machine-output (release 2.12.0, §5.5). The
    * host wraps `{ message, exitCode, suggestion? }` in a `status:'error'`
@@ -331,7 +345,7 @@ export interface ToolCliContext {
    * `unknown` here for the same layer reason as `render`/`emitEnvelope`.
    */
   readonly deliverSignals: (
-    envelope: unknown,
+    envelope: WireSignalEnvelope,
     opts: {
       readonly cwd: string;
       readonly reportTo?: string;
@@ -354,7 +368,7 @@ export interface ToolCliContext {
    * `unknown` here for the same layer reason as `render`/`emitEnvelope`/
    * `deliverSignals`.
    */
-  readonly writeSarif: (envelope: unknown, path: string) => Promise<void>;
+  readonly writeSarif: (envelope: WireSignalEnvelope, path: string) => Promise<void>;
   /**
    * Host baseline/ratchet plane seams (ADR-0036). The host owns persistence
    * (`BaselineRepo`), the diff, and exit derivation; a tool inherits a CI ratchet
@@ -365,14 +379,14 @@ export interface ToolCliContext {
    * `SignalEnvelope` typed `unknown` here for the same layer reason as
    * `writeSarif`/`deliverSignals`.
    */
-  readonly saveBaseline: (tool: string, envelope: unknown) => Promise<void>;
+  readonly saveBaseline: (tool: string, envelope: WireSignalEnvelope) => Promise<void>;
   /**
    * Compare the current (stamped) envelope against this tool's saved baseline.
    * Throws a `ConfigurationError` (→ exit 2) when no baseline exists. The host
    * derives the gate exit from `result.degraded` via the `deliverSignals`
    * runFailed override — no tool calls `setExitCode` for the gate path (ADR-0035).
    */
-  readonly compareBaseline: (tool: string, envelope: unknown) => Promise<GateCompareResult>;
+  readonly compareBaseline: (tool: string, envelope: WireSignalEnvelope) => Promise<GateCompareResult>;
   /**
    * Export this tool's baseline to a SARIF file by reconstructing a synthetic
    * envelope from the stored per-fingerprint payloads (no stored envelope to
