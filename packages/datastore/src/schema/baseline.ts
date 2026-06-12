@@ -19,7 +19,7 @@ export const toolBaselineEntries = sqliteTable(
     payload: text('payload', { mode: 'json' }), // the Signal as JSON
     capturedAt: integer('captured_at').notNull(),
   },
-  (t) => ({ pk: primaryKey({ columns: [t.tool, t.fingerprint] }) }),
+  (t) => [primaryKey({ columns: [t.tool, t.fingerprint] })],
 );
 
 /**

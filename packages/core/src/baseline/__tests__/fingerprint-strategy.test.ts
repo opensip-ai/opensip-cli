@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { defaultFingerprintStrategy, stampFingerprints } from '../fingerprint-strategy.js';
 import { createSignal, type Signal } from '../../types/signal.js';
+import { defaultFingerprintStrategy, stampFingerprints } from '../fingerprint-strategy.js';
 
 function sig(overrides: Partial<Signal> = {}): Signal {
   return {
