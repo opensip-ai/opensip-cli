@@ -20,6 +20,7 @@ import { BUNDLED_TOOLS } from '../../../__tests__/test-utils/bundled-tools.js';
 import { composeAndValidateToolConfig } from '../../../bootstrap/config-and-capabilities.js';
 import { generateConfig } from '../config-templates.js';
 
+import type { ToolScaffold } from '../../shared.js';
 import type { SupportedLanguage } from '../language-detection.js';
 
 const LANGUAGES: readonly SupportedLanguage[] = [
@@ -37,6 +38,16 @@ function realRegistry(): ToolRegistry {
   return reg;
 }
 
+/** Scaffold contributions from the bundled tools — mirrors the host aggregation. */
+function scaffolds(): ToolScaffold[] {
+  return BUNDLED_TOOLS.filter((t) => t.pluginLayout !== undefined).map((t) => ({
+    layout: t.pluginLayout!,
+    scaffoldExamples: t.scaffoldExamples,
+    stableExampleIds: t.stableExampleIds,
+    scaffoldConfigBlock: t.scaffoldConfigBlock,
+  }));
+}
+
 describe('init config template round-trips through the composed schema', () => {
   let dir: string;
   beforeEach(() => {
@@ -49,7 +60,7 @@ describe('init config template round-trips through the composed schema', () => {
   for (const lang of LANGUAGES) {
     it(`the ${lang} scaffold validates STRICT (no drift)`, () => {
       const configPath = join(dir, 'opensip-tools.config.yml');
-      writeFileSync(configPath, generateConfig([lang]), 'utf8');
+      writeFileSync(configPath, generateConfig([lang], scaffolds()), 'utf8');
       expect(() =>
         composeAndValidateToolConfig({ tools: realRegistry(), configPath, env: {} }),
       ).not.toThrow();
@@ -58,7 +69,7 @@ describe('init config template round-trips through the composed schema', () => {
 
   it('the polyglot (all-languages) scaffold validates STRICT', () => {
     const configPath = join(dir, 'opensip-tools.config.yml');
-    writeFileSync(configPath, generateConfig(LANGUAGES), 'utf8');
+    writeFileSync(configPath, generateConfig(LANGUAGES, scaffolds()), 'utf8');
     expect(() =>
       composeAndValidateToolConfig({ tools: realRegistry(), configPath, env: {} }),
     ).not.toThrow();

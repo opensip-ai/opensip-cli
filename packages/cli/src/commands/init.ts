@@ -78,6 +78,7 @@ import {
   formatInsideExistingProjectMessage,
 } from './init/state-machine.js';
 
+import type { ToolScaffold } from './shared.js';
 import type { InitOptions, InitResult } from '@opensip-tools/contracts';
 
 // Re-export the public API of `init` so existing imports (notably the
@@ -90,7 +91,11 @@ export type { SupportedLanguage } from './init/language-detection.js';
  * (CLI render layer) prints it.
  */
 export function executeInit(
-  args: InitOptions & { projectContext?: ProjectContext; cwdExplicit?: boolean },
+  args: InitOptions & {
+    projectContext?: ProjectContext;
+    cwdExplicit?: boolean;
+    toolScaffolds: readonly ToolScaffold[];
+  },
 ): InitResult {
   const cwd = args.cwd;
   const keep = args.keep === true;
@@ -157,7 +162,8 @@ export function executeInit(
   const { languages } = resolution;
 
   const state = classifyWorkingDir(paths);
-  const preExistingFiles = state === 'pristine' ? [] : classifyFiles(paths, languages);
+  const preExistingFiles =
+    state === 'pristine' ? [] : classifyFiles(paths, languages, args.toolScaffolds);
 
   // Pristine: scaffold and exit. No flag interaction needed.
   if (state === 'pristine') {
@@ -170,6 +176,7 @@ export function executeInit(
         preExistingFiles: [],
         removeFirst: false,
         keepCustom: false,
+        toolScaffolds: args.toolScaffolds,
       },
       baseResult,
     );
@@ -203,6 +210,7 @@ export function executeInit(
         preExistingFiles,
         removeFirst: true,
         keepCustom: false,
+        toolScaffolds: args.toolScaffolds,
       },
       baseResult,
     );
@@ -218,6 +226,7 @@ export function executeInit(
       preExistingFiles,
       removeFirst: false,
       keepCustom: true,
+      toolScaffolds: args.toolScaffolds,
     },
     baseResult,
   );

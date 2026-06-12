@@ -7,6 +7,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { fitnessTool } from '@opensip-tools/fitness';
+import { simulationTool } from '@opensip-tools/simulation';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -16,7 +18,20 @@ import {
   type SupportedLanguage,
 } from '../commands/init.js';
 
+import type { ToolScaffold } from '../commands/shared.js';
 import type { InitOptions } from '@opensip-tools/contracts';
+
+/** First-party scaffold contributions (ADR-0038), mirroring the host's registry aggregation. */
+function firstPartyScaffolds(): ToolScaffold[] {
+  return [fitnessTool, simulationTool]
+    .filter((t) => t.pluginLayout !== undefined)
+    .map((t) => ({
+      layout: t.pluginLayout!,
+      scaffoldExamples: t.scaffoldExamples,
+      stableExampleIds: t.stableExampleIds,
+      scaffoldConfigBlock: t.scaffoldConfigBlock,
+    }));
+}
 
 let testDir: string;
 
@@ -28,11 +43,16 @@ afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
 });
 
-function makeArgs(overrides: Partial<InitOptions> = {}): InitOptions {
+// ADR-0038: executeInit now takes the registered tools' scaffold contributions.
+// makeArgs injects the first-party set so every existing call site is unchanged.
+function makeArgs(
+  overrides: Partial<InitOptions> = {},
+): InitOptions & { toolScaffolds: ToolScaffold[] } {
   return {
     json: false,
     cwd: testDir,
     debug: false,
+    toolScaffolds: firstPartyScaffolds(),
     ...overrides,
   };
 }

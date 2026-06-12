@@ -13,12 +13,39 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { fitnessTool } from '@opensip-tools/fitness';
+import { simulationTool } from '@opensip-tools/simulation';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { EXAMPLE_CHECK_IDS } from '../commands/init/config-templates.js';
 import { executeInit } from '../commands/init.js';
 
+import type { ToolScaffold } from '../commands/shared.js';
 import type { InitOptions } from '@opensip-tools/contracts';
+
+/** The first-party scaffold contributions, mirroring the host's registry aggregation. */
+function firstPartyScaffolds(): ToolScaffold[] {
+  return [fitnessTool, simulationTool]
+    .filter((t) => t.pluginLayout !== undefined)
+    .map((t) => ({
+      layout: t.pluginLayout!,
+      scaffoldExamples: t.scaffoldExamples,
+      stableExampleIds: t.stableExampleIds,
+      scaffoldConfigBlock: t.scaffoldConfigBlock,
+    }));
+}
+
+/**
+ * The pinned check id fitness embeds for a single language — read from the
+ * tool's OWN contribution (ADR-0038), not a CLI-side constant. This is the id
+ * that drives stale-scaffolded detection, so asserting the scaffolded file
+ * contains it verifies the id-embedding contract end to end.
+ */
+function pinnedCheckId(language: string): string {
+  const files = fitnessTool.scaffoldExamples?.({ languages: [language] }) ?? [];
+  const check = files.find((f) => f.filename.startsWith('example-check'));
+  if (!check) throw new Error(`no example-check contribution for ${language}`);
+  return check.stableId;
+}
 
 let testDir: string;
 
@@ -40,7 +67,10 @@ function read(rel: string): string {
 
 describe('init golden — single language (typescript)', () => {
   it('scaffolds the exact fit+sim layout, config bytes, ids, .gitignore, and dirs', () => {
-    const result = executeInit(makeArgs({ language: 'typescript' }));
+    const result = executeInit({
+      ...makeArgs({ language: 'typescript' }),
+      toolScaffolds: firstPartyScaffolds(),
+    });
     expect(result.created).toBe(true);
     expect(result.gitignoreUpdated).toBe(true);
 
@@ -57,7 +87,7 @@ describe('init golden — single language (typescript)', () => {
 
     // The pinned check id is embedded in the check file (drives stale detection).
     const checkSrc = read('opensip-tools/fit/checks/example-check.mjs');
-    expect(checkSrc).toContain(EXAMPLE_CHECK_IDS.typescript);
+    expect(checkSrc).toContain(pinnedCheckId('typescript'));
 
     // Byte-exact contracts — the registry-driven refactor must reproduce these.
     expect(read('opensip-tools.config.yml')).toMatchSnapshot('config.yml');
@@ -75,7 +105,7 @@ describe('init golden — single language (typescript)', () => {
   });
 
   it('the config contains the host-rendered fitness: block (Phase 3 must reproduce it)', () => {
-    executeInit(makeArgs({ language: 'typescript' }));
+    executeInit({ ...makeArgs({ language: 'typescript' }), toolScaffolds: firstPartyScaffolds() });
     const config = read('opensip-tools.config.yml');
     expect(config).toContain('fitness:');
     // Lock the block bytes (from the first `fitness:` line to the end of its block).
@@ -86,13 +116,16 @@ describe('init golden — single language (typescript)', () => {
 
 describe('init golden — polyglot (rust,typescript)', () => {
   it('scaffolds per-language check files + the polyglot recipe slug list', () => {
-    const result = executeInit(makeArgs({ language: 'rust,typescript' }));
+    const result = executeInit({
+      ...makeArgs({ language: 'rust,typescript' }),
+      toolScaffolds: firstPartyScaffolds(),
+    });
     expect(result.created).toBe(true);
 
     const rustCheck = read('opensip-tools/fit/checks/example-check-rust.mjs');
     const tsCheck = read('opensip-tools/fit/checks/example-check-typescript.mjs');
-    expect(rustCheck).toContain(EXAMPLE_CHECK_IDS.rust);
-    expect(tsCheck).toContain(EXAMPLE_CHECK_IDS.typescript);
+    expect(rustCheck).toContain(pinnedCheckId('rust'));
+    expect(tsCheck).toContain(pinnedCheckId('typescript'));
 
     expect(rustCheck).toMatchSnapshot('poly/example-check-rust.mjs');
     expect(tsCheck).toMatchSnapshot('poly/example-check-typescript.mjs');

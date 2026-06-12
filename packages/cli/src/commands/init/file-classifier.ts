@@ -10,57 +10,34 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename as pathBasename, join } from 'node:path';
 
-import {
-  EXAMPLE_CHECK_IDS,
-  exampleCheckSource,
-  exampleRecipeSource,
-  exampleScenarioSource,
-  exampleSimRecipeSource,
-} from './config-templates.js';
+import { ALL_LANGUAGES } from './language-detection.js';
 
 import type { SupportedLanguage } from './language-detection.js';
+import type { ToolScaffold } from '../shared.js';
 import type { PreExistingFile } from '@opensip-tools/contracts';
 import type { ProjectPaths } from '@opensip-tools/core';
 
 /**
- * Build the full set of scaffold templates that init would write for
- * the given language set. Maps each absolute path to the byte-for-byte
- * content the current init implementation would produce, so the file
- * classifier can detect "scaffolded" files via SHA-256 content match.
+ * Build the full set of scaffold templates that init would write for the given
+ * language set — registry-driven (ADR-0038): each tool's `scaffoldExamples` over
+ * the current languages, mapped to `userPluginDir(domain, file.kind)/filename`.
+ * Same bytes as before; the classifier detects "scaffolded" files via SHA-256.
  */
 function buildScaffoldTemplates(
   paths: ProjectPaths,
   languages: readonly SupportedLanguage[],
+  toolScaffolds: readonly ToolScaffold[],
 ): Map<string, string> {
   const templates = new Map<string, string>();
-  if (languages.length === 1) {
-    const lang = languages[0] ?? 'typescript';
-    templates.set(
-      join(paths.userPluginDir('fit', 'checks'), 'example-check.mjs'),
-      exampleCheckSource(lang),
-    );
-  } else {
-    for (const lang of languages) {
+  for (const ts of toolScaffolds) {
+    if (!ts.scaffoldExamples) continue;
+    for (const file of ts.scaffoldExamples({ languages })) {
       templates.set(
-        join(paths.userPluginDir('fit', 'checks'), `example-check-${lang}.mjs`),
-        exampleCheckSource(lang, lang),
+        join(paths.userPluginDir(ts.layout.domain, file.kind), file.filename),
+        file.content,
       );
     }
   }
-  const slugs =
-    languages.length === 1 ? ['example-check'] : languages.map((lang) => `example-check-${lang}`);
-  templates.set(
-    join(paths.userPluginDir('fit', 'recipes'), 'example-recipe.mjs'),
-    exampleRecipeSource(slugs),
-  );
-  templates.set(
-    join(paths.userPluginDir('sim', 'scenarios'), 'example-scenario.mjs'),
-    exampleScenarioSource(),
-  );
-  templates.set(
-    join(paths.userPluginDir('sim', 'recipes'), 'example-recipe.mjs'),
-    exampleSimRecipeSource(),
-  );
   return templates;
 }
 
@@ -98,15 +75,29 @@ function sha256(content: string): string {
 export function classifyFiles(
   paths: ProjectPaths,
   currentLanguages: readonly SupportedLanguage[],
+  toolScaffolds: readonly ToolScaffold[],
 ): PreExistingFile[] {
   if (!existsSync(paths.userSourceDir)) return [];
 
-  const templates = buildScaffoldTemplates(paths, currentLanguages);
+  const templates = buildScaffoldTemplates(paths, currentLanguages, toolScaffolds);
   const templateHashes = new Map<string, string>();
   for (const [absPath, body] of templates) {
     templateHashes.set(absPath, sha256(body));
   }
   const currentLangSet = new Set<string>(currentLanguages);
+
+  // Stale-id detection (ADR-0038): the COMPLETE id universe each tool owns
+  // (`stableExampleIds`), minus the ids the CURRENT languages scaffold. A file
+  // carrying a complete-but-not-current id is a stale scaffold for a config the
+  // project no longer uses; current-config ids are excluded so an edited
+  // current-language example (no content-hash match) stays `custom`.
+  const completeIds = new Set<string>(toolScaffolds.flatMap((ts) => ts.stableExampleIds?.() ?? []));
+  const currentIds = new Set<string>(
+    toolScaffolds.flatMap((ts) =>
+      (ts.scaffoldExamples?.({ languages: currentLanguages }) ?? []).map((f) => f.stableId),
+    ),
+  );
+  const staleIds = [...completeIds].filter((id) => !currentIds.has(id));
 
   const out: PreExistingFile[] = [];
 
@@ -134,7 +125,7 @@ export function classifyFiles(
         continue;
       }
       if (!st.isFile()) continue;
-      out.push(classifyOneFile(full, templateHashes, currentLangSet));
+      out.push(classifyOneFile(full, templateHashes, currentLangSet, staleIds));
     }
   };
   visit(paths.userSourceDir);
@@ -151,6 +142,7 @@ function classifyOneFile(
   absPath: string,
   templateHashes: ReadonlyMap<string, string>,
   currentLangSet: ReadonlySet<string>,
+  staleIds: readonly string[],
 ): PreExistingFile {
   let content: string;
   try {
@@ -177,16 +169,19 @@ function classifyOneFile(
   const filenameMatch = STALE_FILENAME_PATTERN.exec(basename);
   if (filenameMatch) {
     const fileLang = filenameMatch[1];
-    if (fileLang && !currentLangSet.has(fileLang) && fileLang in EXAMPLE_CHECK_IDS) {
+    if (
+      fileLang &&
+      !currentLangSet.has(fileLang) &&
+      (ALL_LANGUAGES as readonly string[]).includes(fileLang)
+    ) {
       return { path: absPath, classification: 'stale-scaffolded' };
     }
   }
 
-  // 3) Stale-by-pinned-UUID: any EXAMPLE_CHECK_IDS UUID for a language
-  //    not in the current set, embedded in the file.
-  for (const [lang, uuid] of Object.entries(EXAMPLE_CHECK_IDS)) {
-    if (currentLangSet.has(lang)) continue;
-    if (content.includes(uuid)) {
+  // 3) Stale-by-pinned-id: any of the aggregated stale ids (the complete tool id
+  //    universe minus the current-config ids) embedded in the file.
+  for (const id of staleIds) {
+    if (content.includes(id)) {
       return { path: absPath, classification: 'stale-scaffolded' };
     }
   }

@@ -93,7 +93,11 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
       // source for "was --cwd typed on the CLI?"); the former register-init
       // recomputed `cmd.getOptionValueSource('cwd') === 'cli'` on its own
       // Commander command — identical, since the hook's actionCommand IS init.
-      const result = executeInit({ ...opts, cwdExplicit: opts.cwdExplicit === true });
+      const result = executeInit({
+        ...opts,
+        cwdExplicit: opts.cwdExplicit === true,
+        toolScaffolds: ctx.toolScaffolds,
+      });
       // Exit 2 for any non-success path the user can act on: ambiguous-language
       // detection, partial-state refusal, mutex flag error, inside-existing-
       // project refusal.

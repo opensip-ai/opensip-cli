@@ -372,6 +372,7 @@ const INVENTORY_CTX: CliCommandsContext = {
     /* inert — inventory builds never dispatch a handler */
   },
   pluginLayouts: [],
+  toolScaffolds: [],
   // eslint-disable-next-line unicorn/no-useless-undefined -- explicit no-store sentinel matching the `datastore` thunk contract (returns `unknown`; consumers cast to `DataStore | undefined`).
   datastore: () => undefined,
 };

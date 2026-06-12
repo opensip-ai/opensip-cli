@@ -13,7 +13,20 @@
 import type { SpecLike } from './completion.js';
 import type { SessionReplayRegistry } from '../session-replay-registry.js';
 import type { CommandResult } from '@opensip-tools/contracts';
-import type { PluginLayout } from '@opensip-tools/core';
+import type { PluginLayout, ScaffoldContext, ScaffoldFile } from '@opensip-tools/core';
+
+/**
+ * One registered tool's `init`-scaffold contribution (ADR-0038): its structural
+ * `pluginLayout` (domain + userSubdirs the host `mkdir`s) plus the optional
+ * tool-owned example/config hooks. Derived from the tool registry by the host; the
+ * init command iterates these instead of hardcoding fit/sim.
+ */
+export interface ToolScaffold {
+  readonly layout: PluginLayout;
+  readonly scaffoldExamples?: (ctx: ScaffoldContext) => readonly ScaffoldFile[];
+  readonly stableExampleIds?: () => readonly string[];
+  readonly scaffoldConfigBlock?: () => string;
+}
 
 /**
  * Context the orchestrator (`registerCliCommands`) hands to every
@@ -53,6 +66,13 @@ export interface CliCommandsContext {
    * tools remain the single source of truth (ADR-0009 corollary 1).
    */
   readonly pluginLayouts: readonly PluginLayout[];
+  /**
+   * Per-tool `init`-scaffold contributions (ADR-0038), derived from the tool
+   * registry. The `init` command iterates these — each tool's `pluginLayout` +
+   * `scaffoldExamples` — instead of hardcoding the fit/sim directories + example
+   * content. A tool with no `pluginLayout` contributes nothing (e.g. `graph`).
+   */
+  readonly toolScaffolds: readonly ToolScaffold[];
   readonly sessionReplayRegistry?: SessionReplayRegistry;
   /**
    * The live tool command specs (each registered tool's `commandSpecs`),

@@ -100,6 +100,32 @@ async function main(): Promise<void> {
     .list()
     .map((t) => t.pluginLayout)
     .filter((l): l is NonNullable<typeof l> => l !== undefined);
+  // ADR-0038: the per-tool `init`-scaffold contributions, sourced from the same
+  // registry. `init` iterates these (each tool's pluginLayout + scaffoldExamples)
+  // instead of hardcoding fit/sim. A tool with no pluginLayout contributes nothing.
+  const toolScaffolds = toolRegistry
+    .list()
+    .filter((t) => t.pluginLayout !== undefined)
+    .map((t) => ({
+      layout: t.pluginLayout!,
+      scaffoldExamples: t.scaffoldExamples,
+      stableExampleIds: t.stableExampleIds,
+      scaffoldConfigBlock: t.scaffoldConfigBlock,
+    }));
+  // Back-compat diagnostic (registered-set behavior shift): registry-driven init
+  // scaffolds FEWER dirs if a bundled tool failed to load (vs the old always-fit/
+  // sim). A loud warning makes a silent under-scaffold observable; a genuinely
+  // uninstalled third-party tool stays silent (correct).
+  for (const expectedId of ['fitness', 'simulation']) {
+    if (!toolRegistry.list().some((t) => t.metadata.id === expectedId)) {
+      logger.warn({
+        evt: 'cli.tool.expected_bundled_absent',
+        module: 'cli:bootstrap',
+        tool: expectedId,
+        msg: `Expected bundled tool '${expectedId}' is absent from the registry — its init scaffold dirs will not be created.`,
+      });
+    }
+  }
   const sessionReplayRegistry = SessionReplayRegistry.fromTools(toolRegistry);
   // The live tool command surface, sourced from the populated registry so the
   // `completion` command derives its flags from the same specs the runtime
@@ -112,6 +138,7 @@ async function main(): Promise<void> {
     emitError: ctx.emitError,
     datastore: () => getOrOpenDatastore(logger),
     pluginLayouts,
+    toolScaffolds,
     sessionReplayRegistry,
     toolCommandSpecs,
   });

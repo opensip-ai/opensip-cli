@@ -1,16 +1,21 @@
 /**
- * Per-language config and example-source templates for
- * `opensip-tools init`.
+ * Host-owned document skeleton for the `opensip-tools init` config.
  *
- * Owns the bytes that init writes to disk: the YAML config, the
- * example check / recipe / scenario .mjs files, and the pinned UUIDs
- * that drive stale-scaffolded detection.
+ * Owns ONLY the document-level bytes: the YAML header, `schemaVersion`,
+ * `globalExcludes`, and the per-language `targets:` blocks. Each tool's
+ * own config block (e.g. `fitness:`) is contributed by the tool via
+ * `Tool.scaffoldConfigBlock()` (ADR-0038 Decision 2) and appended here —
+ * the host never hard-codes a tool's namespace. The example check / recipe
+ * / scenario `.mjs` bytes and the pinned check-id universe likewise live in
+ * the owning tool's `scaffold/` (relocated out of this file in ADR-0038
+ * Phases 1–2).
  */
 
 import { renderDocumentHeader, type TargetTemplateInput } from '@opensip-tools/config';
 import { CLI_SUPPORTED_SCHEMA_VERSION } from '@opensip-tools/core';
 
 import type { SupportedLanguage } from './language-detection.js';
+import type { ToolScaffold } from '../shared.js';
 
 type TargetTemplate = TargetTemplateInput;
 
@@ -91,171 +96,25 @@ function targetTemplate(lang: SupportedLanguage): TargetTemplate {
   }
 }
 
-export function generateConfig(languages: readonly SupportedLanguage[]): string {
+export function generateConfig(
+  languages: readonly SupportedLanguage[],
+  toolScaffolds: readonly ToolScaffold[],
+): string {
   // The document-level skeleton (header, schemaVersion, globalExcludes, targets)
   // is rendered by @opensip-tools/config — the package that also OWNS + validates
   // those blocks (2.10.1, ADR-0023), so the scaffold cannot drift from what the
   // composed schema accepts (asserted by a round-trip test). The CLI supplies the
-  // per-language target content and appends the tool-owned `fitness:` block.
+  // per-language target content; each registered tool contributes its own config
+  // block (ADR-0038 Decision 2 — fitness owns `fitness:`, sim contributes none).
   const header = renderDocumentHeader({
     schemaVersion: CLI_SUPPORTED_SCHEMA_VERSION,
     targets: languages.map(targetTemplate),
   });
 
-  const fitnessBlock = [
-    '',
-    '# =============================================================================',
-    '# Fitness configuration',
-    '# =============================================================================',
-    '',
-    'fitness:',
-    '  failOnErrors: 1     # fail if total errors >= this (0 = never fail on errors)',
-    '  failOnWarnings: 0   # fail if total warnings >= this (0 = warnings are informational)',
-    '  disabledChecks: []',
-    '',
-  ].join('\n');
+  const toolBlocks = toolScaffolds
+    .map((ts) => ts.scaffoldConfigBlock?.())
+    .filter((block): block is string => block !== undefined)
+    .join('');
 
-  return `${header}\n${fitnessBlock}`;
-}
-
-// Stable UUIDs for the scaffolded example checks. Hard-coded (rather
-// than generated per-init) so the same project re-running `init --keep`
-// or `init --remove` keeps the same id, and so two projects on the same
-// machine can run the example simultaneously without spurious id
-// collisions in shared session storage. Per-language ids let the
-// polyglot scaffold register distinct checks. UUID v4 random bytes —
-// produced once and pinned.
-//
-// These ids also drive stale-scaffolded detection: a file carrying
-// EXAMPLE_CHECK_IDS[<lang>] for a language NOT in the current detection
-// set is classified as 'stale-scaffolded' and surfaced (preserved) by
-// `--keep`.
-export const EXAMPLE_CHECK_IDS: Record<SupportedLanguage, string> = {
-  typescript: 'a3e1f8c4-9b2d-4f5a-8e6c-7d1a2b3c4d5e',
-  rust: 'b4f2e9d5-8c3e-4a6b-9f7d-8e2b3c4d5e6f',
-  python: 'c5a3f0e6-7d4f-4b7c-a08e-9f3c4d5e6f70',
-  go: 'd6b4a1f7-6e5a-4c8d-b19f-a04d5e6f7081',
-  java: 'e7c5b2a8-5f6b-4d9e-c2af-b15e6f708192',
-  cpp: 'f8d6c3b9-4a7c-4ea0-d3b0-c26f708192a3',
-};
-
-export function exampleCheckSource(language: SupportedLanguage, polyglotSuffix = ''): string {
-  // The example check flags any file containing the literal
-  // `EXAMPLE_TODO`. Default behavior on a fresh repo is to pass with
-  // 0 violations — it scans real files but finds nothing.
-  const slug = polyglotSuffix ? `example-check-${polyglotSuffix}` : 'example-check';
-  return `// Example fitness check.
-//
-// Edit this file or add new .mjs files to opensip-tools/fit/checks/.
-// Files in this directory are auto-loaded on the next \`opensip-tools fit\` run.
-//
-// This demo flags any file containing the literal \`EXAMPLE_TODO\`. After
-// you confirm the wiring works, delete or replace it with a real check.
-//
-// Docs: https://github.com/opensip-ai/opensip-tools#authoring-a-check-package
-import { defineCheck } from '@opensip-tools/fitness';
-
-export const checks = [
-  defineCheck({
-    id: '${EXAMPLE_CHECK_IDS[language]}',
-    slug: '${slug}',
-    description: 'Demo check — flags any file containing the literal EXAMPLE_TODO',
-    scope: { languages: ['${language}'], concerns: ['backend'] },
-    tags: ['example'],
-    analyze: (content, filePath) => {
-      const i = content.indexOf('EXAMPLE_TODO');
-      if (i < 0) return [];
-      return [{
-        line: content.slice(0, i).split('\\n').length,
-        message: 'Found the example trigger string.',
-        severity: 'warning',
-        suggestion:
-          'This is just a demo. Delete opensip-tools/fit/checks/example-check.mjs ' +
-          'once you have your own checks.',
-        filePath,
-      }];
-    },
-  }),
-];
-`;
-}
-
-export function exampleRecipeSource(slugs: readonly string[]): string {
-  const slugList = slugs.map((s) => `'${s}'`).join(', ');
-  return `// Example fitness recipe — runs only the example check(s).
-//
-// Edit this file or add new .mjs files to opensip-tools/fit/recipes/.
-// Files in this directory are auto-loaded on the next run.
-//
-// Run this recipe explicitly:  opensip-tools fit --recipe example
-//
-// To run all enabled checks (built-in + your custom ones), omit
-// --recipe and the built-in \`default\` recipe applies.
-export const recipes = [{
-  id: 'URCP_example',
-  name: 'example',
-  displayName: 'Example',
-  description: 'Demo recipe — runs only the example check(s)',
-  checks: { type: 'explicit', checkIds: [${slugList}] },
-  execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
-  reporting: { format: 'table', verbose: false },
-}];
-`;
-}
-
-export function exampleScenarioSource(): string {
-  return `// Example simulation scenario — a real load window against an in-process target.
-//
-// 'sim' is a standalone driver: you bring the target. This demo drives a
-// trivial in-process target so it runs out-of-box and shows the harness
-// mechanics (a real request loop, measured latency, asserted SLOs). To test
-// YOUR service, replace 'target' with httpTarget({ url: process.env.TARGET_URL })
-// — and point it only at a target you own. For fault injection, see the chaos
-// docs (defineChaosScenario + fault.*).
-//
-// Edit this file or add new .mjs files to opensip-tools/sim/scenarios/.
-// Files in this directory are auto-loaded on the next \`opensip-tools sim\` run.
-//
-// Docs: https://github.com/opensip-ai/opensip-tools#simulation
-import { defineLoadScenario, ASSERTIONS /*, httpTarget */ } from '@opensip-tools/simulation';
-
-export const scenarios = [
-  defineLoadScenario({
-    id: 'example-scenario',
-    name: 'example-scenario',
-    description: 'Demo load scenario — drives a trivial in-process target',
-    tags: ['example'],
-    // BYO target: any async function that resolves on success / throws on failure.
-    // Swap for your service:  target: httpTarget({ url: process.env.TARGET_URL }),
-    target: async () => {
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    },
-    workload: { rps: 20, rampUp: 1 },
-    duration: 3,
-    assertions: [ASSERTIONS.lowErrorRate(), ASSERTIONS.lowLatency('p95', 500)],
-  }),
-];
-`;
-}
-
-export function exampleSimRecipeSource(): string {
-  return `// Example simulation recipe — runs only the example scenario.
-//
-// Edit this file or add new .mjs files to opensip-tools/sim/recipes/.
-// Files in this directory are auto-loaded on the next run.
-//
-// Run this recipe explicitly:  opensip-tools sim --recipe example
-import { defineSimulationRecipe } from '@opensip-tools/simulation';
-
-export const recipes = [
-  defineSimulationRecipe({
-    id: 'URCP_sim_example',
-    name: 'example',
-    displayName: 'Example',
-    description: 'Demo recipe — runs only the example scenario',
-    scenarios: { type: 'explicit', scenarioIds: ['example-scenario'] },
-    execution: { mode: 'parallel', timeout: 30_000 },
-  }),
-];
-`;
+  return `${header}\n${toolBlocks}`;
 }

@@ -11,18 +11,13 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import {
-  exampleCheckSource,
-  exampleRecipeSource,
-  exampleScenarioSource,
-  exampleSimRecipeSource,
-  generateConfig,
-} from './config-templates.js';
+import { generateConfig } from './config-templates.js';
 
 import type { SupportedLanguage } from './language-detection.js';
 import type { WorkingDirState } from './state-machine.js';
+import type { ToolScaffold } from '../shared.js';
 import type { InitResult, PreExistingFile } from '@opensip-tools/contracts';
-import type { ProjectPaths } from '@opensip-tools/core';
+import type { ProjectPaths, ScaffoldContext } from '@opensip-tools/core';
 
 const GITIGNORE_LINE = 'opensip-tools/.runtime/';
 
@@ -85,71 +80,36 @@ interface ScaffoldOptions {
   readonly preExistingByPath: ReadonlyMap<string, PreExistingFile>;
 }
 
-function scaffoldFitChecks(
+/**
+ * ADR-0038: generic, registry-driven scaffold. For each registered tool's
+ * contribution: `mkdir` every `userSubdirs` kind under its `pluginLayout.domain`,
+ * then write each `ScaffoldFile` the tool's `scaffoldExamples(ctx)` returns under
+ * `userPluginDir(domain, file.kind)/file.filename`. No fit/sim/checks/recipes
+ * literals — the directory layout comes from each tool's `pluginLayout`, the
+ * example bytes from the tool (ADR-0009 corollary 1).
+ */
+function scaffoldToolExamples(
   paths: ProjectPaths,
-  languages: SupportedLanguage[],
+  toolScaffolds: readonly ToolScaffold[],
+  ctx: ScaffoldContext,
   options: ScaffoldOptions,
   createdFiles: string[],
 ): void {
-  mkdirSync(paths.userPluginDir('fit', 'checks'), { recursive: true });
-  if (languages.length === 1) {
-    writeScaffoldedFile(
-      join(paths.userPluginDir('fit', 'checks'), 'example-check.mjs'),
-      exampleCheckSource(languages[0] ?? 'typescript'),
-      options.keepCustom,
-      options.preExistingByPath,
-      createdFiles,
-    );
-    return;
+  for (const ts of toolScaffolds) {
+    if (!ts.scaffoldExamples) continue;
+    for (const kind of ts.layout.userSubdirs) {
+      mkdirSync(paths.userPluginDir(ts.layout.domain, kind), { recursive: true });
+    }
+    for (const file of ts.scaffoldExamples(ctx)) {
+      writeScaffoldedFile(
+        join(paths.userPluginDir(ts.layout.domain, file.kind), file.filename),
+        file.content,
+        options.keepCustom,
+        options.preExistingByPath,
+        createdFiles,
+      );
+    }
   }
-  // Polyglot: one example per language so each is independently editable / deletable.
-  for (const lang of languages) {
-    writeScaffoldedFile(
-      join(paths.userPluginDir('fit', 'checks'), `example-check-${lang}.mjs`),
-      exampleCheckSource(lang, lang),
-      options.keepCustom,
-      options.preExistingByPath,
-      createdFiles,
-    );
-  }
-}
-
-function scaffoldExamples(
-  paths: ProjectPaths,
-  languages: SupportedLanguage[],
-  options: ScaffoldOptions,
-  createdFiles: string[],
-): void {
-  scaffoldFitChecks(paths, languages, options, createdFiles);
-
-  mkdirSync(paths.userPluginDir('fit', 'recipes'), { recursive: true });
-  const slugs =
-    languages.length === 1 ? ['example-check'] : languages.map((lang) => `example-check-${lang}`);
-  writeScaffoldedFile(
-    join(paths.userPluginDir('fit', 'recipes'), 'example-recipe.mjs'),
-    exampleRecipeSource(slugs),
-    options.keepCustom,
-    options.preExistingByPath,
-    createdFiles,
-  );
-
-  mkdirSync(paths.userPluginDir('sim', 'scenarios'), { recursive: true });
-  writeScaffoldedFile(
-    join(paths.userPluginDir('sim', 'scenarios'), 'example-scenario.mjs'),
-    exampleScenarioSource(),
-    options.keepCustom,
-    options.preExistingByPath,
-    createdFiles,
-  );
-
-  mkdirSync(paths.userPluginDir('sim', 'recipes'), { recursive: true });
-  writeScaffoldedFile(
-    join(paths.userPluginDir('sim', 'recipes'), 'example-recipe.mjs'),
-    exampleSimRecipeSource(),
-    options.keepCustom,
-    options.preExistingByPath,
-    createdFiles,
-  );
 }
 
 export interface ScaffoldRunInputs {
@@ -160,13 +120,16 @@ export interface ScaffoldRunInputs {
   readonly preExistingFiles: readonly PreExistingFile[];
   readonly removeFirst: boolean;
   readonly keepCustom: boolean;
+  /** Per-tool scaffold contributions (ADR-0038) — the directory layout + example bytes. */
+  readonly toolScaffolds: readonly ToolScaffold[];
 }
 
 export function runScaffold(
   inputs: ScaffoldRunInputs,
   baseResult: Pick<InitResult, 'type' | 'path' | 'cwd' | 'configFilename'>,
 ): InitResult {
-  const { paths, languages, cwd, state, preExistingFiles, removeFirst, keepCustom } = inputs;
+  const { paths, languages, cwd, state, preExistingFiles, removeFirst, keepCustom, toolScaffolds } =
+    inputs;
 
   // --remove: blow away the user-source dir before scaffolding. The
   // config file is always rewritten below regardless.
@@ -180,7 +143,7 @@ export function runScaffold(
   // selected languages, and a re-init with new --language values must
   // refresh it. (The legacy code rewrote it unconditionally on --force
   // too; we keep that semantics.)
-  writeFileSync(paths.configFile, generateConfig(languages), 'utf8');
+  writeFileSync(paths.configFile, generateConfig(languages, toolScaffolds), 'utf8');
   createdFiles.push(paths.configFile);
 
   // After --remove the dir is gone, so nothing pre-existed; pass an
@@ -189,7 +152,8 @@ export function runScaffold(
     ? new Map<string, PreExistingFile>()
     : new Map<string, PreExistingFile>(preExistingFiles.map((f) => [f.path, f]));
 
-  scaffoldExamples(paths, languages, { keepCustom, preExistingByPath }, createdFiles);
+  const ctx: ScaffoldContext = { languages };
+  scaffoldToolExamples(paths, toolScaffolds, ctx, { keepCustom, preExistingByPath }, createdFiles);
 
   const gitignoreUpdated = ensureGitignore(cwd);
 

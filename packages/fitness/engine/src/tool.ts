@@ -69,6 +69,7 @@ import {
 } from './framework/scope-registry.js';
 import { fitReplayFromSession } from './persistence/session-replay.js';
 import { FIT_PLUGIN_LAYOUT } from './plugins/loader.js';
+import { fitScaffoldConfigBlock } from './scaffold/config-block.js';
 import { fitScaffoldExamples, fitStableExampleIds } from './scaffold/examples.js';
 // Side-effect import: ensures the RunScope.fitness augmentation is loaded so
 // `scope.fitness` is the correctly-typed slot here.
@@ -259,6 +260,9 @@ export const fitnessTool: Tool = {
   // The host writes each returned file under userPluginDir('fit', file.kind).
   scaffoldExamples: fitScaffoldExamples,
   stableExampleIds: fitStableExampleIds,
+  // ADR-0038 Decision 2: fitness owns its `fitness:` config block (inline guidance
+  // comments the bare ToolConfigDeclaration.defaults can't express → the hook route).
+  scaffoldConfigBlock: fitScaffoldConfigBlock,
   initialize: async (): Promise<void> => {
     // ensureChecksLoaded() is called inside the executeFit / listChecks
     // / listRecipes paths, so a separate initialize() pass is not
