@@ -32,6 +32,7 @@
     "graph": "turbo run build && node packages/cli/dist/index.js graph",
     "graph:ci": "node packages/cli/dist/index.js graph --gate-save",
     "graph:catalog-diff": "pnpm build && node scripts/graph-catalog-diff.mjs",
+    "bench:partition": "pnpm build && node scripts/bench-partition-strategies.mjs",
     "graph:equivalence:ci": "node packages/cli/dist/index.js graph-equivalence-check",
     "sim": "node packages/cli/dist/index.js sim",
     "dashboard": "node packages/cli/dist/index.js dashboard",
