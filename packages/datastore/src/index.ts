@@ -18,4 +18,7 @@ export { isDbNewerThanCli, readSupportedDbVersion } from './schema-version.js';
 // + the per-tool repo over them.
 export { toolBaselineEntries, toolBaselineMeta } from './schema/baseline.js';
 export { BaselineRepo } from './baseline-repo.js';
+// ADR-0042: the generic keyed tool-state table + repo (the cli.toolState seams).
+export { toolState } from './schema/tool-state.js';
+export { ToolStateRepo, TOOL_STATE_MAX_PAYLOAD_BYTES } from './tool-state-repo.js';
 export type { BaselineEntry, BaselineRow } from './baseline-repo.js';

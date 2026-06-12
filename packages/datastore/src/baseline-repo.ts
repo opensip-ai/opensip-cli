@@ -140,4 +140,30 @@ export class BaselineRepo {
       .get();
     return row?.capturedAt;
   }
+
+  /**
+   * Delete this tool's baseline — entries + the meta existence marker, one
+   * transaction (`tools data purge`, ADR-0042). After a clear, `exists()` is
+   * false (vs. `save(tool, [])`, which leaves an EMPTY-but-saved baseline).
+   */
+  clear(tool: string): { readonly entries: number; readonly meta: boolean } {
+    let entries = 0;
+    let meta = false;
+    this.datastore.transaction((tx) => {
+      entries = tx
+        .delete(toolBaselineEntries)
+        .where(eq(toolBaselineEntries.tool, tool))
+        .run().changes;
+      meta = tx.delete(toolBaselineMeta).where(eq(toolBaselineMeta.tool, tool)).run().changes > 0;
+    });
+    logger.info({
+      evt: 'datastore.baseline.clear.complete',
+      module: MODULE_NAME,
+      msg: 'Cleared tool baseline',
+      tool,
+      entries,
+      meta,
+    });
+    return { entries, meta };
+  }
 }

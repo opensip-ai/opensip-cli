@@ -609,7 +609,23 @@ There are **two plugin shapes** with different install models:
 
 **`list`** shows fit/sim packs (installed ∩ config-listed) plus every discovered tool plugin (under the `tool` domain). **`sync`** installs everything declared in the config — the post-clone bootstrap (fit/sim only).
 
-**See also:** [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/).
+**See also:** [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/). For **whole Tool plugins**, prefer the customer-facing [`tools` command group](/docs/opensip-tools/70-reference/12-tools-command/) — `plugin add --domain tool` remains supported as the lower-level machinery.
+
+---
+
+## `tools list/validate/install/uninstall/data-purge` — manage whole Tool plugins
+
+The documented surface for whole Tool plugins (`kind: "tool"` packages that contribute entire subcommands). See the full reference: [`12-tools-command.md`](/docs/opensip-tools/70-reference/12-tools-command/).
+
+```
+opensip-tools tools list
+opensip-tools tools validate <spec>
+opensip-tools tools install <spec> [--project]
+opensip-tools tools uninstall <name-or-id> [--global|--project] [--purge-data]
+opensip-tools tools data-purge <tool-id>
+```
+
+`validate` runs the same admission pipeline the CLI's own bootstrap admits tools through — one validator, shared. `install` is atomic: stage → validate → activate; a failed install leaves nothing behind. `uninstall` never deletes project SQLite data; `data-purge` deletes rows (sessions, baselines, tool state), never tables. **`validate` and `install` execute the package's module** — see the trust notes in the full reference.
 
 ---
 

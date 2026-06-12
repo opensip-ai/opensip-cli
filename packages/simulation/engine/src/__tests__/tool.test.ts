@@ -113,6 +113,12 @@ function makeFakeContext(): {
       Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
     exportBaselineSarif: () => Promise.resolve(),
     exportBaselineFingerprints: () => Promise.resolve(),
+    toolState: {
+      get: () => Promise.resolve(undefined),
+      put: () => Promise.resolve(),
+      delete: () => Promise.resolve(),
+      list: () => Promise.resolve([]),
+    },
   };
   return { ctx, rendered, exitCodes, emitted };
 }

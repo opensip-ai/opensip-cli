@@ -19,6 +19,10 @@
 export { ConfigurationError } from '@opensip-tools/core';
 
 export { composeConfigSchema, validateConfigDocument } from './composer.js';
+// ADR-0043: the unclaimed-namespace claim report (pure; the CLI emits the
+// warning / applies the loaded-tool rejection).
+export { analyzeNamespaceClaims } from './namespace-claims.js';
+export type { NamespaceClaimReport, UnclaimedNamespace } from './namespace-claims.js';
 export type {
   EnvBindingDeclaration,
   EnvBindingType,
