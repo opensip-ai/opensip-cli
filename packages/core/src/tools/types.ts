@@ -207,6 +207,10 @@ export interface ToolCliContext {
    * `RunScope`): everything tools read via `cli.scope.*`, minus the
    * `tools` registry tools never touch. This is what keeps the `Tool`
    * contract free of any `RunScope` reference (audit 2026-05-29, M4).
+   *
+   * Host-owned planes live here (baselines, toolState per ADR-0042, and now
+   * the combined governance/entitlements/audit plane via the `hostPlanes`
+   * evolution bag). See the plan and spec for H1-H3.
    */
   readonly scope: ToolScope;
   /** Render an Ink result (CommandResult shape from @opensip-tools/contracts). */
@@ -424,7 +428,74 @@ export interface ToolCliContext {
     readonly delete: (tool: string, key: string) => Promise<void>;
     readonly list: (tool: string) => Promise<readonly string[]>;
   };
+
+  /**
+   * Host-owned evolution bag for additional durable/governance planes.
+   *
+   * This is the combined Host-Owned Governance, Entitlements, and Audit Plane
+   * (H1: Extension/Community Governance, H2: Per-Tool Audit/Provenance/Decision Records,
+   * H3: Entitlements/Licensing/Paid-Extension State).
+   *
+   * See:
+   * - docs/plans/specs/host-owned-governance-entitlements-audit-plane.md (lightweight spec)
+   * - docs/plans/ready/host-owned-governance-entitlements-audit-plane/ (full plan)
+   * - ADR-0042 (toolState baseline this reuses)
+   *
+   * Design: typed seams here (host provides the impl), opaque/namespaced storage under the
+   * existing toolState seam (and the single host-owned `tool_state` table). Tools never
+   * touch raw datastore for these concerns. The bag prevents interface bloat on ToolCliContext
+   * (symmetric to ToolExtensionPoints on the Tool side).
+   *
+   * All members are optional so this change is purely additive for GA-era code and stubs.
+   */
+  readonly hostPlanes?: {
+    governance?: {
+      /** Read the current governance state blob for a tool (installed/enabled/block/approvals). */
+      getGovernanceState(toolId: string): Promise<ToolGovernanceState | undefined>;
+      listForProject(projectRoot: string): Promise<ToolGovernanceState[]>;
+      queryAudit(toolId: string, filter?: unknown): Promise<AuditEntry[]>;
+
+      recordInstallation(toolId: string, record: InstallationRecord): Promise<void>;
+      recordApprovalDecision(toolId: string, decision: ApprovalDecision): Promise<void>;
+      setBlock(toolId: string, blocked: boolean, reason?: string): Promise<void>;
+
+      /** Enforcement helper (used by run paths or Cloud before acting on a tool). */
+      checkAllowed(toolId: string, action: 'install' | 'enable' | 'run-remediation' | 'run-simulation'): Promise<boolean>;
+    };
+
+    audit?: {
+      append(toolId: string, entry: ToolAuditEntry): Promise<void>;
+      query(toolId: string, filter?: unknown): Promise<ToolAuditEntry[]>;
+      /** Best-effort linkage point for Cloud's WORM/tamper-evident audit chain. */
+      exportForCloud?(...args: unknown[]): Promise<unknown>;
+    };
+
+    entitlements?: {
+      check(toolId: string, action?: string): Promise<EntitlementStatus>;
+      recordUsage(toolId: string, usage: UsageRecord): Promise<void>;
+      getLicenseState(toolId: string): Promise<LicenseState | undefined>;
+    };
+  };
 }
+
+/**
+ * Lightweight / forward-compatible record types for the host-owned
+ * governance/entitlements/audit plane.
+ *
+ * These are intentionally minimal in the first cut. Most fields are either
+ * opaque to the CLI today or will be interpreted by Cloud/Community surfaces.
+ * The host (via hostPlanes seams) performs serialization into the existing
+ * namespaced tool_state rows. See the governing spec for full rationale and
+ * evolution path.
+ */
+export interface ToolGovernanceState extends Record<string, unknown> {}
+export interface InstallationRecord extends Record<string, unknown> {}
+export interface ApprovalDecision extends Record<string, unknown> {}
+export interface AuditEntry extends Record<string, unknown> {}
+export interface ToolAuditEntry extends Record<string, unknown> {}
+export interface EntitlementStatus extends Record<string, unknown> {}
+export interface UsageRecord extends Record<string, unknown> {}
+export interface LicenseState extends Record<string, unknown> {}
 
 /**
  * Tool error-handling contract.
@@ -512,6 +583,10 @@ export interface ScaffoldFile {
  *
  * See ADR-0027 / ADR-0038 context and the second-pass architecture review
  * (GA blocker #3).
+ *
+ * Tools can declare participation in the host-owned governance/entitlements/audit
+ * plane here (or via the reserved `distribution` / `extensionMetadata` manifest
+ * fields) for discoverability by the host, Cloud, and community catalog.
  */
 export interface ToolExtensionPoints {
   readonly initialize?: () => Promise<void>;
@@ -541,6 +616,10 @@ export interface ToolExtensionPoints {
  * For future evolution of the contract (especially rarer hooks and community
  * distribution concerns), prefer adding to `extensionPoints` rather than new
  * top-level members. See `ToolExtensionPoints`.
+ *
+ * Tools may declare participation in the combined host-owned governance,
+ * entitlements and audit plane (H1-H3) via `extensionPoints` or the reserved
+ * manifest fields. The host provides the `hostPlanes` seams on ToolCliContext.
  */
 export interface Tool {
   readonly metadata: ToolMetadata;
