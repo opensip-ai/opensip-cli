@@ -50,6 +50,7 @@
 import { readPackageVersion } from '@opensip-tools/core';
 
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
+import { fitScaffoldExamples, fitStableExampleIds } from './scaffold/examples.js';
 import { collectFitnessDashboardData } from './cli/dashboard.js';
 import {
   fitBaselineExportCommandSpec,
@@ -254,6 +255,10 @@ export const fitnessTool: Tool = {
   // message)), read by the host baseline/ratchet seams when fit stamps its gate
   // envelope. Excludes line/col so unrelated line-shifts don't flap the ratchet.
   fingerprintStrategy: fitnessFingerprintStrategy,
+  // ADR-0038: fitness owns its `init` example bytes + the pinned check-id universe.
+  // The host writes each returned file under userPluginDir('fit', file.kind).
+  scaffoldExamples: fitScaffoldExamples,
+  stableExampleIds: fitStableExampleIds,
   initialize: async (): Promise<void> => {
     // ensureChecksLoaded() is called inside the executeFit / listChecks
     // / listRecipes paths, so a separate initialize() pass is not
