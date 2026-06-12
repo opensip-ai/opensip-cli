@@ -55,6 +55,7 @@ import {
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
+import { buildStateSeams } from './bootstrap/state-seams.js';
 import { deliverEnvelope, writeEnvelopeSarif } from './bootstrap/deliver-envelope.js';
 import {
   outcomeFromEnvelope,
@@ -338,6 +339,8 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   // Host baseline/ratchet plane seams (ADR-0036): persistence + diff + exports.
   // Bound to the lazy project datastore (resolved per call, like the run paths).
   const baselineSeams = buildBaselineSeams({ getDatastore: getOrOpenDatastore, logger: log });
+  // Host keyed tool-state seams (ADR-0042) — same lazy resolver.
+  const stateSeams = buildStateSeams({ getDatastore: getOrOpenDatastore });
 
   const ctx: ToolCliContext = {
     get scope(): RunScope {
@@ -415,6 +418,8 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     compareBaseline: baselineSeams.compareBaseline,
     exportBaselineSarif: baselineSeams.exportBaselineSarif,
     exportBaselineFingerprints: baselineSeams.exportBaselineFingerprints,
+    // Host keyed tool-state plane (ADR-0042) — durable per-tool JSON state.
+    toolState: stateSeams,
   };
 
   return {

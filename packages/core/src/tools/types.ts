@@ -384,6 +384,26 @@ export interface ToolCliContext {
    * (`{version,tool,capturedAt,fingerprints[]}`). Throws when no baseline exists.
    */
   readonly exportBaselineFingerprints: (tool: string, path: string) => Promise<void>;
+  /**
+   * Host-owned keyed tool state (ADR-0042) — durable, per-tool, opaque-JSON
+   * persistence over the generic `tool_state` table, the third-party parity
+   * mechanism beside sessions + baselines. ONE grouped member (not four flat
+   * seams — the interface-segregation lesson from the baseline plane). Rules:
+   *
+   *   - `tool` scopes every operation; a tool never sees another's rows.
+   *   - Payloads are opaque JSON, capped at 256 KiB per payload; an oversized
+   *     `put` throws a `ValidationError` (error, never evict).
+   *   - Durable: unlike baselines (drop-and-recapture), a release never drops
+   *     these rows. `tools data purge <tool-id>` clears them on request.
+   *   - Requires the entered project scope (the datastore is per-project);
+   *     calls outside one reject with the host's datastore-unavailable error.
+   */
+  readonly toolState: {
+    readonly get: (tool: string, key: string) => Promise<unknown>;
+    readonly put: (tool: string, key: string, payload: unknown) => Promise<void>;
+    readonly delete: (tool: string, key: string) => Promise<void>;
+    readonly list: (tool: string) => Promise<readonly string[]>;
+  };
 }
 
 /**
