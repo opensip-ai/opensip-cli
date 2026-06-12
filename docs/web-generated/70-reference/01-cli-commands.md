@@ -463,7 +463,10 @@ opensip-tools init --keep
 opensip-tools init --remove
 ```
 
-Detects the project's primary language(s) from filesystem markers and writes:
+Detects the project's primary language(s) from filesystem markers and writes one
+directory tree per **registered tool** — each tool owns its own example files and
+config block; `init` itself hardcodes no tool. With the bundled fitness +
+simulation tools, a project gets:
 
 ```
 <cwd>/opensip-tools.config.yml                              # TRACKED
@@ -474,6 +477,12 @@ Detects the project's primary language(s) from filesystem markers and writes:
 ```
 
 Plus appends `opensip-tools/.runtime/` to `<cwd>/.gitignore`.
+
+The scaffolded set equals the **registered** set: a tool that declares no project
+layout (e.g. `graph`) writes no directory, and a tool installed *after* `init`
+scaffolds its examples on the next `opensip-tools init --keep`. If a bundled tool
+fails to load, `init` scaffolds fewer directories and emits a loud
+`cli.tool.expected_bundled_absent` diagnostic so the gap is visible.
 
 The scaffold output is loose `.mjs` files — the lightest-weight starting point. When a pack outgrows loose files (substantial helpers, tests, more than a dozen checks/scenarios), the customer graduates `opensip-tools/<domain>/` to a workspace npm package. Fit packs add `opensipTools.kind: "fit-pack"` and load through marker discovery; sim scenario packs use the `<scope>/scenarios-*` package-name pattern or an explicit `plugins.scenarioPackages:` pin. See [`50-extend/01-plugin-authoring.md`](/docs/opensip-tools/50-extend/01-plugin-authoring/) for the graduation path.
 

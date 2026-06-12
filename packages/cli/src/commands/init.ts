@@ -1,12 +1,26 @@
 /**
  * init command — scaffold the project layout.
  *
- * Creates:
+ * Registry-driven (ADR-0038): `init` scaffolds one directory tree per
+ * REGISTERED tool, never a hardcoded fit/sim pair. Each tool owns its own
+ * example bytes + config block; the host owns only the directory layout
+ * (`pluginLayout`), the document header, and `targets:`. With the bundled
+ * fitness + simulation tools registered, a TypeScript project gets:
  *   <cwd>/opensip-tools.config.yml                                    (TRACKED)
  *   <cwd>/opensip-tools/fit/checks/example-check.mjs                  (TRACKED)
  *   <cwd>/opensip-tools/fit/recipes/example-recipe.mjs                (TRACKED)
  *   <cwd>/opensip-tools/sim/scenarios/example-scenario.mjs            (TRACKED)
  *   <cwd>/opensip-tools/sim/recipes/example-recipe.mjs                (TRACKED)
+ * A tool with no `pluginLayout` (e.g. `graph`) contributes no directory.
+ *
+ * Consequence — the scaffolded set equals the REGISTERED set:
+ *   - A tool installed AFTER `init` scaffolds on the next `init --keep`.
+ *   - Back-compat behavior shift: if a bundled tool fails to load, init
+ *     now scaffolds FEWER dirs (vs the old always-fit/sim). A bundled tool
+ *     that's expected but absent is surfaced loudly via the
+ *     `cli.tool.expected_bundled_absent` diagnostic (bootstrap) so a silent
+ *     under-scaffold is observable; a genuinely uninstalled third-party
+ *     tool stays silent (correct).
  *
  * Appends `opensip-tools/.runtime/` to <cwd>/.gitignore so the
  * tool-generated state (sessions, logs, dashboards, baselines, plugin
@@ -55,7 +69,9 @@
  *
  * Implementation is split across `./init/` siblings:
  *   - language-detection.ts — marker scanning + `--language` parsing
- *   - config-templates.ts   — YAML / example-source byte generation
+ *   - config-templates.ts   — host-owned YAML document skeleton (header +
+ *                             targets); per-tool config blocks come from
+ *                             each tool's `scaffoldConfigBlock()`
  *   - file-classifier.ts    — scaffolded / stale / custom tagging
  *   - state-machine.ts      — working-dir state + refusal messages
  *   - scaffold-writer.ts    — disk writes + gitignore patching

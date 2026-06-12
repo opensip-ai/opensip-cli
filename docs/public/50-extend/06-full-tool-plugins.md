@@ -187,6 +187,17 @@ A Tool that wants to reuse the fitness check registry (e.g. an `audit-fit` that 
 
 A Tool that's structurally different (a benchmark runner, a custom report generator) doesn't need to import `@opensip-tools/fitness` at all — it can be entirely self-contained, with its own logic and its own output shape, as long as it produces a renderable `CommandResult` for the CLI's render layer to consume.
 
+## Participating in `init` scaffolding
+
+`opensip-tools init` is registry-driven: it scaffolds one directory tree per registered tool, and your tool owns its example bytes. To opt in, declare three optional `Tool` members — the host owns the directory layout, the document header, and `targets:`; you own everything inside your domain:
+
+- **`pluginLayout`** — `{ domain, userSubdirs }`. `init` creates `opensip-tools/<domain>/<subdir>/` for each `userSubdirs` entry (fitness uses `{ domain: 'fit', userSubdirs: ['checks', 'recipes'] }`). A tool with no `pluginLayout` (e.g. `graph`) scaffolds nothing.
+- **`scaffoldExamples(ctx)`** — returns the `ScaffoldFile[]` to write (each `{ kind, filename, content, stableId }`); `kind` matches one of your `userSubdirs`. `ctx.languages` is the project's detected/selected language list, so you can emit per-language examples.
+- **`stableExampleIds()`** — your tool's COMPLETE pinned-id universe (across every language), used by `init --keep` to detect stale scaffolds left over from a config the project no longer uses.
+- **`scaffoldConfigBlock()`** *(optional)* — returns your tool's YAML config block (e.g. fitness's `fitness:` block), appended to the host-rendered document. Omit it if your tool needs no config block.
+
+No `packages/cli` change is needed to add a tool to `init` — the scaffolded set is exactly the registered set.
+
 ## Per-command options: one interface per command
 
 Each built-in command has its own options interface in `@opensip-tools/contracts`, and that interface is the single source of truth for the command's flags — the executor takes it directly (`executeFit(args: FitOptions, …)`, `executeSim(args: ToolOptions)`, `executeInit(args: InitOptions & {…})`).
