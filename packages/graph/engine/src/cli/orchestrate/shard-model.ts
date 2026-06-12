@@ -93,3 +93,15 @@ export interface ShardBuildResult {
   readonly boundaryCalls: readonly CrossBoundaryCall[];
   readonly parseErrors: readonly ParseError[];
 }
+
+/** Per-run sharded-build statistics, mirrored into the --profile summary
+ *  (ADR-0045 measurement plane). All counts are plain numbers. */
+export interface ShardRunStats {
+  readonly shardCount: number;
+  readonly shardsBuilt: number;
+  readonly shardsCached: number;
+  /** Files per shard, sorted descending (balance metric input). */
+  readonly shardSizes: readonly number[];
+  /** Total cross-shard boundary call sites handed to the linker. */
+  readonly boundaryCallSites: number;
+}

@@ -31,6 +31,13 @@ export interface GraphProfileRunSummary {
   readonly resolvedMedium?: number;
   readonly resolvedLow?: number;
   readonly unresolved?: number;
+  // Sharded-build statistics (ADR-0045 measurement plane). Present only when
+  // the run used the sharded engine; mirrored from `RunGraphResult.shardStats`.
+  readonly boundaryCallSites?: number;
+  readonly shardCount?: number;
+  readonly shardsBuilt?: number;
+  readonly shardsCached?: number;
+  readonly shardSizes?: readonly number[];
 }
 
 export interface GraphProfileRun {
@@ -169,6 +176,7 @@ function summaryFromResult(result: RunGraphResult): GraphProfileRunSummary {
           resolvedLow: result.resolutionStats.resolvedLow,
           unresolved: result.resolutionStats.unresolved,
         }),
+    ...(result.shardStats === undefined ? {} : { ...result.shardStats }),
   };
 }
 

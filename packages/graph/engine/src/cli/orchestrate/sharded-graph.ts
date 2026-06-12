@@ -39,7 +39,7 @@ import {
 } from './cross-shard-resolve.js';
 import { planShardWork, runShardsInParallel } from './shard-runner.js';
 
-import type { Shard, ShardBuildResult } from './shard-model.js';
+import type { Shard, ShardBuildResult, ShardRunStats } from './shard-model.js';
 import type { GraphProgressCallback, GraphStage } from './types.js';
 import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
@@ -116,6 +116,8 @@ export interface RunShardedResult {
   /** Engine-computed feature table over the merged global catalog (only the
    *  requested columns populated). */
   readonly features: FeatureTable;
+  /** Per-run sharded-build statistics (mirrored into the --profile summary). */
+  readonly shardStats: ShardRunStats;
 }
 
 /** Run the full sharded build and return a unified RunGraphResult-shaped value. */
@@ -277,6 +279,13 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     'opensip_tools.graph.shards_cached': plan.cached.length,
     'opensip_tools.graph.shards_failed': built.failures.length,
   });
+  const shardStats: ShardRunStats = {
+    shardCount: shards.length,
+    shardsBuilt: plan.toBuild.length,
+    shardsCached: plan.cached.length,
+    shardSizes: shards.map((s) => s.files.length).sort((a, b) => b - a),
+    boundaryCallSites: boundaryCalls.length,
+  };
   return {
     catalog: catalogToPersist,
     indexes,
@@ -285,6 +294,7 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     cacheHit: plan.toBuild.length === 0,
     failedShardIds: built.failures.map((f) => f.shardId),
     features,
+    shardStats,
   };
 }
 

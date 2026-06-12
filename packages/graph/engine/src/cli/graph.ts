@@ -491,6 +491,7 @@ async function runShardedBuild(ctx: ShardedBuildContext): Promise<RunGraphResult
     resolutionStats: sharded.resolutionStats,
     cacheHit: sharded.cacheHit,
     features: sharded.features,
+    shardStats: sharded.shardStats,
   };
 }
 

@@ -56,13 +56,18 @@ for (const f of files) {
   try { const st = statSync(f); parts.push(f + '|' + String(st.mtimeMs) + '|' + String(st.size)); }
   catch { parts.push(f + '|missing'); }
 }
+// Shard ids starting with 'bc:' inject one unresolvable boundary call so the
+// shardStats.boundaryCallSites plumbing can be asserted (ADR-0045).
+const boundaryCalls = id.startsWith('bc:')
+  ? [{ ownerHash: 'h-' + id, ownerFile: id + '/index.ts', calleeName: 'nonexistent_callee', line: 1, column: 0, text: 'nonexistent_callee()' }]
+  : [];
 const result = {
   shardId: id,
   fragment: {
     version: '3.0', tool: 'graph', language: 'typescript', builtAt: 'x',
     cacheKey: ${JSON.stringify(STAMPED_KEY)}, resolutionMode: 'exact', functions: { [name]: [occ] },
   },
-  fingerprint: parts.join('\n'), boundaryCalls: [], parseErrors: [],
+  fingerprint: parts.join('\n'), boundaryCalls, parseErrors: [],
 };
 process.stdout.write(JSON.stringify(result));
 process.exit(0);
@@ -130,6 +135,31 @@ describe('runShardedGraph', () => {
     expect(out.signals[0]?.message).toBe('saw 2 functions');
     expect(evaluatedAgainst).not.toBeNull();
     expect(out.resolutionStats.totalCallSites).toBe(0);
+  });
+
+  it('reports per-run shard statistics (ADR-0045 measurement plane)', async () => {
+    // Uneven shard sizes (2 files vs 1) pin the descending sort; the 'bc:'
+    // shard injects exactly one boundary call through the worker fixture.
+    const big: Shard = {
+      id: 'bc:big',
+      rootDir: dir,
+      files: [join(dir, 'big-1.ts'), join(dir, 'big-2.ts')],
+    };
+    const out = await runShardedGraph({
+      shards: [shard('pkg:a'), big],
+      projectRoot: dir,
+      cliScript,
+      adapter,
+      resolutionMode: 'exact',
+      useCache: false,
+      catalogRepo: null,
+      rules: [],
+    });
+
+    expect(out.shardStats.shardCount).toBe(2);
+    expect(out.shardStats.shardsBuilt + out.shardStats.shardsCached).toBe(2);
+    expect(out.shardStats.shardSizes).toEqual([2, 1]);
+    expect(out.shardStats.boundaryCallSites).toBe(1);
   });
 
   it('emits the seven canonical stages onto onProgress (ADR-0032: engine-agnostic live view)', async () => {

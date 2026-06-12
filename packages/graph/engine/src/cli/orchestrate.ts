@@ -54,6 +54,7 @@ import type {
   Rule,
 } from '../types.js';
 import type { RunStageArgs } from './orchestrate/catalog-builder.js';
+import type { ShardRunStats } from './orchestrate/shard-model.js';
 import type { GraphProgressCallback } from './orchestrate/types.js';
 import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
 import type { DataStore } from '@opensip-tools/datastore';
@@ -136,6 +137,12 @@ export interface RunGraphResult {
   /** The engine-computed feature table for this run (only the requested
    *  columns are populated). `null` only on a path that produced no catalog. */
   readonly features: FeatureTable | null;
+  /**
+   * Per-run sharded-build statistics (ADR-0045 measurement plane), mirrored
+   * into the `--profile` summary. Present only on the sharded path; the exact
+   * (`runGraph`) single-program path leaves it undefined.
+   */
+  readonly shardStats?: ShardRunStats;
 }
 
 /**
