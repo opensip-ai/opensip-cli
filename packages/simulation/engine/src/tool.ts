@@ -26,6 +26,7 @@ import {
 } from './framework/registry.js';
 import { simReplayFromSession } from './persistence/session-replay.js';
 import { SIM_PLUGIN_LAYOUT } from './plugins/loader.js';
+import { simScaffoldExamples, simStableExampleIds } from './scaffold/examples.js';
 import {
   createSimulationRecipeRegistry,
   currentSimulationRecipeRegistry,
@@ -370,4 +371,8 @@ export const simulationTool: Tool = {
   // its manifest). It supplies the REAL registrar so the host can replace the
   // manifest-time deferred placeholder once sim's module loads.
   capabilityRegistrars: { 'sim-pack': registerSimScenario, 'sim-recipe': registerSimRecipe },
+  // ADR-0038: simulation owns its `init` example bytes (language-independent). The
+  // host writes each returned file under userPluginDir('sim', file.kind).
+  scaffoldExamples: simScaffoldExamples,
+  stableExampleIds: simStableExampleIds,
 };
