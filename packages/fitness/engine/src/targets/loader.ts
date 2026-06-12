@@ -15,6 +15,7 @@ import {
 import {
   PROJECT_CONFIG_FILENAME,
   ValidationError,
+  currentScope,
   readYamlFileOrThrow,
   resolveProjectConfigPath,
 } from '@opensip-tools/core';
@@ -67,19 +68,40 @@ function buildFromParsed(
 ): { registry: TargetRegistry; config: TargetsConfig } {
   const registry = new TargetRegistry();
 
-  for (const [name, entry] of Object.entries(targets)) {
-    const config: TargetConfig = Object.freeze({
-      name,
-      description: entry.description,
-      include: Object.freeze([...entry.include]),
-      exclude: Object.freeze([...(entry.exclude ?? DEFAULT_EXCLUDES)]),
-      ...(entry.tags && { tags: Object.freeze([...entry.tags]) }),
-      ...(entry.languages && { languages: Object.freeze([...entry.languages]) }),
-      ...(entry.concerns && { concerns: Object.freeze([...entry.concerns]) }),
-    });
-    registry.register(Object.freeze({ config }));
+  // ADR-0037 cutover: the host already parsed `targets:` from the single
+  // validated config document into `scope.targets` (Phase 1). When that host
+  // set is present, fitness CONSUMES it — mirroring the same frozen `Target`
+  // references into a fitness registry so the check-domain `findByScope` can run
+  // over them — rather than re-deriving its own generic target set. The fitness
+  // `toTarget` normalization (build-targets.ts) is byte-identical to the
+  // fallback below, so this is a reference copy, not a re-parse.
+  const scopeTargets = currentScope()?.targets;
+  if (scopeTargets) {
+    for (const target of scopeTargets.getAll()) {
+      registry.register(target);
+    }
+  } else {
+    // Fallback: no host `scope.targets` (a config-less/agnostic run, or a unit
+    // test that doesn't wire a scope) — build the registry from the parsed
+    // `targets:` block directly. Same normalization the host applies.
+    for (const [name, entry] of Object.entries(targets)) {
+      const config: TargetConfig = Object.freeze({
+        name,
+        description: entry.description,
+        include: Object.freeze([...entry.include]),
+        exclude: Object.freeze([...(entry.exclude ?? DEFAULT_EXCLUDES)]),
+        ...(entry.tags && { tags: Object.freeze([...entry.tags]) }),
+        ...(entry.languages && { languages: Object.freeze([...entry.languages]) }),
+        ...(entry.concerns && { concerns: Object.freeze([...entry.concerns]) }),
+      });
+      registry.register(Object.freeze({ config }));
+    }
   }
 
+  // checkOverrides is fitness-namespaced config the host does NOT semantically
+  // cross-validate (only fitness knows check slugs). Each referenced target name
+  // is validated against `registry` — which now mirrors `scope.targets` (the
+  // host-owned set) when present, exactly the cross-reference ADR-0037 requires.
   const checkOverrides: Record<string, string | readonly string[]> = {};
   if (rawCheckOverrides) {
     for (const [checkSlug, targetRef] of Object.entries(rawCheckOverrides)) {

@@ -50,23 +50,6 @@ function unionTargetFiles(
 }
 
 // =============================================================================
-// Global excludes
-// =============================================================================
-
-function applyGlobalExcludes(
-  files: readonly string[],
-  rootDir: string,
-  globalExcludes: readonly string[],
-): readonly string[] {
-  if (globalExcludes.length === 0) return files;
-
-  return files.filter((filePath) => {
-    const relativePath = relative(rootDir, filePath);
-    return !globalExcludes.some((pattern) => minimatch(relativePath, pattern, { dot: true }));
-  });
-}
-
-// =============================================================================
 // Per-check resolution (pure in-memory, no I/O)
 // =============================================================================
 
