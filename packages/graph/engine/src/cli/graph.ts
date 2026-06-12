@@ -85,7 +85,14 @@ import type { GraphCommandOptions } from './graph-options.js';
 import type { Shard } from './orchestrate/shard-model.js';
 import type { GraphProgressCallback, RunGraphResult } from './orchestrate.js';
 import type { GraphProfileRunRecorder } from './profile.js';
-import type { Catalog, FeatureColumn, GraphConfig, ResolutionMode, Rule } from '../types.js';
+import type {
+  Catalog,
+  FeatureColumn,
+  GraphConfig,
+  PartitionStrategy,
+  ResolutionMode,
+  Rule,
+} from '../types.js';
 import type { GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-tools/contracts';
 import type { Signal, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
@@ -412,10 +419,16 @@ function resolveSyntheticFlatShards(opts: GraphCommandOptions): Shard[] {
   if (layout.kind !== 'flat-large' || selection.mode !== 'synthetic-partition') {
     return [];
   }
+  // Strategy precedence: `graph.partitionStrategy` (config/env, ADR-0045) >
+  // the layout-recommended default > 'hybrid'. `loadGraphConfig` is
+  // scope-first and cheap, so reading it here (off the hot path) is safe.
+  const graphConfig = loadGraphConfig(opts.cwd);
+  const strategy: PartitionStrategy =
+    graphConfig.partitionStrategy ?? selection.partitionStrategy ?? 'hybrid';
   const partitions = partitionFlatRepo({
     files: layout.files,
     repoRoot: discovery.projectDirAbs,
-    strategy: selection.partitionStrategy ?? 'hybrid',
+    strategy,
   });
   const shards = partitions
     .filter((p) => p.files.length > 0)
