@@ -10,6 +10,9 @@
 export type { Formatter } from './format/types.js';
 export { formatSignalJson } from './format/signal-json.js';
 export { formatSignalSarif, buildOpenSipSarif, type SarifDriver } from './format/signal-sarif.js';
+// Pure baseline diff — the generic net-new ratchet (ADR-0036).
+export { diffBaseline } from './format/baseline-diff.js';
+export type { GateCompareResult, BaselineDiffRow } from './format/baseline-diff.js';
 export {
   formatSignalTableRows,
   formatSignalTableSummary,
