@@ -432,6 +432,16 @@ export interface ScaffoldFile {
   readonly stableId: string;
 }
 
+/**
+ * The contract every first-party, installed, or project-local tool implements
+ * (`fitness`, `simulation`, `graph`, …). A tool declares its metadata and
+ * `commandSpecs` (the only command surface), and opts into host-owned planes via
+ * optional hooks — session replay, capability discovery, fingerprinting, and the
+ * `init`-scaffold seam (`pluginLayout` + `scaffoldExamples` + `stableExampleIds` +
+ * `scaffoldConfigBlock`, ADR-0038). The host (`cli`) loads every tool through the
+ * same dynamic-import plugin path; nothing here distinguishes a bundled tool from
+ * an installed one (ADR-0027).
+ */
 export interface Tool {
   readonly metadata: ToolMetadata;
   /**

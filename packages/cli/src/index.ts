@@ -103,15 +103,18 @@ async function main(): Promise<void> {
   // ADR-0038: the per-tool `init`-scaffold contributions, sourced from the same
   // registry. `init` iterates these (each tool's pluginLayout + scaffoldExamples)
   // instead of hardcoding fit/sim. A tool with no pluginLayout contributes nothing.
-  const toolScaffolds = toolRegistry
-    .list()
-    .filter((t) => t.pluginLayout !== undefined)
-    .map((t) => ({
-      layout: t.pluginLayout!,
-      scaffoldExamples: t.scaffoldExamples,
-      stableExampleIds: t.stableExampleIds,
-      scaffoldConfigBlock: t.scaffoldConfigBlock,
-    }));
+  const toolScaffolds = toolRegistry.list().flatMap((t) => {
+    const layout = t.pluginLayout;
+    if (layout === undefined) return [];
+    return [
+      {
+        layout,
+        scaffoldExamples: t.scaffoldExamples,
+        stableExampleIds: t.stableExampleIds,
+        scaffoldConfigBlock: t.scaffoldConfigBlock,
+      },
+    ];
+  });
   // Back-compat diagnostic (registered-set behavior shift): registry-driven init
   // scaffolds FEWER dirs if a bundled tool failed to load (vs the old always-fit/
   // sim). A loud warning makes a silent under-scaffold observable; a genuinely

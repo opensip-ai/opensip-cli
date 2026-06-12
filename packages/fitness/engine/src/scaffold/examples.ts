@@ -98,37 +98,38 @@ export const recipes = [{
  */
 export function fitScaffoldExamples(ctx: ScaffoldContext): ScaffoldFile[] {
   const languages = ctx.languages.length > 0 ? ctx.languages : ['typescript'];
-  const files: ScaffoldFile[] = [];
+  const single = languages.length === 1;
 
-  if (languages.length === 1) {
-    const lang = languages[0] ?? 'typescript';
-    files.push({
-      kind: 'checks',
-      filename: 'example-check.mjs',
-      content: exampleCheckSource(lang),
-      stableId: EXAMPLE_CHECK_IDS[lang] ?? '',
-    });
-  } else {
-    for (const lang of languages) {
-      files.push({
+  // Single language ⇒ one un-suffixed `example-check.mjs`. Polyglot ⇒ one
+  // `example-check-<lang>.mjs` per language. A declarative `.map` (not a
+  // push-in-loop) keeps the check files' contents the single source.
+  const checkFiles: ScaffoldFile[] = single
+    ? [
+        {
+          kind: 'checks',
+          filename: 'example-check.mjs',
+          content: exampleCheckSource(languages[0] ?? 'typescript'),
+          stableId: EXAMPLE_CHECK_IDS[languages[0] ?? 'typescript'] ?? '',
+        },
+      ]
+    : languages.map((lang) => ({
         kind: 'checks',
         filename: `example-check-${lang}.mjs`,
         content: exampleCheckSource(lang, lang),
         stableId: EXAMPLE_CHECK_IDS[lang] ?? '',
-      });
-    }
-  }
+      }));
 
-  const slugs =
-    languages.length === 1 ? ['example-check'] : languages.map((lang) => `example-check-${lang}`);
-  files.push({
-    kind: 'recipes',
-    filename: 'example-recipe.mjs',
-    content: exampleRecipeSource(slugs),
-    stableId: 'URCP_example',
-  });
+  const slugs = single ? ['example-check'] : languages.map((lang) => `example-check-${lang}`);
 
-  return files;
+  return [
+    ...checkFiles,
+    {
+      kind: 'recipes',
+      filename: 'example-recipe.mjs',
+      content: exampleRecipeSource(slugs),
+      stableId: 'URCP_example',
+    },
+  ];
 }
 
 /** fitness's COMPLETE stable example-id universe (every language's check id). */
