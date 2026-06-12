@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads single source files one at a time for the lexical import scan; per-file memory bounded by source size (same class as index.ts / parse-fast.ts)
 /**
  * Program-free file→file import scan (ADR-0045).
  *

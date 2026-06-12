@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- the host's readFile delegates to ts.sys.readFile over single source/config files during module resolution; per-file memory bounded by source size (same class as index.ts / parse-fast.ts)
 /**
  * Shared module-resolution host construction for the TypeScript adapter.
  *
