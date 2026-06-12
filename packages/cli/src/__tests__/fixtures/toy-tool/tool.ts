@@ -14,7 +14,6 @@
  * dogfood checks (host-owned-verdict, no-local-exit) correctly exempt it.
  */
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
 import {
   createSignal,
   defaultFingerprintStrategy,
@@ -98,14 +97,17 @@ export const toyTool: Tool = {
         { flag: '--gate-compare', description: 'Compare against the toy baseline' },
       ],
       handler: async (rawOpts, cli): Promise<void> => {
-        const opts = rawOpts as { gateSave?: boolean; gateCompare?: boolean };
+        const opts = rawOpts as { gateSave?: boolean; gateCompare?: boolean; cwd?: string };
         const envelope = buildToyEnvelope();
         if (opts.gateSave === true) {
           await cli.saveBaseline(TOY_TOOL_ID, envelope);
           return;
         }
         const result = await cli.compareBaseline(TOY_TOOL_ID, envelope);
-        if (result.degraded) cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+        // ADR-0035: the HOST derives the gate exit — the tool passes the ratchet
+        // verdict as the deliverSignals runFailed override; it NEVER calls
+        // setExitCode for the gate path.
+        await cli.deliverSignals(envelope, { cwd: opts.cwd ?? '.', runFailed: result.degraded });
       },
     }),
   ],
