@@ -332,6 +332,46 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------
+    // Layer enforcement — targeting depends on core + config only (ADR-0037).
+    //
+    // @opensip-tools/targeting is the host file-targeting runtime substrate:
+    // the generic TargetRegistry, the uniform glob expansion (resolveTargets /
+    // preResolveAllTargets) and globalExcludes filtering any tool consumes via
+    // scope.targets. It sits at the peer layer beside lang-*/output/config. It
+    // may import core (the generic Registry<T> base — a kernel primitive, NOT
+    // its tool vocabulary; it does not read currentScope) and config (the
+    // targeting types), plus glob/minimatch — nothing else. It must NEVER reach
+    // UP into datastore, contracts, a tool engine, the CLI, language packs,
+    // check packs, graph, simulation, session-store, or the output layer.
+    // -------------------------------------------------------------------
+    {
+      name: 'targeting-imports-config-core-only',
+      severity: 'error',
+      comment:
+        'targeting hosts the generic file-targeting runtime (ADR-0037): the ' +
+        'TargetRegistry, resolveTargets/preResolveAllTargets, and ' +
+        'applyGlobalExcludes. It depends on core (the Registry<T> base) and ' +
+        'config (targeting types) plus glob/minimatch — nothing else. It must ' +
+        'not import datastore, contracts, a tool engine, cli, lang, check ' +
+        'pack, graph, simulation, session-store, or output.',
+      from: { path: '^packages/targeting/src/' },
+      to: {
+        path: [
+          '^packages/datastore/',
+          '^packages/contracts/',
+          '^packages/cli/',
+          '^packages/fitness/engine/',
+          '^packages/simulation/engine/',
+          '^packages/graph/',
+          '^packages/languages/lang-',
+          '^packages/fitness/checks-',
+          '^packages/session-store/',
+          '^packages/output/',
+        ],
+      },
+    },
+
+    // -------------------------------------------------------------------
     // ADR-0011 — tool engines emit, never render/deliver.
     //
     // A tool run produces a SignalEnvelope and RETURNS it; the CLI
