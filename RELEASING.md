@@ -2,12 +2,12 @@
 
 Releases are tag-driven. Pushing a tag matching `v*` triggers
 `.github/workflows/release.yml`, which builds, tests, packs, and
-publishes all 32 packages to npm via OIDC trusted publishing — no
-`NPM_TOKEN` required. (31 are scoped `@opensip-tools/*`; the CLI itself
+publishes all 33 packages to npm via OIDC trusted publishing — no
+`NPM_TOKEN` required. (32 are scoped `@opensip-tools/*`; the CLI itself
 publishes under the unscoped name **`opensip-tools`** — the one package
 end-users install directly, via `npm i -g opensip-tools`.)
 
-## The 32 packages
+## The 33 packages
 
 > **Single source of truth.** This table, the publish order below, the
 > npm-verify loop in step 6, the loops in `.github/workflows/release.yml`
@@ -27,6 +27,7 @@ end-users install directly, via `npm i -g opensip-tools`.)
 | Persistence | `@opensip-tools/session-store` | `packages/session-store` |
 | Output | `@opensip-tools/output` | `packages/output` |
 | Config | `@opensip-tools/config` | `packages/config` |
+| Targeting | `@opensip-tools/targeting` | `packages/targeting` |
 | Shared CLI | `@opensip-tools/cli-ui` | `packages/cli-ui` |
 | Languages | `@opensip-tools/tree-sitter` | `packages/tree-sitter` |
 | Languages | `@opensip-tools/lang-typescript` | `packages/languages/lang-typescript` |
@@ -54,7 +55,7 @@ end-users install directly, via `npm i -g opensip-tools`.)
 | Check packs | `@opensip-tools/checks-rust` | `packages/fitness/checks-rust` |
 | CLI | `opensip-tools` (unscoped) | `packages/cli` |
 
-All 32 share the same version. The release workflow publishes them in
+All 33 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
 their `dependencies`.
 
@@ -65,7 +66,7 @@ their `dependencies`.
    pnpm -r --filter '@opensip-tools/*' exec npm version <patch|minor|major> --no-git-tag-version
    ```
 
-   **The `--filter '@opensip-tools/*'` form matches only the 31 scoped
+   **The `--filter '@opensip-tools/*'` form matches only the 32 scoped
    packages — it misses the unscoped `opensip-tools` CLI
    (`packages/cli`) and the root `package.json`.** Bump those two
    explicitly (or run a script that walks every workspace
@@ -112,7 +113,7 @@ their `dependencies`.
 
 6. Verify on npm:
    ```bash
-   for p in core datastore contracts session-store output config cli-ui tree-sitter fitness simulation graph dashboard \
+   for p in core datastore contracts session-store output config targeting cli-ui tree-sitter fitness simulation graph dashboard \
             graph-adapter-common graph-typescript graph-python graph-rust graph-go graph-java \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             checks-typescript checks-universal checks-python checks-go checks-java checks-cpp checks-rust; do
@@ -271,7 +272,7 @@ To unblock:
    ```
 
    The script is **namespace-creation only** and **idempotent**. It
-   iterates the 32 packages in dependency order, skips any whose NAME
+   iterates the 33 packages in dependency order, skips any whose NAME
    already exists on npm (those get v`X.Y.Z` via the OIDC tagged
    release, with provenance), packs and publishes only the brand-new
    names using the token, and at the end prints a list of newly-created

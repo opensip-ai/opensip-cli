@@ -92,6 +92,13 @@ export const RELEASE_PACKAGE_ORDER = [
     dir: 'packages/config',
     filter: '@opensip-tools/config',
   },
+  // Layer 2.5 — file-targeting runtime substrate (ADR-0037; depends on core + config)
+  {
+    unscoped: 'targeting',
+    name: '@opensip-tools/targeting',
+    dir: 'packages/targeting',
+    filter: '@opensip-tools/targeting',
+  },
   // Layer 3 — shared Ink/React UI primitives
   {
     unscoped: 'cli-ui',
