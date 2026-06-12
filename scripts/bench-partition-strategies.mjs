@@ -40,6 +40,14 @@
 //     [--strategies hybrid,community]
 //     [--runs 3]              cold-run repetitions (median reported)
 //     [--concurrency 4]       fixed for equal conditions
+//     [--equivalence]         also run the fixture-level equivalence gate per
+//                             strategy: graph-equivalence-check against a
+//                             ZERO-floor budget written into the corpus
+//                             (.config/graph-equivalence-budget.json). A
+//                             non-zero exit = divergence = mechanically a bug
+//                             in the prototype — the bench fails hard; never
+//                             budget around it. Hybrid runs too (the control
+//                             proving the harness itself is sound).
 //     [--quick]               files=2600, runs=1 (sanity mode)
 //
 // Run `pnpm build` first — the script REQUIRES a fresh build and refuses to
@@ -78,6 +86,7 @@ const { values: args } = parseArgs({
     strategies: { type: 'string', default: 'hybrid,community' },
     runs: { type: 'string' },
     concurrency: { type: 'string', default: '4' },
+    equivalence: { type: 'boolean', default: false },
     quick: { type: 'boolean', default: false },
   },
 });
@@ -246,6 +255,43 @@ function profileArgs(name) {
   return ['--profile', join(benchDir, name), '--concurrency', String(concurrency)];
 }
 
+/**
+ * Fixture-level equivalence gate (spec "Differential guardrail" §2): run the
+ * REAL `graph-equivalence-check` command against the corpus with the current
+ * strategy configured (the command shards via resolveShardsForCwd, which
+ * honors the corpus config) and ZERO directional floors. NOT a budget ratchet:
+ * any divergence is mechanically a prototype bug — fail hard, never budget
+ * around it (the REPO budget .config/graph-equivalence-budget.json is out of
+ * scope for this track). NOT a CI step during the prototype (fixture
+ * generation + double build is too heavy per PR); it IS the pre-commit bar
+ * for Phase 2+ behavioral commits.
+ */
+function runEquivalence(strategy) {
+  console.error(`[${strategy}] equivalence gate (graph-equivalence-check, zero floors)`);
+  mkdirSync(join(corpusDir, '.config'), { recursive: true });
+  const budget = {
+    phantomDivergences: 0,
+    declineDivergences: 0,
+    conflictDivergences: 0,
+    sccDivergences: 0,
+  };
+  writeFileSync(
+    join(corpusDir, '.config', 'graph-equivalence-budget.json'),
+    `${JSON.stringify(budget, null, 2)}\n`,
+    'utf8',
+  );
+  const res = spawnSync(process.execPath, [cli, 'graph-equivalence-check'], {
+    cwd: corpusDir,
+    env: { ...process.env, NODE_OPTIONS: CHILD_NODE_OPTIONS },
+    stdio: ['ignore', 'pipe', 'inherit'],
+    encoding: 'utf8',
+  });
+  // Echo the verdict lines to the progress channel (stderr) so stdout stays
+  // the pasteable Markdown table.
+  if (typeof res.stdout === 'string' && res.stdout.length > 0) process.stderr.write(res.stdout);
+  return res.status === 0;
+}
+
 /** One edited-tree warm run: apply `suffix` to the edit target, run, revert, re-prime. */
 function runEditScenario(strategy, label, suffix) {
   const original = readFileSync(editAbs, 'utf8');
@@ -294,6 +340,10 @@ function benchStrategy(strategy) {
   console.error(`[${strategy}] W2b (import edit) on ${editRel}`);
   const w2b = runEditScenario(strategy, 'w2b', W2B_SUFFIX);
 
+  // Equivalence gate last — its catalogs build cold/no-cache/in-memory, so it
+  // never disturbs the fragment cache the W phases primed.
+  const equivalencePassed = args.equivalence ? runEquivalence(strategy) : undefined;
+
   const balance = balanceStats(cold.summary.shardSizes);
   return {
     strategy,
@@ -308,6 +358,7 @@ function benchStrategy(strategy) {
     w1DurationMs: w1.durationMs,
     w2aShardsBuilt: w2a.summary.shardsBuilt,
     w2bShardsBuilt: w2b.summary.shardsBuilt,
+    equivalencePassed,
   };
 }
 
@@ -324,16 +375,20 @@ console.log(
   `Conditions: runs=${String(runs)} (median), concurrency=${String(concurrency)}, ` +
     `NODE_OPTIONS=${CHILD_NODE_OPTIONS}, corpus=${corpusDir}\n`,
 );
+const equivalenceCell = (r) => {
+  if (r.equivalencePassed === undefined) return 'not run';
+  return r.equivalencePassed ? 'PASS' : 'FAIL';
+};
 console.log(
-  '| strategy | shards | boundary calls | max/median | CV | cold median ms | partition ms | W1 fully cached | W1 warm ms | W2a shardsBuilt | W2b shardsBuilt |',
+  '| strategy | shards | boundary calls | max/median | CV | cold median ms | partition ms | W1 fully cached | W1 warm ms | W2a shardsBuilt | W2b shardsBuilt | equivalence |',
 );
-console.log('|---|---|---|---|---|---|---|---|---|---|---|');
+console.log('|---|---|---|---|---|---|---|---|---|---|---|---|');
 for (const r of rows) {
   console.log(
     `| ${r.strategy} | ${fmt(r.shardCount)} | ${fmt(r.boundaryCallSites)} | ` +
       `${fmt(r.maxOverMedian, 2)} | ${fmt(r.cv, 2)} | ${fmt(r.coldMedianMs)} | ` +
       `${fmt(r.partitionMs)} | ${r.w1FullyCached ? 'yes' : 'NO'} | ${fmt(r.w1DurationMs)} | ` +
-      `${fmt(r.w2aShardsBuilt)} | ${fmt(r.w2bShardsBuilt)} |`,
+      `${fmt(r.w2aShardsBuilt)} | ${fmt(r.w2bShardsBuilt)} | ${equivalenceCell(r)} |`,
   );
 }
 console.log('');
@@ -348,6 +403,15 @@ if (notCached.length > 0) {
     `\nWARNING: W1 was NOT fully cached for: ${notCached.map((r) => r.strategy).join(', ')} — ` +
       'an unchanged-tree warm run must be a 100% fragment-cache hit (determinism proof). ' +
       'Treat as a Phase 0-3 bug.',
+  );
+  process.exitCode = 1;
+}
+const diverged = rows.filter((r) => r.equivalencePassed === false);
+if (diverged.length > 0) {
+  console.error(
+    `\nFAIL: equivalence divergence under: ${diverged.map((r) => r.strategy).join(', ')} — ` +
+      'mechanically a bug in the prototype (ADR-0033: partition layout must not be ' +
+      'observable in the merged catalog). Fix it; never budget around it.',
   );
   process.exitCode = 1;
 }
