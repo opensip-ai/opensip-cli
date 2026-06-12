@@ -236,7 +236,14 @@ export interface StrategySelection {
  * - `flat-small` → `single-process` (current default; heap-preflight
  *   handles elevation if needed).
  * - `flat-large` → `synthetic-partition` with `hybrid` strategy
- *   (recommended default per Phase 12 audit).
+ *   (recommended default).
+ *
+ * Note (2026-06): A "community" (Louvain) partitionStrategy was prototyped
+ * and measured (see docs/plans/ready/louvain-community-shard-partitioning).
+ * It was discarded after the experiment showed worse accuracy and
+ * performance vs. the current hybrid. The `partitionStrategy` config knob
+ * and `StrategySelection` type are retained for future experiments, but
+ * only `hybrid` is currently supported in production paths.
  */
 export function selectStrategyForLayout(layout: MonorepoLayout): StrategySelection {
   if (layout.kind === 'workspaces') return { mode: 'packages-fanout' };
