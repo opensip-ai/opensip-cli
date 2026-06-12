@@ -61,13 +61,17 @@ const SCANNED_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts'
 
 function* walkSourceFiles(dir: string, root: string): Generator<string> {
   for (const entry of readdirSync(dir)) {
-    if (entry === 'node_modules' || entry.startsWith('.')) continue;
+    // Skip deps and dotdirs; skip test trees + spec files — Tier A gates the
+    // SHIPPABLE surface (same production-only rationale as the dogfood rules;
+    // a DDL string inside a tool's own test fixture is not schema capability).
+    if (entry === 'node_modules' || entry === '__tests__' || entry.startsWith('.')) continue;
     const abs = join(dir, entry);
     const stat = statSync(abs);
     if (stat.isDirectory()) {
       yield* walkSourceFiles(abs, root);
       continue;
     }
+    if (/\.test\.[cm]?[jt]s$/.test(entry)) continue;
     const dot = entry.lastIndexOf('.');
     if (dot !== -1 && SCANNED_EXTENSIONS.has(entry.slice(dot))) yield abs;
   }

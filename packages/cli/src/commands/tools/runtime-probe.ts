@@ -10,6 +10,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { AdmissionSectionResult } from '../../bootstrap/admit-tool-package.js';
@@ -27,8 +28,18 @@ export interface ProbeReport {
 /** Hard ceiling on candidate module-load time (a hung import must not hang the CLI). */
 export const PROBE_TIMEOUT_MS = 30_000;
 
-/** Resolved against THIS module's location, so it works from dist and when packed. */
-const PROBE_ENTRY = fileURLToPath(new URL('runtime-probe-entry.js', import.meta.url));
+/**
+ * Resolved against THIS module's location, so it works from dist and when
+ * packed. Under vitest, `import.meta.url` points into `src/` where the
+ * compiled sibling does not exist — fall back to the built `dist/` twin (the
+ * test suites require a build, same as every dist-spawning e2e here).
+ */
+function resolveProbeEntry(): string {
+  const sibling = fileURLToPath(new URL('runtime-probe-entry.js', import.meta.url));
+  if (existsSync(sibling)) return sibling;
+  return sibling.replace(`${'/src/'}`, '/dist/');
+}
+const PROBE_ENTRY = resolveProbeEntry();
 
 /**
  * Run the runtime admission sections against `packageDir` in a child process.

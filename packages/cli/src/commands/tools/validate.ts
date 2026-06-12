@@ -165,7 +165,13 @@ export async function runToolValidation(
         !probe.ok &&
         staged.stagedByInstall === false &&
         runtimeSections.some(
-          (s) => s.diagnostic !== undefined && /cannot find (module|package)/i.test(s.diagnostic),
+          (s) =>
+            s.diagnostic !== undefined &&
+            // A probe-INFRA failure ("runtime probe crashed/timed out/...")
+            // must never classify as a candidate missing-dep, even when the
+            // child's stderr mentions an unresolved module.
+            !s.diagnostic.startsWith('runtime probe') &&
+            /cannot find (module|package)/i.test(s.diagnostic),
         );
       if (missingDep) {
         // In-place path validation without --install-deps: the candidate's own
