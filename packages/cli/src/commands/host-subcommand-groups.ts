@@ -75,14 +75,21 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
         description: 'Maximum sessions to return',
         parse: parsePositiveInt,
       },
+      {
+        flag: '--summary-only',
+        description:
+          'Omit heavy per-session payloads (agent friendly; showCommand and lightweight summary remain). ' +
+          'Pairs well with --json for lean "menu" of historical results.',
+      },
     ],
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
-      const opts = rawOpts as { tool?: ToolShortId; limit?: number };
+      const opts = rawOpts as { tool?: ToolShortId; limit?: number; 'summary-only'?: boolean };
       return showHistory(ctx.datastore() as DataStore, {
         tool: opts.tool,
         limit: opts.limit,
+        summaryOnly: !!opts['summary-only'],
       });
     },
   });
@@ -101,19 +108,41 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
         description: 'Tool for latest, or an optional id sanity check',
         choices: ['fit', 'graph', 'sim'],
       },
+      {
+        flag: '--filter',
+        value: '<type>',
+        description:
+          'Filter replayed signals (repeatable): errors-only | warnings-only | top:<n>. ' +
+          'Composable, e.g. --filter errors-only --filter top:20. Agent ergonomics for historical results.',
+      },
+      {
+        flag: '--raw',
+        description:
+          'With --json: emit the inner payload (session + envelope + metadata) without the outer CommandResult wrapper. ' +
+          'Ideal for agents that want the smallest possible response.',
+      },
     ],
     scope: PROJECT_SCOPE,
     output: RAW_STREAM,
     rawStreamReason: 'session-replay',
     handler: async (rawOpts) => {
-      const opts = rawOpts as { _args: string[]; tool?: ToolShortId; json?: boolean };
+      const opts = rawOpts as {
+        _args: string[];
+        tool?: ToolShortId;
+        json?: boolean;
+        filter?: string | string[];
+        raw?: boolean;
+      };
       const ref = opts._args[0];
+      const filters = Array.isArray(opts.filter) ? opts.filter : opts.filter ? [opts.filter] : undefined;
       await executeSessionShow({
         datastore: ctx.datastore() as DataStore,
         replayRegistry: ctx.sessionReplayRegistry,
         ref,
         tool: opts.tool,
         json: opts.json,
+        filters,
+        raw: opts.raw,
         render: ctx.render,
         emitJson: ctx.emitJson,
         emitError: ctx.emitError,
