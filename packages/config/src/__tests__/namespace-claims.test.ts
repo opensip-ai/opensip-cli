@@ -4,8 +4,8 @@
  * non-object documents silent.
  */
 
-import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { analyzeNamespaceClaims } from '../namespace-claims.js';
 

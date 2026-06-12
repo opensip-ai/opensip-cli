@@ -21,6 +21,7 @@ import type { CliCommandsContext } from '../shared.js';
 import type { DataStore } from '@opensip-tools/datastore';
 
 type HostSpec = CommandSpec<unknown, CliCommandsContext>;
+const COMMAND_RESULT_OUTPUT = 'command-result';
 
 interface ScopeFilterOpts {
   cwd?: string;
@@ -51,7 +52,7 @@ function buildToolsListSpec(): HostSpec {
     // Listing must work outside a project too (global tools are still
     // visible); the project host dir simply scans empty there.
     scope: 'none',
-    output: 'command-result',
+    output: COMMAND_RESULT_OUTPUT,
     handler: (rawOpts) => {
       const opts = rawOpts as ScopeFilterOpts;
       return Promise.resolve(
@@ -80,7 +81,7 @@ function buildToolsValidateSpec(ctx: CliCommandsContext): HostSpec {
       },
     ],
     scope: 'none',
-    output: 'command-result',
+    output: COMMAND_RESULT_OUTPUT,
     handler: async (rawOpts) => {
       const opts = rawOpts as ScopeFilterOpts & { _args: string[]; installDeps?: boolean };
       const spec = opts._args[0] ?? '';
@@ -110,7 +111,7 @@ function buildToolsInstallSpec(ctx: CliCommandsContext): HostSpec {
       },
     ],
     scope: 'none',
-    output: 'command-result',
+    output: COMMAND_RESULT_OUTPUT,
     handler: async (rawOpts) => {
       const opts = rawOpts as ScopeFilterOpts & { _args: string[] };
       if (opts.global === true && opts.project === true) {
@@ -149,7 +150,7 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
       },
     ],
     scope: 'none',
-    output: 'command-result',
+    output: COMMAND_RESULT_OUTPUT,
     // eslint-disable-next-line @typescript-eslint/require-await -- async keeps the CommandSpec handler signature; the bodies are synchronous SQLite + fs
     handler: async (rawOpts) => {
       const opts = rawOpts as ScopeFilterOpts & { _args: string[]; purgeData?: boolean };
@@ -200,7 +201,7 @@ function buildToolsDataPurgeSpec(ctx: CliCommandsContext): HostSpec {
     commonFlags: ['json'],
     args: [{ name: 'tool-id', description: 'The tool id whose rows to delete' }],
     scope: 'project',
-    output: 'command-result',
+    output: COMMAND_RESULT_OUTPUT,
     handler: (rawOpts) => {
       const opts = rawOpts as ScopeFilterOpts & { _args: string[] };
       const datastore = ctx.datastore() as DataStore | undefined;
