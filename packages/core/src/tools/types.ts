@@ -173,6 +173,9 @@ export interface SignalDeliveryResult {
  * (layering). The composition root (cli) narrows it to `SignalEnvelope`.
  * This is the documented cost of strict kernel layering; shape-sync tests
  * and the explicit `Wire*` aliases are the hygiene.
+ *
+ * (GA Lows cleanup, 2026-06: alias + usage added as part of resolving the
+ * "heavy unknown + casts" item. See roadmap item 5.)
  */
 type WireSignalEnvelope = unknown;
 
