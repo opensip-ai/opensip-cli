@@ -24,7 +24,7 @@
  * before the handler runs), so the handler trusts the parsed value.
  */
 
-import { EXIT_CODES, type StoredSession } from '@opensip-tools/contracts';
+import { EXIT_CODES, type SignalEnvelope, type StoredSession } from '@opensip-tools/contracts';
 import { defineCommand } from '@opensip-tools/core';
 import { resolveSession } from '@opensip-tools/session-store';
 
@@ -298,26 +298,34 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
     await cli.writeSarif(envelope, opts.sarif);
   }
 
-  // Effectful egress lives at the composition root (ADR-0011 / ADR-0008):
-  // cloud sync + `--report-to` (which owns exit 4). `executeGraph` returns
-  // the envelope for every mode that should deliver (catalog / default render /
-  // `--report-to`) and `undefined` for the modes that must not (plain `--json`
-  // workspace-child carrier, `--workspace` parent, error paths). Called once per
-  // run, after rendering.
-  //
-  // ADR-0036: gate modes (`--gate-save`/`--gate-compare`) own their OWN
-  // deliverSignals call inside `runGateMode` — they feed the gate verdict to the
-  // host's runFailed override (the host derives the exit; no tool setExitCode), so
-  // the host must NOT deliver again here. The `--sarif` write above still runs for
-  // gate mode (it reads the returned envelope), preserving `if: always()` export.
+  await deliverNonGateEgress(opts, envelope, cli);
+}
+
+/**
+ * Effectful egress at the composition root (ADR-0011 / ADR-0008): cloud sync +
+ * `--report-to` (which owns exit 4). `executeGraph` returns the envelope for every
+ * mode that should deliver (catalog / default render / `--report-to`) and
+ * `undefined` for the modes that must not (plain `--json` workspace-child carrier,
+ * `--workspace` parent, error paths).
+ *
+ * ADR-0036: gate modes (`--gate-save`/`--gate-compare`) own their OWN
+ * deliverSignals call inside `runGateMode` — they feed the gate verdict to the
+ * host's runFailed override (the host derives the exit; no tool setExitCode), so
+ * the host must NOT deliver again here. The `--sarif` write still runs for gate
+ * mode (it reads the returned envelope), preserving `if: always()` export.
+ */
+async function deliverNonGateEgress(
+  opts: GraphCommandOptions,
+  envelope: SignalEnvelope | undefined,
+  cli: ToolCliContext,
+): Promise<void> {
   const isGateMode = opts.gateSave === true || opts.gateCompare === true;
-  if (envelope !== undefined && !isGateMode) {
-    await cli.deliverSignals(envelope, {
-      cwd: opts.cwd,
-      reportTo: opts.reportTo,
-      apiKey: opts.apiKey,
-    });
-  }
+  if (envelope === undefined || isGateMode) return;
+  await cli.deliverSignals(envelope, {
+    cwd: opts.cwd,
+    reportTo: opts.reportTo,
+    apiKey: opts.apiKey,
+  });
 }
 
 async function runGraphShowMode(opts: GraphCommandOptions, cli: ToolCliContext): Promise<void> {

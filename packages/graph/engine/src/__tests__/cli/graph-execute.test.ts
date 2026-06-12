@@ -98,7 +98,7 @@ function mockCli(datastore?: DataStore): MockCliBag {
   const emitEnvelope = vi.fn();
   // ADR-0036: stub the host baseline seams against the test datastore, and map
   // the deliverSignals runFailed override to setExitCode exactly as the host does.
-  const repo = (): BaselineRepo => new BaselineRepo(datastore as DataStore);
+  const repo = (): BaselineRepo => new BaselineRepo(datastore!);
   return {
     cli: {
       setExitCode,

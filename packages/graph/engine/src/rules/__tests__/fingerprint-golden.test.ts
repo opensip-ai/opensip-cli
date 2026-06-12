@@ -2,7 +2,7 @@
  * @fileoverview Golden-fingerprint snapshot — the load-bearing byte-stability
  * guard for the `defineRule` port (Plan B, Phase 5 Task 5.1).
  *
- * `fingerprintSignal(s)` = `ruleId|filePath|line|column` (fingerprint-signal.ts).
+ * `graphFingerprintStrategy(s)` = `ruleId|filePath|line|column` (baseline-strategy.ts).
  * This is the baseline + Code-Scanning identity: renaming a slug or shifting a
  * finding's location invalidates every saved gate baseline. This test runs the
  * original five-rule golden set over a fixture that triggers each,
@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { fingerprintSignal } from '../../fingerprint-signal.js';
+import { graphFingerprintStrategy } from '../../baseline-strategy.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
 import { alwaysThrowsBranchRule } from '../always-throws-branch.js';
 import { duplicatedFunctionBodyRule } from '../duplicated-function-body.js';
@@ -56,7 +56,7 @@ function allFingerprints(): string[] {
   const fingerprints: string[] = [];
   for (const rule of RULES) {
     for (const signal of rule.evaluate(catalog, indexes, EMPTY_CONFIG, undefined)) {
-      fingerprints.push(fingerprintSignal(signal));
+      fingerprints.push(graphFingerprintStrategy(signal));
     }
   }
   return fingerprints.sort();

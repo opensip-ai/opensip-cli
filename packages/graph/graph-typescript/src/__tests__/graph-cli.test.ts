@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { LanguageRegistry, RunScope, runWithScope, runWithScopeSync } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { currentAdapterRegistry, graphTool } from '@opensip-tools/graph';
 import { executeGraph } from '@opensip-tools/graph/internal';
 import { typescriptAdapter } from '@opensip-tools/lang-typescript';
@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 
 import { typescriptGraphAdapter } from '../index.js';
 
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { Signal, ToolCliContext } from '@opensip-tools/core';
 
 /** Minimal structural view of GraphDoneResult — avoids a contracts dep in this adapter test. */
 interface GraphDoneLike {
@@ -121,12 +121,29 @@ function makeCli(): CapturedCli {
     emitEnvelope: vi.fn((envelope: unknown) => {
       process.stdout.write(`${JSON.stringify(envelope, null, 2)}\n`);
     }),
-    deliverSignals: vi.fn(() => Promise.resolve()),
+    // ADR-0036: the host owns the baseline seams + the gate exit. Mirror the real
+    // host seams against the test datastore, and map the deliverSignals runFailed
+    // override to setExitCode exactly as the host's deliver-envelope does.
+    deliverSignals: vi.fn((_e: unknown, opts?: { runFailed?: boolean }) => {
+      exitCodes.push(opts?.runFailed === true ? 1 : 0);
+      return Promise.resolve();
+    }),
     writeSarif: vi.fn(() => Promise.resolve()),
-    saveBaseline: vi.fn(() => Promise.resolve()),
-    compareBaseline: vi.fn(() =>
-      Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
-    ),
+    saveBaseline: vi.fn((tool: string, env: unknown) => {
+      const signals = (env as { signals: readonly Signal[] }).signals;
+      new BaselineRepo(datastore).save(
+        tool,
+        signals.map((s) => ({ fingerprint: s.fingerprint ?? '', payload: s })),
+      );
+      return Promise.resolve();
+    }),
+    compareBaseline: vi.fn((tool: string, env: unknown) => {
+      const baseFps = new Set(new BaselineRepo(datastore).load(tool).map((r) => r.fingerprint));
+      const added = (env as { signals: readonly Signal[] }).signals.filter(
+        (s) => !baseFps.has(s.fingerprint ?? ''),
+      );
+      return Promise.resolve({ added, resolved: [], unchanged: [], degraded: added.length > 0 });
+    }),
     exportBaselineSarif: vi.fn(() => Promise.resolve()),
     exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
   };
@@ -448,49 +465,11 @@ describe('executeGraph', () => {
     expect(exitCodes).toContain(0);
   });
 
-  it('gate mode without a DataStore raises a configuration error', async () => {
-    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
-    // Build a CLI without a datastore
-    const exitCodes: number[] = [];
-    const projectNoStore = {
-      cwd: '/test',
-      cwdExplicit: false,
-      projectRoot: '/test',
-      configPath: undefined,
-      walkedUp: 0,
-      scope: 'none' as const,
-    };
-    const cli: ToolCliContext = {
-      scope: makeGraphScope({ project: projectNoStore }),
-      render: vi.fn(() => Promise.resolve()),
-      renderLive: vi.fn(() => Promise.resolve()),
-      maybeOpenDashboard: vi.fn(() => Promise.resolve()),
-      logger: {
-        info: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-        debug: vi.fn(),
-      },
-      setExitCode: (c: number) => {
-        exitCodes.push(c);
-      },
-      emitJson: vi.fn(),
-      emitEnvelope: vi.fn(),
-      emitError: vi.fn(),
-      deliverSignals: vi.fn(() => Promise.resolve()),
-      writeSarif: vi.fn(() => Promise.resolve()),
-      saveBaseline: vi.fn(() => Promise.resolve()),
-      compareBaseline: vi.fn(() =>
-        Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
-      ),
-      exportBaselineSarif: vi.fn(() => Promise.resolve()),
-      exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
-      registerLiveView: vi.fn(),
-    };
-    await runExecuteGraph({ cwd: dir, gateSave: true }, cli);
-    expect(stderr).toContain('requires a DataStore');
-    expect(exitCodes).toContain(2);
-  });
+  // NOTE: the "gate mode without a DataStore" guard moved to the host seam
+  // (getOrOpenDatastore / the BaselineRepo construction) in ADR-0036 — graph's
+  // runGateMode no longer resolves the datastore itself. That missing-store
+  // behavior is now covered host-side, so the former graph-typescript test for it
+  // was removed here.
 
   it('--workspace surfaces child failure as a runtime-error exit code', async () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });

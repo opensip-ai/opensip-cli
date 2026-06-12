@@ -178,8 +178,8 @@ export function runCatalogJsonMode(
     repoId: opts.repoId,
     gitSha: opts.gitSha,
   });
-  // Defensively create the parent dir before writing — siblings
-  // `runSarifExportMode` and `exportGraphBaseline` do the same. The
+  // Defensively create the parent dir before writing — the sibling
+  // `runSarifExportMode` does the same. The
   // opensip `EngineSubprocessPort.runCatalogExport` may point
   // `--catalog-output` at a run-scoped temp dir that doesn't exist yet,
   // so a bare writeFileSync would throw ENOENT.

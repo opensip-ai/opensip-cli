@@ -37,7 +37,11 @@ function envelopeOf(signals: readonly Signal[]): SignalEnvelope {
     tool: 'graph',
     runId: 'test-run',
     createdAt: '1970-01-01T00:00:00.000Z',
-    verdict: { score: 0, passed: true, summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } },
+    verdict: {
+      score: 0,
+      passed: true,
+      summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+    },
     units: [],
     signals,
   };

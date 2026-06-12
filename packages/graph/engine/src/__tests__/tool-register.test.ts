@@ -131,6 +131,37 @@ interface MockCliBag {
   readonly render: MockInstance;
 }
 
+/**
+ * Mirror the real host `exportBaselineFingerprints` seam against the test
+ * datastore: write the byte-identical fingerprint JSON, or throw the
+ * missing-baseline ConfigurationError. Extracted so `makeMockCli` stays within
+ * its cognitive-complexity budget.
+ */
+function writeFingerprintBaseline(
+  datastore: DataStore | undefined,
+  tool: string,
+  path: string,
+): void {
+  const repo = new BaselineRepo(datastore!);
+  if (!repo.exists(tool)) {
+    throw new ConfigurationError(`No ${tool} baseline found in the project SQLite store.`, {
+      code: 'CONFIGURATION.GATE.BASELINE_MISSING',
+    });
+  }
+  const fingerprints = repo
+    .load(tool)
+    .map((r) => r.fingerprint)
+    .sort((a, b) => a.localeCompare(b));
+  const file = {
+    version: '1',
+    tool,
+    capturedAt: new Date(repo.capturedAt(tool) ?? 0).toISOString(),
+    fingerprints,
+  };
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(file, null, 2), 'utf8');
+}
+
 function makeMockCli(datastore?: DataStore): MockCliBag {
   const setExitCode = vi.fn();
   const emitJson = vi.fn();
@@ -166,22 +197,9 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
       .mockResolvedValue({ added: [], resolved: [], unchanged: [], degraded: false }),
     exportBaselineSarif: vi.fn().mockResolvedValue(undefined),
     // eslint-disable-next-line @typescript-eslint/require-await -- async to match the seam signature
-    exportBaselineFingerprints: vi.fn(async (tool: string, path: string) => {
-      const repo = new BaselineRepo(datastore as DataStore);
-      if (!repo.exists(tool)) {
-        throw new ConfigurationError(`No ${tool} baseline found in the project SQLite store.`, {
-          code: 'CONFIGURATION.GATE.BASELINE_MISSING',
-        });
-      }
-      const fingerprints = repo
-        .load(tool)
-        .map((r) => r.fingerprint)
-        .sort((a, b) => a.localeCompare(b));
-      const capturedAt = repo.capturedAt(tool) ?? 0;
-      const file = { version: '1', tool, capturedAt: new Date(capturedAt).toISOString(), fingerprints };
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, JSON.stringify(file, null, 2), 'utf8');
-    }),
+    exportBaselineFingerprints: vi.fn(async (tool: string, path: string) =>
+      writeFingerprintBaseline(datastore, tool, path),
+    ),
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
   } as unknown as ToolCliContext;

@@ -14,9 +14,10 @@
  * stays graph-owned (tool vocabulary does not belong in the tool-agnostic
  * output layer).
  *
- * The gate path (`saveBaseline`/`fingerprintSignal`) consumes the raw
- * `result.signals` UPSTREAM of this builder, so its engine-slug fingerprint
- * vocabulary is unaffected (remapping here would churn baselines). The
+ * The gate path stamps `graphFingerprintStrategy` (`ruleId|filePath|line|col`,
+ * `baseline-strategy.ts`) onto the built envelope's signals before handing it to
+ * the host baseline seams (ADR-0036). The fingerprint excludes `source`, so the
+ * remap this builder applies does not churn baselines. The
  * dashboard session payload (`persistence/session-payload.ts`) likewise keeps
  * the engine slug (its metric-column keys are engine slugs).
  *
