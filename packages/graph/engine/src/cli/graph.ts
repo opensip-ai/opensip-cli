@@ -85,6 +85,7 @@ import type { GraphCommandOptions } from './graph-options.js';
 import type { Shard } from './orchestrate/shard-model.js';
 import type { GraphProgressCallback, RunGraphResult } from './orchestrate.js';
 import type { GraphProfileRunRecorder } from './profile.js';
+import type { DiscoverOutput, GraphLanguageAdapter } from '../lang-adapter/types.js';
 import type {
   Catalog,
   FeatureColumn,
@@ -451,10 +452,18 @@ function resolveSyntheticFlatShards(opts: GraphCommandOptions): ShardResolution 
   const graphConfig = loadGraphConfig(opts.cwd);
   const strategy: PartitionStrategy =
     graphConfig.partitionStrategy ?? selection.partitionStrategy ?? 'hybrid';
+  // 'community' (and only 'community') pays for the adapter import scan —
+  // hybrid runs must not fund a scan they don't use. Throws propagate to
+  // executeGraph's handleGraphError as CONFIGURATION_ERROR (fail loud).
+  const scan =
+    strategy === 'community'
+      ? scanCommunityImportEdges(adapter, discovery, canonicalFiles)
+      : undefined;
   const partitions = partitionFlatRepo({
     files: layout.files,
     repoRoot: discovery.projectDirAbs,
     strategy,
+    ...(scan === undefined ? {} : { importEdges: scan.edges }),
   });
   const shards = partitions
     .filter((p) => p.files.length > 0)
@@ -467,13 +476,48 @@ function resolveSyntheticFlatShards(opts: GraphCommandOptions): ShardResolution 
       }),
     );
   if (shards.length <= 1) return { shards: [] };
+  const scanDetail =
+    scan === undefined ? '' : `scan ${String(scan.scanMs)}ms, ${String(scan.edges.length)} edges, `;
   return {
     shards,
     partition: {
       durationMs: Date.now() - partitionStart,
-      detail: `${strategy}: ${String(shards.length)} partition(s)`,
+      detail: `${strategy}: ${scanDetail}${String(shards.length)} partition(s)`,
     },
   };
+}
+
+/**
+ * Run the adapter's program-free import scan for the `community`
+ * partition strategy (ADR-0045), timing it so the cost lands in the
+ * `partition` profile stage detail rather than being smuggled into the
+ * build total. Fails loud when the adapter does not implement the seam —
+ * an opt-in strategy never silently degrades to a different partition.
+ *
+ * @throws {ConfigurationError} When the adapter lacks `scanImports`.
+ */
+function scanCommunityImportEdges(
+  adapter: GraphLanguageAdapter,
+  discovery: DiscoverOutput,
+  files: readonly string[],
+): { readonly edges: readonly (readonly [string, string])[]; readonly scanMs: number } {
+  if (adapter.scanImports === undefined) {
+    throw new ConfigurationError(
+      `graph.partitionStrategy 'community' requires the '${adapter.id}' ` +
+        'adapter to implement scanImports() — only the TypeScript adapter ' +
+        'does today (ADR-0045).',
+    );
+  }
+  const scanStart = Date.now();
+  const { edges } = adapter.scanImports({
+    projectDirAbs: discovery.projectDirAbs,
+    files,
+    ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+    ...(discovery.compilerOptions === undefined
+      ? {}
+      : { compilerOptions: discovery.compilerOptions }),
+  });
+  return { edges, scanMs: Date.now() - scanStart };
 }
 
 /**
