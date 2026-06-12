@@ -20,6 +20,8 @@
  *   cacheKey         → ./cache-key.ts:cacheKey
  *   ruleHints        → starter list of side-effect primitives + the
  *                      `isTestFile` predicate previously inlined in walk.ts
+ *   scanImports      → ./scan-imports.ts:scanImports (optional method 7 —
+ *                      program-free partition-time import scan, ADR-0045)
  *
  * Files outside this subtree are forbidden from importing the
  * TypeScript compiler API directly; the dep-cruiser rule
@@ -36,7 +38,9 @@ import { discoverFiles as discoverTypescriptFiles } from './discover.js';
 import { methodTargetFile } from './edge-helpers/method-target.js';
 import { extractBoundaryCalls, type MethodTargetResolver } from './edge-resolvers/boundary.js';
 import { resolveEdgesFromRecords, resolveEdgesSyntactic } from './edges.js';
+import { createModuleResolutionHost } from './module-resolution.js';
 import { parseProject as parseTypescriptProject } from './parse.js';
+import { scanImports } from './scan-imports.js';
 import { isTypescriptTestFile } from './test-file.js';
 import { walkProgram } from './walk.js';
 
@@ -285,26 +289,6 @@ function buildModuleInitIndex(catalog: Catalog): ReadonlyMap<string, string> {
 }
 
 /**
- * Wrap `ts.sys` into a `ModuleResolutionHost`. Methods are bound
- * through arrow functions to satisfy `@typescript-eslint/unbound-method`
- * (arrow `this` is lexical / void). `useCaseSensitiveFileNames` is a
- * boolean property on modern `ts.sys` — the function-vs-boolean branch
- * in earlier code was unreachable dead-code (both branches returned the
- * same value).
- */
-function createModuleResolutionHost(): ts.ModuleResolutionHost {
-  return {
-    fileExists: (fileName: string): boolean => ts.sys.fileExists(fileName),
-    readFile: (fileName: string, encoding?: string): string | undefined =>
-      ts.sys.readFile(fileName, encoding),
-    directoryExists: (directoryName: string): boolean => ts.sys.directoryExists(directoryName),
-    getCurrentDirectory: (): string => ts.sys.getCurrentDirectory(),
-    getDirectories: (path: string): string[] => ts.sys.getDirectories(path),
-    useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
-  };
-}
-
-/**
  * Resolve a single import site to its target module-init bodyHash(es).
  * Returns the empty array if the module resolves outside the catalog
  * (e.g. external package, `.d.ts` declaration file) or fails to resolve
@@ -410,6 +394,7 @@ export const typescriptGraphAdapter: GraphLanguageAdapter<TsParsed> = {
   walkProject: walkProjectAdapter,
   resolveCallSites: resolveCallSitesAdapter,
   cacheKey: typescriptCacheKey,
+  scanImports,
   ruleHints: {
     isTestFile: isTypescriptTestFile,
     sideEffectPrimitives: TYPESCRIPT_SIDE_EFFECT_PRIMITIVES,
