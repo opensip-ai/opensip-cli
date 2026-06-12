@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Use graph"
 audience: [getting-started, ci-integrators, contributors]
 purpose: "Task-led guide for running static call-graph analysis, inspecting discovered files, scoping runs, opening the dashboard, and adopting graph gates."

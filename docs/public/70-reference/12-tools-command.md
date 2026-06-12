@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "`tools` command"
 audience: [plugin-authors, contributors]
 purpose: "Customer-facing command group for managing whole Tool plugins: list, validate, install, uninstall, and data-purge."
@@ -13,7 +13,6 @@ source-files:
 related-docs:
   - ./01-cli-commands.md
   - ./10-environment-variables.md
-  - ./11-migrating-to-3.0.md
   - ../50-extend/06-full-tool-plugins.md
 ---
 # `tools` — manage whole Tool plugins
@@ -142,7 +141,7 @@ group level deep).
 ## See also
 
 - [`01-cli-commands.md`](./01-cli-commands.md) — the full command inventory.
-- [`11-migrating-to-3.0.md`](./11-migrating-to-3.0.md) — the tool-plugin
-  parity GA this surface builds on.
+- [`../50-extend/06-full-tool-plugins.md`](../50-extend/06-full-tool-plugins.md)
+  — how to build a package that contributes a full command surface.
 - ADR-0041 / ADR-0042 / ADR-0043 in `docs/decisions/` — the decisions behind
   the surface, the storage contract, and the config-namespace warning.

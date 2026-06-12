@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Create your first Tool"
 audience: [plugin-authors, contributors]
 purpose: "Task-led guide for creating a tracked project-local Tool plugin that adds a custom opensip-cli subcommand."

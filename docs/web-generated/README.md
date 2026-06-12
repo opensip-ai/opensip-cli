@@ -1,12 +1,12 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 owner: opensip-cli
 indexable: true
 title: "opensip-cli Docs"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
-purpose: "Public documentation entry point for opensip-cli v3.0.0: product overview, fast paths, and the full reference map."
+purpose: "Public documentation entry point for opensip-cli v1.0.0: product overview, fast paths, and the full reference map."
 ---
 # opensip-cli Docs
 
@@ -159,26 +159,23 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 42. [JSON output schema](/docs/opensip-cli/70-reference/04-json-output-schema/)
 43. [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/)
 44. [Dashboard](/docs/opensip-cli/70-reference/06-dashboard/)
-45. [Migrating to 2.7](/docs/opensip-cli/70-reference/07-migrating-to-2.7/)
-46. [Supply-chain security](/docs/opensip-cli/70-reference/08-supply-chain-security/)
-47. [Migrating to 2.12](/docs/opensip-cli/70-reference/09-migrating-to-2.12/)
-48. [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/)
-49. [Migrating to 3.0](/docs/opensip-cli/70-reference/11-migrating-to-3.0/)
-50. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
+45. [Supply-chain security](/docs/opensip-cli/70-reference/08-supply-chain-security/)
+46. [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/)
+47. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
 
 ### 80 - Internals
 
-51. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
-52. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
-53. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
-54. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
-55. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
-56. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
-57. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
+48. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
+49. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
+50. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
+51. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
+52. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
+53. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
+54. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
 
 ## Factual Baseline
 
-This v3.0.0 doc set was rechecked against the source on 2026-06-12:
+This v1.0.0 doc set was rechecked against the source on 2026-06-12:
 
 - 166 built-in fitness checks across seven packs.
 - 33 publishable workspace packages, plus the private `@opensip-cli/test-support` package.

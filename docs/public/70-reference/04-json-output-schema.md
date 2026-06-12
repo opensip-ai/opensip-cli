@@ -1,10 +1,10 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v3.0.0
+release: v1.0.0
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
-purpose: "The SignalEnvelope shape every tool emits on --json. Every field, every type, every presence rule, plus the v1→v2 mapping."
+purpose: "The CommandOutcome and SignalEnvelope shapes every tool emits on --json. Every field, every type, and every presence rule."
 source-files:
   - packages/contracts/src/signal-envelope.ts
   - packages/core/src/types/signal.ts
@@ -15,9 +15,11 @@ related-docs:
 ---
 # JSON output schema
 
-`opensip fit --json`, `opensip sim --json`, and `opensip graph --json` all emit **one `CommandOutcome` wrapper on stdout** (release 2.12.0, [ADR-0024](../../decisions/ADR-0024-command-outcome-and-observability.md)). The **byte-identical `SignalEnvelope` rides under `.envelope`**; list/dashboard commands carry their result under `.data`; a failure carries structured `errors`. This is the contract surface for CI integrations.
-
-> **2.12.0 breaking change.** Before 2.12.0, `--json` emitted the bare `SignalEnvelope` at the top level. It is now nested under `.envelope` of a `CommandOutcome`. Read `.envelope.verdict.passed` where you previously read `.verdict.passed` (and `.data` for list/dashboard, `.errors` for failures). The inner envelope is unchanged. See [Migrating to 2.12](./09-migrating-to-2.12.md).
+`opensip fit --json`, `opensip sim --json`, and `opensip graph --json` all emit
+one `CommandOutcome` wrapper on stdout ([ADR-0024](../../decisions/ADR-0024-command-outcome-and-observability.md)).
+Run commands carry a `SignalEnvelope` under `.envelope`; list/dashboard commands
+carry their result under `.data`; failures carry structured `errors`. This is
+the contract surface for CI integrations.
 
 ```jsonc
 {
@@ -34,10 +36,6 @@ related-docs:
 The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](../../../packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope.
 
 > **Stability:** the `schemaVersion: 2` field on the envelope is the output-contract version (independent of any package version). Adding optional fields is a minor change; removing or changing types is a major change.
-
-> **Migrating from the old shape?** The v1 `CliOutput` JSON (`version: "1.0"`, `checks[]`, `findings[]`) became the v2 envelope in 2.7.0 — jump to the [v1 → v2 mapping](#v1--v2-mapping). The 2.12.0 `CommandOutcome` wrapper is covered in [Migrating to 2.12](./09-migrating-to-2.12.md).
-
----
 
 ## The `SignalEnvelope`
 
@@ -133,7 +131,9 @@ A **unit** is the neutral umbrella over a fit check, a graph rule, and a sim sce
 
 ### `Signal`
 
-Each entry in `signals[]` is a `Signal` ([`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts)). This is the richer shape that replaced the lossy `FindingOutput`: it carries 4-level severity, a `category`, a `provider`, a `fingerprint`, and a fix hint with confidence.
+Each entry in `signals[]` is a `Signal` ([`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts)).
+It carries 4-level severity, a `category`, a `provider`, a `fingerprint`, and a
+fix hint with confidence.
 
 ```jsonc
 {
@@ -187,7 +187,8 @@ All three tools emit the **same envelope**; the differences are confined to a fe
 
 - **`fit`** — `tool: "fit"`; each unit is a check (`slug` = check slug); signal `ruleId` is `fit:<slug>`. Units carry the fitness-only `filesValidated` / `itemType` / `ignoredCount`.
 - **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](../../../packages/graph/engine/src/cli/build-envelope.ts).
-- **`sim`** — `tool: "sim"`; each unit is a scenario (`slug` = scenario id, `error` set when a scenario errored). `sim --json` now emits this envelope too — the old bespoke `sim-done` JSON shape is retired.
+- **`sim`** — `tool: "sim"`; each unit is a scenario (`slug` = scenario id,
+  `error` set when a scenario errored).
 
 > **Per-kind sim detail** (load p99, chaos recovery time) is **not** in the envelope. It lives in the session's `session_tool_payload` row persisted to the project-local SQLite store (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`. The dashboard reads the session record for the deeper view.
 
@@ -213,26 +214,6 @@ When a run fails before producing an envelope (config invalid, plugin failed to 
 ```
 
 Each `ErrorDetail` carries a `message`, an optional actionable `suggestion`, and an optional machine `code`. The `exitCode` is 2 (configuration/runtime error) or whatever the throwing code specified — and it matches the top-level `exitCode` field as well as the process exit code.
-
----
-
-## v1 → v2 mapping
-
-The v1 `--json` output was the fitness-shaped `CliOutput` husk (`version: "1.0"`). v2 is the signal-native `SignalEnvelope` (`schemaVersion: 2`). The mapping for a CI consumer migrating off v1:
-
-| v1 (`CliOutput`) | v2 (`SignalEnvelope`) | Notes |
-|---|---|---|
-| `version: "1.0"` | `schemaVersion: 2` | Discriminator field renamed and re-typed (string → number). |
-| top-level `score` | `verdict.score` | Same 0..100 meaning. |
-| top-level `passed` | `verdict.passed` | Same boolean; now defined as "no `critical`/`high` signals". |
-| `summary.*` | `verdict.summary.*` | Same field names, nested under `verdict`. |
-| `timestamp` | `createdAt` | Renamed. |
-| `durationMs` (top-level) | per-unit `units[].durationMs` | No single top-level total; sum `units[].durationMs` if needed. |
-| `checks[]` | `units[]` | Per-unit ran/errored/timing facts (no nested findings). |
-| `checks[].checkSlug` | `units[].slug` **and** `signals[].source` | The signal's `source` is the join key back to its unit's `slug`. |
-| `checks[].findings[]` | `signals[]` | Flattened into one top-level list; join to a unit via `signals[].source === units[].slug`. |
-| `findings[].severity: "error" \| "warning"` | `signals[].severity: "critical" \| "high" \| "medium" \| "low"` | 4-level. `error` ≈ `critical`/`high`; `warning` ≈ `medium`/`low`. |
-| `findings[].ruleId` / `message` / `suggestion` / `filePath` / `line` / `column` | `signals[].ruleId` / `message` / `suggestion` / `filePath` / `line` / `column` | Same fields; signals add `category`, `provider`, `fingerprint`, `fixConfidence`. |
 
 ---
 

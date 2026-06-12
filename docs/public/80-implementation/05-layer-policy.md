@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-11
-release: v3.0.0
+release: v1.0.0
 title: "Layer policy"
 audience: [contributors]
 purpose: "The dependency-cruiser rules that enforce the six-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
@@ -232,7 +232,8 @@ A cluster of rules in `.config/dependency-cruiser.cjs` keep the graph tool's sta
 - **`graph-no-fitness`** — graph production source must not import `@opensip-cli/fitness`. The former sole edge was the SARIF / cloud-report helper; per ADR-0011 SARIF is now the single shared `formatSignalSarif` formatter in `@opensip-cli/output`, applied at the composition root — graph returns a `SignalEnvelope` and imports neither fitness nor `@opensip-cli/output`. There is no longer any sanctioned exception. (Test files may use devDeps.)
 - **`fitness-no-graph`** — fitness production source must not import `@opensip-cli/graph`. The former dashboard-reads-graph edge is gone: the CLI is now the dashboard composition root and each tool contributes its own dashboard data via the `Tool.collectDashboardData` seam. (Test files may use devDeps.)
 
-**Dropped in v2.0.0** (recorded here so future spelunkers don't wonder where they went):
+**Superseded graph checks** (recorded here so future contributors know which
+package-edge rules took over):
 
 - `graph-no-typescript-import-outside-lang-typescript` — the engine no longer declares `typescript` as a dependency (it ships only in `@opensip-cli/graph-typescript`). No engine source file can import the TS compiler API; the package edge enforces this by construction.
 - `graph-no-tree-sitter-import-outside-lang-packs` — same story for tree-sitter. The engine has no tree-sitter dep; `web-tree-sitter` ships only as a dep of `@opensip-cli/graph-adapter-common` (the shared WASM-grammar scaffolding) and, transitively, the `@opensip-cli/graph-(python|rust|go|java)` adapter packs that consume it.

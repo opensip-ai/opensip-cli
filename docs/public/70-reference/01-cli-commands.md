@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for user-facing CLI commands, important machine-facing commands, flags, and exit semantics."
@@ -262,7 +262,7 @@ opensip graph --workspace
 # → one session in the dashboard combining TS package results + Cargo member results
 ```
 
-**Session contract.** A single CLI invocation produces a single dashboard session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of dashboard sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`) opt out. (Machine-artifact catalog/SARIF exports live on the dedicated `catalog-export` / `sarif-export` subcommands — the v1 `graph --catalog-output` flag was retired by the graph-adapter split.)
+**Session contract.** A single CLI invocation produces a single dashboard session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of dashboard sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`) opt out. Machine-artifact catalog/SARIF exports live on the dedicated `catalog-export` / `sarif-export` subcommands.
 
 **Adapter selection.** opensip-cli ships first-party graph adapters for TypeScript, Python, Rust, Go, and Java — each is its own publishable npm package under the `@opensip-cli/graph-*` namespace. Auto-discovery is name pattern + marker: `node_modules` is walked for packages whose names match `@opensip-cli/graph-*` and whose `package.json` declares `opensipTools.kind: "graph-adapter"`, or you can pin an explicit list under `plugins.graphAdapters:` in `opensip-cli.config.yml`. Marker-file detection (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`/`build.gradle*`) then chooses which discovered adapter(s) apply to the run; positional paths inherit that decision unless `--language` overrides it.
 
@@ -272,7 +272,13 @@ opensip graph --workspace
 
 **`OPENSIP_HEAP_NO_MONITOR`** (env var): during a build, `graph` runs a V8 heap-pressure monitor that aborts with a readable `MemoryPressureError` when old-gen usage crosses ~90% of the heap limit — catching an impending OOM before V8 SIGABRTs the process. In unusual GC scenarios (REPL embedding, custom allocators) this guard can fire as a false positive before a real OOM is imminent. Set `OPENSIP_HEAP_NO_MONITOR=1` to disable it entirely. This is an escape hatch only: with the monitor off, an actual out-of-memory condition becomes a bare V8 abort instead of a structured error. Prefer raising the heap ceiling (above) or scoping the run (positional paths / `--workspace`) first.
 
-**Catalog storage:** v2 stores the catalog in the project's SQLite database (`<project>/opensip-cli/.runtime/datastore.sqlite`, `graph_catalog` row). v3 wire-format remains: `language` (adapter id), `cacheKey` (an opaque per-adapter invalidation string — TypeScript: `ts-${ts.version}-${tsconfigContentHash}`; Python and Rust use language-id-prefixed keys), and a per-file mtime+size fingerprint. The reconstructed in-memory `Catalog` shape is unchanged from v1's `cache/read.ts` output.
+**Catalog storage:** graph stores the catalog in the project's SQLite database
+(`<project>/opensip-cli/.runtime/datastore.sqlite`, `graph_catalog` row). The
+wire format carries `language` (adapter id), `cacheKey` (an opaque per-adapter
+invalidation string — TypeScript: `ts-${ts.version}-${tsconfigContentHash}`;
+Python and Rust use language-id-prefixed keys), and a per-file mtime+size
+fingerprint. The reconstructed in-memory `Catalog` shape is what graph rules,
+indexes, and dashboard views consume.
 
 **Cache behavior:** three verdicts — `valid` (full cache hit), `incremental` (re-walk only the changed files plus their transitive edge-dependents), `invalid` (full rebuild). The incremental path makes single-file edits ~6× faster than a `--no-cache` rebuild while producing byte-identical output. See the cache section in the stages-and-catalog doc.
 
@@ -506,9 +512,8 @@ After parsing flags init classifies the working directory into one of four state
 | `partial-config-only` | present | absent | exit 2, partial-state error | scaffold the dir | scaffold the dir |
 | `partial-dir-only` | absent | present | exit 2, partial-state error | preserve custom; write YAML | `rm -rf opensip-cli/`; write YAML; scaffold |
 
-`--keep` and `--remove` are mutually exclusive. The legacy `--force`
-flag is removed; users who scripted it should migrate to `--remove`
-(closest semantic match — both blow away existing scaffolds).
+`--keep` and `--remove` are mutually exclusive. Use `--remove` when you want to
+replace existing scaffolds.
 
 Each pre-existing file under `opensip-cli/` is classified as:
 
@@ -580,7 +585,16 @@ opensip sessions purge -y
 | `purge` | `--older-than <days>` | Only delete sessions older than N days. Default: delete all. |
 | `purge` | `-y, --yes` | Skip the confirmation prompt. |
 
-**Session replay (2.12.0).** `sessions show` reconstructs a past run's output from the stored payload: each tool contributes a `sessionReplay` projection (`fit`/`graph`/`sim`) that decodes the opaque payload back into a `SignalEnvelope`. The replay `fidelity` is `projection` — it is rebuilt from persisted findings, not a re-execution. Each run command also accepts an inline `--show <session>` flag (`fit --show latest`, `graph --show <id>`, `sim --show latest`) as a shorthand for the same replay scoped to that tool. A missing session, wrong tool, or undecodable payload returns a structured error (`reason`/`code`: `not-found`, `wrong-tool`, `ambiguous-latest`, `decode-error`) and exit 2.
+**Session replay.** `sessions show` reconstructs a past run's output from the
+stored payload: each tool contributes a `sessionReplay` projection
+(`fit`/`graph`/`sim`) that decodes the opaque payload back into a
+`SignalEnvelope`. The replay `fidelity` is `projection` — it is rebuilt from
+persisted findings, not a re-execution. Each run command also accepts an inline
+`--show <session>` flag (`fit --show latest`, `graph --show <id>`,
+`sim --show latest`) as a shorthand for the same replay scoped to that tool. A
+missing session, wrong tool, or undecodable payload returns a structured error
+(`reason`/`code`: `not-found`, `wrong-tool`, `ambiguous-latest`, `decode-error`)
+and exit 2.
 
 **See also:** [`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md).
 
@@ -691,7 +705,7 @@ Two modes:
 
 | Mode | Targets removed | When to use |
 |---|---|---|
-| Default / `--user` | `~/.opensip-cli/` (user-level config dir) | Removing the cloud API key + per-user defaults; cleaning legacy cruft from earlier versions. |
+| Default / `--user` | `~/.opensip-cli/` (user-level config dir) | Removing the cloud API key and per-user defaults. |
 | `--project [path]` | `<path>/opensip-cli/.runtime/` by default | Remove rebuildable session/cache/log/baseline state for one repo while preserving authored checks, recipes, scenarios, and config. |
 | `--project [path] --purge` | `<path>/opensip-cli/` (authored content included) and `<path>/opensip-cli.config.yml` | Fully disengage from opensip-cli in one repo. Destructive if custom checks/recipes are not committed. |
 
@@ -709,7 +723,12 @@ Both modes:
 - Refuse to run when no targets exist (`--project` against a directory that contains no OpenSIP CLI state is a no-op, not a destructive accident). In project mode without `--purge`, a repo that has only authored content and no `.runtime/` also becomes a no-op and tells you what it kept.
 - Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g opensip-cli`); the project-mode success message points back at the user-mode command for the matching cleanup.
 
-State contract enforced by code: `~/.opensip-cli/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`paths.ts`](../../../packages/core/src/lib/paths.ts), [`logger.ts`](../../../packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
+State contract enforced by code: `~/.opensip-cli/` holds `config.yml` only.
+Persistence and logging modules throw when asked to write there (see
+[`paths.ts`](../../../packages/core/src/lib/paths.ts),
+[`logger.ts`](../../../packages/core/src/lib/logger.ts)). Anything else in that
+directory is considered extra user-level state and is swept up by the default
+`uninstall`.
 
 ---
 

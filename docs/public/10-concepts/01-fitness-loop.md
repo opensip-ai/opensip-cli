@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-09
-release: v3.0.0
+release: v1.0.0
 title: "The fitness loop"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "One check, end to end. Definition → loading → recipe selection → scope resolution → execution → signal → render → exit. The spine of the doc set."
@@ -107,7 +107,10 @@ Source: [`packages/cli/src/index.ts`](../../../packages/cli/src/index.ts)
 3. Walk the per-invocation `ToolRegistry` (populated during bootstrap) and mount each registered Tool's declared `commandSpecs` via the host's `mountCommandSpec`. The fitness Tool declares `fit`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; the host builds the Commander commands, applies the shared cross-tool flags, and owns the parse → handler → render → `--json` → exit pipeline. The cross-tool `dashboard` command is mounted separately by the CLI because it composes data from every registered Tool.
 4. Hand argv to Commander, which dispatches to the `fit` command spec's handler ([`packages/fitness/engine/src/tool.ts`](../../../packages/fitness/engine/src/tool.ts) assembles the `commandSpecs`; the handler bodies live in the `cli/` spec modules alongside it).
 
-The CLI does not know what `fit` does. It knows a Tool exists, it admitted and imported it, mounted the typed `commandSpecs` the Tool declared, and Commander now owns the routing. Everything specific to fitness from this point on lives inside `@opensip-cli/fitness`. (3.0.0: tools declare `commandSpecs`; the pre-GA `register(cli)` + raw `cli.program` path was removed — see [the tool-plugin model](./02-tool-plugin-model.md).)
+The CLI does not know what `fit` does. It knows a Tool exists, it admitted and
+imported it, mounted the typed `commandSpecs` the Tool declared, and Commander
+now owns the routing. Everything specific to fitness from this point on lives
+inside `@opensip-cli/fitness`; see [the tool-plugin model](./02-tool-plugin-model.md).
 
 > **Where the example lands:** the binary is `opensip-cli`, argv is `['fit']` (defaults applied), the resolved Tool is `fitnessTool` with metadata `{ id: 'fitness', version: <pkg.version>, description: 'Run fitness checks against a codebase' }`. (Version is read at startup from `@opensip-cli/fitness/package.json`.)
 

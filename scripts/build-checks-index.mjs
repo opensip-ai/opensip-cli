@@ -82,6 +82,12 @@ function escapeMd(s) {
     .trim();
 }
 
+function publicDescription(description) {
+  return String(description ?? '*(no description; see source)*')
+    .replace(/\s*\(release \d+\.\d+\.\d+[^)]*\)/g, '')
+    .trim();
+}
+
 function checkLabel(count) {
   return count === 1 ? 'check' : 'checks';
 }
@@ -180,7 +186,7 @@ async function main() {
       );
       for (const c of items) {
         const slugCell = `[\`${c.slug}\`](https://github.com/opensip-ai/opensip-cli/blob/main/${c.file})`;
-        const descCell = escapeMd(c.description ?? '*(no description; see source)*');
+        const descCell = escapeMd(publicDescription(c.description));
         out.push(`| ${slugCell} | ${descCell} |`);
       }
       out.push('');

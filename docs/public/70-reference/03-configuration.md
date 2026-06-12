@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-11
-release: v3.0.0
+release: v1.0.0
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-cli.config.yml schema, every field, defaults, and where each is read."
@@ -142,10 +142,9 @@ simulation:
 
 CLI-wide defaults that act as flag pre-fills. Each project's `cli` section is equivalent to a config-loaded set of flags applied to every invocation.
 
-`cli.recipe` was removed in 3.0.0. Recipe defaults are tool-scoped (ADR-0022),
-so set `fitness.recipe`, `graph.recipe`, or `simulation.recipe` instead. The
-`cli` namespace is strict; a remaining `cli.recipe` key is rejected as an
-unknown config field.
+Recipe defaults are tool-scoped (ADR-0022), so set `fitness.recipe`,
+`graph.recipe`, or `simulation.recipe`. The `cli` namespace is strict; unknown
+config fields are rejected.
 
 | Field | Type | Effect |
 |---|---|---|

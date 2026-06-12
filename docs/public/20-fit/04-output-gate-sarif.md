@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Output, gate, SARIF"
 audience: [contributors, ci-integrators]
 purpose: "What happens to the signals a check produces — formatter/sink routing, JSON output, SARIF, the gate, cloud reporting."
@@ -81,7 +81,11 @@ interface SignalEnvelope {
 }
 ```
 
-The full `UnitResult` and `Signal` field tables are in [`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md) (which also carries the **v1 `CliOutput` → v2 `SignalEnvelope` mapping**). The short version: a `Signal` carries 4-level severity (`critical|high|medium|low`), a `category`, a `provider`, a `fingerprint`, and a fix hint — strictly richer than the old `FindingOutput`.
+The full `UnitResult` and `Signal` field tables are in
+[`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md).
+The short version: a `Signal` carries 4-level severity
+(`critical|high|medium|low`), a `category`, a `provider`, a `fingerprint`, and a
+fix hint.
 
 `SignalEnvelope` is the canonical artifact and the single output currency of every tool. **Tools no longer render their own output**: a tool's action returns the envelope via `CommandResult`, and the CLI composition root maps flags (`--json`, `--report-to`, gate modes) to a (formatter × sink) pair. Output decomposes along two axes:
 
@@ -156,7 +160,9 @@ The gate is the regression-detection workflow. `--gate-save` fingerprint-stamps 
 
 > **Baseline shape.** Per ADR-0011/ADR-0036 the baseline stores the run's *signals* (fingerprint + payload rows) directly — **not** a SARIF document — through host seams shared by every tool; fitness contributes only its `fingerprintStrategy`. This keeps fitness off any `@opensip-cli/output` production dependency: the root owns all SARIF egress. `fit-baseline-export` re-renders the stored signals as SARIF via the root `cli.writeSarif` seam, so the on-disk CI artifact stays a SARIF document.
 
-> **v1 → v2 break.** The `--baseline <path>` flag is gone. v1 stored baselines as committed SARIF files; v2 stores them in SQLite. See [`10-concepts/05-architecture-gate.md#ci-integration-patterns`](../10-concepts/05-architecture-gate.md#ci-integration-patterns) for the artifact-based CI workflow that replaces the v1 "committed baseline" pattern.
+Baselines are stored in SQLite, and SARIF is an export format. See
+[`10-concepts/05-architecture-gate.md#ci-integration-patterns`](../10-concepts/05-architecture-gate.md#ci-integration-patterns)
+for the artifact-based CI workflow.
 
 The full gate behavior — diff classification, line-shift invariance, partial-SARIF tolerance — is documented in [`10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md). The short version:
 

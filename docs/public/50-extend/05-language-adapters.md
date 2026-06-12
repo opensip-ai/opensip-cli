@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-09
-release: v3.0.0
+release: v1.0.0
 title: "Language adapters (fitness)"
 audience: [contributors, plugin-authors]
 purpose: "What the fitness LanguageAdapter is, the six bundled adapters, and how to author a new one."

@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/fitness",
-  "version": "3.0.0",
+  "version": "1.0.0",
   "license": "MIT",
   "description": "Fitness checks engine for OpenSIP CLI",
   "keywords": [

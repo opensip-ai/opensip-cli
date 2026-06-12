@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Adding a language to graph"
 audience: [contributors, plugin-authors]
 purpose: "Step-by-step guide for writing a new GraphLanguageAdapter — C/C++, or anything else — without touching the engine."
@@ -136,11 +136,11 @@ Different adapters produce different-fidelity edges. This is intrinsic — TypeS
 
 | Adapter | `confidence` for direct calls | Notes |
 |---|---|---|
-| `typescript` (shipped, v1.0) | `'high'` (symbol-resolved) | Reference. Has the TS type-checker. |
-| `python` (shipped, v1.3.0) | Mostly `'medium'`; `'low'` on simple-name collisions | Tree-sitter; multiple functions named `process` may resolve to the wrong target. |
-| `rust` (shipped, v1.3.0) | `'medium'` (with `impl` block context for receivers) | Tree-sitter; trait dispatch and method-on-generic resolution stay name-only. |
-| `go` (first shipped in v2.0.0) | `'medium'` (with receiver-type narrowing) | Tree-sitter; package-aware discovery via `go.mod`. |
-| `java` (first shipped in v2.0.0) | `'medium'` (with class context) | Tree-sitter; class-resident scope means the resolver always knows the enclosing type. |
+| `typescript` | `'high'` (symbol-resolved) | Reference. Has the TS type-checker. |
+| `python` | Mostly `'medium'`; `'low'` on simple-name collisions | Tree-sitter; multiple functions named `process` may resolve to the wrong target. |
+| `rust` | `'medium'` (with `impl` block context for receivers) | Tree-sitter; trait dispatch and method-on-generic resolution stay name-only. |
+| `go` | `'medium'` (with receiver-type narrowing) | Tree-sitter; package-aware discovery via `go.mod`. |
+| `java` | `'medium'` (with class context) | Tree-sitter; class-resident scope means the resolver always knows the enclosing type. |
 | `c/c++` (planned) | `'medium'` | Header/source duplication and namespace resolution are the wrinkles. |
 
 Per-rule fidelity expectations:
@@ -219,7 +219,7 @@ When you open the PR for a new adapter, verify each of these:
 
 ## 8. Common gotchas
 
-These are drawn from real bugs caught while shipping the Python and Rust adapters in v1.3.0.
+These are drawn from real bugs caught while shipping the tree-sitter adapters.
 
 - **Don't reach back into the catalog inside `walkProject`.** The catalog is built _after_ the walk from the walker's occurrence output. If your walker tries to look up a callee in the catalog mid-walk, you'll get `undefined` for half of them. That's what `resolveCallSites` is for — it runs after the catalog is frozen.
 - **Don't mutate `catalog` from `resolveCallSites`.** Per I-4, the catalog is frozen by the time it reaches the resolver. Build name-lookup helpers locally in the resolver function and discard them on return.

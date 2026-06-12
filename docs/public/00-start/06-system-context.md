@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v3.0.0
+release: v1.0.0
 title: "System context"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Where opensip-cli sits between you, your codebase, CI, and OpenSIP Cloud — and what it touches on disk."
@@ -120,9 +120,14 @@ Gitignored (`opensip init` adds the entry to `.gitignore` for you):
     └── sim/node_modules/                         ← project-pinned sim plugins
 ```
 
-The split rule is simple: anything you author lives in `opensip-cli/`; anything the tool generates lives in `opensip-cli/.runtime/`. The runtime dir is rebuildable from the source side, so wiping `.runtime/` is always safe — caches rebuild and session history is lost.
-
-**v2.0.0 change:** the fit gate baseline (formerly `baseline.sarif`) and the graph catalog/baseline (formerly `cache/graph/`) now live as rows in the SQLite store, not as separate files. The `--baseline <path>` flag is gone; teams that committed a SARIF baseline file for cross-CI gate comparisons should re-run `fit --gate-save` once on the new version to populate the SQLite store. See [`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md) for the full schema layout.
+The split rule is simple: anything you author lives in `opensip-cli/`; anything
+the tool generates lives in `opensip-cli/.runtime/`. The runtime dir is
+rebuildable from the source side, so wiping `.runtime/` is always safe — caches
+rebuild and session history is lost. Gate baselines, graph catalogs, sessions,
+and tool state live in the project-local SQLite store under `.runtime/`; run
+`--gate-save` to capture a baseline and `--gate-compare` to ratchet against it.
+See [`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md)
+for the schema layout.
 
 ### User-level (`~/.opensip-cli/`)
 

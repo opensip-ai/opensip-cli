@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Full Tool plugins"
 audience: [plugin-authors]
 purpose: "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph aren't the right shape and you want something fundamentally different."
@@ -55,8 +55,8 @@ Once a Tool exists as a package, the customer-facing management surface is the [
     ]
   },
   "peerDependencies": {
-    "@opensip-cli/contracts": "^3.0.0",
-    "@opensip-cli/core": "^3.0.0"
+    "@opensip-cli/contracts": "^1.0.0",
+    "@opensip-cli/core": "^1.0.0"
   }
 }
 ```
@@ -65,10 +65,13 @@ The `opensipTools` block is your tool's **static manifest** — read before your
 
 - **`kind: "tool"`** — the marker that makes the CLI discover your package.
 - **`id`** — your tool's stable identity; must equal the runtime `tool.metadata.id`.
-- **`apiVersion`** — the plugin-API epoch you target (currently `1`). **Mandatory since 3.0.0**: a tool that declares no `apiVersion` is not admitted (it fail-closes when run explicitly, or is skipped with a diagnostic when discovered).
+- **`apiVersion`** — the plugin-API epoch you target (currently `1`). A tool
+  that declares no `apiVersion` is not admitted (it fail-closes when run
+  explicitly, or is skipped with a diagnostic when discovered).
 - **`commands`** — the command **names** (with descriptions) your tool mounts. The host asserts this set equals your runtime `tool.commands` at load (`assertManifestMatchesTool`) and throws on drift — the manifest is the cheap, no-import way to enumerate your surface for `--help`/completion, so it must stay in sync with the tool.
 
-Peer-dep on `@opensip-cli/contracts` and `@opensip-cli/core` at `^3.0.0` (the `commandSpecs`-only contract) — the consumer brings their own version.
+Peer-dep on `@opensip-cli/contracts` and `@opensip-cli/core` at `^1.0.0`; the
+consumer brings their own version.
 
 ## `src/index.ts`
 
@@ -166,7 +169,7 @@ carrying the same identity fields inline — `kind`, `id`, `name`, `version`,
 The runtime contract is unchanged — the directory's resolved main must export
 `tool: Tool`, and the host runs the same `assertManifestMatchesTool` drift guard.
 Authored discovery, admission, dynamic import, and registration travel the exact
-same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/docs/decisions/ADR-0030-authored-tool-discovery.md)).
+same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/docs/decisions/ADR-0030-authored-tool-discovery.md)).
 
 > **Sidecar vs `plugin add --project`.** `plugin add --project` *installs an npm
 > package* into the gitignored `.runtime/plugins/tool/` and keeps provenance
@@ -182,7 +185,12 @@ same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-
 - A code change in `@opensip-cli/core`.
 - A schema migration.
 
-The Tool contract is the seam. The CLI builds a per-invocation `ToolRegistry`, discovers your package via the `opensipTools.kind: 'tool'` marker, admits it (manifest + `apiVersion` check), dynamically imports it, and mounts your declared `commandSpecs` via `mountCommandSpec`. (The pre-3.0.0 `register(cli)` hook and the raw `cli.program` Commander handle were removed at the GA cutover — `commandSpecs` is the one command surface.) For the architecture behind this decoupling, see [the tool-plugin model](/docs/opensip-cli/10-concepts/02-tool-plugin-model/).
+The Tool contract is the seam. The CLI builds a per-invocation `ToolRegistry`,
+discovers your package via the `opensipTools.kind: 'tool'` marker, admits it
+(manifest + `apiVersion` check), dynamically imports it, and mounts your
+declared `commandSpecs` via `mountCommandSpec`. `commandSpecs` is the one
+command surface. For the architecture behind this decoupling, see
+[the tool-plugin model](/docs/opensip-cli/10-concepts/02-tool-plugin-model/).
 
 ## Tools that use the kernel registries
 
@@ -214,7 +222,11 @@ Each built-in command has its own options interface in `@opensip-cli/contracts`,
 
 New flags are additive on the relevant interface. There is no shared cross-command union — each command's shape stands on its own.
 
-For your own Tool plugin you don't reuse any of these: you declare each command's options as `OptionSpec`s on its `commandSpec`, and the host wires Commander and passes the parsed options to your handler as the first argument. You never touch Commander or take a `commander` dependency — the host owns the program (3.0.0; the old `register(cli)` + raw `cli.program` path was removed).
+For your own Tool plugin you don't reuse any of these: you declare each
+command's options as `OptionSpec`s on its `commandSpec`, and the host wires
+Commander and passes the parsed options to your handler as the first argument.
+You never touch Commander or take a `commander` dependency — the host owns the
+program.
 
 ## Tips that come up
 

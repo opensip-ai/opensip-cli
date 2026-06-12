@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.x
+release: v1.0.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."
@@ -35,7 +35,7 @@ Language-agnostic; runs against every project.
 | Slug | Description |
 |---|---|
 | [`capability-by-manifest`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/capability-by-manifest.ts) | A capability domain must be declared in a tool manifest and registered via registerCapabilityDomainsFromManifest, not host-compiled (ADR-0023, §5.3) |
-| [`command-surface-parity`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/command-surface-parity.ts) | Every tool command resolves to a typed CommandSpec; no raw Commander access from a tool (release 2.11.0 command plane, Principle 6) |
+| [`command-surface-parity`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/command-surface-parity.ts) | Every tool command resolves to a typed CommandSpec; no raw Commander access from a tool |
 | [`cross-tool-flag-parity`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/cross-tool-flag-parity.ts) | Cross-tool common CLI flags must come from the shared registry, not be hand-declared (ADR-0021) |
 | [`docker-ignore-validation`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-ignore-validation.ts) | Validate .dockerignore files exist alongside Dockerfiles with required patterns |
 | [`docker-version-sync`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-version-sync.ts) | Validate Docker Node/pnpm versions match package.json |
@@ -60,7 +60,7 @@ Language-agnostic; runs against every project.
 | [`restrict-raw-db-access`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/restrict-raw-db-access.ts) | Confine the raw Drizzle handle (DataStore.db) to the persistence ownership boundary (ADR-0009) |
 | [`same-recipe-semantics`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/same-recipe-semantics.ts) | Recipe execution must run on the shared substrate; no per-tool scheduler reimplementation (§5.8/§4.3) |
 | [`stale-build-artifacts`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/stale-build-artifacts.ts) | Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/ |
-| [`tool-has-manifest`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-has-manifest.ts) | Every first-party tool package must declare a conformant opensipTools manifest (kind/id/apiVersion/commands) the host can read before import (release 3.0.0) |
+| [`tool-has-manifest`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-has-manifest.ts) | Every first-party tool package must declare a conformant opensipTools manifest (kind/id/apiVersion/commands) the host can read before import |
 | [`vitest-config-extends-base`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-extends-base.ts) | Per-package vitest configs must extend the shared .config/vitest.base (when one exists) |
 | [`vitest-config-required-with-tests`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-required-with-tests.ts) | Ensures packages with tests have a vitest.config at the package root |
 

@@ -506,7 +506,7 @@ design exploration not yet ready for external readers, it stays in
 
 ## Release Process
 
-Releases are tag-driven. See `RELEASING.md` — there are 27 packages
+Releases are tag-driven. See `RELEASING.md` — there are 33 packages
 to publish, in a specific dependency order, via OIDC trusted publishing.
 
 The release workflow has two non-obvious steps (npm 11 to a separate
@@ -516,22 +516,14 @@ npm's self-replacement and pnpm's lack of OIDC support.
 
 ## Project Status
 
-**v3.0.0 (GA)** — OpenSIP CLI is a tool-plugin platform: `core` is a
-strict kernel, and `fitness`, `graph`, and `simulation` are peer
-tools implementing a shared Tool contract, with `cli` as a generic
-dispatcher. Adding a new tool requires zero CLI changes. **3.0.0 is the
-tool-plugin-parity GA cutover** (ADR-0027, realizing ADR-0012's reservation):
-the privileged first-party paths are gone — bundled tools load through the same
-dynamic-import plugin path as installed ones (no static `import { fitnessTool }`),
-`Tool.register()` + the raw-Commander `program` handle are removed (a tool
-declares `commandSpecs`, the only command surface), and `apiVersion` is mandatory
-(the grace window ended). The acceptance test — `fit` loaded externally behaves
-identically to the bundled build — passes, and all nine completion invariants
-(north-star §8) are live guardrails indexed at
-`docs/internal/parity-invariant-index.md`. The only thing distinguishing a
-bundled tool from an installed or project-local one is its source of
-installation, never its lifecycle. Future tools (`audit`/`lint`/`bench`) slot in
-by shipping a manifest + `commandSpecs`, inheriting every host-owned plane.
+**v1.0.0 (initial production launch)** — OpenSIP CLI is a tool-plugin
+platform: `core` is a strict kernel, and `fitness`, `graph`, and
+`simulation` are peer tools implementing a shared Tool contract, with
+`cli` as a generic dispatcher. Adding a new tool requires zero CLI
+changes: tools declare `commandSpecs`, ship a manifest, and load through
+the same dynamic-import plugin path whether bundled, installed, or
+project-local. The npm package is `opensip-cli`; the installed command is
+`opensip`.
 
 The new-customer flow is three commands: `init` (language detection
 + scaffolded layout) → `fit --recipe example` → `sim --recipe
@@ -546,8 +538,7 @@ Re-running `init` on a non-pristine project refuses with exit 2 by
 default. Two explicit flags express user intent:
 `--keep` re-scaffolds examples while preserving custom files, and
 `--remove` deletes `opensip-cli/` entirely before scaffolding
-fresh. The flags are mutually exclusive. The legacy `--force` flag
-is gone; users who scripted it should migrate to `--remove`. See
+fresh. The flags are mutually exclusive. See
 `docs/public/70-reference/01-cli-commands.md#init---scaffold-the-project-layout`
 for the full state table.
 

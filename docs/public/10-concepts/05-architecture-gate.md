@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Architecture gate"
 audience: [contributors, ci-integrators]
 purpose: "The baseline-and-compare workflow. Fingerprint identity, line-shift invariance, CI integration patterns."
@@ -41,7 +41,12 @@ opensip fit --gate-compare              # CI gate from now on
 
 > **Baseline shape (ADR-0011 / ADR-0036).** The baseline stores the run's *signals* (fingerprint + full `Signal` payload per row) — **not** a SARIF document. The capture/ratchet/export machinery is host infrastructure shared by every tool: fitness contributes only its [`fingerprintStrategy`](../../../packages/fitness/engine/src/baseline-strategy.ts); the seams (`saveBaseline` / `compareBaseline` / `exportBaselineSarif`) and the [generic table pair](../../../packages/datastore/src/schema/baseline.ts) live in the host and `@opensip-cli/datastore`. `fit-baseline-export` re-renders the stored signals as SARIF via the root `cli.writeSarif` seam, so the on-disk CI artifact stays SARIF.
 
-> **v1 → v2 break.** v1 wrote baselines as SARIF *files* (`baseline.sarif`) and let users override the path with `--baseline <path>`. **The `--baseline` flag is gone in v2.** Teams that committed `baseline.sarif` to git for cross-CI gate comparisons should re-run `--gate-save` once, then adopt one of the artifact-based CI patterns below. See [`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md) for the schema layout.
+Baselines live in the project SQLite store under
+`opensip-cli/.runtime/datastore.sqlite`; they are not committed SARIF files.
+Run `--gate-save` once to capture the current bar, then use one of the
+artifact-based CI patterns below to share the resulting report. See
+[`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md)
+for the schema layout.
 
 > **Exit code (ADR-0020).** `--gate-save` saves first, then exits according to the configured severity thresholds (`failOnErrors`/`failOnWarnings`) — it does **not** unconditionally exit 0. The CI step that records the baseline is therefore also an honest pass/fail signal; run any follow-up export/upload step under `if: always()` so the artifact survives a failed gate.
 

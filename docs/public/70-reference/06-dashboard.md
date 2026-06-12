@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v3.0.0
+release: v1.0.0
 title: "Dashboard"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
@@ -103,15 +103,26 @@ Like the Fitness and Simulation tabs, the Code Paths tab carries subtabs:
 - **Recipes** — the configured graph recipes (named rule subsets).
 - **Explore** — the interactive catalog browser (the views below).
 
-The **Explore** subtab is language-agnostic — it consumes the generic v3 `Catalog` shape and works against TypeScript, Python, Rust, Go, and Java catalogs alike. Per-edge `confidence` is carried on `GraphCallEdge` and is available to views; today it's read but not surfaced as a UI badge, so reachability views on tree-sitter catalogs look the same as TypeScript ones even though the underlying edges are lower-fidelity. See the per-rule fidelity table in [`02-rules-and-gating.md`](../40-graph/02-rules-and-gating.md) for what this means in practice.
+The **Explore** subtab is language-agnostic — it consumes the shared `Catalog`
+shape and works against TypeScript, Python, Rust, Go, and Java catalogs alike.
+Per-edge `confidence` is carried on `GraphCallEdge` and is available to views;
+today it's read but not surfaced as a UI badge, so reachability views on
+tree-sitter catalogs look the same as TypeScript ones even though the underlying
+edges are lower-fidelity. See the per-rule fidelity table in
+[`02-rules-and-gating.md`](../40-graph/02-rules-and-gating.md) for what this
+means in practice.
 
 The Explore subtab has three views (each with the same row-click → universal Function Card flow):
 
-- **Graph** — a node-link topology rendering of the call graph (Cytoscape.js + dagre/cose/breadthfirst layouts), with **SCC cycle highlighting** folded in (the highlight the standalone "SCCs" view used to own).
+- **Graph** — a node-link topology rendering of the call graph (Cytoscape.js +
+  dagre/cose/breadthfirst layouts), with **SCC cycle highlighting** folded in.
 - **Coupling** — the N×N package-by-package call-density matrix; click a cell for the actual call sites. "Is `core` really the bottom layer?"
-- **Functions** — one sortable, paginated, filter-aware function table. Its columns are the union of the metrics the former single-metric tabs ranked individually: body length (lines, the default sort), inbound callers, parameter count (width), and kind/package/file. It carries an in-table **name filter** (which absorbed the former standalone Search subtab) plus a **Test-only** toggle that narrows to production functions reached only from tests. Paginated at 10 rows per page — every function in the catalog (after filters) is reachable by paging.
-
-> **History.** Earlier releases shipped five single-metric explore tabs (Big / Hot / Wide / Untested / SCCs) plus a standalone Search. These were removed in the Code Paths restructure once their signal moved into engine gate rules (`graph:large-function`, `graph:wide-function`, `graph:high-blast-untested`, `graph:cycle`): Big/Hot/Wide/Untested collapsed into the single sortable **Functions** table, the SCCs signal lives on as the Graph view's cycle highlight, and Search became the Functions name filter.
+- **Functions** — one sortable, paginated, filter-aware function table. Its
+  columns cover body length (lines, the default sort), inbound callers,
+  parameter count (width), and kind/package/file. It carries an in-table
+  **name filter** plus a **Test-only** toggle that narrows to production
+  functions reached only from tests. Paginated at 10 rows per page — every
+  function in the catalog (after filters) is reachable by paging.
 
 The **Universal Function Card** is the cross-cutting drill-down: every clickable function name in any view opens the same overlay with name + location, body length, kind, params, return type, callers grouped by package, callees (resolved + external), an "Open in editor" deep link (`vscode://` or `cursor://` — opt in via `dashboard.editor` in [`opensip-cli.config.yml`](../70-reference/03-configuration.md); falls back to "Copy path" when unset), and a "Trace from entry" BFS.
 
@@ -178,9 +189,9 @@ numeric metric, sort descending, and hand the result to
 [`code-paths/view-template.ts`](../../../packages/dashboard/src/code-paths/view-template.ts);
 the view file is declarative config (`id`, `label`, `help`, `metric`,
 optional `predicate` / `preamble` / `searchByName` / `filterToggle`,
-`columns`, `headingText`, `emptyMessage`). It is the same skeleton the
-removed single-metric tabs (`big` / `hot` / `wide` / `untested`) used —
-the Functions view now subsumes all four via re-sortable columns.
+`columns`, `headingText`, `emptyMessage`). The Functions view uses this
+skeleton with sortable columns for the common size, caller, width, and
+test-reachability questions.
 
 A new ranked view that fits this shape is one config and one
 registration in [`code-paths.ts`](../../../packages/dashboard/src/code-paths.ts).

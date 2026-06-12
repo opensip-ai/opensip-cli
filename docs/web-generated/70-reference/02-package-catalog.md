@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-concepts/03-modular-monolith.md."
@@ -124,14 +124,9 @@ Imports every layer below. The published binary.
 
 > **Folder name vs. package name.** The directory is `packages/cli/`, but the
 > published npm package is the **unscoped `opensip-cli`** — the single package
-> end-users install with `curl -fsSL https://opensip.ai/cli/install.sh | bash`. It is the *only* unscoped
-> package; every other package is `@opensip-cli/*`. It was renamed from
-> `@opensip-cli/cli` to `opensip-cli` in v2.4.0; the package now installs
-> the `opensip` binary. The directory deliberately kept its historical
-> `cli` name to avoid churning every import path, workspace glob, and
-> dependency-cruiser rule for a cosmetic rename. The old `@opensip-cli/cli`
-> name is frozen at `2.3.3` and deprecated on npm with a migration message — see
-> the upgrade note in [`../00-start/00-quick-start.md`](/docs/opensip-cli/00-start/00-quick-start/).
+> end-users install with `curl -fsSL https://opensip.ai/cli/install.sh | bash`.
+> It is the only unscoped package; every other package is `@opensip-cli/*`.
+> The package installs the `opensip` binary.
 
 ## Workspace-private (never published)
 
@@ -142,7 +137,7 @@ Imports every layer below. The published binary.
 ## Adding a new package
 
 1. **Decide the layer.** Apply the rules in [`../10-concepts/03-modular-monolith.md`](/docs/opensip-cli/10-concepts/03-modular-monolith/): kernel = zero tool knowledge; contracts = used by every tool; tools = own a Tool contract; language adapters = implement `LanguageAdapter`; check packs = ship `Check[]`; cli = composition root only.
-2. **Add the dep-cruiser carve-out** if needed. The default layer rules forbid most cross-layer edges; if your package needs an exception, add it to [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/.config/dependency-cruiser.cjs) and document it in [`../80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/).
+2. **Add the dep-cruiser carve-out** if needed. The default layer rules forbid most cross-layer edges; if your package needs an exception, add it to [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/.config/dependency-cruiser.cjs) and document it in [`../80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/).
 3. **Add a row** in the right table above with the canonical npm name, path, one-line role (concrete, not "fitness concerns"), and 1–3 key exports a reader would grep for.
 4. **Update the layer narrative** in `10-concepts/03-modular-monolith.md` if the new package changes what the layer *means*. Pure additions to an existing pattern don't need a narrative edit — just the row here.
 
@@ -150,15 +145,25 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v3.0.0 against:
+Last verified at v1.0.0 against:
 
-- `packages/` directory listing — **33 publishable packages** total (all at `3.0.0`), plus one workspace-private test-support package:
+- `packages/` directory listing — **33 publishable packages** total (all at `1.0.0`), plus one workspace-private test-support package:
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + tree-sitter + cli-ui): 4 — `datastore`, `contracts`, `tree-sitter`, `cli-ui`
   - Layer 3 (config + targeting + session-store + output + dashboard + fitness language adapters): 11 — `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`
   - Layer 4 Tools: 3 — `fitness`, `simulation`, `graph`
   - Layer 5 (check packs + graph adapter packs/scaffolding): 13 — `checks-universal`, `checks-typescript`, `checks-python`, `checks-java`, `checks-go`, `checks-cpp`, `checks-rust`, `graph-adapter-common`, `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`
   - Layer 6 (composition root): 1 — `cli`
-- v2.0.0 promoted graph language adapters from internal subdirs to publishable npm packages (`@opensip-cli/graph-*`), added `checks-rust` to the bundled check packs, and split `dashboard` and `cli-ui` into peer-layer libraries to keep Tool engines free of UI-kit and rendering dependencies. Since then the tree-sitter graph adapters moved to the WASM `web-tree-sitter` build and grew a shared `@opensip-cli/graph-adapter-common` scaffolding package, the shared `@opensip-cli/tree-sitter` substrate (ADR-0010) was extracted as its own Layer 2 package, `@opensip-cli/config` became the dedicated config composer/schema-registry package (ADR-0023), and `@opensip-cli/targeting` was extracted as the host file-targeting runtime substrate (ADR-0037). The fitness language adapters (`@opensip-cli/lang-*`) and the graph language adapters (`@opensip-cli/graph-*`) are unrelated siblings implementing different contracts (`LanguageAdapter` vs. `GraphLanguageAdapter`) — see [`50-extend/05-language-adapters.md`](/docs/opensip-cli/50-extend/05-language-adapters/) for the distinction.
+- The graph language adapters are publishable `@opensip-cli/graph-*` packages,
+  backed by the shared `@opensip-cli/graph-adapter-common` scaffolding package
+  and the `@opensip-cli/tree-sitter` substrate. The config composer
+  (`@opensip-cli/config`) and host file-targeting runtime
+  (`@opensip-cli/targeting`) are separate packages so tool engines stay focused
+  on their own domains. The fitness language adapters (`@opensip-cli/lang-*`)
+  and the graph language adapters (`@opensip-cli/graph-*`) are unrelated
+  siblings implementing different contracts (`LanguageAdapter` vs.
+  `GraphLanguageAdapter`) — see
+  [`50-extend/05-language-adapters.md`](/docs/opensip-cli/50-extend/05-language-adapters/)
+  for the distinction.
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.

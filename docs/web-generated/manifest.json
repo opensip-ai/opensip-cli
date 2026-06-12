@@ -1,6 +1,6 @@
 {
-  "version": "3.0.0",
-  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-cli/v3.0.0/",
+  "version": "1.0.0",
+  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-cli/v1.0.0/",
   "pages": [
     {
       "file": "docs/web-generated/README.md",
@@ -13,7 +13,7 @@
         "plugin-authors",
         "ci-integrators"
       ],
-      "purpose": "Public documentation entry point for opensip-cli v3.0.0: product overview, fast paths, and the full reference map."
+      "purpose": "Public documentation entry point for opensip-cli v1.0.0: product overview, fast paths, and the full reference map."
     },
     {
       "file": "docs/web-generated/00-start/00-quick-start.md",
@@ -491,7 +491,7 @@
         "ci-integrators",
         "plugin-authors"
       ],
-      "purpose": "The SignalEnvelope shape every tool emits on --json. Every field, every type, every presence rule, plus the v1→v2 mapping."
+      "purpose": "The CommandOutcome and SignalEnvelope shapes every tool emits on --json. Every field, every type, and every presence rule."
     },
     {
       "file": "docs/web-generated/70-reference/05-checks-index.md",
@@ -517,17 +517,6 @@
       "purpose": "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
     },
     {
-      "file": "docs/web-generated/70-reference/07-migrating-to-2.7.md",
-      "path": "/docs/opensip-cli/70-reference/07-migrating-to-2.7/",
-      "section": "70-reference",
-      "title": "Migrating to 2.7",
-      "audience": [
-        "ci-integrators",
-        "plugin-authors"
-      ],
-      "purpose": "Everything a --json consumer or plugin author must change to move to opensip-cli 2.7 (the signal-output + output-package breaking batch in the pre-GA 2.x line)."
-    },
-    {
       "file": "docs/web-generated/70-reference/08-supply-chain-security.md",
       "path": "/docs/opensip-cli/70-reference/08-supply-chain-security/",
       "section": "70-reference",
@@ -541,17 +530,6 @@
       "purpose": "How opensip-cli reduces npm-family install risk for customers and how teams can use the package-supply-chain-policy check."
     },
     {
-      "file": "docs/web-generated/70-reference/09-migrating-to-2.12.md",
-      "path": "/docs/opensip-cli/70-reference/09-migrating-to-2.12/",
-      "section": "70-reference",
-      "title": "Migrating to 2.12",
-      "audience": [
-        "ci-integrators",
-        "plugin-authors"
-      ],
-      "purpose": "Everything a --json consumer must change for the 2.12.0 CommandOutcome wrapper, plus the new structured bootstrap errors and the governed env surface."
-    },
-    {
       "file": "docs/web-generated/70-reference/10-environment-variables.md",
       "path": "/docs/opensip-cli/70-reference/10-environment-variables/",
       "section": "70-reference",
@@ -561,17 +539,6 @@
         "operators"
       ],
       "purpose": "Every environment variable the opensip-cli CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
-    },
-    {
-      "file": "docs/web-generated/70-reference/11-migrating-to-3.0.md",
-      "path": "/docs/opensip-cli/70-reference/11-migrating-to-3.0/",
-      "section": "70-reference",
-      "title": "Migrating to 3.0 (GA)",
-      "audience": [
-        "plugin-authors",
-        "tool-authors"
-      ],
-      "purpose": "What changes for the 3.0.0 GA cutover: register() is removed (declare commandSpecs), apiVersion is mandatory, and cli.recipe is removed."
     },
     {
       "file": "docs/web-generated/70-reference/12-tools-command.md",
@@ -748,11 +715,8 @@
         "/docs/opensip-cli/70-reference/04-json-output-schema/",
         "/docs/opensip-cli/70-reference/05-checks-index/",
         "/docs/opensip-cli/70-reference/06-dashboard/",
-        "/docs/opensip-cli/70-reference/07-migrating-to-2.7/",
         "/docs/opensip-cli/70-reference/08-supply-chain-security/",
-        "/docs/opensip-cli/70-reference/09-migrating-to-2.12/",
         "/docs/opensip-cli/70-reference/10-environment-variables/",
-        "/docs/opensip-cli/70-reference/11-migrating-to-3.0/",
         "/docs/opensip-cli/70-reference/12-tools-command/"
       ]
     },
@@ -827,10 +791,7 @@
         "/docs/opensip-cli/70-reference/03-configuration/",
         "/docs/opensip-cli/70-reference/04-json-output-schema/",
         "/docs/opensip-cli/70-reference/05-checks-index/",
-        "/docs/opensip-cli/70-reference/07-migrating-to-2.7/",
         "/docs/opensip-cli/70-reference/08-supply-chain-security/",
-        "/docs/opensip-cli/70-reference/09-migrating-to-2.12/",
-        "/docs/opensip-cli/70-reference/11-migrating-to-3.0/",
         "/docs/opensip-cli/70-reference/12-tools-command/",
         "/docs/opensip-cli/80-implementation/02-plugin-loader/"
       ]
@@ -862,9 +823,7 @@
         "/docs/opensip-cli/70-reference/03-configuration/",
         "/docs/opensip-cli/70-reference/04-json-output-schema/",
         "/docs/opensip-cli/70-reference/05-checks-index/",
-        "/docs/opensip-cli/70-reference/07-migrating-to-2.7/",
         "/docs/opensip-cli/70-reference/08-supply-chain-security/",
-        "/docs/opensip-cli/70-reference/09-migrating-to-2.12/",
         "/docs/opensip-cli/70-reference/10-environment-variables/"
       ]
     },

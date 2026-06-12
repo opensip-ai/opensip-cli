@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Quick start"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
 purpose: "From zero to a passing fitness run. Hands-on before the conceptual material."
@@ -77,23 +77,9 @@ opensip sim --recipe example
 
 If `fit --recipe example` exits 0, the platform is wired correctly end-to-end: language detection picked the right adapter, the plugin loader found the example check, the recipe service matched it, the engine executed it, and the renderer drew the result. Every later doc is depth on one of those steps.
 
-opensip-cli publishes through npm trusted publishing/provenance and rejects OpenSIP package-level install hooks before release. For the remaining npm-install risk model, see [supply-chain security](/docs/opensip-cli/70-reference/08-supply-chain-security/).
-
-> **Upgrading from `@opensip-cli/cli`?**
-> The CLI was renamed to the unscoped **`opensip-cli`** in v2.4.0 — one command
-> now installs *and* updates the CLI together with every bundled package
-> (language adapters, engine, check packs). Both the old and new packages
-> provide the same `opensip` binary, so npm refuses to overwrite the old
-> global bin with `EEXIST`. **Uninstall the old package first:**
->
-> ```bash
-> npm uninstall -g @opensip-cli/cli
-> curl -fsSL https://opensip.ai/cli/install.sh | bash
-> ```
->
-> Nothing else changes — `opensip-cli.config.yml`, the `opensip-cli`
-> command, and every subcommand are identical. From 2.4.0 on, the installer
-> keeps the unscoped CLI package current.
+opensip-cli publishes through npm trusted publishing/provenance and rejects
+OpenSIP package-level install hooks before release. For the remaining
+npm-install risk model, see [supply-chain security](/docs/opensip-cli/70-reference/08-supply-chain-security/).
 
 ---
 

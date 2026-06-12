@@ -1,12 +1,12 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 owner: opensip-cli
 indexable: true
 title: "opensip-cli Docs"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
-purpose: "Public documentation entry point for opensip-cli v3.0.0: product overview, fast paths, and the full reference map."
+purpose: "Public documentation entry point for opensip-cli v1.0.0: product overview, fast paths, and the full reference map."
 ---
 # opensip-cli Docs
 
@@ -159,26 +159,23 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 42. [JSON output schema](./70-reference/04-json-output-schema.md)
 43. [Checks reference](./70-reference/05-checks-index.md)
 44. [Dashboard](./70-reference/06-dashboard.md)
-45. [Migrating to 2.7](./70-reference/07-migrating-to-2.7.md)
-46. [Supply-chain security](./70-reference/08-supply-chain-security.md)
-47. [Migrating to 2.12](./70-reference/09-migrating-to-2.12.md)
-48. [Environment variables](./70-reference/10-environment-variables.md)
-49. [Migrating to 3.0](./70-reference/11-migrating-to-3.0.md)
-50. [`tools` command](./70-reference/12-tools-command.md)
+45. [Supply-chain security](./70-reference/08-supply-chain-security.md)
+46. [Environment variables](./70-reference/10-environment-variables.md)
+47. [`tools` command](./70-reference/12-tools-command.md)
 
 ### 80 - Internals
 
-51. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
-52. [Plugin loader](./80-implementation/02-plugin-loader.md)
-53. [Session and persistence](./80-implementation/03-session-and-persistence.md)
-54. [Coding standards](./80-implementation/04-coding-standards.md)
-55. [Layer policy](./80-implementation/05-layer-policy.md)
-56. [Doc conventions](./80-implementation/06-doc-conventions.md)
-57. [Website integration](./80-implementation/07-website-integration.md)
+48. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
+49. [Plugin loader](./80-implementation/02-plugin-loader.md)
+50. [Session and persistence](./80-implementation/03-session-and-persistence.md)
+51. [Coding standards](./80-implementation/04-coding-standards.md)
+52. [Layer policy](./80-implementation/05-layer-policy.md)
+53. [Doc conventions](./80-implementation/06-doc-conventions.md)
+54. [Website integration](./80-implementation/07-website-integration.md)
 
 ## Factual Baseline
 
-This v3.0.0 doc set was rechecked against the source on 2026-06-12:
+This v1.0.0 doc set was rechecked against the source on 2026-06-12:
 
 - 166 built-in fitness checks across seven packs.
 - 33 publishable workspace packages, plus the private `@opensip-cli/test-support` package.

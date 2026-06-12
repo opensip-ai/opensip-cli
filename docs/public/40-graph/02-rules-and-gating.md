@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v3.0.0
+release: v1.0.0
 title: "Rules and gating (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The ten graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
@@ -234,7 +234,11 @@ opensip graph --gate-save
 opensip graph --gate-compare
 ```
 
-v2+: the baseline lives in the project's SQLite store (`<project>/opensip-cli/.runtime/datastore.sqlite`, gitignored), as rows in the host-owned `tool_baseline_entries` table scoped `tool = 'graph'` (ADR-0036 — one generic table pair serves every tool's gate). There is exactly one baseline per tool per project; the v1 `--baseline <path>` flag is gone (see [v2.0.0 CHANGELOG](../../../CHANGELOG.md)).
+The baseline lives in the project's SQLite store
+(`<project>/opensip-cli/.runtime/datastore.sqlite`, gitignored), as rows in the
+host-owned `tool_baseline_entries` table scoped `tool = 'graph'` (ADR-0036 —
+one generic table pair serves every tool's gate). There is exactly one baseline
+per tool per project.
 
 ### Signal fingerprints
 

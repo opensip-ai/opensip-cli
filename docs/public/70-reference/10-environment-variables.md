@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-08
-release: v3.0.0
+release: v1.0.0
 title: "Environment variables"
 audience: [ci-integrators, operators]
 purpose: "Every environment variable the opensip-cli CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
@@ -17,7 +17,7 @@ related-docs:
 # Environment variables
 
 Every environment variable the CLI reads is declared as an `EnvVarSpec` and read
-through a single `EnvRegistry` (release 2.12.0, [ADR-0024](../../decisions/ADR-0024-command-outcome-and-observability.md)),
+through a single `EnvRegistry` ([ADR-0024](../../decisions/ADR-0024-command-outcome-and-observability.md)),
 so the surface is governed, coerced, and documented. The source of truth is
 `describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](../../../packages/cli/src/env/host-env-specs.ts);
 the `env-via-registry` fitness check fails CI on any raw `process.env` read that
@@ -42,7 +42,7 @@ bypasses the registry.
 |---|---|
 | `OPENSIP_NO_UPDATE` | Set to any non-empty value to skip the CLI update check. |
 | `NO_UPDATE_NOTIFIER` | npm-convention update-notifier opt-out; honoured as an equivalent of `OPENSIP_NO_UPDATE`. |
-| `OPENSIP_CLI_SKIP_BUNDLED` | Comma-separated bundled-tool ids (`fitness`/`simulation`/`graph`) to NOT load as bundled, so an installed or project-local package of the same id can take over instead — the install-source-independence escape hatch (3.0.0). Unset loads all bundled tools. |
+| `OPENSIP_CLI_SKIP_BUNDLED` | Comma-separated bundled-tool ids (`fitness`/`simulation`/`graph`) to NOT load as bundled, so an installed or project-local package of the same id can take over instead. Unset loads all bundled tools. |
 
 ## Authored tools
 

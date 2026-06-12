@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-concepts/03-modular-monolith.md."
@@ -124,14 +124,9 @@ Imports every layer below. The published binary.
 
 > **Folder name vs. package name.** The directory is `packages/cli/`, but the
 > published npm package is the **unscoped `opensip-cli`** — the single package
-> end-users install with `curl -fsSL https://opensip.ai/cli/install.sh | bash`. It is the *only* unscoped
-> package; every other package is `@opensip-cli/*`. It was renamed from
-> `@opensip-cli/cli` to `opensip-cli` in v2.4.0; the package now installs
-> the `opensip` binary. The directory deliberately kept its historical
-> `cli` name to avoid churning every import path, workspace glob, and
-> dependency-cruiser rule for a cosmetic rename. The old `@opensip-cli/cli`
-> name is frozen at `2.3.3` and deprecated on npm with a migration message — see
-> the upgrade note in [`../00-start/00-quick-start.md`](../00-start/00-quick-start.md).
+> end-users install with `curl -fsSL https://opensip.ai/cli/install.sh | bash`.
+> It is the only unscoped package; every other package is `@opensip-cli/*`.
+> The package installs the `opensip` binary.
 
 ## Workspace-private (never published)
 
@@ -150,15 +145,25 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v3.0.0 against:
+Last verified at v1.0.0 against:
 
-- `packages/` directory listing — **33 publishable packages** total (all at `3.0.0`), plus one workspace-private test-support package:
+- `packages/` directory listing — **33 publishable packages** total (all at `1.0.0`), plus one workspace-private test-support package:
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + tree-sitter + cli-ui): 4 — `datastore`, `contracts`, `tree-sitter`, `cli-ui`
   - Layer 3 (config + targeting + session-store + output + dashboard + fitness language adapters): 11 — `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`
   - Layer 4 Tools: 3 — `fitness`, `simulation`, `graph`
   - Layer 5 (check packs + graph adapter packs/scaffolding): 13 — `checks-universal`, `checks-typescript`, `checks-python`, `checks-java`, `checks-go`, `checks-cpp`, `checks-rust`, `graph-adapter-common`, `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`
   - Layer 6 (composition root): 1 — `cli`
-- v2.0.0 promoted graph language adapters from internal subdirs to publishable npm packages (`@opensip-cli/graph-*`), added `checks-rust` to the bundled check packs, and split `dashboard` and `cli-ui` into peer-layer libraries to keep Tool engines free of UI-kit and rendering dependencies. Since then the tree-sitter graph adapters moved to the WASM `web-tree-sitter` build and grew a shared `@opensip-cli/graph-adapter-common` scaffolding package, the shared `@opensip-cli/tree-sitter` substrate (ADR-0010) was extracted as its own Layer 2 package, `@opensip-cli/config` became the dedicated config composer/schema-registry package (ADR-0023), and `@opensip-cli/targeting` was extracted as the host file-targeting runtime substrate (ADR-0037). The fitness language adapters (`@opensip-cli/lang-*`) and the graph language adapters (`@opensip-cli/graph-*`) are unrelated siblings implementing different contracts (`LanguageAdapter` vs. `GraphLanguageAdapter`) — see [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md) for the distinction.
+- The graph language adapters are publishable `@opensip-cli/graph-*` packages,
+  backed by the shared `@opensip-cli/graph-adapter-common` scaffolding package
+  and the `@opensip-cli/tree-sitter` substrate. The config composer
+  (`@opensip-cli/config`) and host file-targeting runtime
+  (`@opensip-cli/targeting`) are separate packages so tool engines stay focused
+  on their own domains. The fitness language adapters (`@opensip-cli/lang-*`)
+  and the graph language adapters (`@opensip-cli/graph-*`) are unrelated
+  siblings implementing different contracts (`LanguageAdapter` vs.
+  `GraphLanguageAdapter`) — see
+  [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md)
+  for the distinction.
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.

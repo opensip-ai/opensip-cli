@@ -23,8 +23,8 @@ This package is published for the CLI and advanced plugin authors; most users sh
 ## Documentation
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-cli/
-- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v3.0.0/packages/languages/lang-python
+- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/docs/public/70-reference/02-package-catalog.md
+- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v1.0.0/packages/languages/lang-python
 
 ## License
 

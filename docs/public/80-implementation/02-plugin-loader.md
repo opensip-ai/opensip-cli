@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-09
-release: v3.0.0
+release: v1.0.0
 title: "Plugin loader"
 audience: [contributors, plugin-authors]
 purpose: "How plugins are discovered, loaded, and registered. Source files, npm packages, project pinning, the sync command."
@@ -37,7 +37,7 @@ opensip-cli loads four kinds of plugins. Each has its own discovery shape, but t
 |---|---|---|
 | **Tools** | `node_modules` walk for `opensipTools.kind === 'tool'` marker | At CLI startup, by `discoverToolPackages()` |
 | **Check packs** (`fit-pack`) | (a) `node_modules` walk for the `opensipTools.kind === 'fit-pack'` marker (built-ins resolve from the CLI install tree), (b) exact `plugins.checkPackages:` list ADDED to marker discovery. Co-located `recipes` route to the `fit-recipe` domain. | The GENERIC substrate (`discoverCapabilityContributions` → `loadCapabilityDomain`), driven by fitness's `ensureChecksLoaded()` |
-| **Sim scenario packs** (`sim-pack`) | (a) Project-local source files under `opensip-cli/sim/`, (b) `node_modules` walk for `<scope>/scenarios-*` under default + configured `plugins.packageScopes`, (c) explicit `plugins.scenarioPackages:` pin. (The `sim-pack` marker fallback was retired in v3.0.0 — the descriptor is single-mode `name-pattern`.) Co-located `recipes` route to the `sim-recipe` domain. | The GENERIC substrate, driven by simulation's `ensureScenariosLoaded()` |
+| **Sim scenario packs** (`sim-pack`) | (a) Project-local source files under `opensip-cli/sim/`, (b) `node_modules` walk for `<scope>/scenarios-*` under default + configured `plugins.packageScopes`, (c) explicit `plugins.scenarioPackages:` pin. Co-located `recipes` route to the `sim-recipe` domain. | The GENERIC substrate, driven by simulation's `ensureScenariosLoaded()` |
 | **Graph adapters** (`graph-adapter`) | (a) Explicit `plugins.graphAdapters:` list (pins the set), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for the `opensipTools.kind: "graph-adapter"` marker (built-ins from the CLI install tree; shared scaffolding like `@opensip-cli/graph-adapter-common` carries no marker and is skipped). | The GENERIC substrate, driven per command by the CLI pre-action hook (`loadOwningToolCapabilities`) |
 | **Language adapters** | Direct CLI imports (no discovery walk) | At CLI bootstrap, before any tool is mounted |
 
@@ -99,7 +99,15 @@ Discovery is **deduplicated by package name** with nearest-ancestor wins. If a p
 
 Discovery is **synchronous and at startup**. Tools are cheap (each one is a small adapter); the walk completes in single-digit milliseconds. There is no lazy-load path for tools; either the package is installed by argv parse time or it doesn't exist for this run.
 
-The bundled tools (`@opensip-cli/fitness`, `@opensip-cli/simulation`, `@opensip-cli/graph`) declare the same `opensipTools.kind === 'tool'` marker. Since the **3.0.0 GA cutover** ([ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md)) they are **not** imported statically — `register-tools.ts` lists them by *package name* (`FIRST_PARTY_TOOLS`) and loads each through the same `loadToolManifest → admitTool → dynamic import → register` path a third-party tool travels (the `no-bootstrap-tool-import` check fails the build if a static `import { fitnessTool }` creeps back). The registry is **first-writer-wins**, so the bundled registration is the incumbent and a later same-id discovery is skipped with a warning.
+The bundled tools (`@opensip-cli/fitness`, `@opensip-cli/simulation`,
+`@opensip-cli/graph`) declare the same `opensipTools.kind === 'tool'` marker.
+They are **not** imported statically — `register-tools.ts` lists them by
+package name (`FIRST_PARTY_TOOLS`) and loads each through the same
+`loadToolManifest → admitTool → dynamic import → register` path a third-party
+tool travels (the `no-bootstrap-tool-import` check fails the build if a static
+`import { fitnessTool }` creeps back). The registry is **first-writer-wins**, so
+the bundled registration is the incumbent and a later same-id discovery is
+skipped with a warning.
 
 ---
 

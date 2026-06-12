@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/root",
-  "version": "3.0.0",
+  "version": "1.0.0",
   "private": true,
   "license": "MIT",
   "description": "OpenSIP CLI — open-source codebase analysis toolkit",

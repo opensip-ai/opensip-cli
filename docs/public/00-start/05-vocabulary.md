@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-09
-release: v3.0.0
+release: v1.0.0
 title: "Vocabulary"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The terms used everywhere in opensip-cli. Read this once before going deeper."
@@ -34,9 +34,9 @@ If you're skimming for one definition, [Ctrl-F]. If you're reading top-to-bottom
 
 A **Tool** is a kernel-level plugin that contributes one or more CLI subcommands. `fit` is a Tool. `sim` is a Tool. `graph` is a Tool. Anything you write that mounts under the `opensip` binary is a Tool.
 
-The contract lives in [`packages/core/src/tools/types.ts`](../../../packages/core/src/tools/types.ts). Each Tool exports `metadata` (id, version, description), a `commands[]` array (names + descriptions, used for `--help`), declarative `commandSpecs` (the typed command specs the host mounts), and an optional `initialize()` hook. The CLI is a generic dispatcher — it builds a per-invocation `ToolRegistry`, populates it during bootstrap, and mounts each registered Tool's `commandSpecs`. (3.0.0: the pre-GA `register(cli)` hook and the raw-Commander `program` handle were removed — see [ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md).)
+The contract lives in [`packages/core/src/tools/types.ts`](../../../packages/core/src/tools/types.ts). Each Tool exports `metadata` (id, version, description), a `commands[]` array (names + descriptions, used for `--help`), declarative `commandSpecs` (the typed command specs the host mounts), and an optional `initialize()` hook. The CLI is a generic dispatcher — it builds a per-invocation `ToolRegistry`, populates it during bootstrap, and mounts each registered Tool's `commandSpecs`.
 
-First-party Tools (`fit`, `sim`, `graph`) load by package name through the same plugin path as third-party Tools (3.0.0, [ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md)) — the CLI holds no static `import` of a tool runtime. Third-party Tools are discovered by walking `node_modules` for any package whose `package.json` declares `opensipTools.kind === 'tool'`. See [`../10-concepts/02-tool-plugin-model.md`](../10-concepts/02-tool-plugin-model.md).
+First-party Tools (`fit`, `sim`, `graph`) load by package name through the same plugin path as third-party Tools ([ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md)) — the CLI holds no static `import` of a tool runtime. Third-party Tools are discovered by walking `node_modules` for any package whose `package.json` declares `opensipTools.kind === 'tool'`. See [`../10-concepts/02-tool-plugin-model.md`](../10-concepts/02-tool-plugin-model.md).
 
 ## Check
 
@@ -58,7 +58,7 @@ Recipes are created with `defineRecipe()` from [`packages/fitness/engine/src/rec
 
 The default recipe — what `opensip fit` runs without `--recipe` — is built by [`packages/fitness/engine/src/recipes/built-in-recipes.ts`](../../../packages/fitness/engine/src/recipes/built-in-recipes.ts) and selects every enabled check. A project ships its own recipes under `opensip-cli/fit/recipes/*.mjs`.
 
-As of v2.6.0 the generic recipe substrate — the named selection of units (by id/tag) plus per-unit config overrides — lives in `@opensip-cli/core` (`RecipeRegistry<T>`, generic over the unit type), with the selector-resolution and per-unit-override logic shared. Each tool keeps its own *execution* strategy (fitness runs checks parallel/sequential over file content; sim runs scenarios; graph evaluates rules once over the dataset). `sim` and `graph` reuse the same substrate with their own selectors — same idea, different unit type.
+The generic recipe substrate — the named selection of units (by id/tag) plus per-unit config overrides — lives in `@opensip-cli/core` (`RecipeRegistry<T>`, generic over the unit type), with the selector-resolution and per-unit-override logic shared. Each tool keeps its own *execution* strategy (fitness runs checks parallel/sequential over file content; sim runs scenarios; graph evaluates rules once over the dataset). `sim` and `graph` reuse the same substrate with their own selectors — same idea, different unit type.
 
 ## Scenario
 
@@ -71,7 +71,7 @@ Scenarios are defined by tool packs analogous to check packs ([`packages/simulat
 
 ## Rule
 
-A **rule** is the `graph`-side equivalent of a check — a single, named analysis over the static call graph. As of v2.6.0 (ADR-0005) the graph tool is an architectural peer of fitness: rules are authored with `defineRule` ([`packages/graph/engine/src/rules/define-rule.ts`](../../../packages/graph/engine/src/rules/define-rule.ts)), the parallel to `defineCheck`. The difference is the input — a check sees `(content, filePath)`; a rule's `evaluate(dataset)` sees the engine **dataset**: the catalog, the indexes, and a derived **feature layer** (per-function size, fan-out, blast radius, test reachability; package-coupling and SCC membership). "The data is the data, the engine is the engine" — rules are declarative queries over that dataset, and the dashboard's graph view is a pure view over the same data.
+A **rule** is the `graph`-side equivalent of a check — a single, named analysis over the static call graph. The graph tool is an architectural peer of fitness: rules are authored with `defineRule` ([`packages/graph/engine/src/rules/define-rule.ts`](../../../packages/graph/engine/src/rules/define-rule.ts)), the parallel to `defineCheck`. The difference is the input — a check sees `(content, filePath)`; a rule's `evaluate(dataset)` sees the engine **dataset**: the catalog, the indexes, and a derived **feature layer** (per-function size, fan-out, blast radius, test reachability; package-coupling and SCC membership). "The data is the data, the engine is the engine" — rules are declarative queries over that dataset, and the dashboard's graph view is a pure view over the same data.
 
 Ten rules ship today, in a fixed registration order ([`packages/graph/engine/src/rules/registry.ts`](../../../packages/graph/engine/src/rules/registry.ts)): the five original reachability/duplication rules (`orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`) plus five structural rules (`large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`). Runtime loading of project-local rules is deferred — the bundled set is what runs today. Rule slugs are byte-stable (they key the baseline fingerprint), so a rule's `ruleId` survives refactors.
 
@@ -145,7 +145,7 @@ The gate matches by `(filePath, ruleId, message)` — line numbers are deliberat
 A few terms that appear in the codebase or docs but aren't kernel concepts:
 
 - **Pack** — informal name for an npm package that ships checks (e.g. `@opensip-cli/checks-typescript`). Same thing as a check-pack plugin.
-- **Finding** — synonym for `Signal`, used in some legacy comments. Prefer `Signal`.
+- **Finding** — user-facing synonym for `Signal`. Prefer `Signal` in platform code.
 - **Violation** — what a check returns to the framework (`CheckViolation[]`). The framework converts each violation into a Signal. Use `violation` inside a check, `Signal` everywhere else.
 - **Selector** — the discriminated-union type a recipe uses to pick checks (`all | tags | pattern | explicit`). Lives in [`packages/fitness/engine/src/recipes/types.ts`](../../../packages/fitness/engine/src/recipes/types.ts).
 

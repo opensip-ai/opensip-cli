@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v3.0.0
+release: v1.0.0
 title: "Scenarios and recipes (sim)"
 audience: [contributors, plugin-authors]
 purpose: "What a sim scenario is, the two kinds, and how recipes compose them. The author-facing primitives in the simulation tool."
@@ -52,7 +52,8 @@ opensip sim recognizes two kinds, each with its own author-facing entry point in
 
 Each kind has its own `define.ts`, `executor.ts`, and `result.ts` under [`packages/simulation/engine/src/kinds/<kind>/`](../../../packages/simulation/engine/src/kinds/). They share a common runtime contract (`RunnableScenario`, `ScenarioExecutorResult`) so the engine can execute any kind through the same dispatcher.
 
-The old generic `defineScenario` alias has been removed. New code uses the kind-specific entry points.
+Use the kind-specific entry points so each scenario declares its runtime shape
+explicitly.
 
 ### `defineLoadScenario`
 

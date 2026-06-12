@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Publishable packs"
 audience: [plugin-authors]
 purpose: "Author and publish fit packs or sim scenario packs: workspace package skeleton, discovery contracts, and the migration recipe from loose .mjs files."
@@ -42,14 +42,20 @@ Tag your pack's `package.json` with `opensipTools.kind`:
 }
 ```
 
-For a **fit pack** the `fit-pack` marker is name-pattern-independent — your pack can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`, anything); the marker is what makes the platform find it. A **sim pack** is discovered by a NAME PATTERN instead — name it `<scope>/scenarios-*` (the `sim-pack` marker is no longer a discovery trigger as of v3.0.0; see below).
+For a **fit pack** the `fit-pack` marker is name-pattern-independent — your pack
+can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`,
+anything); the marker is what makes the platform find it. A **sim pack** is
+discovered by a name pattern instead — name it `<scope>/scenarios-*` (see
+below).
 
 ### Discovery paths
 
 Listed in recommendation order:
 
 - **fit: the `fit-pack` marker (recommended)** — declare `opensipTools.kind: "fit-pack"` in your pack's `package.json`. Free choice of scope and name. No config entry.
-- **sim: the `scenarios-*` name pattern (recommended)** — name your pack `<scope>/scenarios-*` (e.g. `@acme/scenarios-load`). `plugins.packageScopes` extends the scopes scanned beyond `@opensip-cli`. The `sim-pack` marker fallback was retired in v3.0.0 when discovery became descriptor-driven (each domain declares ONE discovery mode).
+- **sim: the `scenarios-*` name pattern (recommended)** — name your pack
+  `<scope>/scenarios-*` (e.g. `@acme/scenarios-load`). `plugins.packageScopes`
+  extends the scopes scanned beyond `@opensip-cli`.
 - **explicit listing** — name individual packages in `plugins.checkPackages` (fit) or `plugins.scenarioPackages` (sim) from project `node_modules`. For fit, an explicit list is ADDED to marker discovery; for sim it pins the set.
 - **Project-pinned install** — `opensip plugin add --domain fit @scope/pack` or `--domain sim @scope/pack` installs into `.runtime/plugins/<domain>/` and records `plugins.fit:` / `plugins.sim:` so teammates can reproduce it with `plugin sync`.
 
@@ -105,8 +111,8 @@ This pattern works at scale — the opensip codebase uses it for 308 fitness che
   "type": "module",
   "opensipTools": { "kind": "fit-pack" },
   "peerDependencies": {
-    "@opensip-cli/fitness": "^3.0.0",
-    "@opensip-cli/core": "^3.0.0"
+    "@opensip-cli/fitness": "^1.0.0",
+    "@opensip-cli/core": "^1.0.0"
   },
   "scripts": {
     "build": "tsc"

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "FAQ"
 audience: [getting-started]
 purpose: "Common questions about adoption, edge cases, and what opensip-cli does or doesn't do."
@@ -95,7 +95,12 @@ The runtime cost scales with `checks × matched-files`, not with project size. A
 - **Check** — a single `fit` rule. One file, one `defineCheck()` call. Runs once per matched file.
 - **Recipe** — a named lineup of checks (or scenarios) plus execution options. Used for "what should we run in this CI step?"
 - **Scenario** — a single `sim` workload (load, chaos).
-- **Rule** — what `graph` calls its analyses (orphan-subtree, duplicated-function-body, large-function, etc.). As of v2.6.0 a rule is authored with `defineRule`, the call-graph parallel to `defineCheck`; ten ship in the box. The difference from a check is the input: a rule queries the engine **dataset** (call graph + derived feature columns), not a single file's `(content, filePath)`.
+- **Rule** — what `graph` calls its analyses (orphan-subtree,
+  duplicated-function-body, large-function, etc.). A rule is authored with
+  `defineRule`, the call-graph parallel to `defineCheck`; ten ship in the box.
+  The difference from a check is the input: a rule queries the engine
+  **dataset** (call graph + derived feature columns), not a single file's
+  `(content, filePath)`.
 
 See [vocabulary](./05-vocabulary.md) for the full glossary.
 
@@ -104,12 +109,6 @@ See [vocabulary](./05-vocabulary.md) for the full glossary.
 ### Is this an AI tool?
 
 **No.** No model calls, no embeddings, no agentic anything. Plain TypeScript CLI. You can build an AI tool *on top of* the Tool plugin contract — that's exactly what the contract is for, and the contract is documented in [plugin authoring](../50-extend/01-plugin-authoring.md).
-
----
-
-### What does v2.0 break from v1?
-
-v2.0 swaps internal runtime persistence from JSON files to SQLite. **v2 ignores v1's `<project>/opensip-cli/.runtime/` contents** and initializes a fresh `datastore.sqlite` on first run. Caches rebuild automatically. The `--baseline <path>` flag is removed — there is now exactly one gate baseline per project, stored in the SQLite database. See the v2.0.0 entry in [CHANGELOG.md](https://github.com/opensip-ai/opensip-cli/blob/main/CHANGELOG.md) for details.
 
 ---
 

@@ -161,7 +161,7 @@ export const checks = [
 ];
 ```
 
-**npm packages (explicitly pinned)** — install via `opensip-cli
+**npm packages (explicitly pinned)** — install via `opensip
 plugin add <package>`. The CLI runs `npm install` under
 `opensip-cli/.runtime/plugins/fit/node_modules/` and adds the
 package name to `plugins.fit:` in `opensip-cli.config.yml`. Only

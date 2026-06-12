@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Session and persistence"
 audience: [contributors]
 purpose: "What gets written to disk during and after a run. The runtime dir layout, the SQLite store, logs, reports."
@@ -139,7 +139,16 @@ opensip sessions purge -y                   # skip the confirmation prompt
 
 The dashboard reads the same store to populate its run-history view.
 
-**Session replay (2.12.0).** `sessions show` (and the per-run `--show <session>` shorthand on `fit`/`graph`/`sim`) reconstructs a past run's output from its stored payload. The opaque payload is decoded back into its structural shape by the shared `decodeSessionPayload` in [`@opensip-cli/session-store`](../../../packages/session-store/src/session-payload-decode.ts) — persistence owns the structural decode but still holds **zero tool vocabulary**. Each tool then projects that structure into a `SignalEnvelope` via its `sessionReplay` contribution (`fit`/`graph`/`sim`), tagging the result `fidelity: 'projection'` (rebuilt from persisted findings, not re-executed). Failures (`not-found`, `wrong-tool`, `ambiguous-latest`, `decode-error`) surface as a structured `CommandOutcome` error with exit 2.
+**Session replay.** `sessions show` (and the per-run `--show <session>`
+shorthand on `fit`/`graph`/`sim`) reconstructs a past run's output from its
+stored payload. The opaque payload is decoded back into its structural shape by
+the shared `decodeSessionPayload` in [`@opensip-cli/session-store`](../../../packages/session-store/src/session-payload-decode.ts)
+— persistence owns the structural decode but still holds **zero tool
+vocabulary**. Each tool then projects that structure into a `SignalEnvelope` via
+its `sessionReplay` contribution (`fit`/`graph`/`sim`), tagging the result
+`fidelity: 'projection'` (rebuilt from persisted findings, not re-executed).
+Failures (`not-found`, `wrong-tool`, `ambiguous-latest`, `decode-error`) surface
+as a structured `CommandOutcome` error with exit 2.
 
 ---
 
@@ -168,9 +177,12 @@ All tools' gate baselines live in **one generic table pair** in the SQLite store
 
 The capture (`--gate-save`), ratchet (`--gate-compare`), and export (SARIF + JSON fingerprints) machinery are host seams (`saveBaseline`/`compareBaseline`/`exportBaselineSarif`/`exportBaselineFingerprints` on `ToolCliContext`) over the generic [`BaselineRepo`](../../../packages/datastore/src/baseline-repo.ts) plus the pure `diffBaseline` in `@opensip-cli/output`. A tool inherits the whole gate by stamping fingerprints on its signals — it authors at most a `Tool.fingerprintStrategy` (fitness: `sha256(filePath\nruleId\nmessage)`, line-shift tolerant; graph: `ruleId|filePath|line|column`, message-excluded) and **no schema, no repo, no diff code**.
 
-### v1 → v2: the `--baseline <path>` flag is gone
+### Baselines live in SQLite
 
-v1 wrote baselines as JSON/SARIF files (`baseline.sarif`, `cache/graph/baseline.json`) and let users override the path with `--baseline`. v2 stores exactly one baseline per project, in the SQLite database. **Drop `--baseline path/to/file.sarif` from CI invocations**; the flag has no equivalent. Teams that committed `baseline.sarif` to git for cross-CI-run gate comparisons should re-run `--gate-save` once the new code lands. See the v2.0.0 entry in [`CHANGELOG.md`](../../../CHANGELOG.md) for the full break.
+Each tool has exactly one baseline per project in the SQLite database.
+`--gate-save` replaces that tool's baseline rows; `--gate-compare` compares the
+current run against the saved rows. SARIF remains an export format, not the
+baseline store.
 
 ---
 

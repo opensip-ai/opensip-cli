@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v3.0.0
+release: v1.0.0
 title: "Show me each loop"
 audience: [getting-started]
 purpose: "One sample per tool — fit check, sim scenario, graph rule — so you can see the shape of the work before reading the architecture docs."
@@ -117,7 +117,15 @@ The two scenario kinds — `defineLoadScenario`, `defineChaosScenario` — each 
 
 ## `graph` — a rule on the call graph
 
-As of v2.6.0, `graph` is an architectural *peer* of `fit`: rules are authored with `defineRule` — the call-graph analogue of `defineCheck` — selected through the same shared recipe substrate, and their findings land in sessions and the dashboard exactly like fitness checks. The difference is the *input*: where a check sees `(content, filePath)`, a rule sees the engine **dataset** (the catalog, the indexes, and a derived feature layer). The engine builds your project's static call graph in a staged pipeline (discover → walk → resolve → index → derive features → render); ten built-in rules consume that dataset and emit findings.
+`graph` is an architectural *peer* of `fit`: rules are authored with
+`defineRule` — the call-graph analogue of `defineCheck` — selected through the
+same shared recipe substrate, and their findings land in sessions and the
+dashboard exactly like fitness checks. The difference is the *input*: where a
+check sees `(content, filePath)`, a rule sees the engine **dataset** (the
+catalog, the indexes, and a derived feature layer). The engine builds your
+project's static call graph in a staged pipeline (discover → walk → resolve →
+index → derive features → render); ten built-in rules consume that dataset and
+emit findings.
 
 ```text
 > opensip graph
@@ -144,7 +152,7 @@ The ten rules, in two groups. Reachability and duplication:
 - **`test-only-reachable`** — code only reached from test files (likely dead in production).
 - **`always-throws-branch`** — branches that always throw, suggesting an unreachable code path.
 
-Structural (added in v2.6.0, fed by the engine feature layer):
+Structural (fed by the engine feature layer):
 
 - **`large-function`** — functions whose body exceeds a configured line count.
 - **`wide-function`** — functions taking too many parameters.
