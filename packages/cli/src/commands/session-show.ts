@@ -14,6 +14,10 @@ export interface ExecuteSessionShowOptions {
   readonly ref: string;
   readonly tool?: ToolShortId;
   readonly json?: boolean;
+  /** Agent ergonomics filters (from --filter, repeatable). See Phase 1 plan. */
+  readonly filters?: string[];
+  /** With json: request the inner payload (session + envelope + metadata) without outer wrapper. */
+  readonly raw?: boolean;
   readonly render: CliCommandsContext['render'];
   /** Success machine-output seam — wraps the value in a `CommandOutcome`. */
   readonly emitJson: (value: unknown) => void;
@@ -55,23 +59,109 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
     return;
   }
 
+  // Apply agent filters (Phase 1) *after* tool replay but before host emission.
+  // This keeps per-tool replays pure while enabling token-efficient, focused
+  // historical results for agents. The resulting envelope remains a valid
+  // (possibly filtered) SignalEnvelope.
+  const originalSignalCount = replay.envelope.signals.length;
+  const filteredReplay = opts.filters?.length
+    ? applyFiltersToReplay(resolved.session, replay, opts.filters)
+    : replay;
+
   if (opts.json === true) {
-    opts.emitJson(sessionShowJson(resolved.session, replay));
+    const jsonPayload = sessionShowJson(
+      resolved.session,
+      filteredReplay,
+      opts.filters,
+      originalSignalCount,
+    );
+
+    if (opts.raw) {
+      // Raw mode for agents: emit the core payload directly (bypassing the
+      // standard CommandResult {kind, status, data, ...} wrapper produced by
+      // the higher-level outcome assembly for 'command-result' outputs).
+      // This gives the smallest possible machine response containing the
+      // session metadata + (filtered) envelope + hints.
+      process.stdout.write(JSON.stringify(jsonPayload) + '\n');
+      opts.setExitCode(0);
+      return;
+    }
+
+    opts.emitJson(jsonPayload);
     return;
   }
-  await opts.render(sessionReplayResult(resolved.session, replay));
+  await opts.render(
+    sessionReplayResult(resolved.session, filteredReplay, opts.filters, originalSignalCount),
+  );
+}
+
+/**
+ * Simple, host-side filter applicator for SignalEnvelope signals.
+ * errors-only  => severity === 'high'
+ * warnings-only => severity === 'medium'
+ * top:<n>      => take first N after severity sort (high, medium, low) + stable order
+ * Composable: errors-only + top:20 means top 20 errors.
+ */
+function applyFiltersToReplay(
+  session: StoredSession,
+  replay: ToolSessionReplay<CommandResult>,
+  filters: string[],
+): ToolSessionReplay<CommandResult> {
+  const envelope = replay.envelope;
+  let signals = [...envelope.signals];
+
+  const hasErrorsOnly = filters.some((f) => f === 'errors-only' || f === 'high');
+  const hasWarningsOnly = filters.some((f) => f === 'warnings-only' || f === 'medium');
+
+  if (hasErrorsOnly && !hasWarningsOnly) {
+    signals = signals.filter((s) => s.severity === 'high');
+  } else if (hasWarningsOnly && !hasErrorsOnly) {
+    signals = signals.filter((s) => s.severity === 'medium');
+  }
+  // If both or neither, no severity filter (top will still apply).
+
+  // Apply top:N (last filter wins for simplicity; or take min if multiple).
+  const topFilter = filters.find((f) => f.startsWith('top:'));
+  if (topFilter) {
+    const n = parseInt(topFilter.split(':')[1] || '0', 10);
+    if (n > 0) {
+      // Re-sort for "top": high first, then medium, low, preserving original relative order.
+      signals = signals
+        .map((s, i) => ({ s, i }))
+        .sort((a, b) => {
+          const sevOrder = (sev: string) => (sev === 'high' ? 0 : sev === 'medium' ? 1 : 2);
+          const so = sevOrder(a.s.severity) - sevOrder(b.s.severity);
+          return so !== 0 ? so : a.i - b.i;
+        })
+        .slice(0, n)
+        .map((x) => x.s);
+    }
+  }
+
+  const filteredEnvelope = { ...envelope, signals };
+
+  return {
+    ...replay,
+    envelope: filteredEnvelope,
+  };
 }
 
 /**
  * Build the tool-agnostic `session-replay` view result from a resolved session +
  * its replay. Renders uniformly across fit/graph/sim via the shared envelope
  * table (not each tool's live-run done-view), with no live-run footer.
+ *
+ * When filters are applied, the delivered envelope contains the subset and
+ * we attach agent metadata (counts + filtersApplied). The outer session
+ * verdict (score/passed) always reflects the *original* stored run.
  */
 function sessionReplayResult(
   session: StoredSession,
   replay: ToolSessionReplay<CommandResult>,
+  filters?: string[],
+  originalSignalCount?: number,
 ): CommandResult {
-  return {
+  const base: any = {
     type: 'session-replay',
     session: {
       id: session.id,
@@ -85,13 +175,23 @@ function sessionReplayResult(
     envelope: replay.envelope,
     fidelity: replay.fidelity,
   };
+
+  if (filters?.length && originalSignalCount != null) {
+    base.filtersApplied = filters;
+    base.originalSignalCount = originalSignalCount;
+    base.returnedSignalCount = replay.envelope.signals.length;
+  }
+
+  return base;
 }
 
 function sessionShowJson(
   session: StoredSession,
   replay: ToolSessionReplay<CommandResult>,
+  filters?: string[],
+  originalSignalCount?: number,
 ): unknown {
-  return {
+  const base: any = {
     session: {
       id: session.id,
       tool: session.tool,
@@ -105,6 +205,14 @@ function sessionShowJson(
     fidelity: replay.fidelity,
     envelope: replay.envelope,
   };
+
+  if (filters?.length && originalSignalCount != null) {
+    base.filtersApplied = filters;
+    base.originalSignalCount = originalSignalCount;
+    base.returnedSignalCount = replay.envelope.signals.length;
+  }
+
+  return base;
 }
 
 async function emitSessionShowError(

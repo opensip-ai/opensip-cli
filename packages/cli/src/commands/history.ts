@@ -15,24 +15,34 @@ import type { DataStore } from '@opensip-cli/datastore';
 export interface ShowHistoryOptions {
   readonly tool?: ToolShortId;
   readonly limit?: number;
+  /** Agent ergonomics: drop the heavy per-session payload (keep showCommand + lightweight summary). */
+  readonly summaryOnly?: boolean;
 }
 
 export function showHistory(datastore: DataStore, opts: ShowHistoryOptions = {}): HistoryResult {
   const repo = new SessionRepo(datastore);
-  const sessions = repo.list(opts).map(toHistorySession);
+  const sessions = repo.list(opts).map((s) => toHistorySession(s, opts.summaryOnly));
   return {
     type: 'history',
     sessions,
   };
 }
 
-function toHistorySession(session: StoredSession): HistorySession {
+function toHistorySession(session: StoredSession, summaryOnly = false): HistorySession {
   const summary = sessionSummary(session.payload);
-  return {
+  const base: HistorySession = {
     ...session,
     ...(summary === undefined ? {} : { summary }),
     showCommand: `opensip sessions show ${session.id} --json`,
   };
+
+  if (summaryOnly) {
+    // Drop the (potentially large) tool-owned payload for agent "menu" use cases.
+    // The lightweight summary (if present) and showCommand remain.
+    delete (base as any).payload;
+  }
+
+  return base;
 }
 
 function sessionSummary(payload: unknown): HistorySession['summary'] | undefined {

@@ -46,6 +46,7 @@ import { buildHostSubcommandGroups, type HostSpec } from './host-subcommand-grou
 import { executeInit } from './init.js';
 import { mountCommandSpec } from './mount-command-spec.js';
 import { executeUninstall } from './uninstall.js';
+import { executeAgentCatalog } from './agent-catalog.js';
 
 import type { CliCommandsContext } from './shared.js';
 import type { CliProgram, InitOptions } from '@opensip-cli/contracts';
@@ -277,6 +278,26 @@ function buildUninstallSpec(): HostSpec {
 }
 
 // ---------------------------------------------------------------------------
+// agent-catalog (agent-first discovery surface)
+// ---------------------------------------------------------------------------
+
+function buildAgentCatalogSpec(ctx: CliCommandsContext): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'agent-catalog',
+    description:
+      'Structured catalog of agent-friendly commands, patterns, and output shapes (JSON preferred). ' +
+      'Primary surface for AI agents to bootstrap usage of sessions, filtering, and historical results.',
+    commonFlags: ['json'],
+    scope: 'none',
+    output: 'command-result',
+    handler: (rawOpts) => {
+      const opts = rawOpts as { json?: boolean };
+      return executeAgentCatalog({ json: opts.json });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Assembly + mount
 // ---------------------------------------------------------------------------
 
@@ -300,7 +321,13 @@ const COMPLETION_SELF_SPEC: SpecLike = { name: 'completion', commonFlags: [] };
  * neither caller can form a call cycle back through the completion handler.
  */
 function buildNonCompletionHostSpecs(ctx: CliCommandsContext): readonly HostSpec[] {
-  return [buildInitSpec(ctx), buildDashboardSpec(), buildConfigureSpec(), buildUninstallSpec()];
+  return [
+    buildInitSpec(ctx),
+    buildDashboardSpec(),
+    buildConfigureSpec(),
+    buildAgentCatalogSpec(ctx),
+    buildUninstallSpec(),
+  ];
 }
 
 /**
@@ -336,6 +363,7 @@ export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSp
     buildInitSpec(ctx),
     buildDashboardSpec(),
     buildConfigureSpec(),
+    buildAgentCatalogSpec(ctx),
     buildCompletionSpec(ctx),
     buildUninstallSpec(),
   ];
