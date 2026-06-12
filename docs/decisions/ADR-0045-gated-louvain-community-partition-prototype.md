@@ -166,13 +166,67 @@ prototype deliverable, not a follow-up.
 
 ## Outcome (B2 — to be appended)
 
-*Pending. After the B1 measurement, append the verdict (adopted as flat-large
-default / kept opt-in / discarded-and-removed) and the measurement table
-(boundary calls, shard balance, cold wall-time, warm behavior including W2
-edit stability — both corpora × both strategies) verbatim from
-`docs/plans/backlog/louvain-community-shard-partitioning/results.md`. If no
-suitable real flat repo is found and a scaled-up synthetic fixture substitutes,
-say so here — weaker external validity, documented.*
+**Verdict: pending orchestrator review** (B1 measured 2026-06-12; the numeric
+gate is **NOT MET** — measurement recommends discard. The verdict line is
+completed after the orchestrator's ruling.)
+
+**Corpora.** (1) The seeded synthetic fixture (3,000 files, 30 import
+clusters misaligned across 12 dirs, seed 0xf1a7). (2) A REAL flat repo —
+**`ant-design/ant-design` @ `3442be35b8affc0dc7dc4169986a10e16f9f8c07`**: no
+`workspaces`, no nested `package.json` on the detection paths, single root
+`tsconfig.json`, 3,025 source files (2,785 discovered) → classifies
+`flat-large`. The scaled-synthetic fallback clause was NOT needed.
+Conditions: Apple M5 Max (18 cores, 128 GiB), Node v24.16.0, child heap
+12,288 MB, concurrency 4, 3 cold runs (median), strategy toggled only via
+`graph.partitionStrategy`.
+
+**Measurement table** (verbatim from `results.md`, local plan dir):
+
+Synthetic fixture (3,000 files):
+
+| strategy | shards | boundary calls | max/median | CV | cold median ms | partition ms | W1 fully cached | W1 warm ms | W2a shardsBuilt | W2b shardsBuilt | equivalence |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| hybrid | 12 | 10322 | 1.00 | 0.00 | 4846 | 6 | yes | 752 | 1 | 1 | PASS |
+| community | 30 | 299 | 1.00 | 0.00 | 9166 | 353 | yes | 1459 | 1 | 1 | PASS |
+
+Real corpus (ant-design):
+
+| strategy | shards | boundary calls | max/median | CV | cold median ms | partition ms | W1 fully cached | W1 warm ms | W2a shardsBuilt | W2b shardsBuilt | equivalence |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| hybrid | 91 | 27852 | 5.29 | 0.79 | 45818 | 5 | yes | 3891 | 1 | 1 | FAIL |
+| community | 12 | 26538 | 7.24 | 1.24 | 8499 | 381 | yes | 2255 | 1 | 1 | FAIL |
+
+**Gate evaluation (adopt requires ALL, on BOTH corpora):**
+
+- *Boundary calls ≥ 25% fewer:* synthetic −97.1%; real **−4.7% → MISS**.
+  Real boundary sets are dominated by call sites unresolvable in-shard
+  regardless of co-location.
+- *Shard balance:* PASS — max/median ratio 1.0× (synthetic) and 1.37×
+  (real) of hybrid's, both ≤ ~1.5×; no shard over `maxShardSize` (2,000).
+- *Warm cache:* W1 fully cached + byte-identical on both corpora (30/30 and
+  12/12 `shardsCached == shardCount`); W2a = W2b = 1 shard rebuilt
+  everywhere (the predicted import-edit instability never materialized);
+  but warm wall-time **1.94× hybrid's on the synthetic corpus → MISS**
+  (1,459 vs 752 ms — the import scan + Louvain runs on every warm build).
+- *Soundness:* fixture-level `graph-equivalence-check` GREEN for both
+  strategies at zero floors (the gate input as scoped). The real-corpus
+  equivalence run was heap-feasible (exact oracle over 2,785 files completed
+  in 12 GiB) and **FAILED for BOTH strategies including the hybrid control**
+  (production divergences: hybrid 636, community 929) — a pre-existing
+  sharded≢exact gap on foreign flat repos, not prototype-caused; but
+  community widens it by 46%, and the layout-dependence itself shows
+  ADR-0033's partition-independence invariant does not yet hold on
+  foreign-repo resolution shapes (follow-up track, independent of this
+  verdict).
+
+**Headline surprise (durable learning):** cold wall-time follows SHARD
+COUNT, not boundary-call volume — community was 1.9× slower with 30-vs-12
+shards (synthetic) yet **5.4× faster** with 12-vs-91 shards (real:
+8,499 vs 45,818 ms), while its 97% fixture boundary reduction bought no
+wall-time. The real-corpus cold win is therefore capturable structurally
+(shard-count cap / small-partition pooling for hybrid — the pooling rail
+already exists) without graphology, the partition-time import scan, or the
+warm-path overhead.
 
 **Related specs / ADRs:** Implements
 `docs/plans/specs/louvain-community-shard-partitioning.md` (local), from
