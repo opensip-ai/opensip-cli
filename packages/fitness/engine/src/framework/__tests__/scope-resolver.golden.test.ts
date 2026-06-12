@@ -4,11 +4,11 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { buildScopeBasedFileMap } from '../scope-resolver.js';
 import { TargetRegistry } from '../../targets/target-registry.js';
+import { buildScopeBasedFileMap } from '../scope-resolver.js';
 
-import type { CheckScope } from '../check-config.js';
 import type { Target, TargetsConfig } from '../../targets/types.js';
+import type { CheckScope } from '../check-config.js';
 
 /**
  * ADR-0037 enforcement-reason guard (2): fitness per-check file-set resolution

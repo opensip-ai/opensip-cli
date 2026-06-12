@@ -72,7 +72,7 @@ describe('ADR-0037 adoption: a non-fitness tool resolves a target via scope.targ
     });
     expect(targets).toBeDefined();
 
-    const resolved = fixtureToolResolve(targets as TargetResolver, ['backend']);
+    const resolved = fixtureToolResolve(targets!, ['backend']);
     expect(rel(resolved)).toEqual(['src/server/handler.ts', 'src/server/router.ts']);
   });
 
@@ -84,7 +84,7 @@ describe('ADR-0037 adoption: a non-fitness tool resolves a target via scope.targ
         },
         globalExcludes: ['**/dist/**'],
       },
-    }) as TargetResolver;
+    })!;
 
     expect(targets.has('backend')).toBe(true);
     expect(targets.has('frontend')).toBe(false);

@@ -4,8 +4,8 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { TargetRegistry } from '../target-registry.js';
 import { applyGlobalExcludes, preResolveAllTargets, resolveTargets } from '../resolve.js';
+import { TargetRegistry } from '../target-registry.js';
 
 import type { Target } from '@opensip-tools/config';
 
