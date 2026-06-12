@@ -32,14 +32,33 @@
 // Balance statistics (max/median ratio, coefficient of variation) are
 // computed HERE from the profile's shardSizes — never in the engine (spec).
 //
+// Corpora: the default corpus is the seeded fixture. Passing `--corpus` a
+// directory that EXISTS but is not the fixture (no `src/d0/f0000.ts` marker)
+// switches to REAL-CORPUS mode (ADR-0045 B1 second corpus — e.g. a /tmp
+// clone of a real flat-large repo): the generator is skipped, source files
+// are walked recursively (same skip-dir set as `detectMonorepoLayout`), and
+// the W2 edit/probe targets are picked deterministically from the sorted
+// production file list (median file edited; probe = first file outside its
+// two-segment directory prefix; W2b uses a namespace import so no export
+// name needs to be known). The corpus's `opensip-tools.config.yml` is
+// OVERWRITTEN per strategy — only ever point this at a disposable clone.
+//
 // Usage:
 //   node scripts/bench-partition-strategies.mjs
 //     [--corpus <dir>]        default: <tmpdir>/opensip-flat-large-fixture
-//     [--files <n>]           fixture size, default 3000
-//     [--fresh]               rm + regenerate the fixture
+//     [--files <n>]           fixture size, default 3000 (fixture mode only)
+//     [--fresh]               rm + regenerate the fixture (fixture mode only)
 //     [--strategies hybrid,community]
 //     [--runs 3]              cold-run repetitions (median reported)
 //     [--concurrency 4]       fixed for equal conditions
+//     [--demote <rules>]      comma list of graph rules to demote to warning
+//                             in the corpus config (default
+//                             graph:high-blast-untested). Applied IDENTICALLY
+//                             to both strategies; the rules still run — only
+//                             the severity classification changes. Needed
+//                             whenever a corpus shape trips an error-level
+//                             rule (graph inherits failOnErrors: 1); never
+//                             teach the bench to tolerate non-zero exits.
 //     [--equivalence]         also run the fixture-level equivalence gate per
 //                             strategy: graph-equivalence-check against a
 //                             ZERO-floor budget written into the corpus
@@ -56,7 +75,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, posix, resolve } from 'node:path';
+import { basename, dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -86,6 +105,7 @@ const { values: args } = parseArgs({
     strategies: { type: 'string', default: 'hybrid,community' },
     runs: { type: 'string' },
     concurrency: { type: 'string', default: '4' },
+    demote: { type: 'string', default: 'graph:high-blast-untested' },
     equivalence: { type: 'boolean', default: false },
     quick: { type: 'boolean', default: false },
   },
@@ -126,23 +146,48 @@ console.error(
     '(a stale dist runs old behavior silently).',
 );
 
-// ── fixture ───────────────────────────────────────────────────────
+// ── corpus: generated fixture, or a real flat repo ────────────────
 
-if (args.fresh) {
-  rmSync(corpusDir, { recursive: true, force: true });
+// A real corpus is an EXISTING directory without the fixture marker file —
+// e.g. a /tmp clone of a real flat-large repo (ADR-0045 B1 second corpus).
+const fixtureMarker = join(corpusDir, 'src', 'd0', 'f0000.ts');
+const isRealCorpus = existsSync(corpusDir) && !existsSync(fixtureMarker);
+
+if (isRealCorpus && args.fresh) {
+  console.error('--fresh is fixture-only (it would DELETE the real corpus).');
+  process.exit(1);
 }
-const { generateFlatLargeFixture } = await import(pathToFileURL(generatorDist).href);
-const fixture = generateFlatLargeFixture(corpusDir, { fileCount });
-if (fixture.skipped) {
-  console.error(
-    `corpus: reusing existing fixture at ${corpusDir} (warm-safe; --files is ignored — ` +
-      'pass --fresh to regenerate).',
-  );
+if (isRealCorpus && args.files !== undefined) {
+  console.error('--files is fixture-only (a real corpus has its own file set).');
+  process.exit(1);
+}
+
+let fixture; // fixture mode only (clusterCount drives W2 target math)
+let corpusLabel;
+if (isRealCorpus) {
+  const sha = spawnSync('git', ['-C', corpusDir, 'rev-parse', '--short', 'HEAD'], {
+    encoding: 'utf8',
+  }).stdout?.trim();
+  corpusLabel = `${basename(corpusDir)} (real corpus${sha ? ` @ ${sha}` : ''})`;
+  console.error(`corpus: real repo at ${corpusDir} — ${corpusLabel}`);
 } else {
-  console.error(
-    `corpus: generated ${String(fixture.fileCount)} files / ` +
-      `${String(fixture.clusterCount)} clusters at ${corpusDir}`,
-  );
+  if (args.fresh) {
+    rmSync(corpusDir, { recursive: true, force: true });
+  }
+  const { generateFlatLargeFixture } = await import(pathToFileURL(generatorDist).href);
+  fixture = generateFlatLargeFixture(corpusDir, { fileCount });
+  if (fixture.skipped) {
+    console.error(
+      `corpus: reusing existing fixture at ${corpusDir} (warm-safe; --files is ignored — ` +
+        'pass --fresh to regenerate).',
+    );
+  } else {
+    console.error(
+      `corpus: generated ${String(fixture.fileCount)} files / ` +
+        `${String(fixture.clusterCount)} clusters at ${corpusDir}`,
+    );
+  }
+  corpusLabel = `flat-large-fixture (${String(fixture.fileCount)} files, ${String(fixture.clusterCount)} clusters)`;
 }
 
 const benchDir = join(corpusDir, '.bench');
@@ -201,8 +246,8 @@ function balanceStats(sizes) {
 
 // ── W2 edit-target selection ──────────────────────────────────────
 
-/** Sorted repo-relative POSIX paths of every generated source file. */
-function listSourceFiles() {
+/** Sorted repo-relative POSIX paths of every generated source file (fixture layout). */
+function listFixtureSourceFiles() {
   const out = [];
   const srcDir = join(corpusDir, 'src');
   for (const dir of readdirSync(srcDir)) {
@@ -214,13 +259,44 @@ function listSourceFiles() {
   return out;
 }
 
+/**
+ * Sorted repo-relative POSIX paths of every `.ts`/`.tsx` (non-`.d.ts`)
+ * file in a REAL corpus — recursive walk with the same skip-dir set
+ * `detectMonorepoLayout` uses, so the W2 targets are files the engine
+ * actually discovers.
+ */
+function listRealSourceFiles() {
+  const SKIPPED = new Set(['node_modules', 'dist', 'build', '.git', '.turbo', 'coverage', '.next']);
+  const out = [];
+  const visit = (relDir) => {
+    const abs = relDir === '' ? corpusDir : join(corpusDir, relDir);
+    let entries;
+    try {
+      entries = readdirSync(abs, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const rel = relDir === '' ? entry.name : `${relDir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (!SKIPPED.has(entry.name)) visit(rel);
+      } else if (/\.tsx?$/.test(entry.name) && !entry.name.endsWith('.d.ts')) {
+        out.push(rel);
+      }
+    }
+  };
+  visit('');
+  out.sort();
+  return out;
+}
+
 const indexOfRel = (rel) => Number.parseInt(/f(\d+)\.ts$/.exec(rel)?.[1] ?? 'NaN', 10);
 
 /**
- * Deterministic W2 edit target: the HIGHEST-indexed file that (a) carries no
- * cross-cluster import (index % 10 !== 0) and (b) is not in cluster 0 — so
- * the W2b probe import of f0000 (cluster 0) can never duplicate an existing
- * import of the edited file.
+ * Deterministic FIXTURE W2 edit target: the HIGHEST-indexed file that (a)
+ * carries no cross-cluster import (index % 10 !== 0) and (b) is not in
+ * cluster 0 — so the W2b probe import of f0000 (cluster 0) can never
+ * duplicate an existing import of the edited file.
  */
 function pickEditTarget(files, clusterCount) {
   for (let i = files.length - 1; i >= 0; i--) {
@@ -231,41 +307,85 @@ function pickEditTarget(files, clusterCount) {
   throw new Error('No suitable W2 edit target found in the corpus.');
 }
 
-const sourceFiles = listSourceFiles();
-const editRel = pickEditTarget(sourceFiles, fixture.clusterCount);
+/**
+ * Deterministic REAL-corpus W2 targets: edit the MEDIAN production file
+ * (sorted order; tests excluded so the edit is representative of production
+ * cache behavior), probe-import the first production file whose first two
+ * path segments differ from the edit target's (far away in directory terms,
+ * so the new import edge plausibly crosses a community boundary). The W2b
+ * probe is a NAMESPACE import + use — valid against any module without
+ * knowing its export names; it changes the import graph (what community
+ * partitioning consumes) even though it is not a call.
+ */
+function pickRealEditTargets(files) {
+  const production = files.filter(
+    (rel) => !rel.includes('__tests__/') && !/\.(test|spec)\.tsx?$/.test(rel),
+  );
+  if (production.length < 2) throw new Error('Real corpus has too few production source files.');
+  const edit = production[Math.floor(production.length / 2)];
+  const editPrefix = edit.split('/').slice(0, 2).join('/');
+  const probe = production.find((rel) => rel.split('/').slice(0, 2).join('/') !== editPrefix);
+  if (probe === undefined) throw new Error('No W2b probe target outside the edit directory.');
+  return { edit, probe };
+}
+
+let editRel;
+let probeTargetRel;
+let probeExtension; // fixture imports use explicit .js (NodeNext); real corpora extensionless
+if (isRealCorpus) {
+  const picked = pickRealEditTargets(listRealSourceFiles());
+  editRel = picked.edit;
+  probeTargetRel = picked.probe;
+  probeExtension = '';
+} else {
+  const sourceFiles = listFixtureSourceFiles();
+  editRel = pickEditTarget(sourceFiles, fixture.clusterCount);
+  probeTargetRel = sourceFiles.find((rel) => rel.endsWith('/f0000.ts'));
+  if (probeTargetRel === undefined) throw new Error('Corpus has no f0000.ts probe target.');
+  probeExtension = '.js';
+}
 const editAbs = join(corpusDir, editRel);
-const probeTargetRel = sourceFiles.find((rel) => rel.endsWith('/f0000.ts'));
-if (probeTargetRel === undefined) throw new Error('Corpus has no f0000.ts probe target.');
-const relSpec = posix.relative(posix.dirname(editRel), probeTargetRel).replace(/\.ts$/, '.js');
+const relSpec = posix
+  .relative(posix.dirname(editRel), probeTargetRel)
+  .replace(/\.tsx?$/, probeExtension);
 const probeImportSpec = relSpec.startsWith('.') ? relSpec : `./${relSpec}`;
+console.error(`W2 targets: edit=${editRel} probe-import=${probeTargetRel}`);
 
 const W2A_SUFFIX = '\n// w2a body-edit probe (no import change)\n';
-const W2B_SUFFIX =
-  `\nimport { f0000 } from '${probeImportSpec}';\n` +
-  'export function w2bProbe(): number {\n  return f0000();\n}\n';
+const W2B_SUFFIX = isRealCorpus
+  ? `\nimport * as __w2bProbe from '${probeImportSpec}';\n` +
+    'export function w2bProbe(): unknown {\n  return __w2bProbe;\n}\n'
+  : `\nimport { f0000 } from '${probeImportSpec}';\n` +
+    'export function w2bProbe(): number {\n  return f0000();\n}\n';
 
 // ── protocol ──────────────────────────────────────────────────────
 
 /**
  * Strategy toggling happens ONLY here (spec protocol).
  *
- * `graph:high-blast-untested` is demoted to warning: the synthetic corpus has
- * NO tests by design, so its hub functions all trip the rule at error level,
- * and ADR-0035's host verdict gate (failOnErrors: 1) would fail every plain
- * run. The demotion applies identically to both strategies and the rule still
- * RUNS (same rule work, same wall-time) — only the severity classification
- * changes. If a future corpus shape trips another error-level rule, demote
- * that rule explicitly here too; never teach the bench to tolerate non-zero
- * graph exits (that would mask real runtime failures).
+ * The `--demote` rules (default `graph:high-blast-untested`: the synthetic
+ * corpus has NO tests by design, so its hub functions all trip the rule at
+ * error level, and ADR-0035's host verdict gate (failOnErrors: 1) would fail
+ * every plain run) are demoted to warning. The demotion applies identically
+ * to both strategies and the rules still RUN (same rule work, same
+ * wall-time) — only the severity classification changes. If a corpus shape
+ * trips another error-level rule, demote that rule explicitly via `--demote`;
+ * never teach the bench to tolerate non-zero graph exits (that would mask
+ * real runtime failures).
  */
+const demotedRules = args.demote
+  .split(',')
+  .map((s) => s.trim())
+  .filter((s) => s.length > 0);
+
 function writeCorpusConfig(strategy) {
+  const overrides =
+    demotedRules.length === 0
+      ? ''
+      : `  severityOverrides:\n${demotedRules.map((r) => `    '${r}': warning\n`).join('')}`;
   writeFileSync(
     join(corpusDir, 'opensip-tools.config.yml'),
-    `schemaVersion: 1\n` +
-      `graph:\n` +
-      `  partitionStrategy: ${strategy}\n` +
-      `  severityOverrides:\n` +
-      `    'graph:high-blast-untested': warning\n`,
+    `schemaVersion: 1\n` + `graph:\n` + `  partitionStrategy: ${strategy}\n` + overrides,
     'utf8',
   );
 }
@@ -388,7 +508,6 @@ const rows = strategies.map((strategy) => benchStrategy(strategy));
 const fmt = (v, digits = 0) =>
   typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : 'n/a';
 
-const corpusLabel = `flat-large-fixture (${String(fixture.fileCount)} files, ${String(fixture.clusterCount)} clusters)`;
 console.log(`\n## Partition-strategy bench — ${corpusLabel}\n`);
 console.log(
   `Conditions: runs=${String(runs)} (median), concurrency=${String(concurrency)}, ` +
