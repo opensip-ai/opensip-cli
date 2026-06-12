@@ -20,10 +20,9 @@
  *    branch) — the documented non-Ink exception. The host renders nothing.
  */
 
-import { commonFlags } from '@opensip-tools/contracts';
-import { defineCommand, logger } from '@opensip-tools/core';
+import { commonFlags, EXIT_CODES } from '@opensip-tools/contracts';
+import { ConfigurationError, defineCommand, logger } from '@opensip-tools/core';
 
-import { exportGraphBaseline } from '../baseline-export.js';
 import { executeEquivalenceCheck } from '../equivalence-check-command.js';
 import { runCatalogJsonMode } from '../graph-modes.js';
 import { handleGraphError } from '../graph.js';
@@ -193,28 +192,33 @@ export const graphBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext
   scope: 'project',
   output: RAW_STREAM,
   rawStreamReason: 'file-export',
-  handler: (rawOpts, cli): void => {
+  handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as { cwd: string; out: string; json?: boolean };
-    const datastore = cli.scope.datastore() as DataStore;
-    const result = exportGraphBaseline(datastore, opts.out);
-    if (result.type === 'error') {
+    // ADR-0036: the host owns the byte-identical fingerprint-JSON export. The seam
+    // throws ConfigurationError (→ exit 2) when no baseline exists; map it here for
+    // both the --json (structured) and plain-text boundaries, as today.
+    try {
+      await cli.exportBaselineFingerprints('graph', opts.out);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const exitCode =
+        error instanceof ConfigurationError
+          ? EXIT_CODES.CONFIGURATION_ERROR
+          : EXIT_CODES.RUNTIME_ERROR;
       if (opts.json === true) {
-        // 2.12.0 (§5.5): structured error outcome (host wraps + sets exit code).
-        cli.emitError({ message: result.message, exitCode: result.exitCode });
+        cli.emitError({ message, exitCode });
         return;
       }
-      cli.setExitCode(result.exitCode);
-      process.stderr.write(`Error: ${result.message}\n`);
+      cli.setExitCode(exitCode);
+      process.stderr.write(`Error: ${message}\n`);
       return;
     }
+    const result = { type: 'graph-baseline-export' as const, outPath: opts.out };
     if (opts.json === true) {
       cli.emitJson(result);
       return;
     }
-    process.stdout.write(
-      `Exported graph baseline to ${result.outPath} ` +
-        `(${String(result.fingerprintCount)} fingerprint(s), ${String(result.bytesWritten)} bytes)\n`,
-    );
+    process.stdout.write(`Exported graph baseline to ${opts.out}\n`);
   },
 });
 

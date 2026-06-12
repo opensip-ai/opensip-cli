@@ -17,14 +17,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { enterScope, LanguageRegistry } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { ConfigurationError, enterScope, LanguageRegistry } from '@opensip-tools/core';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { formatSignalSarif } from '@opensip-tools/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import { saveBaseline } from '../gate.js';
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
-import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { graphTool } from '../tool.js';
 
@@ -159,6 +157,30 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     writeSarif: vi.fn(async (envelope: unknown, path: string) => {
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, formatSignalSarif(envelope as Parameters<typeof formatSignalSarif>[0]));
+    }),
+    // ADR-0036 host baseline/ratchet seams. The fingerprint export mirrors the
+    // real host seam against the test datastore (write JSON / throw on missing).
+    saveBaseline: vi.fn().mockResolvedValue(undefined),
+    compareBaseline: vi
+      .fn()
+      .mockResolvedValue({ added: [], resolved: [], unchanged: [], degraded: false }),
+    exportBaselineSarif: vi.fn().mockResolvedValue(undefined),
+    // eslint-disable-next-line @typescript-eslint/require-await -- async to match the seam signature
+    exportBaselineFingerprints: vi.fn(async (tool: string, path: string) => {
+      const repo = new BaselineRepo(datastore as DataStore);
+      if (!repo.exists(tool)) {
+        throw new ConfigurationError(`No ${tool} baseline found in the project SQLite store.`, {
+          code: 'CONFIGURATION.GATE.BASELINE_MISSING',
+        });
+      }
+      const fingerprints = repo
+        .load(tool)
+        .map((r) => r.fingerprint)
+        .sort((a, b) => a.localeCompare(b));
+      const capturedAt = repo.capturedAt(tool) ?? 0;
+      const file = { version: '1', tool, capturedAt: new Date(capturedAt).toISOString(), fingerprints };
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, JSON.stringify(file, null, 2), 'utf8');
     }),
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
@@ -299,7 +321,7 @@ describe('graphTool command surface', () => {
     it('exports baseline to disk on success', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
-        saveBaseline([], new GraphBaselineRepo(datastore));
+        new BaselineRepo(datastore).save('graph', []);
         const outPath = join(workDir, 'baseline.json');
         const { cli } = makeMockCli(datastore);
         await handlerFor('graph-baseline-export')({ out: outPath, _args: [] }, cli);
@@ -313,7 +335,7 @@ describe('graphTool command surface', () => {
     it('emits structured JSON when --json + success', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
-        saveBaseline([], new GraphBaselineRepo(datastore));
+        new BaselineRepo(datastore).save('graph', []);
         const outPath = join(workDir, 'baseline.json');
         const { cli, emitJson } = makeMockCli(datastore);
         await handlerFor('graph-baseline-export')({ out: outPath, json: true, _args: [] }, cli);
