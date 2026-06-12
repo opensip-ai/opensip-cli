@@ -50,7 +50,6 @@
 import { readPackageVersion } from '@opensip-tools/core';
 
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
-import { fitScaffoldExamples, fitStableExampleIds } from './scaffold/examples.js';
 import { collectFitnessDashboardData } from './cli/dashboard.js';
 import {
   fitBaselineExportCommandSpec,
@@ -70,6 +69,7 @@ import {
 } from './framework/scope-registry.js';
 import { fitReplayFromSession } from './persistence/session-replay.js';
 import { FIT_PLUGIN_LAYOUT } from './plugins/loader.js';
+import { fitScaffoldExamples, fitStableExampleIds } from './scaffold/examples.js';
 // Side-effect import: ensures the RunScope.fitness augmentation is loaded so
 // `scope.fitness` is the correctly-typed slot here.
 import './scope-augmentation.js';

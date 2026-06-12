@@ -26,11 +26,11 @@ import {
 } from './framework/registry.js';
 import { simReplayFromSession } from './persistence/session-replay.js';
 import { SIM_PLUGIN_LAYOUT } from './plugins/loader.js';
-import { simScaffoldExamples, simStableExampleIds } from './scaffold/examples.js';
 import {
   createSimulationRecipeRegistry,
   currentSimulationRecipeRegistry,
 } from './recipes/registry.js';
+import { simScaffoldExamples, simStableExampleIds } from './scaffold/examples.js';
 // Side-effect import: ensures the RunScope.simulation augmentation is
 // loaded so `scope.simulation` is the correctly-typed slot here.
 import './scope-augmentation.js';
