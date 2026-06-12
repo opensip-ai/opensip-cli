@@ -15,7 +15,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { makeTestScope, withScope } from '@opensip-tools/core/test-utils/with-scope.js';
+import { makeTestScope, withScope } from '@opensip-tools/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { analyzeSkippedTests, noSkippedTests } from '../checks/testing/no-skipped-tests.js';

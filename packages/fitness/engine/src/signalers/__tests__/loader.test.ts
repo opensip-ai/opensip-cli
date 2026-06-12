@@ -125,15 +125,16 @@ fitness:
   });
 });
 
-describe('loadSignalersConfig — scope-first (ADR-0023 one-reader)', () => {
-  const makeScopeWithDocument = (configDocument: Record<string, unknown>): RunScope => {
-    const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
-    // Structural slot — installed via Object.assign exactly like the CLI
-    // pre-action hook does (scope-types.ts declares it readonly for readers).
-    Object.assign(scope, { configDocument });
-    return scope;
-  };
+/** Scope carrying a host-validated config document on its structural slot —
+ *  installed via Object.assign exactly like the CLI pre-action hook does
+ *  (scope-types.ts declares it readonly for readers). */
+const makeScopeWithDocument = (configDocument: Record<string, unknown>): RunScope => {
+  const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  Object.assign(scope, { configDocument });
+  return scope;
+};
 
+describe('loadSignalersConfig — scope-first (ADR-0023 one-reader)', () => {
   it('projects from scope.configDocument without touching the filesystem', () => {
     // No config file exists in testDir — a file read would throw. The scope
     // document alone must satisfy the load.

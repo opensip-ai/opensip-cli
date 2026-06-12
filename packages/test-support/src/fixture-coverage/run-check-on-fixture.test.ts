@@ -10,15 +10,13 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { defineCheck } from '@opensip-tools/fitness';
 import { afterEach, describe, expect, it } from 'vitest';
-
-import { defineCheck } from '../framework/define-check.js';
 
 import { planCoverageCases, runCheckOnFixture } from './run-check-on-fixture.js';
 
 import type { CoverageConfig } from './manifest.js';
-import type { CheckViolation } from '../framework/check-config.js';
-import type { Check } from '../framework/check-types.js';
+import type { Check, CheckViolation } from '@opensip-tools/fitness';
 
 const bannedCheck = defineCheck({
   id: '11111111-1111-4111-8111-111111111111',

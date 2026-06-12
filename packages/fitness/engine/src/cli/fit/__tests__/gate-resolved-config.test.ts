@@ -13,14 +13,26 @@
  * regression guard that env bindings are no longer no-ops at the gate.
  */
 
-import { policyPasses, runWithScopeSync } from '@opensip-tools/core';
-import { makeTestScope } from '@opensip-tools/core/test-utils/with-scope.js';
+import {
+  LanguageRegistry,
+  RunScope,
+  ToolRegistry,
+  policyPasses,
+  runWithScopeSync,
+} from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
 import { resolveFitVerdictPolicy } from '../result-builders.js';
 
 import type { SignalersConfig } from '../../../signalers/types.js';
 import type { ResolvedToolConfig, VerdictPolicy } from '@opensip-tools/core';
+
+/** Fresh scope with empty registries — local equivalent of the retired
+ *  `@opensip-tools/core/test-utils` helper. The fitness engine's own tests
+ *  cannot use `@opensip-tools/test-support` (it depends on this package —
+ *  the dev edge would make the package graph cyclic; ADR-0040). */
+const makeTestScope = (): RunScope =>
+  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
 
 /** The minimal `signalersConfig` shape `resolveFitVerdictPolicy` reads as the FALLBACK source. */
 function makeSignalersConfig(failOnErrors: number, failOnWarnings: number): SignalersConfig {

@@ -5,7 +5,7 @@
  * tool-package's NON-runtime API is fine, and a tool-runtime symbol appearing as
  * TEXT inside a template literal (the `init` scaffolds) is NOT a real import.
  */
-import { runCheckOnFixture, type FixtureFile } from '@opensip-tools/fitness/internal';
+import { runCheckOnFixture, type FixtureFile } from '@opensip-tools/test-support';
 import { describe, expect, it } from 'vitest';
 
 import { analyzeBootstrapToolImport } from '../checks/architecture/no-bootstrap-tool-import.js';

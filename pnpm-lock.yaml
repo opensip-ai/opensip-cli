@@ -399,6 +399,9 @@ importers:
         specifier: workspace:*
         version: link:../engine
     devDependencies:
+      '@opensip-tools/test-support':
+        specifier: workspace:*
+        version: link:../../test-support
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -415,6 +418,9 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
+      '@opensip-tools/test-support':
+        specifier: workspace:*
+        version: link:../../test-support
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -431,6 +437,9 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
+      '@opensip-tools/test-support':
+        specifier: workspace:*
+        version: link:../../test-support
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -450,6 +459,9 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
+      '@opensip-tools/test-support':
+        specifier: workspace:*
+        version: link:../../test-support
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -466,6 +478,9 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
+      '@opensip-tools/test-support':
+        specifier: workspace:*
+        version: link:../../test-support
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -488,6 +503,9 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
     devDependencies:
+      '@opensip-tools/test-support':
+        specifier: workspace:*
+        version: link:../../test-support
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -504,6 +522,9 @@ importers:
         specifier: workspace:*
         version: link:../engine
     devDependencies:
+      '@opensip-tools/test-support':
+        specifier: workspace:*
+        version: link:../../test-support
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -996,6 +1017,22 @@ importers:
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/test-support:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-tools/fitness':
+        specifier: workspace:*
+        version: link:../fitness/engine
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
       vitest:
         specifier: ^4.1.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))

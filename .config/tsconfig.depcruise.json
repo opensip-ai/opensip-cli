@@ -14,6 +14,7 @@
       "@opensip-tools/output": ["packages/output/src/index.ts"],
       "@opensip-tools/config": ["packages/config/src/index.ts"],
       "@opensip-tools/targeting": ["packages/targeting/src/index.ts"],
+      "@opensip-tools/test-support": ["packages/test-support/src/index.ts"],
       "@opensip-tools/cli-ui": ["packages/cli-ui/src/index.ts"],
       "opensip-tools": ["packages/cli/src/index.ts"],
       "@opensip-tools/dashboard": ["packages/dashboard/src/index.ts"],

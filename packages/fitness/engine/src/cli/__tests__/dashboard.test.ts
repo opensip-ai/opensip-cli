@@ -13,13 +13,24 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  LanguageRegistry,
+  RunScope,
+  ToolRegistry,
   createCapabilityRegistry,
   admitTool,
   loadToolManifest,
   registerCapabilityDomainsFromManifest,
+  runWithScope,
 } from '@opensip-tools/core';
-import { makeTestScope, withScope } from '@opensip-tools/core/test-utils/with-scope.js';
 import { describe, expect, it } from 'vitest';
+
+/** Fresh scope with empty registries — local equivalent of the retired
+ *  `@opensip-tools/core/test-utils` helper. The fitness engine's own tests
+ *  cannot use `@opensip-tools/test-support` (it depends on this package —
+ *  the dev edge would make the package graph cyclic; ADR-0040). */
+const makeTestScope = (): RunScope =>
+  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+const withScope = runWithScope;
 
 import { fitnessTool } from '../../tool.js';
 import { collectFitnessDashboardData } from '../dashboard.js';

@@ -29,8 +29,7 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { runWithScope, type RunScope } from '@opensip-tools/core';
-import { makeTestScope } from '@opensip-tools/core/test-utils/with-scope.js';
+import { LanguageRegistry, RunScope, ToolRegistry, runWithScope } from '@opensip-tools/core';
 import { currentAdapterRegistry, graphTool, type GraphLanguageAdapter } from '@opensip-tools/graph';
 import { runGraph, GRAPH_STAGES } from '@opensip-tools/graph/internal';
 import {
@@ -47,6 +46,13 @@ import {
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+/** Fresh scope with empty registries — local equivalent of the retired
+ *  `@opensip-tools/core/test-utils` helper (ADR-0040: that sugar moved to
+ *  `@opensip-tools/test-support`, which this package's tests cannot use
+ *  without coupling its test graph to the fitness engine). */
+const makeTestScope = (): RunScope =>
+  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
 
 const GRAPH_TRACER_PREFIX = 'opensip_tools.graph.';
 

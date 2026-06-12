@@ -2,14 +2,22 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { makeTestScope, withScopeSync } from '@opensip-tools/core/test-utils/with-scope.js';
+import { LanguageRegistry, RunScope, ToolRegistry, runWithScopeSync } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createExecutionContext } from '../execution-context.js';
 import { fileCache } from '../file-cache.js';
 import { PathMatcher } from '../path-matcher.js';
 
-import type { Logger } from '@opensip-tools/core';
+import type { Logger, RunScopeOptions } from '@opensip-tools/core';
+
+/** Fresh scope with empty registries — local equivalent of the retired
+ *  `@opensip-tools/core/test-utils` helper. The fitness engine's own tests
+ *  cannot use `@opensip-tools/test-support` (it depends on this package —
+ *  the dev edge would make the package graph cyclic; ADR-0040). */
+const makeTestScope = (opts: RunScopeOptions = {}): RunScope =>
+  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry(), ...opts });
+const withScopeSync = runWithScopeSync;
 
 let testDir: string;
 

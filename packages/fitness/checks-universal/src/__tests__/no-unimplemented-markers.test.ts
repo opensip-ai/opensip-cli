@@ -1,4 +1,4 @@
-import { runCheckOnFixture } from '@opensip-tools/fitness/internal';
+import { runCheckOnFixture } from '@opensip-tools/test-support';
 import { describe, expect, it } from 'vitest';
 
 import {

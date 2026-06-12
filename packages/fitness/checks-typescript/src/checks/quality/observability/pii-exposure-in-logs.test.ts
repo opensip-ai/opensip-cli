@@ -8,7 +8,7 @@
  * helper rather than reaching into its private analyze().
  */
 
-import { runCheckOnFixture } from '@opensip-tools/fitness/internal';
+import { runCheckOnFixture } from '@opensip-tools/test-support';
 import { describe, expect, it } from 'vitest';
 
 import { piiExposureInLogs } from './pii-exposure-in-logs.js';

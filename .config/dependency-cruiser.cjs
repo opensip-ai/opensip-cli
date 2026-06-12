@@ -120,6 +120,20 @@ module.exports = {
       from: { pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`] },
       to: { path: String.raw`/src/internal\.ts$` },
     },
+    {
+      name: 'no-prod-import-of-test-support',
+      severity: 'error',
+      comment:
+        '@opensip-tools/test-support is the unpublished cross-package TEST scaffolding ' +
+        'package (ADR-0040): scope sugar + the per-check fixture-coverage harness. Only ' +
+        'test files may import it — a production-source edge would smuggle test ' +
+        'scaffolding into runtime architecture and (because the package is private) ' +
+        'create a phantom dependency in a published package.',
+      from: {
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`, '^packages/test-support/'],
+      },
+      to: { path: '^packages/test-support/' },
+    },
     // Dev-dependency hygiene ("production source must not import a
     // devDependency") is NOT a depcruise rule. `options.includeOnly: '^packages/'`
     // drops every node_modules edge before rules run, so a `to: { dependencyTypes:

@@ -6,12 +6,20 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { makeTestScope, withScopeSync } from '../../test-utils/with-scope.js';
+import { LanguageRegistry } from '../../languages/registry.js';
+import { RunScope, runWithScopeSync } from '../../lib/run-scope.js';
+import { ToolRegistry } from '../../tools/registry.js';
 import {
   getUnitConfig,
   setCurrentRecipeUnitConfig,
   clearCurrentRecipeUnitConfig,
 } from '../unit-config.js';
+
+/** Core-internal stand-ins for the retired `test-utils/with-scope` sugar
+ *  (ADR-0040 — see verdict-policy.test.ts for the cycle rationale). */
+const makeTestScope = (): RunScope =>
+  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+const withScopeSync = runWithScopeSync;
 
 interface MyUnitConfig extends Record<string, unknown> {
   readonly threshold: number;

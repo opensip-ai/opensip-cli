@@ -4,35 +4,14 @@
  *
  * This is NOT public API. Production code in other packages must not import
  * from `@opensip-tools/fitness/internal` (enforced by dependency-cruiser per
- * ADR-0009). `executeFit` lives here because the CLI drives fitness through
- * the Tool contract (`fitnessTool`), not by calling `executeFit` directly;
- * the only external consumer is the SaaS-mode concurrency smoke test.
+ * ADR-0009), and the subpath is excluded from the published exports map.
+ * `executeFit` lives here because the CLI drives fitness through the Tool
+ * contract (`fitnessTool`), not by calling `executeFit` directly; the only
+ * external consumer is the SaaS-mode concurrency smoke test.
+ *
+ * The per-check fixture-coverage harness that used to live here moved to the
+ * unpublished `@opensip-tools/test-support` package (ADR-0040) — test
+ * scaffolding no longer ships inside production package source.
  */
 
 export { executeFit } from './cli/fit.js';
-
-// Per-check fixture-coverage test infrastructure (testing gap P0). Pure,
-// vitest-free manifest helpers and fixture runners consumed by each check
-// pack's fixture-coverage.test.ts.
-export {
-  buildFixtureManifest,
-  validateBookkeeping,
-  extForLanguage,
-  LANGUAGE_EXTENSION,
-  type FixtureDomain,
-  type CheckFixtureRequirement,
-  type CoverageAllowlist,
-  type CommandExemptions,
-  type FilenameOverrides,
-  type BuildManifestOptions,
-  type CoverageConfig,
-} from './fixture-coverage/manifest.js';
-export {
-  runCheckOnFixture,
-  planCoverageCases,
-  type FixtureFile,
-  type FixtureCase,
-  type FixtureRun,
-  type FixtureVariant,
-  type CoverageCase,
-} from './fixture-coverage/run-check-on-fixture.js';

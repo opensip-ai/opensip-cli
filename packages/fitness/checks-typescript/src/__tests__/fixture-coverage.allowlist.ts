@@ -16,7 +16,7 @@ import type {
   CommandExemptions,
   CoverageAllowlist,
   FilenameOverrides,
-} from '@opensip-tools/fitness/internal';
+} from '@opensip-tools/test-support';
 
 export const ALLOWLIST: CoverageAllowlist = [];
 

@@ -248,6 +248,13 @@ distinct from:
   re-exports the generic traversal/position vocabulary beside its
   grammar-specific predicates; a check pack depends on exactly `fitness` +
   `lang-<lang>`. Enforced by the `check-pack-no-tree-sitter` depcruise rule
+- [ADR-0040](./ADR-0040-test-support-package.md) — **Cross-package test
+  scaffolding lives in `@opensip-tools/test-support`** (private, never
+  published): the `RunScope` test sugar (formerly core's published
+  `test-utils` subpath) + the per-check fixture-coverage harness (formerly
+  fitness prod source via `/internal`). Production source must never import
+  it (`no-prod-import-of-test-support` depcruise rule); `fitness/internal`
+  shrinks to `executeFit`
 
 ### Superseded
 

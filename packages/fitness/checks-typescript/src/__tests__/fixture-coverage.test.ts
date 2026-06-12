@@ -18,7 +18,7 @@ import {
   runCheckOnFixture,
   validateBookkeeping,
   type CoverageConfig,
-} from '@opensip-tools/fitness/internal';
+} from '@opensip-tools/test-support';
 import { describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';

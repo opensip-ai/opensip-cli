@@ -388,8 +388,9 @@ export default tseslint.config(
   // rule (gate-activation, 2026-05-30). Specifier-shape rules are ESLint's
   // domain and don't depend on the depcruise resolver. The barrel
   // (`@opensip-tools/core`) is the supported surface; the only sanctioned
-  // subpaths are `languages/*` (incl. parse-cache) and `test-utils/*`,
-  // which AST helpers and tests consume by design. Tests are exempt.
+  // subpath family is `languages/*` (incl. parse-cache), which AST helpers
+  // consume by design. (`test-utils/*` was retired with ADR-0040 — the scope
+  // helpers live in @opensip-tools/test-support now.) Tests are exempt.
   // ---------------------------------------------------------------------------
   {
     files: ['packages/fitness/checks-*/src/**/*.ts'],
@@ -403,14 +404,10 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: [
-                '@opensip-tools/core/*',
-                '!@opensip-tools/core/languages/*',
-                '!@opensip-tools/core/test-utils/*',
-              ],
+              group: ['@opensip-tools/core/*', '!@opensip-tools/core/languages/*'],
               message:
                 'Import @opensip-tools/core via the package barrel, not a ' +
-                'subpath. Sanctioned subpaths: languages/* and test-utils/*.',
+                'subpath. Sanctioned subpaths: languages/*.',
             },
           ],
         },

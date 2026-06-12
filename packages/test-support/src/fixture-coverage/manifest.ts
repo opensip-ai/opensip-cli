@@ -15,7 +15,12 @@
  * actually exercises a fixture lives in `./run-check-on-fixture.ts`.
  */
 
-import type { Check, CheckConfig } from '../framework/check-types.js';
+import type { Check } from '@opensip-tools/fitness';
+
+/** The authoring-surface `Check`'s config shape (`@opensip-tools/fitness`
+ * exports the `Check` type; the config type is derived structurally so this
+ * package consumes only the curated barrel). */
+type CheckConfig = Check['config'];
 
 /** Maps a check's declared language to its fixture file extension. */
 export const LANGUAGE_EXTENSION: Readonly<Record<string, string>> = {

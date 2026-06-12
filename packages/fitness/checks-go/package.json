@@ -44,6 +44,7 @@
   },
   "devDependencies": {
     "@opensip-tools/core": "workspace:*",
+    "@opensip-tools/test-support": "workspace:*",
     "@types/node": "^24.13.2",
     "vitest": "^4.1.8"
   }

@@ -43,6 +43,7 @@
     "@opensip-tools/fitness": "workspace:*"
   },
   "devDependencies": {
+    "@opensip-tools/test-support": "workspace:*",
     "@types/node": "^24.13.2",
     "vitest": "^4.1.8"
   }

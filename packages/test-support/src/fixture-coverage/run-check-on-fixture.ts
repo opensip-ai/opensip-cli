@@ -18,13 +18,13 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 
-import { makeTestScope, withScope } from '@opensip-tools/core/test-utils/with-scope.js';
+import { makeTestScope, withScope } from '../with-scope.js';
 
 import { buildFixtureManifest } from './manifest.js';
 
 import type { CheckFixtureRequirement, CoverageConfig } from './manifest.js';
-import type { Check } from '../framework/check-types.js';
 import type { Signal } from '@opensip-tools/core';
+import type { Check } from '@opensip-tools/fitness';
 
 /** One file written into the fixture temp root (path is relative to the root). */
 export interface FixtureFile {

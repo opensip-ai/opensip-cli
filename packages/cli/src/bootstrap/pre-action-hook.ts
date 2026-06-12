@@ -142,6 +142,22 @@ async function maybeInitializeOwningTool(
 }
 
 /**
+ * The `scope.configDocument` slot value (ADR-0023 one-reader): the validated
+ * document rides the scope so tools project their shapes from it instead of
+ * re-reading the file — but ONLY when a real config file was read. A
+ * config-less run stays document-less so tools that hard-error on a missing
+ * config (fitness) stay loud instead of silently validating `{}`.
+ */
+function configDocumentSlot(
+  project: { readonly scope: string; readonly configPath: string | undefined },
+  configDocument: unknown,
+): { configDocument?: Record<string, unknown> } {
+  return project.scope === 'project' && project.configPath !== undefined
+    ? { configDocument: configDocument as Record<string, unknown> }
+    : {};
+}
+
+/**
  * Mount the bootstrap `preAction` hook on the supplied program.
  *
  * @param program The root Commander program.
@@ -323,14 +339,7 @@ export function installPreActionHook(program: Command, version: string): void {
       capabilities,
       toolConfig,
       targets,
-      // ADR-0023 one-reader: the validated document itself rides the scope so
-      // tools project their shapes from it instead of re-reading the file —
-      // but ONLY when a real config file was read. A config-less run stays
-      // document-less so tools that hard-error on a missing config (fitness)
-      // stay loud instead of silently validating `{}`.
-      ...(project.scope === 'project' && project.configPath !== undefined
-        ? { configDocument: configDocument as Record<string, unknown> }
-        : {}),
+      ...configDocumentSlot(project, configDocument),
     });
 
     enterScope(scope);

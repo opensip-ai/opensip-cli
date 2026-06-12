@@ -94,7 +94,7 @@ function projectSignalersConfig(parsed: unknown, sourceLabel: string): Signalers
   // `data` is typed `z.infer<typeof SignalersConfigSchema>` (mutable).
   // After deepFreeze it's structurally read-only end-to-end; the single
   // cast adds the `DeepReadonly` wrapper that defines `SignalersConfig`.
-  return deepFreeze(data) as SignalersConfig;
+  return deepFreeze(data);
 }
 
 /**

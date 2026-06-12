@@ -13,7 +13,9 @@ import { describe, expect, it } from 'vitest';
 import { buildFixtureManifest, extForLanguage, validateBookkeeping } from './manifest.js';
 
 import type { CoverageConfig } from './manifest.js';
-import type { Check, CheckConfig } from '../framework/check-types.js';
+import type { Check } from '@opensip-tools/fitness';
+
+type CheckConfig = Check['config'];
 
 /** Minimal Check whose `.config` carries only what the manifest reads. */
 function check(config: Partial<CheckConfig> & { slug: string }): Check {

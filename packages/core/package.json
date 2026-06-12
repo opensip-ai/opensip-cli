@@ -30,8 +30,7 @@
     "./signal": "./dist/types/signal.js",
     "./plugins": "./dist/plugins/index.js",
     "./languages": "./dist/languages/index.js",
-    "./languages/parse-cache.js": "./dist/languages/parse-cache.js",
-    "./test-utils/with-scope.js": "./dist/test-utils/with-scope.js"
+    "./languages/parse-cache.js": "./dist/languages/parse-cache.js"
   },
   "files": [
     "dist"

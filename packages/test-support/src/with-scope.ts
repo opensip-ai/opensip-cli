@@ -11,7 +11,7 @@
  *
  * Usage:
  *
- *   import { withScope, makeTestScope } from '@opensip-tools/core/test-utils/with-scope.js';
+ *   import { withScope, makeTestScope } from '@opensip-tools/test-support';
  *
  *   it('does the thing', async () => {
  *     const scope = makeTestScope();
@@ -26,11 +26,15 @@
  * for a scope with fresh empty registries.
  */
 
-import { LanguageRegistry } from '../languages/registry.js';
-import { RunScope, runWithScope, runWithScopeSync } from '../lib/run-scope.js';
-import { ToolRegistry } from '../tools/registry.js';
+import {
+  LanguageRegistry,
+  RunScope,
+  ToolRegistry,
+  runWithScope,
+  runWithScopeSync,
+} from '@opensip-tools/core';
 
-import type { RunScopeOptions } from '../lib/run-scope.js';
+import type { RunScopeOptions } from '@opensip-tools/core';
 
 /**
  * Construct a fresh `RunScope` with empty `LanguageRegistry` /

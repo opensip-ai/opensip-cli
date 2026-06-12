@@ -6,8 +6,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { makeTestScope } from '../../test-utils/with-scope.js';
-import { runWithScopeSync } from '../run-scope.js';
+import { LanguageRegistry } from '../../languages/registry.js';
+import { ToolRegistry } from '../../tools/registry.js';
+import { RunScope, runWithScopeSync } from '../run-scope.js';
 import {
   DEFAULT_FAIL_ON_DEGRADED,
   HOST_VERDICT_POLICY_FALLBACK,
@@ -18,6 +19,13 @@ import {
 } from '../verdict-policy.js';
 
 import type { ResolvedToolConfig } from '../scope-types.js';
+
+/** Fresh scope with empty registries — core-internal stand-in for the retired
+ *  `test-utils/with-scope` sugar (ADR-0040: the shared helper moved to
+ *  `@opensip-tools/test-support`, which core cannot dev-depend on — that
+ *  package depends on core, so the edge would make the package graph cyclic). */
+const makeTestScope = (): RunScope =>
+  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
 
 describe('policyPasses', () => {
   // [errors, warnings, failOnErrors, failOnWarnings, expectedPasses]
