@@ -150,9 +150,13 @@ mkdirSync(benchDir, { recursive: true });
 
 // ── child-process + profile helpers ───────────────────────────────
 
-/** Run `node <cli> graph …` inside the corpus; throw on a non-zero exit. */
+/**
+ * Run `node <cli> graph …` inside the corpus; throw on a non-zero exit.
+ * `--no-cloud` keeps the cloud-sync sink a no-op so no network attempt ever
+ * sits inside a timed run (equal, machine-local conditions).
+ */
 function runGraph(graphArgs) {
-  const res = spawnSync(process.execPath, [cli, ...graphArgs], {
+  const res = spawnSync(process.execPath, [cli, ...graphArgs, '--no-cloud'], {
     cwd: corpusDir,
     env: { ...process.env, NODE_OPTIONS: CHILD_NODE_OPTIONS },
     stdio: ['ignore', 'ignore', 'inherit'],
@@ -242,11 +246,26 @@ const W2B_SUFFIX =
 
 // ── protocol ──────────────────────────────────────────────────────
 
-/** Strategy toggling happens ONLY here (spec protocol). */
+/**
+ * Strategy toggling happens ONLY here (spec protocol).
+ *
+ * `graph:high-blast-untested` is demoted to warning: the synthetic corpus has
+ * NO tests by design, so its hub functions all trip the rule at error level,
+ * and ADR-0035's host verdict gate (failOnErrors: 1) would fail every plain
+ * run. The demotion applies identically to both strategies and the rule still
+ * RUNS (same rule work, same wall-time) — only the severity classification
+ * changes. If a future corpus shape trips another error-level rule, demote
+ * that rule explicitly here too; never teach the bench to tolerate non-zero
+ * graph exits (that would mask real runtime failures).
+ */
 function writeCorpusConfig(strategy) {
   writeFileSync(
     join(corpusDir, 'opensip-tools.config.yml'),
-    `schemaVersion: 1\ngraph:\n  partitionStrategy: ${strategy}\n`,
+    `schemaVersion: 1\n` +
+      `graph:\n` +
+      `  partitionStrategy: ${strategy}\n` +
+      `  severityOverrides:\n` +
+      `    'graph:high-blast-untested': warning\n`,
     'utf8',
   );
 }
