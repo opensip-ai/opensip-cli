@@ -1,7 +1,8 @@
 import { createSignal, type Signal } from '@opensip-tools/core';
+import { sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { BaselineRepo, DataStoreFactory, type DataStore } from '../index.js';
+import { BaselineRepo, DataStoreFactory, type DataStore, type DrizzleDataStore } from '../index.js';
 
 let ds: DataStore;
 let repo: BaselineRepo;
@@ -20,6 +21,17 @@ afterEach(() => {
 });
 
 describe('BaselineRepo', () => {
+  it('migrations dropped the old per-tool baseline tables, kept the generic pair (0006+0007)', () => {
+    const rows = (ds as DrizzleDataStore).db
+      .all(sql`SELECT name FROM sqlite_master WHERE type='table'`) as { name: string }[];
+    const names = new Set(rows.map((r) => r.name));
+    expect(names.has('tool_baseline_entries')).toBe(true);
+    expect(names.has('tool_baseline_meta')).toBe(true);
+    expect(names.has('fit_baseline')).toBe(false);
+    expect(names.has('graph_baseline_signals')).toBe(false);
+    expect(names.has('graph_baseline_meta')).toBe(false);
+  });
+
   it('round-trips fingerprint + full Signal payload', () => {
     const payload = sig('rule-a', 'src/a.ts');
     repo.save('graph', [{ fingerprint: 'fp-a', payload }]);

@@ -38,8 +38,12 @@ export interface BaselineSeams {
 /** Thrown (→ exit 2) when a gate compare/export runs before any baseline was saved. */
 function missingBaseline(tool: string): ConfigurationError {
   return new ConfigurationError(
-    `No baseline found for '${tool}' in the project SQLite store. ` +
-      `Run \`opensip-tools ${tool} --gate-save\` first to capture one.`,
+    `No baseline found for '${tool}' in the project SQLite store. If this is a first ` +
+      `run — or you upgraded across a release that changed the baseline schema (the ` +
+      `per-tool baseline tables were dropped and recaptured, ADR-0036) — run ` +
+      `\`opensip-tools ${tool} --gate-save\` to (re)capture one. The git-trackable ` +
+      `JSON fingerprint baseline (graph-baseline-export) is a file, not a DB row, and ` +
+      `is untouched.`,
     { code: 'CONFIGURATION.GATE.BASELINE_MISSING' },
   );
 }
