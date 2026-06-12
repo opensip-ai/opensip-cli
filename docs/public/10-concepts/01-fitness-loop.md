@@ -42,7 +42,7 @@ We trace one specific scenario: a single check named `no-console-log` (one of th
   argv          ┌──────────────────────────────────────────────────┐
    │            │  1. CLI dispatch       packages/cli/src/index.ts │
    ▼            └──────────────────────────────────────────────────┘
-  Tool.register ────────► fitnessTool
+  commandSpecs ─────────► fitnessTool   (host-mounted; no raw Commander)
                             │
                             ▼
                 ┌──────────────────────────────────────────────────┐
@@ -167,7 +167,7 @@ The recipe service ([`packages/fitness/engine/src/recipes/service.ts`](../../../
 
 ## Stage 5 — Target / scope resolution
 
-Source: [`packages/fitness/engine/src/targets/resolver.ts`](../../../packages/fitness/engine/src/targets/resolver.ts), [`packages/fitness/engine/src/framework/path-matcher.ts`](../../../packages/fitness/engine/src/framework/path-matcher.ts), [`packages/fitness/engine/src/framework/scope-resolver.ts`](../../../packages/fitness/engine/src/framework/scope-resolver.ts).
+Source: [`packages/targeting/src/resolve.ts`](../../../packages/targeting/src/resolve.ts), [`packages/fitness/engine/src/framework/path-matcher.ts`](../../../packages/fitness/engine/src/framework/path-matcher.ts), [`packages/fitness/engine/src/framework/scope-resolver.ts`](../../../packages/fitness/engine/src/framework/scope-resolver.ts).
 
 For each check that survived selector filtering, the framework computes the file set it'll run against:
 

@@ -8,7 +8,7 @@ purpose: "Inline source-level waivers — how `@graph-ignore-next-line` and `@gr
 source-files:
   - packages/graph/engine/src/cli/apply-suppressions.ts
   - packages/graph/engine/src/rules/cycle.ts
-  - packages/graph/engine/src/gate.ts
+  - packages/graph/engine/src/baseline-strategy.ts
   - packages/fitness/checks-universal/src/checks/quality/graph-ignore-hygiene.ts
 related-docs:
   - ./02-rules-and-gating.md

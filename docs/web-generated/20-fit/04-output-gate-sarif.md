@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Output, gate, SARIF"
 audience: [contributors, ci-integrators]
@@ -8,8 +8,10 @@ purpose: "What happens to the signals a check produces — formatter/sink routin
 source-files:
   - packages/contracts/src/signal-envelope.ts
   - packages/output/src/format/signal-sarif.ts
-  - packages/fitness/engine/src/gate.ts
   - packages/fitness/engine/src/cli/fit-modes.ts
+  - packages/fitness/engine/src/baseline-strategy.ts
+  - packages/cli/src/bootstrap/baseline-seams.ts
+  - packages/output/src/format/baseline-diff.ts
   - packages/cli/src/bootstrap/deliver-envelope.ts
   - packages/cli/src/ui/
 related-docs:
@@ -42,9 +44,10 @@ A fit run takes exactly one of these paths:
 fit run ─ Cli    ├─ --json       → CommandOutcome JSON on stdout (envelope under
                  │                  .envelope), exit code from result
                  │
-                 ├─ --gate-save  → envelope stored as baseline (SQLite), exit code 0
-                 │  / --gate-    → current envelope compared to baseline, exit = degraded?
-                 │  compare
+                 ├─ --gate-save  → envelope stored as baseline (SQLite), exit per
+                 │                  failOnErrors/failOnWarnings (ADR-0020)
+                 ├─ --gate-      → current envelope compared to baseline,
+                 │  compare        exit = degraded? (failOnDegraded, default on)
                  │
                  └─ --report-to  → envelope → SARIF, POSTed to URL, exit code from result
 ```
@@ -109,11 +112,11 @@ The renderer is in [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensi
 
 `-v` / `--verbose` adds inline finding details to the table. `--quiet` suppresses the banner and shows only the pass/fail summary line.
 
-The exit code is set by the Tool action via `cli.setExitCode(code)`:
+The findings exit code is host-derived (ADR-0035): fitness declares its verdict policy (`failOnErrors`/`failOnWarnings`), the envelope carries the verdict, and the host sets the exit in `deliverFitSignals` — the tool never calls `setExitCode` for findings:
 
-- `0` — every check passed.
-- `1` — at least one check failed (or `shouldFail` based on `failOnErrors`/`failOnWarnings` config).
-- `2` — runtime error before checks could run.
+- `0` — every check passed (or findings stayed under the configured thresholds).
+- `1` — the `failOnErrors`/`failOnWarnings` thresholds were breached.
+- `2` — configuration/runtime error before checks could run.
 
 ---
 
@@ -149,9 +152,9 @@ opensip-tools fit --gate-save                     # capture today's reality
 opensip-tools fit --gate-compare                  # CI gate from now on
 ```
 
-The gate is the regression-detection workflow. `--gate-save` stores the current run's `SignalEnvelope` into the project's SQLite store (`fit_baseline` table at `<project>/opensip-tools/.runtime/datastore.sqlite`). `--gate-compare` runs the same checks, reads the saved envelope back out, computes the diff, and exits 1 if any *new* signal appears. There is exactly one baseline per project.
+The gate is the regression-detection workflow. `--gate-save` fingerprint-stamps the current run's signals and stores them through the host-owned baseline plane (`cli.saveBaseline('fitness', envelope)` → the generic `tool_baseline_entries` table, scoped by `tool`, at `<project>/opensip-tools/.runtime/datastore.sqlite`), then exits according to the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save itself happens first, so the baseline survives a failing exit). `--gate-compare` runs the same checks, reads the saved rows back, computes the diff, and exits 1 if any *new* signal appears (the reserved `failOnDegraded` key, default on, toggles hard-fail vs. report-only). There is exactly one baseline per tool per project.
 
-> **Baseline shape.** Per ADR-0011 the baseline stores the run's `SignalEnvelope` (signals) directly — **not** a SARIF document — mirroring graph's signal-keyed baseline. This removes fitness's `@opensip-tools/output` production dependency: the root owns all SARIF egress. `fit-baseline-export` reads the stored envelope back and writes SARIF to disk via the root `cli.writeSarif` seam, so the on-disk CI artifact stays a SARIF document.
+> **Baseline shape.** Per ADR-0011/ADR-0036 the baseline stores the run's *signals* (fingerprint + payload rows) directly — **not** a SARIF document — through host seams shared by every tool; fitness contributes only its `fingerprintStrategy`. This keeps fitness off any `@opensip-tools/output` production dependency: the root owns all SARIF egress. `fit-baseline-export` re-renders the stored signals as SARIF via the root `cli.writeSarif` seam, so the on-disk CI artifact stays a SARIF document.
 
 > **v1 → v2 break.** The `--baseline <path>` flag is gone. v1 stored baselines as committed SARIF files; v2 stores them in SQLite. See [`10-concepts/05-architecture-gate.md#ci-integration-patterns`](/docs/opensip-tools/10-concepts/05-architecture-gate/#ci-integration-patterns) for the artifact-based CI workflow that replaces the v1 "committed baseline" pattern.
 
@@ -240,7 +243,7 @@ The full SARIF spec has many more optional fields (`taxonomies`, `invocations`, 
 
 ### The baseline (SQLite, not SARIF)
 
-The gate baseline is the stored `SignalEnvelope`, not a SARIF document (see the gate section above). `compareToBaseline` extracts hashed violations from the current envelope and the stored baseline envelope and diffs them — see [`packages/fitness/engine/src/gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/gate.ts) (`extractViolationsFromEnvelope` / `extractViolationsFromStoredBaseline`). The on-disk CI artifact stays a SARIF document because `fit-baseline-export` converts the stored envelope to SARIF via the root `cli.writeSarif` seam.
+The gate baseline is stored signals (fingerprint + payload rows in the host-owned `tool_baseline_entries` table), not a SARIF document (see the gate section above). `cli.compareBaseline` loads the saved rows and diffs them against the current fingerprint-stamped envelope via the pure [`diffBaseline`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/output/src/format/baseline-diff.ts) in `@opensip-tools/output`. The on-disk CI artifact stays a SARIF document because `fit-baseline-export` converts the stored signals to SARIF via the root `cli.writeSarif` seam.
 
 ---
 
@@ -253,8 +256,8 @@ opensip-tools fit --gate-compare
 ```
 
 1. `executeFit(args)` runs the default recipe, producing a `SignalEnvelope` with 80 units and (today) 30 signals.
-2. The gate loads the stored envelope from the `fit_baseline` row in `.runtime/datastore.sqlite` (29 signals from last week's main build).
-3. `extractViolationsFromEnvelope` and `extractViolationsFromStoredBaseline` both produce hashed violation lists.
+2. The gate loads the stored baseline rows (`tool_baseline_entries`, `tool = 'fitness'`) from `.runtime/datastore.sqlite` (29 signals from last week's main build).
+3. `diffBaseline` reduces the stored rows and the current fingerprint-stamped envelope to two fingerprint sets.
 4. The diff: 1 new signal (`no-console-log` at `services/api/src/routes/payments.ts:88` — a `console.log` slipped in), 0 resolved, 29 unchanged.
 5. Output: `✗ DEGRADED — 1 new violation`. Exit code 1. The PR fails.
 6. Engineer inspects, removes the `console.log`, re-runs CI. New diff: 0 added, 0 resolved, 29 unchanged. Exit code 0. PR merges.

@@ -115,10 +115,11 @@ interface SimDoneResult {
   recipeName: string;
   cwd: string;
   durationMs: number;
-  shouldFail?: boolean;        // any scenario failed
   envelope: SignalEnvelope;    // the run's signals + verdict + per-scenario units
 }
 ```
+
+There is no pass/fail boolean on the result: the run verdict lives on `envelope.verdict` (ADR-0035 — the tool declares its policy; the **host** derives the findings exit code from the envelope when the signals are delivered, so sim never calls `setExitCode` for scenario failures).
 
 `SimDoneResult` is the internal `CommandResult` union member the renderer consumes (the `App.tsx` dispatcher in [`packages/cli/src/ui/`](../../../packages/cli/src/ui/) switches on `result.type`); it derives the per-scenario table from `envelope.units` (one unit per scenario — `slug` = scenario id, `passed`, `durationMs`, `error?`). The **`--json` output wraps the `envelope` in a `CommandOutcome`** (the byte-identical `SignalEnvelope` `fit` and `graph` emit, nested under `.envelope`) — the old bespoke `sim-done` JSON shape is retired. See [`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md).
 
@@ -160,7 +161,7 @@ For `acme-api` running `opensip-tools sim --recipe pre-deploy`:
 3. Scenario 1 (`api-checkout-burst`) runs for 30s. Hits 200 RPS, p99 = 173ms, error rate = 0.4%. All assertions pass. ✓
 4. Scenario 2 (`payment-burst`) runs for 60s. Hits 50 RPS, p99 = 1100ms — fails the `p99-under-500ms` assertion. ✗
 5. Scenario 3 (`checkout-resilient-under-fault`) runs a 30s steady-state window with latency/drop faults injected at 10%, then a 10s recovery window. The recovery window's p95 stays at 1300ms — fails the recovery `ASSERTIONS.lowLatency('p95', 500)` assertion. ✗
-6. `SimDoneResult.shouldFail = true`. Exit code 1. CI's pre-deploy job blocks the deploy.
+6. Two scenario units failed, so `envelope.verdict.passed === false`; the host derives exit code 1 from the envelope verdict. CI's pre-deploy job blocks the deploy.
 
 The session record carries the full per-scenario results; the dashboard shows latency histograms, the chaos recovery curve, and the assertion verdicts.
 

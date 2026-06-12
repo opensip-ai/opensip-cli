@@ -4,7 +4,7 @@ last_verified: 2026-06-09
 release: v3.0.0
 title: "Layered package graph"
 audience: [contributors]
-purpose: "The 32-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+purpose: "The 33-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
 source-files:
   - .config/dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -20,12 +20,12 @@ related-docs:
 ---
 # Layered package graph
 
-Thirty-two packages. Six layers. One enforced rule: dependencies flow up only.
+Thirty-three packages. Six layers. One enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md). For the literal dep-cruiser rules, see [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md).
 
 > **What you'll understand after this:**
-> - Why opensip-tools ships as 32 packages instead of one.
+> - Why opensip-tools ships as 33 packages instead of one.
 > - The six layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
 > - How type-only edges are caught by a second cruiser pass, and the two cross-layer exceptions that were paid down.
@@ -54,8 +54,8 @@ The layer model the dependency-cruiser config enforces ([`.config/dependency-cru
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 3  ┌──────────┬───────────┴───────────┬───────────────┐    │
-│           │  session-store  output  config  dashboard          │   │
-│           │  lang-{ts,rust,py,java,go,cpp}                     │   │
+│           │  session-store  output  config  targeting          │   │
+│           │  dashboard  lang-{ts,rust,py,java,go,cpp}          │   │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 2  ┌──────────────────────┴───────────────────────────┐    │
@@ -84,6 +84,7 @@ The layer model the dependency-cruiser config enforces ([`.config/dependency-cru
 - **`@opensip-tools/session-store`** owns session persistence: the `SessionRepo` runtime, the `sessions`/`session_tool_payload` schema, and the `generateSessionId`/`sanitizeForFilename` helpers. Depends on `core`, `datastore`, and `contracts` (for the `StoredSession` shape it round-trips).
 - **`@opensip-tools/output`** (renamed from `@opensip-tools/reporting`, ADR-0011) owns all machine output: pure `(envelope) => string` formatters under `format/` (json, sarif, table) and effectful `sink/` delivery (cloud egress, entitlement). The CLI composition root composes a formatter with a sink per the run's flags; tool engines no longer import it. Depends on `core` and `contracts` only.
 - **`@opensip-tools/config`** is the capability-configuration substrate (ADR-0023): the `composeConfigSchema` composer that folds each tool's namespaced Zod schema into one strict whole-document schema, the resolver, and the `ToolConfigDeclaration` declaration type. The dependency-cruiser rule here is **directional**: `config` must not import a tool. Tools, by contrast, **do** import `@opensip-tools/config` — for the `ToolConfigDeclaration` type they use to declare their config namespace. So the edge runs tool → config, never config → tool. Depends on `core`.
+- **`@opensip-tools/targeting`** is the host file-targeting runtime substrate (ADR-0037): the `TargetRegistry`, the uniform glob expansion (`resolveTargets`, always applying per-target `exclude` **and** `globalExcludes`), and `applyGlobalExcludes`. The CLI bootstrap builds it once per run from the validated config document and exposes it as `scope.targets`; any tool resolves named file sets without importing fitness. Depends on `config` (targeting types) and `core` (the generic `Registry<T>` base) — never a tool engine. The check-domain half (`checkOverrides`, scope matching, the content `fileCache`) stays in `fitness` as a thin consumer.
 - **`@opensip-tools/dashboard`** is the self-contained HTML report renderer; consumed by the CLI-owned `dashboard` command and each tool's auto-open hook. It does not implement the `Tool` contract; it is a library the composition root consumes.
 - **Language adapters** — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` implement the `LanguageAdapter` contract used by fitness checks. (The graph engine has its own `GraphLanguageAdapter` contract, implemented by the publishable `graph-*` adapter packs at Layer 5.) See [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md) for the distinction.
 
@@ -93,7 +94,7 @@ The layer model the dependency-cruiser config enforces ([`.config/dependency-cru
 
 **Layer 6 — `opensip-tools`.** The composition root. Discovers every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-That's it. Six layers, thirty-two packages.
+That's it. Six layers, thirty-three packages. (A 34th workspace-private package, `@opensip-tools/test-support`, carries cross-package test scaffolding — ADR-0040. It is never published and production source may not import it, so it sits deliberately outside the runtime layer diagram.)
 
 ---
 
@@ -146,7 +147,7 @@ The upshot: there is **no** standing "you may `import type` upward" allowance. A
 
 ---
 
-## Why 32 packages and not 1
+## Why 33 packages and not 1
 
 A single mega-package was considered. It would compile faster, ship faster, and have a simpler `package.json`. We chose against it for three load-bearing reasons:
 
@@ -158,7 +159,7 @@ A check pack like `@opensip-tools/checks-python` has to be installable on its ow
 opensip-tools plugin add @opensip-tools/checks-python
 ```
 
-…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 32 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
+…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 33 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
 
 ### 2. The Tool contract's promise
 
@@ -166,7 +167,7 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 32 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 33 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 

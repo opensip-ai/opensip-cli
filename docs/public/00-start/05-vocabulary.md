@@ -136,7 +136,7 @@ The runtime dir is gitignored — sessions are local artifacts, not source. The 
 
 A **gate** is the architecture-baseline workflow. `opensip-tools fit --gate-save` stores the current run's `SignalEnvelope` in the project SQLite baseline. `opensip-tools fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated). Use `opensip-tools fit-baseline-export` when CI needs a SARIF file.
 
-The gate matches by `(filePath, ruleId, message)` — line numbers are deliberately excluded from the identity hash so unrelated line shifts don't register as added/resolved violations. See [`packages/fitness/engine/src/gate.ts`](../../../packages/fitness/engine/src/gate.ts) and [`../10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md).
+The gate matches by `(filePath, ruleId, message)` — line numbers are deliberately excluded from the identity hash so unrelated line shifts don't register as added/resolved violations. See [`packages/fitness/engine/src/baseline-strategy.ts`](../../../packages/fitness/engine/src/baseline-strategy.ts) and [`../10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md).
 
 ---
 

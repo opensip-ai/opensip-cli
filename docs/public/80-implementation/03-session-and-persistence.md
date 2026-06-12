@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Session and persistence"
 audience: [contributors]
@@ -16,11 +16,10 @@ source-files:
   - packages/session-store/src/store.ts
   - packages/session-store/src/schema/sessions.ts
   - packages/cli/src/dashboard-compose.ts
-  - packages/graph/engine/src/persistence/baseline-repo.ts
   - packages/graph/engine/src/persistence/catalog-repo.ts
   - packages/graph/engine/src/persistence/schema.ts
-  - packages/fitness/engine/src/persistence/baseline-repo.ts
-  - packages/fitness/engine/src/persistence/schema.ts
+  - packages/datastore/src/baseline-repo.ts
+  - packages/datastore/src/schema/baseline.ts
 related-docs:
   - ../00-start/06-system-context.md
   - ./01-cli-dispatch.md
@@ -63,15 +62,15 @@ The WAL/SHM sidecar files are SQLite implementation details (Write-Ahead Log mod
 
 [`packages/datastore`](../../../packages/datastore) hosts the persistence kernel: a `DataStore` interface, a SQLite-backed implementation, an in-memory implementation for tests, and the workspace-wide migration store under `migrations/`. The CLI bootstrap opens one `DataStore` per invocation in the `preAction` hook ([`packages/cli/src/index.ts`](../../../packages/cli/src/index.ts)) and closes it on `process.exit`. Every tool's command receives the handle via `ToolCliContext.datastore`.
 
-Schemas are owned by the package that produces the data — datastore is paradigm-agnostic infrastructure. Adding a new tool means adding a new schema module under that package's `src/persistence/schema.ts` and registering it in [`packages/datastore/drizzle.config.ts`](../../../packages/datastore/drizzle.config.ts). Three packages register schemas today:
+Schemas are owned by the package that produces the data — datastore is paradigm-agnostic infrastructure — **with one deliberate exception**: baseline persistence is a host-owned plane (ADR-0036). A tool that wants tool-specific tables (like graph's catalog cache) adds a schema module under its `src/persistence/schema.ts` and registers it in [`packages/datastore/drizzle.config.ts`](../../../packages/datastore/drizzle.config.ts); a tool that wants the **gate** (`--gate-save`/`--gate-compare`/export) adds *no schema at all* — it inherits the generic `tool_baseline_entries` / `tool_baseline_meta` pair (scoped by a `tool` column, [`packages/datastore/src/schema/baseline.ts`](../../../packages/datastore/src/schema/baseline.ts)) by stamping fingerprints on its signals. The schema registrations today:
 
 | Owner | Schema file | Tables |
 |---|---|---|
 | `@opensip-tools/session-store` | `src/schema/sessions.ts` | `sessions`, `session_tool_payload` |
-| `@opensip-tools/graph` | `src/persistence/schema.ts` | `graph_baseline_signals`, `graph_baseline_meta`, `graph_catalog`, `graph_shard_fragment` |
-| `@opensip-tools/fitness` | `src/persistence/schema.ts` | `fit_baseline` |
+| `@opensip-tools/graph` | `src/persistence/schema.ts` | `graph_catalog`, `graph_shard_fragment` |
+| `@opensip-tools/datastore` (host) | `src/schema/baseline.ts` | `tool_baseline_entries`, `tool_baseline_meta` (all tools' gate baselines) |
 
-`__drizzle_migrations` is a fourth, internal table — Drizzle uses it to record which migrations have been applied.
+`__drizzle_migrations` is a fourth, internal table — Drizzle uses it to record which migrations have been applied. (The historical per-tool baseline tables — `fit_baseline`, `graph_baseline_signals`, `graph_baseline_meta` — were dropped by migration when ADR-0036 landed; baselines are drop-and-recapture, so a re-run of `--gate-save` rebuilds them in the generic pair.)
 
 ```mermaid
 flowchart TB
@@ -79,8 +78,8 @@ flowchart TB
   Store["datastore.sqlite<br/>SQLite + Drizzle"]
   Migrations["__drizzle_migrations"]
   Sessions["sessions<br/>session_tool_payload"]
-  Fit["fit_baseline"]
-  Graph["graph_catalog<br/>graph_baseline_*<br/>graph_shard_fragment"]
+  Baselines["tool_baseline_entries<br/>tool_baseline_meta<br/>(scoped by tool)"]
+  Graph["graph_catalog<br/>graph_shard_fragment"]
 
   Logger["core logger"]
   Logs["logs/YYYY-MM-DD.jsonl"]
@@ -92,7 +91,7 @@ flowchart TB
   CLI --> Store
   Store --> Migrations
   Store --> Sessions
-  Store --> Fit
+  Store --> Baselines
   Store --> Graph
 
   Logger --> Logs
@@ -160,12 +159,14 @@ The `--no-cache` flag forces a cache miss; the existing fingerprint-based invali
 
 ---
 
-## The gate baselines
+## The gate baselines (host-owned plane, ADR-0036)
 
-Two baselines live in the SQLite store:
+All tools' gate baselines live in **one generic table pair** in the SQLite store, scoped by a `tool` column:
 
-- **Fitness baseline** (`fit_baseline`) — the `SignalEnvelope` produced by `opensip-tools fit --gate-save`. Single-row table; `--gate-compare` reads it and diffs against the current envelope by `(filePath, ruleId, message)` hash.
-- **Graph baseline** (`graph_baseline_signals` + `graph_baseline_meta`) — the fingerprint set produced by `opensip-tools graph --gate-save`. The `meta` row marks "a baseline exists" so an empty-but-saved baseline (a clean codebase) reports `exists() === true`.
+- **`tool_baseline_entries`** — one row per finding: `(tool, fingerprint)` composite key plus the full `Signal` JSON payload (the payload feeds the `resolved` diff bucket and the SARIF re-render). `fit --gate-save` writes rows with `tool = 'fitness'`; `graph --gate-save` with `tool = 'graph'`. Save is a per-tool delete-all + bulk-insert (atomic replace).
+- **`tool_baseline_meta`** — a per-tool existence marker + capture timestamp, so an empty-but-saved baseline (a clean codebase) reports `exists() === true`.
+
+The capture (`--gate-save`), ratchet (`--gate-compare`), and export (SARIF + JSON fingerprints) machinery are host seams (`saveBaseline`/`compareBaseline`/`exportBaselineSarif`/`exportBaselineFingerprints` on `ToolCliContext`) over the generic [`BaselineRepo`](../../../packages/datastore/src/baseline-repo.ts) plus the pure `diffBaseline` in `@opensip-tools/output`. A tool inherits the whole gate by stamping fingerprints on its signals — it authors at most a `Tool.fingerprintStrategy` (fitness: `sha256(filePath\nruleId\nmessage)`, line-shift tolerant; graph: `ruleId|filePath|line|column`, message-excluded) and **no schema, no repo, no diff code**.
 
 ### v1 → v2: the `--baseline <path>` flag is gone
 

@@ -1,15 +1,17 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Architecture gate"
 audience: [contributors, ci-integrators]
-purpose: "The baseline-and-compare workflow. Identity hash, line-shift invariance, CI integration patterns."
+purpose: "The baseline-and-compare workflow. Fingerprint identity, line-shift invariance, CI integration patterns."
 source-files:
-  - packages/fitness/engine/src/gate.ts
-  - packages/output/src/format/signal-sarif.ts
-  - packages/fitness/engine/src/persistence/baseline-repo.ts
-  - packages/fitness/engine/src/__tests__/gate.test.ts
+  - packages/fitness/engine/src/cli/fit-modes.ts
+  - packages/fitness/engine/src/baseline-strategy.ts
+  - packages/cli/src/bootstrap/baseline-seams.ts
+  - packages/datastore/src/baseline-repo.ts
+  - packages/output/src/format/baseline-diff.ts
+  - packages/fitness/engine/src/__tests__/baseline-plane.test.ts
   - packages/fitness/engine/src/tool.ts
 related-docs:
   - ../20-fit/03-ignore-directives.md
@@ -22,8 +24,8 @@ The gate is opensip-tools' answer to "we have legacy violations and we need to s
 
 > **What you'll understand after this:**
 > - The two-mode flow: `--gate-save` and `--gate-compare`.
-> - The identity hash and why line numbers are excluded.
-> - Why the v2 baseline is a stored `SignalEnvelope`, not a SARIF document.
+> - The fingerprint identity and why line numbers are excluded.
+> - Why the baseline is stored signals (host-owned tables), not a SARIF document.
 > - The CI patterns that make the gate useful in practice.
 
 ---
@@ -35,13 +37,15 @@ opensip-tools fit --gate-save                 # capture today's reality
 opensip-tools fit --gate-compare              # CI gate from now on
 ```
 
-`--gate-save` runs the configured recipe and stores the resulting `SignalEnvelope` into the project's SQLite store (`fit_baseline` table at `<project>/opensip-tools/.runtime/datastore.sqlite`, via [`FitBaselineRepo`](../../../packages/fitness/engine/src/persistence/baseline-repo.ts)). There is **exactly one baseline per project**.
+`--gate-save` runs the configured recipe, fingerprint-stamps the resulting `SignalEnvelope`, and hands it to the **host-owned baseline plane** (`cli.saveBaseline('fitness', envelope)`, ADR-0036): each finding lands as one row in the generic `tool_baseline_entries` table (scoped by a `tool` column, at `<project>/opensip-tools/.runtime/datastore.sqlite`), with a `tool_baseline_meta` row marking that a baseline exists. There is **exactly one baseline per tool per project**.
 
-> **Baseline shape (ADR-0011).** The v2 baseline stores the run's `SignalEnvelope` (its `signals`) directly — **not** a SARIF document — mirroring graph's signal-keyed baseline. This keeps fitness off any `@opensip-tools/output` production dependency: the composition root owns all SARIF egress. `fit-baseline-export` reads the stored envelope back and writes a SARIF file via the root `cli.writeSarif` seam, so the on-disk CI artifact stays SARIF.
+> **Baseline shape (ADR-0011 / ADR-0036).** The baseline stores the run's *signals* (fingerprint + full `Signal` payload per row) — **not** a SARIF document. The capture/ratchet/export machinery is host infrastructure shared by every tool: fitness contributes only its [`fingerprintStrategy`](../../../packages/fitness/engine/src/baseline-strategy.ts); the seams (`saveBaseline` / `compareBaseline` / `exportBaselineSarif`) and the [generic table pair](../../../packages/datastore/src/schema/baseline.ts) live in the host and `@opensip-tools/datastore`. `fit-baseline-export` re-renders the stored signals as SARIF via the root `cli.writeSarif` seam, so the on-disk CI artifact stays SARIF.
 
-> **v1 → v2 break.** v1 wrote baselines as SARIF *files* (`baseline.sarif`) and let users override the path with `--baseline <path>`. **The `--baseline` flag is gone in v2.** Teams that committed `baseline.sarif` to git for cross-CI gate comparisons should re-run `--gate-save` once on v2, then adopt one of the artifact-based CI patterns below. See [`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md) for the schema layout.
+> **v1 → v2 break.** v1 wrote baselines as SARIF *files* (`baseline.sarif`) and let users override the path with `--baseline <path>`. **The `--baseline` flag is gone in v2.** Teams that committed `baseline.sarif` to git for cross-CI gate comparisons should re-run `--gate-save` once, then adopt one of the artifact-based CI patterns below. See [`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md) for the schema layout.
 
-`--gate-compare` runs the same recipe, reads the saved baseline from the SQLite store, computes the diff, and prints a structured report:
+> **Exit code (ADR-0020).** `--gate-save` saves first, then exits according to the configured severity thresholds (`failOnErrors`/`failOnWarnings`) — it does **not** unconditionally exit 0. The CI step that records the baseline is therefore also an honest pass/fail signal; run any follow-up export/upload step under `if: always()` so the artifact survives a failed gate.
+
+`--gate-compare` runs the same recipe, reads the saved baseline rows back, computes the diff, and prints a structured report:
 
 ```
 opensip-tools fit --gate-compare
@@ -61,38 +65,35 @@ Unchanged (29):
 ✗ DEGRADED — 1 new violation
 ```
 
-Exit code 1 if `degraded` (any added findings); 0 otherwise. CI gates on the exit code; humans read the diff.
+Exit code 1 if `degraded` (any added findings, with the reserved `failOnDegraded` config key at its default `true`); 0 otherwise. Setting `failOnDegraded: 0` turns the ratchet into a report-only diff. CI gates on the exit code; humans read the diff.
 
 The flags are mutually exclusive — passing both raises a configuration error.
 
 ```mermaid
 flowchart TB
   Run["executeFit(args)<br/>standard fit run"]
-  Envelope["SignalEnvelope"]
+  Envelope["SignalEnvelope<br/>fingerprint-stamped"]
   Mode{"Gate mode"}
-  Save["--gate-save"]
-  Compare["--gate-compare"]
-  Store["fit_baseline row<br/>datastore.sqlite"]
-  Current["hash current signals<br/>filePath + ruleId + message"]
-  Baseline["hash baseline signals<br/>filePath + ruleId + message"]
-  Diff["diff hash sets"]
+  Save["--gate-save<br/>cli.saveBaseline"]
+  Compare["--gate-compare<br/>cli.compareBaseline"]
+  Store["tool_baseline_entries rows<br/>(tool = 'fitness')<br/>datastore.sqlite"]
+  Diff["diffBaseline<br/>fingerprint set arithmetic"]
   Added{"any added<br/>signals?"}
+  Verdict["exit per failOnErrors /<br/>failOnWarnings verdict"]
   Pass["exit 0"]
   Fail["exit 1"]
-  Missing["missing / invalid baseline<br/>exit 2"]
+  Missing["missing baseline<br/>exit 2"]
 
   Run --> Envelope
   Envelope --> Mode
   Mode --> Save
   Save --> Store
-  Save --> Pass
+  Save --> Verdict
   Mode --> Compare
   Compare --> Store
-  Store --> Baseline
   Store -.->|missing| Missing
-  Compare --> Current
-  Baseline --> Diff
-  Current --> Diff
+  Store --> Diff
+  Envelope --> Diff
   Diff --> Added
   Added -- yes --> Fail
   Added -- no --> Pass
@@ -100,17 +101,17 @@ flowchart TB
 
 ---
 
-## The identity hash
+## The fingerprint identity
 
-Two findings are "the same finding" iff `(filePath, ruleId, message)` matches exactly. The hash:
+Two findings are "the same finding" iff `(filePath, ruleId, message)` matches exactly. Fitness declares this as its `Tool.fingerprintStrategy` (ADR-0036 — each tool stamps its own envelope; the host plane never re-fingerprints):
 
 ```ts
-function hashViolation(filePath: string, ruleId: string, message: string): string {
-  return createHash('sha256').update(`${filePath}\n${ruleId}\n${message}`).digest('hex');
-}
+/** fitness's message-hash baseline identity: `sha256(filePath\nruleId\nmessage)`. */
+export const fitnessFingerprintStrategy: FingerprintStrategy = (s) =>
+  createHash('sha256').update(`${s.filePath}\n${s.ruleId}\n${s.message}`).digest('hex');
 ```
 
-[`packages/fitness/engine/src/gate.ts:243`](../../../packages/fitness/engine/src/gate.ts).
+[`packages/fitness/engine/src/baseline-strategy.ts`](../../../packages/fitness/engine/src/baseline-strategy.ts). (Graph declares the opposite policy — a location-based key that *excludes* the message, because several graph rules embed run-varying counts in their message text. Both are correct for their domain; the strategy is per-tool, not a global algorithm.)
 
 Three things stay in the hash:
 
@@ -122,31 +123,23 @@ One thing is **deliberately excluded**: the line number. A regex check that flag
 
 The trade-off is symmetric: if a *different* `console.log` is added at the same file with the exact same message, the hash collides and we treat it as unchanged. In practice this hasn't been a problem — messages are usually specific enough that two distinct violations have different messages, and a duplicate-message-same-file pair is rare and benign.
 
-The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests__/gate.test.ts:222`](../../../packages/fitness/engine/src/__tests__/gate.test.ts) with explicit cases for the moved-line scenario and the changed-message scenario.
+The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests__/baseline-plane.test.ts`](../../../packages/fitness/engine/src/__tests__/baseline-plane.test.ts) with explicit cases for the moved-line scenario and the changed-message scenario.
 
 ---
 
-## What `compareToBaseline` actually does
+## What `--gate-compare` actually does
 
-[`packages/fitness/engine/src/gate.ts`](../../../packages/fitness/engine/src/gate.ts):
+The compare is host machinery (ADR-0036): `cli.compareBaseline('fitness', envelope)` ([`packages/cli/src/bootstrap/baseline-seams.ts`](../../../packages/cli/src/bootstrap/baseline-seams.ts)) loads the saved rows for `tool = 'fitness'` (throwing a configuration error → exit 2 when no baseline exists), then runs the pure [`diffBaseline`](../../../packages/output/src/format/baseline-diff.ts) from `@opensip-tools/output`:
 
 ```ts
-export function compareToBaseline(envelope: SignalEnvelope, repo: FitBaselineRepo): GateCompareResult {
-  // 1. Throw GateBaselineMissingError if repo.load() returns null.
-  // 2. Read the stored baseline envelope from the fit_baseline row.
-  //    Throw GateBaselineInvalidError on bad input.
-  // 3. Extract baseline violations from baseline.signals (extractViolationsFromStoredBaseline).
-  // 4. Extract current violations from envelope.signals (extractViolationsFromEnvelope).
-  // 5. Hash both lists into Maps keyed by hash.
-  // 6. Diff:
-  //      added       = current.keys() - baseline.keys()
-  //      resolved    = baseline.keys() - current.keys()
-  //      unchanged   = current.keys() ∩ baseline.keys()
-  // 7. Return { added, resolved, unchanged, degraded: added.length > 0 }
-}
+// diffBaseline(currentSignals, baselineRows) →
+//   added       = current fingerprints  - baseline fingerprints
+//   resolved    = baseline fingerprints - current fingerprints
+//   unchanged   = current fingerprints  ∩ baseline fingerprints
+//   degraded    = added.length > 0
 ```
 
-The diff is set arithmetic on hash-keyed collections. No fuzzy matching, no near-miss heuristic — the hashes match or they don't. This makes the gate's behavior easy to reason about: a one-line change to the message of a check makes every finding from that check appear as both added and resolved.
+The diff is set arithmetic on fingerprint-keyed collections. No fuzzy matching, no near-miss heuristic — the fingerprints match or they don't. This makes the gate's behavior easy to reason about: a one-line change to the message of a check makes every finding from that check appear as both added and resolved.
 
 The `degraded` flag is `added.length > 0`. A run can resolve violations *and* add new ones, in which case it's still degraded — adding is the gate. Resolved counts are informational; they never cause the gate to fail.
 
@@ -154,11 +147,11 @@ The `degraded` flag is `added.length > 0`. A run can resolve violations *and* ad
 
 ## Tolerant baseline reading
 
-Both the stored baseline envelope and the current run reduce to the same hashed violation list before the diff. `extractViolationsFromStoredBaseline` and `extractViolationsFromEnvelope` ([`packages/fitness/engine/src/gate.ts`](../../../packages/fitness/engine/src/gate.ts)) read only the fields the identity hash needs (`filePath`, `ruleId`, `message`) off each `signal` and ignore the rest:
+Both the stored baseline rows and the current run reduce to the same fingerprint set before the diff. The fingerprint reads only the fields fitness's identity needs (`filePath`, `ruleId`, `message`) off each `signal` and ignores the rest:
 
-- A signal with no location → `filePath = ''`. The hash still works (line/column aren't in the hash anyway).
-- Extra signal fields (`category`, `provider`, `fixConfidence`, `metadata`, …) are ignored — they don't affect identity.
-- A baseline envelope with an empty `signals` list → zero baseline violations; every current signal reads as added.
+- A signal with no location → `filePath = ''`. The fingerprint still works (line/column aren't in fitness's identity anyway).
+- Extra signal fields (`category`, `provider`, `fixConfidence`, `metadata`, …) are ignored — they don't affect identity. (The full `Signal` is still stored as the row's `payload`, so the `resolved` bucket and the SARIF export can reconstruct the whole finding.)
+- A saved-but-empty baseline (a clean codebase) → zero baseline fingerprints, but the `tool_baseline_meta` row still marks "a baseline exists"; every current signal reads as added.
 
 The baseline is a rebuildable local cache (ADR-0006): the datastore is regenerated by re-running `--gate-save`, so there is no migration of pre-existing rows. If you need a text-shaped, hand-editable artifact (to grandfather a finding, or to commit to git), use `fit-baseline-export` to emit a SARIF file and one of the artifact-based CI patterns below.
 
@@ -168,17 +161,20 @@ The baseline is a rebuildable local cache (ADR-0006): the datastore is regenerat
 
 ```
 opensip-tools fit --gate-compare
-  → fitnessTool.action(opts)
+  → fitnessTool command handler
        → if (opts.gateSave || opts.gateCompare) { runGateMode(args, cli); return; }
-            → runGateMode:
+            → runGateMode (fit-modes.ts):
                  → executeFit(args)              ← same fit run, no special path
-                 → if save: saveBaseline(output, baselinePath)
-                 → else:    compareToBaseline(output, baselinePath)
+                 → stampFingerprints(envelope, fitnessFingerprintStrategy)
+                 → if save: cli.saveBaseline('fitness', envelope)
+                            deliverFitSignals(...)        ← exit per failOnErrors/failOnWarnings
+                 → else:    cli.compareBaseline('fitness', envelope)
                             renderGateCompareOutput(result)
-                            cli.setExitCode(result.degraded ? 1 : 0)
+                            deliverFitSignals(..., result.degraded && failOnDegraded)
+                                                          ← host sets exit 1 on degraded
 ```
 
-The gate is a post-processing layer on top of the standard `executeFit()` run. It doesn't change which checks ran, which targets were resolved, or how filtering applied. It just takes the same `SignalEnvelope` the renderer would have shown and runs the diff.
+The gate is a post-processing layer on top of the standard `executeFit()` run. It doesn't change which checks ran, which targets were resolved, or how filtering applied. It takes the same `SignalEnvelope` the renderer would have shown, stamps fingerprints, and hands it to the host seams. Note that fitness never calls `setExitCode` for the gate path (ADR-0035): the compare verdict rides into `deliverFitSignals` as the host's `runFailed` override, so a `--report-to` upload failure can never mask the gate verdict.
 
 This is why ignore directives are compatible with the gate: a directive suppresses a violation *before* the signal enters the envelope, so the baseline doesn't see it and the compare doesn't see it. A new directive added today removes a finding from the current run; the gate reports it as resolved (since it was in the baseline). A directive removed today re-introduces a finding; the gate reports it as added.
 
@@ -202,6 +198,8 @@ jobs:
       - run: pnpm i --frozen-lockfile
       - run: opensip-tools fit --gate-save
       - uses: actions/upload-artifact@v4
+        if: always()   # gate-save exits non-zero on a fail-threshold breach (ADR-0020);
+                       # the baseline still saved first, so publish it regardless
         with:
           name: fit-baseline
           path: opensip-tools/.runtime/datastore.sqlite
@@ -249,7 +247,7 @@ A few patterns the gate isn't a fit for:
 
 For `acme-api`:
 
-- Day one: CI's main-branch workflow runs `opensip-tools fit --gate-save` after merging the initial setup. The save records 142 pre-existing violations across the universal/typescript/python check packs as the baseline row in `.runtime/datastore.sqlite`, and CI uploads the SQLite file as the `fit-baseline` artifact.
+- Day one: CI's main-branch workflow runs `opensip-tools fit --gate-save` after merging the initial setup. The save records 142 pre-existing violations across the universal/typescript/python check packs as baseline rows in `.runtime/datastore.sqlite`, and CI uploads the SQLite file as the `fit-baseline` artifact.
 - PR workflow: each PR job downloads the latest `fit-baseline` artifact into `opensip-tools/.runtime/`, then runs `opensip-tools fit --gate-compare`.
 - A PR that introduces one new `console.log` produces an `Added (1)` line and exits 1. The PR fails until the `console.log` is removed (or marked with `// @fitness-ignore-next-line no-console-log`).
 - A PR that resolves four violations produces `Resolved (4)` and exits 0. The team merges; the next main-branch build re-runs `--gate-save` and the artifact rolls forward with the lower count.

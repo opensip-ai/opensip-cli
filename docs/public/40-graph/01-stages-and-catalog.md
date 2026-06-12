@@ -12,7 +12,7 @@ source-files:
   - packages/graph/engine/src/lang-adapter/registry.ts
   - packages/graph/graph-typescript/src/discover.ts
   - packages/graph/graph-typescript/src/walk.ts
-  - packages/graph/graph-typescript/src/inventory.ts
+  - packages/graph/graph-typescript/src/inventory-visitors
   - packages/graph/graph-typescript/src/edges.ts
   - packages/graph/graph-typescript/src/parse.ts
   - packages/graph/graph-typescript/src/cache-key.ts
@@ -29,8 +29,8 @@ source-files:
   - packages/graph/engine/src/cache/invalidate.ts
   - packages/graph/engine/src/cache/engine-version.ts
   - packages/graph/engine/src/cli/orchestrate.ts
-  - packages/graph/engine/src/cli/scope.ts
-  - packages/graph/engine/src/cli/packages-runner.ts
+  - packages/graph/engine/src/cli/positional-paths.ts
+  - packages/graph/engine/src/cli/workspace-runner.ts
   - packages/graph/engine/src/types.ts
 related-docs:
   - ./02-rules-and-gating.md

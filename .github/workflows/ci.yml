@@ -144,6 +144,15 @@ jobs:
       - name: Check generated web docs in sync
         run: node scripts/build-web-docs.mjs --check
 
+      # Verify docs/public/ cites the CURRENT runtime: no retired concept
+      # names outside sanctioned migration-history mentions, and no dead
+      # frontmatter source-files / repo-relative links (those become pinned
+      # GitHub URLs on the website, so a dead path ships as a 404). Added
+      # after the 2026-06-11 audits found seven pages still documenting the
+      # pre-ADR-0036 per-tool baseline tables.
+      - name: Check docs freshness (retired terms + source links)
+        run: pnpm docs:freshness
+
       # Verify docs/public/70-reference/05-checks-index.md is in sync with
       # the checks corpus. Adding, removing, or re-describing a check
       # changes the generated index; regenerate via `pnpm docs:checks-index`

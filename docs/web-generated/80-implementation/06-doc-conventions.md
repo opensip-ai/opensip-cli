@@ -138,7 +138,7 @@ The link target uses absolute repository paths (`packages/core/src/index.ts`) ra
 Cite source files with absolute repo paths, ideally with a line number when the line matters:
 
 ```markdown
-[`packages/fitness/engine/src/gate.ts:243`](../../../packages/fitness/engine/src/gate.ts)
+[`packages/fitness/engine/src/baseline-strategy.ts`](../../../packages/fitness/engine/src/baseline-strategy.ts)
 ```
 
 The relative-path link is what GitHub renders as a clickable file link. The line number in the link text is what helps the reader.

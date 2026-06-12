@@ -8,7 +8,7 @@ purpose: "The front door — what problem opensip-tools solves, what it does, wh
 source-files:
   - README.md
   - packages/cli/src/index.ts
-  - packages/cli/src/ui/components/Summary.tsx
+  - packages/cli-ui/src/run-summary.tsx
   - packages/core/src/tools/types.ts
 related-docs:
   - ./00-quick-start.md

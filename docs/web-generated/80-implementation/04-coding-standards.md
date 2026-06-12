@@ -11,7 +11,7 @@ source-files:
   - packages/core/src/lib/errors.ts
   - packages/core/src/lib/logger.ts
   - packages/contracts/src/exit-codes.ts
-  - knip.json
+  - .config/knip.json
 related-docs:
   - ./05-layer-policy.md
   - ./06-doc-conventions.md

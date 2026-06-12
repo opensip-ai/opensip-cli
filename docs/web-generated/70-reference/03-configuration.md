@@ -107,7 +107,7 @@ Value is a single target name (string) or a non-empty list.
 | `defaultTarget` | string | — | Target used when a check has no `scope`. |
 | `maxParallel` | int ≥ 1 | runner default (CPU-derived) | Cap on parallel checks. |
 | `timeout` | int ≥ 1000 | runner default | Per-check timeout in ms. |
-| `failOnErrors` | int ≥ 0 | `1` | Threshold for `shouldFail`. `0` = never fail; `1` = fail on first error. |
+| `failOnErrors` | int ≥ 0 | `1` | Error threshold for the run verdict (the host derives the exit code from `envelope.verdict`, ADR-0035). `0` = never fail; `1` = fail on first error. |
 | `failOnWarnings` | int ≥ 0 | `0` | Threshold for warnings. `0` = ignore warnings entirely. |
 | `disabledChecks` | string[] | `[]` | Slugs to skip (a recipe's `includeDisabled` can opt back in). |
 | `recipe` | string | — | Default recipe for `fit` when `--recipe` is not passed (ADR-0022). Tool-scoped — distinct from `graph.recipe` / `simulation.recipe`. An unknown name here falls back to the built-in `default` recipe with a warning; an explicit `--recipe` typo still hard-fails. |

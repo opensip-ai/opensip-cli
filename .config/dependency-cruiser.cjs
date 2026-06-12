@@ -13,6 +13,7 @@
  *   3. @opensip-tools/session-store  — session persistence over datastore/contracts
  *   3. @opensip-tools/output         — signal-envelope formatters + sinks
  *   3. @opensip-tools/config         — capability-configuration composer + schema registry (depends on core)
+ *   3. @opensip-tools/targeting      — host file-targeting runtime substrate (scope.targets; depends on core + config)
  *   3. @opensip-tools/lang-*         — language adapters
  *   3. @opensip-tools/dashboard      — HTML report generator (core + contracts)
  *   4. @opensip-tools/fitness        — fitness engine + cli/* commands
@@ -21,6 +22,9 @@
  *   5. @opensip-tools/checks-*       — fitness check packs (depend on fitness)
  *   5. @opensip-tools/graph-*        — graph adapter packs (depend on graph)
  *   6. opensip-tools                 — CLI composition root (depends on tools)
+ *
+ *   (workspace-private, outside the runtime layers: @opensip-tools/test-support —
+ *   cross-package test scaffolding, ADR-0040; only test files may import it.)
  *
  * Forbidden edges pin these import boundaries package by package; adjacent
  * packages at the same displayed layer can still have stricter allowlists.
@@ -1054,10 +1058,13 @@ module.exports = {
     // ignore type-only edges, matching what actually runs.
     //
     // Trade-off: type-only cycles are still a structural smell (often a sign
-    // that the type belongs in a third file), but cleaning them up is a real
-    // refactor in its own right (e.g. moving LoadScenarioConfig out of
-    // simulation/engine/src/kinds/load/define.ts). Tracked separately; not
-    // gated by this rule.
+    // that the type belongs in a third file). They are NOT a blind spot,
+    // though: the type-aware companion (dependency-cruiser.types.cjs) re-runs
+    // this FULL ruleset with tsPreCompilationDeps ON — gating in `pnpm lint`
+    // since round-3 (2026-05-30) — so type-only cycles and type-only layer
+    // inversions fail CI there. (The historical examples, e.g.
+    // LoadScenarioConfig in simulation/engine/src/kinds/load/define.ts, were
+    // paid down before that promotion.)
     tsPreCompilationDeps: false,
 
     // Union: workspace source PLUS the two external families the ADR-0004 /

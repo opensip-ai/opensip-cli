@@ -9,7 +9,7 @@ source-files:
   - packages/fitness/engine/src/framework/define-check.ts
   - packages/fitness/engine/src/recipes/types.ts
   - packages/simulation/engine/src/kinds/load/define.ts
-  - packages/graph/engine/src/cli/run.ts
+  - packages/graph/engine/src/cli/graph-modes.ts
 related-docs:
   - ./00-quick-start.md
   - ../50-extend/01-plugin-authoring.md

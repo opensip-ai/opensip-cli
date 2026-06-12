@@ -8,7 +8,7 @@ purpose: "How the framework decides which files a check runs against. Targets, s
 source-files:
   - packages/fitness/engine/src/targets/types.ts
   - packages/fitness/engine/src/targets/loader.ts
-  - packages/fitness/engine/src/targets/resolver.ts
+  - packages/targeting/src/resolve.ts
   - packages/fitness/engine/src/targets/target-registry.ts
   - packages/fitness/engine/src/framework/scope-resolver.ts
   - packages/fitness/engine/src/framework/path-matcher.ts

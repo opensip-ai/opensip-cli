@@ -41,12 +41,12 @@ That's the floor. The rest of this page is the polish: how to surface findings a
 
 ## PR annotations via SARIF
 
-opensip-tools exports the [SARIF](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html) format that GitHub understands natively via the `fit-baseline-export` subcommand. The flow is two steps: run `fit --gate-save` (which records findings into the project SQLite store and exits 0 regardless of findings), then `fit-baseline-export --out fit.sarif` to write the SARIF document. Uploaded findings appear inline in the PR's "Files changed" view.
+opensip-tools exports the [SARIF](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html) format that GitHub understands natively via the `fit-baseline-export` subcommand. The flow is two steps: run `fit --gate-save` (which records findings into the project SQLite store, then exits according to the `failOnErrors`/`failOnWarnings` thresholds — ADR-0020: the step itself is the gate, not a free pass), then `fit-baseline-export --out fit.sarif` to write the SARIF document. Uploaded findings appear inline in the PR's "Files changed" view.
 
 ```yaml
-- run: opensip-tools fit --gate-save        # record findings in the SQLite store (exit 0)
+- run: opensip-tools fit --gate-save        # record findings, then exit per fail thresholds
 - run: opensip-tools fit-baseline-export --out fit.sarif
-  if: always()      # export even if a prior step failed
+  if: always()      # the save happened before the exit — export even when the gate failed
 - uses: github/codeql-action/upload-sarif@v3
   if: always()      # upload even when a previous step failed
   with:
@@ -54,7 +54,7 @@ opensip-tools exports the [SARIF](https://docs.oasis-open.org/sarif/sarif/v2.1.0
     category: opensip-fit
 ```
 
-The `if: always()` is important — when an earlier step fails (exit code 1), GitHub skips subsequent steps by default. You want the SARIF export + upload to run anyway so the developer sees the annotations on their PR.
+The `if: always()` is important — `fit --gate-save` hard-fails the step when error-level findings breach the configured thresholds (set `failOnErrors: 0` in the `fitness:` block for a ratchet-only adoption where only net-new Code Scanning alerts block PRs), and GitHub skips subsequent steps after a failure by default. The baseline is saved *before* the exit code is set, so the SARIF export + upload still have everything they need — they just have to actually run.
 
 For GitLab, convert the exported SARIF to the *Code Quality* widget format with [GitLab's converter](https://docs.gitlab.com/ee/user/application_security/sast/#sarif-format), renaming the output to `gl-code-quality-report.json`. (There is no native GitLab code-quality emitter today — go through SARIF.)
 

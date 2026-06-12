@@ -37,6 +37,11 @@ opensip-tools/
 │   │                            #   (composition root), which aggregates each
 │   │                            #   tool's contributed data
 │   ├── cli/                     # opensip-tools — generic tool dispatcher
+│   ├── config/                  # @opensip-tools/config — config composer +
+│   │                            #   schema registry (ADR-0023): folds host-owned
+│   │                            #   blocks + each tool's namespaced Zod schema
+│   │                            #   into one strict document; cli/dashboard/
+│   │                            #   targeting/global-config I/O
 │   ├── cli-ui/                  # @opensip-tools/cli-ui — shared Ink/React
 │   │                            #   primitives (Banner, Spinner, RunHeader,
 │   │                            #   theme). Extracted from cli/ so tools that
@@ -50,6 +55,15 @@ opensip-tools/
 │   ├── session-store/           # @opensip-tools/session-store — SessionRepo
 │   │                            #   runtime + sessions schema (the StoredSession
 │   │                            #   type itself lives in contracts)
+│   ├── targeting/               # @opensip-tools/targeting — host file-targeting
+│   │                            #   runtime substrate (ADR-0037): TargetRegistry +
+│   │                            #   glob expansion w/ globalExcludes; built once
+│   │                            #   per run by the CLI bootstrap → scope.targets
+│   ├── test-support/            # @opensip-tools/test-support — PRIVATE, never
+│   │                            #   published (ADR-0040): cross-package test
+│   │                            #   scaffolding (RunScope test sugar + the
+│   │                            #   per-check fixture-coverage harness). Only
+│   │                            #   test files may import it (depcruise rule)
 │   ├── tree-sitter/             # @opensip-tools/tree-sitter — grammar-agnostic
 │   │                            #   web-tree-sitter substrate shared by lang-*
 │   │                            #   and the graph tree-sitter adapters

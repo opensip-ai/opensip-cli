@@ -135,7 +135,7 @@
       "audience": [
         "contributors"
       ],
-      "purpose": "The 32-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+      "purpose": "The 33-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
     },
     {
       "file": "docs/web-generated/10-concepts/04-contract-surfaces.md",
@@ -158,7 +158,7 @@
         "contributors",
         "ci-integrators"
       ],
-      "purpose": "The baseline-and-compare workflow. Identity hash, line-shift invariance, CI integration patterns."
+      "purpose": "The baseline-and-compare workflow. Fingerprint identity, line-shift invariance, CI integration patterns."
     },
     {
       "file": "docs/web-generated/10-concepts/06-cli-output-rendering.md",

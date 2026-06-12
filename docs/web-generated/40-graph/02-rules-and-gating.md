@@ -19,8 +19,7 @@ source-files:
   - packages/graph/engine/src/rules/unexpected-coupling.ts
   - packages/graph/engine/src/rules/_severity-override.ts
   - packages/graph/engine/src/rules/_entry-points.ts
-  - packages/graph/engine/src/gate.ts
-  - packages/graph/engine/src/render/sarif.ts
+  - packages/graph/engine/src/baseline-strategy.ts
   - packages/graph/engine/src/lang-adapter/types.ts
 related-docs:
   - ./01-stages-and-catalog.md
@@ -235,11 +234,11 @@ opensip-tools graph --gate-save
 opensip-tools graph --gate-compare
 ```
 
-v2: the baseline lives in the project's SQLite store (`<project>/opensip-tools/.runtime/datastore.sqlite`, gitignored), in the `graph_baseline_signals` table. There is exactly one baseline per project; the v1 `--baseline <path>` flag is gone (see [v2.0.0 CHANGELOG](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/CHANGELOG.md)).
+v2+: the baseline lives in the project's SQLite store (`<project>/opensip-tools/.runtime/datastore.sqlite`, gitignored), as rows in the host-owned `tool_baseline_entries` table scoped `tool = 'graph'` (ADR-0036 — one generic table pair serves every tool's gate). There is exactly one baseline per tool per project; the v1 `--baseline <path>` flag is gone (see [v2.0.0 CHANGELOG](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/CHANGELOG.md)).
 
 ### Signal fingerprints
 
-A fingerprint is a string identity for a finding, used to diff against the baseline. The shape is `${ruleId}|${filePath}|${line}|${message}` — see [`fingerprintSignal` in `gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/gate.ts). The line number is included, so fingerprints **do** change when a finding moves up or down the file.
+A fingerprint is a string identity for a finding, used to diff against the baseline. The shape is `${ruleId}|${filePath}|${line}|${column}` — graph's declared [`fingerprintStrategy`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/baseline-strategy.ts) (ADR-0036: each tool stamps its own envelope; the host plane never re-fingerprints). The `message` is deliberately **excluded** — several rules embed run-varying counts in their message text (e.g. `duplicated-function-body`'s duplicate count), which would re-key an unchanged finding across runs. The line number **is** included, so fingerprints do change when a finding moves up or down the file.
 
 Two properties matter:
 
@@ -250,7 +249,7 @@ Treat the graph baseline as a snapshot to be re-saved after refactors that move 
 
 ### Compare semantics
 
-`--gate-compare` reads the baseline file and compares its fingerprint set against the current run's. The exit code is:
+`--gate-compare` reads the saved baseline rows and compares their fingerprint set against the current run's (the pure `diffBaseline` in `@opensip-tools/output`). The exit code is:
 
 | Outcome | Exit code | Meaning |
 |---|---|---|
@@ -262,7 +261,7 @@ This intentionally **allows fingerprint removal**. Cleaning up findings doesn't 
 
 ### How this differs from `fit`'s gate
 
-`fit`'s gate (see [`20-fit/04-output-gate-sarif.md`](/docs/opensip-tools/20-fit/04-output-gate-sarif/)) is fundamentally the same shape — save signals, compare later, fail on new — but it hashes findings on `(filePath, ruleId, message)` (no line number). Graph's gate uses a fingerprint-set baseline that includes line numbers. Per [ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **both gates store signals, not SARIF**: fit's baseline is the stored `SignalEnvelope`; graph's is a signal-fingerprint set. Both live in the project's SQLite store (`fit_baseline` row and `graph_baseline_signals` rows respectively), atomic via SQLite transactions. They're independent — running one doesn't affect the other.
+`fit`'s gate (see [`20-fit/04-output-gate-sarif.md`](/docs/opensip-tools/20-fit/04-output-gate-sarif/)) **is the same host machinery** (ADR-0036): both tools ride the same `saveBaseline`/`compareBaseline` seams over the same `tool_baseline_entries`/`tool_baseline_meta` table pair, atomic via SQLite transactions. What differs is each tool's declared `fingerprintStrategy`: fit hashes `(filePath, ruleId, message)` (no line number — line-shift tolerant); graph keys `ruleId|filePath|line|column` (no message — count-shift tolerant). Per [ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **both gates store signals, not SARIF**. The rows are scoped by the `tool` column, so the gates are independent — running one doesn't affect the other.
 
 ---
 
