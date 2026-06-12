@@ -23,12 +23,19 @@ export interface CommandRegistrationInput {
   readonly pluginLayouts: readonly NonNullable<import('@opensip-tools/core').PluginLayout>[];
   readonly toolScaffolds: readonly {
     readonly layout: import('@opensip-tools/core').PluginLayout;
-    readonly scaffoldExamples: import('@opensip-tools/core').ScaffoldFile[] | undefined;
+    readonly scaffoldExamples:
+      | ((
+          ctx: import('@opensip-tools/core').ScaffoldContext,
+        ) => readonly import('@opensip-tools/core').ScaffoldFile[])
+      | undefined;
     readonly stableExampleIds: (() => readonly string[]) | undefined;
     readonly scaffoldConfigBlock: (() => string) | undefined;
   }[];
   readonly sessionReplayRegistry: SessionReplayRegistry;
-  readonly toolCommandSpecs: readonly import('@opensip-tools/core').CommandSpec<unknown, import('@opensip-tools/core').ToolCliContext>[];
+  readonly toolCommandSpecs: readonly import('@opensip-tools/core').CommandSpec<
+    unknown,
+    import('@opensip-tools/core').ToolCliContext
+  >[];
 }
 
 /**
@@ -37,9 +44,7 @@ export interface CommandRegistrationInput {
  * are absent (this warning is intentionally loud when a bundled tool is
  * missing, as it affects `init` scaffolding).
  */
-export function buildCommandRegistrationInput(
-  registry: ToolRegistry,
-): CommandRegistrationInput {
+export function buildCommandRegistrationInput(registry: ToolRegistry): CommandRegistrationInput {
   // Source the plugin-supporting domains from the registered tools'
   // declared layouts — the kernel never enumerates them (ADR-0009).
   const pluginLayouts = registry

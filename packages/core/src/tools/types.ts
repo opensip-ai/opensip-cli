@@ -389,7 +389,10 @@ export interface ToolCliContext {
    * derives the gate exit from `result.degraded` via the `deliverSignals`
    * runFailed override — no tool calls `setExitCode` for the gate path (ADR-0035).
    */
-  readonly compareBaseline: (tool: string, envelope: WireSignalEnvelope) => Promise<GateCompareResult>;
+  readonly compareBaseline: (
+    tool: string,
+    envelope: WireSignalEnvelope,
+  ) => Promise<GateCompareResult>;
   /**
    * Export this tool's baseline to a SARIF file by reconstructing a synthetic
    * envelope from the stored per-fingerprint payloads (no stored envelope to

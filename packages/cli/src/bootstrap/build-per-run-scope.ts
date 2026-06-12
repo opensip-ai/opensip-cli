@@ -29,10 +29,7 @@ import {
 } from '@opensip-tools/core';
 import { resolveSignalSink } from '@opensip-tools/output';
 
-import {
-  buildDatastoreThunk,
-  getToolManifestsForRun,
-} from '../cli-context.js';
+import { buildDatastoreThunk, getToolManifestsForRun } from '../cli-context.js';
 import { buildTargets } from './build-targets.js';
 import { composeAndValidateToolConfig } from './config-and-capabilities.js';
 import { loadCliDefaults } from './cli-defaults.js';
@@ -58,6 +55,13 @@ export interface BuildPerRunScopeInput {
   readonly apiKey?: string;
   readonly noCloud?: boolean;
   readonly logger: Logger;
+  /**
+   * Presentation state resolved by the hook before the scope is built:
+   * the CLI package version and the cached newer-version string (if any).
+   * Passed in — NOT derivable from `cliDefaults` (the `cli:` config block
+   * carries no package version).
+   */
+  readonly ui: { readonly version: string; readonly update: string | undefined };
 }
 
 /**
@@ -69,17 +73,8 @@ export interface BuildPerRunScopeInput {
  * but all inputs are explicit and side effects are contained.
  */
 export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
-  const {
-    project,
-    runId,
-    cwd,
-    cliDefaults,
-    registries,
-    manifests,
-    apiKey,
-    noCloud,
-    logger,
-  } = input;
+  const { project, runId, cwd, cliDefaults, registries, manifests, apiKey, noCloud, logger, ui } =
+    input;
 
   const { languages, tools } = registries;
 
@@ -121,7 +116,9 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // Presentation settings the render paths read via currentScope()?.ui.
     // bannerSize stays an untyped string at the kernel boundary; the
     // cli-ui render sites narrow it with normalizeBannerSize.
-    ui: { bannerSize: cliDefaults.ui?.banner ?? 'mini', version: cliDefaults.version ?? '', update: undefined }, // update handled in hook for now
+    // bannerSize stays derivable from config; version/update are resolved by
+    // the hook (package version + cached update-check result) and passed in.
+    ui: { bannerSize: cliDefaults.ui?.banner ?? 'mini', version: ui.version, update: ui.update },
   });
 
   // D7: each registered tool contributes its tool-specific subscope (e.g.

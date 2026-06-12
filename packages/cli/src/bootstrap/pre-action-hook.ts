@@ -154,7 +154,6 @@ async function maybeInitializeOwningTool(
  * config (fitness) stay loud instead of silently validating `{}`.
  */
 
-
 /**
  * Mount the bootstrap `preAction` hook on the supplied program.
  *
@@ -283,6 +282,7 @@ export function installPreActionHook(program: Command, version: string): void {
       apiKey: opts.apiKey as string | undefined,
       noCloud: actionCommand.optsWithGlobals().cloud === false,
       logger,
+      ui: { version, update },
     });
 
     enterScope(scope);
