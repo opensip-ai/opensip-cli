@@ -52,7 +52,7 @@ const louvain = createRequire(import.meta.url)('graphology-communities-louvain')
 };
 
 /** Fixed Louvain seed — NEVER derived from time/env (determinism layer 1). */
-const LOUVAIN_SEED = 0x5eed;
+const LOUVAIN_SEED = 0x5e_ed;
 /**
  * Communities smaller than this are pooled (guard rail 2). Module
  * constant in B1 by design (spec non-goal: no extra config knobs);
@@ -67,7 +67,7 @@ export interface CommunityPartitionInput {
   /** Absolute repo root — files are keyed by their repo-relative POSIX path. */
   readonly repoRoot: string;
   /** Directed absolute-path edges; endpoints outside `files` are ignored. */
-  readonly importEdges: ReadonlyArray<readonly [from: string, to: string]>;
+  readonly importEdges: readonly (readonly [from: string, to: string])[];
   /** Max files per emitted partition (callers pass the chunkSize, 2000). */
   readonly maxShardSize: number;
 }
@@ -79,9 +79,7 @@ export interface CommunityPartitionInput {
  * each partition sorted, absolute paths. Byte-identical run-to-run for a
  * fixed `(files, importEdges)` by construction.
  */
-export function communityPartition(
-  input: CommunityPartitionInput,
-): readonly SyntheticPartition[] {
+export function communityPartition(input: CommunityPartitionInput): readonly SyntheticPartition[] {
   const keyToAbs = buildKeyMap(input.files, input.repoRoot);
   const graph = buildCanonicalGraph(keyToAbs, input.importEdges);
   const result = louvain.detailed(graph, {
@@ -134,7 +132,7 @@ function buildKeyMap(files: readonly string[], repoRoot: string): ReadonlyMap<st
  */
 function buildCanonicalGraph(
   keyToAbs: ReadonlyMap<string, string>,
-  importEdges: ReadonlyArray<readonly [from: string, to: string]>,
+  importEdges: readonly (readonly [from: string, to: string])[],
 ): UndirectedGraph {
   const graph = new UndirectedGraph({ multi: false });
   const sortedKeys = [...keyToAbs.keys()].sort();
@@ -159,7 +157,7 @@ function buildCanonicalGraph(
  */
 function foldUndirectedWeights(
   keyToAbs: ReadonlyMap<string, string>,
-  importEdges: ReadonlyArray<readonly [from: string, to: string]>,
+  importEdges: readonly (readonly [from: string, to: string])[],
 ): ReadonlyMap<string, number> {
   const absToKey = new Map<string, string>();
   for (const [key, abs] of keyToAbs) {
@@ -194,7 +192,10 @@ function canonicalCommunities(
       members.push(key);
     }
   }
-  const communities = [...byLabel.values()].map((members) => members.sort());
+  const communities = [...byLabel.values()];
+  for (const members of communities) {
+    members.sort();
+  }
   communities.sort((a, b) => ((a[0] ?? '') < (b[0] ?? '') ? -1 : 1));
   return communities;
 }
@@ -271,12 +272,10 @@ function poolUndersized(input: {
     current.push(...candidate.members);
   }
   if (current.length > 0) pools.push(current);
-  const pooled = pools.map(
-    (members, index): KeyPartition => ({
-      id: `community-pool-${String(index)}`,
-      members: members.sort(),
-    }),
-  );
+  const pooled = pools.map((members, index): KeyPartition => {
+    members.sort();
+    return { id: `community-pool-${String(index)}`, members };
+  });
   return [...kept, ...pooled];
 }
 

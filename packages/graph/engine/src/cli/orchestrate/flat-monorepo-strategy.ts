@@ -149,7 +149,7 @@ export interface PartitionFlatRepoInput {
    * inside `files`. REQUIRED by 'community' (supplied by the language
    * adapter's scanImports seam — ADR-0045); ignored by the others.
    */
-  readonly importEdges?: ReadonlyArray<readonly [from: string, to: string]>;
+  readonly importEdges?: readonly (readonly [from: string, to: string])[];
 }
 
 /**
