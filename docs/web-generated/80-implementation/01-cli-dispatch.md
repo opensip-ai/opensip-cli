@@ -134,7 +134,7 @@ Some commands belong to the CLI itself, not to any Tool. They live under [`packa
 | `plugin add/remove/list/sync` | CLI | Manages project-pinned plugins. Cross-tool. |
 | `completion` | CLI | Prints a shell-completion script whose subcommands + flags are **derived from the live `CommandSpec`s** at generation time (`assembleCompletionInventory`) — the same specs the runtime mounts, so it can't drift; a flag-parity test enforces it. Discovered third-party tool commands are included (the inventory is sourced from the populated registry). |
 | `report` | CLI | Generates + opens the HTML report, aggregating each tool's contributed report data (composition root). Cross-tool. |
-| `sessions list/purge` | CLI | Reads the runtime session store. Cross-tool. |
+| `sessions list/purge` | CLI | Reads the runtime session store. Cross-tool. New agent ergonomics (`--summary-only`, `--filter`, `--raw` on show) are also host-owned here. |
 
 Tool-owned commands are mounted from each Tool's declared `commandSpecs` via the
 host's `mountCommandSpec`. The current first-party set: fitness contributes

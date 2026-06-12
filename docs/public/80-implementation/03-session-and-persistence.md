@@ -129,7 +129,9 @@ The session is written via [`SessionRepo.save()`](../../../packages/session-stor
 
 ```bash
 opensip sessions list                       # SELECT * FROM sessions ORDER BY timestamp DESC
+opensip sessions list --json --summary-only # lean listing for agents (omits heavy payloads)
 opensip sessions show <id>                  # replay a stored session (or `latest --tool <fit|graph|sim>`)
+opensip sessions show latest --tool fit --json --filter errors-only --filter top:20
 opensip sessions purge                      # DELETE FROM sessions (prompts for confirm)
 opensip sessions purge --older-than 7       # DELETE FROM sessions WHERE timestamp < cutoff
 opensip sessions purge -y                   # skip the confirmation prompt
@@ -137,7 +139,7 @@ opensip sessions purge -y                   # skip the confirmation prompt
 
 `purge` is **row-level data deletion**, not file removal. The FK cascade from `sessions` → `session_tool_payload` (`onDelete: 'cascade'`) ensures that purging a session drops its opaque payload row in one shot.
 
-The dashboard reads the same store to populate its run-history view.
+The dashboard reads the same store to populate its run-history view. For programmatic discovery of these surfaces (especially the new agent ergonomics around filtering and raw output), see `agent-catalog` in the [CLI commands reference](../70-reference/01-cli-commands.md).
 
 **Session replay.** `sessions show` (and the per-run `--show <session>`
 shorthand on `fit`/`graph`/`sim`) reconstructs a past run's output from its
@@ -149,6 +151,8 @@ its `sessionReplay` contribution (`fit`/`graph`/`sim`), tagging the result
 `fidelity: 'projection'` (rebuilt from persisted findings, not re-executed).
 Failures (`not-found`, `wrong-tool`, `ambiguous-latest`, `decode-error`) surface
 as a structured `CommandOutcome` error with exit 2.
+
+The `--filter` (errors-only / warnings-only / top:<n>) and `--raw` options on `show`, plus `--summary-only` on `list`, provide agent-friendly ergonomics for historical result inspection without changing any human-readable output.
 
 ---
 

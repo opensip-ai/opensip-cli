@@ -24,7 +24,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `fit-list`, `fit-recipes`, graph helper commands) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/cli/src/commands/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `fit-list`, `fit-recipes`, graph helper commands) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `sessions`, `plugin`, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/cli/src/commands/).
 
 ---
 
@@ -562,15 +562,39 @@ The user-level config is shared across every project on the machine. `opensip fi
 
 ---
 
+## `agent-catalog` — structured discovery surface for agents
+
+CLI-owned. A machine-first command that emits a self-describing catalog of the most useful commands, flags, and patterns for AI agents, with emphasis on the sessions/history surface and the agent ergonomics added for historical result inspection.
+
+```
+opensip agent-catalog
+opensip agent-catalog --json
+```
+
+The `--json` output is designed to be consumed directly by agents. It contains:
+
+- Primary entry points with ready-to-use examples (including `sessions show latest --tool <fit|graph|sim> --json --filter errors-only --filter top:20` and `sessions list --json --summary-only`).
+- Common composable agent workflows.
+- Notes on the core output shapes (`SignalEnvelope`, `SessionReplayResult` with `fidelity: "projection"`, etc.).
+- Explicit call-out that human-readable renderers (tables, banners) are unchanged.
+
+This is the recommended starting point for any agent that needs to discover how to drive OpenSIP programmatically or inspect prior runs.
+
+---
+
 ## `sessions list`, `sessions show`, and `sessions purge` — manage session records
 
 CLI-owned. Reads, replays, and deletes session rows in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`. `list` and `show` are `SELECT`s; `purge` is a row-level `DELETE` (the FK cascade drops each session's tool-payload row), not file removal.
 
+Primary surface for inspecting prior runs (especially from agents). See `agent-catalog` above for the recommended discovery entry point.
+
 ```
 opensip sessions list
+opensip sessions list --json --summary-only
 opensip sessions show <session-id>
 opensip sessions show latest --tool fit
-opensip sessions show latest --tool graph --json
+opensip sessions show latest --tool fit --json --filter errors-only --filter top:20
+opensip sessions show latest --tool graph --json --raw
 opensip sessions purge
 opensip sessions purge --older-than 7
 opensip sessions purge -y
@@ -579,22 +603,27 @@ opensip sessions purge -y
 | Subcommand | Flag | Effect |
 |---|---|---|
 | `list` | (none) | List every stored session, newest first. |
-| `show` | `<ref>` (positional) | Replay a stored session by id, or `latest` (requires `--tool`). |
+| `list` | `--summary-only` | Omit heavy per-session tool payloads (agent-friendly "menu" mode). The lightweight summary and `showCommand` hints remain. |
+| `show` | `<ref>` (positional) | Replay a stored session by id, or `latest` (requires `--tool`). Supports relative refs such as `previous` / `latest-N`. |
 | `show` | `--tool <fit\|graph\|sim>` | Required for `latest`; an optional sanity check for an explicit id. |
-| `show` | `--json` | Emit the replayed session as a `CommandOutcome` JSON wrapper (the projected `SignalEnvelope` under `.envelope`). |
+| `show` | `--json` | Emit the replayed session (projected `SignalEnvelope` under the result). |
+| `show` | `--filter <type>` | Filter the replayed signals (repeatable). Supported values: `errors-only` (high severity), `warnings-only` (medium), `top:<n>`. Composable, e.g. `--filter errors-only --filter top:20`. Adds `filtersApplied`, `originalSignalCount`, and `returnedSignalCount` to the machine output. |
+| `show` | `--raw` | With `--json`: emit only the inner payload (`session` + `envelope` + metadata) without the outer `CommandOutcome` wrapper. Ideal for token-sensitive agents. |
 | `purge` | `--older-than <days>` | Only delete sessions older than N days. Default: delete all. |
 | `purge` | `-y, --yes` | Skip the confirmation prompt. |
 
 **Session replay.** `sessions show` reconstructs a past run's output from the
 stored payload: each tool contributes a `sessionReplay` projection
 (`fit`/`graph`/`sim`) that decodes the opaque payload back into a
-`SignalEnvelope`. The replay `fidelity` is `projection` — it is rebuilt from
+`SignalEnvelope`. The replay `fidelity` is always `projection` — it is rebuilt from
 persisted findings, not a re-execution. Each run command also accepts an inline
 `--show <session>` flag (`fit --show latest`, `graph --show <id>`,
 `sim --show latest`) as a shorthand for the same replay scoped to that tool. A
 missing session, wrong tool, or undecodable payload returns a structured error
 (`reason`/`code`: `not-found`, `wrong-tool`, `ambiguous-latest`, `decode-error`)
 and exit 2.
+
+The `--filter` and `--raw` options (plus `--summary-only` on `list`) were added specifically to make historical result inspection efficient for AI agents while leaving all human-readable tables and banners unchanged.
 
 **See also:** [`80-implementation/03-session-and-persistence.md`](/docs/opensip-cli/80-implementation/03-session-and-persistence/).
 

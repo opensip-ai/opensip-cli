@@ -267,7 +267,7 @@ It's worth being explicit about what isn't promised:
 - **Internal framework types.** `CheckConfig`, `FitnessRecipe`, `RecipeCheckResult`, `ExecutionContext`, `PathMatcher` — all internal. They live in `@opensip-cli/fitness`, but they're not re-exported as part of the marketplace shape. Check packs use `defineCheck`/`defineRecipe` (which *are* stable) and never touch these.
 - **Logger output format.** Logs are JSON Lines, but the field set is internal. Don't grep production logs for specific keys; treat them as opaque.
 - **Cache file format.** The AST cache, the glob cache, the prewarm cache — all rebuildable. They have on-disk shapes, but those shapes change without notice. Wiping `<project>/opensip-cli/.runtime/cache/` is always safe.
-- **Session record format.** Sessions are persisted as rows in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`, with per-session detail in a companion `session_tool_payload` row, but the schema is internal. The `sessions list` command is the supported reader.
+- **Session record format.** Sessions are persisted as rows in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`, with per-session detail in a companion `session_tool_payload` row, but the schema is internal. The `sessions list` command (with `--summary-only` for agents) is the supported reader. See also `agent-catalog` for programmatic discovery of the sessions/history surface.
 - **OpenSIP Cloud API.** The cloud is a separate product. Its API is its own contract, not opensip-cli'. The CLI POSTs signals (the `SignalBatch` wire shape derived from the envelope; SARIF on the `--report-to` path), and the cloud is responsible for ingesting it.
 
 ---

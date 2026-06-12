@@ -266,4 +266,4 @@ In CI, `--open` is suppressed (no TTY), so no browser opens — but the HTML fil
 ## What's next
 
 - **[`../80-implementation/03-session-and-persistence.md`](/docs/opensip-cli/80-implementation/03-session-and-persistence/)** — the session and report file lifecycle.
-- **[`./01-cli-commands.md`](/docs/opensip-cli/70-reference/01-cli-commands/)** — `report`, `--open`, and `sessions list/purge` flags.
+- **[`./01-cli-commands.md`](/docs/opensip-cli/70-reference/01-cli-commands/)** — `report`, `--open`, `sessions list/purge/show`, and the new `agent-catalog` discovery surface (with agent ergonomics such as `--filter` / `--raw` / `--summary-only`).
