@@ -24,7 +24,7 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 | Run load or chaos scenarios against a service you control | `opensip sim` |
 | Share internal rules across repos | Publish or install fit packs and sim scenario packs |
 | Add an entire command to the CLI | Build a Tool plugin and manage it with `opensip tools ...` |
-| Show results to humans | Open the local HTML dashboard or export SARIF for code scanning |
+| Show results to humans | Open the local HTML report or export SARIF for code scanning |
 
 ## Start Here
 
@@ -63,7 +63,7 @@ opensip graph
 opensip graph --list-files
 opensip graph --workspace
 opensip sim --recipe <name>
-opensip dashboard
+opensip report
 ```
 
 Whole Tool plugins are managed through the `tools` group:
@@ -158,7 +158,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 41. [Configuration](/docs/opensip-cli/70-reference/03-configuration/)
 42. [JSON output schema](/docs/opensip-cli/70-reference/04-json-output-schema/)
 43. [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/)
-44. [Dashboard](/docs/opensip-cli/70-reference/06-dashboard/)
+44. [Report](/docs/opensip-cli/70-reference/06-dashboard/)
 45. [Supply-chain security](/docs/opensip-cli/70-reference/08-supply-chain-security/)
 46. [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/)
 47. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)

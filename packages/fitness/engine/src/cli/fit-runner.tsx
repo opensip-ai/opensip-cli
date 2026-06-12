@@ -313,8 +313,8 @@ function FitRunner({
                 hints={[
                   VERBOSE_DETAIL_HINT,
                   {
-                    text: 'opensip dashboard for HTML report',
-                    bold: ['opensip dashboard'],
+                    text: 'opensip report for HTML report',
+                    bold: ['opensip report'],
                   },
                 ]}
               />
@@ -322,8 +322,8 @@ function FitRunner({
             {!args.quiet && state.result.configFound === false && (
               <Box paddingLeft={2}>
                 <Text dimColor>
-                  No config file found. Run <Text bold>opensip init</Text> to customize
-                  targets and settings.
+                  No config file found. Run <Text bold>opensip init</Text> to customize targets and
+                  settings.
                 </Text>
               </Box>
             )}

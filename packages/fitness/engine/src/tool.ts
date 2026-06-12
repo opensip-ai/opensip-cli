@@ -9,9 +9,9 @@
  * and owns the parse→handler→error→exit pipeline. This file owns only the
  * fitness command-spec assembly + the live-view renderer wiring; the spec
  * modules under `cli/fit/` own the option declarations and handler bodies. (The
- * standalone `dashboard` subcommand is owned by the CLI, which composes it from
+ * standalone `report` subcommand is owned by the CLI, which composes it from
  * every tool's contributed data — see
- * packages/cli/src/commands/register-dashboard.ts — and migrates with the host
+ * packages/cli/src/commands/host-command-specs.ts — and migrates with the host
  * commands in Phase 6.)
  *
  * Two-key registration invariant
@@ -50,7 +50,7 @@
 import { readPackageVersion } from '@opensip-cli/core';
 
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
-import { collectFitnessDashboardData } from './cli/dashboard.js';
+import { collectFitnessReportData } from './cli/report-data.js';
 import {
   fitBaselineExportCommandSpec,
   fitListCommandSpec,
@@ -234,7 +234,7 @@ export const fitnessTool: Tool = {
   // is gone — fitness no longer touches Commander.
   commandSpecs: fitCommandSpecs,
   contributeScope,
-  collectDashboardData: collectFitnessDashboardData,
+  collectReportData: collectFitnessReportData,
   sessionReplay: {
     tool: 'fit',
     replaySession: fitReplayFromSession,

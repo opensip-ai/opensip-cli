@@ -64,7 +64,7 @@ export type CommandResult =
   | ListChecksResult
   | ListRecipesResult
   | HistoryResult
-  | DashboardResult
+  | ReportResult
   | InitResult
   | ExperimentalResult
   | PluginResult
@@ -339,8 +339,8 @@ export interface HistoryResult {
   sessions: HistorySession[];
 }
 
-export interface DashboardResult {
-  type: 'dashboard';
+export interface ReportResult {
+  type: 'report';
   path: string;
   opened: boolean;
 }
@@ -505,7 +505,7 @@ export type PluginResult =
  * it carries the projected {@link SignalEnvelope} (ADR-0011) + display metadata,
  * and `resultToView` renders it through the SAME shared envelope→table view every
  * tool's live results use — so a replayed graph session finally shows a table,
- * and none of them show the live-run "Use --verbose / dashboard" footer (which is
+ * and none of them show the live-run "Use --verbose / report" footer (which is
  * guidance for a fresh run, not a replay).
  */
 export interface SessionReplayResult {

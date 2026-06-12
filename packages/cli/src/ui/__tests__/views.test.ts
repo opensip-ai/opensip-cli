@@ -127,11 +127,11 @@ describe('session-replay view', () => {
     expect(out).toContain('graph:cycle'); // the shared envelope table body
     // The live-run footer must NOT appear on a replay.
     expect(out).not.toContain('Use --verbose');
-    expect(out).not.toContain('dashboard for HTML report');
+    expect(out).not.toContain('report for HTML report');
   });
 });
 
-describe('experimental + help + dashboard views', () => {
+describe('experimental + help + report views', () => {
   it('renders the experimental sim notice', () => {
     const out = text({ type: 'experimental', tool: 'sim', cwd: '/x' });
     expect(out).toContain('Simulation');
@@ -142,11 +142,9 @@ describe('experimental + help + dashboard views', () => {
     expect(text({ type: 'help' })).toContain('Run fitness checks');
   });
 
-  it('renders dashboard opened / not-opened', () => {
-    expect(text({ type: 'dashboard', path: '/r.html', opened: true })).toContain(
-      'Opened in browser.',
-    );
-    expect(text({ type: 'dashboard', path: '/r.html', opened: false })).toContain(
+  it('renders report opened / not-opened', () => {
+    expect(text({ type: 'report', path: '/r.html', opened: true })).toContain('Opened in browser.');
+    expect(text({ type: 'report', path: '/r.html', opened: false })).toContain(
       'Open the file in your browser',
     );
   });

@@ -6,7 +6,7 @@
  * by `ensureChecksLoaded()` and read by the phase helpers downstream
  * (`buildFitEnvelope`, `buildFitDoneResult`) plus the public
  * `getPluginLoadErrors()` / `getDisplayName()` / `getIcon()` accessors
- * that `FitView` and `dashboard.ts` consume.
+ * that `FitView` and `report-data.ts` consume.
  *
  * As of the scope-owned-registries refactor (2.10.0) this state lives on
  * the RunScope (`scope.fitness.load`), NOT module singletons — two

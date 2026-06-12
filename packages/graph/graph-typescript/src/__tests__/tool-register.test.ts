@@ -61,7 +61,7 @@ function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+    maybeOpenReport: vi.fn(() => Promise.resolve()),
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
     setExitCode: vi.fn(),
     emitJson: vi.fn(),

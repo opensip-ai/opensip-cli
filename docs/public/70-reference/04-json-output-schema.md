@@ -17,7 +17,7 @@ related-docs:
 
 `opensip fit --json`, `opensip sim --json`, and `opensip graph --json` all emit
 one `CommandOutcome` wrapper on stdout ([ADR-0024](../../decisions/ADR-0024-command-outcome-and-observability.md)).
-Run commands carry a `SignalEnvelope` under `.envelope`; list/dashboard commands
+Run commands carry a `SignalEnvelope` under `.envelope`; list/report commands
 carry their result under `.data`; failures carry structured `errors`. This is
 the contract surface for CI integrations.
 
@@ -31,7 +31,7 @@ the contract surface for CI integrations.
 }
 ```
 
-`CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](../../../packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/dashboard command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload.
+`CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](../../../packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/report command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload.
 
 The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](../../../packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope.
 

@@ -87,7 +87,7 @@ child.
   both modes.
 - **Graph stage spans** (`packages/cli/src/telemetry/__tests__/graph-spans.test.ts`,
   via `InMemorySpanExporter` which lives in `cli`): a `runGraph` run emits the six
-  `opensip_tools.graph.<stage>` spans in `GRAPH_STAGES` order with stage +
+  `opensip_cli.graph.<stage>` spans in `GRAPH_STAGES` order with stage +
   orchestrator attributes, all nesting under an active parent's trace id; with no
   provider it emits nothing.
 - **Graph no-op invariant**

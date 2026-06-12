@@ -8,7 +8,7 @@
  * stage spans it starts are non-recording (emit nothing).
  *
  * The span-CAPTURE assertion — that an enabled run produces the six
- * `opensip_tools.graph.<stage>` spans, in order, with the stage attributes —
+ * `opensip_cli.graph.<stage>` spans, in order, with the stage attributes —
  * lives in `opensip-cli`, where the SDK + InMemorySpanExporter
  * legitimately live (`packages/cli/src/telemetry/__tests__/graph-spans.test.ts`).
  * Keeping the SDK out of the tool package is the architectural constraint this

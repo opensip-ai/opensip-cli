@@ -20,7 +20,7 @@
  *
  * This replaces the old inline `--version`/`--help` pair with a broad
  * command-level walk: init → fit (built-in + fit-pack plugin) → list → graph →
- * dashboard → sessions → tool-plugin install. Every scenario runs in ONE
+ * report → sessions → tool-plugin install. Every scenario runs in ONE
  * consumer cwd (passed in), in order; later scenarios depend on the side effects
  * (config, plugins, seeded files) of earlier ones.
  *
@@ -45,7 +45,7 @@ import { expectEnvelope } from './cli-acceptance-core.mjs';
 
 /**
  * 2.12.0 (§5.5): `--json` is a `CommandOutcome` wrapper. Non-run command results
- * (init / list / dashboard / plugin / sessions) ride under `.data`; run-command
+ * (init / list / report / plugin / sessions) ride under `.data`; run-command
  * envelopes ride under `.envelope`. These unwrap the inner payload, tolerating a
  * bare shape too (forward/backward robustness — matches `expectEnvelope`).
  */
@@ -212,21 +212,19 @@ export function buildPackedSmokeScenarios({
       },
     },
     {
-      name: 'dashboard --no-open --json writes the report without launching a browser',
-      args: ['dashboard', '--no-open', '--json'],
+      name: 'report --no-open --json writes the report without launching a browser',
+      args: ['report', '--no-open', '--json'],
       cwd: consumerCwd,
       expect: {
         exitCode: 0,
         json: (parsed) => {
           const failures = [];
           const data = cmdData(parsed);
-          if (data?.type !== 'dashboard') {
-            failures.push(
-              `dashboard.type: expected "dashboard", got ${JSON.stringify(data?.type)}`,
-            );
+          if (data?.type !== 'report') {
+            failures.push(`report.type: expected "report", got ${JSON.stringify(data?.type)}`);
           }
           if (data?.opened !== false)
-            failures.push(`dashboard.opened: expected false, got ${JSON.stringify(data?.opened)}`);
+            failures.push(`report.opened: expected false, got ${JSON.stringify(data?.opened)}`);
           return failures;
         },
       },

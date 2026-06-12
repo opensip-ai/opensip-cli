@@ -2,7 +2,7 @@
  * Tests for the CLI-owned command registration.
  *
  * `registerCliCommands` mounts the cross-tool housekeeping commands
- * (init, dashboard, sessions, configure, plugin, completion, uninstall)
+ * (init, report, sessions, configure, plugin, completion, uninstall)
  * onto a Commander program. The tests verify the full subcommand surface
  * exists with no duplicate or missing names — a drift test that catches
  * additions / removals at PR time.
@@ -45,11 +45,12 @@ describe('registerCliCommands', () => {
     registerCliCommands(program, makeContext());
 
     expect(topLevelNames(program)).toEqual([
+      'agent-catalog',
       'completion',
       'configure',
-      'dashboard',
       'init',
       'plugin',
+      'report',
       'sessions',
       'tools',
       'uninstall',

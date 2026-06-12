@@ -29,7 +29,7 @@ interface MockCliBag {
   readonly renderLive: MockInstance;
   readonly render: MockInstance;
   readonly setExitCode: MockInstance;
-  readonly maybeOpenDashboard: MockInstance;
+  readonly maybeOpenReport: MockInstance;
   readonly emitEnvelope: MockInstance;
   readonly emitError: MockInstance;
   readonly deliverSignals: MockInstance;
@@ -39,7 +39,7 @@ function mockCli(): MockCliBag {
   const renderLive = vi.fn().mockResolvedValue(undefined);
   const render = vi.fn().mockResolvedValue(undefined);
   const setExitCode = vi.fn();
-  const maybeOpenDashboard = vi.fn().mockResolvedValue(undefined);
+  const maybeOpenReport = vi.fn().mockResolvedValue(undefined);
   const emitJson = vi.fn();
   const emitEnvelope = vi.fn();
   // 2.12.0: the structured-error seam. Mirror the host — it sets the exit code.
@@ -49,7 +49,7 @@ function mockCli(): MockCliBag {
     renderLive,
     render,
     setExitCode,
-    maybeOpenDashboard,
+    maybeOpenReport,
     emitJson,
     emitEnvelope,
     emitError,
@@ -62,7 +62,7 @@ function mockCli(): MockCliBag {
     renderLive,
     render,
     setExitCode,
-    maybeOpenDashboard,
+    maybeOpenReport,
     emitEnvelope,
     emitError,
     deliverSignals,
@@ -100,7 +100,7 @@ afterEach(() => {
 describe('runLiveMode', () => {
   it('renders the animated live view on a TTY (and never the static seam)', async () => {
     setTTY(true);
-    const { cli, renderLive, render, maybeOpenDashboard, deliverSignals } = mockCli();
+    const { cli, renderLive, render, maybeOpenReport, deliverSignals } = mockCli();
     await runLiveMode(args, cli, 'fit', false);
     expect(renderLive).toHaveBeenCalledWith('fit', args);
     expect(render).not.toHaveBeenCalled();
@@ -108,7 +108,7 @@ describe('runLiveMode', () => {
     // The TTY live view delivers via the tool's registerLiveView callback,
     // not runLiveMode — so runLiveMode itself does not call deliverSignals here.
     expect(deliverSignals).not.toHaveBeenCalled();
-    expect(maybeOpenDashboard).toHaveBeenCalledTimes(1);
+    expect(maybeOpenReport).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to the static fit-done result + delivers once on non-TTY', async () => {

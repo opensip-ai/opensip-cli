@@ -1,7 +1,7 @@
 /**
- * @fileoverview Helper for the `--open` flag on `fit` and `sim`.
+ * @fileoverview Helper for the `--open` flag on report-producing commands.
  *
- * After a run completes, generate the HTML dashboard and launch it in
+ * After a run completes, generate the HTML report and launch it in
  * the default browser. Hard-skip conditions are strict: we NEVER open
  * a browser in environments where it would be wrong (CI, non-TTY,
  * --json output, SSH without a display).
@@ -12,12 +12,12 @@
 
 import open from 'open';
 
-export interface OpenDashboardDecision {
+export interface OpenReportDecision {
   readonly shouldOpen: boolean;
   readonly reason: string;
 }
 
-export interface OpenDashboardContext {
+export interface OpenReportContext {
   readonly openRequested: boolean;
   readonly jsonOutput: boolean;
   readonly stdoutIsTTY: boolean;
@@ -35,7 +35,7 @@ export interface OpenDashboardContext {
  *   - SSH_CONNECTION set AND no DISPLAY/WAYLAND_DISPLAY (remote shell
  *     without a graphical session — don't try)
  */
-export function decideOpen(ctx: OpenDashboardContext): OpenDashboardDecision {
+export function decideReportOpen(ctx: OpenReportContext): OpenReportDecision {
   if (!ctx.openRequested) return { shouldOpen: false, reason: 'not-requested' };
   if (ctx.jsonOutput) return { shouldOpen: false, reason: 'json-mode' };
   if (!ctx.stdoutIsTTY) return { shouldOpen: false, reason: 'non-tty' };
@@ -51,7 +51,7 @@ export function decideOpen(ctx: OpenDashboardContext): OpenDashboardDecision {
  * true on success, false if `open` refused or threw. Never propagates
  * — a failure to open a browser should NOT fail the fitness run.
  */
-export async function launchBrowser(target: string): Promise<boolean> {
+export async function launchReport(target: string): Promise<boolean> {
   try {
     await open(target);
     return true;

@@ -175,7 +175,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     render,
     registerLiveView,
     renderLive,
-    maybeOpenDashboard: vi.fn(),
+    maybeOpenReport: vi.fn(),
     logger: console,
     setExitCode,
     emitJson,

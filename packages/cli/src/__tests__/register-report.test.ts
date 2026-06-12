@@ -1,25 +1,25 @@
 /**
- * Coverage for the `dashboard` host command spec's wiring AND its action body
+ * Coverage for the `report` host command spec's wiring AND its action body
  * (release 2.11.0 Phase 6 — `host-command-specs.ts`).
  *
  * `register-commands.test.ts` deliberately never runs action bodies; here we
- * drive the `dashboard` action through `parseAsync` so the
- * `composeAndWriteDashboard({ open })` delegation (and the `--no-open` /
- * `--json` open-suppression logic) is exercised. `composeAndWriteDashboard`
+ * drive the `report` action through `parseAsync` so the
+ * `composeAndWriteReport({ open })` delegation (and the `--no-open` /
+ * `--json` open-suppression logic) is exercised. `composeAndWriteReport`
  * is mocked so the test neither writes files nor launches a browser.
  */
 
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const composeAndWriteDashboard = vi.fn();
+const composeAndWriteReport = vi.fn();
 
-vi.mock('../dashboard-compose.js', () => ({ composeAndWriteDashboard }));
+vi.mock('../report-compose.js', () => ({ composeAndWriteReport }));
 
 beforeEach(() => {
-  composeAndWriteDashboard.mockReset();
-  composeAndWriteDashboard.mockResolvedValue({
-    type: 'dashboard',
+  composeAndWriteReport.mockReset();
+  composeAndWriteReport.mockResolvedValue({
+    type: 'report',
     path: 'reports/latest.html',
     opened: false,
   });
@@ -52,11 +52,11 @@ async function mount(ctx: never): Promise<Command> {
   return program;
 }
 
-describe('dashboard spec', () => {
-  it('mounts `dashboard` with --no-open and --json flags', async () => {
+describe('report spec', () => {
+  it('mounts `report` with --no-open and --json flags', async () => {
     const { ctx } = makeCtx();
     const program = await mount(ctx);
-    const cmd = program.commands.find((c) => c.name() === 'dashboard');
+    const cmd = program.commands.find((c) => c.name() === 'report');
     expect(cmd).toBeDefined();
     const flags = cmd!.options.map((o) => o.long);
     expect(flags).toEqual(expect.arrayContaining(['--no-open', '--json']));
@@ -66,9 +66,9 @@ describe('dashboard spec', () => {
     const { ctx, rendered } = makeCtx();
     const program = await mount(ctx);
 
-    await program.parseAsync(['node', 'cli', 'dashboard']);
+    await program.parseAsync(['node', 'cli', 'report']);
 
-    expect(composeAndWriteDashboard).toHaveBeenCalledWith({ open: true });
+    expect(composeAndWriteReport).toHaveBeenCalledWith({ open: true });
     expect(rendered).toHaveLength(1);
   });
 
@@ -76,9 +76,9 @@ describe('dashboard spec', () => {
     const { ctx } = makeCtx();
     const program = await mount(ctx);
 
-    await program.parseAsync(['node', 'cli', 'dashboard', '--no-open']);
+    await program.parseAsync(['node', 'cli', 'report', '--no-open']);
 
-    expect(composeAndWriteDashboard).toHaveBeenCalledWith({ open: false });
+    expect(composeAndWriteReport).toHaveBeenCalledWith({ open: false });
   });
 
   it('never opens a browser in --json mode and writes JSON to stdout instead of rendering', async () => {
@@ -91,14 +91,14 @@ describe('dashboard spec', () => {
       return true;
     });
     try {
-      await program.parseAsync(['node', 'cli', 'dashboard', '--json']);
+      await program.parseAsync(['node', 'cli', 'report', '--json']);
     } finally {
       spy.mockRestore();
     }
 
     // open = opts.open(true) && !opts.json(true) ⇒ false.
-    expect(composeAndWriteDashboard).toHaveBeenCalledWith({ open: false });
-    expect(out.join('')).toContain('"type": "dashboard"');
+    expect(composeAndWriteReport).toHaveBeenCalledWith({ open: false });
+    expect(out.join('')).toContain('"type": "report"');
     expect(rendered).toHaveLength(0);
   });
 });

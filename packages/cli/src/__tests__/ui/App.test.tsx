@@ -15,7 +15,7 @@ import { App, type AppProps } from '../../ui/App.js';
 import type {
   ClearDoneResult,
   ConfigureDoneResult,
-  DashboardResult,
+  ReportResult,
   ErrorResult,
   HelpResult,
 } from '@opensip-cli/contracts';
@@ -105,9 +105,9 @@ describe('App.tsx — banner shell (single source of truth)', () => {
   // Banner block characters confirm the Ink banner rendered.
   const BANNER_GLYPH = '█';
 
-  it('renders the banner for dashboard (regression: dashboard had no banner)', () => {
-    const result: DashboardResult = {
-      type: 'dashboard',
+  it('renders the banner for report output (regression: the HTML report had no banner)', () => {
+    const result: ReportResult = {
+      type: 'report',
       path: '/repo/report.html',
       opened: false,
     };
@@ -145,13 +145,13 @@ describe('App.tsx — banner shell (single source of truth)', () => {
 
 describe('App.tsx — project header (single renderer, under the banner)', () => {
   it('renders the project line when project context is supplied', () => {
-    const result: DashboardResult = { type: 'dashboard', path: '/repo/r.html', opened: false };
+    const result: ReportResult = { type: 'report', path: '/repo/r.html', opened: false };
     const output = renderApp(result, { root: '/repo', walkedUp: 0 });
     expect(output).toContain('ℹ Project: /repo');
   });
 
   it('includes the walked-up suffix', () => {
-    const result: DashboardResult = { type: 'dashboard', path: '/repo/r.html', opened: false };
+    const result: ReportResult = { type: 'report', path: '/repo/r.html', opened: false };
     const output = renderApp(result, { root: '/repo', walkedUp: 2 });
     expect(output).toContain('ℹ Project: /repo  (found 2 levels up)');
   });

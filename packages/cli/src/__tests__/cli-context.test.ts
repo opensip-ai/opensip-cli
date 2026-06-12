@@ -93,7 +93,7 @@ describe('createLiveViewRegistry', () => {
 function makeBuildOpts(): {
   render: ReturnType<typeof vi.fn>;
   liveViews: ReturnType<typeof createLiveViewRegistry>;
-  maybeOpenDashboard: ReturnType<typeof vi.fn>;
+  maybeOpenReport: ReturnType<typeof vi.fn>;
   logger: Logger;
 } {
   const { log } = makeLogger();
@@ -101,7 +101,7 @@ function makeBuildOpts(): {
   return {
     render: vi.fn(() => Promise.resolve()),
     liveViews,
-    maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+    maybeOpenReport: vi.fn(() => Promise.resolve()),
     logger: log,
   };
 }
@@ -173,7 +173,7 @@ describe('buildToolCliContext', () => {
     const { ctx } = buildToolCliContext({
       render: vi.fn(() => Promise.resolve()),
       liveViews: createLiveViewRegistry(),
-      maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+      maybeOpenReport: vi.fn(() => Promise.resolve()),
     });
     expect(ctx.logger).toBeDefined();
   });

@@ -3,7 +3,7 @@
  * error (north-star §5.5, release 2.12.0).
  *
  * `SignalEnvelope` (ADR-0011) is the strong INNER currency, but the outer shape
- * drifted: run commands emitted a bare envelope, list/dashboard commands a bare
+ * drifted: run commands emitted a bare envelope, list/report commands a bare
  * `CommandResult`, errors a bare `ErrorResult`, and the bootstrap bypassed all of
  * it (`process.exit` + raw stream writes). So a machine consumer could not rely on
  * one schema for every outcome — and `--json` produced nothing structured for the
@@ -12,7 +12,7 @@
  *
  * `CommandOutcome<T>` is that one schema. It wraps the **unchanged** inner
  * envelope under `.envelope` (run commands) or the domain `CommandResult` under
- * `.data` (list/dashboard/…); an error or bootstrap outcome carries `errors` +
+ * `.data` (list/report/…); an error or bootstrap outcome carries `errors` +
  * `diagnostics` with neither payload. The host ASSEMBLES it — stamping
  * `kind`/`status`/`exitCode`/`diagnostics` from the handler's pure-domain return —
  * so no tool, first-party or external, chooses its own error JSON or success

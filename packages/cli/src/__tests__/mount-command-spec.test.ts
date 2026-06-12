@@ -56,7 +56,7 @@ function makeCtx(): CapturedCtx {
       liveViews.push({ key, args });
       return Promise.resolve();
     }),
-    maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+    maybeOpenReport: vi.fn(() => Promise.resolve()),
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     setExitCode: vi.fn((code: number) => {
       exitCodes.push(code);

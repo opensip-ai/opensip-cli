@@ -156,7 +156,7 @@ describe('resultToView', () => {
       }),
     });
     expect(out).toContain('Use --verbose for detailed results');
-    expect(out).toContain('opensip dashboard for HTML report');
+    expect(out).toContain('opensip report for HTML report');
   });
 
   it('renders fit-done errored/clean units: ERROR status, blank validated cell', () => {
@@ -297,7 +297,7 @@ describe('resultToView', () => {
 
   it('renders graph-done summary + footer via the shared producers (no banner text)', () => {
     // Non-verbose: no verboseDetail; the seam emits the shared "Use --verbose…"
-    // hint + graph's dashboard hint (ADR-0021).
+    // hint + graph's report hint (ADR-0021).
     const out = textOf({
       type: 'graph-done',
       summary: { passed: 3, failed: 0, errors: 0, warnings: 0 },
@@ -305,7 +305,7 @@ describe('resultToView', () => {
     });
     expect(out).toContain('PASS  (0 Errors, 0 Warnings) | Duration 1.2s');
     expect(out).toContain('  Use --verbose for detailed results');
-    expect(out).toContain('opensip dashboard for HTML report');
+    expect(out).toContain('opensip report for HTML report');
   });
 
   it('renders gate-done lines verbatim', () => {

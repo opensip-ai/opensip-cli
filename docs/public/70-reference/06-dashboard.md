@@ -2,7 +2,7 @@
 status: current
 last_verified: 2026-06-07
 release: v1.0.0
-title: "Dashboard"
+title: "Report"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
 source-files:
@@ -13,22 +13,22 @@ source-files:
   - packages/dashboard/src/sessions.ts
   - packages/dashboard/src/code-paths.ts
   - packages/dashboard/src/code-paths/
-  - packages/cli/src/open-dashboard.ts
-  - packages/fitness/engine/src/cli/dashboard.ts
+  - packages/cli/src/open-report.ts
+  - packages/fitness/engine/src/cli/report-data.ts
 related-docs:
   - ../80-implementation/03-session-and-persistence.md
   - ./01-cli-commands.md
   - ../40-graph/01-stages-and-catalog.md
 ---
-# Dashboard
+# Report
 
-The dashboard is a self-contained HTML report of every fit and sim run on the local machine. No server, no database, no asset hosting — a single directory you can email or commit, fully functional offline.
+The report is a self-contained HTML view of every fit, sim, and graph run on the local machine. No server, no database, no asset hosting — a single file you can email or commit, fully functional offline.
 
 > **What you'll understand after this:**
-> - When the dashboard opens automatically vs. manually.
+> - When the report opens automatically vs. manually.
 > - What the HTML report contains (the four top-level tabs and their subtabs).
 > - How the static HTML is generated and how data flows in.
-> - Where the dashboard's source lives.
+> - Where the report renderer's source lives.
 
 ---
 
@@ -36,10 +36,10 @@ The dashboard is a self-contained HTML report of every fit and sim run on the lo
 
 Two triggers, both opt-in:
 
-1. **`--open` flag.** `opensip fit --open` (or `sim --open`) runs the recipe, then launches the dashboard if conditions allow.
-2. **Explicit `dashboard` command.** `opensip dashboard` opens the most recent run's report regardless of any pending fit run.
+1. **`--open` flag.** `opensip fit --open` (or `sim --open`) runs the recipe, then launches the report if conditions allow.
+2. **Explicit `report` command.** `opensip report` opens the most recent run's report regardless of any pending fit run.
 
-The launcher's `decideOpen` ([`packages/cli/src/open-dashboard.ts`](../../../packages/cli/src/open-dashboard.ts)) returns `shouldOpen: true` only when **all** of these hold:
+The launcher's `decideReportOpen` ([`packages/cli/src/open-report.ts`](../../../packages/cli/src/open-report.ts)) returns `shouldOpen: true` only when **all** of these hold:
 
 - The user requested it (`--open` was passed).
 - Output isn't `--json` (machine-readable runs don't open browsers).
@@ -132,7 +132,7 @@ Source: [`packages/dashboard/src/code-paths.ts`](../../../packages/dashboard/src
 
 ### Tool tabs
 
-The dashboard supports both fit and sim runs. The top-of-page tab switcher (Overview / Fitness / Simulation / Code Paths) filters the panels by tool. Sim runs are sparser today; the panel shapes are the same. Source: [`tool-tabs.ts`](../../../packages/dashboard/src/tool-tabs.ts).
+The report supports fit, sim, and graph runs. The top-of-page tab switcher (Overview / Fitness / Simulation / Code Paths) filters the panels by tool. Sim runs are sparser today; the panel shapes are the same. Source: [`tool-tabs.ts`](../../../packages/dashboard/src/tool-tabs.ts).
 
 ---
 
@@ -150,7 +150,7 @@ The output is one self-contained `latest.html`. No CDN, no external script tags,
 
 Why static, no server? A few reasons:
 
-- **Audit trail.** A static HTML you can email or commit is reviewable. A live dashboard that fetches from a backend is not.
+- **Audit trail.** A static HTML you can email or commit is reviewable. A live report that fetches from a backend is not.
 - **No port conflicts.** Static files don't ask for `localhost:3000`.
 - **No moving parts.** No daemon to crash, no cache to stale, no auth to misconfigure.
 
@@ -158,9 +158,9 @@ The cost: dynamic features (filtering, sorting, expand-collapse) are JS in the b
 
 ---
 
-## Extending the dashboard
+## Extending the report renderer
 
-The dashboard package exposes three contributor-facing seams. New
+The `@opensip-cli/dashboard` package exposes three contributor-facing seams. New
 data, new ranked views, and new session-aware deep-link tabs each go
 through one of them — none requires forking the generator or
 sprinkling globals.
@@ -232,7 +232,7 @@ are available wherever any tab JS runs.
 <project>/opensip-cli/.runtime/reports/latest.html
 ```
 
-Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the SQLite session store (`.runtime/datastore.sqlite`, read via `SessionRepo`); the Sessions panel inlines the **most recent 20 sessions** (`new SessionRepo(datastore).list({ limit: 20 })` in [`packages/cli/src/dashboard-compose.ts`](../../../packages/cli/src/dashboard-compose.ts)) so historical runs are browsable inside the HTML up to that bound. Older sessions stay in the store until you run `sessions purge`.
+Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the SQLite session store (`.runtime/datastore.sqlite`, read via `SessionRepo`); the Sessions panel inlines the **most recent 20 sessions** (`new SessionRepo(datastore).list({ limit: 20 })` in [`packages/cli/src/report-compose.ts`](../../../packages/cli/src/report-compose.ts)) so historical runs are browsable inside the HTML up to that bound. Older sessions stay in the store until you run `sessions purge`.
 
 The HTML file is fully self-contained — no asset directory, no CDN, no fetches. Email a stakeholder the file and they can open it on their machine without opensip-cli installed. Useful for: post-incident reports, security review handoffs, compliance audits.
 
@@ -257,7 +257,7 @@ For `acme-api` after the nightly CI run:
 
 - The session row persisted in `<project>/opensip-cli/.runtime/datastore.sqlite` (tool `fit`, recipe `default`, timestamped `2026-05-17T03:15:22.123Z`) carries the full result in its companion `session_tool_payload` row.
 - The HTML report at `<project>/opensip-cli/.runtime/reports/latest.html` is regenerated. The Sessions panel inside the HTML inlines the most recent 20 session records, so a developer opening it later sees the new run alongside its 19 immediate predecessors.
-- A developer running `opensip dashboard` locally opens the file in their browser. The Sessions panel shows the run; the Overview panel shows the score trend.
+- A developer running `opensip report` locally opens the file in their browser. The Sessions panel shows the run; the Overview panel shows the score trend.
 
 In CI, `--open` is suppressed (no TTY), so no browser opens — but the HTML file is still written. Teams that want a per-run archive copy `latest.html` to a build-artifact path with a run-scoped filename before the next pipeline run overwrites it.
 
@@ -266,4 +266,4 @@ In CI, `--open` is suppressed (no TTY), so no browser opens — but the HTML fil
 ## What's next
 
 - **[`../80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md)** — the session and report file lifecycle.
-- **[`./01-cli-commands.md`](./01-cli-commands.md)** — `dashboard`, `--open`, and `sessions list/purge` flags.
+- **[`./01-cli-commands.md`](./01-cli-commands.md)** — `report`, `--open`, and `sessions list/purge` flags.

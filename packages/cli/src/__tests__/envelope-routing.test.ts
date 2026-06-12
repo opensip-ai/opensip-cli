@@ -134,7 +134,7 @@ function buildEmitErrorCtx() {
   return buildToolCliContext({
     render: renderResult,
     liveViews: createLiveViewRegistry(),
-    maybeOpenDashboard: () => Promise.resolve(),
+    maybeOpenReport: () => Promise.resolve(),
   }).ctx;
 }
 
@@ -166,7 +166,7 @@ describe('root --json path (emitEnvelope)', () => {
     const { ctx } = buildToolCliContext({
       render: renderResult,
       liveViews: createLiveViewRegistry(),
-      maybeOpenDashboard: () => Promise.resolve(),
+      maybeOpenReport: () => Promise.resolve(),
     });
 
     ctx.emitEnvelope(ENVELOPE);

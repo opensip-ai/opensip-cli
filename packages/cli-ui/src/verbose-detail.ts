@@ -39,7 +39,7 @@ export interface FindingGroupView {
 }
 
 /** The single canonical "Use --verbose…" hint item. Tools that compose their
- *  own footer (e.g. graph, which also shows a dashboard hint) reuse THIS item so
+ *  own footer (e.g. graph, which also shows a report hint) reuse THIS item so
  *  the string is never re-typed. */
 export const VERBOSE_DETAIL_HINT: HintItem = {
   text: 'Use --verbose for detailed results',
@@ -109,7 +109,7 @@ function groupNode(g: FindingGroupView): ViewNode {
           { text: `${String(hidden)} more hidden (use ` },
           { text: '--json', bold: true },
           { text: ' or ' },
-          { text: 'opensip dashboard', bold: true },
+          { text: 'opensip report', bold: true },
           { text: ' for all)' },
         ],
         true,

@@ -11,7 +11,7 @@ export { EXIT_CODES, getErrorSuggestion } from '@opensip-cli/contracts';
 export { buildWelcome, printWelcome } from './welcome.js';
 export { buildCompletionScript, printCompletionScript } from './commands/completion.js';
 export { executeUninstall } from './commands/uninstall.js';
-export { decideOpen, launchBrowser } from './open-dashboard.js';
+export { decideReportOpen, launchReport } from './open-report.js';
 export { maybeNotify } from './update-notifier.js';
 export type {
   SignalEnvelope,

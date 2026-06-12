@@ -10,12 +10,7 @@
  *    call doesn't take the whole registry down).
  */
 
-import {
-  LanguageRegistry,
-  ToolRegistry,
-  type Tool,
-  type ToolCliContext,
-} from '@opensip-cli/core';
+import { LanguageRegistry, ToolRegistry, type Tool, type ToolCliContext } from '@opensip-cli/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -37,7 +32,7 @@ function makeStubContext(): ToolCliContext {
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+    maybeOpenReport: vi.fn(() => Promise.resolve()),
     logger: {
       debug: vi.fn(),
       info: vi.fn(),

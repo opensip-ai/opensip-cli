@@ -89,7 +89,7 @@ async function buildShard(spec: ShardWorkerSpec): Promise<ShardBuildResult> {
   // this worker's env (extracted at the CLI boundary by initTelemetry). No live
   // view here — the worker is headless — so no progress/monitor plumbing.
   const built = await buildAndResolveCatalog({
-    runStage: spanRunStage({ 'opensip_tools.graph.shard_id': shard.id }),
+    runStage: spanRunStage({ 'opensip_cli.graph.shard_id': shard.id }),
     adapter,
     discovery,
     resolutionMode,

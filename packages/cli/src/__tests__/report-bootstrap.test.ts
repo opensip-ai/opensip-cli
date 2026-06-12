@@ -1,24 +1,24 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 
-import * as composeMod from '../dashboard-compose.js';
-import * as openDashboardMod from '../open-dashboard.js';
+import * as composeMod from '../report-compose.js';
+import * as openReportMod from '../open-report.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('maybeOpenDashboard', () => {
+describe('maybeOpenReport', () => {
   it('does nothing when openRequested is false', async () => {
-    const launch = vi.spyOn(openDashboardMod, 'launchBrowser');
-    const mod = await import('../bootstrap/dashboard.js');
-    await mod.maybeOpenDashboard({ openRequested: false, jsonOutput: false });
+    const launch = vi.spyOn(openReportMod, 'launchReport');
+    const mod = await import('../bootstrap/report.js');
+    await mod.maybeOpenReport({ openRequested: false, jsonOutput: false });
     expect(launch).not.toHaveBeenCalled();
   });
 
   it('does nothing in JSON mode', async () => {
-    const launch = vi.spyOn(openDashboardMod, 'launchBrowser');
-    const mod = await import('../bootstrap/dashboard.js');
-    await mod.maybeOpenDashboard({ openRequested: true, jsonOutput: true });
+    const launch = vi.spyOn(openReportMod, 'launchReport');
+    const mod = await import('../bootstrap/report.js');
+    await mod.maybeOpenReport({ openRequested: true, jsonOutput: true });
     expect(launch).not.toHaveBeenCalled();
   });
 
@@ -27,7 +27,7 @@ describe('maybeOpenDashboard', () => {
     const savedTTY = process.stdout.isTTY;
 
     beforeEach(() => {
-      // decideOpen wants: openRequested, not json, stdout TTY, not CI, and
+      // decideReportOpen wants: openRequested, not json, stdout TTY, not CI, and
       // not an SSH session without a display.
       delete process.env.CI;
       delete process.env.SSH_CONNECTION;
@@ -42,10 +42,10 @@ describe('maybeOpenDashboard', () => {
 
     it('composes and opens the cross-tool dashboard', async () => {
       const compose = vi
-        .spyOn(composeMod, 'composeAndWriteDashboard')
-        .mockResolvedValue({ type: 'dashboard', path: 'reports/latest.html', opened: true });
-      const mod = await import('../bootstrap/dashboard.js');
-      await mod.maybeOpenDashboard({ openRequested: true, jsonOutput: false });
+        .spyOn(composeMod, 'composeAndWriteReport')
+        .mockResolvedValue({ type: 'report', path: 'reports/latest.html', opened: true });
+      const mod = await import('../bootstrap/report.js');
+      await mod.maybeOpenReport({ openRequested: true, jsonOutput: false });
       expect(compose).toHaveBeenCalledWith({ open: true });
     });
   });

@@ -205,7 +205,7 @@ export async function runLiveMode(
       await deliverFitSignals(cli, fitResult.envelope, args);
     }
   }
-  await cli.maybeOpenDashboard({
+  await cli.maybeOpenReport({
     openRequested,
     jsonOutput: Boolean(args.json),
   });

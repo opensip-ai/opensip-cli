@@ -38,13 +38,14 @@ describe('fitnessTool contract conformance', () => {
     expect(names).toEqual(expect.arrayContaining(['fit', 'fit-list', 'fit-recipes']));
   });
 
-  it("no longer owns the cross-tool 'dashboard' command (moved to the CLI in L2)", () => {
+  it("does not own the cross-tool 'report' command", () => {
     const names = fitnessTool.commands.map((c) => c.name);
+    expect(names).not.toContain('report');
     expect(names).not.toContain('dashboard');
   });
 
-  it('contributes dashboard data via the Tool.collectDashboardData seam', () => {
-    expect(typeof fitnessTool.collectDashboardData).toBe('function');
+  it('contributes report data via the Tool.collectReportData seam', () => {
+    expect(typeof fitnessTool.collectReportData).toBe('function');
   });
 
   it('declares its command surface via commandSpecs (Phase 4), not register()', () => {

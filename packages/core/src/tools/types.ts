@@ -1,4 +1,4 @@
-// @fitness-ignore-file file-length-limit -- the canonical Tool plugin contract: one cohesive interface (metadata, commands, commandSpecs, initialize, contributeScope, collectDashboardData, config, capabilityRegistrars, sessionReplay) whose every member carries load-bearing JSDoc. The slots are the contract surface; splitting the single interface across files would fragment the one type tools implement. Grew past the 400-line soft limit with the 2.10.0 config + capability slots (ADR-0023 / §5.3).
+// @fitness-ignore-file file-length-limit -- the canonical Tool plugin contract: one cohesive interface (metadata, commands, commandSpecs, initialize, contributeScope, collectReportData, config, capabilityRegistrars, sessionReplay) whose every member carries load-bearing JSDoc. The slots are the contract surface; splitting the single interface across files would fragment the one type tools implement. Grew past the 400-line soft limit with the 2.10.0 config + capability slots (ADR-0023 / §5.3).
 /**
  * Tool plugin contract.
  *
@@ -183,7 +183,7 @@ type WireSignalEnvelope = unknown;
 /**
  * Context the host hands to each command handler (and the tool's optional
  * lifecycle hooks): the shared CLI behaviour a handler calls back into — Ink
- * rendering, machine-output emit seams, dashboard auto-open, structured logging,
+ * rendering, machine-output emit seams, report auto-open, structured logging,
  * per-run scope — without depending on the CLI package directly.
  *
  * 3.0.0 GA: this context carries NO Commander `program`. Tools declare
@@ -241,11 +241,11 @@ export interface ToolCliContext {
    */
   readonly renderLive: (key: string, args: unknown) => Promise<void>;
   /**
-   * Open the HTML dashboard in the user's browser when the run
+   * Open the HTML report in the user's browser when the run
    * conditions allow it (TTY, not JSON-mode, opt-in). Tools call this
    * after a run to honor the user's --open flag.
    */
-  readonly maybeOpenDashboard: (opts: {
+  readonly maybeOpenReport: (opts: {
     openRequested: boolean;
     jsonOutput: boolean;
   }) => Promise<void>;
@@ -595,7 +595,7 @@ export interface ScaffoldFile {
 export interface ToolExtensionPoints {
   readonly initialize?: () => Promise<void>;
   readonly contributeScope?: () => ScopeContribution;
-  readonly collectDashboardData?: (
+  readonly collectReportData?: (
     scope: ToolScope,
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
   readonly sessionReplay?: ToolSessionReplayContribution;
@@ -711,19 +711,19 @@ export interface Tool {
    */
   readonly contributeScope?: () => ScopeContribution;
   /**
-   * Optional dashboard-data contribution (audit 2026-05-29, L2). The CLI
-   * is the dashboard composition root: it gathers generic sessions, then
+   * Optional report-data contribution (audit 2026-05-29, L2). The CLI
+   * is the report composition root: it gathers generic sessions, then
    * walks the tool registry calling this hook and merges each tool's
-   * contribution into the dashboard input. A tool returns ITS OWN inputs
+   * contribution into the HTML report input. A tool returns ITS OWN inputs
    * to the HTML report (fitness: check/recipe catalogs; graph: its
    * catalog) — keyed by the field names `generateDashboardHtml` consumes.
    *
    * Returns an opaque `Record<string, unknown>` so the kernel carries no
-   * tool/dashboard vocabulary; the CLI `Object.assign`s it onto the
+   * tool/report-renderer vocabulary; the CLI `Object.assign`s it onto the
    * `DashboardInput`. Tools that contribute nothing leave this undefined.
    * Receives the Tool-facing `ToolScope` (datastore, projectContext, …).
    */
-  readonly collectDashboardData?: (
+  readonly collectReportData?: (
     scope: ToolScope,
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
   /**

@@ -15,7 +15,7 @@ source-files:
   - packages/session-store/src/session-repo.ts
   - packages/session-store/src/store.ts
   - packages/session-store/src/schema/sessions.ts
-  - packages/cli/src/dashboard-compose.ts
+  - packages/cli/src/report-compose.ts
   - packages/graph/engine/src/persistence/catalog-repo.ts
   - packages/graph/engine/src/persistence/schema.ts
   - packages/datastore/src/baseline-repo.ts
@@ -28,7 +28,7 @@ related-docs:
 ---
 # Session and persistence
 
-A run produces three kinds of on-disk artifacts: the SQLite database, structured log files, and HTML dashboard reports. All three live under one directory — `<project>/opensip-cli/.runtime/` — which is gitignored and rebuildable.
+A run produces three kinds of on-disk artifacts: the SQLite database, structured log files, and HTML reports. All three live under one directory — `<project>/opensip-cli/.runtime/` — which is gitignored and rebuildable.
 
 > **What you'll understand after this:**
 > - The on-disk layout and what's stored where.
@@ -208,11 +208,11 @@ The log file persists until manually deleted. There's no rotation; that's the us
 
 ## Reports
 
-The HTML dashboard writes a single self-contained file at `<project>/opensip-cli/.runtime/reports/latest.html`. Each generation overwrites the previous file — the dashboard is "always show the most recent state", not a per-run archive.
+The HTML report writes a single self-contained file at `<project>/opensip-cli/.runtime/reports/latest.html`. Each generation overwrites the previous file — the report is "always show the most recent state", not a per-run archive.
 
-Composition is owned by the **CLI** ([`packages/cli/src/dashboard-compose.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/cli/src/dashboard-compose.ts)), the cross-tool composition root. It reads sessions via `SessionRepo.list({ limit: 20 })`, then walks every registered tool's optional `collectDashboardData(scope)` seam and merges the keyed contributions into one `DashboardInput` — graph returns its `graphCatalog` (via `CatalogRepo.loadCatalogContract()`), fitness returns its catalogs, neither reaching into the other (this is what the `fitness-no-graph` / `graph-no-fitness` layer rules enforce). The merged input is handed to `generateDashboardHtml` ([`@opensip-cli/dashboard`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/dashboard/src/generator.ts)), which assembles the inlined HTML (JS via `<script type="module">`, CSS via `<style>`, session/catalog data via `<script type="application/json">`). The output is one self-contained file you can email — no CDN, no asset bundle, no server.
+Composition is owned by the **CLI** ([`packages/cli/src/report-compose.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/cli/src/report-compose.ts)), the cross-tool composition root. It reads sessions via `SessionRepo.list({ limit: 20 })`, then walks every registered tool's optional `collectReportData(scope)` seam and merges the keyed contributions into one `DashboardInput` — graph returns its `graphCatalog` (via `CatalogRepo.loadCatalogContract()`), fitness returns its catalogs, neither reaching into the other (this is what the `fitness-no-graph` / `graph-no-fitness` layer rules enforce). The merged input is handed to `generateDashboardHtml` ([`@opensip-cli/dashboard`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/dashboard/src/generator.ts)), which assembles the inlined HTML (JS via `<script type="module">`, CSS via `<style>`, session/catalog data via `<script type="application/json">`). The output is one self-contained file you can email — no CDN, no asset bundle, no server.
 
-The dashboard auto-open hook fires after a run if (a) `--open` was requested or auto-open is configured, (b) output isn't `--json`, and (c) stdout is a TTY.
+The report auto-open hook fires after a run if (a) `--open` was requested or auto-open is configured, (b) output isn't `--json`, and (c) stdout is a TTY.
 
 ---
 
@@ -246,6 +246,6 @@ The whole `<project>/opensip-cli/` directory is also safe to delete; `opensip in
 ## What's next
 
 - **[`../10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/)** — the gate's full behavior and the baseline format.
-- **[`../70-reference/06-dashboard.md`](/docs/opensip-cli/70-reference/06-dashboard/)** — the HTML report's structure and the `dashboard` command.
+- **[`../70-reference/06-dashboard.md`](/docs/opensip-cli/70-reference/06-dashboard/)** — the HTML report's structure and the `report` command.
 - **[`../70-reference/03-configuration.md`](/docs/opensip-cli/70-reference/03-configuration/)** — `opensip-cli.config.yml` schema (the one bit of project state that's not in `.runtime/`).
 - **[`../80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/)** — where datastore sits in the workspace layering.

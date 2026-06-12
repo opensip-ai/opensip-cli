@@ -23,7 +23,7 @@ opensip sim --recipe example       # smoke-test the example scenario
 - **`fit`** — run fitness checks against your codebase (core command).
 - **`fit-list`** — list available checks.
 - **`fit-recipes`** — list available recipes.
-- **`dashboard`** — open an HTML report in your browser.
+- **`report`** — open an HTML report in your browser.
 - **`sim`** — run simulation recipes.
 - **`init`** — detect language and scaffold `opensip-cli.config.yml`
   plus example checks/recipes/scenarios under `opensip-cli/`.

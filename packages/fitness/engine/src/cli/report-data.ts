@@ -1,14 +1,14 @@
-// @fitness-ignore-file error-handling-quality -- dashboard-data collection is a best-effort UX action: signalers-config load failures degrade gracefully to ungoverned mode (surfaced separately by the fitness run). The CLI composition root owns file-writing and browser launch; this module only contributes fitness's catalog inputs.
+// @fitness-ignore-file error-handling-quality -- report-data collection is a best-effort UX action: signalers-config load failures degrade gracefully to ungoverned mode (surfaced separately by the fitness run). The CLI composition root owns file-writing and browser launch; this module only contributes fitness's catalog inputs.
 /**
- * dashboard-data contribution — fitness's inputs to the cross-tool HTML
+ * report-data contribution — fitness's inputs to the cross-tool HTML
  * report.
  *
- * Audit 2026-05-29 (L2): the CLI is now the dashboard composition root.
+ * Audit 2026-05-29 (L2): the CLI is now the report composition root.
  * Fitness no longer loads sessions, the graph catalog, writes the file,
  * or opens the browser. It just returns ITS OWN dashboard inputs (the
  * check + recipe catalogs and the editor protocol) keyed by the field
  * names `generateDashboardHtml` consumes. The CLI walks every tool's
- * `collectDashboardData` and merges the contributions into one
+ * `collectReportData` and merges the contributions into one
  * `DashboardInput`. This decouples fitness from graph entirely.
  */
 
@@ -54,7 +54,7 @@ export interface RecipeCatalogEntry {
 }
 
 // ---------------------------------------------------------------------------
-// collectFitnessDashboardData
+// collectFitnessReportData
 // ---------------------------------------------------------------------------
 
 /**
@@ -92,16 +92,14 @@ function loadEditorProtocol(projectDir?: string): string | null {
 }
 
 /**
- * Fitness's dashboard-data contribution (audit 2026-05-29, L2). Returns
+ * Fitness's report-data contribution (audit 2026-05-29, L2). Returns
  * the check catalog, recipe catalog, and editor protocol under the keys
  * `generateDashboardHtml` consumes. Best-effort: a missing signalers
  * config degrades the editor protocol to null; catalog building always
  * succeeds once checks are loaded. The CLI merges this onto the shared
  * `DashboardInput` alongside other tools' contributions.
  */
-export async function collectFitnessDashboardData(
-  scope: ToolScope,
-): Promise<Record<string, unknown>> {
+export async function collectFitnessReportData(scope: ToolScope): Promise<Record<string, unknown>> {
   const projectDir = scope.projectContext?.projectRoot;
   await ensureChecksLoaded(projectDir);
 

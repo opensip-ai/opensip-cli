@@ -78,7 +78,7 @@ import type { CommandResult, SignalEnvelope } from '@opensip-cli/contracts';
 //
 // The `runScope` holder mirrors the entered AsyncLocalStorage scope.
 // It's strictly redundant with `currentScope()` for tools (which always
-// read via ALS), but the CLI's non-action paths — `maybeOpenDashboard`,
+// read via ALS), but the CLI's non-action paths — `maybeOpenReport`,
 // the host `sessions` command — call `getCurrentProjectRoot()` /
 // `getOrOpenDatastore()` from outside the ALS-tracked async chain in
 // rare cases (post-action handlers, error printers). The holder lets
@@ -218,7 +218,7 @@ export function getToolManifestsForRun(): readonly ToolPluginManifest[] {
  *
  * Tools always read via `currentScope()` (ALS).
  * The holder exists **only** for non-action paths that can't reach ALS
- * (post-action callbacks, error printers, `maybeOpenDashboard`, certain host commands).
+ * (post-action callbacks, error printers, `maybeOpenReport`, certain host commands).
  *
  * Contract: caller **must** also call `markScopeEntered()` immediately after
  * this (see pre-action-hook). Using the holder before the scope is properly
@@ -251,7 +251,7 @@ function readScope(): RunScope {
 
 /**
  * Read the current project root. Convenience for non-tool bootstrap
- * helpers (e.g. `maybeOpenDashboard`) that need the project root but
+ * helpers (e.g. `maybeOpenReport`) that need the project root but
  * don't carry a ToolCliContext. Throws if accessed before pre-action-hook
  * constructed the scope.
  */
@@ -355,7 +355,7 @@ export function createLiveViewRegistry(log: Logger = defaultLogger): LiveViewReg
 export interface BuildToolCliContextOptions {
   readonly render: (result: CommandResult) => Promise<void>;
   readonly liveViews: LiveViewRegistry;
-  readonly maybeOpenDashboard: (opts: {
+  readonly maybeOpenReport: (opts: {
     openRequested: boolean;
     jsonOutput: boolean;
   }) => Promise<void>;
@@ -395,7 +395,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     render: (result) => opts.render(result as CommandResult),
     registerLiveView: opts.liveViews.register,
     renderLive: opts.liveViews.render,
-    maybeOpenDashboard: opts.maybeOpenDashboard,
+    maybeOpenReport: opts.maybeOpenReport,
     logger: log,
     setExitCode,
     // 2.12.0 (§5.5): every machine output the host emits is wrapped in a

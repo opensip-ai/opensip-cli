@@ -3,7 +3,7 @@
  * tool-register suite doesn't reach: the `--resolution` choices declaration
  * (+ the `fast` path), the graph-shard-worker handler, catalog-export's
  * incremental + changed-file advisory branch, the error handler on a pipeline
- * throw, and the contributeScope / collectDashboardData hooks.
+ * throw, and the contributeScope / collectReportData hooks.
  *
  * Since release 2.11.0 Phase 5 graph mounts via `commandSpecs`; we drive each
  * spec's handler directly (the host invokes it post-parse), threading
@@ -302,7 +302,7 @@ describe('catalog-export handler branches', () => {
   });
 });
 
-describe('contributeScope + collectDashboardData hooks', () => {
+describe('contributeScope + collectReportData hooks', () => {
   it('contributeScope seeds a fresh graph subscope with adapter + rule + recipe registries', () => {
     const contribution = graphTool.contributeScope?.() ?? {};
     expect(contribution.graph).toBeDefined();
@@ -311,19 +311,19 @@ describe('contributeScope + collectDashboardData hooks', () => {
     expect(contribution.graph?.recipes).toBeDefined();
   });
 
-  it('collectDashboardData returns empty rule/recipe catalogs when no datastore and no graph subscope', () => {
+  it('collectReportData returns empty rule/recipe catalogs when no datastore and no graph subscope', () => {
     const scope = { datastore: () => undefined } as unknown as ToolScope;
-    expect(graphTool.collectDashboardData?.(scope)).toEqual({
+    expect(graphTool.collectReportData?.(scope)).toEqual({
       graphRuleCatalog: [],
       graphRecipeCatalog: [],
     });
   });
 
-  it('collectDashboardData returns a graphCatalog key when a datastore is present', () => {
+  it('collectReportData returns a graphCatalog key when a datastore is present', () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const scope = { datastore: () => datastore } as unknown as ToolScope;
-      const data = graphTool.collectDashboardData?.(scope) ?? {};
+      const data = graphTool.collectReportData?.(scope) ?? {};
       expect('graphCatalog' in data).toBe(true);
     } finally {
       datastore.close();

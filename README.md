@@ -44,7 +44,7 @@ After the example runs pass, edit or remove the scaffolded files under
 ```bash
 opensip fit
 opensip graph
-opensip dashboard
+opensip report
 ```
 
 ## Launch Features
@@ -56,7 +56,7 @@ opensip dashboard
 - **Code graph**: answer "what breaks if I touch this?" before you make the
   change, including oversized functions, cycles, high-blast-radius code, and
   duplicated bodies.
-- **HTML reports**: generate a self-contained dashboard with no server or SaaS
+- **HTML reports**: generate a self-contained report with no server or SaaS
   login required.
 - **Simulation**: define load, chaos, and adversarial scenarios as code with
   personas, invariants, and assertions.
@@ -104,7 +104,7 @@ opensip sim --json
 
 ```bash
 opensip init
-opensip dashboard
+opensip report
 opensip sessions list
 opensip sessions show latest --tool fit
 opensip configure

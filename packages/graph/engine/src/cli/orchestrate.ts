@@ -174,13 +174,13 @@ async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
   // (possibly async) stage work and is a no-op when no SDK is registered.
   const result = await withSpanAsync(
     GRAPH_TRACER,
-    `opensip_tools.graph.${stage}`,
+    `opensip_cli.graph.${stage}`,
     async (span) => {
       const out = await fn();
       if (attrsFn) span.setAttributes(attrsFn(out));
       return out;
     },
-    { 'opensip_tools.graph.stage': stage },
+    { 'opensip_cli.graph.stage': stage },
   );
   const durationMs = Date.now() - startedAt;
   onProgress?.({
@@ -227,7 +227,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
         return { ...raw, files: resolveCanonicalFileSet(raw.files) };
       },
       detailFn: (d) => `${String(d.files.length)} files`,
-      attrsFn: (d) => ({ 'opensip_tools.graph.file_count': d.files.length }),
+      attrsFn: (d) => ({ 'opensip_cli.graph.file_count': d.files.length }),
     });
 
     const { catalog, cacheHit, resolutionStats } = await obtainCatalog({
@@ -250,7 +250,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       // cacheHit is resolved by obtainCatalog (parse/walk/resolve) above, so it
       // is known by the time the index stage runs. Surfacing it here gives the
       // consumer a low-cardinality flag for "was this an incremental/cached run."
-      attrsFn: () => ({ 'opensip_tools.graph.cache_hit': cacheHit }),
+      attrsFn: () => ({ 'opensip_cli.graph.cache_hit': cacheHit }),
     });
 
     // Stage 3.5 — feature derivation. Runs after index / before rules so rules
@@ -262,8 +262,8 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       monitor,
       fn: () => buildFeatures(catalog, indexes, config, requestedColumns),
       attrsFn: (f) => ({
-        'opensip_tools.graph.feature_columns': requestedColumns.length,
-        'opensip_tools.graph.scc_count': f.scc.length,
+        'opensip_cli.graph.feature_columns': requestedColumns.length,
+        'opensip_cli.graph.scc_count': f.scc.length,
       }),
     });
 
@@ -287,8 +287,8 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       },
       detailFn: (sigs) => `${String(ruleSet.length)} rule(s), ${String(sigs.length)} signal(s)`,
       attrsFn: (sigs) => ({
-        'opensip_tools.graph.rule_count': ruleSet.length,
-        'opensip_tools.graph.signal_count': sigs.length,
+        'opensip_cli.graph.rule_count': ruleSet.length,
+        'opensip_cli.graph.signal_count': sigs.length,
       }),
     });
 

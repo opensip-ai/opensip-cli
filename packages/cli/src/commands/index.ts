@@ -4,7 +4,7 @@
  * Cross-tool housekeeping that doesn't belong to any single tool:
  *
  *   - `init`         — scaffold opensip-cli.config.yml + example tree
- *   - `dashboard`    — compose + open the cross-tool HTML report
+ *   - `report`       — compose + open the cross-tool HTML report
  *   - `sessions`     — `list` / `purge`
  *   - `configure`    — set up the OpenSIP Cloud API key
  *   - `plugin`       — `list` / `add` / `remove` / `sync`

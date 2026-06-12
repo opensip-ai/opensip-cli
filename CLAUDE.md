@@ -33,7 +33,7 @@ opensip-cli/
 │   │                            #   migrations
 │   ├── dashboard/               # @opensip-cli/dashboard — self-contained
 │   │                            #   HTML report generator (generateDashboardHtml);
-│   │                            #   consumed by the CLI-owned `dashboard` command
+│   │                            #   consumed by the CLI-owned `report` command
 │   │                            #   (composition root), which aggregates each
 │   │                            #   tool's contributed data
 │   ├── cli/                     # opensip-cli — generic tool dispatcher
@@ -70,7 +70,7 @@ opensip-cli/
 │   │
 │   ├── fitness/                 # fitness namespace
 │   │   ├── engine/              # @opensip-cli/fitness — fitness engine,
-│   │   │                        #   fit/dashboard/fit-list/fit-recipes,
+│   │   │                        #   fit/report-data/fit-list/fit-recipes,
 │   │   │                        #   gate, SARIF
 │   │   ├── checks-typescript/   # @opensip-cli/checks-typescript (~52 checks)
 │   │   ├── checks-universal/    # @opensip-cli/checks-universal (~109 checks)
@@ -119,14 +119,14 @@ opensip-cli/
 
 ## Tech Stack
 
-| Layer    | Stack                                               |
-| -------- | --------------------------------------------------- |
-| Runtime  | Node.js 22+, TypeScript 5.7+                        |
-| Build    | Turborepo, pnpm 10+ workspaces                      |
-| CLI UI   | Ink (React for terminals), Commander.js             |
-| Quality  | ESLint flat config (sonarjs/unicorn/import),        |
-|          | dependency-cruiser, knip                            |
-| Testing  | Vitest                                              |
+| Layer   | Stack                                        |
+| ------- | -------------------------------------------- |
+| Runtime | Node.js 22+, TypeScript 5.7+                 |
+| Build   | Turborepo, pnpm 10+ workspaces               |
+| CLI UI  | Ink (React for terminals), Commander.js      |
+| Quality | ESLint flat config (sonarjs/unicorn/import), |
+|         | dependency-cruiser, knip                     |
+| Testing | Vitest                                       |
 
 ## Essential Commands
 
@@ -171,8 +171,8 @@ tool dispatcher:
 4. Walks the tool registry and mounts each tool's declarative `commandSpecs`
    through the host-owned `mountCommandSpec` infrastructure. Tools never receive
    a raw Commander program.
-5. Adds CLI-only commands: `init`, `sessions`, `configure`, `plugin`,
-   `completion`, `uninstall`.
+5. Adds CLI-only commands: `init`, `report`, `sessions`, `configure`,
+   `plugin`, `completion`, `uninstall`.
 
 **The CLI source has zero static imports of first-party tool runtimes**; bundled
 tools load by package name through the same plugin path as installed tools.
@@ -184,7 +184,7 @@ Subcommands available out of the box:
 - `opensip fit-list` — List available checks
 - `opensip fit-recipes` — List available recipes
 - `opensip fit-baseline-export` — Export fitness findings to SARIF
-- `opensip dashboard` — Generate HTML report
+- `opensip report` — Generate HTML report
 - `opensip graph` — Build the static call graph
 - `opensip graph-lookup` — Look up a symbol's callers/callees in the graph
 - `opensip graph-symbol-index` — Build/query the symbol index
@@ -213,11 +213,12 @@ are approximate and drift as checks are added:
 - `packages/fitness/engine/src/framework/define-check.ts` — `defineCheck()` API
 - `packages/fitness/engine/src/framework/registry.ts` — `defaultRegistry`
 - `packages/fitness/engine/src/recipes/` — Recipe service, registry, types
-- `packages/fitness/engine/src/cli/` — fit/dashboard/fit-list/fit-recipes
+- `packages/fitness/engine/src/cli/` — fit/report-data/fit-list/fit-recipes
   command implementations
 - `packages/fitness/engine/src/tool.ts` — fitness's Tool plugin descriptor
 
 Adding a new check:
+
 1. Decide which pack it belongs in (TS-AST → checks-typescript;
    text/regex → checks-universal; language-specific → checks-<lang>).
 2. Add the source file under `src/checks/<category>/`.
@@ -304,7 +305,7 @@ or `pnpm --filter=@opensip-cli/<pkg> test`.
   into `new RunScope({ tools, languages })`.
 - Library functions deep in the call tree read the current scope via
   `currentScope()` (AsyncLocalStorage). Inside `runWithScope(scope,
-  fn)`, every async descendant of `fn` sees the same scope. The
+fn)`, every async descendant of `fn` sees the same scope. The
   Commander preAction hook uses `enterScope` so the action body
   invoked after the hook returns still resolves the same scope.
 - `getCheckConfig(slug)` reads from `currentScope()?.recipeCheckConfig`.
@@ -316,7 +317,7 @@ or `pnpm --filter=@opensip-cli/<pkg> test`.
   populated registry. No module-import side effects.
 - For tests, wrap any code that reads `currentScope()` in
   `runWithScope(new RunScope({ languages: new LanguageRegistry(),
-  tools: new ToolRegistry(), ... }), () => ...)`. Several test helpers
+tools: new ToolRegistry(), ... }), () => ...)`. Several test helpers
   (`packages/core/src/test-utils/with-scope.ts`,
   `packages/fitness/.../__tests__/`) already wrap this pattern.
 
@@ -334,11 +335,11 @@ checks-* (depend on fitness)
 cli (entry point — depends on every tool)
 ```
 
-- core must NOT import from contracts, cli, fitness, simulation, lang-*, or checks-*.
-- contracts must NOT import from cli, fitness, simulation, lang-*, or checks-*.
+- core must NOT import from contracts, cli, fitness, simulation, lang-_, or checks-_.
+- contracts must NOT import from cli, fitness, simulation, lang-_, or checks-_.
 - fitness / simulation must NOT import from cli (would create a cycle).
 - check packs must NOT import from cli or contracts.
-- lang-* packs must NOT import from cli, contracts, fitness, simulation, or
+- lang-\* packs must NOT import from cli, contracts, fitness, simulation, or
   each other. (The historical lang-typescript exception for `filterContent`
   was paid down — the symbol now lives in `@opensip-cli/lang-typescript`
   alongside the rest of the TS-aware string/comment stripping.)
@@ -455,7 +456,7 @@ scratch area, each with a distinct contract:
   `docs/internal/README.md` for the charter. (Formal decisions live in
   `docs/decisions/`, not here.)
 - **`docs/decisions/`** — hand-edited, committed. The architecture
-  decision log (ADRs): the durable *why* behind a choice, with
+  decision log (ADRs): the durable _why_ behind a choice, with
   alternatives and consequences. One file per `ADR-NNNN-*.md`,
   **append-only** (supersede via a new ADR; never rewrite). This repo
   uses `ADR-NNNN`; the parent `opensip` repo uses `DEC-NNN` — cite a
@@ -463,7 +464,7 @@ scratch area, each with a distinct contract:
   `docs/decisions/README.md` and `docs/decisions/TEMPLATE.md`.
 - **`docs/plans/specs/`** — hand-edited, **local-only (gitignored,
   lives under `docs/plans/`)**. Forward-looking implementation specs
-  (the *how* to build a feature), following the spec skill format; they
+  (the _how_ to build a feature), following the spec skill format; they
   gate planning before code. A spec implements a decision recorded in
   `docs/decisions/`. NOTE: this deliberately overrides the spec skill's
   default `docs/specs/` output — author all specs under
@@ -481,8 +482,8 @@ scratch area, each with a distinct contract:
   `docs/internal/`, reader-facing fact → `docs/public/`) graduates out
   of `docs/plans/`.
 
-Boundary rule of thumb: a durable *decision* (what we chose + why, with
-alternatives) is an ADR in `docs/decisions/`; the *how to build it* is a
+Boundary rule of thumb: a durable _decision_ (what we chose + why, with
+alternatives) is an ADR in `docs/decisions/`; the _how to build it_ is a
 spec in `docs/plans/specs/` (local-only). For prose docs: if you can write the fact about
 opensip-cli without naming a specific consumer, it goes in
 `docs/public/`; if naming a specific consumer (or other private context)
@@ -497,6 +498,7 @@ design exploration not yet ready for external readers, it stays in
   `<!-- web:skip -->` / `<!-- web:only -->` markers (silent in repo view).
 
 **Rules:**
+
 - Never hand-edit anything under `docs/web-generated/` — it gets overwritten.
 - After editing `docs/public/`, run `pnpm docs:build` and commit
   the regenerated `docs/web-generated/` in the same change.
@@ -526,13 +528,14 @@ project-local. The npm package is `opensip-cli`; the installed command is
 `opensip`.
 
 The new-customer flow is three commands: `init` (language detection
-+ scaffolded layout) → `fit --recipe example` → `sim --recipe
+
+- scaffolded layout) → `fit --recipe example` → `sim --recipe
 example`. Project layout is local: user-authored content under
-`<project>/opensip-cli/{fit,sim}/{checks,recipes,scenarios}/`
-(tracked) and tool-generated state under
-`<project>/opensip-cli/.runtime/` (gitignored). Plugin loader
-auto-discovers `.mjs` files by directory presence; npm packages
-must be explicitly listed in `plugins.<domain>` to load.
+  `<project>/opensip-cli/{fit,sim}/{checks,recipes,scenarios}/`
+  (tracked) and tool-generated state under
+  `<project>/opensip-cli/.runtime/` (gitignored). Plugin loader
+  auto-discovers `.mjs` files by directory presence; npm packages
+  must be explicitly listed in `plugins.<domain>` to load.
 
 Re-running `init` on a non-pristine project refuses with exit 2 by
 default. Two explicit flags express user intent:

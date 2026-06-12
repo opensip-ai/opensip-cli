@@ -30,8 +30,8 @@ export { GRAPH_ENV_SPECS } from './cli/pressure-monitor.js';
 // these symbols, and the parent-repo contract spawns the `catalog-export` subcommand rather
 // than importing the orchestrator. See ./internal.ts.
 // `CatalogRepo` (graph catalog persistence) was previously public — exposed so
-// fitness's dashboard command could read the catalog. That coupling is gone
-// (the dashboard is CLI-composed and graph contributes via `collectDashboardData`,
+// fitness's old report path could read the catalog. That coupling is gone
+// (the report is CLI-composed and graph contributes via `collectReportData`,
 // which uses CatalogRepo internally). With no external consumer, a concrete
 // SQLite/Drizzle repo does not belong on the module contract, so it moved to
 // `@opensip-cli/graph/internal` (boundary audit 2026-06-05).

@@ -240,6 +240,6 @@ program.
 
 - [**The tool-plugin model**](/docs/opensip-cli/10-concepts/02-tool-plugin-model/) — the architectural seam your Tool plugs into.
 - [**`tools` command**](/docs/opensip-cli/70-reference/12-tools-command/) — list, validate, install, uninstall, and purge data for whole Tool plugins.
-- [**Dashboard**](/docs/opensip-cli/70-reference/06-dashboard/) — the HTML report's lifecycle (the renderer your Tool's findings end up in).
+- [**Report**](/docs/opensip-cli/70-reference/06-dashboard/) — the HTML report's lifecycle (the renderer your Tool's findings end up in).
 - [**Package catalog**](/docs/opensip-cli/70-reference/02-package-catalog/) — the packages you can depend on.
 - [**Coding standards**](/docs/opensip-cli/80-implementation/04-coding-standards/) — the style and structure conventions used throughout opensip-cli (handy if you're contributing back).

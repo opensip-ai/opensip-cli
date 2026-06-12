@@ -99,7 +99,7 @@ function makeCli(): CapturedCli {
     render,
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+    maybeOpenReport: vi.fn(() => Promise.resolve()),
     logger: {
       info: vi.fn(),
       warn: vi.fn(),

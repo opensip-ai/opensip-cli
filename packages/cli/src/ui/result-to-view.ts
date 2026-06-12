@@ -44,7 +44,7 @@ import {
   viewListRecipes,
   viewHistory,
   viewExperimental,
-  viewDashboard,
+  viewReport,
   viewClearDone,
   viewConfigureDone,
   viewUninstallDone,
@@ -108,12 +108,12 @@ function graphDoneView(result: GraphDoneResult): ViewNode {
     }),
   );
   // Non-verbose run: show the shared "Use --verbose…" hint plus graph's
-  // dashboard hint (ADR-0021 — one source for the verbose-hint string).
+  // report hint (ADR-0021 — one source for the verbose-hint string).
   if (result.verboseDetail === undefined) {
     children.push(
       viewFooterHints([
         VERBOSE_DETAIL_HINT,
-        { text: 'opensip dashboard for HTML report', bold: ['opensip dashboard'] },
+        { text: 'opensip report for HTML report', bold: ['opensip report'] },
       ]),
     );
   }
@@ -124,7 +124,7 @@ function graphDoneView(result: GraphDoneResult): ViewNode {
  * A replayed session (`sessions show` / `--show`). Uniform across tools: a
  * compact session header + the SAME shared envelope→table view a live run uses
  * (so a replayed graph session shows its per-rule table too), and deliberately
- * NO live-run footer ("Use --verbose" / "dashboard") — that is fresh-run guidance,
+ * NO live-run footer ("Use --verbose" / "report") — that is fresh-run guidance,
  * meaningless for a replay. ADR-0011: the projected envelope is the one currency.
  */
 function sessionReplayView(result: SessionReplayResult): ViewNode {
@@ -304,7 +304,7 @@ export function renderVerboseDetail(detail: VerboseDetail): ViewNode {
 
 /**
  * Append the shared non-verbose footer (the "Use --verbose…" hint + the
- * dashboard hint) to a view when `show` is true (ADR-0021). Used by the
+ * report hint) to a view when `show` is true (ADR-0021). Used by the
  * envelope-backed tools (fit/sim) so a non-verbose run nudges toward the detail
  * body and the HTML report — parity with graph's footer.
  */
@@ -314,7 +314,7 @@ function withVerboseHint(node: ViewNode, show: boolean): ViewNode {
     node,
     viewFooterHints([
       VERBOSE_DETAIL_HINT,
-      { text: 'opensip dashboard for HTML report', bold: ['opensip dashboard'] },
+      { text: 'opensip report for HTML report', bold: ['opensip report'] },
     ]),
   ]);
 }
@@ -396,8 +396,8 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'session-replay': {
       return sessionReplayView(result);
     }
-    case 'dashboard': {
-      return viewDashboard(result);
+    case 'report': {
+      return viewReport(result);
     }
     case 'init': {
       return viewInit(result);

@@ -3,7 +3,7 @@
  * {@link CommandSpec}s, mounted through the SAME `mountCommandSpec` plane the
  * tools use (release 2.11.0 Phase 6).
  *
- * Host commands (`init` / `configure` / `sessions` / `plugin` / `dashboard` /
+ * Host commands (`init` / `configure` / `sessions` / `plugin` / `report` /
  * `completion` / `uninstall`) are NOT tool plugins — they don't ride on a
  * `Tool.commandSpecs` and aren't discovered. But making them mount via the same
  * `mountCommandSpec` means the Phase 7 `command-surface-parity` guardrail sees
@@ -32,7 +32,7 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { ConfigurationError, defineCommand, type ProjectContext } from '@opensip-cli/core';
 
-import { composeAndWriteDashboard } from '../dashboard-compose.js';
+import { composeAndWriteReport } from '../report-compose.js';
 
 import {
   assembleCompletionInventory,
@@ -130,12 +130,12 @@ function buildConfigureSpec(): HostSpec {
 }
 
 // ---------------------------------------------------------------------------
-// dashboard (CLI-owned composition root)
+// report (CLI-owned composition root)
 // ---------------------------------------------------------------------------
 
-function buildDashboardSpec(): HostSpec {
+function buildReportSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
-    name: 'dashboard',
+    name: 'report',
     description: 'Generate the cross-tool HTML report and open it in your browser',
     commonFlags: ['json'],
     options: [
@@ -151,9 +151,7 @@ function buildDashboardSpec(): HostSpec {
       const opts = rawOpts as { open: boolean; json: boolean };
       // Commander stores `--no-open` as `opts.open === false`; default true.
       // In `--json` mode we never launch a browser (machine-output contract).
-      // The aggregation/compose logic is unchanged — only the option
-      // DECLARATIONS moved into this spec.
-      return composeAndWriteDashboard({ open: opts.open && !opts.json });
+      return composeAndWriteReport({ open: opts.open && !opts.json });
     },
   });
 }
@@ -323,7 +321,7 @@ const COMPLETION_SELF_SPEC: SpecLike = { name: 'completion', commonFlags: [] };
 function buildNonCompletionHostSpecs(ctx: CliCommandsContext): readonly HostSpec[] {
   return [
     buildInitSpec(ctx),
-    buildDashboardSpec(),
+    buildReportSpec(),
     buildConfigureSpec(),
     buildAgentCatalogSpec(ctx),
     buildUninstallSpec(),
@@ -361,7 +359,7 @@ function buildHostCompletionSurface(ctx: CliCommandsContext): {
 export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSpec[] {
   return [
     buildInitSpec(ctx),
-    buildDashboardSpec(),
+    buildReportSpec(),
     buildConfigureSpec(),
     buildAgentCatalogSpec(ctx),
     buildCompletionSpec(ctx),

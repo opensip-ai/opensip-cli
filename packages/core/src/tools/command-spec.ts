@@ -143,7 +143,7 @@ export interface ArgSpec {
  *   handler that owns a runtime-conditional render+egress flow no single static
  *   mode captures — e.g. `sim`, which branches between an interactive Ink live
  *   view and a static render/JSON path depending on the TTY, then performs its
- *   own cloud egress, dashboard auto-open, and exit-code decision. In both cases
+ *   own cloud egress, report auto-open, and exit-code decision. In both cases
  *   the handler returns `void` and the host does not touch the stream.
  * - `live-view` — interactive Ink view path (graph/fit live default on a TTY)
  *   where the command is UNCONDITIONALLY a live view; the host dispatches to the

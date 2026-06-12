@@ -230,7 +230,7 @@ A cluster of rules in `.config/dependency-cruiser.cjs` keep the graph tool's sta
 **Cross-tool decoupling** (graph and fitness are now fully independent):
 
 - **`graph-no-fitness`** — graph production source must not import `@opensip-cli/fitness`. The former sole edge was the SARIF / cloud-report helper; per ADR-0011 SARIF is now the single shared `formatSignalSarif` formatter in `@opensip-cli/output`, applied at the composition root — graph returns a `SignalEnvelope` and imports neither fitness nor `@opensip-cli/output`. There is no longer any sanctioned exception. (Test files may use devDeps.)
-- **`fitness-no-graph`** — fitness production source must not import `@opensip-cli/graph`. The former dashboard-reads-graph edge is gone: the CLI is now the dashboard composition root and each tool contributes its own dashboard data via the `Tool.collectDashboardData` seam. (Test files may use devDeps.)
+- **`fitness-no-graph`** — fitness production source must not import `@opensip-cli/graph`. The former dashboard-reads-graph edge is gone: the CLI is now the report composition root and each tool contributes its own report data via the `Tool.collectReportData` seam. (Test files may use devDeps.)
 
 **Superseded graph checks** (recorded here so future contributors know which
 package-edge rules took over):

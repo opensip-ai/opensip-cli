@@ -17,7 +17,7 @@ import { Command } from 'commander';
 import {
   bootstrapCli,
   installPreActionHook,
-  maybeOpenDashboard,
+  maybeOpenReport,
   mountToolCommands,
   renderResult,
   buildCommandRegistrationInput,
@@ -85,7 +85,7 @@ async function main(): Promise<void> {
   const { ctx } = buildToolCliContext({
     render: renderResult,
     liveViews: createLiveViewRegistry(logger),
-    maybeOpenDashboard,
+    maybeOpenReport,
     logger,
   });
 

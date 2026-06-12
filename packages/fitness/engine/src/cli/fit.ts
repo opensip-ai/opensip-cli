@@ -17,7 +17,7 @@
  *
  * This file re-exports the public surface (`executeFit`,
  * `ensureChecksLoaded`, and the display accessors) so existing consumers
- * (`opensip-cli`, `dashboard.ts`, the fitness `index.ts` barrel) keep
+ * (`opensip-cli`, `report-data.ts`, the fitness `index.ts` barrel) keep
  * resolving the same names.
  */
 
@@ -42,7 +42,7 @@ import type {
 
 // ---------------------------------------------------------------------------
 // Re-exports — preserve the public surface that external consumers
-// (`opensip-cli`, `dashboard.ts`, fitness's barrel) import from
+// (`opensip-cli`, `report-data.ts`, fitness's barrel) import from
 // this file. Splitting the implementation under `./fit/` is an internal
 // refactor; the import sites stay on `./fit.js`.
 // ---------------------------------------------------------------------------

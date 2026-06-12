@@ -21,6 +21,26 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
     {
       "aliases": [],
       "args": [],
+      "name": "agent-catalog",
+      "options": [
+        {
+          "choices": undefined,
+          "defaultValue": false,
+          "description": "Output structured JSON",
+          "flags": "--json",
+          "negate": false,
+          "optional": false,
+          "required": false,
+          "variadic": false,
+        },
+      ],
+      "subcommands": [],
+      "synopsis": "Structured catalog of agent-friendly commands, patterns, and output shapes (JSON preferred). Primary surface for AI agents to bootstrap usage of sessions, filtering, and historical results.",
+      "usage": "[options]",
+    },
+    {
+      "aliases": [],
+      "args": [],
       "name": "catalog-export",
       "options": [
         {
@@ -179,36 +199,6 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
     {
       "aliases": [],
       "args": [],
-      "name": "dashboard",
-      "options": [
-        {
-          "choices": undefined,
-          "defaultValue": false,
-          "description": "Output structured JSON",
-          "flags": "--json",
-          "negate": false,
-          "optional": false,
-          "required": false,
-          "variadic": false,
-        },
-        {
-          "choices": undefined,
-          "defaultValue": undefined,
-          "description": "Write the report but do not launch a browser",
-          "flags": "--no-open",
-          "negate": true,
-          "optional": false,
-          "required": false,
-          "variadic": false,
-        },
-      ],
-      "subcommands": [],
-      "synopsis": "Generate the cross-tool HTML report and open it in your browser",
-      "usage": "[options]",
-    },
-    {
-      "aliases": [],
-      "args": [],
       "name": "fit",
       "options": [
         {
@@ -314,7 +304,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "Launch the HTML dashboard in your browser after the run completes",
+          "description": "Launch the HTML report in your browser after the run completes",
           "flags": "--open",
           "negate": false,
           "optional": false,
@@ -1181,6 +1171,36 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
     {
       "aliases": [],
       "args": [],
+      "name": "report",
+      "options": [
+        {
+          "choices": undefined,
+          "defaultValue": false,
+          "description": "Output structured JSON",
+          "flags": "--json",
+          "negate": false,
+          "optional": false,
+          "required": false,
+          "variadic": false,
+        },
+        {
+          "choices": undefined,
+          "defaultValue": undefined,
+          "description": "Write the report but do not launch a browser",
+          "flags": "--no-open",
+          "negate": true,
+          "optional": false,
+          "required": false,
+          "variadic": false,
+        },
+      ],
+      "subcommands": [],
+      "synopsis": "Generate the cross-tool HTML report and open it in your browser",
+      "usage": "[options]",
+    },
+    {
+      "aliases": [],
+      "args": [],
       "name": "sarif-export",
       "options": [
         {
@@ -1293,6 +1313,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
               "variadic": false,
             },
             {
+              "choices": undefined,
+              "defaultValue": undefined,
+              "description": "Omit heavy per-session payloads (agent friendly; showCommand and lightweight summary remain). Pairs well with --json for lean "menu" of historical results.",
+              "flags": "--summary-only",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+            {
               "choices": [
                 "fit",
                 "graph",
@@ -1364,9 +1394,29 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
           "options": [
             {
               "choices": undefined,
+              "defaultValue": undefined,
+              "description": "Filter replayed signals (repeatable): errors-only | warnings-only | top:<n>. Composable, e.g. --filter errors-only --filter top:20. Agent ergonomics for historical results.",
+              "flags": "--filter <type>",
+              "negate": false,
+              "optional": false,
+              "required": true,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
               "defaultValue": false,
               "description": "Output structured JSON",
               "flags": "--json",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": undefined,
+              "description": "With --json: emit the inner payload (session + envelope + metadata) without the outer CommandResult wrapper. Ideal for agents that want the smallest possible response.",
+              "flags": "--raw",
               "negate": false,
               "optional": false,
               "required": false,
@@ -1443,7 +1493,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "Launch the HTML dashboard in your browser after the run completes",
+          "description": "Launch the HTML report in your browser after the run completes",
           "flags": "--open",
           "negate": false,
           "optional": false,

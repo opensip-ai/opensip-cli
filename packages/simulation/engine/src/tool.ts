@@ -7,7 +7,7 @@
  * `mountCommandSpec` mounts it (name/description/aliases, the ADR-0021 common
  * flags, the `--recipe` option) and owns the parse→handler→error→exit pipeline.
  * This file owns only the sim runner — the `runSim` handler below — which keeps
- * the JSON/Ink dispatch, cloud egress, and dashboard auto-open exactly as the
+ * the JSON/Ink dispatch, cloud egress, and report auto-open exactly as the
  * old `register()` action body did (byte-identical behaviour).
  */
 
@@ -108,7 +108,7 @@ function setUpSimLiveView(cli: ToolCliContext): void {
  * spec handler. `output: 'raw-stream'` (handler owns its own IO): the host runs
  * this and renders nothing further, so the handler keeps full ownership of the
  * TTY-vs-static branch, the JSON/Ink dispatch, the cloud egress, the exit-code
- * decision, and the dashboard auto-open — byte-identical to 2.10.0.
+ * decision, and the report auto-open — byte-identical to 2.10.0.
  */
 async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   const opts = rawOpts as SimOptions;
@@ -123,7 +123,7 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   if (opts.json !== true && process.stdout.isTTY === true) {
     setUpSimLiveView(cli);
     await cli.renderLive(SIM_LIVE_VIEW_KEY, opts);
-    await cli.maybeOpenDashboard({ openRequested: Boolean(opts.open), jsonOutput: false });
+    await cli.maybeOpenReport({ openRequested: Boolean(opts.open), jsonOutput: false });
     return;
   }
 
@@ -164,7 +164,7 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
     apiKey: opts.apiKey,
   });
 
-  await cli.maybeOpenDashboard({
+  await cli.maybeOpenReport({
     openRequested: Boolean(opts.open),
     jsonOutput: Boolean(opts.json),
   });
@@ -274,7 +274,7 @@ function sessionReplayResult(
  * `output: 'raw-stream'` because sim's handler owns its entire output surface —
  * it dispatches between the interactive Ink live view and the static
  * render/JSON path at runtime (TTY-dependent) and performs cloud egress, the
- * dashboard auto-open, and the exit-code decision itself. None of those are
+ * report auto-open, and the exit-code decision itself. None of those are
  * expressible through the `signal-envelope` dispatch arm (which only does
  * `emitEnvelope`/`render`), so the host renders nothing and the handler stays
  * authoritative — byte-identical to the former action body.

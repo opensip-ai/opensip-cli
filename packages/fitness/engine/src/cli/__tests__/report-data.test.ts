@@ -1,5 +1,5 @@
 /**
- * Tests for `collectFitnessDashboardData` — fitness's contribution to
+ * Tests for `collectFitnessReportData` — fitness's contribution to
  * the cross-tool dashboard composed by the CLI (audit 2026-05-29, L2).
  *
  * The collector returns ONLY fitness-owned inputs (check catalog, recipe
@@ -33,9 +33,9 @@ const makeTestScope = (): RunScope =>
 const withScope = runWithScope;
 
 import { fitnessTool } from '../../tool.js';
-import { collectFitnessDashboardData } from '../dashboard.js';
+import { collectFitnessReportData } from '../report-data.js';
 
-import type { CheckCatalogEntry, RecipeCatalogEntry } from '../dashboard.js';
+import type { CheckCatalogEntry, RecipeCatalogEntry } from '../report-data.js';
 
 /** The fitness engine package root (carries the manifest), 4 dirs up from this test. */
 const ENGINE_DIR = dirname(dirname(dirname(dirname(fileURLToPath(import.meta.url)))));
@@ -80,10 +80,10 @@ function makeFitnessScope(): ReturnType<typeof makeTestScope> {
 
 function collectWithFitnessScope() {
   const scope = makeFitnessScope();
-  return withScope(scope, () => collectFitnessDashboardData(scope));
+  return withScope(scope, () => collectFitnessReportData(scope));
 }
 
-describe('collectFitnessDashboardData', () => {
+describe('collectFitnessReportData', () => {
   it('returns only the fitness-owned dashboard keys', async () => {
     const result = await collectWithFitnessScope();
 

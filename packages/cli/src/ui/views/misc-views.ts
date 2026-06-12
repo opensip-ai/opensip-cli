@@ -1,6 +1,6 @@
 /**
  * View-model builders for the remaining result types: list-checks,
- * list-recipes, history, experimental, dashboard, help, and the
+ * list-recipes, history, experimental, report, help, and the
  * clear/configure/uninstall "done" summaries. Each reproduces the visible
  * output of its retired Ink component as a renderer-agnostic ViewNode.
  */
@@ -18,11 +18,11 @@ import {
 import type {
   ClearDoneResult,
   ConfigureDoneResult,
-  DashboardResult,
   ExperimentalResult,
   HistoryResult,
   ListChecksResult,
   ListRecipesResult,
+  ReportResult,
   StoredSession,
   UninstallDoneResult,
 } from '@opensip-cli/contracts';
@@ -135,11 +135,7 @@ const HISTORY_COLUMNS: readonly (string | TableColumnSpec)[] = [
 export function viewHistory(result: HistoryResult): ViewNode {
   if (result.sessions.length === 0) {
     return group(
-      [
-        line([
-          { text: 'No sessions recorded yet. Run opensip fit to generate data.', dim: true },
-        ]),
-      ],
+      [line([{ text: 'No sessions recorded yet. Run opensip fit to generate data.', dim: true }])],
       2,
     );
   }
@@ -208,9 +204,9 @@ export function viewHelp(): ViewNode {
   );
 }
 
-// --- dashboard ------------------------------------------------------------
+// --- report ---------------------------------------------------------------
 
-export function viewDashboard(result: DashboardResult): ViewNode {
+export function viewReport(result: ReportResult): ViewNode {
   return group(
     [
       line([

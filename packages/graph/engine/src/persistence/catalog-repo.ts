@@ -188,7 +188,7 @@ export class CatalogRepo {
 
   /**
    * Read the catalog as the cross-tool {@link GraphCatalog} contract —
-   * the shape the dashboard (and fitness's dashboard command) depend on.
+   * the shape the report renderer and graph contribution depend on.
    * This is the supported cross-tool read path: it lets fitness drop its
    * raw-SQL `SELECT … FROM graph_catalog` (audit 2026-05-29, H1). The
    * internal `Catalog` is structurally assignable to the GraphCatalog

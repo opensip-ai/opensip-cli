@@ -46,7 +46,7 @@ function makeStubContext(): ToolCliContext {
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+    maybeOpenReport: vi.fn(() => Promise.resolve()),
     logger: {
       debug: vi.fn(),
       info: vi.fn(),
@@ -129,12 +129,7 @@ describe('registerFirstPartyTools', () => {
   it('fails closed (throws) when a bundled package cannot be resolved on disk', async () => {
     const registry = new ToolRegistryClass();
     await expect(
-      registerFirstPartyTools(
-        registry,
-        [],
-        [],
-        ['@opensip-cli/__definitely-not-a-real-package__'],
-      ),
+      registerFirstPartyTools(registry, [], [], ['@opensip-cli/__definitely-not-a-real-package__']),
     ).rejects.toBeInstanceOf(PluginIncompatibleError);
     expect(registry.list()).toHaveLength(0);
   });

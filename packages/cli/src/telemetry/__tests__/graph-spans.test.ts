@@ -7,9 +7,9 @@
  * `@opensip-cli/graph` tool package. We register an in-memory provider, run
  * `runGraph` over a synthetic fixture, and assert:
  *
- *   1. enabled ⇒ one `opensip_tools.graph.<stage>` span per GRAPH_STAGES entry
+ *   1. enabled ⇒ one `opensip_cli.graph.<stage>` span per GRAPH_STAGES entry
  *      is produced, in GRAPH_STAGES order, each carrying the
- *      `opensip_tools.graph.stage` attribute, plus the orchestrator-level
+ *      `opensip_cli.graph.stage` attribute, plus the orchestrator-level
  *      attributes (file_count on discover, cache_hit on index, rule/signal
  *      counts on rules);
  *   2. parent nesting ⇒ under an active parent context, all stage spans share
@@ -54,7 +54,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 const makeTestScope = (): RunScope =>
   new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
 
-const GRAPH_TRACER_PREFIX = 'opensip_tools.graph.';
+const GRAPH_TRACER_PREFIX = 'opensip_cli.graph.';
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
   return {
@@ -128,7 +128,7 @@ describe('graph stage spans — in-process capture (in-memory exporter)', () => 
 
     // Every stage span carries the stage attribute.
     for (const span of stageSpans) {
-      expect(span.attributes['opensip_tools.graph.stage']).toBeTypeOf('string');
+      expect(span.attributes['opensip_cli.graph.stage']).toBeTypeOf('string');
     }
   });
 
@@ -136,10 +136,10 @@ describe('graph stage spans — in-process capture (in-memory exporter)', () => 
     await runOverFixture();
     const byName = new Map(exporter.getFinishedSpans().map((s) => [s.name, s.attributes] as const));
 
-    expect(byName.get('opensip_tools.graph.discover')?.['opensip_tools.graph.file_count']).toBe(2);
-    expect(byName.get('opensip_tools.graph.index')?.['opensip_tools.graph.cache_hit']).toBe(false);
-    expect(byName.get('opensip_tools.graph.rules')?.['opensip_tools.graph.rule_count']).toBe(0);
-    expect(byName.get('opensip_tools.graph.rules')?.['opensip_tools.graph.signal_count']).toBe(0);
+    expect(byName.get('opensip_cli.graph.discover')?.['opensip_cli.graph.file_count']).toBe(2);
+    expect(byName.get('opensip_cli.graph.index')?.['opensip_cli.graph.cache_hit']).toBe(false);
+    expect(byName.get('opensip_cli.graph.rules')?.['opensip_cli.graph.rule_count']).toBe(0);
+    expect(byName.get('opensip_cli.graph.rules')?.['opensip_cli.graph.signal_count']).toBe(0);
   });
 
   it('nests every stage span under a parent trace (TRACEPARENT propagation)', async () => {

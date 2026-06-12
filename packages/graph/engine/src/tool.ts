@@ -7,7 +7,7 @@
  * (`commandSpecs`) and the host's `mountCommandSpec` mounts them
  * (name/description/aliases, the ADR-0021 common flags, each command's
  * options/args) and owns the parse→handler→error→exit pipeline. This file owns
- * only the command-spec assembly + the per-run scope/dashboard contributions; the
+ * only the command-spec assembly + the per-run scope/report contributions; the
  * spec modules under `cli/graph/` own the option declarations and handler bodies.
  *
  * Per spec §10A AC-2 / AC-1: this module does NOT import from opensip-cli. It
@@ -28,7 +28,7 @@ import { logger, readPackageVersion } from '@opensip-cli/core';
 // (register-graph-adapters.ts). The historical engine-side bootstrap is
 // gone.
 import { graphFingerprintStrategy } from './baseline-strategy.js';
-import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/dashboard-data.js';
+import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/report-data.js';
 import {
   graphBaselineExportCommandSpec,
   graphCatalogExportCommandSpec,
@@ -196,11 +196,11 @@ function contributeScope(): ScopeContribution {
  * producing `graph` run requested the dashboard columns
  * (`['blast','scc','packageCoupling']`, see `executeGraph`); it rides on the
  * loaded contract for free via `loadCatalogContract`. This stays a pure read
- * — no on-demand engine compute at dashboard-compose time (ADR-0006). When a
+ * — no on-demand engine compute at report-compose time (ADR-0006). When a
  * catalog was produced by a non-dashboard run, `features` is absent and the
  * panel renders a no-data state.
  */
-function collectDashboardData(scope: ToolScope): Record<string, unknown> {
+function collectReportData(scope: ToolScope): Record<string, unknown> {
   // Rule + recipe catalogs are cheap, scope-only reads (no I/O). A run
   // without the graph subscope yields empty arrays, not a throw. These use
   // DISTINCT keys from fitness's `checkCatalog`/`recipeCatalog` (which the
@@ -252,7 +252,7 @@ export const graphTool: Tool = {
   // — graph no longer touches Commander.
   commandSpecs: graphCommandSpecs,
   contributeScope,
-  collectDashboardData,
+  collectReportData,
   sessionReplay: {
     tool: 'graph',
     replaySession: graphReplayFromSession,

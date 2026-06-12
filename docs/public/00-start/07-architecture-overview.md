@@ -93,9 +93,9 @@ flowchart TB
   envelope["SignalEnvelope<br/>@opensip-cli/contracts"]
   output["Output package<br/>table, JSON, SARIF<br/>cloud sink"]
   datastore["Datastore + session-store<br/>SQLite sessions<br/>fit baseline<br/>graph catalog + baseline"]
-  dashboard["Dashboard composition<br/>CLI + @opensip-cli/dashboard"]
+  dashboard["Report composition<br/>CLI + @opensip-cli/dashboard"]
 
-  user -->|runs fit, sim, graph, dashboard| cli
+  user -->|runs fit, sim, graph, report| cli
   cli -->|bootstrap per invocation| core
   core -->|reads| target
   core -->|resolves and creates| runtime
@@ -124,7 +124,7 @@ flowchart TB
   output -->|stdout table / JSON / SARIF| user
   output -.->|report-to when configured| cloud
 
-  cli -->|collects dashboard data| dashboard
+  cli -->|collects report data| dashboard
   dashboard -->|reads sessions and tool data| datastore
   dashboard -->|writes latest.html| runtime
   runtime -->|opens static report| browser
@@ -170,16 +170,16 @@ flowchart LR
   E --> O["CLI composition root<br/>renders/delivers output"]
   E --> P["session-store/datastore<br/>persists run data"]
   O --> X["terminal table<br/>JSON<br/>SARIF<br/>optional cloud"]
-  P --> D["dashboard history<br/>fit gate baseline<br/>graph catalog/baseline"]
+  P --> D["report history<br/>fit gate baseline<br/>graph catalog/baseline"]
 ```
 
-This shared envelope is the architectural hinge. It lets the three tools keep their own execution models while sharing output formatters, sessions, dashboard composition, SARIF, gates, and optional cloud delivery.
+This shared envelope is the architectural hinge. It lets the three tools keep their own execution models while sharing output formatters, sessions, report composition, SARIF, gates, and optional cloud delivery.
 
 ---
 
 ## Ownership boundaries
 
-- `packages/cli` knows every first-party package and owns process composition, output routing, dashboard composition, and CLI-owned commands.
+- `packages/cli` knows every first-party package and owns process composition, output routing, report composition, and CLI-owned commands.
 - `@opensip-cli/core` owns generic infrastructure: paths, config, registries, plugin discovery, logging, errors, IDs, and run scope.
 - `@opensip-cli/contracts` owns shared result shapes such as `SignalEnvelope`, `CommandResult`, exit codes, session types, and dashboard-facing catalog contracts.
 - `@opensip-cli/output` owns machine output formatting and signal delivery. Tool engines return envelopes instead of writing JSON, SARIF, or cloud reports themselves.

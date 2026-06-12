@@ -219,7 +219,7 @@ function renderSummarySection(
   return [
     '== Summary ==',
     `${String(stats.clean)} rule(s) clean, ${String(stats.dirty)} with findings (${String(totalSignals)} total).`,
-    'Run `opensip dashboard` for the interactive Code Paths view.',
+    'Run `opensip report` for the interactive Code Paths view.',
   ];
 }
 

@@ -84,7 +84,7 @@ function makeFakeContext(): {
     }),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+    maybeOpenReport: vi.fn(() => Promise.resolve()),
     logger: {
       debug: vi.fn(),
       info: vi.fn(),

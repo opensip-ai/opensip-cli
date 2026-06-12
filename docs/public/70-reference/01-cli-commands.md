@@ -24,7 +24,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `fit-list`, `fit-recipes`, graph helper commands) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `dashboard`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `fit-list`, `fit-recipes`, graph helper commands) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
 
 ---
 
@@ -42,8 +42,8 @@ tool run commands (`fit`/`sim`/`graph`) — `--json`, `--cwd`, `-q/--quiet`,
 `-v/--verbose`, `--debug`, `--report-to`, and `--api-key` — are declared
 **once** in a common-flag registry and applied via `applyCommonFlags`, so their
 names, short aliases, descriptions, and defaults are identical where applied and
-cannot drift (ADR-0021). `fit` and `sim` also expose `--open` for dashboard
-auto-open; `graph` writes dashboard data and uses the separate `dashboard`
+cannot drift (ADR-0021). `fit` and `sim` also expose `--open` for HTML report
+auto-open; `graph` writes report data and uses the separate `report`
 command to open the report. `-v/--verbose` is a uniform "show the detailed
 report body" flag whose output is identical in a TTY and a pipe. The only
 `program`-level Commander options are `--version` and `--no-cloud`:
@@ -52,7 +52,7 @@ report body" flag whose output is identical in a TTY and a pipe. The only
 |---|---|
 | `--debug` | Enable debug-level logging (events of `debug` level appear in stderr and the run log file). |
 | `--quiet` | Suppress banner / boxes; print only the pass/fail summary line. (Where supported.) |
-| `--cwd <path>` | Override the project root (default: `process.cwd()`). Registered on `init`, `fit`, `sim`, `graph`, `dashboard`, `plugin <subcmd>`. |
+| `--cwd <path>` | Override the project root (default: `process.cwd()`). Registered on `init`, `fit`, `sim`, `graph`, and `plugin <subcmd>`. |
 | `--json` | Emit structured JSON on stdout instead of the table renderer. (Per-command — `init`, `fit`, `sim`, `graph`.) |
 | `--no-cloud` | Disable OpenSIP Cloud signal sync for this run (program-level). See below. |
 
@@ -134,7 +134,7 @@ opensip fit --gate-compare
 | `--gate-save` | bool | `false` | Save current findings as architecture baseline rows in the project's SQLite store (the host-owned `tool_baseline_entries` table, scoped `tool = 'fitness'`, at `opensip-cli/.runtime/datastore.sqlite`; ADR-0036), then exit per the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save happens before the exit, so the baseline survives a failing gate). |
 | `--gate-compare` | bool | `false` | Compare current findings against baseline; exit 1 on regression (toggle with the reserved `failOnDegraded` key, default on). |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
-| `--open` | bool | `false` | Launch dashboard after run. |
+| `--open` | bool | `false` | Launch the HTML report after run. |
 | `--config <path>` | path | discovered | Override the `opensip-cli.config.yml` location (defaults to the project's config or the package.json pointer). |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
@@ -164,7 +164,7 @@ opensip sim --recipe <name>
 | `--json` | bool | `false` | Emit the `CommandOutcome` JSON on stdout (envelope under `.envelope`) instead of the table renderer. |
 | `-v, --verbose` | bool | `false` | Show the detailed report body (per-scenario findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
-| `--open` | bool | `false` | Launch dashboard after run. |
+| `--open` | bool | `false` | Launch the HTML report after run. |
 | `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
@@ -222,7 +222,7 @@ opensip graph --list-files --workspace  # the per-unit fan-out set
 
 | Flag / Argument | Type | Default | Effect |
 |---|---|---|---|
-| `[paths...]` | path(s) | — | Positional. Scope the run to one or more existing directories (absolute or relative to `--cwd`). Multiple paths aggregate into a single dashboard session per D12. The shell handles globs (`graph 'packages/*/src'`); no glob expansion happens inside the CLI. Mutually exclusive with `--workspace`. |
+| `[paths...]` | path(s) | — | Positional. Scope the run to one or more existing directories (absolute or relative to `--cwd`). Multiple paths aggregate into a single report session per D12. The shell handles globs (`graph 'packages/*/src'`); no glob expansion happens inside the CLI. Mutually exclusive with `--workspace`. |
 | `--cwd <path>` | string | `process.cwd()` | Target directory. Adapter is auto-detected by marker files (TypeScript: `tsconfig.json`/`package.json`; Python: `pyproject.toml`/`setup.py`/`setup.cfg`; Rust: `Cargo.toml`; Go: `go.mod`; Java: `pom.xml`/`build.gradle*`). Polyglot repos apply every matched adapter simultaneously (D6). |
 | `--workspace` | bool | `false` | Fan the run across every workspace unit returned by each detected adapter's `discoverWorkspaceUnits` hook. Polyglot per D8b: a repo with both a TS pnpm workspace and a Cargo workspace fans out across both adapters' units in one combined run. Memory-isolated (one child process per unit). Mutually exclusive with positional paths. |
 | `--concurrency <n>` | int | `cpus()-1` | Concurrency cap for `--workspace` child processes. |
@@ -259,10 +259,10 @@ comm -13 /tmp/git.txt /tmp/graph.txt   # discovered but NOT tracked
 # Polyglot repo: TS frontend + Cargo backend
 # `--workspace` aggregates units from BOTH adapters and fans out in parallel.
 opensip graph --workspace
-# → one session in the dashboard combining TS package results + Cargo member results
+# → one report session combining TS package results + Cargo member results
 ```
 
-**Session contract.** A single CLI invocation produces a single dashboard session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of dashboard sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`) opt out. Machine-artifact catalog/SARIF exports live on the dedicated `catalog-export` / `sarif-export` subcommands.
+**Session contract.** A single CLI invocation produces a single report session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of report sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`) opt out. Machine-artifact catalog/SARIF exports live on the dedicated `catalog-export` / `sarif-export` subcommands.
 
 **Adapter selection.** opensip-cli ships first-party graph adapters for TypeScript, Python, Rust, Go, and Java — each is its own publishable npm package under the `@opensip-cli/graph-*` namespace. Auto-discovery is name pattern + marker: `node_modules` is walked for packages whose names match `@opensip-cli/graph-*` and whose `package.json` declares `opensipTools.kind: "graph-adapter"`, or you can pin an explicit list under `plugins.graphAdapters:` in `opensip-cli.config.yml`. Marker-file detection (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`/`build.gradle*`) then chooses which discovered adapter(s) apply to the run; positional paths inherit that decision unless `--language` overrides it.
 
@@ -278,7 +278,7 @@ wire format carries `language` (adapter id), `cacheKey` (an opaque per-adapter
 invalidation string — TypeScript: `ts-${ts.version}-${tsconfigContentHash}`;
 Python and Rust use language-id-prefixed keys), and a per-file mtime+size
 fingerprint. The reconstructed in-memory `Catalog` shape is what graph rules,
-indexes, and dashboard views consume.
+indexes, and report views consume.
 
 **Cache behavior:** three verdicts — `valid` (full cache hit), `incremental` (re-walk only the changed files plus their transitive edge-dependents), `invalid` (full rebuild). The incremental path makes single-file edits ~6× faster than a `--no-cache` rebuild while producing byte-identical output. See the cache section in the stages-and-catalog doc.
 
@@ -370,22 +370,22 @@ JSON shape (same `list-recipes` result envelope as `fit-recipes`):
 
 ---
 
-## `dashboard` — open the HTML report
+## `report` — open the HTML report
 
-CLI-owned. The cross-tool `dashboard` command lives at the CLI layer (not inside any one tool) because composition walks every tool's `collectDashboardData` contribution via the tool registry. Renders the most recent run as HTML and opens it in the user's default browser.
+CLI-owned. The cross-tool `report` command lives at the CLI layer (not inside any one tool) because composition walks every tool's `collectReportData` contribution via the tool registry. Renders the most recent run as HTML and opens it in the user's default browser.
 
 ```
-opensip dashboard
-opensip dashboard --no-open
-opensip dashboard --json
+opensip report
+opensip report --no-open
+opensip report --json
 ```
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
 | `--no-open` | bool | `false` | Write the report but do not launch a browser. |
-| `--json` | bool | `false` | Emit a `{ type: 'dashboard', path, opened }` JSON envelope on stdout instead of the table renderer. In `--json` mode the browser is never launched (machine-output contract). |
+| `--json` | bool | `false` | Emit a `{ type: 'report', path, opened }` JSON envelope on stdout instead of the table renderer. In `--json` mode the browser is never launched (machine-output contract). |
 
-The dashboard is a single self-contained HTML file at `<project>/opensip-cli/.runtime/reports/latest.html`. Each generation overwrites the previous file. The command launches the browser and exits; the file works without opensip-cli installed, so you can email it directly to a teammate.
+The report is a single self-contained HTML file at `<project>/opensip-cli/.runtime/reports/latest.html`. Each generation overwrites the previous file. The command launches the browser and exits; the file works without opensip-cli installed, so you can email it directly to a teammate.
 
 **See also:** [`70-reference/06-dashboard.md`](./06-dashboard.md), [`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md).
 

@@ -14,7 +14,7 @@ import { spanRunStage } from '../graph-tracer.js';
 
 describe('spanRunStage (sharded-worker stage spans)', () => {
   it('runs fn and returns its value with no SDK registered (no-op span)', async () => {
-    const run = spanRunStage({ 'opensip_tools.graph.shard_id': 's1' });
+    const run = spanRunStage({ 'opensip_cli.graph.shard_id': 's1' });
     const result = await run({
       stage: 'parse',
       onProgress: undefined,
@@ -26,7 +26,7 @@ describe('spanRunStage (sharded-worker stage spans)', () => {
 
   it('passes the stage result to attrsFn so per-stage attributes are derived', async () => {
     const run = spanRunStage();
-    const attrsFn = vi.fn(() => ({ 'opensip_tools.graph.file_count': 3 }));
+    const attrsFn = vi.fn(() => ({ 'opensip_cli.graph.file_count': 3 }));
     const out = { files: [1, 2, 3] };
     await run({
       stage: 'discover',
@@ -39,7 +39,7 @@ describe('spanRunStage (sharded-worker stage spans)', () => {
   });
 
   it('tolerates base attrs + a no-op span without throwing', async () => {
-    const run = spanRunStage({ 'opensip_tools.graph.shard_id': 's2' });
+    const run = spanRunStage({ 'opensip_cli.graph.shard_id': 's2' });
     await expect(
       run({ stage: 'resolve', onProgress: undefined, monitor: undefined, fn: () => undefined }),
     ).resolves.toBeUndefined();

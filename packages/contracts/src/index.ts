@@ -58,7 +58,7 @@ export type {
   ListRecipesResult,
   HistorySession,
   HistoryResult,
-  DashboardResult,
+  ReportResult,
   InitResult,
   PreExistingFile,
   ExperimentalResult,
@@ -75,7 +75,7 @@ export type {
 
 // Command outcome — the OUTER currency wrapping every result and error (§5.5,
 // release 2.12.0). `CommandOutcome<T>` nests the unchanged `SignalEnvelope` under
-// `.envelope` (run) / the `CommandResult` under `.data` (list/dashboard) / errors
+// `.envelope` (run) / the `CommandResult` under `.data` (list/report) / errors
 // under `.errors` (incl. the pre-handler bootstrap path). The host ASSEMBLES it;
 // no tool chooses its own error JSON or success carrier. ADR-0024.
 export type {

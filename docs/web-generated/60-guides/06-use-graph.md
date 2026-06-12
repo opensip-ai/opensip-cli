@@ -54,10 +54,10 @@ The default output is compact. Use verbose mode when you want details in the ter
 opensip graph --verbose
 ```
 
-The run creates a session and writes dashboard data to the project runtime store. Open the report with:
+The run creates a session and writes report data to the project runtime store. Open the report with:
 
 ```bash
-opensip dashboard
+opensip report
 ```
 
 ## 3. Scope the run
@@ -141,7 +141,7 @@ No `--recipe` means the default graph rule set.
 - `graph --list-files` answers "what will graph analyze?" without building.
 - `graph --workspace` is the large-monorepo path.
 - `graph --gate-save` and `graph --gate-compare` use the same baseline model as `fit`.
-- `graph` does not have an `--open` flag; run `opensip dashboard` after the graph run to open the HTML report.
+- `graph` does not have an `--open` flag; run `opensip report` after the graph run to open the HTML report.
 
 ## Where to go next
 

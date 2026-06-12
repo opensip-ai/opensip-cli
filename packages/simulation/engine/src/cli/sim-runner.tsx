@@ -249,15 +249,15 @@ export function SimRunner({
               args.verbose === true
                 ? [
                     {
-                      text: 'opensip dashboard for HTML report',
-                      bold: ['opensip dashboard'],
+                      text: 'opensip report for HTML report',
+                      bold: ['opensip report'],
                     },
                   ]
                 : [
                     VERBOSE_DETAIL_HINT,
                     {
-                      text: 'opensip dashboard for HTML report',
-                      bold: ['opensip dashboard'],
+                      text: 'opensip report for HTML report',
+                      bold: ['opensip report'],
                     },
                   ]
             }

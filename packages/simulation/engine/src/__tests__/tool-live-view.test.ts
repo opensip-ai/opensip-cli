@@ -7,7 +7,7 @@
  *     delivers the returned envelope to the composition root (cloud +
  *     --report-to egress).
  *   - the interactive TTY action branch routes to cli.renderLive +
- *     maybeOpenDashboard instead of the static executeSim path.
+ *     maybeOpenReport instead of the static executeSim path.
  *
  * Since release 2.11.0 Phase 3 sim mounts via a `CommandSpec`; the live-view
  * registration moved from the (removed) `register()` mount hook into the
@@ -81,7 +81,7 @@ function makeCtx(): Captured {
       renderLiveCalls.push([key, args]);
       return Promise.resolve();
     }),
-    maybeOpenDashboard: vi.fn((arg: unknown) => {
+    maybeOpenReport: vi.fn((arg: unknown) => {
       dashboardCalls.push(arg);
       return Promise.resolve();
     }),
@@ -160,14 +160,14 @@ describe('simulationTool action — interactive TTY branch', () => {
     process.stdout.isTTY = originalIsTTY;
   });
 
-  it('routes to renderLive + maybeOpenDashboard when stdout is a TTY (non-json)', async () => {
+  it('routes to renderLive + maybeOpenReport when stdout is a TTY (non-json)', async () => {
     process.stdout.isTTY = true;
     const cap = makeCtx();
 
     await simHandler()({ open: true }, cap.ctx);
 
     // Interactive path: the static executeSim render is bypassed in favour of
-    // the live view, then the dashboard auto-open hook fires.
+    // the live view, then the report auto-open hook fires.
     expect(cap.renderLiveCalls).toHaveLength(1);
     expect(cap.renderLiveCalls[0]?.[0]).toBe('sim');
     expect(cap.dashboardCalls).toHaveLength(1);

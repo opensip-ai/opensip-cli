@@ -51,7 +51,7 @@ function makeStubToolContext(): ToolCliContext {
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+    maybeOpenReport: vi.fn(() => Promise.resolve()),
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
@@ -78,7 +78,7 @@ function buildFullProgram(): Command {
     for (const tool of BUNDLED_TOOLS) registry.register(tool);
     mountAllToolCommands(registry, program, makeStubToolContext());
 
-    // Host-owned commands (init/dashboard/sessions/configure/plugin/completion/
+    // Host-owned commands (init/report/sessions/configure/plugin/completion/
     // uninstall), mounted via the same command plane.
     registerCliCommands(program, {
       setExitCode: vi.fn(),

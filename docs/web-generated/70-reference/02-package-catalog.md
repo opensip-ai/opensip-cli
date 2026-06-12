@@ -58,7 +58,7 @@ Packages above the substrate, below tool engines. These are shared libraries con
 | `@opensip-cli/targeting` | `packages/targeting/` | Host file-targeting runtime substrate (ADR-0037) — `TargetRegistry`, uniform glob expansion with `globalExcludes`, built once per run by the CLI bootstrap and exposed as `scope.targets`. Depends on `config` + `core` only (`targeting-imports-config-core-only`) | `TargetRegistry`, `resolveTargets`, `preResolveAllTargets`, `applyGlobalExcludes` |
 | `@opensip-cli/session-store` | `packages/session-store/` | Session persistence — `SessionRepo` runtime over the (package-internal) `sessions`/`session_tool_payload` schema, session-id helpers. Depends on `core`, `datastore`, `contracts` | `SessionRepo`, `SessionListOptions`, `generateSessionId`, `sanitizeForFilename` |
 | `@opensip-cli/output` | `packages/output/` | Machine output layer (renamed from `@opensip-cli/reporting`, ADR-0011): pure `format/` formatters + effectful `sink/` delivery. Depends on `core`, `contracts` | `formatSignalJson`, `formatSignalSarif`, `buildOpenSipSarif`, `formatSignalTableRows`, `formatSignalTableSummary`, `Formatter`, `postChunked`, `createCloudSignalSink`, `resolveSignalSink`, `resolveRepoIdentity`, `checkEntitlement` |
-| `@opensip-cli/dashboard` | `packages/dashboard/` | Self-contained HTML dashboard generator — renders the fit/sim/graph report from session data + graph catalogs. Consumed by the CLI-owned `dashboard` command and each tool's auto-open hook. | `generateDashboardHtml` |
+| `@opensip-cli/dashboard` | `packages/dashboard/` | Self-contained HTML report generator — renders the fit/sim/graph report from session data + graph catalogs. Consumed by the CLI-owned `report` command and each tool's auto-open hook. | `generateDashboardHtml` |
 
 ### Language adapters (fitness — six languages)
 
@@ -120,7 +120,7 @@ Imports every layer below. The published binary.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `opensip-cli` | `packages/cli/` | The `opensip` command-line binary; argv parsing, Tool registration, top-level commands | `bin/opensip`, `decideOpen`, `launchBrowser`, `printWelcome`, `executeUninstall`, `getErrorSuggestion` (re-export) |
+| `opensip-cli` | `packages/cli/` | The `opensip` command-line binary; argv parsing, Tool registration, top-level commands | `bin/opensip`, `decideReportOpen`, `launchReport`, `printWelcome`, `executeUninstall`, `getErrorSuggestion` (re-export) |
 
 > **Folder name vs. package name.** The directory is `packages/cli/`, but the
 > published npm package is the **unscoped `opensip-cli`** — the single package

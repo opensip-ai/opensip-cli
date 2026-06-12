@@ -70,7 +70,7 @@ export const commonFlags: Readonly<Record<CommonFlagKey, CommonFlagSpec>> = {
   apiKey: { flags: '--api-key <key>', description: 'API key for --report-to authentication' },
   open: {
     flags: '--open',
-    description: 'Launch the HTML dashboard in your browser after the run completes',
+    description: 'Launch the HTML report in your browser after the run completes',
     defaultValue: false,
   },
 } as const;
@@ -102,7 +102,7 @@ export function applyCommonFlags(
 /**
  * The flags every tool's run command MUST declare (the parity set enforced by
  * the `cross-tool-flag-parity` fitness check, ADR-0021). `open` is intentionally
- * NOT mandatory — only dashboard-producing tools expose it.
+ * NOT mandatory — only report-producing tools expose it.
  */
 export const MANDATORY_COMMON_FLAGS: readonly CommonFlagKey[] = [
   'json',

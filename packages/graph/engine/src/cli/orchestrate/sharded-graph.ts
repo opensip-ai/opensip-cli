@@ -12,13 +12,7 @@
  * by the boundary pass and labeled `crossShard: true` / `'syntactic'`.
  */
 
-import {
-  logger,
-  ValidationError,
-  withSpanAsync,
-  type Signal,
-  type Span,
-} from '@opensip-cli/core';
+import { logger, ValidationError, withSpanAsync, type Signal, type Span } from '@opensip-cli/core';
 
 import { buildPackageManifestIndex } from '../../cross-package/export-index.js';
 import { unionFeatureDeps } from '../../pipeline/feature-deps.js';
@@ -128,9 +122,9 @@ export async function runShardedGraph(input: RunShardedInput): Promise<RunSharde
   // it instead of forming orphan traces. Hard no-op when no SDK is registered.
   return withSpanAsync(
     GRAPH_TRACER,
-    'opensip_tools.graph.sharded_build',
+    'opensip_cli.graph.sharded_build',
     (span) => buildShardedGraph(input, span),
-    { 'opensip_tools.graph.shard_count': input.shards.length },
+    { 'opensip_cli.graph.shard_count': input.shards.length },
   );
 }
 
@@ -275,9 +269,9 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   );
 
   span.setAttributes({
-    'opensip_tools.graph.shards_built': plan.toBuild.length,
-    'opensip_tools.graph.shards_cached': plan.cached.length,
-    'opensip_tools.graph.shards_failed': built.failures.length,
+    'opensip_cli.graph.shards_built': plan.toBuild.length,
+    'opensip_cli.graph.shards_cached': plan.cached.length,
+    'opensip_cli.graph.shards_failed': built.failures.length,
   });
   const shardStats: ShardRunStats = {
     shardCount: shards.length,

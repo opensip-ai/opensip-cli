@@ -49,7 +49,7 @@ interface Tool {
   initialize?: () => Promise<void>;
   // Optional contribution slots (most tools use none):
   contributeScope?: () => ScopeContribution;          // per-run subscope (registries, etc.)
-  collectDashboardData?: (scope: ToolScope) => Record<string, unknown>;
+  collectReportData?: (scope: ToolScope) => Record<string, unknown>;
   config?: ToolConfigDeclaration;                      // a namespaced Zod schema block
   capabilityRegistrars?: Record<string, CapabilityRegistrar>;
   sessionReplay?: { tool: string; replaySession: (stored) => unknown };
@@ -67,7 +67,7 @@ The contract has been deliberately kept narrow. Each core member exists for a sp
 - **`commandSpecs`** is the tool's **declarative command surface** — typed `CommandSpec`s (name, description, aliases, common-flag selection, per-command options/args, scope, output mode, and the handler). The host's `mountCommandSpec` ([`packages/cli/src/commands/mount-command-spec.ts`](../../../packages/cli/src/commands/mount-command-spec.ts)) reads them and owns the Commander wiring, the shared flags (`--cwd`/`--json`/…), parsing, help, completion, the `--json` `CommandOutcome` wrapping, and the exit-code pipeline. A handler returns its domain result; it never touches Commander and never writes to stdout. `commandSpecs` is the one command surface — §8 "one command surface" invariant.
 - **`initialize()`** is optional async setup, called once per process — lazily, by the CLI's preAction hook, when a subcommand owned by this tool is about to run (not eagerly for every tool at startup, so an uninvoked tool and the `--help`/welcome paths pay nothing). Most tools don't need it (`fit` doesn't — its setup is lazy inside handlers). A throwing `initialize()` is fatal — the command does not run.
 
-The optional contribution slots (`contributeScope`, `collectDashboardData`, `config`, `capabilityRegistrars`, `sessionReplay`) let a tool plug into the host's per-run scope, the cross-tool dashboard, the composed config document, a capability domain it owns, and `sessions show` replay — each only if the tool declares it.
+The optional contribution slots (`contributeScope`, `collectReportData`, `config`, `capabilityRegistrars`, `sessionReplay`) let a tool plug into the host's per-run scope, the cross-tool HTML report, the composed config document, a capability domain it owns, and `sessions show` replay — each only if the tool declares it.
 
 ### The `ToolCliContext` shape
 
@@ -79,7 +79,7 @@ interface ToolCliContext {
   render: (result: unknown) => Promise<void>;    // render a CommandResult through the shared seam
   registerLiveView: (key: string, renderer: LiveViewRenderer) => void;
   renderLive: (key: string, args: unknown) => Promise<void>;
-  maybeOpenDashboard: (opts: { openRequested: boolean; jsonOutput: boolean }) => Promise<void>;
+  maybeOpenReport: (opts: { openRequested: boolean; jsonOutput: boolean }) => Promise<void>;
   emitJson: (value: unknown) => void;            // the sanctioned --json stdout seam
   setExitCode: (code: number) => void;           // the only writer of the final exit code
   logger: Logger;

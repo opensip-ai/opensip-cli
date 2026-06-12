@@ -35,7 +35,7 @@
     "bench:partition": "pnpm build && node scripts/bench-partition-strategies.mjs",
     "graph:equivalence:ci": "node packages/cli/dist/index.js graph-equivalence-check",
     "sim": "node packages/cli/dist/index.js sim",
-    "dashboard": "node packages/cli/dist/index.js dashboard",
+    "report": "node packages/cli/dist/index.js report",
     "sessions": "node packages/cli/dist/index.js sessions",
     "docs:build": "node scripts/build-web-docs.mjs",
     "docs:check": "node scripts/build-web-docs.mjs --check",

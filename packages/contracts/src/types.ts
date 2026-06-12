@@ -20,7 +20,7 @@ export interface FitOptions {
   debug: boolean;
   /** Suppress banner/boxes; show only the pass-fail summary line. */
   quiet?: boolean;
-  /** Open the HTML dashboard in the default browser after a successful run. */
+  /** Open the HTML report in the default browser after a successful run. */
   open?: boolean;
   /** Replay a stored fit session by id, or `latest` for the latest fit session. */
   show?: string;

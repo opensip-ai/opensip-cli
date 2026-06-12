@@ -420,8 +420,8 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
               hints={[
                 VERBOSE_DETAIL_HINT,
                 {
-                  text: 'opensip dashboard for HTML report',
-                  bold: ['opensip dashboard'],
+                  text: 'opensip report for HTML report',
+                  bold: ['opensip report'],
                 },
               ]}
             />

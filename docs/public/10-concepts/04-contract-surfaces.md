@@ -69,7 +69,7 @@ opensip-cli
 │   ├── --concurrency <n>       (cap for --workspace)
 │   └── --language <name>       (force a specific adapter)
 ├── init                   (scaffold the project)
-├── dashboard              (open the HTML report)
+├── report                 (open the HTML report)
 ├── sessions
 │   ├── list
 │   └── purge
@@ -126,7 +126,7 @@ flowchart LR
   Session["SessionRepo<br/>run history"]
   Gate["fit / graph gate"]
   Cloud["optional cloud sink"]
-  Dashboard["dashboard data"]
+  Dashboard["report data"]
 
   Fit --> Envelope
   Graph --> Envelope
@@ -193,7 +193,7 @@ interface Tool {
   readonly commands: readonly ToolCommandDescriptor[];
   readonly commandSpecs?: readonly CommandSpec<unknown, ToolCliContext>[];
   readonly initialize?: () => Promise<void>;
-  // optional contribution slots: contributeScope, collectDashboardData,
+  // optional contribution slots: contributeScope, collectReportData,
   // config, capabilityRegistrars, sessionReplay
 }
 ```

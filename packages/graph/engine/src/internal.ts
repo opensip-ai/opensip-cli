@@ -44,9 +44,9 @@ export { executeGraph, buildUnifiedReportLines } from './cli/graph.js';
 export type { UnifiedReportInput } from './cli/graph.js';
 
 // `CatalogRepo` — the engine's SQLite/Drizzle catalog persistence repo. Used
-// internally by graph (orchestrator cache, `tool.ts` dashboard contribution,
+// internally by graph (orchestrator cache, `tool.ts` report contribution,
 // `lookup`/`catalog-export`). It was briefly on the public barrel for fitness's
-// dashboard command; with that coupling gone it is demoted here — a concrete
+// report command; with that coupling gone it is demoted here — a concrete
 // repository is not a module contract (boundary audit 2026-06-05). Any future
 // out-of-package read should go through a narrow catalog-read contract, not this.
 export { CatalogRepo } from './persistence/catalog-repo.js';
