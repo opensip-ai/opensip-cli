@@ -281,6 +281,15 @@ distinct from:
   suggestion, and a LOADED tool with a present-but-undeclared namespace is
   rejected instead of falling into the catchall. Claimed namespaces stay
   strict; shared-config portability across different install sets is preserved
+- [ADR-0045](./ADR-0045-gated-louvain-community-partition-prototype.md) —
+  **Louvain import-community shard partitioning: prototyped under a numeric
+  gate, measured, and discarded** (rejected by measurement, not by taste): the
+  B2 gate required ≥25% fewer cross-shard boundary calls on both corpora — the
+  real corpus (ant-design) delivered −4.7%, and warm wall-time regressed 1.94×
+  on the synthetic fixture. The measured matrix lives in the ADR's Outcome;
+  the bench harness (`bench:partition`), flat-large fixture generator,
+  `graph.partitionStrategy` knob, and profile shard metrics were kept; the
+  full prototype is recoverable at tag `prototype/louvain-partitioning`
 
 ### Superseded
 

@@ -257,6 +257,7 @@ Two-band (warn / error) thresholds for the structural rules. A value between the
 | `recipe` | string | — | Default recipe for `graph` when `--recipe` is not passed (ADR-0022). Tool-scoped — distinct from `fitness.recipe` / `simulation.recipe`. An unknown name here falls back to the built-in `default` recipe with a warning; an explicit `--recipe` typo still hard-fails. |
 | `entryPointHashes` | string[] | — | Override the inferred entry-point list with explicit body hashes. |
 | `severityOverrides` | map (rule-slug → `'error' \| 'warning'`) | `{}` | Per-rule severity clamp. An applied opt-in: a listed rule's emitted signals are clamped to the named severity. Only `'error'` / `'warning'` values are accepted; any other value is **rejected** by strict validation with a `CONFIGURATION_ERROR`. |
+| `partitionStrategy` | `'directory-depth'` \| `'file-count-chunks'` \| `'hybrid'` | `'hybrid'` | How a flat (non-workspaces) repo is partitioned into synthetic shards for the sharded build (ADR-0045). Env override: `OPENSIP_GRAPH_PARTITION_STRATEGY`. Unknown values are **rejected** by strict validation. Changing the strategy changes shard identity, so the first run after a switch is a cold (uncached) build. |
 
 ```yaml
 graph:
