@@ -1,10 +1,10 @@
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { resolveSession } from '../resolve-session.js';
 import { SessionRepo } from '../session-repo.js';
 
-import type { StoredSession } from '@opensip-tools/contracts';
+import type { StoredSession } from '@opensip-cli/contracts';
 
 function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {

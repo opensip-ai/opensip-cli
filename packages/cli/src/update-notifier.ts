@@ -1,6 +1,6 @@
 /**
  * @fileoverview Thin wrapper around `update-notifier` that checks npm
- * hourly for a newer version of opensip-tools (see UPDATE_CHECK_INTERVAL_MS).
+ * hourly for a newer version of opensip-cli (see UPDATE_CHECK_INTERVAL_MS).
  *
  * `update-notifier` is used purely as the *fetcher* — it runs the throttled
  * (hourly), detached, non-blocking network check. It is NOT used as the
@@ -68,7 +68,7 @@ export interface CheckForUpdateOptions {
   readonly version: string;
   /**
    * Override the sticky update-state file path (for tests). Defaults to
-   * `~/.opensip-tools/update-state.json`.
+   * `~/.opensip-cli/update-state.json`.
    */
   readonly stateFile?: string;
 }
@@ -173,7 +173,7 @@ export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined 
  */
 export function formatUpdateNag(current: string, latest: string): string {
   return (
-    `\nopensip-tools ${current} → ${latest} available. ` +
+    `\nOpenSIP CLI ${current} -> ${latest} available. ` +
     `Run \`curl -fsSL https://opensip.ai/cli/install.sh | bash\` to update.\n` +
     `(Silence with OPENSIP_NO_UPDATE=1.)\n\n`
   );
@@ -201,7 +201,7 @@ export function maybeNotify(opts: NotifyOptions): UpdateNotifier | null {
   if (update && isNewerVersion(update.latest, update.current)) {
     const write = opts.write ?? ((s: string) => process.stderr.write(s));
     const line =
-      `\nopensip-tools ${update.current} \u2192 ${update.latest} available. ` +
+      `\nOpenSIP CLI ${update.current} -> ${update.latest} available. ` +
       `Run \`curl -fsSL https://opensip.ai/cli/install.sh | bash\` to update.\n` +
       `(Silence with OPENSIP_NO_UPDATE=1.)\n\n`;
     write(line);

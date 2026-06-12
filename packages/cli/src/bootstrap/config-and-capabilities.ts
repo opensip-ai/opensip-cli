@@ -7,7 +7,7 @@
  *
  *   1. {@link composeAndValidateToolConfig} — gather every registered tool's
  *      contributed `ToolConfigDeclaration`, compose them into ONE strict
- *      whole-document schema, validate the parsed `opensip-tools.config.yml`
+ *      whole-document schema, validate the parsed `opensip-cli.config.yml`
  *      STRICT before any command runs (a typo in ANY tool namespace throws a
  *      single `ConfigurationError` → `CONFIGURATION_ERROR` exit through the
  *      existing error boundary), then resolve precedence (flag > env > file >
@@ -20,7 +20,7 @@
  *      (`tool.capabilityRegistrars`). The host routes by domain; the tool owns
  *      the registrar.
  *
- * This module is the ONE place the CLI imports `@opensip-tools/config` (the
+ * This module is the ONE place the CLI imports `@opensip-cli/config` (the
  * composer + precedence resolver). Tools never import it; they read their
  * validated namespace off `scope.toolConfig`.
  */
@@ -33,7 +33,7 @@ import {
   validateConfigDocument,
   type PluginConfigKeyDeclaration,
   type ToolConfigDeclaration,
-} from '@opensip-tools/config';
+} from '@opensip-cli/config';
 import {
   type CapabilityRegistry,
   ConfigurationError,
@@ -43,7 +43,7 @@ import {
   type ToolRegistry,
   registerCapabilityDomainsFromManifest,
   readYamlFile,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 /** A plain-object guard that treats arrays and null as non-objects. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -55,7 +55,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * tool's `config` slot is the kernel-side `ToolConfigContribution` carrier; it
  * is structurally a `ToolConfigDeclaration` (the schema is `unknown` at the
  * kernel boundary, a Zod schema at the config layer), so narrowing it here —
- * the composition root, which DOES import `@opensip-tools/config` — is sound.
+ * the composition root, which DOES import `@opensip-cli/config` — is sound.
  */
 function collectDeclarations(tools: ToolRegistry): readonly ToolConfigDeclaration[] {
   const declarations: ToolConfigDeclaration[] = [];
@@ -129,7 +129,7 @@ function fileBlocksFor(
  * their in-tool defaults.
  *
  * @param tools The per-run tool registry (supplies the contributed schemas).
- * @param configPath The resolved path to `opensip-tools.config.yml`, or
+ * @param configPath The resolved path to `opensip-cli.config.yml`, or
  *   `undefined` when the run has no config document.
  * @param env The environment map for env-binding precedence (typically
  *   `process.env`).
@@ -229,7 +229,7 @@ function reportUnclaimedNamespaces(args: {
       suggestion: u.suggestion,
     });
     process.stderr.write(
-      `opensip-tools: config namespace '${u.namespace}:' is not claimed by any loaded tool${didYouMean} ` +
+      `opensip: config namespace '${u.namespace}:' is not claimed by any loaded tool${didYouMean} ` +
         `(expected if that tool isn't installed in this project)\n`,
     );
   }

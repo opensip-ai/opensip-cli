@@ -22,7 +22,7 @@ import {
   ToolRegistry,
   type Tool,
   type ToolCliContext,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { Command } from 'commander';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

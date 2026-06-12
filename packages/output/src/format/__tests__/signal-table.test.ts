@@ -4,7 +4,7 @@ import { formatSignalTableRows, formatSignalTableSummary } from '../signal-table
 
 import { EMPTY_ENVELOPE, FIXTURE_ENVELOPE } from './envelope.fixtures.js';
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 describe('formatSignalTableRows', () => {
   it('derives one row per unit (snapshot)', () => {

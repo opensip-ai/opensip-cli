@@ -57,7 +57,7 @@ function readVendorBundle(): string {
     }
   }
   throw new Error(
-    'cytoscape-bundle.js not found. Run `pnpm --filter=@opensip-tools/dashboard vendor:cytoscape`.',
+    'cytoscape-bundle.js not found. Run `pnpm --filter=@opensip-cli/dashboard vendor:cytoscape`.',
   );
 }
 

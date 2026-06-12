@@ -19,7 +19,7 @@ import {
   scanRegularString,
   type Region,
   type ScanResult,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- token-state-machine: cyclomatic complexity is inherent to lexer-style scanners; splitting hurts readability
 function scan(src: string): ScanResult {

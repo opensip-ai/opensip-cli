@@ -5,7 +5,7 @@
  * Extracted from `index.ts` so the registration list is not a
  * module-load side effect but a pure function the composition root
  * calls explicitly. Each adapter ships with a layered language pack
- * (`@opensip-tools/lang-*`); the CLI is the single component that
+ * (`@opensip-cli/lang-*`); the CLI is the single component that
  * wires them in — fitness/simulation must not take a hard dep on
  * every language pack (would invert the layered architecture).
  *
@@ -14,14 +14,14 @@
  * resolution.
  */
 
-import { cppAdapter } from '@opensip-tools/lang-cpp';
-import { goAdapter } from '@opensip-tools/lang-go';
-import { javaAdapter } from '@opensip-tools/lang-java';
-import { pythonAdapter } from '@opensip-tools/lang-python';
-import { rustAdapter } from '@opensip-tools/lang-rust';
-import { typescriptAdapter } from '@opensip-tools/lang-typescript';
+import { cppAdapter } from '@opensip-cli/lang-cpp';
+import { goAdapter } from '@opensip-cli/lang-go';
+import { javaAdapter } from '@opensip-cli/lang-java';
+import { pythonAdapter } from '@opensip-cli/lang-python';
+import { rustAdapter } from '@opensip-cli/lang-rust';
+import { typescriptAdapter } from '@opensip-cli/lang-typescript';
 
-import type { LanguageRegistry } from '@opensip-tools/core';
+import type { LanguageRegistry } from '@opensip-cli/core';
 
 /**
  * Register the six bundled language adapters into the supplied

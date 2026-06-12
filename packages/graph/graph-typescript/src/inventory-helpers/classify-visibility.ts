@@ -5,7 +5,7 @@
 
 import ts from 'typescript';
 
-import type { Visibility } from '@opensip-tools/graph';
+import type { Visibility } from '@opensip-cli/graph';
 
 /**
  * For a top-level function/variable: 'exported' if it has the export

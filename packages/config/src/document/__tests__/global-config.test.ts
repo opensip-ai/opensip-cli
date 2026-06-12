@@ -72,7 +72,7 @@ describe('writeGlobalConfig', () => {
 
     writeGlobalConfig({ apiKey: 'sk-clean' });
 
-    const opensipDir = join(HOME, '.opensip-tools');
+    const opensipDir = join(HOME, '.opensip-cli');
     const stragglers = readdirSync(opensipDir).filter((name) => name.endsWith('.tmp'));
     expect(stragglers).toEqual([]);
   });
@@ -99,7 +99,7 @@ describe('writeGlobalConfig', () => {
     expect(() => writeGlobalConfig({ apiKey: 'sk-doomed' })).toThrow();
 
     // The temp file must not linger after the failed rename.
-    const opensipDir = join(HOME, '.opensip-tools');
+    const opensipDir = join(HOME, '.opensip-cli');
     const stragglers = readdirSync(opensipDir).filter((name) => name.endsWith('.tmp'));
     expect(stragglers).toEqual([]);
     // The destination directory is untouched (still a dir, still has blocker).
@@ -115,7 +115,7 @@ describe('readGlobalConfig (missing / malformed paths)', () => {
 
   it('returns {} when the YAML content is malformed', async () => {
     const { writeFileSync, mkdirSync } = await import('node:fs');
-    const opensipDir = join(HOME, '.opensip-tools');
+    const opensipDir = join(HOME, '.opensip-cli');
     mkdirSync(opensipDir, { recursive: true });
     writeFileSync(join(opensipDir, 'config.yml'), '\t: not valid : :');
     const { readGlobalConfig } = await loadModule();
@@ -124,7 +124,7 @@ describe('readGlobalConfig (missing / malformed paths)', () => {
 
   it('returns {} when the YAML parses to null/empty', async () => {
     const { writeFileSync, mkdirSync } = await import('node:fs');
-    const opensipDir = join(HOME, '.opensip-tools');
+    const opensipDir = join(HOME, '.opensip-cli');
     mkdirSync(opensipDir, { recursive: true });
     writeFileSync(join(opensipDir, 'config.yml'), '');
     const { readGlobalConfig } = await loadModule();
@@ -172,7 +172,7 @@ describe('resolveApiKey', () => {
 describe('resolveEffectiveCloudConfig (audit P0-2 — user opt-out layered over project)', () => {
   it('honors the user cloud.sync:false opt-out even when the project enables sync', async () => {
     // The exact privacy gap: a user writes `cloud.sync: false` in
-    // ~/.opensip-tools/config.yml and expects sync off everywhere.
+    // ~/.opensip-cli/config.yml and expects sync off everywhere.
     const { resolveEffectiveCloudConfig, writeGlobalConfig } = await loadModule();
     writeGlobalConfig({ cloud: { sync: false } });
     expect(resolveEffectiveCloudConfig({ sync: true })?.sync).toBe(false);

@@ -3,9 +3,9 @@
  *
  * These accessors are now thin aliases of the generic core accessors
  * (`getUnitConfig` / `setCurrentRecipeUnitConfig` /
- * `clearCurrentRecipeUnitConfig` in `@opensip-tools/core`); the fitness
+ * `clearCurrentRecipeUnitConfig` in `@opensip-cli/core`); the fitness
  * names are preserved because checks import `getCheckConfig` from the
- * `@opensip-tools/fitness` barrel and the recipe service calls
+ * `@opensip-cli/fitness` barrel and the recipe service calls
  * `setCurrentRecipeCheckConfig` / `clearCurrentRecipeCheckConfig`.
  *
  * Recipes can carry a `checks.config` map keyed by check slug. The recipe
@@ -15,14 +15,14 @@
  * `getCheckConfig<T>(slug)` and merge it with their built-in defaults.
  *
  * Scope-bound (not module-bound) lookup is load-bearing — the runtime
- * frequently has TWO copies of `@opensip-tools/fitness` loaded:
+ * frequently has TWO copies of `@opensip-cli/fitness` loaded:
  *
  *   1. The CLI's bundled copy (running the recipe service).
  *   2. The plugin pack's resolved copy (running the check, calling
  *      `getCheckConfig(slug)`).
  *
  * Each copy has its own module-scope state. The lookup routes through
- * `currentScope()` from `@opensip-tools/core` (inside `getUnitConfig`) so
+ * `currentScope()` from `@opensip-cli/core` (inside `getUnitConfig`) so
  * the slot identity is bound to core — a single resolved copy in every
  * npm graph — rather than to whichever fitness copy loaded first.
  *
@@ -35,10 +35,10 @@ import {
   getUnitConfig,
   setCurrentRecipeUnitConfig,
   clearCurrentRecipeUnitConfig,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import type { RecipeCheckConfigMap } from './types.js';
-import type { RunScope } from '@opensip-tools/core';
+import type { RunScope } from '@opensip-cli/core';
 
 /**
  * Read the per-check config slice for the given slug. Alias of core

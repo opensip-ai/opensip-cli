@@ -3,9 +3,9 @@
  * (list / add / remove / sync) as a ViewNode.
  */
 
-import { line, group, type Span, type ViewNode } from '@opensip-tools/cli-ui';
+import { line, group, type Span, type ViewNode } from '@opensip-cli/cli-ui';
 
-import type { PluginInfo, PluginResult, ToolProvenance } from '@opensip-tools/contracts';
+import type { PluginInfo, PluginResult, ToolProvenance } from '@opensip-cli/contracts';
 
 /** A short, stable prefix of the manifest hash — full hash stays in `--json`. */
 function shortHash(manifestHash: string): string {
@@ -78,7 +78,7 @@ function listView(
       { kind: 'spacer' },
       line([
         {
-          text: '  No plugins installed. Run opensip-tools plugin add <package> to get started.',
+          text: '  No plugins installed. Run opensip plugin add <package> to get started.',
           dim: true,
         },
       ]),
@@ -131,7 +131,7 @@ function syncView(
 ): ViewNode {
   if (synced.length === 0) {
     return group(
-      [line([{ text: 'No plugins declared in opensip-tools.config.yml.', dim: true }])],
+      [line([{ text: 'No plugins declared in opensip-cli.config.yml.', dim: true }])],
       2,
     );
   }

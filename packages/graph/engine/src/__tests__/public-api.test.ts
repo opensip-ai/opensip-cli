@@ -1,5 +1,5 @@
 /**
- * Export-surface lock for `@opensip-tools/graph`.
+ * Export-surface lock for `@opensip-cli/graph`.
  *
  * The public barrel is the marketplace contract surface: `graphTool` plus the
  * `GraphLanguageAdapter` authoring API (adapter registry, edge/body-digest
@@ -8,7 +8,7 @@
  * silently re-grow to leak engine internals — the regression the 2026-06-05
  * boundary audit found, where the concrete `CatalogRepo` persistence repo sat
  * on the contract with no external consumer (now demoted to
- * `@opensip-tools/graph/internal`).
+ * `@opensip-cli/graph/internal`).
  *
  * Scope note: type-only exports are erased at runtime and cannot be asserted
  * here. Adding a *value* export to the barrel is a deliberate minor-version act
@@ -65,7 +65,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'truncateForCallEdge',
 ].sort();
 
-describe('@opensip-tools/graph public barrel', () => {
+describe('@opensip-cli/graph public barrel', () => {
   it('exposes exactly the curated value-export surface', () => {
     const actual = Object.keys(barrel)
       .filter((k) => barrel[k as keyof typeof barrel] !== undefined)
@@ -81,7 +81,7 @@ describe('@opensip-tools/graph public barrel', () => {
 
   it('does NOT leak engine internals through the barrel', () => {
     // CatalogRepo (persistence) + the orchestration/rule internals live on
-    // `@opensip-tools/graph/internal`, never the public barrel.
+    // `@opensip-cli/graph/internal`, never the public barrel.
     for (const leak of [
       'CatalogRepo',
       'runGraph',

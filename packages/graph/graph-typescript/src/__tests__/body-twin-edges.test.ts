@@ -13,12 +13,12 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ownerEdgeKey } from '@opensip-tools/graph';
+import { ownerEdgeKey } from '@opensip-cli/graph';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';
 
-import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
+import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 
 let root: string;
 

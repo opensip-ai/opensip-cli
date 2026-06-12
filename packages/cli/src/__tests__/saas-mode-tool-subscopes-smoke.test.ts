@@ -13,17 +13,17 @@
  * subscope, and verify the other scope's subscope is independent.
  */
 
-import { RunScope, runWithScope } from '@opensip-tools/core';
-import { GraphAdapterRegistry, graphTool } from '@opensip-tools/graph';
-import { simulationTool } from '@opensip-tools/simulation';
+import { RunScope, runWithScope } from '@opensip-cli/core';
+import { GraphAdapterRegistry, graphTool } from '@opensip-cli/graph';
+import { simulationTool } from '@opensip-cli/simulation';
 import {
   SimulationRecipeRegistry,
   createScenarioRegistry,
-} from '@opensip-tools/simulation/internal';
+} from '@opensip-cli/simulation/internal';
 import { describe, expect, it } from 'vitest';
 
-import type { GraphLanguageAdapter } from '@opensip-tools/graph';
-import type { RunnableScenario } from '@opensip-tools/simulation';
+import type { GraphLanguageAdapter } from '@opensip-cli/graph';
+import type { RunnableScenario } from '@opensip-cli/simulation';
 
 /** Fresh scope with both tool subscopes attached. */
 function makeScopeWithBothTools(): RunScope {

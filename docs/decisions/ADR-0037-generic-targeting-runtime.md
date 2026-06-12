@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-11
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0037: File-targeting resolution is a host runtime substrate, not a fitness-private capability
@@ -18,18 +18,18 @@ tags: [config, targeting, discovery, parity]
 enforcement: mechanizable
 enforcement-reason: >
   Two guards: (1) a non-fitness fixture tool resolves a named target's files via
-  `scope.targets` with NO `@opensip-tools/fitness` import (the adoption proof);
+  `scope.targets` with NO `@opensip-cli/fitness` import (the adoption proof);
   (2) a fitness per-check file-set golden test is byte-identical pre/post (the
   migration is behavior-preserving). A dependency-cruiser rule pins the new
-  `@opensip-tools/targeting` package's deps to `config` + `glob`/`minimatch` and
+  `@opensip-cli/targeting` package's deps to `config` + `glob`/`minimatch` and
   forbids a `core` tool-vocabulary import.
 ```
 
 **Decision:** The **generic half** of file targeting — named file-sets
 (`include`/`exclude` globs), `globalExcludes`, glob expansion, and tag/scope target
-matching — becomes a **host runtime substrate** (`@opensip-tools/targeting`) any
+matching — becomes a **host runtime substrate** (`@opensip-cli/targeting`) any
 tool consumes via `scope.targets`, finishing what ADR-0023 started when it moved
-the targeting *types* into the host `@opensip-tools/config` layer "explicitly
+the targeting *types* into the host `@opensip-cli/config` layer "explicitly
 anticipating cross-tool use" but left the *runtime* in fitness. The
 **check-domain half** stays in fitness: the check-slug `checkOverrides`, the
 `checkOverrides > scope-match > fileCache` precedence (`resolveFilesForCheck`), the
@@ -38,7 +38,7 @@ thin consumer of the substrate rather than its owner.
 
 **Alternatives:**
 
-- **Fold the runtime into `@opensip-tools/config`.** Rejected: `config` owns
+- **Fold the runtime into `@opensip-cli/config`.** Rejected: `config` owns
   config-*document* parsing/loading; growing it a `glob`/`minimatch`/fs-walk
   dependency puts filesystem discovery in the config-parsing layer — the wrong
   concern boundary. (Note: `config` is *not* types-only — that is `contracts`; the
@@ -74,7 +74,7 @@ not fixed.
 
 **Consequences:**
 
-- **New `@opensip-tools/targeting` package** (peer of `lang-*`/`output`; deps:
+- **New `@opensip-cli/targeting` package** (peer of `lang-*`/`output`; deps:
   `core` — the generic `Registry<T>` base only, NOT its tool vocabulary (the
   enforcement gate above forbids the latter) — plus `config` types and
   `glob`/`minimatch`). Holds `TargetRegistry` (register/get/byTag),

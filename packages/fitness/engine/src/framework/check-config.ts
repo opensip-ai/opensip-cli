@@ -212,7 +212,7 @@ interface BaseCheckConfig {
    */
   readonly contentFilter?: 'raw' | 'strip-strings' | 'strip-strings-and-comments';
   /**
-   * Confidence level of this check's findings. Consumers of opensip-tools
+   * Confidence level of this check's findings. Consumers of opensip-cli
    * signals (via --report-to) use this to decide how aggressively to act
    * on findings; this package treats it as pure metadata.
    *
@@ -238,7 +238,7 @@ interface BaseCheckConfig {
  *
  * Empty `languages` and empty `concerns` are both valid and mean
  * "matches any". This is how cross-language ("universal") checks
- * declare themselves — see @opensip-tools/checks-universal.
+ * declare themselves — see @opensip-cli/checks-universal.
  *
  * findByScope() in TargetRegistry treats empty arrays as match-any
  * already; the schema mirrors that behavior so callers can author

@@ -1,4 +1,4 @@
-import { applyCheckDisplay } from '@opensip-tools/fitness';
+import { applyCheckDisplay } from '@opensip-cli/fitness';
 
 import { clangTidyPassthrough } from './checks/clang-tidy-passthrough.js';
 import { checkDisplay } from './display/index.js';

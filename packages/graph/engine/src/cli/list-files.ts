@@ -1,7 +1,7 @@
 // @fitness-ignore-file error-handling-quality -- the two realpathSync probes (root normalization + per-unit discovery) intentionally fall through: the first uses the resolved path when realpath fails (e.g. a path inside a symlinked dir), the second skips a workspace unit the adapter can't discover (mirrors resolveShards in graph.ts). Both are documented at the call site.
 // @fitness-ignore-file detached-promises -- handleGraphError is synchronous (void); the heuristic flags it as a discarded promise inside the async handler. Mirrors the same pragma on graph.ts for the identical CLI-error-boundary pattern.
 /**
- * `opensip-tools graph --list-files` — discovery-only mode.
+ * `opensip graph --list-files` — discovery-only mode.
  *
  * Resolves the exact source-file set the graph build would analyze for the
  * requested scope and prints it, WITHOUT building the catalog. This is the
@@ -30,8 +30,8 @@
 import { realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { ConfigurationError, logger } from '@opensip-tools/core';
+import { EXIT_CODES } from '@opensip-cli/contracts';
+import { ConfigurationError, logger } from '@opensip-cli/core';
 
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
@@ -43,7 +43,7 @@ import { discoverPolyglotUnits } from './workspace-runner.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 const MODULE_GRAPH_CLI = 'graph:cli';
 
@@ -128,7 +128,7 @@ async function discoverWorkspaceFiles(
   if (units.length === 0) {
     const adapterLabel = adapters.map((a) => a.id).join(', ') || '(no language adapters available)';
     throw new ConfigurationError(
-      `--workspace: no workspace units detected for [${adapterLabel}]. Use 'opensip-tools graph --list-files' for whole-project analysis.`,
+      `--workspace: no workspace units detected for [${adapterLabel}]. Use 'opensip graph --list-files' for whole-project analysis.`,
     );
   }
   const adapter = resolveDiscoveryAdapter(opts);

@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-06
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0012: Versioning & release policy — semver-honest, output contract versioned independently, batch majors; stay pre-GA on 2.x, reserve 3.0.0 for the tool-plugin-parity north star
@@ -30,14 +30,14 @@ enforcement-reason: >
   `scripts/verify-release.mjs` enforces single-version consistency, a dated
   CHANGELOG entry, and generated-artifact freshness; the output-contract
   versions are real fields in code (`SignalEnvelope.schemaVersion` in
-  @opensip-tools/contracts, `SignalBatch.schemaVersion` in @opensip-tools/core).
+  @opensip-cli/contracts, `SignalBatch.schemaVersion` in @opensip-cli/core).
   The judgment half — "batch breaking changes into deliberate majors; declare GA
   by announcement, not by the integer" — is a maintainer discipline, not a gate.
 ```
 
-**Decision:** opensip-tools follows **semantic versioning honestly** for its
-published package APIs: a breaking change to any `@opensip-tools/*` or the
-`opensip-tools` CLI surface requires a **major** bump. Three rules govern how we
+**Decision:** opensip-cli follows **semantic versioning honestly** for its
+published package APIs: a breaking change to any `@opensip-cli/*` or the
+`opensip-cli` CLI surface requires a **major** bump. Three rules govern how we
 apply it:
 
 1. **The machine-output / wire contract is versioned independently of the
@@ -54,7 +54,7 @@ apply it:
    north star (`docs/plans/tool-plugin-parity-architecture-2026-06-06.md`), which
    will be declared **`3.0.0`**. Expect several more `2.x` releases (breaking
    changes batched into `2.x` minors) before then, on the existing
-   `@opensip-tools/*` + `opensip-tools` names. The "production-ready" signal is
+   `@opensip-cli/*` + `opensip-cli` names. The "production-ready" signal is
    the GA release announcement at the north star — **not** the version integer.
 
 When GA (`3.0.0`) is cut, the older pre-GA npm versions are retired with
@@ -64,16 +64,16 @@ When GA (`3.0.0`) is cut, the older pre-GA npm versions are retired with
 **Alternatives:**
 
 - *Reset to `1.0.0` on the existing package names ("relaunch as v1").* **Rejected
-  — technically impossible.** `@opensip-tools/core@1.0.0` (and other early
+  — technically impossible.** `@opensip-cli/core@1.0.0` (and other early
   versions) were published then unpublished; npm permanently forbids
-  republishing a burned version (`npm view @opensip-tools/core@1.0.0` → 404,
+  republishing a burned version (`npm view @opensip-cli/core@1.0.0` → 404,
   verified 2026-06-04). A clean `1.0.0` is therefore only achievable at a *new*
   package identity.
 - *Rename to a new scope/name to obtain a clean `1.0.0`, deprecating the old
-  packages.* **Rejected** — the rename cost (30 packages + the `opensip-tools`
+  packages.* **Rejected** — the rename cost (30 packages + the `opensip-cli`
   CLI binary + every doc + the `opensip.ai/docs` paths + SEO/stars/link
-  continuity, and stranding existing installers — `@opensip-tools/core` ~4.3k,
-  `opensip-tools` ~476 downloads/week as of 2026-06-04) is not justified merely
+  continuity, and stranding existing installers — `@opensip-cli/core` ~4.3k,
+  `opensip-cli` ~476 downloads/week as of 2026-06-04) is not justified merely
   to obtain a lower integer. Worth it ONLY as part of an intentional rebrand,
   which is not on the table.
 - *Cut a new major for each breaking change, no batching policy.* **Rejected** —
@@ -85,8 +85,8 @@ When GA (`3.0.0`) is cut, the older pre-GA npm versions are retired with
   contracts that evolve independently. The envelope already carries its own
   `schemaVersion` (ADR-0011); use it.
 - *Self-`unpublish` the old versions for a clean registry.* **Rejected** —
-  irreversible, and blocked anyway: both `@opensip-tools/core` (~4.3k/wk) and
-  `opensip-tools` (~476/wk) exceed npm's 300-downloads/week self-unpublish
+  irreversible, and blocked anyway: both `@opensip-cli/core` (~4.3k/wk) and
+  `opensip-cli` (~476/wk) exceed npm's 300-downloads/week self-unpublish
   threshold. `npm deprecate` is the correct, reversible instrument.
 
 **Rationale:** The independent output-contract version already exists in code —
@@ -116,7 +116,7 @@ migration effort") instead of noisy.
 - Docs instruct machine-output consumers to pin `schemaVersion`, not the package
   version (see the `--json` reference + the 2.7 migration guide,
   `docs/public/70-reference/07-migrating-to-2.7.md`).
-- **At GA publish time (not before):** `npm deprecate '@opensip-tools/<pkg>@<3.0.0'`
+- **At GA publish time (not before):** `npm deprecate '@opensip-cli/<pkg>@<3.0.0'`
   (and the unscoped CLI) with a message pointing at the GA; do NOT unpublish.
 - The release gate is unchanged: `scripts/verify-release.mjs` (single-version
   consistency, dated CHANGELOG entry, generated-doc freshness) + the tag-driven

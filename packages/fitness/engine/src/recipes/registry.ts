@@ -12,7 +12,7 @@
  * (the canonical T2 violation the runscope+registry plan resolves).
  */
 
-import { RecipeRegistry } from '@opensip-tools/core';
+import { RecipeRegistry } from '@opensip-cli/core';
 
 import { builtInRecipes, isBuiltInRecipe } from './built-in-recipes.js';
 

@@ -18,8 +18,8 @@ import {
   synthesizeModuleInit,
 } from '../walk.js';
 
-import type { FunctionOccurrence } from '@opensip-tools/graph';
-import type { Node } from '@opensip-tools/tree-sitter';
+import type { FunctionOccurrence } from '@opensip-cli/graph';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 // Minimal fake of the web-tree-sitter `Node` shape `isReturnValueDiscarded`
 // reads: it only ever inspects `.parent` and `.type`.

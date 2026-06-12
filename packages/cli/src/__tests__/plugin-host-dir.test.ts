@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { resolveProjectPaths } from '@opensip-tools/core';
+import { resolveProjectPaths } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -78,7 +78,7 @@ describe('ensurePluginHostDir', () => {
       type: string;
       dependencies: Record<string, string>;
     };
-    expect(hostPkg.name).toBe('opensip-tools-fit-plugins');
+    expect(hostPkg.name).toBe('opensip-cli-fit-plugins');
     expect(hostPkg.private).toBe(true);
     expect(hostPkg.type).toBe('module');
     expect(hostPkg.dependencies).toEqual({});

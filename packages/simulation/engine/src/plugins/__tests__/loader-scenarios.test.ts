@@ -13,7 +13,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, RunScope } from '@opensip-tools/core';
+import { enterScope, RunScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { currentScenarioRegistry } from '../../framework/registry.js';
@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 function writeScenarioPlugin(body: string): void {
-  const dir = join(testDir, 'opensip-tools', 'sim', 'scenarios');
+  const dir = join(testDir, 'opensip-cli', 'sim', 'scenarios');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'plugin.mjs'), body);
 }

@@ -48,8 +48,8 @@ beforeAll(() => {
   });
   expect(init.exitCode).toBe(0);
 
-  const projectHost = join(projectDir, 'opensip-tools', '.runtime', 'plugins', 'tool');
-  const globalHost = join(fakeHome, '.opensip-tools', 'plugins', 'tool');
+  const projectHost = join(projectDir, 'opensip-cli', '.runtime', 'plugins', 'tool');
+  const globalHost = join(fakeHome, '.opensip-cli', 'plugins', 'tool');
   // The THROWING tool: a runtime import would crash; listing must not care.
   writeToolPackage(
     projectHost,

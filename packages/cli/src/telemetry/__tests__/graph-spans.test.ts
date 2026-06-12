@@ -2,9 +2,9 @@
  * Graph stage-span CAPTURE test — the in-process counterpart to Phase 4's
  * real-collector validation.
  *
- * This lives in `opensip-tools` because the OTel SDK + InMemorySpanExporter
+ * This lives in `opensip-cli` because the OTel SDK + InMemorySpanExporter
  * legitimately live here (the application boundary), keeping the SDK out of the
- * `@opensip-tools/graph` tool package. We register an in-memory provider, run
+ * `@opensip-cli/graph` tool package. We register an in-memory provider, run
  * `runGraph` over a synthetic fixture, and assert:
  *
  *   1. enabled ⇒ one `opensip_tools.graph.<stage>` span per GRAPH_STAGES entry
@@ -29,9 +29,9 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, ToolRegistry, runWithScope } from '@opensip-tools/core';
-import { currentAdapterRegistry, graphTool, type GraphLanguageAdapter } from '@opensip-tools/graph';
-import { runGraph, GRAPH_STAGES } from '@opensip-tools/graph/internal';
+import { LanguageRegistry, RunScope, ToolRegistry, runWithScope } from '@opensip-cli/core';
+import { currentAdapterRegistry, graphTool, type GraphLanguageAdapter } from '@opensip-cli/graph';
+import { runGraph, GRAPH_STAGES } from '@opensip-cli/graph/internal';
 import {
   ROOT_CONTEXT,
   context as otelContext,
@@ -48,8 +48,8 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 /** Fresh scope with empty registries — local equivalent of the retired
- *  `@opensip-tools/core/test-utils` helper (ADR-0040: that sugar moved to
- *  `@opensip-tools/test-support`, which this package's tests cannot use
+ *  `@opensip-cli/core/test-utils` helper (ADR-0040: that sugar moved to
+ *  `@opensip-cli/test-support`, which this package's tests cannot use
  *  without coupling its test graph to the fitness engine). */
 const makeTestScope = (): RunScope =>
   new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });

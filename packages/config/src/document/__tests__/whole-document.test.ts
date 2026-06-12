@@ -1,7 +1,7 @@
 /**
  * Whole-document validation across host + tool blocks (2.10.1, ADR-0023).
  *
- * The composed schema must validate the WHOLE `opensip-tools.config.yml`
+ * The composed schema must validate the WHOLE `opensip-cli.config.yml`
  * document — the host-owned blocks (cli/dashboard/schemaVersion/targets/
  * globalExcludes/checkOverrides) AND the per-tool namespaces — through ONE
  * schema, with a typo in ANY block failing identically. This pins the seam
@@ -9,7 +9,7 @@
  * `.catchall`-tolerated.
  */
 
-import { ConfigurationError } from '@opensip-tools/core';
+import { ConfigurationError } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 

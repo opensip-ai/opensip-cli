@@ -1,10 +1,10 @@
 /**
- * @fileoverview Path resolution for opensip-tools project + user state.
+ * @fileoverview Path resolution for opensip-cli project + user state.
  *
  * Per-project state lives at:
  *
- *   <project>/opensip-tools.config.yml          ← TRACKED — project config
- *   <project>/opensip-tools/                    ← TRACKED — user-authored
+ *   <project>/opensip-cli.config.yml          ← TRACKED — project config
+ *   <project>/opensip-cli/                    ← TRACKED — user-authored
  *     fit/checks/<*.mjs>                        ← custom fitness checks
  *     fit/recipes/<*.mjs>                       ← custom fitness recipes
  *     sim/scenarios/<*.mjs>                     ← custom sim scenarios
@@ -24,7 +24,7 @@
  *       cache/                                  ← AST + prewarm caches
  *       plugins/<fit|sim>/node_modules/         ← npm-installed plugins
  *
- *   ~/.opensip-tools/                           ← USER-LEVEL (cross-project)
+ *   ~/.opensip-cli/                           ← USER-LEVEL (cross-project)
  *     config.yml                                ← cloud API key, defaults
  *     plugins/tool/node_modules/                ← user-global Tool plugins
  *                                                 (whole subcommands;
@@ -53,37 +53,37 @@ import type { ToolShortId } from '../tools/ids.js';
 export interface ProjectPaths {
   /** Absolute path to the project root (== input). */
   readonly projectDir: string;
-  /** <project>/opensip-tools.config.yml */
+  /** <project>/opensip-cli.config.yml */
   readonly configFile: string;
-  /** <project>/opensip-tools — user-authored content root. */
+  /** <project>/opensip-cli — user-authored content root. */
   readonly userSourceDir: string;
   /**
-   * `<project>/opensip-tools/tools` — TRACKED authored Tool sidecars (the
+   * `<project>/opensip-cli/tools` — TRACKED authored Tool sidecars (the
    * whole-subcommand analogue of fit/checks + sim/scenarios). Each child is
    * a `<name>/opensip-tool.manifest.json` sidecar. Lives BESIDE `fit/` and
    * `sim/`, NOT under `.runtime/`; deny-by-default at admission.
    */
   readonly authoredToolsDir: string;
   /**
-   * `<project>/opensip-tools/<domain>/<kind>` — a tool's user-authored
+   * `<project>/opensip-cli/<domain>/<kind>` — a tool's user-authored
    * plugin source dir (e.g. `userPluginDir('fit', 'checks')`). Generic
    * over (domain, kind) so the kernel carries no fit/sim vocabulary
    * (ADR-0009 corollary 1); the layout's `userSubdirs` supply the kinds.
    */
   readonly userPluginDir: (domain: string, kind: string) => string;
-  /** <project>/opensip-tools/.runtime — gitignored runtime state. */
+  /** <project>/opensip-cli/.runtime — gitignored runtime state. */
   readonly runtimeDir: string;
-  /** <project>/opensip-tools/.runtime/sessions */
+  /** <project>/opensip-cli/.runtime/sessions */
   readonly sessionsDir: string;
-  /** <project>/opensip-tools/.runtime/reports */
+  /** <project>/opensip-cli/.runtime/reports */
   readonly reportsDir: string;
-  /** <project>/opensip-tools/.runtime/logs */
+  /** <project>/opensip-cli/.runtime/logs */
   readonly logsDir: string;
-  /** <project>/opensip-tools/.runtime/cache */
+  /** <project>/opensip-cli/.runtime/cache */
   readonly cacheDir: string;
-  /** <project>/opensip-tools/.runtime/cache/graph — graph-tool catalog cache root. */
+  /** <project>/opensip-cli/.runtime/cache/graph — graph-tool catalog cache root. */
   readonly graphCacheDir: string;
-  /** <project>/opensip-tools/.runtime/plugins/<domain> — npm-installed plugins. */
+  /** <project>/opensip-cli/.runtime/plugins/<domain> — npm-installed plugins. */
   readonly pluginsDir: (domain: string) => string;
 }
 
@@ -102,13 +102,13 @@ export type PathDomain = ToolShortId;
 
 /** Resolve the project path layout for a given project directory. */
 export function resolveProjectPaths(projectDir: string): ProjectPaths {
-  const userSourceDir = join(projectDir, 'opensip-tools');
+  const userSourceDir = join(projectDir, 'opensip-cli');
   const runtimeDir = join(userSourceDir, '.runtime');
   const cacheDir = join(runtimeDir, 'cache');
   const graphCacheDir = join(cacheDir, 'graph');
   return {
     projectDir,
-    configFile: join(projectDir, 'opensip-tools.config.yml'),
+    configFile: join(projectDir, 'opensip-cli.config.yml'),
     userSourceDir,
     authoredToolsDir: join(userSourceDir, 'tools'),
     userPluginDir: (domain, kind) => join(userSourceDir, domain, kind),
@@ -126,14 +126,14 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
 // USER PATHS
 // =============================================================================
 
-/** User-level paths in `~/.opensip-tools/`. */
+/** User-level paths in `~/.opensip-cli/`. */
 export interface UserPaths {
-  /** ~/.opensip-tools — root for all user-level state. */
+  /** ~/.opensip-cli — root for all user-level state. */
   readonly userHomeDir: string;
-  /** ~/.opensip-tools/config.yml — cloud API key + per-user defaults. */
+  /** ~/.opensip-cli/config.yml — cloud API key + per-user defaults. */
   readonly configFile: string;
   /**
-   * `~/.opensip-tools/plugins/<domain>` — user-global (cross-project)
+   * `~/.opensip-cli/plugins/<domain>` — user-global (cross-project)
    * npm-installed plugins. Used today by the `tool` domain: a Tool plugin
    * is a whole subcommand, so a user-global install makes it available in
    * every project (like `npm i -g`), unlike fit/sim packs which are
@@ -142,7 +142,7 @@ export interface UserPaths {
    */
   readonly pluginsDir: (domain: string) => string;
   /**
-   * `~/.opensip-tools/tools` — global authored Tool sidecars
+   * `~/.opensip-cli/tools` — global authored Tool sidecars
    * (trusted-by-default). Each child is a
    * `<name>/opensip-tool.manifest.json` sidecar. The user placed it in
    * their own home dir → admitted without an allowlist (the `npm i -g`
@@ -150,7 +150,7 @@ export interface UserPaths {
    */
   readonly authoredToolsDir: string;
   /**
-   * ~/.opensip-tools/update-state.json — tool-generated cache of the
+   * ~/.opensip-cli/update-state.json — tool-generated cache of the
    * last-known newer published version, so the "update available" notice can
    * persist across runs instead of showing once. NOT user-authored: written
    * by the update notifier, cleared automatically once the running version
@@ -161,7 +161,7 @@ export interface UserPaths {
 
 /** Resolve the user-level path layout. */
 export function resolveUserPaths(): UserPaths {
-  const userHomeDir = join(homedir(), '.opensip-tools');
+  const userHomeDir = join(homedir(), '.opensip-cli');
   return {
     userHomeDir,
     configFile: join(userHomeDir, 'config.yml'),

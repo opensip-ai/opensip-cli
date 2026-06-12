@@ -19,7 +19,7 @@
  * signal as a timeout.
  */
 
-import { TimeoutError, logger, runWithTimeout } from '@opensip-tools/core';
+import { TimeoutError, logger, runWithTimeout } from '@opensip-cli/core';
 
 import { CheckAbortedError } from '../framework/execution-context.js';
 import { memoryProfiler } from '../framework/memory-profiler.js';

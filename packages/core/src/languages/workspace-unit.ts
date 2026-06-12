@@ -8,7 +8,7 @@
  * it (`configPath`) for adapters that have one.
  */
 export interface WorkspaceUnit {
-  /** Stable, human-readable id (e.g. `@opensip-tools/core`, `crate-foo`). */
+  /** Stable, human-readable id (e.g. `@opensip-cli/core`, `crate-foo`). */
   readonly id: string;
   /** Absolute path to the unit's root directory. */
   readonly rootDir: string;

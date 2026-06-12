@@ -19,7 +19,7 @@ import {
   createSignal,
   applyContentFilter,
   currentScope,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import {
   getAnalysisMode,
@@ -47,7 +47,7 @@ import type {
 import type { Check } from './check-types.js';
 import type { ExecutionContext, RunOptions } from './execution-context.js';
 import type { CheckResult } from '../types/findings.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 // =============================================================================
 // VIOLATION → SIGNAL CONVERSION

@@ -5,13 +5,13 @@
  * @fileoverview Dangerous configuration defaults check
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 import {
   defineCheck,
   isTestFile,
   type CheckViolation,
   getLineNumber,
-} from '@opensip-tools/fitness';
+} from '@opensip-cli/fitness';
 
 import { isDigit, isAlphanumericChar } from './_helpers/config-validation.js';
 

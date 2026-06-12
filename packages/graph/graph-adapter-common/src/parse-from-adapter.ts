@@ -6,7 +6,7 @@
  * same read, same `ParseError` messages, same `hasError` "record but keep the
  * partial tree" behavior, same completion log — but the per-file parse is
  * `adapter.parse(source, path)`. This is what lets the graph Python adapter
- * consume `@opensip-tools/lang-python` so there is one parser per language.
+ * consume `@opensip-cli/lang-python` so there is one parser per language.
  *
  * Total over `input.files` per invariant I-7: every file either parses or
  * surfaces in `parseErrors`. The adapter's `parse` is synchronous (its grammar
@@ -16,12 +16,12 @@
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
-import type { LanguageAdapter } from '@opensip-tools/core';
-import type { ParseInput, ParseOutput, ParseError } from '@opensip-tools/graph';
-import type { ParsedFile } from '@opensip-tools/tree-sitter';
+import type { LanguageAdapter } from '@opensip-cli/core';
+import type { ParseInput, ParseOutput, ParseError } from '@opensip-cli/graph';
+import type { ParsedFile } from '@opensip-cli/tree-sitter';
 
 /**
  * Build a graph `parseProject` from a tree-sitter-backed `LanguageAdapter`

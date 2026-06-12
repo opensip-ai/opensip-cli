@@ -13,7 +13,7 @@ import { dashboardIndexesJs } from '../code-paths/indexes.js';
 import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
 import { dashboardViewCouplingJs } from '../code-paths/view-coupling.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
 interface CouplingEnv {
   buildIndexes: (catalog: GraphCatalog) => {

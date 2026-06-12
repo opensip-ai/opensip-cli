@@ -1,4 +1,4 @@
-// TypeScript LanguageAdapter for opensip-tools
+// TypeScript LanguageAdapter for opensip-cli
 
 // Re-export the TypeScript namespace as a first-class top-level export so the
 // barrel surface is the single source of truth for `ts` access. Done as a
@@ -31,7 +31,7 @@ export {
 export type { FunctionLikeNode } from './function-scope.js';
 
 // Canonical TS AST helpers — the compiler-API utilities check packs use.
-// Re-exported so TS checks import them from @opensip-tools/lang-typescript.
+// Re-exported so TS checks import them from @opensip-cli/lang-typescript.
 // The `ts` re-export from this module is intentionally NOT re-surfaced here
 // (it now lives at the top of the barrel above).
 export {

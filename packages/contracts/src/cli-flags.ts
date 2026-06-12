@@ -15,16 +15,16 @@
  * package keeps `commander` as an optional peer dependency (see index.ts).
  */
 
-// The CommonFlagKey KEY TYPE moved to @opensip-tools/core (release 2.11.0) so the
+// The CommonFlagKey KEY TYPE moved to @opensip-cli/core (release 2.11.0) so the
 // command-plane `CommandSpec.commonFlags` can be typed at the kernel layer without
 // core importing contracts (a forbidden layering inversion). The Commander-touching
 // runtime below (applyCommonFlags + the commonFlags registry) stays here. We
 // re-export the type so existing `import { CommonFlagKey } from
-// '@opensip-tools/contracts'` sites keep working unchanged.
-import type { CommonFlagKey } from '@opensip-tools/core';
+// '@opensip-cli/contracts'` sites keep working unchanged.
+import type { CommonFlagKey } from '@opensip-cli/core';
 import type { Command } from 'commander';
 
-export type { CommonFlagKey } from '@opensip-tools/core';
+export type { CommonFlagKey } from '@opensip-cli/core';
 
 /** Canonical declaration of one common flag. */
 export interface CommonFlagSpec {

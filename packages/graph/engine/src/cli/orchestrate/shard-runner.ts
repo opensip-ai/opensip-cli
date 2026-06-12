@@ -18,7 +18,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { cpus, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { currentTraceparent, logger } from '@opensip-tools/core';
+import { currentTraceparent, logger } from '@opensip-cli/core';
 
 import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
@@ -183,7 +183,7 @@ function spawnShardWorker(
     // undefined for standalone runs (no SDK), so TRACEPARENT is simply absent
     // and the worker emits no spans, exactly as before.
     const traceparent = currentTraceparent();
-    // Inherit the PARENT's cwd (the opensip-tools project dir) so the
+    // Inherit the PARENT's cwd (the opensip-cli project dir) so the
     // child's CLI bootstrap resolves the project + adapter registry. The
     // shard's own files are built from `shard.rootDir` in the spec, not from
     // cwd — so the shard need not be a project itself. The full parent env is

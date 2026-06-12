@@ -6,7 +6,7 @@
  * MAY declare one via `Tool.fingerprintStrategy`; a tool that declares nothing
  * inherits {@link defaultFingerprintStrategy}. The fingerprint is stamped onto
  * `Signal.fingerprint` at envelope-construction time: `buildSignalEnvelope`
- * (`@opensip-tools/contracts`) calls {@link stampFingerprints} with the tool's
+ * (`@opensip-cli/contracts`) calls {@link stampFingerprints} with the tool's
  * strategy (host default when none is passed), so every built envelope reaches
  * the host seams already stamped. The plane itself NEVER re-fingerprints or
  * re-derives the value (it treats it opaquely); the seam-side stamped-ness check

@@ -18,7 +18,7 @@ import {
   runCheckOnFixture,
   validateBookkeeping,
   type CoverageConfig,
-} from '@opensip-tools/test-support';
+} from '@opensip-cli/test-support';
 import { describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';

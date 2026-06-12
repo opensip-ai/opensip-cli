@@ -20,10 +20,10 @@
  * renderer leaves the column blank). This keeps ONE shared table formatter
  * (ADR-0011, Phase 6, decision B) rather than a fitness-specific rich view.
  */
-import { formatDuration, isErrorSignal } from '@opensip-tools/core';
+import { formatDuration, isErrorSignal } from '@opensip-cli/core';
 
-import type { SignalEnvelope, UnitResult } from '@opensip-tools/contracts';
-import type { Signal } from '@opensip-tools/core';
+import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 /** Per-unit terminal-table row, derived from a {@link UnitResult} + its signals. */
 export interface SignalTableRow {

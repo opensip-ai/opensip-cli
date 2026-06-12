@@ -26,7 +26,7 @@
 import { z } from 'zod';
 
 import type { GraphConfig } from '../types.js';
-import type { ToolConfigDeclaration } from '@opensip-tools/config';
+import type { ToolConfigDeclaration } from '@opensip-cli/config';
 
 /** Severity posture for the size-2 cycle band — `off` or `low` (GraphConfig). */
 const cycleSize2Severity = z.enum(['off', 'low']);
@@ -79,7 +79,7 @@ declare const _graphConfigLockstep: AssertMutual<SchemaOut, GraphConfig>;
 /**
  * The graph tool's contribution to the composed configuration document
  * (Phase 4). `namespace: 'graph'` is graph's top-level key in
- * `opensip-tools.config.yml`; the composer makes it strict (typo-rejecting)
+ * `opensip-cli.config.yml`; the composer makes it strict (typo-rejecting)
  * and optional. No defaults are declared here — every knob defaults inside
  * its rule, preserving the historical "absent → in-rule default" behaviour.
  */

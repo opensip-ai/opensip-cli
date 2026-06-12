@@ -17,13 +17,13 @@
  *   applied while graph builds its {@link SignalEnvelope}.
  * - {@link formatSignalSarif} — the canonical {@link Formatter}: reads
  *   `signals`/`tool` off the envelope and derives the driver name
- *   (`opensip-tools-<tool>`). Pure: no IO, no clock, no id generation.
+ *   (`opensip-cli-<tool>`). Pure: no IO, no clock, no id generation.
  *
  * Per the prior graph emitter's Phase 0 audit Q1, every finding emits a
  * SINGLE canonical physical location; `relatedLocations` is not populated.
  */
 import type { Formatter } from './types.js';
-import type { Signal, SignalSeverity } from '@opensip-tools/core';
+import type { Signal, SignalSeverity } from '@opensip-cli/core';
 
 /** SARIF v2.1.0 level — `'none' | 'note' | 'warning' | 'error'`. */
 type SarifLevel = 'none' | 'note' | 'warning' | 'error';
@@ -104,7 +104,7 @@ interface SarifLocation {
 
 /** Driver identity for the emitted SARIF run. */
 export interface SarifDriver {
-  /** Tool driver name, e.g. `'opensip-tools-graph'`. */
+  /** Tool driver name, e.g. `'opensip-cli-graph'`. */
   readonly name: string;
   /** Tool driver version — typically the engine package version. */
   readonly version: string;
@@ -172,7 +172,7 @@ export function buildOpenSipSarif(signals: readonly Signal[], driver: SarifDrive
           driver: {
             name: driver.name,
             version: driver.version,
-            informationUri: 'https://github.com/opensip-ai/opensip-tools',
+            informationUri: 'https://github.com/opensip-ai/opensip-cli',
             rules: [...ruleIds].sort().map((id) => ({ id })),
           },
         },
@@ -186,11 +186,11 @@ export function buildOpenSipSarif(signals: readonly Signal[], driver: SarifDrive
 
 /**
  * The canonical signal → SARIF formatter. Reads `signals`/`tool` off the
- * envelope; the driver name is `opensip-tools-<tool>`. Pure `(envelope) =>
+ * envelope; the driver name is `opensip-cli-<tool>`. Pure `(envelope) =>
  * string`.
  */
 export const formatSignalSarif: Formatter = (envelope) =>
   buildOpenSipSarif(envelope.signals, {
-    name: `opensip-tools-${envelope.tool}`,
+    name: `opensip-cli-${envelope.tool}`,
     version: DEFAULT_DRIVER_VERSION,
   });

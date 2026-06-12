@@ -3,9 +3,9 @@
 Releases are tag-driven. Pushing a tag matching `v*` triggers
 `.github/workflows/release.yml`, which builds, tests, packs, and
 publishes all 33 packages to npm via OIDC trusted publishing — no
-`NPM_TOKEN` required. (32 are scoped `@opensip-tools/*`; the CLI itself
-publishes under the unscoped name **`opensip-tools`** — the one package
-end-users install directly, via `npm i -g opensip-tools`.)
+`NPM_TOKEN` required. (32 are scoped `@opensip-cli/*`; the CLI itself
+publishes under the unscoped name **`opensip-cli`** — the one package
+end-users install directly, via `npm i -g opensip-cli`.)
 
 ## The 33 packages
 
@@ -21,39 +21,39 @@ end-users install directly, via `npm i -g opensip-tools`.)
 
 | Layer | Package | Path |
 |-------|---------|------|
-| Kernel | `@opensip-tools/core` | `packages/core` |
-| Persistence | `@opensip-tools/datastore` | `packages/datastore` |
-| Shared CLI | `@opensip-tools/contracts` | `packages/contracts` |
-| Persistence | `@opensip-tools/session-store` | `packages/session-store` |
-| Output | `@opensip-tools/output` | `packages/output` |
-| Config | `@opensip-tools/config` | `packages/config` |
-| Targeting | `@opensip-tools/targeting` | `packages/targeting` |
-| Shared CLI | `@opensip-tools/cli-ui` | `packages/cli-ui` |
-| Languages | `@opensip-tools/tree-sitter` | `packages/tree-sitter` |
-| Languages | `@opensip-tools/lang-typescript` | `packages/languages/lang-typescript` |
-| Languages | `@opensip-tools/lang-rust` | `packages/languages/lang-rust` |
-| Languages | `@opensip-tools/lang-python` | `packages/languages/lang-python` |
-| Languages | `@opensip-tools/lang-go` | `packages/languages/lang-go` |
-| Languages | `@opensip-tools/lang-java` | `packages/languages/lang-java` |
-| Languages | `@opensip-tools/lang-cpp` | `packages/languages/lang-cpp` |
-| Tools | `@opensip-tools/fitness` | `packages/fitness/engine` |
-| Tools | `@opensip-tools/simulation` | `packages/simulation/engine` |
-| Tools | `@opensip-tools/graph` | `packages/graph/engine` |
-| Graph adapters | `@opensip-tools/graph-adapter-common` | `packages/graph/graph-adapter-common` |
-| Graph adapters | `@opensip-tools/graph-typescript` | `packages/graph/graph-typescript` |
-| Graph adapters | `@opensip-tools/graph-python` | `packages/graph/graph-python` |
-| Graph adapters | `@opensip-tools/graph-rust` | `packages/graph/graph-rust` |
-| Graph adapters | `@opensip-tools/graph-go` | `packages/graph/graph-go` |
-| Graph adapters | `@opensip-tools/graph-java` | `packages/graph/graph-java` |
-| Tools | `@opensip-tools/dashboard` | `packages/dashboard` |
-| Check packs | `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript` |
-| Check packs | `@opensip-tools/checks-universal` | `packages/fitness/checks-universal` |
-| Check packs | `@opensip-tools/checks-python` | `packages/fitness/checks-python` |
-| Check packs | `@opensip-tools/checks-go` | `packages/fitness/checks-go` |
-| Check packs | `@opensip-tools/checks-java` | `packages/fitness/checks-java` |
-| Check packs | `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp` |
-| Check packs | `@opensip-tools/checks-rust` | `packages/fitness/checks-rust` |
-| CLI | `opensip-tools` (unscoped) | `packages/cli` |
+| Kernel | `@opensip-cli/core` | `packages/core` |
+| Persistence | `@opensip-cli/datastore` | `packages/datastore` |
+| Shared CLI | `@opensip-cli/contracts` | `packages/contracts` |
+| Persistence | `@opensip-cli/session-store` | `packages/session-store` |
+| Output | `@opensip-cli/output` | `packages/output` |
+| Config | `@opensip-cli/config` | `packages/config` |
+| Targeting | `@opensip-cli/targeting` | `packages/targeting` |
+| Shared CLI | `@opensip-cli/cli-ui` | `packages/cli-ui` |
+| Languages | `@opensip-cli/tree-sitter` | `packages/tree-sitter` |
+| Languages | `@opensip-cli/lang-typescript` | `packages/languages/lang-typescript` |
+| Languages | `@opensip-cli/lang-rust` | `packages/languages/lang-rust` |
+| Languages | `@opensip-cli/lang-python` | `packages/languages/lang-python` |
+| Languages | `@opensip-cli/lang-go` | `packages/languages/lang-go` |
+| Languages | `@opensip-cli/lang-java` | `packages/languages/lang-java` |
+| Languages | `@opensip-cli/lang-cpp` | `packages/languages/lang-cpp` |
+| Tools | `@opensip-cli/fitness` | `packages/fitness/engine` |
+| Tools | `@opensip-cli/simulation` | `packages/simulation/engine` |
+| Tools | `@opensip-cli/graph` | `packages/graph/engine` |
+| Graph adapters | `@opensip-cli/graph-adapter-common` | `packages/graph/graph-adapter-common` |
+| Graph adapters | `@opensip-cli/graph-typescript` | `packages/graph/graph-typescript` |
+| Graph adapters | `@opensip-cli/graph-python` | `packages/graph/graph-python` |
+| Graph adapters | `@opensip-cli/graph-rust` | `packages/graph/graph-rust` |
+| Graph adapters | `@opensip-cli/graph-go` | `packages/graph/graph-go` |
+| Graph adapters | `@opensip-cli/graph-java` | `packages/graph/graph-java` |
+| Tools | `@opensip-cli/dashboard` | `packages/dashboard` |
+| Check packs | `@opensip-cli/checks-typescript` | `packages/fitness/checks-typescript` |
+| Check packs | `@opensip-cli/checks-universal` | `packages/fitness/checks-universal` |
+| Check packs | `@opensip-cli/checks-python` | `packages/fitness/checks-python` |
+| Check packs | `@opensip-cli/checks-go` | `packages/fitness/checks-go` |
+| Check packs | `@opensip-cli/checks-java` | `packages/fitness/checks-java` |
+| Check packs | `@opensip-cli/checks-cpp` | `packages/fitness/checks-cpp` |
+| Check packs | `@opensip-cli/checks-rust` | `packages/fitness/checks-rust` |
+| CLI | `opensip-cli` (unscoped) | `packages/cli` |
 
 All 33 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
@@ -63,15 +63,15 @@ their `dependencies`.
 
 1. Bump every `version` field to the same value (e.g. `1.1.0`):
    ```bash
-   pnpm -r --filter '@opensip-tools/*' exec npm version <patch|minor|major> --no-git-tag-version
+   pnpm -r --filter '@opensip-cli/*' exec npm version <patch|minor|major> --no-git-tag-version
    ```
 
-   **The `--filter '@opensip-tools/*'` form matches only the 32 scoped
-   packages — it misses the unscoped `opensip-tools` CLI
+   **The `--filter '@opensip-cli/*'` form matches only the 32 scoped
+   packages — it misses the unscoped `opensip-cli` CLI
    (`packages/cli`) and the root `package.json`.** Bump those two
    explicitly (or run a script that walks every workspace
-   `package.json` whose name is `opensip-tools` or starts with
-   `@opensip-tools/`, plus the root). `scripts/verify-release.mjs`
+   `package.json` whose name is `opensip-cli` or starts with
+   `@opensip-cli/`, plus the root). `scripts/verify-release.mjs`
    check 1 catches a half-bump — it requires the unscoped CLI to match
    the scoped consensus.
 
@@ -117,10 +117,10 @@ their `dependencies`.
             graph-adapter-common graph-typescript graph-python graph-rust graph-go graph-java \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             checks-typescript checks-universal checks-python checks-go checks-java checks-cpp checks-rust; do
-     printf '%-40s %s\n' "@opensip-tools/$p" "$(npm view "@opensip-tools/$p" version 2>/dev/null || echo MISSING)"
+     printf '%-40s %s\n' "@opensip-cli/$p" "$(npm view "@opensip-cli/$p" version 2>/dev/null || echo MISSING)"
    done
    # The CLI publishes under the unscoped name:
-   printf '%-40s %s\n' "opensip-tools" "$(npm view opensip-tools version 2>/dev/null || echo MISSING)"
+   printf '%-40s %s\n' "opensip-cli" "$(npm view opensip-cli version 2>/dev/null || echo MISSING)"
    ```
 
 ## Publish order
@@ -132,32 +132,32 @@ when downstream's `dependencies` field is resolved.
 
 Order:
 
-1. **`@opensip-tools/core`** — depends on nothing else workspace-internal.
-2. **`@opensip-tools/datastore`** — depends on core. Bundles SQLite + Drizzle persistence.
-3. **`@opensip-tools/contracts`** — depends on core only (types-only; the
+1. **`@opensip-cli/core`** — depends on nothing else workspace-internal.
+2. **`@opensip-cli/datastore`** — depends on core. Bundles SQLite + Drizzle persistence.
+3. **`@opensip-cli/contracts`** — depends on core only (types-only; the
    former datastore + drizzle-orm runtime deps moved to session-store /
    output in the 2026-05-29 contracts split).
-4. **`@opensip-tools/session-store`** — depends on core, datastore, and
+4. **`@opensip-cli/session-store`** — depends on core, datastore, and
    contracts (StoredSession type). Owns the session SQLite schema +
    SessionRepo. Published before fitness / graph / cli, which persist
    sessions through it.
-5. **`@opensip-tools/output`** — depends on core and contracts
+5. **`@opensip-cli/output`** — depends on core and contracts
    (SignalEnvelope type). The shared output layer: pure signal→string
    formatters (json, sarif, table) under `format/` and effectful sinks
    (file, cloud) under `sink/` (ADR-0011; renamed from `reporting`).
    Published before fitness / graph, whose findings the composition root
    formats through it.
-5.5 **`@opensip-tools/config`** — the capability-configuration layer: the
+5.5 **`@opensip-cli/config`** — the capability-configuration layer: the
    config composer + schema registry. Depends on core only (errors, yaml;
    adds Zod for schema validation). Published before the tools + CLI, which
    resolve their effective configuration through it. **Brand-new npm name**
    — needs a one-time trusted-publisher bootstrap (see "Bootstrapping a
    brand-new package").
-6. **`@opensip-tools/cli-ui`** — Ink/React presentational primitives (banner,
+6. **`@opensip-cli/cli-ui`** — Ink/React presentational primitives (banner,
    spinner, run header, theme). Leaf package, depends on no
    workspace-internal package; consumed by every tool live view + the
    CLI's static-render path.
-7. **`@opensip-tools/tree-sitter`** — the tree-sitter parse substrate
+7. **`@opensip-cli/tree-sitter`** — the tree-sitter parse substrate
    (ADR-0010): wraps `web-tree-sitter` and hosts the relocated graph
    node accessors. Depends on no workspace-internal package (only
    `web-tree-sitter`). Published before the language adapters and graph
@@ -169,53 +169,53 @@ Order:
    rest because it has more downstream consumers (every TS-AST check
    pack peer-depends on it transitively). The non-TS language adapters
    (`lang-python|rust|go|java`) additionally depend on
-   `@opensip-tools/tree-sitter` (step 7).
-9. **`@opensip-tools/dashboard`** — depends on core + contracts only.
+   `@opensip-cli/tree-sitter` (step 7).
+9. **`@opensip-cli/dashboard`** — depends on core + contracts only.
    Published before `fitness` because fitness's `cli/dashboard.ts`
    imports `generateDashboardHtml` from it.
-10. **`@opensip-tools/fitness`** — depends on core, contracts,
+10. **`@opensip-cli/fitness`** — depends on core, contracts,
    datastore, session-store, lang-typescript, dashboard, and cli-ui.
    (No longer depends on the output layer — ADR-0011 moved egress to the
    composition root.)
-11. **`@opensip-tools/simulation`** — depends on core, contracts, datastore.
-12. **`@opensip-tools/graph`** — depends on core, contracts, datastore,
+11. **`@opensip-cli/simulation`** — depends on core, contracts, datastore.
+12. **`@opensip-cli/graph`** — depends on core, contracts, datastore,
     session-store, and cli-ui. (Like fitness, sheds its former
     `reporting`/`output` edge under ADR-0011 — the root owns egress.)
-12.5 **`@opensip-tools/graph-adapter-common`** — shared scaffolding for the
+12.5 **`@opensip-cli/graph-adapter-common`** — shared scaffolding for the
     tree-sitter adapters (discover/parse/walk/cache-key factories). Depends
-    on the engine (`@opensip-tools/graph`), core, and
-    `@opensip-tools/tree-sitter` (step 7). **Published AFTER the engine and
+    on the engine (`@opensip-cli/graph`), core, and
+    `@opensip-cli/tree-sitter` (step 7). **Published AFTER the engine and
     BEFORE the four tree-sitter adapter packs**, which all declare it in
     `dependencies`. It is a library, not a discoverable adapter
     (`opensipTools.kind` is absent) and exports no `adapter`; it is pulled
     in transitively by graph-go/java/python/rust, never installed directly.
     (graph-typescript does NOT depend on it — it is TS-compiler-backed, not
     tree-sitter.)
-13. **Graph adapter packs** — `@opensip-tools/graph-typescript`,
+13. **Graph adapter packs** — `@opensip-cli/graph-typescript`,
     `graph-python`, `graph-rust`, `graph-go`, `graph-java`. Each
-    depends on the engine (`@opensip-tools/graph`) plus its parser
-    (typescript / `@opensip-tools/tree-sitter`); the four tree-sitter
-    packs additionally depend on `@opensip-tools/graph-adapter-common`
+    depends on the engine (`@opensip-cli/graph`) plus its parser
+    (typescript / `@opensip-cli/tree-sitter`); the four tree-sitter
+    packs additionally depend on `@opensip-cli/graph-adapter-common`
     (step 12.5). Independent of each other; published in any order within
     the group. All five are first-party CLI dependencies — the CLI bundles
     every graph adapter it loads by default (see step 15), so installing
-    `opensip-tools` pulls them all in. (Only *third-party*
-    `@opensip-tools/graph-*` adapters are opt-in: they're discovered by
+    `opensip-cli` pulls them all in. (Only *third-party*
+    `@opensip-cli/graph-*` adapters are opt-in: they're discovered by
     name pattern and installed explicitly.)
 14. **Check packs** (any order within this group):
     `checks-typescript`, `checks-universal`, `checks-python`,
     `checks-go`, `checks-java`, `checks-cpp`, `checks-rust` — all
     peer-depend on fitness and are first-party CLI dependencies; the CLI
     bundles every check pack it loads by default (see step 15), so
-    installing `opensip-tools` pulls them all in. The packed-install
+    installing `opensip-cli` pulls them all in. The packed-install
     smoke test (`scripts/smoke-pack-scenarios.mjs`) asserts one slug per
     language pack, so a pack dropped from `packages/cli/package.json`
     fails the release gate rather than silently shipping a TS-only CLI.
-15. **`opensip-tools`** (unscoped — the user-facing CLI) — depends on
+15. **`opensip-cli`** (unscoped — the user-facing CLI) — depends on
     every tool, every check pack and every graph adapter pack the CLI
     loads by default, every language adapter, contracts, datastore,
     session-store, output, and cli-ui. Always published last. Its
-    tarball is `opensip-tools-<version>.tgz` (no scope segment); the
+    tarball is `opensip-cli-<version>.tgz` (no scope segment); the
     release workflow's `publish_unscoped` handles the bare name.
 
 ## Prerequisites (one-time setup)
@@ -224,7 +224,7 @@ Order:
   npmjs.com → package settings → Publishing access. Each of the 32
   packages needs an entry pointing to:
   - Organization: `opensip-ai`
-  - Repository: `opensip-tools`
+  - Repository: `opensip-cli`
   - Workflow: `release.yml`
 
   npm has **no "pending trusted publisher" feature** — the package
@@ -235,7 +235,7 @@ Order:
 
 ## Bootstrapping a brand-new package
 
-When the workspace gains a new `@opensip-tools/*` package (or an
+When the workspace gains a new `@opensip-cli/*` package (or an
 existing package gets renamed — `cli-shared` → `contracts` was the
 first instance), the next release workflow will fail at the publish
 step for that package with `404 PUT`. Cause: OIDC publishing routes
@@ -244,27 +244,27 @@ the package name, npm responds 404. The release workflow's preflight
 step warns about this case before publishing starts.
 
 > **Current brand-new package (for the v2.10.0 release):**
-> `@opensip-tools/config` — the new capability-configuration layer (ADR-0023).
+> `@opensip-cli/config` — the new capability-configuration layer (ADR-0023).
 > Genuinely new, so its name will be MISSING on npm and the OIDC release will
 > 404 on it until its trusted publisher exists. Run the bootstrap path below
 > once to create the name, then register its trusted publisher. This is a USER
 > action at release time.
 
 > **Historical brand-new packages (for the v2.7.0 release):**
-> `@opensip-tools/output` and `@opensip-tools/tree-sitter` — verified MISSING on
+> `@opensip-cli/output` and `@opensip-cli/tree-sitter` — verified MISSING on
 > npm (`npm view` → 404), while the other 29 names already exist at 2.6.2.
-> `output` is the new name for the renamed `@opensip-tools/reporting`;
+> `output` is the new name for the renamed `@opensip-cli/reporting`;
 > `tree-sitter` is genuinely new (ADR-0010). The v2.7.0 OIDC release will 404 on
 > both names until their trusted publishers exist — run the bootstrap path below
-> once to create them. (`@opensip-tools/graph-adapter-common`, the prior
+> once to create them. (`@opensip-cli/graph-adapter-common`, the prior
 > brand-new package, is now published at 2.6.2 and no longer needs
-> bootstrapping.) Separately, the abandoned `@opensip-tools/reporting` should be
-> `npm deprecate`d to steer consumers to `@opensip-tools/output`.
+> bootstrapping.) Separately, the abandoned `@opensip-cli/reporting` should be
+> `npm deprecate`d to steer consumers to `@opensip-cli/output`.
 
 To unblock:
 
 1. Generate a short-lived granular access token on npmjs.com (scope
-   `@opensip-tools/*`, publish permission, 1-day expiry).
+   `@opensip-cli/*`, publish permission, 1-day expiry).
 
 2. Run the bootstrap script with the token in the environment:
    ```bash
@@ -298,7 +298,7 @@ versions published by the release workflow include provenance.
 
 ## Schema evolution between versions
 
-opensip-tools v2 stores runtime state in SQLite via Drizzle. Drizzle
+opensip-cli v2 stores runtime state in SQLite via Drizzle. Drizzle
 migrations live under `packages/datastore/migrations/` and are applied
 automatically by `DataStoreFactory.open()` on every CLI invocation.
 
@@ -309,7 +309,7 @@ When a release modifies any schema file —
 workflow needs a fresh migration. Steps:
 
 1. Edit the schema (e.g. add a column to `catalog_functions`).
-2. Run `pnpm --filter=@opensip-tools/datastore db:generate`. Drizzle-kit
+2. Run `pnpm --filter=@opensip-cli/datastore db:generate`. Drizzle-kit
    diffs against the last applied migration and writes a new
    `NNNN_<name>.sql` file under `packages/datastore/migrations/`.
 3. **Read and review the generated SQL before committing.** Drizzle-kit's
@@ -333,7 +333,7 @@ after each successful migrate; on open, a CLI whose supported version is
 migrations are a prefix of what was applied, so `migrate()` would no-op and
 later queries would hit missing columns). The message points the user at the
 install script to upgrade, or at deleting
-`<project>/opensip-tools/.runtime/datastore.sqlite` to continue on the older
+`<project>/opensip-cli/.runtime/datastore.sqlite` to continue on the older
 CLI (cache rebuilds; session history is lost). The forward direction (newer
 CLI, older or pre-guard `user_version 0` DB) auto-migrates and re-stamps with
 no user action. Because the stamp is derived from the journal entry count,

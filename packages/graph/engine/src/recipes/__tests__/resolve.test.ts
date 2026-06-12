@@ -7,7 +7,7 @@
  * resolves to exactly its rules; an unknown name raises a ConfigurationError.
  */
 
-import { ConfigurationError, runWithScopeSync } from '@opensip-tools/core';
+import { ConfigurationError, runWithScopeSync } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';

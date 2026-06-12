@@ -1,5 +1,5 @@
 /**
- * json-schema — emit a JSON Schema for `opensip-tools.config.yml`.
+ * json-schema — emit a JSON Schema for `opensip-cli.config.yml`.
  *
  * Editors and docs consume a JSON Schema for the whole document so an author
  * gets completion + validation in their editor. The schema is generated from

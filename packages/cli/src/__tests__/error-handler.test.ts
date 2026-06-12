@@ -1,7 +1,7 @@
 /**
  * Tests for the catch handler that processes errors thrown out of
  * `program.parseAsync()`. Covers:
- *   - typed errors from `@opensip-tools/core` map to the right exit
+ *   - typed errors from `@opensip-cli/core` map to the right exit
  *     code via `instanceof`
  *   - unknown errors fall back to `getErrorSuggestion`
  *   - the catch handler always routes through `setExitCode` rather
@@ -9,13 +9,13 @@
  *   - rendering goes through the supplied `ErrorResult` renderer
  */
 
-import { EXIT_CODES, type ErrorResult } from '@opensip-tools/contracts';
+import { EXIT_CODES, type ErrorResult } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   NetworkError,
   NotFoundError,
   ValidationError,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { CommanderError } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -52,7 +52,7 @@ describe('handleParseError', () => {
     await handleParseError(new ConfigurationError('Bad config'), opts);
     expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
     expect(opts.rendered[0]?.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
-    expect(opts.rendered[0]?.suggestion).toContain('opensip-tools.config.yml');
+    expect(opts.rendered[0]?.suggestion).toContain('opensip-cli.config.yml');
   });
 
   it('routes ValidationError to CONFIGURATION_ERROR exit code', async () => {
@@ -177,10 +177,10 @@ describe('handleParseError', () => {
     // The typed rule must win — that's the whole point of Phase 4.
     const opts = makeOpts();
     await handleParseError(new ConfigurationError("Unknown recipe 'foo'"), opts);
-    // The typed-rule suggestion mentions opensip-tools.config.yml, the
+    // The typed-rule suggestion mentions opensip-cli.config.yml, the
     // substring rule mentions --recipes. We assert the typed-rule
     // suggestion wins.
-    expect(opts.rendered[0]?.suggestion).toContain('opensip-tools.config.yml');
+    expect(opts.rendered[0]?.suggestion).toContain('opensip-cli.config.yml');
   });
 });
 
@@ -210,7 +210,7 @@ const bootstrapErr = (): BootstrapError =>
   new BootstrapError({
     message: 'No project found.',
     humanMessage: '✗ No project found.\n  Run init.',
-    suggestion: 'Run opensip-tools init.',
+    suggestion: 'Run opensip init.',
     exitCode: 2,
   });
 
@@ -245,7 +245,7 @@ describe('handleParseError — 2.12.0 outcomes', () => {
     expect(outcome.kind).toBe('bootstrap.error');
     expect(outcome.status).toBe('error');
     expect(outcome.errors[0]?.message).toBe('No project found.');
-    expect(outcome.errors[0]?.suggestion).toBe('Run opensip-tools init.');
+    expect(outcome.errors[0]?.suggestion).toBe('Run opensip init.');
   });
 
   it('emits a structured command.error CommandOutcome for a generic error on --json', async () => {

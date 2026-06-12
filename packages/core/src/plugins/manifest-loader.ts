@@ -59,7 +59,7 @@ import type {
 
 /**
  * Filename of the project-local manifest sidecar. A project-local tool is
- * authored content under `<project>/opensip-tools/…`, not an installed npm
+ * authored content under `<project>/opensip-cli/…`, not an installed npm
  * package, so it has no `package.json#opensipTools` marker — it declares
  * its identity via this JSON sidecar (deliberately NOT an executable
  * `.mjs`, so the host reads identity without running tool code).

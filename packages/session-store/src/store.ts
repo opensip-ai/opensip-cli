@@ -1,7 +1,7 @@
 /**
  * Session id / filename runtime helpers.
  *
- * Moved out of `@opensip-tools/contracts` (audit 2026-05-29, contracts
+ * Moved out of `@opensip-cli/contracts` (audit 2026-05-29, contracts
  * split) so contracts carries no runtime. The `StoredSession` type stays
  * in contracts as the cross-tool contract surface.
  */

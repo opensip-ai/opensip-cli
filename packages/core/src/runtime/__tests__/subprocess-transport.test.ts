@@ -69,7 +69,7 @@ describe('createSubprocessProgressRun', () => {
 
 describe('runOffThreadOrInProcess', () => {
   afterEach(() => {
-    delete process.env.OPENSIP_TOOLS_NO_WORKER;
+    delete process.env.OPENSIP_CLI_NO_WORKER;
   });
 
   it('runs the worker by default and resolves its result', async () => {
@@ -99,8 +99,8 @@ describe('runOffThreadOrInProcess', () => {
     expect(events).toEqual([10, 20]);
   });
 
-  it('runs the in-process closure when OPENSIP_TOOLS_NO_WORKER=1', async () => {
-    process.env.OPENSIP_TOOLS_NO_WORKER = '1';
+  it('runs the in-process closure when OPENSIP_CLI_NO_WORKER=1', async () => {
+    process.env.OPENSIP_CLI_NO_WORKER = '1';
     const run = runOffThreadOrInProcess<number, string>({
       descriptor: descriptorFor('throw'),
       inProcess: () => Promise.resolve('env-gated in-process'),
@@ -115,7 +115,7 @@ describe('runOffThreadOrInProcess', () => {
       descriptor: descriptorFor('emit-and-result'),
       inProcess: () => Promise.reject(new Error('unused')),
     });
-    process.env.OPENSIP_TOOLS_NO_WORKER = '1';
+    process.env.OPENSIP_CLI_NO_WORKER = '1';
     const fallback = runOffThreadOrInProcess<number, string>({
       descriptor: descriptorFor('emit-and-result'),
       inProcess: (emit) => {

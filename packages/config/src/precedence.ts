@@ -6,7 +6,7 @@
  *   flag > env > file > defaults
  *
  *   - `defaults` — each declaration's `defaults` (lowest precedence).
- *   - `file`     — the validated `opensip-tools.config.yml` document.
+ *   - `file`     — the validated `opensip-cli.config.yml` document.
  *   - `env`      — values read from environment variables via each
  *     declaration's `env` bindings, coerced per binding `type`.
  *   - `flags`    — CLI-supplied overrides (highest precedence).

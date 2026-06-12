@@ -2,14 +2,14 @@
  * sim-config — resolve the `sim` recipe default (ADR-0022).
  *
  * Recipes are tool-scoped: `sim` reads its own `simulation.recipe` block from
- * `opensip-tools.config.yml`. The `simulation:` block is read permissively here
+ * `opensip-cli.config.yml`. The `simulation:` block is read permissively here
  * (mirroring graph's `graph-config.ts`) — simulation must not depend on fitness,
  * which owns the strict Zod config schema, so it parses its own slice of the
  * document.
  */
 
-import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
-import { currentScope, logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
+import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-cli/contracts';
+import { currentScope, logger, readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
 
 /** Accept anything that looks like a plain object; everything else → undefined. */
 function isPlainObject(v: unknown): v is Record<string, unknown> {

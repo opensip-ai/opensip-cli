@@ -1,6 +1,6 @@
 // @fitness-ignore-file detached-promises -- OTel Span methods (recordException/setStatus/end) return void (sync); the heuristic flags them inside withSpanAsync's async callback. The only promise here (fn(span)) is awaited.
 /**
- * Tracing primitive for opensip-tools — the kernel sibling of `logger`.
+ * Tracing primitive for opensip-cli — the kernel sibling of `logger`.
  *
  * This module is a thin wrapper over the **OpenTelemetry API** (`@opentelemetry/api`)
  * — the no-op facade half of OTel's library/application split. It exposes a
@@ -14,7 +14,7 @@
  * `startActiveSpan` runs the callback with a no-op span, records nothing, makes
  * no network calls, and adds an unmeasurable amount of overhead. That
  * registration happens ONLY at the application boundary — the CLI composition
- * root (`opensip-tools`), gated on `OTEL_EXPORTER_OTLP_ENDPOINT`. The heavy
+ * root (`opensip-cli`), gated on `OTEL_EXPORTER_OTLP_ENDPOINT`. The heavy
  * SDK packages (`@opentelemetry/sdk-*`, exporters, context managers) never enter
  * the kernel.
  *
@@ -36,7 +36,7 @@ import {
 
 /**
  * Resolve a `Tracer` for a given instrumentation scope name (e.g.
- * `'opensip-tools-graph'`). Reads the *global* tracer provider set by the SDK
+ * `'opensip-cli-graph'`). Reads the *global* tracer provider set by the SDK
  * at the application boundary; returns a no-op tracer when no SDK is registered.
  */
 export function getTracer(name: string): Tracer {

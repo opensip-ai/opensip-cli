@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 import { analyzeAllOneConfigDocument, analyzeOneConfigDocument } from '../one-config-document.js';
 
-import type { FileAccessor } from '@opensip-tools/fitness';
+import type { FileAccessor } from '@opensip-cli/fitness';
 
 const GRAPH_CONFIG = 'packages/graph/engine/src/cli/graph-config.ts';
 const SIM_CONFIG = 'packages/simulation/engine/src/cli/sim-config.ts';

@@ -2,7 +2,7 @@
 /**
  * @fileoverview Target config loader
  *
- * Loads target configuration from opensip-tools.config.yml in the project root.
+ * Loads target configuration from opensip-cli.config.yml in the project root.
  * Validates with Zod and populates a TargetRegistry.
  */
 
@@ -11,14 +11,14 @@ import {
   globalExcludesSchema,
   pluginsConfigSchema,
   targetsRecordSchema,
-} from '@opensip-tools/config';
+} from '@opensip-cli/config';
 import {
   PROJECT_CONFIG_FILENAME,
   ValidationError,
   currentScope,
   readYamlFileOrThrow,
   resolveProjectConfigPath,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { z } from 'zod';
 
 import { TargetRegistry } from './target-registry.js';
@@ -33,7 +33,7 @@ const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**']
 // =============================================================================
 
 // The targets / globalExcludes / checkOverrides / plugins shapes are owned by
-// @opensip-tools/config (2.10.1, ADR-0023) — the same schemas the host
+// @opensip-cli/config (2.10.1, ADR-0023) — the same schemas the host
 // registers as document-level declarations. This loader adds the registry build
 // + cross-validation runtime below.
 const TargetsFileSchema = z.object({

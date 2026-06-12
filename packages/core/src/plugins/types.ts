@@ -1,5 +1,5 @@
 /**
- * @fileoverview Plugin contract types for opensip-tools
+ * @fileoverview Plugin contract types for opensip-cli
  *
  * Plugins can be npm packages or loose JS/MJS files.
  *
@@ -41,9 +41,9 @@ export type PluginExports = LangPluginExports | Record<string, unknown>;
 export interface PluginLayout {
   /**
    * Path/domain segment. User loose-file plugins live under
-   * `<project>/opensip-tools/<domain>/<kind>/` and npm plugins under
-   * `<project>/opensip-tools/.runtime/plugins/<domain>/`. Also the key
-   * read from `opensip-tools.config.yml#plugins.<domain>`.
+   * `<project>/opensip-cli/<domain>/<kind>/` and npm plugins under
+   * `<project>/opensip-cli/.runtime/plugins/<domain>/`. Also the key
+   * read from `opensip-cli.config.yml#plugins.<domain>`.
    */
   readonly domain: string;
   /**

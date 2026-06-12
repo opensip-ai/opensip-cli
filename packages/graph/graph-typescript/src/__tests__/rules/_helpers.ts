@@ -8,7 +8,7 @@
  * internals.
  */
 
-import type { CallEdge, Catalog, FunctionOccurrence } from '@opensip-tools/graph';
+import type { CallEdge, Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 
 export interface OccOverride extends Partial<FunctionOccurrence> {
   readonly bodyHash: string;

@@ -106,8 +106,8 @@ describe('discoverPackagesByDeclaredKind', () => {
   });
 
   it('does not return tool-marked packages when asked for fit-pack', () => {
-    writePkg(join(testDir, 'node_modules', '@opensip-tools', 'fitness'), {
-      name: '@opensip-tools/fitness',
+    writePkg(join(testDir, 'node_modules', '@opensip-cli', 'fitness'), {
+      name: '@opensip-cli/fitness',
       opensipTools: { kind: 'tool' },
     });
     expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);

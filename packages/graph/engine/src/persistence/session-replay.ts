@@ -1,4 +1,4 @@
-import { decodeSessionPayload, type DecodedSessionFinding } from '@opensip-tools/session-store';
+import { decodeSessionPayload, type DecodedSessionFinding } from '@opensip-cli/session-store';
 
 import type {
   GraphDoneResult,
@@ -6,8 +6,8 @@ import type {
   StoredSession,
   ToolSessionReplay,
   UnitResult,
-} from '@opensip-tools/contracts';
-import type { Signal } from '@opensip-tools/core';
+} from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 /**
  * Project a stored graph session back into a {@link SignalEnvelope}/{@link GraphDoneResult}.
@@ -80,7 +80,7 @@ function replaySignal(
   return {
     id: `${stored.id}:graph:${checkIndex}:${findingIndex}`,
     source,
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     severity: finding.severity === 'error' ? 'high' : 'medium',
     category: 'architecture',
     ruleId: finding.ruleId,

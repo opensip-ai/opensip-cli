@@ -1,4 +1,4 @@
-import { logger, type Signal } from '@opensip-tools/core';
+import { logger, type Signal } from '@opensip-cli/core';
 import { eq, sql } from 'drizzle-orm';
 
 import { requireDrizzleDataStore, type DataStore, type DrizzleDataStore } from './data-store.js';

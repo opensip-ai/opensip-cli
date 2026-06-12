@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { resolveCapabilityPreferences } from '../capability-preferences.js';
 
-import type { CapabilityDiscoveryDescriptor } from '@opensip-tools/core';
+import type { CapabilityDiscoveryDescriptor } from '@opensip-cli/core';
 
 // The three real domain descriptors (mirroring the engine manifests), so the
 // resolver is pinned against the actual documented key shapes — no rename.
@@ -11,11 +11,11 @@ const FIT: CapabilityDiscoveryDescriptor = {
   exportName: 'checks',
   exportShape: 'array',
   configKeys: { packages: 'checkPackages' },
-  builtinScope: '@opensip-tools',
+  builtinScope: '@opensip-cli',
 };
 
 const SIM: CapabilityDiscoveryDescriptor = {
-  discovery: { mode: 'name-pattern', prefix: 'scenarios-', defaultScopes: ['@opensip-tools'] },
+  discovery: { mode: 'name-pattern', prefix: 'scenarios-', defaultScopes: ['@opensip-cli'] },
   exportName: 'scenarios',
   exportShape: 'array',
   configKeys: {
@@ -65,16 +65,16 @@ describe('resolveCapabilityPreferences', () => {
   });
 
   it('sim name-pattern: no customer scopes resolves to just the default scope', () => {
-    expect(resolveCapabilityPreferences(SIM, {}).scopes).toEqual(['@opensip-tools']);
+    expect(resolveCapabilityPreferences(SIM, {}).scopes).toEqual(['@opensip-cli']);
   });
 
   it('sim name-pattern: customer packageScopes merge with the default, deduped + validated', () => {
     const prefs = resolveCapabilityPreferences(SIM, {
-      packageScopes: ['@acme', '@opensip-tools', 'not-a-scope', '@beta'],
+      packageScopes: ['@acme', '@opensip-cli', 'not-a-scope', '@beta'],
     });
     // default first, valid customer additions appended, the default deduped,
     // and the invalid "not-a-scope" dropped.
-    expect(prefs.scopes).toEqual(['@opensip-tools', '@acme', '@beta']);
+    expect(prefs.scopes).toEqual(['@opensip-cli', '@acme', '@beta']);
   });
 
   it('marker-mode descriptors never carry scopes', () => {

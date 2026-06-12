@@ -26,7 +26,7 @@ import {
   type CommandSpec,
   type ToolCliContext,
   type WorkerMessage,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { resolveRecipeToRules } from '../recipes/resolve.js';
 
@@ -34,8 +34,8 @@ import { toProgressEvent } from './graph-progress.js';
 import { buildLiveGraphOutput, type LiveGraphOutput } from './graph.js';
 import { loadGraphConfig, resolveGraphRecipeSelection, runGraph } from './orchestrate.js';
 
-import type { ProgressEvent } from '@opensip-tools/cli-ui';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { ProgressEvent } from '@opensip-cli/cli-ui';
+import type { DataStore } from '@opensip-cli/datastore';
 
 interface GraphWorkerSpec {
   readonly cwd: string;

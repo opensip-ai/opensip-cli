@@ -1,4 +1,4 @@
-// @fitness-ignore-file file-length-limit -- the @opensip-tools/core public-API re-export barrel: pure re-exports that grow with the kernel surface; splitting it would fragment the one import surface every package consumes.
+// @fitness-ignore-file file-length-limit -- the @opensip-cli/core public-API re-export barrel: pure re-exports that grow with the kernel surface; splitting it would fragment the one import surface every package consumes.
 // Types — internal signal (shared across tools)
 export type {
   Signal,
@@ -160,7 +160,7 @@ export type {
   LiveViewRenderer,
 } from './tools/index.js';
 // Static tool-plugin manifest + the plugin-API epoch + provenance types
-// (release 3.0.0 raw-vs-admitted contract). Re-exported by @opensip-tools/
+// (release 3.0.0 raw-vs-admitted contract). Re-exported by @opensip-cli/
 // contracts for the public surface.
 export { PLUGIN_API_VERSION } from './tools/index.js';
 export type {
@@ -172,7 +172,7 @@ export type {
 } from './tools/index.js';
 // Command-plane types (release 2.11.0, §5.4): the declarative CommandSpec a tool
 // exports for the host to mount, plus the pure CommonFlagKey key type. The
-// Commander-touching applyCommonFlags runtime stays in @opensip-tools/contracts,
+// Commander-touching applyCommonFlags runtime stays in @opensip-cli/contracts,
 // which re-exports CommonFlagKey from here. Re-exported by contracts.
 export { defineCommand, COMMON_FLAG_KEYS, RAW_STREAM_REASONS } from './tools/index.js';
 export type {
@@ -189,7 +189,7 @@ export type {
 // Capability domain model (release 2.10.0, §5.3): the data shape a tool
 // uses to declare an extension point it owns. The scope-owned runtime
 // registry is exported from ./plugins/index.js below. Re-exported by
-// @opensip-tools/contracts for the public surface.
+// @opensip-cli/contracts for the public surface.
 export { isCapabilityValidator, isStructuralContributionSchema } from './tools/index.js';
 export type {
   CapabilityDomainSpec,
@@ -202,7 +202,7 @@ export type {
   ToolCapabilityDeclaration,
 } from './tools/index.js';
 // The single pure compatibility gate shared by the bundled + external
-// admission paths. Re-exported by @opensip-tools/contracts.
+// admission paths. Re-exported by @opensip-cli/contracts.
 export { checkCompatibility } from './tools/index.js';
 export type { CompatibilityVerdict } from './tools/index.js';
 // Load-time manifest⇔Tool drift guard.
@@ -349,7 +349,7 @@ export type {
 
 // Lib — permissive YAML reader (returns undefined on missing/malformed
 // files). Used by plugin-discovery sites that need to peek at a single
-// field of opensip-tools.config.yml without dragging in a Zod schema.
+// field of opensip-cli.config.yml without dragging in a Zod schema.
 // Advanced / discouraged for general use — tools that need structured
 // parse errors should use `readYamlFileOrThrow` instead, or build their
 // own dedicated loader (see fitness's targets/loader.ts for a
@@ -397,14 +397,14 @@ export { readPackageVersion } from './lib/package-version.js';
 // each other.
 export { formatDuration } from './lib/format.js';
 
-// Lib — path resolver (project-local opensip-tools/.runtime, user-level
-// ~/.opensip-tools/config.yml). Every consumer constructs paths through
+// Lib — path resolver (project-local opensip-cli/.runtime, user-level
+// ~/.opensip-cli/config.yml). Every consumer constructs paths through
 // this module so a layout change is a single-file edit.
 export { resolveProjectPaths, resolveUserPaths } from './lib/paths.js';
 export type { ProjectPaths, UserPaths, PathDomain } from './lib/paths.js';
 
 // Lib — project-context resolver. One-shot ancestor walk from cwd to
-// the nearest opensip-tools.config.yml. Returns a ProjectContext that
+// the nearest opensip-cli.config.yml. Returns a ProjectContext that
 // every downstream consumer (CLI bootstrap, tool action handlers,
 // uninstall/init/dashboard) reads from instead of re-deriving cwd
 // semantics.
@@ -426,7 +426,7 @@ export {
 } from './lib/config-version.js';
 export type { SchemaCompat } from './lib/config-version.js';
 
-// Lib — phantom-dir detector. Warns about orphaned opensip-tools/
+// Lib — phantom-dir detector. Warns about orphaned opensip-cli/
 // subtrees left over from pre-discovery runs. Returns paths; callers
 // surface them; never auto-deletes.
 export { detectPhantomRuntimes } from './lib/phantom-detect.js';

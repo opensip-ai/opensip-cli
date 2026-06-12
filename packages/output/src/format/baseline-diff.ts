@@ -11,7 +11,7 @@
  * `output`).
  */
 
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 /** One loaded baseline row: an opaque fingerprint + its stored full payload. */
 export interface BaselineDiffRow {
@@ -40,7 +40,7 @@ function syntheticSignal(fingerprint: string): Signal {
   return {
     id: `sig_resolved`,
     source: 'baseline',
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     severity: 'low',
     category: 'quality',
     ruleId: 'unknown',

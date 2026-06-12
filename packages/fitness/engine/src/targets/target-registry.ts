@@ -3,7 +3,7 @@
  * @fileoverview Fitness Target Registry
  *
  * The generic register/get/byTag/has substrate moved to
- * `@opensip-tools/targeting` (ADR-0037, Phase 0). This fitness registry is a
+ * `@opensip-cli/targeting` (ADR-0037, Phase 0). This fitness registry is a
  * thin **subclass** that adds only the check-domain `findByScope` (languages +
  * concerns intersection) — `concerns` is a check-scope concept, so it stays in
  * fitness, not the host substrate.
@@ -13,8 +13,8 @@
  * while the generic surface lives once, in the substrate.
  */
 
-import { currentScope } from '@opensip-tools/core';
-import { TargetRegistry as SubstrateTargetRegistry } from '@opensip-tools/targeting';
+import { currentScope } from '@opensip-cli/core';
+import { TargetRegistry as SubstrateTargetRegistry } from '@opensip-cli/targeting';
 
 import type { Target } from './types.js';
 

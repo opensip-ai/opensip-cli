@@ -23,12 +23,12 @@ import {
   type CommandSpec,
   type ToolCliContext,
   type WorkerMessage,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { executeFit } from './fit.js';
 
-import type { ProgressEvent } from '@opensip-tools/cli-ui';
-import type { FitOptions } from '@opensip-tools/contracts';
+import type { ProgressEvent } from '@opensip-cli/cli-ui';
+import type { FitOptions } from '@opensip-cli/contracts';
 
 /** The worker's result value mirrors `executeFit`'s return — the parent handles it
  *  identically whether it ran in-process or in the forked worker. */

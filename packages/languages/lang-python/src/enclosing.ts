@@ -2,11 +2,11 @@
 /**
  * Composed enclosing-scope helpers for Python (ADR-0010) — the per-language
  * layer over the generic `findEnclosing`/`nameOf` from
- * `@opensip-tools/tree-sitter`. Mirrors `lang-typescript`'s
+ * `@opensip-cli/tree-sitter`. Mirrors `lang-typescript`'s
  * `findEnclosingFunction` / `getEnclosingFunctionName`.
  */
 
-import { findEnclosing, nameOf, type Node } from '@opensip-tools/tree-sitter';
+import { findEnclosing, nameOf, type Node } from '@opensip-cli/tree-sitter';
 
 import { isClass, isFunction } from './predicates.js';
 

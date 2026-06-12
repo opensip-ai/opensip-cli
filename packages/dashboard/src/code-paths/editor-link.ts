@@ -2,7 +2,7 @@
  * Editor deep-link URL generator.
  *
  * Reads the embedded `EDITOR_PROTOCOL` constant set by `generator.ts`
- * (passed through from `dashboard.editor` in opensip-tools.config.yml).
+ * (passed through from `dashboard.editor` in opensip-cli.config.yml).
  * Recognized values: 'vscode', 'cursor'. Anything else returns null and
  * the Function Card falls back to a "Copy path" button.
  */

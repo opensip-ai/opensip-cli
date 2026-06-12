@@ -1,7 +1,7 @@
 /**
  * @fileoverview Per-scenario structured logger.
  *
- * Wraps the shared @opensip-tools/core logger with `evt: simulation.scenario.<level>`
+ * Wraps the shared @opensip-cli/core logger with `evt: simulation.scenario.<level>`
  * tags and a stable `scenarioId` field, so every log entry from a running
  * scenario is greppable by scenario in the JSONL log stream. Each kind-
  * specific executor (load, chaos, …) constructs one of these per scenario
@@ -14,7 +14,7 @@
  * rather than being duplicated into each kinds/<kind>/executor.ts.
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 import type { ScenarioLogger } from '../types/framework-types.js';
 

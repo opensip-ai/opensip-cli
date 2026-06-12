@@ -3,14 +3,14 @@
 exports[`init golden — polyglot (rust,typescript) > scaffolds per-language check files + the polyglot recipe slug list > poly/example-check-rust.mjs 1`] = `
 "// Example fitness check.
 //
-// Edit this file or add new .mjs files to opensip-tools/fit/checks/.
-// Files in this directory are auto-loaded on the next \`opensip-tools fit\` run.
+// Edit this file or add new .mjs files to opensip-cli/fit/checks/.
+// Files in this directory are auto-loaded on the next \`opensip fit\` run.
 //
 // This demo flags any file containing the literal \`EXAMPLE_TODO\`. After
 // you confirm the wiring works, delete or replace it with a real check.
 //
-// Docs: https://github.com/opensip-ai/opensip-tools#authoring-a-check-package
-import { defineCheck } from '@opensip-tools/fitness';
+// Docs: https://github.com/opensip-ai/opensip-cli#authoring-a-check-package
+import { defineCheck } from '@opensip-cli/fitness';
 
 export const checks = [
   defineCheck({
@@ -27,7 +27,7 @@ export const checks = [
         message: 'Found the example trigger string.',
         severity: 'warning',
         suggestion:
-          'This is just a demo. Delete opensip-tools/fit/checks/example-check.mjs ' +
+          'This is just a demo. Delete opensip-cli/fit/checks/example-check.mjs ' +
           'once you have your own checks.',
         filePath,
       }];
@@ -40,14 +40,14 @@ export const checks = [
 exports[`init golden — polyglot (rust,typescript) > scaffolds per-language check files + the polyglot recipe slug list > poly/example-check-typescript.mjs 1`] = `
 "// Example fitness check.
 //
-// Edit this file or add new .mjs files to opensip-tools/fit/checks/.
-// Files in this directory are auto-loaded on the next \`opensip-tools fit\` run.
+// Edit this file or add new .mjs files to opensip-cli/fit/checks/.
+// Files in this directory are auto-loaded on the next \`opensip fit\` run.
 //
 // This demo flags any file containing the literal \`EXAMPLE_TODO\`. After
 // you confirm the wiring works, delete or replace it with a real check.
 //
-// Docs: https://github.com/opensip-ai/opensip-tools#authoring-a-check-package
-import { defineCheck } from '@opensip-tools/fitness';
+// Docs: https://github.com/opensip-ai/opensip-cli#authoring-a-check-package
+import { defineCheck } from '@opensip-cli/fitness';
 
 export const checks = [
   defineCheck({
@@ -64,7 +64,7 @@ export const checks = [
         message: 'Found the example trigger string.',
         severity: 'warning',
         suggestion:
-          'This is just a demo. Delete opensip-tools/fit/checks/example-check.mjs ' +
+          'This is just a demo. Delete opensip-cli/fit/checks/example-check.mjs ' +
           'once you have your own checks.',
         filePath,
       }];
@@ -77,10 +77,10 @@ export const checks = [
 exports[`init golden — polyglot (rust,typescript) > scaffolds per-language check files + the polyglot recipe slug list > poly/fit/recipes/example-recipe.mjs 1`] = `
 "// Example fitness recipe — runs only the example check(s).
 //
-// Edit this file or add new .mjs files to opensip-tools/fit/recipes/.
+// Edit this file or add new .mjs files to opensip-cli/fit/recipes/.
 // Files in this directory are auto-loaded on the next run.
 //
-// Run this recipe explicitly:  opensip-tools fit --recipe example
+// Run this recipe explicitly:  opensip fit --recipe example
 //
 // To run all enabled checks (built-in + your custom ones), omit
 // --recipe and the built-in \`default\` recipe applies.
@@ -97,19 +97,19 @@ export const recipes = [{
 `;
 
 exports[`init golden — single language (typescript) > scaffolds the exact fit+sim layout, config bytes, ids, .gitignore, and dirs > .gitignore 1`] = `
-"opensip-tools/.runtime/
+"opensip-cli/.runtime/
 "
 `;
 
 exports[`init golden — single language (typescript) > scaffolds the exact fit+sim layout, config bytes, ids, .gitignore, and dirs > config.yml 1`] = `
-"# OpenSIP Tools — project configuration
+"# OpenSIP CLI — project configuration
 #
 # Defines named target file sets for fitness checks. Each fitness
 # check declares a \`scope\` (languages + concerns); discovery
 # matches it against these targets to determine which files the
 # check runs against.
 #
-# Docs: https://github.com/opensip-ai/opensip-tools#configuration
+# Docs: https://github.com/opensip-ai/opensip-cli#configuration
 
 schemaVersion: 1
 
@@ -149,14 +149,14 @@ fitness:
 exports[`init golden — single language (typescript) > scaffolds the exact fit+sim layout, config bytes, ids, .gitignore, and dirs > fit/checks/example-check.mjs 1`] = `
 "// Example fitness check.
 //
-// Edit this file or add new .mjs files to opensip-tools/fit/checks/.
-// Files in this directory are auto-loaded on the next \`opensip-tools fit\` run.
+// Edit this file or add new .mjs files to opensip-cli/fit/checks/.
+// Files in this directory are auto-loaded on the next \`opensip fit\` run.
 //
 // This demo flags any file containing the literal \`EXAMPLE_TODO\`. After
 // you confirm the wiring works, delete or replace it with a real check.
 //
-// Docs: https://github.com/opensip-ai/opensip-tools#authoring-a-check-package
-import { defineCheck } from '@opensip-tools/fitness';
+// Docs: https://github.com/opensip-ai/opensip-cli#authoring-a-check-package
+import { defineCheck } from '@opensip-cli/fitness';
 
 export const checks = [
   defineCheck({
@@ -173,7 +173,7 @@ export const checks = [
         message: 'Found the example trigger string.',
         severity: 'warning',
         suggestion:
-          'This is just a demo. Delete opensip-tools/fit/checks/example-check.mjs ' +
+          'This is just a demo. Delete opensip-cli/fit/checks/example-check.mjs ' +
           'once you have your own checks.',
         filePath,
       }];
@@ -186,10 +186,10 @@ export const checks = [
 exports[`init golden — single language (typescript) > scaffolds the exact fit+sim layout, config bytes, ids, .gitignore, and dirs > fit/recipes/example-recipe.mjs 1`] = `
 "// Example fitness recipe — runs only the example check(s).
 //
-// Edit this file or add new .mjs files to opensip-tools/fit/recipes/.
+// Edit this file or add new .mjs files to opensip-cli/fit/recipes/.
 // Files in this directory are auto-loaded on the next run.
 //
-// Run this recipe explicitly:  opensip-tools fit --recipe example
+// Run this recipe explicitly:  opensip fit --recipe example
 //
 // To run all enabled checks (built-in + your custom ones), omit
 // --recipe and the built-in \`default\` recipe applies.
@@ -208,11 +208,11 @@ export const recipes = [{
 exports[`init golden — single language (typescript) > scaffolds the exact fit+sim layout, config bytes, ids, .gitignore, and dirs > sim/recipes/example-recipe.mjs 1`] = `
 "// Example simulation recipe — runs only the example scenario.
 //
-// Edit this file or add new .mjs files to opensip-tools/sim/recipes/.
+// Edit this file or add new .mjs files to opensip-cli/sim/recipes/.
 // Files in this directory are auto-loaded on the next run.
 //
-// Run this recipe explicitly:  opensip-tools sim --recipe example
-import { defineSimulationRecipe } from '@opensip-tools/simulation';
+// Run this recipe explicitly:  opensip sim --recipe example
+import { defineSimulationRecipe } from '@opensip-cli/simulation';
 
 export const recipes = [
   defineSimulationRecipe({
@@ -237,11 +237,11 @@ exports[`init golden — single language (typescript) > scaffolds the exact fit+
 // — and point it only at a target you own. For fault injection, see the chaos
 // docs (defineChaosScenario + fault.*).
 //
-// Edit this file or add new .mjs files to opensip-tools/sim/scenarios/.
-// Files in this directory are auto-loaded on the next \`opensip-tools sim\` run.
+// Edit this file or add new .mjs files to opensip-cli/sim/scenarios/.
+// Files in this directory are auto-loaded on the next \`opensip sim\` run.
 //
-// Docs: https://github.com/opensip-ai/opensip-tools#simulation
-import { defineLoadScenario, ASSERTIONS /*, httpTarget */ } from '@opensip-tools/simulation';
+// Docs: https://github.com/opensip-ai/opensip-cli#simulation
+import { defineLoadScenario, ASSERTIONS /*, httpTarget */ } from '@opensip-cli/simulation';
 
 export const scenarios = [
   defineLoadScenario({

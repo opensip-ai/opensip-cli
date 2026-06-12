@@ -14,6 +14,6 @@
  * Per I-8: emits `go-`, distinct from `rs-` and `py-`.
  */
 
-import { makeConfigCacheKey } from '@opensip-tools/graph-adapter-common';
+import { makeConfigCacheKey } from '@opensip-cli/graph-adapter-common';
 
 export const cacheKey = makeConfigCacheKey({ prefix: 'go' });

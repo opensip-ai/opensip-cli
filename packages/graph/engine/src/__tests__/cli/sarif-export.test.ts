@@ -9,20 +9,20 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { ConfigurationError } from '@opensip-tools/core';
-import { formatSignalSarif } from '@opensip-tools/output';
+import { ConfigurationError } from '@opensip-cli/core';
+import { formatSignalSarif } from '@opensip-cli/output';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { runSarifExportMode } from '../../cli/sarif-export.js';
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
-import type { Signal, ToolCliContext } from '@opensip-tools/core';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 function makeSignal(over: Partial<Signal> = {}): Signal {
   return {
     id: 'sig_orphan',
     source: 'graph',
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     severity: 'medium',
     category: 'quality',
     ruleId: 'graph:orphan-subtree',
@@ -79,7 +79,7 @@ describe('runSarifExportMode', () => {
       runs: { tool: { driver: { name: string } }; results: { ruleId: string }[] }[];
     };
     expect(parsed.version).toBe('2.1.0');
-    expect(parsed.runs[0]?.tool.driver.name).toBe('opensip-tools-graph');
+    expect(parsed.runs[0]?.tool.driver.name).toBe('opensip-cli-graph');
     expect(parsed.runs[0]?.results[0]?.ruleId).toBe('graph.dead-code.orphan-subtree');
     expect(setExitCode).toHaveBeenCalledWith(0);
   });

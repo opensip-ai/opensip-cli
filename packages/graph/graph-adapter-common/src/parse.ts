@@ -2,7 +2,7 @@
  * Parsed-project type surface for the tree-sitter graph adapters.
  *
  * ADR-0010 (rollout complete): all four tree-sitter adapters (python, rust, go,
- * java) now parse via their `@opensip-tools/lang-*` package through
+ * java) now parse via their `@opensip-cli/lang-*` package through
  * `createParseProjectFromAdapter` (see ./parse-from-adapter.ts). The former
  * grammar-bound `createTreeSitterParseProject` driver — and its `Parser.init()`
  * seam — have been removed; this module is reduced to the two nominal types the
@@ -11,7 +11,7 @@
  * depends on `web-tree-sitter`.
  */
 
-import type { ParsedFile } from '@opensip-tools/tree-sitter';
+import type { ParsedFile } from '@opensip-cli/tree-sitter';
 
 /**
  * The parsed-file shape every tree-sitter adapter uses: the parse tree plus the

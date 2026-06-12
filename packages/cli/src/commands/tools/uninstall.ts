@@ -16,13 +16,13 @@ import {
   loadToolManifest,
   resolveProjectPaths,
   resolveUserPaths,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { getToolProvenanceForRun } from '../../cli-context.js';
 import { TOOL_DOMAIN } from '../plugin/domain-resolution.js';
 import { removeToolPlugin } from '../plugin-host-ops.js';
 
-import type { ToolsUninstallResult } from '@opensip-tools/contracts';
+import type { ToolsUninstallResult } from '@opensip-cli/contracts';
 
 /** Options for {@link toolsUninstall}. */
 export interface ToolsUninstallOptions {

@@ -7,7 +7,7 @@
  * delivers it to the effectful sinks:
  *
  *   1. **Cloud sync (best-effort).** Map the envelope → `SignalBatch`
- *      (`@opensip-tools/core` `buildSignalBatch`, adding repo identity and
+ *      (`@opensip-cli/core` `buildSignalBatch`, adding repo identity and
  *      preserving the envelope's `runId`/`createdAt`; dropping `verdict`/`units`
  *      — the cloud wire shape stays `schemaVersion: 1`) and emit it through the
  *      run's `scope.signalSink`. The sink is a no-op for the keyless / not-
@@ -21,7 +21,7 @@
  *      otherwise passed; a real check/gate failure (`runFailed`) dominates and
  *      is never masked by a reporting failure (ADR-0008).
  *
- * This is the seam that keeps tool engines free of `@opensip-tools/output`:
+ * This is the seam that keeps tool engines free of `@opensip-cli/output`:
  * engines return envelopes, and the composition root owns formatting,
  * delivery, and report-upload exit-code policy.
  */
@@ -29,17 +29,17 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { buildSignalBatch, currentScope, logger as defaultLogger } from '@opensip-tools/core';
+import { EXIT_CODES } from '@opensip-cli/contracts';
+import { buildSignalBatch, currentScope, logger as defaultLogger } from '@opensip-cli/core';
 import {
   formatSignalSarif,
   postChunked,
   resolveRepoIdentity,
   type EgressResult,
-} from '@opensip-tools/output';
+} from '@opensip-cli/output';
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
-import type { Logger, RepoIdentity, SignalBatch, SignalDeliveryResult } from '@opensip-tools/core';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { Logger, RepoIdentity, SignalBatch, SignalDeliveryResult } from '@opensip-cli/core';
 
 const MODULE_TAG = 'cli:bootstrap';
 
@@ -130,7 +130,7 @@ async function emitToCloud(
         ? 'this API key is not entitled to signal sync'
         : 'the upload failed (see the run log)';
     process.stderr.write(
-      `opensip-tools: cloud sync skipped — ${detail}; ` +
+      `opensip: cloud sync skipped — ${detail}; ` +
         `${batch.signals.length} signal(s) were NOT uploaded. ` +
         `Local results are unaffected (silence this with --no-cloud).\n`,
     );
@@ -203,7 +203,7 @@ export async function deliverEnvelope(
   const reportSuccess = result.outcome === 'ok';
   if (!reportSuccess) {
     process.stderr.write(
-      `opensip-tools: --report-to failed (${opts.reportTo}): ` +
+      `opensip: --report-to failed (${opts.reportTo}): ` +
         `${result.errors.length > 0 ? result.errors.join('; ') : 'unknown error'}\n`,
     );
   }
@@ -223,7 +223,7 @@ export async function deliverEnvelope(
  * `path`, creating parent directories as needed. This is the seam behind
  * `ToolCliContext.writeSarif` — a tool that exports SARIF to a file (e.g.
  * `graph sarif-export`) routes through it instead of importing
- * `@opensip-tools/output` itself. The formatter is pure; this function owns
+ * `@opensip-cli/output` itself. The formatter is pure; this function owns
  * the effect (fs write).
  */
 export async function writeEnvelopeSarif(envelope: SignalEnvelope, path: string): Promise<void> {

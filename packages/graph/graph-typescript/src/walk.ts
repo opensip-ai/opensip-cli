@@ -37,7 +37,7 @@ import { synthesizeModuleInit } from './inventory-visitors/module-init.js';
 import { isTypescriptTestFile } from './test-file.js';
 
 import type { VisitorContext } from './inventory-visitors/types.js';
-import type { FunctionOccurrence, ParseError } from '@opensip-tools/graph';
+import type { FunctionOccurrence, ParseError } from '@opensip-cli/graph';
 
 /**
  * A node the unified walk identified as a candidate Stage 2 resolver
@@ -101,7 +101,7 @@ export interface DependencySiteRecord {
  *      `ExportDeclaration` WITH a `moduleSpecifier`.
  *   2. `export { a, b }` (NO `from`) where `a`/`b` are bindings IMPORTED at
  *      the top of the file — TS's import-then-re-export idiom (e.g.
- *      `import { childrenOf } from '@opensip-tools/tree-sitter'; export
+ *      `import { childrenOf } from '@opensip-cli/tree-sitter'; export
  *      { childrenOf }`). Correlated against the file's named imports.
  *
  * A plain `export { localDef }` of a name DEFINED in this file is NOT a

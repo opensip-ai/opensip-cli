@@ -16,7 +16,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 import { discoverFiles } from '../../discover.js';
 import { buildCatalog } from '../_pipeline.js';
 
-import type { Catalog } from '@opensip-tools/graph';
+import type { Catalog } from '@opensip-cli/graph';
 
 function loadFitnessCatalog(): Catalog {
   const projectDir = resolve(HERE, '../../../../../fitness/engine');

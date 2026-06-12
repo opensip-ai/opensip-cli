@@ -3,13 +3,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScopeSync } from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, runWithScopeSync } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { defineCheck } from '../define-check.js';
 import { fileCache } from '../file-cache.js';
 
-import type { LanguageAdapter } from '@opensip-tools/core';
+import type { LanguageAdapter } from '@opensip-cli/core';
 
 const stubAdapter = (id: string, aliases: readonly string[] = []): LanguageAdapter => ({
   id,

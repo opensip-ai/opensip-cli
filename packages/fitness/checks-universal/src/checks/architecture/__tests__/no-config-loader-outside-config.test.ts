@@ -40,7 +40,7 @@ describe('no-config-loader-outside-config', () => {
     expect(analyzeNoConfigLoaderOutsideConfig(content, FIT_PATH)).toHaveLength(0);
   });
 
-  it('exempts the @opensip-tools/config package itself', () => {
+  it('exempts the @opensip-cli/config package itself', () => {
     const content = `
       const doc = readYamlFile(p);
       const cli = doc.cli;

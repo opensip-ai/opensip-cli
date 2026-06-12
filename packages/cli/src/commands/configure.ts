@@ -5,9 +5,9 @@
  * banners and result lines route through Ink via the `configure-done`
  * `CommandResult`. No `console.log` and no raw ANSI escapes here.
  *
- * The actual config I/O (read/write `~/.opensip-tools/config.yml`,
+ * The actual config I/O (read/write `~/.opensip-cli/config.yml`,
  * resolve the API key from flag → env → config) lives in
- * `@opensip-tools/config` (relocated there in 2.10.1, ADR-0023) so the
+ * `@opensip-cli/config` (relocated there in 2.10.1, ADR-0023) so the
  * pre-action hook and this command both read it through the config
  * layer. This file is the prompt+UX wrapper around those primitives.
  * Audit 2026-05-23 M3.
@@ -16,15 +16,15 @@
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-import { GLOBAL_CONFIG_PATH, readGlobalConfig, writeGlobalConfig } from '@opensip-tools/config';
-import { resolveUserPaths } from '@opensip-tools/core';
-import { checkEntitlement, DEFAULT_CLOUD_ENDPOINT } from '@opensip-tools/output';
+import { GLOBAL_CONFIG_PATH, readGlobalConfig, writeGlobalConfig } from '@opensip-cli/config';
+import { resolveUserPaths } from '@opensip-cli/core';
+import { checkEntitlement, DEFAULT_CLOUD_ENDPOINT } from '@opensip-cli/output';
 
-import type { ConfigureDoneResult } from '@opensip-tools/contracts';
+import type { ConfigureDoneResult } from '@opensip-cli/contracts';
 
 // Re-export `resolveApiKey` from the config layer so existing command-side
 // imports (and tests) can continue to consume it through the same name.
-export { resolveApiKey } from '@opensip-tools/config';
+export { resolveApiKey } from '@opensip-cli/config';
 
 // ---------------------------------------------------------------------------
 // Interactive prompt

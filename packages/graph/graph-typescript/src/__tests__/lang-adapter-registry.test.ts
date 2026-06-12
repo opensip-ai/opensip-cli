@@ -11,10 +11,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError, RunScope, runWithScopeSync } from '@opensip-tools/core';
-import { currentAdapterRegistry, graphTool, pickAdapter } from '@opensip-tools/graph';
-import { pythonGraphAdapter } from '@opensip-tools/graph-python';
-import { rustGraphAdapter } from '@opensip-tools/graph-rust';
+import { ConfigurationError, RunScope, runWithScopeSync } from '@opensip-cli/core';
+import { currentAdapterRegistry, graphTool, pickAdapter } from '@opensip-cli/graph';
+import { pythonGraphAdapter } from '@opensip-cli/graph-python';
+import { rustGraphAdapter } from '@opensip-cli/graph-rust';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';

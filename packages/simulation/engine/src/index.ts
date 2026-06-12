@@ -1,6 +1,6 @@
 // @fitness-ignore-file module-coupling-fan-out -- Package barrel by design: re-exports the public surface of every kind module; fan-out is the whole job of this file
 /**
- * @opensip-tools/simulation — Simulation scenarios for codebase analysis.
+ * @opensip-cli/simulation — Simulation scenarios for codebase analysis.
  *
  * The package exposes two kind-specific scenario authoring entry points
  * sharing one runtime contract:
@@ -71,10 +71,10 @@ export { simulationTool, simulationTool as tool } from './tool.js';
 // `executeSim` is NOT here — it lives in `cli/sim.ts` and is not part of the
 // public barrel; the CLI drives simulation through the Tool contract
 // (`simulationTool`), and sim's own tests import lifecycle helpers through
-// relative paths or `@opensip-tools/simulation/internal`.
+// relative paths or `@opensip-cli/simulation/internal`.
 
 // =============================================================================
-// PLUGIN DISCOVERY — sim plugin contract + @opensip-tools/scenarios-*
+// PLUGIN DISCOVERY — sim plugin contract + @opensip-cli/scenarios-*
 // =============================================================================
 
 export type { SimPluginExports } from './plugins/types.js';

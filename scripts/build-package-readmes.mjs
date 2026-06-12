@@ -5,7 +5,7 @@
  *
  * Why: npm renders each package's page from the README *inside that package's
  * own tarball*. The monorepo root README is never bundled into a sub-package,
- * so without this every `@opensip-tools/*` page reads "This package does not
+ * so without this every `@opensip-cli/*` page reads "This package does not
  * have a README file" — looks abandoned and hurts search ranking.
  *
  * Single source of truth: each package.json's own fields (`name`,
@@ -14,7 +14,7 @@
  * (tool / fit-pack / graph-adapter / internal lib), so adding a package needs
  * no edit here — just a `description` and (if it's a plugin) its kind marker.
  *
- * The unscoped `opensip-tools` CLI is EXCLUDED: its README is the curated
+ * The unscoped `opensip-cli` CLI is EXCLUDED: its README is the curated
  * product front page, hand-authored, not generated.
  *
  * Usage:
@@ -31,9 +31,9 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_OWNER = 'opensip-ai';
-const REPO_NAME = 'opensip-tools';
-const DOCS_SITE_URL = 'https://opensip.ai/docs/opensip-tools/';
-const CLI_PACKAGE_NAME = 'opensip-tools'; // curated README — never generated
+const REPO_NAME = 'opensip-cli';
+const DOCS_SITE_URL = 'https://opensip.ai/docs/opensip-cli/';
+const CLI_PACKAGE_NAME = 'opensip-cli'; // curated README — never generated
 
 const __filename = fileURLToPath(import.meta.url);
 const REPO_ROOT = dirname(dirname(__filename));
@@ -64,15 +64,15 @@ function readReleaseRef() {
 
 /** One-line structural role, keyed by the opensipTools.kind marker. */
 const ROLE_BY_KIND = {
-  tool: 'This package is the **engine** behind a first-party `opensip-tools` tool. The CLI bundles it — you do not normally install it directly.',
+  tool: 'This package is the **engine** behind a first-party `opensip-cli` tool. The CLI bundles it — you do not normally install it directly.',
   'fit-pack':
-    'This is a **fitness check pack**. Install it alongside the `opensip-tools` CLI and its checks are discovered automatically.',
+    'This is a **fitness check pack**. Install it alongside the `opensip-cli` CLI and its checks are discovered automatically.',
   'graph-adapter':
-    'This is a **graph language adapter**. Install it alongside the CLI to add language support to `opensip-tools graph`.',
+    'This is a **graph language adapter**. Install it alongside the CLI to add language support to `opensip graph`.',
 };
 
 const DEFAULT_ROLE =
-  'This is an **internal library** of the opensip-tools toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.';
+  'This is an **internal library** of the opensip-cli toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.';
 
 function roleSentence(kind) {
   return ROLE_BY_KIND[kind] ?? DEFAULT_ROLE;
@@ -96,7 +96,7 @@ function renderReadme(pkg, releaseRef) {
     `# ${name}\n\n` +
     `> ${description}\n\n` +
     `${roleSentence(pkg.opensipTools?.kind)}\n\n` +
-    `Part of [**opensip-tools**](${repoRootUrl}) — an open-source codebase-analysis ` +
+    `Part of [**opensip-cli**](${repoRootUrl}) — an open-source codebase-analysis ` +
     `toolkit: fitness checks (\`fit\`), static call-graph analysis (\`graph\`), and ` +
     `simulation (\`sim\`).\n\n` +
     `## Install\n\n` +
@@ -127,9 +127,9 @@ function main() {
 
   for (const pjPath of paths) {
     const pkg = JSON.parse(readFileSync(pjPath, 'utf8'));
-    // Releasable @opensip-tools/* packages only; skip private + the curated CLI.
+    // Releasable @opensip-cli/* packages only; skip private + the curated CLI.
     if (typeof pkg.name !== 'string') continue;
-    if (!pkg.name.startsWith('@opensip-tools/')) continue;
+    if (!pkg.name.startsWith('@opensip-cli/')) continue;
     if (pkg.name === CLI_PACKAGE_NAME) continue;
     if (pkg.private === true) continue;
     if (!pkg.description) {

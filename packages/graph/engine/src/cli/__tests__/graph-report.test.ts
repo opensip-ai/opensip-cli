@@ -6,7 +6,7 @@
 
 import { tmpdir } from 'node:os';
 
-import { runWithScope, runWithScopeSync } from '@opensip-tools/core';
+import { runWithScope, runWithScopeSync } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
@@ -18,7 +18,7 @@ import {
 } from '../graph-report.js';
 
 import type { Catalog, FunctionOccurrence } from '../../types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 function occ(over: Partial<FunctionOccurrence> = {}): FunctionOccurrence {
   return {

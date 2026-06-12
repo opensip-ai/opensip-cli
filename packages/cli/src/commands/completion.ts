@@ -6,9 +6,9 @@
  * current shell to try it out).
  *
  * Usage:
- *   opensip-tools completion bash >> ~/.bashrc
- *   opensip-tools completion zsh  >> ~/.zshrc
- *   opensip-tools completion fish > ~/.config/fish/completions/opensip-tools.fish
+ *   opensip completion bash >> ~/.bashrc
+ *   opensip completion zsh  >> ~/.zshrc
+ *   opensip completion fish > ~/.config/fish/completions/opensip.fish
  *
  * The emitted scripts are static — the user's shell sources them once, so
  * they complete fixed subcommand / flag names rather than querying the CLI
@@ -19,10 +19,10 @@
  * script can never drift from the real command surface the way a
  * hand-maintained flag list does. If dynamic value completion (e.g.
  * matching existing check slugs) is ever needed, that's an additive change
- * that can query `opensip-tools fit --list` at completion time.
+ * that can query `opensip fit --list` at completion time.
  */
 
-import { commonFlags, type CommonFlagKey } from '@opensip-tools/contracts';
+import { commonFlags, type CommonFlagKey } from '@opensip-cli/contracts';
 
 export type Shell = 'bash' | 'zsh' | 'fish';
 
@@ -176,10 +176,10 @@ function bashScript(inv: CompletionInventory): string {
     arms.push(`    ${name}) COMPREPLY=($(compgen -W "${flags.join(' ')}" -- "\${cur}")) ;;`);
   }
   arms.push(`    *) COMPREPLY=($(compgen -W "${commonFlagList}" -- "\${cur}")) ;;`);
-  return `# bash completion for opensip-tools
+  return `# bash completion for opensip
 # Source this file from ~/.bashrc or /etc/bash_completion.d/
 
-_opensip_tools() {
+_opensip() {
   local cur prev words cword
   COMPREPLY=()
   cur="\${COMP_WORDS[COMP_CWORD]}"
@@ -198,7 +198,7 @@ ${arms.join('\n')}
   return 0
 }
 
-complete -F _opensip_tools opensip-tools
+complete -F _opensip opensip
 `;
 }
 
@@ -218,11 +218,11 @@ function zshScript(inv: CompletionInventory): string {
     arms.push(`    ${name}) _values 'flag' ${flags.join(' ')} ;;`);
   }
   arms.push(`    *) _values 'flag' ${commonFlagList} ;;`);
-  return `#compdef opensip-tools
-# zsh completion for opensip-tools
-# Source this file from your fpath (e.g. ~/.zsh/completions/_opensip-tools).
+  return `#compdef opensip
+# zsh completion for opensip
+# Source this file from your fpath (e.g. ~/.zsh/completions/_opensip).
 
-_opensip_tools() {
+_opensip() {
   local -a subcommands
   subcommands=(${subs})
 
@@ -236,7 +236,7 @@ ${arms.join('\n')}
   esac
 }
 
-compdef _opensip_tools opensip-tools
+compdef _opensip opensip
 `;
 }
 
@@ -247,16 +247,16 @@ compdef _opensip_tools opensip-tools
 function fishScript(inv: CompletionInventory): string {
   const subs = inv.subcommands.join(' ');
   const lines: string[] = [
-    '# fish completion for opensip-tools',
-    '# Drop this at ~/.config/fish/completions/opensip-tools.fish',
+    '# fish completion for opensip',
+    '# Drop this at ~/.config/fish/completions/opensip.fish',
     '',
-    `complete -c opensip-tools -f -n "__fish_use_subcommand" -a "${subs}" -d "opensip-tools subcommand"`,
+    `complete -c opensip -f -n "__fish_use_subcommand" -a "${subs}" -d "opensip subcommand"`,
   ];
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
     if (name in inv.groupSubcommands) continue;
     for (const flag of flags) {
       lines.push(
-        `complete -c opensip-tools -n "__fish_seen_subcommand_from ${name}" -l "${flag.replace(/^--/, '')}"`,
+        `complete -c opensip -n "__fish_seen_subcommand_from ${name}" -l "${flag.replace(/^--/, '')}"`,
       );
     }
   }

@@ -8,7 +8,7 @@
  */
 
 import type { CrossPackageContext } from '../edge-helpers/cross-package-context.js';
-import type { Catalog, ResolverVerdict } from '@opensip-tools/graph';
+import type { Catalog, ResolverVerdict } from '@opensip-cli/graph';
 import type ts from 'typescript';
 
 /** Shared context handed to each edge resolver: catalog, TS program, and project root. */

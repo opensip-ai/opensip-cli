@@ -1,4 +1,4 @@
-import { logger, ValidationError } from '@opensip-tools/core';
+import { logger, ValidationError } from '@opensip-cli/core';
 import { and, asc, eq } from 'drizzle-orm';
 
 import { requireDrizzleDataStore, type DataStore, type DrizzleDataStore } from './data-store.js';

@@ -1,4 +1,4 @@
-import { applyCheckDisplay } from '@opensip-tools/fitness';
+import { applyCheckDisplay } from '@opensip-cli/fitness';
 
 import { noFmtPrint } from './checks/no-fmt-print.js';
 import { checkDisplay } from './display/index.js';

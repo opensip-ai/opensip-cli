@@ -5,7 +5,7 @@
  * patterns (using `includes`) and RegExp patterns (using `test`). Previously
  * each check pack carried a byte-identical copy of this helper — surfaced by
  * the graph tool's duplicated-function-body rule. Both packs depend on
- * @opensip-tools/fitness, so the engine is the natural shared home.
+ * @opensip-cli/fitness, so the engine is the natural shared home.
  */
 
 /**

@@ -1,4 +1,4 @@
-import { ConfigurationError } from '@opensip-tools/core';
+import { ConfigurationError } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 

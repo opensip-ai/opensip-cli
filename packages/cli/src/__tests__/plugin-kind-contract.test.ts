@@ -5,7 +5,7 @@
  * package's package.json. Historically some kinds were *also* discovered
  * by name prefix, which meant merely adding a
  * package under that prefix could silently change runtime discovery — that
- * is exactly how `@opensip-tools/graph-adapter-common` (shared scaffolding,
+ * is exactly how `@opensip-cli/graph-adapter-common` (shared scaffolding,
  * not an adapter) ended up being loaded as an adapter and warned on every
  * run.
  *
@@ -33,7 +33,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-const SCOPE = '@opensip-tools';
+const SCOPE = '@opensip-cli';
 
 /**
  * The valid `opensipTools.kind` markers, DERIVED (not compiled-in): the host
@@ -156,7 +156,7 @@ describe('plugin-kind contract (workspace invariant)', () => {
     ).toEqual([]);
   });
 
-  it('every @opensip-tools/graph-* package is a declared graph-adapter or explicitly allowlisted', () => {
+  it('every @opensip-cli/graph-* package is a declared graph-adapter or explicitly allowlisted', () => {
     const graphPrefixed = PACKAGES.filter((p) => p.name.startsWith(`${SCOPE}/graph-`));
     const offenders = graphPrefixed.filter(
       (p) => p.kind !== 'graph-adapter' && !NON_ADAPTER_GRAPH_PACKAGES.has(p.name),
@@ -170,7 +170,7 @@ describe('plugin-kind contract (workspace invariant)', () => {
     ).toEqual([]);
   });
 
-  it('every @opensip-tools/checks-* package is a declared fit-pack or explicitly allowlisted', () => {
+  it('every @opensip-cli/checks-* package is a declared fit-pack or explicitly allowlisted', () => {
     const checksPrefixed = PACKAGES.filter((p) => p.name.startsWith(`${SCOPE}/checks-`));
     const offenders = checksPrefixed.filter(
       // eslint-disable-next-line sonarjs/no-empty-collection -- NON_PACK_CHECKS_PACKAGES is a deliberate, currently-empty extension seam, symmetric with the graph allowlist; a future checks-* shared lib gets added here.

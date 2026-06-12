@@ -7,13 +7,13 @@
  * the boilerplate.
  */
 
-import { LanguageRegistry, RunScope, ToolRegistry, runWithScopeSync } from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, ToolRegistry, runWithScopeSync } from '@opensip-cli/core';
 
 import { graphTool } from '../../tool.js';
 
 /** Fresh scope with empty registries — local equivalent of the retired
- *  `@opensip-tools/core/test-utils` helper (ADR-0040: that sugar moved to
- *  `@opensip-tools/test-support`, which this package's tests cannot use
+ *  `@opensip-cli/core/test-utils` helper (ADR-0040: that sugar moved to
+ *  `@opensip-cli/test-support`, which this package's tests cannot use
  *  without coupling its test graph to the fitness engine). */
 const makeTestScope = (): RunScope =>
   new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });

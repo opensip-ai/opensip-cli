@@ -8,13 +8,13 @@
  * envelope-bearing tool results are rendered and delivered by the composition
  * root instead of by tool-local formatters.
  */
-import { renderToText } from '@opensip-tools/cli-ui';
+import { renderToText } from '@opensip-cli/cli-ui';
 import {
   EXIT_CODES,
   type CommandOutcome,
   type FitDoneResult,
   type SignalEnvelope,
-} from '@opensip-tools/contracts';
+} from '@opensip-cli/contracts';
 import {
   LanguageRegistry,
   noopSignalSink,
@@ -24,7 +24,7 @@ import {
   type EmitResult,
   type SignalBatch,
   type SignalSink,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deliverEnvelope } from '../bootstrap/deliver-envelope.js';
@@ -52,7 +52,7 @@ const ENVELOPE: SignalEnvelope = {
     {
       id: 'sig_routing0001',
       source: 'no-console',
-      provider: 'opensip-tools',
+      provider: 'opensip-cli',
       severity: 'high',
       category: 'quality',
       ruleId: 'no-console',
@@ -67,7 +67,7 @@ const ENVELOPE: SignalEnvelope = {
     {
       id: 'sig_routing0002',
       source: 'no-todo',
-      provider: 'opensip-tools',
+      provider: 'opensip-cli',
       severity: 'low',
       category: 'quality',
       ruleId: 'no-todo',

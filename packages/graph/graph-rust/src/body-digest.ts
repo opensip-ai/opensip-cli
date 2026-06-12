@@ -14,8 +14,8 @@
  * to warrant its own file.
  */
 
-import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-tools/graph';
-import { skipToEndOfLine } from '@opensip-tools/graph-adapter-common';
+import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-cli/graph';
+import { skipToEndOfLine } from '@opensip-cli/graph-adapter-common';
 
 /**
  * Digest a Rust body text — strip comments, collapse whitespace, hash.

@@ -2,15 +2,15 @@
 status: current
 last_verified: 2026-06-12
 release: v3.0.0
-owner: opensip-tools
+owner: opensip-cli
 indexable: true
-title: "opensip-tools Docs"
+title: "opensip-cli Docs"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
-purpose: "Public documentation entry point for opensip-tools v3.0.0: product overview, fast paths, and the full reference map."
+purpose: "Public documentation entry point for opensip-cli v3.0.0: product overview, fast paths, and the full reference map."
 ---
-# opensip-tools Docs
+# opensip-cli Docs
 
-opensip-tools is a local-first engineering quality platform for codebases that need more than a linter. It gives you one CLI for fitness checks, simulation scenarios, static call-graph analysis, baselines, SARIF, dashboards, and your own Tool plugins.
+OpenSIP CLI is a local-first engineering quality platform for codebases that need more than a linter. It gives you one CLI for fitness checks, simulation scenarios, static call-graph analysis, baselines, SARIF, dashboards, and your own Tool plugins.
 
 It runs in your repo and in CI. It works offline. It is designed for teams that want their quality bar to be explicit, versioned, and enforceable.
 
@@ -18,12 +18,12 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 
 | Need | Use |
 |---|---|
-| Enforce project-specific quality, security, and architecture rules | `opensip-tools fit` with 166 built-in checks across seven packs, plus your own checks |
+| Enforce project-specific quality, security, and architecture rules | `opensip fit` with 166 built-in checks across seven packs, plus your own checks |
 | Adopt without fixing every historical issue first | `fit --gate-save` once, then `fit --gate-compare` in CI |
-| Understand reachability, dead ends, duplication, cycles, and blast radius | `opensip-tools graph` with five graph adapters and ten built-in graph rules |
-| Run load or chaos scenarios against a service you control | `opensip-tools sim` |
+| Understand reachability, dead ends, duplication, cycles, and blast radius | `opensip graph` with five graph adapters and ten built-in graph rules |
+| Run load or chaos scenarios against a service you control | `opensip sim` |
 | Share internal rules across repos | Publish or install fit packs and sim scenario packs |
-| Add an entire command to the CLI | Build a Tool plugin and manage it with `opensip-tools tools ...` |
+| Add an entire command to the CLI | Build a Tool plugin and manage it with `opensip tools ...` |
 | Show results to humans | Open the local HTML dashboard or export SARIF for code scanning |
 
 ## Start Here
@@ -31,8 +31,8 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 ```bash
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 cd your-project
-opensip-tools init
-opensip-tools fit --recipe example
+opensip init
+opensip fit --recipe example
 ```
 
 That gets you from a clean shell to a working project scaffold and one passing fitness run. From there:
@@ -40,7 +40,7 @@ That gets you from a clean shell to a working project scaffold and one passing f
 | If you want to ... | Read |
 |---|---|
 | Install, initialize, and run the first smoke test | [Quick start](./00-start/00-quick-start.md) |
-| Understand what opensip-tools is for | [What is opensip-tools?](./00-start/01-what-is-opensip-tools.md) |
+| Understand what OpenSIP CLI is for | [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md) |
 | See fit, sim, and graph side by side | [Show me each loop](./00-start/02-show-me-the-loops.md) |
 | Initialize a repo carefully | [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md) |
 | Write a custom fitness check | [Write your first check](./60-guides/01-write-your-first-check.md) |
@@ -53,27 +53,27 @@ That gets you from a clean shell to a working project scaffold and one passing f
 The most common commands:
 
 ```bash
-opensip-tools init
-opensip-tools fit
-opensip-tools fit --list
-opensip-tools fit --check <slug>
-opensip-tools fit --gate-save
-opensip-tools fit --gate-compare
-opensip-tools graph
-opensip-tools graph --list-files
-opensip-tools graph --workspace
-opensip-tools sim --recipe <name>
-opensip-tools dashboard
+opensip init
+opensip fit
+opensip fit --list
+opensip fit --check <slug>
+opensip fit --gate-save
+opensip fit --gate-compare
+opensip graph
+opensip graph --list-files
+opensip graph --workspace
+opensip sim --recipe <name>
+opensip dashboard
 ```
 
 Whole Tool plugins are managed through the `tools` group:
 
 ```bash
-opensip-tools tools list
-opensip-tools tools validate <spec>
-opensip-tools tools install <spec> [--global|--project]
-opensip-tools tools uninstall <name-or-id> [--global|--project] [--purge-data]
-opensip-tools tools data-purge <tool-id>
+opensip tools list
+opensip tools validate <spec>
+opensip tools install <spec> [--global|--project]
+opensip tools uninstall <name-or-id> [--global|--project] [--purge-data]
+opensip tools data-purge <tool-id>
 ```
 
 For every command, flag, exit code, and machine-output contract, use the [CLI command reference](./70-reference/01-cli-commands.md). For Tool plugin management specifically, use the [`tools` command reference](./70-reference/12-tools-command.md).
@@ -82,7 +82,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 
 | Role | Path |
 |---|---|
-| Evaluating opensip-tools | [What is opensip-tools?](./00-start/01-what-is-opensip-tools.md) -> [vs. other tools](./00-start/03-vs-other-tools.md) -> [FAQ](./00-start/04-faq.md) |
+| Evaluating opensip-cli | [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md) -> [vs. other tools](./00-start/03-vs-other-tools.md) -> [FAQ](./00-start/04-faq.md) |
 | New user | [Quick start](./00-start/00-quick-start.md) -> [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md) -> [Write your first check](./60-guides/01-write-your-first-check.md) |
 | CI owner | [Output, gate, SARIF](./20-fit/04-output-gate-sarif.md) -> [Wire into CI](./60-guides/03-wire-into-ci.md) -> [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md) |
 | Plugin author | [Plugin authoring](./50-extend/01-plugin-authoring.md) -> [Publishable packs](./50-extend/03-publishable-packs.md) -> [Full Tool plugins](./50-extend/06-full-tool-plugins.md) |
@@ -94,7 +94,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 ### 00 - Start
 
 0. [Quick start](./00-start/00-quick-start.md)
-1. [What is opensip-tools?](./00-start/01-what-is-opensip-tools.md)
+1. [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md)
 2. [Show me each loop](./00-start/02-show-me-the-loops.md)
 3. [vs. other tools](./00-start/03-vs-other-tools.md)
 4. [FAQ](./00-start/04-faq.md)
@@ -181,7 +181,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 This v3.0.0 doc set was rechecked against the source on 2026-06-12:
 
 - 166 built-in fitness checks across seven packs.
-- 33 publishable workspace packages, plus the private `@opensip-tools/test-support` package.
+- 33 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
 - Six fitness language adapters: TypeScript/JavaScript, Python, Rust, Go, Java, and C/C++.
 - Five graph language adapters: TypeScript, Python, Rust, Go, and Java.
 - First-party Tool commands are mounted through `CommandSpec`; third-party Tool plugins use the same contract.

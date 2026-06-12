@@ -9,8 +9,8 @@ import {
   buildSignalEnvelope,
   type CommandOutcome,
   type CommandResult,
-} from '@opensip-tools/contracts';
-import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
+} from '@opensip-cli/contracts';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import { renderOutcome } from '../commands/render-outcome.js';

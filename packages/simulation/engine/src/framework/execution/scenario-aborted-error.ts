@@ -4,7 +4,7 @@
  * between action-handlers.ts and execution-engine.ts.
  */
 
-import { SystemError } from '@opensip-tools/core';
+import { SystemError } from '@opensip-cli/core';
 
 /**
  * Error thrown when a scenario is aborted via AbortSignal.

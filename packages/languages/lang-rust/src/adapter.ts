@@ -1,7 +1,7 @@
 import { parseRust, type RustTree } from './parse.js';
 import { stripComments, stripStrings } from './strip.js';
 
-import type { LanguageAdapter } from '@opensip-tools/core';
+import type { LanguageAdapter } from '@opensip-cli/core';
 
 export const rustAdapter: LanguageAdapter<RustTree> = {
   id: 'rust',

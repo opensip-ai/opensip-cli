@@ -9,7 +9,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 
-import { SystemError } from '@opensip-tools/core';
+import { SystemError } from '@opensip-cli/core';
 
 /**
  * Options for abortable command execution

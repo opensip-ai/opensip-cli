@@ -11,7 +11,7 @@
  *
  * Usage:
  *
- *   import { withScope, makeTestScope } from '@opensip-tools/test-support';
+ *   import { withScope, makeTestScope } from '@opensip-cli/test-support';
  *
  *   it('does the thing', async () => {
  *     const scope = makeTestScope();
@@ -32,9 +32,9 @@ import {
   ToolRegistry,
   runWithScope,
   runWithScopeSync,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
-import type { RunScopeOptions } from '@opensip-tools/core';
+import type { RunScopeOptions } from '@opensip-cli/core';
 
 /**
  * Construct a fresh `RunScope` with empty `LanguageRegistry` /

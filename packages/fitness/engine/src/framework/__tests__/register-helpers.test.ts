@@ -1,4 +1,4 @@
-import { enterScope, RunScope } from '@opensip-tools/core';
+import { enterScope, RunScope } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { fitnessTool } from '../../tool.js';

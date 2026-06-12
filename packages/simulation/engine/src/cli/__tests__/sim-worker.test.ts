@@ -13,7 +13,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope } from '@opensip-tools/core';
+import { enterScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { noopTarget } from '../../__tests__/test-utils/targets.js';
@@ -24,8 +24,8 @@ import { defineLoadScenario } from '../../kinds/load/define.js';
 import { executeSimWorker } from '../sim-worker.js';
 
 import type { executeSim } from '../sim.js';
-import type { ProgressEvent } from '@opensip-tools/cli-ui';
-import type { WorkerMessage } from '@opensip-tools/core';
+import type { ProgressEvent } from '@opensip-cli/cli-ui';
+import type { WorkerMessage } from '@opensip-cli/core';
 
 type Msg = WorkerMessage<ProgressEvent, Awaited<ReturnType<typeof executeSim>>>;
 

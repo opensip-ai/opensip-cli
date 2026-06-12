@@ -3,7 +3,7 @@
  *
  * Thin orchestrator. `executeFit` sequences the five extracted phases:
  *   1. {@link ensureChecksLoaded}                — plugin + check-pack discovery
- *   2. {@link loadFitConfig}                     — opensip-tools.config.yml parse
+ *   2. {@link loadFitConfig}                     — opensip-cli.config.yml parse
  *   3. {@link selectRecipe}                      — recipe-name lookup vs. ad-hoc
  *   4. {@link validateLanguagesAgainstAdapters}  — warn on unknown languages
  *   5. {@link runRecipeOrAdHoc}                  — drive FitnessRecipeService
@@ -17,11 +17,11 @@
  *
  * This file re-exports the public surface (`executeFit`,
  * `ensureChecksLoaded`, and the display accessors) so existing consumers
- * (`opensip-tools`, `dashboard.ts`, the fitness `index.ts` barrel) keep
+ * (`opensip-cli`, `dashboard.ts`, the fitness `index.ts` barrel) keep
  * resolving the same names.
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 import { currentCheckRegistry } from '../framework/scope-registry.js';
 import { buildScopeBasedFileMap } from '../framework/scope-resolver.js';
@@ -38,11 +38,11 @@ import type {
   SignalEnvelope,
   FitDoneResult,
   ErrorResult,
-} from '@opensip-tools/contracts';
+} from '@opensip-cli/contracts';
 
 // ---------------------------------------------------------------------------
 // Re-exports — preserve the public surface that external consumers
-// (`opensip-tools`, `dashboard.ts`, fitness's barrel) import from
+// (`opensip-cli`, `dashboard.ts`, fitness's barrel) import from
 // this file. Splitting the implementation under `./fit/` is an internal
 // refactor; the import sites stay on `./fit.js`.
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ export interface ExecuteFitOptions {
  *      (must run first; populates the scope's check + recipe registries
  *      for downstream phases).
  *   2. `loadFitConfig` — resolves `signalersConfig` + `targetsConfig`
- *      from `opensip-tools.config.yml`. Sequenced before `selectRecipe`
+ *      from `opensip-cli.config.yml`. Sequenced before `selectRecipe`
  *      so a missing/invalid config surfaces before recipe-name
  *      validation — the config tells the user what recipes exist, so
  *      the config error is the more useful message of the two.
@@ -161,7 +161,7 @@ export async function executeFit(
   // the universal output currency the composition root renders, emits
   // (`--json`), and delivers (cloud + `--report-to`). Cloud egress no longer
   // happens here: the root's `deliverSignals` owns it (engines dropped their
-  // `@opensip-tools/output` dependency in Phase 6).
+  // `@opensip-cli/output` dependency in Phase 6).
   const envelope = buildFitEnvelope(fitnessResult, recipeName, signalersConfig);
 
   // Persistence is the CALLER's job (ADR-0028 — worker-safe engine). `executeFit`

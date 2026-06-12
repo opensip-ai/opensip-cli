@@ -16,7 +16,7 @@ import { parseProject } from '../parse.js';
 import { walkProgram } from '../walk.js';
 
 import type { CallSiteRecord } from '../walk.js';
-import type { Catalog, ParseError } from '@opensip-tools/graph';
+import type { Catalog, ParseError } from '@opensip-cli/graph';
 
 /** Input to {@link buildCatalog}: project root, source files, and TS compiler options. */
 export interface PipelineInput {

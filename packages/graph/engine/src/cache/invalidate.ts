@@ -19,7 +19,7 @@
 
 import { statSync } from 'node:fs';
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 import type { Catalog } from '../types.js';
 

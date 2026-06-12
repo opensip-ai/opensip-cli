@@ -1,5 +1,5 @@
 /**
- * Host-owned document skeleton for the `opensip-tools init` config.
+ * Host-owned document skeleton for the `opensip init` config.
  *
  * Owns ONLY the document-level bytes: the YAML header, `schemaVersion`,
  * `globalExcludes`, and the per-language `targets:` blocks. Each tool's
@@ -11,8 +11,8 @@
  * Phases 1–2).
  */
 
-import { renderDocumentHeader, type TargetTemplateInput } from '@opensip-tools/config';
-import { CLI_SUPPORTED_SCHEMA_VERSION } from '@opensip-tools/core';
+import { renderDocumentHeader, type TargetTemplateInput } from '@opensip-cli/config';
+import { CLI_SUPPORTED_SCHEMA_VERSION } from '@opensip-cli/core';
 
 import type { SupportedLanguage } from './language-detection.js';
 import type { ToolScaffold } from '../shared.js';
@@ -101,7 +101,7 @@ export function generateConfig(
   toolScaffolds: readonly ToolScaffold[],
 ): string {
   // The document-level skeleton (header, schemaVersion, globalExcludes, targets)
-  // is rendered by @opensip-tools/config — the package that also OWNS + validates
+  // is rendered by @opensip-cli/config — the package that also OWNS + validates
   // those blocks (2.10.1, ADR-0023), so the scaffold cannot drift from what the
   // composed schema accepts (asserted by a round-trip test). The CLI supplies the
   // per-language target content; each registered tool contributes its own config

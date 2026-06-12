@@ -4,7 +4,7 @@
  * Validates TypeScript suppression directives (@ts-expect-error, @ts-ignore) have proper justifications.
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 /** Check ID constant to avoid duplicate string literals */
 const CHECK_SLUG = 'typescript-directive-hygiene';

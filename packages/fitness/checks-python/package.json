@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/checks-python",
+  "name": "@opensip-cli/checks-python",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "Python fitness checks for opensip-tools",
+  "description": "Python fitness checks for opensip-cli",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "fitness-checks",
@@ -13,12 +13,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/fitness/checks-python"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "opensipTools": {
@@ -39,12 +39,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/fitness": "workspace:*",
-    "@opensip-tools/lang-python": "workspace:*"
+    "@opensip-cli/fitness": "workspace:*",
+    "@opensip-cli/lang-python": "workspace:*"
   },
   "devDependencies": {
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/test-support": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/test-support": "workspace:*",
     "@types/node": "^24.13.2",
     "vitest": "^4.1.8"
   }

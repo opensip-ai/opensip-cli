@@ -1,5 +1,5 @@
 {
-  "name": "@opensip-tools-fixture/tool-demo",
+  "name": "@opensip-cli-fixture/tool-demo",
   "version": "0.0.0",
   "private": true,
   "type": "module",

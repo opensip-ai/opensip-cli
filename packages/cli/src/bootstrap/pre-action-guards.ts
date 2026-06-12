@@ -16,7 +16,7 @@ import {
   logger,
   readConfigSchemaVersion,
   type ProjectContext,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { BootstrapError } from './bootstrap-error.js';
 import { formatCliTooOldMessage, formatNoProjectFoundMessage } from './pre-action-messages.js';
@@ -26,10 +26,10 @@ const MODULE_TAG = 'cli:bootstrap';
 /**
  * Commands that operate WITHOUT requiring a project context. These don't
  * read project files or the datastore; running them from a directory
- * with no opensip-tools project is legitimate.
+ * with no opensip-cli project is legitimate.
  *
  * Everything else is project-scoped: when `project.scope === 'none'`,
- * the hook emits the "No opensip-tools project found" error and exits 2.
+ * the hook emits the "No OpenSIP CLI project found" error and exits 2.
  *
  * Note: `uninstall --user` is project-agnostic, but `uninstall --project`
  * requires one. The check is per-command name here; uninstall's own
@@ -72,7 +72,7 @@ export function checkSchemaVersionAndBailout(project: ProjectContext, runId: str
       cliVersion: compat.cliVersion,
     });
     throw new BootstrapError({
-      message: `This project's opensip-tools.config.yml uses a newer schema (v${compat.configVersion}) than this CLI supports (v${compat.cliVersion}).`,
+      message: `This project's opensip-cli.config.yml uses a newer schema (v${compat.configVersion}) than this CLI supports (v${compat.cliVersion}).`,
       humanMessage: msg,
       suggestion: 'Update your CLI: curl -fsSL https://opensip.ai/cli/install.sh | bash',
       exitCode: 2,
@@ -98,7 +98,7 @@ export function checkSchemaVersionAndBailout(project: ProjectContext, runId: str
  * no longer branches on json or writes a stream itself.
  *
  * @throws {BootstrapError} (exit 2) when a project-scoped command runs with no
- *   discoverable opensip-tools project (scope === 'none').
+ *   discoverable opensip-cli project (scope === 'none').
  */
 export function checkNoProjectAndBailout(
   project: ProjectContext,
@@ -115,15 +115,15 @@ export function checkNoProjectAndBailout(
     command: cmdName,
   });
   throw new BootstrapError({
-    message: `No opensip-tools.config.yml found. Searched from ${cwd} upward.`,
+    message: `No opensip-cli.config.yml found. Searched from ${cwd} upward.`,
     humanMessage: formatNoProjectFoundMessage(cwd),
-    suggestion: 'Run opensip-tools init to get started.',
+    suggestion: 'Run opensip init to get started.',
     exitCode: 2,
   });
 }
 
 /**
- * Phantom-runtime warning. Detects orphaned opensip-tools/.runtime/
+ * Phantom-runtime warning. Detects orphaned opensip-cli/.runtime/
  * subtrees between cwd and the discovered project root — fossils from
  * pre-discovery runs that scaffolded under subdirs. Warns to stderr
  * with a safe `rm -rf` hint; never auto-deletes. Suppressed for JSON
@@ -135,9 +135,9 @@ export function warnAboutPhantomRuntimes(project: ProjectContext, jsonOutput: bo
   const phantoms = detectPhantomRuntimes(project.cwd, project.projectRoot);
   for (const phantom of phantoms) {
     process.stderr.write(
-      `ℹ Detected an orphaned opensip-tools/ at:\n` +
+      `ℹ Detected an orphaned opensip-cli/ at:\n` +
         `    ${phantom}\n` +
-        `  Left over from running opensip-tools from this subdirectory\n` +
+        `  Left over from running opensip from this subdirectory\n` +
         `  before project-root discovery was added. Safe to delete with:\n` +
         `    rm -rf ${phantom}\n\n`,
     );

@@ -2,14 +2,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DataStoreFactory } from '@opensip-tools/datastore';
-import { SessionRepo } from '@opensip-tools/session-store';
+import { DataStoreFactory } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { showHistory } from '../commands/history.js';
 
-import type { StoredSession } from '@opensip-tools/contracts';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { StoredSession } from '@opensip-cli/contracts';
+import type { DataStore } from '@opensip-cli/datastore';
 
 let tmp: string;
 let ds: DataStore;
@@ -82,6 +82,6 @@ describe('showHistory', () => {
       errors: 0,
       warnings: 0,
     });
-    expect(result.sessions[0]?.showCommand).toBe('opensip-tools sessions show FIT_01 --json');
+    expect(result.sessions[0]?.showCommand).toBe('opensip sessions show FIT_01 --json');
   });
 });

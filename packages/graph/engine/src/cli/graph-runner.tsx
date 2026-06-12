@@ -1,7 +1,7 @@
 /**
- * graph-runner — owns the live-view state machine for `opensip-tools graph`.
+ * graph-runner — owns the live-view state machine for `opensip graph`.
  *
- * Layer 5 Phase 3 lifted the graph live view out of `opensip-tools`.
+ * Layer 5 Phase 3 lifted the graph live view out of `opensip-cli`.
  * The state machine (loading → running → done | error), `runGraph`
  * orchestration, `buildUnifiedReportLines` post-call, and the Ink/React
  * render tree live here, in the package that owns the graph command
@@ -10,7 +10,7 @@
  * `cli.registerLiveView(key, renderer)`.
  *
  * Progress rendering is the shared `<LiveProgress>` from
- * `@opensip-tools/cli-ui` (ADR-0016), driven in `phases` mode: graph's
+ * `@opensip-cli/cli-ui` (ADR-0016), driven in `phases` mode: graph's
  * 7 fixed pipeline stages map onto the universal `ProgressEvent` stream.
  * The former graph-local StageChecklist/StageLine/RunningStageLine are
  * gone. The build runs OFF the main process (ADR-0028): the runner forks
@@ -19,7 +19,7 @@
  * + the slim {@link LiveGraphOutput} back over IPC — so this process stays
  * free to animate the spinner + 80ms clock instead of freezing under the
  * type-check. It falls back to the in-process closure when forking is
- * disabled (`OPENSIP_TOOLS_NO_WORKER`) or the fork fails; both paths reduce
+ * disabled (`OPENSIP_CLI_NO_WORKER`) or the fork fails; both paths reduce
  * to the same `{ signals, reportLines }` payload.
  *
  * Single exit-code write path: error outcomes route through the
@@ -49,8 +49,8 @@ import {
   type ProgressCallback,
   type ProgressEvent,
   type ProgressSurface,
-} from '@opensip-tools/cli-ui';
-import { runOffThreadOrInProcess, currentScope } from '@opensip-tools/core';
+} from '@opensip-cli/cli-ui';
+import { runOffThreadOrInProcess, currentScope } from '@opensip-cli/core';
 import { Box, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
@@ -68,7 +68,7 @@ import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 import type { Shard } from './orchestrate/shard-model.js';
 import type { GraphStage } from './orchestrate.js';
 import type { GraphConfig, ResolutionMode, Rule } from '../types.js';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { DataStore } from '@opensip-cli/datastore';
 
 const GRAPH_TOOL_TITLE = 'Code Graph';
 const GRAPH_TOOL_DESCRIPTION = 'Building call-graph from source';
@@ -248,7 +248,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
     //     OFF the main process (ADR-0028) — fork the CLI to `graph-run-worker`,
     //     which streams stage progress + the slim LiveGraphOutput over IPC, so the
     //     heavy in-process type-check never freezes the spinner. Falls back to the
-    //     in-process closure (OPENSIP_TOOLS_NO_WORKER / fork failure), which
+    //     in-process closure (OPENSIP_CLI_NO_WORKER / fork failure), which
     //     reduces to the SAME LiveGraphOutput.
     //
     // Both transports converge on one `LiveGraphOutput` — already crossed the
@@ -420,8 +420,8 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
               hints={[
                 VERBOSE_DETAIL_HINT,
                 {
-                  text: 'opensip-tools dashboard for HTML report',
-                  bold: ['opensip-tools dashboard'],
+                  text: 'opensip dashboard for HTML report',
+                  bold: ['opensip dashboard'],
                 },
               ]}
             />

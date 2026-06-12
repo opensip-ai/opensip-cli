@@ -6,7 +6,7 @@
  * unchanged when no adapter is registered for the extension.
  *
  * This is the boundary that lets cross-language checks (in
- * @opensip-tools/checks-universal and similar) consume "code only,
+ * @opensip-cli/checks-universal and similar) consume "code only,
  * strings stripped" or "code only, strings + comments stripped" without
  * knowing which language a file is in.
  */
@@ -58,11 +58,11 @@ export function applyContentFilter(
   if (!scope) {
     // No active RunScope at all. Two cases land here:
     //   1. A unit test calling `check.run` directly (documented, benign).
-    //   2. A DUPLICATE @opensip-tools/core instance — the engine DID call
+    //   2. A DUPLICATE @opensip-cli/core instance — the engine DID call
     //      runWithScope, but on a different core copy than the one running
     //      this code, so its AsyncLocalStorage store is invisible here. This
     //      happens when a globally-installed CLI loads check packs from a
-    //      project that also vendors @opensip-tools packages.
+    //      project that also vendors @opensip-cli packages.
     // Either way we can't strip safely, so we degrade to raw — but a check
     // that asked for stripping and silently gets raw will match patterns
     // inside string literals/comments (false positives). Warn once so the
@@ -74,7 +74,7 @@ export function applyContentFilter(
         evt: 'core.content_filter.degraded',
         module: 'core:content-filter',
         mode,
-        hint: 'A check requested string/comment stripping but no RunScope is active. If you are running a globally-installed opensip-tools inside a project that also installs @opensip-tools packages, duplicate core instances split the scope — prefer the project-local CLI (e.g. `pnpm fit`). Results may contain false positives.',
+        hint: 'A check requested string/comment stripping but no RunScope is active. If you are running a globally-installed opensip-cli inside a project that also installs @opensip-cli packages, duplicate core instances split the scope — prefer the project-local CLI (e.g. `pnpm fit`). Results may contain false positives.',
       });
     }
     return content;

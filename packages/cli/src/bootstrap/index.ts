@@ -31,7 +31,7 @@
  * `loadCliDefaults`, `registerFirstPartyTools`, `BUNDLED_TOOL_PACKAGES`,
  * `registerLanguageAdapters`) stay in their files; bootstrap siblings and
  * tests import them directly. (User-global config I/O moved to
- * `@opensip-tools/config` in 2.10.1.) Audit 2026-05-23 M1.
+ * `@opensip-cli/config` in 2.10.1.) Audit 2026-05-23 M1.
  */
 
 import {
@@ -42,7 +42,7 @@ import {
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { hostEnv } from '../env/host-env-specs.js';
 import { initTelemetry } from '../telemetry/sdk-init.js';
@@ -84,13 +84,13 @@ export interface BootstrapOptions {
   readonly toolRegistry: ToolRegistry;
   /**
    * The CLI's own install directory. Anchors discovery of graph adapters
-   * and of tools installed as siblings of a global `opensip-tools`.
+   * and of tools installed as siblings of a global `opensip-cli`.
    */
   readonly projectDir: string;
   /**
    * The user's working directory (process.cwd()). Anchors project-local
    * and user-global tool discovery (a plain `npm install @tool`, the
-   * project's `.runtime/plugins/tool`, and `~/.opensip-tools/plugins/tool`).
+   * project's `.runtime/plugins/tool`, and `~/.opensip-cli/plugins/tool`).
    */
   readonly cwd: string;
   /**
@@ -105,7 +105,7 @@ export interface BootstrapOptions {
 /**
  * One-shot bootstrap: register language adapters, register the first-
  * party tools, and discover-and-register every third-party tool +
- * @opensip-tools/graph-* adapter pack. Datastore is NOT opened here —
+ * @opensip-cli/graph-* adapter pack. Datastore is NOT opened here —
  * it's a lazy getter on ToolCliContext (cli-context.ts), so dry-runs
  * and error paths that never read `cli.datastore` don't materialise
  * `.runtime/datastore.sqlite`.
@@ -137,15 +137,15 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   // 3.0.0: bundled tools load through the same dynamic-import path as installed
   // tools, so registration is async — awaited before discovery so the bundled
   // manifests are loaded before we derive the built-in skip-set from them.
-  // A bundled tool listed in OPENSIP_TOOLS_SKIP_BUNDLED is NOT loaded as bundled,
+  // A bundled tool listed in OPENSIP_CLI_SKIP_BUNDLED is NOT loaded as bundled,
   // so an installed/project-local copy of the same id can take over — the
   // install-source-independence escape hatch (the bundled tool is one provenance,
   // not a privilege).
   // `.get` returns the spec's `default: []` when unset, so the list is always an
   // array (never undefined).
-  const skipBundled = new Set(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_SKIP_BUNDLED'));
+  const skipBundled = new Set(hostEnv.get<readonly string[]>('OPENSIP_CLI_SKIP_BUNDLED'));
   const bundledPackages = BUNDLED_TOOL_PACKAGES.filter(
-    (pkg) => !skipBundled.has(pkg.replace('@opensip-tools/', '')),
+    (pkg) => !skipBundled.has(pkg.replace('@opensip-cli/', '')),
   );
   await registerFirstPartyTools(opts.toolRegistry, provenance, manifests, bundledPackages);
   // The bundled-tool ids discovery must skip on a name collision, derived from

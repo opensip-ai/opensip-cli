@@ -9,8 +9,8 @@
  *
  *   - **Short form** (`'fit' | 'sim' | 'graph'`) — used as the storage
  *     discriminator in `StoredSession.tool`, `SignalEnvelope.tool`,
- *     path-domain names (`<project>/opensip-tools/fit/`,
- *     `<project>/opensip-tools/sim/`), and CLI subcommand names. SQL
+ *     path-domain names (`<project>/opensip-cli/fit/`,
+ *     `<project>/opensip-cli/sim/`), and CLI subcommand names. SQL
  *     rows, generated dashboards, and on-disk layout all use it.
  *
  * Prior to audit-round-3 Finding H, the same literal union appeared

@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-12
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0040: Cross-package test scaffolding lives in an unpublished test-support package
@@ -26,15 +26,15 @@ enforcement-reason: >
   the ESLint barrel rule's sanction list).
 ```
 
-**Decision:** Cross-package TEST scaffolding lives in `@opensip-tools/test-support`
+**Decision:** Cross-package TEST scaffolding lives in `@opensip-cli/test-support`
 — a `private: true`, never-published workspace package consumed only as a
 devDependency by test files. It hosts (1) the `RunScope` test sugar
 (`makeTestScope` / `withScope` / `withScopeSync`), formerly the **published**
-`@opensip-tools/core/test-utils/with-scope.js` subpath, and (2) the per-check
+`@opensip-cli/core/test-utils/with-scope.js` subpath, and (2) the per-check
 fixture-coverage harness (`runCheckOnFixture`, `planCoverageCases`,
 `buildFixtureManifest`, …), formerly production source under
 `packages/fitness/engine/src/fixture-coverage/` re-exported through
-`@opensip-tools/fitness/internal`. `fitness/internal` shrinks to `executeFit`
+`@opensip-cli/fitness/internal`. `fitness/internal` shrinks to `executeFit`
 (the SaaS-mode smoke test's seam). Production source must never import
 test-support.
 
@@ -55,8 +55,8 @@ test-support.
   dependency serves both families without adding a publishable surface.
 
 **Rationale:** Audit finding (architectural-health review, 2026-06-11): test
-helpers exported from `@opensip-tools/core/test-utils`, consumed by fitness
-*production* files, re-exposed through `@opensip-tools/fitness/internal` — a
+helpers exported from `@opensip-cli/core/test-utils`, consumed by fitness
+*production* files, re-exposed through `@opensip-cli/fitness/internal` — a
 controlled but steadily widening quasi-public test surface. The fix follows the
 repo's own pattern for surfaces that must exist but must not be public:
 make the boundary structural (separate private package + depcruise rule), not
@@ -64,7 +64,7 @@ conventional (a doc comment asking people not to import it).
 
 **Consequences:**
 
-- Because test-support depends on `@opensip-tools/fitness`, the **fitness
+- Because test-support depends on `@opensip-cli/fitness`, the **fitness
   engine's own tests cannot import it** (the dev edge would make the package
   graph cyclic and break turbo). Same for `core`. Their tests use core's
   public `RunScope` API directly via small file-local helpers — deliberate,
@@ -72,8 +72,8 @@ conventional (a doc comment asking people not to import it).
 - Graph/simulation/cli test utilities (`with-graph-scope`, `with-sim-scope`,
   telemetry tests) also use core's public API directly rather than coupling
   their test graphs to the fitness engine through test-support.
-- Check packs consume `@opensip-tools/test-support` as a devDependency for
-  fixture-coverage tests; `@opensip-tools/fitness/internal` no longer exports
+- Check packs consume `@opensip-cli/test-support` as a devDependency for
+  fixture-coverage tests; `@opensip-cli/fitness/internal` no longer exports
   the harness.
 - The ESLint check-pack barrel rule's sanctioned core subpaths shrink to
   `languages/*`.

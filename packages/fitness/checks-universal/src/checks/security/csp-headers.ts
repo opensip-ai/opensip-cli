@@ -6,8 +6,8 @@
  * @fileoverview Validate Content Security Policy headers configuration
  */
 
-import { logger } from '@opensip-tools/core';
-import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness';
+import { logger } from '@opensip-cli/core';
+import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Match unsafe-inline CSP directive

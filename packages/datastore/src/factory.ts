@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ConfigurationError } from '@opensip-tools/core';
+import { ConfigurationError } from '@opensip-cli/core';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
 import { openMemoryBackend } from './backends/memory.js';
@@ -26,7 +26,7 @@ export const DataStoreFactory = {
    * stamp is refreshed to this CLI's supported version.
    *
    * @throws {DataStoreVersionError} When the SQLite file was written by a newer
-   *   opensip-tools than this CLI supports (the downgrade direction).
+   *   opensip-cli than this CLI supports (the downgrade direction).
    * @throws {DataStoreMigrationError} When the SQLite file cannot be opened
    *   (corrupt header, missing parent directory, permission errors), when the
    *   native `better-sqlite3` binding fails to load (an ABI mismatch — the file
@@ -141,7 +141,7 @@ export function openFailureMessage(opts: DataStoreOpenOptions, error: unknown): 
   // user to delete the data store would destroy healthy session history for no
   // reason. Steer them to rebuild the addon instead, regardless of backend.
   if (isNativeBindingError(error)) {
-    return `Failed to load the native SQLite module (better-sqlite3): its compiled binding was built for a different Node.js version than the one now running. Your data store is NOT corrupt — do not delete it. Rebuild the native module for your current Node.js with \`pnpm rebuild better-sqlite3\`, and run opensip-tools on the Node.js version this project targets (see \`.nvmrc\` / the package.json \`engines\` field).`;
+    return `Failed to load the native SQLite module (better-sqlite3): its compiled binding was built for a different Node.js version than the one now running. Your data store is NOT corrupt — do not delete it. Rebuild the native module for your current Node.js with \`pnpm rebuild better-sqlite3\`, and run opensip on the Node.js version this project targets (see \`.nvmrc\` / the package.json \`engines\` field).`;
   }
   if (opts.backend === 'sqlite' && opts.path) {
     return `Failed to open SQLite data store at \`${opts.path}\` — the file may be corrupted, missing permissions, or in a non-writable directory. Delete \`${opts.path}\` to start fresh (cache will rebuild on next run; session history will be lost).`;

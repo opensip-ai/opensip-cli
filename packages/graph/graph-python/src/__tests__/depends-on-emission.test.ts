@@ -26,7 +26,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { pythonGraphAdapter } from '../index.js';
 
-import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
+import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 
 let fixtureRoot: string;
 

@@ -1,5 +1,5 @@
 // CLEAN: common flags come from the shared registry via applyCommonFlags.
-import { applyCommonFlags } from '@opensip-tools/contracts'
+import { applyCommonFlags } from '@opensip-cli/contracts'
 
 export function register(program) {
   const cmd = program.command('fit').description('Run fitness checks')

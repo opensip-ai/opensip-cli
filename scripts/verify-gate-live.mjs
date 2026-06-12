@@ -5,7 +5,7 @@
 //
 // Background: every cross-package layer rule in .config/dependency-cruiser.cjs
 // matches RESOLVED file paths (e.g. ^packages/fitness/engine/). Those rules
-// can only fire if @opensip-tools imports actually resolve into a package's
+// can only fire if @opensip-cli imports actually resolve into a package's
 // src tree and appear as edges in the cruise graph. That resolution depends
 // on .config/tsconfig.depcruise.json (the `paths` map) being wired into
 // options.tsConfig.fileName. If that wiring breaks — a tsconfig rename, a
@@ -63,7 +63,7 @@ const TOOL_OUTPUT_PROBES = [
     // regression vector the granular rules can't see).
     file: `${PROBE_DIR}/__gate_probe_barrel__.ts`,
     source:
-      "import { formatSignalSarif } from '@opensip-tools/output';\n" +
+      "import { formatSignalSarif } from '@opensip-cli/output';\n" +
       'export const _gateProbe = formatSignalSarif;\n',
     rule: 'tool-engines-no-output-barrel',
   },
@@ -199,8 +199,8 @@ function main() {
     for (const d of m.dependencies || []) {
       const resolved = d.resolved || '';
       const mod = d.module || '';
-      const isWorkspace = mod.startsWith('@opensip-tools/');
-      // Signature of a resolved workspace import: @opensip-tools specifier
+      const isWorkspace = mod.startsWith('@opensip-cli/');
+      // Signature of a resolved workspace import: @opensip-cli specifier
       // AND resolved into a package src tree.
       if (isWorkspace && resolved.startsWith('packages/')) {
         sawWorkspaceImportResolved = true;
@@ -212,7 +212,7 @@ function main() {
       // half-broken.
       if (isWorkspace && (resolved.includes('/dist/') || resolved.includes('node_modules'))) {
         console.error(
-          'verify-gate-live: @opensip-tools import resolved to built output (gate would be inert): ' +
+          'verify-gate-live: @opensip-cli import resolved to built output (gate would be inert): ' +
             m.source +
             ' -> ' +
             resolved,
@@ -224,7 +224,7 @@ function main() {
 
   if (!sawWorkspaceImportResolved) {
     console.error(
-      'verify-gate-live: FAIL — no @opensip-tools import resolved to a package src tree. The dependency-cruiser resolver is broken; every cross-package layer rule is INERT. Check options.tsConfig.fileName -> .config/tsconfig.depcruise.json and its paths map.',
+      'verify-gate-live: FAIL — no @opensip-cli import resolved to a package src tree. The dependency-cruiser resolver is broken; every cross-package layer rule is INERT. Check options.tsConfig.fileName -> .config/tsconfig.depcruise.json and its paths map.',
     );
     process.exit(1);
   }

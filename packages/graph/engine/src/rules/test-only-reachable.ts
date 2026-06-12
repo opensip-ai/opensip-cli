@@ -11,7 +11,7 @@ import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { Indexes, Rule } from '../types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 export const testOnlyReachableRule = defineRule({
   slug: 'graph:test-only-reachable',

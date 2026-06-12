@@ -1,6 +1,6 @@
 // @fitness-ignore-file no-direct-stdout-in-tool-engine -- read-only auxiliary subcommand: the `--json` machine path deliberately bypasses the human render seam to emit a structured catalog-query result straight to stdout (documented inline at the call site). The human path uses cli.render. Not the signal-envelope run output.
 /**
- * `opensip-tools graph lookup <name>` — read-only catalog query.
+ * `opensip graph lookup <name>` — read-only catalog query.
  *
  * Loads the persisted catalog from the datastore and prints every
  * FunctionOccurrence whose `simpleName` matches `<name>`. Companion to
@@ -8,18 +8,18 @@
  * on functions and uses the existing catalog as the source of truth.
  *
  * If no catalog has been built yet, exits with CONFIGURATION_ERROR and
- * a clear "run `opensip-tools graph` first" message — this command
+ * a clear "run `opensip graph` first" message — this command
  * never triggers an analysis run.
  */
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { ConfigurationError, logger } from '@opensip-tools/core';
+import { EXIT_CODES } from '@opensip-cli/contracts';
+import { ConfigurationError, logger } from '@opensip-cli/core';
 
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 
 import type { Catalog, FunctionOccurrence } from '../types.js';
-import type { ToolCliContext } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { ToolCliContext } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 export interface LookupCommandOptions {
   readonly name: string;
@@ -39,7 +39,7 @@ export async function executeLookup(
     const catalog = new CatalogRepo(datastore).loadFullCatalog();
     if (!catalog) {
       throw new ConfigurationError(
-        'No graph catalog found. Run `opensip-tools graph` first to build the catalog.',
+        'No graph catalog found. Run `opensip graph` first to build the catalog.',
       );
     }
     const matches = collectMatches(catalog, opts.name);

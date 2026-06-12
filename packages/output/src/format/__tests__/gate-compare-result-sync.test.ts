@@ -3,7 +3,7 @@
  * P2 Task 2.2 → P6 Task 6.6).
  *
  * `core` declares a THIN local `GateCompareResult` for the `compareBaseline` seam
- * return type because `core` must NOT import `@opensip-tools/output` (which owns
+ * return type because `core` must NOT import `@opensip-cli/output` (which owns
  * the authoritative `GateCompareResult` consumed by `diffBaseline`). The two are
  * duplicated by necessity across the layer boundary, so they can silently drift.
  * This test pins them mutually-equal at COMPILE time — an added/renamed/retyped
@@ -16,7 +16,7 @@
 import { describe, expectTypeOf, it } from 'vitest';
 
 import type { GateCompareResult as OutputGateCompareResult } from '../baseline-diff.js';
-import type { GateCompareResult as CoreGateCompareResult } from '@opensip-tools/core';
+import type { GateCompareResult as CoreGateCompareResult } from '@opensip-cli/core';
 
 describe('GateCompareResult structural sync (core ↔ output)', () => {
   it('the two duplicated interfaces are exactly equal (drift guard)', () => {

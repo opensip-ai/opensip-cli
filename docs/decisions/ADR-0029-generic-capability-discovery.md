@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-09
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0029: Generic capability discovery — one substrate, descriptor-driven
@@ -26,7 +26,7 @@ enforcement-reason: >
 
 **Decision:** Every capability domain (fit's `fit-pack`, sim's `sim-pack`, graph's
 `graph-adapter`, plus the co-located `fit-recipe`/`sim-recipe`) is discovered and
-loaded by ONE generic substrate in `@opensip-tools/core`
+loaded by ONE generic substrate in `@opensip-cli/core`
 (`discoverCapabilityContributions` + the scope-owned `loadCapabilityDomain`),
 driven entirely by a `discovery` descriptor each tool declares in its manifest. The
 host routes every contribution through `CapabilityRegistry.routeContribution` to the
@@ -58,7 +58,7 @@ audit scope-isolation findings at their root: F1 (sim's `scenariosLoadedFor`/
 `pluginLoadErrors` module globals → `scope.simulation.load`), F2 (parse cache module
 global → `scope.parseCache`), and F3 (fitness's `mergedCheckDisplay` singleton →
 display folded onto each `check.config`). The single-core guard (drop a pack resolving
-a foreign `@opensip-tools/core`) is hoisted into core and applied to EVERY domain.
+a foreign `@opensip-cli/core`) is hoisted into core and applied to EVERY domain.
 
 **Consequences:**
 - A new tool ships discovery by declaring a `discovery` descriptor + a registrar — no

@@ -20,7 +20,7 @@
 
 import { join } from 'node:path';
 
-import { resolveEffectiveCloudConfig } from '@opensip-tools/config';
+import { resolveEffectiveCloudConfig } from '@opensip-cli/config';
 import {
   createCapabilityRegistry,
   type Logger,
@@ -29,8 +29,8 @@ import {
   RunScope,
   type ToolPluginManifest,
   type ToolRegistry,
-} from '@opensip-tools/core';
-import { resolveSignalSink } from '@opensip-tools/output';
+} from '@opensip-cli/core';
+import { resolveSignalSink } from '@opensip-cli/output';
 
 import { buildDatastoreThunk } from '../cli-context.js';
 

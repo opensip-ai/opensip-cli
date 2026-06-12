@@ -13,7 +13,7 @@
 
 import { execFileSync } from 'node:child_process';
 
-import { buildSignalEnvelope, EXIT_CODES, type SignalEnvelope } from '@opensip-tools/contracts';
+import { buildSignalEnvelope, EXIT_CODES, type SignalEnvelope } from '@opensip-cli/contracts';
 import {
   HOST_VERDICT_POLICY_FALLBACK,
   LanguageRegistry,
@@ -23,7 +23,7 @@ import {
   runWithScope,
   type SignalSink,
   type ToolShortId,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { deliverEnvelope } from '../bootstrap/deliver-envelope.js';

@@ -31,12 +31,12 @@
  * type resolution, or scope analysis an AST would buy us.
  *
  * SCOPE — the filename conventions (`*-runner.tsx` for a tool's live view,
- * `*-worker.ts` for its headless engine entry) are opensip-tools' own; a consumer
+ * `*-worker.ts` for its headless engine entry) are opensip-cli' own; a consumer
  * that does not adopt them sees this check as a no-op. A genuine exception is
  * exempted per-file via `@fitness-ignore-file live-runs-off-thread` with a
  * justification comment.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /** Test-file fragments — skipped (fixtures may exercise either transport). */
 const TEST_PATH = /(?:\.test\.tsx?$|\/__tests__\/)/;
@@ -89,8 +89,8 @@ export function analyzeLiveRunsOffThread(content: string, filePath: string): Che
         line: i + 1,
         suggestion:
           'Drive the engine through `runOffThreadOrInProcess({ descriptor, inProcess })` ' +
-          'from @opensip-tools/core — it forks the headless `<tool>-run-worker` and ' +
-          'falls back to in-process itself (OPENSIP_TOOLS_NO_WORKER / fork failure). ' +
+          'from @opensip-cli/core — it forks the headless `<tool>-run-worker` and ' +
+          'falls back to in-process itself (OPENSIP_CLI_NO_WORKER / fork failure). ' +
           'If this runner is genuinely a light, in-process-only view, add ' +
           '`@fitness-ignore-file live-runs-off-thread` with a justification comment.',
       });

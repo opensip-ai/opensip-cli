@@ -6,9 +6,9 @@
  * Detects configuration properties that are defined but never accessed.
  */
 
-import { logger } from '@opensip-tools/core';
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import { logger } from '@opensip-cli/core';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
+import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 interface ConfigProperty {

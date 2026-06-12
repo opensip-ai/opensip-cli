@@ -1,22 +1,22 @@
 /**
  * @fileoverview The `plugins.checkPackages` preference reader.
  *
- * Check-pack discovery + resolution (marker walk, the `@opensip-tools` built-in
+ * Check-pack discovery + resolution (marker walk, the `@opensip-cli` built-in
  * split, explicit-name resolution, the single-core guard) lives in the GENERIC
- * capability substrate (`@opensip-tools/core`) now. This module keeps only the
+ * capability substrate (`@opensip-cli/core`) now. This module keeps only the
  * fitness-side reader for the documented `plugins.checkPackages` config key —
- * fitness resolves its own preference without depending on `@opensip-tools/config`,
+ * fitness resolves its own preference without depending on `@opensip-cli/config`,
  * then hands an explicit-package list to the generic loader.
  */
 
 import { join } from 'node:path';
 
-import { readYamlFile } from '@opensip-tools/core';
+import { readYamlFile } from '@opensip-cli/core';
 
-const CONFIG_FILENAME = 'opensip-tools.config.yml';
+const CONFIG_FILENAME = 'opensip-cli.config.yml';
 
 /**
- * Read `plugins.checkPackages` from the project's opensip-tools.config.yml
+ * Read `plugins.checkPackages` from the project's opensip-cli.config.yml
  * without a full schema parse. Mirrors the inline-yaml-read pattern used by
  * `readProjectPluginsList()` — avoids a circular dep between plugins/ and targets/.
  */

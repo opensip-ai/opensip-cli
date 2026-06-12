@@ -19,8 +19,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { enterScope, LanguageRegistry } from '@opensip-cli/core';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
@@ -36,7 +36,7 @@ import type {
   ResolveOutput,
   WalkOutput,
 } from '../lang-adapter/types.js';
-import type { CommandHandler, CommandSpec, ToolCliContext, ToolScope } from '@opensip-tools/core';
+import type { CommandHandler, CommandSpec, ToolCliContext, ToolScope } from '@opensip-cli/core';
 
 /** Resolve a graph command-spec by name. */
 function specFor(name: string): CommandSpec<unknown, ToolCliContext> {
@@ -162,7 +162,7 @@ describe('--resolution declaration', () => {
 });
 
 describe('graph interactive --exact path honors graph config', () => {
-  it('loads opensip-tools.config.yml graph block and forwards it to renderLive (--exact, TTY)', async () => {
+  it('loads opensip-cli.config.yml graph block and forwards it to renderLive (--exact, TTY)', async () => {
     // Regression: the interactive live-view path used to call runGraph with no
     // config, silently ignoring the project's `graph:` block — so
     // `graph --verbose` disagreed with `graph --json`. ADR-0032: the Ink live
@@ -170,7 +170,7 @@ describe('graph interactive --exact path honors graph config', () => {
     // (sharded is the default and routes to the static path).
     currentAdapterRegistry().register(fakeAdapter(workDir));
     writeFileSync(
-      join(workDir, 'opensip-tools.config.yml'),
+      join(workDir, 'opensip-cli.config.yml'),
       'graph:\n  minCrossPackageDuplicatePackages: 2\n',
       'utf8',
     );

@@ -25,11 +25,11 @@ import {
   policyPasses,
   SeverityPolicy,
   stampFingerprints,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { passRate } from './score.js';
 
-import type { FingerprintStrategy, Signal, ToolShortId, VerdictPolicy } from '@opensip-tools/core';
+import type { FingerprintStrategy, Signal, ToolShortId, VerdictPolicy } from '@opensip-cli/core';
 
 /**
  * Run-level verdict header. `passed` ⇔ "no `critical`/`high` signals";

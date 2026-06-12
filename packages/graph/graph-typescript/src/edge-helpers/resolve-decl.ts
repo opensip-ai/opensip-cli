@@ -26,7 +26,7 @@
 
 import { relative, sep } from 'node:path';
 
-import { resolveCrossPackageCall } from '@opensip-tools/graph';
+import { resolveCrossPackageCall } from '@opensip-cli/graph';
 
 import { findCatalogEntry } from './find-catalog-entry.js';
 import { traceResolveDecl } from './resolution-trace.js';

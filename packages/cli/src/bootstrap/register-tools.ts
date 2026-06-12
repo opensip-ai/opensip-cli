@@ -17,7 +17,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
-import { type CliProgram } from '@opensip-tools/contracts';
+import { type CliProgram } from '@opensip-cli/contracts';
 import {
   admitTool,
   assertManifestMatchesTool,
@@ -37,7 +37,7 @@ import {
   type ToolProvenance,
   type ToolRegistry,
   type ToolSource,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
@@ -54,7 +54,7 @@ const BOOTSTRAP_MODULE = 'cli:bootstrap';
 
 /**
  * Bundled first-party tool PACKAGES — declared as direct deps of
- * opensip-tools. Order is registration order (and thus help/listing order).
+ * opensip-cli. Order is registration order (and thus help/listing order).
  *
  * 3.0.0 GA cutover: these are package NAMES, not imported tool runtimes. The
  * host no longer statically `import`s `fitnessTool`/`graphTool`/`simulationTool`
@@ -66,9 +66,9 @@ const BOOTSTRAP_MODULE = 'cli:bootstrap';
  * guards this file against a static tool-runtime import creeping back).
  */
 export const BUNDLED_TOOL_PACKAGES: readonly string[] = [
-  '@opensip-tools/fitness',
-  '@opensip-tools/simulation',
-  '@opensip-tools/graph',
+  '@opensip-cli/fitness',
+  '@opensip-cli/simulation',
+  '@opensip-cli/graph',
 ];
 // ^ Editing this list? EXPECTED_SCAFFOLDING_TOOL_IDS below pins the historical
 //   `init`-scaffold expectation against exactly this kind of edit — keep the
@@ -317,7 +317,7 @@ export interface DiscoveryOptions {
  *
  *   1. project-local `.runtime/plugins/tool`  — `plugin add --project`
  *   2. project tree (walk up from cwd)          — plain `npm install @tool`
- *   3. user-global `~/.opensip-tools/plugins/tool` — `plugin add` (default)
+ *   3. user-global `~/.opensip-cli/plugins/tool` — `plugin add` (default)
  *   4. CLI install dir (walk up)                 — `npm i -g @tool`
  *
  * A project-local pin therefore shadows a user-global install of the same
@@ -381,7 +381,7 @@ function admitInstalledTool(
     // 3.0.0: a discovered tool with no conformant manifest is no longer admitted
     // off the `kind:'tool'` marker alone (the grace window ended) — skip it.
     process.stderr.write(
-      `opensip-tools: tool package ${pkg.name} has no conformant package.json#opensipTools manifest — skipping\n`,
+      `opensip: tool package ${pkg.name} has no conformant package.json#opensipTools manifest — skipping\n`,
     );
     logger.warn({
       evt: 'cli.tool.manifest_invalid',
@@ -437,14 +437,14 @@ function emitInstalledLoadFailure(
 ): void {
   if (load.reason === 'no-entry') {
     process.stderr.write(
-      `opensip-tools: tool package ${name} has no resolvable entry point — skipping\n`,
+      `opensip: tool package ${name} has no resolvable entry point — skipping\n`,
     );
     logger.warn({ evt: 'cli.tool.no_entry', module: BOOTSTRAP_MODULE, name });
     return;
   }
   if (load.reason === 'invalid-shape') {
     process.stderr.write(
-      `opensip-tools: tool package ${name} does not export a valid \`tool\` — skipping\n`,
+      `opensip: tool package ${name} does not export a valid \`tool\` — skipping\n`,
     );
     logger.warn({
       evt: 'cli.tool.invalid_shape',
@@ -454,7 +454,7 @@ function emitInstalledLoadFailure(
     return;
   }
   process.stderr.write(
-    `opensip-tools: failed to load tool ${name}: ${load.detail ?? 'import failed'}\n`,
+    `opensip: failed to load tool ${name}: ${load.detail ?? 'import failed'}\n`,
   );
   logger.warn({
     evt: 'cli.tool.load_failed',
@@ -512,7 +512,7 @@ export async function discoverAndRegisterToolPackages(
       manifests.push(admission.manifest);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`opensip-tools: failed to load tool ${pkg.name}: ${msg}\n`);
+      process.stderr.write(`opensip: failed to load tool ${pkg.name}: ${msg}\n`);
       logger.warn({
         evt: 'cli.tool.load_failed',
         module: BOOTSTRAP_MODULE,
@@ -582,7 +582,7 @@ function admitAuthoredTool(source: ToolSource, dir: string): AuthoredAdmission {
  * production discovery in 3.0.0).
  *
  * A project-local tool is authored code under
- * `<project>/opensip-tools/tools/<name>/` declaring its identity via a JSON
+ * `<project>/opensip-cli/tools/<name>/` declaring its identity via a JSON
  * sidecar (`opensip-tool.manifest.json`). It is read + gated WITHOUT importing
  * its module:
  *
@@ -617,7 +617,7 @@ export function admitProjectLocalTool(args: {
   if (!isProjectLocalToolTrusted(manifest.id, args.env)) {
     throw new PluginIncompatibleError(
       `project-local tool '${manifest.id}' is not trusted to load (deny-by-default). ` +
-        `Allowlist it via OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS='${manifest.id}' to admit it.`,
+        `Allowlist it via OPENSIP_CLI_ALLOW_PROJECT_TOOLS='${manifest.id}' to admit it.`,
       { diagnostic: 'project-local tool not allowlisted (deny-by-default)' },
     );
   }
@@ -629,7 +629,7 @@ export function admitProjectLocalTool(args: {
  * {@link admitProjectLocalTool}.
  *
  * A user-global tool is an authored sidecar under
- * `~/.opensip-tools/tools/<name>/`. The user deliberately placed it in their
+ * `~/.opensip-cli/tools/<name>/`. The user deliberately placed it in their
  * own home dir (the `npm i -g` analogue for authored code), so there is **no
  * allowlist gate** — it is trusted-by-default. It still reads the static
  * sidecar and runs `admitTool` BEFORE the module could be imported (the shared
@@ -653,13 +653,13 @@ export function admitUserGlobalTool(args: { readonly dir: string }): AuthoredAdm
  * dormant {@link admitProjectLocalTool} live).
  *
  * Two roots, two trust postures:
- *   - **global** (`~/.opensip-tools/tools/`) → {@link admitUserGlobalTool},
+ *   - **global** (`~/.opensip-cli/tools/`) → {@link admitUserGlobalTool},
  *     trusted-by-default.
- *   - **project** (`<project>/opensip-tools/tools/`) → {@link admitProjectLocalTool},
- *     deny-by-default (allowlist via `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`).
+ *   - **project** (`<project>/opensip-cli/tools/`) → {@link admitProjectLocalTool},
+ *     deny-by-default (allowlist via `OPENSIP_CLI_ALLOW_PROJECT_TOOLS`).
  *
  * Global is processed FIRST so a project-authored tool cannot shadow a same-id
- * global one — matching the `~/.opensip-tools/plugins` precedence note in
+ * global one — matching the `~/.opensip-cli/plugins` precedence note in
  * {@link buildToolDiscoverySources} (first-writer-wins via the registry).
  * `builtInIds` are skipped so an authored tool never shadows a bundled one.
  *
@@ -808,7 +808,7 @@ export function mountAllToolCommands(
       mountOneTool(program, tool, ctx);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`opensip-tools: tool ${tool.metadata.id} failed to mount: ${msg}\n`);
+      process.stderr.write(`opensip: tool ${tool.metadata.id} failed to mount: ${msg}\n`);
       logger.warn({
         evt: 'cli.tool.register_failed',
         module: BOOTSTRAP_MODULE,
@@ -849,7 +849,7 @@ function mountOneTool(program: CliProgram, tool: Tool, ctx: ToolCliContext): voi
   });
 }
 
-const DOCS_HELP_FOOTER = '\nDocs: https://opensip.ai/docs/opensip-tools';
+const DOCS_HELP_FOOTER = '\nDocs: https://opensip.ai/docs/opensip-cli';
 
 /**
  * Apply one help configuration to the root program and every (sub)command:

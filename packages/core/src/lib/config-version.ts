@@ -1,6 +1,6 @@
 /**
  * @fileoverview Permissive reader for the top-level `schemaVersion:`
- * field of opensip-tools.config.yml + a compatibility classifier.
+ * field of opensip-cli.config.yml + a compatibility classifier.
  *
  * The CLI's pre-action-hook calls these BEFORE any tool's strict loader
  * runs, so the reader must tolerate every "couldn't determine" case
@@ -47,7 +47,7 @@ export function readConfigSchemaVersion(configPath: string): number {
  *
  *  - 'ok'           — versions match; proceed silently.
  *  - 'older'        — config is older than CLI; CLI can read it (today).
- *                     Future: `opensip-tools migrate` updates it. For
+ *                     Future: `opensip-cli migrate` updates it. For
  *                     now the CLI runs it as-is.
  *  - 'cli-too-old'  — config is newer than CLI knows. CLI cannot safely
  *                     load it. User must upgrade the CLI.

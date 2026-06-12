@@ -11,7 +11,7 @@ import {
   type TableColumnSpec,
   type Tone,
   type ViewNode,
-} from '@opensip-tools/cli-ui';
+} from '@opensip-cli/cli-ui';
 
 import type {
   ToolsDataPurgeResult,
@@ -21,7 +21,7 @@ import type {
   ToolsUninstallResult,
   ToolsValidateResult,
   ToolsValidateSection,
-} from '@opensip-tools/contracts';
+} from '@opensip-cli/contracts';
 
 const SPACER: ViewNode = { kind: 'spacer' };
 

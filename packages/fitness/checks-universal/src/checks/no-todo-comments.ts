@@ -8,7 +8,7 @@
  * dispatches through the registered LanguageAdapter, so this check
  * works for any language whose adapter implements stripStrings.
  */
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 // HACK is intentionally excluded — `no-temporary-workarounds` owns HACK
 // (with qualifier needles like "temporary"/"workaround"). Including HACK

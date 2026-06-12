@@ -1,7 +1,7 @@
 ---
 status: superseded
 last_verified: 2026-06-09
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0031: Graph determinism — one build, one finalize, many renderers

@@ -3,7 +3,7 @@
  * @fileoverview Environment Variable Validation check
  */
 
-import { createPathMatcher, defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { createPathMatcher, defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 // =============================================================================
 // TYPES

@@ -1,6 +1,6 @@
 // @fitness-ignore-file no-direct-stdout-in-tool-engine -- auxiliary subcommand status line: `graph symbol-index` writes its artifact to a file and prints a one-line "wrote N symbols to <path>" confirmation. This is not the signal-envelope run output (ADR-0011), which routes through the composition root.
 /**
- * `opensip-tools graph symbol-index --out <path>` — emit a symbol-index
+ * `opensip graph symbol-index --out <path>` — emit a symbol-index
  * JSON artifact suitable for agent consumption (e.g., feeding into a
  * coding LLM's context, or piping into another tool).
  *
@@ -28,14 +28,14 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { ConfigurationError, logger } from '@opensip-tools/core';
+import { EXIT_CODES } from '@opensip-cli/contracts';
+import { ConfigurationError, logger } from '@opensip-cli/core';
 
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 
 import type { Catalog } from '../types.js';
-import type { ToolCliContext } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { ToolCliContext } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 export interface SymbolIndexCommandOptions {
   readonly cwd: string;
@@ -70,7 +70,7 @@ export function executeSymbolIndex(opts: SymbolIndexCommandOptions, cli: ToolCli
     const catalog = new CatalogRepo(datastore).loadFullCatalog();
     if (!catalog) {
       throw new ConfigurationError(
-        'No graph catalog found. Run `opensip-tools graph` first to build the catalog.',
+        'No graph catalog found. Run `opensip graph` first to build the catalog.',
       );
     }
     const artifact = buildArtifact(catalog);

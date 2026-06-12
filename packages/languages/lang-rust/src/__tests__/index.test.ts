@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import * as pkg from '../index.js';
 
-describe('@opensip-tools/lang-rust barrel', () => {
+describe('@opensip-cli/lang-rust barrel', () => {
   it('re-exports the rust adapter and adapters array', () => {
     expect(pkg.rustAdapter).toBeDefined();
     expect(pkg.rustAdapter.id).toBe('rust');

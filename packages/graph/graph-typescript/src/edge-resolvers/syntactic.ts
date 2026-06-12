@@ -24,7 +24,7 @@ import { relative, sep, posix } from 'node:path';
 
 import ts from 'typescript';
 
-import type { Catalog, FunctionOccurrence, ResolverVerdict } from '@opensip-tools/graph';
+import type { Catalog, FunctionOccurrence, ResolverVerdict } from '@opensip-cli/graph';
 
 /**
  * Per-file import index: imported binding name → resolved target file

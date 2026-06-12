@@ -1,7 +1,7 @@
 /**
- * @opensip-tools/output — the tool-run output layer.
+ * @opensip-cli/output — the tool-run output layer.
  *
- * Renamed from `@opensip-tools/reporting` (Phase 2, ADR-0011): the package no
+ * Renamed from `@opensip-cli/reporting` (Phase 2, ADR-0011): the package no
  * longer just reports to cloud — it owns all machine formatting + delivery.
  * It depends on core + contracts only.
  */

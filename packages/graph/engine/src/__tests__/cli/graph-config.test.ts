@@ -1,5 +1,5 @@
 /**
- * Loader for the `graph:` block of opensip-tools.config.yml.
+ * Loader for the `graph:` block of opensip-cli.config.yml.
  *
  * Validates that the rule knobs (notably minCrossPackageDuplicatePackages)
  * are read from the project config, and that every absence/malformed path
@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { runWithScopeSync } from '@opensip-tools/core';
+import { runWithScopeSync } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadGraphConfig } from '../../cli/graph-config.js';
@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 function writeConfig(body: string): void {
-  writeFileSync(join(workDir, 'opensip-tools.config.yml'), body, 'utf8');
+  writeFileSync(join(workDir, 'opensip-cli.config.yml'), body, 'utf8');
 }
 
 describe('loadGraphConfig', () => {

@@ -6,11 +6,11 @@
  * extraction — pure functions over tree-sitter nodes, no walker state.
  */
 
-import { childrenOf, namedChildrenOf } from '@opensip-tools/graph-adapter-common';
+import { childrenOf, namedChildrenOf } from '@opensip-cli/graph-adapter-common';
 
 import type { JavaParsedFile } from './parse.js';
-import type { FunctionOccurrence } from '@opensip-tools/graph';
-import type { Node } from '@opensip-tools/tree-sitter';
+import type { FunctionOccurrence } from '@opensip-cli/graph';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 export function packageQualifier(packageName: string, filePathProjectRel: string): string {
   if (packageName.length > 0) return packageName;

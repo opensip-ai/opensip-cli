@@ -4,12 +4,12 @@
  *
  * Resolves recipe check selectors (explicit / pattern / tags / all) into
  * concrete check-key lists. The selection algorithm itself lives once in
- * `@opensip-tools/core` (`resolveSelector`); this module wires fitness's
+ * `@opensip-cli/core` (`resolveSelector`); this module wires fitness's
  * registry, `minimatch`, and namespaced-slug reverse-lookup into it. The
  * per-arm semantics are unchanged from the previous hand-rolled switch.
  */
 
-import { resolveSelector, type ResolveSelectorOptions } from '@opensip-tools/core';
+import { resolveSelector, type ResolveSelectorOptions } from '@opensip-cli/core';
 import { minimatch } from 'minimatch';
 
 import type { CheckSelector } from './types.js';

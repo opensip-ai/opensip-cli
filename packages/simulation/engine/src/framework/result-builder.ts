@@ -6,7 +6,7 @@
  * Assertions are evaluated in order.
  */
 
-import { createSignal, isErrorSignal, ValidationError } from '@opensip-tools/core';
+import { createSignal, isErrorSignal, ValidationError } from '@opensip-cli/core';
 
 import { evaluateAssertion } from './assertions.js';
 import { resolveMetric } from './resolve-metric.js';
@@ -17,7 +17,7 @@ import type {
   FailedAssertion,
   LoadResultPayload,
 } from '../types/framework-types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 /**
  * Build the single error-severity signal that represents a failed scenario

@@ -3,7 +3,7 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-source-maps
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 import { hasSentryUsage } from './_helpers/sentry.js';
 

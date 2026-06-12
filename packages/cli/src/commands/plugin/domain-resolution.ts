@@ -14,7 +14,7 @@
 import { execFileSync } from 'node:child_process';
 import { isAbsolute, join } from 'node:path';
 
-import { readDeclaredKind, type PluginLayout } from '@opensip-tools/core';
+import { readDeclaredKind, type PluginLayout } from '@opensip-cli/core';
 
 import { extractNameFromSpec } from './host-dir.js';
 
@@ -23,7 +23,7 @@ import { extractNameFromSpec } from './host-dir.js';
  * the fit/sim plugin DOMAINS (which are project-committed + listed in
  * `plugins.<domain>` config): a Tool plugin auto-discovers by its
  * `opensipTools.kind: "tool"` marker, needs NO config entry, and installs
- * user-global by default (`~/.opensip-tools/plugins/tool`) so the
+ * user-global by default (`~/.opensip-cli/plugins/tool`) so the
  * subcommand is available in every project — or project-local
  * (`.runtime/plugins/tool`) with `--project`.
  */
@@ -48,7 +48,7 @@ function inferDomain(packageName: string, domains: readonly string[]): string | 
 /**
  * Resolve the target domain, rejecting arbitrary strings from --domain.
  * A bare cast would let a caller pass '../../etc' and drive path
- * construction outside opensip-tools/.runtime/.
+ * construction outside opensip-cli/.runtime/.
  */
 export function resolveDomain(
   override: string | undefined,

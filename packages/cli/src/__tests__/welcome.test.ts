@@ -22,11 +22,11 @@ const ANSI_PATTERN = new RegExp(String.raw`${String.fromCodePoint(0x1b)}\[`);
 describe('buildWelcome', () => {
   it('includes the version and primary subcommands', () => {
     const out = buildWelcome({ version: '1.2.3' });
-    expect(out).toContain('opensip-tools');
+    expect(out).toContain('OpenSIP CLI');
     expect(out).toContain('1.2.3');
-    expect(out).toContain('opensip-tools fit');
-    expect(out).toContain('opensip-tools sim');
-    expect(out).toContain('opensip-tools init');
+    expect(out).toContain('opensip fit');
+    expect(out).toContain('opensip sim');
+    expect(out).toContain('opensip init');
   });
 
   it('emits plain text when NO_COLOR is set', () => {

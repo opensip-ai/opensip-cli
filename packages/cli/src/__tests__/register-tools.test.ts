@@ -11,7 +11,7 @@ import {
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { Command } from 'commander';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
@@ -101,7 +101,7 @@ describe('registerFirstPartyTools', () => {
       expect(record.source).toBe('bundled');
       expect(typeof record.manifestHash).toBe('string');
       expect(record.manifestHash.length).toBeGreaterThan(0);
-      expect(record.packageName).toMatch(/^@opensip-tools\//);
+      expect(record.packageName).toMatch(/^@opensip-cli\//);
     }
     expect(provenance.map((p) => p.id)).toEqual(
       expect.arrayContaining(['fitness', 'simulation', 'graph']),
@@ -133,7 +133,7 @@ describe('registerFirstPartyTools', () => {
         registry,
         [],
         [],
-        ['@opensip-tools/__definitely-not-a-real-package__'],
+        ['@opensip-cli/__definitely-not-a-real-package__'],
       ),
     ).rejects.toBeInstanceOf(PluginIncompatibleError);
     expect(registry.list()).toHaveLength(0);
@@ -148,7 +148,7 @@ describe('registerFirstPartyTools', () => {
     writeFileSync(
       join(dir, 'package.json'),
       JSON.stringify({
-        name: '@opensip-tools-fixture/no-manifest-bundled',
+        name: '@opensip-cli-fixture/no-manifest-bundled',
         version: '0.0.0',
         type: 'module',
         main: './index.js',
@@ -163,7 +163,7 @@ describe('registerFirstPartyTools', () => {
     const registry = new ToolRegistryClass();
     try {
       await expect(
-        registerFirstPartyTools(registry, [], [], ['@opensip-tools-fixture/no-manifest-bundled']),
+        registerFirstPartyTools(registry, [], [], ['@opensip-cli-fixture/no-manifest-bundled']),
       ).rejects.toBeInstanceOf(PluginIncompatibleError);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -181,7 +181,7 @@ describe('registerFirstPartyTools', () => {
     writeFileSync(
       join(dir, 'package.json'),
       JSON.stringify({
-        name: '@opensip-tools-fixture/broken-bundled',
+        name: '@opensip-cli-fixture/broken-bundled',
         version: '0.0.0',
         type: 'module',
         main: './index.js',
@@ -204,7 +204,7 @@ describe('registerFirstPartyTools', () => {
     const restore = silenceStderr();
     try {
       await expect(
-        registerFirstPartyTools(registry, [], [], ['@opensip-tools-fixture/broken-bundled']),
+        registerFirstPartyTools(registry, [], [], ['@opensip-cli-fixture/broken-bundled']),
       ).rejects.toBeInstanceOf(PluginIncompatibleError);
     } finally {
       restore();
@@ -238,7 +238,7 @@ describe('mountAllToolCommands', () => {
     const registry = makeRegistry();
     registry.register(specTool('tool-a', 'a'));
     registry.register(specTool('tool-b', 'b'));
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
 
     mountAllToolCommands(registry, program, makeStubContext());
 
@@ -260,7 +260,7 @@ describe('mountAllToolCommands', () => {
       commands: [],
     } as never);
     registry.register(specTool('tool-ok', 'ok'));
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
 
     const origWrite = process.stderr.write.bind(process.stderr);
     process.stderr.write = () => true;
@@ -304,7 +304,7 @@ describe('mountAllToolCommands', () => {
       ] as never,
     } as never);
     registry.register(specTool('tool-good', 'good'));
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
 
     const origWrite = process.stderr.write.bind(process.stderr);
     process.stderr.write = () => true;
@@ -342,13 +342,13 @@ describe('discoverAndRegisterToolPackages', () => {
 // Discovery loop body. `discoverAndRegisterToolPackages` does `await
 // import(pkg.name)` on every discovered package, so the package must be
 // importable by its bare name. We stage fixture packages inside the CLI
-// package's own node_modules (under a throwaway @opensip-tools-fixture scope)
+// package's own node_modules (under a throwaway @opensip-cli-fixture scope)
 // and point projectDir at the CLI package root so the ancestor-walk finds
 // them AND Node's resolver can import them. Each fixture is removed afterwards.
 // ---------------------------------------------------------------------------
 
 const CLI_PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const FIXTURE_SCOPE = join(CLI_PKG_ROOT, 'node_modules', '@opensip-tools-fixture');
+const FIXTURE_SCOPE = join(CLI_PKG_ROOT, 'node_modules', '@opensip-cli-fixture');
 
 interface Fixture {
   readonly name: string;
@@ -360,7 +360,7 @@ function stageFixture(shortName: string, files: { packageJson: object; indexJs: 
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'package.json'), JSON.stringify(files.packageJson), 'utf8');
   writeFileSync(join(dir, 'index.js'), files.indexJs, 'utf8');
-  return { name: `@opensip-tools-fixture/${shortName}`, dir };
+  return { name: `@opensip-cli-fixture/${shortName}`, dir };
 }
 
 function silenceStderr(): () => void {
@@ -383,7 +383,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     staged.push(
       stageFixture('valid-tool', {
         packageJson: {
-          name: '@opensip-tools-fixture/valid-tool',
+          name: '@opensip-cli-fixture/valid-tool',
           version: '0.0.0',
           type: 'module',
           main: './index.js',
@@ -414,7 +414,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     staged.push(
       stageFixture('drifted-manifest', {
         packageJson: {
-          name: '@opensip-tools-fixture/drifted-manifest',
+          name: '@opensip-cli-fixture/drifted-manifest',
           version: '0.0.0',
           type: 'module',
           main: './index.js',
@@ -457,7 +457,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     staged.push(
       stageFixture('bad-shape', {
         packageJson: {
-          name: '@opensip-tools-fixture/bad-shape',
+          name: '@opensip-cli-fixture/bad-shape',
           version: '0.0.0',
           type: 'module',
           main: './index.js',
@@ -494,7 +494,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     writeFileSync(
       join(dir, 'package.json'),
       JSON.stringify({
-        name: '@opensip-tools-fixture/no-entry',
+        name: '@opensip-cli-fixture/no-entry',
         version: '0.0.0',
         type: 'module',
         opensipTools: {
@@ -506,7 +506,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       }),
       'utf8',
     );
-    staged.push({ name: '@opensip-tools-fixture/no-entry', dir });
+    staged.push({ name: '@opensip-cli-fixture/no-entry', dir });
     const registry = new ToolRegistryClass();
     const restore = silenceStderr();
     try {
@@ -525,7 +525,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     staged.push(
       stageFixture('shadow-fitness', {
         packageJson: {
-          name: '@opensip-tools-fixture/shadow-fitness',
+          name: '@opensip-cli-fixture/shadow-fitness',
           version: '0.0.0',
           type: 'module',
           main: './index.js',
@@ -559,7 +559,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     staged.push(
       stageFixture('future-epoch', {
         packageJson: {
-          name: '@opensip-tools-fixture/future-epoch',
+          name: '@opensip-cli-fixture/future-epoch',
           version: '0.0.0',
           type: 'module',
           main: './index.js',
@@ -602,7 +602,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     staged.push(
       stageFixture('no-apiversion', {
         packageJson: {
-          name: '@opensip-tools-fixture/no-apiversion',
+          name: '@opensip-cli-fixture/no-apiversion',
           version: '0.0.0',
           type: 'module',
           main: './index.js',
@@ -640,7 +640,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     staged.push(
       stageFixture('throws-on-load', {
         packageJson: {
-          name: '@opensip-tools-fixture/throws-on-load',
+          name: '@opensip-cli-fixture/throws-on-load',
           version: '0.0.0',
           type: 'module',
           main: './index.js',
@@ -679,7 +679,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     staged.push(
       stageFixture('admits-then-throws', {
         packageJson: {
-          name: '@opensip-tools-fixture/admits-then-throws',
+          name: '@opensip-cli-fixture/admits-then-throws',
           version: '0.0.0',
           type: 'module',
           main: './index.js',

@@ -20,7 +20,7 @@ import type { FitnessRecipe } from '../recipes/types.js';
  * back to kebab-to-title-case + a default icon.
  *
  * Owned by fitness (ADR-0009): this is tool-specific vocabulary that used to
- * live in the kernel; check packs import it from `@opensip-tools/fitness`.
+ * live in the kernel; check packs import it from `@opensip-cli/fitness`.
  */
 export type CheckDisplayEntry = readonly [icon: string, displayName: string];
 

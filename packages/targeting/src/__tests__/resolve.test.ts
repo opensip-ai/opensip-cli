@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyGlobalExcludes, preResolveAllTargets, resolveTargets } from '../resolve.js';
 import { TargetRegistry } from '../target-registry.js';
 
-import type { Target } from '@opensip-tools/config';
+import type { Target } from '@opensip-cli/config';
 
 let testDir: string;
 

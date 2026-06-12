@@ -18,7 +18,7 @@
  * Serialization-safe by construction: every field is a primitive, a readonly
  * array of primitives/records, or a plain record — no functions, no class
  * instances, no clock captured here. The producer (the scope-owned diagnostics
- * bus, `@opensip-tools/core`) stamps `at` at the emit site; this layer stays
+ * bus, `@opensip-cli/core`) stamps `at` at the emit site; this layer stays
  * pure (the formatter-purity contract that `SignalEnvelope` also honours).
  */
 

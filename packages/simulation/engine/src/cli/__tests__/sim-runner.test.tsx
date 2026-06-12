@@ -20,7 +20,7 @@
  * re-renders.
  */
 
-import { enterScope, RunScope } from '@opensip-tools/core';
+import { enterScope, RunScope } from '@opensip-cli/core';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -32,8 +32,8 @@ import { defineLoadScenario } from '../../kinds/load/define.js';
 import { simulationTool } from '../../tool.js';
 import { SimRunner } from '../sim-runner.js';
 
-import type { SignalEnvelope, ToolOptions } from '@opensip-tools/contracts';
-import type { RunScopeOptions } from '@opensip-tools/core';
+import type { SignalEnvelope, ToolOptions } from '@opensip-cli/contracts';
+import type { RunScopeOptions } from '@opensip-cli/core';
 
 // The live runner forks `sim-run-worker` off the main process (ADR-0028), but in
 // the test runner `process.argv[1]` is vitest, not the CLI — so force the
@@ -41,10 +41,10 @@ import type { RunScopeOptions } from '@opensip-tools/core';
 // against the scope each test sets up. (The fork path is covered by a dedicated
 // subprocess harness, not the component unit tests.)
 beforeAll(() => {
-  process.env.OPENSIP_TOOLS_NO_WORKER = '1';
+  process.env.OPENSIP_CLI_NO_WORKER = '1';
 });
 afterAll(() => {
-  delete process.env.OPENSIP_TOOLS_NO_WORKER;
+  delete process.env.OPENSIP_CLI_NO_WORKER;
 });
 
 afterEach(() => {

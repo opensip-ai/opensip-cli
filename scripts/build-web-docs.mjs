@@ -2,7 +2,7 @@
 //
 // Build website-facing docs from docs/public/.
 //
-// The website at opensip.ai/docs/opensip-tools/ fetches Markdown files
+// The website at opensip.ai/docs/opensip-cli/ fetches Markdown files
 // from this repo directly. Two things must differ between the in-repo
 // view and the website view:
 //
@@ -11,7 +11,7 @@
 //      website's external links survive main-branch churn.
 //
 //   2. Sibling .md links — need to become root-relative website paths
-//      (e.g. /docs/opensip-tools/80-implementation/01-cli-dispatch/) so
+//      (e.g. /docs/opensip-cli/80-implementation/01-cli-dispatch/) so
 //      the website's internal navigation works.
 //
 // This script reads docs/public/**/*.md, applies those rewrites (and a
@@ -42,8 +42,8 @@ import { fileURLToPath } from 'node:url';
 // ---------------------------------------------------------------------
 
 const REPO_OWNER = 'opensip-ai';
-const REPO_NAME = 'opensip-tools';
-const WEB_BASE_URL = '/docs/opensip-tools'; // root-relative on opensip.ai
+const REPO_NAME = 'opensip-cli';
+const WEB_BASE_URL = '/docs/opensip-cli'; // root-relative on opensip.ai
 const SOURCE_DOC_ROOT = 'docs/public';
 const OUTPUT_DOC_ROOT = 'docs/web-generated';
 const STRIP_MD_EXTENSION = true;

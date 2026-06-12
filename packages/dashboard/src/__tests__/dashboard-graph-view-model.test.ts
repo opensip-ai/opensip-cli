@@ -21,7 +21,7 @@ import {
   projectCatalogToGraphViewModel,
 } from '../code-paths/graph-view-model.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -126,7 +126,7 @@ describe('packageOf', () => {
   it('prefers the build-stamped package, scope-stripped', () => {
     expect(
       packageOf(
-        makeOcc({ bodyHash: 'h', simpleName: 'f', package: '@opensip-tools/lang-typescript' }),
+        makeOcc({ bodyHash: 'h', simpleName: 'f', package: '@opensip-cli/lang-typescript' }),
       ),
     ).toBe('lang-typescript');
   });

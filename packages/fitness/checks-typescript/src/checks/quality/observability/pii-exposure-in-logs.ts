@@ -10,13 +10,13 @@
  * @see Logging Standards
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 import {
   parseSource,
   walkNodes,
   getPropertyChain,
   getLineNumber,
-} from '@opensip-tools/lang-typescript';
+} from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 // PII field names that should never be logged directly

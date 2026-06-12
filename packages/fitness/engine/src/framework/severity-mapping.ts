@@ -6,10 +6,10 @@
  * to SignalCategory. Used by defineCheck and PatternDetector.
  */
 
-import { SeverityPolicy, logger } from '@opensip-tools/core';
+import { SeverityPolicy, logger } from '@opensip-cli/core';
 
 import type { FindingSeverity } from '../types/findings.js';
-import type { SignalSeverity, SignalCategory } from '@opensip-tools/core';
+import type { SignalSeverity, SignalCategory } from '@opensip-cli/core';
 
 /**
  * Map FindingSeverity to SignalSeverity. Release 2.13.0 (§5.9): delegates to the

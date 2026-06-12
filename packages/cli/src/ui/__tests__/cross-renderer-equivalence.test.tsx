@@ -11,16 +11,16 @@
  * which is exactly what "the two renderers can't diverge" must guarantee.
  */
 
-import { renderToText, renderToInk, ThemeProvider } from '@opensip-tools/cli-ui';
-import { buildSignalEnvelope } from '@opensip-tools/contracts';
-import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
+import { renderToText, renderToInk, ThemeProvider } from '@opensip-cli/cli-ui';
+import { buildSignalEnvelope } from '@opensip-cli/contracts';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
 import { resultToView } from '../result-to-view.js';
 
-import type { CommandResult } from '@opensip-tools/contracts';
+import type { CommandResult } from '@opensip-cli/contracts';
 
 /** Collapse all whitespace so wrapping/indentation differences are ignored. */
 function normalize(s: string): string {
@@ -76,7 +76,7 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
   },
   'gate-done': {
     type: 'gate-done',
-    lines: ['opensip-tools gate compare', '', '✓ STABLE — no change'],
+    lines: ['opensip gate compare', '', '✓ STABLE — no change'],
   },
   'graph-status': {
     type: 'graph-status',
@@ -114,7 +114,7 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
         {
           id: 's1',
           source: 'no-console',
-          provider: 'opensip-tools',
+          provider: 'opensip-cli',
           severity: 'high',
           category: 'quality',
           ruleId: 'no-console',
@@ -127,7 +127,7 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
         {
           id: 's2',
           source: 'no-console',
-          provider: 'opensip-tools',
+          provider: 'opensip-cli',
           severity: 'high',
           category: 'quality',
           ruleId: 'no-console',
@@ -140,7 +140,7 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
         {
           id: 's3',
           source: 'naming',
-          provider: 'opensip-tools',
+          provider: 'opensip-cli',
           severity: 'medium',
           category: 'quality',
           ruleId: 'naming',

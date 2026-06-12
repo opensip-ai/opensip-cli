@@ -9,7 +9,7 @@ import {
   isCommentLine,
   type CheckViolation,
   getLineNumber,
-} from '@opensip-tools/fitness';
+} from '@opensip-cli/fitness';
 
 /**
  * Pattern for catch blocks that log errors but don't propagate failure.

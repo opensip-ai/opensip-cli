@@ -8,12 +8,12 @@
  * `session-types.ts` for `StoredSession` and `signal-envelope.ts` for the
  * `SignalEnvelope` every migrated tool returns; `types.ts` does NOT import
  * back, so there is no cycle. Re-exported from the package barrel
- * (`index.ts`), so consumers still import these from `@opensip-tools/contracts`.
+ * (`index.ts`), so consumers still import these from `@opensip-cli/contracts`.
  */
 
 import type { StoredSession } from './session-types.js';
 import type { SignalEnvelope } from './signal-envelope.js';
-import type { ToolProvenance } from '@opensip-tools/core';
+import type { ToolProvenance } from '@opensip-cli/core';
 
 // --- Verbose detail currency (ADR-0021) -------------------------------------
 //
@@ -81,7 +81,7 @@ export type CommandResult =
   | HelpResult
   | ErrorResult;
 
-/** Outcome of an `opensip-tools uninstall` run. */
+/** Outcome of an `opensip uninstall` run. */
 export interface UninstallDoneResult {
   type: 'uninstall-done';
   /** Discriminator on the dispatch the run took. */
@@ -103,7 +103,7 @@ export interface ClearDoneResult {
   sessionCount: number;
 }
 
-/** Outcome of an `opensip-tools configure` interactive run. */
+/** Outcome of an `opensip configure` interactive run. */
 export interface ConfigureDoneResult {
   type: 'configure-done';
   /** Where the global config landed on disk. */
@@ -136,7 +136,7 @@ export interface FitDoneResult {
     chunksTotal?: number;
     chunksSucceeded?: number;
   };
-  /** Whether an opensip-tools.config.yml was found in the target directory */
+  /** Whether an opensip-cli.config.yml was found in the target directory */
   configFound?: boolean;
   /**
    * Verbose detail body (ADR-0021), present only on `--verbose` runs.
@@ -243,7 +243,7 @@ export interface ToolsListRow {
   readonly shadowed?: boolean;
 }
 
-/** Outcome of `opensip-tools tools list` (ADR-0041). */
+/** Outcome of `opensip tools list` (ADR-0041). */
 export interface ToolsListResult {
   type: 'tools-list';
   tools: readonly ToolsListRow[];
@@ -262,7 +262,7 @@ export interface ToolsValidateSection {
   readonly diagnostics: readonly string[];
 }
 
-/** Outcome of `opensip-tools tools validate <spec>` (ADR-0041). */
+/** Outcome of `opensip tools validate <spec>` (ADR-0041). */
 export interface ToolsValidateResult {
   type: 'tools-validate';
   readonly spec: string;
@@ -271,7 +271,7 @@ export interface ToolsValidateResult {
   readonly sections: readonly ToolsValidateSection[];
 }
 
-/** Outcome of `opensip-tools tools install <spec>` (ADR-0041): stage → validate → activate. */
+/** Outcome of `opensip tools install <spec>` (ADR-0041): stage → validate → activate. */
 export interface ToolsInstallResult {
   type: 'tools-install';
   readonly spec: string;
@@ -286,7 +286,7 @@ export interface ToolsInstallResult {
   readonly error?: string;
 }
 
-/** Outcome of `opensip-tools tools data-purge <tool-id>` (ADR-0042): per-tool row counts. */
+/** Outcome of `opensip tools data-purge <tool-id>` (ADR-0042): per-tool row counts. */
 export interface ToolsDataPurgeResult {
   type: 'tools-data-purge';
   readonly toolId: string;
@@ -297,7 +297,7 @@ export interface ToolsDataPurgeResult {
   readonly stateRows: number;
 }
 
-/** Outcome of `opensip-tools tools uninstall <name-or-id>` (ADR-0041). */
+/** Outcome of `opensip tools uninstall <name-or-id>` (ADR-0041). */
 export interface ToolsUninstallResult {
   type: 'tools-uninstall';
   /** The id-or-package-name argument as given. */
@@ -345,7 +345,7 @@ export interface DashboardResult {
   opened: boolean;
 }
 
-/** Classification for a file present under `opensip-tools/` before init ran. */
+/** Classification for a file present under `opensip-cli/` before init ran. */
 export interface PreExistingFile {
   readonly path: string;
   readonly classification: 'scaffolded' | 'custom' | 'stale-scaffolded';
@@ -383,7 +383,7 @@ export interface InitResult {
    * when init refused to write anything.
    */
   createdFiles?: readonly string[];
-  /** True when init appended `opensip-tools/.runtime/` to .gitignore. */
+  /** True when init appended `opensip-cli/.runtime/` to .gitignore. */
   gitignoreUpdated?: boolean;
   /**
    * Files that existed before init ran, classified. Empty (or absent)

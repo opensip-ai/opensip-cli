@@ -1,5 +1,5 @@
 /**
- * Export-surface lock for `@opensip-tools/core`.
+ * Export-surface lock for `@opensip-cli/core`.
  *
  * Core is the kernel contract shared by tools: signals, tool/plugin contracts,
  * language primitives, RunScope, recipe substrate, config/path helpers, logging,
@@ -173,7 +173,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'yieldToEventLoop',
 ].sort();
 
-describe('@opensip-tools/core public barrel', () => {
+describe('@opensip-cli/core public barrel', () => {
   it('exposes exactly the curated value-export surface', () => {
     const actual = Object.keys(barrel)
       .filter((k) => barrel[k as keyof typeof barrel] !== undefined)

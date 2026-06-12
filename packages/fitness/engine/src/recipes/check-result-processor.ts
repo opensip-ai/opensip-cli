@@ -6,7 +6,7 @@
  * builds check summaries, and determines whether execution should stop.
  */
 
-import { logger, SystemError } from '@opensip-tools/core';
+import { logger, SystemError } from '@opensip-cli/core';
 
 import { memoryProfiler, type CheckMemoryProfile } from '../framework/memory-profiler.js';
 import { countErrors, countWarnings } from '../types/severity.js';

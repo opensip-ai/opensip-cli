@@ -7,15 +7,15 @@
  * the Code Paths tab (Catalog + Recipes subtabs). These entry types are graph
  * domain vocabulary, so they live here; the dashboard consumes them
  * structurally via `DashboardInput` (typed `readonly unknown[]`) — the same
- * opaque-payload model the fitness catalogs use, keeping `@opensip-tools/dashboard`
- * decoupled from `@opensip-tools/graph`.
+ * opaque-payload model the fitness catalogs use, keeping `@opensip-cli/dashboard`
+ * decoupled from `@opensip-cli/graph`.
  *
  * **Distinct keys.** Graph contributes `graphRuleCatalog` / `graphRecipeCatalog`
  * — NOT `checkCatalog` / `recipeCatalog`, which are fitness-owned globals the
  * CLI merges via `Object.assign`. Reusing those keys would clobber fitness.
  */
 
-import type { ToolScope } from '@opensip-tools/core';
+import type { ToolScope } from '@opensip-cli/core';
 
 /** Rule catalog entry for dashboard display. */
 export interface GraphRuleCatalogEntry {

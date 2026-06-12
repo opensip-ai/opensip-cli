@@ -6,11 +6,11 @@
  * example bytes + config block; the host owns only the directory layout
  * (`pluginLayout`), the document header, and `targets:`. With the bundled
  * fitness + simulation tools registered, a TypeScript project gets:
- *   <cwd>/opensip-tools.config.yml                                    (TRACKED)
- *   <cwd>/opensip-tools/fit/checks/example-check.mjs                  (TRACKED)
- *   <cwd>/opensip-tools/fit/recipes/example-recipe.mjs                (TRACKED)
- *   <cwd>/opensip-tools/sim/scenarios/example-scenario.mjs            (TRACKED)
- *   <cwd>/opensip-tools/sim/recipes/example-recipe.mjs                (TRACKED)
+ *   <cwd>/opensip-cli.config.yml                                    (TRACKED)
+ *   <cwd>/opensip-cli/fit/checks/example-check.mjs                  (TRACKED)
+ *   <cwd>/opensip-cli/fit/recipes/example-recipe.mjs                (TRACKED)
+ *   <cwd>/opensip-cli/sim/scenarios/example-scenario.mjs            (TRACKED)
+ *   <cwd>/opensip-cli/sim/recipes/example-recipe.mjs                (TRACKED)
  * A tool with no `pluginLayout` (e.g. `graph`) contributes no directory.
  *
  * Consequence — the scaffolded set equals the REGISTERED set:
@@ -22,13 +22,13 @@
  *     under-scaffold is observable; a genuinely uninstalled third-party
  *     tool stays silent (correct).
  *
- * Appends `opensip-tools/.runtime/` to <cwd>/.gitignore so the
+ * Appends `opensip-cli/.runtime/` to <cwd>/.gitignore so the
  * tool-generated state (sessions, logs, dashboards, baselines, plugin
  * installs) stays untracked.
  *
  * Promotion path: when a customer's pack outgrows a handful of .mjs
  * files (shared helpers, tests, more than a dozen checks/scenarios),
- * `opensip-tools/<domain>/` can graduate to a real workspace npm
+ * `opensip-cli/<domain>/` can graduate to a real workspace npm
  * package — `package.json` with `opensipTools.kind: "fit-pack"` or
  * `"sim-pack"`, `tsconfig.json`, `index.ts` re-exporting checks/recipes.
  * Marker-based discovery picks up the workspace package automatically
@@ -51,7 +51,7 @@
  *
  * After language resolution, init classifies the working directory
  * into one of four states based on the presence of the config file
- * and the `opensip-tools/` directory:
+ * and the `opensip-cli/` directory:
  *
  *   - 'pristine'             — neither present; scaffold everything.
  *   - 'fully-initialized'    — both present; refuse without a flag.
@@ -61,7 +61,7 @@
  * Two flags express explicit user intent for the non-pristine states:
  *
  *   - `--keep`   — re-scaffold examples; preserve custom files.
- *   - `--remove` — delete `opensip-tools/` entirely; scaffold fresh.
+ *   - `--remove` — delete `opensip-cli/` entirely; scaffold fresh.
  *
  * The two flags are mutually exclusive. The legacy `--force` flag is
  * gone; users who scripted it should migrate to `--remove`, the
@@ -83,7 +83,7 @@
 
 import { existsSync } from 'node:fs';
 
-import { resolveProjectPaths, type ProjectContext } from '@opensip-tools/core';
+import { resolveProjectPaths, type ProjectContext } from '@opensip-cli/core';
 
 import { classifyFiles } from './init/file-classifier.js';
 import { resolveLanguages } from './init/language-detection.js';
@@ -95,7 +95,7 @@ import {
 } from './init/state-machine.js';
 
 import type { ToolScaffold } from './shared.js';
-import type { InitOptions, InitResult } from '@opensip-tools/contracts';
+import type { InitOptions, InitResult } from '@opensip-cli/contracts';
 
 /**
  * Run init for the given args. Returns an InitResult — the caller
@@ -116,7 +116,7 @@ export function executeInit(
     type: 'init' as const,
     path: paths.configFile,
     cwd,
-    configFilename: 'opensip-tools.config.yml',
+    configFilename: 'opensip-cli.config.yml',
   };
 
   // Discovery-aware refusal: if cwd sits inside an existing project and
@@ -154,7 +154,7 @@ export function executeInit(
     // A non-existent target directory is a user error, not a "pristine
     // success". Surface it through `ambiguousLanguageError` (which the
     // register-init layer already maps to CONFIGURATION_ERROR / exit 2)
-    // so `opensip-tools init --cwd /nonexistent` returns a nonzero exit
+    // so `opensip init --cwd /nonexistent` returns a nonzero exit
     // code with a clear message instead of silently exiting 0.
     return {
       ...baseResult,

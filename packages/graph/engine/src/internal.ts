@@ -1,9 +1,9 @@
 /**
- * @fileoverview `@opensip-tools/graph/internal` — engine internals exposed
+ * @fileoverview `@opensip-cli/graph/internal` — engine internals exposed
  * ONLY for the cross-package adapter test suites (graph-typescript et al.).
  *
  * This is NOT public API. Production code in other packages must not import
- * from `@opensip-tools/graph/internal` (enforced by dependency-cruiser per
+ * from `@opensip-cli/graph/internal` (enforced by dependency-cruiser per
  * ADR-0009). The individual built-in rule instances live here because the
  * public way to run a rule is via a recipe (by id); only the rule unit tests
  * need the raw rule object to call `.evaluate(...)` directly.

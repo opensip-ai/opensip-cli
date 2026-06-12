@@ -18,13 +18,13 @@
  *   - ({}) as T used as Proxy target
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 import {
   findEnclosingFunctionBody,
   getEnclosingFunctionName,
   getSharedSourceFile,
   isInsideConditionalBlock,
-} from '@opensip-tools/lang-typescript';
+} from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 /** Placeholder comment patterns - using explicit RegExp constructors for safety */
@@ -69,7 +69,7 @@ interface CheckNodeOptions {
 // AST HELPER UTILITIES
 // =============================================================================
 // Function-scope helpers (findEnclosingFunctionBody, getEnclosingFunctionName,
-// isInsideConditionalBlock) are imported from @opensip-tools/lang-typescript.
+// isInsideConditionalBlock) are imported from @opensip-cli/lang-typescript.
 
 /**
  * Check whether a function body contains substantive statements beyond a single return.

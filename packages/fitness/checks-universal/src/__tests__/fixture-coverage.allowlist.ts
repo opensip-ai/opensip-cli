@@ -15,7 +15,7 @@ import type {
   CommandExemptions,
   CoverageAllowlist,
   FilenameOverrides,
-} from '@opensip-tools/test-support';
+} from '@opensip-cli/test-support';
 
 export const ALLOWLIST: CoverageAllowlist = [];
 

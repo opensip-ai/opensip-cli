@@ -4,7 +4,7 @@
  * @fileoverview Shared helpers for configuration validation checks
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 // =============================================================================
 // CHARACTER HELPERS

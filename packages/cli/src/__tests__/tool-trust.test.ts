@@ -9,8 +9,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-tools/contracts';
-import { PluginIncompatibleError } from '@opensip-tools/core';
+import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
+import { PluginIncompatibleError } from '@opensip-cli/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { admitProjectLocalTool, admitUserGlobalTool } from '../bootstrap/register-tools.js';

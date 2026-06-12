@@ -22,7 +22,7 @@
  * / `fdescribe(` detection is folded in here); the slug and id are retained
  * so the dogfood baseline stays continuous.
  */
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 /** A skip/focus idiom: its detection regex and the violation it yields. */
 interface SkipIdiom {
@@ -144,7 +144,7 @@ export function analyzeSkippedTests(content: string, filePath: string): CheckVio
             ? `Focused test detected (${idiom.label}) — it disables every other test in the file`
             : `Skipped/placeholder test detected (${idiom.label})`,
           // Soft shipped default; repos wanting a hard gate set `failOnWarnings`
-          // (this repo does — see opensip-tools.config.yml).
+          // (this repo does — see opensip-cli.config.yml).
           severity: 'warning',
           line: i + 1,
           suggestion: idiom.focused ? FOCUSED_SUGGESTION : SUGGESTION,

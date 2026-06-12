@@ -3,8 +3,8 @@
  * @fileoverview Validate CORS configuration follows security best practices
  */
 
-import { logger } from '@opensip-tools/core';
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { logger } from '@opensip-cli/core';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Pre-compiled CORS security patterns for static code analysis.

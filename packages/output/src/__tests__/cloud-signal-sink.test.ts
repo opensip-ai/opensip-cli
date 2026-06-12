@@ -1,9 +1,9 @@
-import { buildSignalBatch, createSignal } from '@opensip-tools/core';
+import { buildSignalBatch, createSignal } from '@opensip-cli/core';
 import { describe, it, expect, vi } from 'vitest';
 
 import { createCloudSignalSink } from '../sink/cloud-signal-sink.js';
 
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 function sigs(n: number): Signal[] {
   return Array.from({ length: n }, (_, i) =>

@@ -15,9 +15,9 @@ related-docs:
 ---
 # Ban an API pattern
 
-This is the single most common reason teams adopt opensip-tools: *"I want to fail CI when anyone uses X."* The X is usually a deprecated function, an unsafe primitive, a private/internal API that leaked, or a slow path you've already deprecated in the docs.
+This is the single most common reason teams adopt opensip: *"I want to fail CI when anyone uses X."* The X is usually a deprecated function, an unsafe primitive, a private/internal API that leaked, or a slow path you've already deprecated in the docs.
 
-This guide uses **`crypto.createCipher`** as the running example. It's a real-world ban shape: `createCipher` is a legacy, unsafe API family (no IV, MD5-based KDF), and the safer replacement is `crypto.createCipheriv()`. Banning the deprecated form in your codebase is exactly the kind of architectural rule opensip-tools exists to enforce.
+This guide uses **`crypto.createCipher`** as the running example. It's a real-world ban shape: `createCipher` is a legacy, unsafe API family (no IV, MD5-based KDF), and the safer replacement is `crypto.createCipheriv()`. Banning the deprecated form in your codebase is exactly the kind of architectural rule opensip-cli exists to enforce.
 
 We'll write the ban two ways: with a regex (5 minutes, works for ~80% of cases) and with the TypeScript AST (a bit more code, catches the cases regex misses).
 
@@ -25,10 +25,10 @@ We'll write the ban two ways: with a regex (5 minutes, works for ~80% of cases) 
 
 When the API name is distinctive enough that you can grep for it, a regex check is sharp and tiny.
 
-Create `opensip-tools/fit/checks/no-create-cipher.mjs`:
+Create `opensip-cli/fit/checks/no-create-cipher.mjs`:
 
 ```js
-import { defineCheck } from '@opensip-tools/fitness';
+import { defineCheck } from '@opensip-cli/fitness';
 
 export default defineCheck({
   id: '2b2b2b2b-2b2b-4b2b-8b2b-2b2b2b2b2b2b',
@@ -67,7 +67,7 @@ Three things worth noting:
 Run it:
 
 ```bash
-opensip-tools fit --check no-create-cipher --verbose
+opensip fit --check no-create-cipher --verbose
 ```
 
 ## When regex isn't enough
@@ -79,11 +79,11 @@ The regex catches `createCipher(...)`. It misses:
 - Property access through dynamic keys: `crypto['createCipher']`
 - Re-exports through a wrapper module
 
-If those cases matter, you want an AST-driven check. The TypeScript-AST helpers live in `@opensip-tools/lang-typescript`:
+If those cases matter, you want an AST-driven check. The TypeScript-AST helpers live in `@opensip-cli/lang-typescript`:
 
 ```js
-import { defineCheck } from '@opensip-tools/fitness';
-import { getSharedSourceFile, walkNodes } from '@opensip-tools/lang-typescript';
+import { defineCheck } from '@opensip-cli/fitness';
+import { getSharedSourceFile, walkNodes } from '@opensip-cli/lang-typescript';
 
 export default defineCheck({
   id: '3c3c3c3c-3c3c-4c3c-8c3c-3c3c3c3c3c3c',
@@ -116,16 +116,16 @@ export default defineCheck({
 });
 ```
 
-The AST version catches `crypto.createCipher(...)`, `createCipher(...)` (post-import), and aliased imports if you walk the import map (omitted here for brevity — see `findEnclosingScope` and `getPropertyChain` in `@opensip-tools/lang-typescript`).
+The AST version catches `crypto.createCipher(...)`, `createCipher(...)` (post-import), and aliased imports if you walk the import map (omitted here for brevity — see `findEnclosingScope` and `getPropertyChain` in `@opensip-cli/lang-typescript`).
 
 **Pick one, not both.** Regex is faster to write and faster to run. AST is more robust. For a banned-API check, regex usually wins; the cases AST catches are rare enough that a code-review catches them too. The exception: if the API name is a common English word (`load`, `process`, `run`), AST is the only way to avoid false positives.
 
 ## Add to a recipe
 
-Once the check is in `opensip-tools/fit/checks/`, it auto-loads. To group it with other deprecated-API bans:
+Once the check is in `opensip-cli/fit/checks/`, it auto-loads. To group it with other deprecated-API bans:
 
 ```js
-// opensip-tools/fit/recipes/deprecated-apis.mjs
+// opensip-cli/fit/recipes/deprecated-apis.mjs
 export const recipes = [{
   id: 'URCP_deprecated_apis',
   name: 'deprecated-apis',
@@ -137,15 +137,15 @@ export const recipes = [{
 }];
 ```
 
-Run with `opensip-tools fit --recipe deprecated-apis`.
+Run with `opensip fit --recipe deprecated-apis`.
 
 ## Adopting an existing-violation ban
 
 If the codebase already has uses of the banned API, gating on "all violations" blocks every PR until cleanup is done. Use the baseline flow instead:
 
 ```bash
-opensip-tools fit --recipe deprecated-apis --gate-save     # captures current state
-opensip-tools fit --recipe deprecated-apis --gate-compare  # fails only on *new* uses
+opensip fit --recipe deprecated-apis --gate-save     # captures current state
+opensip fit --recipe deprecated-apis --gate-compare  # fails only on *new* uses
 ```
 
 You can fix the baseline cases over time. New PRs are blocked from adding fresh violations from day one. Full walkthrough in [wire into CI](./03-wire-into-ci.md) and [adopt in a monorepo](./04-adopt-in-a-monorepo.md).

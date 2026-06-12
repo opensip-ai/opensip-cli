@@ -18,7 +18,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 /**
  * Dependencies that should have consistent versions across all packages

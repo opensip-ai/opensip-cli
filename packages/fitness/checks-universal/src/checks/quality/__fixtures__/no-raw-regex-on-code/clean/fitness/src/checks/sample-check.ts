@@ -1,4 +1,4 @@
-import { defineCheck } from '@opensip-tools/fitness'
+import { defineCheck } from '@opensip-cli/fitness'
 
 const PATTERN = /foo/
 

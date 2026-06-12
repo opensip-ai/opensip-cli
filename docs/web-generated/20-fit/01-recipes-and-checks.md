@@ -34,7 +34,7 @@ Two primitives. A **check** is the rule. A **recipe** is the lineup. Authors wri
 
 ## Anatomy of a check
 
-A check is the result of `defineCheck()`. The configuration shape is in [`packages/fitness/engine/src/framework/check-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/framework/check-config.ts); the validator is Zod-driven, so misconfigured checks throw at definition time, not at run time.
+A check is the result of `defineCheck()`. The configuration shape is in [`packages/fitness/engine/src/framework/check-config.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/framework/check-config.ts); the validator is Zod-driven, so misconfigured checks throw at definition time, not at run time.
 
 ### Required fields
 
@@ -156,7 +156,7 @@ defineCheck({
 
 | Field | What it does |
 |---|---|
-| `scope: { languages, concerns }` | Marketplace-ready target matching. See [`02-targets-and-scope.md`](/docs/opensip-tools/20-fit/02-targets-and-scope/). |
+| `scope: { languages, concerns }` | Marketplace-ready target matching. See [`02-targets-and-scope.md`](/docs/opensip-cli/20-fit/02-targets-and-scope/). |
 | `fileTypes: ['ts', 'tsx']` | Filter matched files to these extensions. |
 | `contentFilter: 'raw' \| 'strip-strings' \| 'strip-strings-and-comments'` | Language-adapter filter mode (default `raw`). |
 | `confidence: 'high' \| 'medium' \| 'low'` | Metadata for downstream consumers (dashboards, cloud reporters). |
@@ -167,7 +167,7 @@ defineCheck({
 
 ### What `defineCheck` returns
 
-A `Check` object ([`packages/fitness/engine/src/framework/check-types.ts:45`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/framework/check-types.ts)):
+A `Check` object ([`packages/fitness/engine/src/framework/check-types.ts:45`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/framework/check-types.ts)):
 
 ```ts
 interface Check {
@@ -189,7 +189,7 @@ A recipe is what `--recipe <name>` selects. It's a named configuration that says
 ### `defineRecipe()`
 
 ```ts
-import { defineRecipe } from '@opensip-tools/fitness';
+import { defineRecipe } from '@opensip-cli/fitness';
 
 export default defineRecipe({
   name: 'quick-smoke',
@@ -201,7 +201,7 @@ export default defineRecipe({
 });
 ```
 
-The full input shape is in [`packages/fitness/engine/src/recipes/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/recipes/types.ts):
+The full input shape is in [`packages/fitness/engine/src/recipes/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/recipes/types.ts):
 
 ```ts
 interface FitnessRecipeDefinition {
@@ -255,10 +255,10 @@ defineRecipe({
 });
 ```
 
-Inside the check, read your slice via `getCheckConfig<T>(slug)` ([`packages/fitness/engine/src/recipes/check-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/recipes/check-config.ts)):
+Inside the check, read your slice via `getCheckConfig<T>(slug)` ([`packages/fitness/engine/src/recipes/check-config.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/recipes/check-config.ts)):
 
 ```ts
-import { getCheckConfig } from '@opensip-tools/fitness';
+import { getCheckConfig } from '@opensip-cli/fitness';
 
 defineCheck({
   id: '...',
@@ -272,7 +272,7 @@ defineCheck({
 });
 ```
 
-The recipe service projects the `config:` map onto the current `RunScope` (the per-invocation execution scope) before execution and clears it when the run finishes, so checks read it synchronously via `getCheckConfig()`. The lookup is scope-bound rather than module-bound — `getCheckConfig` resolves through `currentScope()` in `@opensip-tools/core`, which keeps the config slot identity stable even when two copies of `@opensip-tools/fitness` are loaded (the CLI's bundled copy and a plugin pack's resolved copy). Without an override, or when called outside a run scope, `getCheckConfig()` returns an empty object — checks should default-handle that.
+The recipe service projects the `config:` map onto the current `RunScope` (the per-invocation execution scope) before execution and clears it when the run finishes, so checks read it synchronously via `getCheckConfig()`. The lookup is scope-bound rather than module-bound — `getCheckConfig` resolves through `currentScope()` in `@opensip-cli/core`, which keeps the config slot identity stable even when two copies of `@opensip-cli/fitness` are loaded (the CLI's bundled copy and a plugin pack's resolved copy). Without an override, or when called outside a run scope, `getCheckConfig()` returns an empty object — checks should default-handle that.
 
 ### Execution options
 
@@ -313,13 +313,13 @@ Recipe-owned file paths are not part of the supported reporting contract. If a r
 
 Three sources, loaded in order:
 
-1. **Built-in.** [`packages/fitness/engine/src/recipes/built-in-recipes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/recipes/built-in-recipes.ts) defines `default` (every enabled check, parallel, table output) and a small handful of canonical recipes. These ship with `@opensip-tools/fitness` and are always available.
-2. **Project-local.** Files matching `<project>/opensip-tools/fit/recipes/*.mjs` are loaded by the plugin discoverer. Each module exports a default recipe (or a named one). This is where most teams put their `quick-smoke`, `pre-merge`, and `nightly` recipes.
+1. **Built-in.** [`packages/fitness/engine/src/recipes/built-in-recipes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/recipes/built-in-recipes.ts) defines `default` (every enabled check, parallel, table output) and a small handful of canonical recipes. These ship with `@opensip-cli/fitness` and are always available.
+2. **Project-local.** Files matching `<project>/opensip-cli/fit/recipes/*.mjs` are loaded by the plugin discoverer. Each module exports a default recipe (or a named one). This is where most teams put their `quick-smoke`, `pre-merge`, and `nightly` recipes.
 3. **npm-package.** Check packs (any package declaring `opensipTools.kind: "fit-pack"` or listed in `plugins.checkPackages:`) can export recipes alongside checks, by declaring `recipes:` in their entry. A pack-shipped recipe is registered the same way a project-local one is.
 
 The recipe registry is last-writer-wins. A project-local `default` recipe overrides the built-in one; a pack-shipped recipe with a name conflict overrides whichever was registered first.
 
-`opensip-tools fit-recipes` lists every recipe currently registered, with check counts. `opensip-tools fit --recipes` (the alias) does the same.
+`opensip fit-recipes` lists every recipe currently registered, with check counts. `opensip fit --recipes` (the alias) does the same.
 
 ---
 
@@ -331,12 +331,12 @@ For the `acme-api` worked example:
 - The `default` (built-in) recipe selects `{ type: 'all' }`. CI's nightly job runs this with `--gate-compare`.
 - A custom `infra` recipe selects `{ type: 'pattern', include: ['fit:infra-*'] }` for the team that owns the CDK stack. They run it on PRs that touch `infra/`.
 
-All three are in `acme-api/opensip-tools/fit/recipes/`. Nothing in the kernel knows about them; the loader picks them up at startup.
+All three are in `acme-api/opensip-cli/fit/recipes/`. Nothing in the kernel knows about them; the loader picks them up at startup.
 
 ---
 
 ## What's next
 
-- **[`02-targets-and-scope.md`](/docs/opensip-tools/20-fit/02-targets-and-scope/)** — how the framework decides which files a check runs against. Where `scope`, `fileTypes`, and the targets registry interact.
-- **[`03-ignore-directives.md`](/docs/opensip-tools/20-fit/03-ignore-directives/)** — inline source-level suppression for individual violations.
-- **[`../50-extend/01-plugin-authoring.md`](/docs/opensip-tools/50-extend/01-plugin-authoring/)** — full walkthrough of authoring a check pack, a project-local check, and a custom recipe.
+- **[`02-targets-and-scope.md`](/docs/opensip-cli/20-fit/02-targets-and-scope/)** — how the framework decides which files a check runs against. Where `scope`, `fileTypes`, and the targets registry interact.
+- **[`03-ignore-directives.md`](/docs/opensip-cli/20-fit/03-ignore-directives/)** — inline source-level suppression for individual violations.
+- **[`../50-extend/01-plugin-authoring.md`](/docs/opensip-cli/50-extend/01-plugin-authoring/)** — full walkthrough of authoring a check pack, a project-local check, and a custom recipe.

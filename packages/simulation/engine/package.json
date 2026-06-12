@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/simulation",
+  "name": "@opensip-cli/simulation",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "Simulation scenarios for OpenSIP Tools",
+  "description": "Simulation scenarios for OpenSIP CLI",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "simulation",
@@ -12,12 +12,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/simulation/engine"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -63,7 +63,7 @@
             "mode": "name-pattern",
             "prefix": "scenarios-",
             "defaultScopes": [
-              "@opensip-tools"
+              "@opensip-cli"
             ]
           },
           "exportName": "scenarios",
@@ -102,12 +102,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/cli-ui": "workspace:*",
-    "@opensip-tools/config": "workspace:*",
-    "@opensip-tools/contracts": "workspace:*",
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/datastore": "workspace:*",
-    "@opensip-tools/session-store": "workspace:*",
+    "@opensip-cli/cli-ui": "workspace:*",
+    "@opensip-cli/config": "workspace:*",
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/datastore": "workspace:*",
+    "@opensip-cli/session-store": "workspace:*",
     "commander": "^15.0.0",
     "ink": "^7.0.5",
     "react": "^19.2.7",

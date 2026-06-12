@@ -21,7 +21,7 @@ import ts from 'typescript';
 
 import { parseProjectFast, type TypescriptFastParsedProject } from './parse-fast.js';
 
-import type { ParseInput, ParseOutput, ParseError } from '@opensip-tools/graph';
+import type { ParseInput, ParseOutput, ParseError } from '@opensip-cli/graph';
 
 /** Parsed TS project (exact tier): the live tsc {@link ts.Program} instance. */
 export interface TypescriptParsedProject {

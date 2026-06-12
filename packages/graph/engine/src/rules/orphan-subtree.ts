@@ -14,7 +14,7 @@ import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { Catalog, FeatureTable, GraphConfig, Indexes } from '../types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 export const orphanSubtreeRule = defineRule({
   slug: 'graph:orphan-subtree',
@@ -52,7 +52,7 @@ export const orphanSubtreeRule = defineRule({
           message: `${occ.simpleName} is not reachable from any inferred entry point.${caveat}`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion:
-            'Either delete the function, mark it as an entry point in opensip-tools.config.yml, or add a caller.',
+            'Either delete the function, mark it as an entry point in opensip-cli.config.yml, or add a caller.',
           metadata: {
             simpleName: occ.simpleName,
             qualifiedName: occ.qualifiedName,

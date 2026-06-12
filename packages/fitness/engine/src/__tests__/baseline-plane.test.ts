@@ -2,17 +2,17 @@
  * fitness on the host baseline/ratchet plane (ADR-0036, P6 Task 6.4): no-flap
  * round-trip + the message-hash strategy contract (line-shift tolerance).
  *
- * fitness does NOT import `@opensip-tools/output` (tools never do — only the
+ * fitness does NOT import `@opensip-cli/output` (tools never do — only the
  * composition root consumes `diffBaseline`). So no-flap is proven structurally:
  * the stamped current fingerprint set, saved via the generic `BaselineRepo` and
  * reloaded, is byte-identical — so the host diff would yield `added=[]`,
- * `resolved=[]` (the diff itself is unit-tested in `@opensip-tools/output`).
+ * `resolved=[]` (the diff itself is unit-tested in `@opensip-cli/output`).
  */
 
 import { createHash } from 'node:crypto';
 
-import { createSignal, stampFingerprints, type Signal } from '@opensip-tools/core';
-import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { createSignal, stampFingerprints, type Signal } from '@opensip-cli/core';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { fitnessFingerprintStrategy } from '../baseline-strategy.js';

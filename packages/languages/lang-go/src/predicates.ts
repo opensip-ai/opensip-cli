@@ -1,13 +1,13 @@
 // @fitness-ignore-file duplicate-utility-functions -- ADR-0010: the per-language tree-sitter vocabulary intentionally shares helper names across lang-* with grammar-specific implementations; consolidating would defeat the substrate design.
 /**
  * v1 per-language node-kind predicates for Go (ADR-0010). The generic
- * traversal/position helpers live in `@opensip-tools/tree-sitter`; only the
+ * traversal/position helpers live in `@opensip-cli/tree-sitter`; only the
  * grammar-specific node `type` strings differ. Node types are from the
  * tree-sitter-go grammar. Go has no class or try/catch — methods are a distinct
  * `method_declaration` (receiver syntax) and error handling is value-based.
  */
 
-import type { Node } from '@opensip-tools/tree-sitter';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 /** A function or method declaration (both are callable defs). */
 export const isFunction = (node: Node): boolean =>

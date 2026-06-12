@@ -1,10 +1,10 @@
-# CLAUDE.md - AI Agent Guidance for OpenSIP Tools
+# CLAUDE.md - AI Agent Guidance for OpenSIP CLI
 
-This is the **START HERE** document for AI agents working on the OpenSIP Tools codebase.
+This is the **START HERE** document for AI agents working on the OpenSIP CLI codebase.
 
-## What is OpenSIP Tools?
+## What is OpenSIP CLI?
 
-OpenSIP Tools is an **open-source codebase analysis toolkit** — a CLI that
+OpenSIP CLI is an **open-source codebase analysis toolkit** — a CLI that
 hosts pluggable tools for static analysis. Today it ships with three: `fit`
 (fitness checks across TypeScript, Rust, Python, Java, Go, C/C++), `graph`
 (static call-graph analysis), and `sim` (simulation scenarios, experimental).
@@ -12,90 +12,90 @@ Adding a new tool is a plugin operation; the CLI is a generic dispatcher.
 
 ## Repository Structure
 
-Turborepo + pnpm monorepo. Workspace scope: `@opensip-tools/*`. Layered —
+Turborepo + pnpm monorepo. Workspace scope: `@opensip-cli/*`. Layered —
 lower depends on higher only; never the other direction. Architecture
 rules are enforced by dependency-cruiser in CI.
 
 ```
-opensip-tools/
+opensip-cli/
 ├── packages/
-│   ├── core/                    # @opensip-tools/core — kernel: errors, logger,
+│   ├── core/                    # @opensip-cli/core — kernel: errors, logger,
 │   │                            #   IDs, language adapters, plugin loader,
 │   │                            #   Tool contract
-│   ├── contracts/               # @opensip-tools/contracts — contract types
+│   ├── contracts/               # @opensip-cli/contracts — contract types
 │   │                            #   between Tools and the runner: SignalEnvelope
 │   │                            #   (ADR-0011; replaced CliOutput), CommandResult,
 │   │                            #   exit codes, the StoredSession type (runtime in
 │   │                            #   session-store), GraphCatalog type surface
-│   ├── datastore/               # @opensip-tools/datastore — SQLite + Drizzle
+│   ├── datastore/               # @opensip-cli/datastore — SQLite + Drizzle
 │   │                            #   persistence layer: DataStore interface,
 │   │                            #   sqlite/memory backends, factory, schema
 │   │                            #   migrations
-│   ├── dashboard/               # @opensip-tools/dashboard — self-contained
+│   ├── dashboard/               # @opensip-cli/dashboard — self-contained
 │   │                            #   HTML report generator (generateDashboardHtml);
 │   │                            #   consumed by the CLI-owned `dashboard` command
 │   │                            #   (composition root), which aggregates each
 │   │                            #   tool's contributed data
-│   ├── cli/                     # opensip-tools — generic tool dispatcher
-│   ├── config/                  # @opensip-tools/config — config composer +
+│   ├── cli/                     # opensip-cli — generic tool dispatcher
+│   ├── config/                  # @opensip-cli/config — config composer +
 │   │                            #   schema registry (ADR-0023): folds host-owned
 │   │                            #   blocks + each tool's namespaced Zod schema
 │   │                            #   into one strict document; cli/dashboard/
 │   │                            #   targeting/global-config I/O
-│   ├── cli-ui/                  # @opensip-tools/cli-ui — shared Ink/React
+│   ├── cli-ui/                  # @opensip-cli/cli-ui — shared Ink/React
 │   │                            #   primitives (Banner, Spinner, RunHeader,
 │   │                            #   theme). Extracted from cli/ so tools that
 │   │                            #   ship a live view depend on the UI kit
 │   │                            #   without pulling in the dispatcher.
-│   ├── output/                  # @opensip-tools/output — machine output layer
+│   ├── output/                  # @opensip-cli/output — machine output layer
 │   │                            #   (ADR-0011): pure format/ formatters (json,
 │   │                            #   sarif, table) + effectful sink/ delivery
 │   │                            #   (cloud egress, entitlement). Tools never
 │   │                            #   import it; the composition root does.
-│   ├── session-store/           # @opensip-tools/session-store — SessionRepo
+│   ├── session-store/           # @opensip-cli/session-store — SessionRepo
 │   │                            #   runtime + sessions schema (the StoredSession
 │   │                            #   type itself lives in contracts)
-│   ├── targeting/               # @opensip-tools/targeting — host file-targeting
+│   ├── targeting/               # @opensip-cli/targeting — host file-targeting
 │   │                            #   runtime substrate (ADR-0037): TargetRegistry +
 │   │                            #   glob expansion w/ globalExcludes; built once
 │   │                            #   per run by the CLI bootstrap → scope.targets
-│   ├── test-support/            # @opensip-tools/test-support — PRIVATE, never
+│   ├── test-support/            # @opensip-cli/test-support — PRIVATE, never
 │   │                            #   published (ADR-0040): cross-package test
 │   │                            #   scaffolding (RunScope test sugar + the
 │   │                            #   per-check fixture-coverage harness). Only
 │   │                            #   test files may import it (depcruise rule)
-│   ├── tree-sitter/             # @opensip-tools/tree-sitter — grammar-agnostic
+│   ├── tree-sitter/             # @opensip-cli/tree-sitter — grammar-agnostic
 │   │                            #   web-tree-sitter substrate shared by lang-*
 │   │                            #   and the graph tree-sitter adapters
 │   │
 │   ├── fitness/                 # fitness namespace
-│   │   ├── engine/              # @opensip-tools/fitness — fitness engine,
+│   │   ├── engine/              # @opensip-cli/fitness — fitness engine,
 │   │   │                        #   fit/dashboard/fit-list/fit-recipes,
 │   │   │                        #   gate, SARIF
-│   │   ├── checks-typescript/   # @opensip-tools/checks-typescript (~52 checks)
-│   │   ├── checks-universal/    # @opensip-tools/checks-universal (~109 checks)
-│   │   ├── checks-python/       # @opensip-tools/checks-python
-│   │   ├── checks-go/           # @opensip-tools/checks-go
-│   │   ├── checks-java/         # @opensip-tools/checks-java
-│   │   ├── checks-cpp/          # @opensip-tools/checks-cpp
-│   │   └── checks-rust/         # @opensip-tools/checks-rust
+│   │   ├── checks-typescript/   # @opensip-cli/checks-typescript (~52 checks)
+│   │   ├── checks-universal/    # @opensip-cli/checks-universal (~109 checks)
+│   │   ├── checks-python/       # @opensip-cli/checks-python
+│   │   ├── checks-go/           # @opensip-cli/checks-go
+│   │   ├── checks-java/         # @opensip-cli/checks-java
+│   │   ├── checks-cpp/          # @opensip-cli/checks-cpp
+│   │   └── checks-rust/         # @opensip-cli/checks-rust
 │   │
 │   ├── simulation/              # simulation namespace
-│   │   └── engine/              # @opensip-tools/simulation
+│   │   └── engine/              # @opensip-cli/simulation
 │   │
 │   ├── graph/                   # graph namespace
-│   │   ├── engine/              # @opensip-tools/graph — language-agnostic
+│   │   ├── engine/              # @opensip-cli/graph — language-agnostic
 │   │   │                        #   graph kernel; depends on no parser
-│   │   ├── graph-adapter-common/# @opensip-tools/graph-adapter-common —
+│   │   ├── graph-adapter-common/# @opensip-cli/graph-adapter-common —
 │   │   │                        #   shared scaffolding (discover/parse/walk/
 │   │   │                        #   cache-key factories) for the tree-sitter
 │   │   │                        #   adapters; downstream of the engine,
 │   │   │                        #   upstream of go/java/python/rust
-│   │   ├── graph-typescript/    # @opensip-tools/graph-typescript — TS adapter
-│   │   ├── graph-python/        # @opensip-tools/graph-python — Python adapter
-│   │   ├── graph-rust/          # @opensip-tools/graph-rust — Rust adapter
-│   │   ├── graph-go/            # @opensip-tools/graph-go — Go adapter
-│   │   └── graph-java/          # @opensip-tools/graph-java — Java adapter
+│   │   ├── graph-typescript/    # @opensip-cli/graph-typescript — TS adapter
+│   │   ├── graph-python/        # @opensip-cli/graph-python — Python adapter
+│   │   ├── graph-rust/          # @opensip-cli/graph-rust — Rust adapter
+│   │   ├── graph-go/            # @opensip-cli/graph-go — Go adapter
+│   │   └── graph-java/          # @opensip-cli/graph-java — Java adapter
 │   │
 │   └── languages/               # language adapters
 │       ├── lang-typescript/
@@ -148,21 +148,21 @@ pnpm lint
 pnpm lint:fix       # ESLint auto-fix only
 
 # Per-package
-pnpm --filter=@opensip-tools/<pkg> build
-pnpm --filter=@opensip-tools/<pkg> test
+pnpm --filter=@opensip-cli/<pkg> build
+pnpm --filter=@opensip-cli/<pkg> test
 ```
 
 ## CLI Architecture
 
-The `opensip-tools` binary (`packages/cli/src/index.ts`) is a generic
+The `opensip` binary (`packages/cli/src/index.ts`) is a generic
 tool dispatcher:
 
 1. Constructs a fresh per-invocation `LanguageRegistry` and registers
    the bundled language adapters (TypeScript, Rust, Python, Java, Go,
    C/C++) into it.
 2. Constructs a fresh per-invocation `ToolRegistry` and registers the
-   bundled tool packages (`@opensip-tools/fitness`, `@opensip-tools/simulation`,
-   `@opensip-tools/graph`) through the manifest → compatibility gate → dynamic
+   bundled tool packages (`@opensip-cli/fitness`, `@opensip-cli/simulation`,
+   `@opensip-cli/graph`) through the manifest → compatibility gate → dynamic
    import path in `bootstrap/register-tools.ts`. Both registries are passed into
    `new RunScope({ tools, languages })` — there are no module-singleton
    registries (see the RunScope section below).
@@ -179,21 +179,21 @@ tools load by package name through the same plugin path as installed tools.
 
 Subcommands available out of the box:
 
-- `opensip-tools fit` — Run fitness checks (with --gate-save, --gate-compare,
+- `opensip fit` — Run fitness checks (with --gate-save, --gate-compare,
   --recipe, --check, --tags, --json, --report-to)
-- `opensip-tools fit-list` — List available checks
-- `opensip-tools fit-recipes` — List available recipes
-- `opensip-tools fit-baseline-export` — Export fitness findings to SARIF
-- `opensip-tools dashboard` — Generate HTML report
-- `opensip-tools graph` — Build the static call graph
-- `opensip-tools graph-lookup` — Look up a symbol's callers/callees in the graph
-- `opensip-tools graph-symbol-index` — Build/query the symbol index
-- `opensip-tools graph-baseline-export` — Export the graph gate fingerprint baseline to JSON (git-trackable enforcement). For SARIF, use `graph --sarif <path>`.
-- `opensip-tools sim` — Run simulation scenarios [experimental]
-- `opensip-tools init` — Generate `opensip-tools.config.yml`
-- `opensip-tools sessions list|purge` — Manage stored sessions
-- `opensip-tools plugin list|add|remove|sync` — Manage plugins
-- `opensip-tools configure` — Set up OpenSIP Cloud API key
+- `opensip fit-list` — List available checks
+- `opensip fit-recipes` — List available recipes
+- `opensip fit-baseline-export` — Export fitness findings to SARIF
+- `opensip dashboard` — Generate HTML report
+- `opensip graph` — Build the static call graph
+- `opensip graph-lookup` — Look up a symbol's callers/callees in the graph
+- `opensip graph-symbol-index` — Build/query the symbol index
+- `opensip graph-baseline-export` — Export the graph gate fingerprint baseline to JSON (git-trackable enforcement). For SARIF, use `graph --sarif <path>`.
+- `opensip sim` — Run simulation scenarios [experimental]
+- `opensip init` — Generate `opensip-cli.config.yml`
+- `opensip sessions list|purge` — Manage stored sessions
+- `opensip plugin list|add|remove|sync` — Manage plugins
+- `opensip configure` — Set up OpenSIP Cloud API key
 
 ## Fitness Check System
 
@@ -202,11 +202,11 @@ Go, Java, C/C++, Rust). The authoritative per-pack list lives in
 `docs/public/70-reference/05-checks-index.md` (generated) — counts below
 are approximate and drift as checks are added:
 
-- `@opensip-tools/checks-typescript` (~52 checks) — TS-AST-driven checks
+- `@opensip-cli/checks-typescript` (~52 checks) — TS-AST-driven checks
   (drizzle-orm, typed-inject, react, package.json exports, tsconfig).
-- `@opensip-tools/checks-universal` (~109 checks) — text/regex/glob checks
+- `@opensip-cli/checks-universal` (~109 checks) — text/regex/glob checks
   (Docker, .env, Sentry, generic structure, dead-code via knip).
-- `@opensip-tools/checks-python|go|java|cpp|rust` — language-specific checks.
+- `@opensip-cli/checks-python|go|java|cpp|rust` — language-specific checks.
 
 ### Key Files
 
@@ -226,7 +226,7 @@ Adding a new check:
    pretty name and icon (otherwise kebab-to-title-case fallback applies).
 
 For TS-AST checks, prefer the canonical AST helpers exported from
-`@opensip-tools/lang-typescript` over reinventing them inline:
+`@opensip-cli/lang-typescript` over reinventing them inline:
 `getSharedSourceFile`, `walkNodes`, `findEnclosingFunction`,
 `findEnclosingFunctionBody`, `getEnclosingFunctionName`,
 `findEnclosingScope`, `isAsync`, `isInAsyncContext`,
@@ -236,11 +236,11 @@ For TS-AST checks, prefer the canonical AST helpers exported from
 ### Defining a Check
 
 Checks declare **scope** (languages + concerns) for file targeting. The
-platform matches checks to targets defined in `opensip-tools.config.yml`
+platform matches checks to targets defined in `opensip-cli.config.yml`
 via set intersection.
 
 ```typescript
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 export const myCheck = defineCheck({
   id: 'uuid-here',
@@ -256,7 +256,7 @@ export const myCheck = defineCheck({
 });
 ```
 
-`defineCheck` lives in `@opensip-tools/fitness`, NOT `@opensip-tools/core`.
+`defineCheck` lives in `@opensip-cli/fitness`, NOT `@opensip-cli/core`.
 Core is a strict kernel — language adapters, plugin loader, errors,
 logger, IDs, retry, the Tool contract. Anything fitness-shaped lives in
 fitness.
@@ -264,10 +264,10 @@ fitness.
 ### File Scoping (Two-Layer Model)
 
 - **Checks** declare intent: `scope: { languages: ['typescript'], concerns: ['backend'] }`
-- **Targets** (`opensip-tools.config.yml`) declare reality: named file sets
+- **Targets** (`opensip-cli.config.yml`) declare reality: named file sets
   with `languages`, `concerns`, and include/exclude globs
 - **Resolution**: `checkOverrides > scope matching > file cache fallback`
-- **Global excludes**: `globalExcludes` in `opensip-tools.config.yml` —
+- **Global excludes**: `globalExcludes` in `opensip-cli.config.yml` —
   applied to BOTH scope-matched and fileCache-fallback paths (D14)
 - **Per-check exemptions**: `@fitness-ignore-file <check-slug>` inline directives
 
@@ -276,14 +276,14 @@ fitness.
 ### Testing
 
 Vitest. Test files: `*.test.ts` next to the source. Run with `pnpm test`
-or `pnpm --filter=@opensip-tools/<pkg> test`.
+or `pnpm --filter=@opensip-cli/<pkg> test`.
 
 ### Imports
 
-- **Workspace packages** — `import { x } from '@opensip-tools/<pkg>'`
+- **Workspace packages** — `import { x } from '@opensip-cli/<pkg>'`
 - **Subpath exports** are strongly discouraged; prefer the package
   barrel. The exception is
-  `@opensip-tools/core/languages/parse-cache.js` (used by language
+  `@opensip-cli/core/languages/parse-cache.js` (used by language
   adapters).
 - **Internal** — relative paths within a package, always with `.js`
   extension (ESM Node16 module resolution requires it).
@@ -295,7 +295,7 @@ or `pnpm --filter=@opensip-tools/<pkg> test`.
 
 - Per-CLI-invocation state (logger, parse cache, tool/language
   registries, recipe-config slot, project context, lazy datastore
-  thunk) lives on `RunScope` (`@opensip-tools/core/lib/run-scope.ts`).
+  thunk) lives on `RunScope` (`@opensip-cli/core/lib/run-scope.ts`).
   Never reintroduce module-level mutable state for these concerns.
 - Tools read `cli.scope.foo`. The legacy `defaultToolRegistry` and
   `defaultLanguageRegistry` module-singleton exports do not exist
@@ -340,10 +340,10 @@ cli (entry point — depends on every tool)
 - check packs must NOT import from cli or contracts.
 - lang-* packs must NOT import from cli, contracts, fitness, simulation, or
   each other. (The historical lang-typescript exception for `filterContent`
-  was paid down — the symbol now lives in `@opensip-tools/lang-typescript`
+  was paid down — the symbol now lives in `@opensip-cli/lang-typescript`
   alongside the rest of the TS-aware string/comment stripping.)
 - `Registry<T>` (the shared base for all by-id/by-name registries) and
-  `RunScope` (per-invocation execution scope) live in `@opensip-tools/core`.
+  `RunScope` (per-invocation execution scope) live in `@opensip-cli/core`.
   Tools own their own thin subclasses (e.g. `CheckRegistry`,
   `TargetRegistry`); no per-tool registries leak back into the kernel.
 
@@ -361,7 +361,7 @@ pnpm typecheck && pnpm test && pnpm lint
 
 ## Dogfood Gate
 
-CI runs `pnpm fit:ci` on every PR — opensip-tools analyzes itself.
+CI runs `pnpm fit:ci` on every PR — OpenSIP CLI analyzes itself.
 `fit --gate-save` writes findings into the (CI-ephemeral) datastore
 AND hard-fails the step on any error-level finding — it returns the
 `failOnErrors`/`failOnWarnings` exit code (ADR-0020), so the CI step
@@ -384,14 +384,14 @@ plan flagged this as optional but recommended.
 If a Code Scanning alert appears on your PR, run `pnpm fit` locally
 to see the specific finding and the suggestion. Fix the violation
 in your PR. Updating the gate (e.g., via `disabledChecks` in
-`opensip-tools.config.yml`) requires PR-description justification
+`opensip-cli.config.yml`) requires PR-description justification
 and reviewer sign-off — it is not a default contributor option.
 
 The **graph** tool is dogfooded the same way: CI runs `graph
 --gate-save --sarif graph.sarif` (one run: the gate hard-fails on
 error-level findings AND emits SARIF 2.1.0 via the shared
 `cli.writeSarif` envelope→SARIF seam, the same path `fit` uses) →
-upload to Code Scanning under category `opensip-tools-graph`. The
+upload to Code Scanning under category `opensip-cli-graph`. The
 `--sarif` write happens after the gate exit code is set, so the file
 lands even when the gate fails (upload runs under `if: always()`).
 Same ratchet: only net-new graph findings surface on PRs.
@@ -409,9 +409,9 @@ per-tool code (ADR-0036).** Capture (`--gate-save`), the net-new ratchet
 (`--gate-compare`), and export (SARIF + git-trackable JSON fingerprints)
 are four `ToolCliContext` seams — `saveBaseline` / `compareBaseline` /
 `exportBaselineSarif` / `exportBaselineFingerprints` — over one generic
-table pair in `@opensip-tools/datastore` (`tool_baseline_entries` +
+table pair in `@opensip-cli/datastore` (`tool_baseline_entries` +
 `tool_baseline_meta`, scoped by a `tool` column) and one pure
-`diffBaseline` in `@opensip-tools/output`. A tool inherits the whole
+`diffBaseline` in `@opensip-cli/output`. A tool inherits the whole
 ratchet by emitting fingerprint-stamped signals; it authors **at most a
 `Tool.fingerprintStrategy`** — often nothing (the host default keys on
 `ruleId|filePath|line|col`). `graph` declares a byte-preserved strategy
@@ -433,7 +433,7 @@ injection is enabled via `injectWorkspacePackages: true` in
 `pnpm-workspace.yaml` (pnpm 11's settings home — it no longer reads the
 package.json `pnpm` field; the build-script allowlist and `overrides`
 moved there too, as `allowBuilds`/`overrides`), plus
-`@opensip-tools/checks-typescript` and `@opensip-tools/checks-universal`
+`@opensip-cli/checks-typescript` and `@opensip-cli/checks-universal`
 are declared as root devDependencies. Without that, the discovery walker
 would find 0 check packages at the workspace root and the run would
 silently report 0 checks.
@@ -444,7 +444,7 @@ The `docs/` tree has five committed siblings plus one local-only
 scratch area, each with a distinct contract:
 
 - **`docs/public/`** — hand-edited source. These are the docs we publish
-  on the website at opensip.ai/docs/opensip-tools/. Numbered
+  on the website at opensip.ai/docs/opensip-cli/. Numbered
   Diátaxis-ish sections: `00-start`, `10-concepts`, `20-fit`, `30-sim`,
   `40-graph`, `50-extend`, `60-guides`, `70-reference`,
   `80-implementation`. Anything here is reader-facing and externally
@@ -484,7 +484,7 @@ scratch area, each with a distinct contract:
 Boundary rule of thumb: a durable *decision* (what we chose + why, with
 alternatives) is an ADR in `docs/decisions/`; the *how to build it* is a
 spec in `docs/plans/specs/` (local-only). For prose docs: if you can write the fact about
-opensip-tools without naming a specific consumer, it goes in
+opensip-cli without naming a specific consumer, it goes in
 `docs/public/`; if naming a specific consumer (or other private context)
 is load-bearing, it goes in `docs/internal/`; if it's pending work or
 design exploration not yet ready for external readers, it stays in
@@ -516,7 +516,7 @@ npm's self-replacement and pnpm's lack of OIDC support.
 
 ## Project Status
 
-**v3.0.0 (GA)** — opensip-tools is a tool-plugin platform: `core` is a
+**v3.0.0 (GA)** — OpenSIP CLI is a tool-plugin platform: `core` is a
 strict kernel, and `fitness`, `graph`, and `simulation` are peer
 tools implementing a shared Tool contract, with `cli` as a generic
 dispatcher. Adding a new tool requires zero CLI changes. **3.0.0 is the
@@ -536,16 +536,16 @@ by shipping a manifest + `commandSpecs`, inheriting every host-owned plane.
 The new-customer flow is three commands: `init` (language detection
 + scaffolded layout) → `fit --recipe example` → `sim --recipe
 example`. Project layout is local: user-authored content under
-`<project>/opensip-tools/{fit,sim}/{checks,recipes,scenarios}/`
+`<project>/opensip-cli/{fit,sim}/{checks,recipes,scenarios}/`
 (tracked) and tool-generated state under
-`<project>/opensip-tools/.runtime/` (gitignored). Plugin loader
+`<project>/opensip-cli/.runtime/` (gitignored). Plugin loader
 auto-discovers `.mjs` files by directory presence; npm packages
 must be explicitly listed in `plugins.<domain>` to load.
 
 Re-running `init` on a non-pristine project refuses with exit 2 by
 default. Two explicit flags express user intent:
 `--keep` re-scaffolds examples while preserving custom files, and
-`--remove` deletes `opensip-tools/` entirely before scaffolding
+`--remove` deletes `opensip-cli/` entirely before scaffolding
 fresh. The flags are mutually exclusive. The legacy `--force` flag
 is gone; users who scripted it should migrate to `--remove`. See
 `docs/public/70-reference/01-cli-commands.md#init---scaffold-the-project-layout`

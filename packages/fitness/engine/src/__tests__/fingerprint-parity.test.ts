@@ -11,7 +11,7 @@
  * re-keys every saved baseline, so the golden must move deliberately.
  */
 
-import { createSignal, type Signal } from '@opensip-tools/core';
+import { createSignal, type Signal } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { fitnessFingerprintStrategy } from '../baseline-strategy.js';

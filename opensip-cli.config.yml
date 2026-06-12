@@ -1,4 +1,4 @@
-# OpenSIP Tools — Signalers Configuration
+# OpenSIP CLI — Signalers Configuration
 #
 # Defines named file sets (targets) for fitness checks and configures
 # how each signal producer analyzes the codebase.

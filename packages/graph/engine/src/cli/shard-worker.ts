@@ -19,7 +19,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 import { computeFilesFingerprint } from '../cache/invalidate.js';
 import { pickAdapter } from '../lang-adapter/registry.js';
@@ -29,7 +29,7 @@ import { buildAndResolveCatalog } from './orchestrate/catalog-builder.js';
 
 import type { ShardBuildResult, ShardWorkerSpec } from './orchestrate/shard-model.js';
 import type { DiscoverOutput } from '../lang-adapter/types.js';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 /**
  * Build one shard and emit its `ShardBuildResult` as JSON on stdout.

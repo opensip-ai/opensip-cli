@@ -24,7 +24,7 @@ describe('loadAllSimPlugins', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('returns an empty result for a projectDir with no opensip-tools/ subtree', async () => {
+  it('returns an empty result for a projectDir with no opensip-cli/ subtree', async () => {
     const result = await loadAllSimPlugins(testDir);
     expect(result.plugins).toEqual([]);
   });
@@ -32,7 +32,7 @@ describe('loadAllSimPlugins', () => {
   it('loads a discovered user-source plugin file and rolls up counts', async () => {
     // Build a minimal sim project layout that discovers one user-source
     // plugin file.
-    const scenariosDir = join(testDir, 'opensip-tools', 'sim', 'scenarios');
+    const scenariosDir = join(testDir, 'opensip-cli', 'sim', 'scenarios');
     mkdirSync(scenariosDir, { recursive: true });
     writeFileSync(join(scenariosDir, 'a.mjs'), 'export const recipes = [];\n');
 
@@ -43,7 +43,7 @@ describe('loadAllSimPlugins', () => {
   });
 
   it('collects an error when a plugin file throws on import', async () => {
-    const scenariosDir = join(testDir, 'opensip-tools', 'sim', 'scenarios');
+    const scenariosDir = join(testDir, 'opensip-cli', 'sim', 'scenarios');
     mkdirSync(scenariosDir, { recursive: true });
     writeFileSync(join(scenariosDir, 'bad.mjs'), 'throw new Error("boom on import");\n');
 
@@ -54,7 +54,7 @@ describe('loadAllSimPlugins', () => {
   });
 
   it('warns when recipes is not an array', async () => {
-    const scenariosDir = join(testDir, 'opensip-tools', 'sim', 'scenarios');
+    const scenariosDir = join(testDir, 'opensip-cli', 'sim', 'scenarios');
     mkdirSync(scenariosDir, { recursive: true });
     writeFileSync(join(scenariosDir, 'a.mjs'), 'export const recipes = "not an array";\n');
 
@@ -64,7 +64,7 @@ describe('loadAllSimPlugins', () => {
   });
 
   it('skips invalid recipe items', async () => {
-    const scenariosDir = join(testDir, 'opensip-tools', 'sim', 'scenarios');
+    const scenariosDir = join(testDir, 'opensip-cli', 'sim', 'scenarios');
     mkdirSync(scenariosDir, { recursive: true });
     writeFileSync(
       join(scenariosDir, 'a.mjs'),

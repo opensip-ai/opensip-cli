@@ -1,7 +1,7 @@
 // @fitness-ignore-file toctou-race-condition -- cache check + populate is synchronous (sync file I/O + Map.set); no async gap, safe in single-threaded Node.js
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (signaler entries listed in opensip-tools.config.yml)
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (signaler entries listed in opensip-cli.config.yml)
 /**
- * @fileoverview Load and cache opensip-tools.config.yml
+ * @fileoverview Load and cache opensip-cli.config.yml
  *
  * Reads the signalers config file (path resolved via config-resolution),
  * validates with Zod, and returns a frozen SignalersConfig. Throws when
@@ -15,7 +15,7 @@ import {
   readYamlFileOrThrow,
   resolveProjectConfigPath,
   logger,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { SignalersConfigSchema } from './schema.js';
 
@@ -98,7 +98,7 @@ function projectSignalersConfig(parsed: unknown, sourceLabel: string): Signalers
 }
 
 /**
- * Load and validate opensip-tools.config.yml from the given root directory.
+ * Load and validate opensip-cli.config.yml from the given root directory.
  *
  * SCOPE-FIRST (ADR-0023 one-reader): when the current `RunScope` carries the
  * host-validated config document (`scope.configDocument`, attached by the CLI
@@ -107,8 +107,8 @@ function projectSignalersConfig(parsed: unknown, sourceLabel: string): Signalers
  * tool resolving a different file than the host did. The file-read fallback
  * below serves scope-less callers only (programmatic use, unit tests).
  *
- * Fallback resolution: --config (explicit) → package.json#opensip-tools.configPath
- * → <rootDir>/opensip-tools.config.yml. See resolveProjectConfigPath().
+ * Fallback resolution: --config (explicit) → package.json#opensip-cli.configPath
+ * → <rootDir>/opensip-cli.config.yml. See resolveProjectConfigPath().
  * Results are cached per resolved file path.
  *
  * @param rootDir - Absolute path to the project root directory

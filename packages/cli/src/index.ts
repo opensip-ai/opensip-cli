@@ -2,7 +2,7 @@
 
 // @fitness-ignore-file detached-promises -- composition root invokes synchronous bootstrap helpers (mountAllToolCommands, registerCliCommands, printWelcome) that the heuristic mistakes for promise-returning calls
 /**
- * OpenSIP Tools CLI — composition root. Reads top-to-bottom as wiring.
+ * OpenSIP CLI CLI — composition root. Reads top-to-bottom as wiring.
  * Bootstrap, context, command-mount, and error-handling each live in
  * their own module under `./bootstrap`, `./cli-context`, `./commands`,
  * and `./error-handler`. Adding a new tool requires zero changes here.
@@ -11,7 +11,7 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { LanguageRegistry, ToolRegistry, logger, readPackageVersion } from '@opensip-tools/core';
+import { LanguageRegistry, ToolRegistry, logger, readPackageVersion } from '@opensip-cli/core';
 import { Command } from 'commander';
 
 import {
@@ -37,7 +37,7 @@ export * from './api.js';
 
 const cliVersion = readPackageVersion(import.meta.url);
 
-const program = new Command('opensip-tools')
+const program = new Command('opensip')
   .description('Codebase analysis toolkit — pluggable tools for fitness, simulation, and more')
   // ADR-0008: per-run opt-out of OpenSIP Cloud signal sync. `--no-cloud` sets
   // `cloud` to false; the pre-action hook reads it via optsWithGlobals().
@@ -108,7 +108,7 @@ async function main(): Promise<void> {
     ...registrationInput,
   });
 
-  // Bare `opensip-tools` → welcome screen. The update check is owned by the
+  // Bare `opensip` → welcome screen. The update check is owned by the
   // pre-action hook (which only runs for actual subcommands), so it naturally
   // skips zero-arg runs without a guard here.
   // Return (not process.exit) so the top-level `finally` still runs the

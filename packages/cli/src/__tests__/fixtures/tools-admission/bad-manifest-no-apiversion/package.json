@@ -1,5 +1,5 @@
 {
-  "name": "@opensip-tools-fixture/no-apiversion",
+  "name": "@opensip-cli-fixture/no-apiversion",
   "version": "0.0.0",
   "private": true,
   "type": "module",

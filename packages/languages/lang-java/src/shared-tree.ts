@@ -6,7 +6,7 @@
  * is parsed once; falls back to a direct parse when no cache is active.
  */
 
-import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js';
+import { getParseTree } from '@opensip-cli/core/languages/parse-cache.js';
 
 import { javaAdapter } from './adapter.js';
 

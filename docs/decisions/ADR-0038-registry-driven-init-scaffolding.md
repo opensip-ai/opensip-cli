@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-11
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0038: `init` scaffolds the registered tools, not a hardcoded fit/sim set

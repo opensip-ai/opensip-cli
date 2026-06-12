@@ -19,11 +19,11 @@ import {
   isToolShortId,
   TOOL_LONG_TO_SHORT,
   TOOL_SHORT_TO_LONG,
-} from '@opensip-tools/core';
-import { BaselineRepo, ToolStateRepo, type DataStore } from '@opensip-tools/datastore';
-import { SessionRepo } from '@opensip-tools/session-store';
+} from '@opensip-cli/core';
+import { BaselineRepo, ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 
-import type { ToolsDataPurgeResult } from '@opensip-tools/contracts';
+import type { ToolsDataPurgeResult } from '@opensip-cli/contracts';
 
 /**
  * Every id form one user-supplied tool id may appear under across the stores.

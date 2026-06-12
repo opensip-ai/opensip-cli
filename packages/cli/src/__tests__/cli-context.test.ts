@@ -8,7 +8,7 @@ import {
   type Logger,
   type ToolPluginManifest,
   type ToolProvenance,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildToolCliContext, createLiveViewRegistry } from '../cli-context.js';
@@ -189,7 +189,7 @@ describe('getCurrentProjectRoot / setCurrentRunScope', () => {
   it('returns the configured project root once the run scope is set', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const { RunScope } = await import('@opensip-tools/core');
+    const { RunScope } = await import('@opensip-cli/core');
     mod.setCurrentRunScope(
       new RunScope({
         projectContext: {
@@ -206,7 +206,7 @@ describe('getCurrentProjectRoot / setCurrentRunScope', () => {
   it('throws when the scope is set but carries no project context', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const { RunScope } = await import('@opensip-tools/core');
+    const { RunScope } = await import('@opensip-cli/core');
     // A scope with no projectContext (e.g. a bare bootstrap scope) ⇒
     // getCurrentProjectRoot must surface the PROJECT_UNSET error.
     mod.setCurrentRunScope(new RunScope({}));
@@ -225,7 +225,7 @@ describe('setCliRegistriesForRun / getCurrentRegistriesForScope', () => {
   it('round-trips the registries set by main()', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const core = await import('@opensip-tools/core');
+    const core = await import('@opensip-cli/core');
     const languages = new core.LanguageRegistry();
     const tools = new core.ToolRegistry();
     mod.setCliRegistriesForRun({ languages, tools });
@@ -237,7 +237,7 @@ describe('setCliRegistriesForRun / getCurrentRegistriesForScope', () => {
   it('installs registries and plugin metadata as one runtime context', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const core = await import('@opensip-tools/core');
+    const core = await import('@opensip-cli/core');
     const languages = new core.LanguageRegistry();
     const tools = new core.ToolRegistry();
     const provenance: ToolProvenance[] = [
@@ -245,7 +245,7 @@ describe('setCliRegistriesForRun / getCurrentRegistriesForScope', () => {
         id: 'plugin-a',
         version: '1.0.0',
         source: 'bundled',
-        packageName: '@opensip-tools/plugin-a',
+        packageName: '@opensip-cli/plugin-a',
         resolvedPath: '/plugins/a/package.json',
         manifestHash: 'hash-a',
       },
@@ -280,7 +280,7 @@ describe('ToolCliContext.scope getter', () => {
   it('returns the RunScope set via setCurrentRunScope', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const { RunScope } = await import('@opensip-tools/core');
+    const { RunScope } = await import('@opensip-cli/core');
     const scope = new RunScope({
       projectContext: { scope: 'project', projectRoot: '/p', walkedUp: 0 } as never,
     });
@@ -303,7 +303,7 @@ describe('getOrOpenDatastore', () => {
   it('throws when called in a non-project context (user scope)', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const { RunScope } = await import('@opensip-tools/core');
+    const { RunScope } = await import('@opensip-cli/core');
     const project = {
       scope: 'user',
       projectRoot: '/anywhere',
@@ -322,7 +322,7 @@ describe('getOrOpenDatastore', () => {
   it('opens the project-local sqlite datastore and caches it across calls', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const { RunScope, resolveProjectPaths } = await import('@opensip-tools/core');
+    const { RunScope, resolveProjectPaths } = await import('@opensip-cli/core');
 
     const projectRoot = mkdtempSync(join(tmpdir(), 'opensip-clictx-ds-'));
     try {

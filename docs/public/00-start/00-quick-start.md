@@ -10,7 +10,7 @@ source-files:
   - packages/cli/src/index.ts
   - packages/cli/src/commands/init.ts
 related-docs:
-  - ./01-what-is-opensip-tools.md
+  - ./01-what-is-opensip-cli.md
   - ./05-vocabulary.md
   - ../70-reference/01-cli-commands.md
   - ../70-reference/08-supply-chain-security.md
@@ -20,16 +20,16 @@ related-docs:
 From a clean shell to a passing fitness run. The point of this page is to give you something working in your terminal *before* you read the conceptual material — every other doc in this set is sharper once you've seen the output once.
 
 > **What you'll have after this page:**
-> - The `opensip-tools` CLI installed.
-> - An `opensip-tools.config.yml` and an `opensip-tools/` directory in a project of your choice.
+> - The `opensip-cli` CLI installed.
+> - An `opensip-cli.config.yml` and an `opensip-cli/` directory in a project of your choice.
 > - One passing `fit` run, plus an optional `sim` smoke test.
-> - Enough mechanical context that [`./01-what-is-opensip-tools.md`](./01-what-is-opensip-tools.md) lands as *"oh, that's why"* instead of *"wait, what's a recipe?"*
+> - Enough mechanical context that [`./01-what-is-opensip-cli.md`](./01-what-is-opensip-cli.md) lands as *"oh, that's why"* instead of *"wait, what's a recipe?"*
 
 ---
 
 ## Works with
 
-opensip-tools auto-detects your project's language(s) from filesystem markers and runs the matching checks. Polyglot projects get every relevant pack.
+opensip-cli auto-detects your project's language(s) from filesystem markers and runs the matching checks. Polyglot projects get every relevant pack.
 
 | Language | Detection marker | Language-specific checks | Universal checks |
 |---|---|---|---|
@@ -52,7 +52,7 @@ For the full per-language breakdown, see [`../70-reference/02-package-catalog.md
 - A project directory you don't mind a scaffold landing in.
 - *(Optional)* `pnpm` if you're building from source. The curl installer handles global CLI setup.
 
-If you don't have a project handy, `git clone https://github.com/opensip-ai/opensip-tools.git` and run these commands inside the clone — opensip-tools fits checks against its own codebase as the smoke test.
+If you don't have a project handy, `git clone https://github.com/opensip-ai/opensip-cli.git` and run these commands inside the clone — OpenSIP CLI runs checks against its own codebase as the smoke test.
 
 ---
 
@@ -66,32 +66,32 @@ curl -fsSL https://opensip.ai/cli/install.sh | bash
 cd your-project
 
 # 3. Scaffold config + example check/scenario (language auto-detected)
-opensip-tools init
+opensip init
 
 # 4. Run the fitness smoke test
-opensip-tools fit --recipe example
+opensip fit --recipe example
 
 # 5. Optional: run the scaffolded simulation smoke test
-opensip-tools sim --recipe example
+opensip sim --recipe example
 ```
 
 If `fit --recipe example` exits 0, the platform is wired correctly end-to-end: language detection picked the right adapter, the plugin loader found the example check, the recipe service matched it, the engine executed it, and the renderer drew the result. Every later doc is depth on one of those steps.
 
-opensip-tools publishes through npm trusted publishing/provenance and rejects OpenSIP package-level install hooks before release. For the remaining npm-install risk model, see [supply-chain security](../70-reference/08-supply-chain-security.md).
+opensip-cli publishes through npm trusted publishing/provenance and rejects OpenSIP package-level install hooks before release. For the remaining npm-install risk model, see [supply-chain security](../70-reference/08-supply-chain-security.md).
 
-> **Upgrading from `@opensip-tools/cli`?**
-> The CLI was renamed to the unscoped **`opensip-tools`** in v2.4.0 — one command
+> **Upgrading from `@opensip-cli/cli`?**
+> The CLI was renamed to the unscoped **`opensip-cli`** in v2.4.0 — one command
 > now installs *and* updates the CLI together with every bundled package
 > (language adapters, engine, check packs). Both the old and new packages
-> provide the same `opensip-tools` binary, so npm refuses to overwrite the old
+> provide the same `opensip` binary, so npm refuses to overwrite the old
 > global bin with `EEXIST`. **Uninstall the old package first:**
 >
 > ```bash
-> npm uninstall -g @opensip-tools/cli
+> npm uninstall -g @opensip-cli/cli
 > curl -fsSL https://opensip.ai/cli/install.sh | bash
 > ```
 >
-> Nothing else changes — `opensip-tools.config.yml`, the `opensip-tools`
+> Nothing else changes — `opensip-cli.config.yml`, the `opensip-cli`
 > command, and every subcommand are identical. From 2.4.0 on, the installer
 > keeps the unscoped CLI package current.
 
@@ -101,8 +101,8 @@ opensip-tools publishes through npm trusted publishing/provenance and rejects Op
 
 ```
 your-project/
-├── opensip-tools.config.yml                ← project config
-└── opensip-tools/
+├── opensip-cli.config.yml                ← project config
+└── opensip-cli/
     ├── fit/
     │   ├── checks/example-check.mjs        ← demo check (scope matches your language)
     │   └── recipes/example-recipe.mjs      ← runs the demo check
@@ -111,9 +111,9 @@ your-project/
         └── recipes/example-recipe.mjs      ← runs the demo scenario
 ```
 
-`opensip-tools.config.yml` is the only file the CLI *requires*. Everything under `opensip-tools/` is plugin source — auto-discovered at runtime, no opt-in needed. `opensip-tools init` also appends `opensip-tools/.runtime/` to your `.gitignore` so the tool's own state files don't pollute commits.
+`opensip-cli.config.yml` is the only file the CLI *requires*. Everything under `opensip-cli/` is plugin source — auto-discovered at runtime, no opt-in needed. `opensip init` also appends `opensip-cli/.runtime/` to your `.gitignore` so the tool's own state files don't pollute commits.
 
-For a polyglot project (e.g. Rust + TypeScript), `init` writes one example check per detected language. To force a specific configuration: `opensip-tools init --language rust,typescript`.
+For a polyglot project (e.g. Rust + TypeScript), `init` writes one example check per detected language. To force a specific configuration: `opensip init --language rust,typescript`.
 
 ---
 
@@ -121,27 +121,27 @@ For a polyglot project (e.g. Rust + TypeScript), `init` writes one example check
 
 ```bash
 # Install from source (for contributors)
-git clone https://github.com/opensip-ai/opensip-tools.git
-cd opensip-tools && pnpm i && pnpm build
+git clone https://github.com/opensip-ai/opensip-cli.git
+cd opensip-cli && pnpm i && pnpm build
 node packages/cli/dist/index.js fit
 
 # Run the default recipe (every enabled check, not just the example)
-opensip-tools fit
+opensip fit
 
 # See what checks are available
-opensip-tools fit --list
+opensip fit --list
 
 # See what graph would analyze without building a catalog
-opensip-tools graph --list-files
+opensip graph --list-files
 
 # Get a per-violation breakdown instead of the summary line
-opensip-tools fit --verbose
+opensip fit --verbose
 
 # Emit structured JSON for CI
-opensip-tools fit --json
+opensip fit --json
 
 # Run the static call-graph tool (different question shape: "what is reachable from where?")
-opensip-tools graph
+opensip graph
 ```
 
 The full command tree is at [`../70-reference/01-cli-commands.md`](../70-reference/01-cli-commands.md).
@@ -152,11 +152,11 @@ The full command tree is at [`../70-reference/01-cli-commands.md`](../70-referen
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Behavior doesn't match what these docs describe | Older CLI version than the docs you're reading | Check installed version: `opensip-tools --version` (or `-V`). Latest is on [npm](https://www.npmjs.com/package/opensip-tools). Update with `curl -fsSL https://opensip.ai/cli/install.sh \| bash`. |
-| `command not found: opensip-tools` | The shell has not picked up the global command yet | Open a new shell and try again; if it still fails, rerun `curl -fsSL https://opensip.ai/cli/install.sh \| bash` |
-| `init` says it detected no language | No supported language marker found (no `package.json`, `Cargo.toml`, etc.) | Pass `--language <name>` explicitly: `opensip-tools init --language typescript` |
-| `fit --recipe example` says "0 checks ran" | Targets in `opensip-tools.config.yml` don't match any files | Open the config; widen `targets.<your-language>-source.include` to cover where your code actually lives |
-| Errors from `Node.js engine` | Node version is below 24 | Upgrade Node — opensip-tools uses ES2022 + Node16 module resolution |
+| Behavior doesn't match what these docs describe | Older CLI version than the docs you're reading | Check installed version: `opensip --version` (or `-V`). Latest is on [npm](https://www.npmjs.com/package/opensip-cli). Update with `curl -fsSL https://opensip.ai/cli/install.sh \| bash`. |
+| `command not found: opensip-cli` | The shell has not picked up the global command yet | Open a new shell and try again; if it still fails, rerun `curl -fsSL https://opensip.ai/cli/install.sh \| bash` |
+| `init` says it detected no language | No supported language marker found (no `package.json`, `Cargo.toml`, etc.) | Pass `--language <name>` explicitly: `opensip init --language typescript` |
+| `fit --recipe example` says "0 checks ran" | Targets in `opensip-cli.config.yml` don't match any files | Open the config; widen `targets.<your-language>-source.include` to cover where your code actually lives |
+| Errors from `Node.js engine` | Node version is below 24 | Upgrade Node — opensip-cli uses ES2022 + Node16 module resolution |
 
 ---
 
@@ -165,7 +165,7 @@ The full command tree is at [`../70-reference/01-cli-commands.md`](../70-referen
 You've seen the loop run. The rest of this section deepens what you just saw:
 
 1. **[`./02-show-me-the-loops.md`](./02-show-me-the-loops.md)** — One code sample per tool: a fit check, a sim scenario, a graph rule. See what authoring looks like, now that you know the platform works.
-2. **[`./01-what-is-opensip-tools.md`](./01-what-is-opensip-tools.md)** — The product, the problem, the philosophy. What you just ran, conceptually.
+2. **[`./01-what-is-opensip-cli.md`](./01-what-is-opensip-cli.md)** — The product, the problem, the philosophy. What you just ran, conceptually.
 3. **[`../60-guides/00-initialize-your-first-repo.md`](../60-guides/00-initialize-your-first-repo.md)** — The careful repo-adoption version of this page.
 4. **[`./05-vocabulary.md`](./05-vocabulary.md)** — The terms used everywhere: *Tool, recipe, check, scenario, signaler, target, language adapter, plugin, session.*
 5. **[`./06-system-context.md`](./06-system-context.md)** — Where the binary sits between you, the codebase, CI, and OpenSIP Cloud.

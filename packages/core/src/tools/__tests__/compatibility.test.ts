@@ -26,7 +26,7 @@ describe('checkCompatibility', () => {
     if (verdict.kind === 'incompatible') {
       expect(verdict.declared).toBe(PLUGIN_API_VERSION + 1);
       expect(verdict.engine).toBe(PLUGIN_API_VERSION);
-      expect(verdict.reason).toMatch(/upgrade opensip-tools/i);
+      expect(verdict.reason).toMatch(/upgrade OpenSIP CLI/i);
     }
   });
 

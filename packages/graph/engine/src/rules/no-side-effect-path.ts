@@ -32,7 +32,7 @@ import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { FeatureTable, FunctionOccurrence, Indexes, RuleHints } from '../types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 const TYPESCRIPT_FALLBACK_REGEX =
   /\b(?:console|logger|fs\.|http\.|fetch|process\.exit|throw\s+new)\b/;

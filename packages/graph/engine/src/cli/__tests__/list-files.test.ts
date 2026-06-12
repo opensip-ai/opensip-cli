@@ -9,13 +9,13 @@
  * which their own packages test.
  */
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { executeListFiles } from '../list-files.js';
 
 import type { GraphCommandOptions } from '../graph-options.js';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 const h = vi.hoisted(() => ({
   discoverFiles: vi.fn(),

@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-02
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0004: Opt-in OpenTelemetry — env-var gate, API in core / SDK at the boundary

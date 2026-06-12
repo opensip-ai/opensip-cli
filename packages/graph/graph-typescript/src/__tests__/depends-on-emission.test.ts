@@ -20,12 +20,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ownerEdgeKey } from '@opensip-tools/graph';
+import { ownerEdgeKey } from '@opensip-cli/graph';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';
 
-import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
+import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 
 const FIXTURE_TSCONFIG = JSON.stringify({
   compilerOptions: {
@@ -145,7 +145,7 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
   it('emits an unresolved edge for external package imports', async () => {
     writeFile(
       'src/greet.ts',
-      `import { something } from '@opensip-tools/nonexistent-pkg';\nexport function greet(): string { return String(something); }\n`,
+      `import { something } from '@opensip-cli/nonexistent-pkg';\nexport function greet(): string { return String(something); }\n`,
     );
 
     const { catalog, dependenciesByOwner } = await runAdapter();
@@ -156,7 +156,7 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
       ownerEdgeKey(greetModuleInit!.bodyHash, greetModuleInit!.filePath),
     );
     expect(greetDeps).toHaveLength(1);
-    expect(greetDeps![0].specifier).toBe('@opensip-tools/nonexistent-pkg');
+    expect(greetDeps![0].specifier).toBe('@opensip-cli/nonexistent-pkg');
     expect(greetDeps![0].to).toEqual([]);
   });
 

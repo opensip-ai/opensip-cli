@@ -3,7 +3,7 @@
  * @fileoverview Public API JSDoc check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 import { isInPublicApiSurface } from './_public-api-graph.js';
 

@@ -2,13 +2,13 @@
      Change the package's "description" (or the generator template) and run
      `pnpm docs:readmes`. CI enforces sync via `pnpm docs:readmes:check`. -->
 
-# @opensip-tools/checks-rust
+# @opensip-cli/checks-rust
 
-> Rust fitness checks for opensip-tools
+> Rust fitness checks for opensip-cli
 
-This is a **fitness check pack**. Install it alongside the `opensip-tools` CLI and its checks are discovered automatically.
+This is a **fitness check pack**. Install it alongside the `opensip-cli` CLI and its checks are discovered automatically.
 
-Part of [**opensip-tools**](https://github.com/opensip-ai/opensip-tools) — an open-source codebase-analysis toolkit: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
+Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase-analysis toolkit: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
 
 ## Install
 
@@ -18,13 +18,13 @@ Most users install the CLI, which bundles the first-party tools:
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 ```
 
-This package is published for the CLI and advanced plugin authors; most users should not install `@opensip-tools/checks-rust` directly.
+This package is published for the CLI and advanced plugin authors; most users should not install `@opensip-cli/checks-rust` directly.
 
 ## Documentation
 
-- 📚 Project docs: https://opensip.ai/docs/opensip-tools/
-- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-tools/tree/v3.0.0/packages/fitness/checks-rust
+- 📚 Project docs: https://opensip.ai/docs/opensip-cli/
+- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/docs/public/70-reference/02-package-catalog.md
+- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v3.0.0/packages/fitness/checks-rust
 
 ## License
 

@@ -66,7 +66,7 @@ export function checkCompatibility(
 
   const reason =
     apiVersion > engine
-      ? `tool targets plugin API v${apiVersion} but this engine implements v${engine}; upgrade opensip-tools to load it`
+      ? `tool targets plugin API v${apiVersion} but this engine implements v${engine}; upgrade OpenSIP CLI to load it`
       : `tool targets plugin API v${apiVersion} which this engine (v${engine}) no longer supports; upgrade the tool`;
 
   return { kind: 'incompatible', declared: apiVersion, engine, reason };

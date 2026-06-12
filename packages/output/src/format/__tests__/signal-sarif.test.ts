@@ -4,7 +4,7 @@ import { buildOpenSipSarif, formatSignalSarif } from '../signal-sarif.js';
 
 import { EMPTY_ENVELOPE, FIXTURE_ENVELOPE } from './envelope.fixtures.js';
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 describe('formatSignalSarif', () => {
   it('renders the envelope as SARIF v2.1.0 (snapshot)', () => {
@@ -15,7 +15,7 @@ describe('formatSignalSarif', () => {
     const parsed = JSON.parse(formatSignalSarif(FIXTURE_ENVELOPE)) as {
       runs: { tool: { driver: { name: string } } }[];
     };
-    expect(parsed.runs[0].tool.driver.name).toBe('opensip-tools-graph');
+    expect(parsed.runs[0].tool.driver.name).toBe('opensip-cli-graph');
   });
 
   it('emits one result per signal with ruleId verbatim', () => {
@@ -160,13 +160,13 @@ describe('formatSignalSarif', () => {
 describe('buildOpenSipSarif', () => {
   it('uses the supplied driver identity verbatim', () => {
     const sarif = buildOpenSipSarif(FIXTURE_ENVELOPE.signals, {
-      name: 'opensip-tools-graph',
+      name: 'opensip-cli-graph',
       version: '9.9.9',
     });
     const parsed = JSON.parse(sarif) as {
       runs: { tool: { driver: { name: string; version: string } } }[];
     };
-    expect(parsed.runs[0].tool.driver.name).toBe('opensip-tools-graph');
+    expect(parsed.runs[0].tool.driver.name).toBe('opensip-cli-graph');
     expect(parsed.runs[0].tool.driver.version).toBe('9.9.9');
   });
 });

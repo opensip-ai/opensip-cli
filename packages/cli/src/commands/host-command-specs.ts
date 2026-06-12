@@ -29,8 +29,8 @@
  * `.option(spec, desc, process.cwd())` registrars.
  */
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { ConfigurationError, defineCommand, type ProjectContext } from '@opensip-tools/core';
+import { EXIT_CODES } from '@opensip-cli/contracts';
+import { ConfigurationError, defineCommand, type ProjectContext } from '@opensip-cli/core';
 
 import { composeAndWriteDashboard } from '../dashboard-compose.js';
 
@@ -48,7 +48,7 @@ import { mountCommandSpec } from './mount-command-spec.js';
 import { executeUninstall } from './uninstall.js';
 
 import type { CliCommandsContext } from './shared.js';
-import type { CliProgram, InitOptions } from '@opensip-tools/contracts';
+import type { CliProgram, InitOptions } from '@opensip-cli/contracts';
 
 // ---------------------------------------------------------------------------
 // init
@@ -63,7 +63,7 @@ interface InitOpts extends InitOptions {
 function buildInitSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'init',
-    description: 'Scaffold opensip-tools.config.yml + example checks/scenarios for your project',
+    description: 'Scaffold opensip-cli.config.yml + example checks/scenarios for your project',
     // `--cwd` here matches the registry text ("Target directory"); `--json` /
     // `--debug` match the registry too, so they ride the common-flag path.
     commonFlags: ['cwd', 'json', 'debug'],
@@ -76,12 +76,12 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
       },
       {
         flag: '--keep',
-        description: 'Re-scaffold example files. Preserve any custom files in opensip-tools/.',
+        description: 'Re-scaffold example files. Preserve any custom files in opensip-cli/.',
         default: false,
       },
       {
         flag: '--remove',
-        description: 'Delete opensip-tools/ entirely, then scaffold fresh.',
+        description: 'Delete opensip-cli/ entirely, then scaffold fresh.',
         default: false,
       },
     ],
@@ -225,7 +225,7 @@ function buildUninstallSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'uninstall',
     description:
-      'Remove user-level config at ~/.opensip-tools/ (cloud API key, defaults). Use --project to remove project-local state instead.',
+      'Remove user-level config at ~/.opensip-cli/ (cloud API key, defaults). Use --project to remove project-local state instead.',
     commonFlags: [],
     options: [
       { flag: '-y, --yes', description: 'Skip confirmation prompt', default: false },
@@ -236,7 +236,7 @@ function buildUninstallSpec(): HostSpec {
       },
       {
         flag: '--user',
-        description: 'Remove user-level config at ~/.opensip-tools/ (default mode)',
+        description: 'Remove user-level config at ~/.opensip-cli/ (default mode)',
         default: false,
       },
       {
@@ -248,7 +248,7 @@ function buildUninstallSpec(): HostSpec {
       {
         flag: '--purge',
         description:
-          'With --project, also remove user-authored content and opensip-tools.config.yml (DESTRUCTIVE)',
+          'With --project, also remove user-authored content and opensip-cli.config.yml (DESTRUCTIVE)',
         default: false,
       },
       { flag: '--json', description: 'Output structured JSON', default: false },

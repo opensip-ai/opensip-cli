@@ -35,7 +35,7 @@ const __filename = fileURLToPath(import.meta.url);
 const REPO_ROOT = dirname(dirname(__filename));
 const PACKAGES_DIR = join(REPO_ROOT, 'packages');
 const CHECK_ONLY = process.argv.slice(2).includes('--check');
-const CLI_PACKAGE_NAME = 'opensip-tools';
+const CLI_PACKAGE_NAME = 'opensip-cli';
 
 const log = (msg) => console.error(`[build-package-keywords] ${msg}`);
 
@@ -44,7 +44,7 @@ const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.claude', 'coverage'
 // ---- derivation -----------------------------------------------------------
 
 /** Every package carries these. */
-const BASE = ['opensip-tools', 'static-analysis', 'code-quality'];
+const BASE = ['opensip-cli', 'static-analysis', 'code-quality'];
 
 /** Language keywords keyed by the trailing language token in the package name. */
 const LANG_KEYWORDS = {
@@ -59,7 +59,7 @@ const LANG_KEYWORDS = {
 
 /** Per-package additions for the engines and notable libraries. */
 const OVERRIDES = {
-  'opensip-tools': [
+  'opensip-cli': [
     'cli',
     'fitness-functions',
     'call-graph',
@@ -68,24 +68,24 @@ const OVERRIDES = {
     'code-review',
     'devtools',
   ],
-  '@opensip-tools/fitness': ['fitness-functions', 'linting', 'architecture', 'code-review'],
-  '@opensip-tools/graph': ['call-graph', 'dependency-graph', 'code-analysis', 'architecture'],
-  '@opensip-tools/simulation': ['simulation', 'testing'],
-  '@opensip-tools/core': ['kernel', 'plugin-system'],
-  '@opensip-tools/contracts': ['types', 'contracts'],
-  '@opensip-tools/datastore': ['sqlite', 'drizzle', 'persistence'],
-  '@opensip-tools/session-store': ['sqlite', 'persistence'],
-  '@opensip-tools/output': ['sarif', 'output'],
-  '@opensip-tools/tree-sitter': ['tree-sitter', 'ast', 'parser'],
-  '@opensip-tools/dashboard': ['html-report', 'visualization', 'reporting'],
-  '@opensip-tools/cli-ui': ['cli', 'terminal', 'ink', 'react'],
-  '@opensip-tools/graph-adapter-common': ['call-graph', 'tree-sitter'],
+  '@opensip-cli/fitness': ['fitness-functions', 'linting', 'architecture', 'code-review'],
+  '@opensip-cli/graph': ['call-graph', 'dependency-graph', 'code-analysis', 'architecture'],
+  '@opensip-cli/simulation': ['simulation', 'testing'],
+  '@opensip-cli/core': ['kernel', 'plugin-system'],
+  '@opensip-cli/contracts': ['types', 'contracts'],
+  '@opensip-cli/datastore': ['sqlite', 'drizzle', 'persistence'],
+  '@opensip-cli/session-store': ['sqlite', 'persistence'],
+  '@opensip-cli/output': ['sarif', 'output'],
+  '@opensip-cli/tree-sitter': ['tree-sitter', 'ast', 'parser'],
+  '@opensip-cli/dashboard': ['html-report', 'visualization', 'reporting'],
+  '@opensip-cli/cli-ui': ['cli', 'terminal', 'ink', 'react'],
+  '@opensip-cli/graph-adapter-common': ['call-graph', 'tree-sitter'],
 };
 
 /** Derive the (deduplicated, order-preserving) keyword list for one package. */
 function deriveKeywords(pkg) {
   const name = pkg.name;
-  const short = name.replace('@opensip-tools/', '');
+  const short = name.replace('@opensip-cli/', '');
   const kind = pkg.opensipTools?.kind;
   const out = [...BASE];
 
@@ -117,7 +117,7 @@ function collectPackageJsonPaths(dir, out) {
 function isReleasable(pkg) {
   return (
     typeof pkg.name === 'string' &&
-    (pkg.name.startsWith('@opensip-tools/') || pkg.name === CLI_PACKAGE_NAME) &&
+    (pkg.name.startsWith('@opensip-cli/') || pkg.name === CLI_PACKAGE_NAME) &&
     pkg.private !== true
   );
 }

@@ -20,17 +20,17 @@
  * Any `registerDomain({ … })` with an inline literal is a host-compiled domain
  * that bypassed the manifest path.
  *
- * SELF-TARGETING — the check scans opensip-tools' own host sources
+ * SELF-TARGETING — the check scans opensip-cli' own host sources
  * (`packages/{core,cli}/** /src/**`). The one compliant `registerDomain` call
  * passes a variable (not a literal), so it does not match; the registry's own
  * METHOD DEFINITION (`registerDomain(spec: CapabilityDomainSpec, …)`) is a
  * declaration, not a call, and is excluded by requiring a receiver
  * (`<obj>.registerDomain(`).
  *
- * SCOPE — opensip-tools' own monorepo host packages. Inert in adopter repos
+ * SCOPE — opensip-cli' own monorepo host packages. Inert in adopter repos
  * (whose code never calls the kernel's `registerDomain`).
  */
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 /** Host packages that own capability routing (core kernel + cli composition root). */
 const HOST_SRC_PATH = /packages\/(?:core|cli)\/(?:[^/]+\/)?src\//;

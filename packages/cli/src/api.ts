@@ -2,12 +2,12 @@
  * api — re-exports forming the CLI's programmatic API surface.
  *
  * Imported and re-exported by `index.ts` so the composition root stays
- * focused on wiring. Tools that depend on `opensip-tools` (a few
+ * focused on wiring. Tools that depend on `opensip-cli` (a few
  * test harnesses, downstream consumers) import these symbols from the
  * package root; this barrel keeps the surface in one file.
  */
 
-export { EXIT_CODES, getErrorSuggestion } from '@opensip-tools/contracts';
+export { EXIT_CODES, getErrorSuggestion } from '@opensip-cli/contracts';
 export { buildWelcome, printWelcome } from './welcome.js';
 export { buildCompletionScript, printCompletionScript } from './commands/completion.js';
 export { executeUninstall } from './commands/uninstall.js';
@@ -21,5 +21,5 @@ export type {
   FitOptions,
   InitOptions,
   ToolOptions,
-} from '@opensip-tools/contracts';
+} from '@opensip-cli/contracts';
 export { resolveApiKey } from './commands/configure.js';

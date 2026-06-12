@@ -164,7 +164,7 @@ describe('buildExportIndex — re-export following', () => {
         'packages/graph/graph-adapter-common/src/index.ts',
         'childrenOf',
         'childrenOf',
-        '@opensip-tools/tree-sitter',
+        '@opensip-cli/tree-sitter',
       ),
     ]);
     const index = buildExportIndex(cat); // no manifest → no re-export pass
@@ -178,7 +178,7 @@ describe('buildExportIndex — re-export following', () => {
   });
 
   it('is a no-op with a manifest but no re-export facts (base index only)', () => {
-    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const mi = manifest(['@opensip-cli/tree-sitter', 'packages/tree-sitter']);
     // catalog with NO reExports field, and one with an empty array — both base-only.
     expect(buildExportIndex(occCat(), mi).get('graph')?.get('childrenOf')).toBeUndefined();
     expect(
@@ -198,10 +198,10 @@ describe('buildExportIndex — re-export following', () => {
         'packages/graph/graph-adapter-common/src/index.ts',
         'childrenOf',
         'childrenOf',
-        '@opensip-tools/tree-sitter',
+        '@opensip-cli/tree-sitter',
       ),
     ]);
-    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const mi = manifest(['@opensip-cli/tree-sitter', 'packages/tree-sitter']);
     const index = buildExportIndex(cat, mi);
     // still defined under tree-sitter AND now reachable under the re-exporting group (graph)
     expect(
@@ -224,10 +224,10 @@ describe('buildExportIndex — re-export following', () => {
         'packages/graph/graph-adapter-common/src/index.ts',
         'kids',
         'childrenOf',
-        '@opensip-tools/tree-sitter',
+        '@opensip-cli/tree-sitter',
       ),
     ]);
-    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const mi = manifest(['@opensip-cli/tree-sitter', 'packages/tree-sitter']);
     const index = buildExportIndex(cat, mi);
     expect(
       index
@@ -241,17 +241,17 @@ describe('buildExportIndex — re-export following', () => {
   it('follows a chain to a fixpoint (A re-exports from B which re-exports from C)', () => {
     // C=tree-sitter defines childrenOf; B=core re-exports it; A=graph re-exports from B.
     const cat = withReExports(occCat(), [
-      reexp('packages/core/src/index.ts', 'childrenOf', 'childrenOf', '@opensip-tools/tree-sitter'),
+      reexp('packages/core/src/index.ts', 'childrenOf', 'childrenOf', '@opensip-cli/tree-sitter'),
       reexp(
         'packages/graph/engine/src/index.ts',
         'childrenOf',
         'childrenOf',
-        '@opensip-tools/core',
+        '@opensip-cli/core',
       ),
     ]);
     const mi = manifest(
-      ['@opensip-tools/tree-sitter', 'packages/tree-sitter'],
-      ['@opensip-tools/core', 'packages/core'],
+      ['@opensip-cli/tree-sitter', 'packages/tree-sitter'],
+      ['@opensip-cli/core', 'packages/core'],
     );
     const index = buildExportIndex(cat, mi);
     expect(
@@ -279,11 +279,11 @@ describe('buildExportIndex — re-export following', () => {
           'packages/graph/engine/src/index.ts',
           'childrenOf',
           'childrenOf',
-          '@opensip-tools/tree-sitter',
+          '@opensip-cli/tree-sitter',
         ),
       ],
     );
-    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const mi = manifest(['@opensip-cli/tree-sitter', 'packages/tree-sitter']);
     const index = buildExportIndex(cat, mi);
     // graph keeps its own; the re-export does not clobber it.
     expect(
@@ -300,9 +300,9 @@ describe('buildExportIndex — re-export following', () => {
         occ('childrenOf', 'packages/tree-sitter/src/walk.ts', 'TS'),
         occ('nameOf', 'packages/tree-sitter/src/walk.ts', 'NM'),
       ),
-      [reexp('packages/graph/engine/src/index.ts', '*', '*', '@opensip-tools/tree-sitter')],
+      [reexp('packages/graph/engine/src/index.ts', '*', '*', '@opensip-cli/tree-sitter')],
     );
-    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const mi = manifest(['@opensip-cli/tree-sitter', 'packages/tree-sitter']);
     const index = buildExportIndex(cat, mi);
     expect(
       index
@@ -322,7 +322,7 @@ describe('buildExportIndex — re-export following', () => {
     const cat = withReExports(occCat(), [
       reexp('packages/graph/engine/src/index.ts', 'debounce', 'debounce', 'lodash'),
     ]);
-    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']); // no lodash
+    const mi = manifest(['@opensip-cli/tree-sitter', 'packages/tree-sitter']); // no lodash
     const index = buildExportIndex(cat, mi);
     expect(index.get('graph')?.get('debounce')).toBeUndefined();
   });
@@ -333,7 +333,7 @@ describe('buildExportIndex — re-export following', () => {
     const cat = withReExports(catalog(occ('localFn', 'packages/graph/engine/src/x.ts', 'LF')), [
       reexp('packages/graph/engine/src/index.ts', 'localFn', 'localFn', './x.js'),
     ]);
-    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const mi = manifest(['@opensip-cli/tree-sitter', 'packages/tree-sitter']);
     const index = buildExportIndex(cat, mi);
     expect(
       index
@@ -349,9 +349,9 @@ describe('buildExportIndex — re-export following', () => {
         occ('shared', 'packages/tree-sitter/src/walk.ts', 'TS'),
         occ('shared', 'packages/graph/engine/src/own.ts', 'OWN'), // graph's own `shared`
       ),
-      [reexp('packages/graph/engine/src/index.ts', '*', '*', '@opensip-tools/tree-sitter')],
+      [reexp('packages/graph/engine/src/index.ts', '*', '*', '@opensip-cli/tree-sitter')],
     );
-    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const mi = manifest(['@opensip-cli/tree-sitter', 'packages/tree-sitter']);
     const index = buildExportIndex(cat, mi);
     expect(
       index
@@ -367,10 +367,10 @@ describe('buildExportIndex — re-export following', () => {
         'packages/graph/engine/src/index.ts',
         'missing',
         'missing',
-        '@opensip-tools/tree-sitter',
+        '@opensip-cli/tree-sitter',
       ),
     ]);
-    const mi = manifest(['@opensip-tools/tree-sitter', 'packages/tree-sitter']);
+    const mi = manifest(['@opensip-cli/tree-sitter', 'packages/tree-sitter']);
     const index = buildExportIndex(cat, mi);
     expect(index.get('graph')?.get('missing')).toBeUndefined();
   });
@@ -395,9 +395,9 @@ describe('buildPackageManifestIndex + resolveSpecifierToPackage', () => {
 
   beforeAll(() => {
     projectRoot = mkdtempSync(join(tmpdir(), 'export-index-'));
-    // @opensip-tools/core at packages/core, with subpath exports
+    // @opensip-cli/core at packages/core, with subpath exports
     writePackage('packages/core', {
-      name: '@opensip-tools/core',
+      name: '@opensip-cli/core',
       exports: {
         '.': './dist/index.js',
         './errors': './dist/lib/errors.js',
@@ -407,7 +407,7 @@ describe('buildPackageManifestIndex + resolveSpecifierToPackage', () => {
     // unscoped package at packages/output, no exports field
     writePackage('packages/output', { name: 'plain-output' });
     // a package whose name collides nowhere; bare root resolution
-    writePackage('packages/graph/engine', { name: '@opensip-tools/graph' });
+    writePackage('packages/graph/engine', { name: '@opensip-cli/graph' });
 
     shards = [
       shard('pkg:core', 'packages/core'),
@@ -435,16 +435,16 @@ describe('buildPackageManifestIndex + resolveSpecifierToPackage', () => {
   it('indexes each readable package by name and skips missing manifests', () => {
     const index = buildPackageManifestIndex(shards, projectRoot);
     expect([...index.keys()].sort()).toEqual([
-      '@opensip-tools/core',
-      '@opensip-tools/graph',
+      '@opensip-cli/core',
+      '@opensip-cli/graph',
       'plain-output',
     ]);
-    expect(index.get('@opensip-tools/core')?.dir).toBe('packages/core');
+    expect(index.get('@opensip-cli/core')?.dir).toBe('packages/core');
   });
 
   it('resolves a scoped bare root specifier to its package group', () => {
     const index = buildPackageManifestIndex(shards, projectRoot);
-    const resolved = resolveSpecifierToPackage('@opensip-tools/core', index);
+    const resolved = resolveSpecifierToPackage('@opensip-cli/core', index);
     expect(resolved).toEqual({ packageGroup: 'core' });
   });
 
@@ -455,18 +455,18 @@ describe('buildPackageManifestIndex + resolveSpecifierToPackage', () => {
 
   it('resolves a subpath declared in exports, carrying the subpath', () => {
     const index = buildPackageManifestIndex(shards, projectRoot);
-    expect(resolveSpecifierToPackage('@opensip-tools/core/errors', index)).toEqual({
+    expect(resolveSpecifierToPackage('@opensip-cli/core/errors', index)).toEqual({
       packageGroup: 'core',
       subpath: './errors',
     });
     expect(
-      resolveSpecifierToPackage('@opensip-tools/core/languages/parse-cache.js', index),
+      resolveSpecifierToPackage('@opensip-cli/core/languages/parse-cache.js', index),
     ).toEqual({ packageGroup: 'core', subpath: './languages/parse-cache.js' });
   });
 
   it('declines a subpath NOT declared in exports', () => {
     const index = buildPackageManifestIndex(shards, projectRoot);
-    expect(resolveSpecifierToPackage('@opensip-tools/core/internal', index)).toBeUndefined();
+    expect(resolveSpecifierToPackage('@opensip-cli/core/internal', index)).toBeUndefined();
   });
 
   it('declines any subpath against a package with no exports field', () => {
@@ -492,7 +492,7 @@ describe('buildPackageManifestIndex + resolveSpecifierToPackage', () => {
     const cat = catalog(occ('parse', 'packages/core/src/parser.ts', 'P'));
     const exportIndex = buildExportIndex(cat);
 
-    const resolved = resolveSpecifierToPackage('@opensip-tools/core', index);
+    const resolved = resolveSpecifierToPackage('@opensip-cli/core', index);
     expect(resolved).toBeDefined();
     // The whole point: the specifier's group keys straight into the export index.
     const byName = exportIndex.get(resolved?.packageGroup ?? '<none>');

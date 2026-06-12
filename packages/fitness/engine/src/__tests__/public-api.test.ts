@@ -1,5 +1,5 @@
 /**
- * Export-surface lock for `@opensip-tools/fitness`.
+ * Export-surface lock for `@opensip-cli/fitness`.
  *
  * The public barrel is the marketplace contract surface documented in
  * `docs/public/10-concepts/04-contract-surfaces.md`: the check / recipe /
@@ -53,7 +53,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'tool',
 ].sort();
 
-describe('@opensip-tools/fitness public barrel', () => {
+describe('@opensip-cli/fitness public barrel', () => {
   it('exposes exactly the curated value-export surface', () => {
     const actual = Object.keys(barrel)
       .filter((k) => barrel[k as keyof typeof barrel] !== undefined)

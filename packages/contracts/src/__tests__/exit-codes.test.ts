@@ -7,7 +7,7 @@ import {
   TimeoutError,
   ToolError,
   ValidationError,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -97,8 +97,8 @@ describe('getErrorSuggestion', () => {
       expect: { exitCode: EXIT_CODES.CONFIGURATION_ERROR, actionContains: '--recipes' },
     },
     {
-      name: 'config-file rule fires for opensip-tools.config.yml errors',
-      input: 'Failed to parse opensip-tools.config.yml',
+      name: 'config-file rule fires for opensip-cli.config.yml errors',
+      input: 'Failed to parse opensip-cli.config.yml',
       expect: { exitCode: EXIT_CODES.CONFIGURATION_ERROR },
     },
     {
@@ -158,7 +158,7 @@ describe('getErrorSuggestion', () => {
   // literal substring 'config' as a configuration error. That matched
   // common English words like 'configurable', 'reconfigure', and bare
   // 'config invalid'. Phase 1 narrows this into two explicit rules
-  // (opensip-tools.config.yml + YAML); inputs that previously matched
+  // (opensip-cli.config.yml + YAML); inputs that previously matched
   // by accident now fall through to the default null.
 
   const NARROWED_FALSE_POSITIVES = [

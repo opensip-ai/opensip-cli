@@ -1,6 +1,6 @@
 /**
  * Verifies the release-2.8.0 manifest/epoch/compatibility surface is
- * re-exported from the contracts barrel (defined in @opensip-tools/core).
+ * re-exported from the contracts barrel (defined in @opensip-cli/core).
  */
 
 import { describe, expect, it } from 'vitest';

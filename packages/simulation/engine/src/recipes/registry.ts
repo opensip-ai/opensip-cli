@@ -15,7 +15,7 @@
  * (the canonical T2 violation the runscope+registry plan resolves).
  */
 
-import { RecipeRegistry, currentScope } from '@opensip-tools/core';
+import { RecipeRegistry, currentScope } from '@opensip-cli/core';
 
 import { builtInSimulationRecipes } from './built-in-recipes.js';
 

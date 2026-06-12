@@ -4,7 +4,7 @@
  * (never evicting).
  */
 
-import { ValidationError } from '@opensip-tools/core';
+import { ValidationError } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DataStoreFactory } from '../factory.js';

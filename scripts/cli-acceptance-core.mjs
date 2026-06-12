@@ -1,9 +1,9 @@
 /**
  * @fileoverview CLI acceptance harness — dependency-free spawn/assert core.
  *
- * One scenario runner that targets an ARBITRARY opensip-tools binary:
+ * One scenario runner that targets an ARBITRARY opensip binary:
  *   - { kind: 'node-script', script: '<abs>/packages/cli/dist/index.js' }  (PR lane)
- *   - { kind: 'installed-bin', bin: '<abs>/node_modules/.bin/opensip-tools' } (release lane)
+ *   - { kind: 'installed-bin', bin: '<abs>/node_modules/.bin/opensip' } (release lane)
  *
  * A scenario is data; this module is the only thing that knows how to spawn and
  * assert. The TS Vitest wrapper (packages/cli/src/__tests__/harness/) and the
@@ -85,7 +85,7 @@ export function checkScenario(result, expect = {}) {
 }
 
 /**
- * Shape-assert an opensip-tools `--json` Signal envelope. Returns a predicate
+ * Shape-assert an opensip-cli `--json` Signal envelope. Returns a predicate
  * over the parsed stdout suitable for a scenario's `expect.json`.
  *
  * 2.12.0 (§5.5): `--json` is a `CommandOutcome` wrapper; the (unchanged) signal

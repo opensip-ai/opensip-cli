@@ -1,12 +1,12 @@
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { resolveSession } from '@opensip-tools/session-store';
+import { EXIT_CODES } from '@opensip-cli/contracts';
+import { resolveSession } from '@opensip-cli/session-store';
 
 import { SessionReplayRegistry } from '../session-replay-registry.js';
 
 import type { CliCommandsContext } from './shared.js';
-import type { CommandResult, StoredSession, ToolSessionReplay } from '@opensip-tools/contracts';
-import type { ToolShortId } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { CommandResult, StoredSession, ToolSessionReplay } from '@opensip-cli/contracts';
+import type { ToolShortId } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 export interface ExecuteSessionShowOptions {
   readonly datastore: DataStore;

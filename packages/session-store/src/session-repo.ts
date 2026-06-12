@@ -1,15 +1,15 @@
-import { SystemError, isToolShortId, logger } from '@opensip-tools/core';
+import { SystemError, isToolShortId, logger } from '@opensip-cli/core';
 import {
   requireDrizzleDataStore,
   type DataStore,
   type DrizzleDataStore,
-} from '@opensip-tools/datastore';
+} from '@opensip-cli/datastore';
 import { desc, eq, lt } from 'drizzle-orm';
 
 import { sessions, sessionToolPayload } from './schema/sessions.js';
 
-import type { StoredSession } from '@opensip-tools/contracts';
-import type { ToolShortId } from '@opensip-tools/core';
+import type { StoredSession } from '@opensip-cli/contracts';
+import type { ToolShortId } from '@opensip-cli/core';
 
 const MODULE_NAME = 'session-store:session-repo';
 

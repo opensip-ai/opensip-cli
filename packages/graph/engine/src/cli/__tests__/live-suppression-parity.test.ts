@@ -24,7 +24,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createSignal, runWithScope } from '@opensip-tools/core';
+import { createSignal, runWithScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
@@ -33,7 +33,7 @@ import { buildLiveGraphOutput } from '../graph-report.js';
 import { dispatchGraphResult, persistSession } from '../graph.js';
 
 import type { Catalog } from '../../types.js';
-import type { Signal, ToolCliContext } from '@opensip-tools/core';
+import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 // Capture the post-waiver signals the STATIC path hands the gate sink — the same
 // interception the dispatch-suppression-root test uses. runGateMode receives the

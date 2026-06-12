@@ -19,17 +19,17 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { resolveProjectPaths } from '@opensip-tools/core';
-import { fitnessTool } from '@opensip-tools/fitness';
-import { graphTool } from '@opensip-tools/graph';
-import { simulationTool } from '@opensip-tools/simulation';
+import { resolveProjectPaths } from '@opensip-cli/core';
+import { fitnessTool } from '@opensip-cli/fitness';
+import { graphTool } from '@opensip-cli/graph';
+import { simulationTool } from '@opensip-cli/simulation';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { classifyFiles } from '../commands/init/file-classifier.js';
 import { executeInit } from '../commands/init.js';
 
 import type { ToolScaffold } from '../commands/shared.js';
-import type { Tool } from '@opensip-tools/core';
+import type { Tool } from '@opensip-cli/core';
 
 /** Derive a `ToolScaffold` list from real tools, mirroring the host's aggregation. */
 function scaffoldsFor(tools: readonly Tool[]): ToolScaffold[] {
@@ -89,19 +89,19 @@ describe('init — fixture tool scaffolds with no CLI change (ADR-0038)', () => 
     );
     expect(result.created).toBe(true);
 
-    const rule = join(testDir, 'opensip-tools/toy/rules/example-rule.mjs');
+    const rule = join(testDir, 'opensip-cli/toy/rules/example-rule.mjs');
     expect(existsSync(rule)).toBe(true);
     expect(readFileSync(rule, 'utf8')).toBe('// toy\n');
   });
 });
 
 describe('init — a tool with no pluginLayout produces no directory', () => {
-  it('graph contributes nothing (no opensip-tools/graph/)', () => {
+  it('graph contributes nothing (no opensip-cli/graph/)', () => {
     // graphTool declares no pluginLayout, so scaffoldsFor() filters it out — the
     // dir must never appear even when graphTool is in the considered set.
     const result = executeInit(makeArgs(scaffoldsFor([fitnessTool, simulationTool, graphTool])));
     expect(result.created).toBe(true);
-    expect(existsSync(join(testDir, 'opensip-tools/graph'))).toBe(false);
+    expect(existsSync(join(testDir, 'opensip-cli/graph'))).toBe(false);
   });
 });
 
@@ -109,9 +109,9 @@ describe('init — the scaffolded set equals the registered set', () => {
   it('with only fitness registered, fit/ exists and sim/ does not', () => {
     const result = executeInit(makeArgs(scaffoldsFor([fitnessTool])));
     expect(result.created).toBe(true);
-    expect(existsSync(join(testDir, 'opensip-tools/fit/checks'))).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-cli/fit/checks'))).toBe(true);
     // The load-bearing behavioral change: not a hardcoded fit/sim pair.
-    expect(existsSync(join(testDir, 'opensip-tools/sim'))).toBe(false);
+    expect(existsSync(join(testDir, 'opensip-cli/sim'))).toBe(false);
   });
 });
 
@@ -123,7 +123,7 @@ describe('init — stale-detection over the aggregated full-language id universe
   it('flags example-check-<lang>.mjs for an un-detected language (filename branch)', () => {
     initTsOnly();
     // python ∉ the detected set (TS-only) but ∈ ALL_LANGUAGES → stale by filename.
-    const stale = join(testDir, 'opensip-tools/fit/checks/example-check-python.mjs');
+    const stale = join(testDir, 'opensip-cli/fit/checks/example-check-python.mjs');
     writeFileSync(stale, '// drifted python example\n', 'utf8');
 
     const paths = resolveProjectPaths(testDir);
@@ -142,7 +142,7 @@ describe('init — stale-detection over the aggregated full-language id universe
     // pinned id — caught only because the classifier aggregates the FULL id
     // universe (Σ stableExampleIds), not just the TS-context ids.
     const rustId = pinnedCheckId('rust');
-    const stale = join(testDir, 'opensip-tools/fit/checks/my-thing.mjs');
+    const stale = join(testDir, 'opensip-cli/fit/checks/my-thing.mjs');
     writeFileSync(stale, `// id: ${rustId}\n`, 'utf8');
 
     const paths = resolveProjectPaths(testDir);
@@ -159,7 +159,7 @@ describe('init — stale-detection over the aggregated full-language id universe
     // TS id is in the CURRENT-config id set → excluded from the stale universe.
     // A drifted (non-byte-identical) file carrying it is custom, never stale.
     const tsId = pinnedCheckId('typescript');
-    const custom = join(testDir, 'opensip-tools/fit/checks/my-ts-thing.mjs');
+    const custom = join(testDir, 'opensip-cli/fit/checks/my-ts-thing.mjs');
     writeFileSync(custom, `// id: ${tsId}\n// edited\n`, 'utf8');
 
     const paths = resolveProjectPaths(testDir);
@@ -173,7 +173,7 @@ describe('init — stale-detection over the aggregated full-language id universe
 
   it('--keep preserves a stale-scaffolded file', () => {
     initTsOnly();
-    const stale = join(testDir, 'opensip-tools/fit/checks/example-check-python.mjs');
+    const stale = join(testDir, 'opensip-cli/fit/checks/example-check-python.mjs');
     const body = '// drifted python example\n';
     writeFileSync(stale, body, 'utf8');
 

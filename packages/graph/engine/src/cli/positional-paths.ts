@@ -1,6 +1,6 @@
 /**
  * Resolve user-supplied positional paths to validated absolute paths
- * for `opensip-tools graph`. No glob expansion (the shell handles
+ * for `opensip graph`. No glob expansion (the shell handles
  * globs); no workspace-name shortcut (D10). Throws ConfigurationError
  * on the first invalid input.
  */
@@ -8,7 +8,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 
-import { ConfigurationError, logger } from '@opensip-tools/core';
+import { ConfigurationError, logger } from '@opensip-cli/core';
 
 const MODULE_GRAPH_CLI = 'graph:cli';
 

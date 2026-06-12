@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-05
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0018: Sim is a real BYO-target resilience/load harness

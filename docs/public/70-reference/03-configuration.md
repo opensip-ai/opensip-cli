@@ -4,7 +4,7 @@ last_verified: 2026-06-11
 release: v3.0.0
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
-purpose: "The opensip-tools.config.yml schema, every field, defaults, and where each is read."
+purpose: "The opensip-cli.config.yml schema, every field, defaults, and where each is read."
 source-files:
   - packages/config/src/composer.ts
   - packages/cli/src/bootstrap/config-and-capabilities.ts
@@ -20,12 +20,12 @@ related-docs:
 ---
 # Configuration
 
-opensip-tools reads two config files:
+opensip-cli reads two config files:
 
 | File | Scope | Holds |
 |---|---|---|
-| `<project>/opensip-tools.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
-| `~/.opensip-tools/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key and machine-wide cloud-sync controls |
+| `<project>/opensip-cli.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
+| `~/.opensip-cli/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key and machine-wide cloud-sync controls |
 
 Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](../../../packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](../../../packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated (the catchall seam), so a key no tool owns passes through.
 
@@ -174,7 +174,7 @@ graph:
   recipe: default
 ```
 
-**API key resolution precedence**: `--api-key` flag > `cli.apiKey` > `OPENSIP_API_KEY` env > `~/.opensip-tools/config.yml`. Prefer the flag, env var, or user-level config for real secrets; `cli.apiKey` exists for controlled environments and still wins over the env var if set.
+**API key resolution precedence**: `--api-key` flag > `cli.apiKey` > `OPENSIP_API_KEY` env > `~/.opensip-cli/config.yml`. Prefer the flag, env var, or user-level config for real secrets; `cli.apiKey` exists for controlled environments and still wins over the env var if set.
 
 CLI flags always override config — `--no-json` overrides a `cli.json: true` setting.
 
@@ -186,7 +186,7 @@ Plugin lists and discovery preferences. Scoped name-pattern discovery, explicit/
 |---|---|
 | `plugins.fit` | Arbitrary-scope fitness packs pinned into `.runtime/plugins/fit/`. Managed by `plugin add/remove/sync`. |
 | `plugins.sim` | Arbitrary-scope simulation packs pinned into `.runtime/plugins/sim/`. |
-| `plugins.packageScopes` | Additional npm scopes to scan for `<scope>/scenarios-*` simulation packages. `@opensip-tools` is always scanned. |
+| `plugins.packageScopes` | Additional npm scopes to scan for `<scope>/scenarios-*` simulation packages. `@opensip-cli` is always scanned. |
 | `plugins.checkPackages` | Exact fitness package names to load from project `node_modules`. |
 | `plugins.scenarioPackages` | Exact simulation package names to load from project `node_modules`; when set, replaces the `<scope>/scenarios-*` name-pattern scan. |
 | `plugins.autoDiscoverScenarios` | `false` disables the `<scope>/scenarios-*` name-pattern scan for sim. Default `true`. Ignored when `scenarioPackages` is set. |
@@ -200,7 +200,7 @@ plugins:
   graphAdapters: ['@my-org/graph-cpp']
 ```
 
-**Sim-pack discovery is by name-pattern** (ADR-0029): the simulation tool's manifest declares a `name-pattern` discovery mode (`prefix: "scenarios-"`, default scope `@opensip-tools`), so any installed `<scope>/scenarios-*` package is discovered automatically. There is **no** `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. The three layers that contribute scenario packs are: the `<scope>/scenarios-*` name-pattern scan (governed by `packageScopes` / `autoDiscoverScenarios`), explicit `scenarioPackages` pins, and project-local scenario files under `opensip-tools/sim/scenarios/`. See [plugin loader](../80-implementation/02-plugin-loader.md).
+**Sim-pack discovery is by name-pattern** (ADR-0029): the simulation tool's manifest declares a `name-pattern` discovery mode (`prefix: "scenarios-"`, default scope `@opensip-cli`), so any installed `<scope>/scenarios-*` package is discovered automatically. There is **no** `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. The three layers that contribute scenario packs are: the `<scope>/scenarios-*` name-pattern scan (governed by `packageScopes` / `autoDiscoverScenarios`), explicit `scenarioPackages` pins, and project-local scenario files under `opensip-cli/sim/scenarios/`. See [plugin loader](../80-implementation/02-plugin-loader.md).
 
 ## `dashboard`
 
@@ -276,7 +276,7 @@ graph:
 ## User-level config
 
 ```yaml
-# ~/.opensip-tools/config.yml
+# ~/.opensip-cli/config.yml
 apiKey: '<your-opensip-cloud-key>'
 cloud:
   sync: false               # optional: machine-wide opt-out of cloud signal sync
@@ -287,15 +287,15 @@ Cross-project, flat keys. `apiKey` is the OpenSIP Cloud key (for `--report-to`
 and cloud signal sync). The optional `cloud` block is the machine-wide
 privacy control: `sync: false` disables cloud signal sync for every project run
 from this account (it layers over each project's `cli.cloud:`; a `false` in
-either place wins). Use `opensip-tools configure` to write the key;
-`opensip-tools uninstall --user` removes the entire `~/.opensip-tools/` directory.
+either place wins). Use `opensip configure` to write the key;
+`opensip uninstall --user` removes the entire `~/.opensip-cli/` directory.
 
 ---
 
 ## A complete example
 
 ```yaml
-# acme-api/opensip-tools.config.yml
+# acme-api/opensip-cli.config.yml
 
 schemaVersion: 1
 
@@ -328,12 +328,12 @@ graph:
 
 cli:
   reportTo: 'https://opensip.ai/api'
-  # apiKey is read from OPENSIP_API_KEY env or ~/.opensip-tools/config.yml — avoid committing a literal key.
+  # apiKey is read from OPENSIP_API_KEY env or ~/.opensip-cli/config.yml — avoid committing a literal key.
 
 plugins:
   fit:
-    - '@opensip-tools/checks-universal'
-    - '@opensip-tools/checks-typescript'
+    - '@opensip-cli/checks-universal'
+    - '@opensip-cli/checks-typescript'
 ```
 
 Every section is optional; add or remove as needed.

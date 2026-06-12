@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-12
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0042: Two-tier tool storage contract + host-owned ToolStateStore
@@ -29,7 +29,7 @@ enforcement-reason: >
 **Decision:** The tool storage contract is two tiers. **Tier A (enforced now,
 all tools including bundled):** no migrations, no DDL (`CREATE/ALTER/DROP
 TABLE`, `CREATE INDEX`, `PRAGMA writable_schema`), no direct writes to
-`opensip-tools/.runtime/datastore.sqlite`, no imports of datastore-private
+`opensip-cli/.runtime/datastore.sqlite`, no imports of datastore-private
 schema/migration modules. **Tier B (policy direction, enforced only after
 first-party persistence moves behind host seams):** tools do not receive raw
 Drizzle/SQLite handles; they persist exclusively through host APIs — sessions,

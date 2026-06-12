@@ -4,7 +4,7 @@ last_verified: 2026-06-07
 release: v3.0.0
 title: "Architecture overview"
 audience: [contributors, plugin-authors, ci-integrators]
-purpose: "A visual map of opensip-tools: package layers, runtime flow, tool pipelines, output, and local persistence."
+purpose: "A visual map of opensip: package layers, runtime flow, tool pipelines, output, and local persistence."
 source-files:
   - pnpm-workspace.yaml
   - package.json
@@ -28,7 +28,7 @@ related-docs:
 ---
 # Architecture overview
 
-This is the map before the tour. You have already seen where opensip-tools sits relative to your project, CI, the dashboard browser, and optional OpenSIP Cloud; this page zooms one level inward to show how the packages connect and how a run flows through the system.
+This is the map before the tour. You have already seen where opensip-cli sits relative to your project, CI, the dashboard browser, and optional OpenSIP Cloud; this page zooms one level inward to show how the packages connect and how a run flows through the system.
 
 > **What you'll understand after this:**
 > - The package layers and which way dependencies point.
@@ -44,7 +44,7 @@ Arrows mean "depends on". The dependency-cruiser rules enforce this shape so low
 
 ```mermaid
 flowchart TB
-  L5["Layer 5: opensip-tools CLI<br/>packages/cli<br/>composition root"]
+  L5["Layer 5: opensip-cli CLI<br/>packages/cli<br/>composition root"]
   L4["Layer 4: fitness check packs<br/>checks-universal, checks-typescript,<br/>checks-python, checks-go, checks-java,<br/>checks-cpp, checks-rust"]
   L3["Layer 3: tools, UI, dashboard, adapters<br/>fitness, simulation, graph<br/>cli-ui, dashboard<br/>lang-* and graph-*"]
   L2["Layer 2: shared contracts and persistence<br/>contracts, datastore,<br/>session-store, output"]
@@ -60,7 +60,7 @@ flowchart TB
   L2 --> L1
 ```
 
-The important thing is the direction of knowledge. `packages/cli` knows everything because it composes the process. `@opensip-tools/core` knows almost nothing because every tool depends on it. Tool engines sit in the middle: they own domain execution, but they return shared contracts instead of importing the CLI.
+The important thing is the direction of knowledge. `packages/cli` knows everything because it composes the process. `@opensip-cli/core` knows almost nothing because every tool depends on it. Tool engines sit in the middle: they own domain execution, but they return shared contracts instead of importing the CLI.
 
 ---
 
@@ -74,10 +74,10 @@ flowchart TB
   browser["Dashboard browser"]
   cloud["OpenSIP Cloud<br/>optional"]
 
-  target["Target project<br/>source code<br/>opensip-tools.config.yml<br/>opensip-tools/fit<br/>opensip-tools/sim"]
-  runtime["Project runtime dir<br/>opensip-tools/.runtime<br/>datastore.sqlite<br/>logs/*.jsonl<br/>reports/latest.html<br/>plugins/*/node_modules"]
+  target["Target project<br/>source code<br/>opensip-cli.config.yml<br/>opensip-cli/fit<br/>opensip-cli/sim"]
+  runtime["Project runtime dir<br/>opensip-cli/.runtime<br/>datastore.sqlite<br/>logs/*.jsonl<br/>reports/latest.html<br/>plugins/*/node_modules"]
 
-  cli["opensip-tools CLI<br/>packages/cli<br/>argv, commands, composition"]
+  cli["opensip-cli CLI<br/>packages/cli<br/>argv, commands, composition"]
   core["core services<br/>paths + config<br/>ToolRegistry + LanguageRegistry<br/>plugin discovery<br/>logger + RunScope"]
   tools{"ToolRegistry<br/>command dispatch"}
 
@@ -90,10 +90,10 @@ flowchart TB
   sim["Simulation engine<br/>scenarios, recipes, executors"]
   graph["Graph engine<br/>catalog, indexes, features, rules"]
 
-  envelope["SignalEnvelope<br/>@opensip-tools/contracts"]
+  envelope["SignalEnvelope<br/>@opensip-cli/contracts"]
   output["Output package<br/>table, JSON, SARIF<br/>cloud sink"]
   datastore["Datastore + session-store<br/>SQLite sessions<br/>fit baseline<br/>graph catalog + baseline"]
-  dashboard["Dashboard composition<br/>CLI + @opensip-tools/dashboard"]
+  dashboard["Dashboard composition<br/>CLI + @opensip-cli/dashboard"]
 
   user -->|runs fit, sim, graph, dashboard| cli
   cli -->|bootstrap per invocation| core
@@ -130,7 +130,7 @@ flowchart TB
   runtime -->|opens static report| browser
 ```
 
-The local-first rule from system context still holds: there is no daemon, no queue, no server database, and no background worker. The only durable local state is under `<project>/opensip-tools/.runtime/`.
+The local-first rule from system context still holds: there is no daemon, no queue, no server database, and no background worker. The only durable local state is under `<project>/opensip-cli/.runtime/`.
 
 ---
 
@@ -180,12 +180,12 @@ This shared envelope is the architectural hinge. It lets the three tools keep th
 ## Ownership boundaries
 
 - `packages/cli` knows every first-party package and owns process composition, output routing, dashboard composition, and CLI-owned commands.
-- `@opensip-tools/core` owns generic infrastructure: paths, config, registries, plugin discovery, logging, errors, IDs, and run scope.
-- `@opensip-tools/contracts` owns shared result shapes such as `SignalEnvelope`, `CommandResult`, exit codes, session types, and dashboard-facing catalog contracts.
-- `@opensip-tools/output` owns machine output formatting and signal delivery. Tool engines return envelopes instead of writing JSON, SARIF, or cloud reports themselves.
-- `@opensip-tools/datastore` and `@opensip-tools/session-store` own local SQLite access and run history. Tool-specific schemas stay with the tool that produces the data.
-- `@opensip-tools/fitness`, `@opensip-tools/graph`, and `@opensip-tools/simulation` own domain execution. They do not import the CLI.
-- `@opensip-tools/dashboard` generates the self-contained HTML report from data the CLI composes across tools.
+- `@opensip-cli/core` owns generic infrastructure: paths, config, registries, plugin discovery, logging, errors, IDs, and run scope.
+- `@opensip-cli/contracts` owns shared result shapes such as `SignalEnvelope`, `CommandResult`, exit codes, session types, and dashboard-facing catalog contracts.
+- `@opensip-cli/output` owns machine output formatting and signal delivery. Tool engines return envelopes instead of writing JSON, SARIF, or cloud reports themselves.
+- `@opensip-cli/datastore` and `@opensip-cli/session-store` own local SQLite access and run history. Tool-specific schemas stay with the tool that produces the data.
+- `@opensip-cli/fitness`, `@opensip-cli/graph`, and `@opensip-cli/simulation` own domain execution. They do not import the CLI.
+- `@opensip-cli/dashboard` generates the self-contained HTML report from data the CLI composes across tools.
 
 ---
 

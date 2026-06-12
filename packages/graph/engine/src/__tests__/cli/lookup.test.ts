@@ -1,10 +1,10 @@
 /**
- * Coverage for `opensip-tools graph lookup <name>` — the read-only
+ * Coverage for `opensip graph lookup <name>` — the read-only
  * catalog query that mirrors codeindex's symbol lookup at function
  * granularity.
  */
 
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { executeLookup } from '../../cli/lookup.js';
@@ -12,7 +12,7 @@ import { CatalogRepo } from '../../persistence/catalog-repo.js';
 import { occ } from '../rules/_helpers.js';
 
 import type { Catalog, FunctionOccurrence } from '../../types.js';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 function makeCatalog(occs: readonly FunctionOccurrence[]): Catalog {
   const functions: Record<string, FunctionOccurrence[]> = {};
@@ -118,7 +118,7 @@ describe('graph lookup', () => {
     await executeLookup({ name: 'anything' }, cli.cli);
     expect(cli.setExitCode).toHaveBeenCalledWith(2);
     const errOut = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(errOut).toContain('Run `opensip-tools graph` first');
+    expect(errOut).toContain('Run `opensip graph` first');
   });
 
   it('errors with CONFIGURATION_ERROR when no DataStore is wired', async () => {

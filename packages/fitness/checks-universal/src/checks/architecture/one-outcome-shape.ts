@@ -18,7 +18,7 @@
  * patterns). The one sanctioned stdout-JSON writer, `render-outcome.ts`, is
  * allow-listed.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 const CHECK_PACK_PATH = /packages\/[^/]+\/checks-/;
 

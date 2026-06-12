@@ -2,12 +2,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScope } from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadAllPlugins, loadPlugin } from '../loader.js';
 
-import type { DiscoveredPlugin } from '@opensip-tools/core';
+import type { DiscoveredPlugin } from '@opensip-cli/core';
 
 let testDir: string;
 let langRegistry: LanguageRegistry;
@@ -228,7 +228,7 @@ describe('lang plugin domain', () => {
 
   it('loadAllPlugins for the lang domain returns empty', async () => {
     // There is no project-local lang plugin discovery path —
-    // language adapters ship as direct deps of opensip-tools
+    // language adapters ship as direct deps of opensip-cli
     // and are registered by the CLI bootstrap, not by walking a
     // user-source dir. Verify that loadAllPlugins('lang', ...)
     // discovers nothing rather than reading from a stray directory.

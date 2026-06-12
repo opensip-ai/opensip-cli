@@ -6,8 +6,8 @@
  * @fileoverview Detect secrets exposed through env vars in logs/errors
  */
 
-import { logger } from '@opensip-tools/core';
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { logger } from '@opensip-cli/core';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Creates a pre-compiled RegExp for pattern matching.

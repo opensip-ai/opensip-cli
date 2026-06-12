@@ -4,7 +4,7 @@
  *
  * The composition root reads the already-resolved config document, parses the
  * host-owned `targets:` / `globalExcludes:` blocks through the
- * `@opensip-tools/config` Zod field schemas, registers each target into the
+ * `@opensip-cli/config` Zod field schemas, registers each target into the
  * substrate `TargetRegistry`, and returns a `TargetResolver` — the structural
  * scope-slot shape `core` declares — wrapping the registry plus the bound
  * `resolveTargets` / `applyGlobalExcludes` closures + the project
@@ -13,14 +13,14 @@
  *
  * The host build is the GENERIC half only: it does NOT validate `checkOverrides`
  * (a check-slug concept) — that cross-validation stays in
- * `@opensip-tools/fitness`'s loader (Phase 2). A run with no config document, or
+ * `@opensip-cli/fitness`'s loader (Phase 2). A run with no config document, or
  * a config document with no `targets:` block, yields `undefined` — exactly like
  * a config-less `toolConfig`.
  */
 
-import { globalExcludesSchema, targetsRecordSchema, type Target } from '@opensip-tools/config';
-import { type TargetResolver } from '@opensip-tools/core';
-import { TargetRegistry, applyGlobalExcludes, resolveTargets } from '@opensip-tools/targeting';
+import { globalExcludesSchema, targetsRecordSchema, type Target } from '@opensip-cli/config';
+import { type TargetResolver } from '@opensip-cli/core';
+import { TargetRegistry, applyGlobalExcludes, resolveTargets } from '@opensip-cli/targeting';
 
 /**
  * Default per-target exclusion globs, applied when a target declares no

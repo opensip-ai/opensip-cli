@@ -4,14 +4,14 @@
  * @fileoverview Batch operations and memory resilience checks
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 import {
   defineCheck,
   isTestFile,
   type CheckViolation,
   getLineNumber,
-} from '@opensip-tools/fitness';
-import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/fitness';
+} from '@opensip-cli/fitness';
+import { stripStringsAndCommentsPreservingPositions } from '@opensip-cli/fitness';
 
 interface UnboundedBatchPattern {
   pattern: string;

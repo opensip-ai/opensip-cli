@@ -4,7 +4,7 @@
  * @fileoverview Plugin host directory + installed-package introspection.
  *
  * Each plugin domain owns a `node_modules` tree under
- * `<project>/opensip-tools/.runtime/plugins/<domain>/`. This module
+ * `<project>/opensip-cli/.runtime/plugins/<domain>/`. This module
  * creates the host package.json, peeks at installed packages to
  * resolve real package names (for local-path specs that don't carry a
  * name), and walks peerDependencies for auto-install.
@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { resolveProjectPaths, resolveUserPaths } from '@opensip-tools/core';
+import { resolveProjectPaths, resolveUserPaths } from '@opensip-cli/core';
 
 /** Filename of the host package.json that pins plugin installs. */
 export const HOST_PACKAGE_JSON = 'package.json';
@@ -43,7 +43,7 @@ export function ensureHostDir(dir: string, domain: string): string {
       pkgJsonPath,
       JSON.stringify(
         {
-          name: `opensip-tools-${domain}-plugins`,
+          name: `opensip-cli-${domain}-plugins`,
           version: '0.0.0',
           private: true,
           type: 'module',
@@ -57,13 +57,13 @@ export function ensureHostDir(dir: string, domain: string): string {
   return dir;
 }
 
-/** Project-local plugin host dir: `<project>/opensip-tools/.runtime/plugins/<domain>`. */
+/** Project-local plugin host dir: `<project>/opensip-cli/.runtime/plugins/<domain>`. */
 export function ensurePluginHostDir(domain: string, cwd: string): string {
   return ensureHostDir(resolveProjectPaths(cwd).pluginsDir(domain), domain);
 }
 
 /**
- * User-global plugin host dir: `~/.opensip-tools/plugins/<domain>`. Used by
+ * User-global plugin host dir: `~/.opensip-cli/plugins/<domain>`. Used by
  * the `tool` domain so a `plugin add <tool>` makes the subcommand available
  * across every project (the cross-project analogue of `npm i -g`).
  */

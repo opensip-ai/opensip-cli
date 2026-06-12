@@ -8,7 +8,7 @@
  * `ruleId`/`filePath`/`line`/`message` fields the old renderer read.
  */
 
-import type { GateCompareResult, Signal } from '@opensip-tools/core';
+import type { GateCompareResult, Signal } from '@opensip-cli/core';
 
 function formatLocation(s: Signal): string {
   if (!s.filePath) return '(no location)';
@@ -77,7 +77,7 @@ function renderVerdict(result: GateCompareResult): string {
 /** Render fit's gate-compare report. Byte-preserved from the old gate.ts renderer. */
 export function renderGateCompareOutput(result: GateCompareResult): string {
   return [
-    'opensip-tools gate compare',
+    'opensip gate compare',
     '',
     ...renderAdded(result.added),
     ...renderResolved(result.resolved),

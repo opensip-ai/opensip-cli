@@ -22,7 +22,7 @@ import {
   ToolError,
   type EnvVarSpec,
   type ToolErrorOptions,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 /**
  * Graph-engine environment variables (release 2.12.0, §5.12). Read through the
@@ -147,7 +147,7 @@ function formatMessage(stage: string, usedBytes: number, limitBytes: number): st
   const limitGb = (limitBytes / BYTES_PER_GB).toFixed(2);
   return (
     `Heap headroom exhausted at stage "${stage}" (used ${usedGb} GB of ${limitGb} GB cap). ` +
-    `Aborted before V8 OOM. Try \`opensip-tools graph --package <name>\` to scope to a single ` +
+    `Aborted before V8 OOM. Try \`opensip graph --package <name>\` to scope to a single ` +
     `workspace package, or \`--packages\` to fan out per-package (each child gets its own heap).`
   );
 }

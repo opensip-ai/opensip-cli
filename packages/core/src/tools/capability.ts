@@ -16,7 +16,7 @@
  * contribution itself — the owner supplies the registrar.
  *
  * `contributionSchema` is `unknown` at the kernel layer ON PURPOSE: `core`
- * carries no Zod (the composer in `@opensip-tools/config` does). A domain
+ * carries no Zod (the composer in `@opensip-cli/config` does). A domain
  * validates a contribution either structurally (the host applies a
  * built-in shallow check) or via an owner-supplied validator function
  * (see {@link CapabilityValidator}) — never by importing a schema library
@@ -49,7 +49,7 @@ export type CapabilityContributionKind = 'module-export' | 'manifest-entry' | 'f
  *   - `marker` — packages declaring `package.json#opensipTools.kind === markerKind`
  *     (fit's `fit-pack`, graph's `graph-adapter`).
  *   - `name-pattern` — packages named `<scope>/<prefix>*` under a set of scopes
- *     (sim's `@opensip-tools/scenarios-*`). A legitimate, ADR-documented per-domain
+ *     (sim's `@opensip-cli/scenarios-*`). A legitimate, ADR-documented per-domain
  *     difference (§6.7): the descriptor exists precisely to carry it.
  */
 export type CapabilityDiscoveryMode =
@@ -91,7 +91,7 @@ export interface CapabilityDiscoveryDescriptor {
   /** Whether `exportName` is an array of contributions or a single one. */
   readonly exportShape: 'array' | 'single';
   /**
-   * The `opensip-tools.config.yml` `plugins.*` keys this domain's preferences live
+   * The `opensip-cli.config.yml` `plugins.*` keys this domain's preferences live
    * under (the existing per-domain keys, mapped so the documented config keeps
    * working unchanged). Omitted keys default to "auto-discover on, no explicit list".
    */
@@ -103,7 +103,7 @@ export interface CapabilityDiscoveryDescriptor {
   /**
    * Optional package scope that marks a BUILT-IN contribution pack (resolved from
    * the CLI install dir) vs a custom one (resolved from the project) — e.g. fit
-   * splits `@opensip-tools/` built-in check packs from project-local ones.
+   * splits `@opensip-cli/` built-in check packs from project-local ones.
    */
   readonly builtinScope?: string;
   /**
@@ -209,10 +209,10 @@ export type CapabilityRegistrar = (contribution: unknown) => void;
 /**
  * A tool's namespaced configuration contribution, as the kernel sees it
  * (release 2.10.0, ADR-0023, Phase 4). The concrete schema-bearing type —
- * `ToolConfigDeclaration` — lives in `@opensip-tools/config` (which carries
+ * `ToolConfigDeclaration` — lives in `@opensip-cli/config` (which carries
  * Zod); core must not depend on config or Zod, so this kernel-side carrier
  * keeps `schema` (and `defaults`/`env`) `unknown`. The composition root (the
- * CLI, which DOES import `@opensip-tools/config`) narrows a tool's `config`
+ * CLI, which DOES import `@opensip-cli/config`) narrows a tool's `config`
  * slot back to the concrete `ToolConfigDeclaration` when it gathers the
  * declarations to compose + validate the whole document.
  *

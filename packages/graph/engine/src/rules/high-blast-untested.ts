@@ -26,7 +26,7 @@
 import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 const DEFAULT_WARN_BLAST = 75;
 const DEFAULT_ERROR_BLAST = 150;

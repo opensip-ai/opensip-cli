@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * Shared vitest defaults for every `@opensip-tools/*` package.
+ * Shared vitest defaults for every `@opensip-cli/*` package.
  *
  * Timeouts live HERE, once. CI runners (GitHub Actions) are far slower than
  * local hardware, so both the test and the BEFORE/AFTER-hook caps carry generous

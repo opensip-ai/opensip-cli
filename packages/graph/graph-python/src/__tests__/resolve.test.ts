@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { pythonGraphAdapter } from '../index.js';
 
-import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
+import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 
 function runPipeline(dir: string): {
   occurrences: Record<string, FunctionOccurrence[]>;
@@ -242,7 +242,7 @@ describe('lang-python resolve.ts — branches', () => {
     );
     const { edgesByOwner, stats } = runPipeline(dir);
     // creation edges record resolution='static' confidence='high' (per
-    // pushCreationEdge in @opensip-tools/graph)
+    // pushCreationEdge in @opensip-cli/graph)
     const all = flattenEdges(edgesByOwner);
     expect(all.some((e) => e.resolution === 'static' && e.confidence === 'high')).toBe(true);
     expect(stats.resolvedHigh).toBeGreaterThan(0);

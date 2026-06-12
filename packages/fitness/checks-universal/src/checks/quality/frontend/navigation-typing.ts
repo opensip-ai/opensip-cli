@@ -5,7 +5,7 @@
  * Verifies that navigation params are properly typed for type-safe routing.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Analyzes a single file for navigation typing issues

@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScope } from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { noFmtPrint } from '../checks/no-fmt-print.js';

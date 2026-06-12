@@ -17,14 +17,14 @@
  *     previous hardcoded regex (regression check).
  */
 
-import { type CallEdge, type FunctionOccurrence } from '@opensip-tools/graph';
+import { type CallEdge, type FunctionOccurrence } from '@opensip-cli/graph';
 import {
   alwaysThrowsBranchRule,
   buildIndexes,
   noSideEffectPathRule,
-} from '@opensip-tools/graph/internal';
-import { pythonRuleHints } from '@opensip-tools/graph-python';
-import { rustRuleHints } from '@opensip-tools/graph-rust';
+} from '@opensip-cli/graph/internal';
+import { pythonRuleHints } from '@opensip-cli/graph-python';
+import { rustRuleHints } from '@opensip-cli/graph-rust';
 import { describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter } from '../../index.js';

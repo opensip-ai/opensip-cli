@@ -85,7 +85,7 @@ The full `UnitResult` and `Signal` field tables are in [`70-reference/04-json-ou
 
 `SignalEnvelope` is the canonical artifact and the single output currency of every tool. **Tools no longer render their own output**: a tool's action returns the envelope via `CommandResult`, and the CLI composition root maps flags (`--json`, `--report-to`, gate modes) to a (formatter × sink) pair. Output decomposes along two axes:
 
-- **Formatters** — pure `(envelope) => string`, shared across all tools, one per format (`formatSignalJson`, `formatSignalSarif`, the human/table formatter). They live in [`packages/output/src/format/`](../../../packages/output/src/format/) (the package was renamed from `@opensip-tools/reporting` to `@opensip-tools/output`).
+- **Formatters** — pure `(envelope) => string`, shared across all tools, one per format (`formatSignalJson`, `formatSignalSarif`, the human/table formatter). They live in [`packages/output/src/format/`](../../../packages/output/src/format/) (the package was renamed from `@opensip-cli/reporting` to `@opensip-cli/output`).
 - **Sinks** — effectful delivery (stdout, file, chunked HTTPS to OpenSIP Cloud, SQLite), deliberately heterogeneous and resolved only at the composition root.
 
 If you're writing a CI integration, parse the `SignalEnvelope`. The shape is part of the contract surface ([`10-concepts/04-contract-surfaces.md`](../10-concepts/04-contract-surfaces.md)).
@@ -94,7 +94,7 @@ If you're writing a CI integration, parse the `SignalEnvelope`. The shape is par
 
 ## Path 1: the default Ink renderer
 
-The default invocation (`opensip-tools fit`) launches a live Ink view: a spinner while the run executes, a results table when it finishes, a summary footer.
+The default invocation (`opensip fit`) launches a live Ink view: a spinner while the run executes, a results table when it finishes, a summary footer.
 
 The transition path:
 
@@ -123,7 +123,7 @@ The findings exit code is host-derived (ADR-0035): fitness declares its verdict 
 ## Path 2: `--json`
 
 ```bash
-opensip-tools fit --json
+opensip fit --json
 ```
 
 Bypasses the Ink renderer entirely. Calls `executeFit(args)`, then the host wraps the returned envelope in a `CommandOutcome` and serializes the whole outcome through the single `renderOutcome` seam (`cli.emitEnvelope`). The tool never stringifies its own output. The byte-identical `SignalEnvelope` rides under `.envelope`; the outcome adds `kind`, `status`, and `exitCode` at the top level. See [`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md) for the full wrapper shape.
@@ -132,13 +132,13 @@ This is the path CI integrations should use. Stdout is the JSON; stderr carries 
 
 ```bash
 # Capture and pipe to jq (envelope is nested under .envelope):
-opensip-tools fit --json | jq '.envelope.verdict.summary'
+opensip fit --json | jq '.envelope.verdict.summary'
 
 # Fail CI if score < 90:
-opensip-tools fit --json | jq -e '.envelope.verdict.score >= 90' || exit 1
+opensip fit --json | jq -e '.envelope.verdict.score >= 90' || exit 1
 
 # Fail CI on any critical/high signal:
-opensip-tools fit --json | jq -e '.envelope.verdict.passed'
+opensip fit --json | jq -e '.envelope.verdict.passed'
 ```
 
 The `schemaVersion: 2` discriminator is part of the contract. New optional fields can be added in minors; required fields and the discriminator are major-version changes.
@@ -148,13 +148,13 @@ The `schemaVersion: 2` discriminator is part of the contract. New optional field
 ## Path 3: the architecture gate
 
 ```bash
-opensip-tools fit --gate-save                     # capture today's reality
-opensip-tools fit --gate-compare                  # CI gate from now on
+opensip fit --gate-save                     # capture today's reality
+opensip fit --gate-compare                  # CI gate from now on
 ```
 
-The gate is the regression-detection workflow. `--gate-save` fingerprint-stamps the current run's signals and stores them through the host-owned baseline plane (`cli.saveBaseline('fitness', envelope)` → the generic `tool_baseline_entries` table, scoped by `tool`, at `<project>/opensip-tools/.runtime/datastore.sqlite`), then exits according to the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save itself happens first, so the baseline survives a failing exit). `--gate-compare` runs the same checks, reads the saved rows back, computes the diff, and exits 1 if any *new* signal appears (the reserved `failOnDegraded` key, default on, toggles hard-fail vs. report-only). There is exactly one baseline per tool per project.
+The gate is the regression-detection workflow. `--gate-save` fingerprint-stamps the current run's signals and stores them through the host-owned baseline plane (`cli.saveBaseline('fitness', envelope)` → the generic `tool_baseline_entries` table, scoped by `tool`, at `<project>/opensip-cli/.runtime/datastore.sqlite`), then exits according to the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save itself happens first, so the baseline survives a failing exit). `--gate-compare` runs the same checks, reads the saved rows back, computes the diff, and exits 1 if any *new* signal appears (the reserved `failOnDegraded` key, default on, toggles hard-fail vs. report-only). There is exactly one baseline per tool per project.
 
-> **Baseline shape.** Per ADR-0011/ADR-0036 the baseline stores the run's *signals* (fingerprint + payload rows) directly — **not** a SARIF document — through host seams shared by every tool; fitness contributes only its `fingerprintStrategy`. This keeps fitness off any `@opensip-tools/output` production dependency: the root owns all SARIF egress. `fit-baseline-export` re-renders the stored signals as SARIF via the root `cli.writeSarif` seam, so the on-disk CI artifact stays a SARIF document.
+> **Baseline shape.** Per ADR-0011/ADR-0036 the baseline stores the run's *signals* (fingerprint + payload rows) directly — **not** a SARIF document — through host seams shared by every tool; fitness contributes only its `fingerprintStrategy`. This keeps fitness off any `@opensip-cli/output` production dependency: the root owns all SARIF egress. `fit-baseline-export` re-renders the stored signals as SARIF via the root `cli.writeSarif` seam, so the on-disk CI artifact stays a SARIF document.
 
 > **v1 → v2 break.** The `--baseline <path>` flag is gone. v1 stored baselines as committed SARIF files; v2 stores them in SQLite. See [`10-concepts/05-architecture-gate.md#ci-integration-patterns`](../10-concepts/05-architecture-gate.md#ci-integration-patterns) for the artifact-based CI workflow that replaces the v1 "committed baseline" pattern.
 
@@ -177,7 +177,7 @@ The trade-off: if a *different* `console.log` is added at the same file with the
 `--gate-compare` prints a structured diff:
 
 ```
-opensip-tools gate compare
+opensip gate compare
 
 Added (2):
   ✗ no-console-log                          services/api/src/routes/payments.ts:88
@@ -199,10 +199,10 @@ Exit code 1 if `degraded`, 0 otherwise. CI gates on the exit code; humans read t
 ## Path 4: cloud reporting
 
 ```bash
-opensip-tools fit --report-to https://opensip.ai/api --api-key $OPENSIP_API_KEY
+opensip fit --report-to https://opensip.ai/api --api-key $OPENSIP_API_KEY
 ```
 
-The envelope is formatted to SARIF via the single shared `formatSignalSarif` formatter and POSTed to the configured URL through the shared chunked transport. This is a **composition-root** path (ADR-0011): the tool returns its envelope; `cli.deliverSignals` (→ [`deliver-envelope.ts`](../../../packages/cli/src/bootstrap/deliver-envelope.ts)) owns the SARIF formatting *and* the upload. The tool itself never imports `@opensip-tools/output`. This path is composable — `--report-to` runs alongside the default Ink renderer, alongside `--json`, alongside `--gate-compare`. Reporting is a side-channel, not a stdout-replacement.
+The envelope is formatted to SARIF via the single shared `formatSignalSarif` formatter and POSTed to the configured URL through the shared chunked transport. This is a **composition-root** path (ADR-0011): the tool returns its envelope; `cli.deliverSignals` (→ [`deliver-envelope.ts`](../../../packages/cli/src/bootstrap/deliver-envelope.ts)) owns the SARIF formatting *and* the upload. The tool itself never imports `@opensip-cli/output`. This path is composable — `--report-to` runs alongside the default Ink renderer, alongside `--json`, alongside `--gate-compare`. Reporting is a side-channel, not a stdout-replacement.
 
 The transport lives in [`packages/output/src/sink/http-egress.ts`](../../../packages/output/src/sink/http-egress.ts) (`postChunked`). For `--report-to`, the whole SARIF log is sent as one chunk (the envelope is capped upstream):
 
@@ -216,7 +216,7 @@ The `--report-to` path owns **exit code 4** (`REPORT_FAILED`): an upload failure
 
 ## SARIF, specifically
 
-opensip-tools emits SARIF 2.1.0 via the shared `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](../../../packages/output/src/format/signal-sarif.ts)) — the same formatter `fit`, `graph`, and `sim` all use. The schema URI:
+opensip-cli emits SARIF 2.1.0 via the shared `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](../../../packages/output/src/format/signal-sarif.ts)) — the same formatter `fit`, `graph`, and `sim` all use. The schema URI:
 
 ```
 https://json.schemastore.org/sarif-2.1.0.json
@@ -225,9 +225,9 @@ https://json.schemastore.org/sarif-2.1.0.json
 ### What we fill in
 
 - `version: '2.1.0'`, `$schema: <URL>`.
-- `runs[]` — **one run** per envelope, with a single driver (`name: opensip-tools-<tool>`).
+- `runs[]` — **one run** per envelope, with a single driver (`name: opensip-cli-<tool>`).
 - `runs[].tool.driver`:
-  - `name` — `opensip-tools-fit` / `-graph` / `-sim`.
+  - `name` — `opensip-cli-fit` / `-graph` / `-sim`.
   - `version` — a fixed driver version string.
   - `rules[]` — one entry per unique `ruleId` across the run's signals (sorted).
 - `runs[].results[]` — one per signal:
@@ -239,20 +239,20 @@ https://json.schemastore.org/sarif-2.1.0.json
 
 ### What we don't fill in
 
-The full SARIF spec has many more optional fields (`taxonomies`, `invocations`, `originalUriBaseIds`, `fixes`, `properties`). opensip-tools fills in only what's load-bearing for the gate and for downstream consumers like GitHub Code Scanning. Transitive context carried in `Signal.metadata` is intentionally dropped at the SARIF boundary. Adding more fields is a minor compatible change.
+The full SARIF spec has many more optional fields (`taxonomies`, `invocations`, `originalUriBaseIds`, `fixes`, `properties`). opensip-cli fills in only what's load-bearing for the gate and for downstream consumers like GitHub Code Scanning. Transitive context carried in `Signal.metadata` is intentionally dropped at the SARIF boundary. Adding more fields is a minor compatible change.
 
 ### The baseline (SQLite, not SARIF)
 
-The gate baseline is stored signals (fingerprint + payload rows in the host-owned `tool_baseline_entries` table), not a SARIF document (see the gate section above). `cli.compareBaseline` loads the saved rows and diffs them against the current fingerprint-stamped envelope via the pure [`diffBaseline`](../../../packages/output/src/format/baseline-diff.ts) in `@opensip-tools/output`. The on-disk CI artifact stays a SARIF document because `fit-baseline-export` converts the stored signals to SARIF via the root `cli.writeSarif` seam.
+The gate baseline is stored signals (fingerprint + payload rows in the host-owned `tool_baseline_entries` table), not a SARIF document (see the gate section above). `cli.compareBaseline` loads the saved rows and diffs them against the current fingerprint-stamped envelope via the pure [`diffBaseline`](../../../packages/output/src/format/baseline-diff.ts) in `@opensip-cli/output`. The on-disk CI artifact stays a SARIF document because `fit-baseline-export` converts the stored signals to SARIF via the root `cli.writeSarif` seam.
 
 ---
 
 ## Where the example lands
 
-For `acme-api`'s PR CI job (after the workflow downloads the `fit-baseline` artifact built by the main-branch job into `opensip-tools/.runtime/`):
+For `acme-api`'s PR CI job (after the workflow downloads the `fit-baseline` artifact built by the main-branch job into `opensip-cli/.runtime/`):
 
 ```bash
-opensip-tools fit --gate-compare
+opensip fit --gate-compare
 ```
 
 1. `executeFit(args)` runs the default recipe, producing a `SignalEnvelope` with 80 units and (today) 30 signals.

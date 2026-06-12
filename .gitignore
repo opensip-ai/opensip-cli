@@ -39,9 +39,9 @@ coverage/
 
 # v3 per-project runtime state — sessions, logs, dashboard reports,
 # baselines, AST cache, plugin installs. Test fixtures, the
-# opensip-tools repo itself, and any consumer all generate this.
-opensip-tools/.runtime/
-**/opensip-tools/.runtime/
+# opensip-cli repo itself, and any consumer all generate this.
+opensip-cli/.runtime/
+**/opensip-cli/.runtime/
 
 # Local-only implementation plans (kept out of the repo)
 docs/plans/

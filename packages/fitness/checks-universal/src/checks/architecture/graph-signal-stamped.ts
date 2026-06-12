@@ -13,7 +13,7 @@
  * (`create-graph-signal.ts`), the rule infrastructure (`_`-prefixed helpers,
  * `define-rule.ts`, `registry.ts`), and tests are exempt.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /** Graph rule sources — where rules build their signals. */
 const GRAPH_RULES_PATH = 'packages/graph/engine/src/rules/';

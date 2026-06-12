@@ -8,7 +8,7 @@
  * with no shared base (most adopters) is unaffected — the check returns no
  * findings, so it never fires on an unrelated project's vitest config.
  *
- * Rationale: opensip-tools' v2.7.0 release failed at the pre-publish gate because
+ * Rationale: opensip-cli' v2.7.0 release failed at the pre-publish gate because
  * `hookTimeout` had never been set (10s default) in any of ~31 copy-pasted
  * per-package vitest configs, and a catalog-building `beforeAll` blew it on a slow
  * CI runner. The fix centralized the timeouts into `.config/vitest.base.ts`; this
@@ -19,7 +19,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 /** A per-package vitest config filename this check governs. Real-run fixture
  *  exclusion is handled by the project config's `globalExcludes` (the
@@ -97,7 +97,7 @@ export const vitestConfigExtendsBase = defineCheck({
 
 **Self-activating / adopter-safe:** if the repo has no \`.config/vitest.base\`, the check returns no findings — it never fires on an unrelated project's vitest config.
 
-**Why it matters:** opensip-tools' v2.7.0 release failed at the pre-publish test gate because \`hookTimeout\` was never set (10s default) across ~31 copy-pasted per-package configs and a catalog-building \`beforeAll\` blew it on a slow CI runner. Centralizing the timeouts fixed it; this check prevents a new package from re-introducing the gap by rolling its own config.`,
+**Why it matters:** opensip-cli' v2.7.0 release failed at the pre-publish test gate because \`hookTimeout\` was never set (10s default) across ~31 copy-pasted per-package configs and a catalog-building \`beforeAll\` blew it on a slow CI runner. Centralizing the timeouts fixed it; this check prevents a new package from re-introducing the gap by rolling its own config.`,
   tags: ['architecture', 'testing'],
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {

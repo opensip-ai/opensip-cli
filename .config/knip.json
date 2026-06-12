@@ -7,28 +7,28 @@
   },
   "workspaces": {
     ".": {
-      "entry": ["opensip-tools/fit/checks/*.mjs"],
+      "entry": ["opensip-cli/fit/checks/*.mjs"],
       "ignoreDependencies": [
-        "@opensip-tools/checks-cpp",
-        "@opensip-tools/checks-go",
-        "@opensip-tools/checks-java",
-        "@opensip-tools/checks-python",
-        "@opensip-tools/checks-rust"
+        "@opensip-cli/checks-cpp",
+        "@opensip-cli/checks-go",
+        "@opensip-cli/checks-java",
+        "@opensip-cli/checks-python",
+        "@opensip-cli/checks-rust"
       ]
     },
     "packages/cli": {
       "entry": ["src/__tests__/fixtures/**/*.{ts,js}"],
       "ignoreDependencies": [
-        "@opensip-tools/checks-cpp",
-        "@opensip-tools/checks-go",
-        "@opensip-tools/checks-java",
-        "@opensip-tools/checks-python",
-        "@opensip-tools/checks-rust",
-        "@opensip-tools/graph-typescript",
-        "@opensip-tools/graph-python",
-        "@opensip-tools/graph-rust",
-        "@opensip-tools/graph-go",
-        "@opensip-tools/graph-java"
+        "@opensip-cli/checks-cpp",
+        "@opensip-cli/checks-go",
+        "@opensip-cli/checks-java",
+        "@opensip-cli/checks-python",
+        "@opensip-cli/checks-rust",
+        "@opensip-cli/graph-typescript",
+        "@opensip-cli/graph-python",
+        "@opensip-cli/graph-rust",
+        "@opensip-cli/graph-go",
+        "@opensip-cli/graph-java"
       ]
     },
     "packages/dashboard": {
@@ -36,7 +36,7 @@
       "ignoreDependencies": ["cytoscape", "cytoscape-dagre"]
     },
     "packages/fitness/checks-cpp": {
-      "ignoreDependencies": ["@opensip-tools/core"]
+      "ignoreDependencies": ["@opensip-cli/core"]
     },
     "packages/fitness/engine": {
       "entry": ["src/tool.ts", "src/cli/{fit,dashboard,fit-list,fit-recipes}.ts"],

@@ -1,7 +1,7 @@
-# Project-local fitness checks for opensip-tools
+# Project-local fitness checks for opensip-cli
 
 This directory holds **project-local** fit checks that the
-opensip-tools repo uses to analyze itself. They are auto-discovered
+opensip-cli repo uses to analyze itself. They are auto-discovered
 by the plugin loader (see `packages/core/src/plugins/discover.ts`)
 and run as part of every `pnpm fit` invocation against this repo.
 
@@ -12,7 +12,7 @@ These checks serve two audiences:
 1. **Enforcement for this codebase.** Each check encodes a convention
    we care about — committed `it.only`, raw `console.log` in
    production, etc.
-2. **Documentation-by-example for plugin authors.** opensip-tools
+2. **Documentation-by-example for plugin authors.** opensip-cli
    is open-source. Anyone evaluating it or learning to author their
    own checks can read these files top-to-bottom to see how
    `defineCheck` is actually used in practice. We deliberately
@@ -26,7 +26,7 @@ These checks serve two audiences:
 - **Required export:** `export const checks = [defineCheck({...})]`
   — see `packages/core/src/plugins/__tests__/discover.test.ts:68-104`
   for the contract.
-- **Imports:** `import { defineCheck, isTestFile, ... } from '@opensip-tools/fitness'`.
+- **Imports:** `import { defineCheck, isTestFile, ... } from '@opensip-cli/fitness'`.
   Resolves via workspace linkage in this monorepo and via the
   published package in any other consumer.
 - **UUID:** every check needs a fresh `id` field — generate with
@@ -39,13 +39,13 @@ These checks serve two audiences:
   auto-loads these files through the project-local plugin path.
 - **Slug naming:** project-local checks that demonstrate patterns also
   shipped as first-party (e.g. `no-focused-tests`, `no-console-log`
-  exist in `@opensip-tools/checks-universal`) must use a distinct
+  exist in `@opensip-cli/checks-universal`) must use a distinct
   slug — prefix with `dogfood-` so they don't shadow the shipped
   versions in the registry.
 
 ## ADR dogfood guardrails
 
-The `adr-*.mjs` files hold opensip-tools-specific checks derived from
+The `adr-*.mjs` files hold opensip-cli-specific checks derived from
 `docs/decisions`. They intentionally encode local facts such as workflow
 names, first-party package names, manifest marker kinds, and known
 migration bridge files. Keep them here rather than in the shipped
@@ -59,7 +59,7 @@ the current local decision-enforcement set.
 
 ## Promoting to first-party
 
-If a check here proves valuable to other opensip-tools consumers,
+If a check here proves valuable to other opensip-cli consumers,
 promote it to `packages/fitness/checks-typescript/src/checks/`
 (as a `.ts` file with the full first-party machinery: barrel
 export, display entry, dedicated unit tests). The project-local

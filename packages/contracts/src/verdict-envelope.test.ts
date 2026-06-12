@@ -10,7 +10,7 @@ import {
   type Signal,
   type SignalSeverity,
   type VerdictPolicy,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { buildSignalEnvelope, type UnitResult } from './signal-envelope.js';

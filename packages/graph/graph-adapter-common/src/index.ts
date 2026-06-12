@@ -1,11 +1,11 @@
 /**
- * @opensip-tools/graph-adapter-common — shared scaffolding for the
+ * @opensip-cli/graph-adapter-common — shared scaffolding for the
  * tree-sitter graph language adapters (graph-go, graph-java,
  * graph-python, graph-rust).
  *
  * This is a *helper layer for implementing* the engine's
  * `GraphLanguageAdapter` contract, not a change to it. It sits downstream
- * of `@opensip-tools/graph` (the engine) and upstream of the four
+ * of `@opensip-cli/graph` (the engine) and upstream of the four
  * tree-sitter adapters:
  *
  *   core → … → graph (engine) → graph-adapter-common → graph-{go,java,python,rust}

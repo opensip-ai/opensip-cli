@@ -51,8 +51,8 @@ import {
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
-} from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+} from '@opensip-cli/core';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
 import { deliverEnvelope, writeEnvelopeSarif } from './bootstrap/deliver-envelope.js';
@@ -67,7 +67,7 @@ import {
 import { renderOutcome } from './commands/render-outcome.js';
 import { resetTelemetryStartedForTest } from './telemetry/sdk-init.js';
 
-import type { CommandResult, SignalEnvelope } from '@opensip-tools/contracts';
+import type { CommandResult, SignalEnvelope } from '@opensip-cli/contracts';
 
 // ---------------------------------------------------------------------------
 // Per-invocation runtime context.
@@ -286,7 +286,7 @@ export function buildDatastoreThunk(
     if (project.scope !== 'project') {
       throw new SystemError(
         'Datastore accessed in a non-project context. The action body should have ' +
-          'errored earlier with "No opensip-tools project found" before touching this.',
+          'errored earlier with "No OpenSIP CLI project found" before touching this.',
         { code: 'SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT' },
       );
     }
@@ -451,7 +451,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
       }),
     // Root-owned SARIF-file sink (ADR-0011): the one place that formats an
     // envelope to SARIF and writes it to disk, so tools that export SARIF to a
-    // file (e.g. `graph sarif-export`) never import `@opensip-tools/output`.
+    // file (e.g. `graph sarif-export`) never import `@opensip-cli/output`.
     writeSarif: (envelope, path) => writeEnvelopeSarif(envelope as SignalEnvelope, path),
     // Host baseline/ratchet plane seams (ADR-0036) — persistence + diff + exports.
     saveBaseline: baselineSeams.saveBaseline,

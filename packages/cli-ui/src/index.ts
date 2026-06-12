@@ -1,6 +1,6 @@
 /**
- * @opensip-tools/cli-ui — shared Ink/React presentational primitives for
- * OpenSIP Tools CLI tools.
+ * @opensip-cli/cli-ui — shared Ink/React presentational primitives for
+ * OpenSIP CLI CLI tools.
  *
  * Tools that ship an Ink live view (fitness, graph, future audit/lint/etc.)
  * import from this package instead of duplicating banner/spinner/header
@@ -8,7 +8,7 @@
  * imports the same primitives so the live view and the post-run summary
  * look consistent.
  *
- * This package depends on `ink` and `react` only; no opensip-tools deps,
+ * This package depends on `ink` and `react` only; no opensip-cli deps,
  * no Node-runtime side-effects beyond the theme's terminal-capability
  * detection. Safe to import from any Layer 3 tool package.
  */

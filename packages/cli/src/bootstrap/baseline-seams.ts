@@ -4,7 +4,7 @@
  * `exportBaselineSarif`, `exportBaselineFingerprints`.
  *
  * The host owns persistence (`BaselineRepo`), the pure diff (`diffBaseline` from
- * `@opensip-tools/output`), SARIF re-render, and the git-trackable JSON export.
+ * `@opensip-cli/output`), SARIF re-render, and the git-trackable JSON export.
  * The seams are **read-only** of `signal.fingerprint`: the tool stamps its
  * envelope's signals (`stampFingerprints`) at envelope-construction time and the
  * plane NEVER re-fingerprints. Factored out of `cli-context.ts` to keep that
@@ -19,13 +19,13 @@ import {
   type GateCompareResult,
   type Logger,
   type Signal,
-} from '@opensip-tools/core';
-import { BaselineRepo, type DataStore } from '@opensip-tools/datastore';
-import { diffBaseline } from '@opensip-tools/output';
+} from '@opensip-cli/core';
+import { BaselineRepo, type DataStore } from '@opensip-cli/datastore';
+import { diffBaseline } from '@opensip-cli/output';
 
 import { writeEnvelopeSarif } from './deliver-envelope.js';
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 /** The four host baseline/ratchet seam implementations, bound to a datastore resolver. */
 export interface BaselineSeams {
@@ -41,7 +41,7 @@ function missingBaseline(tool: string): ConfigurationError {
     `No baseline found for '${tool}' in the project SQLite store. If this is a first ` +
       `run — or you upgraded across a release that changed the baseline schema (the ` +
       `per-tool baseline tables were dropped and recaptured, ADR-0036) — run ` +
-      `\`opensip-tools ${tool} --gate-save\` to (re)capture one. The git-trackable ` +
+      `\`opensip-cli ${tool} --gate-save\` to (re)capture one. The git-trackable ` +
       `JSON fingerprint baseline (graph-baseline-export) is a file, not a DB row, and ` +
       `is untouched.`,
     { code: 'CONFIGURATION.GATE.BASELINE_MISSING' },

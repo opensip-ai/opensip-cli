@@ -12,7 +12,7 @@
  *
  * The detail shape (`summary` + `checks[]` of rule-grouped findings) is the
  * dashboard's structural session-detail contract, consumed by the shared
- * `renderDetail` in @opensip-tools/dashboard. These types are graph-local
+ * `renderDetail` in @opensip-cli/dashboard. These types are graph-local
  * structural mirrors (not the retired `contracts` `CheckOutput`/
  * `FindingOutput`): the dashboard reads `checkSlug`/`passed`/`durationMs` and
  * each finding's `severity`/`message`/`filePath`/`line`/`suggestion`/`metadata`
@@ -25,7 +25,7 @@
  * envelope's Option-A remap).
  */
 
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 /** Two-level severity the dashboard buckets on (`critical|high → error`). */
 export type GraphFindingSeverity = 'error' | 'warning';

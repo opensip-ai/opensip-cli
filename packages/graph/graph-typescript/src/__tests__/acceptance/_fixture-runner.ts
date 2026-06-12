@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { discoverFiles } from '../../discover.js';
 import { buildCatalog, resolveCatalogEdges } from '../_pipeline.js';
 
-import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
+import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 
 export type FixtureFiles = Readonly<Record<string, string>>;
 

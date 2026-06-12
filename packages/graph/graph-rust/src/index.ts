@@ -1,5 +1,5 @@
 /**
- * @opensip-tools/graph — Rust language adapter.
+ * @opensip-cli/graph — Rust language adapter.
  *
  * Lands in PR 6 of plan docs/plans/10-graph-language-pluggability.md.
  * Exposes `rustGraphAdapter`, a `GraphLanguageAdapter` backed by
@@ -33,7 +33,7 @@ import { rustRuleHints } from './rule-hints.js';
 import { walkProject as rustWalkProject } from './walk.js';
 
 import type { RustParsedProject } from './parse.js';
-import type { GraphLanguageAdapter } from '@opensip-tools/graph';
+import type { GraphLanguageAdapter } from '@opensip-cli/graph';
 
 export const rustGraphAdapter = {
   id: 'rust',

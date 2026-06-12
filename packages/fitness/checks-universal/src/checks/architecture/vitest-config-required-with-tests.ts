@@ -16,7 +16,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 /** Per-package vitest config filenames that satisfy the requirement. */
 const PACKAGE_CONFIG_FILES = ['vitest.config.ts', 'vitest.config.mts'] as const;

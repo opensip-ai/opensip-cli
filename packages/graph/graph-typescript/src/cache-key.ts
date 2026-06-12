@@ -25,7 +25,7 @@
  *
  * F5 — adapter package version. The engine version is folded in separately at
  * the engine boundary (`stampEngineVersion`, ADR-0015), but a
- * `@opensip-tools/graph-typescript` resolver fix shipped WITHOUT an engine
+ * `@opensip-cli/graph-typescript` resolver fix shipped WITHOUT an engine
  * version bump (possible under independent versioning, ADR-0012) would reuse
  * stale fragments. Folding the adapter's OWN package version closes that:
  * belt-and-suspenders while engine + adapters ship in lockstep (3.0.0 today),
@@ -42,10 +42,10 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { readPackageVersion } from '@opensip-tools/core';
+import { readPackageVersion } from '@opensip-cli/core';
 import ts from 'typescript';
 
-import type { CacheKeyInput } from '@opensip-tools/graph';
+import type { CacheKeyInput } from '@opensip-cli/graph';
 
 /**
  * This adapter package's own version (ADR-0012 independent versioning). Resolved

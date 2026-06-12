@@ -46,16 +46,16 @@ export const PLUGIN_API_VERSION = 1;
  *                       (incl. `plugin add` / `plugin add --project`). Trusted
  *                       as an installed dependency.
  *   - `user-global`   — an authored sidecar under
- *                       `~/.opensip-tools/tools/<name>/`
+ *                       `~/.opensip-cli/tools/<name>/`
  *                       (`opensip-tool.manifest.json`). The user placed it in
  *                       their own home dir (the `npm i -g` analogue for
  *                       authored code) → **trusted-by-default**.
  *   - `project-local` — an authored sidecar under
- *                       `<project>/opensip-tools/tools/<name>/`
+ *                       `<project>/opensip-cli/tools/<name>/`
  *                       (`opensip-tool.manifest.json`). It rides in with
  *                       `git clone` → **deny-by-default**; admitted only when
  *                       its id (or `*`) is allowlisted via
- *                       `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`.
+ *                       `OPENSIP_CLI_ALLOW_PROJECT_TOOLS`.
  */
 export type ToolSource = 'bundled' | 'installed' | 'user-global' | 'project-local';
 

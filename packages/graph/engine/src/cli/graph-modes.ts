@@ -2,7 +2,7 @@
 // @fitness-ignore-file no-non-null-assertions -- narrowing helpers prove the discriminant before access; the assertions encode that proof for the type checker.
 // @fitness-ignore-file throws-documentation -- internal CLI mode helper rethrows for the top-level handleGraphError; not a documented contract surface.
 /**
- * @fileoverview Mode dispatch for `opensip-tools graph`.
+ * @fileoverview Mode dispatch for `opensip graph`.
  *
  * Extracted from `cli/graph.ts` so the orchestrator there stays focused
  * on flag validation, run-scope resolution, and result dispatch. Owns:
@@ -19,22 +19,22 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   isErrorSignal,
   logger,
   resolveFailOnDegraded,
   ToolError,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { graphFingerprintStrategy } from '../baseline-strategy.js';
 import { renderCatalogJson } from '../render/catalog-json.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { Catalog, Indexes } from '../types.js';
-import type { SignalEnvelope } from '@opensip-tools/contracts';
-import type { Signal, ToolCliContext } from '@opensip-tools/core';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 const MODULE_GRAPH_RENDER = 'graph:render';
 

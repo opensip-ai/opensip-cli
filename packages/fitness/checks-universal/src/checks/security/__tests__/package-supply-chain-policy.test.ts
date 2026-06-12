@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { fileCache } from '@opensip-tools/fitness';
+import { fileCache } from '@opensip-cli/fitness';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { packageSupplyChainPolicy } from '../package-supply-chain-policy.js';

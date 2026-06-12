@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/graph-java",
+  "name": "@opensip-cli/graph-java",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "Java language adapter for the opensip-tools graph engine",
+  "description": "Java language adapter for the opensip graph engine",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "call-graph",
@@ -13,12 +13,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/graph/graph-java"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -39,11 +39,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/graph": "workspace:*",
-    "@opensip-tools/graph-adapter-common": "workspace:*",
-    "@opensip-tools/lang-java": "workspace:*",
-    "@opensip-tools/tree-sitter": "workspace:*"
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/graph": "workspace:*",
+    "@opensip-cli/graph-adapter-common": "workspace:*",
+    "@opensip-cli/lang-java": "workspace:*",
+    "@opensip-cli/tree-sitter": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",

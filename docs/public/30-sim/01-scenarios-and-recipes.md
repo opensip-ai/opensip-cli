@@ -43,7 +43,7 @@ The `sim` command is the simulation tool. Where `fit` answers "is the codebase c
 
 ## The scenario kinds
 
-opensip-tools sim recognizes two kinds, each with its own author-facing entry point in [`packages/simulation/engine/src/index.ts`](../../../packages/simulation/engine/src/index.ts):
+opensip sim recognizes two kinds, each with its own author-facing entry point in [`packages/simulation/engine/src/index.ts`](../../../packages/simulation/engine/src/index.ts):
 
 | Kind | Entry point | Models |
 |---|---|---|
@@ -57,7 +57,7 @@ The old generic `defineScenario` alias has been removed. New code uses the kind-
 ### `defineLoadScenario`
 
 ```ts
-import { defineLoadScenario, httpTarget, ASSERTIONS } from '@opensip-tools/simulation';
+import { defineLoadScenario, httpTarget, ASSERTIONS } from '@opensip-cli/simulation';
 
 export default defineLoadScenario({
   id: '...',                            // UUID
@@ -85,7 +85,7 @@ keys (`p50/p95/p99_latency`, `error_rate`, `success_rate`, `requests_per_second`
 ### `defineChaosScenario`
 
 ```ts
-import { defineChaosScenario, httpTarget, fault, ASSERTIONS } from '@opensip-tools/simulation';
+import { defineChaosScenario, httpTarget, fault, ASSERTIONS } from '@opensip-cli/simulation';
 
 export default defineChaosScenario({
   id: 'checkout-resilient-under-fault',
@@ -149,7 +149,7 @@ Kind-specific authoring plus a shared runtime contract keeps the engine extensib
 A sim recipe is the same shape as a fit recipe: a named selection of scenarios + execution options + reporting options. Defined in [`packages/simulation/engine/src/recipes/types.ts`](../../../packages/simulation/engine/src/recipes/types.ts) and constructed via [`defineRecipe`](../../../packages/simulation/engine/src/recipes/define-recipe.ts).
 
 ```ts
-import { defineSimulationRecipe } from '@opensip-tools/simulation';
+import { defineSimulationRecipe } from '@opensip-cli/simulation';
 
 export default defineSimulationRecipe({
   name: 'pre-deploy',
@@ -166,7 +166,7 @@ Selectors are similar to fit's but with a slightly different set: `all`, `tags`,
 
 `sequential` mode is the typical shape for sim recipes — load scenarios contend for resources, so running them in parallel is rarely correct. `parallel` is available for scenarios that fan out across independent inputs.
 
-The default recipe ([`packages/simulation/engine/src/recipes/built-in-recipes.ts`](../../../packages/simulation/engine/src/recipes/built-in-recipes.ts)) selects every registered scenario in sequential order. Project-local recipes live under `<project>/opensip-tools/sim/recipes/*.mjs`.
+The default recipe ([`packages/simulation/engine/src/recipes/built-in-recipes.ts`](../../../packages/simulation/engine/src/recipes/built-in-recipes.ts)) selects every registered scenario in sequential order. Project-local recipes live under `<project>/opensip-cli/sim/recipes/*.mjs`.
 
 ---
 
@@ -174,9 +174,9 @@ The default recipe ([`packages/simulation/engine/src/recipes/built-in-recipes.ts
 
 Same three sources as checks:
 
-1. **Built-in.** Currently empty — the engine ships kind support but no built-in scenarios. (Compare to `fit`, where `@opensip-tools/checks-universal` ships universal checks.) Because of this, running `sim` in a project with no project-local or npm-package scenarios fails closed with exit 2 (an empty run is not a pass — see the exit-code contract in the [CLI reference](../70-reference/01-cli-commands.md#sim--run-simulation-scenarios)). Run `opensip-tools init` to scaffold example scenarios first.
-2. **Project-local.** `<project>/opensip-tools/sim/scenarios/*.mjs`. Loaded by the plugin discoverer at startup.
-3. **npm-package.** Sim packs are discovered from project `node_modules` by **name-pattern** (ADR-0029): any package whose name matches `<scope>/scenarios-*` under the default `@opensip-tools` scope plus any configured `plugins.packageScopes`. There is no `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. Explicit `plugins.scenarioPackages:` pins can additionally name exact packages outside the pattern. For deterministic install/sync, `opensip-tools plugin add --domain sim <pkg>` installs into `.runtime/plugins/sim/` and records the package under `plugins.sim:`. The package's main entry exports `scenarios: RunnableScenario[]` and optionally `recipes: SimulationRecipe[]`.
+1. **Built-in.** Currently empty — the engine ships kind support but no built-in scenarios. (Compare to `fit`, where `@opensip-cli/checks-universal` ships universal checks.) Because of this, running `sim` in a project with no project-local or npm-package scenarios fails closed with exit 2 (an empty run is not a pass — see the exit-code contract in the [CLI reference](../70-reference/01-cli-commands.md#sim--run-simulation-scenarios)). Run `opensip init` to scaffold example scenarios first.
+2. **Project-local.** `<project>/opensip-cli/sim/scenarios/*.mjs`. Loaded by the plugin discoverer at startup.
+3. **npm-package.** Sim packs are discovered from project `node_modules` by **name-pattern** (ADR-0029): any package whose name matches `<scope>/scenarios-*` under the default `@opensip-cli` scope plus any configured `plugins.packageScopes`. There is no `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. Explicit `plugins.scenarioPackages:` pins can additionally name exact packages outside the pattern. For deterministic install/sync, `opensip plugin add --domain sim <pkg>` installs into `.runtime/plugins/sim/` and records the package under `plugins.sim:`. The package's main entry exports `scenarios: RunnableScenario[]` and optionally `recipes: SimulationRecipe[]`.
 
 The registry ([`packages/simulation/engine/src/framework/registry.ts`](../../../packages/simulation/engine/src/framework/registry.ts)) is last-writer-wins on id collision. Discovery surfaces conflicts in the CLI's startup logs.
 

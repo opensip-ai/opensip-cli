@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { TOOL_DOMAIN, domainNames, isToolTarget, resolveDomain } from '../domain-resolution.js';
 
-import type { PluginLayout } from '@opensip-tools/core';
+import type { PluginLayout } from '@opensip-cli/core';
 
 const layouts: readonly PluginLayout[] = [
   { domain: 'fit', userSubdirs: ['checks', 'recipes'] },

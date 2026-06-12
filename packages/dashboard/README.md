@@ -2,13 +2,13 @@
      Change the package's "description" (or the generator template) and run
      `pnpm docs:readmes`. CI enforces sync via `pnpm docs:readmes:check`. -->
 
-# @opensip-tools/dashboard
+# @opensip-cli/dashboard
 
-> Self-contained HTML dashboard generator for OpenSIP Tools — renders the fit/sim/graph report from session data and graph catalogs
+> Self-contained HTML dashboard generator for OpenSIP CLI — renders the fit/sim/graph report from session data and graph catalogs
 
-This is an **internal library** of the opensip-tools toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.
+This is an **internal library** of the opensip-cli toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.
 
-Part of [**opensip-tools**](https://github.com/opensip-ai/opensip-tools) — an open-source codebase-analysis toolkit: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
+Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase-analysis toolkit: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
 
 ## Install
 
@@ -18,13 +18,13 @@ Most users install the CLI, which bundles the first-party tools:
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 ```
 
-This package is published for the CLI and advanced plugin authors; most users should not install `@opensip-tools/dashboard` directly.
+This package is published for the CLI and advanced plugin authors; most users should not install `@opensip-cli/dashboard` directly.
 
 ## Documentation
 
-- 📚 Project docs: https://opensip.ai/docs/opensip-tools/
-- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-tools/tree/v3.0.0/packages/dashboard
+- 📚 Project docs: https://opensip.ai/docs/opensip-cli/
+- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/docs/public/70-reference/02-package-catalog.md
+- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v3.0.0/packages/dashboard
 
 ## License
 

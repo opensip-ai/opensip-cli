@@ -8,10 +8,10 @@
  * `DirectiveEntry` audit list (with weak-reason classification), and the
  * rebuilt `CheckResult`. The matching algorithm (file/line directives,
  * anti-recursion: a finding pointing at a directive line is never suppressed)
- * lives once in `@opensip-tools/core`.
+ * lives once in `@opensip-cli/core`.
  */
 
-import { filterSignalsBySuppressions, logger } from '@opensip-tools/core';
+import { filterSignalsBySuppressions, logger } from '@opensip-cli/core';
 
 import { countErrors, countWarnings } from '../types/severity.js';
 
@@ -21,7 +21,7 @@ import { fileCache } from './file-cache.js';
 
 import type { DirectiveEntry } from './directive-inventory.js';
 import type { CheckResult } from '../types/findings.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 // =============================================================================
 // SIGNAL FILTERING

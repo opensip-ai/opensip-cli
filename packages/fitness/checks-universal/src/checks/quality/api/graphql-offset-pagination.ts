@@ -7,7 +7,7 @@
  * where clause) provides stable results.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 const OFFSET_VAR_PATTERN = /\$offset\s*:\s*Int/;
 

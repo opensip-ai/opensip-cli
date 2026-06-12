@@ -27,7 +27,7 @@ import { buildImportSpecifierIndex } from '../../edge-resolvers/syntactic.js';
 import { walkProgram } from '../../walk.js';
 
 import type { ResolverContext } from '../../edge-resolvers/types.js';
-import type { Catalog } from '@opensip-tools/graph';
+import type { Catalog } from '@opensip-cli/graph';
 
 const PROJECT_DIR = '/proj';
 

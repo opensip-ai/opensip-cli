@@ -11,7 +11,7 @@
  * the literal token "printStackTrace()" inside a string literal or
  * comment isn't reported.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 const PRINT_STACK_TRACE_PATTERN = /\.printStackTrace\s*\(\s*\)/g;
 

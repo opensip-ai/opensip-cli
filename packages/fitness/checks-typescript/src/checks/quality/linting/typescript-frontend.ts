@@ -11,7 +11,7 @@
 
 import { join } from 'node:path';
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Shell program run from the project root (the command's cwd). For each

@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-01
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0003: A body hash is not an occurrence identity — edges and reachability key per occurrence

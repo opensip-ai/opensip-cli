@@ -28,12 +28,12 @@
  *     so `detectMonorepoLayout` classifies the corpus `flat-large` once the
  *     file count crosses the 2500 threshold.
  *
- * The generator does NOT write `opensip-tools.config.yml` — the bench
+ * The generator does NOT write `opensip-cli.config.yml` — the bench
  * script (`scripts/bench-partition-strategies.mjs`) owns strategy toggling.
  * It lives under `__tests__/` with the `_`-prefix non-test convention
  * (precedent: `_equivalence-harness.ts`); the engine tsconfig compiles it
  * into `dist/`, which is how the bench script (a plain Node program that
- * may not import `@opensip-tools/test-support`, ADR-0040) consumes it.
+ * may not import `@opensip-cli/test-support`, ADR-0040) consumes it.
  */
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';

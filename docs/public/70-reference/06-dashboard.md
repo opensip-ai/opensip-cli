@@ -36,8 +36,8 @@ The dashboard is a self-contained HTML report of every fit and sim run on the lo
 
 Two triggers, both opt-in:
 
-1. **`--open` flag.** `opensip-tools fit --open` (or `sim --open`) runs the recipe, then launches the dashboard if conditions allow.
-2. **Explicit `dashboard` command.** `opensip-tools dashboard` opens the most recent run's report regardless of any pending fit run.
+1. **`--open` flag.** `opensip fit --open` (or `sim --open`) runs the recipe, then launches the dashboard if conditions allow.
+2. **Explicit `dashboard` command.** `opensip dashboard` opens the most recent run's report regardless of any pending fit run.
 
 The launcher's `decideOpen` ([`packages/cli/src/open-dashboard.ts`](../../../packages/cli/src/open-dashboard.ts)) returns `shouldOpen: true` only when **all** of these hold:
 
@@ -94,7 +94,7 @@ Source: [`packages/dashboard/src/recipes.ts`](../../../packages/dashboard/src/re
 
 ### Code Paths panel
 
-The Code Paths panel is the dashboard's graph-tool surface. It's powered by the catalog produced by `opensip-tools graph`. The pipeline that builds the underlying catalog is documented in [`40-graph/01-stages-and-catalog.md`](../40-graph/01-stages-and-catalog.md).
+The Code Paths panel is the dashboard's graph-tool surface. It's powered by the catalog produced by `opensip graph`. The pipeline that builds the underlying catalog is documented in [`40-graph/01-stages-and-catalog.md`](../40-graph/01-stages-and-catalog.md).
 
 Like the Fitness and Simulation tabs, the Code Paths tab carries subtabs:
 
@@ -113,7 +113,7 @@ The Explore subtab has three views (each with the same row-click → universal F
 
 > **History.** Earlier releases shipped five single-metric explore tabs (Big / Hot / Wide / Untested / SCCs) plus a standalone Search. These were removed in the Code Paths restructure once their signal moved into engine gate rules (`graph:large-function`, `graph:wide-function`, `graph:high-blast-untested`, `graph:cycle`): Big/Hot/Wide/Untested collapsed into the single sortable **Functions** table, the SCCs signal lives on as the Graph view's cycle highlight, and Search became the Functions name filter.
 
-The **Universal Function Card** is the cross-cutting drill-down: every clickable function name in any view opens the same overlay with name + location, body length, kind, params, return type, callers grouped by package, callees (resolved + external), an "Open in editor" deep link (`vscode://` or `cursor://` — opt in via `dashboard.editor` in [`opensip-tools.config.yml`](../70-reference/03-configuration.md); falls back to "Copy path" when unset), and a "Trace from entry" BFS.
+The **Universal Function Card** is the cross-cutting drill-down: every clickable function name in any view opens the same overlay with name + location, body length, kind, params, return type, callers grouped by package, callees (resolved + external), an "Open in editor" deep link (`vscode://` or `cursor://` — opt in via `dashboard.editor` in [`opensip-cli.config.yml`](../70-reference/03-configuration.md); falls back to "Copy path" when unset), and a "Trace from entry" BFS.
 
 Filter chips apply across the Explore views: package multi-select, kind multi-select, and a production/test toggle (default: production-only).
 
@@ -143,7 +143,7 @@ Why static, no server? A few reasons:
 - **No port conflicts.** Static files don't ask for `localhost:3000`.
 - **No moving parts.** No daemon to crash, no cache to stale, no auth to misconfigure.
 
-The cost: dynamic features (filtering, sorting, expand-collapse) are JS in the browser, against the embedded JSON. That works fine up to ~thousands of sessions; beyond that, the page is slow to load. Past a certain scale the right answer is a real backend; for the typical opensip-tools project (dozens of sessions per week), static HTML is plenty.
+The cost: dynamic features (filtering, sorting, expand-collapse) are JS in the browser, against the embedded JSON. That works fine up to ~thousands of sessions; beyond that, the page is slow to load. Past a certain scale the right answer is a real backend; for the typical opensip-cli project (dozens of sessions per week), static HTML is plenty.
 
 ---
 
@@ -158,7 +158,7 @@ sprinkling globals.
 
 `generateDashboardHtml({ … })` accepts a single options object; the
 shape is the `DashboardInput` interface re-exported from
-`@opensip-tools/dashboard`. Today it carries `sessions`,
+`@opensip-cli/dashboard`. Today it carries `sessions`,
 `checkCatalog`, `recipeCatalog`, `graphCatalog`, and
 `editorProtocol`. Future tool-shaped data — alarm history,
 dependency graphs, simulation traces — extends the interface as new
@@ -218,12 +218,12 @@ are available wherever any tab JS runs.
 ## Where it lives
 
 ```
-<project>/opensip-tools/.runtime/reports/latest.html
+<project>/opensip-cli/.runtime/reports/latest.html
 ```
 
 Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the SQLite session store (`.runtime/datastore.sqlite`, read via `SessionRepo`); the Sessions panel inlines the **most recent 20 sessions** (`new SessionRepo(datastore).list({ limit: 20 })` in [`packages/cli/src/dashboard-compose.ts`](../../../packages/cli/src/dashboard-compose.ts)) so historical runs are browsable inside the HTML up to that bound. Older sessions stay in the store until you run `sessions purge`.
 
-The HTML file is fully self-contained — no asset directory, no CDN, no fetches. Email a stakeholder the file and they can open it on their machine without opensip-tools installed. Useful for: post-incident reports, security review handoffs, compliance audits.
+The HTML file is fully self-contained — no asset directory, no CDN, no fetches. Email a stakeholder the file and they can open it on their machine without opensip-cli installed. Useful for: post-incident reports, security review handoffs, compliance audits.
 
 The runtime dir is gitignored. If you want to archive a specific snapshot, copy `latest.html` somewhere else before re-running.
 
@@ -244,9 +244,9 @@ A few common mis-expectations, listed once:
 
 For `acme-api` after the nightly CI run:
 
-- The session row persisted in `<project>/opensip-tools/.runtime/datastore.sqlite` (tool `fit`, recipe `default`, timestamped `2026-05-17T03:15:22.123Z`) carries the full result in its companion `session_tool_payload` row.
-- The HTML report at `<project>/opensip-tools/.runtime/reports/latest.html` is regenerated. The Sessions panel inside the HTML inlines the most recent 20 session records, so a developer opening it later sees the new run alongside its 19 immediate predecessors.
-- A developer running `opensip-tools dashboard` locally opens the file in their browser. The Sessions panel shows the run; the Overview panel shows the score trend.
+- The session row persisted in `<project>/opensip-cli/.runtime/datastore.sqlite` (tool `fit`, recipe `default`, timestamped `2026-05-17T03:15:22.123Z`) carries the full result in its companion `session_tool_payload` row.
+- The HTML report at `<project>/opensip-cli/.runtime/reports/latest.html` is regenerated. The Sessions panel inside the HTML inlines the most recent 20 session records, so a developer opening it later sees the new run alongside its 19 immediate predecessors.
+- A developer running `opensip dashboard` locally opens the file in their browser. The Sessions panel shows the run; the Overview panel shows the score trend.
 
 In CI, `--open` is suppressed (no TTY), so no browser opens — but the HTML file is still written. Teams that want a per-run archive copy `latest.html` to a build-artifact path with a run-scoped filename before the next pipeline run overwrites it.
 

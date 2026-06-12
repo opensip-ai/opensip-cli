@@ -9,8 +9,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { logger } from '@opensip-tools/core';
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { logger } from '@opensip-cli/core';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 /**
  * Valid test file patterns

@@ -18,7 +18,7 @@ import { orphanSubtreeRule } from '../../rules/orphan-subtree.js';
 import { makeCatalog, occ } from './_helpers.js';
 
 import type { GraphConfig } from '../../types.js';
-import type { SignalSeverity } from '@opensip-tools/core';
+import type { SignalSeverity } from '@opensip-cli/core';
 
 const ALL_SEVERITIES: readonly SignalSeverity[] = ['critical', 'high', 'medium', 'low'];
 

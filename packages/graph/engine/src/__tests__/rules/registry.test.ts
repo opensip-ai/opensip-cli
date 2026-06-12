@@ -8,7 +8,7 @@
  * scope (with graph subscope) and reads via `currentRules()`.
  */
 
-import { enterScope, RunScope } from '@opensip-tools/core';
+import { enterScope, RunScope } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { currentRules } from '../../rules/registry.js';

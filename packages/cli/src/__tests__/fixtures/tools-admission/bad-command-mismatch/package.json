@@ -1,5 +1,5 @@
 {
-  "name": "@opensip-tools-fixture/command-mismatch",
+  "name": "@opensip-cli-fixture/command-mismatch",
   "version": "0.0.0",
   "private": true,
   "type": "module",

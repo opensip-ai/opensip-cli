@@ -1,5 +1,5 @@
 {
-  "name": "@opensip-tools-fixture/no-tool-export",
+  "name": "@opensip-cli-fixture/no-tool-export",
   "version": "0.0.0",
   "private": true,
   "type": "module",

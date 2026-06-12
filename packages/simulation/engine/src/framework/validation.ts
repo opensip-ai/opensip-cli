@@ -12,7 +12,7 @@
  * each define.ts.
  */
 
-import { ValidationError as CoreValidationError } from '@opensip-tools/core';
+import { ValidationError as CoreValidationError } from '@opensip-cli/core';
 
 import type { ScenarioKind } from '../types/kind-types.js';
 import type { Target } from './execution/target.js';

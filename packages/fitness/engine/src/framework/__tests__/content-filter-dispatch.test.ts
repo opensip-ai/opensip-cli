@@ -21,19 +21,19 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScope } from '@opensip-tools/core';
-import { filterContent } from '@opensip-tools/lang-typescript';
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
+import { filterContent } from '@opensip-cli/lang-typescript';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { createFileAccessor } from '../file-accessor.js';
 
-import type { LanguageAdapter } from '@opensip-tools/core';
+import type { LanguageAdapter } from '@opensip-cli/core';
 
 // FileAccessor.read dispatches strip via the registered LanguageAdapter
 // for the file's extension. Register a minimal TS adapter for the test
 // scope so the dispatch resolves and the existing core filterContent
 // implementation produces the expected output. Lang packages live in
-// their own workspaces and core can't depend on @opensip-tools/lang-typescript
+// their own workspaces and core can't depend on @opensip-cli/lang-typescript
 // directly without creating a cycle.
 const inProcessTypescriptAdapter: LanguageAdapter = {
   id: 'typescript-test-shim',

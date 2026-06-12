@@ -12,7 +12,7 @@
  * preserved via `skipLine`.
  */
 
-import { defineRegexListCheck } from '@opensip-tools/fitness';
+import { defineRegexListCheck } from '@opensip-cli/fitness';
 
 /**
  * Check: quality/no-window-alert

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Signalers config barrel export
  *
- * Public API for opensip-tools.config.yml:
+ * Public API for opensip-cli.config.yml:
  * - loadSignalersConfig() — Load and validate signalers config
  */
 

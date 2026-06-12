@@ -10,9 +10,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { SessionRepo } from '@opensip-tools/session-store';
+import { enterScope, LanguageRegistry } from '@opensip-cli/core';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { executeGraph } from '../../cli/graph.js';
@@ -27,7 +27,7 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { GraphSessionPayload } from '../../persistence/session-payload.js';
-import type { LanguageAdapter, ToolCliContext, WorkspaceUnit } from '@opensip-tools/core';
+import type { LanguageAdapter, ToolCliContext, WorkspaceUnit } from '@opensip-cli/core';
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
   return {

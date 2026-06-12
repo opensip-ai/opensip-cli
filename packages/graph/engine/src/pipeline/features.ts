@@ -18,7 +18,7 @@
  * indexes and drilldowns from the catalog plus the precomputed features.
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 import { occId, pkgOf, resolveCallee } from '../resolve-callee.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';

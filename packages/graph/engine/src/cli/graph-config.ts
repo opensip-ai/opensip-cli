@@ -1,6 +1,6 @@
 // @fitness-ignore-file null-safety -- Zod schema builder chains (.strict()/.safeParse()) always return valid objects; `.safeParse` is called on a freshly-built strict schema, never a nullable reference.
 /**
- * graph-config — load the `graph:` block of `opensip-tools.config.yml`
+ * graph-config — load the `graph:` block of `opensip-cli.config.yml`
  * into a {@link GraphConfig}.
  *
  * The graph rule knobs (`minDuplicateBodyLines`, `minDuplicateBodySize`,
@@ -8,7 +8,7 @@
  * `entryPointHashes`, `severityOverrides`) are owned by the graph tool, so the graph engine
  * reads its own config block — mirroring the way fitness owns its
  * sections and the CLI seam owns the `cli:` block
- * (`@opensip-tools/contracts` `loadCliDefaults`).
+ * (`@opensip-cli/contracts` `loadCliDefaults`).
  *
  * Release 2.10.0 (ADR-0023, Phase 4): the block is now read through graph's
  * own Zod {@link GraphConfigSchema} (the same schema graph contributes to the
@@ -21,8 +21,8 @@
  * throws.
  */
 
-import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-tools/contracts';
-import { currentScope, logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
+import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-cli/contracts';
+import { currentScope, logger, readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
 
 import { GraphConfigSchema } from './graph-config-schema.js';
 
@@ -34,7 +34,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
- * Best-effort load of the `graph:` block of `opensip-tools.config.yml`.
+ * Best-effort load of the `graph:` block of `opensip-cli.config.yml`.
  *
  * ADR-0023, Phase 4: the resolved `graph:` block rides on the per-run scope
  * (`scope.toolConfig.graph`) — the host already strict-validated + precedence-

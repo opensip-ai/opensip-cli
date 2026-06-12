@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-09
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0030: Authored-Tool discovery realizes the three-sources-one-path claim
@@ -36,14 +36,14 @@ authored Tool declares identity via an `opensip-tool.manifest.json` **sidecar**
 routed through the existing `loadToolManifest → admitTool → importToolRuntime →
 register` machinery:
 
-1. **`~/.opensip-tools/tools/<name>/`** — a new `ToolSource: 'user-global'`,
+1. **`~/.opensip-cli/tools/<name>/`** — a new `ToolSource: 'user-global'`,
    **trusted-by-default**. The user placed it in their own home dir (the `npm i -g`
    analogue for authored code), so it loads without an allowlist.
-2. **`<project>/opensip-tools/tools/<name>/`** — `ToolSource: 'project-local'`,
-   **deny-by-default**. It is TRACKED source committed beside `opensip-tools/fit/`
-   and `opensip-tools/sim/`, but it rides in with a `git clone` before you've read
+2. **`<project>/opensip-cli/tools/<name>/`** — `ToolSource: 'project-local'`,
+   **deny-by-default**. It is TRACKED source committed beside `opensip-cli/fit/`
+   and `opensip-cli/sim/`, but it rides in with a `git clone` before you've read
    it — so it is admitted only when its `id` (or `*`) appears in
-   `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`; otherwise the CLI **fail-closes (exit 5)
+   `OPENSIP_CLI_ALLOW_PROJECT_TOOLS`; otherwise the CLI **fail-closes (exit 5)
    before any import**. The trust decision always precedes the dynamic import.
 
 `plugin add --project` is **unchanged** — it installs an npm package into the
@@ -83,7 +83,7 @@ roots through the one runtime-load seam without a parallel admission hierarchy.
 - `ToolSource` gains `'user-global'`; `project-local` is re-scoped to the project
   authored sidecar. No shim preserves the old broader meaning (it had no
   production caller).
-- One new env var, `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`, declared as a first-class
+- One new env var, `OPENSIP_CLI_ALLOW_PROJECT_TOOLS`, declared as a first-class
   `EnvVarSpec` and documented in the env-surface reference.
 - `plugin list` (human + `--json`) surfaces `user-global` / `project-local`
   provenance rows alongside `bundled` / `installed`; every admitted authored tool

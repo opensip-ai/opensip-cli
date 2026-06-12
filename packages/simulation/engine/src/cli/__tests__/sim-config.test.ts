@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { runWithScopeSync } from '@opensip-tools/core';
+import { runWithScopeSync } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { makeSimTestScope } from '../../__tests__/test-utils/with-sim-scope.js';
@@ -24,7 +24,7 @@ describe('resolveSimRecipeSelection (ADR-0022)', () => {
   });
 
   const write = (yaml: string): void => {
-    writeFileSync(join(dir, 'opensip-tools.config.yml'), yaml);
+    writeFileSync(join(dir, 'opensip-cli.config.yml'), yaml);
   };
 
   it('explicit --recipe wins and is strict', () => {

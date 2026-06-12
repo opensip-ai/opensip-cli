@@ -12,8 +12,8 @@
 
 import type { SpecLike } from './completion.js';
 import type { SessionReplayRegistry } from '../session-replay-registry.js';
-import type { CommandResult } from '@opensip-tools/contracts';
-import type { PluginLayout, ScaffoldContext, ScaffoldFile } from '@opensip-tools/core';
+import type { CommandResult } from '@opensip-cli/contracts';
+import type { PluginLayout, ScaffoldContext, ScaffoldFile } from '@opensip-cli/core';
 
 /**
  * One registered tool's `init`-scaffold contribution (ADR-0038): its structural
@@ -90,7 +90,7 @@ export interface CliCommandsContext {
    * DataStore, opening it lazily on first access. Commands that don't read
    * the datastore (dry-runs, list-style commands, completion) never trigger
    * the SQLite open and therefore don't materialise `.runtime/`. Loosely
-   * typed `unknown` to keep this module free of `@opensip-tools/datastore`
+   * typed `unknown` to keep this module free of `@opensip-cli/datastore`
    * at the type level; consumers cast to `DataStore` at use time.
    *
    * Throws when called in a non-project context — CLI commands that need

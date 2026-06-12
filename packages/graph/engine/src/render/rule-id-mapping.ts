@@ -21,7 +21,7 @@
  * testable in isolation. Phase 2 Task 2.1 per DEC-498.
  */
 
-import { ValidationError } from '@opensip-tools/core';
+import { ValidationError } from '@opensip-cli/core';
 
 /**
  * Mapping from engine `Rule.slug` to OpenSIP-convention rule ID.

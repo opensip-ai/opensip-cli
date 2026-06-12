@@ -3,7 +3,7 @@
  * @fileoverview Logger call detector for observability coverage analysis
  */
 
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 import type { LoggerCall } from './types.js';

@@ -42,7 +42,7 @@ related-docs:
 
 The `graph` command is the static call-graph tool. Where `fit` answers "is the codebase clean?" and `sim` answers "does it behave correctly under stress?", `graph` asks: **"what is reachable from where?"** Orphans, side-effect chains, duplicated bodies, and test-only reachable code are all questions about the call graph, not any single file.
 
-> **Naming.** CLI-facing docs and code use `graph`; the dashboard labels the same data **Code Paths**. The catalog lives in the project-local SQLite store at `<project>/opensip-tools/.runtime/datastore.sqlite` — see [Catalog in SQLite](#the-catalog-in-sqlite) below.
+> **Naming.** CLI-facing docs and code use `graph`; the dashboard labels the same data **Code Paths**. The catalog lives in the project-local SQLite store at `<project>/opensip-cli/.runtime/datastore.sqlite` — see [Catalog in SQLite](#the-catalog-in-sqlite) below.
 
 > **What you'll understand after this:**
 > - The seven-stage pipeline graph uses to build its picture of the codebase.
@@ -106,7 +106,7 @@ Stages 0–2 are language-agnostic over the [`GraphLanguageAdapter`](../../../pa
 
 The stage boundaries are deliberately narrow: each stage communicates through typed outputs instead of reaching into a neighbor's intermediate state. That isolation is the main design guarantee.
 
-> **Adapter layer.** Five first-party adapters ship as publishable npm packages under the `@opensip-tools/graph-*` namespace: TypeScript ([`@opensip-tools/graph-typescript`](../../../packages/graph/graph-typescript/src/index.ts)), Python ([`@opensip-tools/graph-python`](../../../packages/graph/graph-python/src/index.ts)), Rust ([`@opensip-tools/graph-rust`](../../../packages/graph/graph-rust/src/index.ts)), Go ([`@opensip-tools/graph-go`](../../../packages/graph/graph-go/src/index.ts)), and Java ([`@opensip-tools/graph-java`](../../../packages/graph/graph-java/src/index.ts)). Auto-discovery is **marker-based** and descriptor-driven (§5.3): the CLI walks `node_modules` for packages declaring `opensipTools.kind: "graph-adapter"` (built-ins resolve from the CLI install tree) — or, if `plugins.graphAdapters` is set in `opensip-tools.config.yml`, exactly that explicit list. The generic capability loader ([`load-tool-capabilities.ts`](../../../packages/cli/src/bootstrap/load-tool-capabilities.ts)) drives discovery per command and routes each package's `adapter` export through graph's registrar. `pickAdapter(cwd)` chooses by file-extension dominance with a deterministic preference order on ties. Stages 3, 4, and 5 consume the catalog without knowing which adapter built it.
+> **Adapter layer.** Five first-party adapters ship as publishable npm packages under the `@opensip-cli/graph-*` namespace: TypeScript ([`@opensip-cli/graph-typescript`](../../../packages/graph/graph-typescript/src/index.ts)), Python ([`@opensip-cli/graph-python`](../../../packages/graph/graph-python/src/index.ts)), Rust ([`@opensip-cli/graph-rust`](../../../packages/graph/graph-rust/src/index.ts)), Go ([`@opensip-cli/graph-go`](../../../packages/graph/graph-go/src/index.ts)), and Java ([`@opensip-cli/graph-java`](../../../packages/graph/graph-java/src/index.ts)). Auto-discovery is **marker-based** and descriptor-driven (§5.3): the CLI walks `node_modules` for packages declaring `opensipTools.kind: "graph-adapter"` (built-ins resolve from the CLI install tree) — or, if `plugins.graphAdapters` is set in `opensip-cli.config.yml`, exactly that explicit list. The generic capability loader ([`load-tool-capabilities.ts`](../../../packages/cli/src/bootstrap/load-tool-capabilities.ts)) drives discovery per command and routes each package's `adapter` export through graph's registrar. `pickAdapter(cwd)` chooses by file-extension dominance with a deterministic preference order on ties. Stages 3, 4, and 5 consume the catalog without knowing which adapter built it.
 
 ### Stage 0 — Discover
 
@@ -170,7 +170,7 @@ interface CallEdge {
 
 For the TypeScript adapter, resolver logic is split into one file per call shape in [`graph-typescript/edge-resolvers/`](../../../packages/graph/graph-typescript/src/edge-resolvers/): direct calls, property-access calls, JSX elements, `new` expressions, polymorphic dispatch, and a catalog-fallback resolver that handles the long tail. The tree-sitter adapters take the simpler approach — a single `resolve.ts` per adapter that does name-based lookup against the frozen catalog ([`graph-python/resolve.ts`](../../../packages/graph/graph-python/src/resolve.ts), [`graph-rust/resolve.ts`](../../../packages/graph/graph-rust/src/resolve.ts), and equivalents for graph-go and graph-java).
 
-For the TypeScript adapter, a single `ts.Program` is created in `parseProject` and shared across the walk and the resolver pass; `getTypeChecker()` is forced eagerly so parent pointers are populated before visitors walk parent chains. Cold full-rebuild runtime on the opensip-tools self-graph today is ~15 s; subsequent runs hit the incremental path described under "Cache invalidation" below. Tree-sitter adapters (Python, Rust, Go, Java) parse each file into a per-file `Tree` via a vendored `web-tree-sitter` WASM grammar — `Parser.init()` and `Language.load(<wasm>)` run once at module load — and never build a project-wide symbol table.
+For the TypeScript adapter, a single `ts.Program` is created in `parseProject` and shared across the walk and the resolver pass; `getTypeChecker()` is forced eagerly so parent pointers are populated before visitors walk parent chains. Cold full-rebuild runtime on the opensip-cli self-graph today is ~15 s; subsequent runs hit the incremental path described under "Cache invalidation" below. Tree-sitter adapters (Python, Rust, Go, Java) parse each file into a per-file `Tree` via a vendored `web-tree-sitter` WASM grammar — `Parser.init()` and `Language.load(<wasm>)` run once at module load — and never build a project-wide symbol table.
 
 ### Stage 3 — Index build
 
@@ -187,7 +187,7 @@ Indexes are in-memory only — never persisted. They rebuild on every run from t
 
 #### Package identity
 
-Each occurrence carries a `package` — the `name` of its **nearest enclosing `package.json`** (e.g. `@opensip-tools/fitness`), or the top-level path segment when there's no manifest. It is stamped at build time by [`assignPackages`](../../../packages/graph/engine/src/pipeline/assign-packages.ts) (a post-walk catalog pass, before persistence) because the dashboard has no filesystem access. This is what the coupling grid buckets by, so it shows real packages on any repo layout (`packages/`, `apps/`+`libs/`, single-package, non-JS) rather than a `packages/<segment>` heuristic. Consumers read `occurrence.package` via the `pkgOf` helper, which falls back to the path heuristic for pre-2.4.2 catalogs.
+Each occurrence carries a `package` — the `name` of its **nearest enclosing `package.json`** (e.g. `@opensip-cli/fitness`), or the top-level path segment when there's no manifest. It is stamped at build time by [`assignPackages`](../../../packages/graph/engine/src/pipeline/assign-packages.ts) (a post-walk catalog pass, before persistence) because the dashboard has no filesystem access. This is what the coupling grid buckets by, so it shows real packages on any repo layout (`packages/`, `apps/`+`libs/`, single-package, non-JS) rather than a `packages/<segment>` heuristic. Consumers read `occurrence.package` via the `pkgOf` helper, which falls back to the path heuristic for pre-2.4.2 catalogs.
 
 #### Cross-package edge attribution
 
@@ -233,7 +233,7 @@ The two rules that consume entry-points only see the resulting `EntryPoint[]` �
 
 ## The catalog in SQLite
 
-The output of stages 1+2 is persisted to the project-local SQLite store at `<project>/opensip-tools/.runtime/datastore.sqlite` via [`CatalogRepo.replaceAll(catalog)`](../../../packages/graph/engine/src/persistence/catalog-repo.ts). The catalog rides a single row in the `graph_catalog` table: cache-validity fields (language, cacheKey, filesFingerprint) live in typed columns; the function/occurrence/edge data is stored as a JSON payload preserving v1's wire-shape exactly.
+The output of stages 1+2 is persisted to the project-local SQLite store at `<project>/opensip-cli/.runtime/datastore.sqlite` via [`CatalogRepo.replaceAll(catalog)`](../../../packages/graph/engine/src/persistence/catalog-repo.ts). The catalog rides a single row in the `graph_catalog` table: cache-validity fields (language, cacheKey, filesFingerprint) live in typed columns; the function/occurrence/edge data is stored as a JSON payload preserving v1's wire-shape exactly.
 
 The reconstructed `Catalog` value returned by `CatalogRepo.loadFullCatalog()` is identical to v1's `readCatalog` output — dashboard view derivations, rules, and indexes consume the same shape. Format v3 (v1.3.0) carries a `language` field (the adapter id) and an opaque `cacheKey` — the adapter's invalidation string prefixed with the running engine version (`eng=<version>|…`, see [Cache invalidation](#cache-invalidation) below).
 
@@ -292,9 +292,9 @@ Notable shape choices:
 |---|---|---|
 | `valid` | `language` (adapter id), `cacheKey` (adapter-supplied invalidation key), and per-file fingerprint all match exactly. | Reuse the cached catalog as-is. |
 | `incremental` | `language` + `cacheKey` agree, but at least one file's mtime/size differs from the cache. | Re-walk the dependency closure of changed files and merge with cached entries from unchanged files. See "Incremental rebuild" below. |
-| `invalid` | Different adapter (`language` mismatch), `cacheKey` changed — including the **engine version** (opensip-tools was upgraded), the adapter's own key (tsconfig content edited or TS upgraded), the resolution tier — no fingerprint, or pre-v3 catalog format on disk. | Discard the cache; do a full rebuild. |
+| `invalid` | Different adapter (`language` mismatch), `cacheKey` changed — including the **engine version** (opensip-cli was upgraded), the adapter's own key (tsconfig content edited or TS upgraded), the resolution tier — no fingerprint, or pre-v3 catalog format on disk. | Discard the cache; do a full rebuild. |
 
-**Engine-version stamping.** The `cacheKey` is the adapter's invalidation string prefixed with the running graph engine's package version: `eng=<version>|<adapter-key>` ([`cache/engine-version.ts`](../../../packages/graph/engine/src/cache/engine-version.ts), [ADR-0015](../../decisions/ADR-0015-engine-version-cache-invalidation.md)). This guarantees that **upgrading opensip-tools invalidates the cache** even when your source is unchanged — so a new engine (with, say, improved edge resolution or body hashing) never replays a catalog built by the old one. The stamp is applied in the language-agnostic engine, so it covers every adapter (TypeScript and the tree-sitter languages) and both the full-catalog cache and the per-shard fragment cache. The visible consequence: the **first `graph` run after an upgrade is a full cold rebuild**; subsequent runs cache-hit as normal. This is deliberate over-invalidation — a one-time rebuild is always safe, whereas a stale cache is not.
+**Engine-version stamping.** The `cacheKey` is the adapter's invalidation string prefixed with the running graph engine's package version: `eng=<version>|<adapter-key>` ([`cache/engine-version.ts`](../../../packages/graph/engine/src/cache/engine-version.ts), [ADR-0015](../../decisions/ADR-0015-engine-version-cache-invalidation.md)). This guarantees that **upgrading opensip-cli invalidates the cache** even when your source is unchanged — so a new engine (with, say, improved edge resolution or body hashing) never replays a catalog built by the old one. The stamp is applied in the language-agnostic engine, so it covers every adapter (TypeScript and the tree-sitter languages) and both the full-catalog cache and the per-shard fragment cache. The visible consequence: the **first `graph` run after an upgrade is a full cold rebuild**; subsequent runs cache-hit as normal. This is deliberate over-invalidation — a one-time rebuild is always safe, whereas a stale cache is not.
 
 The fingerprint is per-file `path|mtimeMs|size`, computed by `computeFilesFingerprint`. Mtime is cheap to read and stable enough — the ones that lie (formatter passes, `touch`, git clean rebuilds) cause an unnecessary incremental rebuild that produces a byte-identical result, not a correctness bug.
 
@@ -316,7 +316,7 @@ When `classifyCatalog` returns `incremental`, the orchestrator runs `buildAndRes
 
 Correctness: every file whose cached edges might point at a stale hash is itself re-walked. After the fixpoint, no cached edge dangles. Byte-identical to a `--no-cache` full rebuild.
 
-Performance: editing a single file in opensip-tools self-graph drops rebuild time from ~15 s (full) to ~2.5 s (incremental); cache-hit runs (no edits) complete in ~0.8 s.
+Performance: editing a single file in opensip-cli self-graph drops rebuild time from ~15 s (full) to ~2.5 s (incremental); cache-hit runs (no edits) complete in ~0.8 s.
 
 ### Positional paths and `--workspace`
 

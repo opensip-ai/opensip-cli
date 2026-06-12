@@ -4,14 +4,14 @@
  * `Date.now()`) so a fixed envelope renders to a fixed string with zero mocks
  * (formatter-purity contract, ADR-0011).
  */
-import type { SignalEnvelope } from '@opensip-tools/contracts';
-import type { Signal } from '@opensip-tools/core';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 function signal(overrides: Partial<Signal>): Signal {
   return {
     id: 'sig_fixture0001',
     source: 'graph:orphan-subtree',
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     severity: 'high',
     category: 'architecture',
     ruleId: 'graph:orphan-subtree',

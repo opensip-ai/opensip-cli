@@ -17,7 +17,7 @@ related-docs:
 
 **2.12.0 lands one breaking change in the pre-GA 2.x line:** `--json` now emits a
 `CommandOutcome` wrapper instead of the bare result. The project stays pre-GA on
-the long-lived 2.x major ([ADR-0012](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0012-versioning-and-release-policy.md));
+the long-lived 2.x major ([ADR-0012](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/docs/decisions/ADR-0012-versioning-and-release-policy.md));
 breaking changes batch into 2.x minors, exactly as the 2.7.0 `--json` change did.
 Everything else in this release — a diagnostics bus, a governed environment
 surface — is additive.
@@ -58,9 +58,9 @@ Before 2.12.0, a run command emitted the bare `SignalEnvelope` at the top level:
 
 ```bash
 # before
-opensip-tools fit --json | jq '.verdict.passed'
+opensip fit --json | jq '.verdict.passed'
 # after
-opensip-tools fit --json | jq '.envelope.verdict.passed'
+opensip fit --json | jq '.envelope.verdict.passed'
 ```
 
 The inner envelope is unchanged (`schemaVersion: 2`); only the outer nesting moved.
@@ -72,8 +72,8 @@ Commands that emit a `CommandResult` rather than a run envelope (`fit --list
 `sessions`, `plugin list --json`, …) now carry their result under `.data`:
 
 ```bash
-# before:  opensip-tools fit --list --json | jq '.totalCount'
-# after:   opensip-tools fit --list --json | jq '.data.totalCount'
+# before:  opensip fit --list --json | jq '.totalCount'
+# after:   opensip fit --list --json | jq '.data.totalCount'
 ```
 
 ## 3. Failures are now structured (`.errors`) — including bootstrap
@@ -84,14 +84,14 @@ structured at all — they wrote to stderr and exited. Now **every** failure,
 including those pre-handler bootstrap failures, is a structured outcome:
 
 ```jsonc
-// 2.12.0 — fit --json in a directory with no opensip-tools project (exit 2)
+// 2.12.0 — fit --json in a directory with no opensip-cli project (exit 2)
 {
   "kind": "bootstrap.error",
   "status": "error",
   "exitCode": 2,
   "errors": [
-    { "message": "No opensip-tools.config.yml found. Searched from /path upward.",
-      "suggestion": "Run opensip-tools init to get started." }
+    { "message": "No opensip-cli.config.yml found. Searched from /path upward.",
+      "suggestion": "Run opensip init to get started." }
   ]
 }
 ```
@@ -121,5 +121,5 @@ The `one-outcome-shape` fitness check fails CI on the retired shape.
   JSON-emittable stream of lifecycle events (plugins loaded, project resolved,
   command executed). Purely additive — ignore it if you don't need it.
 - Every environment variable the CLI reads is now declared and governed; see the
-  generated [environment-variable reference](/docs/opensip-tools/70-reference/10-environment-variables/). No
+  generated [environment-variable reference](/docs/opensip-cli/70-reference/10-environment-variables/). No
   variable names changed.

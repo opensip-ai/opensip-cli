@@ -1,12 +1,12 @@
-import { renderToText } from '@opensip-tools/cli-ui';
-import { buildSignalEnvelope } from '@opensip-tools/contracts';
-import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
+import { renderToText } from '@opensip-cli/cli-ui';
+import { buildSignalEnvelope } from '@opensip-cli/contracts';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import { resultToView } from '../result-to-view.js';
 
-import type { CommandResult, SimDoneResult } from '@opensip-tools/contracts';
-import type { Signal } from '@opensip-tools/core';
+import type { CommandResult, SimDoneResult } from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 function textOf(result: CommandResult): string {
   return renderToText(resultToView(result));
@@ -23,7 +23,7 @@ function fitSignal(over: {
   return {
     id: `sig_${over.source}_${String(over.line ?? 0)}`,
     source: over.source,
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     severity: over.severity,
     category: 'quality',
     ruleId: over.source,
@@ -156,7 +156,7 @@ describe('resultToView', () => {
       }),
     });
     expect(out).toContain('Use --verbose for detailed results');
-    expect(out).toContain('opensip-tools dashboard for HTML report');
+    expect(out).toContain('opensip dashboard for HTML report');
   });
 
   it('renders fit-done errored/clean units: ERROR status, blank validated cell', () => {
@@ -237,7 +237,7 @@ describe('resultToView', () => {
   const bSignal: Signal = {
     id: 'sig_b1',
     source: 'b',
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     severity: 'high',
     category: 'resilience',
     ruleId: 'invariant.violated',
@@ -305,15 +305,15 @@ describe('resultToView', () => {
     });
     expect(out).toContain('PASS  (0 Errors, 0 Warnings) | Duration 1.2s');
     expect(out).toContain('  Use --verbose for detailed results');
-    expect(out).toContain('opensip-tools dashboard for HTML report');
+    expect(out).toContain('opensip dashboard for HTML report');
   });
 
   it('renders gate-done lines verbatim', () => {
     const out = textOf({
       type: 'gate-done',
-      lines: ['opensip-tools gate compare', '', '✓ STABLE — no change'],
+      lines: ['opensip gate compare', '', '✓ STABLE — no change'],
     });
-    expect(out).toBe('opensip-tools gate compare\n\n✓ STABLE — no change');
+    expect(out).toBe('opensip gate compare\n\n✓ STABLE — no change');
   });
 
   it('renders the graph-done verbose body and fast-tier caveat', () => {

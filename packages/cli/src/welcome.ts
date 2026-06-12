@@ -1,8 +1,8 @@
 /**
- * @fileoverview Welcome message printed when `opensip-tools` is invoked
+ * @fileoverview Welcome message printed when `opensip` is invoked
  * with no subcommand and no flags.
  *
- * Design goal: a new user typing `opensip-tools` sees the two primary
+ * Design goal: a new user typing `opensip` sees the two primary
  * subcommands (fit / sim), a minimal quickstart, and a pointer at
  * `--help` for everything else. Progressive disclosure: the tool
  * decides what to show first rather than dumping the full help dump
@@ -21,7 +21,7 @@
  *   - The welcome screen is the very first thing a zero-arg invocation
  *     does. Loading Ink/React (~50 ms cold-start on a typical machine)
  *     to print twelve lines of static help would be a regression on
- *     `opensip-tools` (no args) → welcome.
+ *     `opensip` (no args) → welcome.
  *   - The render is fully static — no progress, no live updates, no
  *     theme-driven palette decisions. The only colour roles in use are
  *     bold, dim, and a single accent — all NO_COLOR / FORCE_COLOR
@@ -69,22 +69,19 @@ export function buildWelcome(opts: WelcomeOptions): string {
 
   return [
     '',
-    `${bold('opensip-tools')} ${dim(opts.version)} — codebase analysis toolkit`,
+    `${bold('OpenSIP CLI')} ${dim(opts.version)} — codebase analysis toolkit`,
     '',
     `${bold('Primary commands:')}`,
-    `  ${accent('opensip-tools fit')}        Run fitness checks against your codebase`,
-    `  ${accent('opensip-tools sim')}        Run simulation scenarios ${dim('(experimental)')}`,
+    `  ${accent('opensip fit')}        Run fitness checks against your codebase`,
+    `  ${accent('opensip sim')}        Run simulation scenarios ${dim('(experimental)')}`,
     '',
     `${bold('Getting started:')}`,
     `  $ cd your-project`,
-    `  $ opensip-tools init       ${dim('# create a targets config')}`,
-    `  $ opensip-tools fit        ${dim('# run every registered check')}`,
+    `  $ opensip init       ${dim('# create a targets config')}`,
+    `  $ opensip fit        ${dim('# run every registered check')}`,
     '',
-    `${bold('Type it a lot?')} Drop this in your ${accent('~/.zshrc')} or ${accent('~/.bashrc')}:`,
-    `  ${dim('alias')} ${accent('ost')}${dim('=')}${accent("'opensip-tools'")}`,
-    '',
-    `${dim('Full reference: opensip-tools --help')}`,
-    `${dim('Docs:           https://github.com/opensip-ai/opensip-tools')}`,
+    `${dim('Full reference: opensip --help')}`,
+    `${dim('Docs:           https://github.com/opensip-ai/opensip-cli')}`,
     '',
   ].join('\n');
 }

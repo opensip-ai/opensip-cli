@@ -7,8 +7,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { fitnessTool } from '@opensip-tools/fitness';
-import { simulationTool } from '@opensip-tools/simulation';
+import { fitnessTool } from '@opensip-cli/fitness';
+import { simulationTool } from '@opensip-cli/simulation';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -19,7 +19,7 @@ import {
 import { executeInit } from '../commands/init.js';
 
 import type { ToolScaffold } from '../commands/shared.js';
-import type { InitOptions } from '@opensip-tools/contracts';
+import type { InitOptions } from '@opensip-cli/contracts';
 
 /** First-party scaffold contributions (ADR-0038), mirroring the host's registry aggregation. */
 function firstPartyScaffolds(): ToolScaffold[] {
@@ -151,29 +151,29 @@ describe('executeInit (single language)', () => {
     expect(result.createdFiles).toBeDefined();
 
     // Config + 4 example files
-    expect(existsSync(join(testDir, 'opensip-tools.config.yml'))).toBe(true);
-    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'))).toBe(
+    expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'))).toBe(
       true,
     );
-    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'recipes', 'example-recipe.mjs'))).toBe(
+    expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'recipes', 'example-recipe.mjs'))).toBe(
       true,
     );
     expect(
-      existsSync(join(testDir, 'opensip-tools', 'sim', 'scenarios', 'example-scenario.mjs')),
+      existsSync(join(testDir, 'opensip-cli', 'sim', 'scenarios', 'example-scenario.mjs')),
     ).toBe(true);
-    expect(existsSync(join(testDir, 'opensip-tools', 'sim', 'recipes', 'example-recipe.mjs'))).toBe(
+    expect(existsSync(join(testDir, 'opensip-cli', 'sim', 'recipes', 'example-recipe.mjs'))).toBe(
       true,
     );
 
     // Config has the right target shape
-    const config = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
+    const config = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(config).toContain('rust-source:');
     expect(config).toContain('languages: [rust]');
     expect(config).toContain('"src/**/*.rs"');
 
     // Example check has matching scope.languages
     const check = readFileSync(
-      join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'),
+      join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'),
       'utf8',
     );
     expect(check).toContain("scope: { languages: ['rust']");
@@ -181,13 +181,13 @@ describe('executeInit (single language)', () => {
     // .gitignore was created/appended
     expect(result.gitignoreUpdated).toBe(true);
     const gitignore = readFileSync(join(testDir, '.gitignore'), 'utf8');
-    expect(gitignore).toContain('opensip-tools/.runtime/');
+    expect(gitignore).toContain('opensip-cli/.runtime/');
   });
 
   it('scaffolds for TypeScript when --language is explicit', () => {
     const result = executeInit(makeArgs({ language: 'typescript' }));
     expect(result.languages).toEqual(['typescript']);
-    const config = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
+    const config = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(config).toContain('typescript-source:');
   });
 });
@@ -198,22 +198,22 @@ describe('executeInit (polyglot)', () => {
     expect(result.languages).toEqual(['rust', 'typescript']);
 
     expect(
-      existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check-rust.mjs')),
+      existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check-rust.mjs')),
     ).toBe(true);
     expect(
-      existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check-typescript.mjs')),
+      existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check-typescript.mjs')),
     ).toBe(true);
 
     // Recipe references both
     const recipe = readFileSync(
-      join(testDir, 'opensip-tools', 'fit', 'recipes', 'example-recipe.mjs'),
+      join(testDir, 'opensip-cli', 'fit', 'recipes', 'example-recipe.mjs'),
       'utf8',
     );
     expect(recipe).toContain("'example-check-rust'");
     expect(recipe).toContain("'example-check-typescript'");
 
     // Config has a target per language
-    const config = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
+    const config = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(config).toContain('rust-source:');
     expect(config).toContain('typescript-source:');
   });
@@ -236,8 +236,8 @@ describe('executeInit (ambiguous language)', () => {
     expect(result.ambiguousLanguageError?.message).toContain('--language');
 
     // Nothing was written
-    expect(existsSync(join(testDir, 'opensip-tools.config.yml'))).toBe(false);
-    expect(existsSync(join(testDir, 'opensip-tools'))).toBe(false);
+    expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(false);
+    expect(existsSync(join(testDir, 'opensip-cli'))).toBe(false);
   });
 
   it('refuses to scaffold when no language markers present and no --language', () => {
@@ -275,7 +275,7 @@ describe('executeInit (fully-initialized state)', () => {
 
   it('refuses to overwrite without a flag', () => {
     executeInit(makeArgs());
-    const before = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
+    const before = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
 
     const second = executeInit(makeArgs());
     expect(second.created).toBe(false);
@@ -283,16 +283,16 @@ describe('executeInit (fully-initialized state)', () => {
     expect(second.partialStateError).toBeDefined();
     expect(second.partialStateError?.state).toBe('fully-initialized');
 
-    const after = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
+    const after = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(after).toBe(before);
   });
 
-  it('--remove blows away opensip-tools/ and rewrites everything', () => {
+  it('--remove blows away opensip-cli/ and rewrites everything', () => {
     executeInit(makeArgs());
-    writeFileSync(join(testDir, 'opensip-tools.config.yml'), '# manually edited');
+    writeFileSync(join(testDir, 'opensip-cli.config.yml'), '# manually edited');
     // Custom file in the dir — should be removed by --remove.
     writeFileSync(
-      join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs'),
+      join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'),
       '// custom',
     );
 
@@ -300,25 +300,25 @@ describe('executeInit (fully-initialized state)', () => {
     expect(result.created).toBe(true);
     expect(result.state).toBe('fully-initialized');
 
-    const config = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
+    const config = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(config).toContain('rust-source:');
     expect(config).not.toContain('manually edited');
     // Custom file is gone.
-    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs'))).toBe(
+    expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'))).toBe(
       false,
     );
   });
 
   it('--keep overwrites scaffolded files but preserves custom ones', () => {
     executeInit(makeArgs());
-    writeFileSync(join(testDir, 'opensip-tools.config.yml'), '# manually edited');
+    writeFileSync(join(testDir, 'opensip-cli.config.yml'), '# manually edited');
     // A user-authored file that --keep must preserve.
-    const customPath = join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs');
+    const customPath = join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs');
     writeFileSync(customPath, '// custom logic');
     // A scaffolded file the user has tweaked — counts as 'custom' under
     // hash-based detection because the bytes drifted, so --keep
     // preserves it. (The audit calls this out as the safer outcome.)
-    const tweakedPath = join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs');
+    const tweakedPath = join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs');
     writeFileSync(tweakedPath, '// I edited this');
 
     const result = executeInit(makeArgs({ keep: true }));
@@ -326,7 +326,7 @@ describe('executeInit (fully-initialized state)', () => {
     expect(result.state).toBe('fully-initialized');
 
     // Config rewritten (it's a function of language, not of user content).
-    const config = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
+    const config = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(config).not.toContain('manually edited');
     // Custom file preserved.
     expect(readFileSync(customPath, 'utf8')).toBe('// custom logic');
@@ -338,8 +338,8 @@ describe('executeInit (fully-initialized state)', () => {
 describe('executeInit (partial-config-only state)', () => {
   beforeEach(() => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
-    // Create only the config (no opensip-tools/ dir).
-    writeFileSync(join(testDir, 'opensip-tools.config.yml'), '# stub');
+    // Create only the config (no opensip-cli/ dir).
+    writeFileSync(join(testDir, 'opensip-cli.config.yml'), '# stub');
   });
 
   it('refuses by default with a partial-state error', () => {
@@ -354,7 +354,7 @@ describe('executeInit (partial-config-only state)', () => {
   it('--keep scaffolds the missing dir', () => {
     const result = executeInit(makeArgs({ keep: true }));
     expect(result.created).toBe(true);
-    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'))).toBe(
+    expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'))).toBe(
       true,
     );
   });
@@ -362,7 +362,7 @@ describe('executeInit (partial-config-only state)', () => {
   it('--remove scaffolds (no dir to remove)', () => {
     const result = executeInit(makeArgs({ remove: true }));
     expect(result.created).toBe(true);
-    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'))).toBe(
+    expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'))).toBe(
       true,
     );
   });
@@ -372,9 +372,9 @@ describe('executeInit (partial-dir-only state)', () => {
   beforeEach(() => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
     // Create only the dir + a custom file (no config).
-    mkdirSync(join(testDir, 'opensip-tools', 'fit', 'checks'), { recursive: true });
+    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), { recursive: true });
     writeFileSync(
-      join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs'),
+      join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'),
       '// custom',
     );
   });
@@ -393,21 +393,21 @@ describe('executeInit (partial-dir-only state)', () => {
   it('--keep preserves the custom file and writes the YAML', () => {
     const result = executeInit(makeArgs({ keep: true }));
     expect(result.created).toBe(true);
-    expect(existsSync(join(testDir, 'opensip-tools.config.yml'))).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(true);
     expect(
-      readFileSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs'), 'utf8'),
+      readFileSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'), 'utf8'),
     ).toBe('// custom');
   });
 
   it('--remove blows away the dir and writes the YAML', () => {
     const result = executeInit(makeArgs({ remove: true }));
     expect(result.created).toBe(true);
-    expect(existsSync(join(testDir, 'opensip-tools.config.yml'))).toBe(true);
-    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs'))).toBe(
+    expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'))).toBe(
       false,
     );
     // The fresh scaffolded example IS there.
-    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'))).toBe(
+    expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'))).toBe(
       true,
     );
   });
@@ -418,7 +418,7 @@ describe('executeInit (polyglot drift)', () => {
     // Initial polyglot scaffold.
     executeInit(makeArgs({ language: 'typescript,rust' }));
     expect(
-      existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check-rust.mjs')),
+      existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check-rust.mjs')),
     ).toBe(true);
 
     // Re-init with only typescript + --keep. The rust example should be
@@ -433,7 +433,7 @@ describe('executeInit (polyglot drift)', () => {
 
     // Still on disk.
     expect(
-      existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check-rust.mjs')),
+      existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check-rust.mjs')),
     ).toBe(true);
   });
 });
@@ -463,7 +463,7 @@ describe('executeInit (.gitignore)', () => {
     expect(existsSync(join(testDir, '.gitignore'))).toBe(false);
     const result = executeInit(makeArgs());
     expect(result.gitignoreUpdated).toBe(true);
-    expect(readFileSync(join(testDir, '.gitignore'), 'utf8')).toContain('opensip-tools/.runtime/');
+    expect(readFileSync(join(testDir, '.gitignore'), 'utf8')).toContain('opensip-cli/.runtime/');
   });
 
   it('appends to an existing .gitignore', () => {
@@ -473,7 +473,7 @@ describe('executeInit (.gitignore)', () => {
     const content = readFileSync(join(testDir, '.gitignore'), 'utf8');
     expect(content).toContain('node_modules/');
     expect(content).toContain('target/');
-    expect(content).toContain('opensip-tools/.runtime/');
+    expect(content).toContain('opensip-cli/.runtime/');
   });
 
   it('does NOT duplicate the line on re-init with --remove', () => {
@@ -499,8 +499,8 @@ describe('SupportedLanguage', () => {
       const result = executeInit(makeArgs({ language: lang }));
       expect(result.languages).toEqual([lang]);
       // Cleanup so each language gets a fresh testDir state
-      rmSync(join(testDir, 'opensip-tools.config.yml'), { force: true });
-      rmSync(join(testDir, 'opensip-tools'), { recursive: true, force: true });
+      rmSync(join(testDir, 'opensip-cli.config.yml'), { force: true });
+      rmSync(join(testDir, 'opensip-cli'), { recursive: true, force: true });
       rmSync(join(testDir, '.gitignore'), { force: true });
     }
   });

@@ -12,8 +12,8 @@
  * Ink `App` shell adds only the banner/project chrome around the body this
  * produces; there is no separate per-type rendering anymore.
  *
- * cli may depend on both `@opensip-tools/contracts` (for `CommandResult`)
- * and `@opensip-tools/cli-ui` (for the view-model). The keystone boundary
+ * cli may depend on both `@opensip-cli/contracts` (for `CommandResult`)
+ * and `@opensip-cli/cli-ui` (for the view-model). The keystone boundary
  * only forbids the reverse — cli-ui must never import contracts.
  */
 
@@ -31,12 +31,12 @@ import {
   type Span,
   type Tone,
   type ViewNode,
-} from '@opensip-tools/cli-ui';
+} from '@opensip-cli/cli-ui';
 import {
   formatSignalTableRows,
   formatSignalTableSummary,
   type SignalTableRow,
-} from '@opensip-tools/output';
+} from '@opensip-cli/output';
 
 import { viewInit } from './views/init-view.js';
 import {
@@ -66,7 +66,7 @@ import type {
   SessionReplayResult,
   SignalEnvelope,
   VerboseDetail,
-} from '@opensip-tools/contracts';
+} from '@opensip-cli/contracts';
 
 const SPACER: ViewNode = { kind: 'spacer' };
 
@@ -113,7 +113,7 @@ function graphDoneView(result: GraphDoneResult): ViewNode {
     children.push(
       viewFooterHints([
         VERBOSE_DETAIL_HINT,
-        { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
+        { text: 'opensip dashboard for HTML report', bold: ['opensip dashboard'] },
       ]),
     );
   }
@@ -189,7 +189,7 @@ function unknownResultView(result: unknown): ViewNode {
 // The single, tool-agnostic table derivation: every migrated tool's result
 // carries a `SignalEnvelope`, and the terminal table is derived FROM its
 // `units` + `signals` via the shared `formatSignalTableRows` / `Summary`
-// formatters (`@opensip-tools/output`). One row per unit (check / rule /
+// formatters (`@opensip-cli/output`). One row per unit (check / rule /
 // scenario). Replaces the three per-tool, pre-computed `rows`/`reportLines`
 // shapes (the fit/sim/graph `*DoneResult` legacy branches, retired in Phase 7).
 
@@ -314,7 +314,7 @@ function withVerboseHint(node: ViewNode, show: boolean): ViewNode {
     node,
     viewFooterHints([
       VERBOSE_DETAIL_HINT,
-      { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
+      { text: 'opensip dashboard for HTML report', bold: ['opensip dashboard'] },
     ]),
   ]);
 }

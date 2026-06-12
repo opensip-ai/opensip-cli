@@ -1,11 +1,11 @@
 import { stripComments, stripStrings } from './strip.js';
 
-import type { LanguageAdapter } from '@opensip-tools/core';
+import type { LanguageAdapter } from '@opensip-cli/core';
 
 /**
  * C/C++ adapter. parse() returns null intentionally — for C/C++ we
  * rely on external tools (clang-tidy) for AST analysis. Checks targeting
- * C/C++ files use the CommandConfig pattern in @opensip-tools/checks-cpp.
+ * C/C++ files use the CommandConfig pattern in @opensip-cli/checks-cpp.
  *
  * stripStrings/stripComments are still useful for regex-based checks
  * that want to ignore string/comment content.

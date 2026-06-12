@@ -32,11 +32,11 @@
  *     edges during in-program resolution — they are a different layer (the TS
  *     adapter already keys by `ownerEdgeKey`; the merge is what this freezes).
  *
- * SELF-TARGETING — inspects opensip-tools' own graph merge sources only. The
+ * SELF-TARGETING — inspects opensip-cli' own graph merge sources only. The
  * path guard makes the check inert in adopter repos and exempts the one allowed
  * home (`edge-identity.ts`).
  */
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 /** The graph cross-shard MERGE layer (where the F1 drift lived). */
 const MERGE_LAYER_SEGMENT = 'packages/graph/engine/src/cli/orchestrate/';

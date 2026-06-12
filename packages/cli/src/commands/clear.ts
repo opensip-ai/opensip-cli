@@ -14,10 +14,10 @@
 
 import { createInterface } from 'node:readline';
 
-import { SessionRepo } from '@opensip-tools/session-store';
+import { SessionRepo } from '@opensip-cli/session-store';
 
-import type { ClearDoneResult } from '@opensip-tools/contracts';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { ClearDoneResult } from '@opensip-cli/contracts';
+import type { DataStore } from '@opensip-cli/datastore';
 
 export interface ClearOptions {
   olderThan?: number;

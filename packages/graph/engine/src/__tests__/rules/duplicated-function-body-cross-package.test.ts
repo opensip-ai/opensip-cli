@@ -14,7 +14,7 @@ import { duplicatedFunctionBodyRule } from '../../rules/duplicated-function-body
 
 import { makeCatalog, occ } from './_helpers.js';
 
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 /** Aggregate signals carry a `packages` array; per-instance ones carry `primary`. */
 function aggregates(signals: readonly Signal[]): readonly Signal[] {

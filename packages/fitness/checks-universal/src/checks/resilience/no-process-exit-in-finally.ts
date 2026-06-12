@@ -4,7 +4,7 @@
  * @fileoverview Detects process.exit() usage that bypasses finally blocks
  */
 
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
 
 /**
  * Pattern for detecting process.exit() calls

@@ -16,7 +16,7 @@ const originalEnv = { ...process.env };
 const originalIsTTY = process.stdout.isTTY;
 
 // Per-test isolated sticky-state file so checkForUpdate never touches the
-// developer's real ~/.opensip-tools/update-state.json or leaks across tests.
+// developer's real ~/.opensip-cli/update-state.json or leaks across tests.
 let tmpDir: string;
 let stateFile: string;
 
@@ -53,7 +53,7 @@ describe('maybeNotify', () => {
 
   it('returns a notifier (not null) when stdout is a TTY and not opted-out', () => {
     Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
-    const out = maybeNotify({ name: 'opensip-tools-test', version: '0.0.1' });
+    const out = maybeNotify({ name: 'opensip-cli-test', version: '0.0.1' });
     // We don't assert the shape — we only care that the early-skip
     // gates aren't blocking us.
     expect(out).not.toBeNull();
@@ -64,7 +64,7 @@ describe('maybeNotify', () => {
     Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
     const writes: string[] = [];
     const out = maybeNotify({
-      name: 'opensip-tools',
+      name: 'opensip-cli',
       version: '0.0.1',
       write: (s) => writes.push(s),
     });
@@ -113,12 +113,12 @@ describe('isNewerVersion', () => {
 describe('checkForUpdate', () => {
   it('returns undefined when opted out via OPENSIP_NO_UPDATE', () => {
     process.env.OPENSIP_NO_UPDATE = '1';
-    expect(checkForUpdate({ name: 'opensip-tools', version: '0.0.1', stateFile })).toBeUndefined();
+    expect(checkForUpdate({ name: 'opensip-cli', version: '0.0.1', stateFile })).toBeUndefined();
   });
 
   it('returns undefined when stdout is not a TTY', () => {
     Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
-    expect(checkForUpdate({ name: 'opensip-tools', version: '0.0.1', stateFile })).toBeUndefined();
+    expect(checkForUpdate({ name: 'opensip-cli', version: '0.0.1', stateFile })).toBeUndefined();
   });
 
   it('does not throw on a TTY and returns a string or undefined', () => {
@@ -126,7 +126,7 @@ describe('checkForUpdate', () => {
     // The cached npm result is environment-dependent, so we only assert the
     // contract: best-effort, never throws, narrows to string | undefined.
     const result = checkForUpdate({
-      name: 'opensip-tools-test-nonexistent',
+      name: 'opensip-cli-test-nonexistent',
       version: '0.0.1',
       stateFile,
     });
@@ -135,9 +135,9 @@ describe('checkForUpdate', () => {
 });
 
 describe('formatUpdateNag', () => {
-  it('renders the current → latest line with the install command and silence hint', () => {
+  it('renders the current -> latest line with the install command and silence hint', () => {
     const nag = formatUpdateNag('2.2.1', '2.3.0');
-    expect(nag).toContain('opensip-tools 2.2.1 → 2.3.0 available');
+    expect(nag).toContain('OpenSIP CLI 2.2.1 -> 2.3.0 available');
     expect(nag).toContain('curl -fsSL https://opensip.ai/cli/install.sh | bash');
     expect(nag).toContain('OPENSIP_NO_UPDATE=1');
   });

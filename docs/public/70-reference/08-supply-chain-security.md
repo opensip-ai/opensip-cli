@@ -4,7 +4,7 @@ last_verified: 2026-06-07
 release: v3.0.0
 title: "Supply-chain security"
 audience: [getting-started, ci-integrators, plugin-authors, contributors]
-purpose: "How opensip-tools reduces npm-family install risk for customers and how teams can use the package-supply-chain-policy check."
+purpose: "How opensip-cli reduces npm-family install risk for customers and how teams can use the package-supply-chain-policy check."
 source-files:
   - pnpm-workspace.yaml
   - scripts/verify-supply-chain.mjs
@@ -18,7 +18,7 @@ related-docs:
 ---
 # Supply-chain security
 
-opensip-tools is distributed through npm, so customer safety depends on two
+OpenSIP CLI is distributed through npm, so customer safety depends on two
 layers:
 
 1. **The artifacts we publish.** OpenSIP releases must not contain package-level
@@ -86,7 +86,7 @@ For highly sensitive environments, prefer a pinned version and install through
 an internal mirror or vetted cache:
 
 ```bash
-curl -fsSL https://opensip.ai/cli/install.sh | OPENSIP_TOOLS_VERSION=3.0.0 bash
+curl -fsSL https://opensip.ai/cli/install.sh | OPENSIP_CLI_VERSION=3.0.0 bash
 ```
 
 Customers who globally disable npm lifecycle scripts should test the CLI in
@@ -104,7 +104,7 @@ for npm/pnpm/Bun projects.
 Run it directly:
 
 ```bash
-opensip-tools fit --check package-supply-chain-policy
+opensip fit --check package-supply-chain-policy
 ```
 
 It reports:

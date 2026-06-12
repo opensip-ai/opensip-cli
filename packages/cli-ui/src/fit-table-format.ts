@@ -5,7 +5,7 @@
  * fitness live Ink view (`fit-runner-views.tsx`), which previously each kept a
  * byte-identical copy (flagged by graph:duplicated-function-body). Pure
  * functions with structural parameter types so cli-ui stays free of any
- * @opensip-tools dependency — contracts' `TableRow` structurally satisfies
+ * @opensip-cli dependency — contracts' `TableRow` structurally satisfies
  * `FitRowSortKey`, so callers pass a `TableRow` directly.
  */
 

@@ -10,13 +10,13 @@
  * over the `CommandResult` union, so both media consume the same view-model.
  *
  * Every Ink/cli-ui import here is dynamic so this module loads no
- * React/Ink at startup — the hot `opensip-tools fit --json` path (which
+ * React/Ink at startup — the hot `opensip fit --json` path (which
  * uses `emitJson`, never this seam) stays React-free.
  */
 
-import { currentScope } from '@opensip-tools/core';
+import { currentScope } from '@opensip-cli/core';
 
-import type { CommandResult } from '@opensip-tools/contracts';
+import type { CommandResult } from '@opensip-cli/contracts';
 
 /**
  * Render a `CommandResult` to the terminal, choosing Ink (TTY) or plain
@@ -44,7 +44,7 @@ export async function renderResult(result: CommandResult): Promise<void> {
   if (!process.stdout.isTTY) {
     const [{ resultToView }, { renderToText, viewProjectHeader, group }] = await Promise.all([
       import('../ui/result-to-view.js'),
-      import('@opensip-tools/cli-ui'),
+      import('@opensip-cli/cli-ui'),
     ]);
     const body = resultToView(result);
     const node =

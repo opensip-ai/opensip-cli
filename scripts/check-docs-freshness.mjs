@@ -50,17 +50,17 @@ const RETIRED_TERMS = [
   {
     name: 'FitBaselineRepo',
     re: /\bFitBaselineRepo\b/,
-    hint: 'the generic BaselineRepo in @opensip-tools/datastore, ADR-0036',
+    hint: 'the generic BaselineRepo in @opensip-cli/datastore, ADR-0036',
   },
   {
     name: 'GraphBaselineRepo',
     re: /\bGraphBaselineRepo\b/,
-    hint: 'the generic BaselineRepo in @opensip-tools/datastore, ADR-0036',
+    hint: 'the generic BaselineRepo in @opensip-cli/datastore, ADR-0036',
   },
   {
     name: 'compareToBaseline',
     re: /\bcompareToBaseline\b/,
-    hint: 'cli.compareBaseline + the pure diffBaseline in @opensip-tools/output',
+    hint: 'cli.compareBaseline + the pure diffBaseline in @opensip-cli/output',
   },
   {
     name: 'extractViolationsFromEnvelope',

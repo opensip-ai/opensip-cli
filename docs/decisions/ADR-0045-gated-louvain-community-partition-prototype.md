@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-12
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0045: Run a gated Louvain import-community shard-partitioning prototype
@@ -79,7 +79,7 @@ Outcome section below, adopt or discard.
   determinism behavior. Pin exact; any future bump must re-run the determinism
   suite AND the B1 measurement.
 - *Scan imports with a regex inside the graph engine.* Rejected: the engine is
-  deliberately parser-free (`@opensip-tools/graph` has no `typescript`
+  deliberately parser-free (`@opensip-cli/graph` has no `typescript`
   dependency; "language-agnostic graph kernel; depends on no parser"), and a
   regex scanner is wrong on TS edge cases. Language knowledge belongs in the
   adapter — hence the `scanImports` seam (Consequences).

@@ -21,11 +21,11 @@
  *   - `.git/`         — VCS metadata
  *
  * The collect-loop / realpath-dedup / config-precedence scaffolding lives
- * in `@opensip-tools/graph-adapter-common`; this module supplies only the
+ * in `@opensip-cli/graph-adapter-common`; this module supplies only the
  * Java-specific inputs.
  */
 
-import { createDiscover } from '@opensip-tools/graph-adapter-common';
+import { createDiscover } from '@opensip-cli/graph-adapter-common';
 
 const EXCLUDED_DIR_GLOBS: readonly string[] = [
   '**/target/**',

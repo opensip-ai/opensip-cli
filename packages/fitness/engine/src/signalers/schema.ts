@@ -1,9 +1,9 @@
 /**
- * @fileoverview Zod validation schema for opensip-tools.config.yml
+ * @fileoverview Zod validation schema for opensip-cli.config.yml
  *
  * Defines the schema for signal producer configuration (fitness,
  * simulation) and file targeting. These settings live alongside the target
- * definitions in opensip-tools.config.yml.
+ * definitions in opensip-cli.config.yml.
  */
 
 import {
@@ -12,7 +12,7 @@ import {
   dashboardConfigSchema,
   globalExcludesSchema,
   targetsRecordSchema,
-} from '@opensip-tools/config';
+} from '@opensip-cli/config';
 import { z } from 'zod';
 
 import {
@@ -21,7 +21,7 @@ import {
 } from '../config/fitness-config-schema.js';
 
 // =============================================================================
-// Target Definition Schema — owned by @opensip-tools/config (2.10.1, ADR-0023)
+// Target Definition Schema — owned by @opensip-cli/config (2.10.1, ADR-0023)
 // =============================================================================
 
 // `targets` / `globalExcludes` / `checkOverrides` are the shared two-layer scope
@@ -56,11 +56,11 @@ const SimulationSchema = z.object({
 });
 
 // =============================================================================
-// CLI Defaults + Dashboard — now owned by @opensip-tools/config (2.10.1)
+// CLI Defaults + Dashboard — now owned by @opensip-cli/config (2.10.1)
 // =============================================================================
 
 // The `cli:` and `dashboard:` blocks are tool-agnostic document-level config;
-// their schemas moved to `@opensip-tools/config` in 2.10.1 (ADR-0023) and the
+// their schemas moved to `@opensip-cli/config` in 2.10.1 (ADR-0023) and the
 // host registers them as document-level declarations for the composed STRICT
 // validation. This loader imports the schemas rather than re-defining them, so
 // there is one definition of each.
@@ -81,7 +81,7 @@ function section<T extends z.ZodType>(schema: T) {
   return z.preprocess((v) => v ?? {}, schema);
 }
 
-/** Root schema for opensip-tools.config.yml validation */
+/** Root schema for opensip-cli.config.yml validation */
 export const SignalersConfigSchema = z.object({
   // Top-level config schema version. The CLI checks this in pre-action-hook
   // (via readConfigSchemaVersion + checkSchemaCompat in core) BEFORE this

@@ -47,7 +47,7 @@
  * - `cli/fit-modes.ts` owns the dispatch branches (gate/list/recipes/json/live).
  */
 
-import { readPackageVersion } from '@opensip-tools/core';
+import { readPackageVersion } from '@opensip-cli/core';
 
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
 import { collectFitnessDashboardData } from './cli/dashboard.js';
@@ -77,7 +77,7 @@ import './scope-augmentation.js';
 
 import type { Check } from './framework/check-types.js';
 import type { FitnessRecipe } from './recipes/types.js';
-import type { FitOptions } from '@opensip-tools/contracts';
+import type { FitOptions } from '@opensip-cli/contracts';
 import type {
   CapabilityRegistrar,
   CommandSpec,
@@ -85,8 +85,8 @@ import type {
   Tool,
   ToolCliContext,
   ToolCommandDescriptor,
-} from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+} from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 // =============================================================================
 // COMMAND DESCRIPTORS — used by --help listings and conflict detection.

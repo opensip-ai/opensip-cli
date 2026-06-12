@@ -9,7 +9,7 @@ import {
   isTestFile,
   stripStringsAndCommentsPreservingPositions,
   type CheckViolation,
-} from '@opensip-tools/fitness';
+} from '@opensip-cli/fitness';
 
 /**
  * Pattern indicating unbounded Promise.all usage.

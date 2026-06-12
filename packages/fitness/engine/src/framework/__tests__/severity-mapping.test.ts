@@ -1,4 +1,4 @@
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mapFindingSeverity, mapTagsToSignalCategory } from '../severity-mapping.js';

@@ -1,5 +1,5 @@
 /**
- * @opensip-tools/graph — Java language adapter.
+ * @opensip-cli/graph — Java language adapter.
  *
  * Sibling of graph-rust, graph-python, and graph-go. Backed by
  * tree-sitter-java.
@@ -27,7 +27,7 @@ import { javaRuleHints } from './rule-hints.js';
 import { walkProject as javaWalkProject } from './walk.js';
 
 import type { JavaParsedProject } from './parse.js';
-import type { GraphLanguageAdapter } from '@opensip-tools/graph';
+import type { GraphLanguageAdapter } from '@opensip-cli/graph';
 
 export const javaGraphAdapter = {
   id: 'java',

@@ -1,7 +1,7 @@
 // @fitness-ignore-file error-handling-quality -- this module IS the logger; its own write/prune failures cannot be reported via itself without infinite recursion. Best-effort swallow is the documented contract on lines 273/281/297/302.
 // @fitness-ignore-file interface-implementation-consistency -- LoggerImpl deliberately exposes configuration methods (applyOptions/setSilent/setDebugMode/setRunId/getRunId/setRunIdProvider/initLogFile) that are not on the public `Logger` interface. The interface is the narrow log-emission seam used by call sites; the impl's wider surface is the bootstrap/test configuration surface (see JSDoc on LoggerImpl).
 /**
- * Structured logger for opensip-tools.
+ * Structured logger for opensip-cli.
  *
  * Outputs JSON log lines with:
  * - ts: ISO timestamp
@@ -12,10 +12,10 @@
  * - ...data: additional structured fields
  *
  * Destinations:
- * - File: <project>/opensip-tools/.runtime/logs/{YYYY-MM-DD}.jsonl
+ * - File: <project>/opensip-cli/.runtime/logs/{YYYY-MM-DD}.jsonl
  *   The CLI bootstrap supplies this path via configureLogger({ logDir }).
  *   Without that, file output is disabled — user-global state
- *   (`~/.opensip-tools/`) is reserved for config.yml only.
+ *   (`~/.opensip-cli/`) is reserved for config.yml only.
  * - stderr: when debug mode is enabled (Ink renders to stdout, logs to stderr)
  *
  * The `silent: true` option only suppresses stderr output, NOT file output.

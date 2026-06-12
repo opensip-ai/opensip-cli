@@ -96,19 +96,19 @@ The rule is future-proof by shape: any target under `packages/` is forbidden unl
   from: { path: '^packages/datastore/src/' },
   to: {
     path: [
-      '^@opensip-tools/contracts',
-      '^opensip-tools($|/)',
-      '^@opensip-tools/fitness',
-      '^@opensip-tools/simulation',
-      '^@opensip-tools/lang-',
-      '^@opensip-tools/checks-',
-      '^@opensip-tools/graph',
+      '^@opensip-cli/contracts',
+      '^opensip-cli($|/)',
+      '^@opensip-cli/fitness',
+      '^@opensip-cli/simulation',
+      '^@opensip-cli/lang-',
+      '^@opensip-cli/checks-',
+      '^@opensip-cli/graph',
     ],
   },
 }
 ```
 
-`@opensip-tools/datastore` is paradigm-agnostic infrastructure (SQLite + Drizzle wrapper, factory, migration runner). It depends on `core` only — not on any tool, lang pack, check pack, or contracts package.
+`@opensip-cli/datastore` is paradigm-agnostic infrastructure (SQLite + Drizzle wrapper, factory, migration runner). It depends on `core` only — not on any tool, lang pack, check pack, or contracts package.
 
 The reasoning mirrors `contracts`: schemas live with their owning packages (sessions in contracts; baseline/catalog in graph; baseline in fitness). Datastore knows nothing about domain shapes — bundling them would invert the ownership and force schema changes to ripple through datastore.
 
@@ -121,11 +121,11 @@ For the deeper rationale (why a separate package, why not core, why not contract
   from: { path: '^packages/contracts/src/' },
   to: {
     path: [
-      '^opensip-tools($|/)',
-      '^@opensip-tools/fitness',
-      '^@opensip-tools/simulation',
-      '^@opensip-tools/lang-',
-      '^@opensip-tools/checks-',
+      '^opensip-cli($|/)',
+      '^@opensip-cli/fitness',
+      '^@opensip-cli/simulation',
+      '^@opensip-cli/lang-',
+      '^@opensip-cli/checks-',
     ],
   },
 }
@@ -138,8 +138,8 @@ The reasoning: contracts exists to define the contract surface (`SignalEnvelope`
 ### `fitness-no-cli` and `simulation-no-cli`
 
 ```js
-{ name: 'fitness-no-cli',     from: { path: '^packages/fitness/' },    to: { path: '^opensip-tools($|/)' } }
-{ name: 'simulation-no-cli',  from: { path: '^packages/simulation/' }, to: { path: '^opensip-tools($|/)' } }
+{ name: 'fitness-no-cli',     from: { path: '^packages/fitness/' },    to: { path: '^opensip-cli($|/)' } }
+{ name: 'simulation-no-cli',  from: { path: '^packages/simulation/' }, to: { path: '^opensip-cli($|/)' } }
 ```
 
 Tools cannot import the CLI. This would create a cycle (cli depends on every tool). Tools call back into shared CLI infrastructure via `ToolCliContext` (the inversion-of-control seam from the Tool contract).
@@ -150,14 +150,14 @@ Tools cannot import the CLI. This would create a cycle (cli depends on every too
 {
   from: { path: '^packages/fitness/checks-' },
   to: {
-    path: ['^opensip-tools($|/)', '^@opensip-tools/contracts'],
+    path: ['^opensip-cli($|/)', '^@opensip-cli/contracts'],
   },
 }
 ```
 
 Check packs are self-contained units of fitness-domain logic. They depend on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors). They don't depend on the CLI or contracts — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
 
-A consumer using `@opensip-tools/checks-typescript` from inside their own custom Tool gets the checks without the CLI's transitive deps.
+A consumer using `@opensip-cli/checks-typescript` from inside their own custom Tool gets the checks without the CLI's transitive deps.
 
 ### `lang-no-cli-or-contracts`
 
@@ -165,7 +165,7 @@ A consumer using `@opensip-tools/checks-typescript` from inside their own custom
 {
   from: { path: '^packages/languages/lang-' },
   to: {
-    path: ['^opensip-tools($|/)', '^@opensip-tools/contracts', '^@opensip-tools/checks-'],
+    path: ['^opensip-cli($|/)', '^@opensip-cli/contracts', '^@opensip-cli/checks-'],
   },
 }
 ```
@@ -184,15 +184,15 @@ The lang layer is below check packs in the implicit ordering, even though both s
 }
 ```
 
-A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typescript → fitness` exception (`@opensip-tools/lang-typescript` re-exporting `filterContent`, `clearFilterCache`, `FilteredContent`) was paid down by moving those symbols into the adapter package itself — they now live in [`packages/languages/lang-typescript/src/filter.ts`](../../../packages/languages/lang-typescript/src/filter.ts) alongside the rest of the TS-aware string/comment stripping. With that, the rule simplified from the named carve-out (`lang-no-fitness-except-typescript`) to the unconditional form above.
+A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typescript → fitness` exception (`@opensip-cli/lang-typescript` re-exporting `filterContent`, `clearFilterCache`, `FilteredContent`) was paid down by moving those symbols into the adapter package itself — they now live in [`packages/languages/lang-typescript/src/filter.ts`](../../../packages/languages/lang-typescript/src/filter.ts) alongside the rest of the TS-aware string/comment stripping. With that, the rule simplified from the named carve-out (`lang-no-fitness-except-typescript`) to the unconditional form above.
 
 ### Output-boundary rules (ADR-0011)
 
 [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md) makes the `SignalEnvelope` the single output currency: a tool engine *returns* an envelope and **never renders or delivers its own output**. The CLI composition root maps flags → (formatter × sink). Four guards keep that honest — three dependency-cruiser rules plus one fitness check, because the contract has both an *import* shape and a *call* shape:
 
-- **`tool-engines-no-output-formatters`** — a tool engine (`packages/{fitness,graph,simulation}/engine/src/`) must not import an `@opensip-tools/output` formatter (`output/src/format/`). Rendering belongs to the composition root.
-- **`tool-engines-no-output-sinks`** — a tool engine must not import an `@opensip-tools/output` sink (`output/src/sink/`). Cloud/file egress is resolved only at the root.
-- **`tool-engines-no-output-barrel`** — a tool engine must not import the `@opensip-tools/output` barrel at all. The barrel (`output/src/index.ts`) re-exports both formatters and sinks, so the two granular rules above can't see a barrel import; this third rule closes that vector. After the migration a tool engine has zero production `@opensip-tools/output` imports.
+- **`tool-engines-no-output-formatters`** — a tool engine (`packages/{fitness,graph,simulation}/engine/src/`) must not import an `@opensip-cli/output` formatter (`output/src/format/`). Rendering belongs to the composition root.
+- **`tool-engines-no-output-sinks`** — a tool engine must not import an `@opensip-cli/output` sink (`output/src/sink/`). Cloud/file egress is resolved only at the root.
+- **`tool-engines-no-output-barrel`** — a tool engine must not import the `@opensip-cli/output` barrel at all. The barrel (`output/src/index.ts`) re-exports both formatters and sinks, so the two granular rules above can't see a barrel import; this third rule closes that vector. After the migration a tool engine has zero production `@opensip-cli/output` imports.
 
   All three are production-source-only — test files are globally excluded, so graph's relocated golden SARIF test may import `formatSignalSarif` from the barrel.
 
@@ -214,11 +214,11 @@ A cluster of rules in `.config/dependency-cruiser.cjs` keep the graph tool's sta
 
 - **`graph-no-cli`** — graph engine doesn't import the CLI.
 - **`graph-no-check-packs`** — graph engine never reaches into fitness check packs.
-- **`graph-engine-no-adapter-packs`** — the engine package must not depend on any `@opensip-tools/graph-*` adapter pack. Adapters are downstream consumers discovered through the registry walker, not import edges. The inverse (engine → adapter) would create a cycle and defeat the package split. (Engine `__tests__/` are exempt — tests may pull adapter packs as devDeps.)
+- **`graph-engine-no-adapter-packs`** — the engine package must not depend on any `@opensip-cli/graph-*` adapter pack. Adapters are downstream consumers discovered through the registry walker, not import edges. The inverse (engine → adapter) would create a cycle and defeat the package split. (Engine `__tests__/` are exempt — tests may pull adapter packs as devDeps.)
 - **`graph-adapters-disjoint`** — adapter packs must not import each other from production source. Each pack implements the contract for one language; cross-pack imports would couple parser ecosystems together. The rule is pattern-based (`graph-[a-z0-9-]+`) so every adapter pack — including future ones — is covered by construction; it carves out the shared `graph-adapter-common` package (which every tree-sitter adapter is *meant* to consume) and self-imports. (Test sources may consume sibling adapter packs as devDeps for multi-adapter contract / registry / `pickAdapter` coverage.)
-- **`graph-common-no-adapters`** — the shared scaffolding package `@opensip-tools/graph-adapter-common` (which hosts the `web-tree-sitter` WASM `parseProject` template the four tree-sitter adapters reuse) must never reach *back down* into a specific language adapter. The layering is engine → common → adapters; a back-edge would invert it and re-couple the parser ecosystems the disjoint rule keeps apart. `graph-adapter-common` may depend only on the engine (`@opensip-tools/graph`), core, glob, and `web-tree-sitter`.
-- **`graph-adapters-no-cli`** — adapter packs must not depend on `opensip-tools`.
-- **`graph-adapters-no-fitness-or-checks`** — adapter packs must not depend on `@opensip-tools/fitness` or any `@opensip-tools/checks-*` package (peer-layer isolation).
+- **`graph-common-no-adapters`** — the shared scaffolding package `@opensip-cli/graph-adapter-common` (which hosts the `web-tree-sitter` WASM `parseProject` template the four tree-sitter adapters reuse) must never reach *back down* into a specific language adapter. The layering is engine → common → adapters; a back-edge would invert it and re-couple the parser ecosystems the disjoint rule keeps apart. `graph-adapter-common` may depend only on the engine (`@opensip-cli/graph`), core, glob, and `web-tree-sitter`.
+- **`graph-adapters-no-cli`** — adapter packs must not depend on `opensip-cli`.
+- **`graph-adapters-no-fitness-or-checks`** — adapter packs must not depend on `@opensip-cli/fitness` or any `@opensip-cli/checks-*` package (peer-layer isolation).
 
 **In-engine stage discipline** (unchanged from the pre-split layout, just with no `engine/src/lang-*` subtrees to police):
 
@@ -229,13 +229,13 @@ A cluster of rules in `.config/dependency-cruiser.cjs` keep the graph tool's sta
 
 **Cross-tool decoupling** (graph and fitness are now fully independent):
 
-- **`graph-no-fitness`** — graph production source must not import `@opensip-tools/fitness`. The former sole edge was the SARIF / cloud-report helper; per ADR-0011 SARIF is now the single shared `formatSignalSarif` formatter in `@opensip-tools/output`, applied at the composition root — graph returns a `SignalEnvelope` and imports neither fitness nor `@opensip-tools/output`. There is no longer any sanctioned exception. (Test files may use devDeps.)
-- **`fitness-no-graph`** — fitness production source must not import `@opensip-tools/graph`. The former dashboard-reads-graph edge is gone: the CLI is now the dashboard composition root and each tool contributes its own dashboard data via the `Tool.collectDashboardData` seam. (Test files may use devDeps.)
+- **`graph-no-fitness`** — graph production source must not import `@opensip-cli/fitness`. The former sole edge was the SARIF / cloud-report helper; per ADR-0011 SARIF is now the single shared `formatSignalSarif` formatter in `@opensip-cli/output`, applied at the composition root — graph returns a `SignalEnvelope` and imports neither fitness nor `@opensip-cli/output`. There is no longer any sanctioned exception. (Test files may use devDeps.)
+- **`fitness-no-graph`** — fitness production source must not import `@opensip-cli/graph`. The former dashboard-reads-graph edge is gone: the CLI is now the dashboard composition root and each tool contributes its own dashboard data via the `Tool.collectDashboardData` seam. (Test files may use devDeps.)
 
 **Dropped in v2.0.0** (recorded here so future spelunkers don't wonder where they went):
 
-- `graph-no-typescript-import-outside-lang-typescript` — the engine no longer declares `typescript` as a dependency (it ships only in `@opensip-tools/graph-typescript`). No engine source file can import the TS compiler API; the package edge enforces this by construction.
-- `graph-no-tree-sitter-import-outside-lang-packs` — same story for tree-sitter. The engine has no tree-sitter dep; `web-tree-sitter` ships only as a dep of `@opensip-tools/graph-adapter-common` (the shared WASM-grammar scaffolding) and, transitively, the `@opensip-tools/graph-(python|rust|go|java)` adapter packs that consume it.
+- `graph-no-typescript-import-outside-lang-typescript` — the engine no longer declares `typescript` as a dependency (it ships only in `@opensip-cli/graph-typescript`). No engine source file can import the TS compiler API; the package edge enforces this by construction.
+- `graph-no-tree-sitter-import-outside-lang-packs` — same story for tree-sitter. The engine has no tree-sitter dep; `web-tree-sitter` ships only as a dep of `@opensip-cli/graph-adapter-common` (the shared WASM-grammar scaffolding) and, transitively, the `@opensip-cli/graph-(python|rust|go|java)` adapter packs that consume it.
 - `graph-pipeline-no-lang-import` and `graph-orchestrate-no-direct-lang-import` — with all five adapter subtrees relocated into their own packages, the engine has no `engine/src/lang-*` directory to police. The package-edge rule `graph-engine-no-adapter-packs` takes over and is strictly stronger because pnpm + the lockfile enforce package edges by construction.
 
 These mirror the conceptual seven-stage pipeline ([`../40-graph/01-stages-and-catalog.md`](../40-graph/01-stages-and-catalog.md)) and the language-pluggability layering ([`../40-graph/03-adding-a-language.md`](../40-graph/03-adding-a-language.md)). Stages can't reach forward; visitors and resolvers share helpers, not each other; rules and renderers consume frozen data; language-specific code is quarantined to its own publishable adapter package.
@@ -244,7 +244,7 @@ These mirror the conceptual seven-stage pipeline ([`../40-graph/01-stages-and-ca
 
 Six rules guard the dashboard's HTML-generator package against the failure modes that broke earlier panel layouts:
 
-- **`dashboard-no-graph-import`** — dashboard panels don't pull `@opensip-tools/graph` (the dashboard receives a serialized `GraphCatalog`; the graph engine's runtime never ships to the browser).
+- **`dashboard-no-graph-import`** — dashboard panels don't pull `@opensip-cli/graph` (the dashboard receives a serialized `GraphCatalog`; the graph engine's runtime never ships to the browser).
 - **`dashboard-code-paths-self-contained`** — the Code Paths panel's helpers don't import other panels.
 - **`dashboard-views-disjoint`** — each Code Paths view stays in its own file; views can't import each other.
 - **`dashboard-algorithms-no-view-deps`** — Code Paths algorithms (Tarjan, BFS, etc.) don't import any view-specific code.
@@ -259,11 +259,11 @@ These rules exist because the dashboard ships as a single self-contained `index.
 
 Concrete examples of edges that fail the build:
 
-- **`packages/core/src/foo.ts` imports from `@opensip-tools/fitness`** — `core-imports-nothing-workspace` fails. Move the fitness-using code to a higher layer.
-- **`packages/fitness/engine/src/foo.ts` imports from `opensip-tools`** — `fitness-no-cli` fails. Use `ToolCliContext` instead.
-- **`packages/fitness/checks-typescript/src/foo.ts` imports from `opensip-tools`** — `check-pack-no-cli` fails. Check packs only depend on fitness + core.
-- **`packages/languages/lang-rust/src/foo.ts` imports from `@opensip-tools/fitness`** — `lang-no-fitness` fails. No lang pack may import fitness (the old typescript carve-out is gone).
-- **`packages/contracts/src/foo.ts` imports from `@opensip-tools/simulation`** — `contracts-imports-core-only` fails. contracts talks to core only.
+- **`packages/core/src/foo.ts` imports from `@opensip-cli/fitness`** — `core-imports-nothing-workspace` fails. Move the fitness-using code to a higher layer.
+- **`packages/fitness/engine/src/foo.ts` imports from `opensip-cli`** — `fitness-no-cli` fails. Use `ToolCliContext` instead.
+- **`packages/fitness/checks-typescript/src/foo.ts` imports from `opensip-cli`** — `check-pack-no-cli` fails. Check packs only depend on fitness + core.
+- **`packages/languages/lang-rust/src/foo.ts` imports from `@opensip-cli/fitness`** — `lang-no-fitness` fails. No lang pack may import fitness (the old typescript carve-out is gone).
+- **`packages/contracts/src/foo.ts` imports from `@opensip-cli/simulation`** — `contracts-imports-core-only` fails. contracts talks to core only.
 - **`packages/graph/engine/src/rules/foo.ts` imports `typescript` or anything under `pipeline/`** — `graph-rules-no-parser` fails. Rules consume frozen catalog/indexes only.
 - **`packages/graph/engine/src/render/foo.ts` imports from `pipeline/` or `rules/`** — `graph-renderers-no-pipeline` fails. Renderers consume `Signal[]`.
 - **`packages/graph/engine/src/pipeline/inventory-visitors/foo.ts` imports from `pipeline/edge-resolvers/`** — `graph-visitors-resolvers-disjoint` fails (and the symmetric counterpart). They share helpers, not each other.
@@ -275,7 +275,7 @@ All of these surface during `pnpm depcruise` — and, re-run over the type-inclu
 
 ## How to add a new exception
 
-There are **no standing layer exceptions**. `tsPreCompilationDeps: false` on the main pass is not one: it only defers type-only edges to the type-aware pass (`.config/dependency-cruiser.types.cjs`, `tsPreCompilationDeps: true`), which re-runs the full ruleset over the type-inclusive graph — so a type-only layer inversion or cycle is rejected just like a runtime one. The two earlier cross-package exceptions were both paid down — `lang-typescript → fitness` (by moving `filterContent` into the adapter) and `graph → fitness` via `render/sarif.ts` (by moving SARIF formatting and cloud delivery into `@opensip-tools/output` and applying them at the CLI composition root). New exceptions are rare and require justification.
+There are **no standing layer exceptions**. `tsPreCompilationDeps: false` on the main pass is not one: it only defers type-only edges to the type-aware pass (`.config/dependency-cruiser.types.cjs`, `tsPreCompilationDeps: true`), which re-runs the full ruleset over the type-inclusive graph — so a type-only layer inversion or cycle is rejected just like a runtime one. The two earlier cross-package exceptions were both paid down — `lang-typescript → fitness` (by moving `filterContent` into the adapter) and `graph → fitness` via `render/sarif.ts` (by moving SARIF formatting and cloud delivery into `@opensip-cli/output` and applying them at the CLI composition root). New exceptions are rare and require justification.
 
 Process:
 

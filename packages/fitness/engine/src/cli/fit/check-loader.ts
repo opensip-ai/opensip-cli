@@ -22,7 +22,7 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { currentScope, loadCapabilityDomain, logger } from '@opensip-tools/core';
+import { currentScope, loadCapabilityDomain, logger } from '@opensip-cli/core';
 
 import { currentCheckRegistry, currentFitnessLoadState } from '../../framework/scope-registry.js';
 import { readCheckPackagePreferences } from '../../plugins/check-package-discovery.js';
@@ -74,12 +74,12 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   load.loadWarnings = [];
 
   // 1. Load fit plugins — discovers .mjs files in
-  //    <projectDir>/opensip-tools/fit/{checks,recipes}/ and any
+  //    <projectDir>/opensip-cli/fit/{checks,recipes}/ and any
   //    npm packages declared in plugins.fit in the project config.
   //
   //    Bundled language adapters (TypeScript, Rust, Python, etc.)
   //    are registered separately by the CLI bootstrap; fitness
-  //    doesn't take direct deps on @opensip-tools/lang-* packages,
+  //    doesn't take direct deps on @opensip-cli/lang-* packages,
   //    and there's no project-local 'lang' plugin discovery path
   //    (the lang adapter set is fixed and shipped with the CLI).
   const pluginResult = await loadAllPlugins('fit', projectDir);
@@ -95,7 +95,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   }
 
   // 2. Discover + load fit-pack check packages through the GENERIC capability
-  //    substrate (§5.3): marker discovery, the `@opensip-tools` built-in split,
+  //    substrate (§5.3): marker discovery, the `@opensip-cli` built-in split,
   //    explicit `plugins.checkPackages` (augmented onto markers), and the
   //    single-core guard all live in core now — fitness no longer carries a
   //    bespoke loader. The fit-pack registrar registers each check; co-located
@@ -115,7 +115,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
     load.loadWarnings.push(
       'no check packages were loaded. ' +
         'Install at least one package declaring opensipTools.kind: "fit-pack", ' +
-        'or declare plugins.checkPackages in opensip-tools.config.yml.',
+        'or declare plugins.checkPackages in opensip-cli.config.yml.',
     );
     logger.warn({
       evt: 'cli.check_packages.empty',
@@ -133,7 +133,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
  * strings. A no-op when the run carries no capability registry (a programmatic
  * fitness use that never wired the host capability plane) or the fit-pack domain
  * is unregistered. Preferences come from fitness's own `plugins.checkPackages`
- * reader — no dependency on `@opensip-tools/config`.
+ * reader — no dependency on `@opensip-cli/config`.
  */
 async function loadFitCheckPackages(projectDir: string): Promise<readonly string[]> {
   const registry = currentScope()?.capabilities;
@@ -153,11 +153,11 @@ async function loadFitCheckPackages(projectDir: string): Promise<readonly string
 
 /**
  * Resolve the directory the CLI was installed into. Built-in check packs
- * (the @opensip-tools/* fit-packs declared as deps in cli/package.json) always
+ * (the @opensip-cli/* fit-packs declared as deps in cli/package.json) always
  * resolve from here, so a globally-installed CLI runs ITS OWN bundled checks at
- * its own version — a project pinning an older @opensip-tools/checks-* cannot
+ * its own version — a project pinning an older @opensip-cli/checks-* cannot
  * shadow them. Also the discovery fallback when no projectDir is supplied.
- * Walks up from this module's URL to the opensip-tools package root so
+ * Walks up from this module's URL to the opensip-cli package root so
  * node_modules lookup sees the CLI's own dependency tree.
  */
 function cliInstallDir(): string {

@@ -1,6 +1,6 @@
-import { RunScope, runWithScopeSync } from '@opensip-tools/core';
-import { initParseCache, clearParseCache } from '@opensip-tools/core/languages/parse-cache.js';
-import { walkNodes } from '@opensip-tools/tree-sitter';
+import { RunScope, runWithScopeSync } from '@opensip-cli/core';
+import { initParseCache, clearParseCache } from '@opensip-cli/core/languages/parse-cache.js';
+import { walkNodes } from '@opensip-cli/tree-sitter';
 import { describe, expect, it } from 'vitest';
 
 import { findEnclosingFunction, getEnclosingFunctionName } from '../enclosing.js';
@@ -16,7 +16,7 @@ import {
 } from '../predicates.js';
 import { getSharedTree } from '../shared-tree.js';
 
-import type { Node } from '@opensip-tools/tree-sitter';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 const SRC = [
   '// c',

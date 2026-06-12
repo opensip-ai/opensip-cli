@@ -18,7 +18,7 @@
  * structural decode for replay, while tool semantics remain in the engines.
  */
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 /** JSON-safe scalar — the metadata-value subset the persisted shape permits. */
 export type SessionPayloadScalar = string | number | boolean;

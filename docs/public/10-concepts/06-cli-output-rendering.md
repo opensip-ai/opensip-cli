@@ -23,7 +23,7 @@ both is to write the interactive version in Ink and hand-maintain a
 plain-text copy beside it — and then the two drift the moment someone edits
 one and forgets the other.
 
-opensip-tools avoids that by defining each command's output **once** and
+opensip-cli avoids that by defining each command's output **once** and
 rendering it **twice**.
 
 > **What you'll understand after this:**
@@ -37,7 +37,7 @@ Every command result is expressed as a renderer-agnostic **view-model** — a
 small, line-oriented tree of `ViewNode`s (`line`, `heading`, `table`,
 `hints`, `group`, …) whose inline spans carry a *semantic* `Tone`
 (`success`/`error`/`warning`/`brand`/…), never a raw color. This vocabulary
-lives in `@opensip-tools/cli-ui` (`view-model.ts`) and depends on nothing.
+lives in `@opensip-cli/cli-ui` (`view-model.ts`) and depends on nothing.
 
 Two interpreters consume that same tree:
 
@@ -54,7 +54,7 @@ asserts the content matches.
 
 ## The mapping and the seam
 
-`@opensip-tools/cli` owns the `CommandResult → ViewNode` mapping
+`@opensip-cli/cli` owns the `CommandResult → ViewNode` mapping
 (`resultToView`) — it is *total*, with one view per result variant. The
 single render seam (`renderResult` in `bootstrap/render.ts`) is the only
 place that chooses the medium:
@@ -73,8 +73,8 @@ root was analyzed).
 
 ### The cli-ui boundary (load-bearing)
 
-`@opensip-tools/cli-ui` must stay generic: it ships the view-model and the
-two interpreters but **never imports `@opensip-tools/contracts`**. The
+`@opensip-cli/cli-ui` must stay generic: it ships the view-model and the
+two interpreters but **never imports `@opensip-cli/contracts`**. The
 knowledge of *which* result maps to *which* nodes lives in `cli`, above
 contracts in the layer graph. dependency-cruiser enforces this — it keeps
 the UI kit reusable and prevents the result types from leaking into the

@@ -1,4 +1,4 @@
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 /**
  * `RuleHints` — adapter-supplied per-language rule input. Historically

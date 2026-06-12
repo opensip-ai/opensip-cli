@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/checks-universal",
+  "name": "@opensip-cli/checks-universal",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "Cross-language fitness checks for opensip-tools",
+  "description": "Cross-language fitness checks for opensip-cli",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "fitness-checks",
@@ -13,12 +13,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/fitness/checks-universal"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "opensipTools": {
@@ -39,11 +39,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/fitness": "workspace:*"
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/fitness": "workspace:*"
   },
   "devDependencies": {
-    "@opensip-tools/test-support": "workspace:*",
+    "@opensip-cli/test-support": "workspace:*",
     "@types/node": "^24.13.2",
     "vitest": "^4.1.8"
   }

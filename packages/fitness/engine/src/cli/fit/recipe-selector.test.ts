@@ -1,11 +1,11 @@
-import { enterScope, RunScope } from '@opensip-tools/core';
+import { enterScope, RunScope } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { fitnessTool } from '../../tool.js';
 
 import { selectRecipe } from './recipe-selector.js';
 
-import type { FitOptions } from '@opensip-tools/contracts';
+import type { FitOptions } from '@opensip-cli/contracts';
 
 /**
  * `selectRecipe` resolves the fit recipe with tool-scoped precedence (ADR-0022)

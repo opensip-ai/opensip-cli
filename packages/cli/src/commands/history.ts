@@ -6,11 +6,11 @@
  * receives the constructed repo from its caller.
  */
 
-import { SessionRepo } from '@opensip-tools/session-store';
+import { SessionRepo } from '@opensip-cli/session-store';
 
-import type { HistoryResult, HistorySession, StoredSession } from '@opensip-tools/contracts';
-import type { ToolShortId } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { HistoryResult, HistorySession, StoredSession } from '@opensip-cli/contracts';
+import type { ToolShortId } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 export interface ShowHistoryOptions {
   readonly tool?: ToolShortId;
@@ -31,7 +31,7 @@ function toHistorySession(session: StoredSession): HistorySession {
   return {
     ...session,
     ...(summary === undefined ? {} : { summary }),
-    showCommand: `opensip-tools sessions show ${session.id} --json`,
+    showCommand: `opensip sessions show ${session.id} --json`,
   };
 }
 

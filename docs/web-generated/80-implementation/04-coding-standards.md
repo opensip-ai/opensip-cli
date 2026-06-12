@@ -32,7 +32,7 @@ The workspace's quality gates are: TypeScript strict mode, ESLint with type-awar
 
 ## TypeScript
 
-The workspace root [`tsconfig.json`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/tsconfig.json) sets `target: ES2022`, `module: Node16`, `moduleResolution: Node16`, and `strict: true`. Each package has its own `tsconfig.json` that extends those settings.
+The workspace root [`tsconfig.json`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/tsconfig.json) sets `target: ES2022`, `module: Node16`, `moduleResolution: Node16`, and `strict: true`. Each package has its own `tsconfig.json` that extends those settings.
 
 Notable settings:
 
@@ -47,7 +47,7 @@ Notable settings:
 
 ## ESLint
 
-Flat config at [`.config/eslint.config.mjs`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/.config/eslint.config.mjs). The base layers:
+Flat config at [`.config/eslint.config.mjs`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/.config/eslint.config.mjs). The base layers:
 
 - `@eslint/js` recommended.
 - `typescript-eslint` `recommendedTypeChecked` + `stylisticTypeChecked`.
@@ -73,13 +73,13 @@ A file can opt out of a specific rule by writing a directive comment at the top:
 
 The convention is: **always include a justification after `--`**. A bare `eslint-disable-next-line` without a reason is a smell — future contributors won't know whether the suppression is still needed.
 
-The `@fitness-ignore-file` directives are opensip-tools' own (eaten by the fitness check framework, not ESLint). They're used to suppress fitness-check violations on the workspace's own source — yes, opensip-tools dogfoods itself.
+The `@fitness-ignore-file` directives are OpenSIP CLI's own (eaten by the fitness check framework, not ESLint). They're used to suppress fitness-check violations on the workspace's own source — yes, OpenSIP CLI dogfoods itself.
 
 ---
 
 ## Errors
 
-[`packages/core/src/lib/errors.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/lib/errors.ts) defines the workspace's error hierarchy:
+[`packages/core/src/lib/errors.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/core/src/lib/errors.ts) defines the workspace's error hierarchy:
 
 ```ts
 interface ToolErrorOptions extends ErrorOptions { code?: string; [key: string]: unknown }
@@ -110,7 +110,7 @@ Plus the `Result<T, E>` pattern with `ok(value)` / `err(error)` / `tryCatch(fn)`
 
 Each error subclass ships with a sensible default: `VALIDATION_ERROR`, `NOT_FOUND`, `SYSTEM_ERROR`, `TIMEOUT`, `NETWORK_ERROR`, `CONFIGURATION_ERROR`. Call sites that want a more specific code pass `{ code: '...' }` as the second argument, e.g. `new ValidationError('bad', { code: 'SCHEMA_FAIL' })`. Most production throws today use the defaults; the shape is in place for future scoped codes.
 
-Errors are mapped to user-facing suggestions by [`getErrorSuggestion`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/contracts/src/exit-codes.ts):
+Errors are mapped to user-facing suggestions by [`getErrorSuggestion`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/contracts/src/exit-codes.ts):
 
 ```ts
 export interface ErrorSuggestion {
@@ -131,7 +131,7 @@ The CLI calls `getErrorSuggestion(error)` and threads the returned `{ message, a
 
 ## Exit codes
 
-Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/contracts/src/exit-codes.ts):
+Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/contracts/src/exit-codes.ts):
 
 ```ts
 export const EXIT_CODES = {
@@ -145,13 +145,13 @@ export const EXIT_CODES = {
 
 Tools call `cli.setExitCode(code)` instead of mutating `process.exitCode` directly. The CLI mediates the final exit so it can run dashboard launching / cleanup after the Tool is done.
 
-Adding a new exit code is a major-version change — see [`10-concepts/04-contract-surfaces.md`](/docs/opensip-tools/10-concepts/04-contract-surfaces/).
+Adding a new exit code is a major-version change — see [`10-concepts/04-contract-surfaces.md`](/docs/opensip-cli/10-concepts/04-contract-surfaces/).
 
 ---
 
 ## Logging
 
-The structured logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/lib/logger.ts). Every log entry carries:
+The structured logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/core/src/lib/logger.ts). Every log entry carries:
 
 - `evt` — dot-separated event name (`cli.fit.run.start`, `plugin.loader.discover`, `gate.compare.complete`).
 - `module` — the module that emitted it (`cli:fit`, `core:plugins`, `cli:gate`).
@@ -209,15 +209,15 @@ import { join } from 'node:path';
 import { z } from 'zod';
 
 // 3. Internal workspace deps (alphabetical by package)
-import { logger, ToolError } from '@opensip-tools/core';
-import { EXIT_CODES } from '@opensip-tools/contracts';
+import { logger, ToolError } from '@opensip-cli/core';
+import { EXIT_CODES } from '@opensip-cli/contracts';
 
 // 4. Local relative imports
 import { sarifBuilder } from './sarif.js';
 import type { Check } from './types.js';
 ```
 
-Type-only imports use `import type` so they're erased at compile time. The main dep-cruiser pass ignores type-only imports (`tsPreCompilationDeps: false`) because they carry no runtime edge — but this does **not** mean you may `import type` from a higher layer. A second, type-aware pass (`.config/dependency-cruiser.types.cjs`, `tsPreCompilationDeps: true`) re-runs the full layer ruleset over the type-inclusive graph, so a type-only layer inversion or cycle is still rejected. Both passes run under `pnpm lint`. See [`05-layer-policy.md`](/docs/opensip-tools/80-implementation/05-layer-policy/#how-to-add-a-new-exception) and [`../10-concepts/03-modular-monolith.md`](/docs/opensip-tools/10-concepts/03-modular-monolith/#type-only-edges-are-caught-by-the-type-aware-pass).
+Type-only imports use `import type` so they're erased at compile time. The main dep-cruiser pass ignores type-only imports (`tsPreCompilationDeps: false`) because they carry no runtime edge — but this does **not** mean you may `import type` from a higher layer. A second, type-aware pass (`.config/dependency-cruiser.types.cjs`, `tsPreCompilationDeps: true`) re-runs the full layer ruleset over the type-inclusive graph, so a type-only layer inversion or cycle is still rejected. Both passes run under `pnpm lint`. See [`05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/#how-to-add-a-new-exception) and [`../10-concepts/03-modular-monolith.md`](/docs/opensip-cli/10-concepts/03-modular-monolith/#type-only-edges-are-caught-by-the-type-aware-pass).
 
 ---
 
@@ -258,6 +258,6 @@ Naming: `*.test.ts` for unit tests, `*.integration.test.ts` for cross-package in
 
 ## What's next
 
-- **[`05-layer-policy.md`](/docs/opensip-tools/80-implementation/05-layer-policy/)** — the dep-cruiser config, rule by rule, with rationale.
-- **[`06-doc-conventions.md`](/docs/opensip-tools/80-implementation/06-doc-conventions/)** — voice, frontmatter, and verification trails for documentation.
-- **[`../70-reference/02-package-catalog.md`](/docs/opensip-tools/70-reference/02-package-catalog/)** — the workspace package list these standards apply to.
+- **[`05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/)** — the dep-cruiser config, rule by rule, with rationale.
+- **[`06-doc-conventions.md`](/docs/opensip-cli/80-implementation/06-doc-conventions/)** — voice, frontmatter, and verification trails for documentation.
+- **[`../70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/)** — the workspace package list these standards apply to.

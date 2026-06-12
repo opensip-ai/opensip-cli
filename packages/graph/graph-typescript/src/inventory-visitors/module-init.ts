@@ -13,7 +13,7 @@ import { digestSyntheticBody } from '../inventory-helpers/hash-body.js';
 import { synthesizeModuleInitName } from '../inventory-helpers/synthesize-name.js';
 
 import type { VisitorContext } from './types.js';
-import type { FunctionOccurrence } from '@opensip-tools/graph';
+import type { FunctionOccurrence } from '@opensip-cli/graph';
 import type ts from 'typescript';
 
 export function synthesizeModuleInit(

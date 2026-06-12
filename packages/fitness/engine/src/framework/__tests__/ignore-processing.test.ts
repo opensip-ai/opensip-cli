@@ -12,14 +12,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { createSignal } from '@opensip-tools/core';
+import { createSignal } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { fileCache } from '../file-cache.js';
 import { buildFilteredResult, filterSignalsByDirectives } from '../ignore-processing.js';
 
 import type { CheckResult } from '../../types/findings.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 let testDir: string;
 

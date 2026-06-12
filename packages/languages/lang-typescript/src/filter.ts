@@ -8,8 +8,8 @@
  * preserving line/column positions for accurate violation reporting.
  */
 
-import { logger, currentScope } from '@opensip-tools/core';
-import { buildLineStarts } from '@opensip-tools/core/languages';
+import { logger, currentScope } from '@opensip-cli/core';
+import { buildLineStarts } from '@opensip-cli/core/languages';
 import ts from 'typescript';
 
 // =============================================================================
@@ -53,7 +53,7 @@ interface Region {
  * Build a set of 1-based line numbers from a list of regions.
  * A line is included if any part of it falls within a region.
  *
- * Reuses `buildLineStarts` from `@opensip-tools/core/languages` so UTF-16
+ * Reuses `buildLineStarts` from `@opensip-cli/core/languages` so UTF-16
  * surrogate-pair / BOM / CRLF handling stays in one place across language
  * adapters.
  */

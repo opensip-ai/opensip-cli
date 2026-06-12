@@ -15,7 +15,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 /** The extend-docs tree, relative to the scanned project root. */
 const EXTEND_DOCS_REL = path.join('docs', 'public', '50-extend');

@@ -1,6 +1,6 @@
 /**
  * The `fitness:` block fitness contributes to the scaffolded
- * `opensip-tools.config.yml` (ADR-0038, Tool.scaffoldConfigBlock).
+ * `opensip-cli.config.yml` (ADR-0038, Tool.scaffoldConfigBlock).
  *
  * Relocated verbatim from the CLI's `config-templates.ts` (the legacy
  * `fitnessBlock` literal). The CLI's `generateConfig` keeps rendering the

@@ -2,10 +2,10 @@
  * @fileoverview no-local-exit-or-stdout — exit codes flow through the one
  *               boundary, not local process.exit (§4.7). Project-local SELF-check.
  *
- * Relocated out of `@opensip-tools/checks-universal` (where it shipped 2.12.0–2.12.x):
+ * Relocated out of `@opensip-cli/checks-universal` (where it shipped 2.12.0–2.12.x):
  * the PRINCIPLE (drain before exit via `process.exitCode`) is sound, but this
- * check encodes opensip-tools' OWN §4.7 convergence — it forbids `process.exit()`
- * outright and points violators at opensip-tools' typed `BootstrapError`/`ToolError`
+ * check encodes opensip-cli' OWN §4.7 convergence — it forbids `process.exit()`
+ * outright and points violators at opensip-cli' typed `BootstrapError`/`ToolError`
  * and single-top-level-boundary model. A consumer with a different (equally valid)
  * termination architecture — e.g. a sanctioned process-exit wrapper package — does
  * not share that model, so the check is tool-internal, not universal. It lives
@@ -27,7 +27,7 @@
  * parent must terminate with the child's exact exit code (it runs no event loop
  * of its own to drain), so it is allow-listed by basename.
  */
-import { defineCheck } from '@opensip-tools/fitness';
+import { defineCheck } from '@opensip-cli/fitness';
 
 /** A real `process.exit(...)` call (post strip-strings-and-comments). */
 const PROCESS_EXIT_RE = /\bprocess\.exit\s*\(/;

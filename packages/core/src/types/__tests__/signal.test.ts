@@ -30,9 +30,9 @@ describe('createSignal', () => {
     expect(ids.size).toBe(50);
   });
 
-  it('defaults provider to opensip-tools', () => {
+  it('defaults provider to opensip-cli', () => {
     const signal = createSignal(minimalInput);
-    expect(signal.provider).toBe('opensip-tools');
+    expect(signal.provider).toBe('opensip-cli');
   });
 
   it('uses custom provider when supplied', () => {

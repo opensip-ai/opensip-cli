@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, type LanguageAdapter } from '@opensip-tools/core';
+import { LanguageRegistry, type LanguageAdapter } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { detectLanguages } from '../../cli/detect.js';

@@ -2,13 +2,13 @@
  * @fileoverview Service communication and infrastructure resilience checks
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 import {
   defineCheck,
   isTestFile,
   type CheckViolation,
   getLineNumber,
-} from '@opensip-tools/fitness';
+} from '@opensip-cli/fitness';
 
 // =============================================================================
 // PRE-COMPILED REGEX PATTERNS (Safe for static code analysis)

@@ -13,7 +13,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 /** Shape of the bits of Drizzle's `meta/_journal.json` we rely on. */
 interface DrizzleJournal {

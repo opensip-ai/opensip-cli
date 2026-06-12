@@ -1,14 +1,14 @@
 <!-- @fitness-ignore-file file-length-limit -- top-level project README; structural docs grow organically and serve as the project landing page -->
 
-# OpenSIP Tools
+# OpenSIP CLI
 
-[![npm](https://img.shields.io/npm/v/opensip-tools)](https://www.npmjs.com/package/opensip-tools)
+[![npm](https://img.shields.io/npm/v/opensip-cli)](https://www.npmjs.com/package/opensip-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](#license)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen)](https://nodejs.org)
-[![Docs](https://img.shields.io/badge/docs-opensip.ai-2563eb)](https://opensip.ai/docs/opensip-tools/)
+[![Docs](https://img.shields.io/badge/docs-opensip.ai-2563eb)](https://opensip.ai/docs/opensip-cli/)
 [![OpenSIP](https://img.shields.io/badge/part%20of-OpenSIP-7c3aed)](https://opensip.ai)
 
-> **opensip-tools is part of [OpenSIP](https://opensip.ai)** — our developer-productivity platform. Visit **[opensip.ai](https://opensip.ai)** for the full picture.
+> **OpenSIP CLI is part of [OpenSIP](https://opensip.ai)** — our developer-productivity platform. Visit **[opensip.ai](https://opensip.ai)** for the full picture.
 
 > **One CLI to measure, map, and gate the health of any codebase.**
 
@@ -16,7 +16,7 @@ Run ~165 fitness checks across **TypeScript, Python, Go, Java, Rust, and C/C++**
 build a static call graph of your whole repo, and wire both into CI so quality
 only goes up — from a single tool, on your laptop or in your pipeline.
 
-opensip-tools is a **collection of tools, not a single tool**. Today it ships
+OpenSIP CLI is a **collection of tools, not a single tool**. Today it ships
 with three — `fit` (fitness checks), `graph` (static call-graph analysis), and
 `sim` (simulation scenarios, experimental) — and adding a new one is a plugin
 operation: install a package that implements the
@@ -25,7 +25,7 @@ automatically, so the CLI grows without ever being rewritten.
 
 ### Why teams use it
 
-- **🌐 Polyglot quality in one command.** `opensip-tools fit` grades a
+- **🌐 Polyglot quality in one command.** `opensip fit` grades a
   mixed-language monorepo with one unified report — no per-language linter zoo to
   assemble and maintain.
 
@@ -33,12 +33,12 @@ automatically, so the CLI grows without ever being rewritten.
   Scanning** integration with a net-new ratchet: your existing backlog goes into
   a baseline, and only *brand-new* violations surface inline on PR diffs.
 
-- **🕸️ See your call graph and blast radius.** `opensip-tools graph` maps
+- **🕸️ See your call graph and blast radius.** `opensip graph` maps
   function-level dependencies across five languages and flags what bites you in
   review — oversized functions, untested high-blast-radius code, cycles, and
   cross-package copy-paste — with an interactive visual dashboard.
 
-- **📄 One shareable HTML report.** `opensip-tools dashboard` emits a
+- **📄 One shareable HTML report.** `opensip dashboard` emits a
   self-contained, server-free report aggregating every tool's findings. Attach it
   to a PR or hand it to a teammate — no SaaS login required.
 
@@ -46,7 +46,7 @@ automatically, so the CLI grows without ever being rewritten.
   architecture decision nobody checks is a decision that quietly erodes. Encode
   the rule behind each ADR as a custom check in a few lines with `defineCheck()`,
   bundle checks into named recipes, or ship a whole new tool as a plugin — your
-  extensions are first-class, not bolted on. opensip-tools dogfoods this: 20+ of
+  extensions are first-class, not bolted on. OpenSIP CLI dogfoods this: 20+ of
   its own bundled checks enforce its documented architecture decisions.
 
 **In ten seconds:** measure your code, map it, and gate it — in any language,
@@ -55,7 +55,7 @@ from one CLI.
 ## Upgrading from v1.x to v2.x
 
 v2.0.0 swaps internal runtime persistence from JSON files to SQLite. **v2 ignores
-v1's `<project>/opensip-tools/.runtime/` contents** and initializes a fresh
+v1's `<project>/opensip-cli/.runtime/` contents** and initializes a fresh
 `datastore.sqlite` on first run. Caches rebuild automatically; session history
 from v1 is **not preserved**. The `--baseline <path>` flag is removed — there is
 now exactly one gate baseline per project, stored in the project's SQLite database.
@@ -76,22 +76,22 @@ curl -fsSL https://opensip.ai/cli/install.sh | bash
 cd your-project
 
 # 3. Scaffold the project layout (detects language, writes config + examples)
-opensip-tools init
+opensip init
 
 # 4. Smoke-test the install — runs the example check, then the example scenario
-opensip-tools fit --recipe example
-opensip-tools sim --recipe example
+opensip fit --recipe example
+opensip sim --recipe example
 ```
 
 Both example commands should pass. From there, edit (or delete) the example
-files under `opensip-tools/{fit,sim}/`, write your own checks and scenarios,
-and run `opensip-tools fit` (no recipe flag) to use the default recipe.
+files under `opensip-cli/{fit,sim}/`, write your own checks and scenarios,
+and run `opensip fit` (no recipe flag) to use the default recipe.
 
 **Install from source?**
 
 ```bash
-git clone https://github.com/opensip-ai/opensip-tools.git
-cd opensip-tools && pnpm i && pnpm build
+git clone https://github.com/opensip-ai/opensip-cli.git
+cd opensip-cli && pnpm i && pnpm build
 node packages/cli/dist/index.js fit
 ```
 
@@ -99,45 +99,45 @@ node packages/cli/dist/index.js fit
 
 ## OpenSIP — the bigger picture
 
-opensip-tools is the open-source CLI. **OpenSIP**, our hosted developer-productivity platform, is where teams take this beyond one developer's terminal — visit **[opensip.ai](https://opensip.ai)** to see what's there.
+OpenSIP CLI is the open-source CLI. **OpenSIP**, our hosted developer-productivity platform, is where teams take this beyond one developer's terminal — visit **[opensip.ai](https://opensip.ai)** to see what's there.
 
 ### Sending CLI results to OpenSIP
 
-opensip-tools posts findings to any SARIF-compatible endpoint, including OpenSIP:
+OpenSIP CLI posts findings to any SARIF-compatible endpoint, including OpenSIP:
 
 ```bash
 # One-time setup (interactive prompt for your API key)
-opensip-tools configure
+opensip configure
 
 # Then send findings on every run
-opensip-tools fit --report-to https://your-opensip-instance/api/ingest
+opensip fit --report-to https://your-opensip-instance/api/ingest
 
 # Or pass the key per-invocation
-opensip-tools fit --report-to https://your-opensip-instance/api/ingest --api-key sk-...
+opensip fit --report-to https://your-opensip-instance/api/ingest --api-key sk-...
 ```
 
 Findings are posted in SARIF 2.1.0 format with automatic retry on network failures.
 
-API key resolution: `--api-key` flag > `cli.apiKey` in project config > `OPENSIP_API_KEY` env var > `~/.opensip-tools/config.yml`.
+API key resolution: `--api-key` flag > `cli.apiKey` in project config > `OPENSIP_API_KEY` env var > `~/.opensip-cli/config.yml`.
 
 ## What `init` writes
 
-`opensip-tools init` detects your project's primary language(s) from
+`opensip init` detects your project's primary language(s) from
 filesystem markers (`Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`,
 `build.gradle`, `CMakeLists.txt`, `tsconfig.json`, `package.json`) and
 scaffolds:
 
 ```
 your-project/
-├── opensip-tools.config.yml                ← project config
-├── opensip-tools/
+├── opensip-cli.config.yml                ← project config
+├── opensip-cli/
 │   ├── fit/
 │   │   ├── checks/example-check.mjs        ← demo check, scope matches your language
 │   │   └── recipes/example-recipe.mjs      ← runs the demo check
 │   └── sim/
 │       ├── scenarios/example-scenario.mjs  ← demo scenario
 │       └── recipes/example-recipe.mjs      ← runs the demo scenario
-└── .gitignore                              ← adds opensip-tools/.runtime/
+└── .gitignore                              ← adds opensip-cli/.runtime/
 ```
 
 Polyglot projects (e.g. Rust + TypeScript) get one example check per
@@ -145,70 +145,70 @@ language. To override detection or pick a polyglot configuration
 explicitly:
 
 ```bash
-opensip-tools init --language rust              # explicit single language
-opensip-tools init --language rust,typescript   # polyglot
-opensip-tools init --keep                       # re-init, preserve custom files
-opensip-tools init --remove                     # re-init, scrap opensip-tools/ first
+opensip init --language rust              # explicit single language
+opensip init --language rust,typescript   # polyglot
+opensip init --keep                       # re-init, preserve custom files
+opensip init --remove                     # re-init, scrap opensip-cli/ first
 ```
 
 Re-running `init` on an already-initialized (or partially-initialized)
 project refuses with exit 2 by default — pick `--keep` (re-scaffold
 examples, preserve any custom files) or `--remove` (delete
-`opensip-tools/` entirely, then scaffold fresh). The two flags are
+`opensip-cli/` entirely, then scaffold fresh). The two flags are
 mutually exclusive.
 
 After the smoke tests pass, edit (or delete) the example files and
 write your own. The plugin loader auto-discovers anything under
-`opensip-tools/{fit,sim}/`, so adding a new `.mjs` file is enough — no
+`opensip-cli/{fit,sim}/`, so adding a new `.mjs` file is enough — no
 config change required.
 
 ## First-run alternatives
 
 ```bash
-opensip-tools fit                 # runs the default recipe (all enabled checks)
-opensip-tools fit --verbose       # + detailed per-violation output
-opensip-tools fit --list          # browse the check catalog
+opensip fit                 # runs the default recipe (all enabled checks)
+opensip fit --verbose       # + detailed per-violation output
+opensip fit --list          # browse the check catalog
 ```
 
-If `opensip-tools fit` reports zero checks ran, you likely need a
-targets file — `opensip-tools init` writes one (see
+If `opensip fit` reports zero checks ran, you likely need a
+targets file — `opensip init` writes one (see
 [Configuration](#configuration)).
 
 ## Commands
 
 ### `fit` — fitness checks
 ```bash
-opensip-tools fit                   # run all checks (default recipe)
-opensip-tools fit --recipe <name>   # use a named recipe (e.g. quick-smoke, backend)
-opensip-tools fit --check <slug>    # run a single check
-opensip-tools fit --tags <tags>     # filter by tag (comma-separated)
-opensip-tools fit --verbose         # show per-violation detail
-opensip-tools fit --json            # structured JSON (for CI)
-opensip-tools fit --list            # list available checks
-opensip-tools fit --recipes         # list available recipes
-opensip-tools fit --gate-save       # save current findings as architecture baseline
-opensip-tools fit --gate-compare    # compare against baseline; exit 1 on regression
+opensip fit                   # run all checks (default recipe)
+opensip fit --recipe <name>   # use a named recipe (e.g. quick-smoke, backend)
+opensip fit --check <slug>    # run a single check
+opensip fit --tags <tags>     # filter by tag (comma-separated)
+opensip fit --verbose         # show per-violation detail
+opensip fit --json            # structured JSON (for CI)
+opensip fit --list            # list available checks
+opensip fit --recipes         # list available recipes
+opensip fit --gate-save       # save current findings as architecture baseline
+opensip fit --gate-compare    # compare against baseline; exit 1 on regression
 ```
 
 ### Project setup & dashboards
 ```bash
-opensip-tools init                  # detect language, scaffold opensip-tools/ layout
-opensip-tools init --language <l>   # override detection (comma-separated for polyglot)
-opensip-tools init --keep           # re-init, preserve custom files (mutex with --remove)
-opensip-tools init --remove         # re-init, blow away opensip-tools/ first
-opensip-tools configure             # set up OpenSIP Cloud API key (interactive)
-opensip-tools dashboard             # HTML report — opens in browser
-opensip-tools sessions list         # run history
-opensip-tools sessions show latest --tool fit   # replay a stored run
-opensip-tools sessions purge        # delete session data (prompts for confirm)
+opensip init                  # detect language, scaffold opensip-cli/ layout
+opensip init --language <l>   # override detection (comma-separated for polyglot)
+opensip init --keep           # re-init, preserve custom files (mutex with --remove)
+opensip init --remove         # re-init, blow away opensip-cli/ first
+opensip configure             # set up OpenSIP Cloud API key (interactive)
+opensip dashboard             # HTML report — opens in browser
+opensip sessions list         # run history
+opensip sessions show latest --tool fit   # replay a stored run
+opensip sessions purge        # delete session data (prompts for confirm)
 ```
 
 ### Plugins
 ```bash
-opensip-tools plugin list           # installed plugins
-opensip-tools plugin add <pkg>      # install + pin to opensip-tools.config.yml
-opensip-tools plugin remove <pkg>   # uninstall + unpin
-opensip-tools plugin sync           # reinstall pinned plugins after a fresh clone
+opensip plugin list           # installed plugins
+opensip plugin add <pkg>      # install + pin to opensip-cli.config.yml
+opensip plugin remove <pkg>   # uninstall + unpin
+opensip plugin sync           # reinstall pinned plugins after a fresh clone
 ```
 
 ### `sim` — resilience scenarios *(experimental · community-driven)*
@@ -226,33 +226,33 @@ scenarios against a real endpoint.
 That gap is exactly why it's here. The scenario contract, the chaos/load kinds,
 and the gate plumbing are real and stable; the live-execution layer is wide
 open. If resilience testing is your thing, this is a tool you can shape from the
-ground floor — **[issues and PRs welcome](https://github.com/opensip-ai/opensip-tools/issues)**.
+ground floor — **[issues and PRs welcome](https://github.com/opensip-ai/opensip-cli/issues)**.
 
 ```bash
-opensip-tools sim                   # run all scenarios (default recipe)
-opensip-tools sim --recipe example  # try the scenario model on the scaffolded demo
+opensip sim                   # run all scenarios (default recipe)
+opensip sim --recipe example  # try the scenario model on the scaffolded demo
 ```
 
 ### `graph` — static call-graph analysis
 ```bash
-opensip-tools graph                 # run all rules, terminal report
-opensip-tools graph --json          # SignalEnvelope-shaped JSON (for CI)
-opensip-tools graph --no-cache      # skip the catalog cache; re-run stages 1+2
-opensip-tools graph --gate-save     # save current signals as baseline
-opensip-tools graph --gate-compare  # compare against baseline; exit 1 on new signals
-opensip-tools graph --report-to <url>  # POST SARIF 2.1.0 to an endpoint
-opensip-tools graph packages/core      # scope to one or more subtrees (faster)
-opensip-tools graph --workspace        # fan across every detected workspace unit in parallel
-opensip-tools graph --list-files       # print the files graph would discover (no build); add --json for { count, files }
+opensip graph                 # run all rules, terminal report
+opensip graph --json          # SignalEnvelope-shaped JSON (for CI)
+opensip graph --no-cache      # skip the catalog cache; re-run stages 1+2
+opensip graph --gate-save     # save current signals as baseline
+opensip graph --gate-compare  # compare against baseline; exit 1 on new signals
+opensip graph --report-to <url>  # POST SARIF 2.1.0 to an endpoint
+opensip graph packages/core      # scope to one or more subtrees (faster)
+opensip graph --workspace        # fan across every detected workspace unit in parallel
+opensip graph --list-files       # print the files graph would discover (no build); add --json for { count, files }
 ```
 
 Positional `[paths...]` scope the run to one or more existing directories (absolute or relative to `--cwd`); the shell handles any globs (`graph 'packages/*/src'`). Useful on monorepos where a global run is slow: a scoped run typically completes in seconds and fits easily in the default Node heap. The trade-off is fidelity — call sites that cross the in-scope boundary become unresolved, so the orphan-subtree and other reachability rules report against the in-scope subtree(s) only. Positional paths are mutually exclusive with `--workspace`.
 
-Python, Rust, Go, and Java projects are also supported (lower fidelity, name-based resolution) via tree-sitter adapters that share the `@opensip-tools/graph-adapter-common` scaffolding. The Python adapter detects projects with `pyproject.toml` / `setup.py`; call edges resolve by simple name and carry `confidence: 'medium'` (or `'low'` for ambiguous matches). Pass `--language <name>` to force a specific adapter and suppress auto-detection.
+Python, Rust, Go, and Java projects are also supported (lower fidelity, name-based resolution) via tree-sitter adapters that share the `@opensip-cli/graph-adapter-common` scaffolding. The Python adapter detects projects with `pyproject.toml` / `setup.py`; call edges resolve by simple name and carry `confidence: 'medium'` (or `'low'` for ambiguous matches). Pass `--language <name>` to force a specific adapter and suppress auto-detection.
 
-The `--workspace` flag fans out across every detected workspace unit, running one memory-isolated child process per unit (polyglot-aware). Cross-unit edges remain unresolved per child, but the run covers the whole repo. Tune the parallelism with `--concurrency <n>` (default: `cpus()-1`). On opensip-tools's workspace this is roughly 2× faster than the global run; on monorepos with many units the speedup grows with cores.
+The `--workspace` flag fans out across every detected workspace unit, running one memory-isolated child process per unit (polyglot-aware). Cross-unit edges remain unresolved per child, but the run covers the whole repo. Tune the parallelism with `--concurrency <n>` (default: `cpus()-1`). On opensip-cli's workspace this is roughly 2× faster than the global run; on monorepos with many units the speedup grows with cores.
 
-For users who prefer external orchestration, `xargs -P 8 -I {} opensip-tools graph {}` over a list of subtree paths achieves the same effect.
+For users who prefer external orchestration, `xargs -P 8 -I {} opensip graph {}` over a list of subtree paths achieves the same effect.
 
 Ten rules ship today: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The rules are deliberately opinionated and low-noise — each is meant to surface an *actionable* finding rather than raw graph trivia. `duplicated-function-body` flags functions whose bodies are byte-identical across **different packages** as consolidation candidates (a `minCrossPackageDuplicatePackages` knob tunes the threshold); `orphan-subtree` reports whole unreachable subtrees rather than every individually-unreferenced function. Output is grouped by rule with the top 10 findings per rule plus a summary; the full set is always available via `--json`. See [the graph loop docs](./docs/public/40-graph/) for what each rule detects and how the gate workflow integrates with CI.
 
@@ -263,8 +263,8 @@ Exploratory insights that are *not* gating rules — the per-package coupling gr
 For TypeScript projects, `graph` builds a single TypeScript program over every `.ts`/`.tsx` file in the project's `tsconfig.json`. On large monorepos the program plus bound symbol table can exceed Node's default ~4 GB heap. When `graph` detects more than 1000 source files it prints a one-line hint to stderr at startup; if it OOMs, retry with a larger heap:
 
 ```bash
-NODE_OPTIONS=--max-old-space-size=8192 opensip-tools graph     # most monorepos
-NODE_OPTIONS=--max-old-space-size=12288 opensip-tools graph    # very large repos
+NODE_OPTIONS=--max-old-space-size=8192 opensip graph     # most monorepos
+NODE_OPTIONS=--max-old-space-size=12288 opensip graph    # very large repos
 ```
 
 Measured: a 5476-file repo OOM'd at 4 GB after ~17 min, completed at 12 GB in ~25 min with ~4.2 GB peak resident. The 8 GB setting is the recommended default once you cross the threshold. (Heap pressure is most acute for the TypeScript adapter; the tree-sitter adapters parse files lazily and use far less memory.)
@@ -273,7 +273,7 @@ Measured: a 5476-file repo OOM'd at 4 GB after ~17 min, completed at 12 GB in ~2
 
 Once a catalog is cached on disk, subsequent runs only re-walk source files whose mtime or size has changed. The dependency closure is expanded transitively: any unchanged file whose cached call edges point at a hash that vanished after the re-walk is also re-walked, until the closure is closed. This guarantees no stale edges in the merged catalog — the result is byte-identical to a `--no-cache` full rebuild.
 
-On opensip-tools self-graph, editing a single file drops rebuild time from ~15 s (full) to ~2.6 s (incremental), with no fidelity loss. Use `--no-cache` to force a full rebuild.
+On opensip-cli self-graph, editing a single file drops rebuild time from ~15 s (full) to ~2.6 s (incremental), with no fidelity loss. Use `--no-cache` to force a full rebuild.
 
 ### Standalone listing commands
 
@@ -281,13 +281,13 @@ These mirror the `fit --list` / `fit --recipes` flags but work as
 top-level commands too:
 
 ```bash
-opensip-tools fit-list
-opensip-tools fit-recipes
+opensip fit-list
+opensip fit-recipes
 ```
 
 ## Fitness Checks
 
-Run `opensip-tools fit` to scan your codebase. Default output is a compact summary:
+Run `opensip fit` to scan your codebase. Default output is a compact summary:
 
 ```
 120 Passed, 10 Failed (423 Errors, 227 Warnings) | Duration 8.1s
@@ -298,14 +298,14 @@ Use `--verbose` for detailed violation output.
 ### Options
 
 ```bash
-opensip-tools fit                               # Run all checks (default recipe)
-opensip-tools fit --cwd /path/to/project        # Target a different directory
-opensip-tools fit --recipe quick-smoke          # Use a named recipe
-opensip-tools fit --check no-console-log        # Run a single check
-opensip-tools fit --tags security               # Filter by tag
-opensip-tools fit --exclude no-any-types        # Exclude specific checks
-opensip-tools fit --report-to http://localhost:4919  # Send SARIF to OpenSIP
-opensip-tools fit --debug                       # Structured log output to stderr
+opensip fit                               # Run all checks (default recipe)
+opensip fit --cwd /path/to/project        # Target a different directory
+opensip fit --recipe quick-smoke          # Use a named recipe
+opensip fit --check no-console-log        # Run a single check
+opensip fit --tags security               # Filter by tag
+opensip fit --exclude no-any-types        # Exclude specific checks
+opensip fit --report-to http://localhost:4919  # Send SARIF to OpenSIP
+opensip fit --debug                       # Structured log output to stderr
 ```
 
 ### Recipes
@@ -331,11 +331,11 @@ Checks are organized by tags: `security`, `quality`, `architecture`, `modularity
 
 ## Configuration
 
-`opensip-tools init` writes `opensip-tools.config.yml` at your project
+`opensip init` writes `opensip-cli.config.yml` at your project
 root with one named target per detected language. For a Rust project:
 
 ```yaml
-# opensip-tools.config.yml
+# opensip-cli.config.yml
 
 globalExcludes:
   - "**/node_modules/**"
@@ -379,16 +379,16 @@ This is also the natural home for **enforcing your ADRs**: encode the rule each 
 
 ```bash
 # Before making changes — save a baseline
-opensip-tools fit --gate-save
+opensip fit --gate-save
 
 # After making changes — compare
-opensip-tools fit --gate-compare
+opensip fit --gate-compare
 ```
 
 Output of `--gate-compare`:
 
 ```
-opensip-tools gate compare
+opensip gate compare
 
 Added (2):
   ✗ fit:circular-import      packages/foo/x.ts → y.ts
@@ -406,8 +406,8 @@ Resolved (1):
 - `2` — config error (missing baseline, malformed SARIF)
 
 **Baseline storage:** the gate baseline lives in the project's
-`datastore.sqlite` (under `<cwd>/opensip-tools/.runtime/`, gitignored
-automatically by `opensip-tools init`). There is exactly one baseline per
+`datastore.sqlite` (under `<cwd>/opensip-cli/.runtime/`, gitignored
+automatically by `opensip init`). There is exactly one baseline per
 project — `--gate-save` writes it and `--gate-compare` reads it. To export the
 current baseline to a portable SARIF file (e.g. for GitHub Code Scanning), use
 `fit-baseline-export --out <path>`.
@@ -419,9 +419,9 @@ current baseline to a portable SARIF file (e.g. for GitHub Code Scanning), use
 Before letting an AI agent modify your code, save a baseline:
 
 ```bash
-opensip-tools fit --gate-save
+opensip fit --gate-save
 # … agent makes changes …
-opensip-tools fit --gate-compare || echo "Architecture degraded — review changes"
+opensip fit --gate-compare || echo "Architecture degraded — review changes"
 ```
 
 Combined with `--report-to` and the dashboard, you get a continuous record of every agent session's architectural impact.
@@ -434,7 +434,7 @@ Plugins are project-local. Two kinds:
 appropriate directory and it auto-loads:
 
 ```
-opensip-tools/
+opensip-cli/
   fit/
     checks/      ← .mjs exporting `checks`  (auto-loaded)
     recipes/     ← .mjs exporting `recipes` (auto-loaded)
@@ -443,28 +443,28 @@ opensip-tools/
     recipes/     ← .mjs exporting `recipes`   (auto-loaded)
 ```
 
-No config opt-in required. `opensip-tools init` scaffolds working
+No config opt-in required. `opensip init` scaffolds working
 example files in each of these directories.
 
 **npm-installed plugin packages** — explicit pinning in the config.
 The pinned packages are installed under
-`opensip-tools/.runtime/plugins/<domain>/node_modules/`:
+`opensip-cli/.runtime/plugins/<domain>/node_modules/`:
 
 ```bash
-opensip-tools plugin add @company/checks-custom    # installs + pins
-opensip-tools plugin remove @company/checks-custom  # uninstalls + unpins
-opensip-tools plugin list                           # what's installed
-opensip-tools plugin sync                           # reinstall after a fresh clone
+opensip plugin add @company/checks-custom    # installs + pins
+opensip plugin remove @company/checks-custom  # uninstalls + unpins
+opensip plugin list                           # what's installed
+opensip plugin sync                           # reinstall after a fresh clone
 ```
 
 `plugin add` updates the `plugins.<domain>` list in
-`opensip-tools.config.yml` so the install is reproducible across
+`opensip-cli.config.yml` so the install is reproducible across
 machines. Marker-based discovery also runs for packages that declare
-`opensipTools.kind`; transitive dependencies that lack an opensip-tools
+`opensipTools.kind`; transitive dependencies that lack an opensip-cli
 marker do not auto-load.
 
 ```yaml
-# opensip-tools.config.yml
+# opensip-cli.config.yml
 plugins:
   fit:
     - "@company/checks-custom"
@@ -473,7 +473,7 @@ plugins:
 ### Authoring a check package
 
 Your check pack is an ordinary npm package that exports a `checks` and/or
-`recipes` array. Declare `@opensip-tools/fitness` as a **peer dependency** —
+`recipes` array. Declare `@opensip-cli/fitness` as a **peer dependency** —
 this lets the host and your pack share one Check / Signal shape and avoids
 version drift.
 
@@ -493,10 +493,10 @@ won't need to.
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "peerDependencies": {
-    "@opensip-tools/fitness": "^3.0.0"
+    "@opensip-cli/fitness": "^3.0.0"
   },
   "devDependencies": {
-    "@opensip-tools/fitness": "^3.0.0",
+    "@opensip-cli/fitness": "^3.0.0",
     "typescript": "^5.7.0"
   }
 }
@@ -505,7 +505,7 @@ won't need to.
 **`src/index.ts`**
 
 ```typescript
-import { defineCheck, type Check, type CheckDisplayEntry } from '@opensip-tools/fitness';
+import { defineCheck, type Check, type CheckDisplayEntry } from '@opensip-cli/fitness';
 
 const myCheck: Check = defineCheck({
   id: '3f7a…-uuid',
@@ -548,7 +548,7 @@ Add `@my-org/fitness-checks` to your project dependencies and the
 CLI loads it on the next `fit` run.
 
 For packages that do not declare the marker yet, list them by exact name in
-your project's `opensip-tools.config.yml`:
+your project's `opensip-cli.config.yml`:
 
 ```yaml
 plugins:
@@ -560,18 +560,18 @@ This exact list supplements marker-based discovery.
 
 **Why peer dependency?** Check packs return Check objects that the host
 registers and executes; they don't mutate host singletons. Declaring
-`@opensip-tools/fitness` as a peer means one copy of the fitness engine
+`@opensip-cli/fitness` as a peer means one copy of the fitness engine
 serves every loaded pack, so peer resolution is clean and version
 expectations are explicit. This mirrors the ESLint / Rollup plugin model.
 
 ### Single-file plugins
 
 For quick local experiments, drop a `.mjs` file in
-`opensip-tools/fit/checks/`:
+`opensip-cli/fit/checks/`:
 
 ```javascript
-// opensip-tools/fit/checks/my-check.mjs
-import { defineCheck } from '@opensip-tools/fitness';
+// opensip-cli/fit/checks/my-check.mjs
+import { defineCheck } from '@opensip-cli/fitness';
 
 export const checks = [
   defineCheck({
@@ -588,7 +588,7 @@ export const checks = [
 ];
 ```
 
-`@opensip-tools/fitness` resolves from the global CLI install or from your project's
+`@opensip-cli/fitness` resolves from the global CLI install or from your project's
 `node_modules` (when installed as a local devDependency). For pure
 single-file plugins with no other package setup, install the CLI globally
 with the curl installer — that's the supported path.
@@ -599,21 +599,21 @@ Recipes are named check or scenario bundles — useful when you want to
 run a specific set across multiple repos:
 
 ```javascript
-// opensip-tools/fit/recipes/my-recipes.mjs
+// opensip-cli/fit/recipes/my-recipes.mjs
 export const recipes = [{
   id: 'URCP_backend-strict',
   name: 'backend-strict',
   displayName: 'Backend Strict',
-  description: 'All my checks plus opensip-tools backend checks',
+  description: 'All my checks plus opensip-cli backend checks',
   checks: { type: 'all', exclude: [] },
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
   reporting: { format: 'table', verbose: false },
 }];
 ```
 
-Then: `opensip-tools fit --recipe backend-strict`. Sim recipes work
-the same way under `opensip-tools/sim/recipes/` and run via
-`opensip-tools sim --recipe <name>`.
+Then: `opensip fit --recipe backend-strict`. Sim recipes work
+the same way under `opensip-cli/sim/recipes/` and run via
+`opensip sim --recipe <name>`.
 
 ## CI Integration
 
@@ -621,10 +621,10 @@ the same way under `opensip-tools/sim/recipes/` and run via
 
 ```yaml
 - name: Run fitness checks
-  run: opensip-tools fit --json > fitness-report.json
+  run: opensip fit --json > fitness-report.json
 
 - name: Upload to OpenSIP
-  run: opensip-tools fit --report-to ${{ secrets.OPENSIP_URL }} --api-key ${{ secrets.OPENSIP_KEY }}
+  run: opensip fit --report-to ${{ secrets.OPENSIP_URL }} --api-key ${{ secrets.OPENSIP_KEY }}
 ```
 
 ### JSON Output
@@ -667,7 +667,7 @@ stdout; the `SignalEnvelope` rides under `.envelope`:
       {
         "id": "sig_a3f9c204e1b2",
         "source": "no-console-log",
-        "provider": "opensip-tools",
+        "provider": "opensip-cli",
         "severity": "high",
         "category": "quality",
         "ruleId": "fit:no-console-log",
@@ -689,7 +689,7 @@ byte-identical `SignalEnvelope` under `.envelope` (list/dashboard commands carry
 their result under `.data`; failures carry structured `errors`). The stable CI
 fields are `.envelope.verdict.passed`, `.envelope.verdict.score`,
 `.envelope.verdict.summary`, `.envelope.units[]`, and the flat
-`.envelope.signals[]` list — e.g. `opensip-tools fit --json | jq
+`.envelope.signals[]` list — e.g. `opensip fit --json | jq
 '.envelope.verdict.passed'`. See [JSON output
 schema](./docs/public/70-reference/04-json-output-schema.md) for the full field
 table and the 2.12.0 migration notes.
@@ -699,7 +699,7 @@ table and the 2.12.0 migration notes.
 Generate an HTML report with session history:
 
 ```bash
-opensip-tools dashboard
+opensip dashboard
 ```
 
 The dashboard shows:
@@ -715,11 +715,11 @@ The dashboard shows:
 ## Session Management
 
 ```bash
-opensip-tools sessions list                  # Show run history
-opensip-tools sessions show <id>             # Replay a stored session (or `latest --tool fit`)
-opensip-tools sessions purge                 # Delete all sessions (prompts y/n)
-opensip-tools sessions purge --older-than 7  # Delete sessions older than 7 days
-opensip-tools sessions purge --yes           # Skip confirmation
+opensip sessions list                  # Show run history
+opensip sessions show <id>             # Replay a stored session (or `latest --tool fit`)
+opensip sessions purge                 # Delete all sessions (prompts y/n)
+opensip sessions purge --older-than 7  # Delete sessions older than 7 days
+opensip sessions purge --yes           # Skip confirmation
 ```
 
 ## Updating & uninstalling
@@ -731,7 +731,7 @@ opensip-tools sessions purge --yes           # Skip confirmation
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 
 # Check the installed version
-opensip-tools --version
+opensip --version
 ```
 
 The CLI checks npm once per day in interactive shells and prints a one-line
@@ -749,14 +749,14 @@ isolation — most users only need the first.
 
 ```bash
 # 1. Project runtime state — sessions, cache, logs, and baselines in one repo
-opensip-tools uninstall --project                 # cwd
-opensip-tools uninstall --project /path/to/repo   # explicit path
+opensip uninstall --project                 # cwd
+opensip uninstall --project /path/to/repo   # explicit path
 
 # 2. User-level config — cloud API key + per-user defaults
-opensip-tools uninstall
+opensip uninstall
 
 # 3. The CLI binary itself
-npm uninstall -g opensip-tools               # or: pnpm rm -g opensip-tools
+npm uninstall -g opensip-cli               # or: pnpm rm -g opensip-cli
 ```
 
 The running binary can't safely self-delete, so step 3 is always a separate
@@ -767,13 +767,13 @@ The running binary can't safely self-delete, so step 3 is always a separate
 
 Project-mode uninstall removes only the rebuildable `.runtime/` state by
 default. Your authored content (custom checks, recipes, scenarios) and
-`opensip-tools.config.yml` are preserved.
+`opensip-cli.config.yml` are preserved.
 
 To remove everything — including authored content and the config — pass
 `--purge`. `--purge` is destructive: if your custom checks aren't committed
 to git, you'll lose them. We recommend running `git status` first.
 
-Both modes refuse to run when no opensip-tools state exists at the
+Both modes refuse to run when no OpenSIP CLI state exists at the
 resolved path, so an accidental `--project /unrelated/dir` is a no-op
 rather than a destructive accident.
 
@@ -781,22 +781,22 @@ rather than a destructive accident.
 
 | Path | Tracked by git? | Removed by default | Removed by `--purge` |
 |---|---|---|---|
-| `~/.opensip-tools/config.yml` | no — user-level | `opensip-tools uninstall` (user mode) | — |
-| `<project>/opensip-tools.config.yml` | yes — project config | (kept) | `opensip-tools uninstall --project --purge` |
-| `<project>/opensip-tools/.runtime/` | no — runtime state | `opensip-tools uninstall --project` | `opensip-tools uninstall --project --purge` |
-| `<project>/opensip-tools/<user-content>/` (custom checks, recipes, scenarios) | yes — user-authored | (kept) | `opensip-tools uninstall --project --purge` |
+| `~/.opensip-cli/config.yml` | no — user-level | `opensip uninstall` (user mode) | — |
+| `<project>/opensip-cli.config.yml` | yes — project config | (kept) | `opensip uninstall --project --purge` |
+| `<project>/opensip-cli/.runtime/` | no — runtime state | `opensip uninstall --project` | `opensip uninstall --project --purge` |
+| `<project>/opensip-cli/<user-content>/` (custom checks, recipes, scenarios) | yes — user-authored | (kept) | `opensip uninstall --project --purge` |
 
 ## Observability
 
 Every CLI invocation generates a `runId` (prefixed ULID — `RUN_<26char>`)
 for log correlation. Structured JSON logs are written to
-`<project>/opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl` (gitignored).
+`<project>/opensip-cli/.runtime/logs/<YYYY-MM-DD>.jsonl` (gitignored).
 Sessions live in the project SQLite store at
-`<project>/opensip-tools/.runtime/datastore.sqlite`. HTML reports are written to
-`<project>/opensip-tools/.runtime/reports/latest.html`.
+`<project>/opensip-cli/.runtime/datastore.sqlite`. HTML reports are written to
+`<project>/opensip-cli/.runtime/reports/latest.html`.
 
 ```bash
-opensip-tools fit --debug    # Show structured log events on stderr
+opensip fit --debug    # Show structured log events on stderr
 ```
 
 Logs are written to a daily JSONL file; files older than 7 days are
@@ -815,32 +815,32 @@ enforced in CI by [dependency-cruiser](https://github.com/sverweij/dependency-cr
 
 ```
 packages/
-  core/                    # @opensip-tools/core — kernel: errors, logger, IDs,
+  core/                    # @opensip-cli/core — kernel: errors, logger, IDs,
                            #   language adapters, plugin loader, Registry/RunScope,
                            #   Tool contract
-  contracts/               # @opensip-tools/contracts — contract types between
+  contracts/               # @opensip-cli/contracts — contract types between
                            #   Tools and the runner: SignalEnvelope/CommandResult
                            #   shapes, exit codes, GraphCatalog surface
-  datastore/               # @opensip-tools/datastore — SQLite + Drizzle persistence
-  session-store/           # @opensip-tools/session-store — session persistence
-  output/                  # @opensip-tools/output — SARIF / cloud report output
-  dashboard/               # @opensip-tools/dashboard — self-contained HTML report
-  cli-ui/                  # @opensip-tools/cli-ui — shared Ink/React primitives
-  cli/                     # opensip-tools — generic tool dispatcher
+  datastore/               # @opensip-cli/datastore — SQLite + Drizzle persistence
+  session-store/           # @opensip-cli/session-store — session persistence
+  output/                  # @opensip-cli/output — SARIF / cloud report output
+  dashboard/               # @opensip-cli/dashboard — self-contained HTML report
+  cli-ui/                  # @opensip-cli/cli-ui — shared Ink/React primitives
+  cli/                     # opensip-cli — generic tool dispatcher
 
-  fitness/                 # @opensip-tools/fitness namespace
-    engine/                # @opensip-tools/fitness — fit/fit-list/fit-recipes/gate
+  fitness/                 # @opensip-cli/fitness namespace
+    engine/                # @opensip-cli/fitness — fit/fit-list/fit-recipes/gate
                            #   commands, recipe service, gate, SARIF
-    checks-typescript/     # @opensip-tools/checks-typescript — TS-AST checks
-    checks-universal/      # @opensip-tools/checks-universal — text/regex/glob checks
-    checks-python/         # @opensip-tools/checks-python — Python (no-bare-except)
-    checks-go/             # @opensip-tools/checks-go — Go (no-fmt-print)
-    checks-java/           # @opensip-tools/checks-java — Java (no-printstacktrace)
-    checks-cpp/            # @opensip-tools/checks-cpp — C/C++ (clang-tidy)
-    checks-rust/           # @opensip-tools/checks-rust — Rust (no-dbg-macro)
+    checks-typescript/     # @opensip-cli/checks-typescript — TS-AST checks
+    checks-universal/      # @opensip-cli/checks-universal — text/regex/glob checks
+    checks-python/         # @opensip-cli/checks-python — Python (no-bare-except)
+    checks-go/             # @opensip-cli/checks-go — Go (no-fmt-print)
+    checks-java/           # @opensip-cli/checks-java — Java (no-printstacktrace)
+    checks-cpp/            # @opensip-cli/checks-cpp — C/C++ (clang-tidy)
+    checks-rust/           # @opensip-cli/checks-rust — Rust (no-dbg-macro)
 
-  graph/                   # @opensip-tools/graph namespace
-    engine/                # @opensip-tools/graph — language-agnostic graph kernel
+  graph/                   # @opensip-cli/graph namespace
+    engine/                # @opensip-cli/graph — language-agnostic graph kernel
     graph-adapter-common/  # shared tree-sitter scaffolding (discover/parse/walk/
                            #   cache-key) for the go/java/python/rust adapters
     graph-typescript/      # TS call-graph adapter (TypeScript compiler API)
@@ -849,10 +849,10 @@ packages/
     graph-go/              # Go call-graph adapter (tree-sitter)
     graph-java/            # Java call-graph adapter (tree-sitter)
 
-  simulation/              # @opensip-tools/simulation namespace
-    engine/                # @opensip-tools/simulation — sim command + scenarios
+  simulation/              # @opensip-cli/simulation namespace
+    engine/                # @opensip-cli/simulation — sim command + scenarios
 
-  languages/               # language adapters (@opensip-tools/lang-*)
+  languages/               # language adapters (@opensip-cli/lang-*)
     lang-typescript/       # TypeScript / TSX adapter
     lang-rust/             # Rust adapter (hand-written lexer)
     lang-python/           # Python adapter
@@ -875,7 +875,7 @@ their `package.json` declares:
 }
 ```
 
-The `Tool` contract (`@opensip-tools/core/tools`) carries the tool's
+The `Tool` contract (`@opensip-cli/core/tools`) carries the tool's
 metadata, command descriptors (for `--help` listings), and a declarative
 `commandSpecs` array — the tool's only command surface. The host's
 `mountCommandSpec` owns the Commander wiring and the
@@ -895,9 +895,9 @@ keep the contract honest.
 
 ## About OpenSIP
 
-opensip-tools is built and maintained by the team at [**OpenSIP**](https://opensip.ai). Visit **[opensip.ai](https://opensip.ai)** for OpenSIP itself — our hosted developer-productivity platform — and the rest of the product family.
+OpenSIP CLI is built and maintained by the team at [**OpenSIP**](https://opensip.ai). Visit **[opensip.ai](https://opensip.ai)** for OpenSIP itself — our hosted developer-productivity platform — and the rest of the product family.
 
-This CLI is MIT-licensed and developed in the open at [github.com/opensip-ai/opensip-tools](https://github.com/opensip-ai/opensip-tools). Contributions welcome.
+This CLI is MIT-licensed and developed in the open at [github.com/opensip-ai/opensip-cli](https://github.com/opensip-ai/opensip-cli). Contributions welcome.
 
 ## License
 

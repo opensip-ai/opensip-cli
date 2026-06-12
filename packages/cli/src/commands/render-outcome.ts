@@ -16,7 +16,7 @@
  * unchanged — only the machine shape moves.
  */
 
-import type { CommandOutcome, CommandResult } from '@opensip-tools/contracts';
+import type { CommandOutcome, CommandResult } from '@opensip-cli/contracts';
 
 /** Pretty-print width matches the legacy `formatSignalJson` / `emitJson` writers. */
 const JSON_INDENT = 2;

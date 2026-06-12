@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { enterScope, RunScope } from '@opensip-tools/core';
+import { enterScope, RunScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
@@ -26,7 +26,7 @@ import { simulationTool } from '../tool.js';
 
 import { noopTarget } from './test-utils/targets.js';
 
-import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
+import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = JSON.parse(readFileSync(resolve(HERE, '../../package.json'), 'utf8')) as {

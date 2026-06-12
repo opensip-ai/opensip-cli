@@ -7,8 +7,8 @@
  * missing-baseline error before the first save.
  */
 
-import { logger } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { logger } from '@opensip-cli/core';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildBaselineSeams, type BaselineSeams } from '../bootstrap/baseline-seams.js';

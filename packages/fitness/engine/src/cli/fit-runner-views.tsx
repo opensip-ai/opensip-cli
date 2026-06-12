@@ -6,14 +6,14 @@
  * derived view-models (`FitTableRow` / `FitFindingsGroup`, built by
  * `fit/envelope-view.ts`) and pulls colours from the shared cli-ui theme. The
  * Banner, RunHeader, Spinner, and ErrorMessage primitives remain owned by
- * `@opensip-tools/cli-ui` — only the fitness-specific renderers live here.
+ * `@opensip-cli/cli-ui` — only the fitness-specific renderers live here.
  *
- * ADR-0011 Phase 6: fitness no longer imports `@opensip-tools/output`; the
+ * ADR-0011 Phase 6: fitness no longer imports `@opensip-cli/output`; the
  * live table/findings derive straight from the envelope (the static/non-TTY
  * path uses the shared `formatSignalTableRows` at the composition root).
  */
 
-import { useTheme, sortFitRowPriority, parseValidatedCount } from '@opensip-tools/cli-ui';
+import { useTheme, sortFitRowPriority, parseValidatedCount } from '@opensip-cli/cli-ui';
 import { Box, Text } from 'ink';
 import React from 'react';
 
@@ -109,7 +109,7 @@ export function ResultsTable({
 }
 
 // SummaryLine previously lived here — now provided by
-// `@opensip-tools/cli-ui`'s shared `RunSummary` component so fit, graph,
+// `@opensip-cli/cli-ui`'s shared `RunSummary` component so fit, graph,
 // and future tools render the same single-line summary at the bottom
 // of every run. fit-runner.tsx imports `RunSummary` directly.
 
@@ -143,5 +143,5 @@ export function WarningsBlock({
 
 // The former `FindingsBlock` Ink component (and its `locationOf` helper) was
 // retired by ADR-0021: the verbose findings body is now rendered by the shared
-// `viewFindingsGroups` producer (`@opensip-tools/cli-ui`), driven by the
+// `viewFindingsGroups` producer (`@opensip-cli/cli-ui`), driven by the
 // result's `verboseDetail`, so the TTY and piped paths render one source.

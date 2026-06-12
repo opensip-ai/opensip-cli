@@ -1,7 +1,7 @@
 /**
- * @opensip-tools/tree-sitter — the grammar-agnostic tree-sitter substrate
- * (ADR-0010). Sits between `@opensip-tools/core` and the `lang-*` / graph
- * adapters; depends on `web-tree-sitter` only, never on `@opensip-tools/graph`.
+ * @opensip-cli/tree-sitter — the grammar-agnostic tree-sitter substrate
+ * (ADR-0010). Sits between `@opensip-cli/core` and the `lang-*` / graph
+ * adapters; depends on `web-tree-sitter` only, never on `@opensip-cli/graph`.
  *
  *   core → tree-sitter → { lang-*, graph-adapter-common }
  *

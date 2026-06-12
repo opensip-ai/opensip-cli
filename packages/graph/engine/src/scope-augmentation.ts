@@ -45,7 +45,7 @@ export interface GraphSubscope {
   readonly recipes: GraphRecipeRegistry;
 }
 
-declare module '@opensip-tools/core' {
+declare module '@opensip-cli/core' {
   interface ScopeContribution {
     /**
      * Graph tool's per-run state. Returned by the graph tool's

@@ -1,4 +1,4 @@
-import { applyCheckDisplay } from '@opensip-tools/fitness';
+import { applyCheckDisplay } from '@opensip-cli/fitness';
 
 import { noDbgMacro } from './checks/no-dbg-macro.js';
 import { checkDisplay } from './display/index.js';

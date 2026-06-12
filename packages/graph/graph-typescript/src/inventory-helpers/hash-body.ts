@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto';
 
-import { stripComments } from '@opensip-tools/lang-typescript';
+import { stripComments } from '@opensip-cli/lang-typescript';
 
 import type ts from 'typescript';
 

@@ -4,7 +4,7 @@
  * @fileoverview Detects readline usage without proper cleanup
  */
 
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
 
 /**
  * Pattern for detecting readline.createInterface() calls

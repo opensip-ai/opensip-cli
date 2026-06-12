@@ -100,11 +100,11 @@ Three independent controls; a `sync: false` in **either** config wins, and `--no
 | Scope | How | Effect |
 |---|---|---|
 | **This run** | `--no-cloud` | Disables sync for the single invocation. |
-| **This machine** | `~/.opensip-tools/config.yml` → `cloud.sync: false` | Disables sync for every project run from this account. |
-| **This project** | `opensip-tools.config.yml` → `cli.cloud.sync: false` | Disables sync for everyone running this project. |
+| **This machine** | `~/.opensip-cli/config.yml` → `cloud.sync: false` | Disables sync for every project run from this account. |
+| **This project** | `opensip-cli.config.yml` → `cli.cloud.sync: false` | Disables sync for everyone running this project. |
 
 ```yaml
-# ~/.opensip-tools/config.yml  (machine-wide, flat keys)
+# ~/.opensip-cli/config.yml  (machine-wide, flat keys)
 apiKey: '<your-key>'
 cloud:
   sync: false          # opt out of cloud signal sync everywhere on this account
@@ -140,4 +140,4 @@ Sync happens at the composition root after a tool returns its envelope (`cli.del
 | The cloud sink | `packages/output/src/sink/cloud-signal-sink.ts` |
 | Chunked POST transport (retry, idempotency) | `packages/output/src/sink/http-egress.ts` |
 
-The seam lives in `core` (a no-op `SignalSink` by default); the real cloud implementation lives in `@opensip-tools/output`'s `sink/`, so a tool returns its envelope without depending on the HTTP/cloud machinery — the CLI wires the real sink in at the composition root and calls `cli.deliverSignals` on the returned envelope.
+The seam lives in `core` (a no-op `SignalSink` by default); the real cloud implementation lives in `@opensip-cli/output`'s `sink/`, so a tool returns its envelope without depending on the HTTP/cloud machinery — the CLI wires the real sink in at the composition root and calls `cli.deliverSignals` on the returned envelope.

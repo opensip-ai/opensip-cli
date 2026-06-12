@@ -58,9 +58,9 @@ vi.mock('../commands/init.js', () => ({
     (args: { cwd: string }) =>
       ({
         type: 'init',
-        path: `${args.cwd}/opensip-tools.config.yml`,
+        path: `${args.cwd}/opensip-cli.config.yml`,
         cwd: args.cwd,
-        configFilename: 'opensip-tools.config.yml',
+        configFilename: 'opensip-cli.config.yml',
         created: true,
       }) as never,
   ),
@@ -90,7 +90,7 @@ import { pluginAdd, pluginList, pluginRemove, pluginSync } from '../commands/plu
 import { executeUninstall } from '../commands/uninstall.js';
 
 import type { CliCommandsContext } from '../commands/shared.js';
-import type { CommandResult } from '@opensip-tools/contracts';
+import type { CommandResult } from '@opensip-cli/contracts';
 
 interface MakeCtxResult {
   ctx: CliCommandsContext;
@@ -120,7 +120,7 @@ function makeCtx(): MakeCtxResult {
 
 /** Mount the host commands and return the freshly-built program. */
 function mount(ctx: CliCommandsContext): Command {
-  const program = new Command('opensip-tools');
+  const program = new Command('opensip');
   mountHostCommands(program, ctx);
   return program;
 }
@@ -355,7 +355,7 @@ describe('init spec — action body', () => {
       type: 'init',
       path: '',
       cwd: process.cwd(),
-      configFilename: 'opensip-tools.config.yml',
+      configFilename: 'opensip-cli.config.yml',
       created: false,
       ambiguousLanguageError: { detected: [], message: 'ambiguous' },
     } as never);
@@ -372,7 +372,7 @@ describe('init spec — action body', () => {
       type: 'init',
       path: '',
       cwd: process.cwd(),
-      configFilename: 'opensip-tools.config.yml',
+      configFilename: 'opensip-cli.config.yml',
       created: false,
       partialStateError: { state: 'fully-initialized', preExistingFiles: [], message: 'm' },
     } as never);
@@ -389,7 +389,7 @@ describe('init spec — action body', () => {
       type: 'init',
       path: '',
       cwd: process.cwd(),
-      configFilename: 'opensip-tools.config.yml',
+      configFilename: 'opensip-cli.config.yml',
       created: false,
       insideExistingProject: { discoveredRoot: '/r', message: 'm' },
     } as never);

@@ -5,9 +5,9 @@
     {
       "tool": {
         "driver": {
-          "name": "opensip-tools-graph",
+          "name": "opensip-cli-graph",
           "version": "2.0.0",
-          "informationUri": "https://github.com/opensip-ai/opensip-tools",
+          "informationUri": "https://github.com/opensip-ai/opensip-cli",
           "rules": [
             {
               "id": "graph.dead-code.orphan-subtree"

@@ -23,8 +23,8 @@ import { makeTestScope, withScope } from '../with-scope.js';
 import { buildFixtureManifest } from './manifest.js';
 
 import type { CheckFixtureRequirement, CoverageConfig } from './manifest.js';
-import type { Signal } from '@opensip-tools/core';
-import type { Check } from '@opensip-tools/fitness';
+import type { Signal } from '@opensip-cli/core';
+import type { Check } from '@opensip-cli/fitness';
 
 /** One file written into the fixture temp root (path is relative to the root). */
 export interface FixtureFile {

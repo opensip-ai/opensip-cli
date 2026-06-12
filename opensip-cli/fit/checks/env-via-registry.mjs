@@ -1,11 +1,11 @@
 /**
  * @fileoverview env-via-registry — environment reads must flow through the
- *               EnvRegistry (§5.12). Project-local SELF-check for opensip-tools.
+ *               EnvRegistry (§5.12). Project-local SELF-check for opensip-cli.
  *
- * Relocated out of `@opensip-tools/checks-universal` (where it shipped 2.12.0–2.12.x):
- * this check enforces opensip-tools' OWN env-governance model. It mandates reads
- * through the `EnvRegistry` primitive (`@opensip-tools/core`) and allow-lists
- * opensip-tools-internal files (`env-registry.ts` / `host-env-specs.ts` /
+ * Relocated out of `@opensip-cli/checks-universal` (where it shipped 2.12.0–2.12.x):
+ * this check enforces opensip-cli' OWN env-governance model. It mandates reads
+ * through the `EnvRegistry` primitive (`@opensip-cli/core`) and allow-lists
+ * opensip-cli-internal files (`env-registry.ts` / `host-env-specs.ts` /
  * `theme.ts` / `welcome.ts` / `heap-preflight.ts`). None of that is meaningful to
  * a consumer codebase — the registry doesn't exist there and the allow-list names
  * files only this repo has. It is a tool-internal convention, not a universal one,
@@ -23,7 +23,7 @@
  * (they DESCRIBE env patterns, they don't read env); tests are excluded (they
  * legitimately drive code under test via process.env).
  */
-import { defineCheck } from '@opensip-tools/fitness';
+import { defineCheck } from '@opensip-cli/fitness';
 
 /**
  * A real read of a SPECIFIC variable: `process.env.<NAME>` or `process.env[...]`.

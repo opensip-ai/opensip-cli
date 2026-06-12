@@ -8,9 +8,9 @@
  * used across types, framework, and recipes modules.
  */
 
-import { isErrorSeverity } from '@opensip-tools/core';
+import { isErrorSeverity } from '@opensip-cli/core';
 
-import type { SignalSeverity } from '@opensip-tools/core';
+import type { SignalSeverity } from '@opensip-cli/core';
 
 /** Returns true for 'medium' severity signals (warning-level) */
 function isWarningSeverity(severity: SignalSeverity): boolean {

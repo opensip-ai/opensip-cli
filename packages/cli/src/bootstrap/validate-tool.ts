@@ -18,7 +18,7 @@
  * and never reaches `isValidTool`.
  */
 
-import type { Tool } from '@opensip-tools/core';
+import type { Tool } from '@opensip-cli/core';
 
 export function isValidTool(value: unknown): value is Tool {
   if (typeof value !== 'object' || value === null) return false;

@@ -1,5 +1,5 @@
 /**
- * Coverage for `opensip-tools graph symbol-index --out <path>` — the
+ * Coverage for `opensip graph symbol-index --out <path>` — the
  * read-only artifact emitter that serializes the persisted catalog as
  * a name→{file,line,…} + file→names lookup table.
  */
@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { buildArtifact, executeSymbolIndex } from '../../cli/symbol-index.js';
@@ -16,7 +16,7 @@ import { CatalogRepo } from '../../persistence/catalog-repo.js';
 import { occ } from '../rules/_helpers.js';
 
 import type { Catalog, FunctionOccurrence } from '../../types.js';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 function makeCatalog(occs: readonly FunctionOccurrence[]): Catalog {
   const functions: Record<string, FunctionOccurrence[]> = {};

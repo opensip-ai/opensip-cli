@@ -42,17 +42,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   flow (no `Tool.register()`); and version / six-layer / 32-package /
   check-count claims match v3.0.0.
 - **`env-via-registry` and `no-local-exit-or-stdout` removed from
-  `@opensip-tools/checks-universal`** (relocated to opensip-tools' own
+  `@opensip-cli/checks-universal`** (relocated to opensip-cli' own
   project-local dogfood pack). Both were tool-internal SELF-checks that leaked
   into the universal pack: `env-via-registry` (§5.12) mandates reads through
-  opensip-tools' own `EnvRegistry` primitive and allow-lists opensip-tools-internal
+  opensip-cli' own `EnvRegistry` primitive and allow-lists opensip-cli-internal
   files (`host-env-specs.ts`, `theme.ts`); `no-local-exit-or-stdout` (§4.7) encodes
-  opensip-tools' termination convergence (typed `BootstrapError`/`ToolError`,
+  opensip-cli' termination convergence (typed `BootstrapError`/`ToolError`,
   single-boundary `process.exitCode`). Neither is a framework-agnostic invariant — a
   consumer codebase has no `EnvRegistry` and may use a different, equally valid
   termination architecture (e.g. a sanctioned process-exit wrapper package), so the
   checks false-fired across consumer code. They now live in
-  `opensip-tools/fit/checks/*.mjs` (the repo still self-enforces them); the universal
+  `opensip-cli/fit/checks/*.mjs` (the repo still self-enforces them); the universal
   pack holds only framework-agnostic checks. Consumers previously recipe-excluding
   these no longer need to.
 
@@ -102,7 +102,7 @@ thing distinguishing a bundled tool from an installed or project-local one is it
   project — once bundled, once with `fit` dropped from the bundled set so it loads
   through the external/installed path — and asserts the check list, `--help`,
   `fit --json` `CommandOutcome`, and exit code are identical.
-- **`OPENSIP_TOOLS_SKIP_BUNDLED`** — drop a bundled tool (`fitness`/`simulation`/
+- **`OPENSIP_CLI_SKIP_BUNDLED`** — drop a bundled tool (`fitness`/`simulation`/
   `graph`) from the bundled set so an installed or project-local package of the
   same id takes over: the install-source-independence escape hatch made real.
 - **`no-bootstrap-tool-import`** guardrail (the host must not statically import a
@@ -114,13 +114,13 @@ thing distinguishing a bundled tool from an installed or project-local one is it
 - **One generic discovery substrate.** Every capability domain — fit's `fit-pack`,
   sim's `sim-pack`, graph's `graph-adapter`, plus co-located `fit-recipe`/`sim-recipe`
   — is now discovered and loaded by a single descriptor-driven substrate in
-  `@opensip-tools/core` (`discoverCapabilityContributions` → the scope-owned
+  `@opensip-cli/core` (`discoverCapabilityContributions` → the scope-owned
   `loadCapabilityDomain` → `CapabilityRegistry.routeContribution` → the owner's
   registrar). The three bespoke per-tool loaders are **deleted**, including graph's
   host-coupled, eager `register-graph-adapters.ts` (which static-imported graph's
   internals and stashed adapters in a module global — the §4.5 leak). A tool's
   manifest `discovery` descriptor is the single source of truth for how its packs are
-  found (`marker`/`name-pattern`, the `@opensip-tools` built-in split, explicit-list
+  found (`marker`/`name-pattern`, the `@opensip-cli` built-in split, explicit-list
   `replace`/`augment`, recipe co-contributions); the kernel branches on no domain
   identity. `routeContribution` — wired-but-dead since 2.10.0 — is now the one live
   conduit. CLI behaviour is unchanged.
@@ -153,7 +153,7 @@ thing distinguishing a bundled tool from an installed or project-local one is it
   type-check, fit/sim check/scenario batches). Persistence + cloud egress stay on
   the parent post-run; the engine entries are persistence-free. `--json`/non-TTY
   output, exit codes, and persisted sessions are byte/row-identical (the
-  rearchitecture is invisible to consumers). `OPENSIP_TOOLS_NO_WORKER=1` forces the
+  rearchitecture is invisible to consumers). `OPENSIP_CLI_NO_WORKER=1` forces the
   in-process fallback (also taken automatically on a fork failure). A
   **`live-runs-off-thread`** guardrail (140 → 141 checks) keeps a live runner from
   regressing to in-process execution and keeps worker entries persistence-free.
@@ -184,7 +184,7 @@ bar, and the tool-plugin spine is proven with a real externalization
 
 ### Added
 
-- **Execution substrate (`@opensip-tools/core`).** One bounded scheduler +
+- **Execution substrate (`@opensip-cli/core`).** One bounded scheduler +
   per-unit timeout/retry (`scheduleUnits`, `runWithTimeout`, `runWithRetry`,
   `executePipeline`) + a unified `WorkflowExecutionOptions` + `deriveRecipeId`,
   hoisted from fitness's proven scheduler. Fitness runs on it byte-identically; sim
@@ -236,14 +236,14 @@ chooses its own error JSON or success carrier.
 - **`cli.emitError` seam** for tool handlers, retiring the bare `emitJson({ error })`.
 - **Three guardrails:** `one-outcome-shape`, `no-local-exit-or-stdout`,
   `env-via-registry` (133 → 136 checks).
-- **Session replay.** `opensip-tools sessions show <ref>` reconstructs a past
+- **Session replay.** `opensip sessions show <ref>` reconstructs a past
   run's output from the stored session payload — `sessions show latest --tool fit`
   (or an explicit id, optionally `--json`). Each run command also takes an inline
   `--show <session>` shorthand (`fit --show latest`, `graph --show <id>`,
   `sim --show latest`). Each tool contributes a `sessionReplay` projection that
   decodes the opaque payload back into a `SignalEnvelope` (`fidelity: 'projection'`
   — rebuilt from persisted findings, not re-executed). The shared structural
-  decoder lives in `@opensip-tools/session-store` (`decodeSessionPayload`); the
+  decoder lives in `@opensip-cli/session-store` (`decodeSessionPayload`); the
   per-tool severity/category/id projection stays in each engine. A missing
   session, wrong tool, or undecodable payload returns a structured `CommandOutcome`
   error (`reason`/`code`: `not-found` / `wrong-tool` / `ambiguous-latest` /
@@ -282,9 +282,9 @@ with a single sanctioned exception (below). Output currency stays handler-owned
   body without `commandSpecs`. The mechanical enforcement (north-star Principle 6)
   that keeps the privilege retired; the only documented exceptions are the
   action-less host subcommand-group parents (`sessions`, `plugin`).
-- **Declarative command API (`@opensip-tools/core`).** `defineCommand` +
+- **Declarative command API (`@opensip-cli/core`).** `defineCommand` +
   `CommandSpec` / `OptionSpec` / `ArgSpec` — the typed shape a tool exports for the
-  host to mount. Re-exported from `@opensip-tools/contracts` as part of the public
+  host to mount. Re-exported from `@opensip-cli/contracts` as part of the public
   Tool↔runner surface. (`CommonFlagKey` moved to core, beside the `Tool` contract.)
 
 ### Changed
@@ -302,8 +302,8 @@ with a single sanctioned exception (below). Output currency stays handler-owned
 ## [2.10.1] — 2026-06-07
 
 **Config consolidation.** The fast-follow to 2.10.0 relocates the scattered
-_tool-agnostic_ configuration into `@opensip-tools/config`, so the whole
-`opensip-tools.config.yml` document is defined, validated, and templated from one
+_tool-agnostic_ configuration into `@opensip-cli/config`, so the whole
+`opensip-cli.config.yml` document is defined, validated, and templated from one
 place. Hygiene + consolidation, no new behaviour beyond the strict validation
 2.10.0 introduced. See
 [ADR-0023](docs/decisions/ADR-0023-config-package-and-schema-registry.md) (and its
@@ -322,26 +322,26 @@ place. Hygiene + consolidation, no new behaviour beyond the strict validation
 ### Added
 
 - **`no-config-loader-outside-config` architecture guardrail.** Fails CI if a
-  package other than `@opensip-tools/config` hand-rolls a loader for a
+  package other than `@opensip-cli/config` hand-rolls a loader for a
   document-level config block (projecting YAML fields without routing through the
   config-owned Zod schemas). Complements `one-config-document`; together they make
-  "config is parsed only in `@opensip-tools/config`" mechanically true.
+  "config is parsed only in `@opensip-cli/config`" mechanically true.
 
 ### Changed
 
 - **`contracts` is types-only again.** The `cli:` block loader
   (`loadCliDefaults` / `CliDefaults` / its schema) moved out of
-  `@opensip-tools/contracts` — its runtime YAML projection was a standing
-  violation of the package's types-only charter — into `@opensip-tools/config`.
+  `@opensip-cli/contracts` — its runtime YAML projection was a standing
+  violation of the package's types-only charter — into `@opensip-cli/config`.
 - **Shared targeting is no longer owned by `fitness`.** The two-layer scope model
   (`targets` / `globalExcludes` / `checkOverrides` document shape + schemas) lives
-  in `@opensip-tools/config`; `fitness` consumes it and keeps the file-resolution
+  in `@opensip-cli/config`; `fitness` consumes it and keeps the file-resolution
   runtime (`TargetRegistry`).
-- **User-global config I/O** (`~/.opensip-tools/config.yml`) and cloud-config
-  resolution moved into `@opensip-tools/config`; the `configure` command's UX
+- **User-global config I/O** (`~/.opensip-cli/config.yml`) and cloud-config
+  resolution moved into `@opensip-cli/config`; the `configure` command's UX
   stays in the CLI and reads I/O through the package.
 - **The `init` scaffold derives its document skeleton from the composed schema**
-  (rendered by `@opensip-tools/config`) instead of a second, hand-written template
+  (rendered by `@opensip-cli/config`) instead of a second, hand-written template
   that could drift from what validation accepts.
 
 ## [2.10.0] — 2026-06-07
@@ -355,7 +355,7 @@ release — there is no separate 2.9.0.) See
 > ### ⚠️ Behaviour change (pre-GA)
 >
 > **Config validation is now strict.** Each tool's namespace in
-> `opensip-tools.config.yml` (`graph:`, `fitness:`, `simulation:`) is validated
+> `opensip-cli.config.yml` (`graph:`, `fitness:`, `simulation:`) is validated
 > against a composed schema before a command runs; an **unknown key inside a tool
 > block now fails** (e.g. a typo'd knob) instead of silently defaulting. Unknown
 > _top-level_ blocks (`cli:`, `targets:`, …) still pass through — they migrate in
@@ -372,8 +372,8 @@ release — there is no separate 2.9.0.) See
 - **Tool trust & provenance.** Each tool's source (bundled / installed /
   project-local), identity, and manifest hash are recorded and surfaced in
   `plugin list` (human + `--json`). Project-local executable tools are
-  deny-by-default (allowlist via `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`).
-- **New `@opensip-tools/config` package (32nd publishable package).** A
+  deny-by-default (allowlist via `OPENSIP_CLI_ALLOW_PROJECT_TOOLS`).
+- **New `@opensip-cli/config` package (32nd publishable package).** A
   config-schema composer: each tool contributes a namespaced Zod schema; the host
   composes one whole-document schema, validates it strictly before dispatch
   (precedence: flag > env > file > defaults), and generates a JSON Schema for
@@ -431,7 +431,7 @@ per-tool keys (see below).
 
 ### Fixed
 
-- **`opensip-tools graph` (and `sim`) no longer abort with `Unknown graph
+- **`opensip graph` (and `sim`) no longer abort with `Unknown graph
 recipe '<name>'`** when a project sets a `fit` recipe as the (formerly
   tool-agnostic) `cli.recipe` default. Each tool now resolves its own recipe and
   tolerates a config default it doesn't recognize.
@@ -515,7 +515,7 @@ release.
 > **[2.7 migration guide](docs/public/70-reference/07-migrating-to-2.7.md)**.
 
 > **Heads-up for plugin authors / `--json` consumers:** the `--json` payload, the
-> `@opensip-tools/contracts` type surface, the `@opensip-tools/reporting` package
+> `@opensip-cli/contracts` type surface, the `@opensip-cli/reporting` package
 > name, the `RunScope` recipe-config slot, and the `./internal` subpath exports
 > all changed. The
 > [migration guide](docs/public/70-reference/07-migrating-to-2.7.md) is the
@@ -529,7 +529,7 @@ summary }` + `units[]`, identical across `fit` / `sim` / `graph`. A `fit`
   check, a `graph` rule, and a `sim` scenario are all **units** that _produce
   signals_. See the
   [JSON output schema](docs/public/70-reference/04-json-output-schema.md).
-- **`@opensip-tools/tree-sitter` package (ADR-0010).** The new canonical
+- **`@opensip-cli/tree-sitter` package (ADR-0010).** The new canonical
   tree-sitter parse substrate: wraps `web-tree-sitter` and hosts the relocated
   graph node accessors. The `lang-*` packages are now the canonical parse
   substrate; Python / Rust / Go / Java parse through `lang-*` → tree-sitter.
@@ -550,7 +550,7 @@ summary }` + `units[]`, identical across `fit` / `sim` / `graph`. A `fit`
 - **Tools no longer render.** Egress moved to the CLI composition root, which
   routes formatter × sink (`json` / `sarif` / `table` × file / cloud). A new
   `cli.writeSarif` file seam carries SARIF output through the root (ADR-0011).
-- **Renamed package: `@opensip-tools/reporting` → `@opensip-tools/output`.** Split
+- **Renamed package: `@opensip-cli/reporting` → `@opensip-cli/output`.** Split
   into a pure `format/` half (signal → string formatters) and an effectful
   `sink/` half (file, cloud).
 - **Kernel: `recipeCheckConfig` / `RecipeCheckConfigSlot` → `recipeUnitConfig` /
@@ -563,12 +563,12 @@ summary }` + `units[]`, identical across `fit` / `sim` / `graph`. A `fit`
 
 ### Removed
 
-- **Removed from `@opensip-tools/contracts`:** `CliOutput`, `CheckOutput`,
+- **Removed from `@opensip-cli/contracts`:** `CliOutput`, `CheckOutput`,
   `FindingOutput`, `TableRow`, `SummaryOptions` — the types that backed the old
   `CliOutput` rendering model.
 - **`./internal` subpaths are no longer in the published `exports` map** of any
-  package (e.g. `@opensip-tools/fitness/internal`,
-  `@opensip-tools/graph/internal`). They were never a supported surface.
+  package (e.g. `@opensip-cli/fitness/internal`,
+  `@opensip-cli/graph/internal`). They were never a supported surface.
 
 ## [2.6.2] — 2026-06-03
 
@@ -585,7 +585,7 @@ OpenSIP Cloud signal sync, a two-audit remediation pass, and packaging polish.
   to OpenSIP Cloud — additive, best-effort, never blocking or failing a run.
   Local SQLite stays the source of truth. Opt out per-run with `--no-cloud`,
   per-project with `cli.cloud.sync: false`, or machine-wide via
-  `~/.opensip-tools/config.yml`. A first-run notice explains what is sent.
+  `~/.opensip-cli/config.yml`. A first-run notice explains what is sent.
 - **Per-package READMEs and npm `keywords`** generated for all 30 published
   packages (so npmjs.com pages render and are searchable), with `docs:readmes`
   / `docs:keywords` generators + CI sync gates.
@@ -596,10 +596,10 @@ OpenSIP Cloud signal sync, a two-audit remediation pass, and packaging polish.
 ### Changed
 
 - **Public API surface tightened (ADR-0009).** Test-only engine internals moved
-  behind `@opensip-tools/graph/internal` and `@opensip-tools/fitness/internal`;
+  behind `@opensip-cli/graph/internal` and `@opensip-cli/fitness/internal`;
   the raw session schema is package-private; leaked internal helpers were
   dropped from the fitness barrel. **Migration:** import `CheckDisplayEntry`
-  from `@opensip-tools/fitness` (it moved out of `@opensip-tools/core`).
+  from `@opensip-cli/fitness` (it moved out of `@opensip-cli/core`).
 - **Update check runs hourly** instead of daily, so a newly published release
   is noticed within the hour (the detached fetch still never blocks a command).
 - Docs: the modular-monolith and contract-surface concepts refreshed to match
@@ -615,7 +615,7 @@ OpenSIP Cloud signal sync, a two-audit remediation pass, and packaging polish.
 - **fix-evaluation surfaces as explicitly unavailable** (deferred) instead of a
   placeholder `passed: false` that looked like a real verdict.
 - **Privacy: the user-level cloud opt-out is now wired.** `cloud.sync: false`
-  in `~/.opensip-tools/config.yml` was read for the API key but ignored for the
+  in `~/.opensip-cli/config.yml` was read for the API key but ignored for the
   sync setting; it now disables sync (a `false` in either user or project
   config wins).
 - **`fit --report-to` composes with `--json`, gate, and non-TTY (CI) runs** —
@@ -633,9 +633,9 @@ silenced warning below; the rest closes the class of bug that produced it.
 ### Fixed
 
 - **Graph-adapter discovery no longer warns on shared scaffolding.**
-  `opensip-tools` printed
-  `graph adapter @opensip-tools/graph-adapter-common does not export a valid "adapter" — skipping`
-  on every run: adapter auto-discovery matched the `@opensip-tools/graph-*`
+  `opensip-cli` printed
+  `graph adapter @opensip-cli/graph-adapter-common does not export a valid "adapter" — skipping`
+  on every run: adapter auto-discovery matched the `@opensip-cli/graph-*`
   name prefix and swept in the shared `graph-adapter-common` library (which is
   not an adapter). Discovery now requires the `opensipTools.kind: "graph-adapter"`
   marker — mirroring tool discovery — so non-adapter packages under the prefix
@@ -654,7 +654,7 @@ silenced warning below; the rest closes the class of bug that produced it.
   The marker is now the canonical contract for all four plugin kinds.
   `'graph-adapter'` becomes a first-class marker kind in `core`, read through a
   single canonical reader (graph's duplicate reader is gone). First-party
-  `@opensip-tools/checks-*` packs now declare `kind: "fit-pack"`, and the
+  `@opensip-cli/checks-*` packs now declare `kind: "fit-pack"`, and the
   `checks-*` / `graph-*` name-prefix scans are demoted to deprecated fallbacks
   (kept for third-party backward compatibility; removal slated for the next
   major).
@@ -701,7 +701,7 @@ Five new structural graph rules ship on a new engine feature layer. See
 
 - **Recipe selection is now shared (ADR-0005).** The generic recipe substrate
   (unit selection + per-unit config override) is hoisted into
-  `@opensip-tools/core`; `fitness`, `simulation`, and `graph` consume it instead
+  `@opensip-cli/core`; `fitness`, `simulation`, and `graph` consume it instead
   of three separate copies. No behavior change for `fit` / `sim` recipes.
 - **Derived-data persistence policy (ADR-0006).** Engine-derived analyses are
   recomputed views by default, materialized into the catalog document only for
@@ -765,19 +765,19 @@ Five new structural graph rules ship on a new engine feature layer. See
 
 - Split two over-length source files behind re-export barrels (no public API
   change): the `CommandResult` union + variant interfaces moved from
-  `@opensip-tools/contracts` `types.ts` into `command-results.ts`, and the strip
-  scanner primitives moved from `@opensip-tools/core` `strip-utils.ts` into
+  `@opensip-cli/contracts` `types.ts` into `command-results.ts`, and the strip
+  scanner primitives moved from `@opensip-cli/core` `strip-utils.ts` into
   `strip-scanners.ts`. Both files re-export the extracted half, so package
   import surfaces are unchanged.
 - Hoisted the shared fitness results-table helpers (`sortFitRowPriority`,
-  `parseValidatedCount`) into `@opensip-tools/cli-ui` so the live and static fit
+  `parseValidatedCount`) into `@opensip-cli/cli-ui` so the live and static fit
   views share one implementation — clearing the genuine cross-package
   duplication the `graph:duplicated-function-body` watchdog flagged.
 
 ## [2.5.1] — 2026-06-02
 
 > **Note:** `2.5.0` was never a coordinated release. Only
-> `@opensip-tools/graph-adapter-common@2.5.0` was published — by the one-time
+> `@opensip-cli/graph-adapter-common@2.5.0` was published — by the one-time
 > trusted-publisher bootstrap that establishes a brand-new package name on npm
 > (predating the consolidation work below). npm versions are immutable, so that
 > stub can't be overwritten; `2.5.1` is the first complete, coordinated publish
@@ -785,7 +785,7 @@ Five new structural graph rules ship on a new engine feature layer. See
 
 ### Added
 
-- **New package `@opensip-tools/graph-adapter-common`** — shared tree-sitter
+- **New package `@opensip-cli/graph-adapter-common`** — shared tree-sitter
   adapter scaffolding (discover / parse / walk / cache-key factories) consumed
   by the Go, Java, Python, and Rust graph adapters, replacing the boilerplate
   that was duplicated across all four.
@@ -795,7 +795,7 @@ Five new structural graph rules ship on a new engine feature layer. See
   default 3) is reported as a single "hoist to a shared package" finding with
   **no** per-copy size floor — surfacing small-but-widely-copied code the
   per-instance thresholds used to hide. Graph rule config is now read from a
-  `graph:` block in `opensip-tools.config.yml`.
+  `graph:` block in `opensip-cli.config.yml`.
 - **Per-occurrence `package` field** on `GraphFunctionOccurrence` (the nearest
   `package.json` name), so the coupling grid and rules bucket by real package
   identity. Optional / backward-compatible.
@@ -822,10 +822,10 @@ Five new structural graph rules ship on a new engine feature layer. See
   Functions view ranks by the composite blast score (`direct + 0.5 ×
 transitive`); the engine no longer emits per-function blast warnings.
 - **Duplicated code consolidated into shared homes:** language comment/string
-  stripping → `@opensip-tools/core` `makeStripper`; plugin-discovery
+  stripping → `@opensip-cli/core` `makeStripper`; plugin-discovery
   primitives → core; check-pack path/display helpers → the fitness engine;
   tree-sitter adapter helpers (`nameOf`, `skipBlockComment`,
-  `isReturnValueDiscarded`) → `@opensip-tools/graph-adapter-common`; the
+  `isReturnValueDiscarded`) → `@opensip-cli/graph-adapter-common`; the
   `isIdentChar` predicate → core. Surfaced by `graph:duplicated-function-body`
   itself (cross-package duplicate findings 16 → 12; the remainder are
   intentional per-package twins).
@@ -836,7 +836,7 @@ transitive`); the engine no longer emits per-function blast warnings.
 
 - **`graph:high-blast-function` rule** — blast radius is now dashboard-only
   (above). _Breaking_ for anything consuming that rule's findings.
-- **`BlastScore` type and `Indexes.blastRadius`** from the `@opensip-tools/graph`
+- **`BlastScore` type and `Indexes.blastRadius`** from the `@opensip-cli/graph`
   public surface. _Breaking_ for library consumers importing them.
 
 ### Fixed
@@ -916,22 +916,22 @@ transitive`); the engine no longer emits per-function blast warnings.
 
 ### Changed
 
-- **The CLI now publishes under the unscoped name `opensip-tools`** (was
-  `@opensip-tools/cli`). Install and update with a single, memorable command:
+- **The CLI now publishes under the unscoped name `opensip-cli`** (was
+  `@opensip-cli/cli`). Install and update with a single, memorable command:
 
   ```bash
-  npm install -g opensip-tools@latest
+  npm install -g opensip-cli@latest
   ```
 
-  This pulls the CLI **and** every bundled `@opensip-tools/*` package (language
+  This pulls the CLI **and** every bundled `@opensip-cli/*` package (language
   adapters, engine, check packs) in one shot, so updating the CLI updates
-  everything in lockstep. The package name now matches the `opensip-tools`
-  command and bin. The other 28 packages remain scoped `@opensip-tools/*`.
+  everything in lockstep. The package name now matches the `opensip-cli`
+  command and bin. The other 28 packages remain scoped `@opensip-cli/*`.
 
-  **Migration:** `@opensip-tools/cli` is deprecated and points at
-  `opensip-tools`; its last published version (2.3.3) keeps working, but new
-  installs should use `npm i -g opensip-tools`. No code or config changes are
-  required — the `opensip-tools` command, `opensip-tools.config.yml`, and all
+  **Migration:** `@opensip-cli/cli` is deprecated and points at
+  `opensip-cli`; its last published version (2.3.3) keeps working, but new
+  installs should use `npm i -g opensip-cli`. No code or config changes are
+  required — the `opensip-cli` command, `opensip-cli.config.yml`, and all
   subcommands are unchanged.
 
 ## [2.3.3] — 2026-05-31
@@ -955,7 +955,7 @@ transitive`); the engine no longer emits per-function blast warnings.
 ### Changed
 
 - **Clearer messaging when check packs are skipped for a core mismatch.** When
-  a globally-installed CLI runs inside a project that vendors `@opensip-tools`
+  a globally-installed CLI runs inside a project that vendors `@opensip-cli`
   packages, the single-core guard (2.3.1) refuses the project-local packs. That
   case now reports a single consolidated warning naming every skipped pack
   (instead of one paragraph per pack), and suppresses the misleading "install a
@@ -967,19 +967,19 @@ transitive`); the engine no longer emits per-function blast warnings.
 
 ## [2.3.1] — 2026-05-31
 
-A reliability fix for running a globally-installed `opensip-tools` inside a
-project that also installs `@opensip-tools/*` packages.
+A reliability fix for running a globally-installed `opensip-cli` inside a
+project that also installs `@opensip-cli/*` packages.
 
 ### Fixed
 
 - **`fit` no longer produces false positives from a split run scope.** When
   the global CLI discovered check packs from a project's `node_modules`, those
-  packs loaded a second `@opensip-tools/core` instance whose `AsyncLocalStorage`
+  packs loaded a second `@opensip-cli/core` instance whose `AsyncLocalStorage`
   scope differed from the CLI's. Checks then saw no active scope, so the
   content filter silently fell back to raw (unstripped) text and regex checks
   matched patterns inside string literals and comments — e.g. `console.log`
   inside a test fixture. The fit loader now **refuses any check pack that
-  resolves a different `@opensip-tools/core` than the engine** (with an
+  resolves a different `@opensip-cli/core` than the engine** (with an
   actionable warning pointing at the project-local CLI / `pnpm fit`), and the
   content filter **warns once** instead of silently degrading when no run
   scope is active. Packs that share the engine's core (the normal case) are
@@ -1045,16 +1045,16 @@ are unchanged.
 
 Feature release on top of the v2 SQLite-backed platform. The headline
 is a faster, parallel graph engine and an in-browser graph visualizer;
-under the hood, `@opensip-tools/contracts` was purified to a types-only
+under the hood, `@opensip-cli/contracts` was purified to a types-only
 package and its runtime concerns extracted into two new packages. The
-`opensip-tools` CLI surface is backward-compatible with 2.0.x — the
+`opensip-cli` CLI surface is backward-compatible with 2.0.x — the
 breaking items below affect only direct consumers of the
-`@opensip-tools/*` library packages.
+`@opensip-cli/*` library packages.
 
 ### Added
 
-- **Two new packages — `@opensip-tools/session-store` and
-  `@opensip-tools/reporting`** (the workspace is now 29 packages).
+- **Two new packages — `@opensip-cli/session-store` and
+  `@opensip-cli/reporting`** (the workspace is now 29 packages).
   `session-store` owns the session SQLite schema + `SessionRepo`;
   `reporting` owns SARIF build + cloud report. Both were extracted from
   `contracts` so that `contracts` could become types-only.
@@ -1080,11 +1080,11 @@ breaking items below affect only direct consumers of the
 
 ### Changed
 
-- **`@opensip-tools/contracts` is now types-only.** Its former
+- **`@opensip-cli/contracts` is now types-only.** Its former
   drizzle/datastore runtime dependencies are gone; consumers that
   imported `SessionRepo`, the session schema, or SARIF/cloud-report
   helpers from `contracts` must now import them from
-  `@opensip-tools/session-store` or `@opensip-tools/reporting`
+  `@opensip-cli/session-store` or `@opensip-cli/reporting`
   respectively.
 - **The `CliArgs` bridge was removed** — per-command Commander options
   are the single source of truth. Tool authors reading a shared
@@ -1111,17 +1111,17 @@ source behavior changes — this release exists only to repair a broken
 
 ### Fixed
 
-- **`opensip-tools` crashed on startup under 2.0.0** with
-  `SyntaxError: The requested module '@opensip-tools/cli-ui' does not
+- **`opensip-cli` crashed on startup under 2.0.0** with
+  `SyntaxError: The requested module '@opensip-cli/cli-ui' does not
 provide an export named 'RunFooterHints'`. The 2.0.0 release was
-  non-atomic: `@opensip-tools/cli-ui@2.0.0` was published from an
+  non-atomic: `@opensip-cli/cli-ui@2.0.0` was published from an
   earlier build that predated the `RunFooterHints` export, while
-  `@opensip-tools/fitness@2.0.0` (published ~11h later) imported it.
+  `@opensip-cli/fitness@2.0.0` (published ~11h later) imported it.
   Because npm package versions are immutable, the stale `cli-ui` tarball
   could not be overwritten in place. 2.0.1 republishes all 27
-  `@opensip-tools/*` packages together from one clean build, restoring a
+  `@opensip-cli/*` packages together from one clean build, restoring a
   consistent inter-package export contract. **Anyone on 2.0.0 should
-  upgrade: `npm install -g @opensip-tools/cli@2.0.1`.**
+  upgrade: `npm install -g @opensip-cli/cli@2.0.1`.**
 
 ## [2.0.0] — 2026-05-28
 
@@ -1135,11 +1135,11 @@ and breaks compatibility with v1.x runtime layouts.
 
 ### Breaking changes
 
-- **`opensip-tools uninstall --project` no longer destroys user-authored
+- **`opensip uninstall --project` no longer destroys user-authored
   content by default.** The new default removes only
-  `<project>/opensip-tools/.runtime/` (rebuildable state). User-authored
-  content under `opensip-tools/` (custom checks, recipes, scenarios) AND
-  `opensip-tools.config.yml` are preserved. To restore the previous
+  `<project>/opensip-cli/.runtime/` (rebuildable state). User-authored
+  content under `opensip-cli/` (custom checks, recipes, scenarios) AND
+  `opensip-cli.config.yml` are preserved. To restore the previous
   destructive behavior, pass `--purge`. Rationale: the previous default
   was actively dangerous — the warning copy literally said "git history
   is your safety net," which is hope, not a contract.
@@ -1159,16 +1159,16 @@ and breaks compatibility with v1.x runtime layouts.
 - **`ToolCliContext.maybeOpenDashboard` opts no longer accept `cwd`.**
   The dashboard helper reads the project root from `ProjectContext`
   directly. Callers passing `cwd` will fail to compile; remove the field.
-- **`opensip-tools` commands now discover the project root by walking up
-  from cwd.** Running `opensip-tools fit` from a subdirectory of an
+- **`opensip-cli` commands now discover the project root by walking up
+  from cwd.** Running `opensip fit` from a subdirectory of an
   initialized project operates on the parent project root, not the
   subdirectory. This fixes a phantom-scaffold bug where commands run
-  from subdirs silently created a second `opensip-tools/.runtime/`
-  inside the subdir. `opensip-tools init` refuses with an actionable
+  from subdirs silently created a second `opensip-cli/.runtime/`
+  inside the subdir. `opensip init` refuses with an actionable
   three-option message when invoked from inside an existing project —
   use `--cwd .` to override (rare; intended for monorepo packages with
   independent analysis scope).
-- **`opensip-tools` errors with "No opensip-tools project found"
+- **`opensip-cli` errors with "No OpenSIP CLI project found"
   (exit 2) when project-scoped commands run with no config anywhere up
   the ancestor chain.** Previously these would attempt to run and fail
   later with a config-load error. Affected commands: `fit`, `sim`,
@@ -1178,22 +1178,22 @@ and breaks compatibility with v1.x runtime layouts.
   align with the resolved-root semantics. The visible string changed
   from `Target: <cwd>` to `Project: <projectRoot>` (with an optional
   `(found N levels up)` suffix). Third-party tools that import
-  `RunHeader` from `@opensip-tools/cli-ui` must rename the prop.
+  `RunHeader` from `@opensip-cli/cli-ui` must rename the prop.
 - **Runtime state migrates from JSON files to SQLite.** v2 ignores any
-  pre-existing files under `<project>/opensip-tools/.runtime/` and
-  initializes a fresh `<project>/opensip-tools/.runtime/datastore.sqlite`
+  pre-existing files under `<project>/opensip-cli/.runtime/` and
+  initializes a fresh `<project>/opensip-cli/.runtime/datastore.sqlite`
   on first run. Caches rebuild automatically; **session history from
   v1.x is not preserved**. Users who need the old layout should pin to
   v1.x.
-- **`--baseline <path>` flag removed from `opensip-tools fit`.** The
+- **`--baseline <path>` flag removed from `opensip fit`.** The
   baseline is now a single SQLite-backed row per project; the flag has
   no equivalent. Drop `--baseline path/to/file.sarif` from CI
   invocations. The default location of the SARIF baseline (previously
-  `opensip-tools/.runtime/baseline.sarif`) is now embedded as a row in
+  `opensip-cli/.runtime/baseline.sarif`) is now embedded as a row in
   the project's `datastore.sqlite`. Same for the graph baseline (was
-  `opensip-tools/.runtime/cache/graph/baseline.json`).
+  `opensip-cli/.runtime/cache/graph/baseline.json`).
 - **`configurePersistencePaths` removed from
-  `@opensip-tools/contracts`.** This was an internal API used by the
+  `@opensip-cli/contracts`.** This was an internal API used by the
   CLI bootstrap and a small number of tests; replaced by passing a
   `DataStore` through `ToolCliContext`. External consumers who reached
   for it should switch to constructing a `SessionRepo` over the
@@ -1219,8 +1219,8 @@ and breaks compatibility with v1.x runtime layouts.
   workflows continue to consume the file shape without reading the
   datastore directly. Usage:
   ```
-  opensip-tools fit-baseline-export --out path/to/baseline.sarif
-  opensip-tools graph-baseline-export --out path/to/baseline.json
+  opensip fit-baseline-export --out path/to/baseline.sarif
+  opensip graph-baseline-export --out path/to/baseline.json
   ```
   Parent directories of `--out` are created if missing; the file is
   overwritten if present. Exits 2 when no baseline has been captured
@@ -1229,11 +1229,11 @@ and breaks compatibility with v1.x runtime layouts.
   `opensipTools.kind: "fit-pack"` (or `"sim-pack"`) in their `package.json`
   and be auto-discovered regardless of npm scope or name. Mirrors the
   existing tool-plugin marker pattern (`kind: "tool"`). The generic
-  walker lives in `@opensip-tools/core` as `discoverPackagesByMarker`,
+  walker lives in `@opensip-cli/core` as `discoverPackagesByMarker`,
   parameterized by the kind value; fit's `loadDiscoveredCheckPackages`
   and sim's `loadDiscoveredScenarioPackages` call it alongside their
   existing name-pattern walks, deduping by package name. Existing
-  `@opensip-tools/checks-*` / `@opensip-tools/scenarios-*` discovery
+  `@opensip-cli/checks-*` / `@opensip-cli/scenarios-*` discovery
   continues working unchanged.
 - **Fit auto-discovery now loads `mod.recipes`** from discovered check
   packs — previously dropped silently. The `cli.check_package.loaded`
@@ -1245,13 +1245,13 @@ and breaks compatibility with v1.x runtime layouts.
   loader, fit CLI, sim CLI). Emits `plugin.recipe.invalid_item` warnings
   on malformed recipes (previously: sim silently dropped them).
 - **Project-root discovery** — `resolveProjectContext` in
-  `@opensip-tools/core` walks ancestors looking for
-  `opensip-tools.config.yml` (honoring `package.json#opensip-tools.configPath`
+  `@opensip-cli/core` walks ancestors looking for
+  `opensip-cli.config.yml` (honoring `package.json#opensip-cli.configPath`
   at each level). The resolved `ProjectContext` is threaded through
   `ToolCliContext.project` and `opts.projectContext` so every command
   operates on the right root regardless of which directory the user
   invokes from.
-- **`opensip-tools uninstall --purge` flag** for the destructive uninstall
+- **`opensip uninstall --purge` flag** for the destructive uninstall
   mode (removes user content + config alongside runtime).
 - **`ℹ Project: <root>` header** printed before every project-scoped,
   human-readable command (or rendered by `RunHeader` for Ink-rendered
@@ -1259,15 +1259,15 @@ and breaks compatibility with v1.x runtime layouts.
   Suppressed for `--json`, `completion`, `--help`, `--version`,
   user-scoped commands, and `uninstall --project` (whose printer owns
   its own pre-prompt block).
-- **Strict `--config` errors** — `opensip-tools <cmd> --config /typo.yml`
+- **Strict `--config` errors** — `opensip-cli <cmd> --config /typo.yml`
   now errors with the structured `ValidationError` instead of silently
   walking up to find some other ancestor's config.
-- **`@opensip-tools/datastore` package** — paradigm-agnostic SQLite +
+- **`@opensip-cli/datastore` package** — paradigm-agnostic SQLite +
   Drizzle persistence layer. Houses the `DataStore` interface, SQLite
   - in-memory backends, factory, and the workspace-wide migration
     store (`migrations/`). Tools own their domain schemas (sessions in
     contracts; baseline/catalog in graph; baseline in fitness).
-- **`@opensip-tools/dashboard` package** — extracted from contracts
+- **`@opensip-cli/dashboard` package** — extracted from contracts
   (see Changed). Holds `generateDashboardHtml`, the `DashboardInput`
   options shape, the ranked-view template, and the tab activator
   registry.
@@ -1285,22 +1285,22 @@ and breaks compatibility with v1.x runtime layouts.
   `process.stdout.write(JSON.stringify(...))` sites across fitness,
   simulation, and graph.
 - **`Logger` interface + `LoggerImpl` class re-exported from
-  `@opensip-tools/core`.** Tools can substitute their own logger in
+  `@opensip-cli/core`.** Tools can substitute their own logger in
   tests; production code keeps the singleton via the existing
   re-exports.
-- **`LanguageParseCache` re-exported from `@opensip-tools/core`.**
+- **`LanguageParseCache` re-exported from `@opensip-cli/core`.**
   Public type, with a `dispose()` method for test isolation.
-- **`CliProgram` re-exported from `@opensip-tools/contracts`.** Tool
+- **`CliProgram` re-exported from `@opensip-cli/contracts`.** Tool
   packages can drop `as Command` casts in `register(cli)` and accept
   a typed `cli: CliProgram` parameter without taking a direct
   `commander` dependency. The alias is type-only.
-- **`defineRegexListCheck` Template helper in `@opensip-tools/fitness`.**
+- **`defineRegexListCheck` Template helper in `@opensip-cli/fitness`.**
   Collapses the per-line, per-pattern violation-emit loop into a
   declarative config. Adopted at five `checks-universal` sites
   (`no-console-log`, `no-window-alert`, `no-eval`, `no-ai-attribution`,
   `no-process-artifacts`).
-- **`opensip-tools init --keep` and `--remove`.** Two explicit flags
-  for the partial-state cases (config XOR `opensip-tools/` directory
+- **`opensip init --keep` and `--remove`.** Two explicit flags
+  for the partial-state cases (config XOR `opensip-cli/` directory
   present, or directory contents don't match a fresh-init scaffold).
   Default refuses with a clear message; flags express user intent.
   `InitResult.preExistingFiles[]` and `InitResult.partialStateError`
@@ -1317,27 +1317,27 @@ and breaks compatibility with v1.x runtime layouts.
   file, which the v2 graph migration stopped writing. The dashboard's
   Code Paths panel rendered in a no-data state for every project on
   v2 as a result. The fix queries the `graph_catalog` table directly
-  via raw SQL (importing `CatalogRepo` from `@opensip-tools/graph`
+  via raw SQL (importing `CatalogRepo` from `@opensip-cli/graph`
   would create a build cycle since graph already depends on fitness
   for SARIF helpers — DEC-3).
-- **`@opensip-tools/contracts`** gains `SessionRepo` and the sessions
+- **`@opensip-cli/contracts`** gains `SessionRepo` and the sessions
   schema. `StoredSession` shape is unchanged; layout shifts from
   one-JSON-per-run files to `sessions` + `session_checks` +
   `session_findings` rows.
-- **`@opensip-tools/graph`** loads/saves the call-graph catalog and
+- **`@opensip-cli/graph`** loads/saves the call-graph catalog and
   the gate baseline through `CatalogRepo` and `GraphBaselineRepo`.
   Catalog write is whole-replace at end of pipeline; the cached read
   shape is identical to v1's (`Catalog` value with the same fields),
   so dashboard view derivations and rules are unchanged. Performance
   is at parity; per-package incremental writes and view-targeted
   queries land in a follow-up `graph-catalog-perf` plan.
-- **`@opensip-tools/fitness`** stores the SARIF gate baseline in
+- **`@opensip-cli/fitness`** stores the SARIF gate baseline in
   `fit_baseline` (single row). The hash-based diff algorithm
   (`extractViolationsFromSarif`/`extractViolationsFromCliOutput`) is
   unchanged; only the I/O moves. The fitness file-cache stays as v1's
   in-process `Map<string, string>` — it is per-run only, not
   persistent, so no migration applies.
-- **Dashboard renderer extracted to `@opensip-tools/dashboard`.**
+- **Dashboard renderer extracted to `@opensip-cli/dashboard`.**
   The renderer subtree previously living under
   `packages/contracts/src/persistence/dashboard/` moves to its own
   workspace package at Layer 3. `contracts` no longer contains
@@ -1360,9 +1360,9 @@ graphCatalog?, editorProtocol? })`. `DashboardInput` is exported
   Overview tab no longer references `openCodePathsSession` by name;
   it asks the registry via `activateTabForSession(s)`. Session-aware
   tabs register their activators via `registerTabActivator(key, fn)`.
-- **`opensip-tools init` flag rename.** `--force` is removed;
+- **`opensip init` flag rename.** `--force` is removed;
   replaced by `--keep` (re-scaffold examples, preserve custom files)
-  and `--remove` (delete `opensip-tools/` entirely, then scaffold
+  and `--remove` (delete `opensip-cli/` entirely, then scaffold
   fresh). Default refuses on partial state with a clear flag hint.
   Migration: `--force` → `--remove` (closest semantic match — it
   overwrote everything).
@@ -1377,9 +1377,9 @@ graphCatalog?, editorProtocol? })`. `DashboardInput` is exported
   legacy third-party packs that follow `@scope/checks-*` naming
   conventions without declaring the marker. See
   [`docs/public/50-extend/01-plugin-authoring.md`](docs/public/50-extend/01-plugin-authoring.md).
-- **`CliArgs` from `@opensip-tools/contracts` is deprecated for new
+- **`CliArgs` from `@opensip-cli/contracts` is deprecated for new
   flags.** The interface still works (`*OptsToCliArgs` adapter
-  functions in `@opensip-tools/fitness`, `@opensip-tools/simulation`,
+  functions in `@opensip-cli/fitness`, `@opensip-cli/simulation`,
   and the CLI's `init` command remain in place), but new command flags
   should land on the per-command options interfaces — `FitOptions`,
   `ToolOptions`, `InitOptions` — rather than on `CliArgs`. The
@@ -1406,7 +1406,7 @@ graphCatalog?, editorProtocol? })`. `DashboardInput` is exported
   site read them, and every field (`name`, `version`, `description`,
   etc.) duplicated `package.json` which is already read separately via
   `readCheckPackageMetadata`. Removed wholesale; first-party check packs
-  (`@opensip-tools/checks-typescript`, `-universal`, `-python`, `-go`,
+  (`@opensip-cli/checks-typescript`, `-universal`, `-python`, `-go`,
   `-java`, `-cpp`, `-rust`) had their `export const metadata` blocks
   removed. Third-party packs still exporting `metadata` continue to work
   (the field is silently ignored at load time); they can remove it at
@@ -1414,7 +1414,7 @@ graphCatalog?, editorProtocol? })`. `DashboardInput` is exported
   will get a purpose-built design.
 - **`packages/graph/engine/src/cache/{read,write,normalize}.ts`** — the
   streamed JSON catalog reader/writer. Replaced by `CatalogRepo`.
-- **`@opensip-tools/contracts` exports**: `configurePersistencePaths`,
+- **`@opensip-cli/contracts` exports**: `configurePersistencePaths`,
   `saveSession`, `loadSessions`, `loadLatestSession`, `countSessions`,
   `clearAllSessions`, `clearSessionsOlderThan`, `getStoreDir`,
   `getReportsDir`. Replaced by `SessionRepo`.
@@ -1437,7 +1437,7 @@ graphCatalog?, editorProtocol? })`. `DashboardInput` is exported
 
 ### Upgrade path
 
-- **v1.x → v2.0.0**: re-run `opensip-tools fit --gate-save` to
+- **v1.x → v2.0.0**: re-run `opensip fit --gate-save` to
   re-establish the architecture-gate baseline; the rest is automatic.
   Drop `--baseline <path>` from any CI invocations.
 - **v2.x → v2.y** (future minor releases): first run of the new
@@ -1445,27 +1445,27 @@ graphCatalog?, editorProtocol? })`. `DashboardInput` is exported
   existing `datastore.sqlite`. Users see no extra step. Downgrades
   across schema changes are unsupported and produce a
   `DataStoreMigrationError` on next run; recovery is to delete
-  `<project>/opensip-tools/.runtime/datastore.sqlite` (cache rebuilds;
+  `<project>/opensip-cli/.runtime/datastore.sqlite` (cache rebuilds;
   session history lost).
 
 ## [1.3.1] — 2026-05-18
 
 Maintenance release. Clears the `glob@11.1.0` deprecation warning that
-surfaced on `npm install -g @opensip-tools/cli` by bumping the
+surfaced on `npm install -g @opensip-cli/cli` by bumping the
 first-party `glob` dependency to the current major. No behavioral or
 API changes.
 
 ### Changed
 
 - **`glob` bumped from `^11.0.0` to `^13.0.0`** in
-  `@opensip-tools/fitness` and `@opensip-tools/graph`. Both packages
+  `@opensip-cli/fitness` and `@opensip-cli/graph`. Both packages
   use only the stable `glob` / `globSync` named exports, so the
   upgrade is drop-in. The previous `glob@11.x` major was deprecated
   upstream by npm; v13 is the current release line.
 
 ## [1.3.0] — 2026-05-18
 
-Language pluggability for `@opensip-tools/graph`. Implements [plan
+Language pluggability for `@opensip-cli/graph`. Implements [plan
 10](docs/plans/10-graph-language-pluggability.md) end-to-end (PRs
 2-6): the graph engine is no longer TypeScript-only. A new
 `GraphLanguageAdapter` contract lets any language pack participate;
@@ -1475,7 +1475,7 @@ catalog output is byte-identical pre vs. post refactor.
 
 ### Added
 
-- **Python adapter** (`@opensip-tools/graph` ships it first-party).
+- **Python adapter** (`@opensip-cli/graph` ships it first-party).
   Tree-sitter parser, name-based call resolution, file discovery
   via `pyproject.toml` / `setup.py` with `**/*.py` glob fallback.
   Emits function/method/lambda + module-init occurrences.
@@ -1573,7 +1573,7 @@ catalog output is byte-identical pre vs. post refactor.
 
 ## [1.2.0] — 2026-05-18
 
-A performance-focused release for `@opensip-tools/graph`. Implements
+A performance-focused release for `@opensip-cli/graph`. Implements
 [`docs/plans/00-graph-performance-improvements.md`](docs/plans/00-graph-performance-improvements.md)
 waves 1–4. Driven by an OpenSIP measurement run (5476 files) that
 OOM'd Node's default 4 GB heap and took ~25 minutes under a 12 GB
@@ -1584,7 +1584,7 @@ heap.
 - **`graph --packages`** — fan a graph run across every workspace
   package under `packages/**` with a `tsconfig.json`. One child
   process per package, concurrency capped at `cpus()-1`. Aggregates
-  per-package findings into a unified report. On the opensip-tools
+  per-package findings into a unified report. On the opensip-cli
   self-graph (18 packages), a parallel run is ~2.3× faster than the
   global run with no fidelity change. `--packages-concurrency <n>`
   overrides the cap.
@@ -1619,7 +1619,7 @@ heap.
   `incremental`, the orchestrator re-walks only the changed files
   plus their transitive edge-dependents and merges with cached
   entries from unchanged files. Iterates to fixpoint so no cached
-  edge dangles. Editing a single file in the opensip-tools self-
+  edge dangles. Editing a single file in the opensip-cli self-
   graph drops rebuild time from ~15 s (full) to ~2.5 s (incremental,
   ~6×) with byte-identical output. `--no-cache` still forces a full
   rebuild.
@@ -1675,12 +1675,12 @@ heap.
 
 > **DRAFT — please review and rewrite the framing before tagging.** The
 > lead bullet under _Added_ should reflect how you want users to
-> perceive `@opensip-tools/graph`: as a first-class third tool, or
+> perceive `@opensip-cli/graph`: as a first-class third tool, or
 > still flagged experimental like `sim` has been.
 
 ### Added
 
-- **`@opensip-tools/graph` — new tool package**, the third first-party
+- **`@opensip-cli/graph` — new tool package**, the third first-party
   Tool alongside `fit` and `sim`. Static call-graph + dead-end analysis
   with a six-stage staged pipeline and an interactive HTML dashboard
   (`graph dashboard`). Dashboard views shipped: Function Card overlay,
@@ -1688,18 +1688,18 @@ heap.
   (Tarjan), Coupling heat map, plus collapsible filter chips, hash
   routing, editor deep-links from entry, and a slide-out per-tab help
   drawer. Initial gate baseline is committed at
-  `opensip-tools/graph/baseline.json` so the tool can gate itself in CI
+  `opensip-cli/graph/baseline.json` so the tool can gate itself in CI
   from day one.
 
 - **Coverage gate at ≥90%** across the engine and language packs:
-  `@opensip-tools/core`, `fitness`, `simulation`, `graph`, `lang-rust`,
+  `@opensip-cli/core`, `fitness`, `simulation`, `graph`, `lang-rust`,
   `checks-typescript`, `checks-universal`, and exported helpers in
   `checks-{cpp,go,java,python}`. Exercises previously-uncovered
   exported surfaces, not synthetic coverage padding.
 
 ### Fixed
 
-- **`defineRecipe` is now exported from `@opensip-tools/fitness`.**
+- **`defineRecipe` is now exported from `@opensip-cli/fitness`.**
   The helper was used internally but never re-exported through the
   package barrel, blocking out-of-tree recipe authors. The
   `chaos-executor` doc reference was corrected at the same time.
@@ -1708,7 +1708,7 @@ heap.
   All three first-party Tools (`fitness`, `simulation`, `graph`) now
   read their version from package.json at module-load time via a new
   `readPackageVersion(import.meta.url)` helper exported from
-  `@opensip-tools/core`. Previously the version was a hardcoded
+  `@opensip-cli/core`. Previously the version was a hardcoded
   literal in each `tool.ts`; `fitness` and `simulation` reported
   `'1.0.0'` through several releases because nothing forced a sync
   on bump. `fitness` and `simulation` now have contract tests
@@ -1728,16 +1728,16 @@ heap.
 - Release plumbing updated for the third tool: `RELEASING.md`,
   `.github/workflows/release.yml` (preflight, pack, publish steps),
   and `tools/bootstrap-publish.sh` now account for 18 packages
-  including `@opensip-tools/graph`.
+  including `@opensip-cli/graph`.
 
 ## [1.0.10] — 2026-05-16
 
 ### Added
 
-- **`opensip-tools uninstall --project [path]`** — project-local
-  cleanup. Removes both `<path>/opensip-tools/` (user-authored checks +
+- **`opensip uninstall --project [path]`** — project-local
+  cleanup. Removes both `<path>/opensip-cli/` (user-authored checks +
   recipes and the gitignored `.runtime/` cache) and
-  `<path>/opensip-tools.config.yml`. Path defaults to cwd; pass
+  `<path>/opensip-cli.config.yml`. Path defaults to cwd; pass
   `--project /path/to/repo` to target another location. Refuses to run
   when neither target exists at the resolved path, so an accidental
   `--project /unrelated/dir` is a no-op rather than a destructive
@@ -1751,17 +1751,17 @@ heap.
 
 ### Fixed
 
-- **`~/.opensip-tools/` is now reserved for `config.yml` only.**
-  `@opensip-tools/contracts/persistence/store` and
-  `@opensip-tools/core/lib/logger` previously defaulted to writing
+- **`~/.opensip-cli/` is now reserved for `config.yml` only.**
+  `@opensip-cli/contracts/persistence/store` and
+  `@opensip-cli/core/lib/logger` previously defaulted to writing
   sessions, reports, and logs under the home directory if no caller
   bootstrapped them — letting the user-level dir accumulate state that
   the documented architecture said only ever held config. The
   fallbacks are gone; persistence APIs throw if used before
   `configurePersistencePaths()` and `initLogFile(dir)` requires its
   `dir` argument at compile time. Any pre-existing
-  `~/.opensip-tools/{sessions,reports,logs,fit}` dirs are legacy cruft
-  and are swept up by `opensip-tools uninstall`.
+  `~/.opensip-cli/{sessions,reports,logs,fit}` dirs are legacy cruft
+  and are swept up by `opensip uninstall`.
 
 - **Stale `--force` flag in the architecture docs.** The
   `docs/public/70-reference/01-cli-commands.md` uninstall
@@ -1774,11 +1774,11 @@ heap.
 ### Fixed
 
 - **Per-check recipe config now reaches the check.** The
-  `getCheckConfig(slug)` plumbing in `@opensip-tools/fitness` stored
+  `getCheckConfig(slug)` plumbing in `@opensip-cli/fitness` stored
   the recipe-service-supplied config map on a module-local `let` —
-  which meant the CLI's bundled `@opensip-tools/fitness` (running the
+  which meant the CLI's bundled `@opensip-cli/fitness` (running the
   recipe service) and the plugin pack's resolved
-  `@opensip-tools/fitness` (running the check + calling
+  `@opensip-cli/fitness` (running the check + calling
   `getCheckConfig`) saw separate module-scope state. The recipe's
   `additionalSyncFunctions` / `additionalSelfDocumentingSuffixes` /
   `additionalSafeTOCTOUPaths` allowlists were silently never reaching
@@ -1786,7 +1786,7 @@ heap.
   / null-safety / toctou-race-condition warned on every project-
   declared safe call site despite the recipe authoring them.
 
-  The fix hoists the slot onto a `Symbol.for('@opensip-tools/fitness/
+  The fix hoists the slot onto a `Symbol.for('@opensip-cli/fitness/
 currentRecipeCheckConfig')` entry on `globalThis`, so every loaded
   copy reads + writes the same well-known slot regardless of which
   package instance imported the module. The single-session contract
@@ -1804,7 +1804,7 @@ currentRecipeCheckConfig')` entry on `globalThis`, so every loaded
 
 - **Directive parser now recognises Markdown (`<!--`) and shell/YAML
   (`#`) comment prefixes.** Pre-1.0.8 `extractCheckIdFromDirective` in
-  `@opensip-tools/fitness` only matched `//` and `/*` openers, so
+  `@opensip-cli/fitness` only matched `//` and `/*` openers, so
   `@fitness-ignore-file <slug>` / `@fitness-ignore-next-line <slug>`
   pragmas inside Markdown documents, HTML files, YAML configs, shell
   scripts, and Python were silently ignored — the file got scanned
@@ -1825,7 +1825,7 @@ Four built-in checks were producing high-rate false positives against
 real-world TypeScript codebases. Each fix tightens the heuristic
 without losing real-bug coverage; regression tests pin the FP cases.
 
-- **`sql-injection`** (`@opensip-tools/checks-typescript`)
+- **`sql-injection`** (`@opensip-cli/checks-typescript`)
   - `SQL_CLAUSE_PATTERN` was case-insensitive — `/\b(?:WHERE|AND|OR|
 SET|VALUES)\b/i` matched the English words "and"/"or"/"set"/"where"
     inside CLI help text (`cli.info('Usage: ...\n' + '...and continues
@@ -1842,7 +1842,7 @@ DELETE|...`) somewhere. Closes the residual FP where uppercase
     function for direct test invocation; added 7-test FP regression
     suite in `__tests__/sql-injection.test.ts`.
 
-- **`context-mutation-check`** (`@opensip-tools/checks-typescript`)
+- **`context-mutation-check`** (`@opensip-cli/checks-typescript`)
   - Flagged `ctx.X = value` mutations even when `ctx` was a locally-
     declared `const`/`let`/`var` (object-construction pattern), not
     a shared request context. Now scans the file for local
@@ -1851,7 +1851,7 @@ DELETE|...`) somewhere. Closes the residual FP where uppercase
   - Extracted `analyzeContextMutation` for direct test invocation;
     added 4-test FP regression suite.
 
-- **`no-hardcoded-secrets`** (`@opensip-tools/checks-universal`)
+- **`no-hardcoded-secrets`** (`@opensip-cli/checks-universal`)
   - Matched secret patterns inside REGEX LITERALS (the file IS the
     redactor — `[/-----BEGIN PRIVATE KEY-----.../g, replacement]`)
     and inside REDACTION PLACEHOLDERS (`'-----BEGIN PRIVATE KEY-----
@@ -1864,7 +1864,7 @@ DELETE|...`) somewhere. Closes the residual FP where uppercase
   - Extracted `analyzeHardcodedSecrets`; added 3-test FP regression
     suite.
 
-- **`eslint-justifications`** (`@opensip-tools/checks-universal`)
+- **`eslint-justifications`** (`@opensip-cli/checks-universal`)
   - Reported "Malformed ESLint suppression comment" for rationales
     between 401 and 500 characters. The disable-pattern regex
     accepted bodies up to 500 chars (matching `MAX_JUSTIFICATION_
@@ -1885,12 +1885,12 @@ LENGTH`) but the rationale-extraction regex capped at 400 — so
 
 ### Fixed
 
-- **Plugin discovery now honors `package.json#opensip-tools.configPath`.**
-  `readProjectPluginsList` in `@opensip-tools/core` previously hardcoded
-  `<projectDir>/opensip-tools.config.yml`, ignoring the package.json
+- **Plugin discovery now honors `package.json#opensip-cli.configPath`.**
+  `readProjectPluginsList` in `@opensip-cli/core` previously hardcoded
+  `<projectDir>/opensip-cli.config.yml`, ignoring the package.json
   pointer that the targets loader (`resolveProjectConfigPath`) already
   honored. Projects whose config lived at a non-default path — e.g.,
-  pointing at `opensip-tools/opensip-tools.config.yml` in a monorepo
+  pointing at `opensip-cli/opensip-cli.config.yml` in a monorepo
   with a vendor-tooling subdir — had their `plugins.<domain>: [...]`
   declaration silently skipped. The plugins dir then fell through to
   the empty default, and the declared pack never registered (so no
@@ -1898,8 +1898,8 @@ LENGTH`) but the rationale-extraction regex capped at 400 — so
 
   The fix routes `readProjectPluginsList` through
   `resolveProjectConfigPath` so the precedence is identical across
-  the two loaders: `--config` → `package.json#opensip-tools.configPath`
-  → `<projectDir>/opensip-tools.config.yml`. Coverage added to
+  the two loaders: `--config` → `package.json#opensip-cli.configPath`
+  → `<projectDir>/opensip-cli.config.yml`. Coverage added to
   `discover.test.ts` for the pointer + default-fallback cases.
 
 ## [1.0.0] — 2026-05-15
@@ -1910,7 +1910,7 @@ releases listed further down are the actual public history.
 
 ### Architecture
 
-- **Tool-plugin platform.** `@opensip-tools/core` is a strict kernel
+- **Tool-plugin platform.** `@opensip-cli/core` is a strict kernel
   (errors, logger, IDs, language adapters, plugin loader, Tool
   contract). Fitness and simulation are first-party tools that
   implement the Tool contract; the CLI is a generic dispatcher that
@@ -1927,60 +1927,60 @@ releases listed further down are the actual public history.
 
 ### Packages (17)
 
-- **`@opensip-tools/cli`** — generic tool dispatcher (Ink/React UI).
-- **`@opensip-tools/core`** — kernel: errors, logger, IDs, language
+- **`@opensip-cli/cli`** — generic tool dispatcher (Ink/React UI).
+- **`@opensip-cli/core`** — kernel: errors, logger, IDs, language
   adapters, plugin loader, Tool contract, path resolution.
-- **`@opensip-tools/contracts`** — CLI types, exit codes, session
+- **`@opensip-cli/contracts`** — CLI types, exit codes, session
   persistence, dashboard HTML generator.
-- **`@opensip-tools/fitness`** — fitness engine + commands
+- **`@opensip-cli/fitness`** — fitness engine + commands
   (`fit`, `dashboard`, `fit-list`, `fit-recipes`), recipe service,
   architecture gate (baseline/compare), SARIF reporting.
-- **`@opensip-tools/simulation`** — simulation engine, sim recipes,
+- **`@opensip-cli/simulation`** — simulation engine, sim recipes,
   built-in `default` recipe (selects all scenarios). Load + chaos
   scenario kinds are end-to-end functional; invariant and
   fix-evaluation are usable but their executors are MVP.
-- **`@opensip-tools/checks-typescript`** (66 checks) — TS-AST checks
+- **`@opensip-cli/checks-typescript`** (66 checks) — TS-AST checks
   (drizzle-orm, typed-inject, react, package.json#exports, tsconfig).
-- **`@opensip-tools/checks-universal`** (88 checks) — text/regex/glob
+- **`@opensip-cli/checks-universal`** (88 checks) — text/regex/glob
   checks (Docker, .env, Sentry, generic structure).
-- **`@opensip-tools/checks-{python,go,java,cpp}`** — language-specific
+- **`@opensip-cli/checks-{python,go,java,cpp}`** — language-specific
   packs (Python `no-bare-except`, Go `no-fmt-print`, Java
   `no-printstacktrace`, C/C++ `clang-tidy` passthrough).
-- **`@opensip-tools/lang-{typescript,rust,python,go,java,cpp}`** —
+- **`@opensip-cli/lang-{typescript,rust,python,go,java,cpp}`** —
   language adapters (typescript ships a tsc-based parser; the others
   are hand-written lexers, with tree-sitter integration deferred).
 
 ### CLI surface
 
 ```bash
-opensip-tools                              # welcome screen
-opensip-tools init                         # detect language + scaffold
-opensip-tools fit --recipe example         # smoke test the example check
-opensip-tools sim --recipe example         # smoke test the example scenario
-opensip-tools fit                          # run the default recipe
-opensip-tools fit --check <slug>           # run a single check
-opensip-tools fit --tags <list>            # tag filter
-opensip-tools fit --gate-save              # save baseline
-opensip-tools fit --gate-compare           # diff against baseline
-opensip-tools fit --report-to <url>        # SARIF upload to OpenSIP Cloud
-opensip-tools dashboard                    # HTML report
-opensip-tools fit-list / fit-recipes       # catalog browsing
-opensip-tools sessions list|purge          # run history
-opensip-tools plugin add|remove|list|sync  # project-local npm plugins
-opensip-tools configure                    # cloud API key setup
-opensip-tools completion                   # shell completion script
-opensip-tools uninstall                    # remove ~/.opensip-tools/
+opensip-cli                              # welcome screen
+opensip init                         # detect language + scaffold
+opensip fit --recipe example         # smoke test the example check
+opensip sim --recipe example         # smoke test the example scenario
+opensip fit                          # run the default recipe
+opensip fit --check <slug>           # run a single check
+opensip fit --tags <list>            # tag filter
+opensip fit --gate-save              # save baseline
+opensip fit --gate-compare           # diff against baseline
+opensip fit --report-to <url>        # SARIF upload to OpenSIP Cloud
+opensip dashboard                    # HTML report
+opensip fit-list / fit-recipes       # catalog browsing
+opensip sessions list|purge          # run history
+opensip plugin add|remove|list|sync  # project-local npm plugins
+opensip configure                    # cloud API key setup
+opensip completion                   # shell completion script
+opensip uninstall                    # remove ~/.opensip-cli/
 ```
 
 ### Project layout (v1)
 
-User identity (cloud API key, theme) lives at `~/.opensip-tools/config.yml`.
+User identity (cloud API key, theme) lives at `~/.opensip-cli/config.yml`.
 Everything else is project-local:
 
 ```
 <project>/
-├── opensip-tools.config.yml                       (TRACKED)
-├── opensip-tools/
+├── opensip-cli.config.yml                       (TRACKED)
+├── opensip-cli/
 │   ├── fit/{checks,recipes}/*.mjs                 (TRACKED — auto-loaded)
 │   ├── sim/{scenarios,recipes}/*.mjs              (TRACKED — auto-loaded)
 │   └── .runtime/                                  (GITIGNORED)
@@ -1996,31 +1996,31 @@ Everything else is project-local:
 ### Plugin model
 
 - **Source files (auto-loaded):** drop a `.mjs` into
-  `opensip-tools/{fit,sim}/{checks,recipes,scenarios}/` and the loader
+  `opensip-cli/{fit,sim}/{checks,recipes,scenarios}/` and the loader
   picks it up. No config opt-in required.
-- **npm packages (explicit):** `opensip-tools plugin add <pkg>`
-  installs to `opensip-tools/.runtime/plugins/<domain>/node_modules/`
+- **npm packages (explicit):** `opensip plugin add <pkg>`
+  installs to `opensip-cli/.runtime/plugins/<domain>/node_modules/`
   and pins the name in `plugins.<domain>:` in
-  `opensip-tools.config.yml`. Only packages explicitly listed there
+  `opensip-cli.config.yml`. Only packages explicitly listed there
   are loaded — transitive deps in the runtime tree do not auto-load.
-- **`@opensip-tools/checks-*` packages** found in `node_modules/`
+- **`@opensip-cli/checks-*` packages** found in `node_modules/`
   (any ancestor) are auto-discovered as fitness check packs unless
   `plugins.autoDiscoverChecks: false` is set.
 
 ### `init` and onboarding
 
-`opensip-tools init` detects the project's language(s) from filesystem
+`opensip init` detects the project's language(s) from filesystem
 markers (`Cargo.toml`, `pyproject.toml`, `setup.py`, `go.mod`,
 `pom.xml`, `build.gradle`, `CMakeLists.txt`, `tsconfig.json`,
 `package.json`) and scaffolds:
 
-- `opensip-tools.config.yml` with one named target per detected language
-- `opensip-tools/fit/checks/example-check.mjs` (one per language for
+- `opensip-cli.config.yml` with one named target per detected language
+- `opensip-cli/fit/checks/example-check.mjs` (one per language for
   polyglot projects, distinct slugs)
-- `opensip-tools/fit/recipes/example-recipe.mjs`
-- `opensip-tools/sim/scenarios/example-scenario.mjs`
-- `opensip-tools/sim/recipes/example-recipe.mjs`
-- `.gitignore` entry for `opensip-tools/.runtime/`
+- `opensip-cli/fit/recipes/example-recipe.mjs`
+- `opensip-cli/sim/scenarios/example-scenario.mjs`
+- `opensip-cli/sim/recipes/example-recipe.mjs`
+- `.gitignore` entry for `opensip-cli/.runtime/`
 
 `--language <comma-separated>` overrides detection or specifies a
 polyglot configuration explicitly. Ambiguous detection exits 2 with a
@@ -2036,30 +2036,30 @@ prompt — no partial scaffolding.
 
 ### Migration from 0.x
 
-1. Replace `@opensip-tools/checks-builtin` in your `package.json` with
-   `@opensip-tools/checks-typescript` + `@opensip-tools/checks-universal`.
+1. Replace `@opensip-cli/checks-builtin` in your `package.json` with
+   `@opensip-cli/checks-typescript` + `@opensip-cli/checks-universal`.
    The 158-check builtin pack is split: TS-AST checks moved into
    `checks-typescript`, text/regex/glob checks into `checks-universal`.
 2. If you imported fitness symbols (`defineCheck`, `CheckViolation`,
-   etc.) from `@opensip-tools/core`, switch the import to
-   `@opensip-tools/fitness`. Core is a strict kernel now.
-3. From your project root, run `opensip-tools init` to scaffold the
+   etc.) from `@opensip-cli/core`, switch the import to
+   `@opensip-cli/fitness`. Core is a strict kernel now.
+3. From your project root, run `opensip init` to scaffold the
    v1 directory layout. Move any custom `.mjs` files from
-   `~/.opensip-tools/fit/` into `<project>/opensip-tools/fit/checks/`
+   `~/.opensip-cli/fit/` into `<project>/opensip-cli/fit/checks/`
    (or `recipes/` if the file exports `recipes`). Move sim files the
-   same way under `<project>/opensip-tools/sim/`.
+   same way under `<project>/opensip-cli/sim/`.
 4. If your config declared `plugins.checkPackages:` for npm-installed
-   packs, run `opensip-tools plugin sync` to reinstall them under
-   `<project>/opensip-tools/.runtime/plugins/`.
-5. Replace any `opensip-tools plugin install` calls with
-   `opensip-tools plugin add`. The `install` command was always doing
+   packs, run `opensip plugin sync` to reinstall them under
+   `<project>/opensip-cli/.runtime/plugins/`.
+5. Replace any `opensip plugin install` calls with
+   `opensip plugin add`. The `install` command was always doing
    two operations; `add` is the one-step equivalent.
-6. Delete `~/.opensip-tools/{fit,sim,sessions,logs,reports}/` —
-   they're no longer read. `opensip-tools uninstall` does this for you.
+6. Delete `~/.opensip-cli/{fit,sim,sessions,logs,reports}/` —
+   they're no longer read. `opensip uninstall` does this for you.
 
 ## [0.6.1] — 2026-05-07
 
-### Fixed (`@opensip-tools/checks-builtin`)
+### Fixed (`@opensip-cli/checks-builtin`)
 
 - **`async-patterns` and `batch-operations`** — split the strip-comments
   preprocessing between per-match scanning and bounded-pattern
@@ -2072,7 +2072,7 @@ prompt — no partial scaffolding.
 
 ## [0.6.0] — 2026-05-07
 
-### Removed (`@opensip-tools/checks-builtin`) — BREAKING
+### Removed (`@opensip-cli/checks-builtin`) — BREAKING
 
 Four checks have been removed from the default recipe because their
 false-positive rate on idiomatic TypeScript codebases consistently
@@ -2080,7 +2080,7 @@ exceeded the bar for a built-in. Each was either opinion-based
 ("naming should be 3+ characters"), enforced an arbitrary numeric
 cutoff ("functions should have ≤5 parameters"), or guarded a class of
 bugs that doesn't meaningfully occur in practice ("exported objects
-should be frozen"). Customers running `opensip-tools fit` against a
+should be frozen"). Customers running `opensip fit` against a
 typical TypeScript repo would see a wall of false positives on day 1
 — a poor first-impression experience that trains users to ignore
 warnings rather than act on them.
@@ -2109,7 +2109,7 @@ If a team wants any of these patterns enforced, they can re-add the
 check as a workspace plugin under their own recipe — but they
 shouldn't be defaults.
 
-### Improved (`@opensip-tools/checks-builtin`) — Precision narrowings
+### Improved (`@opensip-cli/checks-builtin`) — Precision narrowings
 
 A round of false-positive narrowings landed alongside the removals.
 Every change shipped with at least one regression test asserting the
@@ -2161,7 +2161,7 @@ reduce noise.
 
 ## [0.5.0] — 2026-05-05
 
-### Removed (`@opensip-tools/core`) — BREAKING
+### Removed (`@opensip-cli/core`) — BREAKING
 
 - The deprecated `contentFilter: 'code-only'` and
   `contentFilter: 'no-strings-no-comments'` aliases are removed.
@@ -2171,7 +2171,7 @@ reduce noise.
     Mapping is mechanical — same dispatch, same behaviour, just the
     spelling changes.
 
-  Consumers of `@opensip-tools/core` who passed either old name to
+  Consumers of `@opensip-cli/core` who passed either old name to
   `defineCheck({ contentFilter, ... })` or to `createFileAccessor(...,
 { contentFilter })` will see a TypeScript narrowing error and a Zod
   validation rejection at runtime.
@@ -2185,7 +2185,7 @@ reduce noise.
 
 ## [0.4.0] — 2026-05-05
 
-### Added (`@opensip-tools/core`)
+### Added (`@opensip-cli/core`)
 
 - New `contentFilter` mode names that describe what the filter strips:
   - `'strip-strings'` — string literals blanked, comments preserved
@@ -2201,12 +2201,12 @@ reduce noise.
   cause real false positives — `code-only` strips strings but PRESERVES
   comments, which most rule authors didn't expect from the name.
 
-### Changed (`@opensip-tools/checks-builtin`)
+### Changed (`@opensip-cli/checks-builtin`)
 
 - 82 built-in checks migrated to the new `strip-strings` /
   `strip-strings-and-comments` names.
 
-### Deprecated (`@opensip-tools/core`)
+### Deprecated (`@opensip-cli/core`)
 
 - `contentFilter: 'code-only'` — use `'strip-strings'` instead (same
   dispatch, no behaviour change).
@@ -2215,7 +2215,7 @@ reduce noise.
 
   Both old names continue to work as aliases. Plan to remove in 0.5.0.
 
-### Fixed (`@opensip-tools/checks-builtin`)
+### Fixed (`@opensip-cli/checks-builtin`)
 
 - `resilience/no-process-exit-in-finally` no longer false-fires on
   files that use `Promise.prototype.finally(...)` without a try/finally
@@ -2238,20 +2238,20 @@ infrastructure improvements over 0.2.5; see git log for details.)
 Users on 0.2.4 and earlier should upgrade. Three issues in plugin discovery
 allowed code outside the plugin directory to be loaded and executed:
 
-- **Path traversal in plugin discovery** (`@opensip-tools/core`). A malicious
-  `.opensip-tools/fit/package.json` (or `~/.opensip-tools/fit/package.json`)
+- **Path traversal in plugin discovery** (`@opensip-cli/core`). A malicious
+  `.opensip-cli/fit/package.json` (or `~/.opensip-cli/fit/package.json`)
   with a dependency key like `"../../etc/passwd"` would resolve outside the
   plugins' `node_modules/` and the matching file could be dynamically
   imported. Now: dependency names containing `..`, leading `/`, or NUL bytes
   are rejected before any filesystem access, and resolved package paths are
   containment-checked against `node_modules/` via `realpathSync`.
-- **Symlink follow in loose-file plugin discovery** (`@opensip-tools/core`).
-  A symlink in `~/.opensip-tools/fit/` (or a project-local plugin dir)
+- **Symlink follow in loose-file plugin discovery** (`@opensip-cli/core`).
+  A symlink in `~/.opensip-cli/fit/` (or a project-local plugin dir)
   pointing to an arbitrary file outside the plugin dir would be loaded as a
   plugin and dynamically imported. Now: loose-file plugin paths are
   containment-checked against the plugin dir; pnpm-style symlinks that
   resolve inside the plugin dir continue to work.
-- **Silent plugin load failure** (`@opensip-tools/cli`). When a plugin failed
+- **Silent plugin load failure** (`@opensip-cli/cli`). When a plugin failed
   to import, errors were printed to stderr but the run still exited 0 with
   `passed: true` if no checks failed. A malicious or broken plugin could
   therefore suppress its own checks (including compliance-required checks)
@@ -2271,7 +2271,7 @@ allowed code outside the plugin directory to be loaded and executed:
 - **Plugin install no longer runs npm lifecycle scripts.** All three
   `npm install` invocations (project-local sync, user-level `plugin install`,
   and peer-dep auto-install) now pass `--ignore-scripts`. Without this,
-  `opensip-tools fit` running in a freshly cloned repo with declared
+  `opensip fit` running in a freshly cloned repo with declared
   plugins would auto-install them and execute their `postinstall` /
   `preinstall` / `prepare` scripts before the user had any chance to
   inspect what was being installed. Plugins are loaded via dynamic
@@ -2324,19 +2324,19 @@ allowed code outside the plugin directory to be loaded and executed:
 
 - Ink-based CLI rendering with themed components (React for terminals)
 - Commander.js for argument parsing with auto-generated `--help`
-- `opensip-tools dashboard` — top-level HTML report command
-- `opensip-tools sessions list` — view run history
-- `opensip-tools sessions purge` — delete session data with confirmation
+- `opensip dashboard` — top-level HTML report command
+- `opensip sessions list` — view run history
+- `opensip sessions purge` — delete session data with confirmation
 - `--verbose` flag shows detailed results table (default is compact summary)
 - `--findings` flag shows per-check violation details
 - `--debug` flag outputs structured JSON logs to stderr
 - `--report-to` sends findings as SARIF 2.1.0 with retry on failure
 - `failOnErrors` / `failOnWarnings` config for CI exit code control
-- Structured JSON logging with ULID run IDs to `~/.opensip-tools/logs/`
+- Structured JSON logging with ULID run IDs to `~/.opensip-cli/logs/`
 - Theme system with terminal capability detection (NO_COLOR, tmux, truecolor)
 - Shared animation clock for spinner
 - `RunHeader` component showing tool info between banner and content
-- Custom check plugin support via `~/.opensip-tools/fit/`
+- Custom check plugin support via `~/.opensip-cli/fit/`
 - `itemType` support in `defineCheck()` for accurate validated column display
 - `withRetry()` utility for network calls with exponential backoff
 - Result pattern (`ok()`, `err()`, `tryCatchAsync()`) in core
@@ -2357,7 +2357,7 @@ allowed code outside the plugin directory to be loaded and executed:
 
 ### Removed
 
-- `opensip-tools asm` command and `@opensip-tools/assess` package
+- `opensip asm` command and `@opensip-cli/assess` package
 - 28 OpenSIP-specific fitness checks (moved to community plugin)
 - 6 OpenSIP-specific tool checks (hardcoded paths)
 - 3 OpenSIP-specific assessments

@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resolveByCatalogFallback } from '../../edge-resolvers/catalog-fallback.js';
 import { findOccurrence, runFixture, writeFixture } from '../acceptance/_fixture-runner.js';
 
-import type { Catalog } from '@opensip-tools/graph';
+import type { Catalog } from '@opensip-cli/graph';
 
 describe('edge-resolvers — defensive / unresolved branches', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-resolver-branches-'));

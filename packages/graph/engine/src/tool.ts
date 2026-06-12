@@ -10,8 +10,8 @@
  * only the command-spec assembly + the per-run scope/dashboard contributions; the
  * spec modules under `cli/graph/` own the option declarations and handler bodies.
  *
- * Per spec §10A AC-2 / AC-1: this module does NOT import from opensip-tools. It
- * receives the ToolCliContext interface from @opensip-tools/core.
+ * Per spec §10A AC-2 / AC-1: this module does NOT import from opensip-cli. It
+ * receives the ToolCliContext interface from @opensip-cli/core.
  *
  * History: v0.2 originally registered three subcommands (`graph`,
  * `graph-orphans`, `graph-entry-points`). The orphans and entry-points
@@ -20,7 +20,7 @@
  * invocation.
  */
 
-import { logger, readPackageVersion } from '@opensip-tools/core';
+import { logger, readPackageVersion } from '@opensip-cli/core';
 
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: the
 // engine no longer hosts adapter source. First-party adapters live in
@@ -60,8 +60,8 @@ import type {
   ToolCliContext,
   ToolCommandDescriptor,
   ToolScope,
-} from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+} from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 // =============================================================================
 // COMMAND DESCRIPTORS — used by --help listings and conflict detection.

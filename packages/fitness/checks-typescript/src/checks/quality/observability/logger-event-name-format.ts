@@ -8,8 +8,8 @@ import {
   isInsideStringLiteral,
   isTestFile,
   type CheckViolation,
-} from '@opensip-tools/fitness';
-import { countUnescapedBackticks } from '@opensip-tools/lang-typescript';
+} from '@opensip-cli/fitness';
+import { countUnescapedBackticks } from '@opensip-cli/lang-typescript';
 
 /**
  * Validates evt format: domain.component.action (3+ segments in lowercase with underscores)

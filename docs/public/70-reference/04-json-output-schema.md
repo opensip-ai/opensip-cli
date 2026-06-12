@@ -15,7 +15,7 @@ related-docs:
 ---
 # JSON output schema
 
-`opensip-tools fit --json`, `opensip-tools sim --json`, and `opensip-tools graph --json` all emit **one `CommandOutcome` wrapper on stdout** (release 2.12.0, [ADR-0024](../../decisions/ADR-0024-command-outcome-and-observability.md)). The **byte-identical `SignalEnvelope` rides under `.envelope`**; list/dashboard commands carry their result under `.data`; a failure carries structured `errors`. This is the contract surface for CI integrations.
+`opensip fit --json`, `opensip sim --json`, and `opensip graph --json` all emit **one `CommandOutcome` wrapper on stdout** (release 2.12.0, [ADR-0024](../../decisions/ADR-0024-command-outcome-and-observability.md)). The **byte-identical `SignalEnvelope` rides under `.envelope`**; list/dashboard commands carry their result under `.data`; a failure carries structured `errors`. This is the contract surface for CI integrations.
 
 > **2.12.0 breaking change.** Before 2.12.0, `--json` emitted the bare `SignalEnvelope` at the top level. It is now nested under `.envelope` of a `CommandOutcome`. Read `.envelope.verdict.passed` where you previously read `.verdict.passed` (and `.data` for list/dashboard, `.errors` for failures). The inner envelope is unchanged. See [Migrating to 2.12](./09-migrating-to-2.12.md).
 
@@ -139,7 +139,7 @@ Each entry in `signals[]` is a `Signal` ([`packages/core/src/types/signal.ts`](.
 {
   "id": "sig_a3f9c204e1b2",
   "source": "no-console-log",
-  "provider": "opensip-tools",
+  "provider": "opensip-cli",
   "severity": "high",
   "category": "quality",
   "ruleId": "fit:no-console-log",
@@ -160,7 +160,7 @@ Each entry in `signals[]` is a `Signal` ([`packages/core/src/types/signal.ts`](.
 |---|---|---|---|
 | `id` | string | yes | Per-signal identifier (`sig_<12 hex>`). |
 | `source` | string | yes | The producing unit's slug — the join key back to `units[].slug`. For graph this is the OpenSIP-convention rule id (`graph.<family>.<rule>`). |
-| `provider` | string | yes | The producer's namespace. `"opensip-tools"` for built-in checks/rules; command-mode wrappers carry the wrapped tool's name. |
+| `provider` | string | yes | The producer's namespace. `"opensip-cli"` for built-in checks/rules; command-mode wrappers carry the wrapped tool's name. |
 | `severity` | `"critical"` \| `"high"` \| `"medium"` \| `"low"` | yes | 4-level severity. `critical`/`high` are the "error rung" (drive `verdict.passed`); `medium`/`low` are the "warning rung". |
 | `category` | string | yes | Canonical labels: `security` \| `quality` \| `architecture` \| `testing` \| `resilience` \| `documentation` \| `warning` \| `performance` \| `error`. Open at the plugin layer (a plugin may declare its own). |
 | `ruleId` | string | yes | Rule identifier. `fit:<slug>` for fit checks, `graph.<family>.<rule>` for graph rules, `<provider>:<rule>` for command-mode wrappers. |
@@ -189,7 +189,7 @@ All three tools emit the **same envelope**; the differences are confined to a fe
 - **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](../../../packages/graph/engine/src/cli/build-envelope.ts).
 - **`sim`** — `tool: "sim"`; each unit is a scenario (`slug` = scenario id, `error` set when a scenario errored). `sim --json` now emits this envelope too — the old bespoke `sim-done` JSON shape is retired.
 
-> **Per-kind sim detail** (load p99, chaos recovery time) is **not** in the envelope. It lives in the session's `session_tool_payload` row persisted to the project-local SQLite store (`<project>/opensip-tools/.runtime/datastore.sqlite`) via `SessionRepo`. The dashboard reads the session record for the deeper view.
+> **Per-kind sim detail** (load p99, chaos recovery time) is **not** in the envelope. It lives in the session's `session_tool_payload` row persisted to the project-local SQLite store (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`. The dashboard reads the session record for the deeper view.
 
 ---
 
@@ -204,8 +204,8 @@ When a run fails before producing an envelope (config invalid, plugin failed to 
   "exitCode": 2,
   "errors": [
     {
-      "message": "Gate baseline not found in the project SQLite store. Run `opensip-tools fit --gate-save` first to create one.",
-      "suggestion": "Run opensip-tools fit --gate-save.",
+      "message": "Gate baseline not found in the project SQLite store. Run `opensip fit --gate-save` first to create one.",
+      "suggestion": "Run opensip fit --gate-save.",
       "code": "CONFIGURATION_ERROR"
     }
   ]
@@ -253,26 +253,26 @@ The envelope is nested under `.envelope` of the `CommandOutcome` wrapper — eve
 
 ```bash
 # Fail on any error-rung (critical/high) signal:
-opensip-tools fit --json | jq -e '.envelope.verdict.passed'
+opensip fit --json | jq -e '.envelope.verdict.passed'
 
 # Print only failed units:
-opensip-tools fit --json | jq '.envelope.units | map(select(.passed == false))'
+opensip fit --json | jq '.envelope.units | map(select(.passed == false))'
 
 # Count error-rung signals by file:
-opensip-tools fit --json | jq '.envelope.signals[] | select(.severity == "critical" or .severity == "high") | .filePath' | sort | uniq -c
+opensip fit --json | jq '.envelope.signals[] | select(.severity == "critical" or .severity == "high") | .filePath' | sort | uniq -c
 
 # All signals for one unit (join on source → slug):
-opensip-tools fit --json | jq '.envelope.signals[] | select(.source == "no-console-log")'
+opensip fit --json | jq '.envelope.signals[] | select(.source == "no-console-log")'
 
 # Score gate:
-opensip-tools fit --json | jq -e '.envelope.verdict.score >= 90'
+opensip fit --json | jq -e '.envelope.verdict.score >= 90'
 ```
 
-For SARIF (the gate's native shape), use `--gate-save` / `--gate-compare`. The SARIF shape is the SARIF 2.1.0 spec's, not opensip-tools' — see [`10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md).
+For SARIF (the gate's native shape), use `--gate-save` / `--gate-compare`. The SARIF shape is the SARIF 2.1.0 spec's, not opensip-cli' — see [`10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md).
 
 ---
 
 ## What's next
 
-- **[`03-configuration.md`](./03-configuration.md)** — `opensip-tools.config.yml` schema (the *input* shape).
+- **[`03-configuration.md`](./03-configuration.md)** — `opensip-cli.config.yml` schema (the *input* shape).
 - **[`../10-concepts/04-contract-surfaces.md`](../10-concepts/04-contract-surfaces.md)** — every contract surface, with stability tiers.

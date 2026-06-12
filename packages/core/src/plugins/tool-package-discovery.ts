@@ -12,7 +12,7 @@
  * existing CLI consumers depend on, and delegates the actual node_modules
  * traversal to the shared primitive.
  *
- * Direct dependencies of opensip-tools are always loaded by the
+ * Direct dependencies of opensip-cli are always loaded by the
  * CLI's own import statements; this discovery exists so a user can
  * install a third-party tool via `npm install` and have it picked up
  * with no further wiring.
@@ -32,7 +32,7 @@ export interface ToolPackageDiscoveryOptions {
 }
 
 export interface DiscoveredToolPackage {
-  /** npm package name, e.g. '@opensip-tools/fitness' or '@my-co/audit'. */
+  /** npm package name, e.g. '@opensip-cli/fitness' or '@my-co/audit'. */
   readonly name: string;
   /** Absolute path to the package's directory inside node_modules. */
   readonly packageDir: string;
@@ -59,7 +59,7 @@ export function discoverToolPackages(
  *    CLI install dir — covers a plain `npm install @tool` and global CLI
  *    siblings).
  *  - `scanDir`: scan exactly `<dir>/node_modules`, no walk (the fixed
- *    plugin host dirs — `~/.opensip-tools/plugins/tool`,
+ *    plugin host dirs — `~/.opensip-cli/plugins/tool`,
  *    `<project>/.runtime/plugins/tool`).
  */
 export interface ToolDiscoverySource {

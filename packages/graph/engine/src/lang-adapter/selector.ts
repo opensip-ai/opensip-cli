@@ -1,4 +1,4 @@
-import { ConfigurationError, logger } from '@opensip-tools/core';
+import { ConfigurationError, logger } from '@opensip-cli/core';
 import { globSync } from 'glob';
 
 import type { GraphLanguageAdapter } from './types.js';
@@ -41,7 +41,7 @@ export class GraphAdapterSelector {
       const entry = this.registry.getById(language);
       if (entry !== undefined) return entry.adapter;
       throw new ConfigurationError(
-        `graph: language adapter '${language}' is not registered. Install @opensip-tools/graph-${language} or list it under plugins.graphAdapters in opensip-tools.config.yml.`,
+        `graph: language adapter '${language}' is not registered. Install @opensip-cli/graph-${language} or list it under plugins.graphAdapters in opensip-cli.config.yml.`,
       );
     }
     return this.pickImplicit(input.cwd);
@@ -51,10 +51,10 @@ export class GraphAdapterSelector {
     if (this.registry.size === 0) {
       throw new ConfigurationError(
         'graph: no language adapter is registered. Graph adapters ship as ' +
-          'separate packages (@opensip-tools/graph-typescript, -python, ' +
+          'separate packages (@opensip-cli/graph-typescript, -python, ' +
           '-rust, -go, -java) and are auto-discovered from node_modules. ' +
           "Install the adapter for your project's language, or list it under " +
-          'plugins.graphAdapters in opensip-tools.config.yml.',
+          'plugins.graphAdapters in opensip-cli.config.yml.',
       );
     }
     if (this.registry.size === 1) {
@@ -94,8 +94,8 @@ export class GraphAdapterSelector {
         'No installed graph adapter matched any source files under the ' +
         'target; falling back to TypeScript, which may yield an empty ' +
         'result. If this project is in another language, install its ' +
-        'adapter (e.g. @opensip-tools/graph-go, @opensip-tools/graph-java) ' +
-        'or list it under plugins.graphAdapters in opensip-tools.config.yml.',
+        'adapter (e.g. @opensip-cli/graph-go, @opensip-cli/graph-java) ' +
+        'or list it under plugins.graphAdapters in opensip-cli.config.yml.',
       registered: this.registry.getAll().map((entry) => entry.id),
       cwd,
     });

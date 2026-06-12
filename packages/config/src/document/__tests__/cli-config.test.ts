@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 function writeConfig(yaml: string): string {
-  const filePath = join(testDir, 'opensip-tools.config.yml');
+  const filePath = join(testDir, 'opensip-cli.config.yml');
   writeFileSync(filePath, yaml);
   return filePath;
 }

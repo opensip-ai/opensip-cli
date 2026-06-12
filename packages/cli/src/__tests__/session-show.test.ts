@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ToolRegistry } from '@opensip-tools/core';
-import { DataStoreFactory } from '@opensip-tools/datastore';
-import { SessionRepo } from '@opensip-tools/session-store';
+import { ToolRegistry } from '@opensip-cli/core';
+import { DataStoreFactory } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { executeSessionShow } from '../commands/session-show.js';
@@ -16,9 +16,9 @@ import type {
   SignalEnvelope,
   StoredSession,
   ToolSessionReplay,
-} from '@opensip-tools/contracts';
-import type { Tool, ToolSessionRecord } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+} from '@opensip-cli/contracts';
+import type { Tool, ToolSessionRecord } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 let tmp: string;
 let ds: DataStore;

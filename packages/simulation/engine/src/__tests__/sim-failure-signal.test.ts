@@ -7,7 +7,7 @@
  * fix against the real executors.
  */
 
-import { isErrorSignal } from '@opensip-tools/core';
+import { isErrorSignal } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';

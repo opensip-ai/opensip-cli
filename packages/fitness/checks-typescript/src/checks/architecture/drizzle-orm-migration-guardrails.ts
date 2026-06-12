@@ -9,7 +9,7 @@
  * - ALTER TABLE with data loss risk (column type changes)
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 interface DangerousPattern {
   pattern: RegExp;

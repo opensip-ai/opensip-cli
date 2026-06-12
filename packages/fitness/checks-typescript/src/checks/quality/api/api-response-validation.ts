@@ -10,8 +10,8 @@
 
 import { basename } from 'node:path';
 
-import { defineCheck, type CheckViolation, isAPIFile } from '@opensip-tools/fitness';
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import { defineCheck, type CheckViolation, isAPIFile } from '@opensip-cli/fitness';
+import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 /**

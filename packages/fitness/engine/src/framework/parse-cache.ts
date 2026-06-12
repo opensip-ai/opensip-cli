@@ -10,10 +10,10 @@
  * This file no longer re-exports the parse-cache lifecycle/getParseTree
  * API — `import-graph.ts` is its only internal consumer. New TS check
  * authors should import the canonical AST helpers from
- * @opensip-tools/lang-typescript instead.
+ * @opensip-cli/lang-typescript instead.
  */
 
-import { getParseTree, currentScope } from '@opensip-tools/core';
+import { getParseTree, currentScope } from '@opensip-cli/core';
 import ts from 'typescript';
 
 /**
@@ -21,7 +21,7 @@ import ts from 'typescript';
  * adapter is registered, falling back to a direct parse otherwise.
  *
  * @internal Used by framework/import-graph.ts. New TS check authors
- * should import getSharedSourceFile from @opensip-tools/lang-typescript.
+ * should import getSharedSourceFile from @opensip-cli/lang-typescript.
  */
 export function getSharedSourceFile(filePath: string, content: string): ts.SourceFile | null {
   const adapter = currentScope()?.languages.get('typescript');

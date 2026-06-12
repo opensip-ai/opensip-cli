@@ -1,5 +1,5 @@
 /**
- * ID generation for opensip-tools.
+ * ID generation for opensip-cli.
  * Uses ULID for time-sortable, unique identifiers.
  */
 

@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-04
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0013: Curate the fitness public barrel to the authoring surface, locked by an export-surface test
@@ -20,11 +20,11 @@ enforcement-reason: >
   Two gates. (1) dependency-cruiser `no-cross-package-internal` already forbids
   production code from importing any `src/internal.ts`. (2) A new runtime
   export-surface test, `packages/fitness/engine/src/__tests__/public-api.test.ts`,
-  asserts the exact set of value exports from the `@opensip-tools/fitness` barrel,
+  asserts the exact set of value exports from the `@opensip-cli/fitness` barrel,
   so re-growth fails CI.
 ```
 
-**Decision:** The `@opensip-tools/fitness` public barrel exports only the
+**Decision:** The `@opensip-cli/fitness` public barrel exports only the
 check / recipe / plugin **authoring** surface plus the `fitnessTool` plugin
 descriptor. Engine internals — registries, the recipe service,
 `ExecutionContext`, targets/signalers config, the plugin loader, check-package

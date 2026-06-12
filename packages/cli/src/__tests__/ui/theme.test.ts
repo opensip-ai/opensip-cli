@@ -1,4 +1,4 @@
-import { detectTerminalCapabilities, ThemeContext } from '@opensip-tools/cli-ui';
+import { detectTerminalCapabilities, ThemeContext } from '@opensip-cli/cli-ui';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 describe('theme', () => {

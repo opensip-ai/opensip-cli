@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-11
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0034: Language adapters are host-wired, not plugin-discovered
@@ -24,7 +24,7 @@ enforcement-reason: >
   tests (fit/sim/graph-external-load) prove TOOLS take no such shortcut.
 ```
 
-**Decision:** The six bundled `@opensip-tools/lang-*` language adapters are
+**Decision:** The six bundled `@opensip-cli/lang-*` language adapters are
 statically imported and registered by the host composition root
 (`packages/cli/src/bootstrap/register-language-adapters.ts`) into the kernel
 `LanguageRegistry`. They deliberately do NOT travel the tool-plugin path
@@ -66,7 +66,7 @@ and is invisible to admission policy.
 
 - `register-language-adapters.ts` remains the ONLY production file in
   `packages/cli/src` permitted to statically value-import a first-party
-  `@opensip-tools/lang-*` package. Tool runtimes (fitness/simulation/graph)
+  `@opensip-cli/lang-*` package. Tool runtimes (fitness/simulation/graph)
   stay behind the dynamic plugin path guarded by `no-bootstrap-tool-import`.
 - Adding a language means adding a bundled `lang-*` package and registering it
   here — there is intentionally no "drop a parser in node_modules" path. A

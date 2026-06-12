@@ -26,12 +26,12 @@ import {
   type LanguageAdapter,
   type Signal,
   type WorkspaceUnit,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { runWorkerPool } from './orchestrate/worker-pool.js';
 
 import type { ResolutionMode } from '../types.js';
-import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 /**
  * Per-unit result from a `graph --workspace` fan-out — one entry per
@@ -138,7 +138,7 @@ export async function runWorkspaceUnitsInParallel(
 ): Promise<RunWorkspaceUnitsOutput> {
   if (input.units.length === 0) {
     throw new ConfigurationError(
-      '--workspace: no workspace units found. Use `opensip-tools graph` for whole-project analysis.',
+      '--workspace: no workspace units found. Use `opensip graph` for whole-project analysis.',
     );
   }
 

@@ -32,7 +32,7 @@ import type {
 /** Governed escape hatch (env-via-registry): force in-process execution. */
 const WORKER_ENV = new EnvRegistry([
   {
-    canonical: 'OPENSIP_TOOLS_NO_WORKER',
+    canonical: 'OPENSIP_CLI_NO_WORKER',
     coerce: (raw) => raw === '1',
     default: false,
     docs: 'Set to 1 to run a tool engine in the main process instead of a forked worker (debugging / constrained runtimes). The live view may stutter; output is unchanged.',
@@ -122,7 +122,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
  * ran. The caller supplies BOTH a {@link SubprocessJobDescriptor} (the forked
  * worker) and the equivalent in-process {@link ProgressJob} (the same work as a
  * local closure). Subprocess is preferred unless `preferWorker: false` or
- * `OPENSIP_TOOLS_NO_WORKER=1`, and a synchronous fork failure degrades to
+ * `OPENSIP_CLI_NO_WORKER=1`, and a synchronous fork failure degrades to
  * in-process.
  */
 export function runOffThreadOrInProcess<TEvent, TResult>(opts: {
@@ -130,7 +130,7 @@ export function runOffThreadOrInProcess<TEvent, TResult>(opts: {
   readonly inProcess: ProgressJob<TEvent, TResult>;
   readonly preferWorker?: boolean;
 }): ProgressRun<TEvent, TResult> {
-  const envDisablesWorker = WORKER_ENV.get<boolean>('OPENSIP_TOOLS_NO_WORKER') === true;
+  const envDisablesWorker = WORKER_ENV.get<boolean>('OPENSIP_CLI_NO_WORKER') === true;
   const preferWorker = (opts.preferWorker ?? true) && !envDisablesWorker;
   if (preferWorker) {
     try {

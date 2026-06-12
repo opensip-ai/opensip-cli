@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { generateDashboardHtml } from '../generator.js';
 
-import type { StoredSession } from '@opensip-tools/contracts';
+import type { StoredSession } from '@opensip-cli/contracts';
 
 function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {
@@ -59,7 +59,7 @@ describe('generateDashboardHtml', () => {
 
   it('omits the score from the title when there are no sessions', () => {
     const html = generateDashboardHtml({ sessions: [] });
-    expect(html).toMatch(/<title>OpenSIP Tools<\/title>/);
+    expect(html).toMatch(/<title>OpenSIP CLI<\/title>/);
   });
 
   it('inlines session, check catalog, and recipe catalog as JS data', () => {
@@ -115,7 +115,7 @@ describe('generateDashboardHtml', () => {
   it('renders score 0 in <title> when the session score is non-finite', () => {
     const bad = makeSession({ score: Number.NaN });
     const html = generateDashboardHtml({ sessions: [bad] });
-    expect(html).toMatch(/<title>OpenSIP Tools — Pass Rate: 0%<\/title>/);
+    expect(html).toMatch(/<title>OpenSIP CLI — Pass Rate: 0%<\/title>/);
   });
 
   it('renders all three tab panels (overview, fitness, simulation)', () => {

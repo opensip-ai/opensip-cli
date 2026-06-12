@@ -35,7 +35,7 @@ function makeCtx() {
 }
 
 function mount(ctx: CliCommandsContext): Command {
-  const program = new Command('opensip-tools');
+  const program = new Command('opensip');
   mountHostCommands(program, ctx);
   return program;
 }

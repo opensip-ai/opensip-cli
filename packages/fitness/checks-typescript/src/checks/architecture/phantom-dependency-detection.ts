@@ -15,8 +15,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
-import { getSharedSourceFile, walkNodes } from '@opensip-tools/lang-typescript';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
+import { getSharedSourceFile, walkNodes } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 /**

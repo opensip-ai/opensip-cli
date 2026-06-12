@@ -1,5 +1,5 @@
 /**
- * Typed error classes and Result pattern for opensip-tools.
+ * Typed error classes and Result pattern for opensip-cli.
  */
 
 // =============================================================================
@@ -31,7 +31,7 @@ export interface ToolErrorOptions extends ErrorOptions {
   [key: string]: unknown;
 }
 
-/** Base class for all opensip-tools errors; carries a `code` for programmatic dispatch. */
+/** Base class for all opensip-cli errors; carries a `code` for programmatic dispatch. */
 export class ToolError extends Error {
   /**
    * Error code. Typed as a `string` super-set of `ToolErrorCode` because

@@ -7,7 +7,7 @@
  * `adapter.parse` when no cache is active (single-check mode).
  */
 
-import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js';
+import { getParseTree } from '@opensip-cli/core/languages/parse-cache.js';
 
 import { pythonAdapter } from './adapter.js';
 

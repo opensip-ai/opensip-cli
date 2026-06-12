@@ -49,7 +49,7 @@
  * exempted per-file via `@fitness-ignore-file restrict-raw-db-access` with a
  * justification comment.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Resolved-path fragments that identify a persistence-owned source file.

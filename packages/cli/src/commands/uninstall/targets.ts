@@ -15,15 +15,15 @@
 import { existsSync, readdirSync, statSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 
-import { resolveProjectPaths } from '@opensip-tools/core';
+import { resolveProjectPaths } from '@opensip-cli/core';
 
 /**
  * Bucket classification per target:
- *  - 'runtime'      — opensip-tools/.runtime/. Rebuildable. Removed by default.
- *  - 'user-content' — anything else under opensip-tools/. User-authored.
+ *  - 'runtime'      — opensip-cli/.runtime/. Rebuildable. Removed by default.
+ *  - 'user-content' — anything else under opensip-cli/. User-authored.
  *                     Preserved unless --purge.
- *  - 'config'       — opensip-tools.config.yml. Preserved unless --purge.
- *  - 'user-level'   — ~/.opensip-tools/ in user mode.
+ *  - 'config'       — opensip-cli.config.yml. Preserved unless --purge.
+ *  - 'user-level'   — ~/.opensip-cli/ in user mode.
  */
 type TargetBucket = 'runtime' | 'user-content' | 'config' | 'user-level';
 
@@ -91,13 +91,13 @@ function countFilesRecursive(dir: string): number {
  *
  * Project mode:
  *  - .runtime/                      → bucket 'runtime'
- *  - everything else under opensip-tools/ (per top-level entry)
+ *  - everything else under opensip-cli/ (per top-level entry)
  *                                   → bucket 'user-content' (one entry each)
- *  - opensip-tools.config.yml       → bucket 'config'
+ *  - opensip-cli.config.yml       → bucket 'config'
  *
- * The user-content invariant is "everything under opensip-tools/ minus
+ * The user-content invariant is "everything under opensip-cli/ minus
  * .runtime/" — NOT an enumeration of known subdirs like fit/ + sim/.
- * Future tools and user-created folders (e.g. opensip-tools/notes/) are
+ * Future tools and user-created folders (e.g. opensip-cli/notes/) are
  * preserved automatically.
  */
 export function collectTargets(
@@ -138,7 +138,7 @@ function collectProjectTargets(projectDir: string): Target[] {
 }
 
 /**
- * Enumerate every top-level entry under opensip-tools/ EXCEPT .runtime/.
+ * Enumerate every top-level entry under opensip-cli/ EXCEPT .runtime/.
  * Enumeration is for display; the invariant is "not .runtime/".
  */
 function collectUserContentTargets(userSourceDir: string): Target[] {
@@ -172,7 +172,7 @@ function collectUserContentTargets(userSourceDir: string): Target[] {
 }
 
 function formatKeepLine(t: Target): string {
-  if (t.bucket === 'config') return 'opensip-tools.config.yml';
+  if (t.bucket === 'config') return 'opensip-cli.config.yml';
   if (t.displayLabel === undefined) return t.path;
   const slash = t.kind === 'dir' ? '/' : '';
   let inner = '';
@@ -180,7 +180,7 @@ function formatKeepLine(t: Target): string {
     const plural = t.fileCount === 1 ? '' : 's';
     inner = ` (${t.fileCount} file${plural})`;
   }
-  return `opensip-tools/${t.displayLabel}${slash}${inner}`;
+  return `opensip-cli/${t.displayLabel}${slash}${inner}`;
 }
 
 export function printUserModeTargets(write: (s: string) => void, targets: readonly Target[]): void {

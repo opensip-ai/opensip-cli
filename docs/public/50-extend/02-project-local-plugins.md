@@ -4,7 +4,7 @@ last_verified: 2026-06-07
 release: v3.0.0
 title: "Project-local plugins"
 audience: [plugin-authors, getting-started]
-purpose: "The fastest path to extend opensip-tools: drop .mjs files under opensip-tools/{fit,sim}/ — checks, recipes, scenarios."
+purpose: "The fastest path to extend opensip: drop .mjs files under opensip-cli/{fit,sim}/ — checks, recipes, scenarios."
 source-files:
   - packages/fitness/engine/src/framework/define-check.ts
   - packages/fitness/engine/src/recipes/types.ts
@@ -17,15 +17,15 @@ related-docs:
 ---
 # Project-local plugins
 
-The fastest path to extend opensip-tools: drop a `.mjs` file under `<project>/opensip-tools/fit/{checks,recipes}/` or `<project>/opensip-tools/sim/{scenarios,recipes}/`. The loader picks it up on the next run. No publishing, no install, no config entry.
+The fastest path to extend opensip: drop a `.mjs` file under `<project>/opensip-cli/fit/{checks,recipes}/` or `<project>/opensip-cli/sim/{scenarios,recipes}/`. The loader picks it up on the next run. No publishing, no install, no config entry.
 
 This page covers all three project-local shapes: a check, a recipe, and a sim scenario. Each is ~30 lines.
 
 ## A project-local check
 
 ```js
-// <project>/opensip-tools/fit/checks/no-fixme.mjs
-import { defineCheck } from '@opensip-tools/fitness';
+// <project>/opensip-cli/fit/checks/no-fixme.mjs
+import { defineCheck } from '@opensip-cli/fitness';
 
 export default defineCheck({
   id: '0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a',
@@ -50,7 +50,7 @@ export default defineCheck({
 });
 ```
 
-`opensip-tools fit-list` shows it. `opensip-tools fit` runs it against every TypeScript file in matched targets.
+`opensip fit-list` shows it. `opensip fit` runs it against every TypeScript file in matched targets.
 
 The id is a UUID v4. Generate one with `node -e "console.log(crypto.randomUUID())"`. It must be stable across renames — no central registry, but the framework uses the id to key baselines, so changing it breaks gates.
 
@@ -64,13 +64,13 @@ The id is a UUID v4. Generate one with `node -e "console.log(crypto.randomUUID()
 | `scope` | Almost always. Tells the framework what kind of code this check is for. |
 | `contentFilter` | Set to `'strip-strings-and-comments'` for regex-shaped checks; default `'raw'` is for text scanners. |
 
-For walking the TypeScript AST instead of regex, see [Ban an API pattern](../60-guides/02-ban-an-api-pattern.md) for the AST shape, and [`@opensip-tools/lang-typescript`](../../../packages/languages/lang-typescript/src/index.ts) for the helper exports.
+For walking the TypeScript AST instead of regex, see [Ban an API pattern](../60-guides/02-ban-an-api-pattern.md) for the AST shape, and [`@opensip-cli/lang-typescript`](../../../packages/languages/lang-typescript/src/index.ts) for the helper exports.
 
 ## A project-local recipe
 
 ```js
-// <project>/opensip-tools/fit/recipes/quick-smoke.mjs
-import { defineRecipe } from '@opensip-tools/fitness';
+// <project>/opensip-cli/fit/recipes/quick-smoke.mjs
+import { defineRecipe } from '@opensip-cli/fitness';
 
 // Recipes load only from a `recipes` array export — not a default export.
 export const recipes = [defineRecipe({
@@ -83,7 +83,7 @@ export const recipes = [defineRecipe({
 })];
 ```
 
-`opensip-tools fit-recipes` lists it. `opensip-tools fit --recipe quick-smoke` runs it.
+`opensip fit-recipes` lists it. `opensip fit --recipe quick-smoke` runs it.
 
 The four selectors: `{ type: 'all' }`, `{ type: 'tags', include: [...] }`, `{ type: 'pattern', include: [...] }`, `{ type: 'explicit', checkIds: [...] }`. See [recipes and checks](../20-fit/01-recipes-and-checks.md).
 
@@ -103,8 +103,8 @@ The check reads its slice via `getCheckConfig<T>('complex-function')`.
 ## A project-local sim scenario
 
 ```js
-// <project>/opensip-tools/sim/scenarios/checkout-burst.mjs
-import { defineLoadScenario } from '@opensip-tools/simulation';
+// <project>/opensip-cli/sim/scenarios/checkout-burst.mjs
+import { defineLoadScenario } from '@opensip-cli/simulation';
 
 // Scenarios load only from a `scenarios` array export — not a default export.
 export const scenarios = [defineLoadScenario({

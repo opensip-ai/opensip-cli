@@ -14,7 +14,7 @@ import type { CheckScope } from '../check-config.js';
  * ADR-0037 enforcement-reason guard (2): fitness per-check file-set resolution
  * is BYTE-IDENTICAL through the Phase 2 substrate migration. A fixed corpus of
  * checks × targets is resolved by the live `buildScopeBasedFileMap` (which now
- * globs via `@opensip-tools/targeting`) and asserted against a checked-in golden.
+ * globs via `@opensip-cli/targeting`) and asserted against a checked-in golden.
  *
  * The corpus exercises every resolution path:
  *  - per-target `exclude`            (the test-file glob drops src test files from ts-src)

@@ -1,33 +1,33 @@
 /**
  * cli-defaults — read the `cli:` block from
- * `opensip-tools.config.yml` and merge it into Commander-parsed opts.
+ * `opensip-cli.config.yml` and merge it into Commander-parsed opts.
  *
  * Extracted from `index.ts` so the merge precedence is testable and the
  * bootstrap module owns config-resolution end-to-end. Order is
  * load → merge → derive (silent/debug) so flag-driven log mode reflects
  * the merged opts (F10).
  *
- * The schema + loader live in `@opensip-tools/config`
+ * The schema + loader live in `@opensip-cli/config`
  * (`loadCliDefaults`, `cliConfigSchema`) — the `cli:` block is
  * tool-agnostic and a project shipping only `simulation` shouldn't need
  * fitness installed just to read its own CLI defaults. Relocated out of
- * `@opensip-tools/contracts` in 2.10.1 (ADR-0023; restores contracts
+ * `@opensip-cli/contracts` in 2.10.1 (ADR-0023; restores contracts
  * types-only). Audit 2026-05-23 G2.
  */
 
-import { loadCliDefaults as loadCliDefaultsFromConfig, resolveApiKey } from '@opensip-tools/config';
-import { logger } from '@opensip-tools/core';
+import { loadCliDefaults as loadCliDefaultsFromConfig, resolveApiKey } from '@opensip-cli/config';
+import { logger } from '@opensip-cli/core';
 
-import type { CliDefaults } from '@opensip-tools/config';
+import type { CliDefaults } from '@opensip-cli/config';
 
 // Re-export the type at the same name the rest of the bootstrap path
 // already imports — internal bootstrap call sites stay stable.
-export type { CliDefaults } from '@opensip-tools/config';
+export type { CliDefaults } from '@opensip-cli/config';
 
 /**
  * Best-effort load of the `cli:` block. Falls back to `{}` when the
  * config is missing or malformed — config-presence is optional. The
- * underlying loader (in `@opensip-tools/contracts`) is already
+ * underlying loader (in `@opensip-cli/contracts`) is already
  * permissive on every failure path; the wrapper here exists so the
  * absence path emits a structured debug log keyed against `cli:` (the
  * contracts loader stays dependency-light and doesn't reach for the

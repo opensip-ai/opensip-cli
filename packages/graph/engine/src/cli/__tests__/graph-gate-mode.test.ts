@@ -12,13 +12,13 @@
  * signal here is by definition UNSUPPRESSED — exactly what should trip the gate.
  */
 
-import { createSignal, type Signal, type ToolCliContext } from '@opensip-tools/core';
+import { createSignal, type Signal, type ToolCliContext } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { runGateMode } from '../graph-modes.js';
 
 import type { GraphCommandOptions } from '../graph-options.js';
-import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 function signal(over: Partial<Parameters<typeof createSignal>[0]> = {}): Signal {
   return createSignal({

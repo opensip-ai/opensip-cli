@@ -1,7 +1,7 @@
 /**
- * fit-runner — owns the live-view state machine for `opensip-tools fit`.
+ * fit-runner — owns the live-view state machine for `opensip fit`.
  *
- * Layer 5 Phase 3 lifted the fit live view out of `opensip-tools`.
+ * Layer 5 Phase 3 lifted the fit live view out of `opensip-cli`.
  * The state machine (loading → running → done | error), `executeFit`
  * orchestration, `reportToCloud` post-call, and the Ink/React render
  * tree all live here, in the package that owns the fitness command
@@ -10,7 +10,7 @@
  * `cli.registerLiveView(key, renderer)`.
  *
  * Shared presentational primitives (Banner, RunHeader, Spinner, theme
- * tokens) come from `@opensip-tools/cli-ui`. Tool-specific render
+ * tokens) come from `@opensip-cli/cli-ui`. Tool-specific render
  * pieces (results table, findings block, cloud-report status) live in
  * `cli/fit-runner-views.tsx`; they're imported here so this module
  * stays focused on the state machine and entry point.
@@ -45,14 +45,14 @@ import {
   type ProgressCallback,
   type ProgressEvent,
   type ProgressSurface,
-} from '@opensip-tools/cli-ui';
+} from '@opensip-cli/cli-ui';
 import {
   type FitOptions,
   type ErrorResult,
   type FitDoneResult,
   type SignalEnvelope,
-} from '@opensip-tools/contracts';
-import { runOffThreadOrInProcess, currentScope } from '@opensip-tools/core';
+} from '@opensip-cli/contracts';
+import { runOffThreadOrInProcess, currentScope } from '@opensip-cli/core';
 import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
@@ -61,7 +61,7 @@ import { persistFitSession } from './fit/result-builders.js';
 import { ResultsTable, WarningsBlock } from './fit-runner-views.js';
 import { ensureChecksLoaded, executeFit, getEnabledCheckCount } from './fit.js';
 
-import type { DataStore } from '@opensip-tools/datastore';
+import type { DataStore } from '@opensip-cli/datastore';
 
 // Theme constants used by tool-specific sub-components below. The shared
 // presentational primitives (Banner, RunHeader, Spinner, ErrorMessage)
@@ -139,7 +139,7 @@ function FitRunner({
       // which re-bootstraps the full scope and streams progress + the final result
       // over IPC, so this process stays free to animate the spinner + 80ms clock.
       // `runOffThreadOrInProcess` falls back to the in-process closure when forking
-      // is disabled/unavailable (OPENSIP_TOOLS_NO_WORKER) — identical result either
+      // is disabled/unavailable (OPENSIP_CLI_NO_WORKER) — identical result either
       // way. The worker reads its run spec (the serializable FitOptions) from a
       // temp file we clean up after the run settles.
       const specDir = mkdtempSync(join(tmpdir(), 'fit-worker-'));
@@ -313,8 +313,8 @@ function FitRunner({
                 hints={[
                   VERBOSE_DETAIL_HINT,
                   {
-                    text: 'opensip-tools dashboard for HTML report',
-                    bold: ['opensip-tools dashboard'],
+                    text: 'opensip dashboard for HTML report',
+                    bold: ['opensip dashboard'],
                   },
                 ]}
               />
@@ -322,7 +322,7 @@ function FitRunner({
             {!args.quiet && state.result.configFound === false && (
               <Box paddingLeft={2}>
                 <Text dimColor>
-                  No config file found. Run <Text bold>opensip-tools init</Text> to customize
+                  No config file found. Run <Text bold>opensip init</Text> to customize
                   targets and settings.
                 </Text>
               </Box>

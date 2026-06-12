@@ -15,7 +15,7 @@
  *     hand-rolled cast to verify the runtime guard, not just the types.
  */
 
-import { Registry, type Registerable, ValidationError } from '@opensip-tools/core';
+import { Registry, type Registerable, ValidationError } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { LatencyTracker } from '../execution/latency-tracker.js';

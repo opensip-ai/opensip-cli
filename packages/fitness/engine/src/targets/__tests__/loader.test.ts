@@ -9,7 +9,7 @@ import {
   ToolRegistry,
   ValidationError,
   runWithScopeSync,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadTargetsConfig } from '../loader.js';
@@ -27,7 +27,7 @@ afterEach(() => {
 describe('loadTargetsConfig', () => {
   it('loads a minimal targets config', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets:
   src:
     description: Source
@@ -42,7 +42,7 @@ describe('loadTargetsConfig', () => {
 
   it('applies default exclude patterns when none provided', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets:
   src:
     description: Source
@@ -56,7 +56,7 @@ describe('loadTargetsConfig', () => {
 
   it('preserves custom exclude patterns when provided', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets:
   src:
     description: Source
@@ -72,7 +72,7 @@ describe('loadTargetsConfig', () => {
 
   it('parses globalExcludes', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `globalExcludes:
   - "**/docs/**"
 targets:
@@ -87,7 +87,7 @@ targets:
 
   it('parses checkOverrides as string and as array', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets:
   src:
     description: x
@@ -107,7 +107,7 @@ checkOverrides:
 
   it('throws when checkOverrides references an unknown target', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets:
   src:
     description: x
@@ -121,7 +121,7 @@ checkOverrides:
 
   it('parses plugins block with current keys', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets:
   src:
     description: x
@@ -153,7 +153,7 @@ plugins:
     ['wrong explicit-list type', 'graphAdapters: "@i/j"'],
   ])('throws ValidationError on malformed plugins config: %s', (_label, pluginsBody) => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets:
   src:
     description: x
@@ -167,7 +167,7 @@ plugins:
 
   it('throws ValidationError when target name is not kebab-case', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets:
   Bad_Name:
     description: x
@@ -182,7 +182,7 @@ plugins:
   });
 
   it('throws ValidationError when YAML is malformed', () => {
-    writeFileSync(join(testDir, 'opensip-tools.config.yml'), 'targets: [unbalanced\n');
+    writeFileSync(join(testDir, 'opensip-cli.config.yml'), 'targets: [unbalanced\n');
     expect(() => loadTargetsConfig(testDir)).toThrow(ValidationError);
   });
 
@@ -201,12 +201,12 @@ plugins:
 
   it('throws SystemError when config file exceeds the size limit', () => {
     const huge = 'x'.repeat(11 * 1024 * 1024); // 11 MB > 10 MB limit
-    writeFileSync(join(testDir, 'opensip-tools.config.yml'), huge);
+    writeFileSync(join(testDir, 'opensip-cli.config.yml'), huge);
     expect(() => loadTargetsConfig(testDir)).toThrow(SystemError);
   });
 
   it('throws ValidationError when the resolved path is a directory (readFileSync EISDIR)', () => {
-    mkdirSync(join(testDir, 'opensip-tools.config.yml'), { recursive: true });
+    mkdirSync(join(testDir, 'opensip-cli.config.yml'), { recursive: true });
     expect(() => loadTargetsConfig(testDir)).toThrow(ValidationError);
   });
 });

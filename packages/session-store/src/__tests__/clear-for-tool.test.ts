@@ -3,13 +3,13 @@
  * sessions are removed, and their payload rows cascade.
  */
 
-import { DataStoreFactory } from '@opensip-tools/datastore';
+import { DataStoreFactory } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { SessionRepo } from '../session-repo.js';
 
-import type { StoredSession } from '@opensip-tools/contracts';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { StoredSession } from '@opensip-cli/contracts';
+import type { DataStore } from '@opensip-cli/datastore';
 
 let ds: DataStore;
 let repo: SessionRepo;

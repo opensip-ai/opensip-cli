@@ -10,16 +10,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScope, runWithScopeSync } from '@opensip-tools/core';
-import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { currentAdapterRegistry, graphTool } from '@opensip-tools/graph';
-import { executeGraph } from '@opensip-tools/graph/internal';
-import { typescriptAdapter } from '@opensip-tools/lang-typescript';
+import { LanguageRegistry, RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
+import { executeGraph } from '@opensip-cli/graph/internal';
+import { typescriptAdapter } from '@opensip-cli/lang-typescript';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';
 
-import type { Signal, ToolCliContext } from '@opensip-tools/core';
+import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 /** Minimal structural view of GraphDoneResult — avoids a contracts dep in this adapter test. */
 interface GraphDoneLike {
@@ -456,7 +456,7 @@ describe('executeGraph', () => {
         `  runId: 'r', createdAt: new Date().toISOString(),\n` +
         `  verdict: { score: 50, passed: false, summary: { total: 1, passed: 0, failed: 1, errors: 0, warnings: 1 } },\n` +
         `  units: [{ slug: 'graph.dead-code.orphan-subtree', passed: true, durationMs: 0 }],\n` +
-        `  signals: [{ id: 's1', source: 'graph.dead-code.orphan-subtree', provider: 'opensip-tools', severity: 'low', category: 'quality', ruleId: 'graph.dead-code.orphan-subtree', message: 'orphan x', filePath: 'main.ts', line: 1, column: 1, metadata: {}, createdAt: new Date().toISOString() }]\n` +
+        `  signals: [{ id: 's1', source: 'graph.dead-code.orphan-subtree', provider: 'opensip-cli', severity: 'low', category: 'quality', ruleId: 'graph.dead-code.orphan-subtree', message: 'orphan x', filePath: 'main.ts', line: 1, column: 1, metadata: {}, createdAt: new Date().toISOString() }]\n` +
         `}));\n` +
         `process.exit(0);\n`,
       'utf8',
@@ -464,7 +464,7 @@ describe('executeGraph', () => {
     const { cli, exitCodes, render } = makeCli();
     await runExecuteGraph({ cwd: dir, workspace: true, cliScript: helper, concurrency: 1 }, cli);
     const out = renderedLines(render);
-    expect(out).toContain('opensip-tools graph --workspace');
+    expect(out).toContain('opensip graph --workspace');
     expect(out).toContain('== Units');
     expect(out).toContain('== Findings ==');
     expect(out).toContain('orphan x');

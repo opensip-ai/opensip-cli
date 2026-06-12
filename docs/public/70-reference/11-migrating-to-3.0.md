@@ -58,7 +58,7 @@ export const tool = {
 **After (3.0.0):**
 
 ```ts
-import { defineCommand } from '@opensip-tools/core';
+import { defineCommand } from '@opensip-cli/core';
 
 export const tool = {
   metadata: { id: 'audit', version: '1.0.0', description: 'Audit tool' },

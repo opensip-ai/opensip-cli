@@ -16,6 +16,6 @@
  * Per I-8: emits `rs-`, distinct from `ts-` and `py-`.
  */
 
-import { makeConfigCacheKey } from '@opensip-tools/graph-adapter-common';
+import { makeConfigCacheKey } from '@opensip-cli/graph-adapter-common';
 
 export const cacheKey = makeConfigCacheKey({ prefix: 'rs' });

@@ -27,13 +27,13 @@ import {
   mapToolErrorToExitCode,
   type CliProgram,
   type CommandResult,
-} from '@opensip-tools/contracts';
-import { ToolError, currentScope } from '@opensip-tools/core';
+} from '@opensip-cli/contracts';
+import { ToolError, currentScope } from '@opensip-cli/core';
 import { Option } from 'commander';
 
 import { emitCommandResult } from './mount-result-command.js';
 
-import type { ArgSpec, CommandSpec, OptionSpec, ToolCliContext } from '@opensip-tools/core';
+import type { ArgSpec, CommandSpec, OptionSpec, ToolCliContext } from '@opensip-cli/core';
 
 /**
  * A {@link CommandSpec} whose handler receives the concrete host

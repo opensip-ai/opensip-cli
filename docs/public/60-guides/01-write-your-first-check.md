@@ -4,7 +4,7 @@ last_verified: 2026-06-07
 release: v3.0.0
 title: "Write your first check"
 audience: [getting-started, plugin-authors]
-purpose: "Task-led walkthrough: from `opensip-tools init` to a passing CI gate, with one custom check you authored, in ~15 minutes."
+purpose: "Task-led walkthrough: from `opensip init` to a passing CI gate, with one custom check you authored, in ~15 minutes."
 source-files:
   - packages/fitness/engine/src/framework/define-check.ts
   - packages/cli/src/commands/init.ts
@@ -16,22 +16,22 @@ related-docs:
 ---
 # Write your first check
 
-By the end of this page you'll have: an installed CLI, an `opensip-tools.config.yml`, one custom check you wrote, a recipe that runs it, and a passing-or-failing exit code that CI can gate on. ~15 minutes if you're new to the tool; less if you've seen the [show-me page](../00-start/02-show-me-the-loops.md).
+By the end of this page you'll have: an installed CLI, an `opensip-cli.config.yml`, one custom check you wrote, a recipe that runs it, and a passing-or-failing exit code that CI can gate on. ~15 minutes if you're new to the tool; less if you've seen the [show-me page](../00-start/02-show-me-the-loops.md).
 
 ## 1. Scaffold a project
 
 ```bash
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 cd your-project
-opensip-tools init
+opensip init
 ```
 
 `init` detects your language(s) and scaffolds:
 
 ```
 your-project/
-├── opensip-tools.config.yml
-└── opensip-tools/
+├── opensip-cli.config.yml
+└── opensip-cli/
     ├── fit/
     │   ├── checks/example-check.mjs
     │   └── recipes/example-recipe.mjs
@@ -42,7 +42,7 @@ your-project/
 Confirm it works:
 
 ```bash
-opensip-tools fit --recipe example
+opensip fit --recipe example
 # 1 Passed, 0 Failed | Duration 0.1s
 ```
 
@@ -52,10 +52,10 @@ If that exits 0, the platform is wired correctly. Delete or edit the example as 
 
 Pick something your team cares about. We'll do *"no `FIXME` comments left in production code"* — small enough to fit on this page, real enough to demonstrate the moving parts.
 
-Create `opensip-tools/fit/checks/no-fixme.mjs`:
+Create `opensip-cli/fit/checks/no-fixme.mjs`:
 
 ```js
-import { defineCheck } from '@opensip-tools/fitness';
+import { defineCheck } from '@opensip-cli/fitness';
 
 export default defineCheck({
   // UUID v4 — stable across renames. Generate with:
@@ -96,19 +96,19 @@ Five fields you'll touch in every check:
 ## 3. Confirm it loads
 
 ```bash
-opensip-tools fit --list
+opensip fit --list
 ```
 
 Your check appears in the list. If it doesn't, check:
 
-- File is at `opensip-tools/fit/checks/*.mjs` (the `.mjs` extension matters — it's how the loader identifies plugins)
+- File is at `opensip-cli/fit/checks/*.mjs` (the `.mjs` extension matters — it's how the loader identifies plugins)
 - `export default defineCheck(...)` (default export — not a named one)
-- No syntax errors (`node opensip-tools/fit/checks/no-fixme.mjs` will surface them)
+- No syntax errors (`node opensip-cli/fit/checks/no-fixme.mjs` will surface them)
 
 ## 4. Run it
 
 ```bash
-opensip-tools fit --check no-fixme-comments
+opensip fit --check no-fixme-comments
 ```
 
 Output:
@@ -124,14 +124,14 @@ Output:
 Add `--verbose` to see each violation's file + line:
 
 ```bash
-opensip-tools fit --check no-fixme-comments --verbose
+opensip fit --check no-fixme-comments --verbose
 ```
 
 If you wanted to *clean up* the violations first and gate on *new* ones only, this is where the baseline flow kicks in — see [wire into CI](./03-wire-into-ci.md) and [adopt in a monorepo](./04-adopt-in-a-monorepo.md).
 
 ## 5. Add it to a recipe
 
-A recipe is a named lineup of checks plus execution options. Create `opensip-tools/fit/recipes/quality.mjs`:
+A recipe is a named lineup of checks plus execution options. Create `opensip-cli/fit/recipes/quality.mjs`:
 
 ```js
 export const recipes = [{
@@ -154,7 +154,7 @@ export const recipes = [{
 Run the recipe:
 
 ```bash
-opensip-tools fit --recipe quality
+opensip fit --recipe quality
 ```
 
 ## 6. Lock in a CI gate
@@ -162,13 +162,13 @@ opensip-tools fit --recipe quality
 Run once to capture the current state as the baseline:
 
 ```bash
-opensip-tools fit --recipe quality --gate-save
+opensip fit --recipe quality --gate-save
 ```
 
 From now on, in CI:
 
 ```bash
-opensip-tools fit --recipe quality --gate-compare
+opensip fit --recipe quality --gate-compare
 ```
 
 `--gate-compare` exits 0 if no *new* violations appeared (existing ones are tolerated), non-zero otherwise. That's the incremental-adoption flow — you don't have to fix the baseline before turning the gate on.

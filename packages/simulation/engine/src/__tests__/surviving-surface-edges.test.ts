@@ -7,7 +7,7 @@
  * dedicated framework/execution and per-kind executor test suites.
  */
 
-import { enterScope, RunScope, runWithScopeSync } from '@opensip-tools/core';
+import { enterScope, RunScope, runWithScopeSync } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';

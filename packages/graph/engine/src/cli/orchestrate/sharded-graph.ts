@@ -18,7 +18,7 @@ import {
   withSpanAsync,
   type Signal,
   type Span,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { buildPackageManifestIndex } from '../../cross-package/export-index.js';
 import { unionFeatureDeps } from '../../pipeline/feature-deps.js';

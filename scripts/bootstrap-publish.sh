@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# One-time bootstrap publish for @opensip-tools/*.
+# One-time bootstrap publish for @opensip-cli/*.
 #
 # Use this when one or more workspace packages do not yet exist on
 # npmjs.com. npm trusted publishing (OIDC) requires the package to
@@ -28,7 +28,7 @@
 #   1. For each package marked NEW in the output, visit its npmjs.com
 #      settings page and configure trusted publishing:
 #        org:      opensip-ai
-#        repo:     opensip-tools
+#        repo:     opensip-cli
 #        workflow: release.yml
 #        environment: (leave empty)
 #   2. Delete the npm token you just used.
@@ -39,7 +39,7 @@ set -euo pipefail
 if [[ -z "${NPM_TOKEN:-}" ]]; then
   echo "error: NPM_TOKEN environment variable is required" >&2
   echo "  generate one at https://www.npmjs.com/settings/<user>/tokens" >&2
-  echo "  (granular access token, scope @opensip-tools/*, publish permission)" >&2
+  echo "  (granular access token, scope @opensip-cli/*, publish permission)" >&2
   exit 1
 fi
 
@@ -72,15 +72,15 @@ skipped=0
 newly_created=()
 
 for pkg in "${PACKAGES[@]}"; do
-  # The CLI publishes under the unscoped name `opensip-tools`; everything else
-  # is `@opensip-tools/<pkg>`. pnpm pack names the tarball accordingly:
-  # unscoped → `opensip-tools-<ver>.tgz`, scoped → `opensip-tools-<pkg>-<ver>.tgz`.
-  if [[ "$pkg" == "opensip-tools" ]]; then
-    name="opensip-tools"
-    tarball="$TARBALL_DIR/opensip-tools-${VERSION}.tgz"
+  # The CLI publishes under the unscoped name `opensip-cli`; everything else
+  # is `@opensip-cli/<pkg>`. pnpm pack names the tarball accordingly:
+  # unscoped → `opensip-cli-<ver>.tgz`, scoped → `opensip-cli-<pkg>-<ver>.tgz`.
+  if [[ "$pkg" == "opensip-cli" ]]; then
+    name="opensip-cli"
+    tarball="$TARBALL_DIR/opensip-cli-${VERSION}.tgz"
   else
-    name="@opensip-tools/$pkg"
-    tarball="$TARBALL_DIR/opensip-tools-${pkg}-${VERSION}.tgz"
+    name="@opensip-cli/$pkg"
+    tarball="$TARBALL_DIR/opensip-cli-${pkg}-${VERSION}.tgz"
   fi
 
   # Namespace-creation only: skip any package whose NAME already exists on
@@ -134,7 +134,7 @@ if (( ${#newly_created[@]} > 0 )); then
   echo
   echo "  Settings to enter (per package):"
   echo "    Organization: opensip-ai"
-  echo "    Repository:   opensip-tools"
+  echo "    Repository:   opensip-cli"
   echo "    Workflow:     release.yml"
   echo "    Environment:  (leave empty)"
 fi

@@ -78,8 +78,8 @@ describe('update-state store', () => {
     expect(existsSync(stateFile)).toBe(false);
   });
 
-  it('resolves the default path under ~/.opensip-tools/', () => {
+  it('resolves the default path under ~/.opensip-cli/', () => {
     const path = defaultUpdateStateFile();
-    expect(path.endsWith(join('.opensip-tools', 'update-state.json'))).toBe(true);
+    expect(path.endsWith(join('.opensip-cli', 'update-state.json'))).toBe(true);
   });
 });

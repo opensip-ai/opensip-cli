@@ -3,7 +3,7 @@
  * users get the same mental model across both tools.
  *
  * A recipe is a named bundle that selects scenarios and configures their
- * execution. The user runs `opensip-tools sim --recipe <name>` to invoke
+ * execution. The user runs `opensip sim --recipe <name>` to invoke
  * one. Without a flag, the built-in `default` recipe applies.
  */
 
@@ -42,7 +42,7 @@ export interface KindScenarioSelector {
 /**
  * Union of every scenario-selector shape used by recipes.
  *
- * The `explicit` / `all` / `tags` arms mirror `@opensip-tools/core`'s
+ * The `explicit` / `all` / `tags` arms mirror `@opensip-cli/core`'s
  * `RecipeSelector` shape (keeping sim's historical `scenarioIds` field on
  * `explicit`); `kind` is a sim-only arm. Resolution delegates to core's
  * `resolveSelector` via per-arm predicates (see `service.ts`) — sim's

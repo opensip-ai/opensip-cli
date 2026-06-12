@@ -15,9 +15,9 @@
  * actually exercises a fixture lives in `./run-check-on-fixture.ts`.
  */
 
-import type { Check } from '@opensip-tools/fitness';
+import type { Check } from '@opensip-cli/fitness';
 
-/** The authoring-surface `Check`'s config shape (`@opensip-tools/fitness`
+/** The authoring-surface `Check`'s config shape (`@opensip-cli/fitness`
  * exports the `Check` type; the config type is derived structurally so this
  * package consumes only the curated barrel). */
 type CheckConfig = Check['config'];

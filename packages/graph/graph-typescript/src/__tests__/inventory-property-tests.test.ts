@@ -32,7 +32,7 @@ import { discoverFiles } from '../discover.js';
 
 import { buildCatalog as runInventory, resolveCatalogEdges } from './_pipeline.js';
 
-import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
+import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 
 const FIXTURE_TSCONFIG = JSON.stringify({
   compilerOptions: {

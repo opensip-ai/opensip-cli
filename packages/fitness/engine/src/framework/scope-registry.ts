@@ -20,7 +20,7 @@
  *   - `currentFitnessLoadState()` — reads `scope.fitness.load`; same throws.
  */
 
-import { currentScope } from '@opensip-tools/core';
+import { currentScope } from '@opensip-cli/core';
 
 import { FitnessRecipeRegistry } from '../recipes/registry.js';
 

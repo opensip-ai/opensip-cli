@@ -5,7 +5,7 @@
  * The single observable claim: the declared env bindings
  * OPENSIP_FIT_FAIL_ON_ERRORS / OPENSIP_FIT_FAIL_ON_WARNINGS actually change the
  * `fit` gate (and therefore the process exit code) WITHOUT editing
- * opensip-tools.config.yml. Before Phase 4 these were resolved into
+ * opensip-cli.config.yml. Before Phase 4 these were resolved into
  * `scope.toolConfig` but no-ops at runtime — the gate read the re-parsed
  * `signalersConfig.fitness.*`. These tests run the real CLI against the same
  * project with and without the env var and assert the exit code flips, proving
@@ -29,7 +29,7 @@ let testDir: string;
 /** Write the project config with explicit gate thresholds in the FILE. */
 function writeConfig(failOnErrors: number, failOnWarnings: number): void {
   writeFileSync(
-    join(testDir, 'opensip-tools.config.yml'),
+    join(testDir, 'opensip-cli.config.yml'),
     [
       'schemaVersion: 1',
       'fitness:',

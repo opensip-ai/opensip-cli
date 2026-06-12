@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { dashboardFiltersJs } from '../code-paths/filters.js';
 import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
 
-import type { GraphFunctionOccurrence } from '@opensip-tools/contracts';
+import type { GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
 interface FilterEnv {
   passesFilter: (occ: GraphFunctionOccurrence, fs: FilterState) => boolean;

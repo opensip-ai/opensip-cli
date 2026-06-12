@@ -1,7 +1,7 @@
 /**
  * @fileoverview Simulation plugin export contract
  *
- * What an @opensip-tools/scenarios-* (or any sim-domain plugin) exports.
+ * What an @opensip-cli/scenarios-* (or any sim-domain plugin) exports.
  *
  * Both scenarios and recipes are registered explicitly by the
  * simulation plugin loader — `defineLoadScenario({...})`,

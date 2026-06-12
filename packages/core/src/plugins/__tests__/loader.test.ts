@@ -183,7 +183,7 @@ describe('loadAllPlugins', () => {
 
   it('rolls up counts across multiple discovered plugins', async () => {
     // Build a minimal fit project layout that discovers two user-source plugins.
-    const checksDir = join(testDir, 'opensip-tools', 'fit', 'checks');
+    const checksDir = join(testDir, 'opensip-cli', 'fit', 'checks');
     mkdirSync(checksDir, { recursive: true });
     writeFileSync(join(checksDir, 'a.mjs'), 'export const x = 1;');
     writeFileSync(join(checksDir, 'b.mjs'), 'export const x = 2;');
@@ -201,7 +201,7 @@ describe('loadAllPlugins', () => {
   });
 
   it('collects errors from failing plugins without halting', async () => {
-    const checksDir = join(testDir, 'opensip-tools', 'fit', 'checks');
+    const checksDir = join(testDir, 'opensip-cli', 'fit', 'checks');
     mkdirSync(checksDir, { recursive: true });
     writeFileSync(join(checksDir, 'good.mjs'), 'export const x = 1;');
     writeFileSync(join(checksDir, 'bad.mjs'), 'export const x = 1;');
@@ -220,7 +220,7 @@ describe('loadAllPlugins', () => {
   });
 
   it('rolls up arbitrary per-kind counts', async () => {
-    const checksDir = join(testDir, 'opensip-tools', 'fit', 'checks');
+    const checksDir = join(testDir, 'opensip-cli', 'fit', 'checks');
     mkdirSync(checksDir, { recursive: true });
     writeFileSync(join(checksDir, 'a.mjs'), 'export const x = 1;');
 

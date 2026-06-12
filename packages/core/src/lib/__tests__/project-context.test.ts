@@ -2,8 +2,8 @@
  * @fileoverview Unit tests for `resolveProjectContext`.
  *
  * Critical isolation note: every fixture uses `mkdtempSync` + `stopAt` so
- * the walker cannot escape into the real opensip-tools repo's
- * `opensip-tools.config.yml` (which sits somewhere above the test runner's
+ * the walker cannot escape into the real opensip-cli repo's
+ * `opensip-cli.config.yml` (which sits somewhere above the test runner's
  * cwd). Tests that omit `stopAt` would be machine-dependent and flaky.
  */
 
@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 function writeConfig(dir: string): string {
-  const path = join(dir, 'opensip-tools.config.yml');
+  const path = join(dir, 'opensip-cli.config.yml');
   writeFileSync(path, 'targets: {}\n');
   return path;
 }
@@ -109,9 +109,9 @@ describe('resolveProjectContext', () => {
 
     it('honors stopAt to prevent walking into the real repo above tmpdir', () => {
       // No config anywhere in testDir, but the host machine's real
-      // opensip-tools repo's config lives somewhere above tmpdir. The
+      // opensip-cli repo's config lives somewhere above tmpdir. The
       // walker MUST stop at testDir; otherwise this test passes
-      // on machines that don't host an opensip-tools checkout and
+      // on machines that don't host an opensip-cli checkout and
       // fails on machines that do.
       const inner = join(testDir, 'inner');
       mkdirSync(inner);
@@ -125,15 +125,15 @@ describe('resolveProjectContext', () => {
   });
 
   describe('package.json pointer at ancestor', () => {
-    it('honors package.json#opensip-tools.configPath when walking up', () => {
-      // testDir/package.json → "configPath": "config/opensip-tools.config.yml"
-      // testDir/config/opensip-tools.config.yml exists
+    it('honors package.json#opensip-cli.configPath when walking up', () => {
+      // testDir/package.json → "configPath": "config/opensip-cli.config.yml"
+      // testDir/config/opensip-cli.config.yml exists
       mkdirSync(join(testDir, 'config'));
-      const pointedConfig = join(testDir, 'config', 'opensip-tools.config.yml');
+      const pointedConfig = join(testDir, 'config', 'opensip-cli.config.yml');
       writeFileSync(pointedConfig, 'targets: {}\n');
       writeFileSync(
         join(testDir, 'package.json'),
-        JSON.stringify({ 'opensip-tools': { configPath: 'config/opensip-tools.config.yml' } }),
+        JSON.stringify({ 'opensip-cli': { configPath: 'config/opensip-cli.config.yml' } }),
       );
       const sub = join(testDir, 'sub');
       mkdirSync(sub);

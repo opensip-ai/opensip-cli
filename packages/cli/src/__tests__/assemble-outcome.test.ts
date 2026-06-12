@@ -4,12 +4,12 @@
  * wrapped envelope.
  */
 
-import { buildSignalEnvelope, type ErrorResult } from '@opensip-tools/contracts';
+import { buildSignalEnvelope, type ErrorResult } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   HOST_VERDICT_POLICY_FALLBACK,
   NotFoundError,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import {

@@ -1,13 +1,13 @@
 /**
- * @fileoverview A package other than `@opensip-tools/config` may not hand-roll a
- * loader for a tool-AGNOSTIC, document-level block of `opensip-tools.config.yml`
+ * @fileoverview A package other than `@opensip-cli/config` may not hand-roll a
+ * loader for a tool-AGNOSTIC, document-level block of `opensip-cli.config.yml`
  * — those blocks (`cli`, `targets`, `globalExcludes`, `checkOverrides`,
- * `dashboard`) are owned, schema'd, and validated by `@opensip-tools/config`
+ * `dashboard`) are owned, schema'd, and validated by `@opensip-cli/config`
  * (release 2.10.1, ADR-0023, Phase 4 / north-star Principle 6).
  *
  * The config-consolidation release moved the scattered hand-projections
  * (`contracts/cli-config.ts`'s `projectCliDefaults`, fitness's targeting
- * loaders' inline schemas) into `@opensip-tools/config`, behind one composed
+ * loaders' inline schemas) into `@opensip-cli/config`, behind one composed
  * whole-document validation. This guardrail keeps the next release from
  * re-accumulating that drift: it fires when a file OUTSIDE the config package
  * binds a parsed YAML document and reads a document-level block off it, then
@@ -16,25 +16,25 @@
  * COMPLEMENT TO `one-config-document` — that check governs a TOOL reading its
  * OWN namespace block (`graph`/`fitness`/`simulation`); this one governs the
  * tool-AGNOSTIC document blocks. Together they make "config is parsed only in
- * `@opensip-tools/config`" mechanically true.
+ * `@opensip-cli/config`" mechanically true.
  *
  * NOT flagged (the compliant tree): a binding handed into a Zod `.parse(...)` /
  * `.safeParse(...)` (e.g. fitness's `loadTargetsConfig` / `loadSignalersConfig`,
  * which read the document THROUGH the config-owned schemas to build their
  * runtime registry) — schema-routed reads are exactly the allowed path.
  *
- * SCOPE — opensip-tools' own first-party config-reading paths (cli bootstrap +
+ * SCOPE — opensip-cli' own first-party config-reading paths (cli bootstrap +
  * the tool engines). The path guard makes the check inert in adopter repos and
  * exempts the config package itself (the one allowed home).
  */
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 import { yamlDocBindings } from './_yaml-doc-bindings.js';
 
-/** First-party paths that read the opensip-tools config document (config pkg excluded). */
+/** First-party paths that read the opensip-cli config document (config pkg excluded). */
 const CONFIG_READER_PATH = /packages\/(?:cli|fitness|graph|simulation)\/(?:engine\/)?src\//;
 
-/** The tool-agnostic, document-level blocks owned by @opensip-tools/config. */
+/** The tool-agnostic, document-level blocks owned by @opensip-cli/config. */
 const DOCUMENT_LEVEL_KEYS = [
   'cli',
   'targets',
@@ -101,13 +101,13 @@ export function analyzeNoConfigLoaderOutsideConfig(
       filePath,
       message:
         `Hand-rolled loader for the document-level '${info.key}:' block of ` +
-        `opensip-tools.config.yml (projects ${readList}) outside ` +
-        `@opensip-tools/config. The tool-agnostic document blocks (cli/targets/` +
+        `opensip-cli.config.yml (projects ${readList}) outside ` +
+        `@opensip-cli/config. The tool-agnostic document blocks (cli/targets/` +
         `globalExcludes/checkOverrides/dashboard) are owned, schema'd, and ` +
-        `strict-validated by @opensip-tools/config (ADR-0023).`,
+        `strict-validated by @opensip-cli/config (ADR-0023).`,
       severity: 'error',
       suggestion:
-        `Read the '${info.key}:' block through @opensip-tools/config (its schema / ` +
+        `Read the '${info.key}:' block through @opensip-cli/config (its schema / ` +
         `loader, or off the composed scope config) instead of projecting raw YAML ` +
         `fields. Schema-routed reads (a binding handed to .parse/.safeParse) are ` +
         `the allowed path; a fresh hand-projection re-introduces the drift 2.10.1 removed.`,
@@ -137,7 +137,7 @@ export const noConfigLoaderOutsideConfig = defineCheck({
   id: 'b1e7c2a0-4d6f-4a8b-9c3e-1f2a3b4c5d6e',
   slug: 'no-config-loader-outside-config',
   description:
-    'A tool-agnostic config block (cli/targets/globalExcludes/checkOverrides/dashboard) must be parsed only in @opensip-tools/config, not hand-rolled elsewhere (ADR-0023)',
+    'A tool-agnostic config block (cli/targets/globalExcludes/checkOverrides/dashboard) must be parsed only in @opensip-cli/config, not hand-rolled elsewhere (ADR-0023)',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   tags: ['architecture'],
   fileTypes: ['ts'],

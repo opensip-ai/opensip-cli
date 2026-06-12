@@ -1,5 +1,5 @@
 /**
- * Export-surface lock for `@opensip-tools/simulation/internal`.
+ * Export-surface lock for `@opensip-cli/simulation/internal`.
  *
  * `/internal` is the deliberate, test-only escape hatch for simulation engine
  * registry/lifecycle/recipe execution seams. Production packages must use the
@@ -31,7 +31,7 @@ const EXPECTED_INTERNAL_EXPORTS = [
   'readScenarioPackagePreferences',
 ].sort();
 
-describe('@opensip-tools/simulation/internal surface', () => {
+describe('@opensip-cli/simulation/internal surface', () => {
   it('exposes exactly the intended test-only value surface', () => {
     const actual = Object.keys(internal)
       .filter((k) => internal[k as keyof typeof internal] !== undefined)

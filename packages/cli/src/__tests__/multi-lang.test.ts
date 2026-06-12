@@ -1,7 +1,7 @@
 /**
  * End-to-end multi-language test.
  *
- * Pins the contract that opensip-tools fit walks files in every
+ * Pins the contract that opensip fit walks files in every
  * bundled language (rust, python, java, go, cpp, typescript) and
  * dispatches checks to the right adapters. Uses the
  * fixtures/multi-lang sample tree as input.
@@ -23,8 +23,8 @@ const cli = distRunner();
 
 describe('CLI multi-language', () => {
   beforeEach(() => {
-    rmSync(join(FIXTURE, 'opensip-tools', '.runtime'), { recursive: true, force: true });
-    rmSync(join(UNKNOWN_FIXTURE, 'opensip-tools', '.runtime'), { recursive: true, force: true });
+    rmSync(join(FIXTURE, 'opensip-cli', '.runtime'), { recursive: true, force: true });
+    rmSync(join(UNKNOWN_FIXTURE, 'opensip-cli', '.runtime'), { recursive: true, force: true });
   });
 
   it('lists language adapters for all six bundled languages', () => {
@@ -58,7 +58,7 @@ describe('CLI multi-language', () => {
   });
 
   it('fixture config declares targets for every language', () => {
-    const cfg = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf8');
+    const cfg = readFileSync(join(FIXTURE, 'opensip-cli.config.yml'), 'utf8');
     expect(cfg).toContain('languages: [rust]');
     expect(cfg).toContain('languages: [python]');
     expect(cfg).toContain('languages: [java]');

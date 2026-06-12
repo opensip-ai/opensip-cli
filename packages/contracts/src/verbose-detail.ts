@@ -6,11 +6,11 @@
  * Lives in contracts (next to `buildSignalEnvelope`) so fit and sim — peer
  * packages that cannot import each other — share ONE mapping rather than each
  * re-deriving it (which would also trip the `graph:duplicated-function-body`
- * dogfood check). contracts may import `@opensip-tools/core` at runtime (the
+ * dogfood check). contracts may import `@opensip-cli/core` at runtime (the
  * layer below it), so `isErrorSignal` is available here.
  */
 
-import { isErrorSignal, type Signal } from '@opensip-tools/core';
+import { isErrorSignal, type Signal } from '@opensip-cli/core';
 
 import type { FindingGroup, FindingLine } from './command-results.js';
 

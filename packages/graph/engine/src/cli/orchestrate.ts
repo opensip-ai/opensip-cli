@@ -24,7 +24,7 @@
  * public type surface.
  */
 
-import { withSpanAsync, type Signal } from '@opensip-tools/core';
+import { withSpanAsync, type Signal } from '@opensip-cli/core';
 
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
@@ -57,7 +57,7 @@ import type { RunStageArgs } from './orchestrate/catalog-builder.js';
 import type { ShardRunStats } from './orchestrate/shard-model.js';
 import type { GraphProgressCallback } from './orchestrate/types.js';
 import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { DataStore } from '@opensip-cli/datastore';
 
 // Re-export the orchestration types so existing callers (the engine's
 // public `index.ts` barrel, the Ink live view, downstream tooling)

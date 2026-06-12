@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/fitness",
+  "name": "@opensip-cli/fitness",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "Fitness checks engine for OpenSIP Tools",
+  "description": "Fitness checks engine for OpenSIP CLI",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "fitness-functions",
@@ -14,12 +14,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/fitness/engine"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -83,7 +83,7 @@
           "configKeys": {
             "packages": "checkPackages"
           },
-          "builtinScope": "@opensip-tools",
+          "builtinScope": "@opensip-cli",
           "explicitListMode": "augment",
           "coContributions": [
             {
@@ -114,13 +114,13 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/cli-ui": "workspace:*",
-    "@opensip-tools/config": "workspace:*",
-    "@opensip-tools/contracts": "workspace:*",
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/datastore": "workspace:*",
-    "@opensip-tools/session-store": "workspace:*",
-    "@opensip-tools/targeting": "workspace:*",
+    "@opensip-cli/cli-ui": "workspace:*",
+    "@opensip-cli/config": "workspace:*",
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/datastore": "workspace:*",
+    "@opensip-cli/session-store": "workspace:*",
+    "@opensip-cli/targeting": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "commander": "^15.0.0",
     "drizzle-orm": "^0.45.2",
@@ -132,7 +132,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@opensip-tools/lang-typescript": "workspace:*",
+    "@opensip-cli/lang-typescript": "workspace:*",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "vitest": "^4.1.8"

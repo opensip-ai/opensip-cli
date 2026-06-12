@@ -11,7 +11,7 @@
  *     TypeScript type checker.
  *
  * The exact engine used to follow the type-checker alias straight into a
- * workspace package's BUILT `dist/*.d.ts` (Node16 resolves `@opensip-tools/*` to
+ * workspace package's BUILT `dist/*.d.ts` (Node16 resolves `@opensip-cli/*` to
  * the published declaration, not the source `.ts`). The `.d.ts` carries only a
  * bodiless signature, so hashing it never matched the SOURCE body the catalog
  * holds → the real cross-package edge was dropped (under-resolution); and the

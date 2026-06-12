@@ -1,5 +1,5 @@
 /**
- * @fileoverview ADR dogfood checks for runtime boundaries in opensip-tools.
+ * @fileoverview ADR dogfood checks for runtime boundaries in opensip-cli.
  *
  * These checks are repo-local by design: they encode the first-party package
  * layout, known migration bridges, and output/runtime boundaries that only make
@@ -7,7 +7,7 @@
  */
 import path from 'node:path';
 
-import { defineCheck } from '@opensip-tools/fitness';
+import { defineCheck } from '@opensip-cli/fitness';
 
 const ROOT = process.cwd();
 
@@ -72,7 +72,7 @@ function analyzeTreeSitterOwnership(content, filePath) {
           lineNo,
           'tree-sitter-direct-import',
           'Direct web-tree-sitter imports must stay inside packages/tree-sitter/src (ADR-0010).',
-          'Import parser helpers or types from @opensip-tools/tree-sitter instead of binding directly to web-tree-sitter.',
+          'Import parser helpers or types from @opensip-cli/tree-sitter instead of binding directly to web-tree-sitter.',
         ),
       );
     }

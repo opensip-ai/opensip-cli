@@ -52,17 +52,17 @@ beforeAll(() => {
   const fixturesDir = fileURLToPath(new URL('fixtures', import.meta.url));
   toolPluginTarball = packFixture(join(fixturesDir, 'tool-plugin'), consumerCwd);
   fitPackTarball = packFixture(join(fixturesDir, 'fit-pack-plugin'), consumerCwd);
-  // The fit-pack fixture imports `@opensip-tools/fitness` (it authors via the
+  // The fit-pack fixture imports `@opensip-cli/fitness` (it authors via the
   // real `defineCheck`). In the release lane the consumer's node_modules
   // carries the packed workspace; here the BUILT workspace package stands in,
   // via the same resolution walk (installed plugin → up to the consumer's
   // node_modules). Node follows the symlink to its real path, so fitness's own
   // deps resolve from the workspace exactly as the packed install resolves
   // them from the consumer tree.
-  mkdirSync(join(consumerCwd, 'node_modules', '@opensip-tools'), { recursive: true });
+  mkdirSync(join(consumerCwd, 'node_modules', '@opensip-cli'), { recursive: true });
   symlinkSync(
     fileURLToPath(new URL('../../../fitness/engine', import.meta.url)),
-    join(consumerCwd, 'node_modules', '@opensip-tools', 'fitness'),
+    join(consumerCwd, 'node_modules', '@opensip-cli', 'fitness'),
     'dir',
   );
 }, 120_000);

@@ -1,5 +1,5 @@
 // Fixture full Tool plugin (audit P1b). A third-party `kind: "tool"`
-// package: installed via `opensip-tools plugin add`, discovered by marker,
+// package: installed via `opensip plugin add`, discovered by marker,
 // and mounted as the `audit-demo` subcommand with no config wiring.
 export const tool = {
   metadata: {

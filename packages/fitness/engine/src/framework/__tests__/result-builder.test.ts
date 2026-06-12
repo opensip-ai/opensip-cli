@@ -1,9 +1,9 @@
-import { createSignal } from '@opensip-tools/core';
+import { createSignal } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { ResultBuilder, extractSnippet, getLineNumber, isAPIFile } from '../result-builder.js';
 
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 const sig = (overrides: Partial<Parameters<typeof createSignal>[0]> = {}): Signal =>
   createSignal({

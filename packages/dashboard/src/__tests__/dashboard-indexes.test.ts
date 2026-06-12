@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import { dashboardIndexesJs } from '../code-paths/indexes.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
 type BuildIndexesFn = (catalog: GraphCatalog | null) => {
   byBodyHash: Map<string, GraphFunctionOccurrence>;

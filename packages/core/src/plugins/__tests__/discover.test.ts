@@ -26,26 +26,26 @@ afterEach(() => {
 /**
  * Helpers to build the project layout in the test tmpdir:
  *
- *   <testDir>/opensip-tools/<tool>/<kind>/<file>.mjs
- *   <testDir>/opensip-tools/<tool>/<kind>/<file>.js
- *   <testDir>/opensip-tools/.runtime/plugins/<domain>/...
- *   <testDir>/opensip-tools.config.yml  (declares plugins.<domain>)
+ *   <testDir>/opensip-cli/<tool>/<kind>/<file>.mjs
+ *   <testDir>/opensip-cli/<tool>/<kind>/<file>.js
+ *   <testDir>/opensip-cli/.runtime/plugins/<domain>/...
+ *   <testDir>/opensip-cli.config.yml  (declares plugins.<domain>)
  */
 
 function fitChecksDir(): string {
-  return join(testDir, 'opensip-tools', 'fit', 'checks');
+  return join(testDir, 'opensip-cli', 'fit', 'checks');
 }
 function fitRecipesDir(): string {
-  return join(testDir, 'opensip-tools', 'fit', 'recipes');
+  return join(testDir, 'opensip-cli', 'fit', 'recipes');
 }
 function simScenariosDir(): string {
-  return join(testDir, 'opensip-tools', 'sim', 'scenarios');
+  return join(testDir, 'opensip-cli', 'sim', 'scenarios');
 }
 function fitPluginsDir(): string {
-  return join(testDir, 'opensip-tools', '.runtime', 'plugins', 'fit');
+  return join(testDir, 'opensip-cli', '.runtime', 'plugins', 'fit');
 }
 function writeConfig(yaml: string): void {
-  writeFileSync(join(testDir, 'opensip-tools.config.yml'), yaml);
+  writeFileSync(join(testDir, 'opensip-cli.config.yml'), yaml);
 }
 
 /** Build a `plugins.fit:` config block with the given declared deps. */
@@ -59,17 +59,17 @@ describe('discoverPlugins', () => {
     expect(discoverPlugins(FIT_LAYOUT)).toEqual([]);
   });
 
-  it('returns empty array when no opensip-tools/ directory exists', () => {
+  it('returns empty array when no opensip-cli/ directory exists', () => {
     expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([]);
   });
 
   it('returns empty array for `lang` (no subdir model)', () => {
-    mkdirSync(join(testDir, 'opensip-tools', 'lang'), { recursive: true });
+    mkdirSync(join(testDir, 'opensip-cli', 'lang'), { recursive: true });
     expect(discoverPlugins(LANG_LAYOUT, testDir)).toEqual([]);
   });
 
   describe('user-source files (no config opt-in needed)', () => {
-    it('discovers .mjs files in opensip-tools/fit/checks/', () => {
+    it('discovers .mjs files in opensip-cli/fit/checks/', () => {
       mkdirSync(fitChecksDir(), { recursive: true });
       writeFileSync(join(fitChecksDir(), 'my-check.mjs'), 'export const checks = []');
 
@@ -82,7 +82,7 @@ describe('discoverPlugins', () => {
       expect(result[0]?.namespace).toContain('my-check');
     });
 
-    it('discovers .js files in opensip-tools/fit/checks/', () => {
+    it('discovers .js files in opensip-cli/fit/checks/', () => {
       mkdirSync(fitChecksDir(), { recursive: true });
       writeFileSync(join(fitChecksDir(), 'plugin.js'), 'export const checks = []');
 
@@ -91,7 +91,7 @@ describe('discoverPlugins', () => {
       expect(result[0]?.source).toBe('plugin.js');
     });
 
-    it('discovers files in BOTH opensip-tools/fit/checks/ and opensip-tools/fit/recipes/', () => {
+    it('discovers files in BOTH opensip-cli/fit/checks/ and opensip-cli/fit/recipes/', () => {
       mkdirSync(fitChecksDir(), { recursive: true });
       mkdirSync(fitRecipesDir(), { recursive: true });
       writeFileSync(join(fitChecksDir(), 'my-check.mjs'), 'export const checks = []');
@@ -232,7 +232,7 @@ describe('discoverPlugins', () => {
 
   describe('security: path traversal and symlink containment', () => {
     it('rejects plugin names containing .. (would traverse out of node_modules)', () => {
-      // The plugin list comes from opensip-tools.config.yml. A malicious
+      // The plugin list comes from opensip-cli.config.yml. A malicious
       // (or careless) entry like "../escapee" would, without the
       // containment check, resolve relative to node_modules and pull in
       // arbitrary code.
@@ -290,12 +290,12 @@ describe('discoverPlugins', () => {
     });
   });
 
-  describe('config-path resolution (package.json#opensip-tools.configPath)', () => {
+  describe('config-path resolution (package.json#opensip-cli.configPath)', () => {
     // Regression: readProjectPluginsList used to hardcode
-    // `join(projectDir, 'opensip-tools.config.yml')`, ignoring the
+    // `join(projectDir, 'opensip-cli.config.yml')`, ignoring the
     // package.json pointer that the targets loader already honored. As
     // a result, projects whose config lived elsewhere (e.g.,
-    // `<projectDir>/opensip-tools/opensip-tools.config.yml`) had their
+    // `<projectDir>/opensip-cli/opensip-cli.config.yml`) had their
     // `plugins.<domain>: [...]` declaration silently skipped — the
     // plugins-dir fallback returned an empty user-level dir and no
     // pack registered.
@@ -304,18 +304,18 @@ describe('discoverPlugins', () => {
     // so the precedence (--config → package.json pointer → default)
     // is identical across the targets and plugins loaders.
 
-    it('honors `package.json#opensip-tools.configPath` for plugin declarations', () => {
+    it('honors `package.json#opensip-cli.configPath` for plugin declarations', () => {
       // Config lives at a non-default path; the package.json points there.
       mkdirSync(join(testDir, 'sub'), { recursive: true });
       writeFileSync(
-        join(testDir, 'sub', 'opensip-tools.config.yml'),
+        join(testDir, 'sub', 'opensip-cli.config.yml'),
         'plugins:\n  fit:\n    - "pointed-pkg"\n',
       );
       writeFileSync(
         join(testDir, 'package.json'),
         JSON.stringify({
           name: 'test-project',
-          'opensip-tools': { configPath: 'sub/opensip-tools.config.yml' },
+          'opensip-cli': { configPath: 'sub/opensip-cli.config.yml' },
         }),
       );
 
@@ -330,7 +330,7 @@ describe('discoverPlugins', () => {
       writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []');
 
       // Sanity: the default path has NO config — only the pointer path does.
-      expect(existsSync(join(testDir, 'opensip-tools.config.yml'))).toBe(false);
+      expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(false);
 
       const result = discoverPlugins(FIT_LAYOUT, testDir);
       expect(result).toHaveLength(1);

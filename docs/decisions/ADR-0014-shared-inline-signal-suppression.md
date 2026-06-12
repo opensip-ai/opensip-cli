@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-05
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0014: Inline signal suppression is a shared core primitive
@@ -25,7 +25,7 @@ enforcement-reason: >
 ```
 
 **Decision:** Inline, per-occurrence, reason-carrying suppression of findings is
-a **shared primitive in `@opensip-tools/core`**, operating on the `Signal`
+a **shared primitive in `@opensip-cli/core`**, operating on the `Signal`
 stream — not a per-tool feature. Fitness's existing implementation (today in
 `packages/fitness/engine/src/framework/{directive-parsing,ignore-processing}.ts`)
 is migrated onto it; graph adopts it for its rule findings. Config-level *whole-
@@ -42,7 +42,7 @@ substrate to core" symmetry principle from recipes to suppression.
    independent `@graph-ignore`) that drift. Directly contradicts ADR-0005, which
    chose parity-via-shared-substrate over per-tool reinvention.
 2. **Keep fitness's implementation where it is; graph imports it from
-   `@opensip-tools/fitness`.** Rejected: fitness and graph are *peer* tools, not
+   `@opensip-cli/fitness`.** Rejected: fitness and graph are *peer* tools, not
    layers. A `graph → fitness` import inverts the dependency graph (blocked by
    dependency-cruiser) and silently anoints fitness as a kernel for suppression —
    exactly the module-singleton-by-accident shape the kernel split was meant to
@@ -54,7 +54,7 @@ substrate to core" symmetry principle from recipes to suppression.
    undifferentiated (accepts the whole current set at once), carries no reason,
    and is line-fragile (edits above a finding re-fingerprint it). Inadequate for
    recording a durable, co-located human verdict.
-4. **[Chosen] Hoist the inline-suppression substrate to `@opensip-tools/core`;
+4. **[Chosen] Hoist the inline-suppression substrate to `@opensip-cli/core`;
    both tools consume it.**
 
 **Rationale:**
@@ -122,7 +122,7 @@ substrate to core" symmetry principle from recipes to suppression.
   `filterSignalsByDirectives` does today. Reason *quality* is enforced
   out-of-band, mirroring fitness's two mechanisms: a `graph-ignore-hygiene` check
   (parallel to `fitness-ignore-hygiene`) and a `_directives/graph.ts` parser in
-  the existing `directive-audit` framework — both in `@opensip-tools/checks-
+  the existing `directive-audit` framework — both in `@opensip-cli/checks-
   universal`, which already audits foreign directives (eslint/ts/semgrep), so
   graph is a 1:1 extension with no graph import.
 - Out of scope, stays per-tool: whole-rule disable (`disabledChecks` /

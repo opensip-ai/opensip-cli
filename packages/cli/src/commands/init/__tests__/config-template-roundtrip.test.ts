@@ -1,7 +1,7 @@
 /**
  * No-drift guarantee for the `init` scaffold (2.10.1, ADR-0023, Phase 3).
  *
- * The document-level skeleton is rendered by `@opensip-tools/config`
+ * The document-level skeleton is rendered by `@opensip-cli/config`
  * (`renderDocumentHeader`) — the same package that composes + STRICT-validates
  * the whole document. This test closes the loop: the config `init` actually
  * writes, for every supported language, must parse clean through the REAL
@@ -13,7 +13,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ToolRegistry } from '@opensip-tools/core';
+import { ToolRegistry } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { BUNDLED_TOOLS } from '../../../__tests__/test-utils/bundled-tools.js';
@@ -59,7 +59,7 @@ describe('init config template round-trips through the composed schema', () => {
 
   for (const lang of LANGUAGES) {
     it(`the ${lang} scaffold validates STRICT (no drift)`, () => {
-      const configPath = join(dir, 'opensip-tools.config.yml');
+      const configPath = join(dir, 'opensip-cli.config.yml');
       writeFileSync(configPath, generateConfig([lang], scaffolds()), 'utf8');
       expect(() =>
         composeAndValidateToolConfig({ tools: realRegistry(), configPath, env: {} }),
@@ -68,7 +68,7 @@ describe('init config template round-trips through the composed schema', () => {
   }
 
   it('the polyglot (all-languages) scaffold validates STRICT', () => {
-    const configPath = join(dir, 'opensip-tools.config.yml');
+    const configPath = join(dir, 'opensip-cli.config.yml');
     writeFileSync(configPath, generateConfig(LANGUAGES, scaffolds()), 'utf8');
     expect(() =>
       composeAndValidateToolConfig({ tools: realRegistry(), configPath, env: {} }),

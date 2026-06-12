@@ -17,9 +17,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { ConfigurationError, enterScope, LanguageRegistry } from '@opensip-tools/core';
-import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { formatSignalSarif } from '@opensip-tools/output';
+import { ConfigurationError, enterScope, LanguageRegistry } from '@opensip-cli/core';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { formatSignalSarif } from '@opensip-cli/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
@@ -36,7 +36,7 @@ import type {
   WalkOutput,
 } from '../lang-adapter/types.js';
 import type { Catalog, FunctionOccurrence } from '../types.js';
-import type { CommandHandler, ToolCliContext } from '@opensip-tools/core';
+import type { CommandHandler, ToolCliContext } from '@opensip-cli/core';
 
 /**
  * Resolve a graph command-spec handler by command name. Mirrors how the host

@@ -4,7 +4,7 @@ last_verified: 2026-06-12
 release: v3.0.0
 title: "Plugin authoring"
 audience: [plugin-authors]
-purpose: "Overview of the five ways to extend opensip-tools — from a dropped .mjs file to a full Tool plugin. Routes you to the right deep-dive."
+purpose: "Overview of the five ways to extend opensip-cli — from a dropped .mjs file to a full Tool plugin. Routes you to the right deep-dive."
 source-files:
   - packages/core/src/tools/types.ts
   - packages/core/src/plugins/types.ts
@@ -19,13 +19,13 @@ related-docs:
 ---
 # Plugin authoring
 
-opensip-tools is extensible across five shapes, listed in increasing order of effort and capability. Pick the one that matches what you're trying to ship.
+OpenSIP CLI is extensible across five shapes, listed in increasing order of effort and capability. Pick the one that matches what you're trying to ship.
 
 | # | Shape | When to use | Effort | Read |
 |---|---|---|---|---|
-| 1 | **Project-local check** — a `.mjs` file under `opensip-tools/fit/checks/` | Add one rule to one repo. No publishing. | ~10 lines | [Project-local plugins](./02-project-local-plugins.md) |
-| 2 | **Project-local recipe** — a `.mjs` file under `opensip-tools/fit/recipes/` | Define a named lineup of checks for CI ("`quick-smoke` for pre-commit"). | ~10 lines | [Project-local plugins](./02-project-local-plugins.md) |
-| 3 | **Project-local sim scenario** — a `.mjs` file under `opensip-tools/sim/scenarios/` | Run load / chaos simulations against your service. | ~30 lines | [Project-local plugins](./02-project-local-plugins.md) |
+| 1 | **Project-local check** — a `.mjs` file under `opensip-cli/fit/checks/` | Add one rule to one repo. No publishing. | ~10 lines | [Project-local plugins](./02-project-local-plugins.md) |
+| 2 | **Project-local recipe** — a `.mjs` file under `opensip-cli/fit/recipes/` | Define a named lineup of checks for CI ("`quick-smoke` for pre-commit"). | ~10 lines | [Project-local plugins](./02-project-local-plugins.md) |
+| 3 | **Project-local sim scenario** — a `.mjs` file under `opensip-cli/sim/scenarios/` | Run load / chaos simulations against your service. | ~30 lines | [Project-local plugins](./02-project-local-plugins.md) |
 | 4 | **Publishable pack** — a fit package declaring `opensipTools.kind: "fit-pack"` or a sim package using the `scenarios-*` name pattern | Ship the same checks/scenarios across multiple projects, or organize a large in-repo set. | ~100-500 lines + tooling | [Publishable packs](./03-publishable-packs.md) |
 | 5 | **Full Tool plugin** — an npm package declaring `opensipTools.kind: "tool"` | Your own subcommand. Fundamentally different from `fit`/`sim`/`graph` (e.g. `audit-sec`, `bench`). | ~50-150 lines per Tool | [Full Tool plugins](./06-full-tool-plugins.md) |
 

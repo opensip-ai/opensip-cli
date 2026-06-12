@@ -11,13 +11,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { setToolProvenanceForRun } from '../cli-context.js';
 import { pluginList } from '../commands/plugin.js';
 
-import type { ToolProvenance } from '@opensip-tools/contracts';
+import type { ToolProvenance } from '@opensip-cli/contracts';
 
 const FIT_PROVENANCE: ToolProvenance = {
   source: 'bundled',
   id: 'fit',
   version: '2.8.0',
-  packageName: '@opensip-tools/fitness',
+  packageName: '@opensip-cli/fitness',
   resolvedPath: '/pkgs/fitness',
   manifestHash: 'fit00000000000000000000000000000000000000000000000000000000fit0',
 };
@@ -26,7 +26,7 @@ const GRAPH_PROVENANCE: ToolProvenance = {
   source: 'installed',
   id: 'graph',
   version: '2.8.0',
-  packageName: '@opensip-tools/graph',
+  packageName: '@opensip-cli/graph',
   resolvedPath: '/pkgs/graph',
   manifestHash: 'graph0000000000000000000000000000000000000000000000000000000gr',
 };
@@ -62,7 +62,7 @@ describe('plugin list — tool provenance', () => {
     const fit = json.toolProvenance.find((p) => p.id === 'fit');
     expect(fit?.source).toBe('bundled');
     expect(fit?.manifestHash).toBe(FIT_PROVENANCE.manifestHash);
-    expect(fit?.packageName).toBe('@opensip-tools/fitness');
+    expect(fit?.packageName).toBe('@opensip-cli/fitness');
   });
 
   it('is an empty array when no tools were admitted (no bootstrap)', async () => {

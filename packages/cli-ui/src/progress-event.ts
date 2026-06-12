@@ -1,12 +1,12 @@
 /**
  * Progress currency — the universal live-run event vocabulary consumed by the
  * shared `<LiveProgress>` renderer (ADR-0016). The run-time analogue of
- * `@opensip-tools/contracts`' `SignalEnvelope` *output* currency.
+ * `@opensip-cli/contracts`' `SignalEnvelope` *output* currency.
  *
  * Why this lives in cli-ui (not contracts): progress is renderer-bound and
  * ephemeral — it is never persisted or egressed the way a `SignalEnvelope` is.
  * The renderer owns its input vocabulary, and cli-ui depends on ink/react only,
- * so the pure presentational leaf carries no `@opensip-tools/*` dependency.
+ * so the pure presentational leaf carries no `@opensip-cli/*` dependency.
  *
  * One event union covers both tool shapes:
  *   - `phases` — few, fixed, ordered, named stages (graph's 7-stage pipeline),

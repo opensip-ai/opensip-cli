@@ -1,13 +1,13 @@
 /**
  * @fileoverview Project-context resolver.
  *
- * Walks up from `cwd` looking for an opensip-tools project (i.e. an
+ * Walks up from `cwd` looking for an opensip-cli project (i.e. an
  * ancestor where `resolveProjectConfigPath` would succeed). Returns a
  * single `ProjectContext` carrying everything downstream consumers
  * need: cwd, cwdExplicit, projectRoot, configPath, walkedUp, scope.
  *
  * The walker leans on `resolveProjectConfigPath` at each ancestor so
- * the `package.json#opensip-tools.configPath` pointer is honored
+ * the `package.json#opensip-cli.configPath` pointer is honored
  * everywhere it works at a single directory (matches existing
  * `resolveProjectConfigPath` contract).
  *

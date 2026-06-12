@@ -66,7 +66,7 @@ The rule attaches every member's location to the finding (`memberLocations` in [
 
 ## Suppression is unconditional; reasons are a separate check
 
-A `@graph-ignore` **always** suppresses, even with no `-- reason`. Quality is enforced *out of band* — exactly as fitness does it — by the `graph-ignore-hygiene` check (it runs under `opensip-tools fit`), which warns on:
+A `@graph-ignore` **always** suppresses, even with no `-- reason`. Quality is enforced *out of band* — exactly as fitness does it — by the `graph-ignore-hygiene` check (it runs under `opensip fit`), which warns on:
 
 - a missing `-- reason`,
 - an id that isn't a valid `graph:<kebab>`,

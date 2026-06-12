@@ -7,7 +7,7 @@
  * moved, renamed, or deleted. Use stable identifiers instead.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Pattern to match .md file references in comments

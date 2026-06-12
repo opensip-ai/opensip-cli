@@ -14,12 +14,12 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { buildSignalBatch, createSignal } from '@opensip-tools/core';
+import { buildSignalBatch, createSignal } from '@opensip-cli/core';
 import { describe, it, expect, vi } from 'vitest';
 
 import { resolveSignalSink } from '../sink/resolve-signal-sink.js';
 
-import type { SignalBatch } from '@opensip-tools/core';
+import type { SignalBatch } from '@opensip-cli/core';
 
 function batch(findings: number): SignalBatch {
   return buildSignalBatch({

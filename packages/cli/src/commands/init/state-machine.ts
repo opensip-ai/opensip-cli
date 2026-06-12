@@ -1,5 +1,5 @@
 /**
- * Working-directory state classification for `opensip-tools init`.
+ * Working-directory state classification for `opensip init`.
  *
  * Decides one of four states (pristine / fully-initialized /
  * partial-config-only / partial-dir-only) based on whether the config
@@ -10,22 +10,22 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { relative } from 'node:path';
 
-import type { InitResult, PreExistingFile } from '@opensip-tools/contracts';
-import type { ProjectPaths } from '@opensip-tools/core';
+import type { InitResult, PreExistingFile } from '@opensip-cli/contracts';
+import type { ProjectPaths } from '@opensip-cli/core';
 
 export type WorkingDirState = NonNullable<InitResult['state']>;
 
 /**
  * Classify the working directory into one of four states based on the
- * presence of the config file and the `opensip-tools/` directory.
+ * presence of the config file and the `opensip-cli/` directory.
  *
- * The dir-presence check ignores `opensip-tools/.runtime/` — that
+ * The dir-presence check ignores `opensip-cli/.runtime/` — that
  * subtree is tool-managed (logs, sessions, caches, plugin installs)
  * and the CLI's `preAction` hook creates `.runtime/logs/` before any
  * subcommand runs. Treating a runtime-only dir as a "partial-dir"
  * would misclassify a pristine project the moment the bootstrap hook
  * touches the disk. User-authored content lives under
- * `opensip-tools/{fit,sim}/`; only those count as "the dir is present".
+ * `opensip-cli/{fit,sim}/`; only those count as "the dir is present".
  */
 export function classifyWorkingDir(paths: ProjectPaths): WorkingDirState {
   const hasConfig = existsSync(paths.configFile);
@@ -62,15 +62,15 @@ export function buildPartialStateMessage(
   const lines: string[] = [];
   switch (state) {
     case 'fully-initialized': {
-      lines.push('opensip-tools is already initialized in this directory.');
+      lines.push('OpenSIP CLI is already initialized in this directory.');
       break;
     }
     case 'partial-config-only': {
-      lines.push('opensip-tools.config.yml exists but opensip-tools/ does not.');
+      lines.push('opensip-cli.config.yml exists but opensip-cli/ does not.');
       break;
     }
     case 'partial-dir-only': {
-      lines.push('opensip-tools/ exists but opensip-tools.config.yml does not.');
+      lines.push('opensip-cli/ exists but opensip-cli.config.yml does not.');
       break;
     }
     case 'pristine': {
@@ -80,7 +80,7 @@ export function buildPartialStateMessage(
   }
 
   if (preExistingFiles.length > 0) {
-    lines.push('', `Found ${String(preExistingFiles.length)} file(s) under opensip-tools/:`);
+    lines.push('', `Found ${String(preExistingFiles.length)} file(s) under opensip-cli/:`);
     for (const f of preExistingFiles) {
       lines.push(`  ${relativize(f.path, cwd)}  (${f.classification})`);
     }
@@ -89,33 +89,33 @@ export function buildPartialStateMessage(
   lines.push(
     '',
     'Choose one:',
-    '  opensip-tools init --keep    Re-scaffold examples; preserve custom files.',
-    '  opensip-tools init --remove  Delete opensip-tools/ and scaffold fresh.',
+    '  opensip init --keep    Re-scaffold examples; preserve custom files.',
+    '  opensip init --remove  Delete opensip-cli/ and scaffold fresh.',
   );
   return lines.join('\n');
 }
 
 /**
- * Build the "✗ This directory is already inside an opensip-tools project"
+ * Build the "✗ This directory is already inside an OpenSIP CLI project"
  * refusal message. Same string is embedded in the InitResult.insideExistingProject
  * for --json consumers and rendered by InitFeedback for human-readable output.
  */
 export function formatInsideExistingProjectMessage(discoveredRoot: string): string {
   return [
-    `✗ This directory is already inside an opensip-tools project:`,
+    `✗ This directory is already inside an OpenSIP CLI project:`,
     `    ${discoveredRoot}`,
-    `    (config: opensip-tools.config.yml)`,
+    `    (config: opensip-cli.config.yml)`,
     ``,
     `  What did you want to do?`,
     ``,
     `    • Re-scaffold examples, keep your custom files:`,
-    `        opensip-tools init --keep --cwd ${discoveredRoot}`,
+    `        opensip init --keep --cwd ${discoveredRoot}`,
     ``,
     `    • Reset the existing project (delete everything, start over):`,
-    `        opensip-tools init --remove --cwd ${discoveredRoot}`,
+    `        opensip init --remove --cwd ${discoveredRoot}`,
     ``,
     `    • Create a NEW separate project here (rare — only for`,
     `      truly independent sub-projects in a monorepo):`,
-    `        opensip-tools init --cwd .`,
+    `        opensip init --cwd .`,
   ].join('\n');
 }

@@ -2,14 +2,14 @@
  * @fileoverview Fitness ignore-directive parsing — thin wrappers over the
  * shared core suppression scanner (ADR-0014).
  *
- * The directive-scanning algorithm lives once in `@opensip-tools/core`
+ * The directive-scanning algorithm lives once in `@opensip-cli/core`
  * (`scanSuppressionDirectives`). These wrappers bind it to the fitness
  * keywords (`@fitness-ignore-file` / `@fitness-ignore-next-line`) and the
  * historical `boolean` / `Set<number>` signatures the fitness framework and
  * its tests depend on. No scanning logic is duplicated here.
  */
 
-import { scanSuppressionDirectives, type SuppressionKeywords } from '@opensip-tools/core';
+import { scanSuppressionDirectives, type SuppressionKeywords } from '@opensip-cli/core';
 
 export const FITNESS_KEYWORDS: SuppressionKeywords = {
   file: '@fitness-ignore-file',

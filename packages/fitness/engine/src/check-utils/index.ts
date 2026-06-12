@@ -2,8 +2,8 @@
  * @fileoverview Shared utilities for check authors.
  *
  * These helpers were previously copy-pasted between check packs
- * (@opensip-tools/checks-typescript and @opensip-tools/checks-universal).
- * Both packs depend on @opensip-tools/fitness, so the engine is the
+ * (@opensip-cli/checks-typescript and @opensip-cli/checks-universal).
+ * Both packs depend on @opensip-cli/fitness, so the engine is the
  * natural shared home.
  */
 

@@ -88,7 +88,7 @@ The rule does a forward BFS from the entry-point seeds (computed by [`_entry-poi
 
 Both paths apply the same exclusions: `arrow` / `function-expression` / `module-init` kinds and test-file occurrences are skipped. The aggregate signal carries `metadata: { packages, packageCount, occurrenceCount, bodyHash }` and is anchored at the lexicographically-lowest qualified name for a stable fingerprint.
 
-**Config** ([`GraphConfig`](../../../packages/graph/engine/src/types.ts)), read from the `graph:` block of `opensip-tools.config.yml`:
+**Config** ([`GraphConfig`](../../../packages/graph/engine/src/types.ts)), read from the `graph:` block of `opensip-cli.config.yml`:
 
 | Knob | Default | Effect |
 | --- | --- | --- |
@@ -228,13 +228,13 @@ The gate model: signal **fingerprints** are written to a baseline file with `--g
 
 ```bash
 # Establish the baseline once (commit the resulting file).
-opensip-tools graph --gate-save
+opensip graph --gate-save
 
 # In CI: fail the build if any new signal appeared.
-opensip-tools graph --gate-compare
+opensip graph --gate-compare
 ```
 
-v2+: the baseline lives in the project's SQLite store (`<project>/opensip-tools/.runtime/datastore.sqlite`, gitignored), as rows in the host-owned `tool_baseline_entries` table scoped `tool = 'graph'` (ADR-0036 — one generic table pair serves every tool's gate). There is exactly one baseline per tool per project; the v1 `--baseline <path>` flag is gone (see [v2.0.0 CHANGELOG](../../../CHANGELOG.md)).
+v2+: the baseline lives in the project's SQLite store (`<project>/opensip-cli/.runtime/datastore.sqlite`, gitignored), as rows in the host-owned `tool_baseline_entries` table scoped `tool = 'graph'` (ADR-0036 — one generic table pair serves every tool's gate). There is exactly one baseline per tool per project; the v1 `--baseline <path>` flag is gone (see [v2.0.0 CHANGELOG](../../../CHANGELOG.md)).
 
 ### Signal fingerprints
 
@@ -249,7 +249,7 @@ Treat the graph baseline as a snapshot to be re-saved after refactors that move 
 
 ### Compare semantics
 
-`--gate-compare` reads the saved baseline rows and compares their fingerprint set against the current run's (the pure `diffBaseline` in `@opensip-tools/output`). The exit code is:
+`--gate-compare` reads the saved baseline rows and compares their fingerprint set against the current run's (the pure `diffBaseline` in `@opensip-cli/output`). The exit code is:
 
 | Outcome | Exit code | Meaning |
 |---|---|---|
@@ -273,7 +273,7 @@ Per [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md
 
 | Graph concept | SARIF field |
 |---|---|
-| Run | A single run per invocation: `runs[0].tool.driver.name = 'opensip-tools-graph'` |
+| Run | A single run per invocation: `runs[0].tool.driver.name = 'opensip-cli-graph'` |
 | Rule | `runs[0].tool.driver.rules[].id` — the distinct OpenSIP-convention rule ids (`graph.<rule-family>.<rule-id>`), sorted |
 | Signal | `runs[0].results[]`, each with `ruleId` set to its mapped OpenSIP rule id |
 | Function occurrence | `result.locations[0].physicalLocation.{artifactLocation,region}` |

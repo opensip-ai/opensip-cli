@@ -22,11 +22,11 @@
  *     top-level imports are emitted).
  */
 
-import { childrenOf, namedChildrenOf } from '@opensip-tools/graph-adapter-common';
+import { childrenOf, namedChildrenOf } from '@opensip-cli/graph-adapter-common';
 
 import type { PythonParsedFile } from './parse.js';
-import type { DependencySiteRecord } from '@opensip-tools/graph';
-import type { Node } from '@opensip-tools/tree-sitter';
+import type { DependencySiteRecord } from '@opensip-cli/graph';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 export function collectDependencySites(
   file: PythonParsedFile,

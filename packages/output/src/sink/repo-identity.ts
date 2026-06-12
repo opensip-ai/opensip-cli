@@ -9,7 +9,7 @@
  */
 import { execFileSync } from 'node:child_process';
 
-import type { RepoIdentity } from '@opensip-tools/core';
+import type { RepoIdentity } from '@opensip-cli/core';
 
 function git(cwd: string, args: readonly string[]): string | undefined {
   try {

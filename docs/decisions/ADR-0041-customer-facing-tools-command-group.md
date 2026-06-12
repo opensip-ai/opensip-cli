@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-12
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0041: Make `tools` the customer-facing whole-tool management surface
@@ -25,7 +25,7 @@ enforcement-reason: >
   the throwing-module-top-level fixture test.
 ```
 
-**Decision:** Add a first-class `opensip-tools tools` command group
+**Decision:** Add a first-class `opensip tools` command group
 (`list | install | uninstall | validate | data purge`) as the documented,
 customer-facing surface for whole Tool plugins. `plugin` remains the
 lower-level fit/sim/tool machinery that `tools` is implemented over —

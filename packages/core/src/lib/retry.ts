@@ -1,6 +1,6 @@
 // @fitness-ignore-file performance-anti-patterns -- sequential await is the entire point of a retry/backoff loop; running attempts in parallel would defeat retry semantics
 /**
- * Retry with exponential backoff for opensip-tools.
+ * Retry with exponential backoff for opensip-cli.
  * Designed for network calls (e.g., --report-to SARIF POST).
  */
 

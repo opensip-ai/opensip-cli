@@ -25,7 +25,7 @@ import {
   type CommandSpec,
   type ProjectContext,
   type ToolShortId,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { executeClear } from './clear.js';
 import { showHistory } from './history.js';
@@ -34,7 +34,7 @@ import { executeSessionShow } from './session-show.js';
 import { buildToolsGroupLeaves } from './tools/index.js';
 
 import type { CliCommandsContext } from './shared.js';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { DataStore } from '@opensip-cli/datastore';
 
 /** A host command spec — handler receives the {@link CliCommandsContext}. */
 export type HostSpec = CommandSpec<unknown, CliCommandsContext>;
@@ -155,7 +155,7 @@ function buildSessionsPurgeSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'purge',
     description:
-      'Delete session rows from the project-local SQLite store (opensip-tools/.runtime/datastore.sqlite)',
+      'Delete session rows from the project-local SQLite store (opensip-cli/.runtime/datastore.sqlite)',
     commonFlags: ['json'],
     options: [
       {
@@ -259,7 +259,7 @@ function buildPluginAddSpec(ctx: CliCommandsContext): HostSpec {
 function buildPluginRemoveSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'remove',
-    description: 'Uninstall a plugin (and remove from opensip-tools.config.yml for fit/sim packs)',
+    description: 'Uninstall a plugin (and remove from opensip-cli.config.yml for fit/sim packs)',
     commonFlags: ['json'],
     options: [
       {
@@ -295,7 +295,7 @@ function buildPluginRemoveSpec(ctx: CliCommandsContext): HostSpec {
 function buildPluginSyncSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'sync',
-    description: 'Install every plugin declared in opensip-tools.config.yml (post-clone bootstrap)',
+    description: 'Install every plugin declared in opensip-cli.config.yml (post-clone bootstrap)',
     commonFlags: ['json'],
     options: [
       { flag: '--domain', value: '<fit|sim>', description: 'Sync only one domain' },

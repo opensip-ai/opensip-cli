@@ -9,13 +9,13 @@ import { describe, expect, it } from 'vitest';
 
 import { buildGraphEnvelope } from '../build-envelope.js';
 
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 function signal(over: Partial<Signal> = {}): Signal {
   return {
     id: 'sig_1',
     source: 'graph',
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     severity: 'medium',
     category: 'quality',
     ruleId: 'graph:orphan-subtree',

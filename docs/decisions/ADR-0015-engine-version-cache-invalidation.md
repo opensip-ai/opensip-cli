@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-05
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0015: Fold the engine version into the graph cache key
@@ -28,7 +28,7 @@ enforcement-reason: >
 
 **Decision:** The graph engine stamps its own package version onto the
 `Catalog.cacheKey` (via `stampEngineVersion`, prefix `eng=<version>|`) at every
-engine-side cacheKey computation, so that upgrading opensip-tools invalidates the
+engine-side cacheKey computation, so that upgrading opensip-cli invalidates the
 persisted catalog and per-shard fragment caches for **every** language adapter
 and the next run rebuilds with the engine the user actually installed.
 
@@ -74,7 +74,7 @@ shard fragments reused (3.1s vs 7.4s cold); the stored keys carry
   stamp), `obtainCatalog` (cache-orchestrator.ts — full-catalog reuse), and
   `planShardWork` (shard-runner.ts — shard-fragment reuse). The stamped and
   compared keys must agree, so all sites use the same helper.
-- First run after any opensip-tools upgrade does one cold rebuild per project;
+- First run after any opensip-cli upgrade does one cold rebuild per project;
   subsequent runs cache-hit as before.
 - The fitness tool is unaffected: it re-runs all checks against current source
   each invocation and keeps no persistent analysis cache, so it has no equivalent

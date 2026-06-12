@@ -6,7 +6,7 @@
  */
 
 import type { GraphProgressEvent, GraphStage } from './orchestrate.js';
-import type { ProgressEvent } from '@opensip-tools/cli-ui';
+import type { ProgressEvent } from '@opensip-cli/cli-ui';
 
 /**
  * Human label per graph pipeline stage (the checklist row text) for the

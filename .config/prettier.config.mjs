@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Prettier config for the opensip-tools workspace.
+ * Prettier config for the opensip-cli workspace.
  *
  * Boundary (matches the repo's separation-of-concerns ethos):
  *   - Prettier owns LAYOUT  — whitespace, quotes, semicolons, line width,

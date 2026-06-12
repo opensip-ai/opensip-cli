@@ -10,7 +10,7 @@
  * the literal string `"dbg!("` inside a comment, regular string, or
  * raw string (e.g. `r#"dbg!(x)"#`) doesn't false-fire.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 // Matches `dbg!(` / `dbg![` / `dbg!{` — Rust macros accept any of the
 // three delimiter pairs. `\b` anchors so `xdbg!(...)` doesn't match.

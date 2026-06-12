@@ -4,7 +4,7 @@ last_verified: 2026-06-08
 release: v3.0.0
 title: "Environment variables"
 audience: [ci-integrators, operators]
-purpose: "Every environment variable the opensip-tools CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
+purpose: "Every environment variable the opensip-cli CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
 source-files:
   - packages/cli/src/env/host-env-specs.ts
   - packages/config/src/document/global-config.ts
@@ -17,9 +17,9 @@ related-docs:
 # Environment variables
 
 Every environment variable the CLI reads is declared as an `EnvVarSpec` and read
-through a single `EnvRegistry` (release 2.12.0, [ADR-0024](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0024-command-outcome-and-observability.md)),
+through a single `EnvRegistry` (release 2.12.0, [ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/docs/decisions/ADR-0024-command-outcome-and-observability.md)),
 so the surface is governed, coerced, and documented. The source of truth is
-`describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/env/host-env-specs.ts);
+`describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/cli/src/env/host-env-specs.ts);
 the `env-via-registry` fitness check fails CI on any raw `process.env` read that
 bypasses the registry.
 
@@ -27,7 +27,7 @@ bypasses the registry.
 
 | Variable | Effect |
 |---|---|
-| `OPENSIP_API_KEY` | OpenSIP Cloud API key. Overrides the `apiKey` stored in `~/.opensip-tools/config.yml`. |
+| `OPENSIP_API_KEY` | OpenSIP Cloud API key. Overrides the `apiKey` stored in `~/.opensip-cli/config.yml`. |
 
 ## Observability (OpenTelemetry)
 
@@ -42,13 +42,13 @@ bypasses the registry.
 |---|---|
 | `OPENSIP_NO_UPDATE` | Set to any non-empty value to skip the CLI update check. |
 | `NO_UPDATE_NOTIFIER` | npm-convention update-notifier opt-out; honoured as an equivalent of `OPENSIP_NO_UPDATE`. |
-| `OPENSIP_TOOLS_SKIP_BUNDLED` | Comma-separated bundled-tool ids (`fitness`/`simulation`/`graph`) to NOT load as bundled, so an installed or project-local package of the same id can take over instead — the install-source-independence escape hatch (3.0.0). Unset loads all bundled tools. |
+| `OPENSIP_CLI_SKIP_BUNDLED` | Comma-separated bundled-tool ids (`fitness`/`simulation`/`graph`) to NOT load as bundled, so an installed or project-local package of the same id can take over instead — the install-source-independence escape hatch (3.0.0). Unset loads all bundled tools. |
 
 ## Authored tools
 
 | Variable | Effect |
 |---|---|
-| `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS` | Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default); `*` admits all. A project-authored sidecar Tool under `<project>/opensip-tools/tools/` is NOT loaded unless its id (or `*`) appears here — it rides in with `git clone`, so loading it runs untrusted code (fail-closed, exit 5, before any import). Global-authored Tools under `~/.opensip-tools/tools/` are trusted-by-default and ignore this list. |
+| `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` | Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default); `*` admits all. A project-authored sidecar Tool under `<project>/opensip-cli/tools/` is NOT loaded unless its id (or `*`) appears here — it rides in with `git clone`, so loading it runs untrusted code (fail-closed, exit 5, before any import). Global-authored Tools under `~/.opensip-cli/tools/` are trusted-by-default and ignore this list. |
 
 ## Graph engine
 
@@ -60,7 +60,7 @@ bypasses the registry.
 
 | Variable | Effect |
 |---|---|
-| `OPENSIP_TOOLS_NO_WORKER` | Set to `1` to run a tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. |
+| `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. |
 
 ## Terminal / pre-scope
 

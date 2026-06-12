@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildGraphSessionPayload } from '../../persistence/session-payload.js';
 
-import type { Signal, SignalSeverity } from '@opensip-tools/core';
+import type { Signal, SignalSeverity } from '@opensip-cli/core';
 
 /** A minimal engine Signal for the session-payload builder. */
 function sig(over: {
@@ -15,7 +15,7 @@ function sig(over: {
   return {
     id: `sig_${over.ruleId}_${String(over.line ?? 0)}`,
     source: 'graph',
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     severity: over.severity,
     category: 'quality',
     ruleId: over.ruleId,

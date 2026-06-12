@@ -22,7 +22,7 @@ import type { ResolvedToolConfig } from '../scope-types.js';
 
 /** Fresh scope with empty registries — core-internal stand-in for the retired
  *  `test-utils/with-scope` sugar (ADR-0040: the shared helper moved to
- *  `@opensip-tools/test-support`, which core cannot dev-depend on — that
+ *  `@opensip-cli/test-support`, which core cannot dev-depend on — that
  *  package depends on core, so the edge would make the package graph cyclic). */
 const makeTestScope = (): RunScope =>
   new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });

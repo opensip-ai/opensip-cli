@@ -9,7 +9,7 @@ import {
   ToolRegistry,
   ValidationError,
   runWithScopeSync,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadSignalersConfig } from '../loader.js';
@@ -26,7 +26,7 @@ afterEach(() => {
 
 describe('loadSignalersConfig', () => {
   it('loads a minimal valid config', () => {
-    writeFileSync(join(testDir, 'opensip-tools.config.yml'), 'targets: {}\n');
+    writeFileSync(join(testDir, 'opensip-cli.config.yml'), 'targets: {}\n');
     const cfg = loadSignalersConfig(testDir);
     expect(cfg.targets).toEqual({});
     expect(cfg.fitness.failOnErrors).toBe(1);
@@ -35,7 +35,7 @@ describe('loadSignalersConfig', () => {
 
   it('parses targets with description, include, exclude', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets:
   src:
     description: TS source
@@ -53,7 +53,7 @@ describe('loadSignalersConfig', () => {
   });
 
   it('caches by resolved file path within the TTL', () => {
-    const path = join(testDir, 'opensip-tools.config.yml');
+    const path = join(testDir, 'opensip-cli.config.yml');
     writeFileSync(path, 'targets: {}\n');
     const a = loadSignalersConfig(testDir);
     // Re-write the file content; cached load should not re-read.
@@ -64,7 +64,7 @@ describe('loadSignalersConfig', () => {
 
   it('throws ValidationError when target name violates kebab-case', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets:
   Invalid_Name:
     description: x
@@ -75,13 +75,13 @@ describe('loadSignalersConfig', () => {
   });
 
   it('throws ValidationError when YAML is malformed', () => {
-    writeFileSync(join(testDir, 'opensip-tools.config.yml'), 'targets: [unbalanced\n');
+    writeFileSync(join(testDir, 'opensip-cli.config.yml'), 'targets: [unbalanced\n');
     expect(() => loadSignalersConfig(testDir)).toThrow(ValidationError);
   });
 
   it('throws SystemError when the file is too large', () => {
     const huge = 'x'.repeat(11 * 1024 * 1024); // 11 MB > 10 MB limit
-    writeFileSync(join(testDir, 'opensip-tools.config.yml'), huge);
+    writeFileSync(join(testDir, 'opensip-cli.config.yml'), huge);
     expect(() => loadSignalersConfig(testDir)).toThrow(SystemError);
   });
 
@@ -92,7 +92,7 @@ describe('loadSignalersConfig', () => {
   });
 
   it('treats null YAML as an empty object', () => {
-    writeFileSync(join(testDir, 'opensip-tools.config.yml'), '');
+    writeFileSync(join(testDir, 'opensip-cli.config.yml'), '');
     const cfg = loadSignalersConfig(testDir);
     expect(cfg.targets).toEqual({});
   });
@@ -104,7 +104,7 @@ describe('loadSignalersConfig', () => {
   });
 
   it('throws ValidationError when the resolved path is a directory (readFileSync EISDIR)', () => {
-    const dirAsConfig = join(testDir, 'opensip-tools.config.yml');
+    const dirAsConfig = join(testDir, 'opensip-cli.config.yml');
     mkdirSync(dirAsConfig, { recursive: true });
     expect(() => loadSignalersConfig(testDir)).toThrow();
   });
@@ -114,7 +114,7 @@ describe('loadSignalersConfig', () => {
     // verbatim. Counterpart to "treats null YAML as empty object" — that
     // test handles the nullish branch; this one covers the truthy branch.
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets: {}
 fitness:
   failOnErrors: 5
@@ -152,7 +152,7 @@ describe('loadSignalersConfig — scope-first (ADR-0023 one-reader)', () => {
     // after bootstrap (or a different file the tool would have resolved)
     // must NOT win over the scope-carried document.
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       'targets: {}\nfitness:\n  failOnErrors: 99\n',
     );
     const scope = makeScopeWithDocument({ targets: {}, fitness: { failOnErrors: 2 } });

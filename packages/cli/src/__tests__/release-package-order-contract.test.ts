@@ -77,9 +77,9 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
   it('the source of truth is non-trivial and CLI-last (sanity)', () => {
     // Guard against a silently-passing test if the import shape ever breaks.
     expect(RELEASE_PACKAGE_ORDER.length).toBeGreaterThan(20);
-    expect(RELEASE_PACKAGE_ORDER.some((p) => p.name === '@opensip-tools/core')).toBe(true);
+    expect(RELEASE_PACKAGE_ORDER.some((p) => p.name === '@opensip-cli/core')).toBe(true);
     const last = RELEASE_PACKAGE_ORDER.at(-1);
-    expect(last?.name, 'the unscoped CLI must always be published last').toBe('opensip-tools');
+    expect(last?.name, 'the unscoped CLI must always be published last').toBe('opensip-cli');
     expect(last?.layer).toBe('cli');
     // Exactly one CLI entry (the unscoped composition root).
     expect(RELEASE_PACKAGE_ORDER.filter((p) => p.layer === 'cli')).toHaveLength(1);
@@ -194,15 +194,15 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
   const releasingMd = read('RELEASING.md');
 
   it('RELEASING.md "The 32 packages" table names == the reference set', () => {
-    // Table rows look like: `| Layer | `@opensip-tools/<name>` | `packages/…` |`
-    // plus the unscoped CLI row: `| CLI | `opensip-tools` (unscoped) | … |`.
+    // Table rows look like: `| Layer | `@opensip-cli/<name>` | `packages/…` |`
+    // plus the unscoped CLI row: `| CLI | `opensip-cli` (unscoped) | … |`.
     const tableNames = new Set<string>();
-    for (const m of releasingMd.matchAll(/\|\s*`(@opensip-tools\/[a-z0-9-]+)`\s*\|/g)) {
+    for (const m of releasingMd.matchAll(/\|\s*`(@opensip-cli\/[a-z0-9-]+)`\s*\|/g)) {
       tableNames.add(m[1]);
     }
-    // The unscoped CLI row uses `opensip-tools` (no scope) before "(unscoped)".
-    if (/\|\s*`opensip-tools`\s*\(unscoped\)/.test(releasingMd)) {
-      tableNames.add('opensip-tools');
+    // The unscoped CLI row uses `opensip-cli` (no scope) before "(unscoped)".
+    if (/\|\s*`opensip-cli`\s*\(unscoped\)/.test(releasingMd)) {
+      tableNames.add('opensip-cli');
     }
 
     const inTableNotRef = [...tableNames].filter((n) => !referenceNames.has(n)).sort();
@@ -250,10 +250,10 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
       .split(/\s+/)
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
-    const loopNames = new Set(tokens.map((t) => `@opensip-tools/${t}`));
+    const loopNames = new Set(tokens.map((t) => `@opensip-cli/${t}`));
 
     // Reference minus the unscoped CLI (verified separately in the runbook).
-    const scopedRef = new Set([...referenceNames].filter((n) => n !== 'opensip-tools'));
+    const scopedRef = new Set([...referenceNames].filter((n) => n !== 'opensip-cli'));
 
     const inLoopNotRef = [...loopNames].filter((n) => !scopedRef.has(n)).sort();
     const inRefNotLoop = [...scopedRef].filter((n) => !loopNames.has(n)).sort();
@@ -270,8 +270,8 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
     ).toEqual([]);
     // And the unscoped CLI must be verified on its own line.
     expect(
-      releasingMd.includes('npm view opensip-tools version'),
-      'RELEASING.md must verify the unscoped `opensip-tools` on its own line',
+      releasingMd.includes('npm view opensip-cli version'),
+      'RELEASING.md must verify the unscoped `opensip-cli` on its own line',
     ).toBe(true);
   });
 });

@@ -17,7 +17,7 @@
  * semantics.
  */
 
-import { defineRegexListCheck } from '@opensip-tools/fitness';
+import { defineRegexListCheck } from '@opensip-cli/fitness';
 
 const FIX_MESSAGE = 'Remove AI-generation metadata; comments must stand on their own merit';
 const VIOLATION_MESSAGE = `AI-attribution comment found. ${FIX_MESSAGE}`;

@@ -10,11 +10,11 @@
  * dead-code run, then lands the file on opensip's `SarifProvider`. Its
  * external behavior (the `--output-sarif` flag, byte-identical OpenSIP SARIF)
  * is unchanged: the canonical signal → SARIF formatter (`formatSignalSarif` in
- * `@opensip-tools/output`) emits the same bytes graph's former adapter did
+ * `@opensip-cli/output`) emits the same bytes graph's former adapter did
  * once the envelope carries the OpenSIP-mapped rule IDs.
  *
  * Per ADR-0011 (file is a sink; the root renders/delivers), SARIF-to-file is a
- * root seam — graph no longer imports `@opensip-tools/output`. Validates the
+ * root seam — graph no longer imports `@opensip-cli/output`. Validates the
  * provenance flags the consumer contract requires (`--tenant-id`/`--repo-id`)
  * so a misinvocation fails loudly (exit 2) rather than emitting an unscoped
  * file.
@@ -22,12 +22,12 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { ConfigurationError, logger } from '@opensip-tools/core';
+import { EXIT_CODES } from '@opensip-cli/contracts';
+import { ConfigurationError, logger } from '@opensip-cli/core';
 
 import { buildGraphEnvelope } from './build-envelope.js';
 
-import type { Signal, ToolCliContext } from '@opensip-tools/core';
+import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 const MODULE_GRAPH_RENDER = 'graph:render';
 

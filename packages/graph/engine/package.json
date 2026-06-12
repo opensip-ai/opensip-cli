@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/graph",
+  "name": "@opensip-cli/graph",
   "version": "3.0.0",
   "license": "MIT",
   "description": "Static call-graph + dead-end analysis (seven-stage pipeline)",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "call-graph",
@@ -14,12 +14,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/graph/engine"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -103,7 +103,7 @@
             "packages": "graphAdapters",
             "autoDiscover": "autoDiscoverGraphAdapters"
           },
-          "builtinScope": "@opensip-tools"
+          "builtinScope": "@opensip-cli"
         }
       }
     ]
@@ -115,12 +115,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/cli-ui": "workspace:*",
-    "@opensip-tools/config": "workspace:*",
-    "@opensip-tools/contracts": "workspace:*",
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/datastore": "workspace:*",
-    "@opensip-tools/session-store": "workspace:*",
+    "@opensip-cli/cli-ui": "workspace:*",
+    "@opensip-cli/config": "workspace:*",
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/datastore": "workspace:*",
+    "@opensip-cli/session-store": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "commander": "^15.0.0",
     "drizzle-orm": "^0.45.2",
@@ -130,7 +130,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@opensip-tools/output": "workspace:*",
+    "@opensip-cli/output": "workspace:*",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "typescript": "~6.0.3",

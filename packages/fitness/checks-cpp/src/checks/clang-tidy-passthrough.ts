@@ -2,13 +2,13 @@
  * @fileoverview clang-tidy passthrough check.
  *
  * Runs `clang-tidy` against the matched files and surfaces its
- * diagnostics as opensip-tools violations. The user's `.clang-tidy`
+ * diagnostics as opensip-cli violations. The user's `.clang-tidy`
  * config (if present) controls which lints fire — we don't override
  * it. Use `--checks=...` in the args if you want a fixed lint set.
  */
 import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 const CLANG_TIDY_LINE =
   // eslint-disable-next-line sonarjs/slow-regex -- input is one bounded line of clang-tidy output; no real ReDoS exposure
@@ -22,7 +22,7 @@ const CLANG_TIDY_LINE =
  *
  * Note on empty `cwd`: when called with `cwd === ''`, `path.resolve`
  * falls back to `process.cwd()`. The production `command`-mode caller
- * (`executeCommandMode` in `@opensip-tools/fitness`) always passes a
+ * (`executeCommandMode` in `@opensip-cli/fitness`) always passes a
  * non-empty cwd, so the production contract is well-defined; the
  * pass-through is tolerated only as a convenience for tests and is
  * not part of the public surface.
@@ -89,7 +89,7 @@ export function parseClangTidyOutput(
 export const clangTidyPassthrough = defineCheck({
   id: 'e1f2a3b4-9876-4321-eeee-500000000001',
   slug: 'cpp-clang-tidy',
-  description: 'Run clang-tidy and surface its diagnostics as opensip-tools violations',
+  description: 'Run clang-tidy and surface its diagnostics as opensip-cli violations',
   scope: { languages: ['cpp'], concerns: [] },
   tags: ['quality', 'cpp'],
   // Cap the per-invocation runtime so a slow clang-tidy (or one hung

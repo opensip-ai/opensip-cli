@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-11
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0036: Baseline capture + net-new ratchet + baseline export are a host-owned plane
@@ -103,7 +103,7 @@ a behavioral guess.
   rebuilds `signals[]` from payloads into a *synthetic* envelope; sound because
   `formatSignalSarif` derives `results[]` from signals only). A bloat-driven
   minimal projection must still retain the SARIF-result + resolved fields.
-- **Code placement:** pure diff + `GateCompareResult` in `@opensip-tools/output`
+- **Code placement:** pure diff + `GateCompareResult` in `@opensip-cli/output`
   (already the home of pure envelope transforms); `BaselineRepo` + migration in
   `datastore` (already centralizes baseline DDL); seams on `cli-context.ts`. Kernel
   `core` carries no persistence (dependency-cruiser-enforced).

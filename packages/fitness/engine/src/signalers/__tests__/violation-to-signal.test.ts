@@ -60,10 +60,10 @@ describe('violationToSignal', () => {
     expect(signal.suggestion).toBe('Use the barrel');
   });
 
-  it('defaults category to quality and provider to opensip-tools', () => {
+  it('defaults category to quality and provider to opensip-cli', () => {
     const signal = violationToSignal('s', violation());
     expect(signal.category).toBe('quality');
-    expect(signal.provider).toBe('opensip-tools');
+    expect(signal.provider).toBe('opensip-cli');
   });
 
   it('produces a well-formed Signal id and ISO createdAt', () => {

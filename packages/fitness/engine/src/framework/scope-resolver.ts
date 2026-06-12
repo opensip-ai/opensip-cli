@@ -12,7 +12,7 @@ import {
   applyGlobalExcludes,
   preResolveAllTargets,
   resolveTargets,
-} from '@opensip-tools/targeting';
+} from '@opensip-cli/targeting';
 
 import type { CheckScope } from './check-config.js';
 import type { TargetRegistry } from '../targets/target-registry.js';
@@ -24,7 +24,7 @@ import type { TargetsConfig } from '../targets/types.js';
 //
 // The generic glob mechanics — `preResolveAllTargets` (deduped multi-target
 // glob pass), `resolveTargets` (single-pass include/exclude expansion), and
-// `applyGlobalExcludes` — now live ONCE in `@opensip-tools/targeting` (ADR-0037,
+// `applyGlobalExcludes` — now live ONCE in `@opensip-cli/targeting` (ADR-0037,
 // Phase 0) and are imported above. Fitness keeps only the check-domain
 // resolution below (`unionTargetFiles`, the 3-tier `resolveFilesForCheck`, and
 // `buildScopeBasedFileMap`).

@@ -11,7 +11,7 @@
  * sequencing (registries, bootstrap, mounting, registration, dispatch).
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 import { SessionReplayRegistry } from '../session-replay-registry.js';
 
@@ -24,7 +24,7 @@ import type {
   ScaffoldFile,
   ToolCliContext,
   ToolRegistry,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 /** The structured input consumed by `registerCliCommands`. */
 export interface CommandRegistrationInput {

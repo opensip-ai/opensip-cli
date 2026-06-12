@@ -95,7 +95,7 @@ export interface DataStoreVersionMismatch {
 }
 
 /**
- * Thrown when the on-disk SQLite cache was written by a NEWER opensip-tools than
+ * Thrown when the on-disk SQLite cache was written by a NEWER opensip-cli than
  * the one now opening it (`dbVersion > supportedVersion`). Drizzle's migrator
  * cannot detect this direction — the older CLI's migrations are all a prefix of
  * what was applied, so `migrate()` would no-op and later queries would hit
@@ -120,7 +120,7 @@ export class DataStoreVersionError extends Error {
 
 function formatVersionErrorMessage(mismatch: DataStoreVersionMismatch): string {
   return [
-    `This project's opensip-tools cache was written by a newer version of opensip-tools than this CLI supports.`,
+    `This project's opensip-cli cache was written by a newer version of opensip-cli than this CLI supports.`,
     ``,
     `  Cache:          ${mismatch.path}`,
     `  Cache schema:   v${mismatch.dbVersion}`,

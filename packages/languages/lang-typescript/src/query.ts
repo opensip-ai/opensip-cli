@@ -5,7 +5,7 @@ import type {
   Import,
   LanguageQueryAPI,
   Location,
-} from '@opensip-tools/core/languages';
+} from '@opensip-cli/core/languages';
 
 function locationOf(sourceFile: ts.SourceFile, node: ts.Node): Location {
   const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));

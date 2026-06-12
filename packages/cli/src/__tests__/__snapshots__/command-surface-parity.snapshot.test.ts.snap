@@ -4,7 +4,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
 {
   "aliases": [],
   "args": [],
-  "name": "opensip-tools",
+  "name": "opensip",
   "options": [
     {
       "choices": undefined,
@@ -234,7 +234,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": undefined,
-          "description": "Path to opensip-tools.config.yml (overrides package.json pointer and default)",
+          "description": "Path to opensip-cli.config.yml (overrides package.json pointer and default)",
           "flags": "--config <path>",
           "negate": false,
           "optional": false,
@@ -954,7 +954,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "Re-scaffold example files. Preserve any custom files in opensip-tools/.",
+          "description": "Re-scaffold example files. Preserve any custom files in opensip-cli/.",
           "flags": "--keep",
           "negate": false,
           "optional": false,
@@ -974,7 +974,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "Delete opensip-tools/ entirely, then scaffold fresh.",
+          "description": "Delete opensip-cli/ entirely, then scaffold fresh.",
           "flags": "--remove",
           "negate": false,
           "optional": false,
@@ -983,7 +983,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         },
       ],
       "subcommands": [],
-      "synopsis": "Scaffold opensip-tools.config.yml + example checks/scenarios for your project",
+      "synopsis": "Scaffold opensip-cli.config.yml + example checks/scenarios for your project",
       "usage": "[options]",
     },
     {
@@ -1131,7 +1131,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
             },
           ],
           "subcommands": [],
-          "synopsis": "Uninstall a plugin (and remove from opensip-tools.config.yml for fit/sim packs)",
+          "synopsis": "Uninstall a plugin (and remove from opensip-cli.config.yml for fit/sim packs)",
           "usage": "[options] <package>",
         },
         {
@@ -1171,7 +1171,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
             },
           ],
           "subcommands": [],
-          "synopsis": "Install every plugin declared in opensip-tools.config.yml (post-clone bootstrap)",
+          "synopsis": "Install every plugin declared in opensip-cli.config.yml (post-clone bootstrap)",
           "usage": "[options]",
         },
       ],
@@ -1348,7 +1348,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
             },
           ],
           "subcommands": [],
-          "synopsis": "Delete session rows from the project-local SQLite store (opensip-tools/.runtime/datastore.sqlite)",
+          "synopsis": "Delete session rows from the project-local SQLite store (opensip-cli/.runtime/datastore.sqlite)",
           "usage": "[options]",
         },
         {
@@ -1772,7 +1772,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "With --project, also remove user-authored content and opensip-tools.config.yml (DESTRUCTIVE)",
+          "description": "With --project, also remove user-authored content and opensip-cli.config.yml (DESTRUCTIVE)",
           "flags": "--purge",
           "negate": false,
           "optional": false,
@@ -1782,7 +1782,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "Remove user-level config at ~/.opensip-tools/ (default mode)",
+          "description": "Remove user-level config at ~/.opensip-cli/ (default mode)",
           "flags": "--user",
           "negate": false,
           "optional": false,
@@ -1801,7 +1801,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         },
       ],
       "subcommands": [],
-      "synopsis": "Remove user-level config at ~/.opensip-tools/ (cloud API key, defaults). Use --project to remove project-local state instead.",
+      "synopsis": "Remove user-level config at ~/.opensip-cli/ (cloud API key, defaults). Use --project to remove project-local state instead.",
       "usage": "[options]",
     },
   ],

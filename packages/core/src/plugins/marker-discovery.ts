@@ -51,7 +51,7 @@ export interface MarkerDiscoveryOptions {
 
 /** A package discovered by its closed-union marker kind, with name, on-disk directory, and the echoed kind. */
 export interface DiscoveredMarkerPackage {
-  /** npm package name, e.g. '@opensip-tools/fitness' or '@my-co/fit'. */
+  /** npm package name, e.g. '@opensip-cli/fitness' or '@my-co/fit'. */
   readonly name: string;
   /** Absolute path to the package's directory inside node_modules. */
   readonly packageDir: string;
@@ -70,7 +70,7 @@ export function isMarkerKind(value: unknown): value is MarkerKind {
 /**
  * Walk up from `projectDir` looking for `node_modules/` directories.
  * For each one, scan top-level entries (and one level into scoped
- * directories like `@opensip-tools/`) for packages declaring
+ * directories like `@opensip-cli/`) for packages declaring
  * `opensipTools.kind === options.kind`. Return the deduplicated list.
  *
  * Same-named packages are returned once — the first occurrence walking
@@ -92,7 +92,7 @@ export function discoverPackagesByMarker(
 /**
  * Scan EXACTLY ONE `node_modules` directory for packages declaring
  * `opensipTools.kind === kind` — no ancestor walk. Used for fixed plugin
- * host dirs (`~/.opensip-tools/plugins/tool/node_modules`,
+ * host dirs (`~/.opensip-cli/plugins/tool/node_modules`,
  * `<project>/.runtime/plugins/tool/node_modules`) where walking up would
  * wrongly pull in `$HOME/node_modules` or unrelated ancestor trees.
  */

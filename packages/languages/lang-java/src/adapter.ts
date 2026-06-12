@@ -1,7 +1,7 @@
 import { parseJava, type JavaTree } from './parse.js';
 import { stripComments, stripStrings } from './strip.js';
 
-import type { LanguageAdapter } from '@opensip-tools/core';
+import type { LanguageAdapter } from '@opensip-cli/core';
 
 export const javaAdapter: LanguageAdapter<JavaTree> = {
   id: 'java',

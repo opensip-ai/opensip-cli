@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { resolveProjectPaths, resolveUserPaths } from '@opensip-tools/core';
+import { resolveProjectPaths, resolveUserPaths } from '@opensip-cli/core';
 
 import { TOOL_DOMAIN } from './plugin/domain-resolution.js';
 import {
@@ -25,7 +25,7 @@ import {
   readHostDependencies,
 } from './plugin/host-dir.js';
 
-import type { PluginResult } from '@opensip-tools/contracts';
+import type { PluginResult } from '@opensip-cli/contracts';
 
 // Re-exported so the test hook (`__test.editPluginList`) and any host-ops
 // consumer have a single import home for the host-mutation surface.

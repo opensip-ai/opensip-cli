@@ -1,11 +1,11 @@
-import { nameOf, walkNodes } from '@opensip-tools/tree-sitter';
+import { nameOf, walkNodes } from '@opensip-cli/tree-sitter';
 import { describe, expect, it } from 'vitest';
 
 import { findEnclosingFunction, getEnclosingFunctionName, isMethod } from '../enclosing.js';
 import { parsePython } from '../parse.js';
 import { isFunction } from '../predicates.js';
 
-import type { Node } from '@opensip-tools/tree-sitter';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 const SRC = [
   'class S:',

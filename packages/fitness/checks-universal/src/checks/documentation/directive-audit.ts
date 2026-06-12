@@ -15,7 +15,7 @@
  * map directives onto CheckViolations.
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 import { parseESLintDirectives } from './_directives/eslint.js';
 import { parseFitnessDirectives } from './_directives/fitness.js';

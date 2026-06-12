@@ -2,14 +2,14 @@ import { access, mkdtemp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { buildSignalBatch, createSignal, noopSignalSink } from '@opensip-tools/core';
+import { buildSignalBatch, createSignal, noopSignalSink } from '@opensip-cli/core';
 import { describe, it, expect, vi } from 'vitest';
 
 import { checkEntitlement } from '../sink/entitlement.js';
 import { resolveSignalSink } from '../sink/resolve-signal-sink.js';
 
 import type * as EntitlementModule from '../sink/entitlement.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 vi.mock('../sink/entitlement.js', async (importOriginal) => {
   const actual = await importOriginal<typeof EntitlementModule>();

@@ -12,9 +12,9 @@
  * This phase only ensures the bag is constructed and attached so the type is
  * satisfied and the surface exists for tools + host commands.
  */
-import { ToolStateRepo, type DataStore } from '@opensip-tools/datastore';
+import { ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 
-import type { Logger, ToolCliContext } from '@opensip-tools/core';
+import type { Logger, ToolCliContext } from '@opensip-cli/core';
 
 /**
  * Build the hostPlanes bag.

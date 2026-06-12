@@ -13,7 +13,7 @@ import {
   type TableColumnSpec,
   type Tone,
   type ViewNode,
-} from '@opensip-tools/cli-ui';
+} from '@opensip-cli/cli-ui';
 
 import type {
   ClearDoneResult,
@@ -25,7 +25,7 @@ import type {
   ListRecipesResult,
   StoredSession,
   UninstallDoneResult,
-} from '@opensip-tools/contracts';
+} from '@opensip-cli/contracts';
 
 const SPACER: ViewNode = { kind: 'spacer' };
 const SEPARATOR: ViewNode = { kind: 'separator' };
@@ -137,7 +137,7 @@ export function viewHistory(result: HistoryResult): ViewNode {
     return group(
       [
         line([
-          { text: 'No sessions recorded yet. Run opensip-tools fit to generate data.', dim: true },
+          { text: 'No sessions recorded yet. Run opensip fit to generate data.', dim: true },
         ]),
       ],
       2,
@@ -177,7 +177,7 @@ export function viewExperimental(_result: ExperimentalResult): ViewNode {
         ]),
         line([{ text: "  We're looking for contributors to help build this out!" }]),
         SPACER,
-        line([{ text: '  → https://github.com/opensip-ai/opensip-tools/issues', dim: true }]),
+        line([{ text: '  → https://github.com/opensip-ai/opensip-cli/issues', dim: true }]),
       ],
       2,
     ),
@@ -189,7 +189,7 @@ export function viewExperimental(_result: ExperimentalResult): ViewNode {
 export function viewHelp(): ViewNode {
   return group(
     [
-      line([{ text: 'opensip-tools', bold: true }]),
+      line([{ text: 'opensip-cli', bold: true }]),
       line([{ text: 'Codebase analysis toolkit', dim: true }]),
       SPACER,
       line([{ text: 'Commands:', bold: true }]),
@@ -202,7 +202,7 @@ export function viewHelp(): ViewNode {
       ]),
       line([{ text: '  ' }, { text: 'plugin', tone: 'brand' }, { text: '  Manage plugins' }]),
       SPACER,
-      line([{ text: 'Run opensip-tools <command> --help for details.', dim: true }]),
+      line([{ text: 'Run opensip-cli <command> --help for details.', dim: true }]),
     ],
     2,
   );
@@ -302,8 +302,8 @@ export function viewUninstallDone(result: UninstallDoneResult): ViewNode {
   }
   const hint =
     result.mode === 'user'
-      ? 'To remove the CLI itself: npm uninstall -g opensip-tools'
-      : 'To also remove user-level config: opensip-tools uninstall';
+      ? 'To remove the CLI itself: npm uninstall -g opensip-cli'
+      : 'To also remove user-level config: opensip uninstall';
   return group(
     [
       line([

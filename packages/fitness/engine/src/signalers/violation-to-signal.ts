@@ -22,10 +22,10 @@
  * the gate, verdict, and dashboard all agree.
  */
 
-import { createSignalFromViolation } from '@opensip-tools/core';
+import { createSignalFromViolation } from '@opensip-cli/core';
 
 import type { RecipeCheckResult } from '../recipes/types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 /** A single fitness violation, as carried on {@link RecipeCheckResult.violations}. */
 type RecipeViolation = NonNullable<RecipeCheckResult['violations']>[number];

@@ -1,4 +1,4 @@
-import { applyCheckDisplay } from '@opensip-tools/fitness';
+import { applyCheckDisplay } from '@opensip-cli/fitness';
 
 import { pythonFunctionTooLong } from './checks/function-too-long.js';
 import { noBareExcept } from './checks/no-bare-except.js';

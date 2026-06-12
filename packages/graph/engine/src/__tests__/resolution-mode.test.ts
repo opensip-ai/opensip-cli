@@ -7,7 +7,7 @@
  *   - the approximation caveat helper reflects the tier.
  */
 
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildGraphEnvelope } from '../cli/build-envelope.js';

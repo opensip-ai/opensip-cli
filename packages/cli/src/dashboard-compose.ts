@@ -4,7 +4,7 @@
  * Audit 2026-05-29 (L2): the CLI, not any single tool, composes the HTML
  * report. It walks every registered tool's `collectDashboardData(scope)`
  * contribution and merges the results into one `DashboardInput`, then
- * renders the self-contained HTML via `@opensip-tools/dashboard` and
+ * renders the self-contained HTML via `@opensip-cli/dashboard` and
  * writes it to the project's reports directory.
  *
  * This is what decouples fitness from graph: fitness contributes only
@@ -24,15 +24,15 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { currentScope, resolveProjectPaths } from '@opensip-tools/core';
-import { generateDashboardHtml, type DashboardInput } from '@opensip-tools/dashboard';
-import { SessionRepo } from '@opensip-tools/session-store';
+import { currentScope, resolveProjectPaths } from '@opensip-cli/core';
+import { generateDashboardHtml, type DashboardInput } from '@opensip-cli/dashboard';
+import { SessionRepo } from '@opensip-cli/session-store';
 
 import { getCurrentProjectRoot } from './cli-context.js';
 import { launchBrowser } from './open-dashboard.js';
 
-import type { DashboardResult } from '@opensip-tools/contracts';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { DashboardResult } from '@opensip-cli/contracts';
+import type { DataStore } from '@opensip-cli/datastore';
 
 /**
  * Build the merged `DashboardInput` from every registered tool's

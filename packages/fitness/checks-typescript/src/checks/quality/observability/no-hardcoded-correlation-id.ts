@@ -3,8 +3,8 @@
  * @fileoverview Detects hardcoded correlation ID values
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
-import { countUnescapedBackticks } from '@opensip-tools/lang-typescript';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
+import { countUnescapedBackticks } from '@opensip-cli/lang-typescript';
 
 /**
  * Pattern for detecting hardcoded correlationId string literal assignments.

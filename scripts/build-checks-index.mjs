@@ -140,9 +140,9 @@ async function main() {
     '---',
     '# Checks reference',
     '',
-    `opensip-tools ships **${total} built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from \`defineCheck\`.`,
+    `opensip-cli ships **${total} built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from \`defineCheck\`.`,
     '',
-    "> This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.",
+    "> This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-cli/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.",
     '',
   ];
 
@@ -179,7 +179,7 @@ async function main() {
         '|---|---|',
       );
       for (const c of items) {
-        const slugCell = `[\`${c.slug}\`](https://github.com/opensip-ai/opensip-tools/blob/main/${c.file})`;
+        const slugCell = `[\`${c.slug}\`](https://github.com/opensip-ai/opensip-cli/blob/main/${c.file})`;
         const descCell = escapeMd(c.description ?? '*(no description; see source)*');
         out.push(`| ${slugCell} | ${descCell} |`);
       }
@@ -195,9 +195,9 @@ async function main() {
     "Every check above is loaded automatically when its pack is in your project's `node_modules/`. To target one explicitly:",
     '',
     '```bash',
-    'opensip-tools fit --check <slug>           # run one check',
-    'opensip-tools fit --tags security          # run all checks tagged security',
-    'opensip-tools fit --recipe quick-smoke     # run a named lineup',
+    'opensip fit --check <slug>           # run one check',
+    'opensip fit --tags security          # run all checks tagged security',
+    'opensip fit --recipe quick-smoke     # run a named lineup',
     '```',
     '',
     'Per-check parameter overrides go in your recipe under `config:` — see [recipes and checks](../20-fit/01-recipes-and-checks.md).',

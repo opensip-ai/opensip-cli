@@ -1,17 +1,17 @@
 // @fitness-ignore-file error-handling-quality -- isPhantomDir/safeIsDirectory are filesystem probes where exception → false is the function's contract; the caller treats absence/permission errors identically to "not a phantom dir".
 /**
- * @fileoverview Detect orphaned `opensip-tools/` subtrees between cwd
+ * @fileoverview Detect orphaned `opensip-cli/` subtrees between cwd
  * and the discovered project root. These are fossils from pre-discovery
- * runs where `opensip-tools fit` was invoked from a subdirectory and
+ * runs where `opensip fit` was invoked from a subdirectory and
  * silently scaffolded a phantom project tree at that subdir.
  *
- * Conservative: only flag directories where `opensip-tools/` contains
+ * Conservative: only flag directories where `opensip-cli/` contains
  * EXCLUSIVELY `.runtime/` (plus optional dotfiles). Any other entry
- * (a `fit/`, a `sim/`, a `opensip-tools.config.yml` at that level) is
+ * (a `fit/`, a `sim/`, a `opensip-cli.config.yml` at that level) is
  * treated as legitimate user content and ignored — never warned about.
  *
  * Warn-only: returns paths. Callers print warnings to stderr but never
- * auto-delete. Auto-deletion of anything called `opensip-tools/` would
+ * auto-delete. Auto-deletion of anything called `opensip-cli/` would
  * be too dangerous to do without explicit user invocation.
  */
 
@@ -24,7 +24,7 @@ const MODULE_TAG = 'core:phantom-detect';
 
 /**
  * Walk every ancestor between `cwd` (inclusive) and `root` (exclusive)
- * and return the list of paths that host a phantom `opensip-tools/`.
+ * and return the list of paths that host a phantom `opensip-cli/`.
  */
 export function detectPhantomRuntimes(cwd: string, root: string): readonly string[] {
   const start = resolve(cwd);
@@ -36,7 +36,7 @@ export function detectPhantomRuntimes(cwd: string, root: string): readonly strin
   let dir = start;
   while (dir !== stop) {
     if (isPhantomDir(dir)) {
-      phantoms.push(join(dir, 'opensip-tools'));
+      phantoms.push(join(dir, 'opensip-cli'));
     }
     const parent = dirname(dir);
     if (parent === dir) break; // hit filesystem root unexpectedly
@@ -55,7 +55,7 @@ export function detectPhantomRuntimes(cwd: string, root: string): readonly strin
 }
 
 function isPhantomDir(dir: string): boolean {
-  const innerDir = join(dir, 'opensip-tools');
+  const innerDir = join(dir, 'opensip-cli');
   if (!safeIsDirectory(innerDir)) return false;
   let entries: string[];
   try {

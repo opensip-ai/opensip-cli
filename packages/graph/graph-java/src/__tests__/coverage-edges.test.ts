@@ -16,7 +16,7 @@
  *     non-module-init occurrence early-return, and the falsy occs guard.
  */
 
-import { parseJava } from '@opensip-tools/lang-java';
+import { parseJava } from '@opensip-cli/lang-java';
 import { describe, expect, it } from 'vitest';
 
 import { digestJavaBody } from '../body-digest.js';
@@ -32,8 +32,8 @@ import type {
   DependencySiteRecord,
   FunctionOccurrence,
   ResolveInput,
-} from '@opensip-tools/graph';
-import type { Node } from '@opensip-tools/tree-sitter';
+} from '@opensip-cli/graph';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 // ADR-0010: parse via the canonical lang-java substrate (which owns the
 // grammar) rather than constructing a web-tree-sitter parser here.

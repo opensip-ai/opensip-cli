@@ -19,7 +19,7 @@ related-docs:
 
 Sometimes a graph rule is right that *a thing exists* — there really is a cycle, the function really is long — but you've looked, and it's intentional. A recursive-descent visitor genuinely is a call cycle. A function whose body is one big embedded template is "long" only because a line counter can't tell code from a data blob.
 
-`@graph-ignore` directives are how you record that judgment **next to the code**, with a reason, so it survives refactors and shows up in review. They are the per-finding *waiver* that complements the graph **gate** (the don't-get-worse baseline in [Rules and gating](/docs/opensip-tools/40-graph/02-rules-and-gating/)).
+`@graph-ignore` directives are how you record that judgment **next to the code**, with a reason, so it survives refactors and shows up in review. They are the per-finding *waiver* that complements the graph **gate** (the don't-get-worse baseline in [Rules and gating](/docs/opensip-cli/40-graph/02-rules-and-gating/)).
 
 > **What you'll understand after this:**
 > - The two directive forms and the rule-id they take.
@@ -36,9 +36,9 @@ Sometimes a graph rule is right that *a thing exists* — there really is a cycl
 // @graph-ignore-file <graph:rule>        — waive every finding for that rule in this file
 ```
 
-The second token is a graph **rule id** — the namespaced form like `graph:cycle`, `graph:large-function`, `graph:wide-function` (the same ids listed in [Rules and gating](/docs/opensip-tools/40-graph/02-rules-and-gating/)). A directive naming one rule never waives another. There is no "ignore everything" form, by design.
+The second token is a graph **rule id** — the namespaced form like `graph:cycle`, `graph:large-function`, `graph:wide-function` (the same ids listed in [Rules and gating](/docs/opensip-cli/40-graph/02-rules-and-gating/)). A directive naming one rule never waives another. There is no "ignore everything" form, by design.
 
-These keywords are deliberately distinct from fitness's [`@fitness-ignore-*`](/docs/opensip-tools/20-fit/03-ignore-directives/): a reader at the suppression site should see *which tool* is being silenced without decoding the id. The shared machinery is the same (both run through the kernel's suppression primitive, [ADR-0014](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0014-shared-inline-signal-suppression.md)); only the vocabulary differs.
+These keywords are deliberately distinct from fitness's [`@fitness-ignore-*`](/docs/opensip-cli/20-fit/03-ignore-directives/): a reader at the suppression site should see *which tool* is being silenced without decoding the id. The shared machinery is the same (both run through the kernel's suppression primitive, [ADR-0014](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/docs/decisions/ADR-0014-shared-inline-signal-suppression.md)); only the vocabulary differs.
 
 ```ts
 // @graph-ignore-next-line graph:large-function -- emits one cohesive browser-JS bundle as a template; the line count is embedded data, not splittable logic
@@ -60,13 +60,13 @@ function visit(node: Node, ctx: WalkCtx): void {
 }
 ```
 
-The rule attaches every member's location to the finding (`memberLocations` in [`cycle.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/rules/cycle.ts)); graph's suppression pass treats all of them as candidate sites. You annotate the member that reads best.
+The rule attaches every member's location to the finding (`memberLocations` in [`cycle.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/engine/src/rules/cycle.ts)); graph's suppression pass treats all of them as candidate sites. You annotate the member that reads best.
 
 ---
 
 ## Suppression is unconditional; reasons are a separate check
 
-A `@graph-ignore` **always** suppresses, even with no `-- reason`. Quality is enforced *out of band* — exactly as fitness does it — by the `graph-ignore-hygiene` check (it runs under `opensip-tools fit`), which warns on:
+A `@graph-ignore` **always** suppresses, even with no `-- reason`. Quality is enforced *out of band* — exactly as fitness does it — by the `graph-ignore-hygiene` check (it runs under `opensip fit`), which warns on:
 
 - a missing `-- reason`,
 - an id that isn't a valid `graph:<kebab>`,
@@ -83,4 +83,4 @@ Suppression runs **before** anything consumes the run's signals — the gate bas
 - A waived finding **never enters the gate baseline** (`--gate-save`) and never surfaces as a net-new alert on a PR (`--gate-compare`).
 - The run's completion log reports how many findings were suppressed, so a waiver is never silent.
 
-This is the division of labor: the **gate** keeps you from getting *worse*; a **waiver** records that a specific current finding is *fine, and here's why*. Reach for a waiver when the rule is correct but the code is intentional. Reach for a fix when it isn't. Reach for the baseline when you're adopting graph on an existing repo and want to ratchet from today's state — see [Rules and gating](/docs/opensip-tools/40-graph/02-rules-and-gating/).
+This is the division of labor: the **gate** keeps you from getting *worse*; a **waiver** records that a specific current finding is *fine, and here's why*. Reach for a waiver when the rule is correct but the code is intentional. Reach for a fix when it isn't. Reach for the baseline when you're adopting graph on an existing repo and want to ratchet from today's state — see [Rules and gating](/docs/opensip-cli/40-graph/02-rules-and-gating/).

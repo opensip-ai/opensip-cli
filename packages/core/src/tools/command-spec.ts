@@ -30,8 +30,8 @@
  * (a layering inversion forbidden by dependency-cruiser). The Commander-touching
  * runtime that turns these keys into `.option(...)` calls — `applyCommonFlags`,
  * the `commonFlags` registry, and `CommonFlagSpec` — stays in
- * `@opensip-tools/contracts/cli-flags`, which re-exports this type so existing
- * `import { CommonFlagKey } from '@opensip-tools/contracts'` sites keep working.
+ * `@opensip-cli/contracts/cli-flags`, which re-exports this type so existing
+ * `import { CommonFlagKey } from '@opensip-cli/contracts'` sites keep working.
  *
  * Keep this union in lockstep with the `commonFlags` registry keys in
  * contracts (the `cross-tool-flag-parity` check guards the run-command set).

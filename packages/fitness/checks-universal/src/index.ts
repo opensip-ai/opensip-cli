@@ -1,23 +1,23 @@
 /**
- * @opensip-tools/checks-universal — Cross-language fitness checks for opensip-tools
+ * @opensip-cli/checks-universal — Cross-language fitness checks for opensip-cli
  *
  * This package follows the plugin contract: it exports a `checks` array. Each
  * check carries its own display (`config.icon`/`config.displayName`), folded on
  * from this pack's `CHECK_DISPLAY` map via `applyCheckDisplay` (§5.3) — there is
  * no separate `checkDisplay` export. The CLI auto-discovers the package via the
- * same code path used for every other `@opensip-tools/checks-*` package.
+ * same code path used for every other `@opensip-cli/checks-*` package.
  *
  * Scope: checks that operate on raw text, regex, file globs, or
  * language-agnostic config (Docker, .env, READMEs, generic file structure).
  * They could apply to any codebase regardless of language.
  */
 
-import { applyCheckDisplay, collectCheckObjects } from '@opensip-tools/fitness';
+import { applyCheckDisplay, collectCheckObjects } from '@opensip-cli/fitness';
 
 import * as allChecks from './checks/index.js';
 import { CHECK_DISPLAY } from './display/index.js';
 
-import type { Check } from '@opensip-tools/fitness';
+import type { Check } from '@opensip-cli/fitness';
 
 /** All cross-language checks (display folded on from CHECK_DISPLAY), per plugin contract. */
 export const checks: readonly Check[] = applyCheckDisplay(

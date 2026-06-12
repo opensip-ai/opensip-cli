@@ -12,8 +12,8 @@ import { describe, expect, it } from 'vitest';
 import { buildGraphSessionPayload } from '../../persistence/session-payload.js';
 import { graphReplayFromSession } from '../../persistence/session-replay.js';
 
-import type { StoredSession } from '@opensip-tools/contracts';
-import type { Signal } from '@opensip-tools/core';
+import type { StoredSession } from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 function sig(
   over: Partial<Signal> & { ruleId: string; severity: Signal['severity']; filePath: string },
@@ -21,7 +21,7 @@ function sig(
   return {
     id: `sig_${over.ruleId}`,
     source: 'graph',
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     category: 'architecture',
     message: `${over.severity} ${over.ruleId}`,
     metadata: {},

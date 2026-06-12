@@ -13,7 +13,7 @@
 import { existsSync, realpathSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve, sep } from 'node:path';
 
-import { ConfigurationError, logger } from '@opensip-tools/core';
+import { ConfigurationError, logger } from '@opensip-cli/core';
 import ts from 'typescript';
 
 import { normalizeProjectDir } from './normalize-project-dir.js';

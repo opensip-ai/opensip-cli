@@ -1,9 +1,9 @@
 /**
- * End-to-end tests for the opensip-tools CLI.
+ * End-to-end tests for the opensip-cli CLI.
  *
  * These tests exercise the actual CLI binary (packages/cli/dist/index.js)
  * against a small fixture project. The build must be done before running
- * these tests (pnpm --filter=opensip-tools build).
+ * these tests (pnpm --filter=opensip-cli build).
  */
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -32,7 +32,7 @@ describe('CLI e2e', () => {
   // apply cleanly against a fresh DB. Cheap; tests already round-trip
   // through the CLI's own writes.
   beforeEach(() => {
-    rmSync(join(FIXTURE, 'opensip-tools', '.runtime'), { recursive: true, force: true });
+    rmSync(join(FIXTURE, 'opensip-cli', '.runtime'), { recursive: true, force: true });
   });
 
   it('--help shows usage information', () => {
@@ -154,7 +154,7 @@ describe('CLI e2e', () => {
         // 2.12.0 (§4.7): no-project --json is a structured bootstrap.error outcome.
         const outcome = JSON.parse(stdout);
         expect(outcome.kind).toBe('bootstrap.error');
-        expect(outcome.errors[0].message).toContain('No opensip-tools.config.yml found');
+        expect(outcome.errors[0].message).toContain('No opensip-cli.config.yml found');
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
       }
@@ -168,7 +168,7 @@ describe('CLI e2e', () => {
       mkdirSync(join(tempDir, 'nested'), { recursive: true });
       try {
         // Seed the fixture's config into a non-default location
-        const configSrc = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf8');
+        const configSrc = readFileSync(join(FIXTURE, 'opensip-cli.config.yml'), 'utf8');
         const configPath = join(tempDir, 'nested', 'custom.yml');
         writeFileSync(configPath, configSrc);
         mkdirSync(join(tempDir, 'src'), { recursive: true });
@@ -186,20 +186,20 @@ describe('CLI e2e', () => {
       }
     });
 
-    it('respects package.json#opensip-tools.configPath pointer', () => {
+    it('respects package.json#opensip-cli.configPath pointer', () => {
       const tempDir = join(
         tmpdir(),
         `opensip-e2e-pkgjson-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       );
       mkdirSync(join(tempDir, '.config'), { recursive: true });
       try {
-        const configSrc = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf8');
-        writeFileSync(join(tempDir, '.config', 'opensip-tools.config.yml'), configSrc);
+        const configSrc = readFileSync(join(FIXTURE, 'opensip-cli.config.yml'), 'utf8');
+        writeFileSync(join(tempDir, '.config', 'opensip-cli.config.yml'), configSrc);
         writeFileSync(
           join(tempDir, 'package.json'),
           JSON.stringify({
             name: 'pkg-pointer-test',
-            'opensip-tools': { configPath: '.config/opensip-tools.config.yml' },
+            'opensip-cli': { configPath: '.config/opensip-cli.config.yml' },
           }),
         );
         mkdirSync(join(tempDir, 'src'), { recursive: true });
@@ -285,15 +285,15 @@ describe('CLI e2e', () => {
       const { exitCode } = cli.run(['init', '--language', 'typescript'], { cwd: tempDir });
       expect(exitCode).toBe(0);
 
-      expect(existsSync(join(tempDir, 'opensip-tools.config.yml'))).toBe(true);
-      expect(existsSync(join(tempDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'))).toBe(
+      expect(existsSync(join(tempDir, 'opensip-cli.config.yml'))).toBe(true);
+      expect(existsSync(join(tempDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'))).toBe(
         true,
       );
       expect(
-        existsSync(join(tempDir, 'opensip-tools', 'fit', 'recipes', 'example-recipe.mjs')),
+        existsSync(join(tempDir, 'opensip-cli', 'fit', 'recipes', 'example-recipe.mjs')),
       ).toBe(true);
       expect(
-        existsSync(join(tempDir, 'opensip-tools', 'sim', 'scenarios', 'example-scenario.mjs')),
+        existsSync(join(tempDir, 'opensip-cli', 'sim', 'scenarios', 'example-scenario.mjs')),
       ).toBe(true);
       expect(existsSync(join(tempDir, '.gitignore'))).toBe(true);
     });
@@ -330,7 +330,7 @@ describe('CLI e2e', () => {
       const { exitCode } = cli.run(['init', '--json'], { cwd: tempDir });
       expect(exitCode).toBe(2);
       // Nothing should have been written.
-      expect(existsSync(join(tempDir, 'opensip-tools.config.yml'))).toBe(false);
+      expect(existsSync(join(tempDir, 'opensip-cli.config.yml'))).toBe(false);
     });
   });
 

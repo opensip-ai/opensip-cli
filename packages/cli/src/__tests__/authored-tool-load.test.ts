@@ -1,7 +1,7 @@
 /**
  * Authored-Tool end-to-end load (Phase 5.3): drive `discoverAndRegisterAuthoredTools`
  * — the real bootstrap walk — against fixture authored sidecar tools staged into a
- * temp project's `opensip-tools/tools/<name>/` and a temp `~/.opensip-tools/tools/<name>/`.
+ * temp project's `opensip-cli/tools/<name>/` and a temp `~/.opensip-cli/tools/<name>/`.
  *
  * Asserts the trust matrix end to end:
  *   - project tool, no allowlist  → throws PluginIncompatibleError (exit 5),
@@ -19,14 +19,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { mapToolErrorToExitCode, EXIT_CODES } from '@opensip-tools/contracts';
-import { PluginIncompatibleError, ToolRegistry } from '@opensip-tools/core';
+import { mapToolErrorToExitCode, EXIT_CODES } from '@opensip-cli/contracts';
+import { PluginIncompatibleError, ToolRegistry } from '@opensip-cli/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { discoverAndRegisterAuthoredTools } from '../bootstrap/register-tools.js';
 import { PROJECT_TOOL_ALLOWLIST_ENV } from '../bootstrap/tool-trust.js';
 
-import type { ToolPluginManifest, ToolProvenance } from '@opensip-tools/core';
+import type { ToolPluginManifest, ToolProvenance } from '@opensip-cli/core';
 
 const staged: string[] = [];
 

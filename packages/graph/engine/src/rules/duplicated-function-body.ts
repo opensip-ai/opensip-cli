@@ -43,7 +43,7 @@ import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { Catalog, FeatureTable, FunctionOccurrence, GraphConfig } from '../types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 const DEFAULT_MIN_LINES = 5;
 const DEFAULT_MIN_BODY_SIZE = 200;

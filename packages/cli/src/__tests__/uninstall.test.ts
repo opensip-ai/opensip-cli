@@ -2,7 +2,7 @@
  * Tests for `executeUninstall` — covers both user-level mode (default)
  * and project-local mode (`--project`).
  *
- * Each test uses a per-test tmp dir so nothing in the real `~/.opensip-tools`
+ * Each test uses a per-test tmp dir so nothing in the real `~/.opensip-cli`
  * or any real project is ever touched. The `write` and `prompt` hooks let
  * us assert on output and drive the confirmation flow deterministically.
  */
@@ -123,9 +123,9 @@ describe('executeUninstall — project mode', () => {
 
   beforeEach(() => {
     projectDir = makeTempDir();
-    userSourceDir = join(projectDir, 'opensip-tools');
+    userSourceDir = join(projectDir, 'opensip-cli');
     runtimeDir = join(userSourceDir, '.runtime');
-    configFile = join(projectDir, 'opensip-tools.config.yml');
+    configFile = join(projectDir, 'opensip-cli.config.yml');
     mkdirSync(join(userSourceDir, 'fit', 'checks'), { recursive: true });
     mkdirSync(join(runtimeDir, 'logs'), { recursive: true });
     writeFileSync(join(userSourceDir, 'fit', 'checks', 'custom.mjs'), '// custom check\n', 'utf8');
@@ -173,7 +173,7 @@ describe('executeUninstall — project mode', () => {
       const text = out.text();
       expect(text).toContain('This will remove (rebuildable runtime state only)');
       expect(text).toContain('These will be KEPT');
-      expect(text).toContain('opensip-tools.config.yml');
+      expect(text).toContain('opensip-cli.config.yml');
       expect(text).toContain('--purge');
     });
 
@@ -236,7 +236,7 @@ describe('executeUninstall — project mode', () => {
     });
   });
 
-  it('refuses to run when no opensip-tools state exists at the resolved path', async () => {
+  it('refuses to run when no OpenSIP CLI state exists at the resolved path', async () => {
     rmSync(userSourceDir, { recursive: true, force: true });
     rmSync(configFile);
     const out = captureWrite();
@@ -249,7 +249,7 @@ describe('executeUninstall — project mode', () => {
     expect(result.action).not.toBe('removed');
     expect(result.targets).toHaveLength(0);
     expect(out.text()).toContain('Nothing to remove');
-    expect(out.text()).toContain('no opensip-tools state');
+    expect(out.text()).toContain('no OpenSIP CLI state');
   });
 
   it('uses cwd override when --project is passed without a value', async () => {

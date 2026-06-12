@@ -6,8 +6,8 @@
  * These patterns can lead to DoS vulnerabilities when processing untrusted input.
  */
 
-import { defineCheck, stripStringsAndComments, type CheckViolation } from '@opensip-tools/fitness';
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import { defineCheck, stripStringsAndComments, type CheckViolation } from '@opensip-cli/fitness';
+import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 /** Patterns that indicate bounded buffer usage */

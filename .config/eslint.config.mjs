@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * ESLint flat config for the opensip-tools workspace.
+ * ESLint flat config for the opensip-cli workspace.
  *
  * Layered: shared base for every TS package, plus package-type overrides
  * for tests, React/Ink components, and the simulation kinds (which use
@@ -191,7 +191,7 @@ export default tseslint.config(
       // event names) that don't belong in constants.
       'sonarjs/no-duplicate-string': ['warn', { threshold: 5 }],
       // TODO/FIXME tags are tracked by fitness's own `todo-comments`
-      // check (in @opensip-tools/checks-universal). Avoid double-flagging.
+      // check (in @opensip-cli/checks-universal). Avoid double-flagging.
       'sonarjs/todo-tag': 'off',
       // Math.random is fine for non-security uses (jitter, sample IDs,
       // demo data). Crypto code uses node:crypto explicitly.
@@ -312,7 +312,7 @@ export default tseslint.config(
   // graph engine — must stay parser-agnostic. Engine code routes all
   // language work through the GraphLanguageAdapter contract from
   // lang-adapter/; the TypeScript-specific adapter lives in its own
-  // package (@opensip-tools/graph-typescript), NOT in the engine.
+  // package (@opensip-cli/graph-typescript), NOT in the engine.
   //
   // `typescript` is a dev dependency of the engine (for its own build +
   // tests), so engine code importing it would compile and pass local
@@ -338,7 +338,7 @@ export default tseslint.config(
                 'The graph engine must stay parser-agnostic. Route language ' +
                 'work through the GraphLanguageAdapter contract from ' +
                 'lang-adapter/; TypeScript compiler access belongs in the ' +
-                '@opensip-tools/graph-typescript adapter package.',
+                '@opensip-cli/graph-typescript adapter package.',
             },
           ],
         },
@@ -349,9 +349,9 @@ export default tseslint.config(
   // ---------------------------------------------------------------------------
   // ADR-0010 ratchet — a migrated graph adapter must not import web-tree-sitter.
   //
-  // A migrated graph adapter parses via its @opensip-tools/lang-* package and
+  // A migrated graph adapter parses via its @opensip-cli/lang-* package and
   // sources all tree-sitter surface (incl. the Node type) from
-  // @opensip-tools/tree-sitter. It must not reach back to web-tree-sitter
+  // @opensip-cli/tree-sitter. It must not reach back to web-tree-sitter
   // directly. The four tree-sitter graph adapters are now covered here; the
   // remaining graph-adapter-common parse surface is shared type/driver code,
   // not a place that constructs parsers.
@@ -371,8 +371,8 @@ export default tseslint.config(
               name: 'web-tree-sitter',
               message:
                 'ADR-0010: every tree-sitter graph adapter (python, rust, go, java) now ' +
-                'parses via its @opensip-tools/lang-* package and consumes the tree-sitter ' +
-                'substrate from @opensip-tools/tree-sitter. Production code must not import ' +
+                'parses via its @opensip-cli/lang-* package and consumes the tree-sitter ' +
+                'substrate from @opensip-cli/tree-sitter. Production code must not import ' +
                 'web-tree-sitter directly (test fixtures that build trees are exempt).',
             },
           ],
@@ -382,15 +382,15 @@ export default tseslint.config(
   },
 
   // ---------------------------------------------------------------------------
-  // Check packs — import @opensip-tools/core via the BARREL, not subpaths.
+  // Check packs — import @opensip-cli/core via the BARREL, not subpaths.
   //
   // Replaces the retired dependency-cruiser `check-pack-no-core-subpath`
   // rule (gate-activation, 2026-05-30). Specifier-shape rules are ESLint's
   // domain and don't depend on the depcruise resolver. The barrel
-  // (`@opensip-tools/core`) is the supported surface; the only sanctioned
+  // (`@opensip-cli/core`) is the supported surface; the only sanctioned
   // subpath family is `languages/*` (incl. parse-cache), which AST helpers
   // consume by design. (`test-utils/*` was retired with ADR-0040 — the scope
-  // helpers live in @opensip-tools/test-support now.) Tests are exempt.
+  // helpers live in @opensip-cli/test-support now.) Tests are exempt.
   // ---------------------------------------------------------------------------
   {
     files: ['packages/fitness/checks-*/src/**/*.ts'],
@@ -404,9 +404,9 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['@opensip-tools/core/*', '!@opensip-tools/core/languages/*'],
+              group: ['@opensip-cli/core/*', '!@opensip-cli/core/languages/*'],
               message:
-                'Import @opensip-tools/core via the package barrel, not a ' +
+                'Import @opensip-cli/core via the package barrel, not a ' +
                 'subpath. Sanctioned subpaths: languages/*.',
             },
           ],

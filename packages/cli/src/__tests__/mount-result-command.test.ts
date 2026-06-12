@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mountResultCommand, mountResultCommandWithArg } from '../commands/mount-result-command.js';
 
 import type { CliCommandsContext } from '../commands/index.js';
-import type { CommandResult } from '@opensip-tools/contracts';
+import type { CommandResult } from '@opensip-cli/contracts';
 
 function makeCtx(): {
   ctx: CliCommandsContext;

@@ -23,7 +23,7 @@ let configPath: string;
 
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'plugin-yaml-test-'));
-  configPath = join(tempDir, 'opensip-tools.config.yml');
+  configPath = join(tempDir, 'opensip-cli.config.yml');
 });
 
 afterEach(() => {

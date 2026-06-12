@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-08
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0024: One CommandOutcome currency, a diagnostics bus, and a governed env surface
@@ -58,7 +58,7 @@ the identical outcome because the host — not the tool — stamps it. The dispa
 seam the 2.11.0 command plane deliberately built
 (`packages/cli/src/commands/mount-command-spec.ts` → the host emit seams) made the
 swap land in the seams, not the handlers. Diagnostics defined in
-`@opensip-tools/core` (the bus that produces it) and re-exported by `contracts`
+`@opensip-cli/core` (the bus that produces it) and re-exported by `contracts`
 (where `CommandOutcome` names it) follows the established manifest/command-spec
 cross-layer pattern.
 

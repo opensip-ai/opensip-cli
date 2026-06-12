@@ -22,7 +22,7 @@ let configPath: string;
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'opensip-config-edit-'));
-  configPath = join(dir, 'opensip-tools.config.yml');
+  configPath = join(dir, 'opensip-cli.config.yml');
 });
 
 afterEach(() => {

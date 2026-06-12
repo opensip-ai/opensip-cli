@@ -18,7 +18,7 @@
 // (newlines preserved) so line/column positions remain stable.
 //
 // NOTE: this pack deliberately does NOT consume the C-family scanners
-// from `@opensip-tools/core/languages/strip-utils.ts`
+// from `@opensip-cli/core/languages/strip-utils.ts`
 // (`scanRegularString`, `scanLineComment`, `scanBlockCommentNonNesting`,
 // `scanCharLiteral`). Python's quote rules are the family outlier —
 // strings open with either `'` or `"`, support eight ASCII prefix
@@ -28,7 +28,7 @@
 // `scanQuotedString(quoteChar)` into core; with one consumer it stays
 // here.
 
-import { isIdentChar, makeStripper, type Region, type ScanResult } from '@opensip-tools/core';
+import { isIdentChar, makeStripper, type Region, type ScanResult } from '@opensip-cli/core';
 
 // Allowed Python string prefixes (lowercase). Case-insensitivity is
 // handled at match time by lowercasing the candidate. Two-letter

@@ -7,7 +7,7 @@
  * (`renderToText`). They replace the three hand-copied "Use --verbose…" hints
  * and the fitness-local `FindingsBlock` Ink component.
  *
- * cli-ui must never import `@opensip-tools/contracts` (keystone boundary), so
+ * cli-ui must never import `@opensip-cli/contracts` (keystone boundary), so
  * these take plain structural inputs ({@link FindingGroupView}) — the cli
  * `resultToView` seam passes the contracts `FindingGroup` *values* straight in
  * (the shapes are structurally identical; a type-compat test pins that).
@@ -109,7 +109,7 @@ function groupNode(g: FindingGroupView): ViewNode {
           { text: `${String(hidden)} more hidden (use ` },
           { text: '--json', bold: true },
           { text: ' or ' },
-          { text: 'opensip-tools dashboard', bold: true },
+          { text: 'opensip dashboard', bold: true },
           { text: ' for all)' },
         ],
         true,

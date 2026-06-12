@@ -9,13 +9,13 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createSignal, type Signal } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { createSignal, type Signal } from '@opensip-cli/core';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildBaselineSeams, type BaselineSeams } from '../bootstrap/baseline-seams.js';
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 let ds: DataStore;
 let seams: BaselineSeams;
@@ -108,7 +108,7 @@ describe('exportBaselineSarif (reconstruct from payloads)', () => {
     await seams.exportBaselineSarif('graph', out);
     const sarif = JSON.parse(readFileSync(out, 'utf8')) as { runs?: { tool?: unknown }[] };
     expect(sarif.runs).toHaveLength(1);
-    expect(readFileSync(out, 'utf8')).toContain('opensip-tools-graph');
+    expect(readFileSync(out, 'utf8')).toContain('opensip-cli-graph');
   });
 
   it('throws the missing-baseline error when no baseline exists', async () => {

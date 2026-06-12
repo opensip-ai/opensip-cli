@@ -5,7 +5,7 @@
  * applySeverityOverride(...) })` shape (modulo the generated id/timestamp).
  */
 
-import { createSignal, type Signal } from '@opensip-tools/core';
+import { createSignal, type Signal } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import { applySeverityOverride } from '../_severity-override.js';

@@ -5,14 +5,14 @@
  * live: purging 'fitness' missed a 'fit' session.
  */
 
-import { DataStoreFactory, BaselineRepo, ToolStateRepo } from '@opensip-tools/datastore';
-import { SessionRepo } from '@opensip-tools/session-store';
+import { DataStoreFactory, BaselineRepo, ToolStateRepo } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { toolsDataPurge } from '../commands/tools/data-purge.js';
 
-import type { StoredSession } from '@opensip-tools/contracts';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { StoredSession } from '@opensip-cli/contracts';
+import type { DataStore } from '@opensip-cli/datastore';
 
 let ds: DataStore;
 

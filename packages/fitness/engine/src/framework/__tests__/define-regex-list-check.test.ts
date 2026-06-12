@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 
 import { defineRegexListCheck } from '../define-regex-list-check.js';
 
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 const FIXED_ID = '11111111-1111-4111-8111-111111111111';
 const PATTERN_ID_A = '22222222-2222-4222-8222-222222222222';

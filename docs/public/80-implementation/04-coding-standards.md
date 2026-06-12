@@ -73,7 +73,7 @@ A file can opt out of a specific rule by writing a directive comment at the top:
 
 The convention is: **always include a justification after `--`**. A bare `eslint-disable-next-line` without a reason is a smell — future contributors won't know whether the suppression is still needed.
 
-The `@fitness-ignore-file` directives are opensip-tools' own (eaten by the fitness check framework, not ESLint). They're used to suppress fitness-check violations on the workspace's own source — yes, opensip-tools dogfoods itself.
+The `@fitness-ignore-file` directives are OpenSIP CLI's own (eaten by the fitness check framework, not ESLint). They're used to suppress fitness-check violations on the workspace's own source — yes, OpenSIP CLI dogfoods itself.
 
 ---
 
@@ -209,8 +209,8 @@ import { join } from 'node:path';
 import { z } from 'zod';
 
 // 3. Internal workspace deps (alphabetical by package)
-import { logger, ToolError } from '@opensip-tools/core';
-import { EXIT_CODES } from '@opensip-tools/contracts';
+import { logger, ToolError } from '@opensip-cli/core';
+import { EXIT_CODES } from '@opensip-cli/contracts';
 
 // 4. Local relative imports
 import { sarifBuilder } from './sarif.js';

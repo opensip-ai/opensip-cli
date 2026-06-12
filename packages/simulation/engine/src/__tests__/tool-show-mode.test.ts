@@ -7,16 +7,16 @@
  * entry point with a fake `ToolCliContext` whose scope carries a datastore.
  */
 
-import { enterScope, RunScope } from '@opensip-tools/core';
-import { DataStoreFactory } from '@opensip-tools/datastore';
-import { SessionRepo } from '@opensip-tools/session-store';
+import { enterScope, RunScope } from '@opensip-cli/core';
+import { DataStoreFactory } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { simulationTool } from '../tool.js';
 
-import type { StoredSession } from '@opensip-tools/contracts';
-import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { StoredSession } from '@opensip-cli/contracts';
+import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 function simSpec(): CommandSpec<unknown, ToolCliContext> {
   const spec = simulationTool.commandSpecs?.[0];

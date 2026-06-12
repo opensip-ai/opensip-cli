@@ -3,7 +3,7 @@
 // the envelope (schemaVersion 2) is the single output currency every tool emits.
 import { describe, it, expect } from 'vitest';
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 describe('JSON output contract', () => {
   it('SignalEnvelope has required fields', () => {

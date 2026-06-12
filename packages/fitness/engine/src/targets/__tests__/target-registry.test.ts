@@ -1,10 +1,10 @@
-import { LanguageRegistry, RunScope, runWithScopeSync } from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, runWithScopeSync } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { TargetRegistry } from '../target-registry.js';
 
 import type { Target } from '../types.js';
-import type { LanguageAdapter } from '@opensip-tools/core';
+import type { LanguageAdapter } from '@opensip-cli/core';
 
 const stub = (
   name: string,

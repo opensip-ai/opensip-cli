@@ -6,13 +6,13 @@
  * parse otherwise. Both branches are exercised here.
  */
 
-import { LanguageRegistry, RunScope, runWithScopeSync } from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, runWithScopeSync } from '@opensip-cli/core';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { getSharedSourceFile } from '../parse-cache.js';
 
-import type { LanguageAdapter } from '@opensip-tools/core';
+import type { LanguageAdapter } from '@opensip-cli/core';
 
 describe('getSharedSourceFile — fallback (no adapter registered)', () => {
   it('returns a TypeScript SourceFile for valid TS content', () => {

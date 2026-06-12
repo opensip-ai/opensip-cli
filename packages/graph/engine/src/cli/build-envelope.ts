@@ -28,14 +28,14 @@
  * input (formatter-purity contract).
  */
 
-import { buildSignalEnvelope } from '@opensip-tools/contracts';
-import { isErrorSignal, resolveVerdictPolicy } from '@opensip-tools/core';
+import { buildSignalEnvelope } from '@opensip-cli/contracts';
+import { isErrorSignal, resolveVerdictPolicy } from '@opensip-cli/core';
 
 import { graphFingerprintStrategy } from '../baseline-strategy.js';
 import { mapEngineSlugToOpenSipRuleId } from '../render/rule-id-mapping.js';
 
-import type { SignalEnvelope, UnitResult } from '@opensip-tools/contracts';
-import type { Signal } from '@opensip-tools/core';
+import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 /** Inputs to {@link buildGraphEnvelope}. */
 export interface BuildGraphEnvelopeInput {

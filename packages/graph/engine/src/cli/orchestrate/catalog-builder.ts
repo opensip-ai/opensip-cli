@@ -34,7 +34,7 @@ import type {
   ResolutionStats,
 } from '../../types.js';
 import type { PressureMonitor } from '../pressure-monitor.js';
-import type { Attributes } from '@opensip-tools/core';
+import type { Attributes } from '@opensip-cli/core';
 
 /**
  * Arguments to a {@link RunStage} invocation: the stage label, the

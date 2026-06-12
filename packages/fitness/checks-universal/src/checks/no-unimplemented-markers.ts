@@ -15,7 +15,7 @@
  * Patterns are dispatched by file extension and tuned for low false
  * positives — each requires an unambiguous construct, not a bare word.
  */
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 /** Unfinished-work phrasing shared by the message-bearing language patterns. */
 const UNIMPLEMENTED_MESSAGE = /not\s*implemented|unimplemented/i;
@@ -152,7 +152,7 @@ export function analyzeUnimplementedMarkers(content: string, filePath: string): 
         violations.push({
           message: `Unimplemented-work marker found (\`${marker}\` idiom): code announces it is not implemented`,
           // Soft shipped default; repos wanting a hard gate set `failOnWarnings`
-          // (this repo does — see opensip-tools.config.yml).
+          // (this repo does — see opensip-cli.config.yml).
           severity: 'warning',
           line: i + 1,
           suggestion:

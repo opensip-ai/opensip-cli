@@ -1,4 +1,4 @@
-import { createSignal, type Signal } from '@opensip-tools/core';
+import { createSignal, type Signal } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { diffBaseline, type BaselineDiffRow } from '../baseline-diff.js';

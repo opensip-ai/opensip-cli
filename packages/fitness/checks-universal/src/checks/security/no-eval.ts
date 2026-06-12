@@ -9,7 +9,7 @@
  * `oneViolationPerLine: true` option (combined with non-global regexes).
  */
 
-import { defineRegexListCheck } from '@opensip-tools/fitness';
+import { defineRegexListCheck } from '@opensip-cli/fitness';
 
 /**
  * Check: security/no-eval

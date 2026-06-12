@@ -27,9 +27,9 @@ import {
   type FunctionOccurrence,
   type GraphLanguageAdapter,
   type WalkOutput,
-} from '@opensip-tools/graph';
-import { pythonGraphAdapter, type PythonParsedProject } from '@opensip-tools/graph-python';
-import { rustGraphAdapter, type RustParsedProject } from '@opensip-tools/graph-rust';
+} from '@opensip-cli/graph';
+import { pythonGraphAdapter, type PythonParsedProject } from '@opensip-cli/graph-python';
+import { rustGraphAdapter, type RustParsedProject } from '@opensip-cli/graph-rust';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter, type TsParsed } from '../index.js';

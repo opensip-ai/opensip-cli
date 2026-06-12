@@ -132,11 +132,11 @@ Directives are line-local. They're explicit. They're greppable. They survive rev
 The check fires on dozens of legitimate sites because the rule landed late or because the team's view changed. Use the gate baseline (`--gate-save`) instead. The baseline grandfathers existing violations and only fails on new ones.
 
 ```bash
-opensip-tools fit --gate-save                # capture today's reality into .runtime/datastore.sqlite
-opensip-tools fit --gate-compare             # CI gate from now on
+opensip fit --gate-save                # capture today's reality into .runtime/datastore.sqlite
+opensip fit --gate-compare             # CI gate from now on
 ```
 
-In v2 the baseline lives in `<project>/opensip-tools/.runtime/datastore.sqlite` (gitignored). For CI to share a baseline across runs, upload that file as a workflow artifact on main-branch builds and download it before `--gate-compare` on PR builds — see [`10-concepts/05-architecture-gate.md#ci-integration-patterns`](../10-concepts/05-architecture-gate.md#ci-integration-patterns).
+In v2 the baseline lives in `<project>/opensip-cli/.runtime/datastore.sqlite` (gitignored). For CI to share a baseline across runs, upload that file as a workflow artifact on main-branch builds and download it before `--gate-compare` on PR builds — see [`10-concepts/05-architecture-gate.md#ci-integration-patterns`](../10-concepts/05-architecture-gate.md#ci-integration-patterns).
 
 ### When NOT to directive
 

@@ -1,8 +1,8 @@
 // @fitness-ignore-file silent-early-returns -- config-edit helpers (editPluginList/appendToPluginList/removeFromPluginList) return boolean as their documented "did I modify?" contract: false means "no-op / idempotent (already present, already absent, nothing to remove)"; explicit idempotency signals, not silent failures.
-// @fitness-ignore-file unbounded-memory -- reads opensip-tools.config.yml; bounded by configuration shape.
+// @fitness-ignore-file unbounded-memory -- reads opensip-cli.config.yml; bounded by configuration shape.
 /**
  * @fileoverview YAML-driven edits to `plugins.<domain>` in
- * `opensip-tools.config.yml`.
+ * `opensip-cli.config.yml`.
  *
  * Extracted from `commands/plugin.ts` to keep that module focused on
  * Commander wiring + the npm install/uninstall flows. The Document API
@@ -61,12 +61,12 @@ export function editPluginList(
   }
 
   // The top-level node must be a YAML map. A scalar / sequence at
-  // the root means the file isn't an opensip-tools config — refuse
+  // the root means the file isn't an opensip-cli config — refuse
   // to edit rather than reformat the whole thing.
   if (!isMap(root)) {
     throw new Error(
       `Cannot edit plugins.${domain} in ${configPath}: top-level node is not a mapping. ` +
-        `opensip-tools.config.yml must start with a YAML map.`,
+        `opensip-cli.config.yml must start with a YAML map.`,
     );
   }
 

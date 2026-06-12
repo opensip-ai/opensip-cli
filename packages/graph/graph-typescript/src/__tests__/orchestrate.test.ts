@@ -9,10 +9,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { RunScope, runWithScope, runWithScopeSync } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { currentAdapterRegistry, graphTool } from '@opensip-tools/graph';
-import { runGraph } from '@opensip-tools/graph/internal';
+import { RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
+import { runGraph } from '@opensip-cli/graph/internal';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';
@@ -232,8 +232,8 @@ describe('runGraph orchestrator', () => {
     // Place a regular file where the orchestrator wants to create the
     // cache *parent* directory. mkdirSync(recursive=true) tolerates
     // ENOTDIR mid-path by throwing — the orchestrator catches.
-    const cachePath = join(dir, 'opensip-tools', '.runtime', 'cache');
-    mkdirSync(join(dir, 'opensip-tools', '.runtime'), { recursive: true });
+    const cachePath = join(dir, 'opensip-cli', '.runtime', 'cache');
+    mkdirSync(join(dir, 'opensip-cli', '.runtime'), { recursive: true });
     writeFileSync(cachePath, 'block', 'utf8');
     const result = await runScopedGraph({ cwd: dir, datastore });
     // Run still produced a catalog; cache simply could not be written.

@@ -3,7 +3,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Phase V — End-to-end validation against opensip-tools' own
+ * Phase V — End-to-end validation against OpenSIP CLI's own
  * generated dashboard. Reads the live latest.html (produced by the
  * preceding `pnpm dashboard` run during workspace test bootstrap)
  * and exercises every view + the Function Card flow.
@@ -22,7 +22,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 const HERE = dirname(fileURLToPath(import.meta.url));
 // HERE is packages/contracts/src/__tests__; repo root is four levels up.
 const REPO_ROOT = join(HERE, '..', '..', '..', '..');
-const REPORT = join(REPO_ROOT, 'opensip-tools', '.runtime', 'reports', 'latest.html');
+const REPORT = join(REPO_ROOT, 'opensip-cli', '.runtime', 'reports', 'latest.html');
 
 function readReportOrSkip(): string | null {
   if (!existsSync(REPORT)) return null;

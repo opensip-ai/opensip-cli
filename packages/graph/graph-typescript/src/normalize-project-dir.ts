@@ -9,7 +9,7 @@
 import { realpathSync, statSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 
-import { ConfigurationError } from '@opensip-tools/core';
+import { ConfigurationError } from '@opensip-cli/core';
 
 /**
  * Normalize a project directory: resolve to absolute, then realpath

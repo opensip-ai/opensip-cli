@@ -1,14 +1,14 @@
 ---
 status: active
 last_verified: 2026-06-07
-owner: opensip-tools
+owner: opensip-cli
 ---
 
-# ADR-0023: A dedicated `@opensip-tools/config` package and one composed config document
+# ADR-0023: A dedicated `@opensip-cli/config` package and one composed config document
 
 ```yaml
 id: ADR-0023
-title: A dedicated @opensip-tools/config package and one composed config document
+title: A dedicated @opensip-cli/config package and one composed config document
 date: 2026-06-07
 status: active
 supersedes: []
@@ -23,7 +23,7 @@ enforcement-reason: >
   on the live `cross-tool-flag-parity` check (ADR-0021).
 ```
 
-**Decision:** Introduce a dedicated **`@opensip-tools/config`** package that owns
+**Decision:** Introduce a dedicated **`@opensip-cli/config`** package that owns
 the cross-cutting configuration *machinery* — the namespaced-schema **composer**,
 whole-document **validation + precedence + JSON-Schema generation** — and the
 tool-agnostic *document blocks* (shared targeting, `cli`/`cloud` defaults,
@@ -38,7 +38,7 @@ half-move config.
 
 **Alternatives:**
 - *Keep config in `contracts` + per-tool loaders (status quo).* Rejected: one file
-  (`opensip-tools.config.yml`) is parsed by ≥3 independent hand-projections
+  (`opensip-cli.config.yml`) is parsed by ≥3 independent hand-projections
   (`contracts/cli-config.ts` `projectCliDefaults`, `graph/.../graph-config.ts`
   `projectGraphConfig`, fitness loaders) with different strictness — the
   divergence north-star §4.4 names. And `cli-config.ts`'s runtime YAML projection
@@ -59,11 +59,11 @@ precedence order, and a single JSON-Schema for editors — the parity invariant
 "one config document." A dedicated package is the only home that honours layering
 (`core → config → {tools, cli}`, beside `contracts`) while carrying the Zod
 dependency the kernel refuses. The package boundary also *defines done*: once
-config logic lives only in `@opensip-tools/config`, the guardrail can mechanically
+config logic lives only in `@opensip-cli/config`, the guardrail can mechanically
 forbid YAML projection anywhere else.
 
 **Consequences:**
-- A **32nd publishable package** (`@opensip-tools/config`) — update `RELEASING.md`,
+- A **32nd publishable package** (`@opensip-cli/config`) — update `RELEASING.md`,
   `scripts/release-package-order.mjs` (and every surface ADR-0017 derives from it),
   and bootstrap its npm trusted publisher (brand-new name).
 - **2.10.0** (spec: `docs/plans/specs/release-2.10.0-capability-configuration.md`):
@@ -101,7 +101,7 @@ cross-cutting config machinery and the document blocks.
 The governing distinction the migration revealed: a config document has **two
 separable concerns** — *locating + version-gating* it (preconditions that run
 before validation; kernel-level, no Zod) versus *validating + shaping* its
-content (the `@opensip-tools/config` layer). The boundary is therefore **locate +
+content (the `@opensip-cli/config` layer). The boundary is therefore **locate +
 version-gate = `core`; validate + shape = `config`.**
 
 1. **`config-resolution.ts` STAYS in `core` — diverges from the Consequences
@@ -142,5 +142,5 @@ version-gate = `core`; validate + shape = `config`.**
 must exempt the `core` path primitive (`resolveProjectConfigPath`) and the generic
 `lib/yaml.ts` reader — they are the allowed *locate/read* primitives, not config
 projection. The guardrail forbids projecting a *document block* into a config
-object outside `@opensip-tools/config`, which is the boundary this amendment
+object outside `@opensip-cli/config`, which is the boundary this amendment
 sharpens.

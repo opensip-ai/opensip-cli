@@ -22,13 +22,13 @@
  * `package.json` in the scanned set; `node_modules` is excluded by the
  * `configs` target.
  *
- * SCOPE — opensip-tools' own monorepo. The marker (`opensipTools.kind`) is a
+ * SCOPE — opensip-cli' own monorepo. The marker (`opensipTools.kind`) is a
  * platform convention, so the check is inert in adopter repos whose packages
  * never declare it (zero `kind:'tool'` package.json → zero findings).
  */
 import path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 /** A `commands[]` entry as declared in the static manifest. */
 interface ManifestCommand {

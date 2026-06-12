@@ -9,7 +9,7 @@
  * directory.
  *
  * Hoisted into core so every scoped discovery surface enforces the
- * same invariant. The `@opensip-tools/scenarios-*` discovery in sim
+ * same invariant. The `@opensip-cli/scenarios-*` discovery in sim
  * flows through this helper.
  */
 
@@ -29,7 +29,7 @@ export const VALID_NPM_SCOPE_REGEX = /^@[a-z0-9][a-z0-9._-]*$/;
  * dropped with a structured warning rather than throwing — consistent
  * with how discovery handles unresolved explicit packages elsewhere.
  *
- * @param defaultScope  The platform default (e.g. `@opensip-tools`)
+ * @param defaultScope  The platform default (e.g. `@opensip-cli`)
  * @param extraScopes   Customer-configured additions
  * @param evt           Log event name to use when warning about invalid
  *                       entries — lets each caller emit a domain-specific

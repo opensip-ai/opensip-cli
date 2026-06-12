@@ -6,7 +6,7 @@
  * Data → data.
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 import { occId, pkgOf } from '../resolve-callee.js';
 

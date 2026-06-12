@@ -4,7 +4,7 @@ import { formatSignalJson } from '../signal-json.js';
 
 import { EMPTY_ENVELOPE, FIXTURE_ENVELOPE } from './envelope.fixtures.js';
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 describe('formatSignalJson', () => {
   it('serialises the envelope as pretty JSON (snapshot)', () => {

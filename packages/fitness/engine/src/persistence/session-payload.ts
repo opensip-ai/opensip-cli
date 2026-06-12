@@ -15,10 +15,10 @@
  * consumers, two shapes).
  */
 
-import { isErrorSignal } from '@opensip-tools/core';
+import { isErrorSignal } from '@opensip-cli/core';
 
-import type { SignalEnvelope, UnitResult } from '@opensip-tools/contracts';
-import type { Signal } from '@opensip-tools/core';
+import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 /** Two-level severity the dashboard buckets on (`critical|high → error`). */
 export type FitnessFindingSeverity = 'error' | 'warning';

@@ -4,7 +4,7 @@ last_verified: 2026-06-12
 release: v3.0.0
 title: "Create your first Tool"
 audience: [plugin-authors, contributors]
-purpose: "Task-led guide for creating a tracked project-local Tool plugin that adds a custom opensip-tools subcommand."
+purpose: "Task-led guide for creating a tracked project-local Tool plugin that adds a custom opensip-cli subcommand."
 source-files:
   - packages/core/src/plugins/manifest-loader.ts
   - packages/core/src/tools/command-spec.ts
@@ -18,19 +18,19 @@ related-docs:
 ---
 # Create your first Tool
 
-A Tool plugin adds a whole subcommand to `opensip-tools`. Use this path when your work is not a fitness check, simulation scenario, or graph adapter.
+A Tool plugin adds a whole subcommand to `opensip-cli`. Use this path when your work is not a fitness check, simulation scenario, or graph adapter.
 
-This guide creates a tracked project-local Tool under `opensip-tools/tools/`. It is the fastest way to understand the contract before you package a Tool for npm.
+This guide creates a tracked project-local Tool under `opensip-cli/tools/`. It is the fastest way to understand the contract before you package a Tool for npm.
 
 ## 1. Create the directory
 
 ```bash
-mkdir -p opensip-tools/tools/hello-tools
+mkdir -p opensip-cli/tools/hello-tools
 ```
 
 ## 2. Add the sidecar manifest
 
-Create `opensip-tools/tools/hello-tools/opensip-tool.manifest.json`:
+Create `opensip-cli/tools/hello-tools/opensip-tool.manifest.json`:
 
 ```json
 {
@@ -50,7 +50,7 @@ The manifest is read before the module is imported. Its `id` must match the runt
 
 ## 3. Add the runtime
 
-Create `opensip-tools/tools/hello-tools/index.mjs`:
+Create `opensip-cli/tools/hello-tools/index.mjs`:
 
 ```js
 export const tool = {
@@ -79,14 +79,14 @@ export const tool = {
 };
 ```
 
-This example uses a plain object so it has no package dependencies. A publishable Tool package can use `defineCommand` and TypeScript types from `@opensip-tools/core`.
+This example uses a plain object so it has no package dependencies. A publishable Tool package can use `defineCommand` and TypeScript types from `@opensip-cli/core`.
 
 ## 4. Allowlist the project-local Tool
 
 Tracked project-local Tools are executable code, so they are deny-by-default. Admit this Tool for the current shell:
 
 ```bash
-export OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS=hello-tools
+export OPENSIP_CLI_ALLOW_PROJECT_TOOLS=hello-tools
 ```
 
 Use a comma-separated list for more than one Tool, or `*` only when you trust every project-local Tool in the repo.
@@ -94,19 +94,19 @@ Use a comma-separated list for more than one Tool, or `*` only when you trust ev
 ## 5. Run it
 
 ```bash
-opensip-tools hello-tools
+opensip hello-tools
 ```
 
 You can also ask for JSON because the command declared the shared `json` flag:
 
 ```bash
-opensip-tools hello-tools --json
+opensip hello-tools --json
 ```
 
 ## 6. See it in the Tool inventory
 
 ```bash
-opensip-tools tools list --project
+opensip tools list --project
 ```
 
 The row should show the `hello-tools` id, `project` source, and `hello-tools` command.
@@ -118,8 +118,8 @@ The tracked sidecar layout is ideal while authoring inside one repo. To distribu
 1. Move the runtime into an npm package.
 2. Put the manifest under `package.json#opensipTools` with `kind: "tool"`.
 3. Export `tool` from the package main.
-4. Run `opensip-tools tools validate <spec>`.
-5. Install with `opensip-tools tools install <spec>`.
+4. Run `opensip tools validate <spec>`.
+5. Install with `opensip tools install <spec>`.
 
 `tools validate` and `tools install` execute the candidate package module as part of validation. Install scripts are blocked and runtime probing has a timeout, but this is still code execution with your user privileges.
 
@@ -127,7 +127,7 @@ The tracked sidecar layout is ideal while authoring inside one repo. To distribu
 
 | You want to ... | Go to |
 |---|---|
-| Learn the full Tool contract | [Full Tool plugins](/docs/opensip-tools/50-extend/06-full-tool-plugins/) |
-| Manage installed Tools | [`tools` command](/docs/opensip-tools/70-reference/12-tools-command/) |
-| See the allowlist environment variable | [Environment variables](/docs/opensip-tools/70-reference/10-environment-variables/) |
-| Understand Tool architecture | [The tool-plugin model](/docs/opensip-tools/10-concepts/02-tool-plugin-model/) |
+| Learn the full Tool contract | [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/) |
+| Manage installed Tools | [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/) |
+| See the allowlist environment variable | [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/) |
+| Understand Tool architecture | [The tool-plugin model](/docs/opensip-cli/10-concepts/02-tool-plugin-model/) |

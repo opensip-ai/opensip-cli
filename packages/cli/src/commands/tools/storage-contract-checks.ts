@@ -48,7 +48,7 @@ export const TIER_A_PATTERNS: readonly { readonly pattern: RegExp; readonly clau
     clause: 'no direct datastore-file access (ADR-0042 Tier A)',
   },
   {
-    pattern: /@opensip-tools\/datastore\/(schema|migrations)\//,
+    pattern: /@opensip-cli\/datastore\/(schema|migrations)\//,
     clause: 'no datastore-private schema/migration imports (ADR-0042 Tier A)',
   },
   {

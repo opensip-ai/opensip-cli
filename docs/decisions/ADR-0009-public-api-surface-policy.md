@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-03
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0009: Explicit public-API surfaces; internals and persistence schema stay owner-private
@@ -30,7 +30,7 @@ that exposes a package's internal mechanics — does **not** belong in that
 barrel. It moves behind an explicit `<pkg>/internal` subpath (test/contract
 kit) that production code in other packages may not import. Two corollaries:
 
-1. **The kernel is tool-agnostic.** `@opensip-tools/core` carries no
+1. **The kernel is tool-agnostic.** `@opensip-cli/core` carries no
    tool-specific vocabulary. Fitness/check-shaped names
    (`CheckDisplayEntry`, `checksRegistered`, `totalChecks`) move into the
    fitness engine; what stays in core is generic (`PluginDisplayEntry`,
@@ -73,7 +73,7 @@ Concrete leaks found by the 2026-06-03 boundary audit:
 **Consequences:**
 
 - **M1** — graph (and the analogous fitness) test-only helpers move from the
-  package barrel to `@opensip-tools/graph/internal`; the graph-typescript test
+  package barrel to `@opensip-cli/graph/internal`; the graph-typescript test
   suite imports them from there. Production sibling packages may not import
   `*/internal` (dep-cruiser rule).
 - **M2** — `CheckDisplayEntry` + the check-count fields move to the fitness

@@ -19,7 +19,7 @@ import { addToolPlugin } from '../plugin-host-ops.js';
 
 import { runToolValidation } from './validate.js';
 
-import type { ToolsInstallResult } from '@opensip-tools/contracts';
+import type { ToolsInstallResult } from '@opensip-cli/contracts';
 
 /** Options for {@link toolsInstall}. */
 export interface ToolsInstallOptions {

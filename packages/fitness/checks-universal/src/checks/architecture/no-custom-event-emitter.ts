@@ -2,7 +2,7 @@
  * @fileoverview No Custom Event Emitter check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 interface EventEmitterIssue {
   file: string;

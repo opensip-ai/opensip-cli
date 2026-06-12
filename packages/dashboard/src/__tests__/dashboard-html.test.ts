@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import { generateDashboardHtml } from '../generator.js';
 
-import type { StoredSession } from '@opensip-tools/contracts';
+import type { StoredSession } from '@opensip-cli/contracts';
 
 // Fitness-shaped detail now lives in the tool-owned opaque `payload`;
 // `contracts` no longer carries summary/checks on StoredSession. The
@@ -60,7 +60,7 @@ describe('generateDashboardHtml', () => {
     const html = generateDashboardHtml({ sessions: [] });
     expect(html).toContain('<!DOCTYPE html>');
     // Title should not have a score
-    expect(html).toContain('<title>OpenSIP Tools</title>');
+    expect(html).toContain('<title>OpenSIP CLI</title>');
     // The JS renders the "no sessions" message
     expect(html).toContain('No sessions yet');
   });
@@ -139,7 +139,7 @@ describe('generateDashboardHtml', () => {
   it('includes the footer with opensip.ai link', () => {
     const html = generateDashboardHtml({ sessions: [makeSession()] });
     expect(html).toContain('opensip.ai');
-    expect(html).toContain('opensip-tools');
+    expect(html).toContain('OpenSIP CLI');
   });
 
   it('handles multiple sessions for trend chart', () => {

@@ -6,7 +6,7 @@
  * outcome (which field failed, with which message), not just that a line ran.
  */
 
-import { ValidationError } from '@opensip-tools/core';
+import { ValidationError } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import {

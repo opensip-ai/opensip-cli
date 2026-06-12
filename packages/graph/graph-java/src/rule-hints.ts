@@ -11,7 +11,7 @@
 
 import { isTestFile } from './walk.js';
 
-import type { RuleHints } from '@opensip-tools/graph';
+import type { RuleHints } from '@opensip-cli/graph';
 
 const JAVA_SIDE_EFFECT_PRIMITIVES: readonly string[] = [
   'System.out.print',

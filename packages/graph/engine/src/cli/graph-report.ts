@@ -20,7 +20,7 @@ import { finalizeGraphSignals } from './apply-suppressions.js';
 
 import type { EntryPoint } from '../rules/_entry-points.js';
 import type { Catalog, Indexes } from '../types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 const ENTRY_POINTS_PREVIEW = 10;
 const FINDINGS_PREVIEW = 10;
@@ -219,7 +219,7 @@ function renderSummarySection(
   return [
     '== Summary ==',
     `${String(stats.clean)} rule(s) clean, ${String(stats.dirty)} with findings (${String(totalSignals)} total).`,
-    'Run `opensip-tools dashboard` for the interactive Code Paths view.',
+    'Run `opensip dashboard` for the interactive Code Paths view.',
   ];
 }
 

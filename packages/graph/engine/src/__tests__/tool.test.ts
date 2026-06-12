@@ -11,7 +11,7 @@
  *    output — they remain output sections, not separate commands.
  *  - Since release 2.11.0 Phase 5 graph mounts via declarative
  *    `commandSpecs`, not the deprecated `register()` hook.
- *  - graphTool does NOT import from opensip-tools (compile-time
+ *  - graphTool does NOT import from opensip-cli (compile-time
  *    via TypeScript imports — if it did, package wouldn't build)
  */
 

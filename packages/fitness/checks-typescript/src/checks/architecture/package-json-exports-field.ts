@@ -8,7 +8,7 @@
  * inside the package, creating fragile coupling to internal structure.
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 // Match a `packages/` or `services/` workspace segment whether the path is
 // repo-relative (`packages/a/package.json`) or absolute (`/abs/packages/a/…`).

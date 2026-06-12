@@ -1,10 +1,10 @@
 /**
  * @fileoverview Target type definitions for shared targeting.
  *
- * The targeting document shape (these types) is owned by `@opensip-tools/config`
+ * The targeting document shape (these types) is owned by `@opensip-cli/config`
  * as of 2.10.1 (ADR-0023) — targeting is cross-tool, not a fitness concern. The
  * generic targeting runtime (register/get/byTag, glob expansion, globalExcludes)
- * now lives in `@opensip-tools/targeting` and is consumed via the host-built
+ * now lives in `@opensip-cli/targeting` and is consumed via the host-built
  * `scope.targets` (ADR-0037). Fitness keeps only the check-domain layer:
  * `findByScope`, the `checkOverrides` cross-validation, `resolveFilesForCheck`'s
  * 3-tier precedence, and the content `fileCache`. Re-exported here so the
@@ -17,4 +17,4 @@ export type {
   CheckTargetMap,
   PluginsConfig,
   TargetsConfig,
-} from '@opensip-tools/config';
+} from '@opensip-cli/config';

@@ -5,7 +5,7 @@
  * lived as raw ANSI prints inside the command implementations.
  */
 
-import { ThemeProvider } from '@opensip-tools/cli-ui';
+import { ThemeProvider } from '@opensip-cli/cli-ui';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
@@ -18,7 +18,7 @@ import type {
   DashboardResult,
   ErrorResult,
   HelpResult,
-} from '@opensip-tools/contracts';
+} from '@opensip-cli/contracts';
 
 function renderApp(result: AppProps['result'], projectHeader?: AppProps['projectHeader']): string {
   const { lastFrame } = render(
@@ -82,7 +82,7 @@ describe('App.tsx — configure-done branch', () => {
     const result: ConfigureDoneResult = {
       type: 'configure-done',
       action: 'saved',
-      configPath: '/Users/test/.opensip-tools/config.yml',
+      configPath: '/Users/test/.opensip-cli/config.yml',
       maskedKey: 'abcd...wxyz',
     };
     const output = renderApp(result);
@@ -94,7 +94,7 @@ describe('App.tsx — configure-done branch', () => {
     const result: ConfigureDoneResult = {
       type: 'configure-done',
       action: 'cancelled',
-      configPath: '/Users/test/.opensip-tools/config.yml',
+      configPath: '/Users/test/.opensip-cli/config.yml',
     };
     const output = renderApp(result);
     expect(output).toContain('No key provided. Configuration unchanged.');
@@ -120,7 +120,7 @@ describe('App.tsx — banner shell (single source of truth)', () => {
     const result: ConfigureDoneResult = {
       type: 'configure-done',
       action: 'saved',
-      configPath: '/Users/test/.opensip-tools/config.yml',
+      configPath: '/Users/test/.opensip-cli/config.yml',
       maskedKey: 'abcd...wxyz',
     };
     expect(renderApp(result)).toContain(BANNER_GLYPH);

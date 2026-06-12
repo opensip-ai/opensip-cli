@@ -3,14 +3,14 @@
  *
  * Wraps the `Signal[]` a single run produced with the identity the cloud
  * needs to store them (tool, repo, run id, timestamp, counts). This is the
- * wire contract opensip-tools owns; the parent `opensip` repo ingests it.
+ * wire contract opensip-cli owns; the parent `opensip` repo ingests it.
  * `runId` is the idempotency root — the transport derives a per-chunk
- * `Idempotency-Key` of `${runId}:${ordinal}` (see @opensip-tools/output).
+ * `Idempotency-Key` of `${runId}:${ordinal}` (see @opensip-cli/output).
  *
  * `buildSignalBatch` is a pure factory (no IO beyond a truncation log). The
  * run already produces `Signal[]` natively (ADR-0011), so the CLI composition
  * root maps a tool's `SignalEnvelope` to a batch (`deliver-envelope.ts`,
- * @opensip-tools/cli) — no findings→Signal downgrade step exists anymore.
+ * @opensip-cli/cli) — no findings→Signal downgrade step exists anymore.
  */
 import { generatePrefixedId } from '../lib/ids.js';
 import { logger } from '../lib/logger.js';

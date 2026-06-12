@@ -17,7 +17,7 @@ import { dashboardTraceJs } from '../code-paths/trace.js';
 import { dashboardViewCouplingJs } from '../code-paths/view-coupling.js';
 import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
 interface Env {
   views: {

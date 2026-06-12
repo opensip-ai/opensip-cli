@@ -8,10 +8,10 @@
 
 import os from 'node:os';
 
-import { deriveRecipeId } from '@opensip-tools/core';
+import { deriveRecipeId } from '@opensip-cli/core';
 
 import type { DirectiveEntry } from '../framework/directive-inventory.js';
-import type { RecipeUnitConfigMap } from '@opensip-tools/core';
+import type { RecipeUnitConfigMap } from '@opensip-cli/core';
 
 // =============================================================================
 // CHECK SELECTOR TYPES

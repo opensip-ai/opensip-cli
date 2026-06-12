@@ -8,7 +8,7 @@
  * The per-pattern UUID + sub-slug shape is now the helper's default.
  */
 
-import { defineRegexListCheck } from '@opensip-tools/fitness';
+import { defineRegexListCheck } from '@opensip-cli/fitness';
 
 /**
  * Paths where console.* is the correct output mechanism (CLI tools, display modules, scripts).

@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from '../../cli/workspace-runner.js';
 
-import type { LanguageAdapter, WorkspaceUnit } from '@opensip-tools/core';
+import type { LanguageAdapter, WorkspaceUnit } from '@opensip-cli/core';
 
 function mockAdapter(id: string, units?: readonly WorkspaceUnit[]): LanguageAdapter {
   return {

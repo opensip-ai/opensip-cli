@@ -3,7 +3,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
-import type { WorkspaceUnit } from '@opensip-tools/core';
+import type { WorkspaceUnit } from '@opensip-cli/core';
 
 const PACKAGES_SEARCH_ROOT = 'packages';
 const SEARCH_MAX_DEPTH = 3;

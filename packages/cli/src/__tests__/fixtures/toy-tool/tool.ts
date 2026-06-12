@@ -4,12 +4,12 @@
  *
  * A brand-new tool that merely EMITS signals inherits `--gate-save` /
  * `--gate-compare` with ZERO tool-authored persistence, diff, or fingerprint
- * code: its gate handler imports only `@opensip-tools/core` + the `cli` baseline
+ * code: its gate handler imports only `@opensip-cli/core` + the `cli` baseline
  * seams. It declares NO `fingerprintStrategy`, so the host's
  * `defaultFingerprintStrategy` keys its baseline. The host owns BaselineRepo, the
  * diff, and the exit.
  *
- * NOTE: this file imports NO `@opensip-tools/datastore`, no diff, no fingerprint
+ * NOTE: this file imports NO `@opensip-cli/datastore`, no diff, no fingerprint
  * hashing — that absence IS the proof. Lives under `__tests__/fixtures/` so the
  * dogfood checks (host-owned-verdict, no-local-exit) correctly exempt it.
  */
@@ -22,9 +22,9 @@ import {
   type Signal,
   type Tool,
   type ToolCliContext,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 /** The toy tool's id — the per-tool scope key for the host baseline plane. */
 export const TOY_TOOL_ID = 'toy';

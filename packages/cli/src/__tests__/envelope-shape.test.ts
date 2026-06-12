@@ -13,13 +13,13 @@
  * Deterministic: fixed `runId`/`createdAt`, no clock / id generation here
  * (formatter-purity contract — those arrive on the input).
  */
-import { buildSignalEnvelope, type SignalEnvelope } from '@opensip-tools/contracts';
+import { buildSignalEnvelope, type SignalEnvelope } from '@opensip-cli/contracts';
 import {
   createSignal,
   HOST_VERDICT_POLICY_FALLBACK,
   type Signal,
   type ToolShortId,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 const RUN = { runId: 'run_shape0001', createdAt: '2026-06-04T00:00:00.000Z' };

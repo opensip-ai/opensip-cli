@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-05
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0017: Release gate must be at least as strict as the PR gate
@@ -91,7 +91,7 @@ boundary beats trusting external state.
   single source of truth (`scripts/release-package-order.mjs`) that every release
   surface derives from or is verified against, plus `verify-release.mjs` check #10
   (release-time) and a PR-time contract test. This closes the partial-release risk
-  where `@opensip-tools/tree-sitter` was present in pack/publish but **omitted**
+  where `@opensip-cli/tree-sitter` was present in pack/publish but **omitted**
   from the release preflight loop.
 
 **Related specs / ADRs:** This decision is implemented by the local-only plan

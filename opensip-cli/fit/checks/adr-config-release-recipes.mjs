@@ -1,13 +1,13 @@
 /**
  * @fileoverview ADR dogfood checks for config, release, flags, and recipes.
  *
- * These checks intentionally encode opensip-tools-specific workflow names,
+ * These checks intentionally encode opensip-cli-specific workflow names,
  * command files, config-loader bridge files, and recipe module layout.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { defineCheck } from '@opensip-tools/fitness';
+import { defineCheck } from '@opensip-cli/fitness';
 
 const ROOT = process.cwd();
 
@@ -156,7 +156,7 @@ function analyzeOneConfigDocumentRatchet(content, filePath) {
       filePath,
       lineOfNeedle(content, 'readYamlFile'),
       'config-yaml-reader-outside-allowlist',
-      'New opensip-tools.config.yml readers must not appear outside the sanctioned config/loading seams (ADR-0023).',
+      'New opensip-cli.config.yml readers must not appear outside the sanctioned config/loading seams (ADR-0023).',
       'Route config through the composed document loader or add a narrow allowlist entry here with the ADR-specific bridge justification.',
     ),
   ];
@@ -272,7 +272,7 @@ async function analyzeRecipeSemantics(files) {
           1,
           'recipe-scheduler-not-shared',
           `${relativePath} must route execution scheduling through core scheduleUnits (ADR-0026).`,
-          'Keep shared recipe execution semantics in @opensip-tools/core and tool-specific setup in the tool package.',
+          'Keep shared recipe execution semantics in @opensip-cli/core and tool-specific setup in the tool package.',
         ),
       );
     }

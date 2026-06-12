@@ -17,13 +17,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, RunScope } from '@opensip-tools/core';
-import { currentAdapterRegistry, graphTool } from '@opensip-tools/graph';
+import { enterScope, RunScope } from '@opensip-cli/core';
+import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';
 
-import type { CommandHandler, CommandSpec, ToolCliContext } from '@opensip-tools/core';
+import type { CommandHandler, CommandSpec, ToolCliContext } from '@opensip-cli/core';
 
 /** Resolve a graph command-spec by name (the host mounts these). */
 function graphSpec(name: string): CommandSpec<unknown, ToolCliContext> {

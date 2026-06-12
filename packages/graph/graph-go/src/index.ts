@@ -1,5 +1,5 @@
 /**
- * @opensip-tools/graph — Go language adapter.
+ * @opensip-cli/graph — Go language adapter.
  *
  * Sibling of graph-rust and graph-python. Backed by tree-sitter-go.
  *
@@ -27,7 +27,7 @@ import { goRuleHints } from './rule-hints.js';
 import { walkProject as goWalkProject } from './walk.js';
 
 import type { GoParsedProject } from './parse.js';
-import type { GraphLanguageAdapter } from '@opensip-tools/graph';
+import type { GraphLanguageAdapter } from '@opensip-cli/graph';
 
 export const goGraphAdapter = {
   id: 'go',

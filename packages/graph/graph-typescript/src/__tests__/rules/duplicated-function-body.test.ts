@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { buildIndexes, duplicatedFunctionBodyRule } from '@opensip-tools/graph/internal';
+import { buildIndexes, duplicatedFunctionBodyRule } from '@opensip-cli/graph/internal';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { runFixture, writeFixture } from '../acceptance/_fixture-runner.js';

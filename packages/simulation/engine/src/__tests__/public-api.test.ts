@@ -1,10 +1,10 @@
 /**
- * Export-surface lock for `@opensip-tools/simulation`.
+ * Export-surface lock for `@opensip-cli/simulation`.
  *
  * The public barrel is the scenario-pack authoring contract: kind-specific
  * scenario builders, target/fault/assertion helpers, recipe definitions, and
  * `simulationTool`. Engine registries, package loading, CLI lifecycle, and
- * recipe execution services live on `@opensip-tools/simulation/internal`.
+ * recipe execution services live on `@opensip-cli/simulation/internal`.
  *
  * Scope note: type-only exports are erased at runtime and cannot be asserted
  * here. Adding a *value* export to the barrel is a deliberate minor-version act
@@ -43,7 +43,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'validateLoadScenarioConfig',
 ].sort();
 
-describe('@opensip-tools/simulation public barrel', () => {
+describe('@opensip-cli/simulation public barrel', () => {
   it('exposes exactly the curated value-export surface', () => {
     const actual = Object.keys(barrel)
       .filter((k) => barrel[k as keyof typeof barrel] !== undefined)

@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 import { analyzeAllToolManifests, analyzeToolHasManifest } from '../tool-has-manifest.js';
 
-import type { FileAccessor } from '@opensip-tools/fitness';
+import type { FileAccessor } from '@opensip-cli/fitness';
 
 const CONFORMANT = {
   opensipTools: {

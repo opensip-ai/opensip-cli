@@ -9,7 +9,7 @@
  *
  * Why the equality is asserted against a KNOWN command list rather than by
  * importing the tool's runtime `Tool.commands`: core is the kernel and MUST
- * NOT import `@opensip-tools/fitness` / `graph` / `simulation` (the layering
+ * NOT import `@opensip-cli/fitness` / `graph` / `simulation` (the layering
  * rule dependency-cruiser enforces). The manifest⇔tool equality was already
  * asserted from the tool side in Phase 1; here we assert the manifest the
  * host reads matches the contract-frozen command set the tools register.

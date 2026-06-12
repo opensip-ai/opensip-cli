@@ -19,12 +19,12 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createSignal } from '@opensip-tools/core';
+import { createSignal } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { dispatchGraphResult } from '../graph.js';
 
-import type { Signal, ToolCliContext } from '@opensip-tools/core';
+import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 // Capture the signals each output mode receives. runGateMode is the simplest
 // sink to assert against (it takes the post-waiver signals as arg[1]).

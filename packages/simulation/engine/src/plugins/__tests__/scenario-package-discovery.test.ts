@@ -19,21 +19,21 @@ afterEach(() => {
 describe('readScenarioPackagePreferences', () => {
   it('reads scenarioPackages and autoDiscoverScenarios from project config', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `plugins:
   scenarioPackages:
-    - "@opensip-tools/scenarios-load-default"
+    - "@opensip-cli/scenarios-load-default"
   autoDiscoverScenarios: false
 `,
     );
     const prefs = readScenarioPackagePreferences(testDir);
-    expect(prefs.scenarioPackages).toEqual(['@opensip-tools/scenarios-load-default']);
+    expect(prefs.scenarioPackages).toEqual(['@opensip-cli/scenarios-load-default']);
     expect(prefs.autoDiscoverScenarios).toBe(false);
   });
 
   it('reads packageScopes from project config', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `plugins:
   packageScopes:
     - "@acme"
@@ -46,7 +46,7 @@ describe('readScenarioPackagePreferences', () => {
 
   it('returns empty object when config has no plugins section', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `simulation: { enabled: true }
 `,
     );

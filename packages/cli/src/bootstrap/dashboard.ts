@@ -11,7 +11,7 @@
  * dynamically importing fitness's `openDashboard`. The CLI is the
  * dashboard composition root — it walks every registered tool's
  * `collectDashboardData` contribution and merges them. This removes the
- * last `cli → @opensip-tools/fitness` dynamic import from this path and
+ * last `cli → @opensip-cli/fitness` dynamic import from this path and
  * keeps fitness decoupled from graph.
  *
  * Extracted from the prior `render-helpers.ts` so the pure renderer
@@ -45,6 +45,6 @@ export async function maybeOpenDashboard(opts: {
   // Compose the cross-tool dashboard and launch the browser. The CLI
   // owns composition; `composeAndWriteDashboard` reads `currentScope()`
   // for the tool registry + datastore and walks each tool's
-  // `collectDashboardData`. No `@opensip-tools/fitness` import here.
+  // `collectDashboardData`. No `@opensip-cli/fitness` import here.
   await composeAndWriteDashboard({ open: true });
 }

@@ -11,8 +11,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { enterScope, LanguageRegistry } from '@opensip-cli/core';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { executeGraph } from '../../cli/graph.js';
@@ -26,7 +26,7 @@ import type {
   ResolveOutput,
   WalkOutput,
 } from '../../lang-adapter/types.js';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 function emptyAdapter(projectDir: string): GraphLanguageAdapter {
   return {

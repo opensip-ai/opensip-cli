@@ -1,6 +1,6 @@
 /**
- * template — render the document-level skeleton of `opensip-tools.config.yml`
- * that `opensip-tools init` scaffolds.
+ * template — render the document-level skeleton of `opensip-cli.config.yml`
+ * that `opensip init` scaffolds.
  *
  * The config package owns the *document shape*, so it owns the rendering of the
  * host-owned blocks — `schemaVersion`, `globalExcludes`, and `targets` — that it
@@ -63,14 +63,14 @@ function renderTarget(t: TargetTemplateInput): string[] {
 export function renderDocumentHeader(input: DocumentHeaderInput): string {
   const globalExcludes = input.globalExcludes ?? DEFAULT_GLOBAL_EXCLUDES;
   const lines: string[] = [
-    '# OpenSIP Tools — project configuration',
+    '# OpenSIP CLI — project configuration',
     '#',
     '# Defines named target file sets for fitness checks. Each fitness',
     '# check declares a `scope` (languages + concerns); discovery',
     '# matches it against these targets to determine which files the',
     '# check runs against.',
     '#',
-    '# Docs: https://github.com/opensip-ai/opensip-tools#configuration',
+    '# Docs: https://github.com/opensip-ai/opensip-cli#configuration',
     '',
     `schemaVersion: ${input.schemaVersion}`,
     '',

@@ -14,7 +14,7 @@ import {
   isTestFile,
   type CheckViolation,
   type FileAccessor,
-} from '@opensip-tools/fitness';
+} from '@opensip-cli/fitness';
 
 /**
  * Type guard to validate a Map with array values.

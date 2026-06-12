@@ -19,17 +19,17 @@ import {
   ToolRegistry,
   policyPasses,
   runWithScopeSync,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { resolveFitVerdictPolicy } from '../result-builders.js';
 
 import type { SignalersConfig } from '../../../signalers/types.js';
-import type { ResolvedToolConfig, VerdictPolicy } from '@opensip-tools/core';
+import type { ResolvedToolConfig, VerdictPolicy } from '@opensip-cli/core';
 
 /** Fresh scope with empty registries — local equivalent of the retired
- *  `@opensip-tools/core/test-utils` helper. The fitness engine's own tests
- *  cannot use `@opensip-tools/test-support` (it depends on this package —
+ *  `@opensip-cli/core/test-utils` helper. The fitness engine's own tests
+ *  cannot use `@opensip-cli/test-support` (it depends on this package —
  *  the dev edge would make the package graph cyclic; ADR-0040). */
 const makeTestScope = (): RunScope =>
   new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });

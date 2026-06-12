@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-11
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0022: Recipe defaults are tool-scoped
@@ -55,7 +55,7 @@ config schema now rejects it.
 ADR the CLI hydrated `opts.recipe` from the tool-agnostic `cli:` block in the
 generic pre-action hook, so the same default reached `fit`, `graph`, and `sim`
 alike. In the parent `opensip` repo, `cli.recipe: opensip` (a *fit* recipe at
-`opensip-tools/fit/recipes/opensip.mjs`) made `opensip-tools graph` fail with
+`opensip-cli/fit/recipes/opensip.mjs`) made `opensip graph` fail with
 `Unknown graph recipe 'opensip'`. The config block already has tool-scoped
 siblings (`fitness:`, `graph:`, `simulation:` are contributed to the composed
 strict config schema by their owning tools), so a per-tool `recipe` key is the
@@ -67,7 +67,7 @@ strictness preserves the typo-catching guardrail.
 - `mergeConfigDefaults` no longer copies `recipe` onto `opts`; `opts.recipe`
   now reflects only the explicit `--recipe` flag. Each tool resolves its own
   default via the shared `resolveToolRecipeName` helper in
-  `@opensip-tools/contracts`, reading only its own block.
+  `@opensip-cli/contracts`, reading only its own block.
 - Config keys: `fitness.recipe`, `graph.recipe`, `simulation.recipe`.
 - The recipe resolvers (`resolveRecipeToRules` in graph, `selectRecipe` in fit,
   the inline lookup in sim) accept a `tolerant` flag: config-sourced unknown →

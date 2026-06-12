@@ -1,11 +1,11 @@
 /**
  * targeting — the shared two-layer scope model: the `targets:`,
  * `globalExcludes:`, and `checkOverrides:` document-level blocks of
- * `opensip-tools.config.yml`.
+ * `opensip-cli.config.yml`.
  *
  * This is cross-tool config, not a fitness concern — a project shipping only
  * `graph` resolves its scope through the same model. Relocated here from
- * `@opensip-tools/fitness` in 2.10.1 (ADR-0023). The data/runtime boundary:
+ * `@opensip-cli/fitness` in 2.10.1 (ADR-0023). The data/runtime boundary:
  *
  *   - config owns the **document shape** — the types below and the Zod field
  *     schemas — so the composed whole-document validation can strict-check the
@@ -61,8 +61,8 @@ export type CheckTargetMap = Readonly<Record<string, string | readonly string[]>
  * Project-local plugin declarations — one list per plugin domain.
  *
  * When present in the config file, these override the default user-level
- * plugin directory (`~/.opensip-tools/<domain>/`). Plugins get installed
- * into `<project-root>/.opensip-tools/<domain>/` and are version-pinned
+ * plugin directory (`~/.opensip-cli/<domain>/`). Plugins get installed
+ * into `<project-root>/.opensip-cli/<domain>/` and are version-pinned
  * by the project rather than by each developer's machine.
  *
  * Each entry is any npm install spec: `@scope/pkg`, `@scope/pkg@^1.2.3`,
@@ -73,7 +73,7 @@ export interface PluginsConfig {
   readonly sim?: readonly string[];
   /**
    * Explicit list of npm package names to load as check providers
-   * (e.g. ['@opensip-tools/checks-python', '@my-org/checks-internal']).
+   * (e.g. ['@opensip-cli/checks-python', '@my-org/checks-internal']).
    *
    * Marker-based discovery still runs alongside this list; use this for
    * packages that do not declare `opensipTools.kind: "fit-pack"` yet, or
@@ -90,7 +90,7 @@ export interface PluginsConfig {
   readonly autoDiscoverScenarios?: boolean;
   /**
    * Additional npm scopes to include in simulation scenario-package
-   * auto-discovery, on top of the platform default (`@opensip-tools`).
+   * auto-discovery, on top of the platform default (`@opensip-cli`).
    */
   readonly packageScopes?: readonly string[];
   /** Exact graph adapter package names to load from project `node_modules`. */
@@ -105,7 +105,7 @@ export type PluginConfigKeyKind = 'packages' | 'autoDiscover' | 'scopes';
 /**
  * One `plugins.<key>` declared by an admitted tool capability descriptor. The CLI
  * maps manifest `capabilities[].discovery.configKeys` into this config-layer
- * shape, keeping core manifest types out of `@opensip-tools/config`.
+ * shape, keeping core manifest types out of `@opensip-cli/config`.
  */
 export interface PluginConfigKeyDeclaration {
   readonly key: string;
@@ -124,7 +124,7 @@ export interface TargetsConfig {
   /**
    * Project-local plugin declarations, keyed by domain. When any domain
    * has entries here, plugin discovery for that domain reads from
-   * `<project>/.opensip-tools/<domain>/` instead of `~/.opensip-tools/<domain>/`.
+   * `<project>/.opensip-cli/<domain>/` instead of `~/.opensip-cli/<domain>/`.
    */
   readonly plugins?: PluginsConfig;
 }

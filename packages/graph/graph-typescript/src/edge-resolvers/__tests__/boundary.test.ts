@@ -12,14 +12,14 @@
  * `CrossBoundaryCall` descriptors (and the cases it skips).
  */
 
-import { ownerEdgeKey } from '@opensip-tools/graph';
+import { ownerEdgeKey } from '@opensip-cli/graph';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { extractBoundaryCalls } from '../boundary.js';
 
 import type { CallSiteRecord } from '../../walk.js';
-import type { CallEdge } from '@opensip-tools/graph';
+import type { CallEdge } from '@opensip-cli/graph';
 
 /**
  * Project root the boundary extractor derives `ownerFile` against. Empty string

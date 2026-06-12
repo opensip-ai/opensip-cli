@@ -12,7 +12,7 @@
  *  - No-side-effects: --dry-run uninstall doesn't create .runtime/.
  *
  * These tests run the actual binary (`packages/cli/dist/index.js`), so
- * the build must be done first (pnpm --filter=opensip-tools build).
+ * the build must be done first (pnpm --filter=opensip-cli build).
  */
 
 import {
@@ -60,7 +60,7 @@ afterEach(() => {
 describe('Project: header', () => {
   it('shows the project root with no walked-up suffix when cwd === root', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
@@ -75,7 +75,7 @@ describe('Project: header', () => {
 
   it('shows "(found N levels up)" when run from a subdir', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
@@ -93,7 +93,7 @@ describe('Project: header', () => {
 
   it('suppresses the imperative header for --json', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
@@ -105,7 +105,7 @@ describe('Project: header', () => {
 describe('phantom-scaffold regression (the original bug)', () => {
   it('running fit-list from a subdir uses the parent project root', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
@@ -113,8 +113,8 @@ describe('phantom-scaffold regression (the original bug)', () => {
     mkdirSync(subdir, { recursive: true });
     runCli(['fit-list'], subdir);
     // .runtime/ should appear at the project root, NOT at the subdir.
-    expect(existsSync(join(testDir, 'opensip-tools', '.runtime'))).toBe(true);
-    expect(existsSync(join(subdir, 'opensip-tools'))).toBe(false);
+    expect(existsSync(join(testDir, 'opensip-cli', '.runtime'))).toBe(true);
+    expect(existsSync(join(subdir, 'opensip-cli'))).toBe(false);
   });
 });
 
@@ -122,8 +122,8 @@ describe('no project found', () => {
   it('project-scoped command errors exit 2 with the structured message', () => {
     const { stderr, exitCode } = runCli(['fit-list'], testDir);
     expect(exitCode).toBe(2);
-    expect(stderr).toContain('No opensip-tools project found');
-    expect(stderr).toContain('opensip-tools init');
+    expect(stderr).toContain('No OpenSIP CLI project found');
+    expect(stderr).toContain('opensip init');
   });
 
   it('project-scoped --json emits a structured bootstrap.error outcome on stdout', () => {
@@ -138,7 +138,7 @@ describe('no project found', () => {
     };
     expect(outcome.kind).toBe('bootstrap.error');
     expect(outcome.status).toBe('error');
-    expect(outcome.errors[0].message).toContain('No opensip-tools.config.yml found');
+    expect(outcome.errors[0].message).toContain('No opensip-cli.config.yml found');
   });
 });
 
@@ -146,7 +146,7 @@ describe('init from a fresh tmpdir', () => {
   it('scaffolds with schemaVersion: 1 in the config', () => {
     const { exitCode } = runCli(['init', '--language', 'typescript'], testDir);
     expect(exitCode).toBe(0);
-    const cfg = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
+    const cfg = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(cfg).toMatch(/^schemaVersion: 1$/m);
   });
 });
@@ -154,51 +154,51 @@ describe('init from a fresh tmpdir', () => {
 describe('init refusal inside existing project', () => {
   it('refuses with exit 2 + three-option message when run from a subdir', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
-    mkdirSync(join(testDir, 'opensip-tools', 'fit', 'checks'), { recursive: true });
+    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), { recursive: true });
     const subdir = join(testDir, 'packages', 'api');
     mkdirSync(subdir, { recursive: true });
     const { stdout, stderr, exitCode } = runCli(['init'], subdir);
     expect(exitCode).toBe(2);
     const out = stdout + stderr;
-    expect(out).toContain('already inside an opensip-tools project');
+    expect(out).toContain('already inside an OpenSIP CLI project');
     expect(out).toContain(testDir);
-    expect(out).toContain('opensip-tools init --keep --cwd');
-    expect(out).toContain('opensip-tools init --remove --cwd');
-    expect(out).toContain('opensip-tools init --cwd .');
+    expect(out).toContain('opensip init --keep --cwd');
+    expect(out).toContain('opensip init --remove --cwd');
+    expect(out).toContain('opensip init --cwd .');
   });
 });
 
 describe('uninstall safe default + --purge', () => {
   beforeEach(() => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
-    mkdirSync(join(testDir, 'opensip-tools', 'fit', 'checks'), { recursive: true });
-    writeFileSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'my.mjs'), '\n', 'utf8');
-    mkdirSync(join(testDir, 'opensip-tools', '.runtime', 'logs'), { recursive: true });
-    writeFileSync(join(testDir, 'opensip-tools', '.runtime', 'logs', 'run.jsonl'), '{}\n', 'utf8');
+    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), { recursive: true });
+    writeFileSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my.mjs'), '\n', 'utf8');
+    mkdirSync(join(testDir, 'opensip-cli', '.runtime', 'logs'), { recursive: true });
+    writeFileSync(join(testDir, 'opensip-cli', '.runtime', 'logs', 'run.jsonl'), '{}\n', 'utf8');
   });
 
   it('default removes ONLY .runtime/; preserves user content + config', () => {
     const { stdout, exitCode } = runCli(['uninstall', '--project', '--yes'], testDir);
     expect(exitCode).toBe(0);
-    expect(existsSync(join(testDir, 'opensip-tools', '.runtime'))).toBe(false);
-    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'my.mjs'))).toBe(true);
-    expect(existsSync(join(testDir, 'opensip-tools.config.yml'))).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-cli', '.runtime'))).toBe(false);
+    expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my.mjs'))).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(true);
     expect(stdout).toContain('These will be KEPT');
   });
 
   it('--purge removes EVERYTHING with the git-status warning', () => {
     const { stdout, exitCode } = runCli(['uninstall', '--project', '--purge', '--yes'], testDir);
     expect(exitCode).toBe(0);
-    expect(existsSync(join(testDir, 'opensip-tools'))).toBe(false);
-    expect(existsSync(join(testDir, 'opensip-tools.config.yml'))).toBe(false);
+    expect(existsSync(join(testDir, 'opensip-cli'))).toBe(false);
+    expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(false);
     expect(stdout).toContain('⚠ This removes EVERYTHING');
     expect(stdout).toContain('git status');
   });
@@ -207,7 +207,7 @@ describe('uninstall safe default + --purge', () => {
 describe('schema-version skew', () => {
   it('schemaVersion: 99 exits 2 with "Update your CLI" message (not migrate)', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 99\ntargets: {}\n',
       'utf8',
     );
@@ -216,11 +216,11 @@ describe('schema-version skew', () => {
     expect(stderr).toContain('uses a newer schema than your CLI supports');
     expect(stderr).toContain('curl -fsSL https://opensip.ai/cli/install.sh | bash');
     // Critical: must NOT say "migrate" — direction was previously wrong.
-    expect(stderr.toLowerCase()).not.toContain('opensip-tools migrate');
+    expect(stderr.toLowerCase()).not.toContain('opensip-cli migrate');
   });
 
   it('config missing schemaVersion works as v1 silently', () => {
-    writeFileSync(join(testDir, 'opensip-tools.config.yml'), 'targets: {}\n', 'utf8');
+    writeFileSync(join(testDir, 'opensip-cli.config.yml'), 'targets: {}\n', 'utf8');
     const { stderr, exitCode } = runCli(['fit-list'], testDir);
     expect(exitCode).toBe(0);
     expect(stderr).not.toContain('newer schema');
@@ -229,9 +229,9 @@ describe('schema-version skew', () => {
 
 describe('full Tool-plugin install path (audit P1b)', () => {
   const FIXTURE_TOOL = join(__dirname, 'fixtures', 'tool-plugin');
-  const TOOL_PKG = join('@opensip-tools-fixture', 'tool-demo');
+  const TOOL_PKG = join('@opensip-cli-fixture', 'tool-demo');
 
-  // A throwaway HOME so the user-global install (~/.opensip-tools/...) lands
+  // A throwaway HOME so the user-global install (~/.opensip-cli/...) lands
   // in a temp dir, never the real home. resolveUserPaths() reads homedir().
   function withFreshHome(): { home: string; env: Record<string, string> } {
     const home = realpathSync(mkdtempSync(join(tmpdir(), 'opensip-e2e-home-')));
@@ -240,7 +240,7 @@ describe('full Tool-plugin install path (audit P1b)', () => {
 
   function writeProject(): void {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
@@ -257,9 +257,9 @@ describe('full Tool-plugin install path (audit P1b)', () => {
       // Landed in the user-global tool host dir, NOT a fit/sim domain dir,
       // and NO config entry was written (tools auto-discover by marker).
       expect(
-        existsSync(join(home, '.opensip-tools', 'plugins', 'tool', 'node_modules', TOOL_PKG)),
+        existsSync(join(home, '.opensip-cli', 'plugins', 'tool', 'node_modules', TOOL_PKG)),
       ).toBe(true);
-      expect(readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8')).not.toContain(
+      expect(readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8')).not.toContain(
         'tool-demo',
       );
 
@@ -282,11 +282,11 @@ describe('full Tool-plugin install path (audit P1b)', () => {
       expect(add.exitCode).toBe(0);
       expect(
         existsSync(
-          join(testDir, 'opensip-tools', '.runtime', 'plugins', 'tool', 'node_modules', TOOL_PKG),
+          join(testDir, 'opensip-cli', '.runtime', 'plugins', 'tool', 'node_modules', TOOL_PKG),
         ),
       ).toBe(true);
       // Did NOT install user-global.
-      expect(existsSync(join(home, '.opensip-tools', 'plugins', 'tool'))).toBe(false);
+      expect(existsSync(join(home, '.opensip-cli', 'plugins', 'tool'))).toBe(false);
       const ran = runCli(['audit-demo'], testDir, env);
       expect(ran.exitCode).toBe(0);
       expect(ran.stdout).toContain('audit-demo ran');
@@ -317,22 +317,22 @@ describe('full Tool-plugin install path (audit P1b)', () => {
 describe('no-side-effects', () => {
   it('uninstall --project --dry-run does NOT open the SQLite datastore', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
-    mkdirSync(join(testDir, 'opensip-tools', 'fit', 'checks'), { recursive: true });
-    writeFileSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'my.mjs'), '\n', 'utf8');
+    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), { recursive: true });
+    writeFileSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my.mjs'), '\n', 'utf8');
     runCli(['uninstall', '--project', '--dry-run', '--yes'], testDir);
     // The catastrophic side effect was the SQLite file. With lazy
     // datastore (Phase 1.3), dry-run never reads cli.datastore so
     // openSqliteBackend's mkdirSync + open never fires.
-    expect(existsSync(join(testDir, 'opensip-tools', '.runtime', 'datastore.sqlite'))).toBe(false);
+    expect(existsSync(join(testDir, 'opensip-cli', '.runtime', 'datastore.sqlite'))).toBe(false);
   });
 
   it('schemaVersion: 99 bailout does NOT open SQLite or initialise logs', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 99\ntargets: {}\n',
       'utf8',
     );
@@ -340,6 +340,6 @@ describe('no-side-effects', () => {
     // pre-action-hook exits 2 BEFORE the side-effect block
     // (configureLogger({ logDir }) + setProjectContextForRun). No
     // .runtime/ tree at all.
-    expect(existsSync(join(testDir, 'opensip-tools', '.runtime'))).toBe(false);
+    expect(existsSync(join(testDir, 'opensip-cli', '.runtime'))).toBe(false);
   });
 });

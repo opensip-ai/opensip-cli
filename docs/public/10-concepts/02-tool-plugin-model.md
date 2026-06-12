@@ -99,16 +99,16 @@ The flow lives in [`packages/cli/src/bootstrap/register-tools.ts`](../../../pack
    const toolRegistry = new ToolRegistry();
 
 2. Bundled tools load by PACKAGE NAME (not a static import):
-   FIRST_PARTY_TOOLS = ['@opensip-tools/fitness',
-                        '@opensip-tools/simulation',
-                        '@opensip-tools/graph']   // names, not runtimes
+   FIRST_PARTY_TOOLS = ['@opensip-cli/fitness',
+                        '@opensip-cli/simulation',
+                        '@opensip-cli/graph']   // names, not runtimes
    For each: loadToolManifest → admitTool → dynamic import → register.
    The host holds NO `import { fitnessTool }` — the `no-bootstrap-tool-import`
    fitness check fails the build if a static tool-runtime import creeps back.
 
 3. Discovery (third-party): walk, in precedence order, the project's
    .runtime/plugins/tool/ → the project node_modules → the user-global
-   ~/.opensip-tools/plugins/tool/ → the CLI's own install tree, for any
+   ~/.opensip-cli/plugins/tool/ → the CLI's own install tree, for any
    package whose package.json declares opensipTools.kind === 'tool'. Each
    travels the identical loadToolManifest → admitTool → import → register path.
 
@@ -171,7 +171,7 @@ Once installed, the CLI picks it up at next launch — no config edit, no code c
 
 A few alternatives were considered. Worth knowing why they're not what's here.
 
-- **No package.json `bin` shimming.** A Tool is *not* a separate binary. It's a subcommand inside the `opensip-tools` binary. One config file, one logger, one runtime dir, one exit-code convention — shared across every tool a user has installed.
+- **No package.json `bin` shimming.** A Tool is *not* a separate binary. It's a subcommand inside the `opensip` binary. One config file, one logger, one runtime dir, one exit-code convention — shared across every tool a user has installed.
 - **A thin manifest, not a full command-tree schema.** The `opensipTools` block is an *identity + admission* descriptor (`kind`, `id`, `apiVersion`, command names) — enough for the host to discover, version-check, and enumerate a tool's surface without importing it. The real command shape (options, args, handlers) lives in the typed `commandSpecs`; TypeScript and the load-time `assertManifestMatchesTool` keep the two in sync. There's no separate JSON option-schema to maintain.
 - **No event hooks or middleware chain.** Tools don't subscribe to events; they own their commands end-to-end. This rules out "before-fit" plugins — but those would create an ordering problem (which middleware runs first?) and an observability problem (whose log line is this?). Tools are flat: install one, run one.
 - **A declarative command surface, host-owned wiring (3.0.0).** A tool declares its commands as data (`commandSpecs`) and the host builds the Commander tree, applies the shared cross-tool flags, and owns parse → handler → render → `--json` → exit. The pre-GA model (each tool wired its own Commander inside `register()`, casting a raw `cli.program`) was removed at 3.0.0: letting every tool touch Commander made "the same flag means the same thing across tools" a convention rather than an invariant. Centralizing the wiring makes it structural — see [ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md) and [ADR-0021](../../decisions/ADR-0021-cross-tool-cli-flag-currency.md).
@@ -184,7 +184,7 @@ The minimum viable tool, end-to-end:
 
 ```ts
 // packages/audit-sec/src/index.ts
-import { defineCommand, type Tool, type ToolCliContext } from '@opensip-tools/core';
+import { defineCommand, type Tool, type ToolCliContext } from '@opensip-cli/core';
 import { runAudit } from './audit.js';
 
 export const auditSecTool: Tool = {
@@ -229,23 +229,23 @@ export const tool = auditSecTool; // discovery export
     "commands": [{ "name": "audit-sec", "description": "Run the audit" }]
   },
   "peerDependencies": {
-    "opensip-tools": "^3.0.0",
-    "@opensip-tools/core": "^3.0.0"
+    "opensip-cli": "^3.0.0",
+    "@opensip-cli/core": "^3.0.0"
   }
 }
 ```
 
-That's the whole tool. Add `@yourorg/audit-sec` to the project (or run `opensip-tools plugin add @yourorg/audit-sec`), and `opensip-tools audit-sec` works. For the full walkthrough — installation modes, per-command options, kernel-registry reuse — see [Full Tool plugins](../50-extend/06-full-tool-plugins.md).
+That's the whole tool. Add `@yourorg/audit-sec` to the project (or run `opensip plugin add @yourorg/audit-sec`), and `opensip audit-sec` works. For the full walkthrough — installation modes, per-command options, kernel-registry reuse — see [Full Tool plugins](../50-extend/06-full-tool-plugins.md).
 
 What you *don't* need:
 
 - An entry-points declaration.
 - A hook or middleware registration.
-- A code change in `opensip-tools`.
-- A code change in `@opensip-tools/core`.
-- A schema migration for the project config (unless your tool has its own config — which goes in a tool-namespaced section under `opensip-tools.config.yml`, declared via the Tool's `config` slot).
+- A code change in `opensip-cli`.
+- A code change in `@opensip-cli/core`.
+- A schema migration for the project config (unless your tool has its own config — which goes in a tool-namespaced section under `opensip-cli.config.yml`, declared via the Tool's `config` slot).
 
-If your tool also wants to ship checks (the way `@opensip-tools/checks-typescript` does for `fit`), that's a separate, lighter contract — a check pack declaring `opensipTools.kind: "fit-pack"`. See [`50-extend/01-plugin-authoring.md`](../50-extend/01-plugin-authoring.md).
+If your tool also wants to ship checks (the way `@opensip-cli/checks-typescript` does for `fit`), that's a separate, lighter contract — a check pack declaring `opensipTools.kind: "fit-pack"`. See [`50-extend/01-plugin-authoring.md`](../50-extend/01-plugin-authoring.md).
 
 ---
 
@@ -253,8 +253,8 @@ If your tool also wants to ship checks (the way `@opensip-tools/checks-typescrip
 
 Three things, in order of importance:
 
-1. **A stable kernel.** `@opensip-tools/core` does not import any tool. The layer policy ([dependency-cruiser config](../../../.config/dependency-cruiser.cjs)) enforces this — the build fails if `core` ever reached up. A kernel bump can't break a tool, because the kernel can't see the tool.
-2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to a major-version range of each first-party tool, but third-party tools release on their own cadence. A user can pin a third-party `@yourorg/audit-sec@0.x` while staying on the current `opensip-tools@3.x`.
+1. **A stable kernel.** `@opensip-cli/core` does not import any tool. The layer policy ([dependency-cruiser config](../../../.config/dependency-cruiser.cjs)) enforces this — the build fails if `core` ever reached up. A kernel bump can't break a tool, because the kernel can't see the tool.
+2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to a major-version range of each first-party tool, but third-party tools release on their own cadence. A user can pin a third-party `@yourorg/audit-sec@0.x` while staying on the current `opensip-cli@3.x`.
 3. **A future where `fit` is just one of many tools.** The platform was designed for `audit-*`, `lint-*`, `report-*`, `bench-*`, and similar Tools to slot in by shipping a manifest + `commandSpecs`, inheriting every host-owned plane (output, progress, config, sessions, dashboard). Today there are three (`fit`, `sim`, `graph`); the CLI grows by zero lines for the fourth.
 
 ---

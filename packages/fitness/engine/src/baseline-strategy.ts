@@ -18,7 +18,7 @@
 
 import { createHash } from 'node:crypto';
 
-import type { FingerprintStrategy } from '@opensip-tools/core';
+import type { FingerprintStrategy } from '@opensip-cli/core';
 
 /** fitness's message-hash baseline identity: `sha256(filePath\nruleId\nmessage)`. */
 export const fitnessFingerprintStrategy: FingerprintStrategy = (s) =>

@@ -31,7 +31,7 @@ import type {
   DependencyEdge,
   DependencySiteRecord,
   FunctionOccurrence,
-} from '@opensip-tools/graph';
+} from '@opensip-cli/graph';
 
 let dir: string;
 

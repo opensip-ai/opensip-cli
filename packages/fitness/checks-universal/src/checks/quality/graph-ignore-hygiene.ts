@@ -3,7 +3,7 @@
  * @fileoverview Graph ignore hygiene check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /** Regex to match @graph-ignore directives */
 const GRAPH_IGNORE_REGEX = /@graph-ignore(?:-file|-next-line)?\s+(\S+)/g;

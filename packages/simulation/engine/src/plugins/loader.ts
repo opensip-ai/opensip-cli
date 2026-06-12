@@ -15,7 +15,7 @@
  * fitness's `loadAllPlugins('fit', projectDir)`.
  */
 
-import { loadAllPlugins } from '@opensip-tools/core';
+import { loadAllPlugins } from '@opensip-cli/core';
 
 import { currentScenarioRegistry } from '../framework/registry.js';
 import { currentSimulationRecipeRegistry } from '../recipes/registry.js';
@@ -28,11 +28,11 @@ import type {
   PluginLoadResult,
   RegisteredCounts,
   RegisterCtx,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 /**
  * Simulation's project-local plugin layout — user scenarios/recipes live
- * under `<project>/opensip-tools/sim/{scenarios,recipes}/`. Exported so
+ * under `<project>/opensip-cli/sim/{scenarios,recipes}/`. Exported so
  * the `simulationTool` descriptor (`Tool.pluginLayout`) and the CLI's
  * `plugin` command share one source of truth (ADR-0009 corollary 1).
  */

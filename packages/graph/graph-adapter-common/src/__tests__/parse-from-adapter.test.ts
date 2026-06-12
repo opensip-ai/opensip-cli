@@ -19,8 +19,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createParseProjectFromAdapter } from '../parse-from-adapter.js';
 
-import type { LanguageAdapter } from '@opensip-tools/core';
-import type { ParsedFile } from '@opensip-tools/tree-sitter';
+import type { LanguageAdapter } from '@opensip-cli/core';
+import type { ParsedFile } from '@opensip-cli/tree-sitter';
 
 // A fake parsed tree whose only observed field is `rootNode.hasError`. The
 // driver also threads `source` straight through, so we keep it on the object.

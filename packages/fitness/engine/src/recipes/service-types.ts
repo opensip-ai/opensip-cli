@@ -78,7 +78,7 @@ export interface FitnessRecipeServiceConfig {
   /** When true, carry violation details on RecipeCheckResult. */
   includeViolations?: boolean;
   /**
-   * Run-wide file exclusion patterns from `opensip-tools.config.yml`'s
+   * Run-wide file exclusion patterns from `opensip-cli.config.yml`'s
    * top-level `globalExcludes`. Threaded into each check's RunOptions
    * so the matchFiles() fallback honors them — without this, scope-empty
    * checks scan every prewarmed file. Should be the same array passed

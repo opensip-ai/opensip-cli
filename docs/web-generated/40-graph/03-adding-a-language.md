@@ -24,7 +24,7 @@ related-docs:
 
 # Adding a language to graph
 
-The `graph` tool started as a TypeScript-only call-graph engine. The language-pluggability work introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language. There are **five first-party adapters** — each as its own publishable npm package under `packages/graph/graph-<lang>/`: TypeScript (symbol-resolved via the TS compiler API), Python (tree-sitter), Rust (tree-sitter), Go (tree-sitter), and Java (tree-sitter). The four tree-sitter adapters are backed by **vendored `web-tree-sitter` WASM grammars** (no native build / node-gyp at install) and share the parse/discover/walk/cache-key scaffolding in [`@opensip-tools/graph-adapter-common`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-adapter-common/src/parse.ts). Auto-discovery is by **name pattern + marker**: a package must match `@opensip-tools/graph-*` and declare `opensipTools.kind: "graph-adapter"`, or you can pin an exact list in `plugins.graphAdapters` in `opensip-tools.config.yml`. Any first-party or third-party adapter slots in by implementing the contract and shipping under that name/marker pair (or via the explicit-pin form).
+The `graph` tool started as a TypeScript-only call-graph engine. The language-pluggability work introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language. There are **five first-party adapters** — each as its own publishable npm package under `packages/graph/graph-<lang>/`: TypeScript (symbol-resolved via the TS compiler API), Python (tree-sitter), Rust (tree-sitter), Go (tree-sitter), and Java (tree-sitter). The four tree-sitter adapters are backed by **vendored `web-tree-sitter` WASM grammars** (no native build / node-gyp at install) and share the parse/discover/walk/cache-key scaffolding in [`@opensip-cli/graph-adapter-common`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-adapter-common/src/parse.ts). Auto-discovery is by **name pattern + marker**: a package must match `@opensip-cli/graph-*` and declare `opensipTools.kind: "graph-adapter"`, or you can pin an exact list in `plugins.graphAdapters` in `opensip-cli.config.yml`. Any first-party or third-party adapter slots in by implementing the contract and shipping under that name/marker pair (or via the explicit-pin form).
 
 This doc walks a contributor through that workflow.
 
@@ -32,21 +32,21 @@ This doc walks a contributor through that workflow.
 > - Decided where your adapter lives (first-party in this repo vs. third-party npm package).
 > - Implemented the six adapter methods against your language's parser.
 > - Run the contract test suite against your fixture project.
-> - Registered the adapter so `opensip-tools graph` works on a project in your language.
+> - Registered the adapter so `opensip graph` works on a project in your language.
 
 ---
 
 ## 1. Read first
 
-The canonical contract source is the TypeScript file itself: [`packages/graph/engine/src/lang-adapter/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/lang-adapter/types.ts) — interface signatures, behavioral invariants I-1 through I-9 (in JSDoc), and the I/O shapes that flow between the orchestrator and your adapter.
+The canonical contract source is the TypeScript file itself: [`packages/graph/engine/src/lang-adapter/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/engine/src/lang-adapter/types.ts) — interface signatures, behavioral invariants I-1 through I-9 (in JSDoc), and the I/O shapes that flow between the orchestrator and your adapter.
 
 Then look at the reference implementations. Five ship today:
 
-- [`packages/graph/graph-typescript/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-typescript/src/index.ts) — `typescriptGraphAdapter` is a thin façade over the existing TypeScript-specific machinery. Each contract method delegates to a sibling file (`discover.ts`, `parse.ts`, `walk.ts`, `edges.ts`, `cache-key.ts`) and translates I/O shapes. Symbol-resolved (`'high'` confidence on direct calls).
-- [`packages/graph/graph-python/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-python/src/index.ts) — `pythonGraphAdapter` is the canonical tree-sitter reference. ~8 source files plus a fixture project; its `parse.ts` loads the vendored `tree-sitter-python.wasm` via `web-tree-sitter` and binds the shared `createTreeSitterParseProject` driver from `@opensip-tools/graph-adapter-common`. Discovery via `pyproject.toml` / `setup.py` with `**/*.py` glob fallback; resolution by simple name. **If you're writing a tree-sitter adapter, read this one first** — its layout is the recommended template.
-- [`packages/graph/graph-rust/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-rust/src/index.ts) — `rustGraphAdapter` adds receiver-type narrowing on top of the Python pattern (`Foo::method(...)` lifts confidence when the receiver type is statically present in the call expression). Discovery via `Cargo.toml` with `**/*.rs` glob fallback.
-- [`packages/graph/graph-go/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-go/src/index.ts) — `goGraphAdapter` follows the Python pattern with Go's package-aware discovery (`go.mod` + `**/*.go` glob) and receiver-aware call resolution for method values.
-- [`packages/graph/graph-java/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-java/src/index.ts) — `javaGraphAdapter` uses tree-sitter over Maven/Gradle-discovered source roots and lifts class context into the resolver (everything in Java is in a class, so the resolver always has receiver scope).
+- [`packages/graph/graph-typescript/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-typescript/src/index.ts) — `typescriptGraphAdapter` is a thin façade over the existing TypeScript-specific machinery. Each contract method delegates to a sibling file (`discover.ts`, `parse.ts`, `walk.ts`, `edges.ts`, `cache-key.ts`) and translates I/O shapes. Symbol-resolved (`'high'` confidence on direct calls).
+- [`packages/graph/graph-python/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-python/src/index.ts) — `pythonGraphAdapter` is the canonical tree-sitter reference. ~8 source files plus a fixture project; its `parse.ts` loads the vendored `tree-sitter-python.wasm` via `web-tree-sitter` and binds the shared `createTreeSitterParseProject` driver from `@opensip-cli/graph-adapter-common`. Discovery via `pyproject.toml` / `setup.py` with `**/*.py` glob fallback; resolution by simple name. **If you're writing a tree-sitter adapter, read this one first** — its layout is the recommended template.
+- [`packages/graph/graph-rust/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-rust/src/index.ts) — `rustGraphAdapter` adds receiver-type narrowing on top of the Python pattern (`Foo::method(...)` lifts confidence when the receiver type is statically present in the call expression). Discovery via `Cargo.toml` with `**/*.rs` glob fallback.
+- [`packages/graph/graph-go/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-go/src/index.ts) — `goGraphAdapter` follows the Python pattern with Go's package-aware discovery (`go.mod` + `**/*.go` glob) and receiver-aware call resolution for method values.
+- [`packages/graph/graph-java/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-java/src/index.ts) — `javaGraphAdapter` uses tree-sitter over Maven/Gradle-discovered source roots and lifts class context into the resolver (everything in Java is in a class, so the resolver always has receiver scope).
 
 ---
 
@@ -56,14 +56,14 @@ A `GraphLanguageAdapter` exposes six methods plus three identity fields (`id`, `
 
 | Method | Responsibility | TypeScript reference |
 |---|---|---|
-| `discoverFiles` | Resolve which files belong to the project for a given cwd. Reads language-specific config (tsconfig.json, pyproject.toml, Cargo.toml, go.mod, etc.). Returns absolute, realpath-normalized, sorted file paths. | [`graph-typescript/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-typescript/src/discover.ts) |
-| `parseProject` | Build adapter-internal parse state. The shape is opaque (`P = unknown`); the engine passes it back into `walkProject` and `resolveCallSites` unchanged. **Must stay synchronous** (the engine calls it synchronously and the shard worker serializes results across a process boundary). TypeScript holds a `ts.Program`; the tree-sitter adapters hold a `Map<filePath, { tree, source }>` parsed via `web-tree-sitter` — the one-time async `Parser.init()` / `Language.load(<wasm>)` are confined to module top-level `await`, so `parseProject` itself stays sync. | [`graph-typescript/parse.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-typescript/src/parse.ts) |
-| `walkProject` | One pass over the parsed project. Emit `FunctionOccurrence`s (one per callable thing — function, method, arrow, constructor, getter/setter, plus a synthetic module-init per file) AND `CallSiteRecord`s (pre-located call expressions, owner-keyed by `bodyHash`). | [`graph-typescript/walk.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-typescript/src/walk.ts) |
-| `resolveCallSites` | Resolve the call-site list against the frozen catalog. Return a `bodyHash → CallEdge[]` map plus resolution stats. Call edges carry a `confidence` (`'high'` for symbol-resolved, `'medium'`/`'low'` for name-only resolution). | [`graph-typescript/edges.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-typescript/src/edges.ts) (`resolveEdgesFromRecords`) |
-| `cacheKey` | Compute an opaque per-adapter cache invalidation key. Different adapters MUST emit different prefixes (e.g. `ts-…`, `py-…`, `rs-…`, `go-…`, `java-…`) so cross-adapter accidents hash-mismatch immediately. | [`graph-typescript/cache-key.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-typescript/src/cache-key.ts) |
-| `ruleHints` | Optional. Declare what counts as a test file in your language and which side-effect primitives the `no-side-effect-path` rule should look for. Without this, defaults apply and rules silently degrade. | [`graph-typescript/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-typescript/src/index.ts) (`ruleHints`) |
+| `discoverFiles` | Resolve which files belong to the project for a given cwd. Reads language-specific config (tsconfig.json, pyproject.toml, Cargo.toml, go.mod, etc.). Returns absolute, realpath-normalized, sorted file paths. | [`graph-typescript/discover.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-typescript/src/discover.ts) |
+| `parseProject` | Build adapter-internal parse state. The shape is opaque (`P = unknown`); the engine passes it back into `walkProject` and `resolveCallSites` unchanged. **Must stay synchronous** (the engine calls it synchronously and the shard worker serializes results across a process boundary). TypeScript holds a `ts.Program`; the tree-sitter adapters hold a `Map<filePath, { tree, source }>` parsed via `web-tree-sitter` — the one-time async `Parser.init()` / `Language.load(<wasm>)` are confined to module top-level `await`, so `parseProject` itself stays sync. | [`graph-typescript/parse.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-typescript/src/parse.ts) |
+| `walkProject` | One pass over the parsed project. Emit `FunctionOccurrence`s (one per callable thing — function, method, arrow, constructor, getter/setter, plus a synthetic module-init per file) AND `CallSiteRecord`s (pre-located call expressions, owner-keyed by `bodyHash`). | [`graph-typescript/walk.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-typescript/src/walk.ts) |
+| `resolveCallSites` | Resolve the call-site list against the frozen catalog. Return a `bodyHash → CallEdge[]` map plus resolution stats. Call edges carry a `confidence` (`'high'` for symbol-resolved, `'medium'`/`'low'` for name-only resolution). | [`graph-typescript/edges.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-typescript/src/edges.ts) (`resolveEdgesFromRecords`) |
+| `cacheKey` | Compute an opaque per-adapter cache invalidation key. Different adapters MUST emit different prefixes (e.g. `ts-…`, `py-…`, `rs-…`, `go-…`, `java-…`) so cross-adapter accidents hash-mismatch immediately. | [`graph-typescript/cache-key.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-typescript/src/cache-key.ts) |
+| `ruleHints` | Optional. Declare what counts as a test file in your language and which side-effect primitives the `no-side-effect-path` rule should look for. Without this, defaults apply and rules silently degrade. | [`graph-typescript/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-typescript/src/index.ts) (`ruleHints`) |
 
-The exact TypeScript signatures live in [`lang-adapter/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/lang-adapter/types.ts). Read that file once — it's the technical reference.
+The exact TypeScript signatures live in [`lang-adapter/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/engine/src/lang-adapter/types.ts). Read that file once — it's the technical reference.
 
 ---
 
@@ -73,11 +73,11 @@ A new first-party adapter ships as its own publishable npm package under `packag
 
 ```
 packages/graph/graph-<id>/
-  package.json       — { "name": "@opensip-tools/graph-<id>",
-                          deps on @opensip-tools/graph + @opensip-tools/core
+  package.json       — { "name": "@opensip-cli/graph-<id>",
+                          deps on @opensip-cli/graph + @opensip-cli/core
                           (+ graph-adapter-common + web-tree-sitter for
                           tree-sitter adapters); `files` includes `wasm` }
-                        (the `@opensip-tools/graph-*` name prefix is
+                        (the `@opensip-cli/graph-*` name prefix is
                         the first-party naming convention; default
                         discovery consults the
                         `opensipTools: { kind: "graph-adapter" }` marker)
@@ -104,15 +104,15 @@ packages/graph/graph-<id>/
                        parsing, occurrence emission, call resolution
 ```
 
-This mirrors `graph-python/`, `graph-rust/`, `graph-go/`, and `graph-java/` — the recommended template for tree-sitter adapters. The four tree-sitter adapters keep most of their `discover` / `parse` / `walk` / `cache-key` scaffolding in [`@opensip-tools/graph-adapter-common`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-adapter-common/src/parse.ts) (e.g. `createTreeSitterParseProject`, `createDiscover`, `hashConfig`) and each `src/` file is a thin per-language binding plus the vendored `wasm/<grammar>.wasm` (shipped in the package's `files`). The TypeScript adapter has a deeper subdir layout (`inventory-visitors/`, `edge-resolvers/`, `inventory-helpers/`) because its symbol-resolved walk is genuinely more complex; for a tree-sitter adapter the flat layout is plenty. Adapters that prefer one big file or a different breakdown are fine — the contract doesn't care, only the public `index.ts` export matters.
+This mirrors `graph-python/`, `graph-rust/`, `graph-go/`, and `graph-java/` — the recommended template for tree-sitter adapters. The four tree-sitter adapters keep most of their `discover` / `parse` / `walk` / `cache-key` scaffolding in [`@opensip-cli/graph-adapter-common`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-adapter-common/src/parse.ts) (e.g. `createTreeSitterParseProject`, `createDiscover`, `hashConfig`) and each `src/` file is a thin per-language binding plus the vendored `wasm/<grammar>.wasm` (shipped in the package's `files`). The TypeScript adapter has a deeper subdir layout (`inventory-visitors/`, `edge-resolvers/`, `inventory-helpers/`) because its symbol-resolved walk is genuinely more complex; for a tree-sitter adapter the flat layout is plenty. Adapters that prefer one big file or a different breakdown are fine — the contract doesn't care, only the public `index.ts` export matters.
 
-**Third-party graph adapters** are supported via the same discovery path the first-party packages use: any package installed in `node_modules` whose name matches `@opensip-tools/graph-*` and declares `opensipTools.kind: "graph-adapter"` is loaded and its `adapter` export registered. For deployments that need pinned discovery, list the exact package names under `plugins.graphAdapters:` in `opensip-tools.config.yml` — that list replaces the auto-scan entirely. The adapter contract types (`GraphLanguageAdapter`, `registerAdapter`, `pickAdapter`) are exported from `@opensip-tools/graph`.
+**Third-party graph adapters** are supported via the same discovery path the first-party packages use: any package installed in `node_modules` whose name matches `@opensip-cli/graph-*` and declares `opensipTools.kind: "graph-adapter"` is loaded and its `adapter` export registered. For deployments that need pinned discovery, list the exact package names under `plugins.graphAdapters:` in `opensip-cli.config.yml` — that list replaces the auto-scan entirely. The adapter contract types (`GraphLanguageAdapter`, `registerAdapter`, `pickAdapter`) are exported from `@opensip-cli/graph`.
 
 ---
 
 ## 4. The contract test suite
 
-Every adapter MUST pass the shared contract test suite at [`packages/graph/graph-typescript/src/__tests__/lang-adapter-contract.test.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-typescript/src/__tests__/lang-adapter-contract.test.ts). It validates the nine behavioral invariants documented on the `GraphLanguageAdapter` interface:
+Every adapter MUST pass the shared contract test suite at [`packages/graph/graph-typescript/src/__tests__/lang-adapter-contract.test.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-typescript/src/__tests__/lang-adapter-contract.test.ts). It validates the nine behavioral invariants documented on the `GraphLanguageAdapter` interface:
 
 | Invariant | What the test checks |
 |---|---|
@@ -159,18 +159,18 @@ When you ship a new adapter, add a row to this table in your PR.
 
 ## 6. Registration
 
-First-party and third-party adapters use the same registration path: ship a package whose name matches `@opensip-tools/graph-*`, declares `opensipTools.kind: "graph-adapter"`, and whose main entry exports `adapter` (or list the package name under `plugins.graphAdapters:` in the project config).
+First-party and third-party adapters use the same registration path: ship a package whose name matches `@opensip-cli/graph-*`, declares `opensipTools.kind: "graph-adapter"`, and whose main entry exports `adapter` (or list the package name under `plugins.graphAdapters:` in the project config).
 
 ```json
 {
-  "name": "@opensip-tools/graph-cpp",
+  "name": "@opensip-cli/graph-cpp",
   "main": "dist/index.js",
   "files": ["dist", "wasm"],
   "opensipTools": { "kind": "graph-adapter" },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/graph": "workspace:*",
-    "@opensip-tools/graph-adapter-common": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/graph": "workspace:*",
+    "@opensip-cli/graph-adapter-common": "workspace:*",
     "web-tree-sitter": "0.25.10"
   }
 }
@@ -180,7 +180,7 @@ The `opensipTools.kind` marker is what default graph-adapter discovery consults.
 
 ```ts
 // packages/graph/graph-cpp/src/index.ts
-import type { GraphLanguageAdapter } from '@opensip-tools/graph';
+import type { GraphLanguageAdapter } from '@opensip-cli/graph';
 
 export const cppGraphAdapter: GraphLanguageAdapter<CppParsedProject> = {
   id: 'cpp',
@@ -197,9 +197,9 @@ export const cppGraphAdapter: GraphLanguageAdapter<CppParsedProject> = {
 export const adapter = cppGraphAdapter;
 ```
 
-The generic capability loader ([`packages/cli/src/bootstrap/load-tool-capabilities.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/bootstrap/load-tool-capabilities.ts)) discovers `graph-adapter` packages per command and routes each package's `adapter` export through graph's registrar into the per-run scope. A new adapter is live once it is installed or present in the workspace.
+The generic capability loader ([`packages/cli/src/bootstrap/load-tool-capabilities.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/cli/src/bootstrap/load-tool-capabilities.ts)) discovers `graph-adapter` packages per command and routes each package's `adapter` export through graph's registrar into the per-run scope. A new adapter is live once it is installed or present in the workspace.
 
-Once two or more adapters are registered, [`pickAdapter(cwd)`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/lang-adapter/registry.ts) chooses by file-extension dominance with a deterministic preference list. Add your language to the preference list in `resolveTie` if you ship a new first-party adapter.
+Once two or more adapters are registered, [`pickAdapter(cwd)`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/engine/src/lang-adapter/registry.ts) chooses by file-extension dominance with a deterministic preference list. Add your language to the preference list in `resolveTie` if you ship a new first-party adapter.
 
 ---
 
@@ -211,7 +211,7 @@ When you open the PR for a new adapter, verify each of these:
 - [ ] Per-rule fidelity entry added to the table in §5 of this doc.
 - [ ] Adapter ships with at least one fixture project under `__tests__/fixtures/<id>/` that exercises file discovery, parsing, occurrence emission, and call resolution.
 - [ ] README and CLI `--help` mention the new language.
-- [ ] dep-cruiser layer rules pass — graph engine internals (`pipeline/`, `cache/`, `rules/`, `render/`, `cli/`) MUST NOT import your `@opensip-tools/graph-<id>` package directly. Registration goes through package discovery.
+- [ ] dep-cruiser layer rules pass — graph engine internals (`pipeline/`, `cache/`, `rules/`, `render/`, `cli/`) MUST NOT import your `@opensip-cli/graph-<id>` package directly. Registration goes through package discovery.
 - [ ] `pnpm typecheck`, `pnpm test`, `pnpm lint` all clean.
 - [ ] If your `cacheKey` prefix is novel (it must be), document it in your `cache-key.ts`'s docstring so the next adapter author doesn't accidentally collide.
 
@@ -227,21 +227,21 @@ These are drawn from real bugs caught while shipping the Python and Rust adapter
 - **Adapter cacheKey prefixes must not collide.** A Python catalog with `cacheKey: ts-...` would falsely match a TypeScript run. Always include the language id at the start of your prefix (e.g. `py-`, `rs-`, `go-`). Invariant I-8 enforces this in the contract test suite.
 - **Keep `walkProject` deterministic.** Don't rely on `Map` iteration order across runs (it's stable in V8 but worth being explicit); always sort outputs by a stable key (file path, then position) before emission. The byte-identical-catalog gate will catch most violations on the second test run.
 - **Watch for `*/` inside JSDoc-style block comments in source you generate.** When emitting comments into your adapter's TypeScript files, a literal `*/` inside a `/** … */` block silently terminates the comment and the next character flips into code. Escape as `*​/` or split across lines.
-- **Vendor the grammar as WASM; don't add a native tree-sitter dep.** The four tree-sitter adapters use `web-tree-sitter` and ship the compiled `tree-sitter-<lang>.wasm` under `wasm/` (listed in the package's `files`). There is no native tree-sitter grammar npm dependency and no node-gyp build at install — that was the whole point of the WASM migration. Load the grammar with a module top-level `await Language.load(fileURLToPath(new URL('../wasm/<grammar>.wasm', import.meta.url)))` and bind `createTreeSitterParseProject` from `@opensip-tools/graph-adapter-common`.
+- **Vendor the grammar as WASM; don't add a native tree-sitter dep.** The four tree-sitter adapters use `web-tree-sitter` and ship the compiled `tree-sitter-<lang>.wasm` under `wasm/` (listed in the package's `files`). There is no native tree-sitter grammar npm dependency and no node-gyp build at install — that was the whole point of the WASM migration. Load the grammar with a module top-level `await Language.load(fileURLToPath(new URL('../wasm/<grammar>.wasm', import.meta.url)))` and bind `createTreeSitterParseProject` from `@opensip-cli/graph-adapter-common`.
 - **Keep `parseProject` synchronous.** `web-tree-sitter` needs a one-time async `Parser.init()` and async `Language.load(<wasm>)`, but `parser.parse(source)` is synchronous once the language is loaded. Confine both awaits to module top level (the shared `graph-adapter-common/parse.ts` runs `Parser.init()` at its own top level; your adapter runs `Language.load()` at its top level) so the contract-mandated synchronous `parseProject` stays sync. Adapter discovery `import()`s the package, so both top-level awaits settle before the engine ever calls `parseProject`.
-- **Reuse the shared `appendEdge` helper.** [`lang-adapter/edge-helpers.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/lang-adapter/edge-helpers.ts) was extracted because the duplicated-function-body rule legitimately fired across multiple adapters' near-identical helpers. Use it instead of writing your own; if you need a variant, add a parameter rather than forking.
+- **Reuse the shared `appendEdge` helper.** [`lang-adapter/edge-helpers.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/engine/src/lang-adapter/edge-helpers.ts) was extracted because the duplicated-function-body rule legitimately fired across multiple adapters' near-identical helpers. Use it instead of writing your own; if you need a variant, add a parameter rather than forking.
 
 ---
 
 ## 9. Where to ask
 
-- The TypeScript adapter ([`graph-typescript/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-typescript/src/index.ts)) is the concrete reference; reading it end-to-end takes ~30 minutes.
+- The TypeScript adapter ([`graph-typescript/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/graph-typescript/src/index.ts)) is the concrete reference; reading it end-to-end takes ~30 minutes.
 - The contract test suite is the spec — if the test passes for your adapter, you're conforming.
-- The interface JSDoc on [`packages/graph/engine/src/lang-adapter/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/lang-adapter/types.ts) documents every invariant and design decision in line with the code.
+- The interface JSDoc on [`packages/graph/engine/src/lang-adapter/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/engine/src/lang-adapter/types.ts) documents every invariant and design decision in line with the code.
 
 ---
 
 ## What's next
 
-- **[`01-stages-and-catalog.md`](/docs/opensip-tools/40-graph/01-stages-and-catalog/)** — the engine pipeline your adapter feeds into.
-- **[`02-rules-and-gating.md`](/docs/opensip-tools/40-graph/02-rules-and-gating/)** — the ten rules that consume the catalog and the gate workflow.
+- **[`01-stages-and-catalog.md`](/docs/opensip-cli/40-graph/01-stages-and-catalog/)** — the engine pipeline your adapter feeds into.
+- **[`02-rules-and-gating.md`](/docs/opensip-cli/40-graph/02-rules-and-gating/)** — the ten rules that consume the catalog and the gate workflow.

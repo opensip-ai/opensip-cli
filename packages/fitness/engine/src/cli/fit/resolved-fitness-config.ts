@@ -8,7 +8,7 @@
  * precedence-resolved result rides on `currentScope().toolConfig` — keyed by
  * namespace (`fitness`/`graph`/`simulation`).
  *
- * Before this module, fitness re-read `opensip-tools.config.yml` through
+ * Before this module, fitness re-read `opensip-cli.config.yml` through
  * `loadSignalersConfig` and projected `signalersConfig.fitness.*`. That path
  * NEVER saw the declared env bindings (`OPENSIP_FIT_FAIL_ON_ERRORS` /
  * `OPENSIP_FIT_FAIL_ON_WARNINGS`) — they resolved into `scope.toolConfig` but
@@ -23,7 +23,7 @@
  * composer before they landed on the scope, so a structural narrowing is sound.
  */
 
-import { currentScope } from '@opensip-tools/core';
+import { currentScope } from '@opensip-cli/core';
 
 /** The fitness namespace's resolved knobs (mirror of `FitnessNamespaceSchema`). */
 export interface ResolvedFitnessConfig {

@@ -1,7 +1,7 @@
 // @fitness-ignore-file error-handling-quality -- readGlobalConfig returns {} on any failure by documented contract (absent file and "everything default" are equivalent to the merge step); writeGlobalConfig's inner unlink is cleanup-of-cleanup where the meaningful rename error is already thrown on the next line.
-// @fitness-ignore-file unbounded-memory -- reads ~/.opensip-tools/config.yml, a small user-config file bounded by configuration shape
+// @fitness-ignore-file unbounded-memory -- reads ~/.opensip-cli/config.yml, a small user-config file bounded by configuration shape
 /**
- * global-config — read/write the user-level (`~/.opensip-tools/config.yml`)
+ * global-config — read/write the user-level (`~/.opensip-cli/config.yml`)
  * config that holds the cloud API key and per-user defaults.
  *
  * User-scoped config I/O is tool-agnostic, so it lives in the config layer
@@ -31,7 +31,7 @@ import {
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { EnvRegistry, type EnvVarSpec } from '@opensip-tools/core';
+import { EnvRegistry, type EnvVarSpec } from '@opensip-cli/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 /**
@@ -43,18 +43,18 @@ import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 export const CONFIG_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
   {
     canonical: 'OPENSIP_API_KEY',
-    docs: 'OpenSIP Cloud API key. Overrides the apiKey stored in ~/.opensip-tools/config.yml.',
+    docs: 'OpenSIP Cloud API key. Overrides the apiKey stored in ~/.opensip-cli/config.yml.',
   },
 ];
 const CONFIG_ENV = new EnvRegistry(CONFIG_ENV_SPECS);
 
 /** User-level OpenSIP root directory. */
-const OPENSIP_DIR = join(homedir(), '.opensip-tools');
+const OPENSIP_DIR = join(homedir(), '.opensip-cli');
 /** User-level config file path. */
 export const GLOBAL_CONFIG_PATH = join(OPENSIP_DIR, 'config.yml');
 
 /**
- * Shape of `~/.opensip-tools/config.yml`. Open-ended on purpose — future
+ * Shape of `~/.opensip-cli/config.yml`. Open-ended on purpose — future
  * per-user defaults (theme, last-used recipe, telemetry opt-in) can land
  * here without a contract change.
  */
@@ -128,7 +128,7 @@ export function writeGlobalConfig(config: GlobalConfig): void {
  *
  *   1. CLI flag (`--api-key`).
  *   2. Environment variable (`OPENSIP_API_KEY`).
- *   3. User-level global config (`~/.opensip-tools/config.yml#apiKey`).
+ *   3. User-level global config (`~/.opensip-cli/config.yml#apiKey`).
  *
  * The pre-action hook calls this for the global merge step; the
  * `configure` command calls it for the "current key" hint at the
@@ -157,7 +157,7 @@ function readUserCloudConfig(): { sync?: boolean; endpoint?: string } | undefine
 
 /**
  * Resolve the effective cloud config for a run by layering the user-level
- * cloud block (`~/.opensip-tools/config.yml#cloud`) over the project-level
+ * cloud block (`~/.opensip-cli/config.yml#cloud`) over the project-level
  * `cli.cloud:` block — the missing piece behind audit P0-2, where the
  * documented user opt-out was read for the API key but never for `cloud`.
  *

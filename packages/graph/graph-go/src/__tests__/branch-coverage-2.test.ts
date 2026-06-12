@@ -32,7 +32,7 @@ import type {
   Catalog,
   DependencySiteRecord,
   FunctionOccurrence,
-} from '@opensip-tools/graph';
+} from '@opensip-cli/graph';
 
 let dir: string;
 

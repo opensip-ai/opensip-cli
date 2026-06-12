@@ -25,7 +25,7 @@ import { dirname, join } from 'node:path';
 
 /** A package discovered (or resolved) inside node_modules. */
 export interface DiscoveredScopedPackage {
-  /** npm package name, e.g. '@opensip-tools/checks-python'. */
+  /** npm package name, e.g. '@opensip-cli/checks-python'. */
   readonly name: string;
   /** Absolute path to the package's directory inside node_modules. */
   readonly packageDir: string;

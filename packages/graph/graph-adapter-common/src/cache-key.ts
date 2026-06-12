@@ -19,7 +19,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 
-import type { CacheKeyInput } from '@opensip-tools/graph';
+import type { CacheKeyInput } from '@opensip-cli/graph';
 
 /**
  * Fingerprint a language config file's content.

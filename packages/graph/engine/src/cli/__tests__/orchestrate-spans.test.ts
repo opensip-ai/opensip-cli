@@ -2,14 +2,14 @@
  * Graph stage-span — standalone no-op invariant.
  *
  * The graph engine carries NO OpenTelemetry SDK (only the `@opentelemetry/api`
- * no-op facade, via `@opensip-tools/core`'s `withSpan`). So this test proves the
+ * no-op facade, via `@opensip-cli/core`'s `withSpan`). So this test proves the
  * load-bearing standalone guarantee at the graph layer: with no provider
  * registered, `runGraph` over a small fixture completes identically and the
  * stage spans it starts are non-recording (emit nothing).
  *
  * The span-CAPTURE assertion — that an enabled run produces the six
  * `opensip_tools.graph.<stage>` spans, in order, with the stage attributes —
- * lives in `opensip-tools`, where the SDK + InMemorySpanExporter
+ * lives in `opensip-cli`, where the SDK + InMemorySpanExporter
  * legitimately live (`packages/cli/src/telemetry/__tests__/graph-spans.test.ts`).
  * Keeping the SDK out of the tool package is the architectural constraint this
  * split exists to honor.
@@ -19,7 +19,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { getTracer, runWithScope, runWithScopeSync } from '@opensip-tools/core';
+import { getTracer, runWithScope, runWithScopeSync } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';

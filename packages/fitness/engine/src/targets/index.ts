@@ -2,13 +2,13 @@
  * @fileoverview Target system barrel export (fitness-internal)
  *
  * - loadTargetsConfig() — Load checkOverrides/plugins/globalExcludes from
- *   opensip-tools.config.yml and mirror the host-built `scope.targets` set into
+ *   opensip-cli.config.yml and mirror the host-built `scope.targets` set into
  *   a fitness registry (ADR-0037).
  * - TargetRegistry — the fitness subclass (substrate registry + check-domain
  *   `findByScope`). NOT a public engine export (`public-api.test.ts` asserts it
  *   stays internal).
  * - resolveTargets / preResolveAllTargets / applyGlobalExcludes — re-exported
- *   from `@opensip-tools/targeting` so fitness-internal consumers (scope-resolver,
+ *   from `@opensip-cli/targeting` so fitness-internal consumers (scope-resolver,
  *   execution-context) have a single import surface for the generic glob
  *   mechanics that now live once in the substrate.
  */
@@ -24,4 +24,4 @@ export {
   resolveTargets,
   preResolveAllTargets,
   applyGlobalExcludes,
-} from '@opensip-tools/targeting';
+} from '@opensip-cli/targeting';

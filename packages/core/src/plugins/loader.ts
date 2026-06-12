@@ -20,7 +20,7 @@
  * structured warnings without re-deriving plugin metadata.
  *
  * This file replaces what used to be a fit-coupled loader in
- * @opensip-tools/fitness. The fitness loader is now a thin adapter
+ * @opensip-cli/fitness. The fitness loader is now a thin adapter
  * that supplies a fit-specific registerExports callback and re-exports
  * loadPlugin / loadAllPlugins with the same public signatures it had
  * before, so existing callers (fit.ts) don't change.

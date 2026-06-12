@@ -47,7 +47,7 @@ function makeCtx() {
 
 async function mount(ctx: never): Promise<Command> {
   const { mountHostCommands } = await import('../commands/host-command-specs.js');
-  const program = new Command('opensip-tools');
+  const program = new Command('opensip');
   mountHostCommands(program, ctx);
   return program;
 }

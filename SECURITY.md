@@ -2,13 +2,13 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in opensip-tools, please report it responsibly.
+If you discover a security vulnerability in opensip-cli, please report it responsibly.
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
 
 ### How to report
 
-1. **GitHub Security Advisories (preferred):** Use [GitHub's private vulnerability reporting](https://github.com/opensip-ai/opensip-tools/security/advisories/new) to submit a report directly.
+1. **GitHub Security Advisories (preferred):** Use [GitHub's private vulnerability reporting](https://github.com/opensip-ai/opensip-cli/security/advisories/new) to submit a report directly.
 
 2. **Email:** Send details to security@opensip.ai
 
@@ -29,31 +29,31 @@ If you discover a security vulnerability in opensip-tools, please report it resp
 ### Scope
 
 This policy covers all 31 first-party packages (the unscoped
-`opensip-tools` CLI plus 30 `@opensip-tools/*` packages):
+`opensip-cli` CLI plus 30 `@opensip-cli/*` packages):
 
-- `opensip-tools` — the CLI binary
-- `@opensip-tools/core` — kernel (errors, logger, language adapters,
+- `opensip-cli` — the CLI binary
+- `@opensip-cli/core` — kernel (errors, logger, language adapters,
   plugin loader, Tool contract)
-- `@opensip-tools/contracts` — Tool↔runner contract types (types-only)
-- `@opensip-tools/datastore` — SQLite + Drizzle persistence layer
-- `@opensip-tools/session-store` — SessionRepo runtime + sessions schema
-- `@opensip-tools/output` — machine-output formatters + delivery sinks
-- `@opensip-tools/dashboard` — self-contained HTML report generator
-- `@opensip-tools/cli-ui` — shared Ink/React CLI primitives
-- `@opensip-tools/tree-sitter` — grammar-agnostic web-tree-sitter substrate
-- `@opensip-tools/fitness` — fitness engine
-- `@opensip-tools/checks-{typescript,universal,python,go,java,cpp,rust}` —
+- `@opensip-cli/contracts` — Tool↔runner contract types (types-only)
+- `@opensip-cli/datastore` — SQLite + Drizzle persistence layer
+- `@opensip-cli/session-store` — SessionRepo runtime + sessions schema
+- `@opensip-cli/output` — machine-output formatters + delivery sinks
+- `@opensip-cli/dashboard` — self-contained HTML report generator
+- `@opensip-cli/cli-ui` — shared Ink/React CLI primitives
+- `@opensip-cli/tree-sitter` — grammar-agnostic web-tree-sitter substrate
+- `@opensip-cli/fitness` — fitness engine
+- `@opensip-cli/checks-{typescript,universal,python,go,java,cpp,rust}` —
   fitness check packs
-- `@opensip-tools/simulation` — simulation engine
-- `@opensip-tools/graph` — static call-graph engine
-- `@opensip-tools/graph-adapter-common` — shared tree-sitter adapter scaffolding
-- `@opensip-tools/graph-{typescript,python,rust,go,java}` — graph language adapters
-- `@opensip-tools/lang-{typescript,rust,python,go,java,cpp}` —
+- `@opensip-cli/simulation` — simulation engine
+- `@opensip-cli/graph` — static call-graph engine
+- `@opensip-cli/graph-adapter-common` — shared tree-sitter adapter scaffolding
+- `@opensip-cli/graph-{typescript,python,rust,go,java}` — graph language adapters
+- `@opensip-cli/lang-{typescript,rust,python,go,java,cpp}` —
   language adapters
 
 ### Out of scope
 
-- Community plugins installed via `opensip-tools plugin add`
+- Community plugins installed via `opensip plugin add`
 - Issues in upstream dependencies (report those to the respective projects)
 
 ## Supported Versions
@@ -68,9 +68,9 @@ We recommend always running the latest version.
 
 ### 0.2.5 (2026-05-04) — Plugin discovery path traversal & symlink escape
 
-Affected: `@opensip-tools/core` and `opensip-tools` versions `< 0.2.5`.
+Affected: `@opensip-cli/core` and `opensip-cli` versions `< 0.2.5`.
 
-A user-controlled `.opensip-tools/fit/package.json` or a symlink planted in
+A user-controlled `.opensip-cli/fit/package.json` or a symlink planted in
 the plugin directory could cause the toolkit to dynamically import code
 from arbitrary paths outside the plugin sandbox. Additionally, plugin load
 failures did not fail the run, allowing a broken or malicious plugin to

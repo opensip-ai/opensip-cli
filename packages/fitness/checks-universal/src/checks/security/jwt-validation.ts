@@ -4,8 +4,8 @@
  * @fileoverview Validate JWT handling follows security best practices
  */
 
-import { logger } from '@opensip-tools/core';
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { logger } from '@opensip-cli/core';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * JWT security pattern definitions.

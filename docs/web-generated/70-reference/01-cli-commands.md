@@ -24,17 +24,17 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `fit-list`, `fit-recipes`, graph helper commands) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `dashboard`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `fit-list`, `fit-recipes`, graph helper commands) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `dashboard`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/cli/src/commands/).
 
 ---
 
 ## Top-level
 
 ```
-opensip-tools                           # show welcome banner + next steps
-opensip-tools --version                  # print version, exit
-opensip-tools --help                     # print full help, exit
-opensip-tools <command> --help           # per-command help
+opensip-cli                           # show welcome banner + next steps
+opensip --version                  # print version, exit
+opensip --help                     # print full help, exit
+opensip-cli <command> --help           # per-command help
 ```
 
 Per-command flags that appear on most subcommands. The flags shared across the
@@ -60,13 +60,13 @@ report body" flag whose output is identical in a TTY and a pipe. The only
 
 > **Preview — not yet generally available.** The cloud ingestion, entitlement,
 > and storage endpoints live in the parent OpenSIP service and **do not exist
-> yet** ([ADR-0008](/docs/opensip-tools/10-concepts/06-cloud-signal-sync/)). This repo ships the
+> yet** ([ADR-0008](/docs/opensip-cli/10-concepts/06-cloud-signal-sync/)). This repo ships the
 > client and the wire contract (`SignalBatch`) only. Until the server side ships,
 > an entitled run has no live endpoint to sync against; the description below is
 > the *intended* behavior, gated behind a key + entitlement the OSS majority
 > never sets.
 
-When configured (an OpenSIP API key via `opensip-tools configure` or
+When configured (an OpenSIP API key via `opensip configure` or
 `OPENSIP_API_KEY`) **and** entitled to the cloud storage tier, each `fit`
 and `graph` run additionally emits its **signals** (the findings it already
 produces) to OpenSIP Cloud for storage. This is **additive and best-effort**:
@@ -86,7 +86,7 @@ What is sent: each signal's file path, message, suggestion, code-location
 hints, and rule metadata. Nothing is sent for users without an API key or
 without the entitlement.
 
-Opt out machine-wide in your user config `~/.opensip-tools/config.yml` (flat,
+Opt out machine-wide in your user config `~/.opensip-cli/config.yml` (flat,
 alongside `apiKey`):
 
 ```yaml
@@ -95,7 +95,7 @@ cloud:
   endpoint: https://...     # optional https override of the built-in URL
 ```
 
-Or per project in `opensip-tools.config.yml` under `cli.cloud:` (same fields).
+Or per project in `opensip-cli.config.yml` under `cli.cloud:` (same fields).
 A `sync: false` in **either** place disables sync — the more restrictive
 setting wins. Or opt out per-run with `--no-cloud`.
 
@@ -107,15 +107,15 @@ This is distinct from `--report-to`: that path explicitly POSTs **SARIF** to
 
 ## `fit` — run fitness checks
 
-Tool-owned: [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/tool.ts).
+Tool-owned: [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/tool.ts).
 
 ```
-opensip-tools fit
-opensip-tools fit --recipe <name>
-opensip-tools fit --check <slug>
-opensip-tools fit --tags <list>
-opensip-tools fit --gate-save
-opensip-tools fit --gate-compare
+opensip fit
+opensip fit --recipe <name>
+opensip fit --check <slug>
+opensip fit --tags <list>
+opensip fit --gate-save
+opensip fit --gate-compare
 ```
 
 | Flag | Type | Default | Effect |
@@ -131,11 +131,11 @@ opensip-tools fit --gate-compare
 | `-v, --verbose` | bool | `false` | Show the detailed report body (per-check findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
 | `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
-| `--gate-save` | bool | `false` | Save current findings as architecture baseline rows in the project's SQLite store (the host-owned `tool_baseline_entries` table, scoped `tool = 'fitness'`, at `opensip-tools/.runtime/datastore.sqlite`; ADR-0036), then exit per the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save happens before the exit, so the baseline survives a failing gate). |
+| `--gate-save` | bool | `false` | Save current findings as architecture baseline rows in the project's SQLite store (the host-owned `tool_baseline_entries` table, scoped `tool = 'fitness'`, at `opensip-cli/.runtime/datastore.sqlite`; ADR-0036), then exit per the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save happens before the exit, so the baseline survives a failing gate). |
 | `--gate-compare` | bool | `false` | Compare current findings against baseline; exit 1 on regression (toggle with the reserved `failOnDegraded` key, default on). |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
 | `--open` | bool | `false` | Launch dashboard after run. |
-| `--config <path>` | path | discovered | Override the `opensip-tools.config.yml` location (defaults to the project's config or the package.json pointer). |
+| `--config <path>` | path | discovered | Override the `opensip-cli.config.yml` location (defaults to the project's config or the package.json pointer). |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
 
@@ -143,17 +143,17 @@ opensip-tools fit --gate-compare
 
 **Exit codes:** 0 (passed), 1 (violations or regression), 2 (configuration error), 3 (`--check` slug not found via the error-suggestion mapping), 4 (`--report-to` upload failure). A `--report-to` upload failure exits 4 — but only when the run otherwise passed; a check/gate failure (1) or configuration error (2) takes precedence and is never masked by a reporting failure. This matches `graph` and the canonical exit-code contract.
 
-**See also:** [`20-fit/04-output-gate-sarif.md`](/docs/opensip-tools/20-fit/04-output-gate-sarif/), [`10-concepts/05-architecture-gate.md`](/docs/opensip-tools/10-concepts/05-architecture-gate/).
+**See also:** [`20-fit/04-output-gate-sarif.md`](/docs/opensip-cli/20-fit/04-output-gate-sarif/), [`10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/).
 
 ---
 
 ## `sim` — run simulation scenarios
 
-Tool-owned: [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/simulation/engine/src/tool.ts). Marked **experimental** in `--help`.
+Tool-owned: [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/simulation/engine/src/tool.ts). Marked **experimental** in `--help`.
 
 ```
-opensip-tools sim
-opensip-tools sim --recipe <name>
+opensip sim
+opensip sim --recipe <name>
 ```
 
 | Flag | Type | Default | Effect |
@@ -171,51 +171,51 @@ opensip-tools sim --recipe <name>
 
 **Exit codes:** 0 (all scenarios passed), 1 (any scenario failed), 2 (config/runtime error, **including a run that selected zero scenarios** — an empty run fails closed rather than reporting a false pass: no scenario packages installed, or the recipe selector matched none). Exit 0 therefore always means at least one scenario ran and passed.
 
-**See also:** [`30-sim/`](/docs/opensip-tools/30-sim/).
+**See also:** [`30-sim/`](/docs/opensip-cli/30-sim/).
 
 ---
 
 ## `graph` — static call-graph + dead-end analysis
 
-Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-graph/01-stages-and-catalog.md`](/docs/opensip-tools/40-graph/01-stages-and-catalog/); perf-plan history is recoverable from `git -P log -- packages/graph`.
+Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-graph/01-stages-and-catalog.md`](/docs/opensip-cli/40-graph/01-stages-and-catalog/); perf-plan history is recoverable from `git -P log -- packages/graph`.
 
 ```
 # Whole project (language auto-detected)
-opensip-tools graph
+opensip graph
 
 # Scope to a single subtree
-opensip-tools graph packages/core
+opensip graph packages/core
 
 # Scope to multiple subtrees (one session aggregates results)
-opensip-tools graph packages/core packages/cli
+opensip graph packages/core packages/cli
 
-# Shell glob expansion (the shell expands; opensip-tools doesn't)
-opensip-tools graph 'packages/*/src'
+# Shell glob expansion (the shell expands; opensip-cli doesn't)
+opensip graph 'packages/*/src'
 
 # Fan out across detected workspace units (memory-isolated)
-opensip-tools graph --workspace
-opensip-tools graph --workspace --concurrency 4
+opensip graph --workspace
+opensip graph --workspace --concurrency 4
 
 # Force a specific language adapter (suppresses auto-detection)
-opensip-tools graph --language typescript
-opensip-tools graph --language python packages/services/api
+opensip graph --language typescript
+opensip graph --language python packages/services/api
 
 # Other modes
-opensip-tools graph --json
-opensip-tools graph --no-cache
-opensip-tools graph --exact          # force the single-program exact engine (default is the sharded engine)
-opensip-tools graph --gate-save
-opensip-tools graph --gate-compare
-opensip-tools graph --gate-save --sarif graph.sarif   # gate + SARIF 2.1.0 for Code Scanning
-opensip-tools graph --report-to <url>
+opensip graph --json
+opensip graph --no-cache
+opensip graph --exact          # force the single-program exact engine (default is the sharded engine)
+opensip graph --gate-save
+opensip graph --gate-compare
+opensip graph --gate-save --sarif graph.sarif   # gate + SARIF 2.1.0 for Code Scanning
+opensip graph --report-to <url>
 
 # Scope to a named recipe (a subset of graph rules; default = all rules)
-opensip-tools graph --recipe <name>
+opensip graph --recipe <name>
 
 # List the source files graph would discover for this scope — no build
-opensip-tools graph --list-files
-opensip-tools graph --list-files --json       # machine-readable: { count, files }
-opensip-tools graph --list-files --workspace  # the per-unit fan-out set
+opensip graph --list-files
+opensip graph --list-files --json       # machine-readable: { count, files }
+opensip graph --list-files --workspace  # the per-unit fan-out set
 ```
 
 `graph` is the single entry point for static call-graph analysis. The default (non-JSON) output is a one-line summary; pass `-v`/`--verbose` to expand the structured terminal report into its detailed sections: catalog summary, findings grouped by rule (top 10 per rule, with overflow indicator), and top 10 inferred entry points. The full data is always available via `--json`.
@@ -247,7 +247,7 @@ opensip-tools graph --list-files --workspace  # the per-unit fan-out set
 **Inspecting discovery (`--list-files`).** `graph` does not enumerate files the way a filesystem walk would — it asks the language adapter, which for TypeScript means the set the `tsconfig` resolves (so `.d.ts` is excluded, an extension-priority collision like a `foo.tsx` shadowed by a sibling `foo.ts` is collapsed to the `.ts`, and each package's `include`/`exclude` is honored). `--list-files` prints exactly that set for the chosen scope and exits before any catalog build, which makes it the cheap, authoritative answer to "what does graph actually see?" The whole-project list and the `--workspace` list can legitimately differ — the latter is the union of per-package `tsconfig`s, which may exclude paths (e.g. `__fixtures__`, root scripts, out-of-`src` files) the root tree includes. To diff graph's view against the VCS:
 
 ```
-opensip-tools graph --list-files --json | jq -r '.files[]' | sort > /tmp/graph.txt
+opensip graph --list-files --json | jq -r '.files[]' | sort > /tmp/graph.txt
 git ls-files '*.ts' '*.tsx' | sort > /tmp/git.txt
 comm -23 /tmp/git.txt /tmp/graph.txt   # tracked but NOT discovered
 comm -13 /tmp/git.txt /tmp/graph.txt   # discovered but NOT tracked
@@ -258,13 +258,13 @@ comm -13 /tmp/git.txt /tmp/graph.txt   # discovered but NOT tracked
 ```
 # Polyglot repo: TS frontend + Cargo backend
 # `--workspace` aggregates units from BOTH adapters and fans out in parallel.
-opensip-tools graph --workspace
+opensip graph --workspace
 # → one session in the dashboard combining TS package results + Cargo member results
 ```
 
 **Session contract.** A single CLI invocation produces a single dashboard session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of dashboard sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`) opt out. (Machine-artifact catalog/SARIF exports live on the dedicated `catalog-export` / `sarif-export` subcommands — the v1 `graph --catalog-output` flag was retired by the graph-adapter split.)
 
-**Adapter selection.** opensip-tools ships first-party graph adapters for TypeScript, Python, Rust, Go, and Java — each is its own publishable npm package under the `@opensip-tools/graph-*` namespace. Auto-discovery is name pattern + marker: `node_modules` is walked for packages whose names match `@opensip-tools/graph-*` and whose `package.json` declares `opensipTools.kind: "graph-adapter"`, or you can pin an explicit list under `plugins.graphAdapters:` in `opensip-tools.config.yml`. Marker-file detection (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`/`build.gradle*`) then chooses which discovered adapter(s) apply to the run; positional paths inherit that decision unless `--language` overrides it.
+**Adapter selection.** opensip-cli ships first-party graph adapters for TypeScript, Python, Rust, Go, and Java — each is its own publishable npm package under the `@opensip-cli/graph-*` namespace. Auto-discovery is name pattern + marker: `node_modules` is walked for packages whose names match `@opensip-cli/graph-*` and whose `package.json` declares `opensipTools.kind: "graph-adapter"`, or you can pin an explicit list under `plugins.graphAdapters:` in `opensip-cli.config.yml`. Marker-file detection (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`/`build.gradle*`) then chooses which discovered adapter(s) apply to the run; positional paths inherit that decision unless `--language` overrides it.
 
 **Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression / any `--workspace` child failed), 2 (configuration error / D14 zero-file mismatch), 4 (`--report-to` upload failed).
 
@@ -272,7 +272,7 @@ opensip-tools graph --workspace
 
 **`OPENSIP_HEAP_NO_MONITOR`** (env var): during a build, `graph` runs a V8 heap-pressure monitor that aborts with a readable `MemoryPressureError` when old-gen usage crosses ~90% of the heap limit — catching an impending OOM before V8 SIGABRTs the process. In unusual GC scenarios (REPL embedding, custom allocators) this guard can fire as a false positive before a real OOM is imminent. Set `OPENSIP_HEAP_NO_MONITOR=1` to disable it entirely. This is an escape hatch only: with the monitor off, an actual out-of-memory condition becomes a bare V8 abort instead of a structured error. Prefer raising the heap ceiling (above) or scoping the run (positional paths / `--workspace`) first.
 
-**Catalog storage:** v2 stores the catalog in the project's SQLite database (`<project>/opensip-tools/.runtime/datastore.sqlite`, `graph_catalog` row). v3 wire-format remains: `language` (adapter id), `cacheKey` (an opaque per-adapter invalidation string — TypeScript: `ts-${ts.version}-${tsconfigContentHash}`; Python and Rust use language-id-prefixed keys), and a per-file mtime+size fingerprint. The reconstructed in-memory `Catalog` shape is unchanged from v1's `cache/read.ts` output.
+**Catalog storage:** v2 stores the catalog in the project's SQLite database (`<project>/opensip-cli/.runtime/datastore.sqlite`, `graph_catalog` row). v3 wire-format remains: `language` (adapter id), `cacheKey` (an opaque per-adapter invalidation string — TypeScript: `ts-${ts.version}-${tsconfigContentHash}`; Python and Rust use language-id-prefixed keys), and a per-file mtime+size fingerprint. The reconstructed in-memory `Catalog` shape is unchanged from v1's `cache/read.ts` output.
 
 **Cache behavior:** three verdicts — `valid` (full cache hit), `incremental` (re-walk only the changed files plus their transitive edge-dependents), `invalid` (full rebuild). The incremental path makes single-file edits ~6× faster than a `--no-cache` rebuild while producing byte-identical output. See the cache section in the stages-and-catalog doc.
 
@@ -287,8 +287,8 @@ opensip-tools graph --workspace
 Tool-owned (graph Tool). Queries the persisted catalog in the project's datastore for every function occurrence whose simple name matches the argument. Useful for "where is `saveBaseline` defined?" probes without re-running the full graph build.
 
 ```
-opensip-tools graph-lookup <name>
-opensip-tools graph-lookup <name> --json
+opensip graph-lookup <name>
+opensip graph-lookup <name> --json
 ```
 
 | Flag / Argument | Type | Default | Effect |
@@ -296,7 +296,7 @@ opensip-tools graph-lookup <name> --json
 | `<name>` | string | — | Positional. Function simple name to look up (e.g. `saveBaseline`). Required. |
 | `--json` | bool | `false` | Output structured JSON instead of the human-readable list. |
 
-The command reads from the catalog stored in `<project>/opensip-tools/.runtime/datastore.sqlite`. Run `opensip-tools graph` at least once first to populate the catalog.
+The command reads from the catalog stored in `<project>/opensip-cli/.runtime/datastore.sqlite`. Run `opensip graph` at least once first to populate the catalog.
 
 ---
 
@@ -305,8 +305,8 @@ The command reads from the catalog stored in `<project>/opensip-tools/.runtime/d
 Tool-owned (graph Tool). Writes a `symbolindex.json` file built from the persisted catalog: two maps — `name → [{ file, line }, …]` and `file → [name, …]`. Intended for editor tooling and offline cross-reference.
 
 ```
-opensip-tools graph-symbol-index
-opensip-tools graph-symbol-index --out path/to/symbolindex.json
+opensip graph-symbol-index
+opensip graph-symbol-index --out path/to/symbolindex.json
 ```
 
 | Flag | Type | Default | Effect |
@@ -314,7 +314,7 @@ opensip-tools graph-symbol-index --out path/to/symbolindex.json
 | `--cwd <path>` | path | `process.cwd()` | Target directory; `--out` resolves against this. |
 | `--out <path>` | path | `symbolindex.json` | Output file path. |
 
-Reads from the persisted catalog; run `opensip-tools graph` first to populate it.
+Reads from the persisted catalog; run `opensip graph` first to populate it.
 
 ---
 
@@ -323,7 +323,7 @@ Reads from the persisted catalog; run `opensip-tools graph` first to populate it
 Tool-owned (graph Tool). Exports the stored graph gate baseline (the Signal fingerprint set saved by `graph --gate-save`) from the SQLite datastore to a portable JSON file. Mirrors `fit-baseline-export` for the graph tool.
 
 ```
-opensip-tools graph-baseline-export --out graph-baseline.json
+opensip graph-baseline-export --out graph-baseline.json
 ```
 
 | Flag | Type | Default | Effect |
@@ -341,8 +341,8 @@ Exit codes: 0 on success, non-zero with a `result.exitCode` if the baseline is m
 Tool-owned (graph Tool). Mirrors `fit-recipes` for the graph tool: prints the loaded graph-recipe inventory (a graph recipe is a named subset of the graph rule set). Reuses the shared `ListRecipesResult` contract and renderer.
 
 ```
-opensip-tools graph-recipes
-opensip-tools graph-recipes --json
+opensip graph-recipes
+opensip graph-recipes --json
 ```
 
 | Flag | Type | Default | Effect |
@@ -369,9 +369,9 @@ JSON shape (same `list-recipes` result envelope as `fit-recipes`):
 CLI-owned. The cross-tool `dashboard` command lives at the CLI layer (not inside any one tool) because composition walks every tool's `collectDashboardData` contribution via the tool registry. Renders the most recent run as HTML and opens it in the user's default browser.
 
 ```
-opensip-tools dashboard
-opensip-tools dashboard --no-open
-opensip-tools dashboard --json
+opensip dashboard
+opensip dashboard --no-open
+opensip dashboard --json
 ```
 
 | Flag | Type | Default | Effect |
@@ -379,9 +379,9 @@ opensip-tools dashboard --json
 | `--no-open` | bool | `false` | Write the report but do not launch a browser. |
 | `--json` | bool | `false` | Emit a `{ type: 'dashboard', path, opened }` JSON envelope on stdout instead of the table renderer. In `--json` mode the browser is never launched (machine-output contract). |
 
-The dashboard is a single self-contained HTML file at `<project>/opensip-tools/.runtime/reports/latest.html`. Each generation overwrites the previous file. The command launches the browser and exits; the file works without opensip-tools installed, so you can email it directly to a teammate.
+The dashboard is a single self-contained HTML file at `<project>/opensip-cli/.runtime/reports/latest.html`. Each generation overwrites the previous file. The command launches the browser and exits; the file works without opensip-cli installed, so you can email it directly to a teammate.
 
-**See also:** [`70-reference/06-dashboard.md`](/docs/opensip-tools/70-reference/06-dashboard/), [`80-implementation/03-session-and-persistence.md`](/docs/opensip-tools/80-implementation/03-session-and-persistence/).
+**See also:** [`70-reference/06-dashboard.md`](/docs/opensip-cli/70-reference/06-dashboard/), [`80-implementation/03-session-and-persistence.md`](/docs/opensip-cli/80-implementation/03-session-and-persistence/).
 
 ---
 
@@ -390,8 +390,8 @@ The dashboard is a single self-contained HTML file at `<project>/opensip-tools/.
 Tool-owned. Prints the loaded check inventory: slug, description, tags.
 
 ```
-opensip-tools fit-list
-opensip-tools fit-list --json
+opensip fit-list
+opensip fit-list --json
 ```
 
 JSON shape:
@@ -404,7 +404,7 @@ JSON shape:
 }
 ```
 
-Useful for scripting (`opensip-tools fit-list --json | jq '.checks[].slug'`) and for verifying that a `plugin add` actually registered the new pack's checks.
+Useful for scripting (`opensip fit-list --json | jq '.checks[].slug'`) and for verifying that a `plugin add` actually registered the new pack's checks.
 
 ---
 
@@ -413,8 +413,8 @@ Useful for scripting (`opensip-tools fit-list --json | jq '.checks[].slug'`) and
 Tool-owned. Prints the loaded recipe inventory.
 
 ```
-opensip-tools fit-recipes
-opensip-tools fit-recipes --json
+opensip fit-recipes
+opensip fit-recipes --json
 ```
 
 JSON shape:
@@ -439,7 +439,7 @@ JSON shape:
 Tool-owned (fitness Tool). Exports the stored fit gate baseline (the violation set saved by `fit --gate-save`) from the SQLite datastore to a SARIF file. Used to promote a local baseline into CI or to feed GitHub Code Scanning.
 
 ```
-opensip-tools fit-baseline-export --out fit.sarif
+opensip fit-baseline-export --out fit.sarif
 ```
 
 | Flag | Type | Default | Effect |
@@ -454,13 +454,13 @@ The dogfood CI uses this command to write `fit.sarif` after a `fit --gate-save` 
 
 ## `init` — scaffold the project layout
 
-CLI-owned: [`packages/cli/src/commands/init.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/init.ts).
+CLI-owned: [`packages/cli/src/commands/init.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/cli/src/commands/init.ts).
 
 ```
-opensip-tools init
-opensip-tools init --language <list>
-opensip-tools init --keep
-opensip-tools init --remove
+opensip init
+opensip init --language <list>
+opensip init --keep
+opensip init --remove
 ```
 
 Detects the project's primary language(s) from filesystem markers and writes one
@@ -469,28 +469,28 @@ config block; `init` itself hardcodes no tool. With the bundled fitness +
 simulation tools, a project gets:
 
 ```
-<cwd>/opensip-tools.config.yml                              # TRACKED
-<cwd>/opensip-tools/fit/checks/example-check.mjs            # TRACKED
-<cwd>/opensip-tools/fit/recipes/example-recipe.mjs          # TRACKED
-<cwd>/opensip-tools/sim/scenarios/example-scenario.mjs      # TRACKED
-<cwd>/opensip-tools/sim/recipes/example-recipe.mjs          # TRACKED
+<cwd>/opensip-cli.config.yml                              # TRACKED
+<cwd>/opensip-cli/fit/checks/example-check.mjs            # TRACKED
+<cwd>/opensip-cli/fit/recipes/example-recipe.mjs          # TRACKED
+<cwd>/opensip-cli/sim/scenarios/example-scenario.mjs      # TRACKED
+<cwd>/opensip-cli/sim/recipes/example-recipe.mjs          # TRACKED
 ```
 
-Plus appends `opensip-tools/.runtime/` to `<cwd>/.gitignore`.
+Plus appends `opensip-cli/.runtime/` to `<cwd>/.gitignore`.
 
 The scaffolded set equals the **registered** set: a tool that declares no project
 layout (e.g. `graph`) writes no directory, and a tool installed *after* `init`
-scaffolds its examples on the next `opensip-tools init --keep`. If a bundled tool
+scaffolds its examples on the next `opensip init --keep`. If a bundled tool
 fails to load, `init` scaffolds fewer directories and emits a loud
 `cli.tool.expected_bundled_absent` diagnostic so the gap is visible.
 
-The scaffold output is loose `.mjs` files — the lightest-weight starting point. When a pack outgrows loose files (substantial helpers, tests, more than a dozen checks/scenarios), the customer graduates `opensip-tools/<domain>/` to a workspace npm package. Fit packs add `opensipTools.kind: "fit-pack"` and load through marker discovery; sim scenario packs use the `<scope>/scenarios-*` package-name pattern or an explicit `plugins.scenarioPackages:` pin. See [`50-extend/01-plugin-authoring.md`](/docs/opensip-tools/50-extend/01-plugin-authoring/) for the graduation path.
+The scaffold output is loose `.mjs` files — the lightest-weight starting point. When a pack outgrows loose files (substantial helpers, tests, more than a dozen checks/scenarios), the customer graduates `opensip-cli/<domain>/` to a workspace npm package. Fit packs add `opensipTools.kind: "fit-pack"` and load through marker discovery; sim scenario packs use the `<scope>/scenarios-*` package-name pattern or an explicit `plugins.scenarioPackages:` pin. See [`50-extend/01-plugin-authoring.md`](/docs/opensip-cli/50-extend/01-plugin-authoring/) for the graduation path.
 
 | Flag | Effect |
 |---|---|
 | `--language <list>` | Comma-separated language list (`typescript,rust`). Overrides detection. |
-| `--keep` | Re-scaffold examples; preserve any custom files in `opensip-tools/`. |
-| `--remove` | Delete `opensip-tools/` entirely, then scaffold fresh. |
+| `--keep` | Re-scaffold examples; preserve any custom files in `opensip-cli/`. |
+| `--remove` | Delete `opensip-cli/` entirely, then scaffold fresh. |
 | `--cwd <path>` | Target directory (default: `process.cwd()`). |
 | `--json` | Emit a structured JSON result instead of the human-readable summary. |
 | `--debug` | Enable debug-level logging. |
@@ -499,18 +499,18 @@ The scaffold output is loose `.mjs` files — the lightest-weight starting point
 
 After parsing flags init classifies the working directory into one of four states:
 
-| State | `opensip-tools.config.yml` | `opensip-tools/` (excluding `.runtime/`) | Default | `--keep` | `--remove` |
+| State | `opensip-cli.config.yml` | `opensip-cli/` (excluding `.runtime/`) | Default | `--keep` | `--remove` |
 |---|---|---|---|---|---|
 | `pristine` | absent | absent | scaffold | scaffold | scaffold |
-| `fully-initialized` | present | present | exit 2, partial-state error | re-scaffold; preserve custom | `rm -rf opensip-tools/`; scaffold |
+| `fully-initialized` | present | present | exit 2, partial-state error | re-scaffold; preserve custom | `rm -rf opensip-cli/`; scaffold |
 | `partial-config-only` | present | absent | exit 2, partial-state error | scaffold the dir | scaffold the dir |
-| `partial-dir-only` | absent | present | exit 2, partial-state error | preserve custom; write YAML | `rm -rf opensip-tools/`; write YAML; scaffold |
+| `partial-dir-only` | absent | present | exit 2, partial-state error | preserve custom; write YAML | `rm -rf opensip-cli/`; write YAML; scaffold |
 
 `--keep` and `--remove` are mutually exclusive. The legacy `--force`
 flag is removed; users who scripted it should migrate to `--remove`
 (closest semantic match — both blow away existing scaffolds).
 
-Each pre-existing file under `opensip-tools/` is classified as:
+Each pre-existing file under `opensip-cli/` is classified as:
 
 - `scaffolded` — content matches a current-template byte-for-byte.
 - `stale-scaffolded` — was scaffolded for a language not in the current
@@ -540,35 +540,35 @@ Ambiguous detection (multiple markers, no `--language`) exits 2 with a prompt to
 
 ## `configure` — manage user-level settings
 
-CLI-owned: [`packages/cli/src/commands/configure.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/configure.ts). Interactive — writes the OpenSIP Cloud API key to `~/.opensip-tools/config.yml` and verifies it best-effort against the cloud entitlement endpoint.
+CLI-owned: [`packages/cli/src/commands/configure.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/cli/src/commands/configure.ts). Interactive — writes the OpenSIP Cloud API key to `~/.opensip-cli/config.yml` and verifies it best-effort against the cloud entitlement endpoint.
 
 ```
-opensip-tools configure
+opensip configure
 ```
 
 Prompts:
 1. If a key is already configured, show its masked value.
 2. Ask for a new OpenSIP Cloud API key.
 3. If the prompt is blank, cancel without changing the file.
-4. Save the key to `~/.opensip-tools/config.yml`.
+4. Save the key to `~/.opensip-cli/config.yml`.
 5. Test the key against the cloud entitlement endpoint. Verification is best-effort; the key stays saved if the endpoint is unreachable so offline setup still works.
 
-The user-level config is shared across every project on the machine. `opensip-tools fit --report-to <url>` uses the configured key by default unless `--api-key` overrides it.
+The user-level config is shared across every project on the machine. `opensip fit --report-to <url>` uses the configured key by default unless `--api-key` overrides it.
 
 ---
 
 ## `sessions list`, `sessions show`, and `sessions purge` — manage session records
 
-CLI-owned. Reads, replays, and deletes session rows in the project-local SQLite datastore (`<project>/opensip-tools/.runtime/datastore.sqlite`) via `SessionRepo`. `list` and `show` are `SELECT`s; `purge` is a row-level `DELETE` (the FK cascade drops each session's tool-payload row), not file removal.
+CLI-owned. Reads, replays, and deletes session rows in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`. `list` and `show` are `SELECT`s; `purge` is a row-level `DELETE` (the FK cascade drops each session's tool-payload row), not file removal.
 
 ```
-opensip-tools sessions list
-opensip-tools sessions show <session-id>
-opensip-tools sessions show latest --tool fit
-opensip-tools sessions show latest --tool graph --json
-opensip-tools sessions purge
-opensip-tools sessions purge --older-than 7
-opensip-tools sessions purge -y
+opensip sessions list
+opensip sessions show <session-id>
+opensip sessions show latest --tool fit
+opensip sessions show latest --tool graph --json
+opensip sessions purge
+opensip sessions purge --older-than 7
+opensip sessions purge -y
 ```
 
 | Subcommand | Flag | Effect |
@@ -582,21 +582,21 @@ opensip-tools sessions purge -y
 
 **Session replay (2.12.0).** `sessions show` reconstructs a past run's output from the stored payload: each tool contributes a `sessionReplay` projection (`fit`/`graph`/`sim`) that decodes the opaque payload back into a `SignalEnvelope`. The replay `fidelity` is `projection` — it is rebuilt from persisted findings, not a re-execution. Each run command also accepts an inline `--show <session>` flag (`fit --show latest`, `graph --show <id>`, `sim --show latest`) as a shorthand for the same replay scoped to that tool. A missing session, wrong tool, or undecodable payload returns a structured error (`reason`/`code`: `not-found`, `wrong-tool`, `ambiguous-latest`, `decode-error`) and exit 2.
 
-**See also:** [`80-implementation/03-session-and-persistence.md`](/docs/opensip-tools/80-implementation/03-session-and-persistence/).
+**See also:** [`80-implementation/03-session-and-persistence.md`](/docs/opensip-cli/80-implementation/03-session-and-persistence/).
 
 ---
 
 ## `plugin add/remove/list/sync` — manage project-pinned plugins
 
-CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/plugin.ts).
+CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/cli/src/commands/plugin.ts).
 
 ```
-opensip-tools plugin list
-opensip-tools plugin add <pkg>
-opensip-tools plugin add <pkg> --domain <fit|sim|tool>
-opensip-tools plugin add <tool-pkg> --project
-opensip-tools plugin remove <pkg>
-opensip-tools plugin sync
+opensip plugin list
+opensip plugin add <pkg>
+opensip plugin add <pkg> --domain <fit|sim|tool>
+opensip plugin add <tool-pkg> --project
+opensip plugin remove <pkg>
+opensip plugin sync
 ```
 
 | Flag | Subcommands | Effect |
@@ -607,25 +607,25 @@ opensip-tools plugin sync
 
 There are **two plugin shapes** with different install models:
 
-- **fit/sim packs** are **project-committed**: `add` writes to `.runtime/plugins/<domain>/node_modules/<pkg>/` **and** appends to `plugins.<domain>:` in `opensip-tools.config.yml` so teammates reproduce them via `sync`. Fit packs declare `kind: "fit-pack"`; sim packs are listed under `plugins.sim:` / `plugins.scenarioPackages:` or discovered by the `scenarios-*` package-name pattern. `remove` is the inverse.
-- **full Tool plugins** (`kind: "tool"`, whole subcommands) **auto-discover by marker — no config entry**. `add` detects the kind before installing (local `package.json`, or `npm view` for a registry spec) and installs **user-global** to `~/.opensip-tools/plugins/tool/` by default (available in every project), or project-local with `--project`. Force the tool path with `--domain tool` when detection can't reach the registry. Because there's no config record, tool plugins are **not** part of `sync`.
+- **fit/sim packs** are **project-committed**: `add` writes to `.runtime/plugins/<domain>/node_modules/<pkg>/` **and** appends to `plugins.<domain>:` in `opensip-cli.config.yml` so teammates reproduce them via `sync`. Fit packs declare `kind: "fit-pack"`; sim packs are listed under `plugins.sim:` / `plugins.scenarioPackages:` or discovered by the `scenarios-*` package-name pattern. `remove` is the inverse.
+- **full Tool plugins** (`kind: "tool"`, whole subcommands) **auto-discover by marker — no config entry**. `add` detects the kind before installing (local `package.json`, or `npm view` for a registry spec) and installs **user-global** to `~/.opensip-cli/plugins/tool/` by default (available in every project), or project-local with `--project`. Force the tool path with `--domain tool` when detection can't reach the registry. Because there's no config record, tool plugins are **not** part of `sync`.
 
 **`list`** shows fit/sim packs (installed ∩ config-listed) plus every discovered tool plugin (under the `tool` domain). **`sync`** installs everything declared in the config — the post-clone bootstrap (fit/sim only).
 
-**See also:** [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/). For **whole Tool plugins**, prefer the customer-facing [`tools` command group](/docs/opensip-tools/70-reference/12-tools-command/) — `plugin add --domain tool` remains supported as the lower-level machinery.
+**See also:** [`80-implementation/02-plugin-loader.md`](/docs/opensip-cli/80-implementation/02-plugin-loader/). For **whole Tool plugins**, prefer the customer-facing [`tools` command group](/docs/opensip-cli/70-reference/12-tools-command/) — `plugin add --domain tool` remains supported as the lower-level machinery.
 
 ---
 
 ## `tools list/validate/install/uninstall/data-purge` — manage whole Tool plugins
 
-The documented surface for whole Tool plugins (`kind: "tool"` packages that contribute entire subcommands). See the full reference: [`12-tools-command.md`](/docs/opensip-tools/70-reference/12-tools-command/).
+The documented surface for whole Tool plugins (`kind: "tool"` packages that contribute entire subcommands). See the full reference: [`12-tools-command.md`](/docs/opensip-cli/70-reference/12-tools-command/).
 
 ```
-opensip-tools tools list
-opensip-tools tools validate <spec>
-opensip-tools tools install <spec> [--global|--project]
-opensip-tools tools uninstall <name-or-id> [--global|--project] [--purge-data]
-opensip-tools tools data-purge <tool-id>
+opensip tools list
+opensip tools validate <spec>
+opensip tools install <spec> [--global|--project]
+opensip tools uninstall <name-or-id> [--global|--project] [--purge-data]
+opensip tools data-purge <tool-id>
 ```
 
 `validate` runs the same admission pipeline the CLI's own bootstrap admits tools through — one validator, shared. `install` is atomic: stage → validate → activate; a failed install leaves nothing behind. `uninstall` never deletes project SQLite data; `data-purge` deletes rows (sessions, baselines, tool state), never tables. **`validate` and `install` execute the package's module** — see the trust notes in the full reference.
@@ -638,13 +638,13 @@ These commands are mounted through the same `CommandSpec` system but are primari
 
 | Command | Owner | Purpose |
 |---|---|---|
-| `opensip-tools catalog-export` | graph | Emit a graph catalog artifact for parent ingestion. Uses `--catalog-output`, tenant/repo/run identity flags, `--cwd`, `--language`, and `--resolution`. |
-| `opensip-tools sarif-export` | graph | Emit graph findings as SARIF for a stored run. Uses `--output-sarif`, tenant/repo/run identity flags, `--cwd`, `--language`, and `--resolution`. |
-| `opensip-tools graph-equivalence-check` | graph | Contributor guardrail for exact vs. sharded graph-engine equivalence. Uses `--cwd`, `--budget`, and `--update-budget`. |
-| `opensip-tools graph-run-worker` | graph | Internal worker for memory-isolated graph runs. |
-| `opensip-tools graph-shard-worker <specPath>` | graph | Internal worker for sharded catalog builds. |
-| `opensip-tools fit-run-worker` | fitness | Internal worker for memory-isolated fitness runs. |
-| `opensip-tools sim-run-worker` | simulation | Internal worker for memory-isolated simulation runs. |
+| `opensip catalog-export` | graph | Emit a graph catalog artifact for parent ingestion. Uses `--catalog-output`, tenant/repo/run identity flags, `--cwd`, `--language`, and `--resolution`. |
+| `opensip sarif-export` | graph | Emit graph findings as SARIF for a stored run. Uses `--output-sarif`, tenant/repo/run identity flags, `--cwd`, `--language`, and `--resolution`. |
+| `opensip graph-equivalence-check` | graph | Contributor guardrail for exact vs. sharded graph-engine equivalence. Uses `--cwd`, `--budget`, and `--update-budget`. |
+| `opensip graph-run-worker` | graph | Internal worker for memory-isolated graph runs. |
+| `opensip graph-shard-worker <specPath>` | graph | Internal worker for sharded catalog builds. |
+| `opensip fit-run-worker` | fitness | Internal worker for memory-isolated fitness runs. |
+| `opensip sim-run-worker` | simulation | Internal worker for memory-isolated simulation runs. |
 
 The worker commands are not the public authoring surface; they exist so parent commands can fan out safely while preserving the same tool-owned execution contracts.
 
@@ -652,12 +652,12 @@ The worker commands are not the public authoring surface; they exist so parent c
 
 ## `completion` — print shell completion script
 
-CLI-owned: [`packages/cli/src/commands/completion.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/completion.ts).
+CLI-owned: [`packages/cli/src/commands/completion.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/cli/src/commands/completion.ts).
 
 ```
-opensip-tools completion bash
-opensip-tools completion zsh
-opensip-tools completion fish
+opensip completion bash
+opensip completion zsh
+opensip completion fish
 ```
 
 `<shell>` is required — there's no default.
@@ -665,57 +665,57 @@ opensip-tools completion fish
 Pipe to your shell's completion config:
 
 ```bash
-opensip-tools completion zsh > ~/.opensip-tools-completion.zsh
-echo "source ~/.opensip-tools-completion.zsh" >> ~/.zshrc
+opensip completion zsh > ~/.opensip-cli-completion.zsh
+echo "source ~/.opensip-cli-completion.zsh" >> ~/.zshrc
 ```
 
 The emitted script is static (your shell sources it once), but its contents are **derived from the live `CommandSpec`s at generation time** — the same specs the runtime mounts (`assembleCompletionInventory` in `packages/cli/src/commands/completion.ts`). Subcommands and per-command flags come from the populated tool registry plus the host commands, so the script can't drift from the real command surface; a flag-parity test enforces it. Because the inventory is sourced from the runtime registry, **discovered third-party tool subcommands and flags are included too**, not just the built-in `fit`/`sim`/`graph` families.
 
 ---
 
-## `uninstall` — remove opensip-tools state
+## `uninstall` — remove opensip-cli state
 
-CLI-owned: [`packages/cli/src/commands/uninstall.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/uninstall.ts).
+CLI-owned: [`packages/cli/src/commands/uninstall.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/cli/src/commands/uninstall.ts).
 
 ```
-opensip-tools uninstall                       # remove ~/.opensip-tools/
-opensip-tools uninstall --user                # explicitly remove ~/.opensip-tools/
-opensip-tools uninstall --project             # remove project runtime state at cwd
-opensip-tools uninstall --project /path/repo  # remove project runtime state at <path>
-opensip-tools uninstall --project --purge     # also remove authored content + config
-opensip-tools uninstall --dry-run             # print targets, take no action
-opensip-tools uninstall --yes                 # skip confirmation prompt
+opensip uninstall                       # remove ~/.opensip-cli/
+opensip uninstall --user                # explicitly remove ~/.opensip-cli/
+opensip uninstall --project             # remove project runtime state at cwd
+opensip uninstall --project /path/repo  # remove project runtime state at <path>
+opensip uninstall --project --purge     # also remove authored content + config
+opensip uninstall --dry-run             # print targets, take no action
+opensip uninstall --yes                 # skip confirmation prompt
 ```
 
 Two modes:
 
 | Mode | Targets removed | When to use |
 |---|---|---|
-| Default / `--user` | `~/.opensip-tools/` (user-level config dir) | Removing the cloud API key + per-user defaults; cleaning legacy cruft from earlier versions. |
-| `--project [path]` | `<path>/opensip-tools/.runtime/` by default | Remove rebuildable session/cache/log/baseline state for one repo while preserving authored checks, recipes, scenarios, and config. |
-| `--project [path] --purge` | `<path>/opensip-tools/` (authored content included) and `<path>/opensip-tools.config.yml` | Fully disengage from opensip-tools in one repo. Destructive if custom checks/recipes are not committed. |
+| Default / `--user` | `~/.opensip-cli/` (user-level config dir) | Removing the cloud API key + per-user defaults; cleaning legacy cruft from earlier versions. |
+| `--project [path]` | `<path>/opensip-cli/.runtime/` by default | Remove rebuildable session/cache/log/baseline state for one repo while preserving authored checks, recipes, scenarios, and config. |
+| `--project [path] --purge` | `<path>/opensip-cli/` (authored content included) and `<path>/opensip-cli.config.yml` | Fully disengage from opensip-cli in one repo. Destructive if custom checks/recipes are not committed. |
 
 | Flag | Effect |
 |---|---|
 | `--user` | Explicitly choose default user mode. Mutually exclusive with `--project`. |
 | `--project [path]` | Switch to project mode. Path defaults to cwd. |
-| `--purge` | In project mode, also remove user-authored content under `opensip-tools/` and `opensip-tools.config.yml`. |
+| `--purge` | In project mode, also remove user-authored content under `opensip-cli/` and `opensip-cli.config.yml`. |
 | `--yes`, `-y` | Skip the `[y/N]` confirmation prompt. |
 | `--dry-run` | Enumerate targets and total size; make no changes. |
 
 Both modes:
 
 - Print every target path and its size before acting.
-- Refuse to run when no targets exist (`--project` against a directory that contains no opensip-tools state is a no-op, not a destructive accident). In project mode without `--purge`, a repo that has only authored content and no `.runtime/` also becomes a no-op and tells you what it kept.
-- Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g opensip-tools`); the project-mode success message points back at the user-mode command for the matching cleanup.
+- Refuse to run when no targets exist (`--project` against a directory that contains no OpenSIP CLI state is a no-op, not a destructive accident). In project mode without `--purge`, a repo that has only authored content and no `.runtime/` also becomes a no-op and tells you what it kept.
+- Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g opensip-cli`); the project-mode success message points back at the user-mode command for the matching cleanup.
 
-State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/lib/paths.ts), [`logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
+State contract enforced by code: `~/.opensip-cli/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/core/src/lib/paths.ts), [`logger.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
 
 ---
 
 ## Upgrading
 
-opensip-tools updates through the same installer used for first-time setup:
+opensip-cli updates through the same installer used for first-time setup:
 
 ```
 curl -fsSL https://opensip.ai/cli/install.sh | bash
@@ -726,7 +726,7 @@ The CLI checks npm for a newer version once a day (non-blocking, TTY-only). The 
 - On the default `mini` banner, the version line shows `(vX.Y.Z available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
 - On the `lg`/`md`/`sm` banners (and the `--json` path, which renders no banner), the same upgrade command is printed as a one-line note on stderr.
 
-Silence the check entirely with `OPENSIP_NO_UPDATE=1` (or the conventional `NO_UPDATE_NOTIFIER=1`). It's also skipped automatically when `CI` is set or stdout isn't a TTY. Check your installed version any time with `opensip-tools --version`.
+Silence the check entirely with `OPENSIP_NO_UPDATE=1` (or the conventional `NO_UPDATE_NOTIFIER=1`). It's also skipped automatically when `CI` is set or stdout isn't a TTY. Check your installed version any time with `opensip --version`.
 
 If you installed via a version manager (volta, asdf) or Homebrew, use that tool's upgrade path instead of the curl installer above.
 
@@ -734,6 +734,6 @@ If you installed via a version manager (volta, asdf) or Homebrew, use that tool'
 
 ## What's next
 
-- **[`../50-extend/01-plugin-authoring.md`](/docs/opensip-tools/50-extend/01-plugin-authoring/)** — write a check, recipe, scenario, or full Tool plugin.
-- **[`06-dashboard.md`](/docs/opensip-tools/70-reference/06-dashboard/)** — the HTML report's structure and lifecycle.
-- **[`../70-reference/03-configuration.md`](/docs/opensip-tools/70-reference/03-configuration/)** — every field of `opensip-tools.config.yml`.
+- **[`../50-extend/01-plugin-authoring.md`](/docs/opensip-cli/50-extend/01-plugin-authoring/)** — write a check, recipe, scenario, or full Tool plugin.
+- **[`06-dashboard.md`](/docs/opensip-cli/70-reference/06-dashboard/)** — the HTML report's structure and lifecycle.
+- **[`../70-reference/03-configuration.md`](/docs/opensip-cli/70-reference/03-configuration/)** — every field of `opensip-cli.config.yml`.

@@ -4,12 +4,12 @@
  * Maps check slugs to display entries (icon + display name) for CLI and dashboard output.
  * Falls back to kebab-to-title-case conversion for unknown slugs.
  *
- * The lookup logic itself lives in @opensip-tools/fitness/check-utils; this
+ * The lookup logic itself lives in @opensip-cli/fitness/check-utils; this
  * file owns only the per-pack CHECK_DISPLAY map and binds the shared helpers
  * to it.
  */
 
-import { makeDisplayHelpers } from '@opensip-tools/fitness';
+import { makeDisplayHelpers } from '@opensip-cli/fitness';
 
 import { ARCHITECTURE_DISPLAY, DOCUMENTATION_DISPLAY } from './architecture.js';
 import { QUALITY_DISPLAY } from './quality.js';
@@ -30,7 +30,7 @@ export const CHECK_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
 
 /**
  * Slug-only display lookups bound to this pack's CHECK_DISPLAY map. The lookup
- * logic lives in @opensip-tools/fitness; this file owns only the data.
+ * logic lives in @opensip-cli/fitness; this file owns only the data.
  */
 export const { getCheckIcon, getCheckDisplayName } = makeDisplayHelpers(CHECK_DISPLAY);
 

@@ -13,8 +13,8 @@
  *     synthetic text isn't a function body.
  */
 
-import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-tools/graph';
-import { skipToEndOfLine } from '@opensip-tools/graph-adapter-common';
+import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-cli/graph';
+import { skipToEndOfLine } from '@opensip-cli/graph-adapter-common';
 
 export function digestPythonBody(text: string): BodyDigest {
   return hashBody(normalizePythonBody(text));

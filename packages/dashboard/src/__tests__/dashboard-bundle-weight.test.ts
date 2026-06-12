@@ -23,7 +23,7 @@ import { dashboardCytoscapeVendorJs } from '../code-paths/cytoscape-vendor.js';
 import { projectCatalogToGraphViewModel } from '../code-paths/graph-view-model.js';
 import { dashboardViewGraphJs } from '../code-paths/view-graph.js';
 
-import type { GraphCatalog } from '@opensip-tools/contracts';
+import type { GraphCatalog } from '@opensip-cli/contracts';
 
 /** Phase 0 §1 raw-byte budget for the vendor bundle. */
 const BUDGET_KB = 600;

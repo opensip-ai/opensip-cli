@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/checks-cpp",
+  "name": "@opensip-cli/checks-cpp",
   "version": "3.0.0",
   "license": "MIT",
   "description": "C/C++ fitness checks (clang-tidy backed)",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "fitness-checks",
@@ -14,12 +14,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/fitness/checks-cpp"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "opensipTools": {
@@ -40,11 +40,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/fitness": "workspace:*"
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/fitness": "workspace:*"
   },
   "devDependencies": {
-    "@opensip-tools/test-support": "workspace:*",
+    "@opensip-cli/test-support": "workspace:*",
     "@types/node": "^24.13.2",
     "vitest": "^4.1.8"
   }

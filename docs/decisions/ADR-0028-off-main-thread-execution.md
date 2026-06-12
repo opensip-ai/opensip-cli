@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-08
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0028: Off-main-process execution for live runs
@@ -21,7 +21,7 @@ enforcement-reason: >
   runners (`*-runner.tsx`) drive the engine through the off-thread selector
   (`runOffThreadOrInProcess`), not a bare in-process transport, and that the
   worker entries (`*-worker.ts`) + the persistence-free `executeFit`/`executeSim`
-  never import `@opensip-tools/datastore`. Runs in `pnpm fit:ci`. The transport
+  never import `@opensip-cli/datastore`. Runs in `pnpm fit:ci`. The transport
   relay/buffer/error/fallback behaviour is covered by unit tests in core.
 ```
 
@@ -33,7 +33,7 @@ engine, and streams `ProgressEvent`s + a slim, serializable result back over IPC
 The main process runs **only** Ink + the 80 ms clock, so the live spinner and the
 stage checklist never starve. Persistence and cloud egress stay on the main
 process, after the run, from the returned result. `--json` / non-TTY paths stay
-fully in-process (no fork), and an `OPENSIP_TOOLS_NO_WORKER=1` escape hatch forces
+fully in-process (no fork), and an `OPENSIP_CLI_NO_WORKER=1` escape hatch forces
 the in-process fallback (which is also taken automatically if the fork fails).
 
 **Alternatives:**
@@ -92,7 +92,7 @@ the transport implementation behind it, exactly as that ADR anticipated.
 - New core seams: `runOffThreadOrInProcess` + `createSubprocessProgressRun`
   (`runtime/subprocess-transport.ts`), forking with `serialization: 'advanced'`,
   relaying `WorkerMessage` progress/result/error, settling once, and killing the
-  child. A governed `OPENSIP_TOOLS_NO_WORKER` env var (via `EnvRegistry`) selects
+  child. A governed `OPENSIP_CLI_NO_WORKER` env var (via `EnvRegistry`) selects
   the in-process fallback.
 - `--json` / non-TTY output is unchanged and stays in-process — only the live TTY
   path forks.

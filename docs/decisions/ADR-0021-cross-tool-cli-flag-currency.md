@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-06
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0021: One source of truth for cross-tool CLI flags; `--verbose` is an output-currency concern
@@ -29,7 +29,7 @@ enforcement-reason: >
 and `--verbose` (the per-tool detail body) is rendered **once** through the
 shared output seam — never per-tool. Concretely:
 
-1. **Flag specs live in `@opensip-tools/contracts`.** A `commonFlags` registry
+1. **Flag specs live in `@opensip-cli/contracts`.** A `commonFlags` registry
    maps each shared flag key (`json`, `cwd`, `quiet`, `verbose`, `debug`,
    `reportTo`, `apiKey`, `open`) to its canonical `{ flags, description, default }`
    tuple, plus an `applyCommonFlags(command, keys[])` helper. Every tool builds
@@ -65,7 +65,7 @@ shared output seam — never per-tool. Concretely:
 
 **Alternatives:**
 
-- *Flag registry in `@opensip-tools/core`.* Rejected: core is the kernel and
+- *Flag registry in `@opensip-cli/core`.* Rejected: core is the kernel and
   declares no `commander` dependency; flag specs are a CLI-contract concern, and
   `contracts` already declares `commander` and is the documented Tool↔runner
   contract layer that every tool and the CLI sit above. Putting the registry in

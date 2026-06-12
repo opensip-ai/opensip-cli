@@ -1,4 +1,4 @@
-import { ValidationError, createSignal } from '@opensip-tools/core';
+import { ValidationError, createSignal } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../assertions.js';

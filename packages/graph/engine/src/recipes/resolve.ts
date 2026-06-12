@@ -12,14 +12,14 @@
  * `RunGraphInput.rules`.
  */
 
-import { BUILTIN_DEFAULT_RECIPE } from '@opensip-tools/contracts';
+import { BUILTIN_DEFAULT_RECIPE } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   currentScope,
   logger,
   resolveSelector,
   setCurrentRecipeUnitConfig,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { currentRules } from '../rules/registry.js';
 
@@ -69,7 +69,7 @@ export function resolveRecipeToRules(
   if (!recipe) {
     // @fitness-ignore-next-line result-pattern-consistency -- user config error surfaced as a thrown ConfigurationError, mapped to an exit code by handleGraphError
     throw new ConfigurationError(
-      `Unknown graph recipe '${name}'. Run 'opensip-tools graph-recipes' to list available recipes.`,
+      `Unknown graph recipe '${name}'. Run 'opensip graph-recipes' to list available recipes.`,
       { code: UNKNOWN_RECIPE_CODE },
     );
   }

@@ -41,12 +41,12 @@ describe('discoverToolPackages', () => {
   });
 
   it('finds a scoped package marked as a tool', () => {
-    writePkg(join(testDir, 'node_modules', '@opensip-tools', 'fitness'), {
-      name: '@opensip-tools/fitness',
+    writePkg(join(testDir, 'node_modules', '@opensip-cli', 'fitness'), {
+      name: '@opensip-cli/fitness',
       opensipTools: { kind: 'tool' },
     });
     const out = discoverToolPackages({ projectDir: testDir });
-    expect(out.map((t) => t.name)).toEqual(['@opensip-tools/fitness']);
+    expect(out.map((t) => t.name)).toEqual(['@opensip-cli/fitness']);
   });
 
   it('skips packages that are not marked as tools', () => {
@@ -66,19 +66,19 @@ describe('discoverToolPackages', () => {
     const nested = join(testDir, 'project');
     mkdirSync(nested, { recursive: true });
 
-    writePkg(join(testDir, 'node_modules', '@opensip-tools', 'fitness'), {
-      name: '@opensip-tools/fitness',
+    writePkg(join(testDir, 'node_modules', '@opensip-cli', 'fitness'), {
+      name: '@opensip-cli/fitness',
       opensipTools: { kind: 'tool' },
     });
-    writePkg(join(nested, 'node_modules', '@opensip-tools', 'fitness'), {
-      name: '@opensip-tools/fitness',
+    writePkg(join(nested, 'node_modules', '@opensip-cli', 'fitness'), {
+      name: '@opensip-cli/fitness',
       opensipTools: { kind: 'tool' },
     });
 
     const out = discoverToolPackages({ projectDir: nested });
     expect(out).toHaveLength(1);
     // Nearest-ancestor wins: the inner copy
-    expect(out[0]?.packageDir).toBe(join(nested, 'node_modules', '@opensip-tools', 'fitness'));
+    expect(out[0]?.packageDir).toBe(join(nested, 'node_modules', '@opensip-cli', 'fitness'));
   });
 
   it('treats malformed package.json as non-tool (no crash)', () => {

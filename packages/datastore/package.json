@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/datastore",
+  "name": "@opensip-cli/datastore",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "SQLite + Drizzle persistence layer for OpenSIP Tools — DataStore interface, backends, factory, schema migrations",
+  "description": "SQLite + Drizzle persistence layer for OpenSIP CLI — DataStore interface, backends, factory, schema migrations",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "sqlite",
@@ -13,12 +13,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/datastore"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -39,7 +39,7 @@
     "db:check": "drizzle-kit check"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2"

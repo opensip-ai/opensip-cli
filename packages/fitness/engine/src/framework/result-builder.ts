@@ -14,7 +14,7 @@ import {
 import { countErrors, countWarnings } from '../types/severity.js';
 
 import type { CheckResult, CheckInfo, ItemType } from '../types/findings.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 /**
  * Options for building results.

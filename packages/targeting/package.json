@@ -1,21 +1,21 @@
 {
-  "name": "@opensip-tools/targeting",
+  "name": "@opensip-cli/targeting",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "Host file-targeting runtime substrate for OpenSIP Tools — the generic TargetRegistry, uniform glob expansion (resolveTargets/preResolveAllTargets), and globalExcludes filtering any tool consumes via scope.targets",
+  "description": "Host file-targeting runtime substrate for OpenSIP CLI — the generic TargetRegistry, uniform glob expansion (resolveTargets/preResolveAllTargets), and globalExcludes filtering any tool consumes via scope.targets",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/targeting"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -33,8 +33,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/config": "workspace:*",
-    "@opensip-tools/core": "workspace:*",
+    "@opensip-cli/config": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
     "glob": "^13.0.0",
     "minimatch": "^10.2.5"
   },

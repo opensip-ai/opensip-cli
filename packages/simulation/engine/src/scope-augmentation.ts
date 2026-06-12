@@ -27,7 +27,7 @@
 
 import type { RunnableScenario } from './framework/runnable-scenario.js';
 import type { SimulationRecipeRegistry } from './recipes/registry.js';
-import type { Registry } from '@opensip-tools/core';
+import type { Registry } from '@opensip-cli/core';
 
 /**
  * Per-RunScope `ensureScenariosLoaded` lifecycle state — moved off the `sim.ts`
@@ -58,7 +58,7 @@ export interface SimulationSubscope {
   readonly load: SimulationLoadState;
 }
 
-declare module '@opensip-tools/core' {
+declare module '@opensip-cli/core' {
   interface ScopeContribution {
     /**
      * Simulation tool's per-run state. Returned by the simulation tool's

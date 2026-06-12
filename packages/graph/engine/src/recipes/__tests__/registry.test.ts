@@ -4,15 +4,15 @@
  * `rules/__tests__/registry.test.ts`.
  */
 
-import { LanguageRegistry, RunScope, ToolRegistry, runWithScopeSync } from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, ToolRegistry, runWithScopeSync } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
 import { createRecipeRegistry, currentGraphRecipes } from '../registry.js';
 
 /** Fresh scope with empty registries — local equivalent of the retired
- *  `@opensip-tools/core/test-utils` helper (ADR-0040: that sugar moved to
- *  `@opensip-tools/test-support`, which this package's tests cannot use
+ *  `@opensip-cli/core/test-utils` helper (ADR-0040: that sugar moved to
+ *  `@opensip-cli/test-support`, which this package's tests cannot use
  *  without coupling its test graph to the fitness engine). */
 const makeTestScope = (): RunScope =>
   new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });

@@ -6,7 +6,7 @@ import { currentRecipeRegistry } from '../framework/scope-registry.js';
 
 import { ensureChecksLoaded } from './fit.js';
 
-import type { ListRecipesResult } from '@opensip-tools/contracts';
+import type { ListRecipesResult } from '@opensip-cli/contracts';
 
 // ---------------------------------------------------------------------------
 // listRecipes
@@ -14,7 +14,7 @@ import type { ListRecipesResult } from '@opensip-tools/contracts';
 
 /** Returns metadata for every registered recipe (built-in plus user-defined). */
 export async function listRecipes(projectDir?: string): Promise<ListRecipesResult> {
-  // Load plugins so user-defined recipes (e.g. ~/.opensip-tools/fit/*.mjs) appear.
+  // Load plugins so user-defined recipes (e.g. ~/.opensip-cli/fit/*.mjs) appear.
   await ensureChecksLoaded(projectDir);
 
   const recipes = currentRecipeRegistry()

@@ -1,5 +1,5 @@
 // @fitness-ignore-file error-handling-quality -- every function here is best-effort cosmetic state for the "update available" notice: any failure (missing dir, malformed JSON, EACCES) must degrade silently to "nothing known" and never break the user's command. Absence and corruption are deliberately equivalent to "no update known".
-// @fitness-ignore-file unbounded-memory -- reads ~/.opensip-tools/update-state.json, a tiny tool-generated cache holding a single version string.
+// @fitness-ignore-file unbounded-memory -- reads ~/.opensip-cli/update-state.json, a tiny tool-generated cache holding a single version string.
 /**
  * update-state — sticky persistence for the "update available" notice.
  *
@@ -15,7 +15,7 @@
  * moment the running version catches up — so it stops on its own after an
  * upgrade, with no stale "update available" lingering.
  *
- * The store is a tiny JSON file at `~/.opensip-tools/update-state.json`
+ * The store is a tiny JSON file at `~/.opensip-cli/update-state.json`
  * (see {@link resolveUserPaths}), kept separate from the user-authored
  * `config.yml`. Reads and writes are best-effort: any failure degrades to
  * "nothing known" rather than breaking the command.
@@ -24,15 +24,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { resolveUserPaths } from '@opensip-tools/core';
+import { resolveUserPaths } from '@opensip-cli/core';
 
-/** On-disk shape of `~/.opensip-tools/update-state.json`. */
+/** On-disk shape of `~/.opensip-cli/update-state.json`. */
 interface UpdateState {
   /** The newest published version the hourly check has observed. */
   readonly latest: string;
 }
 
-/** Default store path: `~/.opensip-tools/update-state.json`. */
+/** Default store path: `~/.opensip-cli/update-state.json`. */
 export function defaultUpdateStateFile(): string {
   return resolveUserPaths().updateStateFile;
 }

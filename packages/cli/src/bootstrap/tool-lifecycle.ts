@@ -51,8 +51,8 @@
 
 import { mountAllToolCommands } from './register-tools.js';
 
-import type { CliProgram } from '@opensip-tools/contracts';
-import type { ToolCliContext, ToolRegistry } from '@opensip-tools/core';
+import type { CliProgram } from '@opensip-cli/contracts';
+import type { ToolCliContext, ToolRegistry } from '@opensip-cli/core';
 
 /**
  * Canonical, ordered tool-lifecycle steps (release 2.11.0, §5.4). The numeric

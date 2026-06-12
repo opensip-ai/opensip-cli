@@ -14,8 +14,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RunScope, runWithScope } from '@opensip-tools/core';
-import { fileCache } from '@opensip-tools/fitness';
+import { RunScope, runWithScope } from '@opensip-cli/core';
+import { fileCache } from '@opensip-cli/fitness';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';

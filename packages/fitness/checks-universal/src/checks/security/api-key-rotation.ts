@@ -4,9 +4,9 @@
  * @fileoverview Validate API key handling supports rotation
  */
 
-import { logger } from '@opensip-tools/core';
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
-import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness';
+import { logger } from '@opensip-cli/core';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+import { stripStringLiterals, stripStringsAndComments } from '@opensip-cli/fitness';
 
 /**
  * Checks if text contains a single API key equality comparison

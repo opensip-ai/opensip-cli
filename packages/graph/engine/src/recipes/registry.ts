@@ -12,7 +12,7 @@
  * attaches it to `scope.graph.recipes`.
  */
 
-import { RecipeRegistry, currentScope } from '@opensip-tools/core';
+import { RecipeRegistry, currentScope } from '@opensip-cli/core';
 
 import { builtInGraphRecipes } from './built-in-recipes.js';
 

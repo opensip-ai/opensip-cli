@@ -13,7 +13,7 @@
  * structure not in the base's shape.
  */
 
-import { NotFoundError, Registry, logger, type Registerable } from '@opensip-tools/core';
+import { NotFoundError, Registry, logger, type Registerable } from '@opensip-cli/core';
 
 import type { Check } from './check-types.js';
 

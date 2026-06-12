@@ -24,8 +24,8 @@ import {
   type ErrorDetail,
   type ErrorResult,
   type SignalEnvelope,
-} from '@opensip-tools/contracts';
-import { ToolError, currentScope } from '@opensip-tools/core';
+} from '@opensip-cli/contracts';
+import { ToolError, currentScope } from '@opensip-cli/core';
 
 /**
  * Attach the scope-owned diagnostics snapshot (north-star §5.10) to a freshly

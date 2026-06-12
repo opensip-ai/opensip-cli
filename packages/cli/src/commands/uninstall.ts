@@ -1,12 +1,12 @@
 // @fitness-ignore-file error-handling-quality -- file/dir walks for uninstall planning and best-effort tidy-up: missing/unreadable entries (TOCTOU vanish between readdir+stat, permission-denied subdirs, already-removed parent shells) are the expected non-terminal signal to skip; failure-IS-the-signal is the function contract in each catch.
 /**
- * @fileoverview `opensip-tools uninstall` — remove opensip-tools state
+ * @fileoverview `opensip uninstall` — remove opensip-cli state
  * from a user account and/or project.
  *
  * Two modes:
  *
  *  • Default (no flag) — remove the user-level directory
- *    `~/.opensip-tools/`. Contract: this dir holds `config.yml` only
+ *    `~/.opensip-cli/`. Contract: this dir holds `config.yml` only
  *    (cloud API key + per-user defaults). Persistence and logging code
  *    throws if asked to write anywhere user-global, so the dir does
  *    not grow over time. Any pre-existing `sessions/`, `reports/`,
@@ -14,17 +14,17 @@
  *    earlier versions and are swept up by the same removal.
  *
  *  • `--project [path]` — remove project-local state at `[path]` (or
- *    cwd if omitted): both `<path>/opensip-tools/` (user-authored
+ *    cwd if omitted): both `<path>/opensip-cli/` (user-authored
  *    checks + recipes plus the gitignored `.runtime/` cache) and
- *    `<path>/opensip-tools.config.yml`. Refuses to run if neither
+ *    `<path>/opensip-cli.config.yml`. Refuses to run if neither
  *    target exists at the resolved path, to avoid `rm -rf`-ing an
  *    unrelated directory.
  *
- *    The recursive removal of `<path>/opensip-tools/` transitively
+ *    The recursive removal of `<path>/opensip-cli/` transitively
  *    sweeps up `.runtime/datastore.sqlite` and its `-wal`/`-shm` SQLite
  *    sidecars introduced in v2 — no datastore-specific path needs to be
  *    enumerated here. Caveat for Windows: open file handles can block
- *    removal of WAL/SHM files; ensure no opensip-tools CLI process is
+ *    removal of WAL/SHM files; ensure no opensip-cli CLI process is
  *    active when running uninstall.
  *
  * Does NOT remove the npm global install — the running binary can't
@@ -57,7 +57,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 
-import { resolveProjectPaths } from '@opensip-tools/core';
+import { resolveProjectPaths } from '@opensip-cli/core';
 
 import {
   collectTargets,
@@ -68,8 +68,8 @@ import {
   type UninstallMode,
 } from './uninstall/targets.js';
 
-import type { UninstallDoneResult } from '@opensip-tools/contracts';
-import type { ProjectContext } from '@opensip-tools/core';
+import type { UninstallDoneResult } from '@opensip-cli/contracts';
+import type { ProjectContext } from '@opensip-cli/core';
 
 export interface UninstallOptions {
   readonly yes?: boolean;
@@ -104,7 +104,7 @@ export interface UninstallOptions {
   readonly prompt?: (question: string) => Promise<string>;
 }
 
-const DEFAULT_USER_ROOT = join(homedir(), '.opensip-tools');
+const DEFAULT_USER_ROOT = join(homedir(), '.opensip-cli');
 
 async function confirm(
   prompt: (question: string) => Promise<string>,
@@ -208,7 +208,7 @@ export async function executeUninstall(opts: UninstallOptions = {}): Promise<Uni
     const where = mode === 'user' ? userRoot : projectDir;
     const note =
       mode === 'project'
-        ? `\nNothing to remove — no opensip-tools state found at ${where}.\n\n`
+        ? `\nNothing to remove — no OpenSIP CLI state found at ${where}.\n\n`
         : `\nNothing to remove — ${where} does not exist.\n\n`;
     write(note);
     return buildResult({ action: 'empty', mode, targets: [], rootPath });
@@ -244,7 +244,7 @@ export async function executeUninstall(opts: UninstallOptions = {}): Promise<Uni
 
 /**
  * Delete the resolved targets and, after --purge, tidy the now-empty
- * `opensip-tools/` shell. Extracted so executeUninstall stays under the
+ * `opensip-cli/` shell. Extracted so executeUninstall stays under the
  * cognitive-complexity threshold.
  */
 function performRemoval(

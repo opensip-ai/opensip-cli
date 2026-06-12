@@ -65,7 +65,7 @@ export interface FitnessSubscope {
   readonly load: FitnessLoadState;
 }
 
-declare module '@opensip-tools/core' {
+declare module '@opensip-cli/core' {
   interface ScopeContribution {
     /**
      * Fitness tool's per-run state. Returned by the fitness tool's

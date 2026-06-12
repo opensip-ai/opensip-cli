@@ -19,8 +19,8 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RunScope, runWithScope, runWithScopeSync } from '@opensip-tools/core';
-import { fileCache } from '@opensip-tools/fitness';
+import { RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
+import { fileCache } from '@opensip-cli/fitness';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { analyzeNullSafety } from '../checks/quality/data-integrity/null-safety.js';
@@ -31,7 +31,7 @@ import { analyzeSqlInjection } from '../checks/security/sql-injection.js';
 import { getCheckDisplayName, getCheckIcon } from '../display/index.js';
 import { checks } from '../index.js';
 
-import type { CheckResult, CheckViolation } from '@opensip-tools/fitness';
+import type { CheckResult, CheckViolation } from '@opensip-cli/fitness';
 
 const testScope = new RunScope();
 

@@ -21,10 +21,10 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 import { glob } from 'glob';
 
-import type { DiscoverInput, DiscoverOutput } from '@opensip-tools/graph';
+import type { DiscoverInput, DiscoverOutput } from '@opensip-cli/graph';
 
 /** Per-language inputs to the shared discover template. */
 export interface TreeSitterDiscoverConfig {

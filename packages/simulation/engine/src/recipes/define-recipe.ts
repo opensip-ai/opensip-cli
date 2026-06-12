@@ -17,7 +17,7 @@
  * registers each into the current scope's `SimulationRecipeRegistry`.
  */
 
-import { ValidationError } from '@opensip-tools/core';
+import { ValidationError } from '@opensip-cli/core';
 
 import type { SimulationRecipe, SimulationRecipeConfig } from './types.js';
 

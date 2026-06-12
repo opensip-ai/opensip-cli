@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-08
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0025: Session replay as a Tool-contributed projection over a shared structural decoder
@@ -26,7 +26,7 @@ enforcement-reason: >
 **Decision:** A stored session is **replayed**, never re-executed. The opaque
 `StoredSession.payload` is decoded back into its structural shape
 (`{ summary, checks[] }`) by ONE shared decoder, `decodeSessionPayload`, in
-`@opensip-tools/session-store`; each tool then contributes a `sessionReplay`
+`@opensip-cli/session-store`; each tool then contributes a `sessionReplay`
 projection (a new optional `Tool` contract member) that maps that structure into
 a `SignalEnvelope` tagged `fidelity: 'projection'`. The host exposes it as
 `sessions show <ref>` plus an inline `--show <session>` shorthand on each run
@@ -44,7 +44,7 @@ command, and routes all machine output through the 2.12.0 `CommandOutcome` seam.
 - *Put the decoder in `contracts`.* Rejected: `contracts` is types-only and
   cannot host runtime.
 
-**Rationale:** All three engines already depend on `@opensip-tools/session-store`,
+**Rationale:** All three engines already depend on `@opensip-cli/session-store`,
 which owns session persistence — so it is the natural home for the *inverse*
 (structural decode for replay). The decoder holds **zero tool vocabulary**:
 severity→category mapping, signal IDs, and the envelope/result shape stay in each
@@ -57,7 +57,7 @@ the currency; this is a faithful projection of it, not a fresh run).
 **Consequences:**
 - New optional `Tool.sessionReplay` member (tool short id + `replaySession`); the
   CLI builds a `SessionReplayRegistry` from the registered tools' contributions.
-- `@opensip-tools/session-store` gains `decodeSessionPayload` (and the field
+- `@opensip-cli/session-store` gains `decodeSessionPayload` (and the field
   coercers) on its public surface; its charter note is amended to cover the
   structural decode while preserving the opaque-to-persistence invariant.
 - Replay errors are structured `CommandOutcome` errors (`reason`/`code`:

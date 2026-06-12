@@ -20,7 +20,7 @@ function packageOfPath(filePath) {
   return m ? m[1] : '<unknown>';
 }
 
-// Strip an npm scope for display: "@opensip-tools/lang-typescript" -> "lang-typescript".
+// Strip an npm scope for display: "@opensip-cli/lang-typescript" -> "lang-typescript".
 function shortPkg(name) {
   if (typeof name !== 'string') return '<unknown>';
   return name.charCodeAt(0) === 64 /* @ */ ? name.slice(name.indexOf('/') + 1) : name;

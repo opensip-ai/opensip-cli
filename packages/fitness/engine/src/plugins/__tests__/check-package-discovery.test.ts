@@ -19,7 +19,7 @@ afterEach(() => {
 describe('readCheckPackagePreferences', () => {
   it('reads checkPackages from project config', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `targets:
   src:
     description: x
@@ -28,7 +28,7 @@ describe('readCheckPackagePreferences', () => {
     include: ["**/*.ts"]
 plugins:
   checkPackages:
-    - "@opensip-tools/checks-python"
+    - "@opensip-cli/checks-python"
 fitness:
   failOnErrors: 1
   failOnWarnings: 0
@@ -36,12 +36,12 @@ fitness:
 `,
     );
     const prefs = readCheckPackagePreferences(testDir);
-    expect(prefs.checkPackages).toEqual(['@opensip-tools/checks-python']);
+    expect(prefs.checkPackages).toEqual(['@opensip-cli/checks-python']);
   });
 
   it('ignores removed prefix-discovery preferences', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `plugins:
   autoDiscoverChecks: false
   packageScopes:
@@ -53,7 +53,7 @@ fitness:
 
   it('returns empty object when config has no plugins section', () => {
     writeFileSync(
-      join(testDir, 'opensip-tools.config.yml'),
+      join(testDir, 'opensip-cli.config.yml'),
       `fitness: { failOnErrors: 0, failOnWarnings: 0, disabledChecks: [] }\n`,
     );
     expect(readCheckPackagePreferences(testDir)).toEqual({});

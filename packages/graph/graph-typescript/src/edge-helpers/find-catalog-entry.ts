@@ -9,7 +9,7 @@
 
 import { hashFunctionBody } from '../inventory-helpers/hash-body.js';
 
-import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
+import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 import type ts from 'typescript';
 
 /**

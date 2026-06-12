@@ -1,6 +1,6 @@
 // CLEAN: a live runner that drives the engine OFF the main process via the
 // off-thread selector. No bare in-process transport call.
-import { runOffThreadOrInProcess } from '@opensip-tools/core'
+import { runOffThreadOrInProcess } from '@opensip-cli/core'
 
 export function startLive(args: { cwd: string }): void {
   const run = runOffThreadOrInProcess({

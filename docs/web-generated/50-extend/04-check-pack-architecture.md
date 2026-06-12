@@ -24,7 +24,7 @@ related-docs:
 ---
 # Check pack architecture
 
-A check pack is an npm package that contributes one or more `Check` objects. Seven pack packages ship today; an arbitrary number of third-party packs can be added by `plugin add`, by declaring `opensipTools.kind: "fit-pack"` in `package.json`, or by exact name in `plugins.checkPackages`. The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/)) takes care of the rest.
+A check pack is an npm package that contributes one or more `Check` objects. Seven pack packages ship today; an arbitrary number of third-party packs can be added by `plugin add`, by declaring `opensipTools.kind: "fit-pack"` in `package.json`, or by exact name in `plugins.checkPackages`. The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`80-implementation/02-plugin-loader.md`](/docs/opensip-cli/80-implementation/02-plugin-loader/)) takes care of the rest.
 
 > **What you'll understand after this:**
 > - The `FitPluginExports` shape every pack implements.
@@ -41,23 +41,23 @@ A check pack's main entry implements the `FitPluginExports` contract — one req
 
 ```ts
 // packages/fitness/checks-universal/src/index.ts
-import type { Check, FitnessRecipe } from '@opensip-tools/fitness';
+import type { Check, FitnessRecipe } from '@opensip-cli/fitness';
 
 export const checks: readonly Check[];              // required
 export const recipes?: readonly FitnessRecipe[];    // optional
 ```
 
-`Check` and `FitnessRecipe` live in `@opensip-tools/fitness` — the kernel doesn't know about checks or fitness vocabulary.
+`Check` and `FitnessRecipe` live in `@opensip-cli/fitness` — the kernel doesn't know about checks or fitness vocabulary.
 
 `checks` is the flat list of every `defineCheck()` result the pack provides (the only required export). `recipes` is an optional list of `defineRecipe()` results the pack bundles (co-discovered through the same package walk and routed to fitness's recipe domain). There is **no** `checkDisplay` export and **no** `metadata` export — display travels ON each check, and package name + version come from the pack's `package.json`.
 
-**Display (icon + name) travels on the check (§5.3).** Each check carries optional `config.icon` and `config.displayName`. Set them directly in `defineCheck({ ..., icon: '🔒', displayName: 'No Hardcoded Secrets' })`, or keep a per-pack `CHECK_DISPLAY` authoring map (`slug → [icon, displayName]`) and fold it onto the pack's checks at the barrel with `applyCheckDisplay(checks, CHECK_DISPLAY)` (exported from `@opensip-tools/fitness`). Slugs with no display fall back to kebab-to-title-case + a default icon. There is no merged-display registry; the CLI/dashboard read `check.config.displayName`/`icon` from the per-run check registry.
+**Display (icon + name) travels on the check (§5.3).** Each check carries optional `config.icon` and `config.displayName`. Set them directly in `defineCheck({ ..., icon: '🔒', displayName: 'No Hardcoded Secrets' })`, or keep a per-pack `CHECK_DISPLAY` authoring map (`slug → [icon, displayName]`) and fold it onto the pack's checks at the barrel with `applyCheckDisplay(checks, CHECK_DISPLAY)` (exported from `@opensip-cli/fitness`). Slugs with no display fall back to kebab-to-title-case + a default icon. There is no merged-display registry; the CLI/dashboard read `check.config.displayName`/`icon` from the per-run check registry.
 
 Plus a discoverable package.json shape:
 
 ```json
 {
-  "name": "@opensip-tools/checks-universal",
+  "name": "@opensip-cli/checks-universal",
   "opensipTools": { "kind": "fit-pack" },
   "main": "dist/index.js"
 }
@@ -66,11 +66,11 @@ Plus a discoverable package.json shape:
 Discovery uses **two paths**, both run on every fit invocation; results are merged and deduplicated by package name:
 
 - **Marker** — any package whose `package.json` declares `opensipTools.kind: "fit-pack"` is discovered regardless of npm scope or name pattern. This is the canonical path for first-party and third-party packs.
-- **Explicit list** — `plugins.checkPackages:` in `opensip-tools.config.yml` names packages by exact name. Use for packages that do not declare the marker yet. Marker discovery still runs alongside it.
+- **Explicit list** — `plugins.checkPackages:` in `opensip-cli.config.yml` names packages by exact name. Use for packages that do not declare the marker yet. Marker discovery still runs alongside it.
 
-See [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/) for the resolution rules.
+See [`80-implementation/02-plugin-loader.md`](/docs/opensip-cli/80-implementation/02-plugin-loader/) for the resolution rules.
 
-The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/framework/check-types.ts) helper (re-exported from `@opensip-tools/fitness`) walks a barrel's exports recursively, narrowing each value to a `Check` via `isCheck` and deduplicating by reference. Each pack's `src/index.ts` calls it on `allChecks` (the re-export of `src/checks/index.ts`) so new checks are picked up by simply re-exporting them from the category barrel — no central registration list to update.
+The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/framework/check-types.ts) helper (re-exported from `@opensip-cli/fitness`) walks a barrel's exports recursively, narrowing each value to a `Check` via `isCheck` and deduplicating by reference. Each pack's `src/index.ts` calls it on `allChecks` (the re-export of `src/checks/index.ts`) so new checks are picked up by simply re-exporting them from the category barrel — no central registration list to update.
 
 ---
 
@@ -78,13 +78,13 @@ The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-tools/blob/v3.
 
 | Pack | Path | Scope |
 |---|---|---|
-| `@opensip-tools/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape), e.g. file-length, TODO scanners, security secret detection. 108 checks. |
-| `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript/` | TypeScript-specific: complex-function via AST, dead-code detection, dependency rules, react/hook patterns. 52 checks. |
-| `@opensip-tools/checks-python` | `packages/fitness/checks-python/` | Python-specific. Today ships 2 checks. |
-| `@opensip-tools/checks-java` | `packages/fitness/checks-java/` | Java-specific. Today ships `no-printstacktrace`. |
-| `@opensip-tools/checks-go` | `packages/fitness/checks-go/` | Go-specific. Today ships `no-fmt-print`. |
-| `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp/` | C/C++ via clang-tidy passthrough (`clang-tidy-passthrough`). |
-| `@opensip-tools/checks-rust` | `packages/fitness/checks-rust/` | Rust-specific. Today ships `rust-no-dbg-macro`. |
+| `@opensip-cli/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape), e.g. file-length, TODO scanners, security secret detection. 108 checks. |
+| `@opensip-cli/checks-typescript` | `packages/fitness/checks-typescript/` | TypeScript-specific: complex-function via AST, dead-code detection, dependency rules, react/hook patterns. 52 checks. |
+| `@opensip-cli/checks-python` | `packages/fitness/checks-python/` | Python-specific. Today ships 2 checks. |
+| `@opensip-cli/checks-java` | `packages/fitness/checks-java/` | Java-specific. Today ships `no-printstacktrace`. |
+| `@opensip-cli/checks-go` | `packages/fitness/checks-go/` | Go-specific. Today ships `no-fmt-print`. |
+| `@opensip-cli/checks-cpp` | `packages/fitness/checks-cpp/` | C/C++ via clang-tidy passthrough (`clang-tidy-passthrough`). |
+| `@opensip-cli/checks-rust` | `packages/fitness/checks-rust/` | Rust-specific. Today ships `rust-no-dbg-macro`. |
 
 The per-language packs vary by maturity: TypeScript has the deepest pack, Python has two checks, and Go/Java/C++/Rust each ship a canonical first-party check. They expand as patterns prove worth standardizing across teams.
 
@@ -133,7 +133,7 @@ A check that's worth shipping is often worth parameterizing. The cyclomatic-comp
 The pattern: read your slice of the recipe's `config:` map at run time.
 
 ```ts
-import { getCheckConfig } from '@opensip-tools/fitness';
+import { getCheckConfig } from '@opensip-cli/fitness';
 
 interface ComplexFunctionConfig {
   readonly maxComplexity?: number;
@@ -175,7 +175,7 @@ The recipe service projects the `config:` map into module-level state before exe
 
 ## The display map — folded onto the check
 
-A pack keeps an authoring `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/checks-universal/src/display/index.ts) and analogues) of `slug → [icon, displayName]`:
+A pack keeps an authoring `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/checks-universal/src/display/index.ts) and analogues) of `slug → [icon, displayName]`:
 
 ```ts
 export const CHECK_DISPLAY: Record<string, CheckDisplayEntry> = {
@@ -188,7 +188,7 @@ export const CHECK_DISPLAY: Record<string, CheckDisplayEntry> = {
 …and folds it ONTO its checks at the barrel (§5.3), so display travels with each check rather than as a separate sidecar:
 
 ```ts
-import { applyCheckDisplay, collectCheckObjects } from '@opensip-tools/fitness';
+import { applyCheckDisplay, collectCheckObjects } from '@opensip-cli/fitness';
 export const checks = applyCheckDisplay(collectCheckObjects(allChecks), CHECK_DISPLAY);
 ```
 
@@ -200,9 +200,9 @@ The icon is shown in the results table; the display name is the dashboard label.
 
 The chain:
 
-1. The user runs `opensip-tools plugin add @my-co/checks-internal`.
-2. The CLI's `plugin add` command installs the package into `<project>/opensip-tools/.runtime/plugins/fit/` and appends `@my-co/checks-internal` to `plugins.fit:` in `opensip-tools.config.yml`.
-3. On the next `opensip-tools fit` run, the fitness Tool's `ensureChecksLoaded()` calls into the discoverer.
+1. The user runs `opensip plugin add @my-co/checks-internal`.
+2. The CLI's `plugin add` command installs the package into `<project>/opensip-cli/.runtime/plugins/fit/` and appends `@my-co/checks-internal` to `plugins.fit:` in `opensip-cli.config.yml`.
+3. On the next `opensip fit` run, the fitness Tool's `ensureChecksLoaded()` calls into the discoverer.
 4. The discoverer reads `plugins.fit:`, walks `.runtime/plugins/fit/node_modules/`, finds `@my-co/checks-internal/`, and dynamically imports its main entry.
 5. The pack's `checks` export is registered into the per-run check registry (each check carrying its folded-on display); its optional `recipes` export is co-routed to the recipe domain.
 6. Recipes that select these checks (by tag, slug, or `all`) now run them.
@@ -224,7 +224,7 @@ Minimum viable pack:
 
 ```ts
 // dist/index.js
-import { defineCheck } from '@opensip-tools/fitness';
+import { defineCheck } from '@opensip-cli/fitness';
 
 const noTodoBeforeDeploy = defineCheck({
   id: 'a1b2c3d4-...',
@@ -242,20 +242,20 @@ export const checks = [noTodoBeforeDeploy];
 
 Package name and version come from the pack's `package.json` — there is no `metadata` export to maintain in lockstep.
 
-Peer-depend on `@opensip-tools/fitness` and `@opensip-tools/core` so a project at any compatible major version can install your pack:
+Peer-depend on `@opensip-cli/fitness` and `@opensip-cli/core` so a project at any compatible major version can install your pack:
 
 ```json
 {
   "peerDependencies": {
-    "@opensip-tools/fitness": "^3.0.0",
-    "@opensip-tools/core": "^3.0.0"
+    "@opensip-cli/fitness": "^3.0.0",
+    "@opensip-cli/core": "^3.0.0"
   }
 }
 ```
 
 Publish to npm, install via `plugin add`, ship.
 
-For the full walkthrough — boilerplate, testing, publishing — see [`50-extend/01-plugin-authoring.md`](/docs/opensip-tools/50-extend/01-plugin-authoring/).
+For the full walkthrough — boilerplate, testing, publishing — see [`50-extend/01-plugin-authoring.md`](/docs/opensip-cli/50-extend/01-plugin-authoring/).
 
 ---
 
@@ -264,7 +264,7 @@ For the full walkthrough — boilerplate, testing, publishing — see [`50-exten
 Every shipped check must prove **both directions** — that it fires on bad code
 *and* stays silent on clean code — or CI fails. Each first-party check pack runs
 a `fixture-coverage.test.ts` meta-test (built on
-`@opensip-tools/fitness/internal`) that, for every shipped check, loads a clean
+`@opensip-cli/fitness/internal`) that, for every shipped check, loads a clean
 and a violation fixture and asserts the clean one produces **0** findings for
 that check and the violation one produces **≥1**.
 
@@ -299,7 +299,7 @@ src/checks/<category>/
 > real code and keep the clean fixture free of the trigger token entirely (even
 > in comments/strings). The check's own `*.test.ts` covers content-filter
 > behavior. First-party authors can call `runCheckOnFixture` from
-> `@opensip-tools/fitness/internal` for a one-line per-check assertion.
+> `@opensip-cli/fitness/internal` for a one-line per-check assertion.
 
 ---
 
@@ -307,10 +307,10 @@ src/checks/<category>/
 
 `acme-api`'s loaded check inventory:
 
-- `@opensip-tools/checks-universal` — file-length-limit, no-todo-comments, no-hardcoded-secrets, the cyclomatic complexity check, …
-- `@opensip-tools/checks-typescript` — circular-import detection, no-default-export-in-routes, the typescript-specific patterns.
-- `@opensip-tools/checks-python` — `no-bare-except`.
-- Project-local `<project>/opensip-tools/fit/checks/` — three custom checks.
+- `@opensip-cli/checks-universal` — file-length-limit, no-todo-comments, no-hardcoded-secrets, the cyclomatic complexity check, …
+- `@opensip-cli/checks-typescript` — circular-import detection, no-default-export-in-routes, the typescript-specific patterns.
+- `@opensip-cli/checks-python` — `no-bare-except`.
+- Project-local `<project>/opensip-cli/fit/checks/` — three custom checks.
 
 The dashboard groups by category (universal pack's display map provides the icons), shows pack-of-origin in the verbose view, and highlights checks with project-level overrides. The CLI's `fit-list` command shows the full inventory: 166 checks across the bundled packs, source-tagged.
 
@@ -318,6 +318,6 @@ The dashboard groups by category (universal pack's display map provides the icon
 
 ## What's next
 
-- **[`../10-concepts/05-architecture-gate.md`](/docs/opensip-tools/10-concepts/05-architecture-gate/)** — the regression-detection workflow built on top of check output.
-- **[`../50-extend/01-plugin-authoring.md`](/docs/opensip-tools/50-extend/01-plugin-authoring/)** — full walkthrough of authoring a pack from scratch.
-- **[`../70-reference/02-package-catalog.md`](/docs/opensip-tools/70-reference/02-package-catalog/)** — every pack's package, key exports, layer.
+- **[`../10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/)** — the regression-detection workflow built on top of check output.
+- **[`../50-extend/01-plugin-authoring.md`](/docs/opensip-cli/50-extend/01-plugin-authoring/)** — full walkthrough of authoring a pack from scratch.
+- **[`../70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/)** — every pack's package, key exports, layer.

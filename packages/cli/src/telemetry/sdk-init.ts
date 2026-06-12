@@ -41,7 +41,7 @@
  * final flush against the same deadline and swallows any failure.
  */
 
-import { logger, readPackageVersion, TimeoutError } from '@opensip-tools/core';
+import { logger, readPackageVersion, TimeoutError } from '@opensip-cli/core';
 import {
   ROOT_CONTEXT,
   context as otelContext,
@@ -111,7 +111,7 @@ export function initTelemetry(cliEntryUrl: string): void {
   // `tenant_id=...,run_id=...`.
   const resource = detectResources({ detectors: [envDetector] }).merge(
     resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: 'opensip-tools',
+      [ATTR_SERVICE_NAME]: 'opensip-cli',
       [ATTR_SERVICE_VERSION]: readPackageVersion(cliEntryUrl),
     }),
   );

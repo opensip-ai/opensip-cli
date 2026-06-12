@@ -16,15 +16,15 @@
  *      → exit-code mapping the mounter owns.
  */
 
-import { ConfigurationError, defineCommand } from '@opensip-tools/core';
+import { ConfigurationError, defineCommand } from '@opensip-cli/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
 import type { CommandMountContext, HostCommandSpec } from '../commands/mount-command-spec.js';
-import type { CommandResult } from '@opensip-tools/contracts';
-import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
+import type { CommandResult } from '@opensip-cli/contracts';
+import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
 
 /** A Commander argParser reducer that accumulates repeated flag values into an array. */
 function accumulateReducer(raw: string, previous: unknown): string[] {

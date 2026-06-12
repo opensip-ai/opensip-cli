@@ -1,11 +1,11 @@
-import { renderToText } from '@opensip-tools/cli-ui';
-import { buildSignalEnvelope } from '@opensip-tools/contracts';
-import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
+import { renderToText } from '@opensip-cli/cli-ui';
+import { buildSignalEnvelope } from '@opensip-cli/contracts';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import { resultToView } from '../result-to-view.js';
 
-import type { CommandResult } from '@opensip-tools/contracts';
+import type { CommandResult } from '@opensip-cli/contracts';
 
 const text = (r: CommandResult): string => renderToText(resultToView(r));
 
@@ -55,7 +55,7 @@ describe('history view', () => {
           durationMs: 1500,
           recipe: 'example',
           payload: { summary: { passed: 9, total: 10 } },
-          showCommand: 'opensip-tools sessions show FIT_1 --json',
+          showCommand: 'opensip sessions show FIT_1 --json',
         } as never,
         {
           id: 'GRAPH_2',
@@ -65,7 +65,7 @@ describe('history view', () => {
           passed: false,
           durationMs: 500,
           payload: {},
-          showCommand: 'opensip-tools sessions show GRAPH_2 --json',
+          showCommand: 'opensip sessions show GRAPH_2 --json',
         } as never,
       ],
     });
@@ -193,7 +193,7 @@ describe('init view', () => {
     created: true,
     path: '/p/cfg.yml',
     cwd: '/p',
-    configFilename: 'opensip-tools.config.yml',
+    configFilename: 'opensip-cli.config.yml',
   } as const;
 
   it('renders the pristine success scaffold with created files + try-it hints', () => {
@@ -201,13 +201,13 @@ describe('init view', () => {
       ...base,
       state: 'pristine',
       languages: ['typescript'],
-      createdFiles: ['/p/opensip-tools/x.ts'],
+      createdFiles: ['/p/opensip-cli/x.ts'],
       gitignoreUpdated: true,
     });
     expect(out).toContain('Scaffolded for typescript');
-    expect(out).toContain('opensip-tools/x.ts');
+    expect(out).toContain('opensip-cli/x.ts');
     expect(out).toContain('.gitignore');
-    expect(out).toContain('opensip-tools fit --recipe example');
+    expect(out).toContain('opensip fit --recipe example');
   });
 
   it('renders the inside-existing-project refusal verbatim', () => {
@@ -236,14 +236,14 @@ describe('init view', () => {
       created: false,
       partialStateError: {
         state: 'partial-dir-only',
-        preExistingFiles: [{ path: '/p/opensip-tools/c.ts', classification: 'custom' }],
+        preExistingFiles: [{ path: '/p/opensip-cli/c.ts', classification: 'custom' }],
         message: 'm',
       },
     });
-    expect(out).toContain('opensip-tools/ present but');
+    expect(out).toContain('opensip-cli/ present but');
     expect(out).toContain('(custom)');
-    expect(out).toContain('opensip-tools init --keep');
-    expect(out).toContain('opensip-tools init --remove');
+    expect(out).toContain('opensip init --keep');
+    expect(out).toContain('opensip init --remove');
   });
 
   it('renders the creation-failure fallback', () => {
@@ -289,7 +289,7 @@ describe('plugin view', () => {
           source: 'bundled',
           id: 'fit',
           version: '2.8.0',
-          packageName: '@opensip-tools/fitness',
+          packageName: '@opensip-cli/fitness',
           resolvedPath: '/pkgs/fitness',
           manifestHash: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
         },
@@ -299,7 +299,7 @@ describe('plugin view', () => {
     expect(out).toContain('fit');
     expect(out).toContain('[bundled]');
     expect(out).toContain('abcdef012345'); // 12-char short hash
-    expect(out).toContain('@opensip-tools/fitness');
+    expect(out).toContain('@opensip-cli/fitness');
   });
 
   it('list: renders dynamically contributed domains and tool plugins', () => {

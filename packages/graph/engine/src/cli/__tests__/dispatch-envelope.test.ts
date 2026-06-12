@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { dispatchGraphResult } from '../graph.js';
 
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 vi.mock('../graph-modes.js', () => ({
   runGateMode: vi.fn().mockResolvedValue(undefined),

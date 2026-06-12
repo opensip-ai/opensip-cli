@@ -6,7 +6,7 @@
  */
 
 import type { WorkspaceUnitRunResult } from './workspace-runner.js';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 const FINDINGS_PREVIEW = 10;
 
@@ -20,7 +20,7 @@ export function workspaceReportLines(
 ): readonly string[] {
   const totalFindings = perUnit.reduce((n, r) => n + r.signals.length, 0);
   return [
-    'opensip-tools graph --workspace',
+    'opensip graph --workspace',
     '',
     `== Units (${String(perUnit.length)}) ==`,
     ...renderWorkspaceStatusLines(perUnit),

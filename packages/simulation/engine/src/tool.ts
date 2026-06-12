@@ -11,9 +11,9 @@
  * old `register()` action body did (byte-identical behaviour).
  */
 
-import { EXIT_CODES, type StoredSession, type ToolOptions } from '@opensip-tools/contracts';
-import { defineCommand, readPackageVersion } from '@opensip-tools/core';
-import { resolveSession } from '@opensip-tools/session-store';
+import { EXIT_CODES, type StoredSession, type ToolOptions } from '@opensip-cli/contracts';
+import { defineCommand, readPackageVersion } from '@opensip-cli/core';
+import { resolveSession } from '@opensip-cli/session-store';
 
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { renderSimLive } from './cli/sim-runner.js';
@@ -44,8 +44,8 @@ import type {
   Tool,
   ToolCliContext,
   ToolCommandDescriptor,
-} from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+} from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 const SIM: ToolCommandDescriptor = {
   name: 'sim',

@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/dashboard",
+  "name": "@opensip-cli/dashboard",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "Self-contained HTML dashboard generator for OpenSIP Tools — renders the fit/sim/graph report from session data and graph catalogs",
+  "description": "Self-contained HTML dashboard generator for OpenSIP CLI — renders the fit/sim/graph report from session data and graph catalogs",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "html-report",
@@ -13,12 +13,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/dashboard"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -37,7 +37,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/contracts": "workspace:*"
+    "@opensip-cli/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",

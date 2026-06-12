@@ -8,13 +8,13 @@
  * carried through from the envelope verdict.
  */
 
-import { buildSignalEnvelope } from '@opensip-tools/contracts';
-import { createSignal, HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
+import { buildSignalEnvelope } from '@opensip-cli/contracts';
+import { createSignal, HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { buildFitnessSessionPayload } from './session-payload.js';
 
-import type { SignalSeverity } from '@opensip-tools/core';
+import type { SignalSeverity } from '@opensip-cli/core';
 
 function sig(source: string, severity: SignalSeverity, ruleId = `fit:${source}`) {
   return createSignal({

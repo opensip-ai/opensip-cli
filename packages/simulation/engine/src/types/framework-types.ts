@@ -16,7 +16,7 @@ import type {
   SimulationMetrics,
   ScenarioAssertion as MutableScenarioAssertion,
 } from './base-types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 // =============================================================================
 // ASSERTION TYPES

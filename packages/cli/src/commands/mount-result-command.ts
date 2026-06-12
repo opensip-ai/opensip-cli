@@ -29,7 +29,7 @@ import { outcomeFromResult } from './assemble-outcome.js';
 import { renderOutcome } from './render-outcome.js';
 
 import type { CliCommandsContext } from './shared.js';
-import type { CommandResult } from '@opensip-tools/contracts';
+import type { CommandResult } from '@opensip-cli/contracts';
 import type { Command } from 'commander';
 
 export type CommandHandler<TOpts> = (opts: TOpts) => CommandResult | Promise<CommandResult>;

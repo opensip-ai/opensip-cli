@@ -15,7 +15,7 @@ import {
   ToolRegistry,
   type Tool,
   type ToolCliContext,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -105,7 +105,7 @@ describe('mountAllToolCommands', () => {
     const registry = new ToolRegistry();
     registry.register(specTool('fake-1', 'fake1'));
     registry.register(specTool('fake-2', 'fake2'));
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
 
     mountAllToolCommands(registry, program, makeStubContext());
 
@@ -134,7 +134,7 @@ describe('mountAllToolCommands', () => {
     };
     registry.register(broken);
     registry.register(specTool('works', 'works'));
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
 
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     mountAllToolCommands(registry, program, makeStubContext());

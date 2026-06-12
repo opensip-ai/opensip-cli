@@ -4,7 +4,7 @@
  * ADR-0010: `lang-python` is the canonical Python parse substrate for the whole
  * platform — fitness checks parse via the adapter (`getSharedTree`) and the
  * graph Python adapter consumes this too. The grammar is loaded once at module
- * top level (the WASM runtime is initialized by `@opensip-tools/tree-sitter`'s
+ * top level (the WASM runtime is initialized by `@opensip-cli/tree-sitter`'s
  * own top-level `Parser.init()`, statically imported here); a single reused
  * parser keeps `parse()` synchronous and allocation-free. Tree-sitter recovers
  * from syntax errors with MISSING nodes, so a malformed file yields a partial
@@ -18,7 +18,7 @@ import {
   createParser,
   parseToTree,
   type ParsedFile,
-} from '@opensip-tools/tree-sitter';
+} from '@opensip-cli/tree-sitter';
 
 const grammar = await loadGrammar(
   fileURLToPath(new URL('../wasm/tree-sitter-python.wasm', import.meta.url)),

@@ -4,7 +4,7 @@
  * ADR-0021 ("cross-tool CLI flag currency"): the flags every tool's run command
  * shares — `--json`, `--cwd`, `-q/--quiet`, `-v/--verbose`, `--debug`,
  * `--report-to`, `--api-key`, `--open` — are declared ONCE in
- * `@opensip-tools/contracts` (`commonFlags`) and applied via `applyCommonFlags`.
+ * `@opensip-cli/contracts` (`commonFlags`) and applied via `applyCommonFlags`.
  * Hand-declaring one with a raw `.option('--json', ...)` in a tool registration
  * file reintroduces the per-tool duplication that already drifted (`--report-to`
  * read three different ways before the registry). This check fires on that raw
@@ -15,13 +15,13 @@
  * (`tool-flag-surface.test.ts`, `sim-capability-contract.test.ts`). This check
  * is the complementary "don't hand-declare a common flag" guard.
  *
- * SCOPE — opensip-tools' own tool registration files only
+ * SCOPE — opensip-cli' own tool registration files only
  * (`packages/{fitness,graph,simulation}/engine/src/tool.ts`). The path guard
  * makes it inert in adopter repos (whose Commander CLIs legitimately declare
  * `--json` etc.) — it enforces THIS platform's architecture, not a universal
  * rule.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /** Resolved-path fragment identifying a first-party tool registration file. */
 const TOOL_REGISTRATION_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/src\/tool\.ts$/;
@@ -59,7 +59,7 @@ export function analyzeCrossToolFlagParity(content: string): CheckViolation[] {
       message: `Common flag '${longFlag}' is hand-declared via .option(...); cross-tool flags must come from the shared registry (ADR-0021).`,
       severity: 'error',
       line: i + 1,
-      suggestion: `Apply it via applyCommonFlags(cmd, [...keys]) from @opensip-tools/contracts instead of a raw .option('${longFlag}' ...).`,
+      suggestion: `Apply it via applyCommonFlags(cmd, [...keys]) from @opensip-cli/contracts instead of a raw .option('${longFlag}' ...).`,
     });
   }
   return violations;

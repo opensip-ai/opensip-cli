@@ -20,7 +20,7 @@ import {
   type ImportIndex,
 } from '../syntactic.js';
 
-import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
+import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 
 /** Build a minimal catalog occurrence for a named function in a file. */
 function occ(simpleName: string, filePath: string, hash: string): FunctionOccurrence {

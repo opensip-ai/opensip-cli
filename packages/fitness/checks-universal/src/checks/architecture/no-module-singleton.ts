@@ -33,13 +33,13 @@
  *     (or the line above) — an escape hatch that REQUIRES a written reason, so
  *     any new exemption is reviewable in the diff rather than silent.
  *
- * SCOPE — opensip-tools' own monorepo sources (`packages/** /src/**`,
+ * SCOPE — opensip-cli' own monorepo sources (`packages/** /src/**`,
  * excluding tests). Adopter repos are unaffected: the path guard makes the
  * check inert outside this workspace's package layout.
  */
 import path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 /** A first-party package source file (excludes tests + build output). */
 const PACKAGE_SRC_PATH = /packages\/[^/]+\/(?:[^/]+\/)?src\//;

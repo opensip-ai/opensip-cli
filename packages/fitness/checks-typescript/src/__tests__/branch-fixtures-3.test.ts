@@ -9,12 +9,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RunScope, runWithScope } from '@opensip-tools/core';
+import { RunScope, runWithScope } from '@opensip-cli/core';
 import {
   fileCache,
   setCurrentRecipeCheckConfig,
   clearCurrentRecipeCheckConfig,
-} from '@opensip-tools/fitness';
+} from '@opensip-cli/fitness';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';

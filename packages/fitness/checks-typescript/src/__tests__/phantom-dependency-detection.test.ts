@@ -9,7 +9,7 @@
  * resolution path matches production exactly.
  */
 
-import { runCheckOnFixture, type FixtureFile } from '@opensip-tools/test-support';
+import { runCheckOnFixture, type FixtureFile } from '@opensip-cli/test-support';
 import { describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';

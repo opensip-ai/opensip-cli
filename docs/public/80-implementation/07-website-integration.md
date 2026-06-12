@@ -29,7 +29,7 @@ should expose `/cli/install.sh` as a stable branded URL and either redirect or
 proxy to:
 
 ```
-https://raw.githubusercontent.com/opensip-ai/opensip-tools/main/scripts/install.sh
+https://raw.githubusercontent.com/opensip-ai/opensip-cli/main/scripts/install.sh
 ```
 
 For a Replit/Express site, the smallest route is:
@@ -38,7 +38,7 @@ For a Replit/Express site, the smallest route is:
 app.get('/cli/install.sh', (_req, res) => {
   res.redirect(
     302,
-    'https://raw.githubusercontent.com/opensip-ai/opensip-tools/main/scripts/install.sh',
+    'https://raw.githubusercontent.com/opensip-ai/opensip-cli/main/scripts/install.sh',
   );
 });
 ```
@@ -55,22 +55,22 @@ the implementation detail.
 The single entry point is `docs/web-generated/manifest.json`. Fetch it from:
 
 ```
-https://raw.githubusercontent.com/opensip-ai/opensip-tools/main/docs/web-generated/manifest.json
+https://raw.githubusercontent.com/opensip-ai/opensip-cli/main/docs/web-generated/manifest.json
 ```
 
 Shape:
 
 ```ts
 type DocManifest = {
-  version: string;       // e.g. "1.0.4" — the opensip-tools release this docset matches
-  rawBase: string;       // e.g. "https://raw.githubusercontent.com/opensip-ai/opensip-tools/v1.0.4/"
+  version: string;       // e.g. "1.0.4" — the opensip-cli release this docset matches
+  rawBase: string;       // e.g. "https://raw.githubusercontent.com/opensip-ai/opensip-cli/v1.0.4/"
   pages: DocPage[];
   nav: NavSection[];
 };
 
 type DocPage = {
   file: string;          // 'docs/web-generated/00-start/00-quick-start.md'
-  path: string;          // '/docs/opensip-tools/00-start/00-quick-start/'
+  path: string;          // '/docs/opensip-cli/00-start/00-quick-start/'
   section: string;       // '00-start' (empty string for root README)
   title: string;
   audience?: string[];
@@ -86,7 +86,7 @@ type NavSection = {
 
 Per-page markdown is at `${rawBase}${page.file}`. Frontmatter is YAML; the body is GitHub-flavored markdown. The build script's link rewriter has already turned source-code references into full `github.com/...` URLs and sibling `.md` links into root-relative website paths.
 
-`rawBase` pins to the **release tag** of opensip-tools, not `main`. The website's docs always match a released version of the CLI — you never see a half-merged-mid-release state. When opensip-tools bumps versions, the manifest's `rawBase` updates automatically and the website picks up the new release on the next cache refresh.
+`rawBase` pins to the **release tag** of opensip-cli, not `main`. The website's docs always match a released version of the CLI — you never see a half-merged-mid-release state. When opensip-cli bumps versions, the manifest's `rawBase` updates automatically and the website picks up the new release on the next cache refresh.
 
 ---
 
@@ -101,7 +101,7 @@ import matter from 'gray-matter';
 const router = Router();
 
 const MANIFEST_URL =
-  'https://raw.githubusercontent.com/opensip-ai/opensip-tools/main/docs/web-generated/manifest.json';
+  'https://raw.githubusercontent.com/opensip-ai/opensip-cli/main/docs/web-generated/manifest.json';
 const TTL_MS = 5 * 60 * 1000;  // 5-minute cache
 
 type Cached<T> = { value: T; expiresAt: number };
@@ -145,7 +145,7 @@ router.get('/manifest', async (_req, res, next) => {
 router.get('/page', async (req, res, next) => {
   try {
     const path = String(req.query.path ?? '');
-    if (!path.startsWith('/docs/opensip-tools/')) {
+    if (!path.startsWith('/docs/opensip-cli/')) {
       return res.status(400).json({ error: 'invalid path' });
     }
     const manifest = await fetchManifest();
@@ -180,7 +180,7 @@ Dependencies: `gray-matter` (for frontmatter parsing). The `fetch` built-in is a
 
 The 5-minute TTL is the default freshness window. Two ways to go tighter if it matters:
 
-- **GitHub webhook** — opensip-tools fires a webhook on every push to main; your Express receives it and clears `manifestCache.current` and `pageCache`. Adds ~10 lines and a webhook secret to manage.
+- **GitHub webhook** — opensip-cli fires a webhook on every push to main; your Express receives it and clears `manifestCache.current` and `pageCache`. Adds ~10 lines and a webhook secret to manage.
 - **Just lower TTL** — `TTL_MS = 60_000` (1 minute) is fine for the GitHub raw endpoints' rate limits if your docs traffic is modest.
 
 For longer-term resilience: replace the in-memory `Map` with a PostgreSQL table via Drizzle. Doesn't change the contract, just the storage. Useful if you have multiple Express instances behind a load balancer.
@@ -251,7 +251,7 @@ export function DocsOpensipTools() {
       .then((data) => {
         setTitle(data.page.title);
         setBody(data.body);
-        document.title = `${data.page.title} · OpenSIP Tools`;
+        document.title = `${data.page.title} · OpenSIP CLI`;
       })
       .catch((e) => setError(e.message));
   }, [location]);
@@ -324,7 +324,7 @@ Register the route in your top-level router:
 import { Route } from 'wouter';
 import { DocsOpensipTools } from '@/pages/DocsOpensipTools';
 
-<Route path="/docs/opensip-tools/:rest*" component={DocsOpensipTools} />
+<Route path="/docs/opensip-cli/:rest*" component={DocsOpensipTools} />
 ```
 
 Dependencies to add: `react-markdown`, `remark-gfm`.
@@ -358,7 +358,7 @@ Vite + React renders client-side, which Googlebot handles (it executes JS) but i
 
 1. **Express middleware that serves prerendered HTML to crawlers**. Detect Googlebot/Bingbot via user-agent; for those requests, fetch the manifest+page server-side and inline the body into the initial HTML response. For everyone else, serve the standard SPA shell.
 
-2. **Move docs rendering fully into Express** — return a server-rendered HTML page at `/docs/opensip-tools/*` paths, bypassing React entirely for that route. Most SEO-friendly but doubles the rendering surface.
+2. **Move docs rendering fully into Express** — return a server-rendered HTML page at `/docs/opensip-cli/*` paths, bypassing React entirely for that route. Most SEO-friendly but doubles the rendering surface.
 
 Start with plain CSR; upgrade only if Google indexing latency is hurting acquisition.
 
@@ -376,9 +376,9 @@ Start with plain CSR; upgrade only if Google indexing latency is hurting acquisi
 
 ## Adding new docs
 
-The contract is: every time `docs/web-generated/manifest.json` in opensip-tools updates, the website picks up the changes within the 5-minute TTL window. No deployment of opensip.ai is needed for new docs.
+The contract is: every time `docs/web-generated/manifest.json` in opensip-cli updates, the website picks up the changes within the 5-minute TTL window. No deployment of opensip.ai is needed for new docs.
 
-In opensip-tools:
+In opensip:
 1. Edit `docs/public/*.md`
 2. `pnpm docs:build` regenerates `docs/web-generated/` (including manifest)
 3. Commit and push

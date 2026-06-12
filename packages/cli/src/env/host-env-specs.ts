@@ -12,15 +12,15 @@
  * exceptions into one `describeHostEnv()` for the reference doc — the CLI is the
  * composition root, so it is the one place that can name every layer's specs.
  *
- * Pre-scope exceptions: the terminal-theme color vars (`@opensip-tools/cli-ui` has
+ * Pre-scope exceptions: the terminal-theme color vars (`@opensip-cli/cli-ui` has
  * no `core` dependency and resolves colors before any scope exists) and
  * `NODE_OPTIONS` (the graph heap-preflight mutates it before any opensip module
  * loads) are read raw at their sites. They are declared here for documentation
  * only and allow-listed by the `env-via-registry` guardrail.
  */
 
-import { CONFIG_ENV_SPECS } from '@opensip-tools/config';
-import { EnvRegistry, type EnvVarSpec } from '@opensip-tools/core';
+import { CONFIG_ENV_SPECS } from '@opensip-cli/config';
+import { EnvRegistry, type EnvVarSpec } from '@opensip-cli/core';
 
 /** CLI-layer infra variables: OpenTelemetry + the update-notifier opt-outs. */
 export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
@@ -45,7 +45,7 @@ export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
     docs: 'npm-convention update-notifier opt-out; honoured as an equivalent of OPENSIP_NO_UPDATE.',
   },
   {
-    canonical: 'OPENSIP_TOOLS_SKIP_BUNDLED',
+    canonical: 'OPENSIP_CLI_SKIP_BUNDLED',
     coerce: (raw) =>
       raw
         .split(',')
@@ -58,7 +58,7 @@ export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       '— the install-source-independence escape hatch (3.0.0). Unset = load all bundled tools.',
   },
   {
-    canonical: 'OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS',
+    canonical: 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
     // Mirror parseAllowlist's split (whitespace AND comma) so the registry value
     // and tool-trust's set agree exactly — including the `*` token, which passes
     // through as a plain id the trust check tests for.
@@ -71,9 +71,9 @@ export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
     docs:
       'Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default). ' +
       "Use '*' to admit all project-authored tools. A project-authored sidecar tool under " +
-      '<project>/opensip-tools/tools/ is NOT loaded unless its id (or *) appears here — it ' +
+      '<project>/opensip-cli/tools/ is NOT loaded unless its id (or *) appears here — it ' +
       'rides in with git clone, so loading it runs untrusted code. Global-authored tools ' +
-      '(~/.opensip-tools/tools/) are trusted-by-default and ignore this list.',
+      '(~/.opensip-cli/tools/) are trusted-by-default and ignore this list.',
   },
 ];
 
@@ -86,7 +86,7 @@ export const hostEnv = new EnvRegistry(CLI_ENV_SPECS);
  * at the composition root for the env-surface reference.
  *
  * 3.0.0 GA: the host no longer statically imports a tool package (e.g.
- * `GRAPH_ENV_SPECS` from `@opensip-tools/graph`) — that would couple the host to
+ * `GRAPH_ENV_SPECS` from `@opensip-cli/graph`) — that would couple the host to
  * a tool runtime and break the install-source-independence the `no-bootstrap-tool-import`
  * guardrail enforces. The tool keeps OWNING the runtime read (its registry, its
  * coercion); the composition root names the variable for documentation only, the

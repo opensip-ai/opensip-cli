@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-08
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0027: GA — the tool-plugin parity cutover (remove the privileged paths)

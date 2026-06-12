@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-01
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0002: Coupling buckets by nearest package.json, not a path heuristic
@@ -22,7 +22,7 @@ enforcement-reason: >
 ```
 
 **Decision:** A file's package identity is the `name` of its **nearest enclosing
-`package.json`** (e.g. `@opensip-tools/fitness`), falling back to the top-level
+`package.json`** (e.g. `@opensip-cli/fitness`), falling back to the top-level
 path segment when no manifest is found. It is computed once at build time by the
 `assignPackages` post-walk pass and stamped on every occurrence as
 `FunctionOccurrence.package` (a new optional catalog-contract field). The coupling

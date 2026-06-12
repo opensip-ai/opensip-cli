@@ -1,5 +1,5 @@
 /**
- * Banner — the OpenSIP Tools ASCII art banner. Used as the header for every
+ * Banner — the OpenSIP CLI ASCII art banner. Used as the header for every
  * live-view tool runner and for App.tsx's static-render path.
  *
  * Four sizes are available via the `size` prop:
@@ -10,7 +10,7 @@
  *     make it read as a mug).
  *   - `sm` — half-height AND half-width (quarter-block wordmark, smaller mug).
  *   - `mini` — a compact, boxed identity card: a small amber coffee cup on
- *     the left and four info lines on the right (`opensip-tools vX.Y.Z`,
+ *     the left and four info lines on the right (`opensip-cli vX.Y.Z`,
  *     the tagline, the `www.opensip.ai` URL, and the project path), framed in
  *     a rounded amber border. Modeled on the Claude Code session card. Unlike
  *     the wordmark sizes it carries the version + project path inline, so
@@ -57,7 +57,7 @@ export function UpdateHint(): React.ReactElement {
 
 /**
  * Narrow an untyped banner-size string (e.g. from `ui.banner` in
- * `opensip-tools.config.yml`, which reaches the kernel as a plain `string`)
+ * `opensip-cli.config.yml`, which reaches the kernel as a plain `string`)
  * to a {@link BannerSize}. Unknown / undefined values fall back to `lg`, the
  * documented default. Centralised here so `cli-ui` stays the single owner of
  * the `BannerSize` union and the layers below it (core, contracts) need only
@@ -233,7 +233,7 @@ function MiniBanner({
       </Box>
       <Box flexDirection="column">
         <Text>
-          <Text bold>opensip-tools</Text> <Text dimColor>v{version}</Text>
+          <Text bold>OpenSIP CLI</Text> <Text dimColor>v{version}</Text>
           {update !== undefined && <Text color={theme.success}> (v{update} available)</Text>}
         </Text>
         <Text dimColor>{MINI_TAGLINE}</Text>

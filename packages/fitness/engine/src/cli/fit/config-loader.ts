@@ -1,5 +1,5 @@
 /**
- * `opensip-tools.config.yml` parsing + validation for the `fit` command.
+ * `opensip-cli.config.yml` parsing + validation for the `fit` command.
  *
  * Wraps `loadSignalersConfig` and `loadTargetsConfig` so that
  * `executeFit` gets a single resolve-or-error step. A missing/invalid
@@ -7,14 +7,14 @@
  * zero findings, the exact failure mode the CLI exists to prevent.
  */
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { logger } from '@opensip-tools/core';
+import { EXIT_CODES } from '@opensip-cli/contracts';
+import { logger } from '@opensip-cli/core';
 
 import { loadSignalersConfig } from '../../signalers/index.js';
 import { loadTargetsConfig } from '../../targets/index.js';
 
 import type { SignalersConfig } from '../../signalers/types.js';
-import type { ErrorResult, FitOptions } from '@opensip-tools/contracts';
+import type { ErrorResult, FitOptions } from '@opensip-cli/contracts';
 
 export interface LoadedFitConfig {
   signalersConfig: SignalersConfig;
@@ -48,7 +48,7 @@ export function loadFitConfig(args: FitOptions): LoadedFitConfig | { error: Erro
         type: 'error',
         message,
         suggestion:
-          "Run 'opensip-tools init' to scaffold a config, or pass --config <path> to point at an existing one.",
+          "Run 'opensip init' to scaffold a config, or pass --config <path> to point at an existing one.",
         exitCode: EXIT_CODES.CONFIGURATION_ERROR,
       },
     };
@@ -83,7 +83,7 @@ export function loadFitConfig(args: FitOptions): LoadedFitConfig | { error: Erro
 export async function validateLanguagesAgainstAdapters(
   targetRegistry: LoadedFitConfig['targetRegistry'],
 ): Promise<readonly string[]> {
-  const { currentScope, isRecognizedNonCodeFormat } = await import('@opensip-tools/core');
+  const { currentScope, isRecognizedNonCodeFormat } = await import('@opensip-cli/core');
   const scope = currentScope();
   if (!scope) {
     throw new Error(

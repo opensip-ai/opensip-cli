@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadCliDefaultsFromContracts = vi.fn();
 
-vi.mock('@opensip-tools/contracts', () => ({
+vi.mock('@opensip-cli/contracts', () => ({
   loadCliDefaults: loadCliDefaultsFromContracts,
 }));
 

@@ -1,4 +1,4 @@
-import { LanguageRegistry, RunScope, ToolRegistry, currentScope } from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, ToolRegistry, currentScope } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import { makeTestScope, withScope, withScopeSync } from '../with-scope.js';

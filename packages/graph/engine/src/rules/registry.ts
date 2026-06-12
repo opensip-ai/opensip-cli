@@ -17,7 +17,7 @@
  * it's gone. Callers now use the `currentRules()` helper.
  */
 
-import { Registry, currentScope, type Registerable } from '@opensip-tools/core';
+import { Registry, currentScope, type Registerable } from '@opensip-cli/core';
 
 import { alwaysThrowsBranchRule } from './always-throws-branch.js';
 import { cycleRule } from './cycle.js';

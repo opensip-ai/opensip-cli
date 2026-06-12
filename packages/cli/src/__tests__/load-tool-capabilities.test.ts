@@ -16,7 +16,7 @@ import {
   runWithScope,
   type CapabilityDomainSpec,
   type Tool,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { loadOwningToolCapabilities } from '../bootstrap/load-tool-capabilities.js';

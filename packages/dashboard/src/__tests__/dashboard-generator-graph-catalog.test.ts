@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import { generateDashboardHtml } from '../generator.js';
 
-import type { GraphCatalog } from '@opensip-tools/contracts';
+import type { GraphCatalog } from '@opensip-cli/contracts';
 
 const minimalCatalog: GraphCatalog = {
   version: '2.0',

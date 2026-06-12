@@ -28,10 +28,10 @@ describe('formatNoProjectFoundMessage', () => {
   // bootstrap.error CommandOutcome. This formatter is the human path only.
   it('renders the human walked-up explainer with the init hint', () => {
     const out = formatNoProjectFoundMessage('/some/dir');
-    expect(out).toContain('No opensip-tools project found');
+    expect(out).toContain('No OpenSIP CLI project found');
     expect(out).toContain('Searched from: /some/dir');
     expect(out).toContain('Walked up to: /');
-    expect(out).toContain('opensip-tools init');
+    expect(out).toContain('opensip init');
     // Human path is not JSON.
     expect(() => JSON.parse(out)).toThrow();
   });

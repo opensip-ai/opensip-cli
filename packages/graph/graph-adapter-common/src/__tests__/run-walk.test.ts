@@ -19,7 +19,7 @@ import type {
   DependencySiteRecord,
   FunctionOccurrence,
   WalkInput,
-} from '@opensip-tools/graph';
+} from '@opensip-cli/graph';
 
 // A parsed file is opaque to runWalk (only walkFile reads it), so a tagged
 // stub suffices.

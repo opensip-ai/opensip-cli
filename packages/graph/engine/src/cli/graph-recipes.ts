@@ -13,7 +13,7 @@
 
 import { currentGraphRecipes } from '../recipes/registry.js';
 
-import type { ListRecipesResult } from '@opensip-tools/contracts';
+import type { ListRecipesResult } from '@opensip-cli/contracts';
 
 /**
  * Returns metadata for every registered graph recipe.

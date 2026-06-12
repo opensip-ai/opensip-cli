@@ -8,13 +8,13 @@
  * any tool-specific component. Layer 5 Phase 3 (audit 2026-05-23 F3).
  */
 
-import { ThemeProvider } from '@opensip-tools/cli-ui';
+import { ThemeProvider } from '@opensip-cli/cli-ui';
 import React from 'react';
 
 import { App, type ProjectHeaderProps } from './App.js';
 
-import type { CommandResult } from '@opensip-tools/contracts';
-import type { UiContext } from '@opensip-tools/core';
+import type { CommandResult } from '@opensip-cli/contracts';
+import type { UiContext } from '@opensip-cli/core';
 
 /** Render a static command result. */
 export async function renderApp(

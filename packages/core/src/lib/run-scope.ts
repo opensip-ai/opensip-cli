@@ -15,7 +15,7 @@
  * read from `currentScope()` instead of `globalThis`. The two-copies-of-
  * fitness hazard documented at the prior `Symbol.for(globalThis)` site
  * is solved by ALS — both fitness copies share the same
- * `AsyncLocalStorage` instance exported from `@opensip-tools/core`.
+ * `AsyncLocalStorage` instance exported from `@opensip-cli/core`.
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';

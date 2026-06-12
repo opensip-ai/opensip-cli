@@ -4,7 +4,7 @@
  * CLI infra reads coerce as the migrated sites expect.
  */
 
-import { GRAPH_ENV_SPECS } from '@opensip-tools/graph';
+import { GRAPH_ENV_SPECS } from '@opensip-cli/graph';
 import { afterEach, describe, it, expect } from 'vitest';
 
 import {
@@ -33,7 +33,7 @@ describe('describeHostEnv', () => {
     // The project-authored-tool allowlist var is declared (Phase 3) so the
     // generated env reference is complete; tool-trust reads it via an injectable
     // env seam (pre-scope), documented here.
-    expect(canonicals).toContain('OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS');
+    expect(canonicals).toContain('OPENSIP_CLI_ALLOW_PROJECT_TOOLS');
     // No duplicates — each variable is declared once across the whole surface.
     expect(new Set(canonicals).size).toBe(canonicals.length);
     // Every spec carries docs (the reference is generated from these).
@@ -88,31 +88,31 @@ describe('hostEnv reads (CLI infra)', () => {
       'TRACEPARENT',
       'OPENSIP_NO_UPDATE',
       'NO_UPDATE_NOTIFIER',
-      'OPENSIP_TOOLS_SKIP_BUNDLED',
-      'OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS',
+      'OPENSIP_CLI_SKIP_BUNDLED',
+      'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
     ]);
   });
 
-  it('OPENSIP_TOOLS_SKIP_BUNDLED coerces to a trimmed id list (default empty)', () => {
-    expect(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_SKIP_BUNDLED')).toEqual([]);
-    process.env.OPENSIP_TOOLS_SKIP_BUNDLED = ' fitness , graph ';
-    expect(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_SKIP_BUNDLED')).toEqual([
+  it('OPENSIP_CLI_SKIP_BUNDLED coerces to a trimmed id list (default empty)', () => {
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_SKIP_BUNDLED')).toEqual([]);
+    process.env.OPENSIP_CLI_SKIP_BUNDLED = ' fitness , graph ';
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_SKIP_BUNDLED')).toEqual([
       'fitness',
       'graph',
     ]);
-    delete process.env.OPENSIP_TOOLS_SKIP_BUNDLED;
+    delete process.env.OPENSIP_CLI_SKIP_BUNDLED;
   });
 
-  it('OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS coerces on whitespace AND comma (default empty), agreeing with parseAllowlist', () => {
-    expect(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS')).toEqual([]);
-    process.env.OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS = 'my-audit, my-lint  my-bench';
-    expect(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS')).toEqual([
+  it('OPENSIP_CLI_ALLOW_PROJECT_TOOLS coerces on whitespace AND comma (default empty), agreeing with parseAllowlist', () => {
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_PROJECT_TOOLS')).toEqual([]);
+    process.env.OPENSIP_CLI_ALLOW_PROJECT_TOOLS = 'my-audit, my-lint  my-bench';
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_PROJECT_TOOLS')).toEqual([
       'my-audit',
       'my-lint',
       'my-bench',
     ]);
-    process.env.OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS = '*';
-    expect(hostEnv.get<readonly string[]>('OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS')).toEqual(['*']);
-    delete process.env.OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS;
+    process.env.OPENSIP_CLI_ALLOW_PROJECT_TOOLS = '*';
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_PROJECT_TOOLS')).toEqual(['*']);
+    delete process.env.OPENSIP_CLI_ALLOW_PROJECT_TOOLS;
   });
 });

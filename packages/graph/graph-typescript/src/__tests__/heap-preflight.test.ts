@@ -11,17 +11,17 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { RunScope, runWithScope, runWithScopeSync } from '@opensip-tools/core';
-import { currentAdapterRegistry, graphTool } from '@opensip-tools/graph';
+import { RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
+import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import {
   HEAP_TARGETS,
   decideHeapTargetMb,
   runHeapPreflight,
   systemHasMemoryFor,
   totalSystemMemoryMb,
-} from '@opensip-tools/graph/internal';
-import { pythonGraphAdapter } from '@opensip-tools/graph-python';
-import { rustGraphAdapter } from '@opensip-tools/graph-rust';
+} from '@opensip-cli/graph/internal';
+import { pythonGraphAdapter } from '@opensip-cli/graph-python';
+import { rustGraphAdapter } from '@opensip-cli/graph-rust';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';

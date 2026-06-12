@@ -14,14 +14,14 @@
  *      off precision: edge cases like nested template literals or escaped
  *      quotes inside comments are best-effort.
  *
- *   2. **`filterContent` in `@opensip-tools/lang-typescript`** — uses the
+ *   2. **`filterContent` in `@opensip-cli/lang-typescript`** — uses the
  *      real TypeScript scanner, position-preserving (string content is
  *      replaced with whitespace of equal length so line/column numbers
  *      survive). Cached. Used exclusively by TS-aware checks where the
  *      precision matters.
  *
  * The dispatch boundary is `applyContentFilter` in
- * `@opensip-tools/core/languages/content-filter-dispatch.ts` — checks
+ * `@opensip-cli/core/languages/content-filter-dispatch.ts` — checks
  * declare a `contentFilter` mode (`'strip-strings'`,
  * `'strip-strings-and-comments'`, `'raw'`) and the language adapter for
  * the file's extension routes to the right family. New strippers plug in

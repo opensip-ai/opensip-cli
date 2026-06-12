@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-12
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0044: Dashboard graph containment via compound nodes on the existing Cytoscape substrate
@@ -104,7 +104,7 @@ guardrails, not a platform change: projection stays at report-generation time
 as an embedded JSON blob (recompute-not-materialize, never persisted back —
 ADR-0006's decoupled-reader posture is preserved, with `graph-view-model.ts`
 remaining the bundle-size budget enforcement point), and nothing in
-`@opensip-tools/graph` or the `GraphCatalog` contract changes.
+`@opensip-cli/graph` or the `GraphCatalog` contract changes.
 
 **Consequences:**
 
@@ -113,7 +113,7 @@ remaining the bundle-size budget enforcement point), and nothing in
   `cytoscape-fcose`, `cytoscape-expand-collapse` — fcose's UMD global chain
   is order-sensitive); `BUDGET_KB` is 700 in the script and both gate tests,
   with the measured table above as the recorded justification. esbuild joins
-  `@opensip-tools/dashboard` as an exact-pinned devDependency.
+  `@opensip-cli/dashboard` as an exact-pinned devDependency.
 - The `dashboard-no-ui-framework` regex covers `cytoscape-*` plugins; the
   offline test additionally asserts the new globals resolve with zero
   `<script src>`/CDN.

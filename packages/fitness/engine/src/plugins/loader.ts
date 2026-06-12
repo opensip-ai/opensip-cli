@@ -2,7 +2,7 @@
  * @fileoverview Fitness plugin loader — adapter over core's generic loader.
  *
  * Core owns the discovery, dynamic-import, error-wrap, and log machinery
- * (see @opensip-tools/core's loadPlugin / loadAllPlugins). This file
+ * (see @opensip-cli/core's loadPlugin / loadAllPlugins). This file
  * supplies the fitness-specific `registerExports` callback that knows
  * how to interpret a `FitPluginExports`-shaped module: register
  * language adapters (for the `lang` domain), checks (named or in a
@@ -17,7 +17,7 @@ import {
   loadAllPlugins as coreLoadAllPlugins,
   loadPlugin as coreLoadPlugin,
   registerRecipesFromMod,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { isCheck } from '../framework/check-types.js';
 import { currentCheckRegistry, currentRecipeRegistry } from '../framework/scope-registry.js';
@@ -31,11 +31,11 @@ import type {
   PluginLoadResult,
   RegisteredCounts,
   RegisterCtx,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 /**
  * Fitness's project-local plugin layout — user checks/recipes live under
- * `<project>/opensip-tools/fit/{checks,recipes}/`. Exported so the
+ * `<project>/opensip-cli/fit/{checks,recipes}/`. Exported so the
  * `fitnessTool` descriptor (`Tool.pluginLayout`) and the CLI's `plugin`
  * command share one source of truth (ADR-0009 corollary 1).
  */

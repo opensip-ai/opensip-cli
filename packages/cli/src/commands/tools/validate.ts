@@ -29,11 +29,11 @@ import { npmInstallIntoHost } from '../plugin-host-ops.js';
 import { runRuntimeProbe } from './runtime-probe.js';
 import { runStorageContractChecks, type StorageFinding } from './storage-contract-checks.js';
 
-import type { ToolsValidateResult, ToolsValidateSection } from '@opensip-tools/contracts';
+import type { ToolsValidateResult, ToolsValidateSection } from '@opensip-cli/contracts';
 
 /** The one-line execution notice printed before any candidate code can run. */
 export const VALIDATE_EXECUTION_NOTICE =
-  'opensip-tools: validating runs the package’s module (untrusted code; ' +
+  'opensip: validating runs the package’s module (untrusted code; ' +
   'install scripts stay blocked, the import runs in a sandboxed-by-timeout ' +
   'child process — a crash boundary, not a security boundary).\n';
 

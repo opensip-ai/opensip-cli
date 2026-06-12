@@ -5,7 +5,7 @@
  * no-op contract (no SDK is registered in the graph package) plus the wiring
  * that the stage result flows into `attrsFn`. Span-CAPTURE for the sharded
  * path (real spans, nested under the parent build via TRACEPARENT) lives in
- * `opensip-tools`, where the SDK legitimately lives.
+ * `opensip-cli`, where the SDK legitimately lives.
  */
 
 import { describe, it, expect, vi } from 'vitest';

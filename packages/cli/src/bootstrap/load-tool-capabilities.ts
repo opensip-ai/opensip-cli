@@ -13,24 +13,24 @@
  * import; no module singleton; lazy per command (only the invoked tool's domains
  * load, so `graph` does not load fit-packs).
  *
- * This module is one of the few places the CLI imports `@opensip-tools/config`
+ * This module is one of the few places the CLI imports `@opensip-cli/config`
  * (the preference resolver) — tools never do.
  */
 
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { resolveCapabilityPreferences } from '@opensip-tools/config';
+import { resolveCapabilityPreferences } from '@opensip-cli/config';
 import {
   currentCapabilityRegistry,
   loadCapabilityDomain,
   readYamlFile,
   type Tool,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 /**
  * Resolve the directory the CLI was installed into. BUILT-IN capability packs
- * (the bundled `@opensip-tools/*` check packs + graph adapters, declared as CLI
+ * (the bundled `@opensip-cli/*` check packs + graph adapters, declared as CLI
  * dependencies) always resolve from here — a project never carries them, and a
  * globally-installed CLI runs ITS OWN bundled packs. This file lives at
  * `cli/dist/bootstrap/`, so the package root is three directories up.
@@ -75,7 +75,7 @@ export async function loadOwningToolCapabilities(
   const { owningTool, projectDir, configPath } = options;
   if (!owningTool) return 0;
   // Built-in packs (those under a descriptor's `builtinScope`, e.g. the bundled
-  // @opensip-tools/graph-* adapters) resolve from the CLI's own install tree.
+  // @opensip-cli/graph-* adapters) resolve from the CLI's own install tree.
   const cliDir = options.cliDir ?? cliInstallDir();
 
   // The per-run capability registry is read off the current scope (the loader's

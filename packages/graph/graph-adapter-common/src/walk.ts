@@ -21,7 +21,7 @@
 
 import { relative } from 'node:path';
 
-import { nameOf, childrenOf, namedChildrenOf } from '@opensip-tools/tree-sitter';
+import { nameOf, childrenOf, namedChildrenOf } from '@opensip-cli/tree-sitter';
 
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
 import type {
@@ -32,8 +32,8 @@ import type {
   ParseError,
   WalkInput,
   WalkOutput,
-} from '@opensip-tools/graph';
-import type { Node } from '@opensip-tools/tree-sitter';
+} from '@opensip-cli/graph';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 // ── output helpers ────────────────────────────────────────────────
 
@@ -215,9 +215,9 @@ export function synthesizeModuleInit<F extends TreeSitterParsedFile>(
 // ── node helpers ──────────────────────────────────────────────────
 
 // `nameOf` / `childrenOf` / `namedChildrenOf` now live in the canonical
-// grammar-agnostic substrate `@opensip-tools/tree-sitter` (ADR-0010). They
+// grammar-agnostic substrate `@opensip-cli/tree-sitter` (ADR-0010). They
 // are re-exported here so the graph adapters' existing imports from
-// `@opensip-tools/graph-adapter-common` are unchanged. (Imported, not just
+// `@opensip-cli/graph-adapter-common` are unchanged. (Imported, not just
 // re-exported, because `synthesizeModuleInit` above uses `childrenOf`
 // internally — a plain `export…from` would not bind it in scope.)
 // eslint-disable-next-line unicorn/prefer-export-from -- childrenOf is also used internally; the import binding is required

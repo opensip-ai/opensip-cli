@@ -16,9 +16,9 @@
 import { readFile as fsReadFile } from 'node:fs/promises';
 import { resolve as resolvePath } from 'node:path';
 
-import { filterSignalsBySuppressions } from '@opensip-tools/core';
+import { filterSignalsBySuppressions } from '@opensip-cli/core';
 
-import type { Signal, SuppressionKeywords, SuppressionLocation } from '@opensip-tools/core';
+import type { Signal, SuppressionKeywords, SuppressionLocation } from '@opensip-cli/core';
 
 const GRAPH_KEYWORDS: SuppressionKeywords = {
   file: '@graph-ignore-file',

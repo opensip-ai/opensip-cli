@@ -16,14 +16,14 @@
  *
  * This is the **generic** half of file targeting (ADR-0037): register/get/byTag
  * over the host-owned `Target` shape. The scope-matching `findByScope`
- * (languages + concerns) stays in `@opensip-tools/fitness` — `concerns` is a
+ * (languages + concerns) stays in `@opensip-cli/fitness` — `concerns` is a
  * check-scope concept, so the substrate carries no language-canonicalizing path
  * and never reads the run scope.
  */
 
-import { Registry, type Registerable } from '@opensip-tools/core';
+import { Registry, type Registerable } from '@opensip-cli/core';
 
-import type { Target } from '@opensip-tools/config';
+import type { Target } from '@opensip-cli/config';
 
 interface RegisterableTarget extends Registerable {
   readonly id: string; // same as target.config.name (Target has no id today)

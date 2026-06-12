@@ -7,7 +7,7 @@
 
 import * as fs from 'node:fs/promises';
 
-import { ValidationError, applyContentFilter } from '@opensip-tools/core';
+import { ValidationError, applyContentFilter } from '@opensip-cli/core';
 
 import { fileCache } from './file-cache.js';
 

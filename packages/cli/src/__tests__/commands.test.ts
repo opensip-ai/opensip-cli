@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { registerCliCommands } from '../commands/index.js';
 
-import type { CommandResult } from '@opensip-tools/contracts';
+import type { CommandResult } from '@opensip-cli/contracts';
 
 function makeContext(): {
   setExitCode: ReturnType<typeof vi.fn>;
@@ -41,7 +41,7 @@ function subcommandNames(parent: Command, name: string): string[] {
 
 describe('registerCliCommands', () => {
   it('mounts every CLI-owned top-level command', () => {
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
     registerCliCommands(program, makeContext());
 
     expect(topLevelNames(program)).toEqual([
@@ -57,19 +57,19 @@ describe('registerCliCommands', () => {
   });
 
   it('mounts the documented sessions subcommands', () => {
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
     registerCliCommands(program, makeContext());
     expect(subcommandNames(program, 'sessions')).toEqual(['list', 'purge', 'show']);
   });
 
   it('mounts the documented plugin subcommands', () => {
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
     registerCliCommands(program, makeContext());
     expect(subcommandNames(program, 'plugin')).toEqual(['add', 'list', 'remove', 'sync']);
   });
 
   it('does not mount any tool subcommands (those come via tool.register)', () => {
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
     registerCliCommands(program, makeContext());
     const names = topLevelNames(program);
     expect(names).not.toContain('fit');

@@ -56,7 +56,7 @@ export class LanguageParseCache {
   /**
    * Language-specific filtered-content cache. Keyed by raw content
    * string (no adapter or file path prefix) because the
-   * `filterContent(content)` API in `@opensip-tools/lang-typescript`
+   * `filterContent(content)` API in `@opensip-cli/lang-typescript`
    * is content-only. Phase 6 Task 6.4 moved this off a separate
    * module-level Map; the merge is by lifecycle, not by key shape.
    */

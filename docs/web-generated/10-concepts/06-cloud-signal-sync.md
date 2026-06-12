@@ -21,7 +21,7 @@ related-docs:
 ---
 # Cloud signal sync
 
-Cloud signal sync is an **optional, entitlement-gated, best-effort** sidecar to a normal run. When you have an OpenSIP Cloud API key and the cloud-storage entitlement, each `fit`/`graph` run *also* sends the findings it already computes to OpenSIP Cloud for storage. It is **additive**: your results are always written to the local SQLite store first, and a cloud failure never blocks, slows, or fails a run. Decided in [ADR-0008](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0008-opensip-cloud-signal-sync.md).
+Cloud signal sync is an **optional, entitlement-gated, best-effort** sidecar to a normal run. When you have an OpenSIP Cloud API key and the cloud-storage entitlement, each `fit`/`graph` run *also* sends the findings it already computes to OpenSIP Cloud for storage. It is **additive**: your results are always written to the local SQLite store first, and a cloud failure never blocks, slows, or fails a run. Decided in [ADR-0008](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/docs/decisions/ADR-0008-opensip-cloud-signal-sync.md).
 
 > **Preview — server side not yet available.** This repo owns the **client and the wire contract** (a `SignalBatch` envelope) only. The signal-ingestion endpoint, the entitlement API, and the Postgres storage live in the parent `opensip` service and **do not exist yet** (per ADR-0008). Until they ship, an entitled run has no live endpoint to reach — this page describes the *intended* behavior and the client pipeline that is already wired, not a feature you can rely on today.
 
@@ -59,11 +59,11 @@ If you don't have a key, none of this runs — no network, no check, no cost. Th
                  OpenSIP Cloud (https://opensip.ai/api)
 ```
 
-Per [ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), a tool **returns its `SignalEnvelope` and never emits**: the composition root ([`deliver-envelope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/bootstrap/deliver-envelope.ts)) maps the envelope to the cloud `SignalBatch` wire shape (`buildSignalBatch` — adding repo identity, preserving `runId`/`createdAt`, dropping `verdict`/`units`) and emits it through the run's `signalSink`. The per-tool `emitRunSignals` driver was retired.
+Per [ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), a tool **returns its `SignalEnvelope` and never emits**: the composition root ([`deliver-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/cli/src/bootstrap/deliver-envelope.ts)) maps the envelope to the cloud `SignalBatch` wire shape (`buildSignalBatch` — adding repo identity, preserving `runId`/`createdAt`, dropping `verdict`/`units`) and emits it through the run's `signalSink`. The per-tool `emitRunSignals` driver was retired.
 
-**The sink is chosen once, at startup.** The CLI's pre-action hook calls [`resolveSignalSink`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/output/src/sink/resolve-signal-sink.ts), which returns the **no-op sink** unless *all* of these hold: an API key is present, `cloud.sync` is not `false`, `--no-cloud` was not passed, and the endpoint is HTTPS. So for a keyless run the sink is a no-op with zero IO — the cost only exists when you've opted in.
+**The sink is chosen once, at startup.** The CLI's pre-action hook calls [`resolveSignalSink`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/output/src/sink/resolve-signal-sink.ts), which returns the **no-op sink** unless *all* of these hold: an API key is present, `cloud.sync` is not `false`, `--no-cloud` was not passed, and the endpoint is HTTPS. So for a keyless run the sink is a no-op with zero IO — the cost only exists when you've opted in.
 
-**The entitlement check is deferred to the first emit, and cached.** [`checkEntitlement`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/output/src/sink/entitlement.ts) answers "is this key entitled to store signals?" It is **fail-closed**: on *any* ambiguity — no key, an unreachable endpoint, a non-2xx response, a malformed body — the answer is `entitled: false` and nothing is sent. A positive result is cached (~6h) so it isn't a network round-trip every run; a `401`/`403` at emit time busts the cache, so a revoked plan stops within one run rather than waiting out the TTL.
+**The entitlement check is deferred to the first emit, and cached.** [`checkEntitlement`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/output/src/sink/entitlement.ts) answers "is this key entitled to store signals?" It is **fail-closed**: on *any* ambiguity — no key, an unreachable endpoint, a non-2xx response, a malformed body — the answer is `entitled: false` and nothing is sent. A positive result is cached (~6h) so it isn't a network round-trip every run; a `401`/`403` at emit time busts the cache, so a revoked plan stops within one run rather than waiting out the TTL.
 
 On a successful sync you'll see one line on stderr: `✓ Sent N signals to OpenSIP Cloud`.
 
@@ -71,7 +71,7 @@ On a successful sync you'll see one line on stderr: `✓ Sent N signals to OpenS
 
 ## Exactly what is sent
 
-The unit of egress is a **`SignalBatch`** ([`packages/core/src/types/signal-batch.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/types/signal-batch.ts)):
+The unit of egress is a **`SignalBatch`** ([`packages/core/src/types/signal-batch.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/core/src/types/signal-batch.ts)):
 
 ```ts
 interface SignalBatch {
@@ -87,7 +87,7 @@ interface SignalBatch {
 }
 ```
 
-Each `Signal` is a finding the tool **already produced locally** — its file path, message, suggestion, code-location hints, and rule metadata ([`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/types/signal.ts)). The batch adds run context: the tool, recipe, a **repo identity** (your git commit SHA and origin remote URL), a run id, a timestamp, and severity counts. Large batches are capped, with a `truncated` count recording how many were dropped.
+Each `Signal` is a finding the tool **already produced locally** — its file path, message, suggestion, code-location hints, and rule metadata ([`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/core/src/types/signal.ts)). The batch adds run context: the tool, recipe, a **repo identity** (your git commit SHA and origin remote URL), a run id, a timestamp, and severity counts. Large batches are capped, with a `truncated` count recording how many were dropped.
 
 Nothing else leaves your machine — no source file contents beyond the path/line/hint already in a finding, no environment, no credentials. The local SQLite store is unaffected and remains the source of truth.
 
@@ -100,18 +100,18 @@ Three independent controls; a `sync: false` in **either** config wins, and `--no
 | Scope | How | Effect |
 |---|---|---|
 | **This run** | `--no-cloud` | Disables sync for the single invocation. |
-| **This machine** | `~/.opensip-tools/config.yml` → `cloud.sync: false` | Disables sync for every project run from this account. |
-| **This project** | `opensip-tools.config.yml` → `cli.cloud.sync: false` | Disables sync for everyone running this project. |
+| **This machine** | `~/.opensip-cli/config.yml` → `cloud.sync: false` | Disables sync for every project run from this account. |
+| **This project** | `opensip-cli.config.yml` → `cli.cloud.sync: false` | Disables sync for everyone running this project. |
 
 ```yaml
-# ~/.opensip-tools/config.yml  (machine-wide, flat keys)
+# ~/.opensip-cli/config.yml  (machine-wide, flat keys)
 apiKey: '<your-key>'
 cloud:
   sync: false          # opt out of cloud signal sync everywhere on this account
   endpoint: https://... # optional https override of the built-in cloud URL
 ```
 
-See [`70-reference/03-configuration.md`](/docs/opensip-tools/70-reference/03-configuration/) for the config shape and [`70-reference/01-cli-commands.md`](/docs/opensip-tools/70-reference/01-cli-commands/#opensip-cloud-signal-sync) for the flag.
+See [`70-reference/03-configuration.md`](/docs/opensip-cli/70-reference/03-configuration/) for the config shape and [`70-reference/01-cli-commands.md`](/docs/opensip-cli/70-reference/01-cli-commands/#opensip-cloud-signal-sync) for the flag.
 
 This is distinct from `fit --report-to <url>`, which explicitly POSTs **SARIF** to **any** receiver (and can fail a CI build via exit 4). Cloud sync emits **native signals** to **OpenSIP Cloud** automatically and best-effort.
 
@@ -140,4 +140,4 @@ Sync happens at the composition root after a tool returns its envelope (`cli.del
 | The cloud sink | `packages/output/src/sink/cloud-signal-sink.ts` |
 | Chunked POST transport (retry, idempotency) | `packages/output/src/sink/http-egress.ts` |
 
-The seam lives in `core` (a no-op `SignalSink` by default); the real cloud implementation lives in `@opensip-tools/output`'s `sink/`, so a tool returns its envelope without depending on the HTTP/cloud machinery — the CLI wires the real sink in at the composition root and calls `cli.deliverSignals` on the returned envelope.
+The seam lives in `core` (a no-op `SignalSink` by default); the real cloud implementation lives in `@opensip-cli/output`'s `sink/`, so a tool returns its envelope without depending on the HTTP/cloud machinery — the CLI wires the real sink in at the composition root and calls `cli.deliverSignals` on the returned envelope.

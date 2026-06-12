@@ -12,11 +12,11 @@
  *      `.tox`, `node_modules`, `dist`, `build`, `.eggs`).
  *
  * The collect-loop / realpath-dedup / config-precedence scaffolding lives
- * in `@opensip-tools/graph-adapter-common`; this module supplies only the
+ * in `@opensip-cli/graph-adapter-common`; this module supplies only the
  * Python-specific inputs.
  */
 
-import { createDiscover } from '@opensip-tools/graph-adapter-common';
+import { createDiscover } from '@opensip-cli/graph-adapter-common';
 
 const EXCLUDED_DIR_GLOBS: readonly string[] = [
   '**/.venv/**',

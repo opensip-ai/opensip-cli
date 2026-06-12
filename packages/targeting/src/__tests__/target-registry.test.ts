@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { TargetRegistry } from '../target-registry.js';
 
-import type { Target } from '@opensip-tools/config';
+import type { Target } from '@opensip-cli/config';
 
 /**
  * Substrate registry tests — the GENERIC surface only (register/get/byTag/has/
  * size/clear + silent-skip). The scope-matching `findByScope` is a check-domain
- * concept that stays in `@opensip-tools/fitness`, so it is NOT exercised here
+ * concept that stays in `@opensip-cli/fitness`, so it is NOT exercised here
  * (its tests live alongside the fitness subclass).
  */
 

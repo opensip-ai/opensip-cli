@@ -20,10 +20,10 @@
  *
  * Confidence: high (narrow scope, narrow trigger).
  *
- * Inspired by `opensip-ai/opensip/opensip-tools` `arch-cli-realpath-validation`.
+ * Inspired by `opensip-ai/opensip/opensip-cli` `arch-cli-realpath-validation`.
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 const SCOPED_PATH_SEGMENTS: readonly string[] = ['packages/cli/src/', 'packages/core/src/plugins/'];
 

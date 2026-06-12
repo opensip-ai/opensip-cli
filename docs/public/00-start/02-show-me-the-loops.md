@@ -19,7 +19,7 @@ related-docs:
 ---
 # Show me each loop
 
-opensip-tools ships three first-party tools. Each answers a different question shape:
+opensip-cli ships three first-party tools. Each answers a different question shape:
 
 | Tool | Question | Unit of work |
 |---|---|---|
@@ -33,11 +33,11 @@ One concrete sample of each, below. After you've seen them, [quick start](./00-q
 
 ## `fit` — a check
 
-A check is one file. Drop it under `opensip-tools/fit/checks/` and the platform finds it on the next run.
+A check is one file. Drop it under `opensip-cli/fit/checks/` and the platform finds it on the next run.
 
 ```js
-// opensip-tools/fit/checks/no-fixme.mjs
-import { defineCheck } from '@opensip-tools/fitness';
+// opensip-cli/fit/checks/no-fixme.mjs
+import { defineCheck } from '@opensip-cli/fitness';
 
 export default defineCheck({
   id: '0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a',
@@ -62,10 +62,10 @@ export default defineCheck({
 });
 ```
 
-`analyze(content, filePath)` runs once per file. Return an array of violations. Empty array = passed. Recipes (`opensip-tools/fit/recipes/*.mjs`) compose checks into named lineups for CI. Deeper detail: [plugin authoring](../50-extend/01-plugin-authoring.md) and [recipes and checks](../20-fit/01-recipes-and-checks.md).
+`analyze(content, filePath)` runs once per file. Return an array of violations. Empty array = passed. Recipes (`opensip-cli/fit/recipes/*.mjs`) compose checks into named lineups for CI. Deeper detail: [plugin authoring](../50-extend/01-plugin-authoring.md) and [recipes and checks](../20-fit/01-recipes-and-checks.md).
 
 ```text
-> opensip-tools fit --check no-fixme-comments
+> opensip fit --check no-fixme-comments
   ✗ no-fixme-comments   312 files,   2 violations
   0 Passed, 1 Failed (2 Errors, 0 Warnings) | Duration 0.4s
 
@@ -79,11 +79,11 @@ Exit code drives CI. That's the whole contract.
 
 ## `sim` — a scenario
 
-A scenario describes a load (or chaos) workload and the assertions that should hold against the result. Drop it under `opensip-tools/sim/scenarios/`.
+A scenario describes a load (or chaos) workload and the assertions that should hold against the result. Drop it under `opensip-cli/sim/scenarios/`.
 
 ```js
-// opensip-tools/sim/scenarios/checkout-burst.mjs
-import { defineLoadScenario } from '@opensip-tools/simulation';
+// opensip-cli/sim/scenarios/checkout-burst.mjs
+import { defineLoadScenario } from '@opensip-cli/simulation';
 
 export default defineLoadScenario({
   id: '11111111-1111-4111-8111-111111111111',
@@ -120,7 +120,7 @@ The two scenario kinds — `defineLoadScenario`, `defineChaosScenario` — each 
 As of v2.6.0, `graph` is an architectural *peer* of `fit`: rules are authored with `defineRule` — the call-graph analogue of `defineCheck` — selected through the same shared recipe substrate, and their findings land in sessions and the dashboard exactly like fitness checks. The difference is the *input*: where a check sees `(content, filePath)`, a rule sees the engine **dataset** (the catalog, the indexes, and a derived feature layer). The engine builds your project's static call graph in a staged pipeline (discover → walk → resolve → index → derive features → render); ten built-in rules consume that dataset and emit findings.
 
 ```text
-> opensip-tools graph
+> opensip graph
   Graph
   Catalog: 4,128 functions, 23,201 edges   Project: ~/work/my-app
   ────────────────────────────────────────────────────────────
@@ -163,9 +163,9 @@ Like `fit`, `graph` ships with a gate flow: `--gate-save` captures today's catal
 All three tools share the surface:
 
 ```bash
-opensip-tools fit     # codebase cleanliness
-opensip-tools sim     # runtime behavior under load
-opensip-tools graph   # call-graph shape
+opensip fit     # codebase cleanliness
+opensip sim     # runtime behavior under load
+opensip graph   # call-graph shape
 ```
 
 Each exits `0` when the bar holds, non-zero when it doesn't. Each emits SARIF for CI annotations. Each has a baseline/compare gate so you can adopt incrementally. The CLI doesn't know what any of them do internally — they're tools registered against a shared dispatcher. Same model lets a future `audit` or `lint` tool slot in without CLI changes.
@@ -175,6 +175,6 @@ Each exits `0` when the bar holds, non-zero when it doesn't. Each emits SARIF fo
 | If you want to … | Go to … |
 |---|---|
 | Run the first smoke test right now | [Quick start](./00-quick-start.md) |
-| Understand the design philosophy | [What is opensip-tools](./01-what-is-opensip-tools.md) |
+| Understand the design philosophy | [What is opensip-cli](./01-what-is-opensip-cli.md) |
 | Author a fit check or recipe | [Plugin authoring](../50-extend/01-plugin-authoring.md) |
 | Go deep on one loop | [Fit](../20-fit/01-recipes-and-checks.md) · [Sim](../30-sim/01-scenarios-and-recipes.md) · [Graph](../40-graph/01-stages-and-catalog.md) |

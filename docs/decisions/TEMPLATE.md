@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: YYYY-MM-DD
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-NNNN: <short imperative title>
@@ -45,6 +45,6 @@ Conventions:
 - This repo uses ADR-NNNN; the parent `opensip` repo uses DEC-NNN. Reference a
   parent decision as DEC-NNN under `related`.
 - The `Audit-history impact` block from the parent's DEC template is intentionally
-  omitted — opensip-tools is a static-analysis CLI with no audit chain.
+  omitted — OpenSIP CLI is a static-analysis CLI with no audit chain.
 - After adding/changing an ADR, update README.md's index.
 -->

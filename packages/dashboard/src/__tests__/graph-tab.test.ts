@@ -3,8 +3,8 @@
  *
  * Feeds a DashboardInput carrying graphRuleCatalog + graphRecipeCatalog through
  * generateDashboardHtml and asserts the emitted HTML embeds the graph rule
- * slugs + recipe names. Also re-confirms decoupling: @opensip-tools/dashboard
- * has no @opensip-tools/graph dependency.
+ * slugs + recipe names. Also re-confirms decoupling: @opensip-cli/dashboard
+ * has no @opensip-cli/graph dependency.
  */
 
 import { readFileSync } from 'node:fs';
@@ -80,12 +80,12 @@ describe('dashboard graph-tab — rule/recipe catalog wiring', () => {
     expect(baselineRule).toContain('font-family: var(--font)');
   });
 
-  it('@opensip-tools/dashboard declares no @opensip-tools/graph dependency (decoupled)', () => {
+  it('@opensip-cli/dashboard declares no @opensip-cli/graph dependency (decoupled)', () => {
     const pkg = JSON.parse(readFileSync(join(HERE, '..', '..', 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };
-    expect(pkg.dependencies?.['@opensip-tools/graph']).toBeUndefined();
-    expect(pkg.devDependencies?.['@opensip-tools/graph']).toBeUndefined();
+    expect(pkg.dependencies?.['@opensip-cli/graph']).toBeUndefined();
+    expect(pkg.devDependencies?.['@opensip-cli/graph']).toBeUndefined();
   });
 });

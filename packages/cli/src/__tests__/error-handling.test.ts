@@ -1,4 +1,4 @@
-import { getErrorSuggestion, EXIT_CODES } from '@opensip-tools/contracts';
+import { getErrorSuggestion, EXIT_CODES } from '@opensip-cli/contracts';
 import { describe, it, expect } from 'vitest';
 
 describe('error handling', () => {
@@ -55,8 +55,8 @@ describe('error handling', () => {
       expect(suggestion!.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
     });
 
-    it('detects config file errors (opensip-tools.config.yml)', () => {
-      const err = new Error('Invalid opensip-tools.config.yml');
+    it('detects config file errors (opensip-cli.config.yml)', () => {
+      const err = new Error('Invalid opensip-cli.config.yml');
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
       expect(suggestion!.message).toContain('Configuration error');
@@ -70,11 +70,11 @@ describe('error handling', () => {
       expect(suggestion!.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
     });
 
-    it('does not match the bare "config" substring (narrowed to opensip-tools.config.yml + YAML)', () => {
+    it('does not match the bare "config" substring (narrowed to opensip-cli.config.yml + YAML)', () => {
       // Layer 2 Phase 1: the previous over-broad 'config' substring rule
       // matched 'configurable', 'reconfigure', and bare 'Invalid config'
       // messages. It has been narrowed into two explicit rules
-      // (opensip-tools.config.yml + YAML); inputs that previously
+      // (opensip-cli.config.yml + YAML); inputs that previously
       // matched by accident now fall through to the default null.
       const err = new Error('Invalid config value');
       expect(getErrorSuggestion(err)).toBeNull();
@@ -158,7 +158,7 @@ describe('error handling', () => {
       const testCases = [
         new Error('Check not found: x'),
         new Error('Unknown recipe'),
-        new Error('opensip-tools.config.yml invalid'),
+        new Error('opensip-cli.config.yml invalid'),
         new Error('EACCES denied'),
         new Error('No checks registered'),
         new Error('fetch error'),

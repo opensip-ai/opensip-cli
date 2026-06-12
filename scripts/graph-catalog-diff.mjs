@@ -21,7 +21,7 @@
 //
 // EXTRACTION ROUTE (chosen for faithfulness — drives the REAL CLI end-to-end,
 // no engine-internal re-implementation):
-//   1. delete the project datastore (`opensip-tools/.runtime/datastore.sqlite`)
+//   1. delete the project datastore (`opensip-cli/.runtime/datastore.sqlite`)
 //      so the next build is genuinely COLD (empty cache),
 //   2. run `graph --exact` (exact) / `graph` (sharded, the default) WITH cache
 //      enabled — cold build
@@ -50,7 +50,7 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const cli = join(repoRoot, 'packages', 'cli', 'dist', 'index.js');
-const datastore = join(repoRoot, 'opensip-tools', '.runtime', 'datastore.sqlite');
+const datastore = join(repoRoot, 'opensip-cli', '.runtime', 'datastore.sqlite');
 
 if (!existsSync(cli)) {
   console.error(`CLI not built at ${cli} — run \`pnpm build\` first.`);

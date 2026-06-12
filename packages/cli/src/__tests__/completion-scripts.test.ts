@@ -1,4 +1,4 @@
-import { type CommonFlagKey } from '@opensip-tools/contracts';
+import { type CommonFlagKey } from '@opensip-cli/contracts';
 import { describe, it, expect, vi } from 'vitest';
 
 import {
@@ -35,9 +35,9 @@ function fixtureInventory(): CompletionInventory {
 describe('buildCompletionScript', () => {
   it('emits a bash completion script with the expected scaffolding', () => {
     const s = buildCompletionScript('bash', fixtureInventory());
-    expect(s).toContain('_opensip_tools()');
+    expect(s).toContain('_opensip()');
     expect(s).toContain('compgen -W');
-    expect(s).toContain('complete -F _opensip_tools opensip-tools');
+    expect(s).toContain('complete -F _opensip opensip');
     // Subcommand `fit` should be present.
     expect(s).toContain('fit');
   });
@@ -57,14 +57,14 @@ describe('buildCompletionScript', () => {
 
   it('emits a zsh completion script with #compdef and _values', () => {
     const s = buildCompletionScript('zsh', fixtureInventory());
-    expect(s).toContain('#compdef opensip-tools');
+    expect(s).toContain('#compdef opensip');
     expect(s).toContain('_values');
-    expect(s).toContain('compdef _opensip_tools opensip-tools');
+    expect(s).toContain('compdef _opensip opensip');
   });
 
   it('emits a fish completion script with one complete line per flag', () => {
     const s = buildCompletionScript('fish', fixtureInventory());
-    expect(s).toContain('complete -c opensip-tools');
+    expect(s).toContain('complete -c opensip');
     expect(s).toContain('__fish_use_subcommand');
     expect(s).toContain('__fish_seen_subcommand_from fit');
     expect(s).toContain('__fish_seen_subcommand_from sim');
@@ -79,7 +79,7 @@ describe('printCompletionScript', () => {
     const out: string[] = [];
     printCompletionScript('bash', fixtureInventory(), (s) => out.push(s));
     expect(out).toHaveLength(1);
-    expect(out[0]).toContain('opensip-tools');
+    expect(out[0]).toContain('opensip');
   });
 
   it('defaults to process.stdout.write', () => {

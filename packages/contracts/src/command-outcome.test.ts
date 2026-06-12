@@ -7,13 +7,13 @@
  * payload, only `errors` (+ diagnostics). All three JSON round-trip.
  */
 
-import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import { buildSignalEnvelope } from './signal-envelope.js';
 
 import type { CommandOutcome } from './command-outcome.js';
-import type { RunDiagnostics } from '@opensip-tools/core';
+import type { RunDiagnostics } from '@opensip-cli/core';
 
 const DIAGNOSTICS: RunDiagnostics = { runId: 'run_1', events: [] };
 
@@ -60,8 +60,8 @@ describe('CommandOutcome', () => {
       exitCode: 2,
       errors: [
         {
-          message: 'No opensip-tools project found.',
-          suggestion: 'Run opensip-tools init.',
+          message: 'No OpenSIP CLI project found.',
+          suggestion: 'Run opensip init.',
           code: 'CONFIGURATION_ERROR',
         },
       ],
@@ -69,7 +69,7 @@ describe('CommandOutcome', () => {
     };
     expect(outcome.data).toBeUndefined();
     expect(outcome.envelope).toBeUndefined();
-    expect(outcome.errors?.[0]?.suggestion).toBe('Run opensip-tools init.');
+    expect(outcome.errors?.[0]?.suggestion).toBe('Run opensip init.');
     const wire = JSON.stringify(outcome);
     expect(JSON.parse(wire)).toEqual(outcome);
   });

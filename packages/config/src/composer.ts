@@ -33,7 +33,7 @@
  * `fitness` and a typo in `graph` fail identically.
  */
 
-import { ConfigurationError } from '@opensip-tools/core';
+import { ConfigurationError } from '@opensip-cli/core';
 import { z, type ZodType } from 'zod';
 
 import type { ToolConfigDeclaration } from './declaration.js';

@@ -2,7 +2,7 @@
  * @fileoverview Unit tests for `detectPhantomRuntimes`.
  *
  * The "conservative" filter is the critical assertion: only flag
- * directories where `opensip-tools/` contains EXCLUSIVELY `.runtime/`.
+ * directories where `opensip-cli/` contains EXCLUSIVELY `.runtime/`.
  * Any legitimate user content disqualifies the directory — false
  * positives would lead users to delete real work.
  */
@@ -26,10 +26,10 @@ afterEach(() => {
 });
 
 function createPhantomAt(parent: string): string {
-  const phantomDir = join(parent, 'opensip-tools', '.runtime', 'logs');
+  const phantomDir = join(parent, 'opensip-cli', '.runtime', 'logs');
   mkdirSync(phantomDir, { recursive: true });
   writeFileSync(join(phantomDir, 'old.jsonl'), '{}\n', 'utf8');
-  return join(parent, 'opensip-tools');
+  return join(parent, 'opensip-cli');
 }
 
 describe('detectPhantomRuntimes', () => {
@@ -56,22 +56,22 @@ describe('detectPhantomRuntimes', () => {
     expect(phantoms).toContain(phantomPath);
   });
 
-  it('does NOT flag when opensip-tools/ contains user content (fit/checks)', () => {
+  it('does NOT flag when opensip-cli/ contains user content (fit/checks)', () => {
     const sub = join(testDir, 'sub');
-    mkdirSync(join(sub, 'opensip-tools', 'fit', 'checks'), { recursive: true });
-    mkdirSync(join(sub, 'opensip-tools', '.runtime'), { recursive: true });
-    writeFileSync(join(sub, 'opensip-tools', 'fit', 'checks', 'custom.mjs'), '\n', 'utf8');
+    mkdirSync(join(sub, 'opensip-cli', 'fit', 'checks'), { recursive: true });
+    mkdirSync(join(sub, 'opensip-cli', '.runtime'), { recursive: true });
+    writeFileSync(join(sub, 'opensip-cli', 'fit', 'checks', 'custom.mjs'), '\n', 'utf8');
     expect(detectPhantomRuntimes(sub, testDir)).toEqual([]);
   });
 
-  it('flags when opensip-tools/ has .runtime/ + dotfiles only', () => {
+  it('flags when opensip-cli/ has .runtime/ + dotfiles only', () => {
     const sub = join(testDir, 'sub');
     mkdirSync(sub);
     createPhantomAt(sub);
-    writeFileSync(join(sub, 'opensip-tools', '.gitignore'), '.runtime/\n', 'utf8');
+    writeFileSync(join(sub, 'opensip-cli', '.gitignore'), '.runtime/\n', 'utf8');
     const phantoms = detectPhantomRuntimes(sub, testDir);
     expect(phantoms).toHaveLength(1);
-    expect(phantoms[0]).toBe(join(sub, 'opensip-tools'));
+    expect(phantoms[0]).toBe(join(sub, 'opensip-cli'));
   });
 
   it('flags multiple phantoms in a chain', () => {
@@ -82,8 +82,8 @@ describe('detectPhantomRuntimes', () => {
     createPhantomAt(b);
     const phantoms = detectPhantomRuntimes(b, testDir);
     expect(phantoms).toHaveLength(2);
-    expect(phantoms).toContain(join(a, 'opensip-tools'));
-    expect(phantoms).toContain(join(b, 'opensip-tools'));
+    expect(phantoms).toContain(join(a, 'opensip-cli'));
+    expect(phantoms).toContain(join(b, 'opensip-cli'));
   });
 
   it('does not infinite-loop when reaching filesystem root unexpectedly', () => {

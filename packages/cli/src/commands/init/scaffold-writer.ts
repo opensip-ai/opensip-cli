@@ -1,6 +1,6 @@
 // @fitness-ignore-file unbounded-memory -- reads scaffold template files shipped with the CLI; bounded by the package's own embedded examples
 /**
- * Disk-write phase for `opensip-tools init`.
+ * Disk-write phase for `opensip init`.
  *
  * Writes the config + example files, optionally preserving pre-existing
  * custom/stale-scaffolded files (`--keep`) or wiping the user-source
@@ -16,10 +16,10 @@ import { generateConfig } from './config-templates.js';
 import type { SupportedLanguage } from './language-detection.js';
 import type { WorkingDirState } from './state-machine.js';
 import type { ToolScaffold } from '../shared.js';
-import type { InitResult, PreExistingFile } from '@opensip-tools/contracts';
-import type { ProjectPaths, ScaffoldContext } from '@opensip-tools/core';
+import type { InitResult, PreExistingFile } from '@opensip-cli/contracts';
+import type { ProjectPaths, ScaffoldContext } from '@opensip-cli/core';
 
-const GITIGNORE_LINE = 'opensip-tools/.runtime/';
+const GITIGNORE_LINE = 'opensip-cli/.runtime/';
 
 function ensureGitignore(cwd: string): boolean {
   const path = join(cwd, '.gitignore');
@@ -37,7 +37,7 @@ function ensureGitignore(cwd: string): boolean {
   const sep = content.endsWith('\n') ? '' : '\n';
   writeFileSync(
     path,
-    `${content}${sep}\n# opensip-tools runtime state\n${GITIGNORE_LINE}\n`,
+    `${content}${sep}\n# opensip-cli runtime state\n${GITIGNORE_LINE}\n`,
     'utf8',
   );
   return true;

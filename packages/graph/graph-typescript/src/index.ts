@@ -1,6 +1,6 @@
 // @fitness-ignore-file unbounded-memory -- reads single source files for parsing; per-file memory bounded by source size
 /**
- * @opensip-tools/graph — TypeScript language adapter.
+ * @opensip-cli/graph — TypeScript language adapter.
  *
  * Lands in PR 3 of plan docs/plans/10-graph-language-pluggability.md.
  * Exposes `typescriptGraphAdapter`, the GraphLanguageAdapter
@@ -28,7 +28,7 @@
 
 import { relative, sep } from 'node:path';
 
-import { ownerEdgeKey } from '@opensip-tools/graph';
+import { ownerEdgeKey } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
@@ -61,7 +61,7 @@ import type {
   WalkOutput,
   Catalog,
   CallEdge,
-} from '@opensip-tools/graph';
+} from '@opensip-cli/graph';
 
 /**
  * Starter list of well-known side-effect primitives for the

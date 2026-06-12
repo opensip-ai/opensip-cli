@@ -1,6 +1,6 @@
 /**
  * single-core-guard — the discovery-time policy that drops capability packs which
- * resolve a DIFFERENT physical `@opensip-tools/core` than the running engine.
+ * resolve a DIFFERENT physical `@opensip-cli/core` than the running engine.
  *
  * `selfCore()` is the canonical core this runtime resolves; `foreignCorePath`
  * probes a pack's resolved core; `filterSameCorePackages` keeps only same-core
@@ -26,26 +26,26 @@ afterEach(() => {
 });
 
 /**
- * Plant a self-contained `@opensip-tools/core` under `<dir>/node_modules` so a
+ * Plant a self-contained `@opensip-cli/core` under `<dir>/node_modules` so a
  * pack rooted at `dir` resolves THAT physical copy — a "foreign" core distinct
  * from the test runner's own resolved core.
  */
 function plantForeignCore(dir: string): void {
-  const coreDir = join(dir, 'node_modules', '@opensip-tools', 'core');
+  const coreDir = join(dir, 'node_modules', '@opensip-cli', 'core');
   mkdirSync(coreDir, { recursive: true });
   writeFileSync(
     join(coreDir, 'package.json'),
-    JSON.stringify({ name: '@opensip-tools/core', version: '0.0.0-foreign', main: 'index.js' }),
+    JSON.stringify({ name: '@opensip-cli/core', version: '0.0.0-foreign', main: 'index.js' }),
   );
   writeFileSync(join(coreDir, 'index.js'), 'module.exports = {};');
 }
 
 describe('selfCore', () => {
-  it('resolves a concrete path to the running @opensip-tools/core', () => {
+  it('resolves a concrete path to the running @opensip-cli/core', () => {
     const self = selfCore();
     expect(self).toBeDefined();
     // Resolves to core's own entry point (a workspace `packages/core/...` path
-    // in this monorepo, or a `node_modules/@opensip-tools/core/...` path when
+    // in this monorepo, or a `node_modules/@opensip-cli/core/...` path when
     // installed) — in either case a concrete, absolute file path.
     expect(self).toMatch(/[/\\]core[/\\]/);
   });
@@ -61,7 +61,7 @@ describe('foreignCorePath', () => {
     plantForeignCore(testDir);
     const foreign = foreignCorePath(testDir);
     expect(foreign).toBeDefined();
-    expect(foreign).toContain('@opensip-tools');
+    expect(foreign).toContain('@opensip-cli');
     expect(foreign).toContain(testDir);
     expect(foreign).not.toBe(selfCore());
   });
@@ -85,7 +85,7 @@ describe('filterSameCorePackages', () => {
     expect(kept).toEqual([]);
     expect(dropped).toHaveLength(1);
     expect(dropped[0].name).toBe('foreign-pack');
-    expect(dropped[0].foreignCore).toContain('@opensip-tools');
+    expect(dropped[0].foreignCore).toContain('@opensip-cli');
   });
 
   it('keeps same-core packs and drops only the foreign one in a mixed set', () => {

@@ -1,6 +1,6 @@
 // @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while covered domains are split into focused tests.
 /**
- * Tests for `executeGraph` — the main `opensip-tools graph` command
+ * Tests for `executeGraph` — the main `opensip graph` command
  * handler. Drives the full pipeline with a synthetic adapter and
  * exercises every branch the handler can take: human report, JSON,
  * gate-save, gate-compare (pass + degraded), report-to (cloud),
@@ -19,9 +19,9 @@ import {
   createSignal,
   enterScope,
   LanguageRegistry,
-} from '@opensip-tools/core';
-import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { diffBaseline } from '@opensip-tools/output';
+} from '@opensip-cli/core';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { diffBaseline } from '@opensip-cli/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { buildUnifiedReportLines, executeGraph } from '../../cli/graph.js';
@@ -36,8 +36,8 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { Catalog, FunctionOccurrence, Indexes } from '../../types.js';
-import type { GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
-import type { LanguageAdapter, Signal, ToolCliContext, WorkspaceUnit } from '@opensip-tools/core';
+import type { GraphDoneResult, SignalEnvelope } from '@opensip-cli/contracts';
+import type { LanguageAdapter, Signal, ToolCliContext, WorkspaceUnit } from '@opensip-cli/core';
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
   return {
@@ -581,7 +581,7 @@ process.exit(0);
     );
     expect(setExitCode).toHaveBeenCalledWith(0);
     const out = renderedLines(render);
-    expect(out).toContain('opensip-tools graph --workspace');
+    expect(out).toContain('opensip graph --workspace');
     expect(out).toContain('== Units (2)');
   });
 

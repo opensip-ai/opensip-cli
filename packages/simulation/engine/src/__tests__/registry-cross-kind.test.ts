@@ -3,7 +3,7 @@
  * kind filtering, and discriminated-union exhaustiveness.
  */
 
-import { enterScope } from '@opensip-tools/core';
+import { enterScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';

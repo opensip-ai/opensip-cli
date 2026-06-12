@@ -9,7 +9,7 @@
 
 import { join, relative, sep } from 'node:path';
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 import { ownerEdgeKey } from './edge-identity.js';
 

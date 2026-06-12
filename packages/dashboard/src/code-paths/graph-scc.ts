@@ -8,7 +8,7 @@
  * shapes — so it lives as a standalone, reusable unit.
  *
  * Replicated here rather than imported from the graph engine: the
- * catalog-decoupling rule forbids `dashboard → @opensip-tools/graph`.
+ * catalog-decoupling rule forbids `dashboard → @opensip-cli/graph`.
  */
 
 /**

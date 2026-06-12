@@ -14,7 +14,7 @@ import {
   type CapabilityRegistrar,
   type Tool,
   type ToolPluginManifest,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
@@ -87,7 +87,7 @@ const capabilityPreferenceManifest: ToolPluginManifest = {
         discovery: {
           mode: 'name-pattern',
           prefix: 'scenarios-',
-          defaultScopes: ['@opensip-tools'],
+          defaultScopes: ['@opensip-cli'],
         },
         exportName: 'scenarios',
         exportShape: 'array',
@@ -127,7 +127,7 @@ describe('composeAndValidateToolConfig', () => {
   });
 
   function writeConfig(body: string): string {
-    const path = join(dir, 'opensip-tools.config.yml');
+    const path = join(dir, 'opensip-cli.config.yml');
     writeFileSync(path, body, 'utf8');
     return path;
   }
@@ -291,7 +291,7 @@ describe('composeAndValidateToolConfig', () => {
       env: { OPENSIP_FIT_FAIL_ON_ERRORS: '0' },
     });
     // env (0) beats the file (5) — this is exactly what makes the gate "never
-    // fail on errors" without editing opensip-tools.config.yml.
+    // fail on errors" without editing opensip-cli.config.yml.
     expect(result.config?.fitness).toMatchObject({ failOnErrors: 0, failOnWarnings: 0 });
   });
 

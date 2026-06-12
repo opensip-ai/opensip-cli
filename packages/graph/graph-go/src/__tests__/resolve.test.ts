@@ -24,7 +24,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { goGraphAdapter } from '../index.js';
 
 import type { GoParsedProject } from '../parse.js';
-import type { Catalog, CallEdge, ResolveOutput, WalkOutput } from '@opensip-tools/graph';
+import type { Catalog, CallEdge, ResolveOutput, WalkOutput } from '@opensip-cli/graph';
 
 interface Pipeline {
   readonly project: GoParsedProject;

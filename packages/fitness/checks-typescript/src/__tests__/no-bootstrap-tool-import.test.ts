@@ -5,7 +5,7 @@
  * tool-package's NON-runtime API is fine, and a tool-runtime symbol appearing as
  * TEXT inside a template literal (the `init` scaffolds) is NOT a real import.
  */
-import { runCheckOnFixture, type FixtureFile } from '@opensip-tools/test-support';
+import { runCheckOnFixture, type FixtureFile } from '@opensip-cli/test-support';
 import { describe, expect, it } from 'vitest';
 
 import { analyzeBootstrapToolImport } from '../checks/architecture/no-bootstrap-tool-import.js';
@@ -28,8 +28,8 @@ describe('analyzeBootstrapToolImport (AST)', () => {
   it('flags a static tool-runtime import (incl. aliased)', () => {
     const v = analyzeBootstrapToolImport(
       [
-        "import { fitnessTool } from '@opensip-tools/fitness'",
-        "import { graphTool as gt } from '@opensip-tools/graph'",
+        "import { fitnessTool } from '@opensip-cli/fitness'",
+        "import { graphTool as gt } from '@opensip-cli/graph'",
         'export const tools = [fitnessTool, gt]',
       ].join('\n'),
       CLI_PATH,
@@ -42,8 +42,8 @@ describe('analyzeBootstrapToolImport (AST)', () => {
   it('does NOT flag a tool package NON-runtime API import', () => {
     const v = analyzeBootstrapToolImport(
       [
-        "import { defineCheck } from '@opensip-tools/fitness'",
-        "import { discoverGraphAdapterPackages, type GraphLanguageAdapter } from '@opensip-tools/graph'",
+        "import { defineCheck } from '@opensip-cli/fitness'",
+        "import { discoverGraphAdapterPackages, type GraphLanguageAdapter } from '@opensip-cli/graph'",
         'export const x = defineCheck',
       ].join('\n'),
       CLI_PATH,
@@ -58,7 +58,7 @@ describe('analyzeBootstrapToolImport (AST)', () => {
     const v = analyzeBootstrapToolImport(
       [
         'export const scaffold = `',
-        "import { fitnessTool } from '@opensip-tools/fitness';",
+        "import { fitnessTool } from '@opensip-cli/fitness';",
         'fitnessTool.run();',
         '`',
       ].join('\n'),
@@ -74,7 +74,7 @@ describe('no-bootstrap-tool-import (gate)', () => {
       await findingsFor({
         path: CLI_PATH,
         content:
-          "import { simulationTool } from '@opensip-tools/simulation'\nexport const t = simulationTool",
+          "import { simulationTool } from '@opensip-cli/simulation'\nexport const t = simulationTool",
       }),
     ).toBeGreaterThanOrEqual(1);
   });
@@ -84,7 +84,7 @@ describe('no-bootstrap-tool-import (gate)', () => {
       await findingsFor({
         path: 'packages/graph/engine/src/x.ts',
         content:
-          "import { fitnessTool } from '@opensip-tools/fitness'\nexport const t = fitnessTool",
+          "import { fitnessTool } from '@opensip-cli/fitness'\nexport const t = fitnessTool",
       }),
     ).toBe(0);
   });
@@ -94,7 +94,7 @@ describe('no-bootstrap-tool-import (gate)', () => {
       await findingsFor({
         path: 'packages/cli/src/__tests__/x.test.ts',
         content:
-          "import { fitnessTool } from '@opensip-tools/fitness'\nexport const t = fitnessTool",
+          "import { fitnessTool } from '@opensip-cli/fitness'\nexport const t = fitnessTool",
       }),
     ).toBe(0);
   });

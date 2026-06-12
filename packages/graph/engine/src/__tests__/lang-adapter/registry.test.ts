@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError, logger, runWithScopeSync } from '@opensip-tools/core';
+import { ConfigurationError, logger, runWithScopeSync } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { currentAdapterRegistry, pickAdapter } from '../../lang-adapter/registry.js';

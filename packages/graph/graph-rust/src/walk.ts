@@ -54,7 +54,7 @@ import {
   runWalk,
   synthesizeModuleInit as buildModuleInit,
   type WalkSinks,
-} from '@opensip-tools/graph-adapter-common';
+} from '@opensip-cli/graph-adapter-common';
 
 import { digestRustBody, digestSyntheticBody } from './body-digest.js';
 
@@ -65,8 +65,8 @@ import type {
   FunctionOccurrence,
   WalkInput,
   WalkOutput,
-} from '@opensip-tools/graph';
-import type { Node } from '@opensip-tools/tree-sitter';
+} from '@opensip-cli/graph';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 const TEST_PATH_RE = /(?:^|\/)tests?\//;
 const TEST_FILE_NAME_RE = /(?:^|\/)[^/]*_test\.rs$/;

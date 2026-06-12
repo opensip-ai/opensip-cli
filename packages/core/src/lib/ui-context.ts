@@ -8,7 +8,7 @@
  * via `currentScope()?.ui`.
  *
  * `bannerSize` is a plain `string` here, NOT the `BannerSize` union: that
- * union lives in `@opensip-tools/cli-ui` (a higher layer the kernel must not
+ * union lives in `@opensip-cli/cli-ui` (a higher layer the kernel must not
  * import). The render sites narrow it with `normalizeBannerSize` at the
  * point of use, so an unknown / stale config value degrades to `lg`.
  */

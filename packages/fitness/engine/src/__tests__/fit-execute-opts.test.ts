@@ -8,23 +8,23 @@
  * exactly one session. `onProgress` wiring is also covered.
  *
  * Implementation note: the fixture is a minimal tmp project with just
- * `opensip-tools.config.yml`.
+ * `opensip-cli.config.yml`.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScope } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { SessionRepo } from '@opensip-tools/session-store';
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { persistFitSession } from '../cli/fit/result-builders.js';
 import { executeFit } from '../cli/fit.js';
 import { fitnessTool } from '../tool.js';
 
-import type { FitOptions } from '@opensip-tools/contracts';
+import type { FitOptions } from '@opensip-cli/contracts';
 
 let projectDir: string;
 let datastore: DataStore;
@@ -34,7 +34,7 @@ beforeEach(() => {
   // Minimal config — at least one target so executeFit doesn't short
   // out on a missing config error.
   writeFileSync(
-    join(projectDir, 'opensip-tools.config.yml'),
+    join(projectDir, 'opensip-cli.config.yml'),
     `targets:
   source:
     description: minimal

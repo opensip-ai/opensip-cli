@@ -27,7 +27,7 @@ vi.mock('update-notifier', () => ({
 const savedTTY = process.stdout.isTTY;
 
 // Per-test isolated sticky-state file so the display state can't leak across
-// tests or touch the developer's real ~/.opensip-tools/update-state.json.
+// tests or touch the developer's real ~/.opensip-cli/update-state.json.
 let tmpDir: string;
 let stateFile: string;
 
@@ -51,13 +51,13 @@ describe('checkForUpdate (mocked notifier)', () => {
   it('returns the latest version when npm reports a genuinely newer release', async () => {
     fakeUpdate = { latest: '9.9.9', current: '1.0.0' };
     const { checkForUpdate } = await import('../update-notifier.js');
-    expect(checkForUpdate({ name: 'opensip-tools', version: '1.0.0', stateFile })).toBe('9.9.9');
+    expect(checkForUpdate({ name: 'opensip-cli', version: '1.0.0', stateFile })).toBe('9.9.9');
   });
 
   it('mirrors a fresh newer release into the sticky store', async () => {
     fakeUpdate = { latest: '9.9.9', current: '1.0.0' };
     const { checkForUpdate } = await import('../update-notifier.js');
-    checkForUpdate({ name: 'opensip-tools', version: '1.0.0', stateFile });
+    checkForUpdate({ name: 'opensip-cli', version: '1.0.0', stateFile });
     expect(readKnownLatest(stateFile)).toBe('9.9.9');
   });
 
@@ -65,13 +65,13 @@ describe('checkForUpdate (mocked notifier)', () => {
     // Run 1: the daily check reports an update → mirrored to the store.
     fakeUpdate = { latest: '9.9.9', current: '1.0.0' };
     const { checkForUpdate } = await import('../update-notifier.js');
-    expect(checkForUpdate({ name: 'opensip-tools', version: '1.0.0', stateFile })).toBe('9.9.9');
+    expect(checkForUpdate({ name: 'opensip-cli', version: '1.0.0', stateFile })).toBe('9.9.9');
 
     // Run 2: update-notifier deleted its own cache, so it now reports nothing
     // — but the notice must persist from the sticky store. This is the whole
     // point of the change.
     fakeUpdate = undefined;
-    expect(checkForUpdate({ name: 'opensip-tools', version: '1.0.0', stateFile })).toBe('9.9.9');
+    expect(checkForUpdate({ name: 'opensip-cli', version: '1.0.0', stateFile })).toBe('9.9.9');
   });
 
   it('self-clears the sticky store once the running version catches up', async () => {
@@ -79,7 +79,7 @@ describe('checkForUpdate (mocked notifier)', () => {
     writeKnownLatest('9.9.9', stateFile);
     fakeUpdate = undefined;
     const { checkForUpdate } = await import('../update-notifier.js');
-    expect(checkForUpdate({ name: 'opensip-tools', version: '9.9.9', stateFile })).toBeUndefined();
+    expect(checkForUpdate({ name: 'opensip-cli', version: '9.9.9', stateFile })).toBeUndefined();
     // The stale entry is wiped so the notice stops on its own after upgrade.
     expect(readKnownLatest(stateFile)).toBeUndefined();
     expect(existsSync(stateFile)).toBe(true); // cleared in place, not deleted
@@ -88,7 +88,7 @@ describe('checkForUpdate (mocked notifier)', () => {
   it('returns undefined when the reported latest is not newer', async () => {
     fakeUpdate = { latest: '1.0.0', current: '2.0.0' };
     const { checkForUpdate } = await import('../update-notifier.js');
-    expect(checkForUpdate({ name: 'opensip-tools', version: '2.0.0', stateFile })).toBeUndefined();
+    expect(checkForUpdate({ name: 'opensip-cli', version: '2.0.0', stateFile })).toBeUndefined();
   });
 
   it('degrades silently to undefined when the notifier throws', async () => {
@@ -98,7 +98,7 @@ describe('checkForUpdate (mocked notifier)', () => {
       throw new Error('corrupt update cache');
     });
     const { checkForUpdate } = await import('../update-notifier.js');
-    expect(checkForUpdate({ name: 'opensip-tools', version: '1.0.0', stateFile })).toBeUndefined();
+    expect(checkForUpdate({ name: 'opensip-cli', version: '1.0.0', stateFile })).toBeUndefined();
     // A throwing fetch leaves no sticky residue.
     expect(readKnownLatest(stateFile)).toBeUndefined();
   });

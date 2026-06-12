@@ -20,7 +20,7 @@ import {
   type CommandSpec,
   type Tool,
   type ToolCliContext,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { Command } from 'commander';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
@@ -85,7 +85,7 @@ describe('mountAllToolCommands — declarative commandSpecs path (the one surfac
     const registry = new ToolRegistryClass();
     registry.register(specTool('spec-tool', 'speccmd'));
 
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
     mountAllToolCommands(registry, program, makeStubContext());
 
     expect(program.commands.map((c) => c.name())).toContain('speccmd');
@@ -99,7 +99,7 @@ describe('mountAllToolCommands — declarative commandSpecs path (the one surfac
     } as unknown as Tool;
     registry.register(tool);
 
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
     const warnSpy = vi.spyOn(logger, 'warn');
     mountAllToolCommands(registry, program, makeStubContext());
 
@@ -127,7 +127,7 @@ describe('mountAllToolCommands — per-tool failure isolation', () => {
     registry.register(bad);
     registry.register(specTool('ok-tool', 'okcmd'));
 
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
     const warnSpy = vi.spyOn(logger, 'warn');
     const restore = silenceStderr();
     try {
@@ -170,7 +170,7 @@ describe('tool lifecycle — canonical 10-step ordering', () => {
     registry.register(specTool('first', 'firstcmd'));
     registry.register(specTool('second', 'secondcmd'));
 
-    const program = new Command('opensip-tools');
+    const program = new Command('opensip');
     mountToolCommands(registry, program, makeStubContext());
 
     // Step 8 mounts every registered tool's command, in registration (== help/

@@ -18,7 +18,7 @@ import { buildImportSpecifierIndex } from '../edge-resolvers/syntactic.js';
 import { isValueReference, resolveValueReference } from '../edges-value-reference.js';
 
 import type { ResolverContext } from '../edge-resolvers/types.js';
-import type { Catalog } from '@opensip-tools/graph';
+import type { Catalog } from '@opensip-cli/graph';
 
 /** Parse a snippet (parent pointers set) and return the source file. */
 function parse(source: string, name = 'm.ts'): ts.SourceFile {

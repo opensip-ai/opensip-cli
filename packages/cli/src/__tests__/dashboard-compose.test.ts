@@ -24,13 +24,13 @@ import {
   ToolRegistry,
   resolveProjectPaths,
   runWithScope,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { composeAndWriteDashboard } from '../dashboard-compose.js';
 import * as openDashboardMod from '../open-dashboard.js';
 
-import type { ProjectContext, Tool, ToolScope } from '@opensip-tools/core';
+import type { ProjectContext, Tool, ToolScope } from '@opensip-cli/core';
 
 let projectRoot: string;
 

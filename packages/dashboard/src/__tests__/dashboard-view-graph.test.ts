@@ -8,7 +8,7 @@
  * exercised structurally: the view registers with id 'graph' and label
  * 'Visualization', renders the layout selector + canvas from an embedded
  * package-level view-model blob, falls back to an empty state when the blob is
- * missing, and bans any @opensip-tools/graph import.
+ * missing, and bans any @opensip-cli/graph import.
  */
 
 import { describe, expect, it, beforeEach } from 'vitest';
@@ -98,8 +98,8 @@ describe('dashboardViewGraphJs (emitter)', () => {
     expect(dashboardViewGraphJs()).toMatchSnapshot();
   });
 
-  it('imports nothing from @opensip-tools/graph', () => {
-    expect(dashboardViewGraphJs()).not.toContain('@opensip-tools/graph');
+  it('imports nothing from @opensip-cli/graph', () => {
+    expect(dashboardViewGraphJs()).not.toContain('@opensip-cli/graph');
   });
 });
 

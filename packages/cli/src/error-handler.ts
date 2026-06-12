@@ -7,12 +7,12 @@
  *    through the supplied `setExitCode` callback (which `cli-context.ts`
  *    centralises).
  *  - Match on `instanceof` against the typed error hierarchy in
- *    `@opensip-tools/core`; fall back to the data-driven
+ *    `@opensip-cli/core`; fall back to the data-driven
  *    `getErrorSuggestion` (Layer 2 Phase 1) for unknown shapes.
  *  - The typed-error → exit-code policy lives in contracts'
  *    `mapToolErrorToExitCode` (audit-round-2 Finding C). This handler
  *    keeps only the *CLI-specific* layer: per-class action hints (e.g.
- *    "Run opensip-tools fit --list...") that don't belong in the
+ *    "Run opensip fit --list...") that don't belong in the
  *    headless contracts package.
  *  - Keep the renderer pluggable so unit tests can capture the rendered
  *    `ErrorResult` without touching Ink.
@@ -24,14 +24,14 @@ import {
   mapToolErrorToExitCode,
   type ErrorResult,
   type ErrorSuggestion,
-} from '@opensip-tools/contracts';
+} from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   NetworkError,
   NotFoundError,
   PluginIncompatibleError,
   ToolError,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { CommanderError } from 'commander';
 
 import { BootstrapError } from './bootstrap/bootstrap-error.js';
@@ -77,11 +77,11 @@ const ACTION_HINTS: readonly {
 }[] = [
   {
     is: (e) => e instanceof NotFoundError,
-    action: 'Run opensip-tools fit --list to see available checks.',
+    action: 'Run opensip fit --list to see available checks.',
   },
   {
     is: (e) => e instanceof ConfigurationError,
-    action: 'Check opensip-tools.config.yml or your --language flag.',
+    action: 'Check opensip-cli.config.yml or your --language flag.',
   },
   {
     is: (e) => e instanceof NetworkError,
@@ -90,7 +90,7 @@ const ACTION_HINTS: readonly {
   {
     is: (e) => e instanceof PluginIncompatibleError,
     action:
-      'Upgrade opensip-tools (or the tool), or allowlist a project-local tool via OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS.',
+      'Upgrade OpenSIP CLI (or the tool), or allowlist a project-local tool via OPENSIP_CLI_ALLOW_PROJECT_TOOLS.',
   },
 ];
 
@@ -217,7 +217,7 @@ export function handleFatalBootstrapError(
   const message = error instanceof Error ? error.message : String(error);
   const exitCode =
     error instanceof ToolError ? mapToolErrorToExitCode(error) : EXIT_CODES.RUNTIME_ERROR;
-  process.stderr.write(`opensip-tools: fatal error: ${message}\n`);
+  process.stderr.write(`opensip: fatal error: ${message}\n`);
   log.error({
     evt: 'cli.bootstrap.failed',
     module: 'cli:bootstrap',

@@ -9,18 +9,18 @@
  * `readGraphAdapterPackagePreferences` (`plugins.graphAdapters` /
  * `autoDiscoverGraphAdapters`). Each domain's discovery descriptor maps domain →
  * config keys (`descriptor.configKeys`), so this one resolver replaces all three
- * WITHOUT renaming a single key — the documented `opensip-tools.config.yml`
+ * WITHOUT renaming a single key — the documented `opensip-cli.config.yml`
  * surface is byte-identical, no migration.
  *
  * Reads from the raw `plugins` block of the project config (the same block the
- * three readers read). Lives in `@opensip-tools/config` because reading config is
+ * three readers read). Lives in `@opensip-cli/config` because reading config is
  * a config-layer concern; the generic substrate (core) receives the RESOLVED
  * preferences, staying config-pure.
  */
 
-import { isRecord, resolveScopes } from '@opensip-tools/core';
+import { isRecord, resolveScopes } from '@opensip-cli/core';
 
-import type { CapabilityDiscoveryDescriptor } from '@opensip-tools/core';
+import type { CapabilityDiscoveryDescriptor } from '@opensip-cli/core';
 
 /** Resolved discovery preferences for one domain — the shape the substrate consumes. */
 export interface CapabilityPreferences {
@@ -47,7 +47,7 @@ function stringArrayAt(
  * block through the keys its descriptor declares.
  *
  * @param descriptor   The domain's discovery descriptor (supplies `configKeys` + mode).
- * @param pluginsConfig The raw `plugins` block from `opensip-tools.config.yml`
+ * @param pluginsConfig The raw `plugins` block from `opensip-cli.config.yml`
  *   (or anything — a non-object is treated as "no preferences declared").
  */
 export function resolveCapabilityPreferences(
@@ -82,7 +82,7 @@ function resolveNamePatternScopes(
   customerScopes: readonly string[],
 ): readonly string[] | undefined {
   if (descriptor.discovery.mode !== 'name-pattern') return undefined;
-  const [primary = '@opensip-tools', ...restDefaults] = descriptor.discovery.defaultScopes;
+  const [primary = '@opensip-cli', ...restDefaults] = descriptor.discovery.defaultScopes;
   return resolveScopes(
     primary,
     [...restDefaults, ...customerScopes],

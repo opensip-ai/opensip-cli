@@ -10,7 +10,7 @@
  * - Nested O(n^2) loops
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Performance anti-pattern types

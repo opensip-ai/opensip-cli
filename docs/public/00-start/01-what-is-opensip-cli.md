@@ -2,9 +2,9 @@
 status: current
 last_verified: 2026-06-12
 release: v3.0.0
-title: "What is opensip-tools?"
+title: "What is opensip-cli?"
 audience: [getting-started, contributors]
-purpose: "The front door — what problem opensip-tools solves, what it does, what it isn't, and how to try it."
+purpose: "The front door — what problem opensip-cli solves, what it does, what it isn't, and how to try it."
 source-files:
   - README.md
   - packages/cli/src/index.ts
@@ -19,14 +19,14 @@ related-docs:
   - ../10-concepts/01-fitness-loop.md
   - ../10-concepts/02-tool-plugin-model.md
 ---
-# What is opensip-tools?
+# What is opensip-cli?
 
-**opensip-tools enforces a quality bar that linters can't.**
+**opensip-cli enforces a quality bar that linters can't.**
 
 You write the rules. The runner discovers them, runs them across TypeScript / Python / Rust / Go / Java / C/C++ (all in one pass), reports the result, and exits non-zero in CI when the bar is broken.
 
 ```text
-> opensip-tools fit
+> opensip fit
   Fitness Checks
   Recipe: default   Checks: 166   Project: ~/work/my-app
 
@@ -49,13 +49,13 @@ Exit code is `0` when nothing broke the bar, non-zero when something did. That's
 
 ## What it does well
 
-- **Architectural rules.** "No module under `packages/cli/` may import from `packages/fitness/checks-*`." Linters can't say this; opensip-tools can, in 15 lines.
+- **Architectural rules.** "No module under `packages/cli/` may import from `packages/fitness/checks-*`." Linters can't say this; opensip-cli can, in 15 lines.
 - **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 166 checks ship in the box across seven packs; most are language-agnostic, and the rest target a specific language.
 - **CI surfacing.** Outputs SARIF for GitHub PR annotations. Baselines for "fail only on *new* violations" so you can adopt incrementally without rewriting the codebase first.
 
 ## What it deliberately isn't
 
-- **Not a linter replacement.** ESLint, Ruff, and golangci-lint are still the right call for syntactic patterns inside one language. opensip-tools sits *above* linters: it adds architectural and cross-language checks linters can't express.
+- **Not a linter replacement.** ESLint, Ruff, and golangci-lint are still the right call for syntactic patterns inside one language. opensip-cli sits *above* linters: it adds architectural and cross-language checks linters can't express.
 - **Not a bundled-rules product.** Useful checks ship with it, but the point is *you write your own* for the constraints that matter to your codebase. The built-ins are a starting point, not the product.
 - **Not a SaaS.** The binary runs locally and in your CI. There's an optional cloud reporting endpoint (`--report-to`), but it's opt-in; the tool works fully offline.
 
@@ -67,17 +67,17 @@ Every codebase wants a quality bar. The bar is rarely controversial — `no cons
 
 The conventional answer is a giant linter. Linters are great at small syntactic patterns, but a poor fit for *architectural* checks like "no module under `packages/cli/` may import from `packages/fitness/checks-*`" or "every `defineCheck` must declare at least one tag". They're also language-locked: a polyglot repo wants the same gate model in TypeScript and Python and Go.
 
-opensip-tools is the alternative: **a polyglot, plugin-driven check runner** that takes a quality bar and turns it into a deterministic exit code. The runner doesn't know what your checks check; it knows how to discover them, run them, score them, render them, and gate on them.
+OpenSIP CLI is the alternative: **a polyglot, plugin-driven check runner** that takes a quality bar and turns it into a deterministic exit code. The runner doesn't know what your checks check; it knows how to discover them, run them, score them, render them, and gate on them.
 
 ---
 
 ## The three loops
 
-opensip-tools ships three first-party tools, all invoked through the same CLI binary. Each answers a different question shape:
+opensip-cli ships three first-party tools, all invoked through the same CLI binary. Each answers a different question shape:
 
 ### `fit` — fitness checks
 
-The primary loop. *"Is the codebase clean?"* A check runs once per file and returns violations. Checks compose into recipes; recipes drive CI. Project-local checks live as `.mjs` files under `opensip-tools/fit/checks/`; published packs live as npm packages. The whole loop is described in detail in [`../10-concepts/01-fitness-loop.md`](../10-concepts/01-fitness-loop.md), the spine of this doc set.
+The primary loop. *"Is the codebase clean?"* A check runs once per file and returns violations. Checks compose into recipes; recipes drive CI. Project-local checks live as `.mjs` files under `opensip-cli/fit/checks/`; published packs live as npm packages. The whole loop is described in detail in [`../10-concepts/01-fitness-loop.md`](../10-concepts/01-fitness-loop.md), the spine of this doc set.
 
 ### `sim` — simulation scenarios *(experimental)*
 
@@ -96,8 +96,8 @@ The CLI doesn't know what any of these three do internally — they're tools reg
 ```bash
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 cd your-project
-opensip-tools init
-opensip-tools fit --recipe example
+opensip init
+opensip fit --recipe example
 ```
 
 `init` detects your project's language(s) and scaffolds an example check and config. `fit --recipe example` runs that one check to prove the wiring works. From there, edit the example or delete it and write your own.

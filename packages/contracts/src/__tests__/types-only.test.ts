@@ -1,7 +1,7 @@
 /**
- * Structural guard: @opensip-tools/contracts is TYPES-ONLY again (2.10.1,
+ * Structural guard: @opensip-cli/contracts is TYPES-ONLY again (2.10.1,
  * ADR-0023). The `cli:` block loader (`loadCliDefaults`) — a runtime YAML
- * projection — moved to @opensip-tools/config, restoring the charter the
+ * projection — moved to @opensip-cli/config, restoring the charter the
  * package's own docs assert. This test fails if any contracts source reintroduces
  * config-document parsing (a `readYamlFile(...)` / `resolveProjectConfigPath(...)`
  * call), complementing the `no-config-loader-outside-config` fitness guardrail.
@@ -27,7 +27,7 @@ function sourceFiles(dir: string): string[] {
   return out;
 }
 
-describe('@opensip-tools/contracts is types-only', () => {
+describe('@opensip-cli/contracts is types-only', () => {
   const files = sourceFiles(SRC);
 
   it('discovers source files (sanity)', () => {

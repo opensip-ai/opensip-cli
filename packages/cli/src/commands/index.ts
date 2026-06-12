@@ -3,7 +3,7 @@
  *
  * Cross-tool housekeeping that doesn't belong to any single tool:
  *
- *   - `init`         — scaffold opensip-tools.config.yml + example tree
+ *   - `init`         — scaffold opensip-cli.config.yml + example tree
  *   - `dashboard`    — compose + open the cross-tool HTML report
  *   - `sessions`     — `list` / `purge`
  *   - `configure`    — set up the OpenSIP Cloud API key

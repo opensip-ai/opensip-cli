@@ -13,7 +13,7 @@
  * and sends a stable `Idempotency-Key` per chunk so a retried-but-stored chunk
  * is de-duplicated server-side.
  */
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 /** Per-caller retry/throttle policy. */
 export interface RetryPolicy {

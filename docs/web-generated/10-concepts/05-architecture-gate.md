@@ -20,7 +20,7 @@ related-docs:
 ---
 # Architecture gate
 
-The gate is opensip-tools' answer to "we have legacy violations and we need to ship a regression detector before we can clean them up." Save a baseline today, compare next week, fail CI if anything new appeared. Ignore directives are too granular for hundreds of legacy sites; the gate handles the volume.
+The gate is opensip-cli' answer to "we have legacy violations and we need to ship a regression detector before we can clean them up." Save a baseline today, compare next week, fail CI if anything new appeared. Ignore directives are too granular for hundreds of legacy sites; the gate handles the volume.
 
 > **What you'll understand after this:**
 > - The two-mode flow: `--gate-save` and `--gate-compare`.
@@ -33,22 +33,22 @@ The gate is opensip-tools' answer to "we have legacy violations and we need to s
 ## The two modes
 
 ```bash
-opensip-tools fit --gate-save                 # capture today's reality
-opensip-tools fit --gate-compare              # CI gate from now on
+opensip fit --gate-save                 # capture today's reality
+opensip fit --gate-compare              # CI gate from now on
 ```
 
-`--gate-save` runs the configured recipe, fingerprint-stamps the resulting `SignalEnvelope`, and hands it to the **host-owned baseline plane** (`cli.saveBaseline('fitness', envelope)`, ADR-0036): each finding lands as one row in the generic `tool_baseline_entries` table (scoped by a `tool` column, at `<project>/opensip-tools/.runtime/datastore.sqlite`), with a `tool_baseline_meta` row marking that a baseline exists. There is **exactly one baseline per tool per project**.
+`--gate-save` runs the configured recipe, fingerprint-stamps the resulting `SignalEnvelope`, and hands it to the **host-owned baseline plane** (`cli.saveBaseline('fitness', envelope)`, ADR-0036): each finding lands as one row in the generic `tool_baseline_entries` table (scoped by a `tool` column, at `<project>/opensip-cli/.runtime/datastore.sqlite`), with a `tool_baseline_meta` row marking that a baseline exists. There is **exactly one baseline per tool per project**.
 
-> **Baseline shape (ADR-0011 / ADR-0036).** The baseline stores the run's *signals* (fingerprint + full `Signal` payload per row) — **not** a SARIF document. The capture/ratchet/export machinery is host infrastructure shared by every tool: fitness contributes only its [`fingerprintStrategy`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/baseline-strategy.ts); the seams (`saveBaseline` / `compareBaseline` / `exportBaselineSarif`) and the [generic table pair](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/datastore/src/schema/baseline.ts) live in the host and `@opensip-tools/datastore`. `fit-baseline-export` re-renders the stored signals as SARIF via the root `cli.writeSarif` seam, so the on-disk CI artifact stays SARIF.
+> **Baseline shape (ADR-0011 / ADR-0036).** The baseline stores the run's *signals* (fingerprint + full `Signal` payload per row) — **not** a SARIF document. The capture/ratchet/export machinery is host infrastructure shared by every tool: fitness contributes only its [`fingerprintStrategy`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/baseline-strategy.ts); the seams (`saveBaseline` / `compareBaseline` / `exportBaselineSarif`) and the [generic table pair](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/datastore/src/schema/baseline.ts) live in the host and `@opensip-cli/datastore`. `fit-baseline-export` re-renders the stored signals as SARIF via the root `cli.writeSarif` seam, so the on-disk CI artifact stays SARIF.
 
-> **v1 → v2 break.** v1 wrote baselines as SARIF *files* (`baseline.sarif`) and let users override the path with `--baseline <path>`. **The `--baseline` flag is gone in v2.** Teams that committed `baseline.sarif` to git for cross-CI gate comparisons should re-run `--gate-save` once, then adopt one of the artifact-based CI patterns below. See [`80-implementation/03-session-and-persistence.md`](/docs/opensip-tools/80-implementation/03-session-and-persistence/) for the schema layout.
+> **v1 → v2 break.** v1 wrote baselines as SARIF *files* (`baseline.sarif`) and let users override the path with `--baseline <path>`. **The `--baseline` flag is gone in v2.** Teams that committed `baseline.sarif` to git for cross-CI gate comparisons should re-run `--gate-save` once, then adopt one of the artifact-based CI patterns below. See [`80-implementation/03-session-and-persistence.md`](/docs/opensip-cli/80-implementation/03-session-and-persistence/) for the schema layout.
 
 > **Exit code (ADR-0020).** `--gate-save` saves first, then exits according to the configured severity thresholds (`failOnErrors`/`failOnWarnings`) — it does **not** unconditionally exit 0. The CI step that records the baseline is therefore also an honest pass/fail signal; run any follow-up export/upload step under `if: always()` so the artifact survives a failed gate.
 
 `--gate-compare` runs the same recipe, reads the saved baseline rows back, computes the diff, and prints a structured report:
 
 ```
-opensip-tools fit --gate-compare
+opensip fit --gate-compare
 
 Added (1):
   ✗ no-console-log                          services/api/src/routes/payments.ts:88
@@ -111,7 +111,7 @@ export const fitnessFingerprintStrategy: FingerprintStrategy = (s) =>
   createHash('sha256').update(`${s.filePath}\n${s.ruleId}\n${s.message}`).digest('hex');
 ```
 
-[`packages/fitness/engine/src/baseline-strategy.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/baseline-strategy.ts). (Graph declares the opposite policy — a location-based key that *excludes* the message, because several graph rules embed run-varying counts in their message text. Both are correct for their domain; the strategy is per-tool, not a global algorithm.)
+[`packages/fitness/engine/src/baseline-strategy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/baseline-strategy.ts). (Graph declares the opposite policy — a location-based key that *excludes* the message, because several graph rules embed run-varying counts in their message text. Both are correct for their domain; the strategy is per-tool, not a global algorithm.)
 
 Three things stay in the hash:
 
@@ -123,13 +123,13 @@ One thing is **deliberately excluded**: the line number. A regex check that flag
 
 The trade-off is symmetric: if a *different* `console.log` is added at the same file with the exact same message, the hash collides and we treat it as unchanged. In practice this hasn't been a problem — messages are usually specific enough that two distinct violations have different messages, and a duplicate-message-same-file pair is rare and benign.
 
-The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests__/baseline-plane.test.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/__tests__/baseline-plane.test.ts) with explicit cases for the moved-line scenario and the changed-message scenario.
+The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests__/baseline-plane.test.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/__tests__/baseline-plane.test.ts) with explicit cases for the moved-line scenario and the changed-message scenario.
 
 ---
 
 ## What `--gate-compare` actually does
 
-The compare is host machinery (ADR-0036): `cli.compareBaseline('fitness', envelope)` ([`packages/cli/src/bootstrap/baseline-seams.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/bootstrap/baseline-seams.ts)) loads the saved rows for `tool = 'fitness'` (throwing a configuration error → exit 2 when no baseline exists), then runs the pure [`diffBaseline`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/output/src/format/baseline-diff.ts) from `@opensip-tools/output`:
+The compare is host machinery (ADR-0036): `cli.compareBaseline('fitness', envelope)` ([`packages/cli/src/bootstrap/baseline-seams.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/cli/src/bootstrap/baseline-seams.ts)) loads the saved rows for `tool = 'fitness'` (throwing a configuration error → exit 2 when no baseline exists), then runs the pure [`diffBaseline`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/output/src/format/baseline-diff.ts) from `@opensip-cli/output`:
 
 ```ts
 // diffBaseline(currentSignals, baselineRows) →
@@ -160,7 +160,7 @@ The baseline is a rebuildable local cache (ADR-0006): the datastore is regenerat
 ## Where the gate lives in the lifecycle
 
 ```
-opensip-tools fit --gate-compare
+opensip fit --gate-compare
   → fitnessTool command handler
        → if (opts.gateSave || opts.gateCompare) { runGateMode(args, cli); return; }
             → runGateMode (fit-modes.ts):
@@ -184,11 +184,11 @@ This is why ignore directives are compatible with the gate: a directive suppress
 
 ## CI integration patterns
 
-In v2 the baseline lives in `<project>/opensip-tools/.runtime/datastore.sqlite`, which is gitignored. To get a shared baseline across CI runs the SQLite store (or just its baseline payload) has to travel with the workflow. Two shapes that work in practice:
+In v2 the baseline lives in `<project>/opensip-cli/.runtime/datastore.sqlite`, which is gitignored. To get a shared baseline across CI runs the SQLite store (or just its baseline payload) has to travel with the workflow. Two shapes that work in practice:
 
 ### Pattern 1 — rolling baseline via CI artifact
 
-CI runs `--gate-save` on every main-branch build and uploads `<project>/opensip-tools/.runtime/datastore.sqlite` as a workflow artifact. PR runs download the most recent main artifact before invoking `--gate-compare`.
+CI runs `--gate-save` on every main-branch build and uploads `<project>/opensip-cli/.runtime/datastore.sqlite` as a workflow artifact. PR runs download the most recent main artifact before invoking `--gate-compare`.
 
 ```yaml
 # .github/workflows/main.yml (build a fresh baseline on main)
@@ -198,13 +198,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pnpm i --frozen-lockfile
-      - run: opensip-tools fit --gate-save
+      - run: opensip fit --gate-save
       - uses: actions/upload-artifact@v4
         if: always()   # gate-save exits non-zero on a fail-threshold breach (ADR-0020);
                        # the baseline still saved first, so publish it regardless
         with:
           name: fit-baseline
-          path: opensip-tools/.runtime/datastore.sqlite
+          path: opensip-cli/.runtime/datastore.sqlite
           retention-days: 30
 
 # .github/workflows/pr.yml (gate every PR against the latest main baseline)
@@ -217,9 +217,9 @@ jobs:
         with:
           workflow: main.yml
           name: fit-baseline
-          path: opensip-tools/.runtime/
+          path: opensip-cli/.runtime/
       - run: pnpm i --frozen-lockfile
-      - run: opensip-tools fit --gate-compare
+      - run: opensip fit --gate-compare
 ```
 
 PRs are graded against a moving target, but the target only goes down (main never adds violations, by construction). This is the closest equivalent to v1's "committed baseline" workflow.
@@ -249,8 +249,8 @@ A few patterns the gate isn't a fit for:
 
 For `acme-api`:
 
-- Day one: CI's main-branch workflow runs `opensip-tools fit --gate-save` after merging the initial setup. The save records 142 pre-existing violations across the universal/typescript/python check packs as baseline rows in `.runtime/datastore.sqlite`, and CI uploads the SQLite file as the `fit-baseline` artifact.
-- PR workflow: each PR job downloads the latest `fit-baseline` artifact into `opensip-tools/.runtime/`, then runs `opensip-tools fit --gate-compare`.
+- Day one: CI's main-branch workflow runs `opensip fit --gate-save` after merging the initial setup. The save records 142 pre-existing violations across the universal/typescript/python check packs as baseline rows in `.runtime/datastore.sqlite`, and CI uploads the SQLite file as the `fit-baseline` artifact.
+- PR workflow: each PR job downloads the latest `fit-baseline` artifact into `opensip-cli/.runtime/`, then runs `opensip fit --gate-compare`.
 - A PR that introduces one new `console.log` produces an `Added (1)` line and exits 1. The PR fails until the `console.log` is removed (or marked with `// @fitness-ignore-next-line no-console-log`).
 - A PR that resolves four violations produces `Resolved (4)` and exits 0. The team merges; the next main-branch build re-runs `--gate-save` and the artifact rolls forward with the lower count.
 
@@ -260,6 +260,6 @@ Today's count: 78 violations in the baseline. The 64-violation gap from day one'
 
 ## What's next
 
-- **[`../70-reference/01-cli-commands.md`](/docs/opensip-tools/70-reference/01-cli-commands/)** — every gate flag in the lookup-shaped reference.
-- **[`../20-fit/04-output-gate-sarif.md`](/docs/opensip-tools/20-fit/04-output-gate-sarif/)** — the wider context of fit output paths the gate fits into.
-- **[`../20-fit/03-ignore-directives.md`](/docs/opensip-tools/20-fit/03-ignore-directives/)** — when to use directives vs. baselining.
+- **[`../70-reference/01-cli-commands.md`](/docs/opensip-cli/70-reference/01-cli-commands/)** — every gate flag in the lookup-shaped reference.
+- **[`../20-fit/04-output-gate-sarif.md`](/docs/opensip-cli/20-fit/04-output-gate-sarif/)** — the wider context of fit output paths the gate fits into.
+- **[`../20-fit/03-ignore-directives.md`](/docs/opensip-cli/20-fit/03-ignore-directives/)** — when to use directives vs. baselining.

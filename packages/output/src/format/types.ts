@@ -11,10 +11,10 @@
  * `process.stdout`, no network, no `Date.now()`/`randomUUID`. The run id and
  * timestamp arrive on the envelope, so a fixed envelope renders to a fixed
  * string (snapshot-testable with zero mocks). All effects live in
- * `@opensip-tools/output/sink`; a sink may import a formatter, never the
+ * `@opensip-cli/output/sink`; a sink may import a formatter, never the
  * reverse.
  */
-import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 /** Pure `(envelope) => string` formatter. The shared output transform contract. */
 export type Formatter = (envelope: SignalEnvelope) => string;

@@ -29,7 +29,7 @@ import {
   type Catalog,
   type ExportIndex,
   type PackageManifestIndex,
-} from '@opensip-tools/graph';
+} from '@opensip-cli/graph';
 
 /** The two indexes the shared {@link resolveCrossPackageCall} resolver links against. */
 export interface CrossPackageContext {

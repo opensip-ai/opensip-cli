@@ -1,4 +1,4 @@
-import { runCheckOnFixture } from '@opensip-tools/test-support';
+import { runCheckOnFixture } from '@opensip-cli/test-support';
 import { describe, expect, it } from 'vitest';
 
 import {

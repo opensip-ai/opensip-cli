@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { buildFixtureManifest, extForLanguage, validateBookkeeping } from './manifest.js';
 
 import type { CoverageConfig } from './manifest.js';
-import type { Check } from '@opensip-tools/fitness';
+import type { Check } from '@opensip-cli/fitness';
 
 type CheckConfig = Check['config'];
 

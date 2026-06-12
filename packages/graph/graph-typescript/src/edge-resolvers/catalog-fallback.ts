@@ -9,7 +9,7 @@
  * match; otherwise UNRESOLVED.
  */
 
-import type { Catalog, FunctionOccurrence, ResolverVerdict } from '@opensip-tools/graph';
+import type { Catalog, FunctionOccurrence, ResolverVerdict } from '@opensip-cli/graph';
 
 const UNRESOLVED: ResolverVerdict = {
   to: [],

@@ -2,7 +2,7 @@
  * tool-trust — the project-local executable-tool trust policy (release
  * 2.8.0, Phase 3 Task 3.2).
  *
- * A `project-local` tool is authored code under `<project>/opensip-tools/…`
+ * A `project-local` tool is authored code under `<project>/opensip-cli/…`
  * that changes with the repo (§5.2.1). Running it imports arbitrary code
  * from the working tree, so the host MUST make the trust decision explicit
  * rather than load-by-presence.
@@ -10,11 +10,11 @@
  * Policy for 2.8.0 (signed off): **deny-by-default for non-interactive
  * runs; admit-with-allowlist when configured.** No interactive prompt UX
  * in this release. The allowlist is a comma/whitespace-separated list of
- * tool ids in the `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS` environment variable
+ * tool ids in the `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` environment variable
  * — a minimal, documented opt-in:
  *
- *   OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS="my-audit, my-lint"   # admit by id
- *   OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS="*"                    # admit all
+ *   OPENSIP_CLI_ALLOW_PROJECT_TOOLS="my-audit, my-lint"   # admit by id
+ *   OPENSIP_CLI_ALLOW_PROJECT_TOOLS="*"                    # admit all
  *
  * The decision is made BEFORE the tool's module is imported: a disallowed
  * project-local tool is fail-closed (exit 5) without its code ever running.
@@ -25,7 +25,7 @@
  * once per decision (cheap), never cached, so a test can set/unset it
  * around a single call.
  */
-export const PROJECT_TOOL_ALLOWLIST_ENV = 'OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS';
+export const PROJECT_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS';
 
 /**
  * Parse the allowlist env var into a set of permitted tool ids. Empty/
@@ -48,7 +48,7 @@ function parseAllowlist(raw: string | undefined): ReadonlySet<string> {
  *
  * **Env governance (pre-scope exception).** The allowlist var is declared as a
  * first-class `EnvVarSpec` in `CLI_ENV_SPECS`
- * (`OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`, `host-env-specs.ts`) — that declaration
+ * (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`, `host-env-specs.ts`) — that declaration
  * is the documentation home, so it appears in the generated env-surface
  * reference. The read here stays on the INJECTED `env` param rather than
  * `hostEnv.get(...)`: this trust check runs at BOOTSTRAP, before any `RunScope`

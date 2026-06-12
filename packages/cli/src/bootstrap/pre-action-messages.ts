@@ -24,7 +24,7 @@ export interface CliTooOldInput {
  */
 export function formatCliTooOldMessage(input: CliTooOldInput): string {
   return [
-    `✗ This project's opensip-tools.config.yml uses a newer schema than your CLI supports.`,
+    `✗ This project's opensip-cli.config.yml uses a newer schema than your CLI supports.`,
     ``,
     `  Project:        ${input.root}`,
     `  Config schema:  v${input.configVersion}`,
@@ -33,12 +33,12 @@ export function formatCliTooOldMessage(input: CliTooOldInput): string {
     `  Update your CLI to continue:`,
     `    curl -fsSL https://opensip.ai/cli/install.sh | bash`,
     ``,
-    `  (Or, if installed locally to the project: pnpm up opensip-tools@latest)`,
+    `  (Or, if installed locally to the project: pnpm up opensip-cli@latest)`,
   ].join('\n');
 }
 
 /**
- * Render the human "no opensip-tools project found" explainer — the actionable
+ * Render the human "no opensip-cli project found" explainer — the actionable
  * walked-up-to-root message with the `init` hint. The `--json` shape is no longer
  * rendered here: a no-project failure is a `BootstrapError` the top-level boundary
  * turns into a structured `bootstrap.error` `CommandOutcome` (release 2.12.0,
@@ -46,12 +46,12 @@ export function formatCliTooOldMessage(input: CliTooOldInput): string {
  */
 export function formatNoProjectFoundMessage(cwd: string): string {
   return [
-    '✗ No opensip-tools project found.',
+    '✗ No OpenSIP CLI project found.',
     '',
     '  Searched from: ' + cwd,
     '  Walked up to: /',
     '',
     '  To get started:',
-    '    opensip-tools init',
+    '    opensip init',
   ].join('\n');
 }

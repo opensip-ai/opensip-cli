@@ -1,6 +1,6 @@
-import { createSignal, enterScope } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { SessionRepo } from '@opensip-tools/session-store';
+import { createSignal, enterScope } from '@opensip-cli/core';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { noopTarget } from '../../__tests__/test-utils/targets.js';
@@ -11,8 +11,8 @@ import { defineLoadScenario } from '../../kinds/load/define.js';
 import { executeSim, persistSimSession } from '../sim.js';
 
 import type { ScenarioExecutorResult } from '../../framework/scenario-executor-result.js';
-import type { ToolOptions } from '@opensip-tools/contracts';
-import type { SignalSeverity } from '@opensip-tools/core';
+import type { ToolOptions } from '@opensip-cli/contracts';
+import type { SignalSeverity } from '@opensip-cli/core';
 
 const args = (overrides: Partial<ToolOptions> = {}): ToolOptions => ({
   json: false,

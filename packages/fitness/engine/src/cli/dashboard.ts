@@ -17,14 +17,14 @@ import { loadSignalersConfig } from '../signalers/index.js';
 
 import { ensureChecksLoaded, getDisplayName, getIcon } from './fit.js';
 
-import type { ToolScope } from '@opensip-tools/core';
+import type { ToolScope } from '@opensip-cli/core';
 
 // ---------------------------------------------------------------------------
 // Dashboard catalog entries (fitness-owned)
 //
 // Audit 2026-05-29 (L1): these describe fitness's check/recipe catalogs
 // rendered on the dashboard. They are fitness domain vocabulary, so they
-// live here rather than in @opensip-tools/contracts. The dashboard, as
+// live here rather than in @opensip-cli/contracts. The dashboard, as
 // the presentation owner, consumes them structurally via DashboardInput
 // (typed `readonly unknown[]`) — the same opaque-payload model used for
 // session detail and the graph catalog.
@@ -59,13 +59,13 @@ export interface RecipeCatalogEntry {
 
 /**
  * "built-in" vs "community" classification for the dashboard catalog.
- * Anything registered under the @opensip-tools/ scope is first-party;
+ * Anything registered under the @opensip-cli/ scope is first-party;
  * anything else (loose plugin file, third-party npm package) is
  * community. We no longer match a single magic package name — the
  * scope rule keeps working when checks-builtin is split into multiple
  * first-party packages (checks-typescript, checks-universal, etc).
  */
-const FIRST_PARTY_SCOPE = '@opensip-tools/';
+const FIRST_PARTY_SCOPE = '@opensip-cli/';
 
 function classifyCheckSource(namespace: string | undefined): 'built-in' | 'community' {
   return namespace?.startsWith(FIRST_PARTY_SCOPE) ? 'built-in' : 'community';

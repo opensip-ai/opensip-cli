@@ -1,6 +1,6 @@
 /**
  * @fileoverview A tool may not hand-project its own config block out of
- * `opensip-tools.config.yml` — it must validate through a Zod schema the host
+ * `opensip-cli.config.yml` — it must validate through a Zod schema the host
  * composes into ONE whole-document validation (release 2.10.0, ADR-0023,
  * Phase 4 / north-star Principle 6).
  *
@@ -14,7 +14,7 @@
  * namespace block from a parsed YAML document and projects MULTIPLE knob
  * fields out of it WITHOUT routing the block through a Zod parse.
  *
- * SELF-TARGETING — the check inspects opensip-tools' own tool-engine sources
+ * SELF-TARGETING — the check inspects opensip-cli' own tool-engine sources
  * (`packages/{fitness,graph,simulation}/engine/src/**`). For each such file it
  * first finds the identifiers bound to a PARSED YAML DOCUMENT (`const doc =
  * readYamlFile(...)` and siblings), then a read of the tool's own namespace key
@@ -41,11 +41,11 @@
  * sibling `no-config-loader-outside-config` check — so they never match the
  * own-namespace read anchor here regardless.
  *
- * SCOPE — opensip-tools' own monorepo. The tool-engine path guard makes the
+ * SCOPE — opensip-cli' own monorepo. The tool-engine path guard makes the
  * check inert in adopter repos (whose code never matches those paths), so it
  * enforces THIS platform's architecture, not a universal rule.
  */
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 import { yamlDocBindings } from './_yaml-doc-bindings.js';
 
@@ -141,7 +141,7 @@ export function analyzeOneConfigDocument(content: string, filePath: string): Che
       filePath,
       message:
         `Tool '${namespace}' hand-projects its own config block out of ` +
-        `opensip-tools.config.yml (reads ${readList}) ` +
+        `opensip-cli.config.yml (reads ${readList}) ` +
         `without a Zod parse. A tool's config block must validate through its ` +
         `namespaced ToolConfigDeclaration so the host composes + strict-validates ` +
         `the whole document before dispatch (ADR-0023).`,
@@ -177,7 +177,7 @@ export const oneConfigDocument = defineCheck({
   id: 'd86854d1-bcc0-4aca-9d8c-0d621f193355',
   slug: 'one-config-document',
   description:
-    'A tool must validate its config block through a composed Zod schema, not hand-project its own opensip-tools.config.yml namespace (ADR-0023)',
+    'A tool must validate its config block through a composed Zod schema, not hand-project its own opensip-cli.config.yml namespace (ADR-0023)',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   tags: ['architecture'],
   fileTypes: ['ts'],

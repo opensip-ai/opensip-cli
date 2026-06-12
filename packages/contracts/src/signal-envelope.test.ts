@@ -4,7 +4,7 @@ import {
   HOST_VERDICT_POLICY_FALLBACK,
   type Signal,
   type SignalSeverity,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { buildSignalEnvelope, type UnitResult } from './signal-envelope.js';

@@ -1,5 +1,5 @@
 /**
- * Language detection for `opensip-tools init`.
+ * Language detection for `opensip init`.
  *
  * Inspects the cwd for well-known language markers (Cargo.toml,
  * pyproject.toml, go.mod, pom.xml/build.gradle, CMakeLists.txt,
@@ -122,7 +122,7 @@ export function resolveLanguages(
         detected: [],
         message:
           'No language markers found. Specify with: ' +
-          'opensip-tools init --language <typescript|rust|python|go|java|cpp> ' +
+          'opensip init --language <typescript|rust|python|go|java|cpp> ' +
           '(comma-separated for polyglot projects).',
       },
     };
@@ -135,7 +135,7 @@ export function resolveLanguages(
         message:
           `Detected multiple languages: ${detected.join(', ')}. ` +
           `Pass --language <comma-separated-list> to choose. ` +
-          `Example: opensip-tools init --language ${detected.join(',')}`,
+          `Example: opensip init --language ${detected.join(',')}`,
       },
     };
   }

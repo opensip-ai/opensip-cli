@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/contracts",
+  "name": "@opensip-cli/contracts",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "Shared contract types for OpenSIP Tools — SignalEnvelope / CommandResult shapes, exit codes, session persistence",
+  "description": "Shared contract types for OpenSIP CLI — SignalEnvelope / CommandResult shapes, exit codes, session persistence",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "types",
@@ -12,12 +12,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/contracts"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -35,7 +35,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*"
+    "@opensip-cli/core": "workspace:*"
   },
   "peerDependencies": {
     "commander": "^14.0.0 || ^15.0.0"

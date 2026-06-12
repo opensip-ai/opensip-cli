@@ -1,6 +1,6 @@
 /**
  * @fileoverview Permissive YAML reader used by plugin-discovery sites
- * that need to extract a single field from `opensip-tools.config.yml`
+ * that need to extract a single field from `opensip-cli.config.yml`
  * without dragging in a Zod schema or surfacing structured errors.
  *
  * The kernel's plugin discovery (and fitness's check-package discovery)

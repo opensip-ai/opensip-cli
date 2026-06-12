@@ -7,7 +7,7 @@
  * are documented with specific reasons.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 // =============================================================================
 // CONSTANTS

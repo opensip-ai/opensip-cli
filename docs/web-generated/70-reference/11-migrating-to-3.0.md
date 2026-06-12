@@ -18,7 +18,7 @@ related-docs:
 **3.0.0 is the tool-plugin parity cutover.** The privileged first-party paths the
 2.x ladder built *alongside* the parity planes are removed, so a tool behaves
 identically whether it ships bundled, is installed from npm, or lives in a project
-([ADR-0027](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0027-ga-parity-cutover.md)). The breaking changes
+([ADR-0027](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/docs/decisions/ADR-0027-ga-parity-cutover.md)). The breaking changes
 are mostly **author-facing**; the one config-facing break is the removal of
 `cli.recipe`.
 
@@ -58,7 +58,7 @@ export const tool = {
 **After (3.0.0):**
 
 ```ts
-import { defineCommand } from '@opensip-tools/core';
+import { defineCommand } from '@opensip-cli/core';
 
 export const tool = {
   metadata: { id: 'audit', version: '1.0.0', description: 'Audit tool' },
@@ -91,7 +91,7 @@ Key differences:
   register its renderer lazily (e.g. on the first live render) via
   `ctx.registerLiveView(key, renderer)` and declare `output: 'live-view'`.
 
-See [Full tool plugins](/docs/opensip-tools/50-extend/06-full-tool-plugins/) for the complete
+See [Full tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/) for the complete
 authoring shape.
 
 ## 2. `apiVersion` is now mandatory

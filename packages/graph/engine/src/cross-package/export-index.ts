@@ -31,7 +31,7 @@
 import { readFileSync } from 'node:fs';
 import { posix, relative } from 'node:path';
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 import { packageOf } from '../resolve-callee.js';
 

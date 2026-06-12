@@ -8,7 +8,7 @@
  * resolving each selector type against the live scenario registry.
  */
 
-import { enterScope } from '@opensip-tools/core';
+import { enterScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { noopTarget } from '../../__tests__/test-utils/targets.js';

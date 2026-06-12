@@ -3,13 +3,13 @@
  * @fileoverview Enforce use of centralized crypto module
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 import {
   createPathMatcher,
   defineCheck,
   isCommentLine,
   type CheckViolation,
-} from '@opensip-tools/fitness';
+} from '@opensip-cli/fitness';
 
 /**
  * Pattern configuration for detecting direct crypto usage

@@ -1,10 +1,10 @@
 /**
- * @fileoverview Resolve the path to opensip-tools.config.yml.
+ * @fileoverview Resolve the path to opensip-cli.config.yml.
  *
  * Resolution order (first match wins):
  *   1. Explicit path — passed from --config CLI flag or programmatic caller.
- *   2. package.json — `opensip-tools.configPath` field at <rootDir>/package.json.
- *   3. Default — <rootDir>/opensip-tools.config.yml.
+ *   2. package.json — `opensip-cli.configPath` field at <rootDir>/package.json.
+ *   3. Default — <rootDir>/opensip-cli.config.yml.
  *
  * Throws ValidationError if none of the above resolve to an existing file.
  * This is intentional: running fitness checks with no config silently
@@ -17,11 +17,11 @@ import { isAbsolute, join, resolve } from 'node:path';
 
 import { ValidationError } from './lib/errors.js';
 
-/** Canonical filename for the opensip-tools project config. */
-export const PROJECT_CONFIG_FILENAME = 'opensip-tools.config.yml';
+/** Canonical filename for the opensip-cli project config. */
+export const PROJECT_CONFIG_FILENAME = 'opensip-cli.config.yml';
 
 /** Key read from package.json to locate a non-default config path. */
-const PKG_JSON_POINTER_FIELD = 'opensip-tools';
+const PKG_JSON_POINTER_FIELD = 'opensip-cli';
 const PKG_JSON_POINTER_SUBFIELD = 'configPath';
 
 /** Read `configPath` from <rootDir>/package.json. Returns null when absent. */
@@ -75,7 +75,7 @@ export function resolveProjectConfigPath(rootDir: string, explicitPath?: string)
     });
   }
 
-  // 2. package.json#opensip-tools.configPath
+  // 2. package.json#opensip-cli.configPath
   const pointerRaw = readConfigPathFromPackageJson(rootDir);
   if (pointerRaw) {
     const resolved = isAbsolute(pointerRaw) ? pointerRaw : resolve(rootDir, pointerRaw);
@@ -89,7 +89,7 @@ export function resolveProjectConfigPath(rootDir: string, explicitPath?: string)
     );
   }
 
-  // 3. Default: <rootDir>/opensip-tools.config.yml
+  // 3. Default: <rootDir>/opensip-cli.config.yml
   const defaultPath = join(rootDir, PROJECT_CONFIG_FILENAME);
   attempts.push(defaultPath);
   if (existsSync(defaultPath)) return defaultPath;
@@ -97,7 +97,7 @@ export function resolveProjectConfigPath(rootDir: string, explicitPath?: string)
   throw new ValidationError(
     `No ${PROJECT_CONFIG_FILENAME} found. Checked:\n` +
       attempts.map((a) => `  - ${a}`).join('\n') +
-      `\n\nRun 'opensip-tools init' to scaffold one, or pass --config <path> ` +
+      `\n\nRun 'opensip init' to scaffold one, or pass --config <path> ` +
       `to point at an existing config.`,
     { operation: 'resolve', loader: 'project-config', code: 'ERRORS.CONFIG.NOT_FOUND' },
   );

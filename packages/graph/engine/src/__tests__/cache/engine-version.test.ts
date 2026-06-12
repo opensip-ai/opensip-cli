@@ -2,7 +2,7 @@
  * Engine-version cache invalidation (ADR-0015).
  *
  * The catalog + shard-fragment caches must invalidate when the graph
- * engine itself changes version, so a customer who upgrades opensip-tools
+ * engine itself changes version, so a customer who upgrades opensip-cli
  * never replays a stale catalog built by the old engine. The mechanism is
  * `stampEngineVersion`, folded into the `cacheKey` at every engine-side
  * cacheKey computation — these tests pin the format and the end-to-end
@@ -24,7 +24,7 @@ describe('stampEngineVersion', () => {
   });
 
   it('reads a real version (not the 0.0.0 not-found sentinel)', () => {
-    // Resolves @opensip-tools/graph's package.json; a 0.0.0 here would mean
+    // Resolves @opensip-cli/graph's package.json; a 0.0.0 here would mean
     // the version walk failed and every cache would silently never invalidate.
     expect(ENGINE_VERSION).not.toBe('0.0.0');
     expect(ENGINE_VERSION).toMatch(/^\d+\.\d+\.\d+/);

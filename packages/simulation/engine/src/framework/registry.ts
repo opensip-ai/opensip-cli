@@ -23,7 +23,7 @@
  *     route through the scope-bound registry.
  */
 
-import { Registry, currentScope } from '@opensip-tools/core';
+import { Registry, currentScope } from '@opensip-cli/core';
 
 import type { RunnableScenario } from './runnable-scenario.js';
 import type { SimulationLoadState } from '../scope-augmentation.js';

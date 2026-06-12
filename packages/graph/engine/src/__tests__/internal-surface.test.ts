@@ -1,5 +1,5 @@
 /**
- * Export-surface lock for `@opensip-tools/graph/internal`.
+ * Export-surface lock for `@opensip-cli/graph/internal`.
  *
  * `/internal` is the deliberate, test-only escape hatch (ADR-0009): the
  * cross-package adapter + CLI-telemetry suites reach `runGraph`/`executeGraph`,
@@ -38,7 +38,7 @@ const EXPECTED_INTERNAL_EXPORTS = [
   'totalSystemMemoryMb',
 ].sort();
 
-describe('@opensip-tools/graph/internal surface', () => {
+describe('@opensip-cli/graph/internal surface', () => {
   it('exposes exactly the intended test-only value surface', () => {
     const actual = Object.keys(internal)
       .filter((k) => internal[k as keyof typeof internal] !== undefined)

@@ -3,8 +3,8 @@
  * @fileoverview Enforce use of canonical recovery patterns
  */
 
-import { logger } from '@opensip-tools/core';
-import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness';
+import { logger } from '@opensip-cli/core';
+import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-cli/fitness';
 
 // =============================================================================
 // PATTERN DEFINITIONS (inlined from config/patterns.ts)

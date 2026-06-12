@@ -4,12 +4,12 @@
  *
  * Layout (no user-global plugin dir):
  *
- *   <project>/opensip-tools/.runtime/plugins/<domain>/
+ *   <project>/opensip-cli/.runtime/plugins/<domain>/
  *   ├── package.json       — host package; "dependencies" is the
  *   │                        plugin install state for this domain
  *   └── node_modules/      — npm-installed plugin packages
  *
- *   <project>/opensip-tools.config.yml
+ *   <project>/opensip-cli.config.yml
  *   plugins:
  *     fit:
  *       - "@org/fitness-checks"   — declares which installed packages
@@ -20,7 +20,7 @@
  *
  * `plugin add <pkg>` is the one-step install: writes the package to
  * .runtime/plugins/<domain>/node_modules AND adds it to plugins.<domain>
- * in the project config. After: `opensip-tools fit` loads it on next run.
+ * in the project config. After: `opensip fit` loads it on next run.
  *
  * `plugin remove <pkg>` is the inverse: removes from node_modules AND
  * deletes from plugins.<domain>.
@@ -52,7 +52,7 @@ import {
   resolveProjectPaths,
   resolveUserPaths,
   type PluginLayout,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { getToolProvenanceForRun } from '../cli-context.js';
 
@@ -72,7 +72,7 @@ import {
   removeToolPlugin,
 } from './plugin-host-ops.js';
 
-import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-tools/contracts';
+import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-cli/contracts';
 
 /**
  * CommandResult discriminator literals. `as const` keeps the literal type
@@ -103,7 +103,7 @@ export async function pluginList(
   cwd: string = process.cwd(),
   layouts: readonly PluginLayout[] = [],
 ): Promise<PluginResult> {
-  const { discoverPlugins } = await import('@opensip-tools/core');
+  const { discoverPlugins } = await import('@opensip-cli/core');
 
   const plugins: PluginInfo[] = [];
 
@@ -177,7 +177,7 @@ export async function pluginAdd(
       type: PLUGIN_ADD,
       packageName: '',
       success: false,
-      error: 'No package name provided. Usage: opensip-tools plugin add <package-name>',
+      error: 'No package name provided. Usage: opensip plugin add <package-name>',
     };
   }
   if (!isSafeNpmSpec(packageName)) {
@@ -235,7 +235,7 @@ export async function pluginRemove(
       type: PLUGIN_REMOVE,
       packageName: '',
       success: false,
-      error: 'No package name provided. Usage: opensip-tools plugin remove <package-name>',
+      error: 'No package name provided. Usage: opensip plugin remove <package-name>',
     };
   }
   if (!isSafeNpmSpec(packageName)) {
@@ -299,9 +299,9 @@ export async function pluginRemove(
  * after `git pull` updates the install state.
  *
  * The post-clone story: a developer clones a repo with declared
- * plugins, runs `opensip-tools plugin sync`, and the
+ * plugins, runs `opensip plugin sync`, and the
  * .runtime/plugins/<domain>/node_modules trees are populated. Without
- * this, the first `opensip-tools fit` would warn about every declared
+ * this, the first `opensip fit` would warn about every declared
  * plugin being uninstalled.
  */
 /* eslint-disable @typescript-eslint/require-await, sonarjs/cognitive-complexity --

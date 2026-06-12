@@ -9,7 +9,7 @@
 
 import * as fs from 'node:fs/promises';
 
-import { SystemError, currentScope, logger as defaultLogger } from '@opensip-tools/core';
+import { SystemError, currentScope, logger as defaultLogger } from '@opensip-cli/core';
 
 import { applyGlobalExcludes } from '../targets/index.js';
 

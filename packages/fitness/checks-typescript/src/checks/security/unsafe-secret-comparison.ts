@@ -7,7 +7,7 @@
  * constant-time comparison function like safeCompare().
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 import {
   parseSource,
   walkNodes,
@@ -15,7 +15,7 @@ import {
   isLiteral,
   isPropertyAccess,
   getLineNumber,
-} from '@opensip-tools/lang-typescript';
+} from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 /**

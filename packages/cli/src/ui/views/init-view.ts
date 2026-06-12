@@ -4,9 +4,9 @@
  * refusal, re-scaffold/pristine success, creation failure) as a ViewNode.
  */
 
-import { line, group, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
+import { line, group, type Tone, type ViewNode } from '@opensip-cli/cli-ui';
 
-import type { InitResult, PreExistingFile } from '@opensip-tools/contracts';
+import type { InitResult, PreExistingFile } from '@opensip-cli/contracts';
 
 function classificationTone(cls: PreExistingFile['classification']): Tone {
   if (cls === 'custom') return 'success';
@@ -31,8 +31,8 @@ function partialStateHeadline(
   cfg: string,
 ): string {
   if (state === 'fully-initialized') return 'Already initialized';
-  if (state === 'partial-config-only') return `${cfg} present but opensip-tools/ missing`;
-  return `opensip-tools/ present but ${cfg} missing`;
+  if (state === 'partial-config-only') return `${cfg} present but opensip-cli/ missing`;
+  return `opensip-cli/ present but ${cfg} missing`;
 }
 
 function createdHeadline(state: InitResult['state']): string {
@@ -84,7 +84,7 @@ function partialStateView(
     children.push(
       { kind: 'spacer' },
       line([
-        { text: `  Found ${err.preExistingFiles.length} file(s) under opensip-tools/:`, dim: true },
+        { text: `  Found ${err.preExistingFiles.length} file(s) under opensip-cli/:`, dim: true },
       ]),
       ...preExistingLines(err.preExistingFiles, cwd),
     );
@@ -94,13 +94,13 @@ function partialStateView(
     line([{ text: '  Choose one:' }]),
     line([
       { text: '    ' },
-      { text: 'opensip-tools init --keep', tone: 'brand' },
+      { text: 'opensip init --keep', tone: 'brand' },
       { text: '    Re-scaffold examples; preserve custom files.', dim: true },
     ]),
     line([
       { text: '    ' },
-      { text: 'opensip-tools init --remove', tone: 'brand' },
-      { text: '  Delete opensip-tools/ and scaffold fresh.', dim: true },
+      { text: 'opensip init --remove', tone: 'brand' },
+      { text: '  Delete opensip-cli/ and scaffold fresh.', dim: true },
     ]),
   );
   return group(children, 2);
@@ -126,7 +126,7 @@ function createdView(result: InitResult): ViewNode {
     );
   }
   if (result.gitignoreUpdated === true) {
-    children.push(line([{ text: '    .gitignore (added opensip-tools/.runtime/)', dim: true }]));
+    children.push(line([{ text: '    .gitignore (added opensip-cli/.runtime/)', dim: true }]));
   }
   if (result.preExistingFiles && result.preExistingFiles.length > 0) {
     children.push(
@@ -138,8 +138,8 @@ function createdView(result: InitResult): ViewNode {
   children.push(
     { kind: 'spacer' },
     line([{ text: '  Try it:', dim: true }]),
-    line([{ text: '    ' }, { text: 'opensip-tools fit --recipe example', tone: 'brand' }]),
-    line([{ text: '    ' }, { text: 'opensip-tools sim --recipe example', tone: 'brand' }]),
+    line([{ text: '    ' }, { text: 'opensip fit --recipe example', tone: 'brand' }]),
+    line([{ text: '    ' }, { text: 'opensip sim --recipe example', tone: 'brand' }]),
   );
   return group(children, 2);
 }

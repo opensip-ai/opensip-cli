@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { applyGlobalExcludes } from '@opensip-tools/targeting';
+import { applyGlobalExcludes } from '@opensip-cli/targeting';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createExecutionContext } from '../execution-context.js';

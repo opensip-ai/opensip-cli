@@ -5,7 +5,7 @@
  * grid and the cross-package edge constraint bucket by real package boundary
  * rather than a path heuristic. The package label is the `name` of the
  * occurrence's **nearest enclosing `package.json`** (walking up from the
- * file's directory to the project root), e.g. `@opensip-tools/fitness`. When
+ * file's directory to the project root), e.g. `@opensip-cli/fitness`. When
  * no manifest is found, it falls back to the file's top-level path segment
  * (so `apps/`, `libs/`, `src/`, `crates/`, Go-module repos still bucket
  * sensibly instead of collapsing to one `<unknown>`).
@@ -17,7 +17,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 import type { Catalog, FunctionOccurrence } from '../types.js';
 

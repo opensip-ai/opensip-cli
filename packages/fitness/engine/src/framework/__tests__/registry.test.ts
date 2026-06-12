@@ -1,4 +1,4 @@
-import { NotFoundError } from '@opensip-tools/core';
+import { NotFoundError } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import { CheckRegistry } from '../../framework/registry.js';

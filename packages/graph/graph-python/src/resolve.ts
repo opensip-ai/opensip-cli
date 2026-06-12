@@ -32,14 +32,14 @@
 
 import { dirname, posix } from 'node:path';
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 import {
   appendEdge,
   createMutableStats,
   pushCreationEdge,
   truncateForCallEdge,
-} from '@opensip-tools/graph';
-import { buildNameIndex } from '@opensip-tools/graph-adapter-common';
+} from '@opensip-cli/graph';
+import { buildNameIndex } from '@opensip-cli/graph-adapter-common';
 
 import type { PythonParsedFile, PythonParsedProject } from './parse.js';
 import type {
@@ -51,8 +51,8 @@ import type {
   ResolutionStats,
   ResolveInput,
   ResolveOutput,
-} from '@opensip-tools/graph';
-import type { Node } from '@opensip-tools/tree-sitter';
+} from '@opensip-cli/graph';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 function pythonPosition(
   node: Node,

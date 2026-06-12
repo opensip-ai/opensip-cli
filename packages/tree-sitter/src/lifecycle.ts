@@ -1,6 +1,6 @@
 /**
  * web-tree-sitter lifecycle — the grammar-agnostic half lifted out of
- * `graph-adapter-common/parse.ts` (ADR-0010). No `@opensip-tools/graph`
+ * `graph-adapter-common/parse.ts` (ADR-0010). No `@opensip-cli/graph`
  * coupling: this layer knows nothing of `ParseInput`/`ParseOutput`. The
  * per-project parse driver (which owns those graph types) stays in
  * graph-adapter-common; `lang-*` adapters call `parseToTree` per file.

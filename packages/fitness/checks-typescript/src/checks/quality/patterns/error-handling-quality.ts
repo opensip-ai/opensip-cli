@@ -8,8 +8,8 @@
  * Replaces: resilience/no-empty-catch, quality/error-swallowing-boolean
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
+import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 // =============================================================================

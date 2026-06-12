@@ -20,8 +20,8 @@
  *    branch) — the documented non-Ink exception. The host renders nothing.
  */
 
-import { commonFlags, EXIT_CODES } from '@opensip-tools/contracts';
-import { ConfigurationError, defineCommand, logger } from '@opensip-tools/core';
+import { commonFlags, EXIT_CODES } from '@opensip-cli/contracts';
+import { ConfigurationError, defineCommand, logger } from '@opensip-cli/core';
 
 import { executeEquivalenceCheck } from '../equivalence-check-command.js';
 import { runCatalogJsonMode } from '../graph-modes.js';
@@ -34,8 +34,8 @@ import { executeShardWorker } from '../shard-worker.js';
 import { executeSymbolIndex } from '../symbol-index.js';
 
 import type { ResolutionMode } from '../../types.js';
-import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 // Shared --cwd flag string for the auxiliary subcommands that declare it as a
 // tool option (symbol-index keeps a custom description; the export commands keep

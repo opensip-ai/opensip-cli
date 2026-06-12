@@ -11,7 +11,7 @@
 
 import { fileURLToPath } from 'node:url';
 
-import { ToolRegistry } from '@opensip-tools/core';
+import { ToolRegistry } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { admitToolPackage } from '../bootstrap/index.js';

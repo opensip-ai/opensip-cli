@@ -37,7 +37,7 @@ afterEach(() => {
 });
 
 function writeProjectConfig(yaml: string): void {
-  writeFileSync(join(projectDir, 'opensip-tools.config.yml'), yaml);
+  writeFileSync(join(projectDir, 'opensip-cli.config.yml'), yaml);
 }
 
 describe('loadCliDefaults', () => {

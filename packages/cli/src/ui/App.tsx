@@ -15,14 +15,14 @@ import {
   normalizeBannerSize,
   ProjectHeader,
   renderToInk,
-} from '@opensip-tools/cli-ui';
+} from '@opensip-cli/cli-ui';
 import { Box } from 'ink';
 import React from 'react';
 
 import { resultToView } from './result-to-view.js';
 
-import type { CommandResult } from '@opensip-tools/contracts';
-import type { UiContext } from '@opensip-tools/core';
+import type { CommandResult } from '@opensip-cli/contracts';
+import type { UiContext } from '@opensip-cli/core';
 
 /** Project location for the shell's `ℹ Project:` line. */
 export interface ProjectHeaderProps {

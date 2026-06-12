@@ -22,7 +22,7 @@ import {
   type CheckViolation,
   type FileAccessor,
   buildImportGraph,
-} from '@opensip-tools/fitness';
+} from '@opensip-cli/fitness';
 
 const WARNING_THRESHOLD = 15;
 const ERROR_THRESHOLD = 30;

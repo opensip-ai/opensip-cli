@@ -6,7 +6,7 @@
  * spawn failure).
  */
 
-import { SystemError } from '@opensip-tools/core';
+import { SystemError } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { execAbortable } from '../abortable-exec.js';

@@ -1,12 +1,12 @@
 // @fitness-ignore-file duplicate-utility-functions -- ADR-0010: the per-language tree-sitter vocabulary intentionally shares helper names across lang-* with grammar-specific implementations; consolidating would defeat the substrate design.
 /**
  * Composed enclosing-scope helpers for Java (ADR-0010) — the per-language layer
- * over the generic `findEnclosing`/`nameOf` from `@opensip-tools/tree-sitter`.
+ * over the generic `findEnclosing`/`nameOf` from `@opensip-cli/tree-sitter`.
  * `isMethod` is grammar-direct (Java's `method_declaration`) and lives in
  * predicates.ts; this module composes the enclosing-function lookups.
  */
 
-import { findEnclosing, nameOf, type Node } from '@opensip-tools/tree-sitter';
+import { findEnclosing, nameOf, type Node } from '@opensip-cli/tree-sitter';
 
 import { isFunction } from './predicates.js';
 

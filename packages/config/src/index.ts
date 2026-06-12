@@ -1,5 +1,5 @@
 /**
- * @opensip-tools/config — the capability-configuration layer.
+ * @opensip-cli/config — the capability-configuration layer.
  *
  * Each tool contributes a {@link ToolConfigDeclaration}; the host composes the
  * registered namespaced Zod schemas into one strict whole-document schema
@@ -13,10 +13,10 @@
  * contradictory configuration. Surfacing it from the config package's own
  * barrel means consumers `catch` against the configuration layer they call,
  * not the kernel underneath it. (This re-export also keeps a runtime import of
- * @opensip-tools/core live in the barrel.)
+ * @opensip-cli/core live in the barrel.)
  */
 
-export { ConfigurationError } from '@opensip-tools/core';
+export { ConfigurationError } from '@opensip-cli/core';
 
 export { composeConfigSchema, validateConfigDocument } from './composer.js';
 // ADR-0043: the unclaimed-namespace claim report (pure; the CLI emits the

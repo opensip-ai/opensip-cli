@@ -3,9 +3,9 @@
  * @fileoverview Validate routes have authentication middleware
  */
 
-import { logger } from '@opensip-tools/core';
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
-import { stripStringsAndComments } from '@opensip-tools/fitness';
+import { logger } from '@opensip-cli/core';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+import { stripStringsAndComments } from '@opensip-cli/fitness';
 
 /**
  * Match Fastify route definitions

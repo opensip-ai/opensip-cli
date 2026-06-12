@@ -2,7 +2,7 @@
  * sim-config-schema — the simulation tool's namespaced Zod config schema
  * (release 2.10.0, ADR-0023, Phase 4 Task 4.2).
  *
- * Describes the `simulation:` top-level block of `opensip-tools.config.yml`.
+ * Describes the `simulation:` top-level block of `opensip-cli.config.yml`.
  * Today simulation owns a single knob — the tool-scoped `recipe` default
  * (ADR-0022) — so the schema is minimal; it grows as sim gains config.
  *
@@ -14,7 +14,7 @@
 
 import { z } from 'zod';
 
-import type { ToolConfigDeclaration } from '@opensip-tools/config';
+import type { ToolConfigDeclaration } from '@opensip-cli/config';
 
 /**
  * Zod object for the `simulation:` namespace. The `recipe` field is optional;

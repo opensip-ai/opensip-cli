@@ -2,14 +2,14 @@
  * @fileoverview Tests for the per-check recipe-config helper.
  *
  * As of Phase 6 Task 6.2, the slot moved off `Symbol.for(globalThis)`
- * onto the current `RunScope`. Both copies of `@opensip-tools/fitness`
+ * onto the current `RunScope`. Both copies of `@opensip-cli/fitness`
  * (the CLI's bundled copy + the plugin pack's resolved copy) read
  * from the same `AsyncLocalStorage` instance exported from
- * `@opensip-tools/core` — so the slot identity is bound to core,
+ * `@opensip-cli/core` — so the slot identity is bound to core,
  * not to whichever fitness happens to load first.
  */
 
-import { RunScope, runWithScopeSync } from '@opensip-tools/core';
+import { RunScope, runWithScopeSync } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import {
@@ -72,7 +72,7 @@ describe('getCheckConfig', () => {
 
   it('two-copies-of-fitness smoke test: separately-imported getCheckConfig sees the same scope-bound config', async () => {
     // Regression coverage for the cross-cutting T1 finding. The runtime
-    // frequently has TWO copies of `@opensip-tools/fitness`:
+    // frequently has TWO copies of `@opensip-cli/fitness`:
     //
     //   1. The CLI's bundled copy (running the recipe service).
     //   2. The plugin pack's resolved copy (running the check, calling
@@ -80,7 +80,7 @@ describe('getCheckConfig', () => {
     //
     // The previous design used `Symbol.for(globalThis)` to make both
     // copies share a slot. The current design routes through
-    // `currentScope()` from `@opensip-tools/core` — both fitness copies
+    // `currentScope()` from `@opensip-cli/core` — both fitness copies
     // import the same `AsyncLocalStorage` instance from core, so the
     // slot identity is bound to core (one resolved copy) rather than to
     // whichever fitness happens to be loaded first.

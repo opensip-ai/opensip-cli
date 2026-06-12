@@ -15,14 +15,14 @@
  * occurrences?") is what fixes the name-collision class: a name imported from
  * another package is a cross-shard call even when a DIFFERENT local function in
  * this shard happens to share the name (e.g. checks-universal has a local
- * `isTestFile`, but a call to the IMPORTED `@opensip-tools/fitness` `isTestFile`
+ * `isTestFile`, but a call to the IMPORTED `@opensip-cli/fitness` `isTestFile`
  * still crosses the boundary). Conversely, a site the in-shard resolver already
  * resolved is skipped, so a recovered boundary edge never double-counts.
  */
 
 import { relative, sep } from 'node:path';
 
-import { ownerEdgeKey } from '@opensip-tools/graph';
+import { ownerEdgeKey } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { isReturnValueDiscarded } from '../edges.js';
@@ -30,7 +30,7 @@ import { isReturnValueDiscarded } from '../edges.js';
 import { calleeAnchorNode, calleeSimpleName, buildImportSpecifierIndex } from './syntactic.js';
 
 import type { CallSiteRecord } from '../walk.js';
-import type { CallEdge, CrossBoundaryCall } from '@opensip-tools/graph';
+import type { CallEdge, CrossBoundaryCall } from '@opensip-cli/graph';
 
 /** Max length of the descriptor's display text — the CallEdge.text contract. */
 const TEXT_MAX = 80;

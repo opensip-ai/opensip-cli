@@ -8,7 +8,7 @@
  * a Phase-1 parity test pin byte-identity with the legacy CLI builders.
  */
 
-import type { ScaffoldContext, ScaffoldFile } from '@opensip-tools/core';
+import type { ScaffoldContext, ScaffoldFile } from '@opensip-cli/core';
 
 /**
  * Pinned example-check ids per language — the COMPLETE id universe (drives
@@ -32,14 +32,14 @@ export function exampleCheckSource(language: string, polyglotSuffix = ''): strin
   const slug = polyglotSuffix ? `example-check-${polyglotSuffix}` : 'example-check';
   return `// Example fitness check.
 //
-// Edit this file or add new .mjs files to opensip-tools/fit/checks/.
-// Files in this directory are auto-loaded on the next \`opensip-tools fit\` run.
+// Edit this file or add new .mjs files to opensip-cli/fit/checks/.
+// Files in this directory are auto-loaded on the next \`opensip fit\` run.
 //
 // This demo flags any file containing the literal \`EXAMPLE_TODO\`. After
 // you confirm the wiring works, delete or replace it with a real check.
 //
-// Docs: https://github.com/opensip-ai/opensip-tools#authoring-a-check-package
-import { defineCheck } from '@opensip-tools/fitness';
+// Docs: https://github.com/opensip-ai/opensip-cli#authoring-a-check-package
+import { defineCheck } from '@opensip-cli/fitness';
 
 export const checks = [
   defineCheck({
@@ -56,7 +56,7 @@ export const checks = [
         message: 'Found the example trigger string.',
         severity: 'warning',
         suggestion:
-          'This is just a demo. Delete opensip-tools/fit/checks/example-check.mjs ' +
+          'This is just a demo. Delete opensip-cli/fit/checks/example-check.mjs ' +
           'once you have your own checks.',
         filePath,
       }];
@@ -71,10 +71,10 @@ export function exampleRecipeSource(slugs: readonly string[]): string {
   const slugList = slugs.map((s) => `'${s}'`).join(', ');
   return `// Example fitness recipe — runs only the example check(s).
 //
-// Edit this file or add new .mjs files to opensip-tools/fit/recipes/.
+// Edit this file or add new .mjs files to opensip-cli/fit/recipes/.
 // Files in this directory are auto-loaded on the next run.
 //
-// Run this recipe explicitly:  opensip-tools fit --recipe example
+// Run this recipe explicitly:  opensip fit --recipe example
 //
 // To run all enabled checks (built-in + your custom ones), omit
 // --recipe and the built-in \`default\` recipe applies.

@@ -40,19 +40,19 @@ import {
   ToolRegistry,
   currentScope,
   runWithScope,
-} from '@opensip-tools/core';
-import { fitnessTool } from '@opensip-tools/fitness';
-import { executeFit } from '@opensip-tools/fitness/internal';
+} from '@opensip-cli/core';
+import { fitnessTool } from '@opensip-cli/fitness';
+import { executeFit } from '@opensip-cli/fitness/internal';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import type { FitOptions } from '@opensip-tools/contracts';
+import type { FitOptions } from '@opensip-cli/contracts';
 
 let projectA: string;
 let projectB: string;
 
 function writeFixture(dir: string, includeGlob: string, srcFiles: Record<string, string>): void {
   writeFileSync(
-    join(dir, 'opensip-tools.config.yml'),
+    join(dir, 'opensip-cli.config.yml'),
     `targets:
   source:
     description: smoke fixture

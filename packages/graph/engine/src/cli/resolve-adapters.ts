@@ -8,12 +8,12 @@
  * import the large graph command handler just for this helper.
  */
 
-import { ConfigurationError } from '@opensip-tools/core';
+import { ConfigurationError } from '@opensip-cli/core';
 
 import { detectLanguages } from './detect.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
-import type { LanguageAdapter, ToolCliContext } from '@opensip-tools/core';
+import type { LanguageAdapter, ToolCliContext } from '@opensip-cli/core';
 
 /**
  * Resolve which language adapters apply to this run. With `--language`

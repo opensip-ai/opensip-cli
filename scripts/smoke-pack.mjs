@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 //
-// Post-pack / pre-publish smoke test for opensip-tools releases.
+// Post-pack / pre-publish smoke test for opensip-cli releases.
 //
 // Installs the freshly-packed tarballs *together* into a throwaway
 // consumer project and actually loads the CLI. This is the gate that
@@ -8,9 +8,9 @@
 // version-string and dependency-range checks (verify-release.mjs)
 // structurally cannot see.
 //
-// It exists because of the 2.0.0 incident: @opensip-tools/cli-ui@2.0.0
+// It exists because of the 2.0.0 incident: @opensip-cli/cli-ui@2.0.0
 // was published from a stale build that did not export `RunFooterHints`,
-// while @opensip-tools/fitness@2.0.0 imported it. Every version string
+// while @opensip-cli/fitness@2.0.0 imported it. Every version string
 // said "2.0.0" and every dep range resolved — but the CLI crashed on
 // startup with `SyntaxError: ... does not provide an export named
 // 'RunFooterHints'`. The only thing that catches that is loading the
@@ -18,8 +18,8 @@
 //
 // Why install from local tarballs instead of the registry: the versions
 // we are about to publish are not on npm yet. A normal
-// `npm install @opensip-tools/cli` would pull the *previously* published
-// versions — i.e. test the wrong bytes. We force every @opensip-tools/*
+// `npm install @opensip-cli/cli` would pull the *previously* published
+// versions — i.e. test the wrong bytes. We force every @opensip-cli/*
 // dependency (direct and transitive) to resolve to its freshly-packed
 // tarball via npm `overrides`, so the test exercises exactly what will
 // be published.
@@ -50,8 +50,8 @@ import { runScenarios } from './cli-acceptance-core.mjs';
 import { buildPackedSmokeScenarios } from './smoke-pack-scenarios.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const SCOPE = '@opensip-tools/';
-const TARBALL_PREFIX = 'opensip-tools-';
+const SCOPE = '@opensip-cli/';
+const TARBALL_PREFIX = 'opensip-cli-';
 
 // ---------------------------------------------------------------------
 // Arg parsing
@@ -105,12 +105,12 @@ if (tarballs.length === 0) {
   fail(`no ${TARBALL_PREFIX}*${tarballSuffix} tarballs found in ${tarballDir}`);
 }
 
-// pnpm pack names scoped packages `opensip-tools-<unscoped-name>-<version>.tgz`
-// and the unscoped CLI package (`opensip-tools`) just `opensip-tools-<version>.tgz`.
+// pnpm pack names scoped packages `opensip-cli-<unscoped-name>-<version>.tgz`
+// and the unscoped CLI package (`opensip-cli`) just `opensip-cli-<version>.tgz`.
 // All packages share one version (verify-release.mjs enforces this), so the
 // suffix is deterministic. The CLI tarball is the install entry point; every
 // other tarball is a scoped transitive dep we force via `overrides`.
-const cliFileName = `opensip-tools-${expectedVersion}.tgz`;
+const cliFileName = `opensip-cli-${expectedVersion}.tgz`;
 const overrides = {};
 let cliTarball;
 for (const file of tarballs) {
@@ -122,12 +122,12 @@ for (const file of tarballs) {
   overrides[`${SCOPE}${unscoped}`] = `file:${join(tarballDir, file)}`;
 }
 info(
-  `discovered ${Object.keys(overrides).length} @opensip-tools/* tarball(s) + the opensip-tools CLI`,
+  `discovered ${Object.keys(overrides).length} @opensip-cli/* tarball(s) + the opensip-cli CLI`,
 );
 
 if (!cliTarball) {
   fail(
-    `opensip-tools tarball (${cliFileName}) missing from ${tarballDir} — cannot smoke-test the entry point`,
+    `opensip-cli tarball (${cliFileName}) missing from ${tarballDir} — cannot smoke-test the entry point`,
   );
 }
 
@@ -139,13 +139,13 @@ const workDir = await fs.mkdtemp(join(tmpdir(), 'ost-smoke-'));
 info(`consumer project: ${workDir}`);
 
 // `dependencies` pulls cli from its local tarball; `overrides` forces
-// every transitive @opensip-tools/* dep to the matching local tarball
+// every transitive @opensip-cli/* dep to the matching local tarball
 // instead of the registry, so we test the about-to-publish bytes.
 const consumerPkg = {
-  name: 'opensip-tools-smoke',
+  name: 'opensip-cli-smoke',
   version: '0.0.0',
   private: true,
-  dependencies: { 'opensip-tools': cliTarball },
+  dependencies: { 'opensip-cli': cliTarball },
   overrides,
 };
 await fs.writeFile(join(workDir, 'package.json'), `${JSON.stringify(consumerPkg, null, 2)}\n`);
@@ -184,7 +184,7 @@ try {
   }
 
   // The real consumer entry point: the bin shim npm created.
-  const bin = join(workDir, 'node_modules', '.bin', 'opensip-tools');
+  const bin = join(workDir, 'node_modules', '.bin', 'opensip-cli');
   if (!existsSync(bin)) {
     fail(`installed CLI bin not found at ${bin} — the cli package did not install correctly`);
   }

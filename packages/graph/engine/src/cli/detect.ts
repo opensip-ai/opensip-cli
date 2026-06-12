@@ -12,7 +12,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { logger, type LanguageRegistry } from '@opensip-tools/core';
+import { logger, type LanguageRegistry } from '@opensip-cli/core';
 
 const MODULE_GRAPH_CLI = 'graph:cli';
 

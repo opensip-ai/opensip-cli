@@ -2,8 +2,8 @@
  * @fileoverview defineRegexListCheck - Template helper for regex-list scanners.
  *
  * Wraps {@link defineCheck} for the common "for line; for pattern; emit one
- * violation per match" shape that ~13 sites in @opensip-tools/checks-universal
- * (and a handful in @opensip-tools/checks-typescript) reimplement, often with
+ * violation per match" shape that ~13 sites in @opensip-cli/checks-universal
+ * (and a handful in @opensip-cli/checks-typescript) reimplement, often with
  * subtly different `lastIndex`-reset, comment-skip, and test-file-skip
  * semantics.
  *

@@ -5,7 +5,7 @@
  * parse/walk/resolve when nothing relevant changed. Their validity is
  * keyed on the adapter `cacheKey` (config + tool-version hash) and a
  * per-file fingerprint — but NOT on the version of the graph engine that
- * produced them. So upgrading opensip-tools to a build with changed
+ * produced them. So upgrading opensip-cli to a build with changed
  * catalog-construction logic (edge resolution, body hashing, a new
  * rule-relevant field) would replay a stale catalog when the source was
  * unchanged: the customer analog of running a stale compiled binary.
@@ -25,10 +25,10 @@
  * catalog simply mismatches the new prefix and rebuilds once.
  */
 
-import { readPackageVersion } from '@opensip-tools/core';
+import { readPackageVersion } from '@opensip-cli/core';
 
 /**
- * The running `@opensip-tools/graph` package version, resolved once from
+ * The running `@opensip-cli/graph` package version, resolved once from
  * the nearest `package.json`. In a published install this is the version
  * npm placed on disk; in the monorepo it is `graph/engine`'s version.
  */

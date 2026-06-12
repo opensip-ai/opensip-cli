@@ -7,7 +7,7 @@
  * shape.
  */
 
-import { scheduleUnits } from '@opensip-tools/core';
+import { scheduleUnits } from '@opensip-cli/core';
 
 import { runOneCheck } from './run-one-check.js';
 import { getEffectiveMaxParallel } from './types.js';

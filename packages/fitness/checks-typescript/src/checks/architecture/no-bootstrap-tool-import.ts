@@ -3,7 +3,7 @@
  *
  * Install-source independence (north-star §1) requires the host to load bundled
  * tools through the SAME dynamic-import plugin path an installed tool uses — never
- * a static `import { fitnessTool } from '@opensip-tools/fitness'`. Importing a
+ * a static `import { fitnessTool } from '@opensip-cli/fitness'`. Importing a
  * tool-runtime export (`fitnessTool` / `graphTool` / `simulationTool`) compiles the
  * tool into the CLI and re-privileges its load path — the exact coupling the
  * acceptance test deletes. Bundled tools are named in `BUNDLED_TOOL_PACKAGES` and
@@ -21,15 +21,15 @@
  * declaration. Test code (`__tests__/`) is exempt: a white-box test may import a
  * tool runtime directly (see `cli/.../__tests__/test-utils/bundled-tools.ts`).
  */
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
+import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 /** The CLI host source tree this check guards (the loader + composition root). */
 const CLI_HOST_PATH = 'packages/cli/src/';
 
 /** Tool packages whose runtime export must not be statically imported by the host. */
-const TOOL_PACKAGE_RE = /^@opensip-tools\/(?:fitness|graph|simulation)(?:\/.*)?$/;
+const TOOL_PACKAGE_RE = /^@opensip-cli\/(?:fitness|graph|simulation)(?:\/.*)?$/;
 
 /** The tool-RUNTIME exports — importing any of these is the load-path privilege. */
 const TOOL_RUNTIME_SYMBOLS: ReadonlySet<string> = new Set([

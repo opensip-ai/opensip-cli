@@ -32,7 +32,7 @@ import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { FunctionOccurrence, Indexes, SccFeatures } from '../types.js';
-import type { Signal, SignalSeverity } from '@opensip-tools/core';
+import type { Signal, SignalSeverity } from '@opensip-cli/core';
 
 const DEFAULT_CYCLE_MIN_SIZE = 3;
 

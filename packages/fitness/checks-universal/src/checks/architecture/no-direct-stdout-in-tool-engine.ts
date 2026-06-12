@@ -32,7 +32,7 @@
  * no-direct-stdout-in-tool-engine` with a justification comment — e.g. the
  * shard-worker IPC protocol (`graph/engine/src/cli/shard-worker.ts`).
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Resolved-path fragment that identifies a tool-engine source file. The

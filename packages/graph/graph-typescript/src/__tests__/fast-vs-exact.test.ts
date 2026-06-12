@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter as adapter } from '../index.js';
 
-import type { CallEdge, Catalog, ResolutionMode } from '@opensip-tools/graph';
+import type { CallEdge, Catalog, ResolutionMode } from '@opensip-cli/graph';
 
 const TSCONFIG =
   '{ "compilerOptions": { "target": "ES2022", "module": "Node16", "moduleResolution": "Node16" } }';

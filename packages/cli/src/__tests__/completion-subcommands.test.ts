@@ -11,7 +11,7 @@
  * `sim --show`, and `graph`'s flags entirely).
  */
 
-import { ToolRegistry, type ToolCliContext } from '@opensip-tools/core';
+import { ToolRegistry, type ToolCliContext } from '@opensip-cli/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -76,7 +76,7 @@ async function buildLiveInventory(): Promise<{
   program: Command;
   registry: ToolRegistry;
 }> {
-  const program = new Command('opensip-tools');
+  const program = new Command('opensip');
   const registry = new ToolRegistry();
   await registerFirstPartyTools(registry);
   const toolCtx = makeStubToolContext();

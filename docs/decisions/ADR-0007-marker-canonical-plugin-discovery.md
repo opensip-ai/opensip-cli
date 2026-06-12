@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-03
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0007: Make the `opensipTools.kind` marker the canonical plugin-discovery contract
@@ -36,7 +36,7 @@ package which is deliberately *not* a plugin is explicitly allowlisted.
 - *Keep name-prefix discovery as a co-equal arm.* Rejected: a naming
   convention silently wired to runtime behavior means merely adding a package
   under a magic prefix changes discovery. That is precisely how
-  `@opensip-tools/graph-adapter-common` (shared scaffolding) was loaded as an
+  `@opensip-cli/graph-adapter-common` (shared scaffolding) was loaded as an
   adapter and warned on every run.
 - *Delete the prefix arms in the original migration.* Rejected for that release:
   the `checks-*` scan was a public extension contract (third parties could
@@ -62,7 +62,7 @@ would otherwise silently fail to load.
 
 **Consequences:**
 
-- First-party `@opensip-tools/checks-*` packs and `@opensip-tools/graph-*`
+- First-party `@opensip-cli/checks-*` packs and `@opensip-cli/graph-*`
   adapters now declare their marker; the prefix scan is redundant for them.
 - The `checks-*` prefix scan (`check-package-discovery.ts`) and its
   `plugins.packageScopes` extension have been removed. Check packs now

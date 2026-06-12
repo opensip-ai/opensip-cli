@@ -34,7 +34,7 @@ import {
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolSource,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { isValidTool } from './validate-tool.js';
 

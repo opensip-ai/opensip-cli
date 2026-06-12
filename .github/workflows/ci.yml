@@ -68,7 +68,7 @@ jobs:
       - name: Test (with coverage thresholds)
         run: pnpm test:coverage
 
-      # Dogfood: run opensip-tools fit against this repo. The CI step itself
+      # Dogfood: run opensip-cli fit against this repo. The CI step itself
       # hard-fails on any error-level finding: `fit --gate-save` returns the
       # `failOnErrors`/`failOnWarnings` exit code (ADR-0020), so enforcement does
       # not depend solely on the downstream Code Scanning net-new ratchet. The
@@ -87,7 +87,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: fit.sarif
-          category: opensip-tools-fit
+          category: opensip-cli-fit
 
       # Dogfood the graph tool the same way as fit. `graph --gate-save --sarif`
       # does both in one run: --gate-save records the current Signals into the
@@ -111,11 +111,11 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: graph.sarif
-          category: opensip-tools-graph
+          category: opensip-cli-graph
 
       # REAL-REPO equivalence guardrail (ADR-0032): assert the SHARDED build is
       # byte-equivalent to the EXACT single-program build on THIS repo — a genuine
-      # multi-package TS monorepo whose `@opensip-tools/*` imports resolve to built
+      # multi-package TS monorepo whose `@opensip-cli/*` imports resolve to built
       # `dist/*.d.ts`, the exact divergence class the unit fixtures cannot model
       # (they reuse the production cross-package helpers, so the two engines agree
       # by construction). This dogfood step builds BOTH catalogs cold with the real
@@ -138,7 +138,7 @@ jobs:
       # of docs/public/) is in sync with its source. Editors who change
       # docs/public/*.md must regenerate docs/web-generated/ by running
       # `node scripts/build-web-docs.mjs` and committing the result. The
-      # website at opensip.ai/docs/opensip-tools/ fetches
+      # website at opensip.ai/docs/opensip-cli/ fetches
       # docs/web-generated/ directly, so stale output is a user-visible
       # bug.
       - name: Check generated web docs in sync

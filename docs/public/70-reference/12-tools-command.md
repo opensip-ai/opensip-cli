@@ -24,11 +24,11 @@ subcommands to the CLI. Five subcommands — no flag aliases, no `tool`
 singular:
 
 ```
-opensip-tools tools list
-opensip-tools tools validate <spec>
-opensip-tools tools install <spec> [--global|--project]
-opensip-tools tools uninstall <name-or-id> [--global|--project] [--purge-data]
-opensip-tools tools data-purge <tool-id>
+opensip tools list
+opensip tools validate <spec>
+opensip tools install <spec> [--global|--project]
+opensip tools uninstall <name-or-id> [--global|--project] [--purge-data]
+opensip tools data-purge <tool-id>
 ```
 
 The lower-level `plugin add/remove --domain tool` machinery keeps working;
@@ -54,8 +54,8 @@ provenance.
 ## `tools list`
 
 The effective tool inventory: bundled tools, user-global installs
-(`~/.opensip-tools/plugins/tool/`), and project-local installs
-(`<project>/opensip-tools/.runtime/plugins/tool/`).
+(`~/.opensip-cli/plugins/tool/`), and project-local installs
+(`<project>/opensip-cli/.runtime/plugins/tool/`).
 
 | Column | Meaning |
 |---|---|

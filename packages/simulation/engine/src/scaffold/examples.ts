@@ -7,7 +7,7 @@
  * verbatim; a Phase-0 golden + a Phase-1 parity test pin byte-identity.
  */
 
-import type { ScaffoldContext, ScaffoldFile } from '@opensip-tools/core';
+import type { ScaffoldContext, ScaffoldFile } from '@opensip-cli/core';
 
 /** Example simulation scenario source (verbatim). */
 export function exampleScenarioSource(): string {
@@ -20,11 +20,11 @@ export function exampleScenarioSource(): string {
 // — and point it only at a target you own. For fault injection, see the chaos
 // docs (defineChaosScenario + fault.*).
 //
-// Edit this file or add new .mjs files to opensip-tools/sim/scenarios/.
-// Files in this directory are auto-loaded on the next \`opensip-tools sim\` run.
+// Edit this file or add new .mjs files to opensip-cli/sim/scenarios/.
+// Files in this directory are auto-loaded on the next \`opensip sim\` run.
 //
-// Docs: https://github.com/opensip-ai/opensip-tools#simulation
-import { defineLoadScenario, ASSERTIONS /*, httpTarget */ } from '@opensip-tools/simulation';
+// Docs: https://github.com/opensip-ai/opensip-cli#simulation
+import { defineLoadScenario, ASSERTIONS /*, httpTarget */ } from '@opensip-cli/simulation';
 
 export const scenarios = [
   defineLoadScenario({
@@ -49,11 +49,11 @@ export const scenarios = [
 export function exampleSimRecipeSource(): string {
   return `// Example simulation recipe — runs only the example scenario.
 //
-// Edit this file or add new .mjs files to opensip-tools/sim/recipes/.
+// Edit this file or add new .mjs files to opensip-cli/sim/recipes/.
 // Files in this directory are auto-loaded on the next run.
 //
-// Run this recipe explicitly:  opensip-tools sim --recipe example
-import { defineSimulationRecipe } from '@opensip-tools/simulation';
+// Run this recipe explicitly:  opensip sim --recipe example
+import { defineSimulationRecipe } from '@opensip-cli/simulation';
 
 export const recipes = [
   defineSimulationRecipe({

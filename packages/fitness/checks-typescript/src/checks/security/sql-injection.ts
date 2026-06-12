@@ -6,8 +6,8 @@
  * text, error messages, and comments.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
-import { parseSource, walkNodes, getLineNumber } from '@opensip-tools/lang-typescript';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+import { parseSource, walkNodes, getLineNumber } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 /**

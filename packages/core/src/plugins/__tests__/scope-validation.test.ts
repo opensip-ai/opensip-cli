@@ -5,7 +5,7 @@ import { VALID_NPM_SCOPE_REGEX, resolveScopes } from '../scope-validation.js';
 
 describe('VALID_NPM_SCOPE_REGEX', () => {
   it('accepts well-formed npm scopes', () => {
-    expect(VALID_NPM_SCOPE_REGEX.test('@opensip-tools')).toBe(true);
+    expect(VALID_NPM_SCOPE_REGEX.test('@opensip-cli')).toBe(true);
     expect(VALID_NPM_SCOPE_REGEX.test('@foo')).toBe(true);
     expect(VALID_NPM_SCOPE_REGEX.test('@foo-bar')).toBe(true);
     expect(VALID_NPM_SCOPE_REGEX.test('@foo.bar')).toBe(true);
@@ -36,40 +36,40 @@ describe('resolveScopes', () => {
   });
 
   it('always includes the default scope first', () => {
-    const out = resolveScopes('@opensip-tools', [], 'plugin.invalid_scope');
-    expect(out).toEqual(['@opensip-tools']);
+    const out = resolveScopes('@opensip-cli', [], 'plugin.invalid_scope');
+    expect(out).toEqual(['@opensip-cli']);
   });
 
   it('appends valid extra scopes after the default', () => {
-    const out = resolveScopes('@opensip-tools', ['@other', '@third'], 'plugin.invalid_scope');
-    expect(out).toEqual(['@opensip-tools', '@other', '@third']);
+    const out = resolveScopes('@opensip-cli', ['@other', '@third'], 'plugin.invalid_scope');
+    expect(out).toEqual(['@opensip-cli', '@other', '@third']);
   });
 
   it('deduplicates extra scopes that match the default', () => {
     const out = resolveScopes(
-      '@opensip-tools',
-      ['@opensip-tools', '@other'],
+      '@opensip-cli',
+      ['@opensip-cli', '@other'],
       'plugin.invalid_scope',
     );
-    expect(out).toEqual(['@opensip-tools', '@other']);
+    expect(out).toEqual(['@opensip-cli', '@other']);
   });
 
   it('deduplicates duplicate extra scopes', () => {
     const out = resolveScopes(
-      '@opensip-tools',
+      '@opensip-cli',
       ['@other', '@other', '@third'],
       'plugin.invalid_scope',
     );
-    expect(out).toEqual(['@opensip-tools', '@other', '@third']);
+    expect(out).toEqual(['@opensip-cli', '@other', '@third']);
   });
 
   it('drops invalid scopes with a structured warning', () => {
     const out = resolveScopes(
-      '@opensip-tools',
+      '@opensip-cli',
       ['@valid', 'no-at-sign', '@Bad'],
       'plugin.invalid_scope',
     );
-    expect(out).toEqual(['@opensip-tools', '@valid']);
+    expect(out).toEqual(['@opensip-cli', '@valid']);
     expect(warnSpy).toHaveBeenCalledTimes(2);
     expect(warnSpy.mock.calls[0]?.[0]).toMatchObject({
       evt: 'plugin.invalid_scope',
@@ -83,7 +83,7 @@ describe('resolveScopes', () => {
   });
 
   it('uses the supplied event name in warnings', () => {
-    resolveScopes('@opensip-tools', ['bad'], 'plugin.scenario_package.invalid_scope');
+    resolveScopes('@opensip-cli', ['bad'], 'plugin.scenario_package.invalid_scope');
     expect(warnSpy.mock.calls[0]?.[0]).toMatchObject({
       evt: 'plugin.scenario_package.invalid_scope',
     });

@@ -1,5 +1,5 @@
 /**
- * @opensip-tools/fitness — public barrel.
+ * @opensip-cli/fitness — public barrel.
  *
  * This barrel is the **marketplace contract surface** for the fitness tool:
  * the check / recipe / plugin authoring API plus the `fitnessTool` plugin
@@ -14,7 +14,7 @@
  * drives fitness through the Tool contract (`fitnessTool`), never by importing
  * those symbols; fitness's own `tool.ts` wires them via relative imports. The
  * handful that cross-package test suites need are exposed via
- * `@opensip-tools/fitness/internal` (see `./internal.ts`), which production
+ * `@opensip-cli/fitness/internal` (see `./internal.ts`), which production
  * code is forbidden from importing (dependency-cruiser `no-cross-package-internal`,
  * ADR-0009 / ADR-0013).
  *
@@ -43,8 +43,8 @@ export type { FitnessRecipeDefinition } from './recipes/types.js';
 
 // ── Re-exported kernel convenience ─────────────────────────────────
 // Lets a pack barrel set `metadata.version` from its own package.json without
-// duplicating the literal or adding a direct @opensip-tools/core dep.
-export { readPackageVersion } from '@opensip-tools/core';
+// duplicating the literal or adding a direct @opensip-cli/core dep.
+export { readPackageVersion } from '@opensip-cli/core';
 
 // ── Check authoring types ──────────────────────────────────────────
 export type {
@@ -79,7 +79,7 @@ export type { ImportGraph } from './framework/import-graph.js';
 
 // Regex-based string/comment strippers — language-agnostic, good enough for
 // universal/text checks. (The TS-AST-aware, position-preserving `filterContent`
-// lives in @opensip-tools/lang-typescript; TS checks import it from there.)
+// lives in @opensip-cli/lang-typescript; TS checks import it from there.)
 export {
   isInsideStringLiteral,
   stripStringLiterals,

@@ -1,7 +1,7 @@
 /**
  * fitness-config-schema — the fitness tool's namespaced Zod config schema.
  *
- * Describes the `fitness:` top-level block of `opensip-tools.config.yml` —
+ * Describes the `fitness:` top-level block of `opensip-cli.config.yml` —
  * the knobs fitness owns: gate thresholds (`failOnErrors`/`failOnWarnings`),
  * the `disabledChecks` list, the tool-scoped `recipe` default, and the
  * scheduling/targeting knobs (`defaultTarget`/`maxParallel`/`timeout`).
@@ -19,7 +19,7 @@
 
 import { z } from 'zod';
 
-import type { ToolConfigDeclaration } from '@opensip-tools/config';
+import type { ToolConfigDeclaration } from '@opensip-cli/config';
 
 /** Defaults for fitness-owned config keys. */
 export const FITNESS_CONFIG_DEFAULTS = {

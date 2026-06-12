@@ -63,7 +63,7 @@ import {
   runWalk,
   synthesizeModuleInit as buildModuleInit,
   type WalkSinks,
-} from '@opensip-tools/graph-adapter-common';
+} from '@opensip-cli/graph-adapter-common';
 
 import { digestJavaBody, digestSyntheticBody } from './body-digest.js';
 import { collectDependencySites } from './walk-dependencies.js';
@@ -83,8 +83,8 @@ import type {
   FunctionOccurrence,
   WalkInput,
   WalkOutput,
-} from '@opensip-tools/graph';
-import type { Node } from '@opensip-tools/tree-sitter';
+} from '@opensip-cli/graph';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 const TEST_PATH_RE = /(?:^|\/)test\//;
 const TEST_FILE_NAME_RE = /(?:^|\/)[^/]*(?:Test|Tests|IT)\.java$/;

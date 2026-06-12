@@ -29,7 +29,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { rustGraphAdapter } from '../index.js';
 
-import type { CallEdge, Catalog, ResolveOutput } from '@opensip-tools/graph';
+import type { CallEdge, Catalog, ResolveOutput } from '@opensip-cli/graph';
 
 /**
  * Drive the full pipeline against a temp project and return the

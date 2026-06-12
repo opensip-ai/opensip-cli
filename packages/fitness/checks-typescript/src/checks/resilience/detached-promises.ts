@@ -20,8 +20,8 @@ import {
   getCheckConfig,
   isTestFile,
   type CheckViolation,
-} from '@opensip-tools/fitness';
-import { getSharedSourceFile, isInAsyncContext } from '@opensip-tools/lang-typescript';
+} from '@opensip-cli/fitness';
+import { getSharedSourceFile, isInAsyncContext } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 /**

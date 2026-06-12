@@ -2,7 +2,7 @@
  * declaration — the contract a tool offers to the configuration layer.
  *
  * Each tool contributes a {@link ToolConfigDeclaration}: a namespace (its
- * top-level key in `opensip-tools.config.yml`), a Zod schema describing that
+ * top-level key in `opensip-cli.config.yml`), a Zod schema describing that
  * namespace's block, optional defaults, and optional environment-variable
  * bindings. The host composes the registered declarations into one strict
  * whole-document schema (see {@link ./composer}) and resolves precedence across

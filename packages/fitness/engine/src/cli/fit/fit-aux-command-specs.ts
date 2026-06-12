@@ -20,14 +20,14 @@
  *    documented non-Ink exception. The host renders nothing.
  */
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { ConfigurationError, defineCommand, logger } from '@opensip-tools/core';
+import { EXIT_CODES } from '@opensip-cli/contracts';
+import { ConfigurationError, defineCommand, logger } from '@opensip-cli/core';
 
 import { listChecks } from '../fit-list.js';
 import { listRecipes } from '../fit-recipes.js';
 
-import type { ToolOptions } from '@opensip-tools/contracts';
-import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
+import type { ToolOptions } from '@opensip-cli/contracts';
+import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
 
 /** `fit-list` — list available fitness checks. */
 export const fitListCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<

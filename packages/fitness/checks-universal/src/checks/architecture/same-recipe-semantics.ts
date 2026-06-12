@@ -2,7 +2,7 @@
  * @fileoverview Recipe execution must run on the shared substrate (§5.8 / §4.3).
  *
  * Release 2.13.0 hoisted one execution substrate (`scheduleUnits` + `runWithTimeout`,
- * `@opensip-tools/core`) that fit + sim recipes run on, so `timeout` / `maxParallel`
+ * `@opensip-cli/core`) that fit + sim recipes run on, so `timeout` / `maxParallel`
  * / `stopOnFirstFailure` mean the same thing in every domain — the "same words, same
  * semantics" guarantee. A recipe engine that reimplements the per-unit timeout with a
  * local `setTimeout(...)` around the run re-creates the exact divergence (§4.3) the
@@ -14,7 +14,7 @@
  * Graph is exempt by ADR-0026 (selection-only execution — it has no `execution`
  * block to schedule). `strip-strings-and-comments`; tests are exempt.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /** Fitness + simulation recipe-execution sources (graph is selection-only, ADR-0026). */
 const RECIPE_EXEC_PATH = /packages\/(?:fitness|simulation)\/engine\/src\/recipes\//;
@@ -38,7 +38,7 @@ export function analyzeSameRecipeSemantics(content: string): CheckViolation[] {
         line: i + 1,
         suggestion:
           'Route the unit run through runWithTimeout / scheduleUnits / executePipeline ' +
-          '(@opensip-tools/core), or — for a deliberate per-domain difference — document it ' +
+          '(@opensip-cli/core), or — for a deliberate per-domain difference — document it ' +
           'in an ADR (the same-recipe-semantics exception, e.g. ADR-0026 for graph).',
       });
     }

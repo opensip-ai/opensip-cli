@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/graph-adapter-common",
+  "name": "@opensip-cli/graph-adapter-common",
   "version": "3.0.0",
   "license": "MIT",
   "description": "Shared scaffolding for the tree-sitter graph language adapters (go, java, python, rust)",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "call-graph",
@@ -12,12 +12,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/graph/graph-adapter-common"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -35,9 +35,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/graph": "workspace:*",
-    "@opensip-tools/tree-sitter": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/graph": "workspace:*",
+    "@opensip-cli/tree-sitter": "workspace:*",
     "glob": "^13.0.0"
   },
   "devDependencies": {

@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 
 const MODULE_TAG = 'entitlement';
 const POSITIVE_TTL_MS = 6 * 60 * 60 * 1000; // 6h — re-check entitled keys infrequently

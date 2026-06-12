@@ -2,10 +2,10 @@
  * Type-only structural shapes for the v0.3 Code Paths panel.
  *
  * The graph engine's catalog.json is consumed here purely by JSON shape;
- * this file MUST NOT import from `@opensip-tools/graph`. The shape is
+ * this file MUST NOT import from `@opensip-cli/graph`. The shape is
  * intentionally duplicated as readonly structural types — this decouples
  * the dashboard panel from the graph engine's runtime types so
- * @opensip-tools/contracts stays a pure type-only kernel boundary.
+ * @opensip-cli/contracts stays a pure type-only kernel boundary.
  *
  * Runtime exports are forbidden. Only `export type` and `export interface`.
  */
@@ -69,7 +69,7 @@ export interface GraphFunctionOccurrence {
   readonly filePath: string;
   /**
    * The package this occurrence belongs to — the `name` of its nearest
-   * enclosing `package.json` (e.g. `@opensip-tools/fitness`), or the
+   * enclosing `package.json` (e.g. `@opensip-cli/fitness`), or the
    * top-level path segment when there is no manifest. Computed at build
    * time (the dashboard has no filesystem access). Absent on pre-2.4.2
    * catalogs; consumers fall back to deriving it from `filePath`.
@@ -94,7 +94,7 @@ export interface GraphFunctionOccurrence {
 // Structural mirror of the engine `PersistedFeatures` (the records/arrays
 // persisted JSON shape, NOT the in-memory `FeatureTable` Maps). Kept in sync
 // with the engine types; duplicated intentionally so the dashboard reads
-// features without importing `@opensip-tools/graph`.
+// features without importing `@opensip-cli/graph`.
 
 /** Mirror of the engine `BlastScore`. */
 export interface GraphBlastScore {

@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/output",
+  "name": "@opensip-cli/output",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "Output layer for OpenSIP Tools — pure signal-envelope formatters (json/sarif/table) and effectful sinks (file/cloud)",
+  "description": "Output layer for OpenSIP CLI — pure signal-envelope formatters (json/sarif/table) and effectful sinks (file/cloud)",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "sarif",
@@ -12,12 +12,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/output"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -35,8 +35,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/contracts": "workspace:*",
-    "@opensip-tools/core": "workspace:*"
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",

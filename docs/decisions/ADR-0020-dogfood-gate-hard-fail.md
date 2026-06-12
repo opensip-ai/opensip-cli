@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-06
-owner: opensip-tools
+owner: opensip-cli
 follow-up-status: graph half implemented 2026-06-06 (graph-modes.ts gate-save branch + graph-gate-mode.test.ts)
 ---
 

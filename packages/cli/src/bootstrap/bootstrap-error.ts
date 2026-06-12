@@ -18,7 +18,7 @@
  * than re-deriving it.
  */
 
-import { ToolError } from '@opensip-tools/core';
+import { ToolError } from '@opensip-cli/core';
 
 export interface BootstrapErrorInput {
   /** Clean, single-line message for the structured `--json` outcome. */

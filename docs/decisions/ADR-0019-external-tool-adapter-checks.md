@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-06
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0019: External quality tools run as first-party `command:` fit checks — wrap, don't reimplement; teach, don't ship
@@ -24,10 +24,10 @@ enforcement-reason: >
   wrapper, once built, IS the enforcement for its tool. The "don't ship opinionated
   wrappers to customers" half is upheld by review + the export-surface tests
   (ADR-0009/ADR-0013) plus the fact that wrappers presuming the host repo's config
-  live only in opensip-tools' own check packs, never in a customer-facing recipe.
+  live only in OpenSIP CLI's own check packs, never in a customer-facing recipe.
 ```
 
-**Decision:** opensip-tools standardizes on **wrapping mature external quality
+**Decision:** opensip-cli standardizes on **wrapping mature external quality
 tools as first-party `command:` fit checks** so that `fit` is the single quality
 entry point for *this* repository — joining the wrappers that already ship
 (`clang-tidy`, `knip` via `dead-code`, `semgrep`, the package-manager audit) with

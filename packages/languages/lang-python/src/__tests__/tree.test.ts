@@ -1,5 +1,5 @@
-import { RunScope, runWithScopeSync } from '@opensip-tools/core';
-import { initParseCache } from '@opensip-tools/core/languages/parse-cache.js';
+import { RunScope, runWithScopeSync } from '@opensip-cli/core';
+import { initParseCache } from '@opensip-cli/core/languages/parse-cache.js';
 import { describe, expect, it } from 'vitest';
 
 import { parsePython } from '../parse.js';

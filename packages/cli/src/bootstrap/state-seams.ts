@@ -7,9 +7,9 @@
  * sync throw still rejects for an awaiting caller).
  */
 
-import { ToolStateRepo, type DataStore } from '@opensip-tools/datastore';
+import { ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 /** Build the `toolState` seam group over a lazy datastore resolver. */
 export function buildStateSeams(deps: {

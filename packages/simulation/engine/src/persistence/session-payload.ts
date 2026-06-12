@@ -1,8 +1,8 @@
 // @fitness-ignore-file batch-operation-limits -- iterates the bounded per-run signal set grouped by source (signals emitted by a single sim run), matching the graph session-payload precedent.
-import { isErrorSignal } from '@opensip-tools/core';
+import { isErrorSignal } from '@opensip-cli/core';
 
-import type { SignalEnvelope, UnitResult } from '@opensip-tools/contracts';
-import type { Signal } from '@opensip-tools/core';
+import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 export type SimulationFindingSeverity = 'error' | 'warning';
 

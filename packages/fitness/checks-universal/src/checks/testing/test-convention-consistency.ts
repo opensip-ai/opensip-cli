@@ -8,7 +8,7 @@
 
 import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 /** Threshold for convention dominance (95%) */
 const DOMINANCE_THRESHOLD = 0.95;

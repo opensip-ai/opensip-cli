@@ -31,7 +31,7 @@ The sim engine has the same architectural shape as fit's recipe engine — selec
 ## The lifecycle
 
 ```
-opensip-tools sim --recipe <name>
+opensip sim --recipe <name>
   → simulationTool.action(opts)
        → executeSim(args)                                                   ↓
             → loadProjectConfig + plugin sync                                │
@@ -123,7 +123,7 @@ There is no pass/fail boolean on the result: the run verdict lives on `envelope.
 
 `SimDoneResult` is the internal `CommandResult` union member the renderer consumes (the `App.tsx` dispatcher in [`packages/cli/src/ui/`](../../../packages/cli/src/ui/) switches on `result.type`); it derives the per-scenario table from `envelope.units` (one unit per scenario — `slug` = scenario id, `passed`, `durationMs`, `error?`). The **`--json` output wraps the `envelope` in a `CommandOutcome`** (the byte-identical `SignalEnvelope` `fit` and `graph` emit, nested under `.envelope`) — the old bespoke `sim-done` JSON shape is retired. See [`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md).
 
-Per-kind details (the load p99, the chaos recovery time) are *not* in the envelope. They're in the executor result, which rides in the session's `session_tool_payload` row persisted to the project-local SQLite store (`<project>/opensip-tools/.runtime/datastore.sqlite`) via `SessionRepo`. The dashboard reads the session record to show full per-kind detail; the CLI summary stays compact.
+Per-kind details (the load p99, the chaos recovery time) are *not* in the envelope. They're in the executor result, which rides in the session's `session_tool_payload` row persisted to the project-local SQLite store (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`. The dashboard reads the session record to show full per-kind detail; the CLI summary stays compact.
 
 ---
 
@@ -154,7 +154,7 @@ A few intentional non-features:
 
 ## Where the example lands
 
-For `acme-api` running `opensip-tools sim --recipe pre-deploy`:
+For `acme-api` running `opensip sim --recipe pre-deploy`:
 
 1. The recipe selects `{ type: 'tags', include: ['load', 'chaos'] }`. Three scenarios match: `api-checkout-burst` (load), `payment-burst` (load), `checkout-resilient-under-fault` (chaos).
 2. Mode is `sequential`. Total expected duration: ~5 minutes.

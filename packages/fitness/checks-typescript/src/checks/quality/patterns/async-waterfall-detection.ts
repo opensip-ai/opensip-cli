@@ -13,8 +13,8 @@
  * - Skips sleep/delay in polling loops
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
-import { getSharedSourceFile, isAsync } from '@opensip-tools/lang-typescript';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
+import { getSharedSourceFile, isAsync } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 /**

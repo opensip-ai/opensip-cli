@@ -7,7 +7,7 @@
  * chaos kinds.
  */
 
-import { enterScope } from '@opensip-tools/core';
+import { enterScope } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';

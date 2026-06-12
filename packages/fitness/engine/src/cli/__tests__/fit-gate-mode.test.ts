@@ -11,8 +11,8 @@
  * run envelope's `verdict.passed`.
  */
 
-import { type FitOptions, type SignalEnvelope } from '@opensip-tools/contracts';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { type FitOptions, type SignalEnvelope } from '@opensip-cli/contracts';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../fit.js', () => ({ executeFit: vi.fn() }));
@@ -20,7 +20,7 @@ vi.mock('../fit.js', () => ({ executeFit: vi.fn() }));
 import { runGateMode } from '../fit-modes.js';
 import { executeFit } from '../fit.js';
 
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 let datastore: DataStore;
 

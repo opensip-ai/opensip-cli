@@ -1,12 +1,12 @@
 ---
 status: active
 last_verified: 2026-06-01
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # Architecture Decision Records
 
-Durable architectural decisions for **opensip-tools**, one file per ADR. Each
+Durable architectural decisions for **opensip-cli**, one file per ADR. Each
 record captures *what* was decided, the *alternatives* rejected, and the *why* —
 so a future contributor can reconstruct the reasoning instead of re-litigating it.
 
@@ -94,13 +94,13 @@ distinct from:
   impossible (1.0.0 is burned on npm; rename rejected); old versions retired via
   `npm deprecate`, never `unpublish`
 - [ADR-0013](./ADR-0013-fitness-curated-export-surface.md) — Curate the
-  `@opensip-tools/fitness` public barrel to the check/recipe/plugin authoring
+  `@opensip-cli/fitness` public barrel to the check/recipe/plugin authoring
   surface + `fitnessTool`; drop engine internals (registries, recipe service,
   gate primitives, `FitBaselineRepo`, CLI handlers). Locked by a runtime
   export-surface test; applies ADR-0009 concretely to fitness
 - [ADR-0014](./ADR-0014-shared-inline-signal-suppression.md) — Inline,
   per-occurrence, reason-carrying finding suppression is a shared
-  `@opensip-tools/core` primitive over the `Signal` stream; fitness migrates its
+  `@opensip-cli/core` primitive over the `Signal` stream; fitness migrates its
   accidental-home implementation onto it and graph adopts it (3.0 GA
   prerequisite). Whole-rule disable + the baseline ratchet stay per-tool.
   Extends ADR-0005's hoist-shared-substrate-to-core symmetry to suppression
@@ -148,7 +148,7 @@ distinct from:
   hard-fails. Fixes a fit recipe default leaking into `graph`/`sim`; the 3.0.0
   config schema rejects the removed `cli.recipe` fallback
 - [ADR-0023](./ADR-0023-config-package-and-schema-registry.md) — A dedicated
-  `@opensip-tools/config` package owns the config composer (namespaced Zod
+  `@opensip-cli/config` package owns the config composer (namespaced Zod
   schemas → one validated whole-document schema, strict, with JSON-Schema
   generation) and the tool-agnostic document blocks; tools contribute their own
   namespaced schema. Composer core lands in 2.10.0; the migration of scattered
@@ -179,14 +179,14 @@ distinct from:
   subcommand (`fit/sim/graph-run-worker`) over the `ProgressTransport` seam, so the
   main process runs only Ink + the 80 ms clock and the spinner never starves;
   persistence/egress stay on the main process post-run; engine entries are
-  persistence-free; `--json`/non-TTY stays in-process; `OPENSIP_TOOLS_NO_WORKER`
+  persistence-free; `--json`/non-TTY stays in-process; `OPENSIP_CLI_NO_WORKER`
   forces the in-process fallback. Exercises the reversibility ADR-0016 reserved
 - [ADR-0030](./ADR-0030-authored-tool-discovery.md) — Authored-Tool discovery
   realizes the ADR-0027 three-sources-one-path claim for the authored source:
-  an `opensip-tool.manifest.json` sidecar under `~/.opensip-tools/tools/` (new
-  `user-global` source, trusted-by-default) or `<project>/opensip-tools/tools/`
+  an `opensip-tool.manifest.json` sidecar under `~/.opensip-cli/tools/` (new
+  `user-global` source, trusted-by-default) or `<project>/opensip-cli/tools/`
   (re-scoped `project-local`, deny-by-default — allowlist via
-  `OPENSIP_TOOLS_ALLOW_PROJECT_TOOLS`, fail-closed exit 5 before import) is
+  `OPENSIP_CLI_ALLOW_PROJECT_TOOLS`, fail-closed exit 5 before import) is
   discovered, trust-gated, and routed through the same admit → import → register
   path bundled/installed tools travel. `plugin add --project` stays `installed`
 - [ADR-0033](./ADR-0033-cross-package-resolution-via-shared-hop.md) — Cross-package
@@ -203,7 +203,7 @@ distinct from:
   sharded-only edge is often a real edge exact under-resolved). Supersedes
   ADR-0032, **carrying its default-engine policy forward unchanged**
 - [ADR-0034](./ADR-0034-language-adapters-host-wired.md) — Language adapters are
-  **host-wired, not plugin-discovered**: the six bundled `@opensip-tools/lang-*`
+  **host-wired, not plugin-discovered**: the six bundled `@opensip-cli/lang-*`
   adapters are statically registered by the composition root
   (`register-language-adapters.ts`) and deliberately do NOT travel the
   tool-plugin path — they are the closed, version-locked parse substrate
@@ -229,7 +229,7 @@ distinct from:
   for free. Complements ADR-0035 (threshold verdict) by owning the orthogonal
   net-new gate it deferred; sequences **after** that work (shared files)
 - [ADR-0037](./ADR-0037-generic-targeting-runtime.md) — **File-targeting resolution
-  is a host runtime substrate** (`@opensip-tools/targeting`, exposed as
+  is a host runtime substrate** (`@opensip-cli/targeting`, exposed as
   `scope.targets`), finishing ADR-0023 which moved the targeting *types* host-side
   for cross-tool use but left the *runtime* in fitness. The generic half (named
   file-sets, `globalExcludes`, glob expansion, tag matching) moves down; the
@@ -244,12 +244,12 @@ distinct from:
   `graph` (no `pluginLayout`) gets no dir. Byte-identical fit+sim output preserved
 - [ADR-0039](./ADR-0039-check-packs-reach-parser-via-language-adapter.md) — **Check
   packs reach the parser substrate through the language adapter**: no
-  `checks-*` → `@opensip-tools/tree-sitter` dependency. The lang-\* package
+  `checks-*` → `@opensip-cli/tree-sitter` dependency. The lang-\* package
   re-exports the generic traversal/position vocabulary beside its
   grammar-specific predicates; a check pack depends on exactly `fitness` +
   `lang-<lang>`. Enforced by the `check-pack-no-tree-sitter` depcruise rule
 - [ADR-0040](./ADR-0040-test-support-package.md) — **Cross-package test
-  scaffolding lives in `@opensip-tools/test-support`** (private, never
+  scaffolding lives in `@opensip-cli/test-support`** (private, never
   published): the `RunScope` test sugar (formerly core's published
   `test-utils` subpath) + the per-check fixture-coverage harness (formerly
   fitness prod source via `/internal`). Production source must never import

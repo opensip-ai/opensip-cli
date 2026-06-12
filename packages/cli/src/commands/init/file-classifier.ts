@@ -1,7 +1,7 @@
 /**
- * Pre-existing file classification for `opensip-tools init`.
+ * Pre-existing file classification for `opensip init`.
  *
- * Walks `opensip-tools/` (skipping `.runtime/`) and tags each file as
+ * Walks `opensip-cli/` (skipping `.runtime/`) and tags each file as
  * 'scaffolded', 'stale-scaffolded', or 'custom' so `--keep` / `--remove`
  * can decide what to overwrite and what to preserve.
  */
@@ -14,8 +14,8 @@ import { ALL_LANGUAGES } from './language-detection.js';
 
 import type { SupportedLanguage } from './language-detection.js';
 import type { ToolScaffold } from '../shared.js';
-import type { PreExistingFile } from '@opensip-tools/contracts';
-import type { ProjectPaths } from '@opensip-tools/core';
+import type { PreExistingFile } from '@opensip-cli/contracts';
+import type { ProjectPaths } from '@opensip-cli/core';
 
 /**
  * Build the full set of scaffold templates that init would write for the given
@@ -46,7 +46,7 @@ function sha256(content: string): string {
 }
 
 /**
- * Walk every file under `opensip-tools/` (excluding `.runtime/`, which
+ * Walk every file under `opensip-cli/` (excluding `.runtime/`, which
  * is gitignored runtime state and not user-authored) and tag each one.
  *
  * Classification rules:
@@ -59,7 +59,7 @@ function sha256(content: string): string {
  *                           language not in the current set.
  *   - 'custom'            — anything else (user-authored).
  *
- * The walk is bounded to the `opensip-tools/` subtree (kilobytes in
+ * The walk is bounded to the `opensip-cli/` subtree (kilobytes in
  * practice). The `.runtime/` subdir is skipped so caches/logs/sessions
  * don't pollute the file list.
  *

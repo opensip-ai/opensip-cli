@@ -1,5 +1,5 @@
 /**
- * Java parseProject — consumes `@opensip-tools/lang-java` (ADR-0010).
+ * Java parseProject — consumes `@opensip-cli/lang-java` (ADR-0010).
  *
  * `lang-java` is the canonical Java parse substrate: it owns the vendored
  * tree-sitter-java grammar and produces the `{ tree, source }` parsed-file
@@ -12,8 +12,8 @@ import {
   createParseProjectFromAdapter,
   type TreeSitterParsedFile,
   type TreeSitterParsedProject,
-} from '@opensip-tools/graph-adapter-common';
-import { javaAdapter } from '@opensip-tools/lang-java';
+} from '@opensip-cli/graph-adapter-common';
+import { javaAdapter } from '@opensip-cli/lang-java';
 
 /** Parsed Java source file: tree-sitter parse tree plus original source text. */
 export type JavaParsedFile = TreeSitterParsedFile;

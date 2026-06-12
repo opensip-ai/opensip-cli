@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-04
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0010: `lang-*` is the single canonical parse + AST substrate for the whole platform
@@ -13,20 +13,20 @@ date: 2026-06-04
 status: active            # active | superseded | deferred
 supersedes: []
 superseded_by: null
-related: [ADR-0009, DEC-521]   # DEC-521 (parent): opensip-tools = open deterministic signal foundry
+related: [ADR-0009, DEC-521]   # DEC-521 (parent): opensip-cli = open deterministic signal foundry
 tags: [architecture, languages, parsing, tree-sitter, polyglot, fitness, graph]
 enforcement: mechanizable
 enforcement-reason: >
   A dependency-cruiser rule restricts construction of a tree-sitter Parser (and
   import of the `web-tree-sitter` / grammar packages) to the `lang-*` packages;
   every other package — including the graph adapters and `graph-adapter-common`
-  — must obtain parsed trees by importing the relevant `@opensip-tools/lang-*`.
+  — must obtain parsed trees by importing the relevant `@opensip-cli/lang-*`.
   The rule activates per-language as each `lang-*` adapter gains its real parser
   (it would false-fire against `graph-adapter-common` mid-migration), matching
   the existing `graph-typescript → lang-typescript` precedent.
 ```
 
-**Decision:** Each `@opensip-tools/lang-<language>` package is the **one
+**Decision:** Each `@opensip-cli/lang-<language>` package is the **one
 canonical place that parses that language** and exposes its AST + the
 fit-friendly navigation helper vocabulary. **Both consumers — fitness checks
 *and* graph adapters — depend on `lang-*` for parsing.** The tree-sitter
@@ -54,7 +54,7 @@ real tree types.
   structural, or AST-aware checks — so never real parity with TypeScript.
 
 **Rationale:** The correct end-state already exists *for TypeScript* and proves
-the shape: `graph-typescript` depends on `@opensip-tools/lang-typescript`, so
+the shape: `graph-typescript` depends on `@opensip-cli/lang-typescript`, so
 `lang-typescript` is the single TS parse substrate consumed by both the graph
 tool and fitness checks. The other languages never followed the pattern:
 
@@ -112,5 +112,5 @@ absorb the refactor cost.
 **Related specs / ADRs:** [ADR-0009](./ADR-0009-public-api-surface-policy.md)
 (public-API surface discipline — the relocated primitives must land behind
 curated barrels / `internal` subpaths); parent-repo **DEC-521** (detection
-boundary — opensip-tools as the open, deterministic, polyglot signal foundry).
+boundary — opensip-cli as the open, deterministic, polyglot signal foundry).
 A phased implementation spec should follow under `docs/plans/specs/`.

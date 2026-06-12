@@ -12,12 +12,12 @@
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { logger, noopSignalSink } from '@opensip-tools/core';
+import { logger, noopSignalSink } from '@opensip-cli/core';
 
 import { createCloudSignalSink } from './cloud-signal-sink.js';
 import { checkEntitlement, invalidateEntitlement } from './entitlement.js';
 
-import type { EmitResult, SignalBatch, SignalSink } from '@opensip-tools/core';
+import type { EmitResult, SignalBatch, SignalSink } from '@opensip-cli/core';
 
 /** Built-in OpenSIP Cloud base URL; the sink appends `/signals`. Overridable via config. */
 export const DEFAULT_CLOUD_ENDPOINT = 'https://opensip.ai/api';

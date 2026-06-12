@@ -21,7 +21,7 @@ related-docs:
 ---
 # Plugin loader
 
-opensip-tools loads four kinds of plugins. Each has its own discovery shape, but they share a small, explicit policy: nothing loads silently, nothing loads transitively without opt-in, and the project owns its plugin set.
+opensip-cli loads four kinds of plugins. Each has its own discovery shape, but they share a small, explicit policy: nothing loads silently, nothing loads transitively without opt-in, and the project owns its plugin set.
 
 > **What you'll understand after this:**
 > - The five discovery shapes (Tool marker; fit-pack marker + augmenting pin; sim-pack `scenarios-*` name pattern + pin; graph-adapter marker + explicit pin; language-adapter direct import) — the middle three now flow through the ONE generic capability substrate (§5.3 / ADR-0029).
@@ -37,8 +37,8 @@ opensip-tools loads four kinds of plugins. Each has its own discovery shape, but
 |---|---|---|
 | **Tools** | `node_modules` walk for `opensipTools.kind === 'tool'` marker | At CLI startup, by `discoverToolPackages()` |
 | **Check packs** (`fit-pack`) | (a) `node_modules` walk for the `opensipTools.kind === 'fit-pack'` marker (built-ins resolve from the CLI install tree), (b) exact `plugins.checkPackages:` list ADDED to marker discovery. Co-located `recipes` route to the `fit-recipe` domain. | The GENERIC substrate (`discoverCapabilityContributions` → `loadCapabilityDomain`), driven by fitness's `ensureChecksLoaded()` |
-| **Sim scenario packs** (`sim-pack`) | (a) Project-local source files under `opensip-tools/sim/`, (b) `node_modules` walk for `<scope>/scenarios-*` under default + configured `plugins.packageScopes`, (c) explicit `plugins.scenarioPackages:` pin. (The `sim-pack` marker fallback was retired in v3.0.0 — the descriptor is single-mode `name-pattern`.) Co-located `recipes` route to the `sim-recipe` domain. | The GENERIC substrate, driven by simulation's `ensureScenariosLoaded()` |
-| **Graph adapters** (`graph-adapter`) | (a) Explicit `plugins.graphAdapters:` list (pins the set), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for the `opensipTools.kind: "graph-adapter"` marker (built-ins from the CLI install tree; shared scaffolding like `@opensip-tools/graph-adapter-common` carries no marker and is skipped). | The GENERIC substrate, driven per command by the CLI pre-action hook (`loadOwningToolCapabilities`) |
+| **Sim scenario packs** (`sim-pack`) | (a) Project-local source files under `opensip-cli/sim/`, (b) `node_modules` walk for `<scope>/scenarios-*` under default + configured `plugins.packageScopes`, (c) explicit `plugins.scenarioPackages:` pin. (The `sim-pack` marker fallback was retired in v3.0.0 — the descriptor is single-mode `name-pattern`.) Co-located `recipes` route to the `sim-recipe` domain. | The GENERIC substrate, driven by simulation's `ensureScenariosLoaded()` |
+| **Graph adapters** (`graph-adapter`) | (a) Explicit `plugins.graphAdapters:` list (pins the set), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for the `opensipTools.kind: "graph-adapter"` marker (built-ins from the CLI install tree; shared scaffolding like `@opensip-cli/graph-adapter-common` carries no marker and is skipped). | The GENERIC substrate, driven per command by the CLI pre-action hook (`loadOwningToolCapabilities`) |
 | **Language adapters** | Direct CLI imports (no discovery walk) | At CLI bootstrap, before any tool is mounted |
 
 Different kinds, different lifetimes. Tools are global to the binary — once registered, they're available regardless of cwd. Check packs and scenario packs are project-scoped — they load when the relevant Tool actually runs. Language adapters are bundled — they're a CLI dep, not a discoverable plugin, because the framework can't usefully run without them.
@@ -52,14 +52,14 @@ flowchart TB
 
   Tools["Tool packages<br/>opensipTools.kind = tool<br/>node_modules walk"]
   Languages["Bundled language adapters<br/>direct imports"]
-  GraphAdapters["Graph adapters<br/>explicit config or<br/>@opensip-tools/graph-* + marker"]
+  GraphAdapters["Graph adapters<br/>explicit config or<br/>@opensip-cli/graph-* + marker"]
 
-  FitLocal["Project-local fit files<br/>opensip-tools/fit/checks<br/>opensip-tools/fit/recipes"]
+  FitLocal["Project-local fit files<br/>opensip-cli/fit/checks<br/>opensip-cli/fit/recipes"]
   FitPinned["Project-pinned fit packages<br/>.runtime/plugins/fit + plugins.fit"]
   FitMarker["Fit-pack marker scan<br/>opensipTools.kind = fit-pack"]
   FitExact["Exact check package pins<br/>plugins.checkPackages"]
 
-  SimLocal["Project-local sim files<br/>opensip-tools/sim/scenarios<br/>opensip-tools/sim/recipes"]
+  SimLocal["Project-local sim files<br/>opensip-cli/sim/scenarios<br/>opensip-cli/sim/recipes"]
   SimPattern["Name-pattern scenario packages<br/>configured scopes / scenarios-*"]
   SimExact["Exact scenario package pins<br/>plugins.scenarioPackages"]
   SimPinned["Project-pinned sim packages<br/>.runtime/plugins/sim + plugins.sim"]
@@ -84,7 +84,7 @@ flowchart TB
 
 ## Tool discovery (`opensipTools.kind === 'tool'`)
 
-[`packages/core/src/plugins/tool-package-discovery.ts`](../../../packages/core/src/plugins/tool-package-discovery.ts) implements the walk. The CLI passes its own install directory as the `projectDir` argument (`packages/cli/src/index.ts` — `cliInstallDir = dirname(__dirname)` inside `loadDiscoveredTools()`); the function then walks upward through that directory's ancestors, looking at each `node_modules/`. Anchoring discovery at the CLI's install location (rather than the user's cwd) is deliberate — third-party tool packages installed alongside `opensip-tools` are picked up regardless of where the user runs the binary from. For each `node_modules` entry (and one level into scoped directories like `@opensip-tools/`), inspect the `package.json`:
+[`packages/core/src/plugins/tool-package-discovery.ts`](../../../packages/core/src/plugins/tool-package-discovery.ts) implements the walk. The CLI passes its own install directory as the `projectDir` argument (`packages/cli/src/index.ts` — `cliInstallDir = dirname(__dirname)` inside `loadDiscoveredTools()`); the function then walks upward through that directory's ancestors, looking at each `node_modules/`. Anchoring discovery at the CLI's install location (rather than the user's cwd) is deliberate — third-party tool packages installed alongside `opensip-cli` are picked up regardless of where the user runs the binary from. For each `node_modules` entry (and one level into scoped directories like `@opensip-cli/`), inspect the `package.json`:
 
 ```ts
 const isToolPackage = (pkgDir: string): boolean => {
@@ -93,13 +93,13 @@ const isToolPackage = (pkgDir: string): boolean => {
 };
 ```
 
-Discovery is by *marker*, not by name prefix. A name-prefix rule would break the moment a third-party scope publishes its own opensip-tools tool: `@my-company/opensip-tools-audit` doesn't match `^@opensip-tools/`. The marker is publication-scope-independent.
+Discovery is by *marker*, not by name prefix. A name-prefix rule would break the moment a third-party scope publishes its own opensip-cli tool: `@my-company/opensip-cli-audit` doesn't match `^@opensip-cli/`. The marker is publication-scope-independent.
 
 Discovery is **deduplicated by package name** with nearest-ancestor wins. If a project's `node_modules/@my-co/audit/` and the workspace root's `node_modules/@my-co/audit/` both declare a tool, the project's local copy wins — same as Node's module resolution.
 
 Discovery is **synchronous and at startup**. Tools are cheap (each one is a small adapter); the walk completes in single-digit milliseconds. There is no lazy-load path for tools; either the package is installed by argv parse time or it doesn't exist for this run.
 
-The bundled tools (`@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/graph`) declare the same `opensipTools.kind === 'tool'` marker. Since the **3.0.0 GA cutover** ([ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md)) they are **not** imported statically — `register-tools.ts` lists them by *package name* (`FIRST_PARTY_TOOLS`) and loads each through the same `loadToolManifest → admitTool → dynamic import → register` path a third-party tool travels (the `no-bootstrap-tool-import` check fails the build if a static `import { fitnessTool }` creeps back). The registry is **first-writer-wins**, so the bundled registration is the incumbent and a later same-id discovery is skipped with a warning.
+The bundled tools (`@opensip-cli/fitness`, `@opensip-cli/simulation`, `@opensip-cli/graph`) declare the same `opensipTools.kind === 'tool'` marker. Since the **3.0.0 GA cutover** ([ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md)) they are **not** imported statically — `register-tools.ts` lists them by *package name* (`FIRST_PARTY_TOOLS`) and loads each through the same `loadToolManifest → admitTool → dynamic import → register` path a third-party tool travels (the `no-bootstrap-tool-import` check fails the build if a static `import { fitnessTool }` creeps back). The registry is **first-writer-wins**, so the bundled registration is the incumbent and a later same-id discovery is skipped with a warning.
 
 ---
 
@@ -112,10 +112,10 @@ The fitness and simulation engines each have their own discovery, layered over t
 ### 1. User-source files (always auto-loaded)
 
 ```
-<project>/opensip-tools/fit/checks/*.{js,mjs}
-<project>/opensip-tools/fit/recipes/*.{js,mjs}
-<project>/opensip-tools/sim/scenarios/*.{js,mjs}
-<project>/opensip-tools/sim/recipes/*.{js,mjs}
+<project>/opensip-cli/fit/checks/*.{js,mjs}
+<project>/opensip-cli/fit/recipes/*.{js,mjs}
+<project>/opensip-cli/sim/scenarios/*.{js,mjs}
+<project>/opensip-cli/sim/recipes/*.{js,mjs}
 ```
 
 Every file with a `.js` or `.mjs` extension under those directories is loaded via dynamic `import()`. Each module is expected to export either:
@@ -126,16 +126,16 @@ Every file with a `.js` or `.mjs` extension under those directories is loaded vi
 
 The loader is forgiving — it loads what it finds and logs (but doesn't throw) on modules whose shape doesn't match. A broken file produces a load-time warning; the rest of the project continues.
 
-These files are **always loaded**. There's no opt-in required because they're already part of the project — you wrote them, you committed them, they're inside `<project>/opensip-tools/`. The auto-loading is the affordance.
+These files are **always loaded**. There's no opt-in required because they're already part of the project — you wrote them, you committed them, they're inside `<project>/opensip-cli/`. The auto-loading is the affordance.
 
 ### 2. Project-pinned npm-package plugins
 
 ```
-<project>/opensip-tools/.runtime/plugins/fit/node_modules/<pkg>/
-<project>/opensip-tools/.runtime/plugins/sim/node_modules/<pkg>/
+<project>/opensip-cli/.runtime/plugins/fit/node_modules/<pkg>/
+<project>/opensip-cli/.runtime/plugins/sim/node_modules/<pkg>/
 ```
 
-Plus the matching list in `opensip-tools.config.yml`:
+Plus the matching list in `opensip-cli.config.yml`:
 
 ```yaml
 plugins:
@@ -163,7 +163,7 @@ plugins:
     - '@my-org/fitness-checks'
 ```
 
-No package is privileged — the bundled packs (`@opensip-tools/checks-universal`, `@opensip-tools/checks-typescript`, etc.) carry the marker and are discovered through the same contract as third-party packs. Add a marker-tagged pack to your project's `dependencies`, and it's loaded on the next run with no further wiring.
+No package is privileged — the bundled packs (`@opensip-cli/checks-universal`, `@opensip-cli/checks-typescript`, etc.) carry the marker and are discovered through the same contract as third-party packs. Add a marker-tagged pack to your project's `dependencies`, and it's loaded on the next run with no further wiring.
 
 The marker shape is what makes "install and use" frictionless without constraining npm names. The exact-list shape (`plugins.checkPackages:`) handles non-marker packages. Project-pinned fit packs (`plugins.fit:`) are managed by `plugin add/remove/sync`.
 
@@ -174,8 +174,8 @@ The marker shape is what makes "install and use" frictionless without constraini
 [`packages/cli/src/bootstrap/register-language-adapters.ts`](../../../packages/cli/src/bootstrap/register-language-adapters.ts) registers the six bundled language adapters into the per-invocation `LanguageRegistry`:
 
 ```ts
-import { typescriptAdapter } from '@opensip-tools/lang-typescript';
-import { rustAdapter }       from '@opensip-tools/lang-rust';
+import { typescriptAdapter } from '@opensip-cli/lang-typescript';
+import { rustAdapter }       from '@opensip-cli/lang-rust';
 // ... four more ...
 
 langRegistry.register(typescriptAdapter);
@@ -199,21 +199,21 @@ This isn't discovery. It's an explicit static call from `bootstrapCli()`. Why?
 CLI-owned commands for managing the npm-package plugin layout. Source: [`packages/cli/src/commands/plugin.ts`](../../../packages/cli/src/commands/plugin.ts).
 
 ```bash
-opensip-tools plugin list                       # what's installed and what's loaded
-opensip-tools plugin add <pkg>                  # install + add to config
-opensip-tools plugin add <pkg> --domain fit     # explicit domain (else inferred from name)
-opensip-tools plugin remove <pkg>                # remove from node_modules + config
-opensip-tools plugin sync                        # install everything declared in config
+opensip plugin list                       # what's installed and what's loaded
+opensip plugin add <pkg>                  # install + add to config
+opensip plugin add <pkg> --domain fit     # explicit domain (else inferred from name)
+opensip plugin remove <pkg>                # remove from node_modules + config
+opensip plugin sync                        # install everything declared in config
 ```
 
 ### `plugin add <pkg>`
 
 Two operations in one command:
 
-1. Install `<pkg>` into `<project>/opensip-tools/.runtime/plugins/<domain>/`. The runtime dir's `package.json` is the install host — its `dependencies` block tracks installed plugins.
-2. Append `<pkg>` to `plugins.<domain>:` in `opensip-tools.config.yml`. Idempotent — adding the same name twice is a no-op.
+1. Install `<pkg>` into `<project>/opensip-cli/.runtime/plugins/<domain>/`. The runtime dir's `package.json` is the install host — its `dependencies` block tracks installed plugins.
+2. Append `<pkg>` to `plugins.<domain>:` in `opensip-cli.config.yml`. Idempotent — adding the same name twice is a no-op.
 
-The domain is inferred from the package name (`inferDomain` matches `/\bsim\b/` → `sim`, else `fit`) unless `--domain` is passed explicitly. Only `fit` and `sim` are accepted as `--domain` values; anything else is rejected so a caller can't drive path construction outside `opensip-tools/.runtime/`. The package-manager call is wrapped in `execFileSync` (no shell, no metacharacter expansion) and the package spec is validated to refuse anything starting with `-` so package-manager flags cannot become an injection vector.
+The domain is inferred from the package name (`inferDomain` matches `/\bsim\b/` → `sim`, else `fit`) unless `--domain` is passed explicitly. Only `fit` and `sim` are accepted as `--domain` values; anything else is rejected so a caller can't drive path construction outside `opensip-cli/.runtime/`. The package-manager call is wrapped in `execFileSync` (no shell, no metacharacter expansion) and the package spec is validated to refuse anything starting with `-` so package-manager flags cannot become an injection vector.
 
 ### `plugin remove <pkg>`
 
@@ -239,8 +239,8 @@ Reads `plugins.<domain>:` from the config and installs each entry. The bootstrap
 
 A few alternatives considered and rejected:
 
-- **User-global plugin dir.** Earlier designs had `~/.opensip-tools/plugins/`. Rejected: every project gets the same plugins, which means a teammate without your global plugin can't reproduce your run. Project-local plugins are the contract. The user-level dir is now strictly the API key + per-user defaults.
-- **Auto-load every package in node_modules.** Rejected: too many surprises. A transitive `@opensip-tools/checks-foo` from a regular dep would inject checks. The explicit `plugins.<domain>:` list is the opt-in.
+- **User-global plugin dir.** Earlier designs had `~/.opensip-cli/plugins/`. Rejected: every project gets the same plugins, which means a teammate without your global plugin can't reproduce your run. Project-local plugins are the contract. The user-level dir is now strictly the API key + per-user defaults.
+- **Auto-load every package in node_modules.** Rejected: too many surprises. A transitive `@opensip-cli/checks-foo` from a regular dep would inject checks. The explicit `plugins.<domain>:` list is the opt-in.
 - **Plugins as workspace packages.** Rejected for non-monorepo projects. Plugins are external dependencies; the runtime dir isolates them from the project's main `package.json` so a plugin install doesn't bloat the project's lockfile.
 - **Lazy plugin discovery (only load what the recipe needs).** Rejected: it would tie discovery to recipe selection, which couples the recipe author to the plugin layout. Today, every plugin loads every run (cheap — the plugin universe is small) and the recipe filters checks at selection time.
 
@@ -250,17 +250,17 @@ A few alternatives considered and rejected:
 
 For `acme-api`:
 
-- `<project>/opensip-tools/fit/checks/` carries three `.mjs` files (custom checks). Auto-loaded every run.
-- `<project>/opensip-tools/fit/recipes/` carries `quick-smoke.mjs` and `infra.mjs`. Auto-loaded every run.
-- `<project>/opensip-tools.config.yml` declares:
+- `<project>/opensip-cli/fit/checks/` carries three `.mjs` files (custom checks). Auto-loaded every run.
+- `<project>/opensip-cli/fit/recipes/` carries `quick-smoke.mjs` and `infra.mjs`. Auto-loaded every run.
+- `<project>/opensip-cli.config.yml` declares:
   ```yaml
   plugins:
     fit:
-      - '@opensip-tools/checks-universal'
-      - '@opensip-tools/checks-typescript'
-      - '@opensip-tools/checks-python'
+      - '@opensip-cli/checks-universal'
+      - '@opensip-cli/checks-typescript'
+      - '@opensip-cli/checks-python'
   ```
-- `<project>/opensip-tools/.runtime/plugins/fit/node_modules/` carries those three packages, installed by `plugin add` (or by `plugin sync` after a fresh clone).
+- `<project>/opensip-cli/.runtime/plugins/fit/node_modules/` carries those three packages, installed by `plugin add` (or by `plugin sync` after a fresh clone).
 
 CI's pipeline:
 
@@ -268,8 +268,8 @@ CI's pipeline:
 git clone …
 cd acme-api
 curl -fsSL https://opensip.ai/cli/install.sh | bash
-opensip-tools plugin sync           # bootstrap project-pinned plugins
-opensip-tools fit --gate-compare    # the actual gate
+opensip plugin sync           # bootstrap project-pinned plugins
+opensip fit --gate-compare    # the actual gate
 ```
 
 ---

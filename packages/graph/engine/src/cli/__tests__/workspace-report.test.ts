@@ -8,13 +8,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWorkspaceJson, workspaceReportLines } from '../workspace-report.js';
 
 import type { WorkspaceUnitRunResult } from '../workspace-runner.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 function signal(over: Partial<Signal> = {}): Signal {
   return {
     id: 'sig_cycle',
     source: 'graph.architecture.cycle',
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     severity: 'medium',
     category: 'quality',
     ruleId: 'graph.architecture.cycle',
@@ -53,7 +53,7 @@ const text = (perUnit: readonly WorkspaceUnitRunResult[], durationMs: number): s
 describe('workspaceReportLines', () => {
   it('renders an ok unit with its finding count and project-relative display path', () => {
     const out = text([unit({ signals: [signal()] })], 1234);
-    expect(out).toContain('opensip-tools graph --workspace');
+    expect(out).toContain('opensip graph --workspace');
     expect(out).toContain('== Units (1) ==');
     expect(out).toContain('packages/core: 1 finding(s) — ok');
     expect(out).toContain('1 total finding(s) across 1 unit(s) in 1234 ms.');

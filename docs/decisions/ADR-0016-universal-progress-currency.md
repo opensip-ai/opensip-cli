@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-05
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0016: Universal progress currency + one live-progress renderer
@@ -30,7 +30,7 @@ through **one** shared currency + renderer + transport seam — the run-time
 analogue of ADR-0011's `SignalEnvelope` *output* currency:
 
 1. **`ProgressEvent` / `ProgressSurface` vocabulary lives in
-   `@opensip-tools/cli-ui`** (not `contracts`). One event union
+   `@opensip-cli/cli-ui`** (not `contracts`). One event union
    (`stage-start | stage-progress | stage-done | stage-cached`) covers both tool
    shapes; a tool-declared `shape: 'phases' | 'pool'` picks the rendering.
 2. **One `<LiveProgress>` renderer (cli-ui), two modes:** `phases` → a checklist
@@ -38,7 +38,7 @@ analogue of ADR-0011's `SignalEnvelope` *output* currency:
    counter (fit's checks, sim's scenarios — many, dynamic, possibly concurrent).
    The graph-local `StageChecklist`/`StageLine`/`RunningStageLine` are deleted;
    fit's inline `Spinner` wiring is replaced.
-3. **`ProgressTransport<TEvent,TResult>` seam in `@opensip-tools/core`**, generic
+3. **`ProgressTransport<TEvent,TResult>` seam in `@opensip-cli/core`**, generic
    over the event type so the kernel names no concrete progress type. Transport
    is **per-tool**: fit + sim use the in-process transport (both already yield to
    the event loop); graph stays in-process too and animates via **cooperative
@@ -46,7 +46,7 @@ analogue of ADR-0011's `SignalEnvelope` *output* currency:
 
 **Alternatives:**
 
-- *`ProgressEvent` in `@opensip-tools/contracts` (symmetry with `SignalEnvelope`).*
+- *`ProgressEvent` in `@opensip-cli/contracts` (symmetry with `SignalEnvelope`).*
   Rejected: progress is renderer-bound and ephemeral — never persisted or egressed
   the way a `SignalEnvelope` is. Putting it in `contracts` forces the pure
   ink/react leaf (`cli-ui`, zero opensip deps) to take a heavy `contracts`

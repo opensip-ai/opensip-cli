@@ -7,7 +7,7 @@
  * - Large objects need truncation
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Pre-compiled patterns for complex objects that need serializers.

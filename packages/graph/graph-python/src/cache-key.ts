@@ -7,7 +7,7 @@
  * The content-fingerprint half (`no-config` / `missing:` / `unreadable:` /
  * sha256-prefix) is the byte-identical `hashConfig` contract shared with
  * go/java/rust; Python imports it from
- * `@opensip-tools/graph-adapter-common` and layers a best-effort
+ * `@opensip-cli/graph-adapter-common` and layers a best-effort
  * "Python version" on top (DEC-4). The version comes from a
  * `requires-python` line in `pyproject.toml` (PEP 621) — a string like
  * `>=3.10,<4.0`, sanitized; absent → the literal `unknown`. It is a CACHE
@@ -21,9 +21,9 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 
-import { hashConfig } from '@opensip-tools/graph-adapter-common';
+import { hashConfig } from '@opensip-cli/graph-adapter-common';
 
-import type { CacheKeyInput } from '@opensip-tools/graph';
+import type { CacheKeyInput } from '@opensip-cli/graph';
 
 // Anchored to start-of-line; horizontal whitespace ([\t ]) and the
 // inner `[^"'\n]` keep matching linear. Using `\s` would cross

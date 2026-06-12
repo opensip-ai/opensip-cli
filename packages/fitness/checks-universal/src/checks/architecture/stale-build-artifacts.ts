@@ -8,7 +8,7 @@
  * the compiled artifact shadows the source file.
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 const SOURCE_DIRS = ['src/', 'lib/'];
 const ARTIFACT_EXTENSIONS = ['.js', '.d.ts', '.js.map'];

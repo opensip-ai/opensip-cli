@@ -1,12 +1,12 @@
 // @fitness-ignore-file duplicate-utility-functions -- ADR-0010: the per-language tree-sitter vocabulary intentionally shares helper names across lang-* with grammar-specific implementations; consolidating would defeat the substrate design.
 /**
  * v1 per-language node-kind predicates for Python (ADR-0010). The generic
- * traversal/position helpers live in `@opensip-tools/tree-sitter`; only the
+ * traversal/position helpers live in `@opensip-cli/tree-sitter`; only the
  * grammar-specific node `type` strings differ per language, and they live here.
  * Node types are from the tree-sitter-python grammar.
  */
 
-import type { Node } from '@opensip-tools/tree-sitter';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 /** A `def` — both top-level functions and methods are `function_definition`. */
 export const isFunction = (node: Node): boolean => node.type === 'function_definition';

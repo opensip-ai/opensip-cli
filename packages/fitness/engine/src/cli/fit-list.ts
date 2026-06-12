@@ -6,7 +6,7 @@ import { currentCheckRegistry } from '../framework/scope-registry.js';
 
 import { ensureChecksLoaded } from './fit.js';
 
-import type { ListChecksResult } from '@opensip-tools/contracts';
+import type { ListChecksResult } from '@opensip-cli/contracts';
 
 // ---------------------------------------------------------------------------
 // listChecks

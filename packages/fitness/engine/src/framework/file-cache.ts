@@ -9,7 +9,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-import { ValidationError } from '@opensip-tools/core';
+import { ValidationError } from '@opensip-cli/core';
 import { glob } from 'glob';
 
 /**

@@ -16,7 +16,7 @@ import { globSync } from 'glob';
 import { minimatch, Minimatch } from 'minimatch';
 
 import type { TargetRegistry } from './target-registry.js';
-import type { Target } from '@opensip-tools/config';
+import type { Target } from '@opensip-cli/config';
 
 // Common infrastructure dirs are always ignored to prevent expensive traversals.
 const COMMON_IGNORE = ['**/node_modules/**', '**/dist/**', '**/.git/**'];

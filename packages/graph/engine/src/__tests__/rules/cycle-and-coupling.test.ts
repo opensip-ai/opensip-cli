@@ -19,7 +19,7 @@ import { unexpectedCouplingRule } from '../../rules/unexpected-coupling.js';
 import { makeCatalog, occ } from './_helpers.js';
 
 import type { FeatureTable, GraphConfig, PackageEdgeFeature, SccFeatures } from '../../types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 const EMPTY: GraphConfig = {};
 

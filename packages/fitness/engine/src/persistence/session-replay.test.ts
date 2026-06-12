@@ -7,14 +7,14 @@
  * remaining tests drive each validation branch directly with malformed payloads.
  */
 
-import { buildSignalEnvelope } from '@opensip-tools/contracts';
-import { createSignal, HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
+import { buildSignalEnvelope } from '@opensip-cli/contracts';
+import { createSignal, HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { buildFitnessSessionPayload } from './session-payload.js';
 import { fitReplayFromSession } from './session-replay.js';
 
-import type { StoredSession } from '@opensip-tools/contracts';
+import type { StoredSession } from '@opensip-cli/contracts';
 
 function storedSession(payload: unknown, overrides: Partial<StoredSession> = {}): StoredSession {
   return {

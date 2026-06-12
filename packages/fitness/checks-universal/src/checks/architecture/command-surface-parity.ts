@@ -25,7 +25,7 @@
  * `packages/cli/src/commands/host-subcommand-groups.ts`
  * (`HOST_SUBCOMMAND_GROUPS`); the value mirrored here is exactly those two.
  *
- * SCOPE — opensip-tools' own first-party TOOL registration files only
+ * SCOPE — opensip-cli' own first-party TOOL registration files only
  * (`packages/{fitness,graph,simulation}/engine/src/tool.ts`). The path guard makes
  * it inert in adopter repos (whose own CLIs legitimately use Commander) — it
  * enforces THIS platform's architecture, not a universal rule. The two host
@@ -33,7 +33,7 @@
  * trip the check; the allow-list is documented here for the reviewer and asserted
  * by the test.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /** Resolved-path fragment identifying a first-party TOOL registration file. */
 const TOOL_REGISTRATION_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/src\/tool\.ts$/;

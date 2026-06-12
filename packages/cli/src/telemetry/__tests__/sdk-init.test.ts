@@ -1,4 +1,4 @@
-import { TimeoutError } from '@opensip-tools/core';
+import { TimeoutError } from '@opensip-cli/core';
 import { trace } from '@opentelemetry/api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

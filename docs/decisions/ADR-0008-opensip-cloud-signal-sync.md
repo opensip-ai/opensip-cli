@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-03
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0008: OpenSIP Cloud signal sync (store-only onboarding tier)
@@ -19,14 +19,14 @@ enforcement: not-mechanizable
 enforcement-reason: >
   The load-bearing invariants (local-always, best-effort/non-blocking,
   fail-closed entitlement, https-only egress, idempotent at-least-once
-  delivery) are guarded by unit/integration tests in @opensip-tools/reporting
-  and opensip-tools (Phase 6/7 of the signal-sync plan), not by a single
+  delivery) are guarded by unit/integration tests in @opensip-cli/reporting
+  and opensip-cli (Phase 6/7 of the signal-sync plan), not by a single
   fitness check. The decoupling boundary (core owns the SignalSink interface;
   reporting owns the cloud impl; no core -> reporting edge) IS mechanized by
   dependency-cruiser.
 ```
 
-**Decision:** opensip-tools gains an optional, entitlement-gated capability to
+**Decision:** opensip-cli gains an optional, entitlement-gated capability to
 emit the `Signal`s it already produces (`packages/core/src/types/signal.ts`,
 already "compatible with OpenSIP's signal format") to OpenSIP Cloud as an
 additive, best-effort sink. Local SQLite remains the source of truth and is
@@ -41,7 +41,7 @@ client and the wire contract (a `SignalBatch` envelope) only.
 
 **Alternatives:**
 
-- *Customer points opensip-tools at their own Postgres as the operational
+- *Customer points opensip-cli at their own Postgres as the operational
   store.* Rejected: makes Postgres an operational datastore swap, which forces
   (a) an async flip of the synchronous `DataStore` contract
   (`packages/datastore/src/data-store.ts`) across ~20 consumers, (b) a
@@ -64,7 +64,7 @@ client and the wire contract (a `SignalBatch` envelope) only.
 
 **Rationale:** Signals already exist internally (the check framework produces
 them; graph works in `Signal[]` for baseline/gate). The parent platform already
-ingests opensip-tools output into Postgres via local subprocess spawn
+ingests opensip-cli output into Postgres via local subprocess spawn
 (`docs/internal/consumers/opensip.md`, Mode 2); the cheap tier is the
 over-the-network, customer-machine version of that path. Modeling the cloud as
 a *sink* rather than an *operational store* keeps the hard database problems

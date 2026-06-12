@@ -2,7 +2,7 @@
  * @fileoverview Built-in sim recipes.
  *
  * Currently only `default` ships built-in. Mirrors fitness's pattern:
- * `opensip-tools sim` (no flag) runs `default`, which selects all
+ * `opensip sim` (no flag) runs `default`, which selects all
  * registered scenarios.
  *
  * Additional built-ins (e.g. `chaos-only`, `load-only`) can be added
@@ -10,7 +10,7 @@
  * that one default is sufficient.
  */
 
-import { deriveRecipeId } from '@opensip-tools/core';
+import { deriveRecipeId } from '@opensip-cli/core';
 
 import { defineSimulationRecipe } from './define-recipe.js';
 

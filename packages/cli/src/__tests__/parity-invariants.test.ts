@@ -14,8 +14,8 @@
  * host-level test can resolve slugs across both the universal and TypeScript
  * packs in one place — the same composition root that runs the gate.
  */
-import { checks as typescriptChecks } from '@opensip-tools/checks-typescript';
-import { checks as universalChecks } from '@opensip-tools/checks-universal';
+import { checks as typescriptChecks } from '@opensip-cli/checks-typescript';
+import { checks as universalChecks } from '@opensip-cli/checks-universal';
 import { describe, it, expect } from 'vitest';
 
 /**

@@ -18,7 +18,7 @@
 import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 // warn=5: `> 4 params` is a common, clean signature (e.g. a small options-ish
 // positional set), so warning at 5 was noisy; warn at 6+, error at 8+ instead.

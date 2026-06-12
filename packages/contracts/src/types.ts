@@ -15,7 +15,7 @@ export interface FitOptions {
   apiKey?: string;
   exclude: string[];
   cwd: string;
-  /** Explicit path to opensip-tools.config.yml (overrides package.json pointer and default location). */
+  /** Explicit path to opensip-cli.config.yml (overrides package.json pointer and default location). */
   config?: string;
   debug: boolean;
   /** Suppress banner/boxes; show only the pass-fail summary line. */
@@ -44,11 +44,11 @@ export interface InitOptions {
   language?: string;
   /**
    * Re-scaffold example files. Preserve any custom files in
-   * `opensip-tools/`. Mutually exclusive with `remove`.
+   * `opensip-cli/`. Mutually exclusive with `remove`.
    */
   keep?: boolean;
   /**
-   * Delete `opensip-tools/` entirely, then scaffold fresh. Mutually
+   * Delete `opensip-cli/` entirely, then scaffold fresh. Mutually
    * exclusive with `keep`.
    */
   remove?: boolean;

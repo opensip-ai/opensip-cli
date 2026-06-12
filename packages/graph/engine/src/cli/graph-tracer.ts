@@ -13,12 +13,12 @@
  * coverage, so multi-package (sharded) builds emitted no per-stage spans at all.
  */
 
-import { withSpanAsync, type Attributes } from '@opensip-tools/core';
+import { withSpanAsync, type Attributes } from '@opensip-cli/core';
 
 import type { RunStage } from './orchestrate/catalog-builder.js';
 
 /** Instrumentation scope for every graph stage span (sequential and sharded). */
-export const GRAPH_TRACER = 'opensip-tools-graph';
+export const GRAPH_TRACER = 'opensip-cli-graph';
 
 /**
  * A {@link RunStage} that emits one span per stage (named

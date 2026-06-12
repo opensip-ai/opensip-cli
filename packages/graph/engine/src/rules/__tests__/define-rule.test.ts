@@ -10,14 +10,14 @@
  *      throws `ValidationError`.
  */
 
-import { ValidationError } from '@opensip-tools/core';
+import { ValidationError } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { defineRule } from '../define-rule.js';
 
 import type { Catalog, FeatureTable, GraphConfig, Indexes, RuleHints } from '../../types.js';
 import type { RuleDataset } from '../define-rule.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 const CATALOG = { functions: {} } as unknown as Catalog;
 const INDEXES = { byBodyHash: new Map() } as unknown as Indexes;

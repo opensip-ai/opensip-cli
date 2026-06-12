@@ -14,7 +14,7 @@ import type {
   DependencyEdge,
   DependencySiteRecord,
   FunctionOccurrence,
-} from '@opensip-tools/graph';
+} from '@opensip-cli/graph';
 
 /**
  * Resolve each Java dependency site to one or more catalog bodyHashes.

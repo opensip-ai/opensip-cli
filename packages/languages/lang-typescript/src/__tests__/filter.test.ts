@@ -1,4 +1,4 @@
-import { RunScope, runWithScopeSync } from '@opensip-tools/core';
+import { RunScope, runWithScopeSync } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { filterContent } from '../filter.js';

@@ -21,12 +21,12 @@ import {
   type CommandSpec,
   type ToolCliContext,
   type WorkerMessage,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { executeSim } from './sim.js';
 
-import type { ProgressEvent } from '@opensip-tools/cli-ui';
-import type { ToolOptions } from '@opensip-tools/contracts';
+import type { ProgressEvent } from '@opensip-cli/cli-ui';
+import type { ToolOptions } from '@opensip-cli/contracts';
 
 type SimWorkerArgs = ToolOptions & { readonly verbose?: boolean };
 /** Mirrors `executeSim`'s return — the parent handles it identically either way. */

@@ -3,13 +3,13 @@
  *
  * `StoredSession` is the cross-tool shape every tool's session row shares.
  * The runtime (SessionRepo, schema, id/filename helpers) lives in
- * @opensip-tools/session-store; this type stays in contracts as the shared
+ * @opensip-cli/session-store; this type stays in contracts as the shared
  * surface tools and the dashboard agree on (audit 2026-05-29, contracts
  * split).
  */
 
 import type { SignalEnvelope } from './signal-envelope.js';
-import type { ToolShortId } from '@opensip-tools/core';
+import type { ToolShortId } from '@opensip-cli/core';
 
 /**
  * A persisted tool-run session.

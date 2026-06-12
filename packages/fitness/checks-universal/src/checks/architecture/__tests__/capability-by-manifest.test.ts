@@ -15,7 +15,7 @@ import {
   analyzeCapabilityByManifest,
 } from '../capability-by-manifest.js';
 
-import type { FileAccessor } from '@opensip-tools/fitness';
+import type { FileAccessor } from '@opensip-cli/fitness';
 
 const CAP_REGISTRY = 'packages/core/src/plugins/capability-registry.ts';
 const CLI_BOOTSTRAP = 'packages/cli/src/bootstrap/config-and-capabilities.ts';

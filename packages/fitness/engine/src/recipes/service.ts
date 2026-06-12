@@ -8,7 +8,7 @@
  * coordinates parallel/sequential execution, and builds results.
  */
 
-import { passRate } from '@opensip-tools/contracts';
+import { passRate } from '@opensip-cli/contracts';
 import {
   logger,
   NotFoundError,
@@ -19,7 +19,7 @@ import {
   RunScope,
   currentScope,
   runWithScope,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { fileCache, DEFAULT_PREWARM_PATTERNS } from '../framework/file-cache.js';
 import { type Check, type CheckRegistry } from '../framework/registry.js';

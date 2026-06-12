@@ -4,8 +4,8 @@
  * Detects API handlers and functions accepting external input without validation.
  */
 
-import { createPathMatcher, defineCheck, type CheckViolation } from '@opensip-tools/fitness';
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript';
+import { createPathMatcher, defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 /**

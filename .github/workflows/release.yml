@@ -74,7 +74,7 @@ jobs:
       #   - `pnpm test:coverage` — full suite WITH per-package coverage thresholds
       #     (replaces the former plain `pnpm test`, which skipped thresholds)
       #   - `pnpm fit:ci`        — dogfood: fails on any error-level fit finding
-      #     (failOnErrors: 1 in opensip-tools.config.yml; ADR-0020)
+      #     (failOnErrors: 1 in opensip-cli.config.yml; ADR-0020)
       #   - `pnpm graph:ci`      — dogfood: fails on any error-level graph finding
       #     (the `critical`/`high` rung, core's isErrorSignal), mirroring fit:ci
       #     (ADR-0020). Net-new (ratchet) detection is the complementary Code
@@ -124,13 +124,13 @@ jobs:
           set -u
           new_count=0
           while IFS= read -r pkg ; do
-            # The CLI publishes under the UNSCOPED name `opensip-tools`; every
-            # other entry is `@opensip-tools/<pkg>`. The source-of-truth lists
-            # the CLI as the bare `opensip-tools` token.
-            if [ "$pkg" = "opensip-tools" ] ; then
-              name="opensip-tools"
+            # The CLI publishes under the UNSCOPED name `opensip-cli`; every
+            # other entry is `@opensip-cli/<pkg>`. The source-of-truth lists
+            # the CLI as the bare `opensip-cli` token.
+            if [ "$pkg" = "opensip-cli" ] ; then
+              name="opensip-cli"
             else
-              name="@opensip-tools/$pkg"
+              name="@opensip-cli/$pkg"
             fi
             if npm view "$name" version >/dev/null 2>&1 ; then
               echo "  ok  $name"
@@ -162,7 +162,7 @@ jobs:
 
       # Post-pack / pre-publish smoke test. Installs the freshly-packed
       # tarballs *together* into a throwaway consumer project (forcing
-      # every @opensip-tools/* dep to its local tarball via npm
+      # every @opensip-cli/* dep to its local tarball via npm
       # overrides) and actually loads the CLI. This is the gate that
       # would have caught the 2.0.0 incident: a stale cli-ui tarball that
       # did not export `RunFooterHints` while fitness imported it — every
@@ -205,7 +205,7 @@ jobs:
 
           publish_if_new() {
             local pkg="$1"
-            local name="@opensip-tools/$pkg"
+            local name="@opensip-cli/$pkg"
             if npm view "${name}@${VERSION}" version >/dev/null 2>&1; then
               echo "::notice::skip ${name}@${VERSION} (already on npm)"
               return 0
@@ -215,11 +215,11 @@ jobs:
             # a prefix of another's — e.g. `graph` matches `graph-typescript`,
             # `graph-python`, `graph-rust`, `graph-go`, `graph-java` — and
             # `npm publish` receives multiple paths and errors EUSAGE.
-            npm publish /tmp/tarballs/opensip-tools-${pkg}-${VERSION}.tgz --access public --provenance
+            npm publish /tmp/tarballs/opensip-cli-${pkg}-${VERSION}.tgz --access public --provenance
           }
 
-          # The CLI publishes under the UNSCOPED name `opensip-tools`, so its
-          # tarball is `opensip-tools-<version>.tgz` (no `<unscoped>` segment)
+          # The CLI publishes under the UNSCOPED name `opensip-cli`, so its
+          # tarball is `opensip-cli-<version>.tgz` (no `<unscoped>` segment)
           # and the registry lookup uses the bare name.
           publish_unscoped() {
             local name="$1"
@@ -233,13 +233,13 @@ jobs:
           # The publish ORDER is DERIVED from scripts/release-package-order.mjs
           # (the single source of truth — ADR-0017): `--print names` emits the
           # unscoped tarball-segment tokens in strict dependency order, CLI
-          # last. The bare `opensip-tools` token routes to publish_unscoped
+          # last. The bare `opensip-cli` token routes to publish_unscoped
           # (unscoped tarball name); every other token to publish_if_new
-          # (scoped `@opensip-tools/<pkg>`). Do NOT re-hand-list the packages
+          # (scoped `@opensip-cli/<pkg>`). Do NOT re-hand-list the packages
           # here; edit that script and every release surface follows.
           while IFS= read -r pkg ; do
-            if [ "$pkg" = "opensip-tools" ] ; then
-              publish_unscoped opensip-tools
+            if [ "$pkg" = "opensip-cli" ] ; then
+              publish_unscoped opensip-cli
             else
               publish_if_new "$pkg"
             fi

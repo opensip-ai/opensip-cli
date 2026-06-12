@@ -16,7 +16,7 @@
  * release lane re-runs it against the PACKED, npm-installed bytes, which is the
  * half only it can do (inter-package export/ABI mismatches). If you change a
  * scenario here, the PR-lane suite is your fast local check:
- * `pnpm --filter=opensip-tools test packed-smoke-scenarios-e2e`.
+ * `pnpm --filter=opensip-cli test packed-smoke-scenarios-e2e`.
  *
  * This replaces the old inline `--version`/`--help` pair with a broad
  * command-level walk: init → fit (built-in + fit-pack plugin) → list → graph →
@@ -27,8 +27,8 @@
  * Hermeticity notes:
  *   - The consumer starts empty, so the first real scenario is `init`.
  *   - Plugin installs use `--project` so they land in the consumer's
- *     `opensip-tools/.runtime/plugins/<domain>/` rather than polluting the real
- *     user-global `~/.opensip-tools/`.
+ *     `opensip-cli/.runtime/plugins/<domain>/` rather than polluting the real
+ *     user-global `~/.opensip-cli/`.
  *   - Plugin installs pass an explicit `--domain` because a `.tgz` spec cannot
  *     be marker-sniffed before install (kind-detection reads a directory's
  *     package.json, not inside a tarball), so without `--domain` a tool tarball
@@ -113,9 +113,9 @@ export function buildPackedSmokeScenarios({
             failures.push(`init.type: expected "init", got ${JSON.stringify(data?.type)}`);
           if (data?.created !== true)
             failures.push(`init.created: expected true, got ${JSON.stringify(data?.created)}`);
-          if (typeof data?.path !== 'string' || !data.path.endsWith('opensip-tools.config.yml')) {
+          if (typeof data?.path !== 'string' || !data.path.endsWith('opensip-cli.config.yml')) {
             failures.push(
-              `init.path: expected a path ending in opensip-tools.config.yml, got ${JSON.stringify(data?.path)}`,
+              `init.path: expected a path ending in opensip-cli.config.yml, got ${JSON.stringify(data?.path)}`,
             );
           }
           return failures;
@@ -176,7 +176,7 @@ export function buildPackedSmokeScenarios({
               `list-checks.totalCount: expected > 0, got ${JSON.stringify(data?.totalCount)}`,
             );
           }
-          // Guardrail (P1-1): a packed `opensip-tools` install must bundle every
+          // Guardrail (P1-1): a packed `opensip-cli` install must bundle every
           // language check pack it advertises (README/FAQ/CLAUDE/checks-index all
           // claim TS, Python, Go, Java, C/C++, Rust). The monorepo masks gaps
           // because all packs are root devDeps; only this packed-consumer lane

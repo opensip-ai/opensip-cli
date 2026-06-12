@@ -9,12 +9,12 @@
  * commander dependency and never invokes a command action.
  */
 
-import { commonFlags } from '@opensip-tools/contracts';
+import { commonFlags } from '@opensip-cli/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { BUNDLED_TOOLS } from './test-utils/bundled-tools.js';
 
-import type { Tool } from '@opensip-tools/core';
+import type { Tool } from '@opensip-cli/core';
 
 /**
  * Derive a tool's long-flag set from its `CommandSpec`s: the ADR-0021

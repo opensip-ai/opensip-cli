@@ -2,7 +2,7 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // ADR-0036: the graph baseline tables (`graph_baseline_signals` /
 // `graph_baseline_meta`) moved to the generic host-owned `tool_baseline_entries`
-// / `tool_baseline_meta` pair in `@opensip-tools/datastore`. The DROP migration
+// / `tool_baseline_meta` pair in `@opensip-cli/datastore`. The DROP migration
 // for the old tables is generated in this plan's P4 (one migration drops all three
 // per-tool baseline tables at once, after fitness also re-points).
 

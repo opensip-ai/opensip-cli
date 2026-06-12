@@ -17,7 +17,7 @@ import ts from 'typescript';
 import { resolveDeclToHash } from './edge-helpers/resolve-decl.js';
 
 import type { ResolverContext } from './edge-resolvers/types.js';
-import type { ResolverVerdict } from '@opensip-tools/graph';
+import type { ResolverVerdict } from '@opensip-cli/graph';
 
 /**
  * Identifier appears in a value position — not as a call target, not as

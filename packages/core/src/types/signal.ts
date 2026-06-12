@@ -93,7 +93,7 @@ export function createSignal(input: CreateSignalInput): Signal {
   return {
     id: `sig_${randomUUID().slice(0, 12)}`,
     source: input.source,
-    provider: input.provider ?? 'opensip-tools',
+    provider: input.provider ?? 'opensip-cli',
     severity: input.severity,
     category: input.category ?? 'quality',
     ruleId: input.ruleId,

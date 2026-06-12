@@ -14,11 +14,11 @@
  * `.test.ts`, so it skips this; the cli tsconfig + coverage both exclude
  * `__tests__`; and `test-file-naming` skips the `test-utils` directory.
  */
-import { fitnessTool } from '@opensip-tools/fitness';
-import { graphTool } from '@opensip-tools/graph';
-import { simulationTool } from '@opensip-tools/simulation';
+import { fitnessTool } from '@opensip-cli/fitness';
+import { graphTool } from '@opensip-cli/graph';
+import { simulationTool } from '@opensip-cli/simulation';
 
-import type { Tool } from '@opensip-tools/core';
+import type { Tool } from '@opensip-cli/core';
 
 /** The bundled tool runtimes, in registration (and thus help/listing) order. */
 export const BUNDLED_TOOLS: readonly Tool[] = [fitnessTool, simulationTool, graphTool];

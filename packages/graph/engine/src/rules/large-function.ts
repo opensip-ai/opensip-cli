@@ -23,7 +23,7 @@ import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
 import type { FeatureTable, FunctionOccurrence } from '../types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 const DEFAULT_WARN_LINES = 300;
 const DEFAULT_ERROR_LINES = 500;

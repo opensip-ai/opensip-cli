@@ -4,13 +4,13 @@
  * @fileoverview Transaction handling resilience checks
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 import {
   defineCheck,
   isTestFile,
   type CheckViolation,
   getLineNumber,
-} from '@opensip-tools/fitness';
+} from '@opensip-cli/fitness';
 
 // =============================================================================
 // TRANSACTION BOUNDARY VALIDATION

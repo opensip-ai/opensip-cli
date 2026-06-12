@@ -35,9 +35,9 @@ A check produces violations against files. The set of files is computed at run t
 
 A polyglot project has many file kinds. A check has one purpose. The matching problem is: given a project and a check, which files does this check inspect?
 
-The naive answer is "the check declares its own globs": `include: ['services/api/**/*.ts'], exclude: ['**/*.test.ts']`. That works in a single project; it doesn't work for a marketplace check pack. A pack like `@opensip-tools/checks-typescript` doesn't know your project's directory layout — it can't hardcode `services/api/`.
+The naive answer is "the check declares its own globs": `include: ['services/api/**/*.ts'], exclude: ['**/*.test.ts']`. That works in a single project; it doesn't work for a marketplace check pack. A pack like `@opensip-cli/checks-typescript` doesn't know your project's directory layout — it can't hardcode `services/api/`.
 
-So opensip-tools splits the declaration:
+So opensip-cli splits the declaration:
 
 - **The project** declares *targets*. "I have a `backend` directory at `services/api/**/*.ts`. I have a `tests` directory at `**/*.test.ts`. I have an `infra` directory at `infra/**/*.ts`."
 - **The check** declares *scope* — semantic, not literal. "I apply to TypeScript backend code." It doesn't know the project's globs; it knows what kind of code it's for.
@@ -63,7 +63,7 @@ defineCheck({
 });
 ```
 
-The framework finds every target whose `languages` overlaps `['typescript']` *and* whose `concerns` overlaps `['backend']`. Empty arrays mean "match any" — `scope: { languages: [], concerns: [] }` is the universal scope (the shape used by every check in `@opensip-tools/checks-universal`).
+The framework finds every target whose `languages` overlaps `['typescript']` *and* whose `concerns` overlaps `['backend']`. Empty arrays mean "match any" — `scope: { languages: [], concerns: [] }` is the universal scope (the shape used by every check in `@opensip-cli/checks-universal`).
 
 This is the recommended shape for marketplace check packs.
 
@@ -81,13 +81,13 @@ The framework filters the matched file list to files with these extensions. Laye
 ### 3. Per-check target override (config-side)
 
 ```yaml
-# opensip-tools.config.yml
+# opensip-cli.config.yml
 checkOverrides:
   no-console-log: backend
   no-todos: ['backend', 'frontend']
 ```
 
-A user can pin a check to a specific target by slug, regardless of what the check declared. This is the escape hatch when a third-party check's scope doesn't match your project's reality. `checkOverrides` is a top-level key alongside `targets:` and `globalExcludes:`. Lives in [`TargetsConfig.checkOverrides`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/targets/types.ts).
+A user can pin a check to a specific target by slug, regardless of what the check declared. This is the escape hatch when a third-party check's scope doesn't match your project's reality. `checkOverrides` is a top-level key alongside `targets:` and `globalExcludes:`. Lives in [`TargetsConfig.checkOverrides`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/targets/types.ts).
 
 ### 4. No declaration at all
 
@@ -97,7 +97,7 @@ A check that declares neither `scope:` nor `fileTypes:` matches *every* file the
 
 ## Anatomy of a target
 
-The shape lives in [`packages/fitness/engine/src/targets/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/targets/types.ts):
+The shape lives in [`packages/fitness/engine/src/targets/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/targets/types.ts):
 
 ```ts
 interface TargetConfig {
@@ -166,10 +166,10 @@ A universal check with `scope: { languages: [], concerns: [] }` matches all four
 
 ## How the resolution actually runs
 
-[`packages/fitness/engine/src/framework/scope-resolver.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/framework/scope-resolver.ts) is where it happens. The flow:
+[`packages/fitness/engine/src/framework/scope-resolver.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/framework/scope-resolver.ts) is where it happens. The flow:
 
 ```
-1. Load TargetsConfig from opensip-tools.config.yml.
+1. Load TargetsConfig from opensip-cli.config.yml.
 2. Pre-glob every target's include patterns once, producing a
    pattern → matched-paths map. This avoids re-running the same
    glob multiple times when targets share patterns.
@@ -192,7 +192,7 @@ The `COMMON_IGNORE` set inside the resolver always includes `node_modules`, `dis
 
 ## Global excludes
 
-`globalExcludes` is the top-level project-wide subtractor (it sits at the root of `opensip-tools.config.yml`, not under `targets:`). Every target's resolved file list passes through it. Common entries:
+`globalExcludes` is the top-level project-wide subtractor (it sits at the root of `opensip-cli.config.yml`, not under `targets:`). Every target's resolved file list passes through it. Common entries:
 
 ```yaml
 globalExcludes:
@@ -212,7 +212,7 @@ Use this rather than repeating the same exclusions on every target. The historic
 
 ## The `PathMatcher`
 
-[`packages/fitness/engine/src/framework/path-matcher.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/framework/path-matcher.ts) is the per-check matcher object. It compiles include/exclude globs once and answers `match(filePath)` queries with a single pass through the compiled `Minimatch` instances.
+[`packages/fitness/engine/src/framework/path-matcher.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/fitness/engine/src/framework/path-matcher.ts) is the per-check matcher object. It compiles include/exclude globs once and answers `match(filePath)` queries with a single pass through the compiled `Minimatch` instances.
 
 You won't usually instantiate one. The framework constructs it for each check inside `executeUnifiedCheck()` and exposes `ctx.matchFiles()` to the check. If you're writing an `analyzeAll`-mode check that needs additional filtering on top of the resolved file list, the matcher is available via `check.getMatcher(cwd)`.
 
@@ -245,7 +245,7 @@ The trade-off: complex targets (e.g. "include any file in a directory that has a
 
 ## What's next
 
-- **[`03-ignore-directives.md`](/docs/opensip-tools/20-fit/03-ignore-directives/)** — inline source-level suppression that survives the resolver and lands in the framework's filter step.
-- **[`04-output-gate-sarif.md`](/docs/opensip-tools/20-fit/04-output-gate-sarif/)** — what happens to the violations a check produces.
-- **[`../50-extend/05-language-adapters.md`](/docs/opensip-tools/50-extend/05-language-adapters/)** — how a check's `contentFilter` setting dispatches through a per-language adapter.
-- **[`../70-reference/03-configuration.md`](/docs/opensip-tools/70-reference/03-configuration/)** — the full `targets:` schema in `opensip-tools.config.yml`.
+- **[`03-ignore-directives.md`](/docs/opensip-cli/20-fit/03-ignore-directives/)** — inline source-level suppression that survives the resolver and lands in the framework's filter step.
+- **[`04-output-gate-sarif.md`](/docs/opensip-cli/20-fit/04-output-gate-sarif/)** — what happens to the violations a check produces.
+- **[`../50-extend/05-language-adapters.md`](/docs/opensip-cli/50-extend/05-language-adapters/)** — how a check's `contentFilter` setting dispatches through a per-language adapter.
+- **[`../70-reference/03-configuration.md`](/docs/opensip-cli/70-reference/03-configuration/)** — the full `targets:` schema in `opensip-cli.config.yml`.

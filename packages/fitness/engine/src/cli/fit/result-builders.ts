@@ -16,9 +16,9 @@ import {
   type SignalEnvelope,
   type UnitResult,
   type FitDoneResult,
-} from '@opensip-tools/contracts';
-import { currentScope, generatePrefixedId, logger } from '@opensip-tools/core';
-import { SessionRepo } from '@opensip-tools/session-store';
+} from '@opensip-cli/contracts';
+import { currentScope, generatePrefixedId, logger } from '@opensip-cli/core';
+import { SessionRepo } from '@opensip-cli/session-store';
 
 import { fitnessFingerprintStrategy } from '../../baseline-strategy.js';
 import { buildFitnessSessionPayload } from '../../persistence/session-payload.js';
@@ -31,8 +31,8 @@ import { resolvedFitnessConfig } from './resolved-fitness-config.js';
 import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../../recipes/service-types.js';
 import type { FitnessRecipeResult, RecipeCheckResult } from '../../recipes/types.js';
 import type { SignalersConfig } from '../../signalers/types.js';
-import type { Signal, VerdictPolicy } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { Signal, VerdictPolicy } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 /**
  * Resolve fit's findings policy (ADR-0035). Reserved keys

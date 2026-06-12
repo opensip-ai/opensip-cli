@@ -16,7 +16,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { fileCache } from '@opensip-tools/fitness';
+import { fileCache } from '@opensip-cli/fitness';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';

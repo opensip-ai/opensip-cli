@@ -15,7 +15,7 @@
 
 import { relative, sep } from 'node:path';
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 import {
   appendEdge,
   createMutableStats,
@@ -23,7 +23,7 @@ import {
   pushCreationEdge as pushSharedCreationEdge,
   resolveSpecifierToPackage,
   truncateForCallEdge,
-} from '@opensip-tools/graph';
+} from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { buildCrossPackageContext } from './edge-helpers/cross-package-context.js';
@@ -58,7 +58,7 @@ import type {
   FunctionOccurrence,
   ResolutionStats,
   ResolverVerdict,
-} from '@opensip-tools/graph';
+} from '@opensip-cli/graph';
 
 /** How many call sites to process between cooperative event-loop yields. Tuned
  *  so the live view's 80ms clock ticks several times per second during a long

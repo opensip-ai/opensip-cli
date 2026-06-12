@@ -6,7 +6,7 @@
  * spy on each level (info/warn/error/debug) to confirm the wiring.
  */
 
-import { logger as coreLogger } from '@opensip-tools/core';
+import { logger as coreLogger } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createScenarioLogger } from '../scenario-logger.js';

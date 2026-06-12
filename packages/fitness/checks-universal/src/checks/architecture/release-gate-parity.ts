@@ -36,7 +36,7 @@
  * immutable publish boundary, aligned with the sibling ADR-enforcing
  * architecture gates in this pack.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Path fragment that identifies the tag-driven release workflow. The check is

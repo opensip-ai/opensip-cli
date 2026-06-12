@@ -1,5 +1,5 @@
 /* eslint-disable unicorn/filename-case -- React component test files mirror PascalCase component filenames */
-import { Banner, ThemeProvider } from '@opensip-tools/cli-ui';
+import { Banner, ThemeProvider } from '@opensip-cli/cli-ui';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';

@@ -45,9 +45,9 @@ export interface RecipeUnitConfigSlot {
  * composed every tool's contributed schema, validated the document STRICT,
  * and resolved precedence (flag > env > file > defaults).
  *
- * Structurally identical to `@opensip-tools/config`'s `ResolvedConfig`, kept
+ * Structurally identical to `@opensip-cli/config`'s `ResolvedConfig`, kept
  * Zod-free here so the kernel carries no config-layer dependency — the CLI
- * (which DOES import `@opensip-tools/config`) writes it, and tools read their
+ * (which DOES import `@opensip-cli/config`) writes it, and tools read their
  * own namespace via `currentScope()?.toolConfig?.<namespace>`.
  */
 export type ResolvedToolConfig = Record<string, Record<string, unknown>>;
@@ -56,9 +56,9 @@ export type ResolvedToolConfig = Record<string, Record<string, unknown>>;
  * The structural shape of one registered target the host hands tools through
  * `scope.targets`. A target is a named file set (`include`/`exclude` globs)
  * plus its language/concern metadata. Kept structural (Zod-free, no
- * `@opensip-tools/config` import) so the kernel carries no config-layer or
+ * `@opensip-cli/config` import) so the kernel carries no config-layer or
  * tool-vocabulary dependency — it mirrors `ResolvedToolConfig`'s "structural
- * analog of a config-layer type" pattern. `@opensip-tools/config`'s `Target`
+ * analog of a config-layer type" pattern. `@opensip-cli/config`'s `Target`
  * (a `{ config: TargetConfig }`) is structurally assignable to this shape.
  */
 export interface TargetView {
@@ -114,7 +114,7 @@ export type DataStoreThunk = () => unknown;
 
 /**
  * Per-tool subscope contribution. Each tool augments this interface from
- * its own package (`declare module '@opensip-tools/core' { interface
+ * its own package (`declare module '@opensip-cli/core' { interface
  * ScopeContribution { graph?: … } }`) and returns the matching object
  * from `Tool.contributeScope()`. The kernel installs it onto the scope.
  * `ToolScope` (and therefore `RunScope`) extends this, so the same slots
@@ -123,7 +123,7 @@ export type DataStoreThunk = () => unknown;
  * Empty here by design — every member arrives via tool augmentation, so
  * core never names a tool-specific type.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- intentionally empty: every member is contributed by a tool via `declare module '@opensip-tools/core' { interface ScopeContribution { … } }`. `object`/`unknown` would not be augmentable.
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- intentionally empty: every member is contributed by a tool via `declare module '@opensip-cli/core' { interface ScopeContribution { … } }`. `object`/`unknown` would not be augmentable.
 export interface ScopeContribution {}
 
 /**
@@ -155,7 +155,7 @@ export interface ToolScope extends ScopeContribution {
   /**
    * The strict-validated raw config document for this run (ADR-0023's
    * one-reader invariant). Seeded by the CLI's pre-action-hook ONLY when a
-   * real `opensip-tools.config.yml` was read for this run — absent on a
+   * real `opensip-cli.config.yml` was read for this run — absent on a
    * project-agnostic or config-less run, so a tool that hard-errors on a
    * missing config (fitness) stays loud. Tools that project tool-specific
    * shapes out of the document (fitness's signalers/targets loaders) parse

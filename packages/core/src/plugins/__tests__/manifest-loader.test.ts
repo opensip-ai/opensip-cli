@@ -251,7 +251,7 @@ describe('capability discovery descriptor (§5.3)', () => {
       exportName: 'items',
       exportShape: 'array',
       configKeys: { packages: 'discPackages' },
-      builtinScope: '@opensip-tools',
+      builtinScope: '@opensip-cli',
     });
     const manifest = loadToolManifest('installed', testDir);
     expect(manifest?.capabilities?.[0]?.discovery).toEqual({
@@ -259,13 +259,13 @@ describe('capability discovery descriptor (§5.3)', () => {
       exportName: 'items',
       exportShape: 'array',
       configKeys: { packages: 'discPackages' },
-      builtinScope: '@opensip-tools',
+      builtinScope: '@opensip-cli',
     });
   });
 
   it('preserves a name-pattern-mode descriptor', () => {
     withCapability({
-      discovery: { mode: 'name-pattern', prefix: 'items-', defaultScopes: ['@opensip-tools'] },
+      discovery: { mode: 'name-pattern', prefix: 'items-', defaultScopes: ['@opensip-cli'] },
       exportName: 'items',
       exportShape: 'array',
       configKeys: { packages: 'p', autoDiscover: 'a', scopes: 's' },
@@ -274,7 +274,7 @@ describe('capability discovery descriptor (§5.3)', () => {
       {
         mode: 'name-pattern',
         prefix: 'items-',
-        defaultScopes: ['@opensip-tools'],
+        defaultScopes: ['@opensip-cli'],
       },
     );
   });

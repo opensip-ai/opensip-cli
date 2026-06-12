@@ -11,7 +11,7 @@
  * InventoryVisitor; PR-5 calls this out explicitly.
  */
 
-import type { FunctionOccurrence } from '@opensip-tools/graph';
+import type { FunctionOccurrence } from '@opensip-cli/graph';
 import type ts from 'typescript';
 
 /** Per-source-file context carried through every inventory visitor invocation. */

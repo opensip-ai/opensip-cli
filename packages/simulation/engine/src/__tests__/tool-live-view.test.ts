@@ -17,13 +17,13 @@
  * the wiring without spinning up a real Ink render host.
  */
 
-import { enterScope, RunScope } from '@opensip-tools/core';
+import { enterScope, RunScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { simulationTool } from '../tool.js';
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
-import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
 
 // Mock the Ink renderer so the live-view callback can run without a real
 // terminal. The mock returns a deterministic envelope.

@@ -10,9 +10,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry } from '@opensip-tools/core';
-import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { diffBaseline } from '@opensip-tools/output';
+import { enterScope, LanguageRegistry } from '@opensip-cli/core';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { diffBaseline } from '@opensip-cli/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { executeGraph } from '../../cli/graph.js';
@@ -27,8 +27,8 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { FunctionOccurrence } from '../../types.js';
-import type { GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { GraphDoneResult, SignalEnvelope } from '@opensip-cli/contracts';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 function occ(over: Partial<FunctionOccurrence> = {}): FunctionOccurrence {
   return {

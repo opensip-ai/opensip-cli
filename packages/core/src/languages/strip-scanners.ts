@@ -11,7 +11,7 @@
  *
  * Split out of `strip-utils.ts` so neither file exceeds the file-length limit;
  * `strip-utils.ts` re-exports everything here, so consumers still import these
- * from `@opensip-tools/core` (or `strip-utils.js`) unchanged.
+ * from `@opensip-cli/core` (or `strip-utils.js`) unchanged.
  */
 
 /** Half-open region `[start, end)` for region-overlay strippers. */

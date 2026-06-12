@@ -39,7 +39,7 @@ import {
   type ProjectContext,
   type Tool,
   type ToolRegistry,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import {
   getCurrentRegistriesForScope,
@@ -63,7 +63,7 @@ import { initializedToolIds } from './process-idempotency.js';
 import type { Command } from 'commander';
 
 /** npm package whose version the update check compares against. */
-const CLI_PACKAGE_NAME = 'opensip-tools';
+const CLI_PACKAGE_NAME = 'opensip-cli';
 
 const MODULE_TAG = 'cli:bootstrap';
 
@@ -198,7 +198,7 @@ export function installPreActionHook(program: Command, version: string): void {
       throw new BootstrapError({
         message: msg,
         humanMessage: `✗ ${msg}`,
-        suggestion: 'Check opensip-tools.config.yml (or your --config path).',
+        suggestion: 'Check opensip-cli.config.yml (or your --config path).',
         exitCode: 2,
       });
     }
@@ -254,7 +254,7 @@ export function installPreActionHook(program: Command, version: string): void {
     // IO; the entitlement check is deferred to first emit so non-signal
     // commands pay nothing. `opts.cloud === false` comes from `--no-cloud`.
     //
-    // `cloud` layers the user-level opt-out (~/.opensip-tools/config.yml#cloud)
+    // `cloud` layers the user-level opt-out (~/.opensip-cli/config.yml#cloud)
     // over the project's `cli.cloud:` block (audit P0-2): a user `sync: false`
     // disables sync for every project on this machine.
     const { languages, tools } = getCurrentRegistriesForScope();

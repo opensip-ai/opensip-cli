@@ -20,7 +20,7 @@ import {
   isTestFile,
   type CheckViolation,
   type FileAccessor,
-} from '@opensip-tools/fitness';
+} from '@opensip-cli/fitness';
 
 const IMPORT_PATTERN = /import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/g;
 const NAMED_EXPORT_BLOCK = /export\s+(?:type\s+)?\{([^}]+)\}/g;

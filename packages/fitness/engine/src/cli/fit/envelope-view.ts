@@ -2,13 +2,13 @@
  * @fileoverview Fitness live-view derivation from the run's `SignalEnvelope`
  * (ADR-0011, Phase 6).
  *
- * The shared `formatSignalTableRows` (`@opensip-tools/output`) is the canonical
+ * The shared `formatSignalTableRows` (`@opensip-cli/output`) is the canonical
  * neutral table for the static/non-TTY render path — but fitness's PRODUCTION
- * source must not import `@opensip-tools/output` (the root owns egress; output
+ * source must not import `@opensip-cli/output` (the root owns egress; output
  * is the egress/format layer). So the TTY live view derives its richer,
  * fitness-specific table (display names + the `Validated`/`Ignores` columns)
- * straight from the envelope here, using only `@opensip-tools/contracts`
- * (envelope/units) + `@opensip-tools/core` (signals). This is the
+ * straight from the envelope here, using only `@opensip-cli/contracts`
+ * (envelope/units) + `@opensip-cli/core` (signals). This is the
  * decision-B fallback: ONE neutral formatter for the shared path, plus a
  * tool-specific rich view for fitness's terminal UX — both fed by the same
  * `UnitResult` facts (`filesValidated`/`itemType`/`ignoredCount`), so there is
@@ -17,14 +17,14 @@
  * Pure: no IO, no clock. `getDisplayName` is a registry lookup (display only).
  */
 
-import { formatValidatedColumn } from '@opensip-tools/cli-ui';
-import { buildFindingGroups } from '@opensip-tools/contracts';
-import { formatDuration, isErrorSignal } from '@opensip-tools/core';
+import { formatValidatedColumn } from '@opensip-cli/cli-ui';
+import { buildFindingGroups } from '@opensip-cli/contracts';
+import { formatDuration, isErrorSignal } from '@opensip-cli/core';
 
 import { getDisplayName } from './display-registry.js';
 
-import type { SignalEnvelope, UnitResult, VerboseDetail } from '@opensip-tools/contracts';
-import type { Signal } from '@opensip-tools/core';
+import type { SignalEnvelope, UnitResult, VerboseDetail } from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 /** A live-view results-table row — one per check unit, with fitness columns. */
 export interface FitTableRow {

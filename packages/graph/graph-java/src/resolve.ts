@@ -27,14 +27,14 @@
  * Per I-4: this function does NOT mutate the input catalog.
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 import {
   appendEdge,
   createMutableStats,
   pushCreationEdge,
   truncateForCallEdge,
-} from '@opensip-tools/graph';
-import { buildNameIndex, isReturnValueDiscarded } from '@opensip-tools/graph-adapter-common';
+} from '@opensip-cli/graph';
+import { buildNameIndex, isReturnValueDiscarded } from '@opensip-cli/graph-adapter-common';
 
 import { resolveDependencies } from './resolve-dependencies.js';
 
@@ -45,8 +45,8 @@ import type {
   ResolutionStats,
   ResolveInput,
   ResolveOutput,
-} from '@opensip-tools/graph';
-import type { Node } from '@opensip-tools/tree-sitter';
+} from '@opensip-cli/graph';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 function javaPosition(
   node: Node,

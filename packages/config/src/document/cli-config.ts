@@ -1,5 +1,5 @@
 /**
- * cli-config — the tool-agnostic `cli:` block of `opensip-tools.config.yml`.
+ * cli-config — the tool-agnostic `cli:` block of `opensip-cli.config.yml`.
  *
  * Owns three things, all relocated here in 2.10.1 (ADR-0023 §Amendment):
  *   - {@link CliDefaults} — the structural type the CLI pre-action hook reads.
@@ -10,7 +10,7 @@
  *     document-level declaration so the composed whole-document validation
  *     STRICT-rejects a typo in `cli:` before dispatch.
  *
- * Previously this lived in `@opensip-tools/contracts` (`cli-config.ts`) — a
+ * Previously this lived in `@opensip-cli/contracts` (`cli-config.ts`) — a
  * runtime YAML projection in a types-only package (the standing charter
  * violation ADR-0023 names). It now lives in the config layer, beside the rest
  * of the document blocks. The generic `readYamlFile` / `resolveProjectConfigPath`
@@ -22,11 +22,11 @@
  * document's job (the `cli` host declaration), not this reader's.
  */
 
-import { readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
+import { readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
 import { z } from 'zod';
 
 /**
- * Shape of the `cli:` block in `opensip-tools.config.yml` as the CLI pre-action
+ * Shape of the `cli:` block in `opensip-cli.config.yml` as the CLI pre-action
  * hook reads it. The structural mirror of {@link cliConfigSchema}.
  */
 export interface CliDefaults {
@@ -151,7 +151,7 @@ function projectUiDefaults(raw: unknown): CliDefaults['ui'] | undefined {
 }
 
 /**
- * Best-effort load of the `cli:` block from `opensip-tools.config.yml`.
+ * Best-effort load of the `cli:` block from `opensip-cli.config.yml`.
  * Resolves the file via the core `resolveProjectConfigPath` primitive.
  *
  * Returns `{}` when the config is missing, unreadable, malformed, or has no

@@ -19,9 +19,9 @@ import {
   type FitOptions,
   type SignalEnvelope,
   type StoredSession,
-} from '@opensip-tools/contracts';
-import { ConfigurationError, resolveFailOnDegraded, SystemError } from '@opensip-tools/core';
-import { resolveSession } from '@opensip-tools/session-store';
+} from '@opensip-cli/contracts';
+import { ConfigurationError, resolveFailOnDegraded, SystemError } from '@opensip-cli/core';
+import { resolveSession } from '@opensip-cli/session-store';
 
 import { fitReplayFromSession } from '../persistence/session-replay.js';
 
@@ -31,8 +31,8 @@ import { listChecks } from './fit-list.js';
 import { listRecipes } from './fit-recipes.js';
 import { executeFit } from './fit.js';
 
-import type { ToolCliContext } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { ToolCliContext } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 /**
  * Persist a completed fit run on the main thread (ADR-0028 — the engine is
@@ -63,7 +63,7 @@ function persistFitRun(
 function emitWarningsToStderr(result: { warnings?: readonly string[] }): void {
   if (!result.warnings || result.warnings.length === 0) return;
   for (const msg of result.warnings) {
-    process.stderr.write(`opensip-tools: ${msg}\n`);
+    process.stderr.write(`opensip: ${msg}\n`);
   }
 }
 

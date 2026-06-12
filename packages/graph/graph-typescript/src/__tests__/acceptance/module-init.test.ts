@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { findOccurrence, runFixture, writeFixture } from './_fixture-runner.js';
 
-import type { Catalog } from '@opensip-tools/graph';
+import type { Catalog } from '@opensip-cli/graph';
 
 describe('module-init acceptance fixture', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-modinit-'));

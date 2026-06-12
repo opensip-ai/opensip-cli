@@ -12,7 +12,7 @@
 
 import type { ChaosOutcome } from '../kinds/chaos/result.js';
 import type { LoadOutcome } from '../kinds/load/result.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 /** Common envelope fields for every kind's result. */
 interface BaseScenarioExecutorResult {

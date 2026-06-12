@@ -4,7 +4,7 @@
  * @fileoverview Detects boolean flag reentrancy guards that should use counters or mutexes
  */
 
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
 
 /**
  * Pattern for detecting module-scoped boolean state flags used as reentrancy guards.

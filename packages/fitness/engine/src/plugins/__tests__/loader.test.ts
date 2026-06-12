@@ -4,22 +4,22 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { enterScope, RunScope } from '@opensip-tools/core';
+import { enterScope, RunScope } from '@opensip-cli/core';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { fitnessTool } from '../../tool.js';
 import { loadPlugin, loadAllPlugins } from '../loader.js';
 
-import type { DiscoveredPlugin } from '@opensip-tools/core';
+import type { DiscoveredPlugin } from '@opensip-cli/core';
 
 // Test fixtures are written to tmpdir() and dynamically imported. Node ESM
 // resolution walks up from /tmp/... and can never reach the workspace's
-// node_modules, so bare specifiers like '@opensip-tools/fitness' fail at
+// node_modules, so bare specifiers like '@opensip-cli/fitness' fail at
 // import time. Resolve the fitness entrypoint here (the test file IS in
 // fitness, so its require can resolve the package) and inject the absolute
 // file URL into each fixture template.
 const require = createRequire(import.meta.url);
-const FITNESS_URL = pathToFileURL(require.resolve('@opensip-tools/fitness')).href;
+const FITNESS_URL = pathToFileURL(require.resolve('@opensip-cli/fitness')).href;
 
 let testDir: string;
 
@@ -313,8 +313,8 @@ describe('loadAllPlugins', () => {
   });
 
   it('aggregates results from multiple plugins', async () => {
-    // Project layout: opensip-tools/fit/checks/<file>.mjs
-    const checksDir = join(testDir, 'opensip-tools', 'fit', 'checks');
+    // Project layout: opensip-cli/fit/checks/<file>.mjs
+    const checksDir = join(testDir, 'opensip-cli', 'fit', 'checks');
     mkdirSync(checksDir, { recursive: true });
     writeFileSync(join(checksDir, 'a.mjs'), 'export const checks = []');
     writeFileSync(join(checksDir, 'b.mjs'), 'export const checks = []');
@@ -324,7 +324,7 @@ describe('loadAllPlugins', () => {
   });
 
   it('collects errors from failed plugins', async () => {
-    const checksDir = join(testDir, 'opensip-tools', 'fit', 'checks');
+    const checksDir = join(testDir, 'opensip-cli', 'fit', 'checks');
     mkdirSync(checksDir, { recursive: true });
     writeFileSync(join(checksDir, 'ok.mjs'), 'export const checks = []');
     writeFileSync(join(checksDir, 'bad.mjs'), 'throw new Error("boom")');

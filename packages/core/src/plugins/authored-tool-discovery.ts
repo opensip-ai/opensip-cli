@@ -47,8 +47,8 @@ export interface AuthoredToolCandidate {
  * validity/admission is the caller's concern, so the walk stays pure and
  * source-agnostic (one walk serves the project and global roots).
  *
- * @param root An authored `tools/` root — `<project>/opensip-tools/tools` or
- *   `~/.opensip-tools/tools`. NOT inferred-from here; the caller assigns the
+ * @param root An authored `tools/` root — `<project>/opensip-cli/tools` or
+ *   `~/.opensip-cli/tools`. NOT inferred-from here; the caller assigns the
  *   `ToolSource` per root.
  */
 export function discoverAuthoredToolSidecars(root: string): AuthoredToolCandidate[] {

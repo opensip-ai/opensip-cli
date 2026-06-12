@@ -1,5 +1,5 @@
 /**
- * @opensip-tools/graph — Python language adapter.
+ * @opensip-cli/graph — Python language adapter.
  *
  * Lands in PR 5 of plan docs/plans/10-graph-language-pluggability.md.
  * Exposes `pythonGraphAdapter`, a `GraphLanguageAdapter` backed by
@@ -30,7 +30,7 @@ import { pythonRuleHints } from './rule-hints.js';
 import { walkProject as pythonWalkProject } from './walk.js';
 
 import type { PythonParsedProject } from './parse.js';
-import type { GraphLanguageAdapter } from '@opensip-tools/graph';
+import type { GraphLanguageAdapter } from '@opensip-cli/graph';
 
 export const pythonGraphAdapter = {
   id: 'python',

@@ -14,7 +14,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { buildExportIndex, buildPackageManifestIndexFromRoots } from '@opensip-tools/graph';
+import { buildExportIndex, buildPackageManifestIndexFromRoots } from '@opensip-cli/graph';
 import ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -22,7 +22,7 @@ import { resolveDeclToHash } from '../../edge-helpers/resolve-decl.js';
 
 import type { CrossPackageContext } from '../../edge-helpers/cross-package-context.js';
 import type { ResolverContext } from '../../edge-resolvers/types.js';
-import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
+import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 
 const EXPORTED_HASH = 'aaaaaaaaaaaaaaaa';
 

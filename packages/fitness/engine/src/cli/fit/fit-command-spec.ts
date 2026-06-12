@@ -14,7 +14,7 @@
  * the handler stays authoritative — byte-identical to the former action body.
  */
 
-import { defineCommand } from '@opensip-tools/core';
+import { defineCommand } from '@opensip-cli/core';
 
 import {
   runGateMode,
@@ -25,8 +25,8 @@ import {
   runShowMode,
 } from '../fit-modes.js';
 
-import type { FitOptions } from '@opensip-tools/contracts';
-import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
+import type { FitOptions } from '@opensip-cli/contracts';
+import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
 
 // Live-view key fitness contributes to the CLI's renderer registry. Owned by
 // this package — the CLI dispatcher does NOT key off this literal; each tool
@@ -116,7 +116,7 @@ export function buildFitCommandSpec(
         flag: '--config',
         value: '<path>',
         description:
-          'Path to opensip-tools.config.yml (overrides package.json pointer and default)',
+          'Path to opensip-cli.config.yml (overrides package.json pointer and default)',
       },
       {
         flag: '--show',

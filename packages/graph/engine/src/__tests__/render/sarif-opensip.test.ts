@@ -4,12 +4,12 @@
  * Graph's former `renderSarifOpenSip` adapter is retired: SARIF now flows
  * through `buildGraphEnvelope` (which applies the Option-A engine-slug →
  * OpenSIP rule-ID mapping at assembly) + the single shared `formatSignalSarif`
- * formatter (`@opensip-tools/output`). This test drives THAT path and asserts
+ * formatter (`@opensip-cli/output`). This test drives THAT path and asserts
  * byte-identical output against the same golden fixtures the adapter produced
  * — proving the migration is behaviour-preserving.
  *
  * Coverage invariants beyond per-rule equality:
- *   1. `tool.driver.name === 'opensip-tools-graph'` for every emission.
+ *   1. `tool.driver.name === 'opensip-cli-graph'` for every emission.
  *   2. Every `result.ruleId` matches the OpenSIP-convention regex
  *      (`graph.<family>.<rule>`).
  *
@@ -17,13 +17,13 @@
  * intentional changes by deleting the file and running the test once.
  */
 
-import { formatSignalSarif } from '@opensip-tools/output';
+import { formatSignalSarif } from '@opensip-cli/output';
 import { describe, expect, it } from 'vitest';
 
 import { buildGraphEnvelope } from '../../cli/build-envelope.js';
 import { OPENSIP_RULE_ID_REGEX } from '../../render/rule-id-mapping.js';
 
-import type { Signal, SignalSeverity } from '@opensip-tools/core';
+import type { Signal, SignalSeverity } from '@opensip-cli/core';
 
 const RUN = { runId: 'run-1', createdAt: '2026-05-27T00:00:00.000Z' };
 
@@ -83,7 +83,7 @@ function makeSignal(fixture: RuleFixture): Signal {
   return {
     id: `sig_${fixture.slug.replace('graph:', '').replaceAll('-', '_')}`,
     source: 'graph',
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     severity: fixture.severity,
     category: 'quality',
     ruleId: fixture.slug,
@@ -120,11 +120,11 @@ describe('graph SARIF — invariants', () => {
     }
   });
 
-  it('tool.driver.name is opensip-tools-graph', () => {
+  it('tool.driver.name is opensip-cli-graph', () => {
     const parsed = JSON.parse(graphSarif(RULE_FIXTURES.map(makeSignal))) as {
       runs: { tool: { driver: { name: string; version: string } } }[];
     };
-    expect(parsed.runs[0].tool.driver.name).toBe('opensip-tools-graph');
+    expect(parsed.runs[0].tool.driver.name).toBe('opensip-cli-graph');
     expect(parsed.runs[0].tool.driver.version).toBe('2.0.0');
   });
 
@@ -231,7 +231,7 @@ function newRuleSignal(c: NewRuleCase): Signal {
   return {
     id: 'sig_new',
     source: 'graph',
-    provider: 'opensip-tools',
+    provider: 'opensip-cli',
     severity: c.severity,
     category: 'quality',
     ruleId: c.slug,

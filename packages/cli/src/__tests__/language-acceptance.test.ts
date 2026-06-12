@@ -59,7 +59,7 @@ function cwdFor(lang: string): string {
 
 beforeEach(() => {
   for (const { lang } of LANGS) {
-    rmSync(join(cwdFor(lang), 'opensip-tools', '.runtime'), { recursive: true, force: true });
+    rmSync(join(cwdFor(lang), 'opensip-cli', '.runtime'), { recursive: true, force: true });
   }
 });
 

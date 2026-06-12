@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-06-04
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0011: Signals are the universal output currency; tools emit, the composition root renders
@@ -18,7 +18,7 @@ tags: [signals, output, contracts, rendering, architecture]
 enforcement: mechanizable
 enforcement-reason: >
   Retiring `CliOutput`/`CheckOutput`/`FindingOutput` from
-  @opensip-tools/contracts makes the fitness-shaped envelope unimportable —
+  @opensip-cli/contracts makes the fitness-shaped envelope unimportable —
   a type that no longer exists cannot be re-grown. Two dependency-cruiser
   rules then keep the model honest: (1) a tool engine
   (`packages/{fitness,graph,simulation}/`) must not import the shared output
@@ -116,7 +116,7 @@ finishes it rather than inventing it.
 **Consequences:**
 
 - **Contracts.** `CliOutput`/`CheckOutput`/`FindingOutput` are removed from
-  `@opensip-tools/contracts`; the signal envelope type takes their place as the
+  `@opensip-cli/contracts`; the signal envelope type takes their place as the
   `CommandResult` payload. `TableRow`/`SummaryOptions` are reassessed (table
   rendering moves to the shared formatter/cli-ui layer).
 - **Public `--json` is a breaking change (a 3.0-flavored bump).** `signals[]`
@@ -125,7 +125,7 @@ finishes it rather than inventing it.
   redefined accordingly. `docs/public/70-reference/04-json-output-schema.md`
   and the `jq '.checks[]'` examples are rewritten; the change is announced.
 - **Rendering consolidates.** The json and sarif formatters join the shared
-  output layer (today's `@opensip-tools/reporting`, likely renamed `output`
+  output layer (today's `@opensip-cli/reporting`, likely renamed `output`
   since it is no longer cloud-only); the human/table formatter stays in
   `cli-ui`. `fitness` and `graph` shed their per-tool renderers and the
   `CliOutput` builders.

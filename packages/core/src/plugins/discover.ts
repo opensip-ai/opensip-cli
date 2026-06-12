@@ -7,15 +7,15 @@
  * never enumerates tool domains itself (ADR-0009 corollary 1). Two
  * artifact sources are walked for the layout:
  *
- *   1. USER SOURCE — `<project>/opensip-tools/<domain>/<kind>/*.{js,mjs}`
+ *   1. USER SOURCE — `<project>/opensip-cli/<domain>/<kind>/*.{js,mjs}`
  *      for each `kind` in `layout.userSubdirs` (e.g. `checks`/`recipes`
  *      for fitness, `scenarios`/`recipes` for simulation). Auto-loaded
  *      by directory presence; no config opt-in.
  *
  *   2. NPM PLUGINS — packages installed under
- *      `<project>/opensip-tools/.runtime/plugins/<domain>/node_modules/`
+ *      `<project>/opensip-cli/.runtime/plugins/<domain>/node_modules/`
  *      whose names appear in the project's
- *      `opensip-tools.config.yml#plugins.<domain>: [...]`. The explicit
+ *      `opensip-cli.config.yml#plugins.<domain>: [...]`. The explicit
  *      list is required so a `plugin install` step is intentional, not
  *      an accidental load of every transitive devDep.
  *
@@ -65,7 +65,7 @@ export function discoverPlugins(layout: PluginLayout, projectDir?: string): Disc
   const projectPaths = resolveProjectPaths(projectDir);
   const plugins: DiscoveredPlugin[] = [];
 
-  // 1. User-source loose files: opensip-tools/<domain>/<kind>/*.{js,mjs}
+  // 1. User-source loose files: opensip-cli/<domain>/<kind>/*.{js,mjs}
   const toolDir = join(projectPaths.userSourceDir, domain);
   for (const kind of userSubdirs) {
     const kindDir = join(toolDir, kind);
@@ -100,7 +100,7 @@ export function discoverPlugins(layout: PluginLayout, projectDir?: string): Disc
 }
 
 // =============================================================================
-// CONFIG READING (plugins.<domain> from opensip-tools.config.yml)
+// CONFIG READING (plugins.<domain> from opensip-cli.config.yml)
 // =============================================================================
 
 /**
@@ -112,7 +112,7 @@ export function discoverPlugins(layout: PluginLayout, projectDir?: string): Disc
  *
  * Config-path resolution mirrors `resolveProjectConfigPath` (the same
  * helper the targets loader uses): --config flag → `package.json#
- * opensip-tools.configPath` pointer → default `<projectDir>/opensip-
+ * opensip-cli.configPath` pointer → default `<projectDir>/opensip-
  * tools.config.yml`. Without this, projects that locate their config
  * via the package.json pointer have their `plugins.<domain>: [...]`
  * declaration silently ignored — discovery falls through to the empty
@@ -161,8 +161,8 @@ function discoverNpmPackages(
 
   for (const name of declared) {
     // Reject names that could traverse before they ever touch the filesystem.
-    // The plugin list comes from opensip-tools.config.yml — user-controlled
-    // content under a project that runs `opensip-tools fit` would otherwise
+    // The plugin list comes from opensip-cli.config.yml — user-controlled
+    // content under a project that runs `opensip fit` would otherwise
     // act as an attacker-influenced input flowing into a path join.
     if (name.length === 0 || name.includes('..') || name.startsWith('/') || name.includes('\0')) {
       logger.warn({

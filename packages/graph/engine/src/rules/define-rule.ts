@@ -23,7 +23,7 @@
  * fallback path stay valid.
  */
 
-import { ValidationError } from '@opensip-tools/core';
+import { ValidationError } from '@opensip-cli/core';
 
 import type {
   Catalog,
@@ -34,7 +34,7 @@ import type {
   Rule,
   RuleHints,
 } from '../types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 /**
  * The engine-computed feature columns attached to the dataset. Plan B

@@ -8,8 +8,8 @@
  * (validate/install/uninstall/data purge).
  */
 
-import { EXIT_CODES, type CommandResult } from '@opensip-tools/contracts';
-import { defineCommand, type CommandSpec, type ProjectContext } from '@opensip-tools/core';
+import { EXIT_CODES, type CommandResult } from '@opensip-cli/contracts';
+import { defineCommand, type CommandSpec, type ProjectContext } from '@opensip-cli/core';
 
 import { toolsDataPurge } from './data-purge.js';
 import { toolsInstall } from './install.js';
@@ -18,7 +18,7 @@ import { toolsUninstall } from './uninstall.js';
 import { runToolValidation } from './validate.js';
 
 import type { CliCommandsContext } from '../shared.js';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { DataStore } from '@opensip-cli/datastore';
 
 type HostSpec = CommandSpec<unknown, CliCommandsContext>;
 const COMMAND_RESULT_OUTPUT = 'command-result';
@@ -183,7 +183,7 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
           // the uninstall result stays the command's one payload.
           const purge = toolsDataPurge(result.removed.id, datastore);
           process.stderr.write(
-            `opensip-tools: purged ${purge.sessions} session(s), ${purge.baselineEntries} baseline entr(ies), ` +
+            `opensip: purged ${purge.sessions} session(s), ${purge.baselineEntries} baseline entr(ies), ` +
               `${purge.stateRows} state row(s) for '${purge.toolId}'\n`,
           );
         }

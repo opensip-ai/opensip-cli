@@ -1,12 +1,12 @@
 /**
- * @fileoverview Single-`@opensip-tools/core` guard for discovered packages.
+ * @fileoverview Single-`@opensip-cli/core` guard for discovered packages.
  *
  * A capability pack (check pack, scenario pack, graph adapter) that resolves a
- * DIFFERENT physical `@opensip-tools/core` than the running engine registers its
+ * DIFFERENT physical `@opensip-cli/core` than the running engine registers its
  * contributions against a core whose `currentScope()` is always `undefined` here
  * (a different `AsyncLocalStorage`). That silently degrades the run — the failure
  * mode seen when a globally-installed CLI discovers packs in a project that
- * vendors its own `@opensip-tools/*`. Such packs are refused at discovery time.
+ * vendors its own `@opensip-cli/*`. Such packs are refused at discovery time.
  *
  * Packs that don't depend on core at all resolve nothing and pass. The guard is
  * tool-agnostic: the generic discovery substrate applies it to EVERY domain's
@@ -18,13 +18,13 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /**
- * The `@opensip-tools/core` THIS module resolves — the canonical core whose
+ * The `@opensip-cli/core` THIS module resolves — the canonical core whose
  * `runWithScope` populates `currentScope()`. Captured once. `undefined` disables
  * the guard (fail-open; defensive only — core always resolves from itself).
  */
 const selfCorePath: string | undefined = (() => {
   try {
-    return createRequire(import.meta.url).resolve('@opensip-tools/core');
+    return createRequire(import.meta.url).resolve('@opensip-cli/core');
   } catch {
     /* v8 ignore next 2 -- core resolves from itself; defensive only */
     // @fitness-ignore-next-line error-handling-quality -- an unresolvable self-core disables the guard (fail-open), not an error.
@@ -32,19 +32,19 @@ const selfCorePath: string | undefined = (() => {
   }
 })();
 
-/** The canonical `@opensip-tools/core` path this runtime resolves (for diagnostics). */
+/** The canonical `@opensip-cli/core` path this runtime resolves (for diagnostics). */
 export function selfCore(): string | undefined {
   return selfCorePath;
 }
 
-/** The pack's resolved `@opensip-tools/core` if it differs from {@link selfCore}; else undefined. */
+/** The pack's resolved `@opensip-cli/core` if it differs from {@link selfCore}; else undefined. */
 export function foreignCorePath(packageDir: string): string | undefined {
   if (selfCorePath === undefined) return undefined;
   try {
     // The anchor file need not exist — createRequire only uses its directory as
     // the resolution base, walking up node_modules from the pack.
     const anchor = pathToFileURL(join(packageDir, 'noop.js')).href;
-    const packCore = createRequire(anchor).resolve('@opensip-tools/core');
+    const packCore = createRequire(anchor).resolve('@opensip-cli/core');
     return packCore === selfCorePath ? undefined : packCore;
   } catch {
     // @fitness-ignore-next-line error-handling-quality -- resolution probe: a pack with no core dep throws here, and "no foreign core → allow" is the contract.
@@ -53,7 +53,7 @@ export function foreignCorePath(packageDir: string): string | undefined {
 }
 
 /**
- * Keep only the packages that resolve THIS runtime's `@opensip-tools/core`
+ * Keep only the packages that resolve THIS runtime's `@opensip-cli/core`
  * (or none at all). `onForeign` is invoked for each dropped pack with the foreign
  * core path it resolved, for a caller-shaped diagnostic.
  */

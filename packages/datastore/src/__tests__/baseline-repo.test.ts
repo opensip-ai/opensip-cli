@@ -1,4 +1,4 @@
-import { createSignal, type Signal } from '@opensip-tools/core';
+import { createSignal, type Signal } from '@opensip-cli/core';
 import { sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

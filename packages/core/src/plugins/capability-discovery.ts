@@ -133,7 +133,7 @@ export async function discoverCapabilityContributions(
  *     OR (an explicit list is present AND `explicitListMode` is `'replace'`);
  *   - `'augment'` mode unions explicit + auto-discovered, deduped.
  * Finally, the single-core guard drops any pack resolving a foreign
- * `@opensip-tools/core` (a split run scope → false positives).
+ * `@opensip-cli/core` (a split run scope → false positives).
  */
 function selectPackages(options: DiscoverCapabilityContributionsOptions): SelectedPackage[] {
   const { descriptor, preferences = {}, onDiagnostic } = options;
@@ -263,7 +263,7 @@ function dedupeSelected(packages: readonly SelectedPackage[]): SelectedPackage[]
 }
 
 /**
- * Single-core guard: drop any pack that resolves a DIFFERENT `@opensip-tools/core`
+ * Single-core guard: drop any pack that resolves a DIFFERENT `@opensip-cli/core`
  * than this runtime (a split run scope → false positives). Delegates to the shared
  * {@link filterSameCorePackages}; wraps each drop in a discovery diagnostic.
  * Generic: every domain's packs get the guard, not just fit's.
@@ -277,7 +277,7 @@ function applySingleCoreGuard(
       evt: 'capability.discovery.foreign_core',
       packageName: pkg.name,
       message:
-        `package ${pkg.name} resolves a different @opensip-tools/core (${foreignCore}) than this ` +
+        `package ${pkg.name} resolves a different @opensip-cli/core (${foreignCore}) than this ` +
         `runtime (${selfCore() ?? '<unknown>'}) — skipping to avoid a split run scope`,
     });
   });

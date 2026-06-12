@@ -11,7 +11,7 @@
 import os from 'node:os';
 import v8 from 'node:v8';
 
-import { ConfigurationError, runWithScope, runWithScopeSync } from '@opensip-tools/core';
+import { ConfigurationError, runWithScope, runWithScopeSync } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {

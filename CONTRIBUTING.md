@@ -1,12 +1,12 @@
-# Contributing to OpenSIP Tools
+# Contributing to OpenSIP CLI
 
 Thanks for your interest in contributing! This guide covers how to set up the project, write checks, and submit changes.
 
 ## Setup
 
 ```bash
-git clone https://github.com/opensip-ai/opensip-tools.git
-cd opensip-tools
+git clone https://github.com/opensip-ai/opensip-cli.git
+cd opensip-cli
 pnpm install
 pnpm build
 ```
@@ -27,18 +27,18 @@ Layered monorepo with three top-level groupings: top-level packages
 
 ```
 packages/
-  core/                    # @opensip-tools/core — kernel
-  contracts/               # @opensip-tools/contracts — Tool↔runner contract types
-  cli/                     # opensip-tools — generic tool dispatcher
+  core/                    # @opensip-cli/core — kernel
+  contracts/               # @opensip-cli/contracts — Tool↔runner contract types
+  cli/                     # opensip-cli — generic tool dispatcher
 
   fitness/
-    engine/                # @opensip-tools/fitness — fitness engine + commands
+    engine/                # @opensip-cli/fitness — fitness engine + commands
     checks-typescript/     # TS-AST checks
     checks-universal/      # text/regex/glob checks
     checks-{python,go,java,cpp}/  # per-language packs
 
   simulation/
-    engine/                # @opensip-tools/simulation
+    engine/                # @opensip-cli/simulation
 
   languages/
     lang-{typescript,rust,python,go,java,cpp}/  # language adapters
@@ -49,12 +49,12 @@ the layer rules enforced by dependency-cruiser.
 
 ## Writing a Fitness Check
 
-Checks are defined with `defineCheck()` from `@opensip-tools/fitness`
-(the fitness engine). Note: NOT `@opensip-tools/core` — core is the
+Checks are defined with `defineCheck()` from `@opensip-cli/fitness`
+(the fitness engine). Note: NOT `@opensip-cli/core` — core is the
 kernel and doesn't carry fitness-domain symbols.
 
 ```typescript
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 export const myCheck = defineCheck({
   id: 'unique-uuid-here',       // Generate with: node -e "console.log(crypto.randomUUID())"
@@ -141,13 +141,13 @@ For checks that aren't suitable for the built-in set, you have two
 project-local options:
 
 **Source files (auto-loaded)** — drop a `.mjs` file in your project's
-`opensip-tools/fit/checks/` (or `recipes/`) directory. The plugin
-loader auto-discovers it on the next `opensip-tools fit` run; no
+`opensip-cli/fit/checks/` (or `recipes/`) directory. The plugin
+loader auto-discovers it on the next `opensip fit` run; no
 config opt-in required:
 
 ```javascript
-// opensip-tools/fit/checks/my-check.mjs
-import { defineCheck } from '@opensip-tools/fitness';
+// opensip-cli/fit/checks/my-check.mjs
+import { defineCheck } from '@opensip-cli/fitness';
 
 export const checks = [
   defineCheck({
@@ -161,10 +161,10 @@ export const checks = [
 ];
 ```
 
-**npm packages (explicitly pinned)** — install via `opensip-tools
+**npm packages (explicitly pinned)** — install via `opensip-cli
 plugin add <package>`. The CLI runs `npm install` under
-`opensip-tools/.runtime/plugins/fit/node_modules/` and adds the
-package name to `plugins.fit:` in `opensip-tools.config.yml`. Only
+`opensip-cli/.runtime/plugins/fit/node_modules/` and adds the
+package name to `plugins.fit:` in `opensip-cli.config.yml`. Only
 packages listed there are loaded.
 
 ## Writing Tests
@@ -173,8 +173,8 @@ We use Vitest. Test files go next to the source as `*.test.ts` (or `*.test.tsx` 
 
 ```bash
 pnpm test                                    # All tests
-pnpm --filter=@opensip-tools/core test       # Core tests only
-pnpm --filter=opensip-tools test        # CLI tests only
+pnpm --filter=@opensip-cli/core test       # Core tests only
+pnpm --filter=opensip-cli test        # CLI tests only
 ```
 
 ### Testing Ink components
@@ -210,7 +210,7 @@ pnpm lint        # ESLint + dependency-cruiser; both must be 0-error
 - Ink components use `.tsx` extension
 - No hardcoded colors in UI — use `useTheme()` from `ui/theme.ts`
 - Commands return data objects — rendering is the UI layer's job
-- Structured logging via `logger` from `@opensip-tools/core`
+- Structured logging via `logger` from `@opensip-cli/core`
 - Imports follow ESLint's `import/order` (enforced): builtin → external →
   internal → parent → sibling → index, with newlines between groups
 - Architecture-layer rules are enforced by dependency-cruiser. See
@@ -219,7 +219,7 @@ pnpm lint        # ESLint + dependency-cruiser; both must be 0-error
 
 ## Reporting Issues
 
-Open an issue at https://github.com/opensip-ai/opensip-tools/issues with:
+Open an issue at https://github.com/opensip-ai/opensip-cli/issues with:
 - What you expected
 - What happened
 - Steps to reproduce

@@ -25,7 +25,7 @@ import {
   scanRegularString,
   type Region,
   type ScanResult,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- C++ has the largest token-set among the C-family packs (line/block comments, raw strings with optional encoding prefix, regular strings with optional encoding prefix, char literals with five opener forms); splitting the dispatch into per-token helpers would force shared mutable state across them and hurt readability. Suppression measured: 37/15 cognitive-complexity at this writing.
 function scan(src: string): ScanResult {

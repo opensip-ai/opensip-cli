@@ -8,7 +8,7 @@
  * Extracted from the former `no-legacy-code` umbrella in Phase C4.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 const EXCLUDE_PATTERNS = [
   /fitness/,

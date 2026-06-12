@@ -27,7 +27,7 @@ export default mergeConfig(
           'src/ui/App.tsx',
           'src/ui/render.tsx',
           // The plugin command shells out to `npm install/uninstall` and
-          // edits opensip-tools.config.yml. The dispatch is exercised by
+          // edits opensip-cli.config.yml. The dispatch is exercised by
           // `e2e.test.ts > plugin list`; deeper add/remove/sync flows are
           // tested in `plugin-config.test.ts`. `plugin-host-ops.ts` holds the
           // npm/host-mutation helpers extracted out of `plugin.ts` — same

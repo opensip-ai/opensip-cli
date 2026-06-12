@@ -6,16 +6,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildTargets } from '../bootstrap/build-targets.js';
 
-import type { TargetResolver } from '@opensip-tools/core';
+import type { TargetResolver } from '@opensip-cli/core';
 
 /**
  * ADR-0037 adoption proof (enforcement-reason guard 1): a NON-fitness tool
  * resolves a named target's files via the host-built `scope.targets`, with NO
- * `@opensip-tools/fitness` import. Until graph adopts, the deliverable is
+ * `@opensip-cli/fitness` import. Until graph adopts, the deliverable is
  * *enabling* — this test is the evidence the substrate is consumable on its own.
  *
  * This file deliberately imports only the host `buildTargets` helper +
- * `@opensip-tools/core` types. It must never import `@opensip-tools/fitness`
+ * `@opensip-cli/core` types. It must never import `@opensip-cli/fitness`
  * (depcruise/ESLint layering would also reject a cli→fitness type cycle).
  */
 

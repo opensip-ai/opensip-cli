@@ -10,15 +10,15 @@
  * single `deliverSignals` egress call (the root owns exit 4, tested there).
  */
 
-import { buildSignalEnvelope } from '@opensip-tools/contracts';
-import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-tools/core';
+import { buildSignalEnvelope } from '@opensip-cli/contracts';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { runJsonMode, runLiveMode } from '../fit-modes.js';
 import { executeFit } from '../fit.js';
 
-import type { SignalEnvelope } from '@opensip-tools/contracts';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 vi.mock('../fit.js', () => ({ executeFit: vi.fn() }));
 

@@ -29,7 +29,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { LanguageRegistry, RunScope, ToolRegistry, runWithScopeSync } from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, ToolRegistry, runWithScopeSync } from '@opensip-cli/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -38,7 +38,7 @@ import { registerCliCommands } from '../commands/index.js';
 
 import { BUNDLED_TOOLS } from './test-utils/bundled-tools.js';
 
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 /**
  * A throwaway tool context whose `program` is a real Commander root. Mounting
@@ -67,7 +67,7 @@ function makeStubToolContext(): ToolCliContext {
 function buildFullProgram(): Command {
   const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
   return runWithScopeSync(scope, () => {
-    const program = new Command('opensip-tools').description(
+    const program = new Command('opensip').description(
       'Codebase analysis toolkit — pluggable tools for fitness, simulation, and more',
     );
     program.option('--no-cloud', 'Disable OpenSIP Cloud signal sync for this run');

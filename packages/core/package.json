@@ -1,10 +1,10 @@
 {
-  "name": "@opensip-tools/core",
+  "name": "@opensip-cli/core",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "Core kernel for OpenSIP Tools — language adapters, plugin loader, errors, logger, IDs, retry, project config",
+  "description": "Core kernel for OpenSIP CLI — language adapters, plugin loader, errors, logger, IDs, retry, project config",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality",
     "kernel",
@@ -12,12 +12,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",

@@ -4,7 +4,7 @@
  * with the default recipe listed as "all rules".
  */
 
-import { runWithScope } from '@opensip-tools/core';
+import { runWithScope } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';

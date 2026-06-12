@@ -8,9 +8,9 @@
  * the plane never re-fingerprints.
  */
 
-import { createSignal, stampFingerprints, type Signal } from '@opensip-tools/core';
-import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { diffBaseline } from '@opensip-tools/output';
+import { createSignal, stampFingerprints, type Signal } from '@opensip-cli/core';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { diffBaseline } from '@opensip-cli/output';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { graphFingerprintStrategy } from '../baseline-strategy.js';

@@ -1,8 +1,8 @@
 import { SessionRepo } from './session-repo.js';
 
-import type { StoredSession } from '@opensip-tools/contracts';
-import type { ToolShortId } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { StoredSession } from '@opensip-cli/contracts';
+import type { ToolShortId } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 /**
  * A reference to one stored session: an explicit `ref` id, or the sentinel
@@ -48,7 +48,7 @@ export function resolveSession(
       return {
         ok: false,
         reason: 'not-found',
-        detail: `no ${reference.tool} session found; run opensip-tools ${reference.tool} first`,
+        detail: `no ${reference.tool} session found; run opensip ${reference.tool} first`,
       };
     }
     return { ok: true, session };

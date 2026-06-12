@@ -2,7 +2,7 @@
  * View-model projection for the Code Graph "Visualization" view.
  *
  * Projects the raw graph `GraphCatalog` (consumed by JSON shape from
- * `@opensip-tools/contracts` — never from `@opensip-tools/graph`) into
+ * `@opensip-cli/contracts` — never from `@opensip-cli/graph`) into
  * the slim, embed-ready `GraphViewModel` the Cytoscape renderer consumes.
  *
  * PACKAGE-LEVEL projection (item 10): the visualization renders a
@@ -38,7 +38,7 @@
 
 import { buildAdjacency, tarjanSccIds } from './graph-scc.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
 /**
  * Slim, embed-ready projection of a graph catalog for the dashboard's
@@ -182,7 +182,7 @@ export function packageOf(occ: GraphFunctionOccurrence): string {
   return packageOfPath(occ ? occ.filePath : '');
 }
 
-/** Strip an npm scope for display: "@opensip-tools/lang-typescript" → "lang-typescript". */
+/** Strip an npm scope for display: "@opensip-cli/lang-typescript" → "lang-typescript". */
 function shortPackage(name: string): string {
   if (typeof name !== 'string') return '<unknown>';
   return name.codePointAt(0) === 64 /* @ */ ? name.slice(name.indexOf('/') + 1) : name;

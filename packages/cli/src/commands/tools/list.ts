@@ -27,12 +27,12 @@ import {
   resolveProjectPaths,
   resolveUserPaths,
   type ToolProvenance,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { getToolManifestsForRun, getToolProvenanceForRun } from '../../cli-context.js';
 import { TOOL_DOMAIN } from '../plugin/domain-resolution.js';
 
-import type { ToolsListResult, ToolsListRow } from '@opensip-tools/contracts';
+import type { ToolsListResult, ToolsListRow } from '@opensip-cli/contracts';
 
 /** The spec's three user-facing source labels. */
 type ListSource = ToolsListRow['source'];

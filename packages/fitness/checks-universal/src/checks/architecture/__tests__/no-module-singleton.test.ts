@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import { analyzeAllNoModuleSingleton, analyzeNoModuleSingleton } from '../no-module-singleton.js';
 
-import type { FileAccessor } from '@opensip-tools/fitness';
+import type { FileAccessor } from '@opensip-cli/fitness';
 
 const SRC = 'packages/fitness/engine/src/framework/registry.ts';
 const FILE_CACHE = 'packages/fitness/engine/src/framework/file-cache.ts';

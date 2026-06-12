@@ -1,7 +1,7 @@
 /**
  * formatDuration — compact ms→human duration used by the shared run-summary and
  * live-progress renderers. Extracted from run-summary.tsx so both consumers share
- * one definition (cli-ui cannot import `@opensip-tools/core`'s formatDuration —
+ * one definition (cli-ui cannot import `@opensip-cli/core`'s formatDuration —
  * the package depends on ink/react only).
  *
  * Format: `<1000ms → "Nms"`, sub-minute durations as `"N.Ys"` (one decimal),
@@ -9,7 +9,7 @@
  * "24m 31.6s" so graph runs that spend many minutes in a stage remain easy to
  * scan.
  */
-// @fitness-ignore-file duplicate-utility-functions -- intentional: cli-ui is deliberately ink/react-only (see docstring above) and must not depend on @opensip-tools/core, so this small formatter is duplicated by design rather than shared across the layer boundary.
+// @fitness-ignore-file duplicate-utility-functions -- intentional: cli-ui is deliberately ink/react-only (see docstring above) and must not depend on @opensip-cli/core, so this small formatter is duplicated by design rather than shared across the layer boundary.
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
 

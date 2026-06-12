@@ -20,7 +20,7 @@ import {
   runWithTimeout,
   scheduleUnits,
   type ResolveSelectorOptions,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { currentScenarioRegistry } from '../framework/registry.js';
 

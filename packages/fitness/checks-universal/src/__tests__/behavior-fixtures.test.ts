@@ -16,7 +16,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { fileCache } from '@opensip-tools/fitness';
+import { fileCache } from '@opensip-cli/fitness';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';
@@ -805,7 +805,7 @@ describe('no-raw-regex-on-code', () => {
         cwd,
         'fitness/src/checks/missing-filter.ts',
         [
-          'import { defineCheck } from "@opensip-tools/fitness";',
+          'import { defineCheck } from "@opensip-cli/fitness";',
           'export const myCheck = defineCheck({',
           '  id: "abc-123",',
           '  slug: "my-check",',
@@ -822,7 +822,7 @@ describe('no-raw-regex-on-code', () => {
         cwd,
         'fitness/src/checks/has-filter.ts',
         [
-          'import { defineCheck } from "@opensip-tools/fitness";',
+          'import { defineCheck } from "@opensip-cli/fitness";',
           'export const myCheck = defineCheck({',
           '  id: "abc-456",',
           '  slug: "my-check",',
@@ -840,7 +840,7 @@ describe('no-raw-regex-on-code', () => {
         cwd,
         'fitness/src/checks/strip-strings-filter.ts',
         [
-          'import { defineCheck } from "@opensip-tools/fitness";',
+          'import { defineCheck } from "@opensip-cli/fitness";',
           'export const myCheck = defineCheck({',
           '  id: "abc-654",',
           '  slug: "my-check",',
@@ -858,7 +858,7 @@ describe('no-raw-regex-on-code', () => {
         cwd,
         'fitness/src/checks/no-regex.ts',
         [
-          'import { defineCheck } from "@opensip-tools/fitness";',
+          'import { defineCheck } from "@opensip-cli/fitness";',
           'export const myCheck = defineCheck({',
           '  id: "abc-789",',
           '  slug: "my-check",',

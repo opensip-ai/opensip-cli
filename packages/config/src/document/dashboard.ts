@@ -1,6 +1,6 @@
 /**
  * dashboard — the `dashboard:` document-level block of
- * `opensip-tools.config.yml`.
+ * `opensip-cli.config.yml`.
  *
  * Currently just the editor protocol used by the Code Paths panel to build
  * `vscode://` / `cursor://` deep links. `dashboard` is a CLI-owned

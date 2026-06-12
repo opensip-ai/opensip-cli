@@ -35,9 +35,9 @@ A check produces violations against files. The set of files is computed at run t
 
 A polyglot project has many file kinds. A check has one purpose. The matching problem is: given a project and a check, which files does this check inspect?
 
-The naive answer is "the check declares its own globs": `include: ['services/api/**/*.ts'], exclude: ['**/*.test.ts']`. That works in a single project; it doesn't work for a marketplace check pack. A pack like `@opensip-tools/checks-typescript` doesn't know your project's directory layout — it can't hardcode `services/api/`.
+The naive answer is "the check declares its own globs": `include: ['services/api/**/*.ts'], exclude: ['**/*.test.ts']`. That works in a single project; it doesn't work for a marketplace check pack. A pack like `@opensip-cli/checks-typescript` doesn't know your project's directory layout — it can't hardcode `services/api/`.
 
-So opensip-tools splits the declaration:
+So opensip-cli splits the declaration:
 
 - **The project** declares *targets*. "I have a `backend` directory at `services/api/**/*.ts`. I have a `tests` directory at `**/*.test.ts`. I have an `infra` directory at `infra/**/*.ts`."
 - **The check** declares *scope* — semantic, not literal. "I apply to TypeScript backend code." It doesn't know the project's globs; it knows what kind of code it's for.
@@ -63,7 +63,7 @@ defineCheck({
 });
 ```
 
-The framework finds every target whose `languages` overlaps `['typescript']` *and* whose `concerns` overlaps `['backend']`. Empty arrays mean "match any" — `scope: { languages: [], concerns: [] }` is the universal scope (the shape used by every check in `@opensip-tools/checks-universal`).
+The framework finds every target whose `languages` overlaps `['typescript']` *and* whose `concerns` overlaps `['backend']`. Empty arrays mean "match any" — `scope: { languages: [], concerns: [] }` is the universal scope (the shape used by every check in `@opensip-cli/checks-universal`).
 
 This is the recommended shape for marketplace check packs.
 
@@ -81,7 +81,7 @@ The framework filters the matched file list to files with these extensions. Laye
 ### 3. Per-check target override (config-side)
 
 ```yaml
-# opensip-tools.config.yml
+# opensip-cli.config.yml
 checkOverrides:
   no-console-log: backend
   no-todos: ['backend', 'frontend']
@@ -169,7 +169,7 @@ A universal check with `scope: { languages: [], concerns: [] }` matches all four
 [`packages/fitness/engine/src/framework/scope-resolver.ts`](../../../packages/fitness/engine/src/framework/scope-resolver.ts) is where it happens. The flow:
 
 ```
-1. Load TargetsConfig from opensip-tools.config.yml.
+1. Load TargetsConfig from opensip-cli.config.yml.
 2. Pre-glob every target's include patterns once, producing a
    pattern → matched-paths map. This avoids re-running the same
    glob multiple times when targets share patterns.
@@ -192,7 +192,7 @@ The `COMMON_IGNORE` set inside the resolver always includes `node_modules`, `dis
 
 ## Global excludes
 
-`globalExcludes` is the top-level project-wide subtractor (it sits at the root of `opensip-tools.config.yml`, not under `targets:`). Every target's resolved file list passes through it. Common entries:
+`globalExcludes` is the top-level project-wide subtractor (it sits at the root of `opensip-cli.config.yml`, not under `targets:`). Every target's resolved file list passes through it. Common entries:
 
 ```yaml
 globalExcludes:
@@ -248,4 +248,4 @@ The trade-off: complex targets (e.g. "include any file in a directory that has a
 - **[`03-ignore-directives.md`](./03-ignore-directives.md)** — inline source-level suppression that survives the resolver and lands in the framework's filter step.
 - **[`04-output-gate-sarif.md`](./04-output-gate-sarif.md)** — what happens to the violations a check produces.
 - **[`../50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md)** — how a check's `contentFilter` setting dispatches through a per-language adapter.
-- **[`../70-reference/03-configuration.md`](../70-reference/03-configuration.md)** — the full `targets:` schema in `opensip-tools.config.yml`.
+- **[`../70-reference/03-configuration.md`](../70-reference/03-configuration.md)** — the full `targets:` schema in `opensip-cli.config.yml`.

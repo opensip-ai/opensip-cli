@@ -5,7 +5,7 @@
 
 import ts from 'typescript';
 
-import type { Param } from '@opensip-tools/graph';
+import type { Param } from '@opensip-cli/graph';
 
 export function extractParams(
   node: ts.SignatureDeclaration | ts.FunctionLikeDeclaration,

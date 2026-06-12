@@ -31,8 +31,8 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { logger } from '@opensip-tools/core';
+import { EXIT_CODES } from '@opensip-cli/contracts';
+import { logger } from '@opensip-cli/core';
 
 import { pickAdapter } from '../lang-adapter/registry.js';
 
@@ -46,7 +46,7 @@ import {
 import { runGraph, runShardedGraph } from './orchestrate.js';
 
 import type { Catalog } from '../types.js';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 
 const MODULE = 'graph:cli';
 

@@ -14,7 +14,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope } from '@opensip-tools/core';
+import { enterScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
@@ -29,8 +29,8 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { LiveGraphOutput } from '../graph.js';
-import type { ProgressEvent } from '@opensip-tools/cli-ui';
-import type { ToolCliContext, WorkerMessage } from '@opensip-tools/core';
+import type { ProgressEvent } from '@opensip-cli/cli-ui';
+import type { ToolCliContext, WorkerMessage } from '@opensip-cli/core';
 
 type Msg = WorkerMessage<ProgressEvent, LiveGraphOutput>;
 

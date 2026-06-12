@@ -31,7 +31,7 @@ function fixtureWith(body: string): string {
   writeFileSync(
     join(dir, 'package.json'),
     JSON.stringify({
-      name: '@opensip-tools-fixture/storage-case',
+      name: '@opensip-cli-fixture/storage-case',
       version: '0.0.0',
       private: true,
       type: 'module',
@@ -57,7 +57,7 @@ describe('Tier A storage-contract scan (ADR-0042)', () => {
       { body: 'const p = "PRAGMA writable_schema = 1";', clauseIncludes: 'pragmas' },
       { body: 'const f = ".runtime/datastore.sqlite";', clauseIncludes: 'datastore-file' },
       {
-        body: 'import { x } from "@opensip-tools/datastore/schema/baseline.js";',
+        body: 'import { x } from "@opensip-cli/datastore/schema/baseline.js";',
         clauseIncludes: 'imports',
       },
       {
@@ -130,7 +130,7 @@ describe('bundled tools pass tools validate unchanged (ADR-0042 parity pin)', ()
     throw new Error(`could not resolve package dir for ${pkg}`);
   };
 
-  it.each(['@opensip-tools/fitness', '@opensip-tools/simulation', '@opensip-tools/graph'])(
+  it.each(['@opensip-cli/fitness', '@opensip-cli/simulation', '@opensip-cli/graph'])(
     '%s passes every section',
     async (pkg) => {
       const { result } = await runToolValidation({ spec: bundledDir(pkg), cwd: process.cwd() });

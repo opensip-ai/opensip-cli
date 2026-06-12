@@ -12,7 +12,7 @@
  * Scenario loading lifecycle (mirrors fitness's `ensureChecksLoaded`):
  *
  *   1. .mjs plugin discovery via `loadAllSimPlugins(projectDir)`.
- *   2. npm package discovery: `@opensip-tools/scenarios-*` packages
+ *   2. npm package discovery: `@opensip-cli/scenarios-*` packages
  *      (or anything under `plugins.scenarioPackages` / customer scopes).
  *   3. No-scenarios guard: `executeSim` fails the run closed with a
  *      CONFIGURATION_ERROR (exit 2) when zero scenarios would run,
@@ -26,7 +26,7 @@ import {
   buildFindingGroups,
   buildSignalEnvelope,
   EXIT_CODES,
-} from '@opensip-tools/contracts';
+} from '@opensip-cli/contracts';
 import {
   currentScope,
   generatePrefixedId,
@@ -34,8 +34,8 @@ import {
   logger,
   resolveScopes,
   resolveVerdictPolicy,
-} from '@opensip-tools/core';
-import { SessionRepo } from '@opensip-tools/session-store';
+} from '@opensip-cli/core';
+import { SessionRepo } from '@opensip-cli/session-store';
 
 import { currentScenarioRegistry, currentSimulationLoadState } from '../framework/registry.js';
 import { buildSimulationSessionPayload } from '../persistence/session-payload.js';
@@ -53,9 +53,9 @@ import type {
   ToolOptions,
   UnitResult,
   VerboseDetail,
-} from '@opensip-tools/contracts';
-import type { Signal } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+} from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 // ---------------------------------------------------------------------------
 // Lazy-load simulation scenarios
@@ -85,7 +85,7 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
   const pluginResult = await loadAllSimPlugins(projectDir);
   load.pluginLoadErrors = pluginResult.errors;
   for (const err of pluginResult.errors) {
-    process.stderr.write(`opensip-tools: plugin failed to load — ${err}\n`);
+    process.stderr.write(`opensip: plugin failed to load — ${err}\n`);
     logger.warn({ evt: 'cli.plugin.warning', module: 'cli:sim', message: err });
   }
 
@@ -114,8 +114,8 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
  * Drive the generic capability loader for the `sim-pack` domain. A no-op when the
  * run carries no capability registry (a programmatic sim use that never wired the
  * host capability plane), the domain is unregistered, or no projectDir. Scopes are
- * merged (default `@opensip-tools` ∪ customer `packageScopes`) here so name-pattern
- * discovery matches the prior `resolveScopes` behavior. No `@opensip-tools/config` dep.
+ * merged (default `@opensip-cli` ∪ customer `packageScopes`) here so name-pattern
+ * discovery matches the prior `resolveScopes` behavior. No `@opensip-cli/config` dep.
  */
 async function loadSimScenarioPackages(projectDir: string): Promise<void> {
   if (projectDir === '') return;
@@ -123,7 +123,7 @@ async function loadSimScenarioPackages(projectDir: string): Promise<void> {
   if (!registry?.hasDomain('sim-pack') || registry.isDomainLoaded('sim-pack', projectDir)) return;
   const prefs = readScenarioPackagePreferences(projectDir);
   const scopes = resolveScopes(
-    '@opensip-tools',
+    '@opensip-cli',
     prefs.packageScopes ?? [],
     'plugin.scenario_package.invalid_scope',
   );
@@ -236,7 +236,7 @@ export async function executeSim(
       result: {
         type: 'error',
         message: `Unknown sim recipe '${recipeName}'.`,
-        suggestion: 'Run `opensip-tools sim --recipes` to see available recipes.',
+        suggestion: 'Run `opensip sim --recipes` to see available recipes.',
         exitCode: EXIT_CODES.CONFIGURATION_ERROR,
       },
     };
@@ -269,7 +269,7 @@ export async function executeSim(
           ? 'No scenarios were loaded — nothing to simulate.'
           : `Recipe '${recipeName}' selected zero scenarios — nothing to simulate.`,
         suggestion: registryEmpty
-          ? 'Install at least one @opensip-tools/scenarios-* package, declare plugins.scenarioPackages in opensip-tools.config.yml, or run `opensip-tools init` to scaffold example scenarios.'
+          ? 'Install at least one @opensip-cli/scenarios-* package, declare plugins.scenarioPackages in opensip-cli.config.yml, or run `opensip init` to scaffold example scenarios.'
           : 'Check the recipe selector — at least one registered scenario must match.',
         exitCode: EXIT_CODES.CONFIGURATION_ERROR,
       },

@@ -13,7 +13,7 @@
  * The check uses `strip-strings` content filtering so a literal like
  * `"except:"` inside a docstring or string doesn't false-fire.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 // eslint-disable-next-line sonarjs/slow-regex -- anchored, bounded line scan; \s* on bounded leading whitespace is safe
 const BARE_EXCEPT_PATTERN = /^\s*except\s*:/gm;

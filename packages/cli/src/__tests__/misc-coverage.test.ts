@@ -35,7 +35,7 @@ describe('formatInsideExistingProjectMessage', () => {
     expect(msg).toContain('--keep');
     expect(msg).toContain('--remove');
     expect(msg).toContain('--cwd .');
-    expect(msg).toMatch(/already inside an opensip-tools project/i);
+    expect(msg).toMatch(/already inside an OpenSIP CLI project/i);
   });
 });
 
@@ -129,7 +129,7 @@ describe('update-notifier default write fallback', () => {
     });
     try {
       const { maybeNotify } = await import('../update-notifier.js');
-      maybeNotify({ name: 'opensip-tools', version: '0.0.1' });
+      maybeNotify({ name: 'opensip-cli', version: '0.0.1' });
     } finally {
       spy.mockRestore();
     }

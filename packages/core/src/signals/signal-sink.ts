@@ -4,7 +4,7 @@
  * A Strategy: callers depend on this interface, never on a concrete cloud
  * client. The default is the Null-Object `noopSignalSink` (OSS / embedded /
  * not-entitled → nothing happens). The OpenSIP Cloud implementation lives in
- * @opensip-tools/output and depends *up* on core — core never imports it,
+ * @opensip-cli/output and depends *up* on core — core never imports it,
  * keeping the kernel free of network concerns.
  *
  * Non-blocking invariant: `emit` MUST NOT throw and MUST NOT affect the run's

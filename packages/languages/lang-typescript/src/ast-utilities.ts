@@ -3,7 +3,7 @@
  * @fileoverview Shared AST utilities for fitness checks.
  *
  * Common TypeScript AST operations for tree walking and node inspection.
- * Used by AST-based fitness checks. Lives in @opensip-tools/lang-typescript
+ * Used by AST-based fitness checks. Lives in @opensip-cli/lang-typescript
  * so the dependency on `typescript` is isolated to the language pack.
  *
  * Source parsing lives in `./parse.ts` (TSX-aware). Function-scope helpers
@@ -12,7 +12,7 @@
  * function-scope helpers to this file.
  */
 
-import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js';
+import { getParseTree } from '@opensip-cli/core/languages/parse-cache.js';
 import * as ts from 'typescript';
 
 import { typescriptAdapter } from './adapter.js';

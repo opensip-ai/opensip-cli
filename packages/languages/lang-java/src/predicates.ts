@@ -1,12 +1,12 @@
 // @fitness-ignore-file duplicate-utility-functions -- ADR-0010: the per-language tree-sitter vocabulary intentionally shares helper names across lang-* with grammar-specific implementations; consolidating would defeat the substrate design.
 /**
  * v1 per-language node-kind predicates for Java (ADR-0010). The generic
- * traversal/position helpers live in `@opensip-tools/tree-sitter`; only the
+ * traversal/position helpers live in `@opensip-cli/tree-sitter`; only the
  * grammar-specific node `type` strings differ. Node types are from the
  * tree-sitter-java grammar.
  */
 
-import type { Node } from '@opensip-tools/tree-sitter';
+import type { Node } from '@opensip-cli/tree-sitter';
 
 /** A method or constructor declaration (both are callable defs). */
 export const isFunction = (node: Node): boolean =>

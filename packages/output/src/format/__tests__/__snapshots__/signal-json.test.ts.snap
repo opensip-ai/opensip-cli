@@ -36,7 +36,7 @@ exports[`formatSignalJson > serialises the envelope as pretty JSON (snapshot) 1`
     {
       "id": "sig_fixture0001",
       "source": "graph:orphan-subtree",
-      "provider": "opensip-tools",
+      "provider": "opensip-cli",
       "severity": "high",
       "category": "architecture",
       "ruleId": "graph:orphan-subtree",
@@ -55,7 +55,7 @@ exports[`formatSignalJson > serialises the envelope as pretty JSON (snapshot) 1`
     {
       "id": "sig_fixture0002",
       "source": "graph:large-function",
-      "provider": "opensip-tools",
+      "provider": "opensip-cli",
       "severity": "medium",
       "category": "quality",
       "ruleId": "graph:large-function",

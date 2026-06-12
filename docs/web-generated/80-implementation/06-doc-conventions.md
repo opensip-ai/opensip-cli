@@ -22,7 +22,7 @@ How the architecture docs are written and maintained. Read this if you're contri
 - **Present tense for current behavior.** "The CLI walks the `ToolRegistry`" — not "the CLI will walk" or "the CLI walked."
 - **Past tense for history.** "An earlier refactor moved `filterContent` out of `core`" — explicit about what's no longer the current shape.
 - **Future tense, always labelled.** "Roadmap: a future tool may live at `kind: 'asm'`" — it's clear this isn't current behavior.
-- **Assumes engineering fluency.** Don't re-explain `tsconfig`, `npm`, `glob pattern`, `ESM module`, or `JSON Lines`. Do explain opensip-tools-specific terms (Tool, Check, Recipe, Target) the first time they appear in a doc, with a link to [`../00-start/05-vocabulary.md`](/docs/opensip-tools/00-start/05-vocabulary/).
+- **Assumes engineering fluency.** Don't re-explain `tsconfig`, `npm`, `glob pattern`, `ESM module`, or `JSON Lines`. Do explain opensip-cli-specific terms (Tool, Check, Recipe, Target) the first time they appear in a doc, with a link to [`../00-start/05-vocabulary.md`](/docs/opensip-cli/00-start/05-vocabulary/).
 - **Prefer concrete over abstract.** "The fitness Tool's action handler in `tool.ts:118`" beats "the appropriate handler somewhere in fitness." Cite source files with line numbers when they help.
 
 ---
@@ -125,11 +125,11 @@ No binary images unless unavoidable. They diff poorly, can't be searched, and br
 
 ## Cross-linking
 
-Use Markdown links for prominent cross-links and inline code links for source-file references. Prefer real relative targets such as `[**Layer policy**](/docs/opensip-tools/80-implementation/05-layer-policy/)` or ``[`packages/core/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/index.ts)``.
+Use Markdown links for prominent cross-links and inline code links for source-file references. Prefer real relative targets such as `[**Layer policy**](/docs/opensip-cli/80-implementation/05-layer-policy/)` or ``[`packages/core/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v3.0.0/packages/core/src/index.ts)``.
 
 Always link forward and back. A doc that depends on another doc's concept links to that doc; the linked-from doc, when relevant, links back to the dependent.
 
-The link target uses absolute repository paths (`packages/core/src/index.ts`) rather than `~/.opensip-tools/...` paths or runtime paths.
+The link target uses absolute repository paths (`packages/core/src/index.ts`) rather than `~/.opensip-cli/...` paths or runtime paths.
 
 ---
 
@@ -210,6 +210,6 @@ Delete only when no inbound link references the doc. The README's reading order 
 
 ## What's next
 
-- **[`../README.md`](/docs/opensip-tools/)** — the doc set's table of contents.
-- **[`04-coding-standards.md`](/docs/opensip-tools/80-implementation/04-coding-standards/)** — code conventions (the parallel to this doc, for source).
-- **[`05-layer-policy.md`](/docs/opensip-tools/80-implementation/05-layer-policy/)** — the dep-cruiser rules.
+- **[`../README.md`](/docs/opensip-cli/)** — the doc set's table of contents.
+- **[`04-coding-standards.md`](/docs/opensip-cli/80-implementation/04-coding-standards/)** — code conventions (the parallel to this doc, for source).
+- **[`05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/)** — the dep-cruiser rules.

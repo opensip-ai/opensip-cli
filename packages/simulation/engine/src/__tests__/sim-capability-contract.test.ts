@@ -7,8 +7,8 @@
  * (so a narrowed-out scenario never runs). Scoped to the non-cloud sim domain.
  */
 
-import { commonFlags } from '@opensip-tools/contracts';
-import { runWithScope, runWithScopeSync } from '@opensip-tools/core';
+import { commonFlags } from '@opensip-cli/contracts';
+import { runWithScope, runWithScopeSync } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { clearScenarioRegistry, currentScenarioRegistry } from '../framework/registry.js';

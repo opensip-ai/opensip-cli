@@ -1,12 +1,12 @@
 /**
  * @fileoverview ADR dogfood checks for plugin, manifest, and API contracts.
  *
- * These are opensip-tools self-checks: they know the first-party package names,
+ * These are opensip-cli self-checks: they know the first-party package names,
  * marker kinds, command-surface migration, and curated public barrel policy.
  */
 import path from 'node:path';
 
-import { defineCheck } from '@opensip-tools/fitness';
+import { defineCheck } from '@opensip-cli/fitness';
 
 const ROOT = process.cwd();
 
@@ -55,7 +55,7 @@ function stringSet(values) {
 // ---------------------------------------------------------------------------
 
 const HOST_STATIC_TOOL_IMPORT_RE =
-  /^\s*import\s+(?!type\b)[^;]+?\bfrom\s*['"]@opensip-tools\/(?:fitness|graph|simulation|checks-[^'"]+)['"]/gm;
+  /^\s*import\s+(?!type\b)[^;]+?\bfrom\s*['"]@opensip-cli\/(?:fitness|graph|simulation|checks-[^'"]+)['"]/gm;
 
 function analyzeNoBootstrapToolImport(content, filePath) {
   const rel = relPath(filePath);
@@ -83,18 +83,18 @@ function analyzeNoBootstrapToolImport(content, filePath) {
 // ---------------------------------------------------------------------------
 
 function expectedPackageKind(pkgName) {
-  if (pkgName.startsWith('@opensip-tools/checks-')) return 'fit-pack';
+  if (pkgName.startsWith('@opensip-cli/checks-')) return 'fit-pack';
   if (
-    pkgName.startsWith('@opensip-tools/graph-') &&
-    pkgName !== '@opensip-tools/graph' &&
-    pkgName !== '@opensip-tools/graph-adapter-common'
+    pkgName.startsWith('@opensip-cli/graph-') &&
+    pkgName !== '@opensip-cli/graph' &&
+    pkgName !== '@opensip-cli/graph-adapter-common'
   ) {
     return 'graph-adapter';
   }
   if (
-    pkgName === '@opensip-tools/fitness' ||
-    pkgName === '@opensip-tools/graph' ||
-    pkgName === '@opensip-tools/simulation'
+    pkgName === '@opensip-cli/fitness' ||
+    pkgName === '@opensip-cli/graph' ||
+    pkgName === '@opensip-cli/simulation'
   ) {
     return 'tool';
   }
@@ -102,9 +102,9 @@ function expectedPackageKind(pkgName) {
 }
 
 function expectedCapabilityIds(pkgName) {
-  if (pkgName === '@opensip-tools/fitness') return ['fit-pack', 'fit-recipe'];
-  if (pkgName === '@opensip-tools/graph') return ['graph-adapter'];
-  if (pkgName === '@opensip-tools/simulation') return ['sim-pack', 'sim-recipe'];
+  if (pkgName === '@opensip-cli/fitness') return ['fit-pack', 'fit-recipe'];
+  if (pkgName === '@opensip-cli/graph') return ['graph-adapter'];
+  if (pkgName === '@opensip-cli/simulation') return ['sim-pack', 'sim-recipe'];
   return [];
 }
 
@@ -121,7 +121,7 @@ function analyzePackageManifest(pkg, filePath) {
       violation(
         filePath,
         1,
-        'opensip-tools-manifest-missing',
+        'opensip-cli-manifest-missing',
         `${rel}: ${pkg.name} must declare package.json#opensipTools.kind='${expectedKind}'.`,
         'Add the static opensipTools manifest so discovery/admission can classify the package before importing runtime code.',
       ),
@@ -132,7 +132,7 @@ function analyzePackageManifest(pkg, filePath) {
       violation(
         filePath,
         1,
-        'opensip-tools-kind-drift',
+        'opensip-cli-kind-drift',
         `${rel}: ${pkg.name} must use opensipTools.kind='${expectedKind}' (got ${JSON.stringify(block.kind)}).`,
         'Keep first-party marker kinds in package.json so plugin discovery stays data-driven and source-independent.',
       ),

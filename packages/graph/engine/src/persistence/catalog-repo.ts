@@ -11,19 +11,19 @@
  * derivations into SQL.
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger } from '@opensip-cli/core';
 import {
   requireDrizzleDataStore,
   type DataStore,
   type DrizzleDataStore,
-} from '@opensip-tools/datastore';
+} from '@opensip-cli/datastore';
 import { sql } from 'drizzle-orm';
 
 import { graphCatalog, graphShardFragment } from './schema.js';
 
 import type { ShardBuildResult } from '../cli/orchestrate/shard-model.js';
 import type { Catalog, PersistedFeatures, ResolutionMode } from '../types.js';
-import type { GraphCatalog } from '@opensip-tools/contracts';
+import type { GraphCatalog } from '@opensip-cli/contracts';
 
 const MODULE_NAME = 'graph:catalog-repo';
 

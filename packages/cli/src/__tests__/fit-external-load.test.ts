@@ -26,15 +26,15 @@
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { admitTool, loadToolManifest } from '@opensip-tools/core';
-import { fitnessTool } from '@opensip-tools/fitness';
+import { admitTool, loadToolManifest } from '@opensip-cli/core';
+import { fitnessTool } from '@opensip-cli/fitness';
 import { Command } from 'commander';
 import { describe, it, expect } from 'vitest';
 
 import { mountCommandSpec, type CommandMountContext } from '../commands/mount-command-spec.js';
 
-import type { CommandResult } from '@opensip-tools/contracts';
-import type { CommandSpec, Tool, ToolCliContext } from '@opensip-tools/core';
+import type { CommandResult } from '@opensip-cli/contracts';
+import type { CommandSpec, Tool, ToolCliContext } from '@opensip-cli/core';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 // Monorepo layout: packages/cli/src/__tests__ → packages/fitness/engine.

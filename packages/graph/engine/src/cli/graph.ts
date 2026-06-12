@@ -6,7 +6,7 @@
 // @fitness-ignore-file public-api-jsdoc -- GraphCommandOptions interface and executeGraph are already documented with rich JSDoc on each field; the check counts the top-level export line, not the fields.
 // @fitness-ignore-file file-length-limit -- top-level graph command handler with rich JSDoc on options; splitting would fragment the unified subcommand surface (gate/persist/output dispatch).
 /**
- * `opensip-tools graph` — main subcommand handler.
+ * `opensip graph` — main subcommand handler.
  *
  * Runs the full pipeline and prints a comprehensive report covering
  * rules, entry points, and catalog summary in one invocation. Per
@@ -29,7 +29,7 @@
 import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { EXIT_CODES, passRate } from '@opensip-tools/contracts';
+import { EXIT_CODES, passRate } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   currentScope,
@@ -37,8 +37,8 @@ import {
   logger,
   ToolError,
   ValidationError,
-} from '@opensip-tools/core';
-import { SessionRepo } from '@opensip-tools/session-store';
+} from '@opensip-cli/core';
+import { SessionRepo } from '@opensip-cli/session-store';
 
 import { pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
@@ -93,9 +93,9 @@ import type {
   ResolutionMode,
   Rule,
 } from '../types.js';
-import type { GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-tools/contracts';
-import type { Signal, ToolCliContext } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-cli/contracts';
+import type { Signal, ToolCliContext } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 // Re-exports kept so the package barrel + cli/graph-runner.tsx + tests
 // keep using `cli/graph.js` as a single import site for these shapes.
@@ -1006,7 +1006,7 @@ async function executeWorkspaceGraph(
   if (units.length === 0) {
     const adapterLabel = adapters.map((a) => a.id).join(', ') || '(no language adapters available)';
     throw new ConfigurationError(
-      `--workspace: no workspace units detected for [${adapterLabel}]. Use 'opensip-tools graph' for whole-project analysis.`,
+      `--workspace: no workspace units detected for [${adapterLabel}]. Use 'opensip graph' for whole-project analysis.`,
     );
   }
 

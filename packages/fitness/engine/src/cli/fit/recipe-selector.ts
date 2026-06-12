@@ -11,14 +11,14 @@ import {
   BUILTIN_DEFAULT_RECIPE,
   EXIT_CODES,
   resolveToolRecipeName,
-} from '@opensip-tools/contracts';
-import { logger } from '@opensip-tools/core';
+} from '@opensip-cli/contracts';
+import { logger } from '@opensip-cli/core';
 
 import { currentRecipeRegistry } from '../../framework/scope-registry.js';
 import { FitnessRecipeService } from '../../recipes/service.js';
 
 import type { FitnessRecipeResult } from '../../recipes/types.js';
-import type { ErrorResult, FitOptions } from '@opensip-tools/contracts';
+import type { ErrorResult, FitOptions } from '@opensip-cli/contracts';
 
 /**
  * Tool-scoped recipe defaults for `fit` (ADR-0022), read from the project
@@ -38,7 +38,7 @@ export interface FitRecipeDefaults {
  *
  * **Precondition:** must run *after* `ensureChecksLoaded` so that any
  * user-defined recipes (loaded as `.mjs` plugins under
- * `<cwd>/opensip-tools/fit/recipes/`) are present in the scope's recipe
+ * `<cwd>/opensip-cli/fit/recipes/`) are present in the scope's recipe
  * registry by the time the lookup runs. Inverting the two
  * lines silently breaks recipe lookup for plugin-provided recipes.
  */
@@ -72,7 +72,7 @@ export function selectRecipe(
       error: {
         type: 'error',
         message: `Unknown recipe '${resolved.name}'.`,
-        suggestion: 'Run opensip-tools fit --recipes to see available recipes.',
+        suggestion: 'Run opensip fit --recipes to see available recipes.',
         exitCode: EXIT_CODES.CONFIGURATION_ERROR,
       },
     };

@@ -27,7 +27,7 @@ import { extname, relative } from 'node:path';
 
 import ts from 'typescript';
 
-import type { ParseInput, ParseOutput, ParseError } from '@opensip-tools/graph';
+import type { ParseInput, ParseOutput, ParseError } from '@opensip-cli/graph';
 
 /**
  * Fast-flavored parsed project: a per-file map of standalone

@@ -9,7 +9,7 @@
 import { countErrors, countWarnings } from './severity.js';
 
 import type { DirectiveEntry } from '../framework/directive-inventory.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 // =============================================================================
 // SEVERITY

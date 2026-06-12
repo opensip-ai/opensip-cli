@@ -20,7 +20,7 @@ import { testOnlyReachableRule } from '../test-only-reachable.js';
 import { buildAllRulesFixture } from './__fixtures__/catalog.fixture.js';
 
 import type { GraphConfig, Rule } from '../../types.js';
-import type { Signal } from '@opensip-tools/core';
+import type { Signal } from '@opensip-cli/core';
 
 const EMPTY_CONFIG: GraphConfig = {};
 

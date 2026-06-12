@@ -20,7 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { findOccurrence, runFixture, writeFixture } from './acceptance/_fixture-runner.js';
 
-import type { Catalog } from '@opensip-tools/graph';
+import type { Catalog } from '@opensip-cli/graph';
 
 describe('value-reference + shorthand edge resolution', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-value-ref-'));

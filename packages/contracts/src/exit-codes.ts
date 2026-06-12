@@ -6,7 +6,7 @@ import {
   TimeoutError,
   ValidationError,
   type ToolError,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 export const EXIT_CODES = {
   SUCCESS: 0,
@@ -32,7 +32,7 @@ export const EXIT_CODES = {
  * `ToolError` locally route through this function.
  *
  * The mapping policy (see `Tool` interface JSDoc in
- * `@opensip-tools/core` for the full contract):
+ * `@opensip-cli/core` for the full contract):
  *
  *   - `NotFoundError`       → `CHECK_NOT_FOUND` (exit 3)
  *   - `ConfigurationError`  → `CONFIGURATION_ERROR` (exit 2)
@@ -97,7 +97,7 @@ function containsAny(haystack: string, needles: readonly string[]): boolean {
  *
  * The over-broad bare `'config'` substring from the previous
  * implementation has been narrowed into two explicit rules — one for
- * `opensip-tools.config.yml` (file shape) and one for `YAML` (parse
+ * `opensip-cli.config.yml` (file shape) and one for `YAML` (parse
  * shape). The bare substring matched common English words like
  * `'configurable'` and `'reconfigure'` and produced false positives.
  */
@@ -116,7 +116,7 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     },
     suggest: (capture) => ({
       message: `Recipe '${capture ?? 'unknown'}' not found.`,
-      action: 'Run opensip-tools fit --recipes to see available recipes.',
+      action: 'Run opensip fit --recipes to see available recipes.',
       exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     }),
   },
@@ -139,7 +139,7 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     },
     suggest: (capture) => ({
       message: `Check '${capture ?? 'unknown'}' not found.`,
-      action: 'Run opensip-tools fit --list to see available checks.',
+      action: 'Run opensip fit --list to see available checks.',
       exitCode: EXIT_CODES.CHECK_NOT_FOUND,
     }),
   },
@@ -150,18 +150,18 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     match: (message) => (containsAny(message, ['Unknown recipe']) ? { capture: message } : null),
     suggest: (capture) => ({
       message: capture ?? 'Unknown recipe.',
-      action: 'Run opensip-tools fit --recipes to see available recipes.',
+      action: 'Run opensip fit --recipes to see available recipes.',
       exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     }),
   },
 
-  // Config file error — opensip-tools.config.yml shape.
+  // Config file error — opensip-cli.config.yml shape.
   {
     match: (message) =>
-      containsAny(message, ['opensip-tools.config.yml']) ? { capture: null } : null,
+      containsAny(message, ['opensip-cli.config.yml']) ? { capture: null } : null,
     suggest: () => ({
       message: 'Configuration error.',
-      action: 'Check opensip-tools.config.yml for syntax errors.',
+      action: 'Check opensip-cli.config.yml for syntax errors.',
       exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     }),
   },
@@ -171,7 +171,7 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     match: (message) => (containsAny(message, ['YAML']) ? { capture: null } : null),
     suggest: () => ({
       message: 'Configuration error.',
-      action: 'Check opensip-tools.config.yml for syntax errors.',
+      action: 'Check opensip-cli.config.yml for syntax errors.',
       exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     }),
   },
@@ -194,7 +194,7 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     suggest: () => ({
       message: 'No checks available to run.',
       action:
-        'Install at least one @opensip-tools/checks-* package, or declare plugins.checkPackages in opensip-tools.config.yml.',
+        'Install at least one @opensip-cli/checks-* package, or declare plugins.checkPackages in opensip-cli.config.yml.',
       exitCode: EXIT_CODES.RUNTIME_ERROR,
     }),
   },

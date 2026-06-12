@@ -2,12 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DataStoreFactory } from '@opensip-tools/datastore';
-import { SessionRepo } from '@opensip-tools/session-store';
+import { DataStoreFactory } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { StoredSession } from '@opensip-tools/contracts';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { StoredSession } from '@opensip-cli/contracts';
+import type { DataStore } from '@opensip-cli/datastore';
 
 let tmp: string;
 let ds: DataStore;

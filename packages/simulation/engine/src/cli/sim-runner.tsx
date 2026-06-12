@@ -1,5 +1,5 @@
 /**
- * sim-runner — owns the live-view state machine for `opensip-tools sim`
+ * sim-runner — owns the live-view state machine for `opensip sim`
  * (ADR-0016). Before this, sim had NO live view: it ran to completion silently
  * and printed a static envelope-to-table. It now renders the shared
  * <LiveProgress> (pool mode) during the run, so the user sees an animated
@@ -7,14 +7,14 @@
  * the counter advances as concurrent scenarios finish.
  *
  * Shared presentational primitives (Banner, RunHeader, RunSummary, LiveProgress)
- * come from @opensip-tools/cli-ui. Effectful egress (cloud + --report-to) stays
+ * come from @opensip-cli/cli-ui. Effectful egress (cloud + --report-to) stays
  * at the composition root: this runner returns the run's SignalEnvelope and the
  * tool's registerLiveView callback delivers it once the Ink app exits.
  *
  * The live run executes OFF the main process (ADR-0028): it forks the CLI to the
  * internal `sim-run-worker` subcommand and relays progress + result over IPC, so
  * the spinner + 80ms clock never block on a synchronous chunk. It falls back to
- * in-process when forking is disabled/unavailable (OPENSIP_TOOLS_NO_WORKER).
+ * in-process when forking is disabled/unavailable (OPENSIP_CLI_NO_WORKER).
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -38,20 +38,20 @@ import {
   viewFindingsGroups,
   type ProgressEvent,
   type ProgressSurface,
-} from '@opensip-tools/cli-ui';
+} from '@opensip-cli/cli-ui';
 import {
   type ErrorResult,
   type SignalEnvelope,
   type ToolOptions,
   type VerboseDetail,
-} from '@opensip-tools/contracts';
-import { runOffThreadOrInProcess, currentScope } from '@opensip-tools/core';
+} from '@opensip-cli/contracts';
+import { runOffThreadOrInProcess, currentScope } from '@opensip-cli/core';
 import { Box, Static, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
 import { executeSim, persistSimSession } from './sim.js';
 
-import type { DataStore } from '@opensip-tools/datastore';
+import type { DataStore } from '@opensip-cli/datastore';
 
 const SIM_TOOL_TITLE = 'Simulation Scenarios';
 const SIM_TOOL_DESCRIPTION = 'Running simulation scenarios against your codebase.';
@@ -122,7 +122,7 @@ export function SimRunner({
     // Execute OFF the main process (ADR-0028): fork the CLI to `sim-run-worker`,
     // which re-bootstraps the full scope and streams progress + the final result
     // over IPC, so this process stays free to animate the spinner + 80ms clock.
-    // Falls back to the in-process closure (OPENSIP_TOOLS_NO_WORKER / fork
+    // Falls back to the in-process closure (OPENSIP_CLI_NO_WORKER / fork
     // failure) — identical result. The worker reads its serializable args spec
     // from a temp file cleaned up after the run settles.
     const specDir = mkdtempSync(join(tmpdir(), 'sim-worker-'));
@@ -249,15 +249,15 @@ export function SimRunner({
               args.verbose === true
                 ? [
                     {
-                      text: 'opensip-tools dashboard for HTML report',
-                      bold: ['opensip-tools dashboard'],
+                      text: 'opensip dashboard for HTML report',
+                      bold: ['opensip dashboard'],
                     },
                   ]
                 : [
                     VERBOSE_DETAIL_HINT,
                     {
-                      text: 'opensip-tools dashboard for HTML report',
-                      bold: ['opensip-tools dashboard'],
+                      text: 'opensip dashboard for HTML report',
+                      bold: ['opensip dashboard'],
                     },
                   ]
             }

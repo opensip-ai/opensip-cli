@@ -27,10 +27,10 @@
  * Confidence: low. Under-flag aggressively. This is a regression guard,
  * not a discovery tool.
  *
- * Inspired by `opensip-ai/opensip/opensip-tools` `arch-callback-invocation-safe`.
+ * Inspired by `opensip-ai/opensip/opensip-cli` `arch-callback-invocation-safe`.
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 const SCOPE_PREFIXES = ['packages/'] as const;
 

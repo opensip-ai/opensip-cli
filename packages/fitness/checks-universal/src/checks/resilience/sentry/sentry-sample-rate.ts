@@ -3,7 +3,7 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-sample-rate
  */
 
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness';
+import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
 
 import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js';
 

@@ -16,10 +16,10 @@
  * `_entry-points.ts`) — no new layer crossing.
  */
 
-import { SeverityPolicy } from '@opensip-tools/core';
+import { SeverityPolicy } from '@opensip-cli/core';
 
 import type { GraphConfig } from '../types.js';
-import type { SignalSeverity } from '@opensip-tools/core';
+import type { SignalSeverity } from '@opensip-cli/core';
 
 /**
  * Clamp a rule's base severity per the opt-in override channel. Release 2.13.0

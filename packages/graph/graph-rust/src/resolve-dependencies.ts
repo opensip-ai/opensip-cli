@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { Catalog, DependencyEdge, DependencySiteRecord } from '@opensip-tools/graph';
+import type { Catalog, DependencyEdge, DependencySiteRecord } from '@opensip-cli/graph';
 
 export function resolveDependencies(
   sites: readonly DependencySiteRecord[],

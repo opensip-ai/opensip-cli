@@ -16,9 +16,9 @@
  * table.
  *
  * The file imports JS-string emitters from sibling modules under
- * `code-paths/`. It MUST NOT import from `@opensip-tools/graph` —
+ * `code-paths/`. It MUST NOT import from `@opensip-cli/graph` —
  * the catalog is consumed by JSON shape only (the structural shape
- * lives in @opensip-tools/contracts to keep this panel decoupled
+ * lives in @opensip-cli/contracts to keep this panel decoupled
  * from the graph engine's runtime types).
  */
 

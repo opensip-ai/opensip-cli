@@ -15,7 +15,7 @@ import { dashboardIndexesJs } from '../code-paths/indexes.js';
 import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
 import { dashboardTraceJs } from '../code-paths/trace.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
 interface Env {
   open: (h: string) => void;

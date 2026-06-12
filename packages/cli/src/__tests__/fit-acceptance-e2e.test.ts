@@ -7,7 +7,7 @@
  * TWICE against the same project:
  *
  *   1. **bundled** — `fit` loads via the bundled path (`BUNDLED_TOOL_PACKAGES`).
- *   2. **installed** — `OPENSIP_TOOLS_SKIP_BUNDLED=fitness` drops `fit` from the
+ *   2. **installed** — `OPENSIP_CLI_SKIP_BUNDLED=fitness` drops `fit` from the
  *      bundled set, so the CLI discovers + loads it through the EXTERNAL plugin
  *      path (`discoverAndRegisterToolPackages`, source `'installed'`) instead.
  *
@@ -33,7 +33,7 @@ import { distRunner } from './harness/cli-acceptance.js';
 const cli = distRunner();
 /** Run `fit` through the INSTALLED path: drop it from the bundled set so the CLI
  *  discovers + loads it as an external plugin (the §1 "as if external" lever). */
-const AS_INSTALLED = { OPENSIP_TOOLS_SKIP_BUNDLED: 'fitness' };
+const AS_INSTALLED = { OPENSIP_CLI_SKIP_BUNDLED: 'fitness' };
 
 let testDir: string;
 
@@ -42,7 +42,7 @@ beforeEach(() => {
   // A minimal but real project: a config + a source file that a universal check
   // flags, so the run produces deterministic findings to compare (not just 0).
   writeFileSync(
-    join(testDir, 'opensip-tools.config.yml'),
+    join(testDir, 'opensip-cli.config.yml'),
     'schemaVersion: 1\ntargets:\n  src:\n    description: source\n    languages: [typescript]\n    concerns: [backend]\n    include: ["**/*.ts"]\n',
     'utf8',
   );

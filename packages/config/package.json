@@ -1,21 +1,21 @@
 {
-  "name": "@opensip-tools/config",
+  "name": "@opensip-cli/config",
   "version": "3.0.0",
   "license": "MIT",
-  "description": "Configuration layer for OpenSIP Tools — the capability-configuration composer and schema registry",
+  "description": "Configuration layer for OpenSIP CLI — the capability-configuration composer and schema registry",
   "keywords": [
-    "opensip-tools",
+    "opensip-cli",
     "static-analysis",
     "code-quality"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
     "directory": "packages/config"
   },
-  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
   "bugs": {
-    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -33,7 +33,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },

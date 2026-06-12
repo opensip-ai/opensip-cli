@@ -7,7 +7,7 @@
  * CLI is a generic dispatcher that walks the registered tool list and
  * mounts each tool's declared `commandSpecs`.
  *
- * Tools are first-party (declared as a direct dep of opensip-tools)
+ * Tools are first-party (declared as a direct dep of opensip-cli)
  * or third-party (any npm package whose package.json declares
  * `opensipTools.kind === 'tool'` — discovered via tool-package-discovery).
  *
@@ -66,7 +66,7 @@ export interface ToolCommandDescriptor {
 
 /** Generic stored-session shape accepted by tool replay hooks.
  *
- * This mirrors `@opensip-tools/contracts` `StoredSession` structurally without
+ * This mirrors `@opensip-cli/contracts` `StoredSession` structurally without
  * importing contracts into core. The CLI passes hydrated session-store rows;
  * tools narrow their opaque payloads inside their own replay builders.
  */
@@ -128,7 +128,7 @@ export class UnknownLiveViewError extends ToolError {
  * Result of the host baseline/ratchet compare seam (ADR-0036) — three full-object
  * buckets + the gate decision. Core declares this thin shape for the
  * {@link ToolCliContext.compareBaseline} return so `core` need not import
- * `@opensip-tools/output` (which owns the authoritative `GateCompareResult` used
+ * `@opensip-cli/output` (which owns the authoritative `GateCompareResult` used
  * by `diffBaseline`). The two are kept structurally in sync by a dedicated test
  * (`core ↔ output GateCompareResult must not diverge`).
  */
@@ -169,7 +169,7 @@ export interface SignalDeliveryResult {
 /**
  * Wire alias for run envelopes passed across the core ↔ cli seam.
  *
- * Typed `unknown` here because core must not depend on @opensip-tools/contracts
+ * Typed `unknown` here because core must not depend on @opensip-cli/contracts
  * (layering). The composition root (cli) narrows it to `SignalEnvelope`.
  * This is the documented cost of strict kernel layering; shape-sync tests
  * and the explicit `Wire*` aliases are the hygiene.
@@ -214,7 +214,7 @@ export interface ToolCliContext {
    * evolution bag). See the plan and spec for H1-H3.
    */
   readonly scope: ToolScope;
-  /** Render an Ink result (CommandResult shape from @opensip-tools/contracts). */
+  /** Render an Ink result (CommandResult shape from @opensip-cli/contracts). */
   readonly render: (result: unknown) => Promise<void>;
   /**
    * Register a renderer for a live, stateful view keyed by `key`. Tools
@@ -287,7 +287,7 @@ export interface ToolCliContext {
    * Emit a tool **run-signal envelope** as machine-output (ADR-0011). The
    * CLI composition root formats the envelope through the single shared
    * `formatSignalJson` formatter and writes it to stdout — so the `--json`
-   * wire contract for a run lives in `@opensip-tools/output`, not
+   * wire contract for a run lives in `@opensip-cli/output`, not
    * re-stringified per tool.
    *
    * This is the specialised seam for the **main analyze commands' run output**
@@ -297,7 +297,7 @@ export interface ToolCliContext {
    * everything that is not a run envelope (see above) — the two seams are
    * complementary, not transitional.
    *
-   * The value is the `SignalEnvelope` from `@opensip-tools/contracts`; it is
+   * The value is the `SignalEnvelope` from `@opensip-cli/contracts`; it is
    * typed `unknown` here for the same reason `render`/`emitJson` are — the
    * `Tool` contract in core must not name the contracts-layer payload type
    * (that edge would invert the layer graph). The composition root narrows
@@ -343,13 +343,13 @@ export interface ToolCliContext {
    *
    * This replaces the per-tool `emitRunSignals` / `reportToCloud` calls the
    * engines make today — moving all egress to the root lets the engines drop
-   * their `@opensip-tools/output` dependency (Phases 4–6). Best-effort: cloud
+   * their `@opensip-cli/output` dependency (Phases 4–6). Best-effort: cloud
    * failures never throw and never affect the exit code; only a `--report-to`
    * failure on an otherwise-passing run sets exit 4. Resolves to a
    * {@link SignalDeliveryResult} stating what actually shipped (the root also
    * prints the user-facing skip/failure notices); callers may ignore it.
    *
-   * `envelope` is the `SignalEnvelope` from `@opensip-tools/contracts`, typed
+   * `envelope` is the `SignalEnvelope` from `@opensip-cli/contracts`, typed
    * `unknown` here for the same layer reason as `render`/`emitEnvelope`.
    */
   readonly deliverSignals: (
@@ -369,10 +369,10 @@ export interface ToolCliContext {
    * — distinct from `--report-to` (a network sink) and the cloud sync — so a
    * tool that exports SARIF to a file (e.g. `graph sarif-export`, the
    * cross-repo `EngineSubprocessPort.runSarifExport` contract) does it through
-   * the root instead of importing `@opensip-tools/output` itself. Awaitable so
+   * the root instead of importing `@opensip-cli/output` itself. Awaitable so
    * the write completes before the short-lived CLI process exits.
    *
-   * `envelope` is the `SignalEnvelope` from `@opensip-tools/contracts`, typed
+   * `envelope` is the `SignalEnvelope` from `@opensip-cli/contracts`, typed
    * `unknown` here for the same layer reason as `render`/`emitEnvelope`/
    * `deliverSignals`.
    */
@@ -518,7 +518,7 @@ export type LicenseState = Record<string, unknown>;
  *      rather let the central handler map to an exit code. The CLI's
  *      top-level `handleParseError` catches every `ToolError` that
  *      escapes a tool's action body and routes it through the
- *      canonical `mapToolErrorToExitCode` (in `@opensip-tools/contracts`).
+ *      canonical `mapToolErrorToExitCode` (in `@opensip-cli/contracts`).
  *
  * Which subclass to throw, by intent:
  *
@@ -635,7 +635,7 @@ export interface Tool {
   readonly commands: readonly ToolCommandDescriptor[];
   /**
    * Optional project-local plugin layout. Tools that support
-   * user-authored / npm plugins under `<project>/opensip-tools/<domain>/`
+   * user-authored / npm plugins under `<project>/opensip-cli/<domain>/`
    * declare `{ domain, userSubdirs }` here; the kernel's `discoverPlugins`
    * / `loadAllPlugins` and the CLI's `plugin` command read it instead of
    * hardcoding domain names (ADR-0009 corollary 1). Tools with no
@@ -688,7 +688,7 @@ export interface Tool {
    *
    * Tools augment `ScopeContribution` from their own package:
    *
-   *   declare module '@opensip-tools/core' {
+   *   declare module '@opensip-cli/core' {
    *     interface ScopeContribution {
    *       simulation?: { scenarios: Registry<RunnableScenario>; ... };
    *     }
@@ -732,7 +732,7 @@ export interface Tool {
    * `StoredSession.payload` projection into renderable replay data.
    *
    * Core keeps the hook structural (`unknown` return) so it does not depend on
-   * `@opensip-tools/contracts`; the CLI narrows the returned value at the
+   * `@opensip-cli/contracts`; the CLI narrows the returned value at the
    * composition boundary.
    */
   readonly sessionReplay?: ToolSessionReplayContribution;
@@ -740,7 +740,7 @@ export interface Tool {
    * Optional namespaced config contribution (release 2.10.0, ADR-0023). A
    * tool owning a top-level block (`graph:`/`fitness:`/`simulation:`) declares
    * its Zod schema here as a `ToolConfigDeclaration` (from
-   * `@opensip-tools/config`). The composition root composes every tool's
+   * `@opensip-cli/config`). The composition root composes every tool's
    * `config` into one strict whole-document schema, validates the config file
    * once before dispatch, and exposes the resolved config back via the scope.
    * Kernel-side {@link ToolConfigContribution} carrier (core carries no Zod);
@@ -763,7 +763,7 @@ export interface Tool {
    * opaquely. Undefined ⇒ host `defaultFingerprintStrategy`. Stamping happens at
    * envelope construction: pass the SAME strategy as
    * `BuildEnvelopeInput.fingerprintStrategy` to `buildSignalEnvelope`
-   * (`@opensip-tools/contracts`), which stamps every signal (host default when
+   * (`@opensip-cli/contracts`), which stamps every signal (host default when
    * omitted) so a built envelope is gate-ready by construction. This field is
    * the tool's DECLARATION of that identity for the plane's documentation and
    * future host consumers; the envelope builder is where it takes effect.
@@ -790,7 +790,7 @@ export interface Tool {
   readonly stableExampleIds?: () => readonly string[];
   /**
    * Optional contribution of the tool's namespaced config block for the
-   * scaffolded `opensip-tools.config.yml` (ADR-0038 Phase 3). Undefined ⇒ the host
+   * scaffolded `opensip-cli.config.yml` (ADR-0038 Phase 3). Undefined ⇒ the host
    * renders the block from the tool's `ToolConfigDeclaration` defaults (or omits
    * it). The host always renders the document header + the `targets:` section.
    */

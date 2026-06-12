@@ -19,7 +19,7 @@ import {
   type Signal,
   type SignalCategory,
   type SignalSeverity,
-} from '@opensip-tools/core';
+} from '@opensip-cli/core';
 
 import { applySeverityOverride } from './_severity-override.js';
 

@@ -24,9 +24,9 @@
  * before the handler runs), so the handler trusts the parsed value.
  */
 
-import { EXIT_CODES, type SignalEnvelope, type StoredSession } from '@opensip-tools/contracts';
-import { defineCommand } from '@opensip-tools/core';
-import { resolveSession } from '@opensip-tools/session-store';
+import { EXIT_CODES, type SignalEnvelope, type StoredSession } from '@opensip-cli/contracts';
+import { defineCommand } from '@opensip-cli/core';
+import { resolveSession } from '@opensip-cli/session-store';
 
 import { graphReplayFromSession } from '../../persistence/session-replay.js';
 import { resolveRecipeToRules } from '../../recipes/resolve.js';
@@ -38,8 +38,8 @@ import { loadGraphConfig, resolveGraphRecipeSelection } from '../orchestrate.js'
 
 import type { GraphConfig, ResolutionMode, Rule } from '../../types.js';
 import type { Shard } from '../orchestrate/shard-model.js';
-import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
+import type { DataStore } from '@opensip-cli/datastore';
 
 /**
  * Live-view key graph contributes to the CLI's renderer registry. Owned by this
@@ -290,7 +290,7 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
 
   // `--sarif <path>`: write this run's findings as a SARIF 2.1.0 file via the
   // root `cli.writeSarif` seam (the one place that formats an envelope to
-  // SARIF; the engine never imports @opensip-tools/output). Composes with
+  // SARIF; the engine never imports @opensip-cli/output). Composes with
   // --gate-save: executeGraph has already set the gate exit code, but the
   // handler body still runs, so the SARIF lands even when the gate fails —
   // GitHub Code Scanning then surfaces net-new graph findings on PRs.

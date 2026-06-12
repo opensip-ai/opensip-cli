@@ -19,7 +19,7 @@
  *     scope-bound instance through GraphAdapterSelector.
  */
 
-import { Registry, currentScope, type Registerable } from '@opensip-tools/core';
+import { Registry, currentScope, type Registerable } from '@opensip-cli/core';
 
 import { GraphAdapterSelector } from './selector.js';
 

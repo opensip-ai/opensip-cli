@@ -4,7 +4,7 @@ last_verified: 2026-06-09
 release: v3.0.0
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
-purpose: "The system's public edges. Every contract opensip-tools makes with the outside world, and what changing each one would cost."
+purpose: "The system's public edges. Every contract opensip-cli makes with the outside world, and what changing each one would cost."
 source-files:
   - packages/contracts/src/types.ts
   - packages/contracts/src/exit-codes.ts
@@ -19,10 +19,10 @@ related-docs:
 ---
 # Contract surfaces
 
-A contract is a promise to a consumer outside your control. Break it, and the consumer breaks. opensip-tools has six contract surfaces. Knowing what they are tells you what you can change freely (everything else) and what's expensive to change (these).
+A contract is a promise to a consumer outside your control. Break it, and the consumer breaks. opensip-cli has six contract surfaces. Knowing what they are tells you what you can change freely (everything else) and what's expensive to change (these).
 
 > **What you'll understand after this:**
-> - The six surfaces opensip-tools commits to.
+> - The six surfaces opensip-cli commits to.
 > - Who consumes each one.
 > - The stability tier each surface sits at.
 > - The shape and rationale of each.
@@ -46,10 +46,10 @@ Anything else — internal types, framework helpers, the recipe registry shape, 
 
 ## 1. CLI argv
 
-The command tree and flag surface. What `opensip-tools --help` shows.
+The command tree and flag surface. What `opensip --help` shows.
 
 ```
-opensip-tools
+opensip-cli
 ├── fit                    (run fitness checks)
 │   ├── --recipe <name>
 │   ├── --check <slug>
@@ -80,7 +80,7 @@ opensip-tools
 │   └── sync
 ├── configure              (cloud API key)
 ├── completion             (shell completion script)
-├── uninstall              (remove ~/.opensip-tools/)
+├── uninstall              (remove ~/.opensip-cli/)
 ├── fit-list
 └── fit-recipes
 ```
@@ -103,7 +103,7 @@ The integer the binary returns when it ends. Defined exactly once in [`packages/
 | `3` | `CHECK_NOT_FOUND` | `--check <slug>` did not match any registered check. |
 | `4` | `REPORT_FAILED` | `--report-to` upload failed (network error or non-2xx). |
 
-CI integrations are the primary consumer. `opensip-tools fit && deploy` is an idiom; so is `opensip-tools fit --gate-compare || (echo "regression" && exit 1)`.
+CI integrations are the primary consumer. `opensip fit && deploy` is an idiom; so is `opensip fit --gate-compare || (echo "regression" && exit 1)`.
 
 **Stability rule.** Adding new codes is a minor change provided the additions stay above 2 (consumers that switch on `0/1/2` continue to work; codes 3 and 4 are reserved for the specialized failure modes documented above). Re-purposing or removing an existing code is a major change. The convention is "0 = green, 1 = red but expected, 2 = red and unexpected" — anything that breaks that mental model breaks consumers.
 
@@ -118,7 +118,7 @@ flowchart LR
   Fit["fit signals"]
   Graph["graph signals"]
   Sim["sim signals"]
-  Envelope["SignalEnvelope<br/>@opensip-tools/contracts"]
+  Envelope["SignalEnvelope<br/>@opensip-cli/contracts"]
   Root["CLI composition root"]
   Json["JSON stdout"]
   Sarif["SARIF formatter"]
@@ -170,11 +170,11 @@ The full per-field reference (when each field is present, what each value can be
 
 ## 4. SARIF output
 
-SARIF 2.1.0 is produced by the single shared `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](../../../packages/output/src/format/signal-sarif.ts)) — reached via the `cli.writeSarif` seam by `--report-to`, by `fit-baseline-export`, and by `graph --sarif <path>` (the gate baselines themselves are stored as signals in SQLite, not SARIF; see surface 3 and the gate doc). Note `graph-baseline-export` is *not* a SARIF producer — it exports the graph gate **fingerprint** baseline as JSON for git-trackable enforcement; graph's SARIF comes from `graph --sarif`. The shape is the SARIF spec's, not ours — opensip-tools commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
+SARIF 2.1.0 is produced by the single shared `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](../../../packages/output/src/format/signal-sarif.ts)) — reached via the `cli.writeSarif` seam by `--report-to`, by `fit-baseline-export`, and by `graph --sarif <path>` (the gate baselines themselves are stored as signals in SQLite, not SARIF; see surface 3 and the gate doc). Note `graph-baseline-export` is *not* a SARIF producer — it exports the graph gate **fingerprint** baseline as JSON for git-trackable enforcement; graph's SARIF comes from `graph --sarif`. The shape is the SARIF spec's, not ours — opensip-cli commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
 
-**Stability rule.** The fields opensip-tools fills in are: `runs[0].tool.driver.name = 'opensip-tools-<tool>'`, `runs[0].results[]` carrying `ruleId`, `message.text`, `level` (`critical`/`high` → `error`; `medium` → `warning`; `low` → `note`), and `locations[].physicalLocation.{artifactLocation, region}`. Future versions may fill in more SARIF fields; we won't stop filling in those.
+**Stability rule.** The fields opensip-cli fills in are: `runs[0].tool.driver.name = 'opensip-cli-<tool>'`, `runs[0].results[]` carrying `ruleId`, `message.text`, `level` (`critical`/`high` → `error`; `medium` → `warning`; `low` → `note`), and `locations[].physicalLocation.{artifactLocation, region}`. Future versions may fill in more SARIF fields; we won't stop filling in those.
 
-The gate's identity hash for diff matching is **not** SARIF-spec — it's an opensip-tools internal: `sha256(filePath + '\n' + ruleId + '\n' + message)`, deliberately excluding line numbers so unrelated line shifts don't register as added/resolved. See [`packages/fitness/engine/src/baseline-strategy.ts`](../../../packages/fitness/engine/src/baseline-strategy.ts) and [`10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md).
+The gate's identity hash for diff matching is **not** SARIF-spec — it's an opensip-cli internal: `sha256(filePath + '\n' + ruleId + '\n' + message)`, deliberately excluding line numbers so unrelated line shifts don't register as added/resolved. See [`packages/fitness/engine/src/baseline-strategy.ts`](../../../packages/fitness/engine/src/baseline-strategy.ts) and [`10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md).
 
 ---
 
@@ -203,7 +203,7 @@ Why this surface is so narrow: every byte of it is a constraint on every Tool au
 
 ## 6. Plugin discovery
 
-opensip-tools discovers third-party packages two different ways depending on what you're shipping:
+opensip-cli discovers third-party packages two different ways depending on what you're shipping:
 
 ### Tools — explicit marker in `package.json`
 
@@ -221,13 +221,13 @@ The kernel's [`discoverToolPackages`](../../../packages/core/src/plugins/tool-pa
 
 ```json
 {
-  "name": "@opensip-tools/checks-mything",
+  "name": "@opensip-cli/checks-mything",
   "opensipTools": { "kind": "fit-pack" },
   "main": "dist/index.js"
 }
 ```
 
-The canonical contract is the `opensipTools.kind: "fit-pack"` marker ([ADR-0007](../../decisions/ADR-0007-marker-canonical-plugin-discovery.md)). The fitness engine discovers marker-declared packs from project `node_modules`; `plugins.checkPackages:` can additionally name exact packages that do not declare the marker yet. The old `@opensip-tools/checks-*` name-prefix scan has been removed. All first-party `@opensip-tools/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]` (each carrying its own `config.icon`/`config.displayName`) and optionally `recipes: FitnessRecipe[]`. There is no separate `checkDisplay` export — display travels on the check (§5.3).
+The canonical contract is the `opensipTools.kind: "fit-pack"` marker ([ADR-0007](../../decisions/ADR-0007-marker-canonical-plugin-discovery.md)). The fitness engine discovers marker-declared packs from project `node_modules`; `plugins.checkPackages:` can additionally name exact packages that do not declare the marker yet. The old `@opensip-cli/checks-*` name-prefix scan has been removed. All first-party `@opensip-cli/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]` (each carrying its own `config.icon`/`config.displayName`) and optionally `recipes: FitnessRecipe[]`. There is no separate `checkDisplay` export — display travels on the check (§5.3).
 
 For packs published under your own scope, declare the marker or pin the package explicitly in the project config:
 
@@ -241,7 +241,7 @@ Marker-based discovery always runs; `plugins.checkPackages:` is an exact-name su
 
 ### Sim scenario packs
 
-Sim packs are discovered by **name-pattern**, not by a marker (ADR-0029): any installed `<scope>/scenarios-*` package under `@opensip-tools` plus configured `plugins.packageScopes` is discovered automatically (the simulation tool's manifest declares `discovery.mode: "name-pattern"` with `prefix: "scenarios-"`). There is no `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. Exact-name pins (`plugins.scenarioPackages:`) and the reproducible project-pinned shape (`plugins.sim:`, managed by `plugin add/remove/sync`) layer on top.
+Sim packs are discovered by **name-pattern**, not by a marker (ADR-0029): any installed `<scope>/scenarios-*` package under `@opensip-cli` plus configured `plugins.packageScopes` is discovered automatically (the simulation tool's manifest declares `discovery.mode: "name-pattern"` with `prefix: "scenarios-"`). There is no `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. Exact-name pins (`plugins.scenarioPackages:`) and the reproducible project-pinned shape (`plugins.sim:`, managed by `plugin add/remove/sync`) layer on top.
 
 ### Stability rules
 
@@ -249,7 +249,7 @@ Sim packs are discovered by **name-pattern**, not by a marker (ADR-0029): any in
 - **Changing what an existing shape requires is a major change.** A pack declaring `opensipTools.kind: "fit-pack"` that exports `checks: Check[]` should keep working across minors.
 - **The Tool marker (`opensipTools.kind: 'tool'`) is a stable surface.** A future fifth kind would be a deliberate addition, not an accident.
 
-A tool's project-local plugin layout is described by a `PluginLayout` descriptor (`{ domain, userSubdirs }` — [`packages/core/src/plugins/types.ts`](../../../packages/core/src/plugins/types.ts)) that the tool declares on its `Tool.pluginLayout` and the kernel consumes. The `domain` is a plain string segment used for path resolution (`<project>/opensip-tools/<domain>/<kind>/` and `.runtime/plugins/<domain>/`), not a `package.json` `kind` value. The kernel deliberately does **not** enumerate the first-party domains — there is no `'fit' | 'sim' | 'lang'` union in core (ADR-0009 corollary 1).
+A tool's project-local plugin layout is described by a `PluginLayout` descriptor (`{ domain, userSubdirs }` — [`packages/core/src/plugins/types.ts`](../../../packages/core/src/plugins/types.ts)) that the tool declares on its `Tool.pluginLayout` and the kernel consumes. The `domain` is a plain string segment used for path resolution (`<project>/opensip-cli/<domain>/<kind>/` and `.runtime/plugins/<domain>/`), not a `package.json` `kind` value. The kernel deliberately does **not** enumerate the first-party domains — there is no `'fit' | 'sim' | 'lang'` union in core (ADR-0009 corollary 1).
 
 ---
 
@@ -257,11 +257,11 @@ A tool's project-local plugin layout is described by a `PluginLayout` descriptor
 
 It's worth being explicit about what isn't promised:
 
-- **Internal framework types.** `CheckConfig`, `FitnessRecipe`, `RecipeCheckResult`, `ExecutionContext`, `PathMatcher` — all internal. They live in `@opensip-tools/fitness`, but they're not re-exported as part of the marketplace shape. Check packs use `defineCheck`/`defineRecipe` (which *are* stable) and never touch these.
+- **Internal framework types.** `CheckConfig`, `FitnessRecipe`, `RecipeCheckResult`, `ExecutionContext`, `PathMatcher` — all internal. They live in `@opensip-cli/fitness`, but they're not re-exported as part of the marketplace shape. Check packs use `defineCheck`/`defineRecipe` (which *are* stable) and never touch these.
 - **Logger output format.** Logs are JSON Lines, but the field set is internal. Don't grep production logs for specific keys; treat them as opaque.
-- **Cache file format.** The AST cache, the glob cache, the prewarm cache — all rebuildable. They have on-disk shapes, but those shapes change without notice. Wiping `<project>/opensip-tools/.runtime/cache/` is always safe.
-- **Session record format.** Sessions are persisted as rows in the project-local SQLite datastore (`<project>/opensip-tools/.runtime/datastore.sqlite`) via `SessionRepo`, with per-session detail in a companion `session_tool_payload` row, but the schema is internal. The `sessions list` command is the supported reader.
-- **OpenSIP Cloud API.** The cloud is a separate product. Its API is its own contract, not opensip-tools'. The CLI POSTs signals (the `SignalBatch` wire shape derived from the envelope; SARIF on the `--report-to` path), and the cloud is responsible for ingesting it.
+- **Cache file format.** The AST cache, the glob cache, the prewarm cache — all rebuildable. They have on-disk shapes, but those shapes change without notice. Wiping `<project>/opensip-cli/.runtime/cache/` is always safe.
+- **Session record format.** Sessions are persisted as rows in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`, with per-session detail in a companion `session_tool_payload` row, but the schema is internal. The `sessions list` command is the supported reader.
+- **OpenSIP Cloud API.** The cloud is a separate product. Its API is its own contract, not opensip-cli'. The CLI POSTs signals (the `SignalBatch` wire shape derived from the envelope; SARIF on the `--report-to` path), and the cloud is responsible for ingesting it.
 
 ---
 
@@ -270,8 +270,8 @@ It's worth being explicit about what isn't promised:
 If you write a tool, a check pack, or a CI integration:
 
 - **Lean on the six surfaces above.** Anything in this doc is safe to depend on. Read the linked source files for the precise shape.
-- **Don't import internal types.** If you find yourself wanting `import { CheckConfig } from '@opensip-tools/fitness'`, take a step back — that import will move under your feet. Use `defineCheck()` instead, or open an issue to expose what you need as a stable surface.
-- **Pin to majors.** `peerDependencies: { "@opensip-tools/core": "^1.0.0" }` is the right shape. Patch and minor are safe; major is a deliberate migration.
+- **Don't import internal types.** If you find yourself wanting `import { CheckConfig } from '@opensip-cli/fitness'`, take a step back — that import will move under your feet. Use `defineCheck()` instead, or open an issue to expose what you need as a stable surface.
+- **Pin to majors.** `peerDependencies: { "@opensip-cli/core": "^1.0.0" }` is the right shape. Patch and minor are safe; major is a deliberate migration.
 - **Test against `--json`, not against the table renderer.** The table renderer is for humans; the JSON output is the contract. Your CI integration parses JSON.
 
 ---

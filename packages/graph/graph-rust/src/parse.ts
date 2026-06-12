@@ -1,5 +1,5 @@
 /**
- * Rust parseProject — consumes `@opensip-tools/lang-rust` (ADR-0010).
+ * Rust parseProject — consumes `@opensip-cli/lang-rust` (ADR-0010).
  *
  * `lang-rust` is the canonical Rust parse substrate: it owns the vendored
  * tree-sitter-rust grammar and produces the `{ tree, source }` parsed-file
@@ -12,8 +12,8 @@ import {
   createParseProjectFromAdapter,
   type TreeSitterParsedFile,
   type TreeSitterParsedProject,
-} from '@opensip-tools/graph-adapter-common';
-import { rustAdapter } from '@opensip-tools/lang-rust';
+} from '@opensip-cli/graph-adapter-common';
+import { rustAdapter } from '@opensip-cli/lang-rust';
 
 /** Parsed Rust source file: tree-sitter parse tree plus original source text. */
 export type RustParsedFile = TreeSitterParsedFile;

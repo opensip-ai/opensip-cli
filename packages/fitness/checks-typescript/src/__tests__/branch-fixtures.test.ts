@@ -8,8 +8,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RunScope, runWithScope } from '@opensip-tools/core';
-import { fileCache } from '@opensip-tools/fitness';
+import { RunScope, runWithScope } from '@opensip-cli/core';
+import { fileCache } from '@opensip-cli/fitness';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';
@@ -1293,7 +1293,7 @@ describe('broad fixture — many checks', () => {
 
 describe('path-matching utility — branches', () => {
   it('exercises string includes and regex test patterns', async () => {
-    const { createPathMatcher } = await import('@opensip-tools/fitness');
+    const { createPathMatcher } = await import('@opensip-cli/fitness');
     const stringOnly = createPathMatcher(['/__tests__/']);
     expect(stringOnly('/src/__tests__/foo.ts')).toBe(true);
     expect(stringOnly('/src/main.ts')).toBe(false);

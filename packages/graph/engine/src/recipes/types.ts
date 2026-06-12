@@ -20,7 +20,7 @@
  * "selection vocabulary").
  */
 
-import type { RecipeSelector, RecipeUnitConfigMap } from '@opensip-tools/core';
+import type { RecipeSelector, RecipeUnitConfigMap } from '@opensip-cli/core';
 
 /**
  * The selector union a graph recipe uses to pick rules. Aliased from core's

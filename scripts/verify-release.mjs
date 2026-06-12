@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 //
-// Pre-publish consistency check for opensip-tools releases.
+// Pre-publish consistency check for opensip-cli releases.
 //
 // Catches the kinds of cross-cutting drift that have produced bad
 // releases in the past: half-bumped package versions, tags that
@@ -9,7 +9,7 @@
 //
 // Ten checks (all run; any failure exits 1):
 //
-//   1. All @opensip-tools/* packages share the same `version`.
+//   1. All @opensip-cli/* packages share the same `version`.
 //   2. Tag matches the package version (CI: --expected-version $TAG).
 //   3. CHANGELOG.md top entry is `## [<consensus version>]`.
 //   4. docs/web-generated/ is in sync with docs/public/ (delegates to
@@ -44,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 import { RELEASE_PACKAGE_ORDER, discoverPublishablePackages } from './release-package-order.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const SCOPE = '@opensip-tools/';
+const SCOPE = '@opensip-cli/';
 
 // ---------------------------------------------------------------------
 // Arg parsing
@@ -76,7 +76,7 @@ const skip = (id, msg) => skips.push({ id, msg });
 
 // Discovery is single-sourced: discoverPublishablePackages() (from
 // release-package-order.mjs) is the ONE walk over packages/** that applies the
-// publishable rule (name is `opensip-tools` or `@opensip-tools/*`, AND not
+// publishable rule (name is `opensip-cli` or `@opensip-cli/*`, AND not
 // `private: true`). We enrich each discovered `{ name, dir }` with the
 // version/deps this script's checks need, rather than duplicating the walk.
 async function findScopedPackages() {
@@ -103,7 +103,7 @@ async function findScopedPackages() {
 
 const pkgs = await findScopedPackages();
 if (pkgs.length === 0) {
-  fail('discover', 'No @opensip-tools/* packages found under packages/.');
+  fail('discover', 'No @opensip-cli/* packages found under packages/.');
   printResults();
   process.exit(1);
 }
@@ -113,7 +113,7 @@ const versions = new Set(pkgs.map((p) => p.version));
 let consensusVersion;
 if (versions.size === 1) {
   consensusVersion = pkgs[0].version;
-  pass(1, `all ${pkgs.length} @opensip-tools/* packages at ${consensusVersion}.`);
+  pass(1, `all ${pkgs.length} @opensip-cli/* packages at ${consensusVersion}.`);
 } else {
   const grouped = {};
   for (const p of pkgs) {

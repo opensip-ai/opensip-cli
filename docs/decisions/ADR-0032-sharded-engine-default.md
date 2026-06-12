@@ -1,7 +1,7 @@
 ---
 status: superseded
 last_verified: 2026-06-11
-owner: opensip-tools
+owner: opensip-cli
 ---
 
 # ADR-0032: The sharded engine is the graph default; `--exact` is the opt-out
