@@ -30,9 +30,13 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
+import { chunkByCount, DEFAULT_CHUNK_SIZE } from './partition-chunk.js';
+
+import type { SyntheticPartition } from './partition-chunk.js';
 import type { PartitionStrategy } from '../../types.js';
 
 export type { PartitionStrategy } from '../../types.js';
+export type { SyntheticPartition } from './partition-chunk.js';
 
 /**
  * Layout classification — three buckets that drive the strategy choice
@@ -52,27 +56,10 @@ export type MonorepoLayout =
   | { readonly kind: 'flat-small'; readonly files: readonly string[] }
   | { readonly kind: 'flat-large'; readonly files: readonly string[] };
 
-/**
- * Synthetic partition — the unit that gets handed to a child process in
- * the flat-large fan-out. `id` is suitable as a display label and a
- * cache-key segment; `files` are absolute paths.
- */
-export interface SyntheticPartition {
-  readonly id: string;
-  readonly files: readonly string[];
-}
-
 /** Default elevation threshold — mirrors `heap-preflight.ts` HEAP_TARGETS top tier. */
 const DEFAULT_HEAP_ELEVATION_THRESHOLD = 2500;
 /** Default partitioning depth for the `directory-depth` strategy. */
 const DEFAULT_DIRECTORY_DEPTH = 2;
-/**
- * Default chunk size for `file-count-chunks` and `hybrid` sub-partitioning.
- * Chosen at 2000 to stay well below the 2500-file heap-elevation
- * threshold — each partition runs in a child process with a default V8
- * heap (no elevation needed at this size).
- */
-const DEFAULT_CHUNK_SIZE = 2000;
 
 const SOURCE_EXTENSIONS: readonly string[] = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 const SKIPPED_DIR_NAMES: ReadonlySet<string> = new Set([
@@ -247,18 +234,6 @@ export function selectStrategyForLayout(layout: MonorepoLayout): StrategySelecti
 }
 
 // ---------- private helpers ----------
-
-function chunkByCount(files: readonly string[], chunkSize: number): readonly SyntheticPartition[] {
-  const sorted = [...files].sort();
-  const out: SyntheticPartition[] = [];
-  for (let i = 0; i < sorted.length; i += chunkSize) {
-    out.push({
-      id: `chunk-${String(out.length)}`,
-      files: sorted.slice(i, i + chunkSize),
-    });
-  }
-  return out;
-}
 
 /**
  * @throws {Error} When `depth` is less than 1 (no directory level to chunk by).
