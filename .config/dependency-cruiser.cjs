@@ -619,6 +619,19 @@ module.exports = {
         path: ['^packages/cli/', '^packages/contracts/'],
       },
     },
+    {
+      name: 'check-pack-no-tree-sitter',
+      severity: 'error',
+      comment:
+        'Check packs must not depend on the parser substrate directly ' +
+        '(ADR-0039): the language adapter owns the parser boundary. AST-level ' +
+        'checks reach traversal/position helpers (walkNodes, nameOf, ' +
+        'getLineNumber, ...) through the lang-* package re-exports, so the ' +
+        'substrate stays swappable behind the adapter and check packs stay ' +
+        'coupled to the language vocabulary, not the AST implementation.',
+      from: { path: '^packages/fitness/checks-' },
+      to: { path: '^packages/tree-sitter/' },
+    },
     // `check-pack-no-core-subpath` was retired here (gate-activation, 2026-05-30)
     // and reimplemented in eslint.config.mjs as a scoped `no-restricted-imports`
     // rule. Specifier-shape rules ("import from the barrel, not a subpath") are

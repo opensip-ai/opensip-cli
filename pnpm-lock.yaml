@@ -446,9 +446,6 @@ importers:
       '@opensip-tools/lang-python':
         specifier: workspace:*
         version: link:../../languages/lang-python
-      '@opensip-tools/tree-sitter':
-        specifier: workspace:*
-        version: link:../../tree-sitter
     devDependencies:
       '@opensip-tools/core':
         specifier: workspace:*

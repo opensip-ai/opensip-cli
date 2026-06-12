@@ -10,8 +10,13 @@
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
-import { getSharedTree, isFunction } from '@opensip-tools/lang-python';
-import { getLineNumber, nameOf, walkNodes } from '@opensip-tools/tree-sitter';
+import {
+  getLineNumber,
+  getSharedTree,
+  isFunction,
+  nameOf,
+  walkNodes,
+} from '@opensip-tools/lang-python';
 
 const MAX_FUNCTION_LINES = 50;
 

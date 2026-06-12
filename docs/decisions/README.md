@@ -242,6 +242,12 @@ distinct from:
   owning the example `.mjs` source. Applies ADR-0009 (kernel carries no tool
   vocabulary) to the last place it leaks. A new tool scaffolds with zero CLI edits;
   `graph` (no `pluginLayout`) gets no dir. Byte-identical fit+sim output preserved
+- [ADR-0039](./ADR-0039-check-packs-reach-parser-via-language-adapter.md) — **Check
+  packs reach the parser substrate through the language adapter**: no
+  `checks-*` → `@opensip-tools/tree-sitter` dependency. The lang-\* package
+  re-exports the generic traversal/position vocabulary beside its
+  grammar-specific predicates; a check pack depends on exactly `fitness` +
+  `lang-<lang>`. Enforced by the `check-pack-no-tree-sitter` depcruise rule
 
 ### Superseded
 

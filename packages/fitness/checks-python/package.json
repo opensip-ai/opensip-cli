@@ -40,8 +40,7 @@
   },
   "dependencies": {
     "@opensip-tools/fitness": "workspace:*",
-    "@opensip-tools/lang-python": "workspace:*",
-    "@opensip-tools/tree-sitter": "workspace:*"
+    "@opensip-tools/lang-python": "workspace:*"
   },
   "devDependencies": {
     "@opensip-tools/core": "workspace:*",
