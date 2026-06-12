@@ -8,6 +8,16 @@
  * the only thing that spawns and asserts — so the release lane exercises exactly
  * the same scenario semantics as the in-repo Vitest harness.
  *
+ * THIS LIST RUNS IN BOTH CI LANES. The PR lane
+ * (`packages/cli/src/__tests__/packed-smoke-scenarios-e2e.test.ts`) imports this
+ * exact module and drives the BUILT dist CLI through it on every PR, so a
+ * `--json`/output-shape change that breaks a scenario fails the PR — not the
+ * publish, days later (the pre-2.13 blind spot that blocked 2.12.0 twice). The
+ * release lane re-runs it against the PACKED, npm-installed bytes, which is the
+ * half only it can do (inter-package export/ABI mismatches). If you change a
+ * scenario here, the PR-lane suite is your fast local check:
+ * `pnpm --filter=opensip-tools test packed-smoke-scenarios-e2e`.
+ *
  * This replaces the old inline `--version`/`--help` pair with a broad
  * command-level walk: init → fit (built-in + fit-pack plugin) → list → graph →
  * dashboard → sessions → tool-plugin install. Every scenario runs in ONE
