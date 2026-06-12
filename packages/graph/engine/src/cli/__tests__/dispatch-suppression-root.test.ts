@@ -103,8 +103,8 @@ describe('dispatchGraphResult — waives against suppressionRoot, not opts.cwd',
     );
 
     expect(runGateMode).toHaveBeenCalledTimes(1);
-    // arg[1] is the post-waiver signal array runGateMode receives.
-    expect(runGateMode.mock.calls[0]?.[1]).toHaveLength(0);
+    // arg[1] is the post-waiver envelope runGateMode receives (ADR-0036).
+    expect(runGateMode.mock.calls[0]?.[1]?.signals).toHaveLength(0);
   });
 
   it('does NOT suppress when only opts.cwd (the wrong base) holds the directive', async () => {
@@ -129,6 +129,6 @@ describe('dispatchGraphResult — waives against suppressionRoot, not opts.cwd',
 
     expect(runGateMode).toHaveBeenCalledTimes(1);
     // The waiver under opts.cwd must NOT apply — the signal survives.
-    expect(runGateMode.mock.calls[0]?.[1]).toHaveLength(1);
+    expect(runGateMode.mock.calls[0]?.[1]?.signals).toHaveLength(1);
   });
 });

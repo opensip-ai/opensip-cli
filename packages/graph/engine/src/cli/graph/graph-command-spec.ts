@@ -176,22 +176,6 @@ async function dispatchGraphLiveView(
  * list-files/live/static dispatch, the `--sarif` write, the cloud egress, and
  * the exit-code decision — byte-identical to 2.10.0.
  */
-/**
- * ADR-0035: the host derives the findings exit from `envelope.verdict.passed`
- * (normal runs return `{}` → no override). The gate modes set their OWN exit
- * upstream inside `executeGraph` — gate-save's error-level gate and gate-compare's
- * baseline-diff `degraded` predicate (NOT the run verdict). In gate mode we
- * re-affirm that already-set exit as the override, so the host doesn't clobber a
- * `degraded`-based gate verdict with the run's findings verdict.
- */
-function gateExitOverride(
-  opts: GraphCommandOptions,
-  cli: ToolCliContext,
-): { runFailed: boolean } | Record<string, never> {
-  if (opts.gateSave !== true && opts.gateCompare !== true) return {};
-  return { runFailed: (cli.getExitCode?.() ?? EXIT_CODES.SUCCESS) !== EXIT_CODES.SUCCESS };
-}
-
 async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   const opts = rawOpts as GraphCommandOptions;
   // `--resolution`'s value is `exact`/`fast` by construction now (declared
@@ -316,18 +300,22 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
 
   // Effectful egress lives at the composition root (ADR-0011 / ADR-0008):
   // cloud sync + `--report-to` (which owns exit 4). `executeGraph` returns
-  // the envelope for every mode that should deliver (gate / catalog /
-  // default render / `--report-to`) and `undefined` for the modes that
-  // must not (plain `--json` workspace-child carrier, `--workspace`
-  // parent, error paths). Called once per run, after rendering.
-  if (envelope !== undefined) {
-    // ADR-0035: the host owns the findings exit (derived from the run verdict);
-    // gate modes re-affirm their own upstream exit via `gateExitOverride`.
+  // the envelope for every mode that should deliver (catalog / default render /
+  // `--report-to`) and `undefined` for the modes that must not (plain `--json`
+  // workspace-child carrier, `--workspace` parent, error paths). Called once per
+  // run, after rendering.
+  //
+  // ADR-0036: gate modes (`--gate-save`/`--gate-compare`) own their OWN
+  // deliverSignals call inside `runGateMode` — they feed the gate verdict to the
+  // host's runFailed override (the host derives the exit; no tool setExitCode), so
+  // the host must NOT deliver again here. The `--sarif` write above still runs for
+  // gate mode (it reads the returned envelope), preserving `if: always()` export.
+  const isGateMode = opts.gateSave === true || opts.gateCompare === true;
+  if (envelope !== undefined && !isGateMode) {
     await cli.deliverSignals(envelope, {
       cwd: opts.cwd,
       reportTo: opts.reportTo,
       apiKey: opts.apiKey,
-      ...gateExitOverride(opts, cli),
     });
   }
 }

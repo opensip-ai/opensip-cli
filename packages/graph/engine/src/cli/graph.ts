@@ -35,11 +35,13 @@ import {
   currentScope,
   generatePrefixedId,
   logger,
+  stampFingerprints,
   ToolError,
   ValidationError,
 } from '@opensip-tools/core';
 import { SessionRepo } from '@opensip-tools/session-store';
 
+import { graphFingerprintStrategy } from '../baseline-strategy.js';
 import { pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { buildGraphSessionPayload } from '../persistence/session-payload.js';
@@ -821,9 +823,20 @@ async function deliverGraphResult(
   const suppressedCount = finalized.suppressedCount;
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
   if (opts.gateSave === true || opts.gateCompare === true) {
-    await runGateMode(opts, result.signals, cli, result.catalog?.resolutionMode);
+    // ADR-0036: stamp the gate envelope's signals with graph's byte-preserved
+    // fingerprint BEFORE handing it to the host seams (the plane never
+    // fingerprints). The fingerprint is `ruleId|filePath|line|col` — independent
+    // of the `source` remap `buildGraphEnvelope` applies — so stamping the built
+    // envelope is byte-equivalent to stamping the raw signal set. runGateMode owns
+    // the deliverSignals call (host-derived exit), so the command-spec skips it.
+    const envelope = envelopeFor(opts, result, durationMs);
+    const stamped: SignalEnvelope = {
+      ...envelope,
+      signals: stampFingerprints(envelope.signals, graphFingerprintStrategy),
+    };
+    await runGateMode(opts, stamped, cli, result.catalog?.resolutionMode);
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI, suppressed: suppressedCount });
-    return envelopeFor(opts, result, durationMs);
+    return stamped;
   }
   if (typeof opts.catalogOutput === 'string' && opts.catalogOutput.length > 0) {
     runCatalogJsonMode(opts, result, cli, startedAt);

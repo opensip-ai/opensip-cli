@@ -11,7 +11,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { enterScope, LanguageRegistry } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { diffBaseline } from '@opensip-tools/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { executeGraph } from '../../cli/graph.js';
@@ -26,7 +27,7 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { FunctionOccurrence } from '../../types.js';
-import type { GraphDoneResult } from '@opensip-tools/contracts';
+import type { GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
 import type { ToolCliContext } from '@opensip-tools/core';
 
 function occ(over: Partial<FunctionOccurrence> = {}): FunctionOccurrence {
@@ -95,13 +96,34 @@ function mockCli(datastore?: DataStore): MockCliBag {
   const setExitCode = vi.fn();
   const render = vi.fn(() => Promise.resolve());
   const emitEnvelope = vi.fn();
+  // ADR-0036: stub the host baseline seams against the test datastore, and map
+  // the deliverSignals runFailed override to setExitCode exactly as the host does.
+  const repo = (): BaselineRepo => new BaselineRepo(datastore as DataStore);
   return {
     cli: {
       setExitCode,
       emitJson: vi.fn(),
       emitEnvelope,
-      deliverSignals: vi.fn(() => Promise.resolve()),
+      deliverSignals: vi.fn((_env: unknown, opts?: { runFailed?: boolean }) => {
+        setExitCode(opts?.runFailed === true ? 1 : 0);
+        return Promise.resolve();
+      }),
       writeSarif: vi.fn(() => Promise.resolve()),
+      saveBaseline: vi.fn((tool: string, env: unknown) => {
+        repo().save(
+          tool,
+          (env as SignalEnvelope).signals.map((s) => ({
+            fingerprint: s.fingerprint ?? '',
+            payload: s,
+          })),
+        );
+        return Promise.resolve();
+      }),
+      compareBaseline: vi.fn((tool: string, env: unknown) =>
+        Promise.resolve(diffBaseline((env as SignalEnvelope).signals, repo().load(tool))),
+      ),
+      exportBaselineSarif: vi.fn(() => Promise.resolve()),
+      exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
       render,
       scope: { datastore: () => datastore, languages: new LanguageRegistry() },
     } as unknown as ToolCliContext,

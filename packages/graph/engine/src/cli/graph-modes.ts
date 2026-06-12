@@ -20,29 +20,30 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import { ConfigurationError, isErrorSignal, logger, ToolError } from '@opensip-tools/core';
+import {
+  ConfigurationError,
+  isErrorSignal,
+  logger,
+  resolveFailOnDegraded,
+  ToolError,
+} from '@opensip-tools/core';
 
-import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
-import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
+import { graphFingerprintStrategy } from '../baseline-strategy.js';
 import { renderCatalogJson } from '../render/catalog-json.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { Catalog, Indexes } from '../types.js';
+import type { SignalEnvelope } from '@opensip-tools/contracts';
 import type { Signal, ToolCliContext } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
 
 const MODULE_GRAPH_RENDER = 'graph:render';
 
 export async function runGateMode(
   opts: GraphCommandOptions,
-  signals: readonly Signal[],
+  envelope: SignalEnvelope,
   cli: ToolCliContext,
   resolutionMode?: 'exact' | 'fast',
 ): Promise<void> {
-  const datastore = cli.scope.datastore() as DataStore | undefined;
-  if (!datastore) {
-    throw new ConfigurationError('Graph gate mode requires a DataStore on ToolCliContext.');
-  }
   // A fast catalog's edges are approximate (syntactic). Seeding the
   // security ratchet from them — or comparing against an exact baseline —
   // would let false orphans/regressions flip the gate. The gate's value
@@ -55,66 +56,58 @@ export async function runGateMode(
         'Re-run with --resolution exact to gate.',
     );
   }
-  const repo = new GraphBaselineRepo(datastore);
+  // The host owns persistence (BaselineRepo), the diff, AND the exit (ADR-0036 /
+  // ADR-0035): graph hands the already-fingerprint-stamped envelope to the seams
+  // and feeds its gate verdict to the host's `deliverSignals` runFailed override.
+  // No tool `setExitCode` on the gate path — the host derives RUNTIME_ERROR.
+  const deliverOpts = { cwd: opts.cwd, reportTo: opts.reportTo, apiKey: opts.apiKey };
   if (opts.gateSave === true) {
     // ADR-0020: gate-save records the baseline AND hard-fails the step when the
     // current (already suppression-filtered, ADR-0014) signal set contains any
-    // error-rung finding. `signals` reaching this mode is the post-`@graph-ignore`
-    // `kept` set (see `cli/graph.ts:484`), so this counts UNSUPPRESSED findings
-    // only. The error rung is core's canonical `isErrorSignal` (`critical`/`high`)
-    // — the same predicate fit's `failOnErrors` threshold and graph's own envelope
-    // verdict (`build-envelope.ts`) use, so all consumers agree on
-    // what "error" means. The CI step (`pnpm graph:ci`) is therefore the honest
-    // pass/fail signal — it no longer exits 0 while error-level graph findings
-    // exist, so enforcement does not rely solely on the downstream Code Scanning
-    // net-new ratchet + branch protection (the external config ADR-0017 declined
-    // to trust). The SARIF export runs in a separate `if: always()` CI step, so
-    // the baseline + net-new PR annotations survive a failed gate. Mirror of
-    // `fit-modes.ts`'s gate-save branch.
-    saveBaseline(signals, repo);
-    const errorCount = signals.filter(isErrorSignal).length;
+    // error-rung finding. The error rung is core's canonical `isErrorSignal`
+    // (`critical`/`high`) — the same predicate graph's envelope verdict
+    // (`build-envelope.ts`) uses — so `errorCount > 0` equals `!verdict.passed`.
+    // ADR-0035: that findings verdict is HOST-owned; graph passes it as the
+    // `deliverSignals` runFailed override (the host sets the exit), so the CI step
+    // is the honest pass/fail signal without a tool-side setExitCode. The `--sarif`
+    // export still runs in the command-spec under `if: always()` semantics.
+    await cli.saveBaseline('graph', envelope);
+    const errorCount = envelope.signals.filter(isErrorSignal).length;
     const runFailed = errorCount > 0;
-    cli.setExitCode(runFailed ? EXIT_CODES.RUNTIME_ERROR : EXIT_CODES.SUCCESS);
     await cli.render({
       type: 'gate-done',
       lines: runFailed
         ? [
-            `Graph baseline saved (${String(signals.length)} signals)`,
+            `Graph baseline saved (${String(envelope.signals.length)} signals)`,
             `Graph gate FAILED: ${String(errorCount)} error-level finding(s) present.`,
           ]
-        : [`Graph baseline saved (${String(signals.length)} signals)`],
+        : [`Graph baseline saved (${String(envelope.signals.length)} signals)`],
     });
+    await cli.deliverSignals(envelope, { ...deliverOpts, runFailed });
     return;
   }
   // gate-compare.
   //
   // ADR-0035 Phase 5 finding — RETAIN (not fold): `degraded` is "net-new findings
-  // since the saved baseline", a baseline-DIFF predicate that is NOT expressible
-  // over this run's own findings verdict (a run can have error-level findings yet
-  // be `degraded: false` if none are net-new, and vice versa). So gate-compare
-  // keeps its own exit here, distinct from the host's findings verdict. The host
-  // does not clobber it: graph-command-spec re-affirms this already-set exit as
-  // the `deliverSignals` runFailed override (via cli.getExitCode), and the run's
-  // verdict headline stays informational for the gate-compare mode.
-  const result = compareToBaseline(signals, repo);
-  if (result.degraded) {
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-    await cli.render({
-      type: 'gate-done',
-      lines: [
-        `Graph gate FAILED: ${String(result.newSignals.length)} new finding(s) since baseline.`,
-        ...result.newSignals.map((s) => `  + ${fingerprintSignal(s)}`),
-      ],
-    });
-  } else {
-    cli.setExitCode(EXIT_CODES.SUCCESS);
-    await cli.render({
-      type: 'gate-done',
-      lines: [
-        `Graph gate PASS: no regressions (${String(result.resolvedFingerprints.length)} resolved since baseline).`,
-      ],
-    });
-  }
+  // since the saved baseline", a baseline-DIFF predicate NOT expressible over this
+  // run's own findings verdict (a run can have error-level findings yet be
+  // `degraded: false` if none are net-new, and vice versa). The ratchet is gated
+  // by the reserved `failOnDegraded` key (ADR-0036, default true); the resulting
+  // verdict rides the host's `deliverSignals` runFailed override — no tool exit.
+  const result = await cli.compareBaseline('graph', envelope);
+  const runFailed = result.degraded && resolveFailOnDegraded('graph');
+  await cli.render({
+    type: 'gate-done',
+    lines: result.degraded
+      ? [
+          `Graph gate FAILED: ${String(result.added.length)} new finding(s) since baseline.`,
+          ...result.added.map((s) => `  + ${graphFingerprintStrategy(s)}`),
+        ]
+      : [
+          `Graph gate PASS: no regressions (${String(result.resolved.length)} resolved since baseline).`,
+        ],
+  });
+  await cli.deliverSignals(envelope, { ...deliverOpts, runFailed });
 }
 
 /**

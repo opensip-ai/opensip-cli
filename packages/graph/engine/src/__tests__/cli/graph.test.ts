@@ -14,14 +14,13 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createSignal, enterScope, LanguageRegistry } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { ConfigurationError, createSignal, enterScope, LanguageRegistry } from '@opensip-tools/core';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { diffBaseline } from '@opensip-tools/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { buildUnifiedReportLines, executeGraph } from '../../cli/graph.js';
-import { saveBaseline } from '../../gate.js';
 import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
-import { GraphBaselineRepo } from '../../persistence/baseline-repo.js';
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
@@ -32,7 +31,7 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { Catalog, FunctionOccurrence, Indexes } from '../../types.js';
-import type { GraphDoneResult } from '@opensip-tools/contracts';
+import type { GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
 import type { LanguageAdapter, Signal, ToolCliContext, WorkspaceUnit } from '@opensip-tools/core';
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
@@ -103,6 +102,33 @@ function mockCli(datastore: DataStore | undefined, languages?: LanguageRegistry)
   const emitEnvelope = vi.fn();
   const emitJson = vi.fn();
   const resolvedLanguages = languages ?? new LanguageRegistry();
+  // ADR-0036: the host owns the baseline seams + the gate exit. These stubs mirror
+  // the real host seams against the test datastore, and map the deliverSignals
+  // runFailed override to setExitCode exactly as the host's deliver-envelope does —
+  // so the gate tests assert the host-derived exit through the same observable.
+  const requireDs = (): DataStore => {
+    if (!datastore) throw new ConfigurationError('Graph gate mode requires a DataStore.');
+    return datastore;
+  };
+  const saveBaselineSeam = vi.fn((tool: string, env: unknown) => {
+    const e = env as SignalEnvelope;
+    new BaselineRepo(requireDs()).save(
+      tool,
+      e.signals.map((s) => ({ fingerprint: s.fingerprint ?? '', payload: s })),
+    );
+    return Promise.resolve();
+  });
+  const compareBaselineSeam = vi.fn((tool: string, env: unknown) => {
+    const repo = new BaselineRepo(requireDs());
+    if (!repo.exists(tool)) {
+      return Promise.reject(new ConfigurationError(`No baseline found for '${tool}'.`));
+    }
+    return Promise.resolve(diffBaseline((env as SignalEnvelope).signals, repo.load(tool)));
+  });
+  const deliverSignals = vi.fn((_env: unknown, opts?: { runFailed?: boolean }) => {
+    setExitCode(opts?.runFailed === true ? 1 : 0);
+    return Promise.resolve();
+  });
   return {
     cli: {
       datastore,
@@ -110,6 +136,11 @@ function mockCli(datastore: DataStore | undefined, languages?: LanguageRegistry)
       render,
       emitEnvelope,
       emitJson,
+      deliverSignals,
+      saveBaseline: saveBaselineSeam,
+      compareBaseline: compareBaselineSeam,
+      exportBaselineSarif: vi.fn(() => Promise.resolve()),
+      exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
       scope: { datastore: () => datastore, languages: resolvedLanguages },
     } as unknown as ToolCliContext,
     setExitCode,
@@ -390,12 +421,13 @@ describe('executeGraph — gate modes', () => {
     datastore.close();
   });
 
-  it('--gate-save persists the current signals as the baseline', async () => {
+  it('--gate-save persists the current signals as the baseline (host-owned exit 0)', async () => {
     const { cli, setExitCode } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, gateSave: true }, cli);
+    // The host derives the exit from the deliverSignals runFailed override; a
+    // clean run maps to 0.
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const repo = new GraphBaselineRepo(datastore);
-    expect(repo.exists()).toBe(true);
+    expect(new BaselineRepo(datastore).exists('graph')).toBe(true);
   });
 
   it('--gate-compare PASS after a --gate-save with matching state', async () => {
@@ -408,19 +440,13 @@ describe('executeGraph — gate modes', () => {
   });
 
   it('--gate-compare FAIL when current findings exceed baseline', async () => {
-    saveBaseline([], new GraphBaselineRepo(datastore));
+    // Seed an empty baseline so every current finding is net-new (degraded).
+    new BaselineRepo(datastore).save('graph', []);
     const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, gateCompare: true }, cli);
+    // degraded → the host runFailed override maps to RUNTIME_ERROR (1).
     expect(setExitCode).toHaveBeenCalledWith(1);
     expect(renderedLines(render)).toContain('Graph gate FAILED');
-  });
-
-  it('throws ConfigurationError if --gate-save is used without a datastore', async () => {
-    const { cli, setExitCode } = mockCli(undefined);
-    await executeGraph({ cwd: projectDir, noCache: true, gateSave: true }, cli);
-    expect(setExitCode).toHaveBeenCalledWith(2);
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(err).toContain('DataStore');
   });
 });
 

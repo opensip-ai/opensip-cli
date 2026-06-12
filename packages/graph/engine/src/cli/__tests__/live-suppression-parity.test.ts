@@ -113,7 +113,8 @@ async function staticSignals(signals: readonly Signal[], root: string): Promise<
     dispatchGraphResult(opts, result, mockCli(), '2026-06-09T00:00:00.000Z', root),
   );
   expect(runGateMode).toHaveBeenCalledTimes(1);
-  return (runGateMode.mock.calls[0]?.[1] ?? []) as readonly Signal[];
+  // arg[1] is the post-waiver envelope runGateMode receives (ADR-0036).
+  return (runGateMode.mock.calls[0]?.[1]?.signals ?? []) as readonly Signal[];
 }
 
 const fileOf = (signals: readonly Signal[]): string[] =>
