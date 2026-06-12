@@ -267,19 +267,19 @@ export function installPreActionHook(program: Command, version: string): void {
     // ADR-0023 Phase 4: compose + STRICT-validate config before building the
     // scope (a typo in any tool namespace → CONFIGURATION_ERROR); resolved
     // config rides the scope (tools read scope.toolConfig.<namespace>).
-    const toolConfig = composeAndValidateToolConfig({
+    const { config: toolConfig, document: configDocument } = composeAndValidateToolConfig({
       tools,
       manifests: getToolManifestsForRun(),
       configPath: project.scope === 'project' ? project.configPath : undefined,
       env: process.env,
     });
     // ADR-0037 Phase 1: build the host file-targeting accessor from the SAME
-    // loaded config doc, once per run. Mirrors `toolConfig` — `undefined` on a
-    // project-agnostic/config-less run, or when the doc has no `targets:` block.
-    // No tool reads it yet (Phase 2 cuts fitness over); this only builds + exposes.
-    const targets = buildTargets({
-      configPath: project.scope === 'project' ? project.configPath : undefined,
-    });
+    // single validated config document the composer already read (ADR-0023: one
+    // reader — `buildTargets` is a pure builder, never a second `readYamlFile`).
+    // Mirrors `toolConfig` — `undefined` on a project-agnostic/config-less run,
+    // or when the doc has no `targets:` block. No tool reads it yet (Phase 2 cuts
+    // fitness over); this only builds + exposes.
+    const targets = buildTargets({ document: configDocument });
     const scope = new RunScope({
       logger,
       projectContext: project,

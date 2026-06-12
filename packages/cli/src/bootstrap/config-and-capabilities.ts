@@ -140,7 +140,7 @@ export function composeAndValidateToolConfig(args: {
   readonly manifests?: readonly ToolPluginManifest[];
   readonly configPath: string | undefined;
   readonly env: Readonly<Record<string, string | undefined>>;
-}): ResolvedToolConfig | undefined {
+}): { readonly config: ResolvedToolConfig | undefined; readonly document: unknown } {
   const { tools, configPath, env, manifests = [] } = args;
   const toolDeclarations = collectDeclarations(tools);
   // A run with no tools that declare config (e.g. a project-agnostic context)
@@ -148,7 +148,7 @@ export function composeAndValidateToolConfig(args: {
   // document-level blocks (cli/dashboard/schemaVersion) only need composing when
   // there is a tool dispatch to validate the document for; the real CLI always
   // registers fit/graph/sim, so they are always composed in practice.
-  if (toolDeclarations.length === 0) return undefined;
+  if (toolDeclarations.length === 0) return { config: undefined, document: {} };
 
   // Compose the host document-level declarations (cli/dashboard/schemaVersion,
   // and from Phase 1 the targeting blocks) BESIDE the tool declarations, so the
@@ -169,11 +169,19 @@ export function composeAndValidateToolConfig(args: {
   // before dispatch. The CLI error boundary maps it to CONFIGURATION_ERROR.
   const validated = validateConfigDocument(schema, document);
 
-  return resolveConfig({
-    declarations,
-    file: fileBlocksFor(declarations, validated),
-    env,
-  });
+  // The validated document is returned alongside the resolved config so the
+  // host can build the targeting substrate (`buildTargets`) from the SAME
+  // single validated read — no second `readYamlFile` (ADR-0023 one-reader).
+  // `targets`/`globalExcludes` are host namespaces validated by the composed
+  // schema; `buildTargets` is a pure builder over them, never a reader.
+  return {
+    config: resolveConfig({
+      declarations,
+      file: fileBlocksFor(declarations, validated),
+      env,
+    }),
+    document: validated,
+  };
 }
 
 /**

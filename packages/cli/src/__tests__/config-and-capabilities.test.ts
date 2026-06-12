@@ -132,13 +132,14 @@ describe('composeAndValidateToolConfig', () => {
     return path;
   }
 
-  it('returns undefined when no tool declares config', () => {
+  it('returns no config + an empty document when no tool declares config', () => {
     const result = composeAndValidateToolConfig({
       tools: registryWith([makeTool({ id: 'x' })]),
       configPath: undefined,
       env: {},
     });
-    expect(result).toBeUndefined();
+    expect(result.config).toBeUndefined();
+    expect(result.document).toEqual({});
   });
 
   it('resolves declared defaults when there is no config file', () => {
@@ -147,7 +148,7 @@ describe('composeAndValidateToolConfig', () => {
       configPath: undefined,
       env: {},
     });
-    expect(result?.fitness).toEqual({ failOnErrors: 1 });
+    expect(result.config?.fitness).toEqual({ failOnErrors: 1 });
   });
 
   it('reads a valid namespace block over the defaults', () => {
@@ -157,7 +158,7 @@ describe('composeAndValidateToolConfig', () => {
       configPath,
       env: {},
     });
-    expect(result?.fitness).toEqual({ failOnErrors: 3 });
+    expect(result.config?.fitness).toEqual({ failOnErrors: 3 });
   });
 
   it('validates the claimed host blocks (cli/targets) and still tolerates genuinely-unknown keys', () => {
@@ -223,7 +224,7 @@ describe('composeAndValidateToolConfig', () => {
       env: {},
     });
 
-    expect(result?.plugins).toMatchObject({
+    expect(result.config?.plugins).toMatchObject({
       fit: ['@acme/fit-pack'],
       sim: ['@acme/sim-pack'],
       lang: ['@acme/lang-pack'],
@@ -292,7 +293,7 @@ describe('composeAndValidateToolConfig', () => {
     });
     // env (0) beats the file (5) — this is exactly what makes the gate "never
     // fail on errors" without editing opensip-tools.config.yml.
-    expect(result?.fitness).toMatchObject({ failOnErrors: 0, failOnWarnings: 0 });
+    expect(result.config?.fitness).toMatchObject({ failOnErrors: 0, failOnWarnings: 0 });
   });
 
   it('OPENSIP_FIT_FAIL_ON_WARNINGS env overrides the default (env > defaults)', () => {
@@ -302,7 +303,7 @@ describe('composeAndValidateToolConfig', () => {
       env: { OPENSIP_FIT_FAIL_ON_WARNINGS: '1' },
     });
     // defaults say 0; env (1) wins — fail on any warning.
-    expect(result?.fitness).toMatchObject({ failOnErrors: 1, failOnWarnings: 1 });
+    expect(result.config?.fitness).toMatchObject({ failOnErrors: 1, failOnWarnings: 1 });
   });
 });
 

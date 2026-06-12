@@ -31,7 +31,20 @@ import {
 
 import type { ToolConfigDeclaration } from '../declaration.js';
 
+/**
+ * Options for {@link hostConfigDeclarations}.
+ *
+ * The host's document-level declarations are mostly static, but the `plugins.*`
+ * namespace is dynamic — a plugin may contribute its own typed config keys. The
+ * composition root collects those and passes them here so the composed schema
+ * validates declared plugin keys strictly.
+ */
 export interface HostConfigDeclarationOptions {
+  /**
+   * Per-plugin config-key declarations discovered for this run. Each becomes a
+   * strictly-validated key under the `plugins.<id>` namespace. Omitted (or
+   * empty) when no plugin contributes config.
+   */
   readonly pluginConfigKeys?: readonly PluginConfigKeyDeclaration[];
 }
 

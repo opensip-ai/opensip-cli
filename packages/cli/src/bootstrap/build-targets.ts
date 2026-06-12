@@ -19,7 +19,7 @@
  */
 
 import { globalExcludesSchema, targetsRecordSchema, type Target } from '@opensip-tools/config';
-import { readYamlFile, type TargetResolver } from '@opensip-tools/core';
+import { type TargetResolver } from '@opensip-tools/core';
 import { TargetRegistry, applyGlobalExcludes, resolveTargets } from '@opensip-tools/targeting';
 
 /**
@@ -64,36 +64,36 @@ function toTarget(
 }
 
 /**
- * Build the host's `scope.targets` resolver from the loaded config document.
+ * Build the host's `scope.targets` resolver from the validated config document.
  *
- * Reads the config file at `configPath`, parses the `targets:` / `globalExcludes:`
- * blocks (already strict-validated whole-document by
- * `composeAndValidateToolConfig`; re-parsed here through the same field schemas
- * to normalize), registers each target into a substrate `TargetRegistry`, and
- * returns a `TargetResolver` wrapping it with the bound `resolveTargets` /
+ * Takes the SAME validated document the single sanctioned reader
+ * (`composeAndValidateToolConfig`) already produced — this is a pure builder, it
+ * never reads the config file itself (ADR-0023: one reader). The host-owned
+ * `targets:` / `globalExcludes:` namespaces were strict-validated whole-document
+ * by the composed schema; they are re-parsed here through the same field schemas
+ * only to recover their narrowed types (idempotent on already-validated data, no
+ * I/O), then each target is registered into a substrate `TargetRegistry` and
+ * wrapped in a `TargetResolver` with the bound `resolveTargets` /
  * `applyGlobalExcludes` closures.
  *
- * @param args.configPath The resolved path to `opensip-tools.config.yml`, or
- *   `undefined` for a project-agnostic / config-less run.
+ * @param args.document The validated config document from
+ *   `composeAndValidateToolConfig`, or an empty object for a config-less run.
  * @returns The `TargetResolver` to attach to `scope.targets`, or `undefined`
  *   when there is no config document or no `targets:` block to resolve.
  */
-export function buildTargets(args: {
-  readonly configPath: string | undefined;
-}): TargetResolver | undefined {
-  const { configPath } = args;
-  if (configPath === undefined) return undefined;
-
-  const raw: unknown = readYamlFile(configPath);
-  if (!isPlainObject(raw)) return undefined;
+export function buildTargets(args: { readonly document: unknown }): TargetResolver | undefined {
+  const { document } = args;
+  if (!isPlainObject(document)) return undefined;
 
   // No `targets:` block → no resolver. A document may carry only tool config
   // (graph/sim namespaces) with no file targeting, exactly like a config-less run.
-  if (raw.targets === undefined) return undefined;
+  if (document.targets === undefined) return undefined;
 
-  const targets = targetsRecordSchema.parse(raw.targets);
+  const targets = targetsRecordSchema.parse(document.targets);
   const globalExcludes: readonly string[] = Object.freeze(
-    raw.globalExcludes === undefined ? [] : [...globalExcludesSchema.parse(raw.globalExcludes)],
+    document.globalExcludes === undefined
+      ? []
+      : [...globalExcludesSchema.parse(document.globalExcludes)],
   );
 
   const registry = new TargetRegistry();
@@ -103,6 +103,7 @@ export function buildTargets(args: {
 
   return {
     getByName: (name) => registry.getByName(name),
+    // @fitness-ignore-next-line batch-operation-limits -- getAll() over the project's declared target set (a handful of named file-sets per config document), bounded like core's tool registry getAll.
     getAll: () => registry.getAll(),
     getByTag: (tag) => registry.getByTag(tag),
     has: (name) => registry.has(name),
