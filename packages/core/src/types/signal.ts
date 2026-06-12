@@ -35,6 +35,14 @@ export interface Signal {
   readonly fixConfidence?: number;
   readonly metadata: Record<string, unknown>;
   readonly strength?: number;
+  /**
+   * Stable identity for the host baseline/ratchet plane (ADR-0036). Stamped at
+   * signal-creation / envelope-construction time by the tool's
+   * `FingerprintStrategy` (host default when unset), via `stampFingerprints`,
+   * BEFORE the envelope reaches a host seam. Opaque to the plane; the plane never
+   * re-fingerprints or re-derives it downstream (the host seams only read it).
+   * Optional: a freshly-`createSignal`'d signal has none until stamped.
+   */
   readonly fingerprint?: string;
   readonly createdAt: string;
 }
