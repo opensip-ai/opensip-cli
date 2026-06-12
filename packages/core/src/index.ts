@@ -22,6 +22,13 @@ export {
   resolveVerdictPolicy,
 } from './lib/verdict-policy.js';
 export type { VerdictPolicy } from './lib/verdict-policy.js';
+// Host-owned baseline/ratchet plane (ADR-0036): the per-tool fingerprint
+// strategy primitive, the host default identity, and the stamp helper.
+export {
+  defaultFingerprintStrategy,
+  stampFingerprints,
+} from './baseline/fingerprint-strategy.js';
+export type { FingerprintStrategy } from './baseline/fingerprint-strategy.js';
 export { createSignalFromViolation } from './signals/create-signal-from-violation.js';
 export type { ViolationInput } from './signals/create-signal-from-violation.js';
 // Cloud signal egress envelope (ADR-0008)
