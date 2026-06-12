@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-11
+last_verified: 2026-06-12
 release: v3.0.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -20,7 +20,7 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **166+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **166 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 

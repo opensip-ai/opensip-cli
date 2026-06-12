@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Doc conventions"
 audience: [contributors]
@@ -156,7 +156,7 @@ Most docs end with a "What's next" section. A few — especially the reference d
 
 Last verified at v3.0.0 against:
 
-- `packages/` directory listing (32 packages …).
+- `packages/` directory listing (33 publishable packages plus workspace-private support packages ...).
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.
 ```

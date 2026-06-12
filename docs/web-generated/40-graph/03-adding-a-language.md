@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Adding a language to graph"
 audience: [contributors, plugin-authors]
@@ -40,7 +40,7 @@ This doc walks a contributor through that workflow.
 
 The canonical contract source is the TypeScript file itself: [`packages/graph/engine/src/lang-adapter/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/lang-adapter/types.ts) — interface signatures, behavioral invariants I-1 through I-9 (in JSDoc), and the I/O shapes that flow between the orchestrator and your adapter.
 
-Then look at the reference implementations. Five ship in v2.0.0:
+Then look at the reference implementations. Five ship today:
 
 - [`packages/graph/graph-typescript/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-typescript/src/index.ts) — `typescriptGraphAdapter` is a thin façade over the existing TypeScript-specific machinery. Each contract method delegates to a sibling file (`discover.ts`, `parse.ts`, `walk.ts`, `edges.ts`, `cache-key.ts`) and translates I/O shapes. Symbol-resolved (`'high'` confidence on direct calls).
 - [`packages/graph/graph-python/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-python/src/index.ts) — `pythonGraphAdapter` is the canonical tree-sitter reference. ~8 source files plus a fixture project; its `parse.ts` loads the vendored `tree-sitter-python.wasm` via `web-tree-sitter` and binds the shared `createTreeSitterParseProject` driver from `@opensip-tools/graph-adapter-common`. Discovery via `pyproject.toml` / `setup.py` with `**/*.py` glob fallback; resolution by simple name. **If you're writing a tree-sitter adapter, read this one first** — its layout is the recommended template.
@@ -139,8 +139,8 @@ Different adapters produce different-fidelity edges. This is intrinsic — TypeS
 | `typescript` (shipped, v1.0) | `'high'` (symbol-resolved) | Reference. Has the TS type-checker. |
 | `python` (shipped, v1.3.0) | Mostly `'medium'`; `'low'` on simple-name collisions | Tree-sitter; multiple functions named `process` may resolve to the wrong target. |
 | `rust` (shipped, v1.3.0) | `'medium'` (with `impl` block context for receivers) | Tree-sitter; trait dispatch and method-on-generic resolution stay name-only. |
-| `go` (shipped, v2.0.0) | `'medium'` (with receiver-type narrowing) | Tree-sitter; package-aware discovery via `go.mod`. |
-| `java` (shipped, v2.0.0) | `'medium'` (with class context) | Tree-sitter; class-resident scope means the resolver always knows the enclosing type. |
+| `go` (first shipped in v2.0.0) | `'medium'` (with receiver-type narrowing) | Tree-sitter; package-aware discovery via `go.mod`. |
+| `java` (first shipped in v2.0.0) | `'medium'` (with class context) | Tree-sitter; class-resident scope means the resolver always knows the enclosing type. |
 | `c/c++` (planned) | `'medium'` | Header/source duplication and namespace resolution are the wrinkles. |
 
 Per-rule fidelity expectations:

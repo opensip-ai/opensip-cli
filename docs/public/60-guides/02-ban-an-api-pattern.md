@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Ban an API pattern"
 audience: [plugin-authors, getting-started]
@@ -17,7 +17,7 @@ related-docs:
 
 This is the single most common reason teams adopt opensip-tools: *"I want to fail CI when anyone uses X."* The X is usually a deprecated function, an unsafe primitive, a private/internal API that leaked, or a slow path you've already deprecated in the docs.
 
-This guide uses **`crypto.createCipher`** as the running example. It's a real-world ban: `createCipher` was removed in Node 22 and was insecure before that (no IV, MD5-based KDF). The right replacement is `crypto.createCipheriv()`. Banning the deprecated form in your codebase is exactly the kind of architectural rule opensip-tools exists to enforce.
+This guide uses **`crypto.createCipher`** as the running example. It's a real-world ban shape: `createCipher` is a legacy, unsafe API family (no IV, MD5-based KDF), and the safer replacement is `crypto.createCipheriv()`. Banning the deprecated form in your codebase is exactly the kind of architectural rule opensip-tools exists to enforce.
 
 We'll write the ban two ways: with a regex (5 minutes, works for ~80% of cases) and with the TypeScript AST (a bit more code, catches the cases regex misses).
 
@@ -33,7 +33,7 @@ import { defineCheck } from '@opensip-tools/fitness';
 export default defineCheck({
   id: '2b2b2b2b-2b2b-4b2b-8b2b-2b2b2b2b2b2b',
   slug: 'no-create-cipher',
-  description: 'Disallow crypto.createCipher (insecure; removed in Node 22). Use createCipheriv instead.',
+  description: 'Disallow crypto.createCipher (legacy unsafe API). Use createCipheriv instead.',
   tags: ['security', 'deprecated-api'],
   scope: { languages: ['typescript'], concerns: [] },
   // Strip strings + comments so the check doesn't false-positive on
@@ -49,7 +49,7 @@ export default defineCheck({
       const line = content.slice(0, match.index).split('\n').length;
       violations.push({
         line,
-        message: 'Use crypto.createCipheriv() — createCipher is insecure and was removed in Node 22.',
+        message: 'Use crypto.createCipheriv(); createCipher is a legacy unsafe API.',
         severity: 'error',
       });
     }
@@ -104,7 +104,7 @@ export default defineCheck({
         if (name === 'createCipher') {
           violations.push({
             line: sf.getLineAndCharacterOfPosition(node.getStart()).line + 1,
-            message: 'Use crypto.createCipheriv() — createCipher is insecure and was removed in Node 22.',
+            message: 'Use crypto.createCipheriv(); createCipher is a legacy unsafe API.',
             severity: 'error',
           });
         }

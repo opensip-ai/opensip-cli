@@ -1,15 +1,16 @@
 ---
 status: current
-last_verified: 2026-06-09
+last_verified: 2026-06-12
 release: v3.0.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
-purpose: "Lookup-shaped reference for every CLI command, its flags, and when to use each."
+purpose: "Lookup-shaped reference for user-facing CLI commands, important machine-facing commands, flags, and exit semantics."
 source-files:
   - packages/cli/src/index.ts
   - packages/cli/src/commands/init.ts
   - packages/cli/src/commands/configure.ts
   - packages/cli/src/commands/plugin.ts
+  - packages/cli/src/commands/tools/index.ts
   - packages/cli/src/commands/uninstall.ts
   - packages/cli/src/commands/completion.ts
   - packages/fitness/engine/src/tool.ts
@@ -21,7 +22,7 @@ related-docs:
 ---
 # CLI command tree
 
-Every command, alphabetized by command name. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
+The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
 The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `fit-list`, `fit-recipes`, graph helper commands) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `dashboard`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/commands/).
 
@@ -38,10 +39,12 @@ opensip-tools <command> --help           # per-command help
 
 Per-command flags that appear on most subcommands. The flags shared across the
 tool run commands (`fit`/`sim`/`graph`) — `--json`, `--cwd`, `-q/--quiet`,
-`-v/--verbose`, `--debug`, `--report-to`, `--api-key`, `--open` — are declared
+`-v/--verbose`, `--debug`, `--report-to`, and `--api-key` — are declared
 **once** in a common-flag registry and applied via `applyCommonFlags`, so their
-names, short aliases, descriptions, and defaults are identical across every tool
-and cannot drift (ADR-0021). `-v/--verbose` is a uniform "show the detailed
+names, short aliases, descriptions, and defaults are identical where applied and
+cannot drift (ADR-0021). `fit` and `sim` also expose `--open` for dashboard
+auto-open; `graph` writes dashboard data and uses the separate `dashboard`
+command to open the report. `-v/--verbose` is a uniform "show the detailed
 report body" flag whose output is identical in a TTY and a pipe. The only
 `program`-level Commander options are `--version` and `--no-cloud`:
 
@@ -397,7 +400,7 @@ JSON shape:
 {
   "type": "list-checks",
   "checks": [{ "slug": "...", "description": "...", "tags": ["..."] }],
-  "totalCount": 155
+  "totalCount": 166
 }
 ```
 
@@ -620,12 +623,30 @@ The documented surface for whole Tool plugins (`kind: "tool"` packages that cont
 ```
 opensip-tools tools list
 opensip-tools tools validate <spec>
-opensip-tools tools install <spec> [--project]
+opensip-tools tools install <spec> [--global|--project]
 opensip-tools tools uninstall <name-or-id> [--global|--project] [--purge-data]
 opensip-tools tools data-purge <tool-id>
 ```
 
 `validate` runs the same admission pipeline the CLI's own bootstrap admits tools through — one validator, shared. `install` is atomic: stage → validate → activate; a failed install leaves nothing behind. `uninstall` never deletes project SQLite data; `data-purge` deletes rows (sessions, baselines, tool state), never tables. **`validate` and `install` execute the package's module** — see the trust notes in the full reference.
+
+---
+
+## Internal and machine-facing commands
+
+These commands are mounted through the same `CommandSpec` system but are primarily for workers, export jobs, or project automation rather than daily interactive use:
+
+| Command | Owner | Purpose |
+|---|---|---|
+| `opensip-tools catalog-export` | graph | Emit a graph catalog artifact for parent ingestion. Uses `--catalog-output`, tenant/repo/run identity flags, `--cwd`, `--language`, and `--resolution`. |
+| `opensip-tools sarif-export` | graph | Emit graph findings as SARIF for a stored run. Uses `--output-sarif`, tenant/repo/run identity flags, `--cwd`, `--language`, and `--resolution`. |
+| `opensip-tools graph-equivalence-check` | graph | Contributor guardrail for exact vs. sharded graph-engine equivalence. Uses `--cwd`, `--budget`, and `--update-budget`. |
+| `opensip-tools graph-run-worker` | graph | Internal worker for memory-isolated graph runs. |
+| `opensip-tools graph-shard-worker <specPath>` | graph | Internal worker for sharded catalog builds. |
+| `opensip-tools fit-run-worker` | fitness | Internal worker for memory-isolated fitness runs. |
+| `opensip-tools sim-run-worker` | simulation | Internal worker for memory-isolated simulation runs. |
+
+The worker commands are not the public authoring surface; they exist so parent commands can fan out safely while preserving the same tool-owned execution contracts.
 
 ---
 

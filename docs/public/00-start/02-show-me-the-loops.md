@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Show me each loop"
 audience: [getting-started]
@@ -174,7 +174,7 @@ Each exits `0` when the bar holds, non-zero when it doesn't. Each emits SARIF fo
 
 | If you want to … | Go to … |
 |---|---|
-| Run the four-command smoke right now | [Quick start](./00-quick-start.md) |
+| Run the first smoke test right now | [Quick start](./00-quick-start.md) |
 | Understand the design philosophy | [What is opensip-tools](./01-what-is-opensip-tools.md) |
 | Author a fit check or recipe | [Plugin authoring](../50-extend/01-plugin-authoring.md) |
 | Go deep on one loop | [Fit](../20-fit/01-recipes-and-checks.md) · [Sim](../30-sim/01-scenarios-and-recipes.md) · [Graph](../40-graph/01-stages-and-catalog.md) |

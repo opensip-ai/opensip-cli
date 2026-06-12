@@ -1,3 +1,21 @@
+---
+status: current
+last_verified: 2026-06-12
+release: v3.0.0
+title: "`tools` command"
+audience: [plugin-authors, contributors]
+purpose: "Customer-facing command group for managing whole Tool plugins: list, validate, install, uninstall, and data-purge."
+source-files:
+  - packages/cli/src/commands/tools/index.ts
+  - packages/cli/src/commands/tools/list.ts
+  - packages/cli/src/bootstrap/register-tools.ts
+  - packages/core/src/plugins/manifest-loader.ts
+related-docs:
+  - ./01-cli-commands.md
+  - ./10-environment-variables.md
+  - ./11-migrating-to-3.0.md
+  - ../50-extend/06-full-tool-plugins.md
+---
 # `tools` — manage whole Tool plugins
 
 The customer-facing command group for whole Tool plugins (ADR-0041): packages

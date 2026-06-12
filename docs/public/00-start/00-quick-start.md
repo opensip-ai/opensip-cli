@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Quick start"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
-purpose: "Four commands from zero to a passing fitness run. Hands-on before the conceptual material."
+purpose: "From zero to a passing fitness run. Hands-on before the conceptual material."
 source-files:
   - README.md
   - packages/cli/src/index.ts
@@ -17,12 +17,12 @@ related-docs:
 ---
 # Quick start
 
-Four commands from a clean shell to a passing fitness run. The point of this page is to give you something working in your terminal *before* you read the conceptual material — every other doc in this set is sharper once you've seen the output once.
+From a clean shell to a passing fitness run. The point of this page is to give you something working in your terminal *before* you read the conceptual material — every other doc in this set is sharper once you've seen the output once.
 
 > **What you'll have after this page:**
 > - The `opensip-tools` CLI installed.
 > - An `opensip-tools.config.yml` and an `opensip-tools/` directory in a project of your choice.
-> - One passing `fit` run and one passing `sim` run.
+> - One passing `fit` run, plus an optional `sim` smoke test.
 > - Enough mechanical context that [`./01-what-is-opensip-tools.md`](./01-what-is-opensip-tools.md) lands as *"oh, that's why"* instead of *"wait, what's a recipe?"*
 
 ---
@@ -33,14 +33,14 @@ opensip-tools auto-detects your project's language(s) from filesystem markers an
 
 | Language | Detection marker | Language-specific checks | Universal checks |
 |---|---|---|---|
-| **TypeScript** / JS / TSX | `tsconfig.json` (or `package.json` alone) | 51 | ✓ |
+| **TypeScript** / JS / TSX | `tsconfig.json` (or `package.json` alone) | 52 | ✓ |
 | **Python** | `pyproject.toml`, `setup.py` | 2 | ✓ |
 | **Java** | `pom.xml`, `build.gradle` | 1 | ✓ |
 | **Go** | `go.mod` | 1 | ✓ |
 | **C / C++** | `CMakeLists.txt` | 1 (clang-tidy backed) | ✓ |
 | **Rust** | `Cargo.toml` | 1 | ✓ |
 
-All six get the **98 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment through 51 TypeScript-specific checks for typed-inject, drizzle-orm, React patterns, package.json exports, and tsconfig posture.
+All six get the **108 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment through 52 TypeScript-specific checks for typed-inject, drizzle-orm, React patterns, package.json exports, and tsconfig posture.
 
 For the full per-language breakdown, see [`../70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md).
 
@@ -56,7 +56,7 @@ If you don't have a project handy, `git clone https://github.com/opensip-ai/open
 
 ---
 
-## The four commands
+## The first run
 
 ```bash
 # 1. Install the CLI globally
@@ -68,8 +68,10 @@ cd your-project
 # 3. Scaffold config + example check/scenario (language auto-detected)
 opensip-tools init
 
-# 4. Run the smoke test — both should exit 0
+# 4. Run the fitness smoke test
 opensip-tools fit --recipe example
+
+# 5. Optional: run the scaffolded simulation smoke test
 opensip-tools sim --recipe example
 ```
 
@@ -129,6 +131,9 @@ opensip-tools fit
 # See what checks are available
 opensip-tools fit --list
 
+# See what graph would analyze without building a catalog
+opensip-tools graph --list-files
+
 # Get a per-violation breakdown instead of the summary line
 opensip-tools fit --verbose
 
@@ -161,8 +166,9 @@ You've seen the loop run. The rest of this section deepens what you just saw:
 
 1. **[`./02-show-me-the-loops.md`](./02-show-me-the-loops.md)** — One code sample per tool: a fit check, a sim scenario, a graph rule. See what authoring looks like, now that you know the platform works.
 2. **[`./01-what-is-opensip-tools.md`](./01-what-is-opensip-tools.md)** — The product, the problem, the philosophy. What you just ran, conceptually.
-3. **[`./05-vocabulary.md`](./05-vocabulary.md)** — The terms used everywhere: *Tool, recipe, check, scenario, signaler, target, language adapter, plugin, session.*
-4. **[`./06-system-context.md`](./06-system-context.md)** — Where the binary sits between you, the codebase, CI, and OpenSIP Cloud.
+3. **[`../60-guides/00-initialize-your-first-repo.md`](../60-guides/00-initialize-your-first-repo.md)** — The careful repo-adoption version of this page.
+4. **[`./05-vocabulary.md`](./05-vocabulary.md)** — The terms used everywhere: *Tool, recipe, check, scenario, signaler, target, language adapter, plugin, session.*
+5. **[`./06-system-context.md`](./06-system-context.md)** — Where the binary sits between you, the codebase, CI, and OpenSIP Cloud.
 
 After this section, the mental-model section ([`../10-concepts/`](../10-concepts/)) takes you deep — starting with [`01-fitness-loop.md`](../10-concepts/01-fitness-loop.md), which threads one check end-to-end through the system you just ran.
 

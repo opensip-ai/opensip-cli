@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Migrating to 2.7"
 audience: [ci-integrators, plugin-authors]
@@ -151,7 +151,7 @@ depend on `@opensip-tools/tree-sitter` directly rather than vendoring
 
 - [JSON output schema](./04-json-output-schema.md) — the full `SignalEnvelope`
   reference and the v1 → v2 mapping table.
-- [Package catalog](./02-package-catalog.md) — the current 31-package set.
+- [Package catalog](./02-package-catalog.md) — the current package set.
 - [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md) —
   why `Signal` is the universal output currency.
 - [ADR-0012](../../decisions/ADR-0012-versioning-and-release-policy.md) — the

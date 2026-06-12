@@ -6,13 +6,14 @@
       "file": "docs/web-generated/README.md",
       "path": "/docs/opensip-tools/",
       "section": "",
-      "title": "opensip-tools Architecture",
+      "title": "opensip-tools Docs",
       "audience": [
+        "getting-started",
         "contributors",
         "plugin-authors",
         "ci-integrators"
       ],
-      "purpose": "Teaching path through opensip-tools — what it is, how it thinks, how it runs — plus a lookup-shaped reference catalog."
+      "purpose": "Public documentation entry point for opensip-tools v3.0.0: product overview, fast paths, and the full reference map."
     },
     {
       "file": "docs/web-generated/00-start/00-quick-start.md",
@@ -25,7 +26,7 @@
         "plugin-authors",
         "ci-integrators"
       ],
-      "purpose": "Four commands from zero to a passing fitness run. Hands-on before the conceptual material."
+      "purpose": "From zero to a passing fitness run. Hands-on before the conceptual material."
     },
     {
       "file": "docs/web-generated/00-start/01-what-is-opensip-tools.md",
@@ -358,6 +359,17 @@
       "purpose": "Build a Tool plugin — your own opensip-tools subcommand. Use when fit/sim/graph aren't the right shape and you want something fundamentally different."
     },
     {
+      "file": "docs/web-generated/60-guides/00-initialize-your-first-repo.md",
+      "path": "/docs/opensip-tools/60-guides/00-initialize-your-first-repo/",
+      "section": "60-guides",
+      "title": "Initialize your first repo",
+      "audience": [
+        "getting-started",
+        "ci-integrators"
+      ],
+      "purpose": "Task-led guide for running opensip-tools init, understanding the scaffold, and getting to the first useful run."
+    },
+    {
       "file": "docs/web-generated/60-guides/01-write-your-first-check.md",
       "path": "/docs/opensip-tools/60-guides/01-write-your-first-check/",
       "section": "60-guides",
@@ -413,6 +425,29 @@
       "purpose": "Task-led: when an ESLint rule belongs in opensip-tools, when it doesn't, and how the two tools coexist in one CI pipeline."
     },
     {
+      "file": "docs/web-generated/60-guides/06-use-graph.md",
+      "path": "/docs/opensip-tools/60-guides/06-use-graph/",
+      "section": "60-guides",
+      "title": "Use graph",
+      "audience": [
+        "getting-started",
+        "ci-integrators",
+        "contributors"
+      ],
+      "purpose": "Task-led guide for running static call-graph analysis, inspecting discovered files, scoping runs, opening the dashboard, and adopting graph gates."
+    },
+    {
+      "file": "docs/web-generated/60-guides/07-create-your-first-tool.md",
+      "path": "/docs/opensip-tools/60-guides/07-create-your-first-tool/",
+      "section": "60-guides",
+      "title": "Create your first Tool",
+      "audience": [
+        "plugin-authors",
+        "contributors"
+      ],
+      "purpose": "Task-led guide for creating a tracked project-local Tool plugin that adds a custom opensip-tools subcommand."
+    },
+    {
       "file": "docs/web-generated/70-reference/01-cli-commands.md",
       "path": "/docs/opensip-tools/70-reference/01-cli-commands/",
       "section": "70-reference",
@@ -422,7 +457,7 @@
         "ci-integrators",
         "contributors"
       ],
-      "purpose": "Lookup-shaped reference for every CLI command, its flags, and when to use each."
+      "purpose": "Lookup-shaped reference for user-facing CLI commands, important machine-facing commands, flags, and exit semantics."
     },
     {
       "file": "docs/web-generated/70-reference/02-package-catalog.md",
@@ -542,7 +577,12 @@
       "file": "docs/web-generated/70-reference/12-tools-command.md",
       "path": "/docs/opensip-tools/70-reference/12-tools-command/",
       "section": "70-reference",
-      "title": "Tools Command"
+      "title": "`tools` command",
+      "audience": [
+        "plugin-authors",
+        "contributors"
+      ],
+      "purpose": "Customer-facing command group for managing whole Tool plugins: list, validate, install, uninstall, and data-purge."
     },
     {
       "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",
@@ -688,11 +728,14 @@
       "section": "60-guides",
       "title": "60 — Guides",
       "pages": [
+        "/docs/opensip-tools/60-guides/00-initialize-your-first-repo/",
         "/docs/opensip-tools/60-guides/01-write-your-first-check/",
         "/docs/opensip-tools/60-guides/02-ban-an-api-pattern/",
         "/docs/opensip-tools/60-guides/03-wire-into-ci/",
         "/docs/opensip-tools/60-guides/04-adopt-in-a-monorepo/",
-        "/docs/opensip-tools/60-guides/05-migrate-from-eslint/"
+        "/docs/opensip-tools/60-guides/05-migrate-from-eslint/",
+        "/docs/opensip-tools/60-guides/06-use-graph/",
+        "/docs/opensip-tools/60-guides/07-create-your-first-tool/"
       ]
     },
     {
@@ -732,6 +775,7 @@
       "audience": "getting-started",
       "title": "Start",
       "pages": [
+        "/docs/opensip-tools/",
         "/docs/opensip-tools/00-start/00-quick-start/",
         "/docs/opensip-tools/00-start/01-what-is-opensip-tools/",
         "/docs/opensip-tools/00-start/02-show-me-the-loops/",
@@ -739,10 +783,12 @@
         "/docs/opensip-tools/00-start/04-faq/",
         "/docs/opensip-tools/10-concepts/06-cloud-signal-sync/",
         "/docs/opensip-tools/50-extend/02-project-local-plugins/",
+        "/docs/opensip-tools/60-guides/00-initialize-your-first-repo/",
         "/docs/opensip-tools/60-guides/01-write-your-first-check/",
         "/docs/opensip-tools/60-guides/02-ban-an-api-pattern/",
         "/docs/opensip-tools/60-guides/03-wire-into-ci/",
         "/docs/opensip-tools/60-guides/05-migrate-from-eslint/",
+        "/docs/opensip-tools/60-guides/06-use-graph/",
         "/docs/opensip-tools/70-reference/03-configuration/",
         "/docs/opensip-tools/70-reference/05-checks-index/",
         "/docs/opensip-tools/70-reference/08-supply-chain-security/"
@@ -776,6 +822,7 @@
         "/docs/opensip-tools/60-guides/01-write-your-first-check/",
         "/docs/opensip-tools/60-guides/02-ban-an-api-pattern/",
         "/docs/opensip-tools/60-guides/04-adopt-in-a-monorepo/",
+        "/docs/opensip-tools/60-guides/07-create-your-first-tool/",
         "/docs/opensip-tools/70-reference/02-package-catalog/",
         "/docs/opensip-tools/70-reference/03-configuration/",
         "/docs/opensip-tools/70-reference/04-json-output-schema/",
@@ -784,6 +831,7 @@
         "/docs/opensip-tools/70-reference/08-supply-chain-security/",
         "/docs/opensip-tools/70-reference/09-migrating-to-2.12/",
         "/docs/opensip-tools/70-reference/11-migrating-to-3.0/",
+        "/docs/opensip-tools/70-reference/12-tools-command/",
         "/docs/opensip-tools/80-implementation/02-plugin-loader/"
       ]
     },
@@ -805,9 +853,11 @@
         "/docs/opensip-tools/40-graph/01-stages-and-catalog/",
         "/docs/opensip-tools/40-graph/02-rules-and-gating/",
         "/docs/opensip-tools/40-graph/04-suppressing-findings/",
+        "/docs/opensip-tools/60-guides/00-initialize-your-first-repo/",
         "/docs/opensip-tools/60-guides/03-wire-into-ci/",
         "/docs/opensip-tools/60-guides/04-adopt-in-a-monorepo/",
         "/docs/opensip-tools/60-guides/05-migrate-from-eslint/",
+        "/docs/opensip-tools/60-guides/06-use-graph/",
         "/docs/opensip-tools/70-reference/01-cli-commands/",
         "/docs/opensip-tools/70-reference/03-configuration/",
         "/docs/opensip-tools/70-reference/04-json-output-schema/",
@@ -847,6 +897,8 @@
         "/docs/opensip-tools/40-graph/04-suppressing-findings/",
         "/docs/opensip-tools/50-extend/04-check-pack-architecture/",
         "/docs/opensip-tools/50-extend/05-language-adapters/",
+        "/docs/opensip-tools/60-guides/06-use-graph/",
+        "/docs/opensip-tools/60-guides/07-create-your-first-tool/",
         "/docs/opensip-tools/70-reference/01-cli-commands/",
         "/docs/opensip-tools/70-reference/02-package-catalog/",
         "/docs/opensip-tools/70-reference/06-dashboard/",

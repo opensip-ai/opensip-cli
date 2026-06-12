@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Plugin authoring"
 audience: [plugin-authors]
@@ -54,5 +54,6 @@ That's by design. The whole point of the platform is that adding a new tool or p
 ## Where to go next
 
 - **Authoring your first thing** → [Write your first check](/docs/opensip-tools/60-guides/01-write-your-first-check/). Hands-on walkthrough with `init`, a custom check, a recipe, and a CI gate.
-- **Reference for every check that ships** → [Checks reference](/docs/opensip-tools/70-reference/05-checks-index/). Browse all 155 built-in checks with descriptions and links to source.
+- **Creating a whole CLI subcommand** → [Create your first Tool](/docs/opensip-tools/60-guides/07-create-your-first-tool/). Short path before the full Tool reference.
+- **Reference for every check that ships** → [Checks reference](/docs/opensip-tools/70-reference/05-checks-index/). Browse all 166 built-in checks with descriptions and links to source.
 - **Deep dive on what a "Tool" is architecturally** → [The tool-plugin model](/docs/opensip-tools/10-concepts/02-tool-plugin-model/).
