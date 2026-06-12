@@ -30,6 +30,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
+import type { PartitionStrategy } from '../../types.js';
+
+export type { PartitionStrategy } from '../../types.js';
+
 /**
  * Layout classification — three buckets that drive the strategy choice
  * in `selectStrategyForLayout`.
@@ -57,8 +61,6 @@ export interface SyntheticPartition {
   readonly id: string;
   readonly files: readonly string[];
 }
-
-type PartitionStrategy = 'directory-depth' | 'file-count-chunks' | 'hybrid';
 
 /** Default elevation threshold — mirrors `heap-preflight.ts` HEAP_TARGETS top tier. */
 const DEFAULT_HEAP_ELEVATION_THRESHOLD = 2500;

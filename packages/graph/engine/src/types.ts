@@ -534,6 +534,12 @@ export interface PersistedFeatures {
   readonly edge?: readonly PackageEdgeFeature[];
 }
 
+/**
+ * Flat-monorepo synthetic-partition strategy (flat-monorepo-strategy.ts).
+ * Phase 2 of the Louvain prototype adds 'community' (ADR-0045).
+ */
+export type PartitionStrategy = 'directory-depth' | 'file-count-chunks' | 'hybrid';
+
 /** Per-rule and overall configuration knobs. */
 export interface GraphConfig {
   /** Minimum lines for a duplicated-function-body match (defaults: 5). */
