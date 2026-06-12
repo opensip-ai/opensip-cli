@@ -20,6 +20,7 @@ import {
 import { currentScope, generatePrefixedId, logger } from '@opensip-tools/core';
 import { SessionRepo } from '@opensip-tools/session-store';
 
+import { fitnessFingerprintStrategy } from '../../baseline-strategy.js';
 import { buildFitnessSessionPayload } from '../../persistence/session-payload.js';
 import { violationToSignal } from '../../signalers/violation-to-signal.js';
 
@@ -117,6 +118,10 @@ export function buildFitEnvelope(
     // they ride runFaulted.
     policy: resolveFitVerdictPolicy(signalersConfig),
     runFaulted: getPluginLoadErrors().length > 0,
+    // ADR-0036: fit's message-hash identity (line-shift-tolerant), stamped at
+    // construction so EVERY fit envelope — live/json/cloud, not only the gate
+    // path — carries gate-ready fingerprints.
+    fingerprintStrategy: fitnessFingerprintStrategy,
   });
 }
 

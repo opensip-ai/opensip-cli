@@ -165,7 +165,9 @@ opensip-tools fit --gate-compare
        → if (opts.gateSave || opts.gateCompare) { runGateMode(args, cli); return; }
             → runGateMode (fit-modes.ts):
                  → executeFit(args)              ← same fit run, no special path
-                 → stampFingerprints(envelope, fitnessFingerprintStrategy)
+                      (the envelope arrives fingerprint-stamped: buildFitEnvelope
+                       passes fitnessFingerprintStrategy to buildSignalEnvelope,
+                       which stamps every signal at construction)
                  → if save: cli.saveBaseline('fitness', envelope)
                             deliverFitSignals(...)        ← exit per failOnErrors/failOnWarnings
                  → else:    cli.compareBaseline('fitness', envelope)
@@ -174,7 +176,7 @@ opensip-tools fit --gate-compare
                                                           ← host sets exit 1 on degraded
 ```
 
-The gate is a post-processing layer on top of the standard `executeFit()` run. It doesn't change which checks ran, which targets were resolved, or how filtering applied. It takes the same `SignalEnvelope` the renderer would have shown, stamps fingerprints, and hands it to the host seams. Note that fitness never calls `setExitCode` for the gate path (ADR-0035): the compare verdict rides into `deliverFitSignals` as the host's `runFailed` override, so a `--report-to` upload failure can never mask the gate verdict.
+The gate is a post-processing layer on top of the standard `executeFit()` run. It doesn't change which checks ran, which targets were resolved, or how filtering applied. It takes the same `SignalEnvelope` the renderer would have shown — already fingerprint-stamped at construction (`buildSignalEnvelope` stamps every signal with the tool's strategy, or the host default `ruleId|filePath|line|col` for a tool that declares none) — and hands it to the host seams. Note that fitness never calls `setExitCode` for the gate path (ADR-0035): the compare verdict rides into `deliverFitSignals` as the host's `runFailed` override, so a `--report-to` upload failure can never mask the gate verdict.
 
 This is why ignore directives are compatible with the gate: a directive suppresses a violation *before* the signal enters the envelope, so the baseline doesn't see it and the compare doesn't see it. A new directive added today removes a finding from the current run; the gate reports it as resolved (since it was in the baseline). A directive removed today re-introduces a finding; the gate reports it as added.
 

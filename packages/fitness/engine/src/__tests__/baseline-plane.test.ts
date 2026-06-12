@@ -23,7 +23,7 @@ function fsig(ruleId: string, file: string, message: string, line = 1): Signal {
   return createSignal({ source: 'fit', severity: 'high', ruleId, message, code: { file, line } });
 }
 
-function stamp(signals: readonly Signal[]): Signal[] {
+function stamp(signals: readonly Signal[]): readonly Signal[] {
   return stampFingerprints(signals, fitnessFingerprintStrategy);
 }
 

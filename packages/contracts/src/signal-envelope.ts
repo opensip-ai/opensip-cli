@@ -20,11 +20,16 @@
  * version. It is `2`, succeeding the implicit `CliOutput` "1.0" husk this
  * envelope replaces.
  */
-import { policyPasses, SeverityPolicy } from '@opensip-tools/core';
+import {
+  defaultFingerprintStrategy,
+  policyPasses,
+  SeverityPolicy,
+  stampFingerprints,
+} from '@opensip-tools/core';
 
 import { passRate } from './score.js';
 
-import type { Signal, ToolShortId, VerdictPolicy } from '@opensip-tools/core';
+import type { FingerprintStrategy, Signal, ToolShortId, VerdictPolicy } from '@opensip-tools/core';
 
 /**
  * Run-level verdict header. `passed` ⇔ "no `critical`/`high` signals";
@@ -113,6 +118,18 @@ export interface BuildEnvelopeInput {
    * FAILs, independent of the findings policy (a crash ≠ "0 errors found").
    */
   readonly runFaulted: boolean;
+  /**
+   * The tool's baseline-identity strategy (ADR-0036). {@link buildSignalEnvelope}
+   * stamps `Signal.fingerprint` with it at construction, so every envelope
+   * reaches the host seams (gate save/compare, cloud, SARIF) already stamped —
+   * the "tool forgot to stamp" failure class cannot occur for an envelope built
+   * here. Omitted ⇒ {@link defaultFingerprintStrategy} (`ruleId|filePath|line|col`),
+   * which is exactly the documented inheritance for a tool that declares no
+   * `Tool.fingerprintStrategy`. Stamping is idempotent: a signal that already
+   * carries a non-empty `fingerprint` is preserved byte-for-byte, so a tool may
+   * still stamp earlier (e.g. at `createSignal`) without double-hashing.
+   */
+  readonly fingerprintStrategy?: FingerprintStrategy;
 }
 
 /**
@@ -129,15 +146,27 @@ export interface BuildEnvelopeInput {
  * - `verdict.passed` (ADR-0035) ⇔ the run did not fault, no unit errored, AND
  *   the error/warning counts pass the tool's findings `policy`. This is the
  *   single verdict that drives both the exit code and the headline.
+ * - Every signal is fingerprint-stamped (ADR-0036) with
+ *   `input.fingerprintStrategy` (host default when omitted; idempotent for
+ *   pre-stamped signals), so the built envelope is gate-ready by construction.
  */
 export function buildSignalEnvelope(input: BuildEnvelopeInput): SignalEnvelope {
   const total = input.units.length;
   const passed = input.units.filter((u) => u.passed).length;
   const failed = total - passed;
 
+  // ADR-0036: fingerprints are an envelope-construction concern. Stamping here
+  // (tool strategy, host default when none) guarantees every built envelope is
+  // gate-ready, instead of trusting each tool to remember a post-hoc stamp that
+  // would otherwise only fail at the first `--gate-save`.
+  const signals = stampFingerprints(
+    input.signals,
+    input.fingerprintStrategy ?? defaultFingerprintStrategy,
+  );
+
   let errors = 0;
   let warnings = 0;
-  for (const signal of input.signals) {
+  for (const signal of signals) {
     // The gate's error/warning split is the central policy predicate (§5.9), one
     // source of truth shared with the verdict / terminal table / SARIF level.
     if (SeverityPolicy.isError(signal.severity)) errors += 1;
@@ -165,7 +194,7 @@ export function buildSignalEnvelope(input: BuildEnvelopeInput): SignalEnvelope {
     createdAt: input.createdAt,
     verdict,
     units: input.units,
-    signals: input.signals,
+    signals,
     resolutionMode: input.resolutionMode,
   };
 }

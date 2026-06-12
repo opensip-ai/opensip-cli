@@ -5,9 +5,13 @@
  * A `FingerprintStrategy` maps a `Signal` to a stable string identity. Each tool
  * MAY declare one via `Tool.fingerprintStrategy`; a tool that declares nothing
  * inherits {@link defaultFingerprintStrategy}. The fingerprint is stamped onto
- * `Signal.fingerprint` at signal-creation / envelope-construction time (via
- * {@link stampFingerprints}) BEFORE the envelope reaches a host seam — the plane
- * itself NEVER re-fingerprints or re-derives the value (it treats it opaquely).
+ * `Signal.fingerprint` at envelope-construction time: `buildSignalEnvelope`
+ * (`@opensip-tools/contracts`) calls {@link stampFingerprints} with the tool's
+ * strategy (host default when none is passed), so every built envelope reaches
+ * the host seams already stamped. The plane itself NEVER re-fingerprints or
+ * re-derives the value (it treats it opaquely); the seam-side stamped-ness check
+ * (`requireStampedEntries`, cli baseline-seams) remains as defense in depth for
+ * envelopes assembled without the builder.
  *
  * This lives in `core` because `core` is the only layer every tool already
  * imports and it owns `Signal`; the strategy is pure (no persistence), so it is
@@ -33,18 +37,20 @@ export const defaultFingerprintStrategy: FingerprintStrategy = (s) =>
 
 /**
  * Stamp `fingerprint` onto each signal using `strategy`, returning new signal
- * objects (spread + override). Called by each tool at envelope-construction time
- * (ADR-0036), BEFORE the envelope reaches a host seam.
+ * objects (spread + override). Called by `buildSignalEnvelope` at
+ * envelope-construction time (ADR-0036), BEFORE the envelope reaches a host seam.
  *
  * **Idempotent**: a signal whose `fingerprint` is already a non-empty string is
- * returned unchanged. This is a safety net (it lets a tool stamp earlier still,
+ * returned unchanged — and a fully pre-stamped array is returned by identity
+ * (no re-allocation). This is a safety net (it lets a tool stamp earlier still,
  * e.g. at `createSignal`, without double-hashing), NOT a second stamping point —
  * the host seams only ever READ `signal.fingerprint`.
  */
 export function stampFingerprints(
   signals: readonly Signal[],
   strategy: FingerprintStrategy,
-): Signal[] {
+): readonly Signal[] {
+  if (signals.every((signal) => signal.fingerprint)) return signals;
   return signals.map((signal) =>
     signal.fingerprint ? signal : { ...signal, fingerprint: strategy(signal) },
   );

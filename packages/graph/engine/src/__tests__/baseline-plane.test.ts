@@ -27,7 +27,7 @@ function gsig(ruleId: string, file: string, line: number, column = 0): Signal {
   });
 }
 
-function stamp(signals: readonly Signal[]): Signal[] {
+function stamp(signals: readonly Signal[]): readonly Signal[] {
   return stampFingerprints(signals, graphFingerprintStrategy);
 }
 

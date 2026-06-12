@@ -1,5 +1,6 @@
 import {
   createSignal,
+  defaultFingerprintStrategy,
   HOST_VERDICT_POLICY_FALLBACK,
   type Signal,
   type SignalSeverity,
@@ -32,8 +33,11 @@ const BASE = {
   runFaulted: false,
 };
 
+/** A recognizable non-default strategy for the stamping cases. */
+const toolStrategy = (s: Signal): string => `tool:${s.ruleId}`;
+
 describe('buildSignalEnvelope', () => {
-  it('stamps the schema version, identity, and passes signals/units through verbatim', () => {
+  it('stamps the schema version and identity, and passes units through verbatim', () => {
     const units = [unit('a', true), unit('b', true)];
     const signals = [signal('low')];
     const env = buildSignalEnvelope({
@@ -50,9 +54,45 @@ describe('buildSignalEnvelope', () => {
     expect(env.runId).toBe('run-1');
     expect(env.createdAt).toBe('2026-01-01T00:00:00.000Z');
     expect(env.resolutionMode).toBe('fast');
-    // pass-through, not copies
+    // units pass through, not copies
     expect(env.units).toBe(units);
-    expect(env.signals).toBe(signals);
+  });
+
+  // ADR-0036: fingerprints are an envelope-construction concern — every built
+  // envelope is gate-ready, so the "tool forgot to stamp" class cannot occur.
+  describe('fingerprint stamping (ADR-0036)', () => {
+    it('stamps every signal with the host default strategy when none is passed', () => {
+      const env = buildSignalEnvelope({
+        ...BASE,
+        units: [unit('a', false)],
+        signals: [signal('low')],
+      });
+      const stamped = env.signals[0];
+      expect(stamped.fingerprint).toBe(defaultFingerprintStrategy(stamped));
+    });
+
+    it('stamps with the tool strategy when one is passed', () => {
+      const env = buildSignalEnvelope({
+        ...BASE,
+        units: [unit('a', false)],
+        signals: [signal('high')],
+        fingerprintStrategy: toolStrategy,
+      });
+      expect(env.signals[0]?.fingerprint).toBe('tool:rule-high');
+    });
+
+    it('preserves pre-stamped signals byte-for-byte and by array identity', () => {
+      const preStamped = [{ ...signal('low'), fingerprint: 'pre-existing' }];
+      const env = buildSignalEnvelope({
+        ...BASE,
+        units: [unit('a', true)],
+        signals: preStamped,
+        fingerprintStrategy: () => 'would-clobber',
+      });
+      expect(env.signals[0]?.fingerprint).toBe('pre-existing');
+      // fully pre-stamped sets pass through by identity (no re-allocation)
+      expect(env.signals).toBe(preStamped);
+    });
   });
 
   it('derives summary.total/passed/failed from the units (units are what "ran")', () => {

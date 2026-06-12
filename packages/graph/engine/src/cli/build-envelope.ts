@@ -14,11 +14,14 @@
  * stays graph-owned (tool vocabulary does not belong in the tool-agnostic
  * output layer).
  *
- * The gate path stamps `graphFingerprintStrategy` (`ruleId|filePath|line|col`,
- * `baseline-strategy.ts`) onto the built envelope's signals before handing it to
- * the host baseline seams (ADR-0036). The fingerprint excludes `source`, so the
- * remap this builder applies does not churn baselines. The
- * dashboard session payload (`persistence/session-payload.ts`) likewise keeps
+ * Fingerprints (ADR-0036): this builder passes `graphFingerprintStrategy`
+ * (`ruleId|filePath|line|col`, `baseline-strategy.ts`) to
+ * {@link buildSignalEnvelope}, which stamps every signal at construction — so
+ * each built envelope (gate, `--json`, cloud, SARIF) is gate-ready, not just
+ * the gate path. The strategy is applied AFTER the Option-A `ruleId` remap
+ * below, so fingerprints are computed over the canonical (OpenSIP-convention)
+ * rule IDs — byte-identical to the prior post-hoc gate-path stamping. The
+ * dashboard session payload (`persistence/session-payload.ts`) keeps
  * the engine slug (its metric-column keys are engine slugs).
  *
  * Pure: no IO, no clock, no id generation — `runId`/`createdAt` arrive on the
@@ -28,6 +31,7 @@
 import { buildSignalEnvelope } from '@opensip-tools/contracts';
 import { isErrorSignal, resolveVerdictPolicy } from '@opensip-tools/core';
 
+import { graphFingerprintStrategy } from '../baseline-strategy.js';
 import { mapEngineSlugToOpenSipRuleId } from '../render/rule-id-mapping.js';
 
 import type { SignalEnvelope, UnitResult } from '@opensip-tools/contracts';
@@ -90,6 +94,9 @@ export function buildGraphEnvelope(input: BuildGraphEnvelopeInput): SignalEnvelo
     // Graph has no pre-unit fault concept, so runFaulted stays false.
     policy: resolveVerdictPolicy('graph'),
     runFaulted: false,
+    // ADR-0036: graph's byte-preserved identity, stamped at construction (over
+    // the remapped canonical ruleIds — see the header note).
+    fingerprintStrategy: graphFingerprintStrategy,
     // Honest-approximation marker: surfaced ONLY when the run was fast, so
     // machine consumers see that edges are syntactic/approximate. An exact
     // (or absent) tier carries no marker — parity with the prior CliOutput.

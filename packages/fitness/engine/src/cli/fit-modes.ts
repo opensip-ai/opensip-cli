@@ -20,15 +20,9 @@ import {
   type SignalEnvelope,
   type StoredSession,
 } from '@opensip-tools/contracts';
-import {
-  ConfigurationError,
-  resolveFailOnDegraded,
-  stampFingerprints,
-  SystemError,
-} from '@opensip-tools/core';
+import { ConfigurationError, resolveFailOnDegraded, SystemError } from '@opensip-tools/core';
 import { resolveSession } from '@opensip-tools/session-store';
 
-import { fitnessFingerprintStrategy } from '../baseline-strategy.js';
 import { fitReplayFromSession } from '../persistence/session-replay.js';
 
 import { renderGateCompareOutput } from './fit/gate-compare-render.js';
@@ -246,12 +240,10 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
     process.stderr.write(`Error: ${fitResult.result.message}\n`);
     return;
   }
-  // ADR-0036: stamp the gate envelope's signals with fitness's message-hash
-  // fingerprint BEFORE handing it to the host seams (the plane never fingerprints).
-  const envelope: SignalEnvelope = {
-    ...fitResult.envelope,
-    signals: stampFingerprints(fitResult.envelope.signals, fitnessFingerprintStrategy),
-  };
+  // ADR-0036: the envelope arrives fingerprint-stamped — `buildFitEnvelope`
+  // passes fit's message-hash strategy to `buildSignalEnvelope`, which stamps
+  // at construction. The host seams only read `signal.fingerprint`.
+  const envelope: SignalEnvelope = fitResult.envelope;
   // Surface non-fatal warnings before the gate output so the user sees them
   // alongside the run summary. Safe here because gate mode is non-Ink.
   emitWarningsToStderr(fitResult.result);
