@@ -46,7 +46,9 @@ export const GraphConfigSchema = z.object({
   minCrossPackageDuplicatePackages: z.number().int().min(0).optional(),
   minCrossPackageDuplicateBodySize: z.number().int().min(0).optional(),
   recipe: z.string().min(1).max(128).optional(),
-  partitionStrategy: z.enum(['directory-depth', 'file-count-chunks', 'hybrid']).optional(),
+  partitionStrategy: z
+    .enum(['directory-depth', 'file-count-chunks', 'hybrid', 'community'])
+    .optional(),
   entryPointHashes: z.array(z.string()).readonly().optional(),
   flagExportedOrphans: z.boolean().optional(),
   flagTestOrphans: z.boolean().optional(),

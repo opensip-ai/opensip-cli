@@ -30,6 +30,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
+import { ConfigurationError } from '@opensip-tools/core';
+
+import { communityPartition } from './community-partition.js';
 import { chunkByCount, DEFAULT_CHUNK_SIZE } from './partition-chunk.js';
 
 import type { SyntheticPartition } from './partition-chunk.js';
@@ -141,6 +144,12 @@ export interface PartitionFlatRepoInput {
   readonly depth?: number;
   /** Chunk size for `'file-count-chunks'` and `'hybrid'`. Default 2000. */
   readonly chunkSize?: number;
+  /**
+   * Directed file-level import edges, absolute paths, both endpoints
+   * inside `files`. REQUIRED by 'community' (supplied by the language
+   * adapter's scanImports seam — ADR-0045); ignored by the others.
+   */
+  readonly importEdges?: ReadonlyArray<readonly [from: string, to: string]>;
 }
 
 /**
@@ -173,11 +182,20 @@ export interface PartitionFlatRepoInput {
  *   directory coherence where the structure helps, falls back to
  *   chunking where one directory dominates.
  *
+ * - **`community`** (EXPERIMENTAL, ADR-0045 B1): Louvain communities
+ *   over the file-level import graph (`community-partition.ts`).
+ *   Requires `importEdges` (from the adapter's `scanImports` seam) —
+ *   absent edges throw `ConfigurationError`: an opt-in strategy fails
+ *   loud, never silently degrades to a different partition than
+ *   configured. `chunkSize` doubles as the max shard size.
+ *
  * Sorted output: partition IDs are returned in stable lexicographic
  * order; files within each partition are sorted lexicographically.
  * Determinism matters for cache keys and reproducible runs.
  *
  * @throws {Error} When `input.chunkSize` is non-positive.
+ * @throws {ConfigurationError} When `strategy` is `'community'` and
+ *   `importEdges` is undefined.
  */
 export function partitionFlatRepo(input: PartitionFlatRepoInput): readonly SyntheticPartition[] {
   const chunkSize = input.chunkSize ?? DEFAULT_CHUNK_SIZE;
@@ -185,6 +203,20 @@ export function partitionFlatRepo(input: PartitionFlatRepoInput): readonly Synth
     throw new Error('partitionFlatRepo: chunkSize must be > 0');
   }
 
+  if (input.strategy === 'community') {
+    if (input.importEdges === undefined) {
+      throw new ConfigurationError(
+        "partitionFlatRepo: strategy 'community' requires importEdges " +
+          '(supplied by the language adapter scanImports seam — ADR-0045).',
+      );
+    }
+    return communityPartition({
+      files: input.files,
+      repoRoot: input.repoRoot,
+      importEdges: input.importEdges,
+      maxShardSize: chunkSize,
+    });
+  }
   if (input.strategy === 'file-count-chunks') {
     return chunkByCount(input.files, chunkSize);
   }
