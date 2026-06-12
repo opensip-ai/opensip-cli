@@ -30,6 +30,7 @@ import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
 import type { CommandSpec } from './command-spec.js';
 import type { ToolShortId } from './ids.js';
+import type { FingerprintStrategy } from '../baseline/fingerprint-strategy.js';
 import type { Logger } from '../lib/logger.js';
 import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
 import type { PluginLayout } from '../plugins/types.js';
@@ -488,6 +489,13 @@ export interface Tool {
    * registry. Undefined ⇒ no declared domains.
    */
   readonly capabilityRegistrars?: Readonly<Record<string, CapabilityRegistrar>>;
+  /**
+   * Optional fingerprint strategy for the host-owned baseline/ratchet plane
+   * (ADR-0036). Populates `Signal.fingerprint` at signal-creation time. The
+   * plane treats the result opaquely. Undefined ⇒ host `defaultFingerprintStrategy`.
+   * Changing a declared strategy is a deliberate, documented re-capture.
+   */
+  readonly fingerprintStrategy?: FingerprintStrategy;
 }
 
 /**
