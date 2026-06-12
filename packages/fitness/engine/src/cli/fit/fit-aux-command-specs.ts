@@ -20,15 +20,14 @@
  *    documented non-Ink exception. The host renders nothing.
  */
 
-import { defineCommand } from '@opensip-tools/core';
+import { EXIT_CODES } from '@opensip-tools/contracts';
+import { ConfigurationError, defineCommand, logger } from '@opensip-tools/core';
 
-import { exportFitBaseline } from '../baseline-export.js';
 import { listChecks } from '../list-checks.js';
 import { listRecipes } from '../list-recipes.js';
 
 import type { ToolOptions } from '@opensip-tools/contracts';
 import type { CommandSpec, ToolCliContext } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
 
 /** `fit-list` (alias `list-checks`) — list available fitness checks. */
 export const fitListCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
@@ -92,22 +91,37 @@ export const fitBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext> 
   rawStreamReason: 'file-export',
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as ToolOptions & { out: string };
-    const datastore = cli.scope.datastore() as DataStore;
-    const result = await exportFitBaseline(datastore, opts.out, cli);
-    if (result.type === 'error') {
+    // ADR-0036: the host owns the SARIF export — it reconstructs a synthetic
+    // envelope from the stored payloads (no stored envelope under the plane). The
+    // seam throws ConfigurationError (→ exit 2) when no baseline exists.
+    try {
+      await cli.exportBaselineSarif('fitness', opts.out);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const exitCode =
+        error instanceof ConfigurationError
+          ? EXIT_CODES.CONFIGURATION_ERROR
+          : EXIT_CODES.RUNTIME_ERROR;
+      logger.warn({
+        evt: 'cli.fit.baseline_export.failed',
+        module: 'fit:cli',
+        message,
+        exitCode,
+      });
       if (opts.json) {
         // 2.12.0 (§5.5): structured error outcome (host wraps + sets exit code).
-        cli.emitError({ message: result.message, exitCode: result.exitCode });
+        cli.emitError({ message, exitCode });
         return;
       }
-      cli.setExitCode(result.exitCode);
-      process.stderr.write(`Error: ${result.message}\n`);
+      cli.setExitCode(exitCode);
+      process.stderr.write(`Error: ${message}\n`);
       return;
     }
+    const result = { type: 'fit-baseline-export' as const, outPath: opts.out };
     if (opts.json) {
       cli.emitJson(result);
       return;
     }
-    process.stdout.write(`Exported fit baseline to ${result.outPath}\n`);
+    process.stdout.write(`Exported fit baseline to ${opts.out}\n`);
   },
 });
