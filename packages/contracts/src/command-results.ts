@@ -76,6 +76,7 @@ export type CommandResult =
   | ToolsValidateResult
   | ToolsInstallResult
   | ToolsUninstallResult
+  | ToolsDataPurgeResult
   | SessionReplayResult
   | HelpResult
   | ErrorResult;
@@ -283,6 +284,17 @@ export interface ToolsInstallResult {
   readonly version?: string;
   /** Activation-step failure detail (validation failures live in `validation`). */
   readonly error?: string;
+}
+
+/** Outcome of `opensip-tools tools data-purge <tool-id>` (ADR-0042): per-tool row counts. */
+export interface ToolsDataPurgeResult {
+  type: 'tools-data-purge';
+  readonly toolId: string;
+  readonly sessions: number;
+  readonly baselineEntries: number;
+  /** Whether a baseline existence marker was removed. */
+  readonly baselineMeta: boolean;
+  readonly stateRows: number;
 }
 
 /** Outcome of `opensip-tools tools uninstall <name-or-id>` (ADR-0041). */

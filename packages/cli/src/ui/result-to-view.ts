@@ -466,6 +466,15 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'tools-uninstall': {
       return viewToolsUninstall(result);
     }
+    case 'tools-data-purge': {
+      return titledLinesView(`Data purge: ${result.toolId}`, [
+        `sessions removed:        ${result.sessions}`,
+        `baseline entries:        ${result.baselineEntries}`,
+        `baseline marker removed: ${result.baselineMeta ? 'yes' : 'no'}`,
+        `state rows removed:      ${result.stateRows}`,
+        'Tables are host-owned and were not touched.',
+      ]);
+    }
     case 'plugin-list':
     case 'plugin-add':
     case 'plugin-remove':

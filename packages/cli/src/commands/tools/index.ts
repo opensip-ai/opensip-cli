@@ -11,10 +11,13 @@
 import { EXIT_CODES, type CommandResult } from '@opensip-tools/contracts';
 import { defineCommand, type CommandSpec } from '@opensip-tools/core';
 
+import { toolsDataPurge } from './data-purge.js';
 import { toolsInstall } from './install.js';
 import { toolsList } from './list.js';
 import { toolsUninstall } from './uninstall.js';
 import { runToolValidation } from './validate.js';
+
+import type { DataStore } from '@opensip-tools/datastore';
 
 import type { CliCommandsContext } from '../shared.js';
 import type { ProjectContext } from '@opensip-tools/core';
@@ -141,19 +144,77 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
     options: [
       { flag: '--global', description: 'Target the user-global install', default: false },
       { flag: '--project', description: 'Target the project-local install', default: false },
+      {
+        flag: '--purge-data',
+        description: 'Also purge the tool’s project SQLite rows (project scope only)',
+        default: false,
+      },
     ],
     scope: 'none',
     output: 'command-result',
-    handler: (rawOpts) => {
-      const opts = rawOpts as ScopeFilterOpts & { _args: string[] };
+    handler: async (rawOpts) => {
+      const opts = rawOpts as ScopeFilterOpts & { _args: string[]; purgeData?: boolean };
+      // --purge-data is project-local only: runtime data lives per project
+      // (the spec's explicit rejection for --global).
+      if (opts.purgeData === true && opts.global === true) {
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        return {
+          type: 'tools-uninstall',
+          target: opts._args[0] ?? '',
+          success: false,
+          error:
+            '--purge-data is project-local only (runtime data lives per project); it cannot combine with --global',
+        } satisfies CommandResult;
+      }
       const result = toolsUninstall({
         target: opts._args[0] ?? '',
         cwd: effectiveCwd(opts),
         global: opts.global,
         project: opts.project,
       });
-      if (!result.success) ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-      return Promise.resolve(result);
+      if (!result.success) {
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        return result;
+      }
+      if (opts.purgeData === true && result.removed?.scope === 'project') {
+        const datastore = ctx.datastore() as DataStore | undefined;
+        if (datastore !== undefined) {
+          // Purge AFTER a successful project uninstall; counts ride stderr so
+          // the uninstall result stays the command's one payload.
+          const purge = toolsDataPurge(result.removed.id, datastore);
+          process.stderr.write(
+            `opensip-tools: purged ${purge.sessions} session(s), ${purge.baselineEntries} baseline entr(ies), ` +
+              `${purge.stateRows} state row(s) for '${purge.toolId}'\n`,
+          );
+        }
+      }
+      return result;
+    },
+  });
+}
+
+function buildToolsDataPurgeSpec(ctx: CliCommandsContext): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'data-purge',
+    description:
+      'Delete one tool’s project SQLite rows (sessions, baselines, state) — never tables',
+    commonFlags: ['json'],
+    args: [{ name: 'tool-id', description: 'The tool id whose rows to delete' }],
+    scope: 'project',
+    output: 'command-result',
+    handler: (rawOpts) => {
+      const opts = rawOpts as ScopeFilterOpts & { _args: string[] };
+      const datastore = ctx.datastore() as DataStore | undefined;
+      if (datastore === undefined) {
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        return Promise.resolve({
+          type: 'tools-uninstall',
+          target: opts._args[0] ?? '',
+          success: false,
+          error: 'tools data-purge requires the project datastore (run inside a project)',
+        } satisfies CommandResult);
+      }
+      return Promise.resolve(toolsDataPurge(opts._args[0] ?? '', datastore));
     },
   });
 }
@@ -165,5 +226,6 @@ export function buildToolsGroupLeaves(ctx: CliCommandsContext): readonly HostSpe
     buildToolsValidateSpec(ctx),
     buildToolsInstallSpec(ctx),
     buildToolsUninstallSpec(ctx),
+    buildToolsDataPurgeSpec(ctx),
   ];
 }

@@ -53,6 +53,7 @@ export type {
   ToolsValidateSection,
   ToolsInstallResult,
   ToolsUninstallResult,
+  ToolsDataPurgeResult,
   ListChecksResult,
   ListRecipesResult,
   HistorySession,
