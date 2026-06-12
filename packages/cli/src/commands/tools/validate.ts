@@ -55,6 +55,10 @@ interface StagedCandidate {
   readonly stagingError?: string;
 }
 
+const NOOP_CLEANUP = (): void => {
+  /* in-place candidates own their dir; nothing was staged */
+};
+
 /** True when `spec` points at an existing local directory. */
 function isLocalDirSpec(spec: string, cwd: string): boolean {
   const candidate = isAbsolute(spec) ? spec : resolve(cwd, spec);
@@ -70,7 +74,7 @@ function stageCandidate(opts: ToolValidationOptions): StagedCandidate {
   const localDir = isLocalDirSpec(opts.spec, opts.cwd);
   if (localDir && opts.installDeps !== true) {
     const pkgDir = isAbsolute(opts.spec) ? opts.spec : resolve(opts.cwd, opts.spec);
-    return { pkgDir, cleanup: () => undefined, stagedByInstall: false };
+    return { pkgDir, cleanup: NOOP_CLEANUP, stagedByInstall: false };
   }
   const tempHost = mkdtempSync(join(tmpdir(), 'ost-tools-validate-'));
   const cleanup = (): void => rmSync(tempHost, { recursive: true, force: true });
@@ -111,6 +115,99 @@ function storageSections(findings: readonly StorageFinding[]): ToolsValidateSect
   ];
 }
 
+/** Map one admission section result to a report section. */
+function fromAdmission(s: {
+  section: string;
+  ok: boolean;
+  diagnostic?: string;
+}): ToolsValidateSection {
+  return section(s.section, s.ok ? 'passed' : 'failed', s.diagnostic ? [s.diagnostic] : []);
+}
+
+/**
+ * True when a FAILED probe over an IN-PLACE candidate failed on the
+ * candidate's own unresolved dependencies (expected without `--install-deps`).
+ * A probe-INFRA failure ("runtime probe crashed/timed out/…") must never
+ * classify as a candidate missing-dep, even when the child's stderr mentions
+ * an unresolved module.
+ */
+function isExpectedMissingDep(
+  probe: ReturnType<typeof runRuntimeProbe>,
+  stagedByInstall: boolean,
+): boolean {
+  if (probe.ok || stagedByInstall) return false;
+  return probe.sections.some(
+    (s) =>
+      s.diagnostic !== undefined &&
+      !s.diagnostic.startsWith('runtime probe') &&
+      /cannot find (module|package)/i.test(s.diagnostic),
+  );
+}
+
+/** The three runtime sections marked skipped (in-place, deps not installed). */
+function skippedRuntimeSections(): ToolsValidateSection[] {
+  return [
+    section('runtime-load', 'skipped', [
+      'dependencies not installed — rerun with --install-deps to verify the runtime sections',
+    ]),
+    section('tool-shape', 'skipped'),
+    section('manifest-runtime-coherence', 'skipped'),
+  ];
+}
+
+/**
+ * Config contract (spec + ADR-0043 family): a manifest that declares config
+ * needs a runtime `Tool.config`; a runtime namespace must equal the tool id.
+ */
+function configContractSection(
+  manifestDeclaresConfig: boolean,
+  toolConfigNamespace: string | null,
+  toolId: string | undefined,
+): ToolsValidateSection {
+  const diagnostics: string[] = [];
+  if (manifestDeclaresConfig && toolConfigNamespace === null) {
+    diagnostics.push(
+      'manifest declares config but the runtime Tool.config contribution is missing',
+    );
+  }
+  if (toolConfigNamespace !== null && toolConfigNamespace !== toolId) {
+    diagnostics.push(
+      `Tool.config.namespace '${toolConfigNamespace}' does not match the tool id '${toolId ?? ''}'`,
+    );
+  }
+  return section('config-contract', diagnostics.length === 0 ? 'passed' : 'failed', diagnostics);
+}
+
+/** The runtime-probe + config-contract leg. Mutates nothing; returns its sections. */
+function runtimeSectionsFor(
+  staged: StagedCandidate,
+  manifestDeclaresConfig: boolean,
+  manifestToolId: string | undefined,
+): { sections: ToolsValidateSection[]; toolId: string | undefined; incomplete: boolean } {
+  const probe = runRuntimeProbe(staged.pkgDir);
+  if (isExpectedMissingDep(probe, staged.stagedByInstall)) {
+    return { sections: skippedRuntimeSections(), toolId: manifestToolId, incomplete: true };
+  }
+  const sections = probe.sections
+    .filter((s) => s.section !== 'manifest' && s.section !== 'compatibility')
+    .map((s) => fromAdmission(s));
+  let toolId = manifestToolId;
+  if (probe.ok) {
+    if (probe.toolId !== null) toolId = probe.toolId;
+    sections.push(configContractSection(manifestDeclaresConfig, probe.toolConfigNamespace, toolId));
+  }
+  return { sections, toolId, incomplete: false };
+}
+
+function verdictFor(
+  sections: readonly ToolsValidateSection[],
+  incomplete: boolean,
+): ToolsValidateResult['verdict'] {
+  if (sections.some((s) => s.status === 'failed')) return 'failed';
+  if (incomplete) return 'incomplete';
+  return 'passed';
+}
+
 /**
  * Run every validation section against one candidate spec. Shared by
  * `tools validate` (renders it) and `tools install` (gates activation on it).
@@ -132,11 +229,9 @@ export async function runToolValidation(
           verdict: 'failed',
           sections: [section('staging', 'failed', [staged.stagingError])],
         },
-        cleanup: () => undefined,
+        cleanup: NOOP_CLEANUP,
       };
     }
-
-    const sections: ToolsValidateSection[] = [];
 
     // Static admission sections (manifest + compatibility) — in-process, no
     // candidate code runs.
@@ -146,100 +241,35 @@ export async function runToolValidation(
       explicitlyRequested: true,
       staticOnly: true,
     });
-    for (const s of staticReport.sections) {
-      sections.push(
-        section(s.section, s.ok ? 'passed' : 'failed', s.diagnostic ? [s.diagnostic] : []),
-      );
-    }
+    const sections: ToolsValidateSection[] = staticReport.sections.map((s) => fromAdmission(s));
 
     let toolId: string | undefined = staticReport.manifest?.id;
     let incomplete = false;
-
     if (staticReport.ok) {
       // Runtime sections — child-process probe (untrusted code executes there).
-      const probe = runRuntimeProbe(staged.pkgDir);
-      const runtimeSections = probe.sections.filter(
-        (s) => s.section !== 'manifest' && s.section !== 'compatibility',
+      const runtime = runtimeSectionsFor(
+        staged,
+        staticReport.manifest?.config !== undefined,
+        toolId,
       );
-      const missingDep =
-        !probe.ok &&
-        staged.stagedByInstall === false &&
-        runtimeSections.some(
-          (s) =>
-            s.diagnostic !== undefined &&
-            // A probe-INFRA failure ("runtime probe crashed/timed out/...")
-            // must never classify as a candidate missing-dep, even when the
-            // child's stderr mentions an unresolved module.
-            !s.diagnostic.startsWith('runtime probe') &&
-            /cannot find (module|package)/i.test(s.diagnostic),
-        );
-      if (missingDep) {
-        // In-place path validation without --install-deps: the candidate's own
-        // deps aren't installed, so an unresolved import is EXPECTED — mark the
-        // runtime sections skipped (verdict `incomplete`, still a non-zero
-        // exit) instead of failed, and say how to complete the run.
-        incomplete = true;
-        sections.push(
-          section('runtime-load', 'skipped', [
-            'dependencies not installed — rerun with --install-deps to verify the runtime sections',
-          ]),
-          section('tool-shape', 'skipped'),
-          section('manifest-runtime-coherence', 'skipped'),
-        );
-      } else {
-        for (const s of runtimeSections) {
-          sections.push(
-            section(s.section, s.ok ? 'passed' : 'failed', s.diagnostic ? [s.diagnostic] : []),
-          );
-        }
-        if (probe.ok) {
-          if (probe.toolId !== null) toolId = probe.toolId;
-          // Config contract (spec + ADR-0043 family): a manifest that declares
-          // config needs a runtime Tool.config; a runtime namespace must equal
-          // the tool id.
-          const manifestDeclaresConfig = staticReport.manifest?.config !== undefined;
-          const configDiagnostics: string[] = [];
-          if (manifestDeclaresConfig && probe.toolConfigNamespace === null) {
-            configDiagnostics.push(
-              'manifest declares config but the runtime Tool.config contribution is missing',
-            );
-          }
-          if (probe.toolConfigNamespace !== null && probe.toolConfigNamespace !== toolId) {
-            configDiagnostics.push(
-              `Tool.config.namespace '${probe.toolConfigNamespace}' does not match the tool id '${toolId ?? ''}'`,
-            );
-          }
-          sections.push(
-            section(
-              'config-contract',
-              configDiagnostics.length === 0 ? 'passed' : 'failed',
-              configDiagnostics,
-            ),
-          );
-        }
-      }
+      sections.push(...runtime.sections);
+      toolId = runtime.toolId;
+      incomplete = runtime.incomplete;
     }
 
     // Tier A storage contract (ADR-0042) — pure file scan, always runs.
     sections.push(...storageSections(runStorageContractChecks(staged.pkgDir)));
-
-    const anyFailed = sections.some((s) => s.status === 'failed');
-    const verdict: ToolsValidateResult['verdict'] = anyFailed
-      ? 'failed'
-      : incomplete
-        ? 'incomplete'
-        : 'passed';
 
     return {
       result: {
         type: 'tools-validate',
         spec: opts.spec,
         ...(toolId === undefined ? {} : { toolId }),
-        verdict,
+        verdict: verdictFor(sections, incomplete),
         sections,
       },
       ...(keepStaged && staged.stagedByInstall ? { stagedPkgDir: staged.pkgDir } : {}),
-      cleanup: keepStaged ? staged.cleanup : () => undefined,
+      cleanup: keepStaged ? staged.cleanup : NOOP_CLEANUP,
     };
   } finally {
     if (!keepStaged) staged.cleanup();

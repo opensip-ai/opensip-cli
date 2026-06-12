@@ -4,7 +4,15 @@ export const tool = {
   metadata: { id: 'runtime-id', name: 'Mismatch', version: '0.0.0', description: 'fixture' },
   commands: [{ name: 'mismatch-cmd', description: 'noop' }],
   commandSpecs: [
-    { name: 'mismatch-cmd', description: 'noop', commonFlags: [], output: 'raw-stream', rawStreamReason: 'fixture', flags: [], handler: () => Promise.resolve() },
+    {
+      name: 'mismatch-cmd',
+      description: 'noop',
+      commonFlags: [],
+      output: 'raw-stream',
+      rawStreamReason: 'fixture',
+      flags: [],
+      handler: () => Promise.resolve(),
+    },
   ],
   apiVersion: 1,
 };

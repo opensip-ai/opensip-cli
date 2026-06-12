@@ -213,12 +213,14 @@ export async function admitToolPackage(opts: AdmitToolPackageOptions): Promise<A
   const load = await importToolRuntime(opts.dir);
   if (!load.ok) {
     if (load.reason === 'invalid-shape') {
-      sections.push({ section: 'runtime-load', ok: true });
-      sections.push({
-        section: 'tool-shape',
-        ok: false,
-        diagnostic: 'module does not export a valid `tool`',
-      });
+      sections.push(
+        { section: 'runtime-load', ok: true },
+        {
+          section: 'tool-shape',
+          ok: false,
+          diagnostic: 'module does not export a valid `tool`',
+        },
+      );
     } else {
       sections.push({
         section: 'runtime-load',
@@ -236,8 +238,7 @@ export async function admitToolPackage(opts: AdmitToolPackageOptions): Promise<A
       ...(load.detail === undefined ? {} : { runtimeLoadDetail: load.detail }),
     };
   }
-  sections.push({ section: 'runtime-load', ok: true });
-  sections.push({ section: 'tool-shape', ok: true });
+  sections.push({ section: 'runtime-load', ok: true }, { section: 'tool-shape', ok: true });
 
   // Section 5 — coherence: the static manifest and the runtime tool are two
   // declarations of one identity; they must agree (id + command surface).

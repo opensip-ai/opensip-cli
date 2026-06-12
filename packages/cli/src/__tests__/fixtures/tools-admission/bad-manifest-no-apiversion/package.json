@@ -7,6 +7,11 @@
   "opensipTools": {
     "kind": "tool",
     "id": "no-apiversion-tool",
-    "commands": [{ "name": "noop-cmd", "description": "noop" }]
+    "commands": [
+      {
+        "name": "noop-cmd",
+        "description": "noop"
+      }
+    ]
   }
 }

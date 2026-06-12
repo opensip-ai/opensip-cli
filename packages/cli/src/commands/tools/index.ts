@@ -9,7 +9,7 @@
  */
 
 import { EXIT_CODES, type CommandResult } from '@opensip-tools/contracts';
-import { defineCommand, type CommandSpec } from '@opensip-tools/core';
+import { defineCommand, type CommandSpec, type ProjectContext } from '@opensip-tools/core';
 
 import { toolsDataPurge } from './data-purge.js';
 import { toolsInstall } from './install.js';
@@ -17,10 +17,8 @@ import { toolsList } from './list.js';
 import { toolsUninstall } from './uninstall.js';
 import { runToolValidation } from './validate.js';
 
-import type { DataStore } from '@opensip-tools/datastore';
-
 import type { CliCommandsContext } from '../shared.js';
-import type { ProjectContext } from '@opensip-tools/core';
+import type { DataStore } from '@opensip-tools/datastore';
 
 type HostSpec = CommandSpec<unknown, CliCommandsContext>;
 
@@ -152,6 +150,7 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
     ],
     scope: 'none',
     output: 'command-result',
+    // eslint-disable-next-line @typescript-eslint/require-await -- async keeps the CommandSpec handler signature; the bodies are synchronous SQLite + fs
     handler: async (rawOpts) => {
       const opts = rawOpts as ScopeFilterOpts & { _args: string[]; purgeData?: boolean };
       // --purge-data is project-local only: runtime data lives per project

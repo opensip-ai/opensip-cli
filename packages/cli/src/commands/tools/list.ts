@@ -122,12 +122,9 @@ export function toolsList(opts: ToolsListOptions): ToolsListResult {
     row.source === 'global' && projectIds.has(row.id) ? { ...row, shadowed: true } : row,
   );
 
-  const filtered =
-    opts.global === true
-      ? marked.filter((r) => r.source === 'global')
-      : opts.project === true
-        ? marked.filter((r) => r.source === 'project')
-        : marked;
+  let filtered = marked;
+  if (opts.global === true) filtered = marked.filter((r) => r.source === 'global');
+  else if (opts.project === true) filtered = marked.filter((r) => r.source === 'project');
 
   return { type: 'tools-list', tools: filtered, totalCount: filtered.length };
 }

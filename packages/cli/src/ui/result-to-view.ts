@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- the one result→view dispatch switch grows a case per CommandResult variant; the view BODIES already live in ui/views/* (init, misc, plugin, tools) and cli-ui, so what remains is the irreducible switch + shared envelope-table helpers. Splitting the switch would fragment the single dispatch surface (cf. command-results.ts's identical waiver for the union itself).
 /**
  * resultToView — the single `CommandResult → ViewNode` mapping.
  *
@@ -50,6 +51,13 @@ import {
   viewHelp,
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
+import {
+  viewToolsDataPurge,
+  viewToolsInstall,
+  viewToolsList,
+  viewToolsUninstall,
+  viewToolsValidate,
+} from './views/tools-views.js';
 
 import type {
   CommandResult,
@@ -157,63 +165,6 @@ function titledLinesView(title: string | undefined, lines: readonly string[]): V
   }
   children.push(...lines.map((l) => line([{ text: l }])));
   return group(children);
-}
-
-/** `tools list` — one aligned row per tool with source/status/shadow facts. */
-function viewToolsList(result: Extract<CommandResult, { type: 'tools-list' }>): ViewNode {
-  if (result.tools.length === 0) {
-    return titledLinesView('Tools', ['(no tools found for this scope)']);
-  }
-  const idWidth = Math.max(...result.tools.map((t) => t.id.length), 4);
-  const versionWidth = Math.max(...result.tools.map((t) => t.version.length), 7);
-  const sourceWidth = Math.max(...result.tools.map((t) => t.source.length), 6);
-  const rows = result.tools.map((t) => {
-    const flags = [
-      t.status === 'manifest-only' ? 'manifest-only' : undefined,
-      t.shadowed === true ? 'shadowed' : undefined,
-    ]
-      .filter((f): f is string => f !== undefined)
-      .join(', ');
-    const commands = t.commands.length > 0 ? t.commands.join(' ') : '—';
-    const suffix = flags.length > 0 ? `  [${flags}]` : '';
-    return `${t.id.padEnd(idWidth)}  ${t.version.padEnd(versionWidth)}  ${t.source.padEnd(sourceWidth)}  ${commands}${suffix}`;
-  });
-  const header = `${'tool'.padEnd(idWidth)}  ${'version'.padEnd(versionWidth)}  ${'source'.padEnd(sourceWidth)}  commands`;
-  return titledLinesView('Tools', [header, ...rows]);
-}
-
-/** `tools validate` — one line per section with verdict + diagnostics. */
-function viewToolsValidate(result: Extract<CommandResult, { type: 'tools-validate' }>): ViewNode {
-  const mark = (s: string): string => (s === 'passed' ? '✓' : s === 'skipped' ? '○' : '✗');
-  const lines: string[] = result.sections.flatMap((s) => [
-    `${mark(s.status)} ${s.name}${s.status === 'skipped' ? ' (skipped)' : ''}`,
-    ...s.diagnostics.map((d) => `    ${d}`),
-  ]);
-  lines.push(
-    '',
-    `verdict: ${result.verdict}${result.toolId === undefined ? '' : `  (tool: ${result.toolId})`}`,
-  );
-  return titledLinesView(`Validate ${result.spec}`, lines);
-}
-
-/** `tools install` — activation outcome + the validation report it gated on. */
-function viewToolsInstall(result: Extract<CommandResult, { type: 'tools-install' }>): ViewNode {
-  const head = result.success
-    ? `✓ installed ${result.toolId ?? result.spec}${result.version === undefined ? '' : `@${result.version}`} (${result.scope})`
-    : `✗ install failed for ${result.spec}${result.error === undefined ? '' : ` — ${result.error}`}`;
-  return group([line([{ text: head, bold: true }]), SPACER, viewToolsValidate(result.validation)]);
-}
-
-/** `tools uninstall` — the resolved identity that was (or was not) removed. */
-function viewToolsUninstall(result: Extract<CommandResult, { type: 'tools-uninstall' }>): ViewNode {
-  if (!result.success) {
-    return titledLinesView('Uninstall', [`✗ ${result.error ?? 'uninstall failed'}`]);
-  }
-  const r = result.removed;
-  return titledLinesView('Uninstall', [
-    `✓ removed ${r?.id ?? result.target}${r === undefined ? '' : ` (${r.packageName}, ${r.scope})`}`,
-    'Project SQLite data was NOT touched — use `tools data purge <tool-id>` for that.',
-  ]);
 }
 
 function unknownResultView(result: unknown): ViewNode {
@@ -467,13 +418,7 @@ export function resultToView(result: CommandResult): ViewNode {
       return viewToolsUninstall(result);
     }
     case 'tools-data-purge': {
-      return titledLinesView(`Data purge: ${result.toolId}`, [
-        `sessions removed:        ${result.sessions}`,
-        `baseline entries:        ${result.baselineEntries}`,
-        `baseline marker removed: ${result.baselineMeta ? 'yes' : 'no'}`,
-        `state rows removed:      ${result.stateRows}`,
-        'Tables are host-owned and were not touched.',
-      ]);
+      return viewToolsDataPurge(result);
     }
     case 'plugin-list':
     case 'plugin-add':

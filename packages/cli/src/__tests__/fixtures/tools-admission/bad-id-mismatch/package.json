@@ -8,6 +8,11 @@
     "kind": "tool",
     "id": "manifest-id",
     "apiVersion": 1,
-    "commands": [{ "name": "mismatch-cmd", "description": "noop" }]
+    "commands": [
+      {
+        "name": "mismatch-cmd",
+        "description": "noop"
+      }
+    ]
   }
 }

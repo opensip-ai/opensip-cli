@@ -48,6 +48,7 @@ export class ToolStateRepo {
   put(tool: string, key: string, payload: unknown): void {
     const bytes = Buffer.byteLength(JSON.stringify(payload) ?? 'null', 'utf8');
     if (bytes > TOOL_STATE_MAX_PAYLOAD_BYTES) {
+      // @fitness-ignore-next-line result-pattern-consistency -- documented @throws boundary (the cap errors, never evicts); exceptions propagate to the public Result/CommandOutcome boundary, matching the BaselineRepo/file-cache precedent
       throw new ValidationError(
         `tool_state payload for '${tool}/${key}' is ${bytes} bytes — over the ` +
           `${TOOL_STATE_MAX_PAYLOAD_BYTES}-byte cap (ADR-0042). Shard or summarize the payload.`,

@@ -44,7 +44,7 @@ beforeAll(() => {
   fakeHome = mkdtempSync(join(tmpdir(), 'ost-tools-list-home-'));
   const init = distRunner().run(['init', '--language', 'typescript'], {
     cwd: projectDir,
-    env: { ...process.env, HOME: fakeHome } as Record<string, string>,
+    env: { ...process.env, HOME: fakeHome },
   });
   expect(init.exitCode).toBe(0);
 
@@ -78,7 +78,7 @@ interface Row {
 function listRows(extra: readonly string[] = []): { rows: Row[]; exitCode: number } {
   const r = distRunner().run(['tools', 'list', '--json', ...extra], {
     cwd: projectDir,
-    env: { ...process.env, HOME: fakeHome } as Record<string, string>,
+    env: { ...process.env, HOME: fakeHome },
   });
   if (r.exitCode !== 0) return { rows: [], exitCode: r.exitCode };
   const parsed = JSON.parse(r.stdout) as { data: { tools: Row[] } };
@@ -114,6 +114,6 @@ describe('tools list', () => {
 
     const all = listRows();
     const bundled = all.rows.filter((t) => t.source === 'bundled').map((t) => t.id);
-    expect(bundled.sort()).toEqual(['fitness', 'graph', 'simulation']);
+    expect([...bundled].sort()).toEqual(['fitness', 'graph', 'simulation']);
   });
 });

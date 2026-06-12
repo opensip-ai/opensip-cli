@@ -16,6 +16,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+
 import { type CliProgram } from '@opensip-tools/contracts';
 import {
   admitTool,
@@ -216,6 +217,7 @@ export async function registerFirstPartyTools(
     });
 
     if (!report.ok) {
+      // @fitness-ignore-next-line detached-promises -- synchronous never-returning thrower; the heuristic mistakes the bare call for an unawaited promise
       throwBundledAdmissionFailure(packageName, report);
     }
     /* v8 ignore next 3 -- throwBundledAdmissionFailure never returns on a failed report; this guard narrows types */
@@ -286,8 +288,10 @@ function throwBundledAdmissionFailure(packageName: string, report: AdmissionRepo
       { diagnostic: `bundled tool runtime load failed: ${reason}` },
     );
   }
-  if (failedSection === 'manifest-runtime-coherence' && report.coherenceError !== undefined) {
+  if (failedSection === 'manifest-runtime-coherence' && report.coherenceError instanceof Error) {
     // Preserve the original drift-guard error type + message untouched.
+    // (assertManifestMatchesTool always throws Error subclasses; the
+    // instanceof narrowing satisfies only-throw-error without a cast.)
     throw report.coherenceError;
   }
   /* v8 ignore next 4 -- defensive: a failed report always carries a failed section */

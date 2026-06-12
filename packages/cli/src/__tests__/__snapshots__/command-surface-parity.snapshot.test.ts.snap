@@ -1530,6 +1530,32 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
           "aliases": [],
           "args": [
             {
+              "name": "tool-id",
+              "required": true,
+              "variadic": false,
+            },
+          ],
+          "name": "data-purge",
+          "options": [
+            {
+              "choices": undefined,
+              "defaultValue": false,
+              "description": "Output structured JSON",
+              "flags": "--json",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+          ],
+          "subcommands": [],
+          "synopsis": "Delete one tool’s project SQLite rows (sessions, baselines, state) — never tables",
+          "usage": "[options] <tool-id>",
+        },
+        {
+          "aliases": [],
+          "args": [
+            {
               "name": "spec",
               "required": true,
               "variadic": false,
@@ -1648,6 +1674,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
               "defaultValue": false,
               "description": "Target the project-local install",
               "flags": "--project",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": false,
+              "description": "Also purge the tool’s project SQLite rows (project scope only)",
+              "flags": "--purge-data",
               "negate": false,
               "optional": false,
               "required": false,
