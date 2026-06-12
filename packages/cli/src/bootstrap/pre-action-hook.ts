@@ -76,23 +76,16 @@ const CLI_PACKAGE_NAME = 'opensip-tools';
 const MODULE_TAG = 'cli:bootstrap';
 
 /**
- * Tool ids whose `initialize()` has already run in this process. The Tool
- * contract guarantees `initialize()` is called "at most once per process";
- * this set enforces that across multiple preAction firings (long-lived
- * hosts, tests). Process-scoped on purpose — a fresh CLI process starts
- * empty.
+ * Process-scoped idempotency for Tool.initialize() (see process-idempotency.ts).
+ * The Set is intentionally process-scoped per the Tool contract ("at most once per process").
+ * Resets are called on per-invocation context setup to prevent leakage.
  *
- * GA Low hygiene: exported reset for test harnesses and per-invocation
- * safety (aligns with scopeEntered / runtime context resets from prior
- * architectural work). Prevents cross-run leakage in long-lived test
- * processes.
+ * GA Low hygiene: centralized in process-idempotency.ts for better isolation and auditability.
  */
-const initializedToolIds = new Set<string>();
+import { initializedToolIds, resetInitializedToolIdsForTest } from './process-idempotency.js';
 
-/** Reset for test harnesses and fresh invocations. */
-export function resetInitializedToolIdsForTest(): void {
-  initializedToolIds.clear();
-}
+// Re-export the reset for consumers that imported it from here (e.g. cli-context.ts for per-invocation resets).
+export { resetInitializedToolIdsForTest };
 
 /**
  * Find the registered tool that owns the invoked subcommand, matching the
