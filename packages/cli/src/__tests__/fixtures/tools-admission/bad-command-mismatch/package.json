@@ -1,0 +1,13 @@
+{
+  "name": "@opensip-tools-fixture/command-mismatch",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "opensipTools": {
+    "kind": "tool",
+    "id": "command-mismatch-tool",
+    "apiVersion": 1,
+    "commands": [{ "name": "declared-cmd", "description": "declared in manifest only" }]
+  }
+}
