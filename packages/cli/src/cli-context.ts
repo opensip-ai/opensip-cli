@@ -54,6 +54,7 @@ import {
 } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 
+import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
 import { deliverEnvelope, writeEnvelopeSarif } from './bootstrap/deliver-envelope.js';
 import {
   outcomeFromEnvelope,
@@ -334,6 +335,10 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     process.exitCode = code;
   };
 
+  // Host baseline/ratchet plane seams (ADR-0036): persistence + diff + exports.
+  // Bound to the lazy project datastore (resolved per call, like the run paths).
+  const baselineSeams = buildBaselineSeams({ getDatastore: getOrOpenDatastore, logger: log });
+
   const ctx: ToolCliContext = {
     get scope(): RunScope {
       // The pre-action-hook constructs a RunScope and calls `enterScope`
@@ -404,6 +409,11 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     // envelope to SARIF and writes it to disk, so tools that export SARIF to a
     // file (e.g. `graph sarif-export`) never import `@opensip-tools/output`.
     writeSarif: (envelope, path) => writeEnvelopeSarif(envelope as SignalEnvelope, path),
+    // Host baseline/ratchet plane seams (ADR-0036) — persistence + diff + exports.
+    saveBaseline: baselineSeams.saveBaseline,
+    compareBaseline: baselineSeams.compareBaseline,
+    exportBaselineSarif: baselineSeams.exportBaselineSarif,
+    exportBaselineFingerprints: baselineSeams.exportBaselineFingerprints,
   };
 
   return {

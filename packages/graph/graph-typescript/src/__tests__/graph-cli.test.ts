@@ -123,6 +123,12 @@ function makeCli(): CapturedCli {
     }),
     deliverSignals: vi.fn(() => Promise.resolve()),
     writeSarif: vi.fn(() => Promise.resolve()),
+    saveBaseline: vi.fn(() => Promise.resolve()),
+    compareBaseline: vi.fn(() =>
+      Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
+    ),
+    exportBaselineSarif: vi.fn(() => Promise.resolve()),
+    exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
   };
   return { cli, exitCodes, datastore, render };
 }
@@ -473,6 +479,12 @@ describe('executeGraph', () => {
       emitError: vi.fn(),
       deliverSignals: vi.fn(() => Promise.resolve()),
       writeSarif: vi.fn(() => Promise.resolve()),
+      saveBaseline: vi.fn(() => Promise.resolve()),
+      compareBaseline: vi.fn(() =>
+        Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
+      ),
+      exportBaselineSarif: vi.fn(() => Promise.resolve()),
+      exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
       registerLiveView: vi.fn(),
     };
     await runExecuteGraph({ cwd: dir, gateSave: true }, cli);

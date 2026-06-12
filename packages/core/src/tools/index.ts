@@ -10,6 +10,7 @@ export type {
   ToolMetadata,
   ToolCommandDescriptor,
   ToolCliContext,
+  GateCompareResult,
   ToolPluginExports,
   ToolSessionRecord,
   ToolSessionReplayContribution,

@@ -34,6 +34,7 @@ import type { FingerprintStrategy } from '../baseline/fingerprint-strategy.js';
 import type { Logger } from '../lib/logger.js';
 import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
 import type { PluginLayout } from '../plugins/types.js';
+import type { Signal } from '../types/signal.js';
 
 // `ToolScope` (the Tool-facing scope view) and `ScopeContribution` (the
 // augmentable subscope bag a tool returns from `contributeScope`) live in
@@ -135,6 +136,25 @@ export class UnknownLiveViewError extends ToolError {
  * structural, not merely guarded. The host owns the program internally and passes
  * it to its own mount step (`mountAllToolCommands(registry, program, ctx)`).
  */
+/**
+ * Result of the host baseline/ratchet compare seam (ADR-0036) — three full-object
+ * buckets + the gate decision. Core declares this thin shape for the
+ * {@link ToolCliContext.compareBaseline} return so `core` need not import
+ * `@opensip-tools/output` (which owns the authoritative `GateCompareResult` used
+ * by `diffBaseline`). The two are kept structurally in sync by a dedicated test
+ * (`core ↔ output GateCompareResult must not diverge`).
+ */
+export interface GateCompareResult {
+  /** Findings present now but not in the baseline (current ∖ baseline). */
+  readonly added: readonly Signal[];
+  /** Findings present in the baseline but not now (baseline ∖ current). */
+  readonly resolved: readonly Signal[];
+  /** Findings present in both (current ∩ baseline). */
+  readonly unchanged: readonly Signal[];
+  /** True iff `added` is non-empty — the gate decision. */
+  readonly degraded: boolean;
+}
+
 export interface ToolCliContext {
   /**
    * Per-run resources (logger, parseCache, registries, datastore,
@@ -310,6 +330,35 @@ export interface ToolCliContext {
    * `deliverSignals`.
    */
   readonly writeSarif: (envelope: unknown, path: string) => Promise<void>;
+  /**
+   * Host baseline/ratchet plane seams (ADR-0036). The host owns persistence
+   * (`BaselineRepo`), the diff, and exit derivation; a tool inherits a CI ratchet
+   * by emitting fingerprint-stamped signals. The seams are **read-only** of
+   * `signal.fingerprint` — the tool stamps its envelope's signals
+   * (`stampFingerprints`) at envelope-construction time; the plane NEVER
+   * re-fingerprints. `tool` scopes every operation; `envelope` is the
+   * `SignalEnvelope` typed `unknown` here for the same layer reason as
+   * `writeSarif`/`deliverSignals`.
+   */
+  readonly saveBaseline: (tool: string, envelope: unknown) => Promise<void>;
+  /**
+   * Compare the current (stamped) envelope against this tool's saved baseline.
+   * Throws a `ConfigurationError` (→ exit 2) when no baseline exists. The host
+   * derives the gate exit from `result.degraded` via the `deliverSignals`
+   * runFailed override — no tool calls `setExitCode` for the gate path (ADR-0035).
+   */
+  readonly compareBaseline: (tool: string, envelope: unknown) => Promise<GateCompareResult>;
+  /**
+   * Export this tool's baseline to a SARIF file by reconstructing a synthetic
+   * envelope from the stored per-fingerprint payloads (no stored envelope to
+   * reload). Throws when no baseline exists.
+   */
+  readonly exportBaselineSarif: (tool: string, path: string) => Promise<void>;
+  /**
+   * Export this tool's baseline as the git-trackable fingerprint JSON
+   * (`{version,tool,capturedAt,fingerprints[]}`). Throws when no baseline exists.
+   */
+  readonly exportBaselineFingerprints: (tool: string, path: string) => Promise<void>;
 }
 
 /**

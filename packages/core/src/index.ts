@@ -147,6 +147,7 @@ export type {
   ToolCommandDescriptor,
   ToolConfigContribution,
   ToolCliContext,
+  GateCompareResult,
   ToolPluginExports,
   ToolSessionRecord,
   ToolSessionReplayContribution,

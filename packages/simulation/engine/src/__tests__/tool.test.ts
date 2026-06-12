@@ -108,6 +108,11 @@ function makeFakeContext(): {
     },
     deliverSignals: () => Promise.resolve(),
     writeSarif: () => Promise.resolve(),
+    saveBaseline: () => Promise.resolve(),
+    compareBaseline: () =>
+      Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
+    exportBaselineSarif: () => Promise.resolve(),
+    exportBaselineFingerprints: () => Promise.resolve(),
   };
   return { ctx, rendered, exitCodes, emitted };
 }
