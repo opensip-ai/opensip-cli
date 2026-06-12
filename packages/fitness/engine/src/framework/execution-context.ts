@@ -8,15 +8,14 @@
  */
 
 import * as fs from 'node:fs/promises';
-import { relative } from 'node:path';
 
 import { SystemError, currentScope, logger as defaultLogger } from '@opensip-tools/core';
-import { Minimatch } from 'minimatch';
 
 import { DEFAULT_EXCLUSION_PATTERNS } from './constants.js';
 import { fileCache } from './file-cache.js';
 import { PathMatcher } from './path-matcher.js';
 import { extractSnippet } from './result-builder.js';
+import { applyGlobalExcludes } from '../targets/index.js';
 
 import type { ResolvedScope } from './check-config.js';
 
@@ -125,8 +124,10 @@ export interface ExecutionContextConfig {
  * fallback path — the path taken by scope-empty checks. Custom
  * `patterns` arguments are honored as-is (the caller knows what they
  * want), and `targetFiles` from per-check overrides are pre-filtered
- * by `preResolveAllTargets`. Pre-compiled to Minimatch matchers so
- * we don't pay regex compilation per filter call.
+ * by `preResolveAllTargets`. The fileCache-fallback exclusion routes
+ * through the substrate `applyGlobalExcludes` (ADR-0037) — the SAME
+ * single implementation the scope-resolution path uses, so globalExcludes
+ * is single-sourced on both paths (no separate Minimatch path in fitness).
  */
 function createMatchFilesFunction(
   cwd: string,
@@ -137,19 +138,6 @@ function createMatchFilesFunction(
   patterns?: readonly string[],
   options?: { ignore?: readonly string[] },
 ) => Promise<readonly string[]> {
-  const compiledGlobalExcludes =
-    globalExcludes && globalExcludes.length > 0
-      ? globalExcludes.map((pattern) => new Minimatch(pattern, { dot: true }))
-      : undefined;
-
-  const applyGlobalExcludes = (files: readonly string[]): readonly string[] => {
-    if (!compiledGlobalExcludes) return files;
-    return files.filter((filePath) => {
-      const rel = relative(cwd, filePath);
-      return !compiledGlobalExcludes.some((m) => m.match(rel));
-    });
-  };
-
   return async (
     patterns?: readonly string[],
     options?: { ignore?: readonly string[] },
@@ -176,7 +164,7 @@ function createMatchFilesFunction(
     // must be applied, otherwise scope-empty checks scan every prewarmed
     // file regardless of project intent.
     if (matcher.includePatterns.length === 0) {
-      return applyGlobalExcludes(fileCache.paths());
+      return applyGlobalExcludes(fileCache.paths(), cwd, globalExcludes ?? []);
     }
 
     return matcher.files();
