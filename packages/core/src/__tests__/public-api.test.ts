@@ -48,6 +48,9 @@ const EXPECTED_VALUE_EXPORTS = [
   'HOST_VERDICT_POLICY_FALLBACK',
   'policyPasses',
   'resolveVerdictPolicy',
+  // Host-owned baseline/ratchet plane (ADR-0036).
+  'defaultFingerprintStrategy',
+  'stampFingerprints',
   // Upstream barrel export missing from this curated list (modular-monolith
   // boundary commits added it to index.ts but not here); the barrel exports it.
   'RAW_STREAM_REASONS',
