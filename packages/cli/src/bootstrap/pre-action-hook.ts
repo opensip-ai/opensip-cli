@@ -52,6 +52,7 @@ import {
   getCurrentRegistriesForScope,
   getToolManifestsForRun,
   setCurrentRunScope,
+  markScopeEntered,
 } from '../cli-context.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
@@ -344,6 +345,7 @@ export function installPreActionHook(program: Command, version: string): void {
 
     enterScope(scope);
     setCurrentRunScope(scope);
+    markScopeEntered(); // enables the narrowed holder guard in cli-context
 
     // Lifecycle diagnostics (§5.10): record plugin-load + config-validate facts on
     // the per-run bus now that the scope is bound. These pre-handler events ride on

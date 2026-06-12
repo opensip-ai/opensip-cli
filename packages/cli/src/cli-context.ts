@@ -102,8 +102,26 @@ let currentRuntimeContext: CliRuntimeContext = {
   toolManifests: [],
 };
 
+/**
+ * Guard for the runtime holder fallback path.
+ * Set true by the pre-action hook after a proper `enterScope` + `setCurrentRunScope`.
+ * Used to make misuse of the holder (before scope is entered) a hard failure
+ * rather than a confusing bootstrap error.
+ */
+let scopeEntered = false;
+
 function updateRuntimeContext(patch: Partial<CliRuntimeContext>): void {
   currentRuntimeContext = { ...currentRuntimeContext, ...patch };
+}
+
+/** Mark that the scope has been properly entered (called from pre-action hook). */
+export function markScopeEntered(): void {
+  scopeEntered = true;
+}
+
+/** Reset for test harnesses and new invocations (called on context setup). */
+export function resetScopeEnteredForTest(): void {
+  scopeEntered = false;
 }
 
 export function setCliRuntimeContextForRun(opts: {
@@ -112,6 +130,7 @@ export function setCliRuntimeContextForRun(opts: {
   readonly toolProvenance?: readonly ToolProvenance[];
   readonly toolManifests?: readonly ToolPluginManifest[];
 }): void {
+  scopeEntered = false; // reset for new invocation
   currentRuntimeContext = {
     languages: opts.languages,
     tools: opts.tools,
@@ -129,6 +148,7 @@ export function setCliRegistriesForRun(opts: {
   readonly languages: LanguageRegistry;
   readonly tools: ToolRegistry;
 }): void {
+  scopeEntered = false;
   updateRuntimeContext({ languages: opts.languages, tools: opts.tools });
 }
 
@@ -187,9 +207,15 @@ export function getToolManifestsForRun(): readonly ToolPluginManifest[] {
 
 /**
  * Called by pre-action-hook AFTER `enterScope(scope)` so the constructed
- * scope is mirrored on a per-run holder. Tools always read via
- * `currentScope()`; the holder exists for non-action paths that can't
- * reach ALS (post-action callbacks, error printers).
+ * scope is mirrored on a per-run holder.
+ *
+ * Tools always read via `currentScope()` (ALS).
+ * The holder exists **only** for non-action paths that can't reach ALS
+ * (post-action callbacks, error printers, `maybeOpenDashboard`, certain host commands).
+ *
+ * Contract: caller **must** also call `markScopeEntered()` immediately after
+ * this (see pre-action-hook). Using the holder before the scope is properly
+ * entered now throws a hard `SCOPE_HOLDER_MISUSE` error.
  */
 export function setCurrentRunScope(scope: RunScope): void {
   updateRuntimeContext({ runScope: scope });
@@ -204,6 +230,13 @@ function readScope(): RunScope {
         'cli.scope / getCurrentProjectRoot() / getOrOpenDatastore() only inside an ' +
         'action body.',
       { code: 'SYSTEM.BOOTSTRAP.SCOPE_UNSET' },
+    );
+  }
+  if (!currentScope() && !scopeEntered) {
+    throw new SystemError(
+      'Non-action path accessed the runtime scope holder before the scope was properly entered. ' +
+        'This indicates a bootstrap ordering bug or misuse of holder paths (e.g. calling getCurrentProjectRoot outside an action body before preAction).',
+      { code: 'SYSTEM.BOOTSTRAP.SCOPE_HOLDER_MISUSE' },
     );
   }
   return bound;
