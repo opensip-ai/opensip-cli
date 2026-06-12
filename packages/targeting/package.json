@@ -3,13 +3,7 @@
   "version": "3.0.0",
   "license": "MIT",
   "description": "Host file-targeting runtime substrate for OpenSIP Tools — the generic TargetRegistry, uniform glob expansion (resolveTargets/preResolveAllTargets), and globalExcludes filtering any tool consumes via scope.targets",
-  "keywords": [
-    "opensip-tools",
-    "static-analysis",
-    "code-quality",
-    "targeting",
-    "glob"
-  ],
+  "keywords": ["opensip-tools", "static-analysis", "code-quality"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
