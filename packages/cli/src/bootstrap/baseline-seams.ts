@@ -14,7 +14,12 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import { ConfigurationError, type GateCompareResult, type Logger, type Signal } from '@opensip-tools/core';
+import {
+  ConfigurationError,
+  type GateCompareResult,
+  type Logger,
+  type Signal,
+} from '@opensip-tools/core';
 import { BaselineRepo, type DataStore } from '@opensip-tools/datastore';
 import { diffBaseline } from '@opensip-tools/output';
 
@@ -67,7 +72,9 @@ export function buildBaselineSeams(deps: {
   const repoFor = (): BaselineRepo => new BaselineRepo(getDatastore());
 
   return {
-    saveBaseline: async (tool, envelope) => {
+    // Sync-bodied (SQLite is synchronous) but typed Promise to match the seam
+    // contract; a sync throw still rejects for an `await`ing caller.
+    saveBaseline: (tool, envelope) => {
       const env = envelope as SignalEnvelope;
       const entries = requireStampedEntries(tool, env.signals);
       repoFor().save(tool, entries);
@@ -77,13 +84,14 @@ export function buildBaselineSeams(deps: {
         tool,
         count: entries.length,
       });
+      return Promise.resolve();
     },
 
-    compareBaseline: async (tool, envelope) => {
+    compareBaseline: (tool, envelope) => {
       const repo = repoFor();
-      if (!repo.exists(tool)) throw missingBaseline(tool);
+      if (!repo.exists(tool)) return Promise.reject(missingBaseline(tool));
       const env = envelope as SignalEnvelope;
-      return diffBaseline(env.signals, repo.load(tool));
+      return Promise.resolve(diffBaseline(env.signals, repo.load(tool)));
     },
 
     exportBaselineSarif: async (tool, path) => {
