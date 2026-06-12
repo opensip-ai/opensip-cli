@@ -60,6 +60,7 @@ import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
 import { deliverEnvelope, writeEnvelopeSarif } from './bootstrap/deliver-envelope.js';
 import { buildStateSeams } from './bootstrap/state-seams.js';
+import { buildHostPlanes } from './bootstrap/host-planes.js';
 import {
   outcomeFromEnvelope,
   outcomeFromErrorMessage,
@@ -380,6 +381,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   // Bound to the lazy project datastore (resolved per call, like the run paths).
   const baselineSeams = buildBaselineSeams({ getDatastore: getOrOpenDatastore, logger: log });
   const stateSeams = buildStateSeams({ getDatastore: getOrOpenDatastore }); // ADR-0042, same lazy resolver
+  const hostPlanes = buildHostPlanes({ getDatastore: getOrOpenDatastore, logger: log });
 
   const ctx: ToolCliContext = {
     get scope(): RunScope {
@@ -458,6 +460,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     exportBaselineSarif: baselineSeams.exportBaselineSarif,
     exportBaselineFingerprints: baselineSeams.exportBaselineFingerprints,
     toolState: stateSeams, // ADR-0042: durable per-tool keyed JSON state
+    hostPlanes, // Host-owned governance / entitlements / audit plane (H1-H3)
   };
 
   return {

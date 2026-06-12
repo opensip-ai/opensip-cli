@@ -77,6 +77,7 @@ export { renderResult } from './render.js';
 export { maybeOpenDashboard } from './dashboard.js';
 export { installPreActionHook } from './pre-action-hook.js';
 export { buildCommandRegistrationInput } from './build-command-registration-input.js';
+export { buildHostPlanes } from './host-planes.js';
 
 export interface BootstrapOptions {
   readonly langRegistry: LanguageRegistry;
