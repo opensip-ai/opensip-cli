@@ -13,10 +13,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   detectLanguages,
-  executeInit,
   parseLanguageFlag,
   type SupportedLanguage,
-} from '../commands/init.js';
+} from '../commands/init/language-detection.js';
+import { executeInit } from '../commands/init.js';
 
 import type { ToolScaffold } from '../commands/shared.js';
 import type { InitOptions } from '@opensip-tools/contracts';

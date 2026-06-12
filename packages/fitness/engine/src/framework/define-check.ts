@@ -318,26 +318,13 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
         cwd,
       });
 
-      const legacyConfig = {
+      const executionConfig = {
         id: config.id,
         slug: config.slug,
-        tags: config.tags ? [...config.tags] : [],
-        description: config.description,
-        scope: {
-          include: [] as readonly string[],
-          exclude: [] as readonly string[],
-          description: '',
-        },
         itemType: config.itemType ?? 'files',
-        docs: config.docs,
-        disabled: config.disabled,
-        timeout: config.timeout,
-        scansFiles: !isCommandConfig(config),
-        // @fitness-ignore-next-line concurrency-safety -- async arrow delegates to executeUnifiedCheck which is async; needed for type compatibility
-        execute: async (ctx: ExecutionContext) => executeUnifiedCheck(config, ctx),
       };
 
-      const ctx = createExecutionContext(legacyConfig, cwd, matcher, options);
+      const ctx = createExecutionContext(executionConfig, cwd, matcher, options);
 
       try {
         const result = await executeUnifiedCheck(config, ctx);

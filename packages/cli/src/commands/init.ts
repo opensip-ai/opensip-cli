@@ -97,11 +97,6 @@ import {
 import type { ToolScaffold } from './shared.js';
 import type { InitOptions, InitResult } from '@opensip-tools/contracts';
 
-// Re-export the public API of `init` so existing imports (notably the
-// test suite) continue to resolve through `commands/init.js`.
-export { detectLanguages, parseLanguageFlag } from './init/language-detection.js';
-export type { SupportedLanguage } from './init/language-detection.js';
-
 /**
  * Run init for the given args. Returns an InitResult — the caller
  * (CLI render layer) prints it.

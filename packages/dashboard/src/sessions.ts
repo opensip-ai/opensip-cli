@@ -12,7 +12,7 @@ export function dashboardSessionsJs(): string {
 // Per-rule metric column map for the expanded findings table. For these
 // graph rules the finding message just repeats the file + the metric, so
 // we DROP the Message column and render a dedicated metric column read
-// from finding.metadata (persisted via the FindingOutput.metadata field).
+// from finding.metadata (persisted on the signal metadata payload).
 const RULE_METRIC_COLUMNS = {
   'graph:large-function': { label: 'Lines', key: 'bodyLines' },
   'graph:high-blast-untested': { label: 'Score', key: 'blast' },

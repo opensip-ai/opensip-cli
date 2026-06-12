@@ -217,7 +217,7 @@ describe('graph session payload — rule-grouped detail is persisted', () => {
     const payload = session?.payload as GraphSessionPayload | undefined;
     expect(payload).toBeDefined();
 
-    // The native signal summary is carried verbatim from the run's CliOutput.
+    // The native signal summary is carried verbatim from the run's SignalEnvelope.
     expect(payload?.summary).toEqual(
       expect.objectContaining({
         total: expect.any(Number),
