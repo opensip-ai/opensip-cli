@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- the one result→view dispatch switch grows a case per CommandResult variant; the view BODIES already live in ui/views/* (init, misc, plugin, tools) and cli-ui, so what remains is the irreducible switch + shared envelope-table helpers. Splitting the switch would fragment the single dispatch surface (cf. command-results.ts's identical waiver for the union itself).
 /**
  * resultToView — the single `CommandResult → ViewNode` mapping.
  *
@@ -50,6 +51,13 @@ import {
   viewHelp,
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
+import {
+  viewToolsDataPurge,
+  viewToolsInstall,
+  viewToolsList,
+  viewToolsUninstall,
+  viewToolsValidate,
+} from './views/tools-views.js';
 
 import type {
   CommandResult,
@@ -396,6 +404,21 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'experimental': {
       return viewExperimental(result);
+    }
+    case 'tools-list': {
+      return viewToolsList(result);
+    }
+    case 'tools-validate': {
+      return viewToolsValidate(result);
+    }
+    case 'tools-install': {
+      return viewToolsInstall(result);
+    }
+    case 'tools-uninstall': {
+      return viewToolsUninstall(result);
+    }
+    case 'tools-data-purge': {
+      return viewToolsDataPurge(result);
     }
     case 'plugin-list':
     case 'plugin-add':

@@ -199,6 +199,7 @@ describe('getCurrentProjectRoot / setCurrentRunScope', () => {
         } as never,
       }),
     );
+    mod.markScopeEntered();
     expect(mod.getCurrentProjectRoot()).toBe('/path/to/proj');
   });
 
@@ -209,6 +210,7 @@ describe('getCurrentProjectRoot / setCurrentRunScope', () => {
     // A scope with no projectContext (e.g. a bare bootstrap scope) ⇒
     // getCurrentProjectRoot must surface the PROJECT_UNSET error.
     mod.setCurrentRunScope(new RunScope({}));
+    mod.markScopeEntered();
     expect(() => mod.getCurrentProjectRoot()).toThrow(/pre-action-hook resolved the context/);
   });
 });
@@ -283,6 +285,7 @@ describe('ToolCliContext.scope getter', () => {
       projectContext: { scope: 'project', projectRoot: '/p', walkedUp: 0 } as never,
     });
     mod.setCurrentRunScope(scope);
+    mod.markScopeEntered();
 
     const opts = makeBuildOpts();
     const { ctx } = mod.buildToolCliContext(opts);
@@ -312,6 +315,7 @@ describe('getOrOpenDatastore', () => {
         datastore: mod.buildDatastoreThunk(project),
       }),
     );
+    mod.markScopeEntered(); // simulate proper pre-action enter for holder path
     expect(() => mod.getOrOpenDatastore()).toThrow(/non-project context/);
   });
 
@@ -325,6 +329,7 @@ describe('getOrOpenDatastore', () => {
       const project = { scope: 'project', projectRoot, walkedUp: 0 } as never;
       const thunk = mod.buildDatastoreThunk(project);
       mod.setCurrentRunScope(new RunScope({ projectContext: project, datastore: thunk }));
+      mod.markScopeEntered(); // simulate proper pre-action enter for holder path
 
       const first = mod.getOrOpenDatastore();
       expect(first).toBeDefined();

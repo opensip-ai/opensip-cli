@@ -52,6 +52,7 @@ import {
   getCurrentRegistriesForScope,
   getToolManifestsForRun,
   setCurrentRunScope,
+  markScopeEntered,
 } from '../cli-context.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
@@ -60,6 +61,7 @@ import { buildTargets } from './build-targets.js';
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
 import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
+import { buildPerRunScope } from './build-per-run-scope.js';
 import {
   checkNoProjectAndBailout,
   checkSchemaVersionAndBailout,
@@ -74,13 +76,16 @@ const CLI_PACKAGE_NAME = 'opensip-tools';
 const MODULE_TAG = 'cli:bootstrap';
 
 /**
- * Tool ids whose `initialize()` has already run in this process. The Tool
- * contract guarantees `initialize()` is called "at most once per process";
- * this set enforces that across multiple preAction firings (long-lived
- * hosts, tests). Process-scoped on purpose — a fresh CLI process starts
- * empty.
+ * Process-scoped idempotency for Tool.initialize() (see process-idempotency.ts).
+ * The Set is intentionally process-scoped per the Tool contract ("at most once per process").
+ * Resets are called on per-invocation context setup to prevent leakage.
+ *
+ * GA Low hygiene: centralized in process-idempotency.ts for better isolation and auditability.
  */
-const initializedToolIds = new Set<string>();
+import { initializedToolIds, resetInitializedToolIdsForTest } from './process-idempotency.js';
+
+// Re-export the reset for consumers that imported it from here (e.g. cli-context.ts for per-invocation resets).
+export { resetInitializedToolIdsForTest };
 
 /**
  * Find the registered tool that owns the invoked subcommand, matching the
@@ -148,14 +153,7 @@ async function maybeInitializeOwningTool(
  * config-less run stays document-less so tools that hard-error on a missing
  * config (fitness) stay loud instead of silently validating `{}`.
  */
-function configDocumentSlot(
-  project: { readonly scope: string; readonly configPath: string | undefined },
-  configDocument: unknown,
-): { configDocument?: Record<string, unknown> } {
-  return project.scope === 'project' && project.configPath !== undefined
-    ? { configDocument: configDocument as Record<string, unknown> }
-    : {};
-}
+
 
 /**
  * Mount the bootstrap `preAction` hook on the supplied program.
@@ -270,80 +268,26 @@ export function installPreActionHook(program: Command, version: string): void {
     // `cloud` layers the user-level opt-out (~/.opensip-tools/config.yml#cloud)
     // over the project's `cli.cloud:` block (audit P0-2): a user `sync: false`
     // disables sync for every project on this machine.
-    const signalSink = resolveSignalSink({
-      apiKey: opts.apiKey as string | undefined,
-      cloud: resolveEffectiveCloudConfig(cliDefaults.cloud),
-      // `--no-cloud` is a global flag, so read it through optsWithGlobals().
-      // @fitness-ignore-next-line null-safety -- optsWithGlobals() returns a commander OptionValues record (never null); `.cloud` is a safe optional read
-      noCloud: actionCommand.optsWithGlobals().cloud === false,
-      cacheDir: join(resolveUserPaths().userHomeDir, 'cache'),
-    });
-
     const { languages, tools } = getCurrentRegistriesForScope();
-    // ADR-0023 Phase 4: compose + STRICT-validate config before building the
-    // scope (a typo in any tool namespace → CONFIGURATION_ERROR); resolved
-    // config rides the scope (tools read scope.toolConfig.<namespace>).
-    const { config: toolConfig, document: configDocument } = composeAndValidateToolConfig({
-      tools,
-      manifests: getToolManifestsForRun(),
-      configPath: project.scope === 'project' ? project.configPath : undefined,
-      env: process.env,
-    });
-    // ADR-0037: build the host file-targeting accessor from the SAME single
-    // validated config document the composer already read (ADR-0023: one
-    // reader — `buildTargets` is a pure builder, never a second `readYamlFile`).
-    // Mirrors `toolConfig` — `undefined` on a project-agnostic/config-less run,
-    // or when the doc has no `targets:` block. Fitness consumes it (Phase 2
-    // cutover): its targets loader mirrors `scope.targets` into the check-domain
-    // registry instead of re-deriving its own set.
-    const targets = buildTargets({ document: configDocument });
-    const scope = new RunScope({
-      logger,
-      projectContext: project,
-      languages,
-      tools,
-      signalSink,
-      // Item 2 — runId is a flat kernel field on RunScope (per D7); the
-      // logger's runId provider reads it back via `currentScope()?.runId`.
-      runId,
-      // Closure-based lazy datastore. SQLite is materialised only on
-      // first access. The thunk captures `project` so non-action paths
-      // (post-action handlers, error printers) that read via
-      // `getOrOpenDatastore()` find the same instance.
-      datastore: buildDatastoreThunk(project, logger),
-      // Presentation settings the render paths read via currentScope()?.ui.
-      // bannerSize stays an untyped string at the kernel boundary; the
-      // cli-ui render sites narrow it with normalizeBannerSize. Product
-      // default is 'mini' (the compact identity card) when no
-      // `cli.ui.banner` is configured; a user can opt back into lg/md/sm.
-      // `update` is the cached newer-version string (if any); the mini banner
-      // shows it inline, other sizes get the stderr nag emitted below.
-      ui: { bannerSize, version, update },
-    });
-    // D7: each registered tool contributes its tool-specific subscope (e.g.
-    // `scope.simulation`, `scope.graph`) BEFORE the scope is entered. IoC (M4):
-    // the tool RETURNS its slot via `contributeScope()`; the kernel installs it
-    // with `Object.assign` (registration order; a tool with no hook is skipped).
-    for (const tool of tools.list()) {
-      const contribution = tool.contributeScope?.();
-      if (contribution) Object.assign(scope, contribution);
-    }
 
-    // §5.3 Phase 4: per-run capability registry (manifest domains → real registrars).
-    const capabilities = wireCapabilityRegistry({
-      tools,
+    // Extracted to thin the composition root (GA architectural blocker #2).
+    // All scope construction + wiring now lives in a dedicated small builder
+    // with explicit inputs. The hook remains the high-level sequencer.
+    const scope = buildPerRunScope({
+      project,
+      runId,
+      cwd,
+      cliDefaults,
+      registries: { languages, tools },
       manifests: getToolManifestsForRun(),
-      registry: createCapabilityRegistry(logger),
-    });
-    Object.assign(scope, {
-      capabilities,
-      toolConfig,
-      targets,
-      ...configDocumentSlot(project, configDocument),
+      apiKey: opts.apiKey as string | undefined,
+      noCloud: actionCommand.optsWithGlobals().cloud === false,
+      logger,
     });
 
     enterScope(scope);
     setCurrentRunScope(scope);
+    markScopeEntered(); // enables the narrowed holder guard in cli-context
 
     // Lifecycle diagnostics (§5.10): record plugin-load + config-validate facts on
     // the per-run bus now that the scope is bound. These pre-handler events ride on

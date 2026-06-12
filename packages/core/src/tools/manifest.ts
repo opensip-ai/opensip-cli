@@ -123,6 +123,22 @@ interface ToolPluginManifestBase {
   readonly pluginDomains?: readonly unknown[];
   /** Later: declared host/peer requirements. */
   readonly requires?: readonly unknown[];
+
+  // ── Reserved for community / catalog (ecosystem vision) ─────────────
+  // These are additive reservations (not yet consumed) so manifests
+  // authored for GA remain forward-shaped for the future community
+  // marketplace, distribution modes, compatibility declarations,
+  // org-scoped registries, and paid-extension support described in the
+  // product ecosystem vision (docs/business/product-ecosystem-vision.md).
+  // See the second-pass architecture review (GA blocker on forward-compat
+  // in manifests/admission). The shape will be defined by the release
+  // that first consumes them.
+  /** Reserved: compatibility metadata (minApiVersion, languages, etc.). */
+  readonly compatibility?: unknown;
+  /** Reserved: distribution posture for community/catalog. */
+  readonly distribution?: 'private' | 'public-free' | 'public-paid' | unknown;
+  /** General bag for future extension metadata (publisher, pricing, etc.). */
+  readonly extensionMetadata?: unknown;
 }
 
 /**

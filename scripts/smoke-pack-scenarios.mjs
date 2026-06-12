@@ -312,6 +312,80 @@ export function buildPackedSmokeScenarios({
         },
       },
     },
+    // ── tools-surface walk (ADR-0041) — depends on the plugin-add scenarios
+    //    above (the tool-plugin fixture is installed project-local). ─────────
+    {
+      name: 'tools list --json shows bundled ids + the installed fixture row',
+      args: ['tools', 'list', '--json'],
+      cwd: consumerCwd,
+      expect: {
+        exitCode: 0,
+        json: (parsed) => {
+          const failures = [];
+          const data = cmdData(parsed);
+          const rows = Array.isArray(data?.tools) ? data.tools : [];
+          const ids = new Set(rows.map((t) => t?.id));
+          for (const bundled of ['fitness', 'simulation', 'graph']) {
+            if (!ids.has(bundled)) failures.push(`tools list: missing bundled id '${bundled}'`);
+          }
+          const fixture = rows.find((t) => t?.id === 'audit-demo-tool');
+          if (fixture === undefined) {
+            failures.push('tools list: missing the installed audit-demo-tool row');
+          } else if (fixture.source !== 'project') {
+            failures.push(
+              `tools list: audit-demo-tool source: expected 'project', got ${JSON.stringify(fixture.source)}`,
+            );
+          }
+          return failures;
+        },
+      },
+    },
+    {
+      name: 'tools validate <tool fixture tarball> passes every section',
+      args: ['tools', 'validate', toolPluginTarball, '--json'],
+      cwd: consumerCwd,
+      timeout: 120_000,
+      expect: {
+        exitCode: 0,
+        json: (parsed) => {
+          const data = cmdData(parsed);
+          return data?.verdict === 'passed'
+            ? []
+            : [`tools-validate.verdict: expected 'passed', got ${JSON.stringify(data?.verdict)}`];
+        },
+      },
+    },
+    {
+      name: 'tools uninstall removes the project-local fixture',
+      args: ['tools', 'uninstall', 'audit-demo-tool', '--project', '--json'],
+      cwd: consumerCwd,
+      expect: {
+        exitCode: 0,
+        json: (parsed) => {
+          const data = cmdData(parsed);
+          return data?.success === true
+            ? []
+            : [
+                `tools-uninstall.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
+              ];
+        },
+      },
+    },
+    {
+      name: 'tools list --json no longer shows the fixture row',
+      args: ['tools', 'list', '--json'],
+      cwd: consumerCwd,
+      expect: {
+        exitCode: 0,
+        json: (parsed) => {
+          const data = cmdData(parsed);
+          const rows = Array.isArray(data?.tools) ? data.tools : [];
+          return rows.some((t) => t?.id === 'audit-demo-tool')
+            ? ['tools list: audit-demo-tool row still present after uninstall']
+            : [];
+        },
+      },
+    },
   ];
 
   return scenarios;

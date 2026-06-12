@@ -75,6 +75,12 @@ function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
     ),
     exportBaselineSarif: vi.fn(() => Promise.resolve()),
     exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
+    toolState: {
+      get: () => Promise.resolve(undefined),
+      put: () => Promise.resolve(),
+      delete: () => Promise.resolve(),
+      list: () => Promise.resolve([]),
+    },
     ...overrides,
   };
 }

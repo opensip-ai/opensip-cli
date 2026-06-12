@@ -69,6 +69,13 @@ const SHUTDOWN_TIMEOUT_MS = 2000;
 /** Idempotency guard — provider registration is process-wide and one-shot. */
 let started = false;
 
+/** Reset for test harnesses and fresh invocations (GA Low hygiene). */
+export function resetTelemetryStartedForTest(): void {
+  started = false;
+  provider = undefined;
+  parentContext = undefined;
+}
+
 /** The active provider, retained so {@link shutdownTelemetry} can flush it. */
 let provider: NodeTracerProvider | undefined;
 

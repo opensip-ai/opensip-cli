@@ -52,10 +52,14 @@ import {
   type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-tools/core';
+
+import { resetInitializedToolIdsForTest } from './bootstrap/pre-action-hook.js';
+import { resetTelemetryStartedForTest } from './telemetry/sdk-init.js';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
 import { deliverEnvelope, writeEnvelopeSarif } from './bootstrap/deliver-envelope.js';
+import { buildStateSeams } from './bootstrap/state-seams.js';
 import {
   outcomeFromEnvelope,
   outcomeFromErrorMessage,
@@ -101,8 +105,26 @@ let currentRuntimeContext: CliRuntimeContext = {
   toolManifests: [],
 };
 
+/**
+ * Guard for the runtime holder fallback path.
+ * Set true by the pre-action hook after a proper `enterScope` + `setCurrentRunScope`.
+ * Used to make misuse of the holder (before scope is entered) a hard failure
+ * rather than a confusing bootstrap error.
+ */
+let scopeEntered = false;
+
 function updateRuntimeContext(patch: Partial<CliRuntimeContext>): void {
   currentRuntimeContext = { ...currentRuntimeContext, ...patch };
+}
+
+/** Mark that the scope has been properly entered (called from pre-action hook). */
+export function markScopeEntered(): void {
+  scopeEntered = true;
+}
+
+/** Reset for test harnesses and new invocations (called on context setup). */
+export function resetScopeEnteredForTest(): void {
+  scopeEntered = false;
 }
 
 export function setCliRuntimeContextForRun(opts: {
@@ -111,6 +133,9 @@ export function setCliRuntimeContextForRun(opts: {
   readonly toolProvenance?: readonly ToolProvenance[];
   readonly toolManifests?: readonly ToolPluginManifest[];
 }): void {
+  scopeEntered = false; // reset for new invocation
+  resetInitializedToolIdsForTest();
+  resetTelemetryStartedForTest();
   currentRuntimeContext = {
     languages: opts.languages,
     tools: opts.tools,
@@ -128,6 +153,9 @@ export function setCliRegistriesForRun(opts: {
   readonly languages: LanguageRegistry;
   readonly tools: ToolRegistry;
 }): void {
+  scopeEntered = false;
+  resetInitializedToolIdsForTest();
+  resetTelemetryStartedForTest();
   updateRuntimeContext({ languages: opts.languages, tools: opts.tools });
 }
 
@@ -186,9 +214,15 @@ export function getToolManifestsForRun(): readonly ToolPluginManifest[] {
 
 /**
  * Called by pre-action-hook AFTER `enterScope(scope)` so the constructed
- * scope is mirrored on a per-run holder. Tools always read via
- * `currentScope()`; the holder exists for non-action paths that can't
- * reach ALS (post-action callbacks, error printers).
+ * scope is mirrored on a per-run holder.
+ *
+ * Tools always read via `currentScope()` (ALS).
+ * The holder exists **only** for non-action paths that can't reach ALS
+ * (post-action callbacks, error printers, `maybeOpenDashboard`, certain host commands).
+ *
+ * Contract: caller **must** also call `markScopeEntered()` immediately after
+ * this (see pre-action-hook). Using the holder before the scope is properly
+ * entered now throws a hard `SCOPE_HOLDER_MISUSE` error.
  */
 export function setCurrentRunScope(scope: RunScope): void {
   updateRuntimeContext({ runScope: scope });
@@ -203,6 +237,13 @@ function readScope(): RunScope {
         'cli.scope / getCurrentProjectRoot() / getOrOpenDatastore() only inside an ' +
         'action body.',
       { code: 'SYSTEM.BOOTSTRAP.SCOPE_UNSET' },
+    );
+  }
+  if (!currentScope() && !scopeEntered) {
+    throw new SystemError(
+      'Non-action path accessed the runtime scope holder before the scope was properly entered. ' +
+        'This indicates a bootstrap ordering bug or misuse of holder paths (e.g. calling getCurrentProjectRoot outside an action body before preAction).',
+      { code: 'SYSTEM.BOOTSTRAP.SCOPE_HOLDER_MISUSE' },
     );
   }
   return bound;
@@ -338,6 +379,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   // Host baseline/ratchet plane seams (ADR-0036): persistence + diff + exports.
   // Bound to the lazy project datastore (resolved per call, like the run paths).
   const baselineSeams = buildBaselineSeams({ getDatastore: getOrOpenDatastore, logger: log });
+  const stateSeams = buildStateSeams({ getDatastore: getOrOpenDatastore }); // ADR-0042, same lazy resolver
 
   const ctx: ToolCliContext = {
     get scope(): RunScope {
@@ -415,6 +457,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     compareBaseline: baselineSeams.compareBaseline,
     exportBaselineSarif: baselineSeams.exportBaselineSarif,
     exportBaselineFingerprints: baselineSeams.exportBaselineFingerprints,
+    toolState: stateSeams, // ADR-0042: durable per-tool keyed JSON state
   };
 
   return {

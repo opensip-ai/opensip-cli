@@ -16,11 +16,11 @@ import { Command } from 'commander';
 
 import {
   bootstrapCli,
-  EXPECTED_SCAFFOLDING_TOOL_IDS,
   installPreActionHook,
   maybeOpenDashboard,
   mountToolCommands,
   renderResult,
+  buildCommandRegistrationInput,
 } from './bootstrap/index.js';
 import {
   buildToolCliContext,
@@ -95,58 +95,18 @@ async function main(): Promise<void> {
   // (3.0.0 — the tool context no longer carries a raw-Commander handle, §8); the
   // one command surface is each tool's declarative commandSpecs.
   mountToolCommands(toolRegistry, program, ctx);
-  // Source the plugin-supporting domains from the registered tools'
-  // declared layouts — the kernel never enumerates them (ADR-0009).
-  const pluginLayouts = toolRegistry
-    .list()
-    .map((t) => t.pluginLayout)
-    .filter((l): l is NonNullable<typeof l> => l !== undefined);
-  // ADR-0038: the per-tool `init`-scaffold contributions, sourced from the same
-  // registry. `init` iterates these (each tool's pluginLayout + scaffoldExamples)
-  // instead of hardcoding fit/sim. A tool with no pluginLayout contributes nothing.
-  const toolScaffolds = toolRegistry.list().flatMap((t) => {
-    const layout = t.pluginLayout;
-    if (layout === undefined) return [];
-    return [
-      {
-        layout,
-        scaffoldExamples: t.scaffoldExamples,
-        stableExampleIds: t.stableExampleIds,
-        scaffoldConfigBlock: t.scaffoldConfigBlock,
-      },
-    ];
-  });
-  // Back-compat diagnostic (ADR-0038): the old init always scaffolded fit/sim;
-  // the registry-driven init scaffolds FEWER dirs if one of those is absent. A
-  // loud warning makes a silent under-scaffold observable; a genuinely
-  // uninstalled third-party tool stays silent (correct). The expected-id pin
-  // lives beside BUNDLED_TOOL_PACKAGES (register-tools.ts) — see its JSDoc for
-  // why it is a historical constant rather than derived from loaded manifests.
-  for (const expectedId of EXPECTED_SCAFFOLDING_TOOL_IDS) {
-    if (!toolRegistry.list().some((t) => t.metadata.id === expectedId)) {
-      logger.warn({
-        evt: 'cli.tool.expected_bundled_absent',
-        module: 'cli:bootstrap',
-        tool: expectedId,
-        msg: `Expected bundled tool '${expectedId}' is absent from the registry — its init scaffold dirs will not be created.`,
-      });
-    }
-  }
-  const sessionReplayRegistry = SessionReplayRegistry.fromTools(toolRegistry);
-  // The live tool command surface, sourced from the populated registry so the
-  // `completion` command derives its flags from the same specs the runtime
-  // mounts (no hand-maintained flag list to drift).
-  const toolCommandSpecs = toolRegistry.list().flatMap((t) => t.commandSpecs ?? []);
+
+  // Extracted into a thin dedicated builder (roadmap item 2) to keep the
+  // top-level composition root focused on sequencing. The builder returns the
+  // exact shape consumed by `registerCliCommands`.
+  const registrationInput = buildCommandRegistrationInput(toolRegistry);
   registerCliCommands(program, {
     setExitCode: ctx.setExitCode,
     render: renderResult,
     emitJson: ctx.emitJson,
     emitError: ctx.emitError,
     datastore: () => getOrOpenDatastore(logger),
-    pluginLayouts,
-    toolScaffolds,
-    sessionReplayRegistry,
-    toolCommandSpecs,
+    ...registrationInput,
   });
 
   // Bare `opensip-tools` → welcome screen. The update check is owned by the

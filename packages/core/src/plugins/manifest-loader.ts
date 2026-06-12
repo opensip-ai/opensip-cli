@@ -295,6 +295,17 @@ function validateManifest(
     if (capabilities === undefined) return undefined; // present but malformed
   }
 
+  // Reserved for future community/catalog (see ToolPluginManifestBase).
+  // We explicitly copy them through as `unknown` (additive) so they survive
+  // load → admit without loss. This is the lightweight consumer hygiene
+  // (roadmap item 3) — authors get structural round-tripping now; future
+  // releases can add non-fatal warnings or concrete schemas without
+  // breaking GA-era manifests. The admission gate already treats extra
+  // fields permissively; this just makes the intent explicit.
+  const compatibility = block.compatibility;
+  const distribution = block.distribution;
+  const extensionMetadata = block.extensionMetadata;
+
   return {
     kind: 'tool',
     id: block.id,
@@ -303,6 +314,9 @@ function validateManifest(
     ...(apiVersion === undefined ? {} : { apiVersion }),
     commands,
     ...(capabilities === undefined ? {} : { capabilities }),
+    ...(compatibility === undefined ? {} : { compatibility }),
+    ...(distribution === undefined ? {} : { distribution }),
+    ...(extensionMetadata === undefined ? {} : { extensionMetadata }),
   };
 }
 

@@ -26,6 +26,7 @@
  */
 
 import {
+  analyzeNamespaceClaims,
   composeConfigSchema,
   hostConfigDeclarations,
   resolveConfig,
@@ -36,6 +37,7 @@ import {
 import {
   type CapabilityRegistry,
   ConfigurationError,
+  logger,
   type ResolvedToolConfig,
   type ToolPluginManifest,
   type ToolRegistry,
@@ -169,6 +171,14 @@ export function composeAndValidateToolConfig(args: {
   // before dispatch. The CLI error boundary maps it to CONFIGURATION_ERROR.
   const validated = validateConfigDocument(schema, document);
 
+  // ADR-0043: the composer TOLERATES unclaimed top-level namespaces (the
+  // uninstalled-tool forward-compat contract) — but never silently. Two cases:
+  //   - the namespace equals a LOADED tool's id → that tool declares no
+  //     Tool.config yet its block exists: a tool-authoring bug, hard-reject;
+  //   - otherwise → warn loudly (structured event + stderr for CI), with a
+  //     did-you-mean when the key is edit-distance-close to a claimed one.
+  reportUnclaimedNamespaces({ declarations, document: validated, tools });
+
   // The validated document is returned alongside the resolved config so the
   // host can build the targeting substrate (`buildTargets`) from the SAME
   // single validated read — no second `readYamlFile` (ADR-0023 one-reader).
@@ -182,6 +192,47 @@ export function composeAndValidateToolConfig(args: {
     }),
     document: validated,
   };
+}
+
+/**
+ * The ADR-0043 unclaimed-namespace policy: reject a LOADED tool's undeclared
+ * block; warn (event + stderr, once per namespace per run) on the rest.
+ *
+ * @throws {ConfigurationError} when an unclaimed namespace equals a loaded
+ *   tool's id — the block exists but the tool cannot consume it.
+ */
+function reportUnclaimedNamespaces(args: {
+  readonly declarations: readonly ToolConfigDeclaration[];
+  readonly document: unknown;
+  readonly tools: ToolRegistry;
+}): void {
+  const report = analyzeNamespaceClaims(args.declarations, args.document);
+  if (report.unclaimed.length === 0) return;
+
+  const loadedToolIds = new Set(args.tools.list().map((t) => t.metadata.id));
+  const toolBugs = report.unclaimed.filter((u) => loadedToolIds.has(u.namespace));
+  if (toolBugs.length > 0) {
+    const names = toolBugs.map((u) => `'${u.namespace}'`).join(', ');
+    throw new ConfigurationError(
+      `Config declares ${names} but the loaded tool(s) of the same id contribute no Tool.config — ` +
+        `the block can never apply. Remove the block or fix the tool's config contribution. (ADR-0043)`,
+      { code: 'CONFIGURATION_ERROR' },
+    );
+  }
+
+  for (const u of report.unclaimed) {
+    const didYouMean = u.suggestion === undefined ? '' : ` — did you mean '${u.suggestion}:'?`;
+    logger.warn({
+      evt: 'cli.config.unclaimed_namespace',
+      module: 'cli:bootstrap',
+      namespace: u.namespace,
+      suggestion: u.suggestion,
+    });
+    process.stderr.write(
+      `opensip-tools: config namespace '${u.namespace}:' is not claimed by any loaded tool${didYouMean} ` +
+        `(expected if that tool isn't installed in this project)\n`,
+    );
+  }
 }
 
 /**

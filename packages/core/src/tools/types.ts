@@ -167,6 +167,19 @@ export interface SignalDeliveryResult {
 }
 
 /**
+ * Wire alias for run envelopes passed across the core ↔ cli seam.
+ *
+ * Typed `unknown` here because core must not depend on @opensip-tools/contracts
+ * (layering). The composition root (cli) narrows it to `SignalEnvelope`.
+ * This is the documented cost of strict kernel layering; shape-sync tests
+ * and the explicit `Wire*` aliases are the hygiene.
+ *
+ * (GA Lows cleanup, 2026-06: alias + usage added as part of resolving the
+ * "heavy unknown + casts" item. See roadmap item 5.)
+ */
+type WireSignalEnvelope = unknown;
+
+/**
  * Context the host hands to each command handler (and the tool's optional
  * lifecycle hooks): the shared CLI behaviour a handler calls back into — Ink
  * rendering, machine-output emit seams, dashboard auto-open, structured logging,
@@ -284,8 +297,12 @@ export interface ToolCliContext {
    * `Tool` contract in core must not name the contracts-layer payload type
    * (that edge would invert the layer graph). The composition root narrows
    * it.
+   *
+   * Hygiene note (GA Low): this `unknown` + cast pattern is the cost of
+   * strict layering (core imports nothing workspace). See the shape-sync
+   * tests and `WireSignalEnvelope` alias below for the invariant.
    */
-  readonly emitEnvelope: (envelope: unknown) => void;
+  readonly emitEnvelope: (envelope: WireSignalEnvelope) => void;
   /**
    * Emit a **structured error** as machine-output (release 2.12.0, §5.5). The
    * host wraps `{ message, exitCode, suggestion? }` in a `status:'error'`
@@ -331,7 +348,7 @@ export interface ToolCliContext {
    * `unknown` here for the same layer reason as `render`/`emitEnvelope`.
    */
   readonly deliverSignals: (
-    envelope: unknown,
+    envelope: WireSignalEnvelope,
     opts: {
       readonly cwd: string;
       readonly reportTo?: string;
@@ -354,7 +371,7 @@ export interface ToolCliContext {
    * `unknown` here for the same layer reason as `render`/`emitEnvelope`/
    * `deliverSignals`.
    */
-  readonly writeSarif: (envelope: unknown, path: string) => Promise<void>;
+  readonly writeSarif: (envelope: WireSignalEnvelope, path: string) => Promise<void>;
   /**
    * Host baseline/ratchet plane seams (ADR-0036). The host owns persistence
    * (`BaselineRepo`), the diff, and exit derivation; a tool inherits a CI ratchet
@@ -365,14 +382,14 @@ export interface ToolCliContext {
    * `SignalEnvelope` typed `unknown` here for the same layer reason as
    * `writeSarif`/`deliverSignals`.
    */
-  readonly saveBaseline: (tool: string, envelope: unknown) => Promise<void>;
+  readonly saveBaseline: (tool: string, envelope: WireSignalEnvelope) => Promise<void>;
   /**
    * Compare the current (stamped) envelope against this tool's saved baseline.
    * Throws a `ConfigurationError` (→ exit 2) when no baseline exists. The host
    * derives the gate exit from `result.degraded` via the `deliverSignals`
    * runFailed override — no tool calls `setExitCode` for the gate path (ADR-0035).
    */
-  readonly compareBaseline: (tool: string, envelope: unknown) => Promise<GateCompareResult>;
+  readonly compareBaseline: (tool: string, envelope: WireSignalEnvelope) => Promise<GateCompareResult>;
   /**
    * Export this tool's baseline to a SARIF file by reconstructing a synthetic
    * envelope from the stored per-fingerprint payloads (no stored envelope to
@@ -384,6 +401,26 @@ export interface ToolCliContext {
    * (`{version,tool,capturedAt,fingerprints[]}`). Throws when no baseline exists.
    */
   readonly exportBaselineFingerprints: (tool: string, path: string) => Promise<void>;
+  /**
+   * Host-owned keyed tool state (ADR-0042) — durable, per-tool, opaque-JSON
+   * persistence over the generic `tool_state` table, the third-party parity
+   * mechanism beside sessions + baselines. ONE grouped member (not four flat
+   * seams — the interface-segregation lesson from the baseline plane). Rules:
+   *
+   *   - `tool` scopes every operation; a tool never sees another's rows.
+   *   - Payloads are opaque JSON, capped at 256 KiB per payload; an oversized
+   *     `put` throws a `ValidationError` (error, never evict).
+   *   - Durable: unlike baselines (drop-and-recapture), a release never drops
+   *     these rows. `tools data purge <tool-id>` clears them on request.
+   *   - Requires the entered project scope (the datastore is per-project);
+   *     calls outside one reject with the host's datastore-unavailable error.
+   */
+  readonly toolState: {
+    readonly get: (tool: string, key: string) => Promise<unknown>;
+    readonly put: (tool: string, key: string, payload: unknown) => Promise<void>;
+    readonly delete: (tool: string, key: string) => Promise<void>;
+    readonly list: (tool: string) => Promise<readonly string[]>;
+  };
 }
 
 /**
@@ -458,6 +495,37 @@ export interface ScaffoldFile {
 }
 
 /**
+ * Bag for extension points and optional hooks (rarer or future concerns).
+ *
+ * New extension points (especially around scaffolding, additional capability
+ * declarations, distribution metadata for community, etc.) should be added
+ * here rather than as additional top-level optional members on the main `Tool`
+ * interface.
+ *
+ * This keeps the primary Tool surface focused on stable identity + command
+ * surface (metadata, commands, pluginLayout, commandSpecs) while providing a
+ * clear evolution path for the extensibility story (private tools today →
+ * community tomorrow, per the product ecosystem vision).
+ *
+ * See ADR-0027 / ADR-0038 context and the second-pass architecture review
+ * (GA blocker #3).
+ */
+export interface ToolExtensionPoints {
+  readonly initialize?: () => Promise<void>;
+  readonly contributeScope?: () => ScopeContribution;
+  readonly collectDashboardData?: (
+    scope: ToolScope,
+  ) => Record<string, unknown> | Promise<Record<string, unknown>>;
+  readonly sessionReplay?: ToolSessionReplayContribution;
+  readonly config?: ToolConfigContribution;
+  readonly capabilityRegistrars?: Readonly<Record<string, CapabilityRegistrar>>;
+  readonly fingerprintStrategy?: FingerprintStrategy;
+  readonly scaffoldExamples?: (ctx: ScaffoldContext) => readonly ScaffoldFile[];
+  readonly stableExampleIds?: () => readonly string[];
+  readonly scaffoldConfigBlock?: () => string;
+}
+
+/**
  * The contract every first-party, installed, or project-local tool implements
  * (`fitness`, `simulation`, `graph`, …). A tool declares its metadata and
  * `commandSpecs` (the only command surface), and opts into host-owned planes via
@@ -466,6 +534,10 @@ export interface ScaffoldFile {
  * `scaffoldConfigBlock`, ADR-0038). The host (`cli`) loads every tool through the
  * same dynamic-import plugin path; nothing here distinguishes a bundled tool from
  * an installed one (ADR-0027).
+ *
+ * For future evolution of the contract (especially rarer hooks and community
+ * distribution concerns), prefer adding to `extensionPoints` rather than new
+ * top-level members. See `ToolExtensionPoints`.
  */
 export interface Tool {
   readonly metadata: ToolMetadata;
@@ -637,6 +709,15 @@ export interface Tool {
    * it). The host always renders the document header + the `targets:` section.
    */
   readonly scaffoldConfigBlock?: () => string;
+
+  /**
+   * Bag for extension points and rarer/future hooks.
+   *
+   * New concerns should go here (see `ToolExtensionPoints` JSDoc) rather than
+   * additional top-level optionals. This is the evolution path for the Tool
+   * contract.
+   */
+  readonly extensionPoints?: ToolExtensionPoints;
 }
 
 /**

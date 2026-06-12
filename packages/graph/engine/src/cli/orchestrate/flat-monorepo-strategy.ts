@@ -225,7 +225,18 @@ export interface StrategySelection {
  * - `flat-small` → `single-process` (current default; heap-preflight
  *   handles elevation if needed).
  * - `flat-large` → `synthetic-partition` with `hybrid` strategy
- *   (recommended default per Phase 12 audit).
+ *   (recommended default).
+ *
+ * Note (2026-06): A "community" (Louvain) partitionStrategy was prototyped
+ * and measured under ADR-0045's numeric gate, and discarded by measurement:
+ * real-corpus boundary-call reduction was −4.7% (gate required ≥25%) and
+ * warm wall-time regressed 1.94× on the synthetic fixture (the import scan
+ * + Louvain ran on every warm build). Equivalence floors stayed at 0 as
+ * scoped — accuracy was NOT the failure. See ADR-0045's Outcome for the
+ * full matrix; the prototype is recoverable at tag
+ * `prototype/louvain-partitioning`. The `partitionStrategy` config knob and
+ * `StrategySelection` type are retained for future experiments, but only
+ * `hybrid` is currently supported in production paths.
  */
 export function selectStrategyForLayout(layout: MonorepoLayout): StrategySelection {
   if (layout.kind === 'workspaces') return { mode: 'packages-fanout' };

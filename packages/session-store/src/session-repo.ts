@@ -164,6 +164,24 @@ export class SessionRepo {
     return removed.changes;
   }
 
+  /**
+   * Delete ONE tool's sessions (`tools data purge`, ADR-0042). Associated
+   * `session_tool_payload` rows go via the schema's `onDelete: 'cascade'` FK
+   * (the sqlite backend runs `PRAGMA foreign_keys = ON`). Returns the deleted
+   * session count.
+   */
+  clearForTool(toolId: string): number {
+    const removed = this.datastore.db.delete(sessions).where(eq(sessions.tool, toolId)).run();
+    logger.info({
+      evt: 'session.clear_for_tool.complete',
+      module: MODULE_NAME,
+      msg: 'Cleared sessions for tool',
+      tool: toolId,
+      deleted: removed.changes,
+    });
+    return removed.changes;
+  }
+
   private hydrateSession(row: typeof sessions.$inferSelect): StoredSession {
     // Validate row.tool against the documented union — the SQLite column
     // is plain text with no CHECK constraint, so a legacy or hand-edited
