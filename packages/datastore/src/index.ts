@@ -14,3 +14,6 @@ export {
 } from './data-store.js';
 export { DataStoreFactory } from './factory.js';
 export { isDbNewerThanCli, readSupportedDbVersion } from './schema-version.js';
+// Generic host-owned baseline/ratchet plane (ADR-0036): the shared table pair
+// + the per-tool repo over them.
+export { toolBaselineEntries, toolBaselineMeta } from './schema/baseline.js';
