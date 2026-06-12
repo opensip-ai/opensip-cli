@@ -56,6 +56,7 @@ import {
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { BootstrapError } from './bootstrap-error.js';
+import { buildTargets } from './build-targets.js';
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
 import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
@@ -272,6 +273,13 @@ export function installPreActionHook(program: Command, version: string): void {
       configPath: project.scope === 'project' ? project.configPath : undefined,
       env: process.env,
     });
+    // ADR-0037 Phase 1: build the host file-targeting accessor from the SAME
+    // loaded config doc, once per run. Mirrors `toolConfig` — `undefined` on a
+    // project-agnostic/config-less run, or when the doc has no `targets:` block.
+    // No tool reads it yet (Phase 2 cuts fitness over); this only builds + exposes.
+    const targets = buildTargets({
+      configPath: project.scope === 'project' ? project.configPath : undefined,
+    });
     const scope = new RunScope({
       logger,
       projectContext: project,
@@ -310,7 +318,7 @@ export function installPreActionHook(program: Command, version: string): void {
       manifests: getToolManifestsForRun(),
       registry: createCapabilityRegistry(logger),
     });
-    Object.assign(scope, { capabilities, toolConfig });
+    Object.assign(scope, { capabilities, toolConfig, targets });
 
     enterScope(scope);
     setCurrentRunScope(scope);
