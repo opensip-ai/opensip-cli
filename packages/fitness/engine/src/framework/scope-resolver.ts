@@ -8,129 +8,26 @@
  * Per-check resolution is a pure in-memory lookup — no redundant I/O.
  */
 
-import { relative, resolve } from 'node:path';
-
-import { globSync } from 'glob';
-import { minimatch, Minimatch } from 'minimatch';
+import {
+  applyGlobalExcludes,
+  preResolveAllTargets,
+  resolveTargets,
+} from '@opensip-tools/targeting';
 
 import type { CheckScope } from './check-config.js';
 import type { TargetRegistry } from '../targets/target-registry.js';
-import type { Target, TargetsConfig } from '../targets/types.js';
+import type { TargetsConfig } from '../targets/types.js';
 
 // =============================================================================
 // Pre-resolved target file cache
 // =============================================================================
-
-/** Assemble a single target's file list from pre-resolved pattern results, applying excludes. */
-function assembleTargetFiles(
-  targetConfig: { include: readonly string[]; exclude: readonly string[]; name: string },
-  patternResults: Map<string, readonly string[]>,
-  compiledGlobalExcludes: Minimatch[],
-  rootDir: string,
-): readonly string[] {
-  const files = new Set<string>();
-  for (const pattern of targetConfig.include) {
-    const matches = patternResults.get(pattern) ?? [];
-    for (const match of matches) {
-      files.add(match);
-    }
-  }
-
-  if (targetConfig.exclude.length > 0 || compiledGlobalExcludes.length > 0) {
-    const compiledTargetExcludes = targetConfig.exclude.map(
-      (ex) => new Minimatch(ex, { dot: true }),
-    );
-    const allExcludes = [...compiledTargetExcludes, ...compiledGlobalExcludes];
-    return [...files]
-      .filter((filePath) => !allExcludes.some((m) => m.match(relative(rootDir, filePath))))
-      .sort();
-  }
-
-  return [...files].sort();
-}
-
-/**
- * Collect all unique glob patterns and ignore patterns from all targets,
- * run a single deduplicated glob pass, then partition results per target.
- *
- * This avoids redundant filesystem traversals when targets share common
- * patterns (e.g. multiple targets including "packages/star/src/starstar/star.ts").
- */
-function preResolveAllTargets(
-  registry: TargetRegistry,
-  config: TargetsConfig,
-  rootDir: string,
-): Map<string, readonly string[]> {
-  const targets = registry.getAll();
-  if (targets.length === 0) return new Map();
-
-  // Collect all unique include patterns across targets
-  const allPatterns = new Set<string>();
-  for (const target of targets) {
-    for (const pattern of target.config.include) {
-      allPatterns.add(pattern);
-    }
-  }
-
-  // Single glob pass for each unique pattern — deduplicated across targets.
-  // Common infrastructure dirs are always ignored to prevent expensive traversals.
-  const COMMON_IGNORE = ['**/node_modules/**', '**/dist/**', '**/.git/**'];
-  const patternResults = new Map<string, readonly string[]>();
-  for (const pattern of allPatterns) {
-    const matches = globSync(pattern, {
-      cwd: rootDir,
-      absolute: true,
-      nodir: true,
-      ignore: COMMON_IGNORE,
-    });
-    patternResults.set(
-      pattern,
-      matches.map((m) => resolve(m)),
-    );
-  }
-
-  // Pre-compile globalExcludes matchers for reuse across all targets
-  const { globalExcludes } = config;
-  const compiledExcludes = globalExcludes.map((pattern) => new Minimatch(pattern, { dot: true }));
-
-  // Assemble per-target file lists by combining pattern results and filtering excludes.
-  // Both target-specific excludes AND globalExcludes are applied here so that
-  // per-check resolution is a pure in-memory lookup with no minimatch calls.
-  const result = new Map<string, readonly string[]>();
-  for (const target of targets) {
-    const files = assembleTargetFiles(
-      { include: target.config.include, exclude: target.config.exclude, name: target.config.name },
-      patternResults,
-      compiledExcludes,
-      rootDir,
-    );
-    result.set(target.config.name, files);
-  }
-
-  return result;
-}
-
-/**
- * Resolve a single target's include/exclude globs to absolute file paths.
- * Used by the resolveFilesForCheck fallback path (single-check mode).
- */
-function resolveTargetGlobs(target: Target, rootDir: string): string[] {
-  const files = new Set<string>();
-  const { include, exclude } = target.config;
-
-  for (const pattern of include) {
-    const matches = globSync(pattern, {
-      cwd: rootDir,
-      ignore: [...exclude],
-      absolute: true,
-    });
-    for (const match of matches) {
-      files.add(resolve(match));
-    }
-  }
-
-  return [...files].sort();
-}
+//
+// The generic glob mechanics — `preResolveAllTargets` (deduped multi-target
+// glob pass), `resolveTargets` (single-pass include/exclude expansion), and
+// `applyGlobalExcludes` — now live ONCE in `@opensip-tools/targeting` (ADR-0037,
+// Phase 0) and are imported above. Fitness keeps only the check-domain
+// resolution below (`unionTargetFiles`, the 3-tier `resolveFilesForCheck`, and
+// `buildScopeBasedFileMap`).
 
 /**
  * Look up pre-resolved files for a set of target names, union and deduplicate.
@@ -217,15 +114,12 @@ function resolveFilesForCheck(
     if (resolvedTargets) {
       return unionTargetFiles(names, resolvedTargets);
     }
-    // Fallback: resolve directly (single-check mode without precomputed cache)
+    // Fallback: resolve directly via the substrate single-pass resolver
+    // (single-check mode without precomputed cache).
     const targets = names
       .map((name) => registry.getByName(name))
       .filter((t): t is NonNullable<typeof t> => t !== undefined);
-    const files = new Set<string>();
-    for (const target of targets) {
-      for (const f of resolveTargetGlobs(target, rootDir)) files.add(f);
-    }
-    return [...files].sort();
+    return [...resolveTargets(targets, rootDir, globalExcludes)];
   };
 
   // 1. Check overrides take priority (for marketplace/third-party checks)
@@ -262,7 +156,7 @@ export function buildScopeBasedFileMap(
 ): Map<string, readonly string[]> {
   // Pre-resolve all targets once — deduplicated glob pass across all targets.
   // GlobalExcludes are applied during pre-resolution so per-check lookups are pure in-memory.
-  const resolvedTargets = preResolveAllTargets(registry, config, rootDir);
+  const resolvedTargets = preResolveAllTargets(registry, config.globalExcludes, rootDir);
   const ctx: CheckFileResolutionContext = { registry, config, rootDir, resolvedTargets };
 
   const result = new Map<string, readonly string[]>();
