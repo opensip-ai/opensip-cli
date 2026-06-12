@@ -27,6 +27,7 @@ import { logger, readPackageVersion } from '@opensip-tools/core';
 // their own packages and register via the CLI's discovery walker
 // (register-graph-adapters.ts). The historical engine-side bootstrap is
 // gone.
+import { graphFingerprintStrategy } from './baseline-strategy.js';
 import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/dashboard-data.js';
 import {
   graphBaselineExportCommandSpec,
@@ -266,4 +267,7 @@ export const graphTool: Tool = {
   // its manifest). It supplies the REAL registrar so the host can replace the
   // manifest-time deferred placeholder once graph's module loads.
   capabilityRegistrars: { 'graph-adapter': registerGraphAdapter },
+  // ADR-0036: graph's byte-preserved baseline identity (ruleId|filePath|line|col),
+  // read by the host baseline/ratchet seams when graph stamps its gate envelope.
+  fingerprintStrategy: graphFingerprintStrategy,
 };
