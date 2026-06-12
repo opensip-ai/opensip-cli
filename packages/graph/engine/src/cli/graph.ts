@@ -203,7 +203,8 @@ export async function executeGraph(
     // `--gate-*`/`--json`. When the project can't shard (no worker script,
     // single-unit, discovery failure) we fall back to the exact engine — the
     // natural single-package/small-repo path — rather than failing.
-    const shards = await resolveEngineShards(opts, cli, positionalPaths);
+    const resolution = await resolveEngineShards(opts, cli, positionalPaths);
+    const shards = resolution.shards;
     logger.info({
       evt: 'graph.cli.graph.engine',
       module: MODULE_GRAPH_CLI,
@@ -217,6 +218,16 @@ export async function executeGraph(
       cwd: runCwd,
       mode: shards.length > 1 ? 'sharded' : 'single-process',
     });
+    // The synthetic partitioner runs BEFORE the profile run recorder exists
+    // (its `mode` label needs the shard count), so its wall time is measured
+    // where it runs and recorded here (ADR-0045 measurement plane).
+    if (resolution.partition !== undefined) {
+      profileRun?.recordStage(
+        'partition',
+        resolution.partition.durationMs,
+        resolution.partition.detail,
+      );
+    }
     const result =
       shards.length > 1
         ? await runProfiledShardedBuild(profileRun, {
@@ -293,13 +304,19 @@ function realpathOrSelf(input: string, base: string): string {
   }
 }
 
+/** Shard resolution + optional synthetic-partition timing (profile stage). */
+interface ShardResolution {
+  readonly shards: Shard[];
+  readonly partition?: { readonly durationMs: number; readonly detail: string };
+}
+
 async function resolveEngineShards(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
   positionalPaths: readonly string[],
-): Promise<Shard[]> {
-  if (opts.exact === true) return [];
-  if (positionalPaths.length > 0) return [];
+): Promise<ShardResolution> {
+  if (opts.exact === true) return { shards: [] };
+  if (positionalPaths.length > 0) return { shards: [] };
   return resolveShards(opts, cli);
 }
 
@@ -330,9 +347,12 @@ function engineSelectionReason(
  * {@link resolveEngineShards}) — sharded is the default. A project that yields
  * ≤1 non-empty shard falls back to the exact single-program engine naturally.
  */
-async function resolveShards(opts: GraphCommandOptions, cli: ToolCliContext): Promise<Shard[]> {
+async function resolveShards(
+  opts: GraphCommandOptions,
+  cli: ToolCliContext,
+): Promise<ShardResolution> {
   const cliScript = opts.cliScript ?? process.argv[1];
-  if (typeof cliScript !== 'string' || cliScript.length === 0) return [];
+  if (typeof cliScript !== 'string' || cliScript.length === 0) return { shards: [] };
 
   let units: readonly { id: string; rootDir: string; configPath?: string }[];
   try {
@@ -370,7 +390,7 @@ async function resolveShards(opts: GraphCommandOptions, cli: ToolCliContext): Pr
     rootConfigPathAbs: rootDiscovery.configPathAbs,
   });
   // Need at least two non-empty shards to justify the parallel/merge overhead.
-  if (shards.length > 1) return shards;
+  if (shards.length > 1) return { shards };
   return resolveSyntheticFlatShards(opts);
 }
 
@@ -388,7 +408,8 @@ export async function resolveShardsForCwd(
   cliScript: string,
   cli: ToolCliContext,
 ): Promise<readonly Shard[]> {
-  return resolveShards({ cwd, cliScript, noCache: true }, cli);
+  const resolution = await resolveShards({ cwd, cliScript, noCache: true }, cli);
+  return resolution.shards;
 }
 
 /**
@@ -398,26 +419,31 @@ export async function resolveShardsForCwd(
  * threshold as heap preflight's 12 GB tier, synthesize directory-coherent
  * shards and feed them into the existing sharded build.
  */
-function resolveSyntheticFlatShards(opts: GraphCommandOptions): Shard[] {
-  if (typeof opts.language === 'string' && opts.language.length > 0) return [];
+function resolveSyntheticFlatShards(opts: GraphCommandOptions): ShardResolution {
+  if (typeof opts.language === 'string' && opts.language.length > 0) return { shards: [] };
   const adapter = pickAdapter(opts.cwd);
-  if (adapter.id !== 'typescript') return [];
+  if (adapter.id !== 'typescript') return { shards: [] };
   let discovery: ReturnType<typeof adapter.discoverFiles>;
   try {
     discovery = adapter.discoverFiles({ cwd: opts.cwd });
   } catch {
-    return [];
+    return { shards: [] };
   }
   // Canonical set (Phase 1): drop fixtures before partitioning so the flat-large
   // fallback shards match the exact engine's file set just like the workspace path.
   const canonicalFiles = resolveCanonicalFileSet(discovery.files);
+  // Measure the partition compute (layout detection + strategy resolution +
+  // partitioning) where it runs — the profile run recorder does not exist yet
+  // (its `mode` label needs the shard count), so executeGraph records the
+  // timing afterwards via `recordStage` (ADR-0045 measurement plane).
+  const partitionStart = Date.now();
   const layout = detectMonorepoLayout({
     repoRoot: discovery.projectDirAbs,
     files: canonicalFiles,
   });
   const selection = selectStrategyForLayout(layout);
   if (layout.kind !== 'flat-large' || selection.mode !== 'synthetic-partition') {
-    return [];
+    return { shards: [] };
   }
   // Strategy precedence: `graph.partitionStrategy` (config/env, ADR-0045) >
   // the layout-recommended default > 'hybrid'. `loadGraphConfig` is
@@ -440,7 +466,14 @@ function resolveSyntheticFlatShards(opts: GraphCommandOptions): Shard[] {
         configPathAbs: discovery.configPathAbs,
       }),
     );
-  return shards.length > 1 ? shards : [];
+  if (shards.length <= 1) return { shards: [] };
+  return {
+    shards,
+    partition: {
+      durationMs: Date.now() - partitionStart,
+      detail: `${strategy}: ${String(shards.length)} partition(s)`,
+    },
+  };
 }
 
 /**
@@ -550,7 +583,8 @@ export async function resolveLiveEngineShards(
   };
   // No positional paths in the whole-project live view, so the engine decision
   // is `--exact` + shardability alone.
-  return resolveEngineShards(opts, cli, []);
+  const resolution = await resolveEngineShards(opts, cli, []);
+  return resolution.shards;
 }
 
 /**
