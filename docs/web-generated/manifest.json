@@ -539,6 +539,12 @@
       "purpose": "What changes for the 3.0.0 GA cutover: register() is removed (declare commandSpecs), apiVersion is mandatory, and cli.recipe is removed."
     },
     {
+      "file": "docs/web-generated/70-reference/12-tools-command.md",
+      "path": "/docs/opensip-tools/70-reference/12-tools-command/",
+      "section": "70-reference",
+      "title": "Tools Command"
+    },
+    {
       "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",
       "path": "/docs/opensip-tools/80-implementation/01-cli-dispatch/",
       "section": "80-implementation",
@@ -703,7 +709,8 @@
         "/docs/opensip-tools/70-reference/08-supply-chain-security/",
         "/docs/opensip-tools/70-reference/09-migrating-to-2.12/",
         "/docs/opensip-tools/70-reference/10-environment-variables/",
-        "/docs/opensip-tools/70-reference/11-migrating-to-3.0/"
+        "/docs/opensip-tools/70-reference/11-migrating-to-3.0/",
+        "/docs/opensip-tools/70-reference/12-tools-command/"
       ]
     },
     {
@@ -844,6 +851,7 @@
         "/docs/opensip-tools/70-reference/02-package-catalog/",
         "/docs/opensip-tools/70-reference/06-dashboard/",
         "/docs/opensip-tools/70-reference/08-supply-chain-security/",
+        "/docs/opensip-tools/70-reference/12-tools-command/",
         "/docs/opensip-tools/80-implementation/01-cli-dispatch/",
         "/docs/opensip-tools/80-implementation/02-plugin-loader/",
         "/docs/opensip-tools/80-implementation/03-session-and-persistence/",
