@@ -60,7 +60,7 @@ import {
 // `mountToolCommands` is the named step-8 seam of the tool lifecycle (release
 // 2.11.0, §5.4); it delegates to `mountAllToolCommands` (kept exported for the
 // existing direct unit tests).
-export { mountAllToolCommands } from './register-tools.js';
+export { mountAllToolCommands, EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
 export { mountToolCommands } from './tool-lifecycle.js';
 export { renderResult } from './render.js';
 export { maybeOpenDashboard } from './dashboard.js';

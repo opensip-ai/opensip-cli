@@ -16,6 +16,7 @@ import { Command } from 'commander';
 
 import {
   bootstrapCli,
+  EXPECTED_SCAFFOLDING_TOOL_IDS,
   installPreActionHook,
   maybeOpenDashboard,
   mountToolCommands,
@@ -115,11 +116,13 @@ async function main(): Promise<void> {
       },
     ];
   });
-  // Back-compat diagnostic (registered-set behavior shift): registry-driven init
-  // scaffolds FEWER dirs if a bundled tool failed to load (vs the old always-fit/
-  // sim). A loud warning makes a silent under-scaffold observable; a genuinely
-  // uninstalled third-party tool stays silent (correct).
-  for (const expectedId of ['fitness', 'simulation']) {
+  // Back-compat diagnostic (ADR-0038): the old init always scaffolded fit/sim;
+  // the registry-driven init scaffolds FEWER dirs if one of those is absent. A
+  // loud warning makes a silent under-scaffold observable; a genuinely
+  // uninstalled third-party tool stays silent (correct). The expected-id pin
+  // lives beside BUNDLED_TOOL_PACKAGES (register-tools.ts) — see its JSDoc for
+  // why it is a historical constant rather than derived from loaded manifests.
+  for (const expectedId of EXPECTED_SCAFFOLDING_TOOL_IDS) {
     if (!toolRegistry.list().some((t) => t.metadata.id === expectedId)) {
       logger.warn({
         evt: 'cli.tool.expected_bundled_absent',

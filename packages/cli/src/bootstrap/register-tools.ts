@@ -67,6 +67,29 @@ export const BUNDLED_TOOL_PACKAGES: readonly string[] = [
   '@opensip-tools/simulation',
   '@opensip-tools/graph',
 ];
+// ^ Editing this list? EXPECTED_SCAFFOLDING_TOOL_IDS below pins the historical
+//   `init`-scaffold expectation against exactly this kind of edit — keep the
+//   two in agreement deliberately, not accidentally.
+
+/**
+ * The ADR-0038 back-compat pin: the tool IDS whose `init` scaffold dirs the
+ * pre-registry-driven CLI ALWAYS created (fit/sim). The composition root warns
+ * (`cli.tool.expected_bundled_absent`) when one of these is missing from the
+ * populated registry, so a build whose {@link BUNDLED_TOOL_PACKAGES} drifted
+ * (a tool removed, a packaging variant) under-scaffolds LOUDLY instead of
+ * silently.
+ *
+ * Deliberately a HISTORICAL CONSTANT, not derived from the loaded bundled
+ * manifests: bundled tools fail CLOSED in {@link registerFirstPartyTools}
+ * (every load failure throws before the warning could run), so "bundled
+ * manifests absent from the registry" is structurally empty — a derived list
+ * could never fire. The only drift this diagnostic exists to catch is an edit
+ * to the package list itself, which is precisely what a derivation would
+ * follow rather than flag. Co-located with the package list (one module owns
+ * both encodings) so an editor of either sees the other. `graph` is correctly
+ * absent: it never scaffolded (`pluginLayout` undefined).
+ */
+export const EXPECTED_SCAFFOLDING_TOOL_IDS: readonly string[] = ['fitness', 'simulation'];
 
 /** Used to resolve the bundled engine package dirs from the CLI's own module graph. */
 const requireFromHere = createRequire(import.meta.url);
