@@ -406,6 +406,32 @@ export interface ToolCliContext {
  * to the data-driven `getErrorSuggestion` substring matcher, then to a
  * generic `RUNTIME_ERROR`. Prefer the typed path.
  */
+
+/**
+ * Inputs the host hands a tool's `scaffoldExamples` hook (ADR-0038): the
+ * project's detected/selected languages (and, optionally, the scaffolded check
+ * slugs). `languages` is `string[]` — core carries no language enum; the CLI
+ * passes its detected list through structurally.
+ */
+export interface ScaffoldContext {
+  readonly languages: readonly string[];
+  readonly slugs?: readonly string[];
+}
+
+/**
+ * One example file a tool contributes to `init` (ADR-0038). The host writes
+ * `content` to `userPluginDir(tool's domain, kind)/filename`. `kind` is a plain
+ * string matched against the tool's own `pluginLayout.userSubdirs` (never a
+ * host-side enum of `'checks'|'recipes'|…`). `stableId` is the pinned id embedded
+ * in `content` that drives stale-scaffolded detection.
+ */
+export interface ScaffoldFile {
+  readonly kind: string;
+  readonly filename: string;
+  readonly content: string;
+  readonly stableId: string;
+}
+
 export interface Tool {
   readonly metadata: ToolMetadata;
   /**
@@ -545,6 +571,31 @@ export interface Tool {
    * Changing a declared strategy is a deliberate, documented re-capture.
    */
   readonly fingerprintStrategy?: FingerprintStrategy;
+  /**
+   * Optional `init`-scaffold contribution (ADR-0038): the example files this tool
+   * writes for a project, given its detected languages. The host writes each
+   * returned file under `userPluginDir(<this tool's pluginLayout.domain>,
+   * file.kind)/file.filename`. Undefined ⇒ this tool scaffolds no examples (e.g.
+   * `graph`). The host owns the directory layout (from `pluginLayout.userSubdirs`)
+   * + the document header + `targets:`; the tool owns the example bytes + ids.
+   */
+  readonly scaffoldExamples?: (ctx: ScaffoldContext) => readonly ScaffoldFile[];
+  /**
+   * The tool's COMPLETE set of stable example ids across EVERY language it can
+   * scaffold — NOT just the languages in any one `ScaffoldContext`. Drives
+   * stale-scaffolded detection (`file-classifier.ts`): a stale
+   * `example-check-python.mjs` left in a now-TS-only project must still be
+   * recognised, which needs the full id universe independent of the project's
+   * currently-detected languages.
+   */
+  readonly stableExampleIds?: () => readonly string[];
+  /**
+   * Optional contribution of the tool's namespaced config block for the
+   * scaffolded `opensip-tools.config.yml` (ADR-0038 Phase 3). Undefined ⇒ the host
+   * renders the block from the tool's `ToolConfigDeclaration` defaults (or omits
+   * it). The host always renders the document header + the `targets:` section.
+   */
+  readonly scaffoldConfigBlock?: () => string;
 }
 
 /**

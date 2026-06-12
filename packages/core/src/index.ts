@@ -151,6 +151,8 @@ export type {
   ToolConfigContribution,
   ToolCliContext,
   GateCompareResult,
+  ScaffoldContext,
+  ScaffoldFile,
   ToolPluginExports,
   ToolSessionRecord,
   ToolSessionReplayContribution,

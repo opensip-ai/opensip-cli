@@ -11,6 +11,8 @@ export type {
   ToolCommandDescriptor,
   ToolCliContext,
   GateCompareResult,
+  ScaffoldContext,
+  ScaffoldFile,
   ToolPluginExports,
   ToolSessionRecord,
   ToolSessionReplayContribution,
