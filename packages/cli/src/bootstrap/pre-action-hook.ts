@@ -273,12 +273,13 @@ export function installPreActionHook(program: Command, version: string): void {
       configPath: project.scope === 'project' ? project.configPath : undefined,
       env: process.env,
     });
-    // ADR-0037 Phase 1: build the host file-targeting accessor from the SAME
-    // single validated config document the composer already read (ADR-0023: one
+    // ADR-0037: build the host file-targeting accessor from the SAME single
+    // validated config document the composer already read (ADR-0023: one
     // reader — `buildTargets` is a pure builder, never a second `readYamlFile`).
     // Mirrors `toolConfig` — `undefined` on a project-agnostic/config-less run,
-    // or when the doc has no `targets:` block. No tool reads it yet (Phase 2 cuts
-    // fitness over); this only builds + exposes.
+    // or when the doc has no `targets:` block. Fitness consumes it (Phase 2
+    // cutover): its targets loader mirrors `scope.targets` into the check-domain
+    // registry instead of re-deriving its own set.
     const targets = buildTargets({ document: configDocument });
     const scope = new RunScope({
       logger,
@@ -318,7 +319,19 @@ export function installPreActionHook(program: Command, version: string): void {
       manifests: getToolManifestsForRun(),
       registry: createCapabilityRegistry(logger),
     });
-    Object.assign(scope, { capabilities, toolConfig, targets });
+    Object.assign(scope, {
+      capabilities,
+      toolConfig,
+      targets,
+      // ADR-0023 one-reader: the validated document itself rides the scope so
+      // tools project their shapes from it instead of re-reading the file —
+      // but ONLY when a real config file was read. A config-less run stays
+      // document-less so tools that hard-error on a missing config (fitness)
+      // stay loud instead of silently validating `{}`.
+      ...(project.scope === 'project' && project.configPath !== undefined
+        ? { configDocument: configDocument as Record<string, unknown> }
+        : {}),
+    });
 
     enterScope(scope);
     setCurrentRunScope(scope);

@@ -9,7 +9,9 @@
  */
 
 import {
+  PROJECT_CONFIG_FILENAME,
   ValidationError,
+  currentScope,
   readYamlFileOrThrow,
   resolveProjectConfigPath,
   logger,
@@ -51,12 +53,62 @@ interface CacheEntry {
  *  time (e.g. --config flag changes between invocations in tests). */
 const cache = new Map<string, CacheEntry>();
 
+/** Per-document memo for the scope-first path: one projection per validated
+ *  document object (the host builds one document per run, so this is a
+ *  per-run cache with no TTL/invalidation concerns — the key IS the run's
+ *  document identity). */
+const scopeDocumentCache = new WeakMap<object, SignalersConfig>();
+
+/**
+ * Validate an already-parsed config document and project it into the frozen
+ * `SignalersConfig` shape. Shared by the scope-first and file-read paths —
+ * the fitness-specific projection/validation lives here exactly once.
+ *
+ * @throws {ValidationError} When the document fails fitness's schema.
+ */
+function projectSignalersConfig(parsed: unknown, sourceLabel: string): SignalersConfig {
+  const result = SignalersConfigSchema.safeParse(parsed);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => `  ${i.path.join('.')}: ${i.message} (expected: ${i.code})`)
+      .join('\n');
+    throw new ValidationError(`${sourceLabel} validation failed:\n${issues}`, {
+      operation: 'load',
+      loader: 'signalers',
+      filePath: sourceLabel,
+      code: 'ERRORS.SIGNALERS.VALIDATION_FAILED',
+    });
+  }
+
+  const data = result.data;
+
+  logger.info({
+    evt: 'core.signalers.config.loaded',
+    module: 'core:signalers',
+    file: sourceLabel,
+    hasFitness: data.fitness !== undefined,
+    hasSimulation: data.simulation !== undefined,
+    targetCount: Object.keys(data.targets).length,
+  });
+
+  // `data` is typed `z.infer<typeof SignalersConfigSchema>` (mutable).
+  // After deepFreeze it's structurally read-only end-to-end; the single
+  // cast adds the `DeepReadonly` wrapper that defines `SignalersConfig`.
+  return deepFreeze(data) as SignalersConfig;
+}
+
 /**
  * Load and validate opensip-tools.config.yml from the given root directory.
  *
- * Resolution: --config (explicit) → package.json#opensip-tools.configPath
- * → <rootDir>/opensip-tools.config.yml. See resolveProjectConfigPath().
+ * SCOPE-FIRST (ADR-0023 one-reader): when the current `RunScope` carries the
+ * host-validated config document (`scope.configDocument`, attached by the CLI
+ * pre-action hook after its single `readYamlFile`), this loader projects the
+ * fitness shape from THAT document — no second file read, no chance of the
+ * tool resolving a different file than the host did. The file-read fallback
+ * below serves scope-less callers only (programmatic use, unit tests).
  *
+ * Fallback resolution: --config (explicit) → package.json#opensip-tools.configPath
+ * → <rootDir>/opensip-tools.config.yml. See resolveProjectConfigPath().
  * Results are cached per resolved file path.
  *
  * @param rootDir - Absolute path to the project root directory
@@ -66,6 +118,19 @@ const cache = new Map<string, CacheEntry>();
  *   the scan would otherwise silently produce zero findings.
  */
 export function loadSignalersConfig(rootDir: string, explicitPath?: string): SignalersConfig {
+  const scope = currentScope();
+  const scopeDocument = scope?.configDocument;
+  if (scopeDocument !== undefined) {
+    const memo = scopeDocumentCache.get(scopeDocument);
+    if (memo) return memo;
+    const config = projectSignalersConfig(
+      scopeDocument,
+      scope?.projectContext?.configPath ?? PROJECT_CONFIG_FILENAME,
+    );
+    scopeDocumentCache.set(scopeDocument, config);
+    return config;
+  }
+
   const filePath = resolveProjectConfigPath(rootDir, explicitPath);
 
   const cached = cache.get(filePath);
@@ -79,35 +144,7 @@ export function loadSignalersConfig(rootDir: string, explicitPath?: string): Sig
   // malformed YAML — same shape this loader used to throw inline.
   const parsed = readYamlFileOrThrow(filePath, { loader: 'signalers' });
 
-  const result = SignalersConfigSchema.safeParse(parsed);
-  if (!result.success) {
-    const issues = result.error.issues
-      .map((i) => `  ${i.path.join('.')}: ${i.message} (expected: ${i.code})`)
-      .join('\n');
-    throw new ValidationError(`${filePath} validation failed:\n${issues}`, {
-      operation: 'load',
-      loader: 'signalers',
-      filePath,
-      code: 'ERRORS.SIGNALERS.VALIDATION_FAILED',
-    });
-  }
-
-  const data = result.data;
-  const targetCount = Object.keys(data.targets).length;
-
-  logger.info({
-    evt: 'core.signalers.config.loaded',
-    module: 'core:signalers',
-    file: filePath,
-    hasFitness: data.fitness !== undefined,
-    hasSimulation: data.simulation !== undefined,
-    targetCount,
-  });
-
-  // `data` is typed `z.infer<typeof SignalersConfigSchema>` (mutable).
-  // After deepFreeze it's structurally read-only end-to-end; the single
-  // cast adds the `DeepReadonly` wrapper that defines `SignalersConfig`.
-  const frozen = deepFreeze(data) as SignalersConfig;
+  const frozen = projectSignalersConfig(parsed, filePath);
   cache.set(filePath, { config: frozen, cachedAt: Date.now(), filePath });
   return frozen;
 }

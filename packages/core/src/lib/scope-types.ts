@@ -153,6 +153,19 @@ export interface ToolScope extends ScopeContribution {
    */
   readonly toolConfig?: ResolvedToolConfig;
   /**
+   * The strict-validated raw config document for this run (ADR-0023's
+   * one-reader invariant). Seeded by the CLI's pre-action-hook ONLY when a
+   * real `opensip-tools.config.yml` was read for this run — absent on a
+   * project-agnostic or config-less run, so a tool that hard-errors on a
+   * missing config (fitness) stays loud. Tools that project tool-specific
+   * shapes out of the document (fitness's signalers/targets loaders) parse
+   * THIS instead of re-reading the file: the host is the only runtime config
+   * reader; what remains in the tool is tool-specific projection and
+   * cross-validation. Structural (`Record<string, unknown>`) so the kernel
+   * carries no config-layer dependency — mirrors `ResolvedToolConfig`.
+   */
+  readonly configDocument?: Readonly<Record<string, unknown>>;
+  /**
    * The host-built file-targeting accessor for this run (ADR-0037). Seeded by
    * the CLI's pre-action-hook from the loaded config document's `targets:` /
    * `globalExcludes:` blocks — built once per run, mirroring `toolConfig` and

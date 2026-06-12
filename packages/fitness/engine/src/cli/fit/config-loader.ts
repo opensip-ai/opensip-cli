@@ -23,9 +23,11 @@ export interface LoadedFitConfig {
 }
 
 /**
- * Resolve `signalersConfig` + `targetsConfig` from the project's
- * opensip-tools.config.yml. Returns an `ErrorResult` instead of throwing
- * so the caller maps it directly to the public failure shape — a
+ * Resolve `signalersConfig` + `targetsConfig` for this run. Scope-first
+ * (ADR-0023 one-reader): on CLI paths both loaders project from the
+ * host-validated `scope.configDocument`; the file read is the scope-less
+ * fallback (programmatic use, unit tests). Returns an `ErrorResult` instead
+ * of throwing so the caller maps it directly to the public failure shape — a
  * missing/invalid config is a HARD error (otherwise file-based checks
  * silently produce zero findings).
  */

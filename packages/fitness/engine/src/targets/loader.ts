@@ -164,6 +164,37 @@ function buildFromParsed(
 // =============================================================================
 
 /**
+ * Validate an already-parsed config document and build the fitness target
+ * registry + config from it. Shared by the scope-first and file-read paths —
+ * the fitness-specific projection (targets shape) and cross-validation
+ * (`checkOverrides` ↔ registry) live here exactly once.
+ *
+ * @throws {ValidationError} When the document fails schema validation or
+ *   `checkOverrides` references an unknown target.
+ */
+function projectTargetsConfig(
+  parsed: unknown,
+  sourceLabel: string,
+): { registry: TargetRegistry; config: TargetsConfig } {
+  const result = TargetsFileSchema.safeParse(parsed);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
+    // @fitness-ignore-next-line result-pattern-consistency -- infrastructure boundary, throw is appropriate
+    throw new ValidationError(`${sourceLabel} validation failed:\n${issues}`, {
+      code: 'ERRORS.TARGETS.VALIDATION_FAILED',
+    });
+  }
+
+  return buildFromParsed(
+    result.data.targets,
+    result.data.globalExcludes,
+    result.data.checkOverrides,
+    sourceLabel,
+    result.data.plugins,
+  );
+}
+
+/**
  * @throws {SystemError} When the file exceeds the shared default 10 MB cap.
  * @throws {ValidationError} When the file is missing, unreadable, contains
  *   invalid YAML, or fails schema validation.
@@ -174,23 +205,7 @@ function loadYamlConfig(filePath: string): { registry: TargetRegistry; config: T
   // already adopted). Raises `SystemError` for oversized files and
   // `ValidationError` for missing / unreadable / malformed YAML.
   const parsed = readYamlFileOrThrow(filePath, { loader: 'targets' });
-
-  const result = TargetsFileSchema.safeParse(parsed);
-  if (!result.success) {
-    const issues = result.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
-    // @fitness-ignore-next-line result-pattern-consistency -- infrastructure boundary, throw is appropriate
-    throw new ValidationError(`${YAML_FILENAME} validation failed:\n${issues}`, {
-      code: 'ERRORS.TARGETS.VALIDATION_FAILED',
-    });
-  }
-
-  return buildFromParsed(
-    result.data.targets,
-    result.data.globalExcludes,
-    result.data.checkOverrides,
-    YAML_FILENAME,
-    result.data.plugins,
-  );
+  return projectTargetsConfig(parsed, YAML_FILENAME);
 }
 
 // =============================================================================
@@ -199,7 +214,15 @@ function loadYamlConfig(filePath: string): { registry: TargetRegistry; config: T
 
 /**
  * Load full targets config including per-check target overrides.
- * Resolves via the shared project-config resolver.
+ *
+ * SCOPE-FIRST (ADR-0023 one-reader): when the current `RunScope` carries the
+ * host-validated config document (`scope.configDocument`), the fitness shapes
+ * are projected from THAT document — no second file read. The registry build
+ * inside `buildFromParsed` additionally mirrors `scope.targets` (ADR-0037)
+ * when the host built it. The file read below serves scope-less callers only
+ * (programmatic use, unit tests); it resolves via the shared project-config
+ * resolver.
+ *
  * @throws {ValidationError} When no targets config file is found or it cannot be loaded
  * @throws {ValidationError} When the config file fails schema validation
  */
@@ -207,6 +230,10 @@ export function loadTargetsConfig(
   rootDir: string,
   explicitPath?: string,
 ): { registry: TargetRegistry; config: TargetsConfig } {
+  const scopeDocument = currentScope()?.configDocument;
+  if (scopeDocument !== undefined) {
+    return projectTargetsConfig(scopeDocument, YAML_FILENAME);
+  }
   const yamlPath = resolveProjectConfigPath(rootDir, explicitPath);
   return loadYamlConfig(yamlPath);
 }

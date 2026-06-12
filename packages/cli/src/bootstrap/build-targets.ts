@@ -24,9 +24,9 @@ import { TargetRegistry, applyGlobalExcludes, resolveTargets } from '@opensip-to
 
 /**
  * Default per-target exclusion globs, applied when a target declares no
- * explicit `exclude`. Mirrors the historical fitness loader so the host build
- * is byte-identical to the registry fitness builds today (the source the
- * Phase 2 cutover replaces).
+ * explicit `exclude`. Mirrors the fitness loader's fallback normalization so
+ * the host-built set and the scope-less fallback build (fitness
+ * `targets/loader.ts`, kept for programmatic/test use) stay byte-identical.
  */
 const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**'];
 

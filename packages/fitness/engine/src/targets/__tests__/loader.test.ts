@@ -2,7 +2,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ValidationError, SystemError } from '@opensip-tools/core';
+import {
+  LanguageRegistry,
+  RunScope,
+  SystemError,
+  ToolRegistry,
+  ValidationError,
+  runWithScopeSync,
+} from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadTargetsConfig } from '../loader.js';
@@ -201,5 +208,45 @@ plugins:
   it('throws ValidationError when the resolved path is a directory (readFileSync EISDIR)', () => {
     mkdirSync(join(testDir, 'opensip-tools.config.yml'), { recursive: true });
     expect(() => loadTargetsConfig(testDir)).toThrow(ValidationError);
+  });
+});
+
+describe('loadTargetsConfig — scope-first (ADR-0023 one-reader)', () => {
+  const makeScopeWithDocument = (configDocument: Record<string, unknown>): RunScope => {
+    const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+    // Structural slot — installed via Object.assign exactly like the CLI
+    // pre-action hook does (scope-types.ts declares it readonly for readers).
+    Object.assign(scope, { configDocument });
+    return scope;
+  };
+
+  it('builds the registry from scope.configDocument without touching the filesystem', () => {
+    // No config file exists in testDir — a file read would throw.
+    const scope = makeScopeWithDocument({
+      targets: { src: { description: 'Source', include: ['src/**/*.ts'] } },
+      globalExcludes: ['vendor/**'],
+    });
+    const { registry, config } = runWithScopeSync(scope, () => loadTargetsConfig(testDir));
+    expect(registry.has('src')).toBe(true);
+    expect(config.globalExcludes).toEqual(['vendor/**']);
+  });
+
+  it('still cross-validates checkOverrides against the registry on the scope path', () => {
+    // The fitness-specific cross-validation (only fitness knows check slugs)
+    // must survive the cutover to the host-read document.
+    const scope = makeScopeWithDocument({
+      targets: { src: { description: 'Source', include: ['src/**'] } },
+      checkOverrides: { 'some-check': 'no-such-target' },
+    });
+    expect(() => runWithScopeSync(scope, () => loadTargetsConfig(testDir))).toThrow(
+      ValidationError,
+    );
+  });
+
+  it('falls back to the file read when the scope carries no document', () => {
+    const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+    expect(() => runWithScopeSync(scope, () => loadTargetsConfig(testDir))).toThrow(
+      ValidationError,
+    );
   });
 });

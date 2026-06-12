@@ -2,7 +2,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ValidationError, SystemError } from '@opensip-tools/core';
+import {
+  LanguageRegistry,
+  RunScope,
+  SystemError,
+  ToolRegistry,
+  ValidationError,
+  runWithScopeSync,
+} from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadSignalersConfig } from '../loader.js';
@@ -115,5 +122,63 @@ fitness:
     );
     const cfg = loadSignalersConfig(testDir);
     expect(cfg.fitness.failOnErrors).toBe(5);
+  });
+});
+
+describe('loadSignalersConfig — scope-first (ADR-0023 one-reader)', () => {
+  const makeScopeWithDocument = (configDocument: Record<string, unknown>): RunScope => {
+    const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+    // Structural slot — installed via Object.assign exactly like the CLI
+    // pre-action hook does (scope-types.ts declares it readonly for readers).
+    Object.assign(scope, { configDocument });
+    return scope;
+  };
+
+  it('projects from scope.configDocument without touching the filesystem', () => {
+    // No config file exists in testDir — a file read would throw. The scope
+    // document alone must satisfy the load.
+    const scope = makeScopeWithDocument({
+      targets: { src: { description: 'TS source', include: ['src/**/*.ts'] } },
+      fitness: { failOnErrors: 3 },
+    });
+    const cfg = runWithScopeSync(scope, () => loadSignalersConfig(testDir));
+    expect(cfg.targets.src?.description).toBe('TS source');
+    expect(cfg.fitness.failOnErrors).toBe(3);
+  });
+
+  it('ignores a stale on-disk file when the scope carries the document', () => {
+    // The host read + validated the document at bootstrap; a file edited
+    // after bootstrap (or a different file the tool would have resolved)
+    // must NOT win over the scope-carried document.
+    writeFileSync(
+      join(testDir, 'opensip-tools.config.yml'),
+      'targets: {}\nfitness:\n  failOnErrors: 99\n',
+    );
+    const scope = makeScopeWithDocument({ targets: {}, fitness: { failOnErrors: 2 } });
+    const cfg = runWithScopeSync(scope, () => loadSignalersConfig(testDir));
+    expect(cfg.fitness.failOnErrors).toBe(2);
+  });
+
+  it('memoizes the projection per document object (one parse per run)', () => {
+    const scope = makeScopeWithDocument({ targets: {} });
+    const a = runWithScopeSync(scope, () => loadSignalersConfig(testDir));
+    const b = runWithScopeSync(scope, () => loadSignalersConfig(testDir));
+    expect(b).toBe(a); // same frozen reference
+  });
+
+  it('falls back to the file read when the scope carries no document', () => {
+    // A scope WITHOUT configDocument (config-less/agnostic run) must keep the
+    // loud missing-config error — never silently validate an empty document.
+    const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+    expect(() => runWithScopeSync(scope, () => loadSignalersConfig(testDir))).toThrow(
+      ValidationError,
+    );
+  });
+
+  it('still rejects an invalid scope document with the fitness error shape', () => {
+    const scope = makeScopeWithDocument({ targets: { 'Bad Name': { include: [] } } });
+    expect(() => runWithScopeSync(scope, () => loadSignalersConfig(testDir))).toThrow(
+      ValidationError,
+    );
   });
 });
