@@ -32,6 +32,8 @@ import { UndirectedGraph } from 'graphology';
 
 import { toPosixPath } from '../../cross-package/posix-path.js';
 
+import { chunkByCount } from './partition-chunk.js';
+
 import type { SyntheticPartition } from './partition-chunk.js';
 import type { DetailedLouvainOutput, LouvainOptions } from 'graphology-communities-louvain';
 
@@ -51,6 +53,12 @@ const louvain = createRequire(import.meta.url)('graphology-communities-louvain')
 
 /** Fixed Louvain seed — NEVER derived from time/env (determinism layer 1). */
 const LOUVAIN_SEED = 0x5eed;
+/**
+ * Communities smaller than this are pooled (guard rail 2). Module
+ * constant in B1 by design (spec non-goal: no extra config knobs);
+ * tuned against the fixture in Phase 4.
+ */
+const MIN_COMMUNITY_SIZE = 25;
 
 /** Input to {@link communityPartition}. */
 export interface CommunityPartitionInput {
@@ -84,7 +92,13 @@ export function communityPartition(
     fastLocalMoves: true,
   });
   const communities = canonicalCommunities(result.communities);
-  return emitPartitions(communities, keyToAbs);
+  const split = splitOversized(communities, input.maxShardSize);
+  const railed = poolUndersized({
+    partitions: split,
+    minSize: MIN_COMMUNITY_SIZE,
+    maxShardSize: input.maxShardSize,
+  });
+  return emitPartitions(railed, keyToAbs);
 }
 
 /**
@@ -190,9 +204,80 @@ function canonicalCommunities(
  * where slug maps `/` and `.` to `-` (e.g. `src/api/client.ts` →
  * `community:src-api-client-ts`). Anchors are unique by construction
  * (communities are disjoint), so ids satisfy `assertUniqueShardIds`.
+ * The `community:` prefix can never collide with the `community-pool-N`
+ * pool id space (different prefixes).
  */
 function anchorId(anchor: string): string {
   return `community:${anchor.replaceAll(/[./]/g, '-')}`;
+}
+
+/** A partition over node KEYS (repo-relative POSIX) with its final id. */
+interface KeyPartition {
+  readonly id: string;
+  readonly members: readonly string[];
+}
+
+/**
+ * Guard rail 1 — max-shard-size splitting: any community larger than
+ * `maxShardSize` is split with the shared `chunkByCount`; sub-ids
+ * concatenate exactly like `hybrid` does: `community:<slug>.chunk-N`.
+ * Iterates communities in anchor-sorted order, so the output preserves
+ * that order (load-bearing for the pooling pass).
+ */
+function splitOversized(
+  communities: readonly (readonly string[])[],
+  maxShardSize: number,
+): readonly KeyPartition[] {
+  const out: KeyPartition[] = [];
+  for (const members of communities) {
+    const id = anchorId(members[0] ?? '');
+    if (members.length <= maxShardSize) {
+      out.push({ id, members });
+      continue;
+    }
+    for (const sub of chunkByCount(members, maxShardSize)) {
+      out.push({ id: `${id}.${sub.id}`, members: sub.files });
+    }
+  }
+  return out;
+}
+
+/**
+ * Guard rail 2 — small-community pooling: partitions smaller than
+ * `minSize` (tiny communities, isolated singletons, and a split's
+ * sub-`minSize` tail chunk alike) are pooled greedily in anchor-sorted
+ * order, packing into pools up to `maxShardSize`. Pool ids are
+ * `community-pool-N` (N = deterministic packing order, 0-based). The
+ * last (or only) pool may itself stay below `minSize` — pooling cannot
+ * help further.
+ */
+function poolUndersized(input: {
+  readonly partitions: readonly KeyPartition[];
+  readonly minSize: number;
+  readonly maxShardSize: number;
+}): readonly KeyPartition[] {
+  const kept: KeyPartition[] = [];
+  const candidates: KeyPartition[] = [];
+  for (const partition of input.partitions) {
+    (partition.members.length < input.minSize ? candidates : kept).push(partition);
+  }
+  const pools: string[][] = [];
+  let current: string[] = [];
+  for (const candidate of candidates) {
+    if (current.length > 0 && current.length + candidate.members.length > input.maxShardSize) {
+      pools.push(current);
+      current = [];
+    }
+    current.push(...candidate.members);
+  }
+  if (current.length > 0) pools.push(current);
+  const pooled = pools.map(
+    (members, index): KeyPartition => ({
+      id: `community-pool-${String(index)}`,
+      members: members.sort(),
+    }),
+  );
+  return [...kept, ...pooled];
 }
 
 /**
@@ -200,12 +285,12 @@ function anchorId(anchor: string): string {
  * back to absolute paths, files sorted, partitions sorted by id.
  */
 function emitPartitions(
-  communities: readonly (readonly string[])[],
+  partitions: readonly KeyPartition[],
   keyToAbs: ReadonlyMap<string, string>,
 ): readonly SyntheticPartition[] {
-  const out: SyntheticPartition[] = communities.map((members) => ({
-    id: anchorId(members[0] ?? ''),
-    files: members.map((key) => keyToAbs.get(key) ?? key).sort(),
+  const out: SyntheticPartition[] = partitions.map((partition) => ({
+    id: partition.id,
+    files: partition.members.map((key) => keyToAbs.get(key) ?? key).sort(),
   }));
   out.sort((a, b) => (a.id < b.id ? -1 : 1));
   return out;
