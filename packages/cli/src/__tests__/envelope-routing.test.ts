@@ -94,8 +94,10 @@ function makeScope(signalSink?: SignalSink): RunScope {
 // without retry/backoff (the test stays fast). 200 = success.
 const FAIL_400: typeof fetch = () => Promise.resolve(new Response('nope', { status: 400 }));
 const OK_200: typeof fetch = () => Promise.resolve(new Response('{}', { status: 200 }));
-// The REAL core no-op sink (identity matters): deliverEnvelope short-circuits on
-// it, so the cloud leg stays silent — the keyless/opted-out contract.
+// The core no-op sink. deliverEnvelope short-circuits on the `noop: true`
+// discriminator (behavioral, NOT identity), so the cloud leg stays silent —
+// the keyless/opted-out contract. Any structurally-equivalent no-op sink
+// substitutes; see the dedicated substitutability test below.
 const NOOP_SINK: SignalSink = noopSignalSink;
 
 /** Stringify a `fetch` URL argument (only the string form is exercised here). */
@@ -301,6 +303,31 @@ describe('root cloud egress (deliverEnvelope → scope.signalSink)', () => {
     });
     try {
       const out = await runWithScope(makeScope(noopSignalSink), () =>
+        deliverEnvelope(ENVELOPE, { cwd: process.cwd(), repo: {} }),
+      );
+      expect(out.cloudAccepted).toBe(0);
+      expect(out.cloudSkippedReason).toBeUndefined();
+      expect(writes.join('')).not.toContain('cloud sync skipped');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("stays silent on a HOST'S OWN no-op sink (substitutability — `noop: true`, not identity)", async () => {
+    // An embedded/SaaS host may install its own no-delivery sink. The root
+    // discriminates on the `noop` marker, never on identity with the core
+    // singleton — a structurally no-op sink must behave identically to it.
+    const hostNoopSink: SignalSink = {
+      noop: true,
+      emit: () => Promise.resolve({ accepted: 0, authRejected: false }),
+    };
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    try {
+      const out = await runWithScope(makeScope(hostNoopSink), () =>
         deliverEnvelope(ENVELOPE, { cwd: process.cwd(), repo: {} }),
       );
       expect(out.cloudAccepted).toBe(0);

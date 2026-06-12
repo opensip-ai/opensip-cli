@@ -36,9 +36,19 @@ export interface EmitResult {
 /** A best-effort destination for a run's signals. Implementations MUST NOT throw. */
 export interface SignalSink {
   emit(batch: SignalBatch): Promise<EmitResult>;
+  /**
+   * Marks an INTENTIONAL no-delivery sink (the user opted out or never
+   * configured a key). The composition root keeps such sinks silent — no
+   * "0 signals uploaded" notice — whereas an active sink that ships nothing
+   * gets a skip notice. A behavioral discriminator, deliberately NOT an
+   * identity check against {@link noopSignalSink}: any host (embedded/SaaS)
+   * may construct its own no-op sink and it must substitute cleanly.
+   */
+  readonly noop?: true;
 }
 
 /** The default sink: does nothing, accepts nothing. Used whenever cloud sync is off. */
 export const noopSignalSink: SignalSink = {
+  noop: true,
   emit: () => Promise.resolve({ accepted: 0, authRejected: false }),
 };

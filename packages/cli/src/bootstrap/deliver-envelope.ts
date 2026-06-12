@@ -30,12 +30,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import {
-  buildSignalBatch,
-  currentScope,
-  logger as defaultLogger,
-  noopSignalSink,
-} from '@opensip-tools/core';
+import { buildSignalBatch, currentScope, logger as defaultLogger } from '@opensip-tools/core';
 import {
   formatSignalSarif,
   postChunked,
@@ -118,7 +113,9 @@ async function emitToCloud(
 ): Promise<CloudEmitOutcome> {
   try {
     const sink = currentScope()?.signalSink;
-    if (!sink || sink === noopSignalSink) return { accepted: 0 };
+    // Behavioral discriminator, not identity: ANY no-op sink (a host's own
+    // included) means "the user asked for no delivery" → stay silent.
+    if (!sink || sink.noop === true) return { accepted: 0 };
     const batch = envelopeToSignalBatch(envelope, repo);
     const result = await sink.emit(batch);
     if (result.accepted > 0) {
