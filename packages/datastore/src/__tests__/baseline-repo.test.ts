@@ -2,7 +2,12 @@ import { createSignal, type Signal } from '@opensip-tools/core';
 import { sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { BaselineRepo, DataStoreFactory, type DataStore, type DrizzleDataStore } from '../index.js';
+import {
+  BaselineRepo,
+  DataStoreFactory,
+  requireDrizzleDataStore,
+  type DataStore,
+} from '../index.js';
 
 let ds: DataStore;
 let repo: BaselineRepo;
@@ -22,8 +27,9 @@ afterEach(() => {
 
 describe('BaselineRepo', () => {
   it('migrations dropped the old per-tool baseline tables, kept the generic pair (0006+0007)', () => {
-    const rows = (ds as DrizzleDataStore).db
-      .all(sql`SELECT name FROM sqlite_master WHERE type='table'`) as { name: string }[];
+    const rows = requireDrizzleDataStore(ds).db.all<{ name: string }>(
+      sql`SELECT name FROM sqlite_master WHERE type='table'`,
+    );
     const names = new Set(rows.map((r) => r.name));
     expect(names.has('tool_baseline_entries')).toBe(true);
     expect(names.has('tool_baseline_meta')).toBe(true);

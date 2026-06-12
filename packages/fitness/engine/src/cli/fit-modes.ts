@@ -257,8 +257,8 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
   emitWarningsToStderr(fitResult.result);
   try {
     if (args.gateSave === true) {
+      // @fitness-ignore-next-line async-waterfall-detection -- ordered side-effects: the "Baseline saved" confirmation (and the subsequent deliver) must follow a SUCCESSFUL save (if saveBaseline throws, nothing downstream runs), so these awaits cannot be parallelized.
       await cli.saveBaseline('fitness', envelope);
-      // @fitness-ignore-next-line async-waterfall-detection -- ordered side-effects: the "Baseline saved" confirmation must follow a SUCCESSFUL save (if saveBaseline throws, no confirmation is rendered), so these awaits cannot be parallelized.
       await cli.render({
         type: 'gate-done',
         lines: [

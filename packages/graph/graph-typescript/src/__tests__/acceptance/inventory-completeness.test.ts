@@ -59,10 +59,12 @@ describe('inventory completeness (§8.1) against fitness/engine', () => {
     expect(occurrenceCount).toBeGreaterThanOrEqual(200);
   });
 
-  it('captures the saveBaseline function in src/gate.ts', () => {
-    const names = namesInFile(catalog, 'src/gate.ts');
-    expect(names).toContain('saveBaseline');
-    expect(names).toContain('compareToBaseline');
+  it('captures the renderGateCompareOutput function in src/cli/fit/gate-compare-render.ts', () => {
+    // (Was src/gate.ts's saveBaseline/compareToBaseline — gate.ts was deleted when
+    // fitness moved onto the host baseline plane, ADR-0036. This file's exported
+    // function declarations demonstrate the same inventory-completeness property.)
+    const names = namesInFile(catalog, 'src/cli/fit/gate-compare-render.ts');
+    expect(names).toContain('renderGateCompareOutput');
   });
 
   it('captures the defineCheck function in src/framework/define-check.ts', () => {
