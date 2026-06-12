@@ -151,6 +151,7 @@ export type {
   ToolConfigContribution,
   ToolCliContext,
   GateCompareResult,
+  SignalDeliveryResult,
   ScaffoldContext,
   ScaffoldFile,
   ToolPluginExports,

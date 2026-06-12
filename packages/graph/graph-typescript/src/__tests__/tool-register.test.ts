@@ -67,7 +67,7 @@ function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
     emitJson: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
-    deliverSignals: vi.fn(() => Promise.resolve()),
+    deliverSignals: vi.fn(() => Promise.resolve({ cloudAccepted: 0 })),
     writeSarif: vi.fn(() => Promise.resolve()),
     saveBaseline: vi.fn(() => Promise.resolve()),
     compareBaseline: vi.fn(() =>

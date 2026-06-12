@@ -75,7 +75,7 @@ function makeContext(datastore: DataStore | undefined): {
       exitCodes.push(detail.exitCode);
       emitted.push(detail);
     },
-    deliverSignals: () => Promise.resolve(),
+    deliverSignals: () => Promise.resolve({ cloudAccepted: 0 }),
     writeSarif: () => Promise.resolve(),
     saveBaseline: () => Promise.resolve(),
     compareBaseline: () =>

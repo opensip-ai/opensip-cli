@@ -85,7 +85,7 @@ describe('resolveSignalSink (deferred entitlement)', () => {
       fetchImpl,
     });
     const r = await sink.emit(batch(2));
-    expect(r).toEqual({ accepted: 0, authRejected: false });
+    expect(r).toEqual({ accepted: 0, authRejected: false, skippedReason: 'unentitled' });
     const hitSignals = (fetchImpl as unknown as { mock: { calls: unknown[][] } }).mock.calls.some(
       (c) => String(c[0]).includes('/signals'),
     );
@@ -146,6 +146,6 @@ describe('resolveSignalSink (deferred entitlement)', () => {
       fetchImpl: routedFetch(true),
     });
     const r = await sink.emit(batch(1));
-    expect(r).toEqual({ accepted: 0, authRejected: false });
+    expect(r).toEqual({ accepted: 0, authRejected: false, skippedReason: 'error' });
   });
 });

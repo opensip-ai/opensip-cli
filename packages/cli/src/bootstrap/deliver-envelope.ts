@@ -30,7 +30,12 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import { buildSignalBatch, currentScope, logger as defaultLogger } from '@opensip-tools/core';
+import {
+  buildSignalBatch,
+  currentScope,
+  logger as defaultLogger,
+  noopSignalSink,
+} from '@opensip-tools/core';
 import {
   formatSignalSarif,
   postChunked,
@@ -39,7 +44,7 @@ import {
 } from '@opensip-tools/output';
 
 import type { SignalEnvelope } from '@opensip-tools/contracts';
-import type { Logger, RepoIdentity, SignalBatch } from '@opensip-tools/core';
+import type { Logger, RepoIdentity, SignalBatch, SignalDeliveryResult } from '@opensip-tools/core';
 
 const MODULE_TAG = 'cli:bootstrap';
 
@@ -68,15 +73,12 @@ export interface DeliverEnvelopeOptions {
   readonly fetchImpl?: typeof fetch;
 }
 
-/** Outcome of an envelope delivery (for tests / callers that surface status). */
-export interface DeliverEnvelopeResult {
-  /** Signals the cloud sink acknowledged (0 for the no-op majority). */
-  readonly cloudAccepted: number;
-  /** Whether a `--report-to` upload was attempted and succeeded. */
-  readonly reportSuccess?: boolean;
-  /** The `--report-to` target URL, when one was requested. */
-  readonly reportUrl?: string;
-}
+/**
+ * Outcome of an envelope delivery. The canonical shape is core's
+ * {@link SignalDeliveryResult} (the `ToolCliContext.deliverSignals` return);
+ * this alias keeps the historical local name for existing imports.
+ */
+export type DeliverEnvelopeResult = SignalDeliveryResult;
 
 /**
  * Map a {@link SignalEnvelope} to the cloud {@link SignalBatch} wire shape:
@@ -93,29 +95,56 @@ export function envelopeToSignalBatch(envelope: SignalEnvelope, repo: RepoIdenti
   });
 }
 
-/** Best-effort cloud emit through the run's selected signal sink. Never throws. */
+/** Cloud-leg outcome: what shipped, and why nothing did when that is knowable. */
+interface CloudEmitOutcome {
+  readonly accepted: number;
+  readonly skippedReason?: 'unentitled' | 'error';
+}
+
+/**
+ * Best-effort cloud emit through the run's selected signal sink. Never throws.
+ *
+ * Best-effort ≠ silent: when the user CONFIGURED cloud sync (an active, non-noop
+ * sink) and the run had signals to ship but none were accepted, a one-line
+ * stderr notice says so — otherwise the user reasonably believes their signals
+ * shipped. The keyless / opted-out majority (no sink or the no-op sink) stays
+ * silent: there, nothing-shipped is exactly what they asked for. Exit code is
+ * never affected (ADR-0008).
+ */
 async function emitToCloud(
   envelope: SignalEnvelope,
   repo: RepoIdentity,
   log: Logger,
-): Promise<number> {
+): Promise<CloudEmitOutcome> {
   try {
     const sink = currentScope()?.signalSink;
-    if (!sink) return 0;
+    if (!sink || sink === noopSignalSink) return { accepted: 0 };
     const batch = envelopeToSignalBatch(envelope, repo);
     const result = await sink.emit(batch);
     if (result.accepted > 0) {
       const noun = result.accepted === 1 ? 'signal' : 'signals';
       process.stderr.write(`✓ Sent ${result.accepted} ${noun} to OpenSIP Cloud\n`);
+      return { accepted: result.accepted };
     }
-    return result.accepted;
+    if (batch.signals.length === 0) return { accepted: 0 };
+    const skippedReason = result.skippedReason ?? 'error';
+    const detail =
+      skippedReason === 'unentitled'
+        ? 'this API key is not entitled to signal sync'
+        : 'the upload failed (see the run log)';
+    process.stderr.write(
+      `opensip-tools: cloud sync skipped — ${detail}; ` +
+        `${batch.signals.length} signal(s) were NOT uploaded. ` +
+        `Local results are unaffected (silence this with --no-cloud).\n`,
+    );
+    return { accepted: 0, skippedReason };
   } catch (error) {
     log.info({
       evt: 'cli.signal-egress.error',
       module: MODULE_TAG,
       error: error instanceof Error ? error.message : String(error),
     });
-    return 0;
+    return { accepted: 0, skippedReason: 'error' };
   }
 }
 
@@ -162,10 +191,15 @@ export async function deliverEnvelope(
   const runFailed = opts.runFailed ?? !envelope.verdict.passed;
   if (runFailed) opts.setExitCode?.(EXIT_CODES.RUNTIME_ERROR);
 
-  const cloudAccepted = await emitToCloud(envelope, repo, log);
+  const cloud = await emitToCloud(envelope, repo, log);
+  const cloudAccepted = cloud.accepted;
+  const cloudLeg = {
+    cloudAccepted,
+    ...(cloud.skippedReason === undefined ? {} : { cloudSkippedReason: cloud.skippedReason }),
+  };
 
   if (opts.reportTo === undefined || opts.reportTo.length === 0) {
-    return { cloudAccepted };
+    return cloudLeg;
   }
 
   const result = await reportSarif(envelope, opts.reportTo, opts.apiKey, opts.fetchImpl);
@@ -183,7 +217,7 @@ export async function deliverEnvelope(
     opts.setExitCode?.(EXIT_CODES.REPORT_FAILED);
   }
 
-  return { cloudAccepted, reportSuccess, reportUrl: opts.reportTo };
+  return { ...cloudLeg, reportSuccess, reportUrl: opts.reportTo };
 }
 
 /**

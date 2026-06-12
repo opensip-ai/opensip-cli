@@ -86,7 +86,7 @@ export function resolveSignalSink(input: ResolveSignalSinkInput): SignalSink {
           cacheDir: input.cacheDir,
           fetchImpl: input.fetchImpl,
         });
-        if (!ent.entitled) return { accepted: 0, authRejected: false };
+        if (!ent.entitled) return { accepted: 0, authRejected: false, skippedReason: 'unentitled' };
 
         // @fitness-ignore-next-line async-waterfall-detection -- the first-run notice must print BEFORE the emit; deliberately sequential, not parallelized
         await maybeShowFirstRunNotice(input.cacheDir);
@@ -97,7 +97,7 @@ export function resolveSignalSink(input: ResolveSignalSinkInput): SignalSink {
         return result;
       } catch {
         // Belt and suspenders — emit MUST NOT throw into the run.
-        return { accepted: 0, authRejected: false };
+        return { accepted: 0, authRejected: false, skippedReason: 'error' };
       }
     },
   };

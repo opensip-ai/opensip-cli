@@ -74,7 +74,7 @@ describe('cloud signal sync — end to end', () => {
   it('not entitled: nothing is sent (fail path), /signals never hit', async () => {
     const f = routedFetch(false);
     const r = await run({ apiKey: 'k', fetchImpl: f.impl });
-    expect(r).toEqual({ accepted: 0, authRejected: false });
+    expect(r).toEqual({ accepted: 0, authRejected: false, skippedReason: 'unentitled' });
     expect(f.calls.signals).toBe(0);
   });
 
@@ -89,6 +89,6 @@ describe('cloud signal sync — end to end', () => {
   it('cloud unreachable: emit returns accepted:0 and never throws (run unaffected)', async () => {
     const f = routedFetch(true, 'reject');
     const r = await run({ apiKey: 'k', fetchImpl: f.impl });
-    expect(r).toEqual({ accepted: 0, authRejected: false });
+    expect(r).toEqual({ accepted: 0, authRejected: false, skippedReason: 'error' });
   }, 15_000);
 });

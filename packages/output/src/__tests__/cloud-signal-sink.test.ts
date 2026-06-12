@@ -64,7 +64,7 @@ describe('createCloudSignalSink', () => {
     ) as unknown as typeof fetch;
     const sink = createCloudSignalSink({ endpoint: 'https://x.test/api', apiKey: 'k', fetchImpl });
     const r = await sink.emit(batch(2));
-    expect(r).toEqual({ accepted: 0, authRejected: true });
+    expect(r).toEqual({ accepted: 0, authRejected: true, skippedReason: 'error' });
   });
 
   it('returns accepted:0 (never throws) when the endpoint is permanently unreachable', async () => {
@@ -73,7 +73,7 @@ describe('createCloudSignalSink', () => {
     ) as unknown as typeof fetch;
     const sink = createCloudSignalSink({ endpoint: 'https://x.test/api', apiKey: 'k', fetchImpl });
     const r = await sink.emit(batch(1));
-    expect(r).toEqual({ accepted: 0, authRejected: false });
+    expect(r).toEqual({ accepted: 0, authRejected: false, skippedReason: 'error' });
   }, 15_000);
 
   it('emits nothing for an empty batch', async () => {
@@ -94,7 +94,7 @@ describe('createCloudSignalSink', () => {
     ) as unknown as typeof fetch;
     const sink = createCloudSignalSink({ endpoint: badEndpoint, apiKey: 'k', fetchImpl });
     const r = await sink.emit(batch(2));
-    expect(r).toEqual({ accepted: 0, authRejected: false });
+    expect(r).toEqual({ accepted: 0, authRejected: false, skippedReason: 'error' });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

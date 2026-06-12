@@ -144,6 +144,29 @@ export interface GateCompareResult {
 }
 
 /**
+ * Outcome of the root's post-run signal delivery
+ * ({@link ToolCliContext.deliverSignals}). Delivery stays best-effort and
+ * non-blocking (ADR-0008) — this result exists so a caller (or a test) can
+ * SURFACE what happened instead of the user silently assuming their signals
+ * shipped. The root already prints the user-facing skip/failure notices; tools
+ * may ignore the result entirely.
+ */
+export interface SignalDeliveryResult {
+  /** Signals the cloud sink acknowledged (0 for the keyless/no-op majority). */
+  readonly cloudAccepted: number;
+  /**
+   * Why an ACTIVE cloud sink accepted nothing, when knowable: `'unentitled'`
+   * (the entitlement check said no) or `'error'` (the emit faulted). Omitted on
+   * success and for the no-op sink (user opted out / no key — silence correct).
+   */
+  readonly cloudSkippedReason?: 'unentitled' | 'error';
+  /** Whether a `--report-to` upload was attempted and succeeded. */
+  readonly reportSuccess?: boolean;
+  /** The `--report-to` target URL, when one was requested. */
+  readonly reportUrl?: string;
+}
+
+/**
  * Context the host hands to each command handler (and the tool's optional
  * lifecycle hooks): the shared CLI behaviour a handler calls back into — Ink
  * rendering, machine-output emit seams, dashboard auto-open, structured logging,
@@ -300,7 +323,9 @@ export interface ToolCliContext {
    * engines make today — moving all egress to the root lets the engines drop
    * their `@opensip-tools/output` dependency (Phases 4–6). Best-effort: cloud
    * failures never throw and never affect the exit code; only a `--report-to`
-   * failure on an otherwise-passing run sets exit 4.
+   * failure on an otherwise-passing run sets exit 4. Resolves to a
+   * {@link SignalDeliveryResult} stating what actually shipped (the root also
+   * prints the user-facing skip/failure notices); callers may ignore it.
    *
    * `envelope` is the `SignalEnvelope` from `@opensip-tools/contracts`, typed
    * `unknown` here for the same layer reason as `render`/`emitEnvelope`.
@@ -313,7 +338,7 @@ export interface ToolCliContext {
       readonly apiKey?: string;
       readonly runFailed?: boolean;
     },
-  ) => Promise<void>;
+  ) => Promise<SignalDeliveryResult>;
   /**
    * Write a tool-run **signal envelope** to a SARIF v2.1.0 file (ADR-0011).
    * The composition root formats the envelope through the single shared
@@ -576,8 +601,14 @@ export interface Tool {
   readonly capabilityRegistrars?: Readonly<Record<string, CapabilityRegistrar>>;
   /**
    * Optional fingerprint strategy for the host-owned baseline/ratchet plane
-   * (ADR-0036). Populates `Signal.fingerprint` at signal-creation time. The
-   * plane treats the result opaquely. Undefined ⇒ host `defaultFingerprintStrategy`.
+   * (ADR-0036). Populates `Signal.fingerprint`; the plane treats the result
+   * opaquely. Undefined ⇒ host `defaultFingerprintStrategy`. Stamping happens at
+   * envelope construction: pass the SAME strategy as
+   * `BuildEnvelopeInput.fingerprintStrategy` to `buildSignalEnvelope`
+   * (`@opensip-tools/contracts`), which stamps every signal (host default when
+   * omitted) so a built envelope is gate-ready by construction. This field is
+   * the tool's DECLARATION of that identity for the plane's documentation and
+   * future host consumers; the envelope builder is where it takes effect.
    * Changing a declared strategy is a deliberate, documented re-capture.
    */
   readonly fingerprintStrategy?: FingerprintStrategy;

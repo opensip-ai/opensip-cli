@@ -126,7 +126,7 @@ function makeCli(): CapturedCli {
     // override to setExitCode exactly as the host's deliver-envelope does.
     deliverSignals: vi.fn((_e: unknown, opts?: { runFailed?: boolean }) => {
       exitCodes.push(opts?.runFailed === true ? 1 : 0);
-      return Promise.resolve();
+      return Promise.resolve({ cloudAccepted: 0 });
     }),
     writeSarif: vi.fn(() => Promise.resolve()),
     saveBaseline: vi.fn((tool: string, env: unknown) => {

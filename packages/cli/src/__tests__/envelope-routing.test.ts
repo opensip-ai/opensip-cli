@@ -17,6 +17,7 @@ import {
 } from '@opensip-tools/contracts';
 import {
   LanguageRegistry,
+  noopSignalSink,
   RunScope,
   ToolRegistry,
   runWithScope,
@@ -93,7 +94,9 @@ function makeScope(signalSink?: SignalSink): RunScope {
 // without retry/backoff (the test stays fast). 200 = success.
 const FAIL_400: typeof fetch = () => Promise.resolve(new Response('nope', { status: 400 }));
 const OK_200: typeof fetch = () => Promise.resolve(new Response('{}', { status: 200 }));
-const NOOP_SINK: SignalSink = { emit: () => Promise.resolve({ accepted: 0, authRejected: false }) };
+// The REAL core no-op sink (identity matters): deliverEnvelope short-circuits on
+// it, so the cloud leg stays silent — the keyless/opted-out contract.
+const NOOP_SINK: SignalSink = noopSignalSink;
 
 /** Stringify a `fetch` URL argument (only the string form is exercised here). */
 function urlString(url: Parameters<typeof fetch>[0]): string {
@@ -260,6 +263,52 @@ describe('root cloud egress (deliverEnvelope → scope.signalSink)', () => {
       deliverEnvelope(ENVELOPE, { cwd: process.cwd(), repo: {} }),
     );
     expect(out.cloudAccepted).toBe(0);
+    expect(out.cloudSkippedReason).toBe('error');
+  });
+
+  it('surfaces an unentitled skip: reason on the result + a one-line stderr notice', async () => {
+    // Best-effort ≠ silent: an ACTIVE sink that ships nothing (entitlement said
+    // no) must tell the user their signals did NOT upload — previously this was
+    // indistinguishable from success.
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    try {
+      const sink: SignalSink = {
+        emit: () =>
+          Promise.resolve({ accepted: 0, authRejected: false, skippedReason: 'unentitled' }),
+      };
+      const out = await runWithScope(makeScope(sink), () =>
+        deliverEnvelope(ENVELOPE, { cwd: process.cwd(), repo: {} }),
+      );
+      expect(out.cloudAccepted).toBe(0);
+      expect(out.cloudSkippedReason).toBe('unentitled');
+      const stderr = writes.join('');
+      expect(stderr).toContain('not entitled');
+      expect(stderr).toContain('NOT uploaded');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('stays silent on the no-op sink — the keyless/opted-out majority asked for nothing', async () => {
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    try {
+      const out = await runWithScope(makeScope(noopSignalSink), () =>
+        deliverEnvelope(ENVELOPE, { cwd: process.cwd(), repo: {} }),
+      );
+      expect(out.cloudAccepted).toBe(0);
+      expect(out.cloudSkippedReason).toBeUndefined();
+      expect(writes.join('')).not.toContain('cloud sync skipped');
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

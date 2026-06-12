@@ -21,6 +21,16 @@ export interface EmitResult {
   readonly accepted: number;
   /** Server rejected auth (401/403) — caller busts the entitlement cache. */
   readonly authRejected: boolean;
+  /**
+   * Why an active sink accepted nothing, when that is knowable. Best-effort
+   * delivery stays non-blocking (ADR-0008) — this exists so the composition
+   * root can SURFACE a skip ("0 of N signals delivered: not entitled") instead
+   * of the user silently believing their signals shipped. `'unentitled'` — the
+   * entitlement check said no; `'error'` — the emit faulted (network, server).
+   * Omitted on success and on the no-op sink (where silence is correct: the
+   * user opted out or never configured a key).
+   */
+  readonly skippedReason?: 'unentitled' | 'error';
 }
 
 /** A best-effort destination for a run's signals. Implementations MUST NOT throw. */

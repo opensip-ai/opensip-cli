@@ -112,7 +112,13 @@ export function createCloudSignalSink(opts: CloudSignalSinkOptions): SignalSink 
           outcome: result.outcome,
           authRejected: result.authRejected,
         });
-        return { accepted, authRejected: result.authRejected };
+        return {
+          accepted,
+          authRejected: result.authRejected,
+          // Surface a transport-level total failure so the root can tell the
+          // user their signals did not ship (still non-blocking, ADR-0008).
+          ...(accepted === 0 ? { skippedReason: 'error' as const } : {}),
+        };
       } catch (error) {
         // Defense in depth — postChunked never throws, but emit MUST NOT either.
         logger.info({
@@ -120,7 +126,7 @@ export function createCloudSignalSink(opts: CloudSignalSinkOptions): SignalSink 
           module: MODULE_TAG,
           error: error instanceof Error ? error.message : String(error),
         });
-        return { accepted: 0, authRejected: false };
+        return { accepted: 0, authRejected: false, skippedReason: 'error' };
       }
     },
   };

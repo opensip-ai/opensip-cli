@@ -394,17 +394,18 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     // The root owns all effectful egress (ADR-0011 / ADR-0008): cloud sync via
     // the run's signal sink + `--report-to` SARIF upload. Tools call this once
     // per run; `setExitCode` is threaded so a `--report-to` failure on an
-    // otherwise-passing run can claim exit 4.
-    deliverSignals: async (envelope, deliverOpts) => {
-      await deliverEnvelope(envelope as SignalEnvelope, {
+    // otherwise-passing run can claim exit 4. The delivery result (what actually
+    // shipped / why a leg was skipped) flows back to the caller — the root has
+    // already printed any user-facing notice, so callers may ignore it.
+    deliverSignals: (envelope, deliverOpts) =>
+      deliverEnvelope(envelope as SignalEnvelope, {
         cwd: deliverOpts.cwd,
         reportTo: deliverOpts.reportTo,
         apiKey: deliverOpts.apiKey,
         runFailed: deliverOpts.runFailed,
         setExitCode,
         logger: log,
-      });
-    },
+      }),
     // Root-owned SARIF-file sink (ADR-0011): the one place that formats an
     // envelope to SARIF and writes it to disk, so tools that export SARIF to a
     // file (e.g. `graph sarif-export`) never import `@opensip-tools/output`.
