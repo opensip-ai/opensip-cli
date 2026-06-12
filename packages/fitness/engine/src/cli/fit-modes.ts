@@ -287,7 +287,12 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
     // the reserved `failOnDegraded` key (ADR-0036, default true → ratchet-as-report
     // when false). The host sets the exit (degraded → RUNTIME_ERROR, else SUCCESS)
     // and a `--report-to` upload failure never masks the gate verdict.
-    await deliverFitSignals(cli, envelope, args, result.degraded && resolveFailOnDegraded('fitness'));
+    await deliverFitSignals(
+      cli,
+      envelope,
+      args,
+      result.degraded && resolveFailOnDegraded('fitness'),
+    );
     return;
   } catch (error) {
     // Gate mode is plain-text (not Ink), so we render the error

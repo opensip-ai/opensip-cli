@@ -44,7 +44,8 @@ function renderAdded(added: readonly Signal[]): string[] {
 function renderResolved(resolved: readonly Signal[]): string[] {
   if (resolved.length === 0) return [];
   const lines = [`Resolved (${resolved.length}):`];
-  for (const v of sortSignals(resolved)) lines.push(`  ✓ ${v.ruleId.padEnd(40)} ${formatLocation(v)}`);
+  for (const v of sortSignals(resolved))
+    lines.push(`  ✓ ${v.ruleId.padEnd(40)} ${formatLocation(v)}`);
   lines.push('');
   return lines;
 }
