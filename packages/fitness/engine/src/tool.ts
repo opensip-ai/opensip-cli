@@ -49,6 +49,7 @@
 
 import { readPackageVersion } from '@opensip-tools/core';
 
+import { fitnessFingerprintStrategy } from './baseline-strategy.js';
 import { collectFitnessDashboardData } from './cli/dashboard.js';
 import {
   fitBaselineExportCommandSpec,
@@ -249,6 +250,10 @@ export const fitnessTool: Tool = {
   // its manifest). It supplies the REAL registrar so the host can replace the
   // manifest-time deferred placeholder once fitness's module loads.
   capabilityRegistrars: { 'fit-pack': registerFitCheck, 'fit-recipe': registerFitRecipe },
+  // ADR-0036: fitness's message-hash baseline identity (sha256(filePath\nruleId\n
+  // message)), read by the host baseline/ratchet seams when fit stamps its gate
+  // envelope. Excludes line/col so unrelated line-shifts don't flap the ratchet.
+  fingerprintStrategy: fitnessFingerprintStrategy,
   initialize: async (): Promise<void> => {
     // ensureChecksLoaded() is called inside the executeFit / listChecks
     // / listRecipes paths, so a separate initialize() pass is not
