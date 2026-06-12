@@ -20,6 +20,8 @@ export {
   HOST_VERDICT_POLICY_FALLBACK,
   policyPasses,
   resolveVerdictPolicy,
+  DEFAULT_FAIL_ON_DEGRADED,
+  resolveFailOnDegraded,
 } from './lib/verdict-policy.js';
 export type { VerdictPolicy } from './lib/verdict-policy.js';
 // Host-owned baseline/ratchet plane (ADR-0036): the per-tool fingerprint

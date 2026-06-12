@@ -69,3 +69,31 @@ export function resolveVerdictPolicy(toolNamespace: string): VerdictPolicy {
     failOnWarnings: asThreshold(ns?.failOnWarnings) ?? HOST_VERDICT_POLICY_FALLBACK.failOnWarnings,
   };
 }
+
+/**
+ * Host default for the third reserved gate key, `failOnDegraded` (ADR-0036): a
+ * `--gate-compare` that finds net-new findings (the diff is `degraded`) fails the
+ * run. `true` by default.
+ */
+export const DEFAULT_FAIL_ON_DEGRADED = true;
+
+/**
+ * Resolve the net-new ratchet's hard-fail switch, `failOnDegraded` (ADR-0036) —
+ * the THIRD reserved gate key beside `failOnErrors`/`failOnWarnings`, read off the
+ * same already-resolved `currentScope().toolConfig?.[toolNamespace]` (ADR-0023
+ * flag>env>file precedence). Boolean, default {@link DEFAULT_FAIL_ON_DEGRADED}.
+ *
+ * Deliberately NOT part of {@link VerdictPolicy} or {@link policyPasses}: the
+ * findings verdict stays a pure function of findings, while the gate-compare
+ * ratchet is the documented ADR-0035 Phase-5 RETAIN carve-out — an orthogonal,
+ * gate-dispatch-only mechanism. `false` ⇒ ratchet-as-report (compare runs, prints
+ * the diff, exits 0), mirroring ADR-0020's `failOnErrors:0 = ratchet-only`.
+ *
+ * The HOST derives the exit: dispatch passes `degraded && failOnDegraded` as the
+ * `deliverSignals` runFailed override (→ RUNTIME_ERROR). No tool calls
+ * `setExitCode` for the gate path (ADR-0035 invariant).
+ */
+export function resolveFailOnDegraded(toolNamespace: string): boolean {
+  const value = currentScope()?.toolConfig?.[toolNamespace]?.failOnDegraded;
+  return typeof value === 'boolean' ? value : DEFAULT_FAIL_ON_DEGRADED;
+}

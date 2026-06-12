@@ -9,8 +9,10 @@ import { describe, expect, it } from 'vitest';
 import { makeTestScope } from '../../test-utils/with-scope.js';
 import { runWithScopeSync } from '../run-scope.js';
 import {
+  DEFAULT_FAIL_ON_DEGRADED,
   HOST_VERDICT_POLICY_FALLBACK,
   policyPasses,
+  resolveFailOnDegraded,
   resolveVerdictPolicy,
   type VerdictPolicy,
 } from '../verdict-policy.js';
@@ -77,5 +79,29 @@ describe('resolveVerdictPolicy', () => {
     expect(resolveWith({ graph: { failOnErrors: -1, failOnWarnings: 1.5 } })).toEqual(
       HOST_VERDICT_POLICY_FALLBACK,
     );
+  });
+});
+
+/** Resolve failOnDegraded inside a scope carrying the given resolved toolConfig. */
+function degradedWith(toolConfig: ResolvedToolConfig | undefined, ns = 'graph'): boolean {
+  const scope = makeTestScope();
+  if (toolConfig !== undefined) Object.assign(scope, { toolConfig });
+  return runWithScopeSync(scope, () => resolveFailOnDegraded(ns));
+}
+
+describe('resolveFailOnDegraded (ADR-0036)', () => {
+  it('defaults to true when no toolConfig / no key is present', () => {
+    expect(DEFAULT_FAIL_ON_DEGRADED).toBe(true);
+    expect(degradedWith(undefined)).toBe(true);
+    expect(degradedWith({ graph: {} })).toBe(true);
+  });
+
+  it('honours an explicit boolean (ratchet-as-report when false)', () => {
+    expect(degradedWith({ graph: { failOnDegraded: false } })).toBe(false);
+    expect(degradedWith({ graph: { failOnDegraded: true } })).toBe(true);
+  });
+
+  it('ignores a non-boolean value, falling back to the default', () => {
+    expect(degradedWith({ graph: { failOnDegraded: 'yes' } })).toBe(true);
   });
 });

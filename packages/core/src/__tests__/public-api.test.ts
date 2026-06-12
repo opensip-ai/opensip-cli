@@ -51,6 +51,8 @@ const EXPECTED_VALUE_EXPORTS = [
   // Host-owned baseline/ratchet plane (ADR-0036).
   'defaultFingerprintStrategy',
   'stampFingerprints',
+  'DEFAULT_FAIL_ON_DEGRADED',
+  'resolveFailOnDegraded',
   // Upstream barrel export missing from this curated list (modular-monolith
   // boundary commits added it to index.ts but not here); the barrel exports it.
   'RAW_STREAM_REASONS',
