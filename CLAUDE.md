@@ -390,6 +390,30 @@ production code only — and `large-function` skips the synthetic
 `<module-init>` (whole-file) occurrence. Run `pnpm graph` locally to
 reproduce a graph alert.
 
+**The baseline/ratchet/export machinery is a HOST-OWNED plane, not
+per-tool code (ADR-0036).** Capture (`--gate-save`), the net-new ratchet
+(`--gate-compare`), and export (SARIF + git-trackable JSON fingerprints)
+are four `ToolCliContext` seams — `saveBaseline` / `compareBaseline` /
+`exportBaselineSarif` / `exportBaselineFingerprints` — over one generic
+table pair in `@opensip-tools/datastore` (`tool_baseline_entries` +
+`tool_baseline_meta`, scoped by a `tool` column) and one pure
+`diffBaseline` in `@opensip-tools/output`. A tool inherits the whole
+ratchet by emitting fingerprint-stamped signals; it authors **at most a
+`Tool.fingerprintStrategy`** — often nothing (the host default keys on
+`ruleId|filePath|line|col`). `graph` declares a byte-preserved strategy
+(its git-trackable JSON fingerprint baseline is a consumer-repo artifact);
+`fitness` declares a message-hash (`sha256(filePath\nruleId\nmessage)`,
+line-shift-tolerant). The plane NEVER re-fingerprints — each tool stamps
+its envelope (`stampFingerprints`) at construction time; the seams only
+read `signal.fingerprint`. The gate-compare exit is host-derived: a tool
+passes `degraded && failOnDegraded` as the `deliverSignals` runFailed
+override (no tool calls `setExitCode` for the gate path; ADR-0035). The
+third reserved gate key `failOnDegraded` (default `true`, beside
+`failOnErrors`/`failOnWarnings`) toggles hard-fail vs. report-only for the
+ratchet. Baselines are drop-and-recapture (CI-ephemeral; a release that
+changes the baseline schema drops the local DB rows — re-run `--gate-save`;
+the committed JSON fingerprint baseline is a file, untouched).
+
 **Why `pnpm fit` works at all in this monorepo:** workspace dep
 injection is enabled via `injectWorkspacePackages: true` in
 `pnpm-workspace.yaml` (pnpm 11's settings home — it no longer reads the
