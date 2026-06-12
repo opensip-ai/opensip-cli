@@ -255,6 +255,31 @@ distinct from:
   fitness prod source via `/internal`). Production source must never import
   it (`no-prod-import-of-test-support` depcruise rule); `fitness/internal`
   shrinks to `executeFit`
+- [ADR-0041](./ADR-0041-customer-facing-tools-command-group.md) — **`tools` is
+  the customer-facing whole-tool management surface**
+  (`list|install|uninstall|validate|data purge`), a veneer over the existing
+  plugin machinery; `tools validate` IS the bootstrap admission pipeline
+  factored into one callable (one validator, four consumers). Subcommands
+  only — no flag aliases, no `tool` singular. `plugin add --domain tool`
+  demoted to low-level machinery with a help-hiding deprecation path.
+  `validate`/`install` execute untrusted code behind the install consent gate;
+  `tools list` never dynamic-imports a runtime
+- [ADR-0042](./ADR-0042-tool-storage-contract-and-state-store.md) — **Two-tier
+  tool storage contract + host-owned `ToolStateStore`**. Tier A (no
+  DDL/migrations/datastore-file writes/private schema imports) gates admission
+  NOW for all tools — bundled ones already satisfy it. Tier B (no raw
+  handles; host-API-only persistence) is enforced only after first-party
+  persistence migrates behind host seams — enforcing earlier would break
+  3.0.0 parity (graph/fit hold the raw handle today). `tool_state`
+  (`tool|key|payload|updatedAt`) copies the ADR-0036 generic-table pattern so
+  third-party tools get persistence parity without schema ownership
+- [ADR-0043](./ADR-0043-tolerated-unclaimed-config-namespaces.md) — **Unclaimed
+  config namespaces warn loudly instead of bricking the run** (amends the one
+  strictness clause of ADR-0023): a namespace no loaded tool claims gets a
+  per-run warning with a did-you-mean suggestion; a LOADED tool's namespace
+  stays strict (and a loaded tool with a present-but-undeclared namespace is
+  rejected). Restores shared-config portability across machines with
+  different third-party install sets while keeping typos observable
 
 ### Superseded
 
