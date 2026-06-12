@@ -578,6 +578,12 @@ export interface GraphConfig {
    * explicit `--recipe` typo still hard-fails.
    */
   readonly recipe?: string;
+  /**
+   * Flat-large synthetic-partition strategy override. Absent → the
+   * layout-recommended default ('hybrid'). EXPERIMENTAL until ADR-0045's
+   * B2 verdict; 'community' (added in Phase 2) requires a TS project.
+   */
+  readonly partitionStrategy?: PartitionStrategy;
   /** Override the inferred entry-point list. */
   readonly entryPointHashes?: readonly string[];
   /**

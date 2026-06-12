@@ -41,6 +41,22 @@ describe('GraphConfigSchema', () => {
     expect(GraphConfigSchema.safeParse({ cycleSize2Severity: 'high' }).success).toBe(false);
   });
 
+  it('accepts a valid partitionStrategy value', () => {
+    expect(GraphConfigSchema.parse({ partitionStrategy: 'directory-depth' })).toEqual({
+      partitionStrategy: 'directory-depth',
+    });
+  });
+
+  it('rejects an out-of-enum partitionStrategy value', () => {
+    expect(GraphConfigSchema.safeParse({ partitionStrategy: 'comunity' }).success).toBe(false);
+  });
+
+  it('rejects a typo of the partitionStrategy key once strict (composer behaviour)', () => {
+    expect(GraphConfigSchema.strict().safeParse({ partitionStratgy: 'hybrid' }).success).toBe(
+      false,
+    );
+  });
+
   it('rejects an unknown key once strict (composer behaviour)', () => {
     // The historical typo the strict schema now catches instead of dropping.
     expect(
@@ -52,5 +68,11 @@ describe('GraphConfigSchema', () => {
     expect(graphConfigDeclaration.namespace).toBe('graph');
     expect(graphConfigDeclaration.defaults).toBeUndefined();
     expect(graphConfigDeclaration.schema).toBe(GraphConfigSchema);
+  });
+
+  it('declares exactly the partitionStrategy env binding', () => {
+    expect(graphConfigDeclaration.env).toEqual([
+      { envVar: 'OPENSIP_GRAPH_PARTITION_STRATEGY', key: 'partitionStrategy' },
+    ]);
   });
 });
