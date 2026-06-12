@@ -52,21 +52,20 @@ import {
   type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-tools/core';
-
-import { resetInitializedToolIdsForTest } from './bootstrap/pre-action-hook.js';
-import { resetTelemetryStartedForTest } from './telemetry/sdk-init.js';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
 import { deliverEnvelope, writeEnvelopeSarif } from './bootstrap/deliver-envelope.js';
-import { buildStateSeams } from './bootstrap/state-seams.js';
 import { buildHostPlanes } from './bootstrap/host-planes.js';
+import { resetInitializedToolIdsForTest } from './bootstrap/process-idempotency.js';
+import { buildStateSeams } from './bootstrap/state-seams.js';
 import {
   outcomeFromEnvelope,
   outcomeFromErrorMessage,
   outcomeFromResult,
 } from './commands/assemble-outcome.js';
 import { renderOutcome } from './commands/render-outcome.js';
+import { resetTelemetryStartedForTest } from './telemetry/sdk-init.js';
 
 import type { CommandResult, SignalEnvelope } from '@opensip-tools/contracts';
 

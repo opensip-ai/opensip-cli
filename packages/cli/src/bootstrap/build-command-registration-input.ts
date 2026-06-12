@@ -14,28 +14,29 @@
 import { logger } from '@opensip-tools/core';
 
 import { SessionReplayRegistry } from '../session-replay-registry.js';
+
 import { EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
 
-import type { ToolRegistry } from '@opensip-tools/core';
+import type {
+  CommandSpec,
+  PluginLayout,
+  ScaffoldContext,
+  ScaffoldFile,
+  ToolCliContext,
+  ToolRegistry,
+} from '@opensip-tools/core';
 
 /** The structured input consumed by `registerCliCommands`. */
 export interface CommandRegistrationInput {
-  readonly pluginLayouts: readonly NonNullable<import('@opensip-tools/core').PluginLayout>[];
+  readonly pluginLayouts: readonly NonNullable<PluginLayout>[];
   readonly toolScaffolds: readonly {
-    readonly layout: import('@opensip-tools/core').PluginLayout;
-    readonly scaffoldExamples:
-      | ((
-          ctx: import('@opensip-tools/core').ScaffoldContext,
-        ) => readonly import('@opensip-tools/core').ScaffoldFile[])
-      | undefined;
+    readonly layout: PluginLayout;
+    readonly scaffoldExamples: ((ctx: ScaffoldContext) => readonly ScaffoldFile[]) | undefined;
     readonly stableExampleIds: (() => readonly string[]) | undefined;
     readonly scaffoldConfigBlock: (() => string) | undefined;
   }[];
   readonly sessionReplayRegistry: SessionReplayRegistry;
-  readonly toolCommandSpecs: readonly import('@opensip-tools/core').CommandSpec<
-    unknown,
-    import('@opensip-tools/core').ToolCliContext
-  >[];
+  readonly toolCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[];
 }
 
 /**

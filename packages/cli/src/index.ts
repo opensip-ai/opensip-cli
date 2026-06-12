@@ -30,7 +30,6 @@ import {
 } from './cli-context.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
-import { SessionReplayRegistry } from './session-replay-registry.js';
 import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';
 import { printWelcome } from './welcome.js';
 

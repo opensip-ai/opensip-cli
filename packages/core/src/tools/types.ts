@@ -177,6 +177,7 @@ export interface SignalDeliveryResult {
  * (GA Lows cleanup, 2026-06: alias + usage added as part of resolving the
  * "heavy unknown + casts" item. See roadmap item 5.)
  */
+/* eslint-disable sonarjs/redundant-type-aliases -- intentional named alias for the unknown seam type (the "Wire" hygiene marker from the GA "heavy unknown + casts" cleanup); used in JSDoc for the baseline seams to document the layering. */
 type WireSignalEnvelope = unknown;
 
 /**
@@ -460,7 +461,10 @@ export interface ToolCliContext {
       setBlock(toolId: string, blocked: boolean, reason?: string): Promise<void>;
 
       /** Enforcement helper (used by run paths or Cloud before acting on a tool). */
-      checkAllowed(toolId: string, action: 'install' | 'enable' | 'run-remediation' | 'run-simulation'): Promise<boolean>;
+      checkAllowed(
+        toolId: string,
+        action: 'install' | 'enable' | 'run-remediation' | 'run-simulation',
+      ): Promise<boolean>;
     };
 
     audit?: {
@@ -488,14 +492,14 @@ export interface ToolCliContext {
  * namespaced tool_state rows. See the governing spec for full rationale and
  * evolution path.
  */
-export interface ToolGovernanceState extends Record<string, unknown> {}
-export interface InstallationRecord extends Record<string, unknown> {}
-export interface ApprovalDecision extends Record<string, unknown> {}
-export interface AuditEntry extends Record<string, unknown> {}
-export interface ToolAuditEntry extends Record<string, unknown> {}
-export interface EntitlementStatus extends Record<string, unknown> {}
-export interface UsageRecord extends Record<string, unknown> {}
-export interface LicenseState extends Record<string, unknown> {}
+export type ToolGovernanceState = Record<string, unknown>;
+export type InstallationRecord = Record<string, unknown>;
+export type ApprovalDecision = Record<string, unknown>;
+export type AuditEntry = Record<string, unknown>;
+export type ToolAuditEntry = Record<string, unknown>;
+export type EntitlementStatus = Record<string, unknown>;
+export type UsageRecord = Record<string, unknown>;
+export type LicenseState = Record<string, unknown>;
 
 /**
  * Tool error-handling contract.

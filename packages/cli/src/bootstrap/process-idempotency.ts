@@ -12,6 +12,7 @@
  * See pre-action-hook.ts and the GA roadmap item 5.
  */
 
+/* eslint-disable sonarjs/no-empty-collection -- intentionally starts empty; populated on tool initialize, cleared per-run for isolation (GA Low hygiene) */
 export const initializedToolIds = new Set<string>();
 
 /** Reset for test harnesses and fresh invocations. */

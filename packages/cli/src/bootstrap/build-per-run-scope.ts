@@ -22,24 +22,24 @@ import { join } from 'node:path';
 
 import { resolveEffectiveCloudConfig } from '@opensip-tools/config';
 import {
-  RunScope,
   createCapabilityRegistry,
+  type Logger,
   type ProjectContext,
+  resolveUserPaths,
+  RunScope,
+  type ToolPluginManifest,
   type ToolRegistry,
 } from '@opensip-tools/core';
 import { resolveSignalSink } from '@opensip-tools/output';
 
-import { buildDatastoreThunk, getToolManifestsForRun } from '../cli-context.js';
+import { buildDatastoreThunk } from '../cli-context.js';
+
 import { buildTargets } from './build-targets.js';
-import { composeAndValidateToolConfig } from './config-and-capabilities.js';
-import { loadCliDefaults } from './cli-defaults.js';
-import { wireCapabilityRegistry } from './config-and-capabilities.js';
-import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
+import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
 
-import type { ToolPluginManifest } from '@opensip-tools/core';
-import type { Logger } from '@opensip-tools/core';
+import type { loadCliDefaults } from './cli-defaults.js';
 
-const CLI_PACKAGE_NAME = 'opensip-tools';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any -- loose types from composition root extraction (build-per-run-scope); structural improvement, full strict typing is follow-up. */
 
 /** Inputs required to build a fully wired per-run scope. */
 export interface BuildPerRunScopeInput {
@@ -73,8 +73,7 @@ export interface BuildPerRunScopeInput {
  * but all inputs are explicit and side effects are contained.
  */
 export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
-  const { project, runId, cwd, cliDefaults, registries, manifests, apiKey, noCloud, logger, ui } =
-    input;
+  const { project, runId, cliDefaults, registries, manifests, apiKey, noCloud, logger, ui } = input;
 
   const { languages, tools } = registries;
 
@@ -162,5 +161,3 @@ function configDocumentSlot(
 // construction close to original to minimize diff while still thinning the hook.
 // The important win is that pre-action-hook no longer contains the 60+ lines of
 // scope assembly + wiring.
-
-import { resolveUserPaths } from '@opensip-tools/core'; // for the cacheDir line if needed in future refinement

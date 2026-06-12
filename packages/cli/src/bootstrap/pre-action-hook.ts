@@ -28,27 +28,20 @@
  */
 
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 
-import { resolveEffectiveCloudConfig } from '@opensip-tools/config';
 import {
-  RunScope,
   configureLogger,
-  createCapabilityRegistry,
   enterScope,
   generatePrefixedId,
   logger,
   resolveProjectContext,
   resolveProjectPaths,
-  resolveUserPaths,
   type ProjectContext,
   type Tool,
   type ToolRegistry,
 } from '@opensip-tools/core';
-import { resolveSignalSink } from '@opensip-tools/output';
 
 import {
-  buildDatastoreThunk,
   getCurrentRegistriesForScope,
   getToolManifestsForRun,
   setCurrentRunScope,
@@ -57,16 +50,15 @@ import {
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { BootstrapError } from './bootstrap-error.js';
-import { buildTargets } from './build-targets.js';
-import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
-import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
-import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
 import { buildPerRunScope } from './build-per-run-scope.js';
+import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
+import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
 import {
   checkNoProjectAndBailout,
   checkSchemaVersionAndBailout,
   warnAboutPhantomRuntimes,
 } from './pre-action-guards.js';
+import { initializedToolIds } from './process-idempotency.js';
 
 import type { Command } from 'commander';
 
@@ -82,10 +74,8 @@ const MODULE_TAG = 'cli:bootstrap';
  *
  * GA Low hygiene: centralized in process-idempotency.ts for better isolation and auditability.
  */
-import { initializedToolIds, resetInitializedToolIdsForTest } from './process-idempotency.js';
 
 // Re-export the reset for consumers that imported it from here (e.g. cli-context.ts for per-invocation resets).
-export { resetInitializedToolIdsForTest };
 
 /**
  * Find the registered tool that owns the invoked subcommand, matching the

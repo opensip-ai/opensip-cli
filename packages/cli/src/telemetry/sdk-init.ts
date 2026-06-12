@@ -71,6 +71,11 @@ let started = false;
 
 /** Reset for test harnesses and fresh invocations (GA Low hygiene). */
 export function resetTelemetryStartedForTest(): void {
+  resetTelemetryState();
+}
+
+/** Internal shared reset to avoid identical function bodies (sonar). */
+function resetTelemetryState(): void {
   started = false;
   provider = undefined;
   parentContext = undefined;
@@ -212,7 +217,5 @@ export async function raceWithTimeout(work: Promise<void>, ms: number): Promise<
  * without a fresh module each time.
  */
 export function resetTelemetryForTests(): void {
-  started = false;
-  provider = undefined;
-  parentContext = undefined;
+  resetTelemetryState();
 }

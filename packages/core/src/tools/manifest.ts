@@ -136,7 +136,7 @@ interface ToolPluginManifestBase {
   /** Reserved: compatibility metadata (minApiVersion, languages, etc.). */
   readonly compatibility?: unknown;
   /** Reserved: distribution posture for community/catalog. */
-  readonly distribution?: 'private' | 'public-free' | 'public-paid' | unknown;
+  readonly distribution?: 'private' | 'public-free' | 'public-paid' | unknown; // eslint-disable-line @typescript-eslint/no-redundant-type-constituents -- unknown for forward-compat on reserved open field (loader may produce null/{}); see GA forward-compat work.
   /** General bag for future extension metadata (publisher, pricing, etc.). */
   readonly extensionMetadata?: unknown;
 }
