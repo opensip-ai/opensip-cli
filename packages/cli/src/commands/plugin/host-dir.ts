@@ -34,7 +34,8 @@ export function isSafeNpmSpec(spec: string): boolean {
 }
 
 /** Create the host package.json (if absent) for a plugin host dir + return the dir. */
-function ensureHostDir(dir: string, domain: string): string {
+/** Create (if absent) a plugin host dir + its host package.json; returns `dir`. */
+export function ensureHostDir(dir: string, domain: string): string {
   mkdirSync(dir, { recursive: true });
   const pkgJsonPath = join(dir, HOST_PACKAGE_JSON);
   if (!existsSync(pkgJsonPath)) {

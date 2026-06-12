@@ -73,6 +73,7 @@ export type CommandResult =
   | UninstallDoneResult
   | TextLinesResult
   | ToolsListResult
+  | ToolsValidateResult
   | SessionReplayResult
   | HelpResult
   | ErrorResult;
@@ -244,6 +245,27 @@ export interface ToolsListResult {
   type: 'tools-list';
   tools: readonly ToolsListRow[];
   totalCount: number;
+}
+
+/** One `tools validate` report section (ADR-0041 / ADR-0042 Tier A). */
+export interface ToolsValidateSection {
+  readonly name: string;
+  /**
+   * `skipped` = the section could not run AND that is expected (in-place path
+   * validation without `--install-deps`); it still makes the overall verdict
+   * `incomplete`, never `passed` — an unverified runtime is not a pass.
+   */
+  readonly status: 'passed' | 'failed' | 'skipped';
+  readonly diagnostics: readonly string[];
+}
+
+/** Outcome of `opensip-tools tools validate <spec>` (ADR-0041). */
+export interface ToolsValidateResult {
+  type: 'tools-validate';
+  readonly spec: string;
+  readonly toolId?: string;
+  readonly verdict: 'passed' | 'failed' | 'incomplete';
+  readonly sections: readonly ToolsValidateSection[];
 }
 
 export interface ListChecksResult {

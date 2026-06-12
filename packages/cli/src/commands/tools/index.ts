@@ -8,9 +8,11 @@
  * (validate/install/uninstall/data purge).
  */
 
+import { EXIT_CODES } from '@opensip-tools/contracts';
 import { defineCommand, type CommandSpec } from '@opensip-tools/core';
 
 import { toolsList } from './list.js';
+import { runToolValidation } from './validate.js';
 
 import type { CliCommandsContext } from '../shared.js';
 import type { ProjectContext } from '@opensip-tools/core';
@@ -60,7 +62,37 @@ function buildToolsListSpec(): HostSpec {
   });
 }
 
+function buildToolsValidateSpec(ctx: CliCommandsContext): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'validate',
+    description:
+      'Validate a tool package against the Tool contract (runs the package module — see docs)',
+    commonFlags: ['json'],
+    args: [{ name: 'spec', description: 'npm spec, tarball, or local directory path' }],
+    options: [
+      {
+        flag: '--install-deps',
+        description: 'For a local path: stage via npm install so the runtime sections can load',
+        default: false,
+      },
+    ],
+    scope: 'none',
+    output: 'command-result',
+    handler: async (rawOpts) => {
+      const opts = rawOpts as ScopeFilterOpts & { _args: string[]; installDeps?: boolean };
+      const spec = opts._args[0] ?? '';
+      const { result } = await runToolValidation({
+        spec,
+        cwd: effectiveCwd(opts),
+        installDeps: opts.installDeps,
+      });
+      if (result.verdict !== 'passed') ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+      return result;
+    },
+  });
+}
+
 /** Build the `tools` group's leaf specs (consumed by the group mounter). */
-export function buildToolsGroupLeaves(_ctx: CliCommandsContext): readonly HostSpec[] {
-  return [buildToolsListSpec()];
+export function buildToolsGroupLeaves(ctx: CliCommandsContext): readonly HostSpec[] {
+  return [buildToolsListSpec(), buildToolsValidateSpec(ctx)];
 }

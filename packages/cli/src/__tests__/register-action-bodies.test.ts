@@ -501,7 +501,7 @@ describe('buildHostCommandInventory', () => {
     const inventory = buildHostCommandInventory();
     expect(inventory.groupSubcommands.sessions).toEqual(['list', 'show', 'purge']);
     expect(inventory.groupSubcommands.plugin).toEqual(['list', 'add', 'remove', 'sync']);
-    expect(inventory.groupSubcommands.tools).toEqual(['list']);
+    expect(inventory.groupSubcommands.tools).toEqual(['list', 'validate']);
     // Exactly the two documented action-less groups — no drift.
     expect(Object.keys(inventory.groupSubcommands).sort()).toEqual(['plugin', 'sessions', 'tools']);
   });

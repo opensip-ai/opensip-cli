@@ -182,6 +182,20 @@ function viewToolsList(result: Extract<CommandResult, { type: 'tools-list' }>): 
   return titledLinesView('Tools', [header, ...rows]);
 }
 
+/** `tools validate` — one line per section with verdict + diagnostics. */
+function viewToolsValidate(result: Extract<CommandResult, { type: 'tools-validate' }>): ViewNode {
+  const mark = (s: string): string => (s === 'passed' ? '✓' : s === 'skipped' ? '○' : '✗');
+  const lines: string[] = result.sections.flatMap((s) => [
+    `${mark(s.status)} ${s.name}${s.status === 'skipped' ? ' (skipped)' : ''}`,
+    ...s.diagnostics.map((d) => `    ${d}`),
+  ]);
+  lines.push(
+    '',
+    `verdict: ${result.verdict}${result.toolId === undefined ? '' : `  (tool: ${result.toolId})`}`,
+  );
+  return titledLinesView(`Validate ${result.spec}`, lines);
+}
+
 function unknownResultView(result: unknown): ViewNode {
   const type =
     typeof result === 'object' &&
@@ -422,6 +436,9 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'tools-list': {
       return viewToolsList(result);
+    }
+    case 'tools-validate': {
+      return viewToolsValidate(result);
     }
     case 'plugin-list':
     case 'plugin-add':

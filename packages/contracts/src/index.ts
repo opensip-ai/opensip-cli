@@ -49,6 +49,8 @@ export type {
   TextLinesResult,
   ToolsListResult,
   ToolsListRow,
+  ToolsValidateResult,
+  ToolsValidateSection,
   ListChecksResult,
   ListRecipesResult,
   HistorySession,
