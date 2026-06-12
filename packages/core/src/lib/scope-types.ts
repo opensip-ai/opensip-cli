@@ -53,6 +53,60 @@ export interface RecipeUnitConfigSlot {
 export type ResolvedToolConfig = Record<string, Record<string, unknown>>;
 
 /**
+ * The structural shape of one registered target the host hands tools through
+ * `scope.targets`. A target is a named file set (`include`/`exclude` globs)
+ * plus its language/concern metadata. Kept structural (Zod-free, no
+ * `@opensip-tools/config` import) so the kernel carries no config-layer or
+ * tool-vocabulary dependency — it mirrors `ResolvedToolConfig`'s "structural
+ * analog of a config-layer type" pattern. `@opensip-tools/config`'s `Target`
+ * (a `{ config: TargetConfig }`) is structurally assignable to this shape.
+ */
+export interface TargetView {
+  readonly config: {
+    readonly name: string;
+    readonly description: string;
+    readonly include: readonly string[];
+    readonly exclude: readonly string[];
+    readonly tags?: readonly string[];
+    readonly languages?: readonly string[];
+    readonly concerns?: readonly string[];
+  };
+}
+
+/**
+ * The structural, host-built targeting accessor exposed on `scope.targets`
+ * (ADR-0037). Names only the generic methods the host and any tool call to
+ * resolve named targets to file sets and apply project-wide exclusions —
+ * never the concrete substrate class. `core` names no targeting concrete
+ * (it imports nothing workspace); the substrate's `TargetRegistry`, wrapped
+ * by the CLI bootstrap with the bound `resolveTargets`/`applyGlobalExcludes`
+ * closures + `globalExcludes` list, is structurally assignable here.
+ *
+ * Mirrors the `ResolvedToolConfig` precedent: a structural, Zod-free analog
+ * of a config-layer runtime, declared in the kernel leaf so the `Tool`
+ * contract can read it without a layer inversion.
+ */
+export interface TargetResolver {
+  /** Look up a registered target by its config name. */
+  getByName(name: string): TargetView | undefined;
+  /** Return every registered target. */
+  getAll(): readonly TargetView[];
+  /** Return every registered target whose `config.tags` include `tag`. */
+  getByTag(tag: string): readonly TargetView[];
+  /** Whether a target with the given name is registered. */
+  has(name: string): boolean;
+  /**
+   * Resolve the named targets to a deduplicated, sorted list of absolute file
+   * paths, applying per-target `exclude` AND the project `globalExcludes`.
+   */
+  resolveTargets(names: readonly string[], rootDir: string): readonly string[];
+  /** Filter a file list against the project `globalExcludes` (rootDir-relative). */
+  applyGlobalExcludes(files: readonly string[], rootDir: string): readonly string[];
+  /** The project-wide exclusion globs this resolver was built with. */
+  readonly globalExcludes: readonly string[];
+}
+
+/**
  * Opaque accessor that lazily opens the datastore on first read.
  * Returns `undefined` when no datastore is configured for this scope.
  */
@@ -98,4 +152,15 @@ export interface ToolScope extends ScopeContribution {
    * (`scope.toolConfig?.graph`, `?.fitness`, `?.simulation`).
    */
   readonly toolConfig?: ResolvedToolConfig;
+  /**
+   * The host-built file-targeting accessor for this run (ADR-0037). Seeded by
+   * the CLI's pre-action-hook from the loaded config document's `targets:` /
+   * `globalExcludes:` blocks — built once per run, mirroring `toolConfig` and
+   * `languages`. Absent on a scope built without a config document (a
+   * project-agnostic command, a config-less project, or a project with no
+   * `targets:` block). Tools read it generically (`scope.targets?.resolveTargets`
+   * / `?.getByTag` / `?.applyGlobalExcludes`); the structural `TargetResolver`
+   * names no targeting concrete, so the kernel carries no targeting dependency.
+   */
+  readonly targets?: TargetResolver;
 }

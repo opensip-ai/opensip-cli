@@ -274,6 +274,8 @@ export type {
   ToolScope,
   ScopeContribution,
   ResolvedToolConfig,
+  TargetResolver,
+  TargetView,
 } from './lib/scope-types.js';
 
 // Lib — errors + Result pattern
