@@ -58,6 +58,15 @@ function mockCli(): {
     emitError: vi.fn(),
     emitJson: vi.fn(),
     logger: console,
+    // ADR-0036 host baseline seams — gate-save/compare route persistence + diff
+    // through these (the host owns them); no-op stubs suffice for the exit/deliver
+    // contract these tests assert.
+    saveBaseline: vi.fn(() => Promise.resolve()),
+    compareBaseline: vi.fn(() =>
+      Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
+    ),
+    exportBaselineSarif: vi.fn(() => Promise.resolve()),
+    exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
     scope: { datastore: () => datastore },
   } as unknown as ToolCliContext;
   return { cli, setExitCode, deliverSignals };

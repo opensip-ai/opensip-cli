@@ -20,18 +20,18 @@ import {
   type SignalEnvelope,
   type StoredSession,
 } from '@opensip-tools/contracts';
+import {
+  ConfigurationError,
+  resolveFailOnDegraded,
+  stampFingerprints,
+  SystemError,
+} from '@opensip-tools/core';
 import { resolveSession } from '@opensip-tools/session-store';
 
-import {
-  saveBaseline,
-  compareToBaseline,
-  renderGateCompareOutput,
-  GateBaselineMissingError,
-  GateBaselineInvalidError,
-} from '../gate.js';
-import { FitBaselineRepo } from '../persistence/baseline-repo.js';
+import { fitnessFingerprintStrategy } from '../baseline-strategy.js';
 import { fitReplayFromSession } from '../persistence/session-replay.js';
 
+import { renderGateCompareOutput } from './fit/gate-compare-render.js';
 import { persistFitSession } from './fit/result-builders.js';
 import { executeFit } from './fit.js';
 import { listChecks } from './list-checks.js';
@@ -230,9 +230,8 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
     return;
   }
   const datastore = cli.scope.datastore() as DataStore;
-  const repo = new FitBaselineRepo(datastore);
   // Persist the run on the main thread (ADR-0028 — engine is persistence-free),
-  // using the same handle the gate baseline is written against, so gate-save /
+  // using the same handle the host gate seam writes against, so gate-save /
   // gate-compare runs land in the session history alongside live-mode runs.
   const fitResult = await executeFit(args);
   persistFitRun(datastore, args, fitResult);
@@ -247,13 +246,19 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
     process.stderr.write(`Error: ${fitResult.result.message}\n`);
     return;
   }
-  const { envelope } = fitResult;
+  // ADR-0036: stamp the gate envelope's signals with fitness's message-hash
+  // fingerprint BEFORE handing it to the host seams (the plane never fingerprints).
+  const envelope: SignalEnvelope = {
+    ...fitResult.envelope,
+    signals: stampFingerprints(fitResult.envelope.signals, fitnessFingerprintStrategy),
+  };
   // Surface non-fatal warnings before the gate output so the user sees them
   // alongside the run summary. Safe here because gate mode is non-Ink.
   emitWarningsToStderr(fitResult.result);
   try {
     if (args.gateSave === true) {
-      saveBaseline(envelope, repo);
+      await cli.saveBaseline('fitness', envelope);
+      // @fitness-ignore-next-line async-waterfall-detection -- ordered side-effects: the "Baseline saved" confirmation must follow a SUCCESSFUL save (if saveBaseline throws, no confirmation is rendered), so these awaits cannot be parallelized.
       await cli.render({
         type: 'gate-done',
         lines: [
@@ -275,24 +280,25 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
       await deliverFitSignals(cli, envelope, args);
       return;
     }
-    const result = compareToBaseline(envelope, repo);
+    const result = await cli.compareBaseline('fitness', envelope);
     await cli.render({ type: 'gate-done', lines: renderGateCompareOutput(result).split('\n') });
     // gate-compare's verdict is the baseline-diff `degraded` predicate, NOT the
-    // findings policy — pass it as the host runFailed override (ADR-0035). The
-    // host sets the exit (degraded → RUNTIME_ERROR, else SUCCESS) and a
-    // `--report-to` upload failure never masks the gate verdict.
-    await deliverFitSignals(cli, envelope, args, result.degraded);
+    // findings policy — pass it as the host runFailed override (ADR-0035), gated by
+    // the reserved `failOnDegraded` key (ADR-0036, default true → ratchet-as-report
+    // when false). The host sets the exit (degraded → RUNTIME_ERROR, else SUCCESS)
+    // and a `--report-to` upload failure never masks the gate verdict.
+    await deliverFitSignals(cli, envelope, args, result.degraded && resolveFailOnDegraded('fitness'));
     return;
   } catch (error) {
     // Gate mode is plain-text (not Ink), so we render the error
     // ourselves to stderr instead of letting it escape to the CLI's
     // Ink-based `handleParseError`. The exit-code policy still flows
     // through the canonical `mapToolErrorToExitCode` so a gate-mode
-    // failure gets the same exit code an Ink-mode failure would —
-    // GateBaselineMissingError (extends ConfigurationError) → 2,
-    // GateBaselineInvalidError (extends SystemError) → 1. Unknown
-    // errors rethrow to the central handler.
-    if (error instanceof GateBaselineMissingError || error instanceof GateBaselineInvalidError) {
+    // failure gets the same exit code an Ink-mode failure would — the
+    // host compare seam throws ConfigurationError on a missing baseline
+    // (→ 2); a datastore-integrity SystemError → 1. Unknown errors
+    // rethrow to the central handler.
+    if (error instanceof ConfigurationError || error instanceof SystemError) {
       cli.logger.warn({
         evt: 'cli.gate.baseline_error',
         module: 'cli:gate',
