@@ -102,8 +102,6 @@ export type {
   CallSiteRecord,
   DependencySiteRecord,
   CacheKeyInput,
-  ScanImportsInput,
-  ScanImportsOutput,
   ParsedProject,
 } from './lang-adapter/types.js';
 export type { CallConfidence as AdapterCallConfidence } from './types.js';
