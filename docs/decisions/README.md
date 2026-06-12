@@ -274,12 +274,13 @@ distinct from:
   (`tool|key|payload|updatedAt`) copies the ADR-0036 generic-table pattern so
   third-party tools get persistence parity without schema ownership
 - [ADR-0043](./ADR-0043-tolerated-unclaimed-config-namespaces.md) — **Unclaimed
-  config namespaces warn loudly instead of bricking the run** (amends the one
-  strictness clause of ADR-0023): a namespace no loaded tool claims gets a
-  per-run warning with a did-you-mean suggestion; a LOADED tool's namespace
-  stays strict (and a loaded tool with a present-but-undeclared namespace is
-  rejected). Restores shared-config portability across machines with
-  different third-party install sets while keeping typos observable
+  config namespaces warn loudly instead of passing silently** (bounds the
+  document-level catchall ADR-0023 chose): the composer already tolerates
+  unclaimed top-level keys silently (`composer.ts` catchall) — the live typo
+  hole. Now an unclaimed namespace gets a per-run warning with a did-you-mean
+  suggestion, and a LOADED tool with a present-but-undeclared namespace is
+  rejected instead of falling into the catchall. Claimed namespaces stay
+  strict; shared-config portability across different install sets is preserved
 
 ### Superseded
 
