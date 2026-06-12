@@ -14,10 +14,6 @@ jobs:
       contents: read
       security-events: write
 
-    strategy:
-      matrix:
-        node-version: [24]
-
     steps:
       - uses: actions/checkout@v6
 
@@ -25,7 +21,11 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node-version }}
+          # Single source of truth: the Node version is pinned in .nvmrc and
+          # kept in lockstep with package.json engines.node by the
+          # node-version-consistency fitness check. CI reads the file rather
+          # than carrying its own literal.
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies

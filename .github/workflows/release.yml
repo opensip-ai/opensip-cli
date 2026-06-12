@@ -18,7 +18,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          # Single source of truth: pinned in .nvmrc (see ci.yml).
+          node-version-file: .nvmrc
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
