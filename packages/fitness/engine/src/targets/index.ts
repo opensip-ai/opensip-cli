@@ -20,4 +20,8 @@ export { loadTargetsConfig } from './loader.js';
 export { TargetRegistry } from './target-registry.js';
 
 // Generic glob mechanics — single-sourced in the host substrate (ADR-0037)
-export { resolveTargets, preResolveAllTargets, applyGlobalExcludes } from '@opensip-tools/targeting';
+export {
+  resolveTargets,
+  preResolveAllTargets,
+  applyGlobalExcludes,
+} from '@opensip-tools/targeting';

@@ -11,11 +11,12 @@ import * as fs from 'node:fs/promises';
 
 import { SystemError, currentScope, logger as defaultLogger } from '@opensip-tools/core';
 
+import { applyGlobalExcludes } from '../targets/index.js';
+
 import { DEFAULT_EXCLUSION_PATTERNS } from './constants.js';
 import { fileCache } from './file-cache.js';
 import { PathMatcher } from './path-matcher.js';
 import { extractSnippet } from './result-builder.js';
-import { applyGlobalExcludes } from '../targets/index.js';
 
 import type { ResolvedScope } from './check-config.js';
 
