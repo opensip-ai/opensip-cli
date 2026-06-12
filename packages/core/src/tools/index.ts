@@ -18,6 +18,7 @@ export type {
   ToolSessionRecord,
   ToolSessionReplayContribution,
   LiveViewRenderer,
+  ToolExtensionPoints,
 } from './types.js';
 export { UnknownLiveViewError } from './types.js';
 export { ToolRegistry } from './registry.js';

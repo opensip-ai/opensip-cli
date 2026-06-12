@@ -478,6 +478,37 @@ export interface ScaffoldFile {
 }
 
 /**
+ * Bag for extension points and optional hooks (rarer or future concerns).
+ *
+ * New extension points (especially around scaffolding, additional capability
+ * declarations, distribution metadata for community, etc.) should be added
+ * here rather than as additional top-level optional members on the main `Tool`
+ * interface.
+ *
+ * This keeps the primary Tool surface focused on stable identity + command
+ * surface (metadata, commands, pluginLayout, commandSpecs) while providing a
+ * clear evolution path for the extensibility story (private tools today →
+ * community tomorrow, per the product ecosystem vision).
+ *
+ * See ADR-0027 / ADR-0038 context and the second-pass architecture review
+ * (GA blocker #3).
+ */
+export interface ToolExtensionPoints {
+  readonly initialize?: () => Promise<void>;
+  readonly contributeScope?: () => ScopeContribution;
+  readonly collectDashboardData?: (
+    scope: ToolScope,
+  ) => Record<string, unknown> | Promise<Record<string, unknown>>;
+  readonly sessionReplay?: ToolSessionReplayContribution;
+  readonly config?: ToolConfigContribution;
+  readonly capabilityRegistrars?: Readonly<Record<string, CapabilityRegistrar>>;
+  readonly fingerprintStrategy?: FingerprintStrategy;
+  readonly scaffoldExamples?: (ctx: ScaffoldContext) => readonly ScaffoldFile[];
+  readonly stableExampleIds?: () => readonly string[];
+  readonly scaffoldConfigBlock?: () => string;
+}
+
+/**
  * The contract every first-party, installed, or project-local tool implements
  * (`fitness`, `simulation`, `graph`, …). A tool declares its metadata and
  * `commandSpecs` (the only command surface), and opts into host-owned planes via
@@ -486,6 +517,10 @@ export interface ScaffoldFile {
  * `scaffoldConfigBlock`, ADR-0038). The host (`cli`) loads every tool through the
  * same dynamic-import plugin path; nothing here distinguishes a bundled tool from
  * an installed one (ADR-0027).
+ *
+ * For future evolution of the contract (especially rarer hooks and community
+ * distribution concerns), prefer adding to `extensionPoints` rather than new
+ * top-level members. See `ToolExtensionPoints`.
  */
 export interface Tool {
   readonly metadata: ToolMetadata;
@@ -657,6 +692,15 @@ export interface Tool {
    * it). The host always renders the document header + the `targets:` section.
    */
   readonly scaffoldConfigBlock?: () => string;
+
+  /**
+   * Bag for extension points and rarer/future hooks.
+   *
+   * New concerns should go here (see `ToolExtensionPoints` JSDoc) rather than
+   * additional top-level optionals. This is the evolution path for the Tool
+   * contract.
+   */
+  readonly extensionPoints?: ToolExtensionPoints;
 }
 
 /**
