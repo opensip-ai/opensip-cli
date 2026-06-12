@@ -128,6 +128,14 @@ export function isNativeBindingError(error: unknown): boolean {
   return false;
 }
 
+/**
+ * Build the user-facing message for a data-store open failure, choosing the
+ * remediation that matches the actual cause: a native-binding ABI mismatch
+ * (rebuild the addon — the data is fine) vs a genuine corrupt/permission/
+ * non-writable SQLite file (delete to start fresh) vs an in-memory programming
+ * error. Separated from the throw site so the cause→message mapping is unit
+ * testable without exercising the real binding.
+ */
 export function openFailureMessage(opts: DataStoreOpenOptions, error: unknown): string {
   // A native-binding ABI mismatch is not a corrupt/missing file — telling the
   // user to delete the data store would destroy healthy session history for no
