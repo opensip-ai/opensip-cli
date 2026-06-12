@@ -8,10 +8,12 @@
  * (validate/install/uninstall/data purge).
  */
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
+import { EXIT_CODES, type CommandResult } from '@opensip-tools/contracts';
 import { defineCommand, type CommandSpec } from '@opensip-tools/core';
 
+import { toolsInstall } from './install.js';
 import { toolsList } from './list.js';
+import { toolsUninstall } from './uninstall.js';
 import { runToolValidation } from './validate.js';
 
 import type { CliCommandsContext } from '../shared.js';
@@ -92,7 +94,76 @@ function buildToolsValidateSpec(ctx: CliCommandsContext): HostSpec {
   });
 }
 
+function buildToolsInstallSpec(ctx: CliCommandsContext): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'install',
+    description: 'Validate, then install a tool package (global by default; see tools validate)',
+    commonFlags: ['json'],
+    args: [{ name: 'spec', description: 'npm spec, tarball, or local directory path' }],
+    options: [
+      { flag: '--global', description: 'Install user-global (the default)', default: false },
+      {
+        flag: '--project',
+        description: 'Install into this project’s runtime tool host instead',
+        default: false,
+      },
+    ],
+    scope: 'none',
+    output: 'command-result',
+    handler: async (rawOpts) => {
+      const opts = rawOpts as ScopeFilterOpts & { _args: string[] };
+      if (opts.global === true && opts.project === true) {
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        return {
+          type: 'tools-uninstall',
+          target: opts._args[0] ?? '',
+          success: false,
+          error: '--global and --project are mutually exclusive',
+        } satisfies CommandResult;
+      }
+      const result = await toolsInstall({
+        spec: opts._args[0] ?? '',
+        cwd: effectiveCwd(opts),
+        project: opts.project,
+      });
+      if (!result.success) ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+      return result;
+    },
+  });
+}
+
+function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'uninstall',
+    description: 'Uninstall a tool by id or package name (never deletes project SQLite data)',
+    commonFlags: ['json'],
+    args: [{ name: 'name-or-id', description: 'Tool id or npm package name' }],
+    options: [
+      { flag: '--global', description: 'Target the user-global install', default: false },
+      { flag: '--project', description: 'Target the project-local install', default: false },
+    ],
+    scope: 'none',
+    output: 'command-result',
+    handler: (rawOpts) => {
+      const opts = rawOpts as ScopeFilterOpts & { _args: string[] };
+      const result = toolsUninstall({
+        target: opts._args[0] ?? '',
+        cwd: effectiveCwd(opts),
+        global: opts.global,
+        project: opts.project,
+      });
+      if (!result.success) ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+      return Promise.resolve(result);
+    },
+  });
+}
+
 /** Build the `tools` group's leaf specs (consumed by the group mounter). */
 export function buildToolsGroupLeaves(ctx: CliCommandsContext): readonly HostSpec[] {
-  return [buildToolsListSpec(), buildToolsValidateSpec(ctx)];
+  return [
+    buildToolsListSpec(),
+    buildToolsValidateSpec(ctx),
+    buildToolsInstallSpec(ctx),
+    buildToolsUninstallSpec(ctx),
+  ];
 }

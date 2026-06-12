@@ -74,6 +74,8 @@ export type CommandResult =
   | TextLinesResult
   | ToolsListResult
   | ToolsValidateResult
+  | ToolsInstallResult
+  | ToolsUninstallResult
   | SessionReplayResult
   | HelpResult
   | ErrorResult;
@@ -266,6 +268,36 @@ export interface ToolsValidateResult {
   readonly toolId?: string;
   readonly verdict: 'passed' | 'failed' | 'incomplete';
   readonly sections: readonly ToolsValidateSection[];
+}
+
+/** Outcome of `opensip-tools tools install <spec>` (ADR-0041): stage → validate → activate. */
+export interface ToolsInstallResult {
+  type: 'tools-install';
+  readonly spec: string;
+  readonly success: boolean;
+  /** The requested install scope. */
+  readonly scope: 'global' | 'project';
+  /** The full validation report the activation decision was made on. */
+  readonly validation: ToolsValidateResult;
+  readonly toolId?: string;
+  readonly version?: string;
+  /** Activation-step failure detail (validation failures live in `validation`). */
+  readonly error?: string;
+}
+
+/** Outcome of `opensip-tools tools uninstall <name-or-id>` (ADR-0041). */
+export interface ToolsUninstallResult {
+  type: 'tools-uninstall';
+  /** The id-or-package-name argument as given. */
+  readonly target: string;
+  readonly success: boolean;
+  /** The resolved identity that was removed (displayed before deletion). */
+  readonly removed?: {
+    readonly id: string;
+    readonly packageName: string;
+    readonly scope: 'global' | 'project';
+  };
+  readonly error?: string;
 }
 
 export interface ListChecksResult {

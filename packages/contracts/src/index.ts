@@ -51,6 +51,8 @@ export type {
   ToolsListRow,
   ToolsValidateResult,
   ToolsValidateSection,
+  ToolsInstallResult,
+  ToolsUninstallResult,
   ListChecksResult,
   ListRecipesResult,
   HistorySession,

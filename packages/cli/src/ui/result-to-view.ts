@@ -196,6 +196,26 @@ function viewToolsValidate(result: Extract<CommandResult, { type: 'tools-validat
   return titledLinesView(`Validate ${result.spec}`, lines);
 }
 
+/** `tools install` — activation outcome + the validation report it gated on. */
+function viewToolsInstall(result: Extract<CommandResult, { type: 'tools-install' }>): ViewNode {
+  const head = result.success
+    ? `✓ installed ${result.toolId ?? result.spec}${result.version === undefined ? '' : `@${result.version}`} (${result.scope})`
+    : `✗ install failed for ${result.spec}${result.error === undefined ? '' : ` — ${result.error}`}`;
+  return group([line([{ text: head, bold: true }]), SPACER, viewToolsValidate(result.validation)]);
+}
+
+/** `tools uninstall` — the resolved identity that was (or was not) removed. */
+function viewToolsUninstall(result: Extract<CommandResult, { type: 'tools-uninstall' }>): ViewNode {
+  if (!result.success) {
+    return titledLinesView('Uninstall', [`✗ ${result.error ?? 'uninstall failed'}`]);
+  }
+  const r = result.removed;
+  return titledLinesView('Uninstall', [
+    `✓ removed ${r?.id ?? result.target}${r === undefined ? '' : ` (${r.packageName}, ${r.scope})`}`,
+    'Project SQLite data was NOT touched — use `tools data purge <tool-id>` for that.',
+  ]);
+}
+
 function unknownResultView(result: unknown): ViewNode {
   const type =
     typeof result === 'object' &&
@@ -439,6 +459,12 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'tools-validate': {
       return viewToolsValidate(result);
+    }
+    case 'tools-install': {
+      return viewToolsInstall(result);
+    }
+    case 'tools-uninstall': {
+      return viewToolsUninstall(result);
     }
     case 'plugin-list':
     case 'plugin-add':
