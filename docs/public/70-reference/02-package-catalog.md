@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-11
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
@@ -152,13 +152,13 @@ Imports every layer below. The published binary.
 
 Last verified at v3.0.0 against:
 
-- `packages/` directory listing — **32 publishable packages** total (all at `3.0.0`):
+- `packages/` directory listing — **33 publishable packages** total (all at `3.0.0`), plus one workspace-private test-support package:
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + tree-sitter + cli-ui): 4 — `datastore`, `contracts`, `tree-sitter`, `cli-ui`
-  - Layer 3 (config + session-store + output + dashboard + fitness language adapters): 10 — `config`, `session-store`, `output`, `dashboard`, `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`
+  - Layer 3 (config + targeting + session-store + output + dashboard + fitness language adapters): 11 — `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`
   - Layer 4 Tools: 3 — `fitness`, `simulation`, `graph`
   - Layer 5 (check packs + graph adapter packs/scaffolding): 13 — `checks-universal`, `checks-typescript`, `checks-python`, `checks-java`, `checks-go`, `checks-cpp`, `checks-rust`, `graph-adapter-common`, `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`
   - Layer 6 (composition root): 1 — `cli`
-- v2.0.0 promoted graph language adapters from internal subdirs to publishable npm packages (`@opensip-tools/graph-*`), added `checks-rust` to the bundled check packs, and split `dashboard` and `cli-ui` into peer-layer libraries to keep Tool engines free of UI-kit and rendering dependencies. Since then the tree-sitter graph adapters moved to the WASM `web-tree-sitter` build and grew a shared `@opensip-tools/graph-adapter-common` scaffolding package, the shared `@opensip-tools/tree-sitter` substrate (ADR-0010) was extracted as its own Layer 2 package, `@opensip-tools/config` became the dedicated config composer/schema-registry package (ADR-0023), and `@opensip-tools/targeting` was extracted as the host file-targeting runtime substrate (ADR-0037) (→ 33 packages, plus the workspace-private `@opensip-tools/test-support` below). The fitness language adapters (`@opensip-tools/lang-*`) and the graph language adapters (`@opensip-tools/graph-*`) are unrelated siblings implementing different contracts (`LanguageAdapter` vs. `GraphLanguageAdapter`) — see [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md) for the distinction.
+- v2.0.0 promoted graph language adapters from internal subdirs to publishable npm packages (`@opensip-tools/graph-*`), added `checks-rust` to the bundled check packs, and split `dashboard` and `cli-ui` into peer-layer libraries to keep Tool engines free of UI-kit and rendering dependencies. Since then the tree-sitter graph adapters moved to the WASM `web-tree-sitter` build and grew a shared `@opensip-tools/graph-adapter-common` scaffolding package, the shared `@opensip-tools/tree-sitter` substrate (ADR-0010) was extracted as its own Layer 2 package, `@opensip-tools/config` became the dedicated config composer/schema-registry package (ADR-0023), and `@opensip-tools/targeting` was extracted as the host file-targeting runtime substrate (ADR-0037). The fitness language adapters (`@opensip-tools/lang-*`) and the graph language adapters (`@opensip-tools/graph-*`) are unrelated siblings implementing different contracts (`LanguageAdapter` vs. `GraphLanguageAdapter`) — see [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md) for the distinction.
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.

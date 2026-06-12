@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-09
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Check pack architecture"
 audience: [contributors, plugin-authors]
@@ -78,15 +78,15 @@ The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-tools/blob/v3.
 
 | Pack | Path | Scope |
 |---|---|---|
-| `@opensip-tools/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape), e.g. file-length, TODO scanners, security secret detection. ~90 checks. |
-| `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript/` | TypeScript-specific: complex-function via AST, dead-code detection, dependency rules, react/hook patterns. ~50 checks. |
-| `@opensip-tools/checks-python` | `packages/fitness/checks-python/` | Python-specific. Today ships `no-bare-except`. |
+| `@opensip-tools/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape), e.g. file-length, TODO scanners, security secret detection. 108 checks. |
+| `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript/` | TypeScript-specific: complex-function via AST, dead-code detection, dependency rules, react/hook patterns. 52 checks. |
+| `@opensip-tools/checks-python` | `packages/fitness/checks-python/` | Python-specific. Today ships 2 checks. |
 | `@opensip-tools/checks-java` | `packages/fitness/checks-java/` | Java-specific. Today ships `no-printstacktrace`. |
 | `@opensip-tools/checks-go` | `packages/fitness/checks-go/` | Go-specific. Today ships `no-fmt-print`. |
 | `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp/` | C/C++ via clang-tidy passthrough (`clang-tidy-passthrough`). |
 | `@opensip-tools/checks-rust` | `packages/fitness/checks-rust/` | Rust-specific. Today ships `rust-no-dbg-macro`. |
 
-The per-language packs are intentionally minimal at v2.0 — one canonical check each, exercised by the per-language CI fixtures and by the language adapters' integration tests. They expand as patterns prove worth standardizing across teams.
+The per-language packs vary by maturity: TypeScript has the deepest pack, Python has two checks, and Go/Java/C++/Rust each ship a canonical first-party check. They expand as patterns prove worth standardizing across teams.
 
 Each pack is structured the same way. Inside `src/checks/`, checks live under category directories: `architecture/`, `quality/`, `security/`, `testing/`, `documentation/`, `resilience/`, `performance/`. The categories aren't enforced by the kernel — they're a convention for discoverability.
 
@@ -312,7 +312,7 @@ src/checks/<category>/
 - `@opensip-tools/checks-python` — `no-bare-except`.
 - Project-local `<project>/opensip-tools/fit/checks/` — three custom checks.
 
-The dashboard groups by category (universal pack's display map provides the icons), shows pack-of-origin in the verbose view, and highlights checks with project-level overrides. The CLI's `fit-list` command shows the full inventory: 155 checks across the bundled packs, source-tagged.
+The dashboard groups by category (universal pack's display map provides the icons), shows pack-of-origin in the verbose view, and highlights checks with project-level overrides. The CLI's `fit-list` command shows the full inventory: 166 checks across the bundled packs, source-tagged.
 
 ---
 

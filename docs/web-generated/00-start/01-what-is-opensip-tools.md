@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-12
 release: v3.0.0
 title: "What is opensip-tools?"
 audience: [getting-started, contributors]
@@ -28,7 +28,7 @@ You write the rules. The runner discovers them, runs them across TypeScript / Py
 ```text
 > opensip-tools fit
   Fitness Checks
-  Recipe: default   Checks: 167   Project: ~/work/my-app
+  Recipe: default   Checks: 166   Project: ~/work/my-app
 
   Scanning your codebase for quality, security, and architecture issues.
   ────────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ Exit code is `0` when nothing broke the bar, non-zero when something did. That's
 ## What it does well
 
 - **Architectural rules.** "No module under `packages/cli/` may import from `packages/fitness/checks-*`." Linters can't say this; opensip-tools can, in 15 lines.
-- **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. ~165+ checks ship in the box across seven packs; most are language-agnostic, and the rest target a specific language.
+- **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 166 checks ship in the box across seven packs; most are language-agnostic, and the rest target a specific language.
 - **CI surfacing.** Outputs SARIF for GitHub PR annotations. Baselines for "fail only on *new* violations" so you can adopt incrementally without rewriting the codebase first.
 
 ## What it deliberately isn't
@@ -109,7 +109,8 @@ opensip-tools fit --recipe example
 | If you want to … | Go to … |
 |---|---|
 | See what real fit / sim / graph code looks like | [Show me each loop](/docs/opensip-tools/00-start/02-show-me-the-loops/) |
-| Run the four-command smoke right now | [Quick start](/docs/opensip-tools/00-start/00-quick-start/) |
+| Run the first smoke test right now | [Quick start](/docs/opensip-tools/00-start/00-quick-start/) |
+| Initialize a real repo carefully | [Initialize your first repo](/docs/opensip-tools/60-guides/00-initialize-your-first-repo/) |
 | Learn the vocabulary used across the docs | [Vocabulary](/docs/opensip-tools/00-start/05-vocabulary/) |
 | Understand the runtime layout (what's on disk) | [System context](/docs/opensip-tools/00-start/06-system-context/) |
 | See the high-level architecture map | [Architecture overview](/docs/opensip-tools/00-start/07-architecture-overview/) |

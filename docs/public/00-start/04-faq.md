@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-09
+last_verified: 2026-06-12
 release: v3.0.0
 title: "FAQ"
 audience: [getting-started]
@@ -28,7 +28,7 @@ See [vs. other tools](./03-vs-other-tools.md) for the full comparison.
 
 ### Do I have to write recipes?
 
-**No.** The built-in `default` recipe runs every enabled check. Recipes are useful when you want a named lineup ("`quick-smoke` for pre-commit, `full` for nightly") but they're optional. The four-command quick-start uses the scaffolded `example` recipe just to prove the wiring works.
+**No.** The built-in `default` recipe runs every enabled check. Recipes are useful when you want a named lineup ("`quick-smoke` for pre-commit, `full` for nightly") but they're optional. The quick start uses the scaffolded `example` recipe just to prove the wiring works.
 
 ---
 
@@ -68,7 +68,7 @@ Use the **baseline gate flow.** Run `opensip-tools fit --gate-save` once to capt
 
 ### What languages does it support?
 
-`fit` runs against TypeScript / JavaScript, Python, Rust, Go, Java, and C/C++. Language detection is automatic (looks for `tsconfig.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`, `CMakeLists.txt`). most built-in checks are language-agnostic (the ~110-check `checks-universal` pack); the rest target a specific language pack.
+`fit` runs against TypeScript / JavaScript, Python, Rust, Go, Java, and C/C++. Language detection is automatic (looks for `tsconfig.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`, `CMakeLists.txt`). Most built-in checks are language-agnostic (the 108-check `checks-universal` pack); the rest target a specific language pack.
 
 `graph` ships five language adapters: TypeScript, Python, Rust, Go, Java. The TypeScript adapter uses the TypeScript compiler API; the Python, Go, Rust, and Java adapters parse with vendored web-tree-sitter WASM grammars, so there's no native toolchain or compiler to install for them.
 
@@ -125,5 +125,5 @@ v2.0 swaps internal runtime persistence from JSON files to SQLite. **v2 ignores 
 |---|---|
 | See how opensip-tools compares to alternatives | [vs. other tools](./03-vs-other-tools.md) |
 | See concrete code samples | [Show me each loop](./02-show-me-the-loops.md) |
-| Run the four-command smoke | [Quick start](./00-quick-start.md) |
+| Run the first smoke test | [Quick start](./00-quick-start.md) |
 | Browse all built-in checks | [Checks reference](../70-reference/05-checks-index.md) |

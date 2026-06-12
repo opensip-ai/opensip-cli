@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-08
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Full Tool plugins"
 audience: [plugin-authors]
@@ -13,6 +13,7 @@ related-docs:
   - ./03-publishable-packs.md
   - ../10-concepts/02-tool-plugin-model.md
   - ../70-reference/01-cli-commands.md
+  - ../70-reference/12-tools-command.md
   - ../70-reference/10-environment-variables.md
   - ../../decisions/ADR-0030-authored-tool-discovery.md
 ---
@@ -21,6 +22,8 @@ related-docs:
 A Tool plugin contributes its own subcommand. Use this when you want something fundamentally different from `fit`, `sim`, or `graph` — an `audit-sec`, a `bench`, a custom `report`. Anything that has its own argv shape, its own logic, and its own result type.
 
 This is the heaviest extension shape. Most teams never need it. If you just want to ship rules, [Publishable packs](/docs/opensip-tools/50-extend/03-publishable-packs/) is the right path.
+
+Once a Tool exists as a package, the customer-facing management surface is the [`tools` command group](/docs/opensip-tools/70-reference/12-tools-command/): `tools list`, `tools validate`, `tools install`, `tools uninstall`, and `tools data-purge`.
 
 ## Layout
 
@@ -224,6 +227,7 @@ For your own Tool plugin you don't reuse any of these: you declare each command'
 ## Where to go next
 
 - [**The tool-plugin model**](/docs/opensip-tools/10-concepts/02-tool-plugin-model/) — the architectural seam your Tool plugs into.
+- [**`tools` command**](/docs/opensip-tools/70-reference/12-tools-command/) — list, validate, install, uninstall, and purge data for whole Tool plugins.
 - [**Dashboard**](/docs/opensip-tools/70-reference/06-dashboard/) — the HTML report's lifecycle (the renderer your Tool's findings end up in).
 - [**Package catalog**](/docs/opensip-tools/70-reference/02-package-catalog/) — the packages you can depend on.
 - [**Coding standards**](/docs/opensip-tools/80-implementation/04-coding-standards/) — the style and structure conventions used throughout opensip-tools (handy if you're contributing back).

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-08
+last_verified: 2026-06-12
 release: v3.0.0
 title: "Full Tool plugins"
 audience: [plugin-authors]
@@ -13,6 +13,7 @@ related-docs:
   - ./03-publishable-packs.md
   - ../10-concepts/02-tool-plugin-model.md
   - ../70-reference/01-cli-commands.md
+  - ../70-reference/12-tools-command.md
   - ../70-reference/10-environment-variables.md
   - ../../decisions/ADR-0030-authored-tool-discovery.md
 ---
@@ -21,6 +22,8 @@ related-docs:
 A Tool plugin contributes its own subcommand. Use this when you want something fundamentally different from `fit`, `sim`, or `graph` — an `audit-sec`, a `bench`, a custom `report`. Anything that has its own argv shape, its own logic, and its own result type.
 
 This is the heaviest extension shape. Most teams never need it. If you just want to ship rules, [Publishable packs](./03-publishable-packs.md) is the right path.
+
+Once a Tool exists as a package, the customer-facing management surface is the [`tools` command group](../70-reference/12-tools-command.md): `tools list`, `tools validate`, `tools install`, `tools uninstall`, and `tools data-purge`.
 
 ## Layout
 
@@ -224,6 +227,7 @@ For your own Tool plugin you don't reuse any of these: you declare each command'
 ## Where to go next
 
 - [**The tool-plugin model**](../10-concepts/02-tool-plugin-model.md) — the architectural seam your Tool plugs into.
+- [**`tools` command**](../70-reference/12-tools-command.md) — list, validate, install, uninstall, and purge data for whole Tool plugins.
 - [**Dashboard**](../70-reference/06-dashboard.md) — the HTML report's lifecycle (the renderer your Tool's findings end up in).
 - [**Package catalog**](../70-reference/02-package-catalog.md) — the packages you can depend on.
 - [**Coding standards**](../80-implementation/04-coding-standards.md) — the style and structure conventions used throughout opensip-tools (handy if you're contributing back).
