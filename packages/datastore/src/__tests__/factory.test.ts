@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { isNativeBindingError, openFailureMessage } from '../factory.js';
 import { DataStoreFactory, DataStoreMigrationError } from '../index.js';
 
 let tmp: string;
@@ -114,6 +115,47 @@ describe('DataStoreFactory.open — migrate failure on healthy backend', () => {
       expect(error).toBeInstanceOf(DataStoreMigrationError);
       expect((error as Error).message).toContain('in-memory backend');
     }
+  });
+});
+
+describe('native-binding (ABI mismatch) failures are not reported as corruption', () => {
+  it('isNativeBindingError detects ERR_DLOPEN_FAILED', () => {
+    const e = Object.assign(new Error('dlopen failed'), { code: 'ERR_DLOPEN_FAILED' });
+    expect(isNativeBindingError(e)).toBe(true);
+  });
+
+  it('isNativeBindingError detects the NODE_MODULE_VERSION mismatch text', () => {
+    const e = new Error(
+      'The module was compiled against a different Node.js version using NODE_MODULE_VERSION 127. This version of Node.js requires NODE_MODULE_VERSION 137.',
+    );
+    expect(isNativeBindingError(e)).toBe(true);
+  });
+
+  it('isNativeBindingError scans the cause chain', () => {
+    const root = Object.assign(new Error('dlopen'), { code: 'ERR_DLOPEN_FAILED' });
+    const wrapped = new Error('failed to construct Database', { cause: root });
+    expect(isNativeBindingError(wrapped)).toBe(true);
+  });
+
+  it('isNativeBindingError is false for a genuine corrupt-file error', () => {
+    const e = Object.assign(new Error('file is not a database'), { code: 'SQLITE_NOTADB' });
+    expect(isNativeBindingError(e)).toBe(false);
+    expect(isNativeBindingError(undefined)).toBe(false);
+  });
+
+  it('binding-error message says rebuild, NOT delete the data store', () => {
+    const e = Object.assign(new Error('dlopen failed'), { code: 'ERR_DLOPEN_FAILED' });
+    const msg = openFailureMessage({ backend: 'sqlite', path: 'project/cache.sqlite' }, e);
+    expect(msg).toContain('pnpm rebuild better-sqlite3');
+    expect(msg).toContain('NOT corrupt');
+    expect(msg).not.toContain('Delete');
+  });
+
+  it('a non-binding sqlite open error keeps the delete-to-recover message', () => {
+    const e = Object.assign(new Error('disk image is malformed'), { code: 'SQLITE_CORRUPT' });
+    const msg = openFailureMessage({ backend: 'sqlite', path: 'project/cache.sqlite' }, e);
+    expect(msg).toContain('Delete');
+    expect(msg).not.toContain('pnpm rebuild');
   });
 });
 
