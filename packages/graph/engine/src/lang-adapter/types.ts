@@ -6,13 +6,15 @@
  * authors. Every adapter must satisfy the 9 contract invariants
  * (I-1 through I-9) documented inline on each method.
  *
- * Six methods total:
+ * Six methods total (plus one optional seventh):
  *   1. discoverFiles    — resolve which files belong to the project
  *   2. parseProject     — build adapter-internal parse state
  *   3. walkProject      — emit occurrences + located call-site records
  *   4. resolveCallSites — produce CallEdge[] keyed by owner bodyHash
  *   5. cacheKey         — opaque per-adapter cache invalidation key
  *   6. ruleHints        — optional per-language rule-input hints
+ *   7. scanImports      — OPTIONAL cheap program-free file→file import
+ *                         scan for partition-time use (ADR-0045)
  */
 
 import type {
@@ -235,6 +237,26 @@ export interface CacheKeyInput {
 // the adapter contract surface they pull from `lang-adapter/types.js`.
 export type { RuleHints } from '../types.js';
 
+// ── method 7 (optional) ───────────────────────────────────────────
+
+export interface ScanImportsInput {
+  /** Absolute, realpath-normalized project root (from DiscoverOutput). */
+  readonly projectDirAbs: string;
+  /** The candidate file set — absolute paths; edges outside it are dropped. */
+  readonly files: readonly string[];
+  readonly configPathAbs?: string;
+  /** Adapter-internal compiler options, as produced by discoverFiles. */
+  readonly compilerOptions?: unknown;
+}
+
+export interface ScanImportsOutput {
+  /**
+   * Directed file-level import edges, absolute paths, BOTH endpoints
+   * inside the input `files`. Sorted by (from, to); deduplicated.
+   */
+  readonly edges: ReadonlyArray<readonly [from: string, to: string]>;
+}
+
 // ── the interface ─────────────────────────────────────────────────
 
 export interface GraphLanguageAdapter<P = ParsedProject> {
@@ -258,6 +280,17 @@ export interface GraphLanguageAdapter<P = ParsedProject> {
    */
   resolveCallSites(input: ResolveInput<P>): ResolveOutput | Promise<ResolveOutput>;
   cacheKey(input: CacheKeyInput): string;
+
+  /**
+   * OPTIONAL cheap, program-free import scan for partition-time use
+   * (community shard partitioning, ADR-0045). MUST be deterministic for a
+   * fixed file tree (sorted output) and MUST NOT build a full semantic
+   * program (for TS: no ts.Program). External/bare specifiers resolving
+   * outside `files` are omitted. Adapters that don't implement it leave it
+   * undefined; the engine fails loud (ConfigurationError) when a config
+   * demands a strategy that needs it.
+   */
+  scanImports?(input: ScanImportsInput): ScanImportsOutput;
 
   readonly ruleHints?: RuleHints;
 }
