@@ -31,6 +31,21 @@ const TSCONFIG = JSON.stringify({
   include: ['src/**/*.ts'],
 });
 
+function scanInput(discovered: DiscoverOutput): ScanImportsInput {
+  return {
+    projectDirAbs: discovered.projectDirAbs,
+    files: discovered.files,
+    configPathAbs: discovered.configPathAbs,
+    compilerOptions: discovered.compilerOptions,
+  };
+}
+
+function fileByBasename(discovered: DiscoverOutput, basename: string): string {
+  const match = discovered.files.find((f) => f.endsWith(`/${basename}`));
+  if (match === undefined) throw new Error(`fixture file ${basename} not discovered`);
+  return match;
+}
+
 describe('scanImports', () => {
   let dir: string;
 
@@ -48,7 +63,11 @@ describe('scanImports', () => {
       "export const b = 1;\nexport * from './c.js';\n",
       'utf8',
     );
-    writeFileSync(join(dir, 'src', 'c.ts'), "import { b } from './b.js';\nexport const c = b;\n", 'utf8');
+    writeFileSync(
+      join(dir, 'src', 'c.ts'),
+      "import { b } from './b.js';\nexport const c = b;\n",
+      'utf8',
+    );
     writeFileSync(join(dir, 'src', 'd.ts'), 'export const d = 4;\n', 'utf8');
   });
 
@@ -58,21 +77,6 @@ describe('scanImports', () => {
 
   function discover(): DiscoverOutput {
     return adapter.discoverFiles({ cwd: dir });
-  }
-
-  function scanInput(discovered: DiscoverOutput): ScanImportsInput {
-    return {
-      projectDirAbs: discovered.projectDirAbs,
-      files: discovered.files,
-      configPathAbs: discovered.configPathAbs,
-      compilerOptions: discovered.compilerOptions,
-    };
-  }
-
-  function fileByBasename(discovered: DiscoverOutput, basename: string): string {
-    const match = discovered.files.find((f) => f.endsWith(`/${basename}`));
-    if (match === undefined) throw new Error(`fixture file ${basename} not discovered`);
-    return match;
   }
 
   it('returns exactly the in-set edges, sorted, with externals dropped', () => {
@@ -96,9 +100,10 @@ describe('scanImports', () => {
     const second = scanImports(scanInput(discovered));
     expect(JSON.stringify(second)).toBe(JSON.stringify(first));
 
+    // Descending sort = reversed order for the (sorted) discovery output.
     const reversed = scanImports({
       ...scanInput(discovered),
-      files: [...discovered.files].reverse(),
+      files: [...discovered.files].sort((x, y) => (x < y ? 1 : -1)),
     });
     expect(JSON.stringify(reversed)).toBe(JSON.stringify(first));
   });
@@ -113,11 +118,7 @@ describe('scanImports', () => {
   });
 
   it('detects require-style imports (detectJavaScriptImports)', () => {
-    writeFileSync(
-      join(dir, 'src', 'e.ts'),
-      "const x = require('./b.js');\nvoid x;\n",
-      'utf8',
-    );
+    writeFileSync(join(dir, 'src', 'e.ts'), "const x = require('./b.js');\nvoid x;\n", 'utf8');
     const discovered = discover();
     const e = fileByBasename(discovered, 'e.ts');
     const b = fileByBasename(discovered, 'b.ts');

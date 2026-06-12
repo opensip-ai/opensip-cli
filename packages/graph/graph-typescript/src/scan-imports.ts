@@ -50,7 +50,7 @@ function dedupeSorted(edges: readonly (readonly [string, string])[]): [string, s
   const out: [string, string][] = [];
   for (const [from, to] of sorted) {
     const last = out.at(-1);
-    if (last !== undefined && last[0] === from && last[1] === to) continue;
+    if (last?.[0] === from && last?.[1] === to) continue;
     out.push([from, to]);
   }
   return out;

@@ -254,7 +254,7 @@ export interface ScanImportsOutput {
    * Directed file-level import edges, absolute paths, BOTH endpoints
    * inside the input `files`. Sorted by (from, to); deduplicated.
    */
-  readonly edges: ReadonlyArray<readonly [from: string, to: string]>;
+  readonly edges: readonly (readonly [from: string, to: string])[];
 }
 
 // ── the interface ─────────────────────────────────────────────────
