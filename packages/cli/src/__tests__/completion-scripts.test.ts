@@ -26,7 +26,7 @@ function fixtureInventory(): CompletionInventory {
     ],
     hostSpecs: [
       spec('init', [], ['--language']),
-      spec('uninstall', [], ['-y, --yes', '--dry-run']),
+      spec('uninstall', [], ['-y, --yes', '--dry-run', '--user']),
     ],
     groups: [],
   });

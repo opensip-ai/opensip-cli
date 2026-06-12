@@ -1574,6 +1574,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
+          "description": "Remove user-level config at ~/.opensip-tools/ (default mode)",
+          "flags": "--user",
+          "negate": false,
+          "optional": false,
+          "required": false,
+          "variadic": false,
+        },
+        {
+          "choices": undefined,
+          "defaultValue": false,
           "description": "Skip confirmation prompt",
           "flags": "-y, --yes",
           "negate": false,

@@ -116,6 +116,9 @@ export function currentAdapterRegistry(): GraphAdapterRegistry {
 // ---------------------------------------------------------------------------
 
 /** Pick the adapter for the current run. See `GraphAdapterRegistry.pick`. */
-export function pickAdapter(cwd?: string): GraphLanguageAdapter {
-  return new GraphAdapterSelector(currentAdapterRegistry()).pick({ cwd });
+export function pickAdapter(cwd?: string, language?: string): GraphLanguageAdapter {
+  return new GraphAdapterSelector(currentAdapterRegistry()).pick({
+    ...(cwd === undefined ? {} : { cwd }),
+    ...(language === undefined ? {} : { language }),
+  });
 }

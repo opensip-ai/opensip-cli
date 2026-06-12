@@ -30,7 +30,7 @@
  */
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import { defineCommand, type ProjectContext } from '@opensip-tools/core';
+import { ConfigurationError, defineCommand, type ProjectContext } from '@opensip-tools/core';
 
 import { composeAndWriteDashboard } from '../dashboard-compose.js';
 
@@ -214,6 +214,7 @@ function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
 interface UninstallOpts {
   yes?: boolean;
   dryRun?: boolean;
+  user?: boolean;
   project?: string | boolean;
   purge?: boolean;
   json?: boolean;
@@ -234,6 +235,11 @@ function buildUninstallSpec(): HostSpec {
         default: false,
       },
       {
+        flag: '--user',
+        description: 'Remove user-level config at ~/.opensip-tools/ (default mode)',
+        default: false,
+      },
+      {
         flag: '--project',
         value: '[path]',
         description:
@@ -251,6 +257,9 @@ function buildUninstallSpec(): HostSpec {
     output: 'command-result',
     handler: (rawOpts) => {
       const opts = rawOpts as UninstallOpts;
+      if (opts.user === true && opts.project !== undefined) {
+        throw new ConfigurationError('uninstall: --user and --project are mutually exclusive.');
+      }
       // Commander passes `true` when the flag is present without a value, a
       // string when given a value, or undefined when omitted.
       let project: string | true | undefined;

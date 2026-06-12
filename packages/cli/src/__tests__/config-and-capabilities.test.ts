@@ -207,7 +207,6 @@ describe('composeAndValidateToolConfig', () => {
         'plugins:',
         '  fit: ["@acme/fit-pack"]',
         '  sim: ["@acme/sim-pack"]',
-        '  lang: ["@acme/lang-pack"]',
         '  checkPackages: ["@acme/checks"]',
         '  scenarioPackages: ["@acme/scenarios-load"]',
         '  autoDiscoverScenarios: false',
@@ -227,7 +226,6 @@ describe('composeAndValidateToolConfig', () => {
     expect(result.config?.plugins).toMatchObject({
       fit: ['@acme/fit-pack'],
       sim: ['@acme/sim-pack'],
-      lang: ['@acme/lang-pack'],
       checkPackages: ['@acme/checks'],
       scenarioPackages: ['@acme/scenarios-load'],
       autoDiscoverScenarios: false,
@@ -239,6 +237,7 @@ describe('composeAndValidateToolConfig', () => {
 
   it.each([
     ['unknown plugin key', 'plugins:\n  scenarioPackagez: ["@acme/scenarios-load"]\n'],
+    ['unsupported language plugin key', 'plugins:\n  lang: ["@acme/lang-pack"]\n'],
     ['wrong explicit-list type', 'plugins:\n  graphAdapters: "@acme/graph-cpp"\n'],
     ['wrong auto-discover type', 'plugins:\n  autoDiscoverScenarios: "false"\n'],
   ])('strict-rejects malformed plugins config: %s', (_label, body) => {
