@@ -1,21 +1,19 @@
 /**
- * @fileoverview Target Registry
+ * @fileoverview Fitness Target Registry
  *
- * Registry for target definitions. Provides lookup by name and tags.
+ * The generic register/get/byTag/has substrate moved to
+ * `@opensip-tools/targeting` (ADR-0037, Phase 0). This fitness registry is a
+ * thin **subclass** that adds only the check-domain `findByScope` (languages +
+ * concerns intersection) — `concerns` is a check-scope concept, so it stays in
+ * fitness, not the host substrate.
  *
- * Built on the kernel's unified `Registry<T>` with `silent-skip` —
- * registering a target with a name that's already taken is a no-op
- * (the historical behaviour).
- *
- * The entire targets module uses a synchronous API because target definitions
- * are loaded once at startup from a small YAML config file (via loader.ts) and
- * then held in-memory for fast, repeated lookups throughout the process lifetime.
- * The resolver (resolver.ts) similarly uses synchronous glob expansion. Since the
- * data set is small and bounded by project configuration, async I/O offers no
- * practical benefit and would complicate every call site that queries targets.
+ * Subclassing keeps every fitness call site (`registry.getByName`,
+ * `registry.has`, `registry.getAll`, `registry.findByScope`) working unchanged
+ * while the generic surface lives once, in the substrate.
  */
 
-import { Registry, currentScope, type Registerable } from '@opensip-tools/core';
+import { currentScope } from '@opensip-tools/core';
+import { TargetRegistry as SubstrateTargetRegistry } from '@opensip-tools/targeting';
 
 import type { Target } from './types.js';
 
@@ -31,69 +29,13 @@ function toCanonical(lang: string): string {
   return currentScope()?.languages.canonicalize(lang) ?? lang.toLowerCase();
 }
 
-interface RegisterableTarget extends Registerable {
-  readonly id: string; // same as target.config.name (Target has no id today)
-  readonly name: string;
-  readonly target: Target;
-  readonly tags?: readonly string[];
-}
-
-/** Registry for target definitions with lookup by name and tags. */
-export class TargetRegistry {
-  private readonly inner = new Registry<RegisterableTarget>({
-    module: 'fitness:targets',
-    duplicatePolicy: 'silent-skip',
-    evtPrefix: 'target.registry',
-  });
-
-  /**
-   * Register a target. Silently skips if a target with the same name already exists.
-   * @param target - Target definition to register
-   * @returns This registry instance for chaining
-   */
-  register(target: Target): this {
-    const name = target.config.name;
-    this.inner.register({
-      id: name,
-      name,
-      target,
-      tags: target.config.tags,
-    });
-    return this;
-  }
-
-  /**
-   * Look up a target by its config name.
-   * @param name - Target name to find
-   * @returns The matching target, or undefined if not found
-   */
-  getByName(name: string): Target | undefined {
-    return this.inner.getById(name)?.target;
-  }
-
-  /** Return all registered targets. */
-  getAll(): readonly Target[] {
-    return this.inner.getAll().map((r) => r.target);
-  }
-
-  /**
-   * Return all targets that include the given tag.
-   * @param tag - Tag string to filter by
-   * @returns Targets whose config.tags contain the tag
-   */
-  getByTag(tag: string): readonly Target[] {
-    return this.inner.getByTag(tag).map((r) => r.target);
-  }
-
-  /**
-   * Check whether a target with the given name is registered.
-   * @param name - Target name to check
-   * @returns True if the target exists in the registry
-   */
-  has(name: string): boolean {
-    return this.inner.has(name);
-  }
-
+/**
+ * Fitness target registry: the substrate registry plus the check-domain
+ * scope-matching `findByScope`. IS-A {@link SubstrateTargetRegistry}, so every
+ * generic lookup (`register`/`getByName`/`getAll`/`getByTag`/`has`/`size`/
+ * `clear`) is inherited unchanged.
+ */
+export class TargetRegistry extends SubstrateTargetRegistry {
   /**
    * Find targets whose languages and concerns intersect with the given scope.
    *
@@ -133,15 +75,5 @@ export class TargetRegistry {
 
       return languageMatch && concernMatch;
     });
-  }
-
-  /** Number of registered targets. */
-  get size(): number {
-    return this.inner.size;
-  }
-
-  /** Remove all targets from the registry. */
-  clear(): void {
-    this.inner.clear();
   }
 }

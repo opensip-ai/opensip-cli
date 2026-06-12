@@ -534,6 +534,9 @@ importers:
       '@opensip-tools/session-store':
         specifier: workspace:*
         version: link:../../session-store
+      '@opensip-tools/targeting':
+        specifier: workspace:*
+        version: link:../../targeting
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
