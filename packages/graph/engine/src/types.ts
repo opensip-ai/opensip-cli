@@ -536,12 +536,11 @@ export interface PersistedFeatures {
 
 /**
  * Flat-monorepo synthetic-partition strategy (flat-monorepo-strategy.ts).
- * `'community'` — Louvain over the file-level import graph
- * (community-partition.ts) — is EXPERIMENTAL until ADR-0045's B2 verdict
- * (prototype B1) and requires a TypeScript project (the adapter must
- * implement `scanImports`).
+ * (A fourth 'community' Louvain strategy was prototyped and discarded by
+ * measurement — ADR-0045 B2; recoverable at tag
+ * `prototype/louvain-partitioning`.)
  */
-export type PartitionStrategy = 'directory-depth' | 'file-count-chunks' | 'hybrid' | 'community';
+export type PartitionStrategy = 'directory-depth' | 'file-count-chunks' | 'hybrid';
 
 /** Per-rule and overall configuration knobs. */
 export interface GraphConfig {
@@ -583,8 +582,7 @@ export interface GraphConfig {
   readonly recipe?: string;
   /**
    * Flat-large synthetic-partition strategy override. Absent → the
-   * layout-recommended default ('hybrid'). EXPERIMENTAL until ADR-0045's
-   * B2 verdict; 'community' (added in Phase 2) requires a TS project.
+   * layout-recommended default ('hybrid').
    */
   readonly partitionStrategy?: PartitionStrategy;
   /** Override the inferred entry-point list. */
