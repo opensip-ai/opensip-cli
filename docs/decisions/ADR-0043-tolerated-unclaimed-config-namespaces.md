@@ -25,28 +25,30 @@ enforcement-reason: >
   hard-rejects; (4) host-block keys remain strict.
 ```
 
-**Decision:** Amend the strict-document-validation consequence of ADR-0023:
-a top-level config namespace that no *loaded* tool claims is tolerated with a
-loud per-run warning — naming the namespace, stating that no installed tool
-claims it, and suggesting the nearest claimed namespace when one is
-edit-distance-close — instead of hard-failing the run. Everything else stays
-strict: a namespace claimed by a loaded tool still validates strictly against
-that tool's declared schema, a loaded tool whose namespace exists but who
-declares no `Tool.config` is rejected, and host-owned blocks remain strict.
-This ADR does not supersede ADR-0023 (whose consolidation, precedence, and
-one-reader decisions stand); it relaxes exactly one clause, for exactly one
-reason: with third-party tools, a config block for a
-temporarily-uninstalled tool must not brick every command in the project.
+**Decision:** Make the composer's existing tolerance of unclaimed top-level
+config namespaces *observable and bounded*. Today `composeConfigSchema`
+deliberately tolerates unclaimed top-level keys (`.catchall(z.unknown())`,
+`packages/config/src/composer.ts:81-85` — an ADR-0023 design choice;
+strictness is *within* a claimed namespace) and it tolerates them **silently**
+— `fitnes:` validates cleanly right now. This ADR adds two things: (1) an
+unclaimed top-level namespace produces a loud per-run warning — naming the
+namespace, stating that no loaded tool claims it, and suggesting the nearest
+claimed namespace when one is edit-distance-close; (2) a namespace matching a
+*loaded* tool that declares no `Tool.config` contribution becomes a hard
+rejection (today it falls into the silent catchall). Claimed namespaces stay
+strict; host-owned blocks stay strict. ADR-0023's consolidation, precedence,
+and one-reader decisions stand untouched.
 
 **Alternatives:**
 
-- *Keep full strictness.* Rejected: shared config files travel between
-  machines and teammates with different install sets; one uninstalled tool's
-  block would make the whole CLI unusable in that checkout.
-- *Silent tolerance of unclaimed namespaces.* Rejected: reopens the typo hole
-  strictness exists to close — `fitnes:` would validate cleanly as a
-  "presumably uninstalled tool". The loud did-you-mean warning is the floor
-  that keeps typos observable.
+- *Make unclaimed namespaces a hard error.* Rejected: shared config files
+  travel between machines and teammates with different third-party install
+  sets; one uninstalled tool's block would make the whole CLI unusable in that
+  checkout.
+- *Keep the status-quo silent tolerance.* Rejected: the typo hole is live
+  today — `fitnes:` (and any misspelled namespace) validates silently as if it
+  were an uninstalled tool's block. The loud did-you-mean warning is the floor
+  that makes typos observable without breaking portability.
 - *Require unclaimed namespaces to be declared (`externalTools: [audit]`) for
   warning-free tolerance.* Deferred, not rejected: ships as the Phase 3
   candidate mechanism (decided when admission-time enforcement lands,
@@ -55,18 +57,23 @@ temporarily-uninstalled tool must not brick every command in the project.
 - *Tolerate only namespaces matching a tool id seen in any discovery source.*
   Rejected: couples shared config portability to local install state.
 
-**Rationale:** ADR-0023 chose strict whole-document validation to fail fast on
-typos when the only tools were bundled (always registered, so "unknown
-namespace" could only mean a mistake). Third-party tools break that
-equivalence: unknown now also legitimately means "not installed here". The
-warning-with-suggestion floor preserves the typo signal (loud, named,
-corrective) while removing the bricking failure mode.
+**Rationale:** ADR-0023's within-namespace strictness catches typos *inside* a
+claimed block (`fitness.faliOnErrors` rejects), but a typo'd *namespace* falls
+through the document-level catchall and is silently ignored — the user's
+config simply doesn't apply, with no signal. While the only tools were bundled
+(always registered), every unclaimed namespace was a mistake and the silence
+was at least diagnosable; with third-party tools, unclaimed namespaces become
+legitimate ("not installed here") and the silent path would hide both cases
+equally. The warning-with-suggestion floor separates them: legitimate blocks
+warn once and continue; typos warn with a correction.
 
 **Consequences:**
 
-- The composer's unknown-namespace path changes from reject to
+- The composer's unclaimed-namespace path changes from silent to
   warn-and-continue; the warning is a structured log event plus a stderr line
   so non-TTY/CI runs surface it.
+- The loaded-tool-with-undeclared-namespace case changes from silently
+  tolerated to rejected.
 - `tools uninstall` need not touch project config; a left-behind block warns
   instead of breaking.
 - Phase 3 revisits the declared-`externalTools` mechanism alongside Tier B
