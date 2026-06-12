@@ -51,6 +51,7 @@ describe('registerCliCommands', () => {
       'init',
       'plugin',
       'sessions',
+      'tools',
       'uninstall',
     ]);
   });

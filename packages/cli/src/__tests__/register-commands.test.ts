@@ -131,8 +131,8 @@ describe('documented subcommand-group exceptions', () => {
   // `command-surface-parity` guardrail allow-lists exactly these. This test
   // locks the list AND asserts every named group is actually a mounted
   // action-less parent (no action handler, has sub-subcommands).
-  it('is exactly [sessions, plugin]', () => {
-    expect([...HOST_SUBCOMMAND_GROUPS].sort()).toEqual(['plugin', 'sessions']);
+  it('is exactly [sessions, plugin, tools]', () => {
+    expect([...HOST_SUBCOMMAND_GROUPS].sort()).toEqual(['plugin', 'sessions', 'tools']);
   });
 
   it('each documented group is a mounted parent with sub-subcommands and no own action', () => {

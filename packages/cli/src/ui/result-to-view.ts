@@ -159,6 +159,29 @@ function titledLinesView(title: string | undefined, lines: readonly string[]): V
   return group(children);
 }
 
+/** `tools list` — one aligned row per tool with source/status/shadow facts. */
+function viewToolsList(result: Extract<CommandResult, { type: 'tools-list' }>): ViewNode {
+  if (result.tools.length === 0) {
+    return titledLinesView('Tools', ['(no tools found for this scope)']);
+  }
+  const idWidth = Math.max(...result.tools.map((t) => t.id.length), 4);
+  const versionWidth = Math.max(...result.tools.map((t) => t.version.length), 7);
+  const sourceWidth = Math.max(...result.tools.map((t) => t.source.length), 6);
+  const rows = result.tools.map((t) => {
+    const flags = [
+      t.status === 'manifest-only' ? 'manifest-only' : undefined,
+      t.shadowed === true ? 'shadowed' : undefined,
+    ]
+      .filter((f): f is string => f !== undefined)
+      .join(', ');
+    const commands = t.commands.length > 0 ? t.commands.join(' ') : '—';
+    const suffix = flags.length > 0 ? `  [${flags}]` : '';
+    return `${t.id.padEnd(idWidth)}  ${t.version.padEnd(versionWidth)}  ${t.source.padEnd(sourceWidth)}  ${commands}${suffix}`;
+  });
+  const header = `${'tool'.padEnd(idWidth)}  ${'version'.padEnd(versionWidth)}  ${'source'.padEnd(sourceWidth)}  commands`;
+  return titledLinesView('Tools', [header, ...rows]);
+}
+
 function unknownResultView(result: unknown): ViewNode {
   const type =
     typeof result === 'object' &&
@@ -396,6 +419,9 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'experimental': {
       return viewExperimental(result);
+    }
+    case 'tools-list': {
+      return viewToolsList(result);
     }
     case 'plugin-list':
     case 'plugin-add':

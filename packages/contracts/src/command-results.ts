@@ -72,6 +72,7 @@ export type CommandResult =
   | ConfigureDoneResult
   | UninstallDoneResult
   | TextLinesResult
+  | ToolsListResult
   | SessionReplayResult
   | HelpResult
   | ErrorResult;
@@ -215,6 +216,34 @@ export interface TextLinesResult {
   readonly title?: string;
   /** Pre-composed display lines, one string per line. */
   readonly lines: readonly string[];
+}
+
+/** One row of the `tools list` effective-tool inventory (ADR-0041). */
+export interface ToolsListRow {
+  /** The tool's stable id (from its manifest; package name when unreadable). */
+  readonly id: string;
+  /** npm package name, when the tool is a package install. */
+  readonly packageName?: string;
+  readonly version: string;
+  /** Where the tool comes from, in the user-facing vocabulary. */
+  readonly source: 'bundled' | 'global' | 'project';
+  /** Command names the manifest declares (names only — no runtime is loaded). */
+  readonly commands: readonly string[];
+  /**
+   * `loaded` — admitted by THIS run's bootstrap; `manifest-only` — present on
+   * disk (marker + manifest file read) but not loaded this run. `tools list`
+   * never dynamic-imports a runtime, so this is as much as a listing can know.
+   */
+  readonly status: 'loaded' | 'manifest-only';
+  /** True on a GLOBAL row whose tool id is shadowed by a project-local install. */
+  readonly shadowed?: boolean;
+}
+
+/** Outcome of `opensip-tools tools list` (ADR-0041). */
+export interface ToolsListResult {
+  type: 'tools-list';
+  tools: readonly ToolsListRow[];
+  totalCount: number;
 }
 
 export interface ListChecksResult {

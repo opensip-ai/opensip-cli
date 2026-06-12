@@ -47,6 +47,8 @@ export type {
   GateDoneResult,
   GraphStatusResult,
   TextLinesResult,
+  ToolsListResult,
+  ToolsListRow,
   ListChecksResult,
   ListRecipesResult,
   HistorySession,

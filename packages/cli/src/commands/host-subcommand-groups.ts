@@ -31,6 +31,7 @@ import { executeClear } from './clear.js';
 import { showHistory } from './history.js';
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from './plugin.js';
 import { executeSessionShow } from './session-show.js';
+import { buildToolsGroupLeaves } from './tools/index.js';
 
 import type { CliCommandsContext } from './shared.js';
 import type { DataStore } from '@opensip-tools/datastore';
@@ -327,7 +328,7 @@ export interface HostSubcommandGroup {
  * This is the FINITE, NAMED set the Phase 7 `command-surface-parity` guardrail
  * allow-lists as documented host exceptions. Every other host command IS a spec.
  */
-export const HOST_SUBCOMMAND_GROUPS: readonly string[] = ['sessions', 'plugin'] as const;
+export const HOST_SUBCOMMAND_GROUPS: readonly string[] = ['sessions', 'plugin', 'tools'] as const;
 
 /**
  * Build the subcommand-group parents with their leaf specs. The mounter turns
@@ -350,6 +351,11 @@ export function buildHostSubcommandGroups(ctx: CliCommandsContext): readonly Hos
         buildPluginRemoveSpec(ctx),
         buildPluginSyncSpec(ctx),
       ],
+    },
+    {
+      name: 'tools',
+      description: 'Manage whole Tool plugins (list, validate, install, uninstall)',
+      leaves: buildToolsGroupLeaves(ctx),
     },
   ];
 }

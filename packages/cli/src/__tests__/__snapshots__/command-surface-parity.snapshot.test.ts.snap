@@ -1523,6 +1523,56 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
     {
       "aliases": [],
       "args": [],
+      "name": "tools",
+      "options": [],
+      "subcommands": [
+        {
+          "aliases": [],
+          "args": [],
+          "name": "list",
+          "options": [
+            {
+              "choices": undefined,
+              "defaultValue": false,
+              "description": "Only user-global installed tools",
+              "flags": "--global",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": false,
+              "description": "Output structured JSON",
+              "flags": "--json",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": false,
+              "description": "Only project-local installed tools",
+              "flags": "--project",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+          ],
+          "subcommands": [],
+          "synopsis": "List the effective tool set (bundled, global, and project-local)",
+          "usage": "[options]",
+        },
+      ],
+      "synopsis": "Manage whole Tool plugins (list, validate, install, uninstall)",
+      "usage": "[options] [command]",
+    },
+    {
+      "aliases": [],
+      "args": [],
       "name": "uninstall",
       "options": [
         {
