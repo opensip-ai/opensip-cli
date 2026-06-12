@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 //
-// bench-partition-strategies — the ADR-0045 B1 measurement protocol:
-// `community` vs `hybrid` flat-large partitioning, compared on the metrics
-// the B2 adopt-or-discard gate reads (boundary-call count, shard-size
-// balance, cold wall-time, warm fragment-cache behavior).
+// bench-partition-strategies — flat-large partition strategies compared on
+// boundary-call count, shard-size balance, cold wall-time, and warm
+// fragment-cache behavior. (Built as the ADR-0045 B1 measurement protocol;
+// kept after the B2 discard as the reusable harness for any future
+// partition-strategy experiment.)
 //
 // Drives the REAL CLI end-to-end (no engine-internal re-implementation —
 // same posture as scripts/graph-catalog-diff.mjs): the corpus is a seeded
@@ -27,7 +28,7 @@
 //               record shardsBuilt, revert (+ re-prime so W2b measures
 //               only its own delta).
 //   W2b:        add one import+call to that file, run, record shardsBuilt
-//               (community's headline edit-stability metric), revert.
+//               (the import-edit stability metric), revert.
 //
 // Balance statistics (max/median ratio, coefficient of variation) are
 // computed HERE from the profile's shardSizes — never in the engine (spec).
@@ -48,7 +49,8 @@
 //     [--corpus <dir>]        default: <tmpdir>/opensip-flat-large-fixture
 //     [--files <n>]           fixture size, default 3000 (fixture mode only)
 //     [--fresh]               rm + regenerate the fixture (fixture mode only)
-//     [--strategies hybrid,community]
+//     [--strategies hybrid]       comma list (directory-depth,
+//                             file-count-chunks, hybrid)
 //     [--runs 3]              cold-run repetitions (median reported)
 //     [--concurrency 4]       fixed for equal conditions
 //     [--demote <rules>]      comma list of graph rules to demote to warning
@@ -64,9 +66,9 @@
 //                             ZERO-floor budget written into the corpus
 //                             (.config/graph-equivalence-budget.json). A
 //                             non-zero exit = divergence = mechanically a bug
-//                             in the prototype — the bench fails hard; never
-//                             budget around it. Hybrid runs too (the control
-//                             proving the harness itself is sound).
+//                             in the strategy under test — the bench fails
+//                             hard; never budget around it. Hybrid runs too
+//                             (the control proving the harness is sound).
 //     [--quick]               files=2600, runs=1 (sanity mode)
 //
 // Run `pnpm build` first — the script REQUIRES a fresh build and refuses to
@@ -79,7 +81,7 @@ import { basename, dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
-const KNOWN_STRATEGIES = new Set(['directory-depth', 'file-count-chunks', 'hybrid', 'community']);
+const KNOWN_STRATEGIES = new Set(['directory-depth', 'file-count-chunks', 'hybrid']);
 /** Equal-heap conditions for every child run (also what the exact oracle needs). */
 const CHILD_NODE_OPTIONS = '--max-old-space-size=12288';
 
@@ -102,7 +104,7 @@ const { values: args } = parseArgs({
     corpus: { type: 'string' },
     files: { type: 'string' },
     fresh: { type: 'boolean', default: false },
-    strategies: { type: 'string', default: 'hybrid,community' },
+    strategies: { type: 'string', default: 'hybrid' },
     runs: { type: 'string' },
     concurrency: { type: 'string', default: '4' },
     demote: { type: 'string', default: 'graph:high-blast-untested' },
@@ -313,10 +315,10 @@ function pickEditTarget(files, clusterCount) {
  * (sorted order; tests excluded so the edit is representative of production
  * cache behavior), probe-import the first production file whose first two
  * path segments differ from the edit target's (far away in directory terms,
- * so the new import edge plausibly crosses a community boundary). The W2b
+ * so the new import edge plausibly crosses a partition boundary). The W2b
  * probe is a NAMESPACE import + use — valid against any module without
- * knowing its export names; it changes the import graph (what community
- * partitioning consumes) even though it is not a call.
+ * knowing its export names; it changes the import graph even though it is
+ * not a call.
  */
 function pickRealEditTargets(files) {
   const production = files.filter(
