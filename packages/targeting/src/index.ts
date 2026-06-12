@@ -1,1 +1,1 @@
-export {};
+export { TargetRegistry } from './target-registry.js';
