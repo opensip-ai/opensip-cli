@@ -34,6 +34,32 @@ export interface StoredSession {
    * Tool-owned opaque per-session detail. `contracts` treats this as
    * `unknown` and never inspects it; the producing tool owns and validates
    * its shape. Absent for tools that persist no detail.
+   *
+   * ## Inner payload versioning convention
+   *
+   * All tools (first-party and third-party) MUST stamp new payloads they
+   * persist with a top-level numeric `"__version": N` (double-underscore
+   * prefix signals infrastructure, not user data). Start at `1` for the
+   * current shape.
+   *
+   * The host (contracts / session-store / datastore) stays ignorant of tool
+   * shapes — only the producing tool owns the semantics of its version.
+   * The structural decoder tolerates legacy payloads (missing `__version`
+   * treated as v1 / legacy with `fidelity: 'projection'`).
+   *
+   * Example of a versioned tool payload (illustrative v1):
+   * ```json
+   * {
+   *   "__version": 1,
+   *   "summary": { "total": 42, "passed": 40, "failed": 2, "errors": 1, "warnings": 1 },
+   *   "checks": [ ... ]
+   * }
+   * ```
+   *
+   * - Additive / optional fields: safe, no version bump required.
+   * - Breaking (remove/rename/ reinterpret required field, change shapes
+   *   that replay code depends on): bump `__version` + follow documented
+   *   deprecation window (see extending guide and ADR-0050).
    */
   readonly payload?: unknown;
 }
