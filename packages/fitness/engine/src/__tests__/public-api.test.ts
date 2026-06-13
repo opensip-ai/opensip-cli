@@ -51,6 +51,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'stripStringsAndComments',
   'stripStringsAndCommentsPreservingPositions',
   'tool',
+  'FITNESS_CONTRACT_VERSION',
 ].sort();
 
 describe('@opensip-cli/fitness public barrel', () => {

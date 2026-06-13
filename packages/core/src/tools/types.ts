@@ -1,4 +1,4 @@
-// @fitness-ignore-file file-length-limit -- the canonical Tool plugin contract: one cohesive interface (metadata, commands, commandSpecs, initialize, contributeScope, collectReportData, config, capabilityRegistrars, sessionReplay) whose every member carries load-bearing JSDoc. The slots are the contract surface; splitting the single interface across files would fragment the one type tools implement. Grew past the 400-line soft limit with the 2.10.0 config + capability slots (ADR-0023 / §5.3).
+// @fitness-ignore-file file-length-limit -- the canonical Tool plugin contract: one cohesive interface (metadata, commands, commandSpecs, initialize, contributeScope, collectReportData, config, capabilityRegistrars, sessionReplay, contractVersion) whose every member carries load-bearing JSDoc. The slots are the contract surface; splitting the single interface across files would fragment the one type tools implement. Grew past the 400-line soft limit with the config + capability slots (ADR-0023 / §5.3).
 /**
  * Tool plugin contract.
  *
@@ -16,7 +16,7 @@
  *     `--help` listings and conflict detection).
  *   - The actual subcommand wiring is host-owned: the tool declares typed
  *     `commandSpecs` and the host's `mountCommandSpec` mounts each one
- *     (3.0.0 GA — `register()` and the raw-Commander `program` handle were
+ *     (1.0.0 launch — `register()` and the raw-Commander `program` handle were
  *     removed; "one command surface", §8).
  *
  * The two-field shape (commands[] for metadata; commandSpecs for the typed
@@ -43,6 +43,35 @@ import type { Signal } from '../types/signal.js';
 // `tools/types.ts → lib/run-scope.ts` edge — the former RunScope⟷Tool
 // type cycle is gone (audit 2026-05-29, M4). A plain top-level
 // `import type` is safe: scope-types is a leaf with no edge back here.
+
+/**
+ * The current version of the `Tool` plugin contract.
+ *
+ * Tool authors may optionally set `contractVersion: TOOL_CONTRACT_VERSION`
+ * (or a string matching a future version) on their exported `Tool` object.
+ *
+ * ## Versioning Policy (ADR-0046)
+ *
+ * - `TOOL_CONTRACT_VERSION` is bumped **only** when the shape or documented
+ *   semantics of the `Tool` interface (or the `ToolExtensionPoints` contract)
+ *   actually change in a way that could affect tool authors.
+ * - When a contract change ships, the value is set to the major.minor of the
+ *   CLI release in which the change is first released (e.g. a breaking contract
+ *   change released as part of CLI v1.2.0 results in
+ *   `TOOL_CONTRACT_VERSION = '1.2'`).
+ * - Releases that do not touch the Tool contract leave the constant at its
+ *   previous value (it will frequently lag the CLI version — this is
+ *   intentional).
+ * - The primary evolution mechanism remains `extensionPoints` (see below and
+ *   the `Tool` interface JSDoc). `contractVersion` is a marker only.
+ *
+ * The host can use the declared value for diagnostics, logging
+ * ("tool X was written against contract vY"), future compatibility warnings,
+ * or ratcheting in the plugin loader / compatibility gate.
+ *
+ * See ADR-0046 for the full policy, alternatives considered, and enforcement.
+ */
+export const TOOL_CONTRACT_VERSION = '1.0.0';
 
 /** Static descriptor for a tool plugin: id, semver, and one-line description. */
 export interface ToolMetadata {
@@ -186,7 +215,7 @@ type WireSignalEnvelope = unknown;
  * rendering, machine-output emit seams, report auto-open, structured logging,
  * per-run scope — without depending on the CLI package directly.
  *
- * 3.0.0 GA: this context carries NO Commander `program`. Tools declare
+ * 1.0.0 launch: this context carries NO Commander `program`. Tools declare
  * `commandSpecs` and the host mounts them (`mountCommandSpec`); a handler has no
  * raw-Commander handle to reach, so the "one command surface" invariant (§8) is
  * structural, not merely guarded. The host owns the program internally and passes
@@ -309,7 +338,7 @@ export interface ToolCliContext {
    */
   readonly emitEnvelope: (envelope: WireSignalEnvelope) => void;
   /**
-   * Emit a **structured error** as machine-output (release 2.12.0, §5.5). The
+   * Emit a **structured error** as machine-output (launch, §5.5). The
    * host wraps `{ message, exitCode, suggestion? }` in a `status:'error'`
    * `CommandOutcome` (`.errors`) through the single `renderOutcome` seam, and
    * threads `exitCode` to `setExitCode` so the process exit and the reported
@@ -332,6 +361,21 @@ export interface ToolCliContext {
      */
     readonly code?: string;
   }) => void;
+  /**
+   * Emit a **raw, unwrapped** value as machine-output for a command that
+   * declares `output:'raw-stream'` (north-star §5.5). Unlike `emitJson`/
+   * `emitEnvelope`/`emitError` — which wrap the payload in the outer
+   * `CommandOutcome` currency — this writes the bare value as a single compact
+   * JSON line, the smallest possible response for agents (e.g. `sessions show
+   * --raw`: session metadata + envelope + hints, no wrapper).
+   *
+   * It is a deliberate, declared opt-out of the one-outcome shape, NOT a bypass:
+   * the single sanctioned write still lives in the host's one stdout-JSON seam
+   * (`renderRaw` in render-outcome), so no command body hand-rolls
+   * `process.stdout.write(JSON.stringify(...))`. A command without
+   * `output:'raw-stream'` should use `emitJson` instead.
+   */
+  readonly emitRaw: (value: unknown) => void;
   /**
    * Deliver a tool-run **signal envelope** to the effectful sinks the
    * composition root owns (ADR-0011 / ADR-0008): best-effort cloud sync via
@@ -438,8 +482,8 @@ export interface ToolCliContext {
    * H3: Entitlements/Licensing/Paid-Extension State).
    *
    * See:
-   * - docs/plans/specs/host-owned-governance-entitlements-audit-plane.md (lightweight spec)
-   * - docs/plans/ready/host-owned-governance-entitlements-audit-plane/ (full plan)
+   * - the "Host-Owned Governance, Entitlements & Audit Plane" spec + plan
+   *   (local-only working docs under docs/plans/, by that title)
    * - ADR-0042 (toolState baseline this reuses)
    *
    * Design: typed seams here (host provides the impl), opaque/namespaced storage under the
@@ -466,7 +510,8 @@ export interface ToolCliContext {
  *   - use the existing `toolState` seam directly for custom records, or
  *   - supply compatible objects (the host will prefer a supplied implementation when present).
  *
- * See the governing spec docs/plans/specs/host-planes-scope-seams-hygiene.md for the flexibility story.
+ * See the governing "Host-Planes / Scope-Seams Hygiene" spec (local-only
+ * working doc under docs/plans/, by that title) for the flexibility story.
  */
 export interface HostGovernance {
   /** Read the current governance state blob for a tool (installed/enabled/block/approvals). */
@@ -485,16 +530,32 @@ export interface HostGovernance {
   ): Promise<boolean>;
 }
 
+/**
+ * Host-owned audit plane (hostPlanes.audit). Tools append per-tool audit
+ * entries and query them back; the host persists them (Cloud primary, OSS
+ * compat via tool_state). Cloud may additionally chain entries into its
+ * WORM/tamper-evident log via {@link HostAudit.exportForCloud}.
+ */
 export interface HostAudit {
+  /** Append one audit entry for `toolId` (host persists it). */
   append(toolId: string, entry: ToolAuditEntry): Promise<void>;
+  /** Read back `toolId`'s audit entries, optionally narrowed by `filter`. */
   query(toolId: string, filter?: unknown): Promise<ToolAuditEntry[]>;
   /** Best-effort linkage point for Cloud's WORM/tamper-evident audit chain. */
   exportForCloud?(...args: unknown[]): Promise<unknown>;
 }
 
+/**
+ * Host-owned entitlements plane (hostPlanes.entitlements). Tools check whether
+ * an action is licensed, record usage for metering, and read the current
+ * license state. OSS hosts may supply permissive compat implementations.
+ */
 export interface HostEntitlements {
+  /** Resolve the entitlement status for `toolId` (optionally for a specific `action`). */
   check(toolId: string, action?: string): Promise<EntitlementStatus>;
+  /** Record a usage event for `toolId` (metering / quota accounting). */
   recordUsage(toolId: string, usage: UsageRecord): Promise<void>;
+  /** Read the current license state for `toolId`, or `undefined` if unknown. */
   getLicenseState(toolId: string): Promise<LicenseState | undefined>;
 }
 
@@ -509,12 +570,19 @@ export interface HostEntitlements {
  * evolution path.
  */
 export type ToolGovernanceState = Record<string, unknown>;
+/** Opaque record describing a tool installation (host/Cloud-interpreted). */
 export type InstallationRecord = Record<string, unknown>;
+/** Opaque record of an install/enable approval decision (host/Cloud-interpreted). */
 export type ApprovalDecision = Record<string, unknown>;
+/** Opaque governance audit entry recorded via {@link HostGovernance.queryAudit}. */
 export type AuditEntry = Record<string, unknown>;
+/** Opaque per-tool audit entry appended/queried via {@link HostAudit}. */
 export type ToolAuditEntry = Record<string, unknown>;
+/** Opaque entitlement-check result returned by {@link HostEntitlements.check}. */
 export type EntitlementStatus = Record<string, unknown>;
+/** Opaque usage event recorded via {@link HostEntitlements.recordUsage}. */
 export type UsageRecord = Record<string, unknown>;
+/** Opaque license-state snapshot returned by {@link HostEntitlements.getLicenseState}. */
 export type LicenseState = Record<string, unknown>;
 
 /**
@@ -589,24 +657,24 @@ export interface ScaffoldFile {
 }
 
 /**
- * Bag for extension points and optional hooks (rarer or future concerns).
+ * Bag for extension points and rarer/future hooks.
  *
- * New extension points (especially around scaffolding, additional capability
- * declarations, distribution metadata for community, etc.) should be added
- * here rather than as additional top-level optional members on the main `Tool`
- * interface.
+ * ## Why this bag exists (discoverability)
  *
- * This keeps the primary Tool surface focused on stable identity + command
- * surface (metadata, commands, pluginLayout, commandSpecs) while providing a
- * clear evolution path for the extensibility story (private tools today →
- * community tomorrow, per the product ecosystem vision).
+ * The main `Tool` interface is deliberately kept as "one cohesive interface"
+ * that every tool author implements. To prevent it from becoming a god
+ * interface over time, **new or experimental concerns should be added here**
+ * rather than as new top-level optional members.
  *
- * See ADR-0027 / ADR-0038 context and the second-pass architecture review
- * (GA blocker #3).
+ * This is the official evolution path for the Tool contract.
  *
- * Tools can declare participation in the host-owned governance/entitlements/audit
- * plane here (or via the reserved `distribution` / `extensionMetadata` manifest
- * fields) for discoverability by the host, Cloud, and community catalog.
+ * ## What belongs here
+ * - Optional lifecycle hooks (initialize, contributeScope, etc.)
+ * - Future capabilities, community distribution metadata, etc.
+ * - Host-plane participation declarations (governance / audit / entitlements)
+ *
+ * See the JSDoc on the `Tool` interface for the recommended grouping and
+ * the "Evolution Path" guidance. Also see ADR-0027 and ADR-0038.
  */
 export interface ToolExtensionPoints {
   readonly initialize?: () => Promise<void>;
@@ -621,32 +689,70 @@ export interface ToolExtensionPoints {
   readonly scaffoldExamples?: (ctx: ScaffoldContext) => readonly ScaffoldFile[];
   readonly stableExampleIds?: () => readonly string[];
   readonly scaffoldConfigBlock?: () => string;
+
+  // Per-tool contract versions (ADR-0047). Each tool may declare its own
+  // e.g. fitnessContractVersion, graphContractVersion, etc. These live here
+  // (the evolution bag) rather than on the main Tool interface so the core
+  // contract stays narrow while per-tool surfaces can evolve independently.
+  readonly fitnessContractVersion?: string;
+  // (Other tools add theirs when they adopt per-tool versioning.)
 }
 
 /**
  * The contract every first-party, installed, or project-local tool implements
- * (`fitness`, `simulation`, `graph`, …). A tool declares its metadata and
- * `commandSpecs` (the only command surface), and opts into host-owned planes via
- * optional hooks — session replay, capability discovery, fingerprinting, and the
- * `init`-scaffold seam (`pluginLayout` + `scaffoldExamples` + `stableExampleIds` +
- * `scaffoldConfigBlock`, ADR-0038). The host (`cli`) loads every tool through the
- * same dynamic-import plugin path; nothing here distinguishes a bundled tool from
- * an installed one (ADR-0027).
+ * (`fitness`, `simulation`, `graph`, …).
  *
- * For future evolution of the contract (especially rarer hooks and community
- * distribution concerns), prefer adding to `extensionPoints` rather than new
- * top-level members. See `ToolExtensionPoints`.
+ * A tool declares its metadata and `commandSpecs` (the **only** command surface).
+ * The host (`cli`) loads every tool through the same dynamic-import plugin path;
+ * nothing here distinguishes a bundled tool from an installed one (ADR-0027).
  *
- * Tools may declare participation in the combined host-owned governance,
- * entitlements and audit plane (H1-H3) via `extensionPoints` or the reserved
- * manifest fields. The host provides the `hostPlanes` seams on ToolCliContext.
+ * ## Contract Structure (for discoverability)
+ *
+ * The surface is intentionally one cohesive interface (see top-of-file comment).
+ * It is organized into these logical groups:
+ *
+ * ### Stable Core Surface (most tools will implement these)
+ * - `metadata`, `commands`, `pluginLayout`, `commandSpecs`
+ *
+ * ### Lifecycle & Host Integration (optional)
+ * - `initialize`, `contributeScope`, `collectReportData`, `sessionReplay`,
+ *   `config`, `capabilityRegistrars`, `fingerprintStrategy`
+ *
+ * ### Scaffolding / `init` support (ADR-0038)
+ * - `scaffoldExamples`, `stableExampleIds`, `scaffoldConfigBlock`
+ *
+ * ### Evolution Path (strongly preferred for new concerns)
+ * - `extensionPoints` (see `ToolExtensionPoints` below)
+ *
+ * ## Future-Proofing
+ *
+ * Use the exported `TOOL_CONTRACT_VERSION` in your `contractVersion` field
+ * when you author a tool. New or experimental capabilities should go into
+ * `extensionPoints` rather than new top-level members.
+ *
+ * The host provides typed seams on `ToolCliContext` (including the typed
+ * `hostPlanes` bag for governance/audit/entitlements).
  */
 export interface Tool {
+  // ── Core Identity ──────────────────────────────────────────────────────
   readonly metadata: ToolMetadata;
+
+  /**
+   * Optional marker for which version of the Tool contract this
+   * implementation was authored against.
+   *
+   * Recommended usage:
+   *   contractVersion: TOOL_CONTRACT_VERSION
+   *
+   * See the exported `TOOL_CONTRACT_VERSION` constant for rationale and
+   * future evolution notes. This field is purely advisory for now.
+   */
+  readonly contractVersion?: string;
+
   /**
    * Metadata for every command this tool contributes. Used for --help
    * listings and conflict detection. Actual handlers are mounted by
-   * register().
+   * the host.
    */
   readonly commands: readonly ToolCommandDescriptor[];
   /**
@@ -659,7 +765,7 @@ export interface Tool {
    */
   readonly pluginLayout?: PluginLayout;
   /**
-   * Declarative command surface (release 2.11.0, north-star §5.4). The
+   * Declarative command surface (launch, north-star §5.4). The
    * PREFERRED way a tool contributes commands: it returns one
    * {@link CommandSpec} per subcommand and the host's `mountCommandSpec`
    * (cli, Phase 1) translates each into a wired Commander command — the tool
@@ -669,7 +775,7 @@ export interface Tool {
    * `defineCommand<TOpts, ToolCliContext>(...)`.
    *
    * The host mounts each spec via `mountCommandSpec` (the ONLY command surface
-   * as of 3.0.0 — `register()` was removed). A tool that declares no
+   * as of launch — `register()` was removed). A tool that declares no
    * `commandSpecs` contributes no commands (a mis-declaration the host surfaces
    * loudly via `cli.tool.no_command_surface`).
    *
@@ -753,7 +859,7 @@ export interface Tool {
    */
   readonly sessionReplay?: ToolSessionReplayContribution;
   /**
-   * Optional namespaced config contribution (release 2.10.0, ADR-0023). A
+   * Optional namespaced config contribution (launch, ADR-0023). A
    * tool owning a top-level block (`graph:`/`fitness:`/`simulation:`) declares
    * its Zod schema here as a `ToolConfigDeclaration` (from
    * `@opensip-cli/config`). The composition root composes every tool's
@@ -764,7 +870,7 @@ export interface Tool {
    */
   readonly config?: ToolConfigContribution;
   /**
-   * Optional capability-domain registrars (release 2.10.0, §5.3), keyed by
+   * Optional capability-domain registrars (launch, §5.3), keyed by
    * domain id. A tool that DECLARES domains in its manifest
    * (`ToolPluginManifest.capabilities`) supplies the REAL registrar for each
    * here. The host registers each manifest domain with a deferred placeholder,

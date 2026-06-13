@@ -290,6 +290,18 @@ distinct from:
   the bench harness (`bench:partition`), flat-large fixture generator,
   `graph.partitionStrategy` knob, and profile shard metrics were kept; the
   full prototype is recoverable at tag `prototype/louvain-partitioning`
+- [ADR-0046](./ADR-0046-tool-contract-versioning-policy.md) —
+  **Tool contract version is bumped only on real contract changes** and takes
+  the major.minor of the CLI release in which the change ships (e.g. a
+  contract-breaking change released in v1.2.0 sets `TOOL_CONTRACT_VERSION =
+  '1.2'`). Releases with no `Tool` interface or `ToolExtensionPoints` semantic
+  change leave the constant untouched. Enforcement is via this ADR + JSDoc
+  requirements + a fitness architecture check.
+- [ADR-0047](./ADR-0047-per-tool-contract-versioning.md) —
+  **Per-tool contract versions** (FITNESS_CONTRACT_VERSION, GRAPH_..., etc.)
+  for the rich domain surfaces, separate from the core TOOL_CONTRACT_VERSION bus
+  marker. Each tool declares its version; independent evolution + ratcheting
+  while keeping the generic Tool contract narrow and stable.
 
 ### Superseded
 

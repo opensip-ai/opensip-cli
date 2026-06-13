@@ -26,6 +26,10 @@
 // ── Check authoring API ────────────────────────────────────────────
 export { defineCheck } from './framework/define-check.js';
 export { defineRegexListCheck } from './framework/define-regex-list-check.js';
+
+// Per-tool contract version (ADR-0047). Re-exported from the tool module
+// (the single source of truth) so check packs and authors can import it.
+export { FITNESS_CONTRACT_VERSION } from './tool.js';
 export type {
   RegexListCheckPattern,
   RegexListCheckOptions,

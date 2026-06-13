@@ -50,7 +50,6 @@
 import { readPackageVersion } from '@opensip-cli/core';
 
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
-import { collectFitnessReportData } from './cli/report-data.js';
 import {
   fitBaselineExportCommandSpec,
   fitListCommandSpec,
@@ -59,6 +58,7 @@ import {
 import { buildFitCommandSpec, FIT_LIVE_VIEW_KEY } from './cli/fit/fit-command-spec.js';
 import { renderFitLive } from './cli/fit-runner.js';
 import { fitRunWorkerCommandSpec } from './cli/fit-worker.js';
+import { collectFitnessReportData } from './cli/report-data.js';
 import { fitnessConfigDeclaration } from './config/fitness-config-schema.js';
 import {
   createCheckRegistry,
@@ -218,6 +218,19 @@ function contributeScope(): ScopeContribution {
 }
 
 // =============================================================================
+// Per-tool contract version (ADR-0047)
+// =============================================================================
+
+/**
+ * Per-tool contract version for the fitness-specific surface
+ * (defineCheck, analysis modes, check packs, recipes, etc.).
+ * Independent of the core TOOL_CONTRACT_VERSION (the generic Tool bus).
+ * Bumped only on actual changes to this surface; value = major.minor of the
+ * CLI release shipping the change (see ADR-0047).
+ */
+export const FITNESS_CONTRACT_VERSION = '1.0.0';
+
+// =============================================================================
 // EXPORT
 // =============================================================================
 
@@ -267,5 +280,13 @@ export const fitnessTool: Tool = {
     // strictly needed today. Left as a no-op so fitness has somewhere
     // to hang future tool-startup work (eager check-pack discovery,
     // catalog warming, etc.) without requiring a contract change.
+  },
+  // ADR-0047: per-tool contract version for the fitness-specific surface
+  // (defineCheck, analysis modes, check packs, recipes, etc.). This is
+  // independent of the core TOOL_CONTRACT_VERSION (the generic Tool bus).
+  // Declared here so agent-catalog, compatibility logic, and external
+  // fitness pack authors can see the exact surface this tool was written against.
+  extensionPoints: {
+    fitnessContractVersion: FITNESS_CONTRACT_VERSION,
   },
 };
