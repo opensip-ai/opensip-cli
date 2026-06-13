@@ -6,10 +6,10 @@ import { SessionReplayRegistry } from '../session-replay-registry.js';
 import type { CliCommandsContext } from './shared.js';
 import type { CommandResult, StoredSession, ToolSessionReplay } from '@opensip-cli/contracts';
 import type { ToolShortId } from '@opensip-cli/core';
+import { currentScope, SystemError } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 export interface ExecuteSessionShowOptions {
-  readonly datastore: DataStore;
   readonly replayRegistry?: SessionReplayRegistry;
   readonly ref: string;
   readonly tool?: ToolShortId;
@@ -27,7 +27,23 @@ export interface ExecuteSessionShowOptions {
 }
 
 export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promise<void> {
-  const resolved = resolveSession(opts.datastore, { ref: opts.ref, tool: opts.tool });
+  const scope = currentScope();
+  if (!scope) {
+    throw new SystemError(
+      'executeSessionShow called before RunScope was entered. ' +
+        'All host command paths (including sessions show) must run inside an entered scope ' +
+        '(pre-action-hook constructs and enters; see host-planes-scope-seams-hygiene plan Phase 2).',
+      { code: 'SYSTEM.SCOPE.NOT_ENTERED' }
+    );
+  }
+  const datastore = scope.datastore();
+  if (datastore == null) {
+    throw new SystemError(
+      'Datastore not available via scope for session show (project scope commands must have an open datastore thunk).',
+      { code: 'SYSTEM.SCOPE.DATASTORE_UNAVAILABLE' }
+    );
+  }
+  const resolved = resolveSession(datastore as DataStore, { ref: opts.ref, tool: opts.tool });
   if (!resolved.ok) {
     await emitSessionShowError(opts, resolved.reason, resolved.detail);
     return;

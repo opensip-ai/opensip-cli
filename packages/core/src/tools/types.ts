@@ -450,36 +450,52 @@ export interface ToolCliContext {
    * All members are optional so this change is purely additive for GA-era code and stubs.
    */
   readonly hostPlanes?: {
-    governance?: {
-      /** Read the current governance state blob for a tool (installed/enabled/block/approvals). */
-      getGovernanceState(toolId: string): Promise<ToolGovernanceState | undefined>;
-      listForProject(projectRoot: string): Promise<ToolGovernanceState[]>;
-      queryAudit(toolId: string, filter?: unknown): Promise<AuditEntry[]>;
-
-      recordInstallation(toolId: string, record: InstallationRecord): Promise<void>;
-      recordApprovalDecision(toolId: string, decision: ApprovalDecision): Promise<void>;
-      setBlock(toolId: string, blocked: boolean, reason?: string): Promise<void>;
-
-      /** Enforcement helper (used by run paths or Cloud before acting on a tool). */
-      checkAllowed(
-        toolId: string,
-        action: 'install' | 'enable' | 'run-remediation' | 'run-simulation',
-      ): Promise<boolean>;
-    };
-
-    audit?: {
-      append(toolId: string, entry: ToolAuditEntry): Promise<void>;
-      query(toolId: string, filter?: unknown): Promise<ToolAuditEntry[]>;
-      /** Best-effort linkage point for Cloud's WORM/tamper-evident audit chain. */
-      exportForCloud?(...args: unknown[]): Promise<unknown>;
-    };
-
-    entitlements?: {
-      check(toolId: string, action?: string): Promise<EntitlementStatus>;
-      recordUsage(toolId: string, usage: UsageRecord): Promise<void>;
-      getLicenseState(toolId: string): Promise<LicenseState | undefined>;
-    };
+    governance?: HostGovernance;
+    audit?: HostAudit;
+    entitlements?: HostEntitlements;
   };
+}
+
+/**
+ * Stable (but minimal) interfaces for the host-provided governance / audit / entitlements planes.
+ * These are defined in core so that both the host (CLI) and consumers (Cloud, future community tools)
+ * have a single source of truth.
+ *
+ * Cloud is the primary consumer. Third-party / OSS tool authors may:
+ *   - ignore the bag entirely, or
+ *   - use the existing `toolState` seam directly for custom records, or
+ *   - supply compatible objects (the host will prefer a supplied implementation when present).
+ *
+ * See the governing spec docs/plans/specs/host-planes-scope-seams-hygiene.md for the flexibility story.
+ */
+export interface HostGovernance {
+  /** Read the current governance state blob for a tool (installed/enabled/block/approvals). */
+  getGovernanceState(toolId: string): Promise<ToolGovernanceState | undefined>;
+  listForProject(projectRoot: string): Promise<ToolGovernanceState[]>;
+  queryAudit(toolId: string, filter?: unknown): Promise<AuditEntry[]>;
+
+  recordInstallation(toolId: string, record: InstallationRecord): Promise<void>;
+  recordApprovalDecision(toolId: string, decision: ApprovalDecision): Promise<void>;
+  setBlock(toolId: string, blocked: boolean, reason?: string): Promise<void>;
+
+  /** Enforcement helper (used by run paths or Cloud before acting on a tool). */
+  checkAllowed(
+    toolId: string,
+    action: 'install' | 'enable' | 'run-remediation' | 'run-simulation',
+  ): Promise<boolean>;
+}
+
+export interface HostAudit {
+  append(toolId: string, entry: ToolAuditEntry): Promise<void>;
+  query(toolId: string, filter?: unknown): Promise<ToolAuditEntry[]>;
+  /** Best-effort linkage point for Cloud's WORM/tamper-evident audit chain. */
+  exportForCloud?(...args: unknown[]): Promise<unknown>;
+}
+
+export interface HostEntitlements {
+  check(toolId: string, action?: string): Promise<EntitlementStatus>;
+  recordUsage(toolId: string, usage: UsageRecord): Promise<void>;
+  getLicenseState(toolId: string): Promise<LicenseState | undefined>;
 }
 
 /**

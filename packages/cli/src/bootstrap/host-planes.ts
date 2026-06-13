@@ -14,7 +14,7 @@
  */
 import { ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 
-import type { Logger, ToolCliContext } from '@opensip-cli/core';
+import type { HostGovernance, HostAudit, HostEntitlements, Logger, ToolCliContext } from '@opensip-cli/core';
 
 /**
  * Build the hostPlanes bag.
@@ -48,109 +48,115 @@ export function buildHostPlanes(opts: {
     getRepo().put(toolId, key, value);
   };
 
+  const governanceImpl: HostGovernance = {
+    async getGovernanceState(toolId: string) {
+      await Promise.resolve();
+      return readBlob<Record<string, unknown>>(toolId, 'governance');
+    },
+    async listForProject(_projectRoot: string) {
+      await Promise.resolve();
+      // First-cut: the host (or future Cloud) would index; here we return empty.
+      // Real listing can be added by scanning known tools or a meta index key.
+      return [];
+    },
+    async queryAudit(toolId: string, _filter?: unknown) {
+      await Promise.resolve();
+      const entries = readBlob<Record<string, unknown>[]>(toolId, 'audit') ?? [];
+      return entries;
+    },
+    async recordInstallation(toolId: string, record: unknown) {
+      const current = readBlob<Record<string, unknown>>(toolId, 'governance') ?? {};
+      writeBlob(toolId, 'governance', {
+        ...current,
+        installed: true,
+        lastInstallation: record,
+        updatedAt: Date.now(),
+      });
+      if (log) log.debug({ evt: 'cli.governance.install-recorded', tool: toolId });
+      await Promise.resolve();
+    },
+    async recordApprovalDecision(toolId: string, decision: unknown) {
+      const current = readBlob<Record<string, unknown>>(toolId, 'governance') ?? {};
+      const approvals = (current.approvals as unknown[] | undefined) ?? [];
+      writeBlob(toolId, 'governance', {
+        ...current,
+        approvals: [...approvals, decision],
+        updatedAt: Date.now(),
+      });
+      await Promise.resolve();
+    },
+    async setBlock(toolId: string, blocked: boolean, reason?: string) {
+      const current = readBlob<Record<string, unknown>>(toolId, 'governance') ?? {};
+      writeBlob(toolId, 'governance', {
+        ...current,
+        blocked,
+        blockReason: reason,
+        updatedAt: Date.now(),
+      });
+      await Promise.resolve();
+    },
+    async checkAllowed(toolId: string, _action: unknown) {
+      await Promise.resolve();
+      const state = readBlob<Record<string, unknown>>(toolId, 'governance') ?? {};
+      // Default allow for tools without explicit governance record (additive).
+      return !state.blocked;
+    },
+  };
+
+  const auditImpl: HostAudit = {
+    async append(toolId: string, entry: unknown) {
+      const current: Record<string, unknown>[] = readBlob(toolId, 'audit') ?? [];
+      const withTs = { ...(entry as Record<string, unknown>), ts: Date.now() };
+      const next = [...current, withTs];
+      // Simple (no chunking yet). If over cap the underlying repo will throw
+      // ValidationError — matches the spec's "chunk if needed" escape hatch.
+      writeBlob(toolId, 'audit', next);
+      if (log) log.debug({ evt: 'cli.audit.append', tool: toolId });
+      await Promise.resolve();
+    },
+    async query(toolId: string, _filter?: unknown) {
+      await Promise.resolve();
+      return readBlob<Record<string, unknown>[]>(toolId, 'audit') ?? [];
+    },
+    async exportForCloud(..._args: unknown[]) {
+      await Promise.resolve();
+      // Best-effort hook. Real Cloud sync will use existing deliverSignals
+      // or a dedicated path. For now just return the current log.
+      const entries =
+        readBlob<Record<string, unknown>[]>((_args[0] as string) || '', 'audit') ?? [];
+      return { entries };
+    },
+  };
+
+  const entitlementsImpl: HostEntitlements = {
+    async check(toolId: string, _action?: string) {
+      await Promise.resolve();
+      const state = readBlob<Record<string, unknown>>(toolId, 'entitlements') ?? {};
+      // Default entitled for anything not explicitly recorded (GA additive).
+      if (!state || Object.keys(state).length === 0) {
+        return { entitled: true, source: 'default' };
+      }
+      return state;
+    },
+    async recordUsage(toolId: string, usage: unknown) {
+      const current = readBlob<Record<string, unknown>>(toolId, 'entitlements') ?? {};
+      writeBlob(toolId, 'entitlements', {
+        ...current,
+        lastUsage: usage,
+        updatedAt: Date.now(),
+      });
+      await Promise.resolve();
+    },
+    async getLicenseState(toolId: string) {
+      await Promise.resolve();
+      const state = readBlob<Record<string, unknown>>(toolId, 'entitlements') ?? {};
+      return state.license as Record<string, unknown> | undefined;
+    },
+  };
+
   return {
-    governance: {
-      async getGovernanceState(toolId: string) {
-        await Promise.resolve();
-        return readBlob<Record<string, unknown>>(toolId, 'governance');
-      },
-      async listForProject(_projectRoot: string) {
-        await Promise.resolve();
-        // First-cut: the host (or future Cloud) would index; here we return empty.
-        // Real listing can be added by scanning known tools or a meta index key.
-        return [];
-      },
-      async queryAudit(toolId: string, _filter?: unknown) {
-        await Promise.resolve();
-        const entries = readBlob<Record<string, unknown>[]>(toolId, 'audit') ?? [];
-        return entries;
-      },
-      async recordInstallation(toolId: string, record: unknown) {
-        const current = readBlob<Record<string, unknown>>(toolId, 'governance') ?? {};
-        writeBlob(toolId, 'governance', {
-          ...current,
-          installed: true,
-          lastInstallation: record,
-          updatedAt: Date.now(),
-        });
-        if (log) log.debug({ evt: 'cli.governance.install-recorded', tool: toolId });
-        await Promise.resolve();
-      },
-      async recordApprovalDecision(toolId: string, decision: unknown) {
-        const current = readBlob<Record<string, unknown>>(toolId, 'governance') ?? {};
-        const approvals = (current.approvals as unknown[] | undefined) ?? [];
-        writeBlob(toolId, 'governance', {
-          ...current,
-          approvals: [...approvals, decision],
-          updatedAt: Date.now(),
-        });
-        await Promise.resolve();
-      },
-      async setBlock(toolId: string, blocked: boolean, reason?: string) {
-        const current = readBlob<Record<string, unknown>>(toolId, 'governance') ?? {};
-        writeBlob(toolId, 'governance', {
-          ...current,
-          blocked,
-          blockReason: reason,
-          updatedAt: Date.now(),
-        });
-        await Promise.resolve();
-      },
-      async checkAllowed(toolId: string, _action: unknown) {
-        await Promise.resolve();
-        const state = readBlob<Record<string, unknown>>(toolId, 'governance') ?? {};
-        // Default allow for tools without explicit governance record (additive).
-        return !state.blocked;
-      },
-    },
-    audit: {
-      async append(toolId: string, entry: unknown) {
-        const current: Record<string, unknown>[] = readBlob(toolId, 'audit') ?? [];
-        const withTs = { ...(entry as Record<string, unknown>), ts: Date.now() };
-        const next = [...current, withTs];
-        // Simple (no chunking yet). If over cap the underlying repo will throw
-        // ValidationError — matches the spec's "chunk if needed" escape hatch.
-        writeBlob(toolId, 'audit', next);
-        if (log) log.debug({ evt: 'cli.audit.append', tool: toolId });
-        await Promise.resolve();
-      },
-      async query(toolId: string, _filter?: unknown) {
-        await Promise.resolve();
-        return readBlob<Record<string, unknown>[]>(toolId, 'audit') ?? [];
-      },
-      async exportForCloud(..._args: unknown[]) {
-        await Promise.resolve();
-        // Best-effort hook. Real Cloud sync will use existing deliverSignals
-        // or a dedicated path. For now just return the current log.
-        const entries =
-          readBlob<Record<string, unknown>[]>((_args[0] as string) || '', 'audit') ?? [];
-        return { entries };
-      },
-    },
-    entitlements: {
-      async check(toolId: string, _action?: string) {
-        await Promise.resolve();
-        const state = readBlob<Record<string, unknown>>(toolId, 'entitlements') ?? {};
-        // Default entitled for anything not explicitly recorded (GA additive).
-        if (!state || Object.keys(state).length === 0) {
-          return { entitled: true, source: 'default' };
-        }
-        return state;
-      },
-      async recordUsage(toolId: string, usage: unknown) {
-        const current = readBlob<Record<string, unknown>>(toolId, 'entitlements') ?? {};
-        writeBlob(toolId, 'entitlements', {
-          ...current,
-          lastUsage: usage,
-          updatedAt: Date.now(),
-        });
-        await Promise.resolve();
-      },
-      async getLicenseState(toolId: string) {
-        await Promise.resolve();
-        const state = readBlob<Record<string, unknown>>(toolId, 'entitlements') ?? {};
-        return state.license as Record<string, unknown> | undefined;
-      },
-    },
+    governance: governanceImpl,
+    audit: auditImpl,
+    entitlements: entitlementsImpl,
   };
 }

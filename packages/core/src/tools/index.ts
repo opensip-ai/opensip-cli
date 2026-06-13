@@ -19,6 +19,10 @@ export type {
   ToolSessionReplayContribution,
   LiveViewRenderer,
   ToolExtensionPoints,
+  // Typed host planes (hygiene plan Phase 0)
+  HostGovernance,
+  HostAudit,
+  HostEntitlements,
 } from './types.js';
 export { UnknownLiveViewError } from './types.js';
 export { ToolRegistry } from './registry.js';
