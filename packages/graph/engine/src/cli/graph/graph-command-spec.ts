@@ -1,5 +1,5 @@
 /**
- * graph-command-spec — the declarative primary `graph` command (release 2.11.0
+ * graph-command-spec — the declarative primary `graph` command (launch
  * Phase 5 Task 5.1).
  *
  * Replaces graph's hand-rolled `registerGraphCommand()` body: the host mounts
@@ -174,7 +174,7 @@ async function dispatchGraphLiveView(
  * lifted verbatim to a spec handler. Returns `void`: the host (`raw-stream`)
  * renders nothing, so the handler keeps full ownership of the
  * list-files/live/static dispatch, the `--sarif` write, the cloud egress, and
- * the exit-code decision — byte-identical to 2.10.0.
+ * the exit-code decision — byte-identical to launch.
  */
 async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   const opts = rawOpts as GraphCommandOptions;
@@ -424,7 +424,7 @@ function sessionReplayResult(
 }
 
 /**
- * The declarative primary `graph` command (release 2.11.0 Phase 5 Task 5.1).
+ * The declarative primary `graph` command (launch Phase 5 Task 5.1).
  * The host mounts this spec, applies the ADR-0021 common flags + graph's options
  * + the `[paths...]` variadic argument, and invokes {@link runGraphCommand}.
  */

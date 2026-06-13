@@ -438,10 +438,7 @@ export default tseslint.config(
   // (dogfood fit:ci gate).
   // ---------------------------------------------------------------------------
   {
-    files: [
-      'packages/cli/src/commands/**/*.ts',
-      'packages/cli/src/**/*.ts',
-    ],
+    files: ['packages/cli/src/commands/**/*.ts', 'packages/cli/src/**/*.ts'],
     ignores: [
       'packages/cli/src/**/__tests__/**',
       'packages/cli/src/**/*.test.ts',
@@ -457,6 +454,8 @@ export default tseslint.config(
       'packages/cli/src/commands/clear.ts', // confirmation prompts and pre-prompt notes (human TTY UX, not run output; has explicit comment)
       'packages/cli/src/commands/completion.ts', // completion script writer (sanctioned output for the completion command)
       'packages/cli/src/commands/render-outcome.ts', // host implementation of the --json emit* seams (the actual machine output write)
+      'packages/cli/src/commands/uninstall.ts', // interactive TTY UX: readline confirmation prompt + human-readable removal-progress notes via an injectable writer (defaulted to stdout), not machine run output (same category as clear.ts/configure.ts)
+      'packages/cli/src/commands/tools/runtime-probe-entry.ts', // child-process probe entry: writes the probe-report JSON to stdout as the private parent↔child IPC wire (runtime-probe.ts parses it), not user-facing run output
     ],
     rules: {
       'no-restricted-properties': [
@@ -476,12 +475,14 @@ export default tseslint.config(
         {
           object: 'console',
           property: 'info',
-          message: 'See process.stdout / console.log restriction (only blessed ToolCliContext seams for output).',
+          message:
+            'See process.stdout / console.log restriction (only blessed ToolCliContext seams for output).',
         },
         {
           object: 'console',
           property: 'debug',
-          message: 'See process.stdout / console.log restriction (only blessed ToolCliContext seams for output).',
+          message:
+            'See process.stdout / console.log restriction (only blessed ToolCliContext seams for output).',
         },
       ],
       'no-restricted-imports': [
@@ -490,13 +491,21 @@ export default tseslint.config(
           paths: [
             {
               name: './cli-context.js',
-              importNames: ['getCurrentRegistriesForScope', 'setCurrentRunScope', 'markScopeEntered'],
+              importNames: [
+                'getCurrentRegistriesForScope',
+                'setCurrentRunScope',
+                'markScopeEntered',
+              ],
               message:
                 'Pre-scope holder symbols are test-only (or internal to bootstrap) after hygiene Phase 3. Handlers must use currentScope() (after enterScope) and the blessed methods on the ToolCliContext they receive.',
             },
             {
               name: '../cli-context.js',
-              importNames: ['getCurrentRegistriesForScope', 'setCurrentRunScope', 'markScopeEntered'],
+              importNames: [
+                'getCurrentRegistriesForScope',
+                'setCurrentRunScope',
+                'markScopeEntered',
+              ],
               message:
                 'Pre-scope holder symbols are test-only (or internal to bootstrap) after hygiene Phase 3. Handlers must use currentScope() (after enterScope) and the blessed methods on the ToolCliContext they receive.',
             },

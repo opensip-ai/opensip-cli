@@ -16,10 +16,7 @@
 import { RunScope, runWithScope } from '@opensip-cli/core';
 import { GraphAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import { simulationTool } from '@opensip-cli/simulation';
-import {
-  SimulationRecipeRegistry,
-  createScenarioRegistry,
-} from '@opensip-cli/simulation/internal';
+import { SimulationRecipeRegistry, createScenarioRegistry } from '@opensip-cli/simulation/internal';
 import { describe, expect, it } from 'vitest';
 
 import type { GraphLanguageAdapter } from '@opensip-cli/graph';

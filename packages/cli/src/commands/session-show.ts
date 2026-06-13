@@ -1,4 +1,5 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
+import { currentScope, SystemError } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { SessionReplayRegistry } from '../session-replay-registry.js';
@@ -6,7 +7,6 @@ import { SessionReplayRegistry } from '../session-replay-registry.js';
 import type { CliCommandsContext } from './shared.js';
 import type { CommandResult, StoredSession, ToolSessionReplay } from '@opensip-cli/contracts';
 import type { ToolShortId } from '@opensip-cli/core';
-import { currentScope, SystemError } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 export interface ExecuteSessionShowOptions {
@@ -21,7 +21,13 @@ export interface ExecuteSessionShowOptions {
   readonly render: CliCommandsContext['render'];
   /** Success machine-output seam — wraps the value in a `CommandOutcome`. */
   readonly emitJson: (value: unknown) => void;
-  /** Structured-error machine-output seam (2.12.0, §5.5). */
+  /**
+   * RAW_STREAM seam — emits the bare, unwrapped payload (the `--raw` agent
+   * path). The host binds this to `ctx.emitRaw`; the actual stdout write lives
+   * in the single `renderRaw` seam, not here.
+   */
+  readonly emitRaw: (value: unknown) => void;
+  /** Structured-error machine-output seam (launch, §5.5). */
   readonly emitError: CliCommandsContext['emitError'];
   readonly setExitCode: CliCommandsContext['setExitCode'];
 }
@@ -33,14 +39,14 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
       'executeSessionShow called before RunScope was entered. ' +
         'All host command paths (including sessions show) must run inside an entered scope ' +
         '(pre-action-hook constructs and enters; see host-planes-scope-seams-hygiene plan Phase 2).',
-      { code: 'SYSTEM.SCOPE.NOT_ENTERED' }
+      { code: 'SYSTEM.SCOPE.NOT_ENTERED' },
     );
   }
   const datastore = scope.datastore();
   if (datastore == null) {
     throw new SystemError(
       'Datastore not available via scope for session show (project scope commands must have an open datastore thunk).',
-      { code: 'SYSTEM.SCOPE.DATASTORE_UNAVAILABLE' }
+      { code: 'SYSTEM.SCOPE.DATASTORE_UNAVAILABLE' },
     );
   }
   const resolved = resolveSession(datastore as DataStore, { ref: opts.ref, tool: opts.tool });
@@ -94,12 +100,13 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
 
     if (opts.raw) {
       // Raw mode for agents: emit the core payload directly (bypassing the
-      // standard CommandResult {kind, status, data, ...} wrapper produced by
-      // the higher-level outcome assembly for 'command-result' outputs).
-      // This gives the smallest possible machine response containing the
-      // session metadata + (filtered) envelope + hints.
-      // @fitness-ignore-file only-documented-toolcli-seams, no-direct-stdout-in-tool-engine -- this is the implementation of the declared RAW_STREAM output mode for the 'sessions show' command spec (see host-subcommand-groups.ts); it is a host seam, not a bypass.
-      process.stdout.write(JSON.stringify(jsonPayload) + '\n');
+      // standard CommandOutcome {kind, status, data, ...} wrapper). This gives
+      // the smallest possible machine response containing the session metadata +
+      // (filtered) envelope + hints. The declared RAW_STREAM output mode for the
+      // 'sessions show' command spec (see host-subcommand-groups.ts) is backed by
+      // the host `emitRaw` seam — the actual stdout write lives in `renderRaw`,
+      // so this body routes through a documented seam, not a raw stdout bypass.
+      opts.emitRaw(jsonPayload);
       opts.setExitCode(0);
       return;
     }
@@ -110,6 +117,13 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
   await opts.render(
     sessionReplayResult(resolved.session, filteredReplay, opts.filters, originalSignalCount),
   );
+}
+
+/** Sort rank for `top:N` severity ordering: high (0) before medium (1) before low (2). */
+function severityRank(severity: string): number {
+  if (severity === 'high') return 0;
+  if (severity === 'medium') return 1;
+  return 2;
 }
 
 /**
@@ -140,15 +154,14 @@ function applyFiltersToReplay(
   // Apply top:N (last filter wins for simplicity; or take min if multiple).
   const topFilter = filters.find((f) => f.startsWith('top:'));
   if (topFilter) {
-    const n = parseInt(topFilter.split(':')[1] || '0', 10);
-    if (n > 0) {
+    const n = Number.parseInt(topFilter.split(':')[1] || '0', 10);
+    if (Number.isFinite(n) && n > 0) {
       // Re-sort for "top": high first, then medium, low, preserving original relative order.
       signals = signals
         .map((s, i) => ({ s, i }))
         .sort((a, b) => {
-          const sevOrder = (sev: string) => (sev === 'high' ? 0 : sev === 'medium' ? 1 : 2);
-          const so = sevOrder(a.s.severity) - sevOrder(b.s.severity);
-          return so !== 0 ? so : a.i - b.i;
+          const so = severityRank(a.s.severity) - severityRank(b.s.severity);
+          return so === 0 ? a.i - b.i : so;
         })
         .slice(0, n)
         .map((x) => x.s);
@@ -172,13 +185,33 @@ function applyFiltersToReplay(
  * we attach agent metadata (counts + filtersApplied). The outer session
  * verdict (score/passed) always reflects the *original* stored run.
  */
+/**
+ * Agent-ergonomics metadata attached when `--filter` narrowed the envelope:
+ * which filters ran + the original/returned signal counts. Absent (all fields
+ * undefined → spread to nothing) when no filter was applied.
+ */
+interface AgentFilterMeta {
+  readonly filtersApplied?: string[];
+  readonly originalSignalCount?: number;
+  readonly returnedSignalCount?: number;
+}
+
+function agentFilterMeta(
+  returnedSignalCount: number,
+  filters?: string[],
+  originalSignalCount?: number,
+): AgentFilterMeta {
+  if (!filters?.length || originalSignalCount == null) return {};
+  return { filtersApplied: filters, originalSignalCount, returnedSignalCount };
+}
+
 function sessionReplayResult(
   session: StoredSession,
   replay: ToolSessionReplay<CommandResult>,
   filters?: string[],
   originalSignalCount?: number,
 ): CommandResult {
-  const base: any = {
+  return {
     type: 'session-replay',
     session: {
       id: session.id,
@@ -191,15 +224,8 @@ function sessionReplayResult(
     },
     envelope: replay.envelope,
     fidelity: replay.fidelity,
+    ...agentFilterMeta(replay.envelope.signals.length, filters, originalSignalCount),
   };
-
-  if (filters?.length && originalSignalCount != null) {
-    base.filtersApplied = filters;
-    base.originalSignalCount = originalSignalCount;
-    base.returnedSignalCount = replay.envelope.signals.length;
-  }
-
-  return base;
 }
 
 function sessionShowJson(
@@ -208,7 +234,7 @@ function sessionShowJson(
   filters?: string[],
   originalSignalCount?: number,
 ): unknown {
-  const base: any = {
+  return {
     session: {
       id: session.id,
       tool: session.tool,
@@ -221,15 +247,8 @@ function sessionShowJson(
     },
     fidelity: replay.fidelity,
     envelope: replay.envelope,
+    ...agentFilterMeta(replay.envelope.signals.length, filters, originalSignalCount),
   };
-
-  if (filters?.length && originalSignalCount != null) {
-    base.filtersApplied = filters;
-    base.originalSignalCount = originalSignalCount;
-    base.returnedSignalCount = replay.envelope.signals.length;
-  }
-
-  return base;
 }
 
 async function emitSessionShowError(

@@ -15,7 +15,7 @@ export const EXIT_CODES = {
   CHECK_NOT_FOUND: 3,
   REPORT_FAILED: 4,
   /**
-   * A plugin was rejected by the compatibility gate (release 2.8.0) — its
+   * A plugin was rejected by the compatibility gate (launch) — its
    * declared `apiVersion` is out of range and it was explicitly requested
    * (fail-closed; the skip path is silent). Dedicated rather than reusing
    * `CONFIGURATION_ERROR` so an incompatible plugin is diagnosable from the

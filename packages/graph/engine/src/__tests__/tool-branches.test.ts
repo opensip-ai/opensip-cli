@@ -94,6 +94,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     render,
     setExitCode,
     emitJson: vi.fn(),
+    emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),

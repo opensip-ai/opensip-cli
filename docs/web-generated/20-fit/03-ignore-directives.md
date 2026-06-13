@@ -136,7 +136,7 @@ opensip fit --gate-save                # capture today's reality into .runtime/d
 opensip fit --gate-compare             # CI gate from now on
 ```
 
-In v2 the baseline lives in `<project>/opensip-cli/.runtime/datastore.sqlite` (gitignored). For CI to share a baseline across runs, upload that file as a workflow artifact on main-branch builds and download it before `--gate-compare` on PR builds — see [`10-concepts/05-architecture-gate.md#ci-integration-patterns`](/docs/opensip-cli/10-concepts/05-architecture-gate/#ci-integration-patterns).
+The baseline lives in `<project>/opensip-cli/.runtime/datastore.sqlite` (gitignored). For CI to share a baseline across runs, upload that file as a workflow artifact on main-branch builds and download it before `--gate-compare` on PR builds — see [`10-concepts/05-architecture-gate.md#ci-integration-patterns`](/docs/opensip-cli/10-concepts/05-architecture-gate/#ci-integration-patterns).
 
 ### When NOT to directive
 

@@ -39,7 +39,7 @@ export interface RecipeUnitConfigSlot {
 }
 
 /**
- * The resolved, validated tool configuration for this run (release 2.10.0,
+ * The resolved, validated tool configuration for this run (launch,
  * ADR-0023, Phase 4). `namespace -> { key -> value }`, where each top-level
  * key is a tool's namespace (`graph`/`fitness`/`simulation`) after the host
  * composed every tool's contributed schema, validated the document STRICT,

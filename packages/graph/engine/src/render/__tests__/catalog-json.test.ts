@@ -69,7 +69,7 @@ function catalogOf(occs: readonly FunctionOccurrence[]): Catalog {
 const provenance = {
   runId: 'run-1',
   completeness: 'complete' as const,
-  engineVersion: '2.0.0',
+  engineVersion: '1.0.0',
   startedAt: '2026-06-01T00:00:00.000Z',
   completedAt: '2026-06-01T00:00:01.000Z',
   tenantId: 't1',

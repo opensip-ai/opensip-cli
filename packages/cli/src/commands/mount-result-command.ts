@@ -99,7 +99,7 @@ async function emit<TOpts>(
  * the imperative `mountResultCommand` route a `CommandResult` through ONE point
  * instead of duplicating the json-short-circuit / `render` decision.
  *
- * 2.12.0 (§5.5): the result is wrapped in a `CommandOutcome` (`.data`, or
+ * launch (§5.5): the result is wrapped in a `CommandOutcome` (`.data`, or
  * `.errors` for an `ErrorResult`) and serialized through the single
  * `renderOutcome` seam. `--json` emits the whole outcome; human mode renders the
  * inner result through the supplied renderer — byte-identical to the prior human

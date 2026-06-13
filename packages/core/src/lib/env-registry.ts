@@ -1,6 +1,6 @@
 /**
  * EnvRegistry — a governed registry of environment variables (north-star §5.12,
- * release 2.12.0).
+ * launch).
  *
  * Environment variables are a user-facing configuration surface, but today they
  * are read inline (`process.env.X`) across ~half a dozen packages with no
@@ -8,7 +8,7 @@
  * deprecation path. `EnvRegistry` is the single seam every env read flows through:
  * a tool/host declares an {@link EnvVarSpec} (canonical name, aliases, coercion,
  * default, docs, deprecation), and all reads go through {@link EnvRegistry.get}.
- * The `env-via-registry` guardrail (2.12.0) then fails CI on any raw `process.env`
+ * The `env-via-registry` guardrail (launch) then fails CI on any raw `process.env`
  * access outside this module.
  *
  * Layering / state: this is a KERNEL observability primitive, beside `logger` and

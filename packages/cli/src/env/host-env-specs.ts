@@ -1,5 +1,5 @@
 /**
- * host-env-specs — the CLI's environment-variable surface (release 2.12.0, §5.12).
+ * host-env-specs — the CLI's environment-variable surface (launch, §5.12).
  *
  * The env surface is governed exactly like the config document: every variable is
  * declared as an immutable {@link EnvVarSpec} and read through the {@link EnvRegistry}
@@ -55,7 +55,7 @@ export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
     docs:
       'Comma-separated bundled-tool ids (fitness/simulation/graph) to NOT load as bundled. ' +
       'A skipped tool can instead be loaded from an installed/project-local package of the same id ' +
-      '— the install-source-independence escape hatch (3.0.0). Unset = load all bundled tools.',
+      '— the install-source-independence escape hatch. Unset = load all bundled tools.',
   },
   {
     canonical: 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
@@ -85,15 +85,16 @@ export const hostEnv = new EnvRegistry(CLI_ENV_SPECS);
  * Env vars a BUNDLED TOOL reads through its own `EnvRegistry`, documented here
  * at the composition root for the env-surface reference.
  *
- * 3.0.0 GA: the host no longer statically imports a tool package (e.g.
- * `GRAPH_ENV_SPECS` from `@opensip-cli/graph`) — that would couple the host to
- * a tool runtime and break the install-source-independence the `no-bootstrap-tool-import`
- * guardrail enforces. The tool keeps OWNING the runtime read (its registry, its
- * coercion); the composition root names the variable for documentation only, the
- * same way it already documents the graph-related `NODE_OPTIONS` below. The
- * `host-env-specs` drift test asserts this list stays a superset of each bundled
- * tool's actual specs (e.g. graph's `GRAPH_ENV_SPECS`), so a tool adding an env
- * var fails CI until it is documented here.
+ * The host does not statically import tool packages just to read env specs
+ * (e.g. `GRAPH_ENV_SPECS` from `@opensip-cli/graph`) — that would couple the
+ * host to a tool runtime and break the install-source-independence the
+ * `no-bootstrap-tool-import` guardrail enforces. The tool keeps OWNING the
+ * runtime read (its registry, its coercion); the composition root names the
+ * variable for documentation only, the same way it already documents the
+ * graph-related `NODE_OPTIONS` below. The `host-env-specs` drift test asserts
+ * this list stays a superset of each bundled tool's actual specs (e.g. graph's
+ * `GRAPH_ENV_SPECS`), so a tool adding an env var fails CI until it is
+ * documented here.
  */
 export const BUNDLED_TOOL_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
   {

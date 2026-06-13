@@ -1,6 +1,7 @@
+// @fitness-ignore-file file-length-limit -- deliberate single cycle-free leaf module: it houses BOTH host subcommand groups' leaf specs (sessions + plugin) AND the completion inventory together specifically because it must import neither completion.ts nor host-command-specs.ts (see header — splitting would reintroduce the module cycle this file exists to break). Cohesive by design; grew past the 400-line soft limit with the per-leaf CommandSpec builders.
 /**
  * host-subcommand-groups — the action-less Commander subcommand GROUPS
- * (`sessions`, `plugin`) and their leaf {@link CommandSpec}s (release 2.11.0
+ * (`sessions`, `plugin`) and their leaf {@link CommandSpec}s (launch
  * Phase 6).
  *
  * Split out of `host-command-specs.ts` for ONE reason: to break a module cycle.
@@ -134,7 +135,7 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
         raw?: boolean;
       };
       const ref = opts._args[0];
-      const filters = Array.isArray(opts.filter) ? opts.filter : opts.filter ? [opts.filter] : undefined;
+      const filters = normalizeFilterOption(opts.filter);
       await executeSessionShow({
         replayRegistry: ctx.sessionReplayRegistry,
         ref,
@@ -144,11 +145,23 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
         raw: opts.raw,
         render: ctx.render,
         emitJson: ctx.emitJson,
+        emitRaw: ctx.emitRaw,
         emitError: ctx.emitError,
         setExitCode: ctx.setExitCode,
       });
     },
   });
+}
+
+/**
+ * Normalize the repeatable `--filter` option (Commander yields a string for one
+ * occurrence, a string[] for many, undefined for none) into a uniform
+ * `string[] | undefined` for `executeSessionShow`.
+ */
+function normalizeFilterOption(filter: string | string[] | undefined): string[] | undefined {
+  if (Array.isArray(filter)) return filter;
+  if (filter) return [filter];
+  return undefined;
 }
 
 /**
@@ -400,6 +413,9 @@ const INVENTORY_CTX: CliCommandsContext = {
   },
   render: () => Promise.resolve(),
   emitJson: () => {
+    /* inert — inventory builds never dispatch a handler */
+  },
+  emitRaw: () => {
     /* inert — inventory builds never dispatch a handler */
   },
   emitError: () => {

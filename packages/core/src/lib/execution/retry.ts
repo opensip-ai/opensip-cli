@@ -2,7 +2,7 @@
 // @fitness-ignore-file performance-anti-patterns -- same: sequential await is the entire point of a retry/backoff loop (same waiver as lib/retry.ts and the fitness retry this hoists)
 /**
  * runWithRetry — the generic retry-with-backoff primitive the execution substrate
- * uses (north-star §5.8, release 2.13.0).
+ * uses (north-star §5.8, launch).
  *
  * Hoisted from fitness's `executeWithRetry` (the proven shape): retry ONLY on a
  * thrown error, never re-throw (return `lastError` instead), and skip retry for a

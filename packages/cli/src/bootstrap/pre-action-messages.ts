@@ -41,7 +41,7 @@ export function formatCliTooOldMessage(input: CliTooOldInput): string {
  * Render the human "no opensip-cli project found" explainer — the actionable
  * walked-up-to-root message with the `init` hint. The `--json` shape is no longer
  * rendered here: a no-project failure is a `BootstrapError` the top-level boundary
- * turns into a structured `bootstrap.error` `CommandOutcome` (release 2.12.0,
+ * turns into a structured `bootstrap.error` `CommandOutcome` (launch,
  * §4.7), so this formatter is the human path only.
  */
 export function formatNoProjectFoundMessage(cwd: string): string {

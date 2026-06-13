@@ -1,5 +1,5 @@
 /**
- * @fileoverview Scope-owned capability registry (release 2.10.0, §5.3).
+ * @fileoverview Scope-owned capability registry (launch, §5.3).
  *
  * The host-side runtime for the capability model in `tools/capability.ts`.
  * A tool declares the domains it OWNS in its static manifest; the host
@@ -364,7 +364,7 @@ export function registerCapabilityDomainsFromManifest(
 
 /**
  * A placeholder registrar for a manifest-declared domain whose owning tool
- * has not yet wired its real registrar (Phase 4). Routing a contribution
+ * has not wired its real registrar (Phase 4). Routing a contribution
  * before then is a programming error — the host knows the domain exists,
  * but no one can yet accept a contribution to it — so it throws a clear
  * diagnostic rather than silently dropping the contribution.

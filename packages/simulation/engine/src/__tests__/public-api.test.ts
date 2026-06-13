@@ -35,6 +35,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'resolveMetric',
   'scenarioAborted',
   'simulationTool',
+  'SIMULATION_CONTRACT_VERSION',
   'sleepWithAbort',
   'tool',
   'updateLatencyMetrics',

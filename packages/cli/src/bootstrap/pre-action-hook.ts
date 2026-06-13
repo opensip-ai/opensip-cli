@@ -43,10 +43,7 @@ import {
   type ToolRegistry,
 } from '@opensip-cli/core';
 
-import {
-  getCurrentRegistriesForScope,
-  getToolManifestsForRun,
-} from '../cli-context.js';
+import { getCurrentRegistriesForScope, getToolManifestsForRun } from '../cli-context.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { BootstrapError } from './bootstrap-error.js';
@@ -208,7 +205,7 @@ export function installPreActionHook(program: Command, version: string): void {
     //    in uninstall.ts; we never use that name here.
     (opts as Record<string, unknown>).projectContext = project;
     // Stash the resolved "was --cwd typed on the CLI?" signal alongside it,
-    // so the `init` command-spec handler (release 2.11.0 Phase 6) reads ONE
+    // so the `init` command-spec handler (launch Phase 6) reads ONE
     // source instead of recomputing `getOptionValueSource('cwd')` on its own
     // Commander command. `actionCommand` IS the init command here, so this is
     // byte-identical to the former register-init computation.
@@ -270,6 +267,7 @@ export function installPreActionHook(program: Command, version: string): void {
       registries: { languages, tools },
       manifests: getToolManifestsForRun(),
       apiKey: opts.apiKey as string | undefined,
+      // @fitness-ignore-next-line null-safety -- Commander's optsWithGlobals() always returns an OptionValues object (never null/undefined); the heuristic misreads the method-call-then-property access. `.cloud` is an absent-or-boolean flag, compared with `=== false`.
       noCloud: actionCommand.optsWithGlobals().cloud === false,
       logger,
       ui: { version, update },

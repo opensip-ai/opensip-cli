@@ -1,8 +1,8 @@
 /**
  * WorkflowExecutionOptions — the unified execution-config shape every domain's
- * recipe runs on (north-star §5.8, release 2.13.0).
+ * recipe runs on (north-star §5.8, launch).
  *
- * Before 2.13.0 each domain declared its own shape — `FitnessExecutionOptions`
+ * Previously each domain declared its own shape — `FitnessExecutionOptions`
  * (richest: mode/stopOnFirstFailure/timeout/maxParallel/retry×2) and
  * `SimulationExecutionOptions` (mode/timeout/maxParallel/stopOnFirstFailure, with
  * `timeout` silently unenforced). This is the common base they map onto so

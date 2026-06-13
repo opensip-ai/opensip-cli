@@ -56,6 +56,9 @@ const EXPECTED_VALUE_EXPORTS = [
   // Upstream barrel export missing from this curated list (modular-monolith
   // boundary commits added it to index.ts but not here); the barrel exports it.
   'RAW_STREAM_REASONS',
+  // Public Tool-contract version marker (ADR-0046) — exported from the barrel
+  // by the contract-versioning commits; curated here so the surface test tracks it.
+  'TOOL_CONTRACT_VERSION',
   'TOOL_LONG_IDS',
   'TOOL_LONG_TO_SHORT',
   'TOOL_SHORT_IDS',

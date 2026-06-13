@@ -6,11 +6,11 @@
  * Verifies the minimal contract the registry depends on: a
  * `metadata.id` string (used for dedupe + listing), a `commands` array,
  * and a command surface — a non-empty `commandSpecs` array (the one command
- * surface as of 3.0.0; `register()` was removed). A tool with no `commandSpecs`
+ * surface as of launch; `register()` was removed). A tool with no `commandSpecs`
  * cannot mount any command, so it fails the shape check. `initialize` and
  * `contributeScope` stay optional per the Tool interface.
  *
- * Ordering vs. the 2.8.0 admission gate: this shape check runs AFTER a
+ * Ordering vs. the admission gate: this shape check runs AFTER a
  * tool's module is imported. The compatibility gate (`admitTool`) and the
  * project-local TRUST gate (`admitProjectLocalTool`, deny-by-default) run
  * on the STATIC manifest *before* import — so a project-local executable
@@ -31,7 +31,7 @@ export function isValidTool(value: unknown): value is Tool {
   if (typeof (candidate.metadata as { id?: unknown }).id !== 'string') return false;
   if (!Array.isArray(candidate.commands)) return false;
   // A tool must expose a command surface: a non-empty declarative `commandSpecs`
-  // array (the one command surface, 3.0.0 — `register()` was removed). A tool
+  // array (the one command surface, launch — `register()` was removed). A tool
   // with no commandSpecs cannot contribute any command and is rejected.
   const hasSpecs = Array.isArray(candidate.commandSpecs) && candidate.commandSpecs.length > 0;
   if (!hasSpecs) return false;

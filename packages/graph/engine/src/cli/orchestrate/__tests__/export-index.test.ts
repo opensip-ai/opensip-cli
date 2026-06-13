@@ -242,12 +242,7 @@ describe('buildExportIndex — re-export following', () => {
     // C=tree-sitter defines childrenOf; B=core re-exports it; A=graph re-exports from B.
     const cat = withReExports(occCat(), [
       reexp('packages/core/src/index.ts', 'childrenOf', 'childrenOf', '@opensip-cli/tree-sitter'),
-      reexp(
-        'packages/graph/engine/src/index.ts',
-        'childrenOf',
-        'childrenOf',
-        '@opensip-cli/core',
-      ),
+      reexp('packages/graph/engine/src/index.ts', 'childrenOf', 'childrenOf', '@opensip-cli/core'),
     ]);
     const mi = manifest(
       ['@opensip-cli/tree-sitter', 'packages/tree-sitter'],
@@ -363,12 +358,7 @@ describe('buildExportIndex — re-export following', () => {
 
   it('declines a named re-export whose name is not exported by the source package', () => {
     const cat = withReExports(occCat(), [
-      reexp(
-        'packages/graph/engine/src/index.ts',
-        'missing',
-        'missing',
-        '@opensip-cli/tree-sitter',
-      ),
+      reexp('packages/graph/engine/src/index.ts', 'missing', 'missing', '@opensip-cli/tree-sitter'),
     ]);
     const mi = manifest(['@opensip-cli/tree-sitter', 'packages/tree-sitter']);
     const index = buildExportIndex(cat, mi);
@@ -459,9 +449,10 @@ describe('buildPackageManifestIndex + resolveSpecifierToPackage', () => {
       packageGroup: 'core',
       subpath: './errors',
     });
-    expect(
-      resolveSpecifierToPackage('@opensip-cli/core/languages/parse-cache.js', index),
-    ).toEqual({ packageGroup: 'core', subpath: './languages/parse-cache.js' });
+    expect(resolveSpecifierToPackage('@opensip-cli/core/languages/parse-cache.js', index)).toEqual({
+      packageGroup: 'core',
+      subpath: './languages/parse-cache.js',
+    });
   });
 
   it('declines a subpath NOT declared in exports', () => {

@@ -115,8 +115,7 @@ export function buildFitCommandSpec(
       {
         flag: '--config',
         value: '<path>',
-        description:
-          'Path to opensip-cli.config.yml (overrides package.json pointer and default)',
+        description: 'Path to opensip-cli.config.yml (overrides package.json pointer and default)',
       },
       {
         flag: '--show',

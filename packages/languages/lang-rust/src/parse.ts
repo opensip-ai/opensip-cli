@@ -12,12 +12,7 @@
 
 import { fileURLToPath } from 'node:url';
 
-import {
-  loadGrammar,
-  createParser,
-  parseToTree,
-  type ParsedFile,
-} from '@opensip-cli/tree-sitter';
+import { loadGrammar, createParser, parseToTree, type ParsedFile } from '@opensip-cli/tree-sitter';
 
 const grammar = await loadGrammar(
   fileURLToPath(new URL('../wasm/tree-sitter-rust.wasm', import.meta.url)),

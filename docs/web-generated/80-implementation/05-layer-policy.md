@@ -252,7 +252,7 @@ Six rules guard the dashboard's HTML-generator package against the failure modes
 - **`dashboard-no-side-stylesheets`** — only the central CSS module emits styles.
 - **`dashboard-no-ui-framework`** — no React, Vue, Svelte, or other UI-framework imports inside the dashboard. The dashboard is hand-written DOM; bundling a framework would balloon the static HTML.
 
-These rules exist because the dashboard ships as a single self-contained `index.html`. Every layering violation here would either bloat the file, break the no-server promise, or reintroduce the panel-cross-talk bugs the v3 refactor untangled.
+These rules exist because the dashboard ships as a single self-contained `index.html`. Every layering violation here would either bloat the file, break the no-server promise, or reintroduce panel-cross-talk bugs.
 
 ---
 

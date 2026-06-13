@@ -183,7 +183,9 @@ describe('getCurrentProjectRoot / entered scope', () => {
   it('throws when called before scope is entered', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    expect(() => mod.getCurrentProjectRoot()).toThrow(/pre-action-hook constructed and entered it|SYSTEM.SCOPE.NOT_ENTERED/);
+    expect(() => mod.getCurrentProjectRoot()).toThrow(
+      /pre-action-hook constructed and entered it|SYSTEM.SCOPE.NOT_ENTERED/,
+    );
   });
 
   it('returns the configured project root once inside an entered RunScope', async () => {
@@ -210,7 +212,9 @@ describe('getCurrentProjectRoot / entered scope', () => {
     // getCurrentProjectRoot must surface the PROJECT_UNSET error.
     const scope = new RunScope({});
     runWithScopeSync(scope, () => {
-      expect(() => mod.getCurrentProjectRoot()).toThrow(/pre-action-hook resolved the context|PROJECT_UNSET/);
+      expect(() => mod.getCurrentProjectRoot()).toThrow(
+        /pre-action-hook resolved the context|PROJECT_UNSET/,
+      );
     });
   });
 });
@@ -315,7 +319,9 @@ describe('getOrOpenDatastore', () => {
     });
     // Enter properly (Phase 3+); the old holder simulation no longer wires readScope.
     runWithScopeSync(scope, () => {
-      expect(() => mod.getOrOpenDatastore()).toThrow(/non-project context|Datastore accessed in a non-project context/);
+      expect(() => mod.getOrOpenDatastore()).toThrow(
+        /non-project context|Datastore accessed in a non-project context/,
+      );
     });
   });
 

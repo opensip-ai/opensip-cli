@@ -56,7 +56,7 @@ const BOOTSTRAP_MODULE = 'cli:bootstrap';
  * Bundled first-party tool PACKAGES — declared as direct deps of
  * opensip-cli. Order is registration order (and thus help/listing order).
  *
- * 3.0.0 GA cutover: these are package NAMES, not imported tool runtimes. The
+ * launch cutover: these are package NAMES, not imported tool runtimes. The
  * host no longer statically `import`s `fitnessTool`/`graphTool`/`simulationTool`
  * — bundled tools are resolved on disk and loaded by DYNAMIC IMPORT through the
  * exact same manifest → `admitTool` → import → register path an installed or
@@ -172,7 +172,7 @@ function resolveRequiredBundledPackageDir(packageName: string): string {
 /**
  * Register the bundled first-party tools into the supplied registry, each one
  * flowing through the SAME admit → dynamic-import → register path the external
- * path uses (3.0.0 GA cutover — replaces the 2.8.0 static-import + gate path).
+ * path uses (launch cutover — replaces the static-import + gate path).
  *
  * Per package name: `resolveBundledPackageDir` → `loadToolManifest('bundled')`
  * → `admitTool({ source: 'bundled', explicitlyRequested: true })` →
@@ -236,7 +236,7 @@ export async function registerFirstPartyTools(
     provenance.push(report.provenance);
     // Record the manifest so the pre-action-hook can register this tool's
     // declared capability domains into the per-run capability registry
-    // (release 2.10.0, §5.3).
+    // (launch, §5.3).
     manifests.push(report.manifest);
   }
 }
@@ -352,7 +352,7 @@ export function buildToolDiscoverySources(
 }
 
 /**
- * Run the 2.8.0 admission gate over a discovered INSTALLED tool package
+ * Run the admission gate over a discovered INSTALLED tool package
  * before its module is imported. Reads the static
  * `package.json#opensipTools` manifest and runs the shared `admitTool` gate
  * (source `'installed'`, best-effort `explicitlyRequested: false` so an
@@ -367,7 +367,7 @@ export function buildToolDiscoverySources(
  *     `plugin list` and the capability registry never see a tool whose import
  *     subsequently failed — matching the bundled/authored legs).
  *
- * 3.0.0 GA: the grace window ended. A discovered `kind:'tool'` package whose
+ * 1.0.0 launch: the grace window ended. A discovered `kind:'tool'` package whose
  * manifest is missing/malformed (`loadToolManifest` → undefined) or declares no
  * `apiVersion` (`admitTool` → skip via {@link checkCompatibility}) is no longer
  * admitted off the marker alone — it is rejected with a diagnostic.
@@ -378,7 +378,7 @@ function admitInstalledTool(
 ): AuthoredAdmission | undefined {
   const manifest = loadToolManifest('installed', pkg.packageDir);
   if (manifest === undefined) {
-    // 3.0.0: a discovered tool with no conformant manifest is no longer admitted
+    // Launch: a discovered tool with no conformant manifest is no longer admitted
     // off the `kind:'tool'` marker alone (the grace window ended) — skip it.
     process.stderr.write(
       `opensip: tool package ${pkg.name} has no conformant package.json#opensipTools manifest — skipping\n`,
@@ -414,7 +414,7 @@ function admitInstalledTool(
  * {@link buildToolDiscoverySources}).
  *
  * Each discovered package runs through the SAME `admitTool` gate the
- * bundled path uses (release 2.8.0, Phase 3) BEFORE its module is imported:
+ * bundled path uses (launch, Phase 3) BEFORE its module is imported:
  * the static `package.json#opensipTools` manifest is read with source
  * `'installed'`, the compatibility gate runs, and only an `admit` verdict
  * proceeds to import + register. An installed tool is best-effort
@@ -428,7 +428,7 @@ function admitInstalledTool(
 /**
  * Emit the best-effort stderr line + structured warning for a discovered
  * INSTALLED tool whose runtime failed to load. Each `ToolRuntimeLoad` failure
- * reason maps to its own message + event (preserving the 2.8.0 diagnostics) —
+ * reason maps to its own message + event (preserving the admission diagnostics) —
  * an installed tool's load failure skips it, never crashing the CLI.
  */
 function emitInstalledLoadFailure(
@@ -453,9 +453,7 @@ function emitInstalledLoadFailure(
     });
     return;
   }
-  process.stderr.write(
-    `opensip: failed to load tool ${name}: ${load.detail ?? 'import failed'}\n`,
-  );
+  process.stderr.write(`opensip: failed to load tool ${name}: ${load.detail ?? 'import failed'}\n`);
   logger.warn({
     evt: 'cli.tool.load_failed',
     module: BOOTSTRAP_MODULE,
@@ -472,20 +470,20 @@ export async function discoverAndRegisterToolPackages(
   manifests: ToolPluginManifest[] = [],
 ): Promise<void> {
   // `builtInIds` is the set of already-registered bundled-tool ids to skip on
-  // a name collision (3.0.0 — passed explicitly by the composition root, which
+  // a name collision (launch — passed explicitly by the composition root, which
   // derives it from the bundled MANIFESTS it just loaded; the host holds no
   // imported tool runtime to read `tool.metadata.id` from).
   const discovered = discoverToolPackagesFromAnchors(opts.sources);
 
   for (const pkg of discovered) {
     try {
-      // Compatibility gate BEFORE import (release 2.8.0). `undefined` means the
+      // Compatibility gate BEFORE import (launch). `undefined` means the
       // gate skipped it (or it's a built-in id); an admission means import +
       // register as before.
       const admission = admitInstalledTool(pkg, builtInIds);
       if (admission === undefined) continue;
 
-      // Load the runtime through the SHARED dynamic-import path (3.0.0) — the
+      // Load the runtime through the SHARED dynamic-import path (launch) — the
       // same `importToolRuntime` the bundled path uses. Resolves the entry
       // from `packageDir` so a tool living in a host dir off the CLI's own
       // module-resolution path still loads. An installed tool is best-effort:
@@ -578,8 +576,8 @@ function admitAuthoredTool(source: ToolSource, dir: string): AuthoredAdmission {
 
 /**
  * Admit (or reject) a single PROJECT-LOCAL authored tool under the
- * deny-by-default trust policy (release 2.8.0, Phase 3 Task 3.2; wired into
- * production discovery in 3.0.0).
+ * deny-by-default trust policy (launch, Phase 3 Task 3.2; wired into
+ * production discovery in the launch contract).
  *
  * A project-local tool is authored code under
  * `<project>/opensip-cli/tools/<name>/` declaring its identity via a JSON
@@ -779,10 +777,10 @@ async function admitAndRegisterAuthored(args: AuthoredRegisterArgs): Promise<voi
 
 /**
  * Walk the registry and mount each tool's commands onto `program`. This is
- * **step 8** of the tool lifecycle (release 2.11.0, §5.4) — see
+ * **step 8** of the tool lifecycle (launch, §5.4) — see
  * {@link runToolLifecycle}.
  *
- * 3.0.0 GA: there is ONE command surface — the tool's declared `commandSpecs`,
+ * 1.0.0 launch: there is ONE command surface — the tool's declared `commandSpecs`,
  * mounted by `mountCommandSpec`. `register()` and the raw-Commander `program`
  * handle on the tool context are gone, so the host owns `program` and passes it
  * in here (the tool never touches Commander). A tool with no `commandSpecs` is a
@@ -825,7 +823,7 @@ export function mountAllToolCommands(
 
 /**
  * Mount ONE tool's commands from its declared `commandSpecs` — the only command
- * surface (3.0.0 GA). Extracted so {@link mountAllToolCommands} keeps its
+ * surface (1.0.0 launch). Extracted so {@link mountAllToolCommands} keeps its
  * per-tool failure isolation around a single call. A tool with no `commandSpecs`
  * contributes nothing and is surfaced via `cli.tool.no_command_surface`.
  */

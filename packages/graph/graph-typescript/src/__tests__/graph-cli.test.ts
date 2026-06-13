@@ -118,6 +118,7 @@ function makeCli(): CapturedCli {
     // Mirror the composition root's `emitEnvelope` seam: write the envelope as
     // JSON to stdout so the `--json` integration test can parse it.
     emitError: vi.fn(),
+    emitRaw: vi.fn(),
     emitEnvelope: vi.fn((envelope: unknown) => {
       process.stdout.write(`${JSON.stringify(envelope, null, 2)}\n`);
     }),

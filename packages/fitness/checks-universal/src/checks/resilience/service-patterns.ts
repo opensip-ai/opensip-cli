@@ -3,12 +3,7 @@
  */
 
 import { logger } from '@opensip-cli/core';
-import {
-  defineCheck,
-  isTestFile,
-  type CheckViolation,
-  getLineNumber,
-} from '@opensip-cli/fitness';
+import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
 
 // =============================================================================
 // PRE-COMPILED REGEX PATTERNS (Safe for static code analysis)

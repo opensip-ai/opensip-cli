@@ -24,6 +24,7 @@ import {
   ConfigurationError,
   isErrorSignal,
   logger,
+  readPackageVersion,
   resolveFailOnDegraded,
   ToolError,
 } from '@opensip-cli/core';
@@ -37,6 +38,7 @@ import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 const MODULE_GRAPH_RENDER = 'graph:render';
+const ENGINE_VERSION = readPackageVersion(import.meta.url);
 
 export async function runGateMode(
   opts: GraphCommandOptions,
@@ -159,7 +161,7 @@ export function runCatalogJsonMode(
   const provenance = {
     runId,
     completeness: 'complete' as const,
-    engineVersion: '2.0.0',
+    engineVersion: ENGINE_VERSION,
     startedAt,
     completedAt,
     tenantId: opts.tenantId,

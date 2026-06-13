@@ -63,6 +63,7 @@ function makeCtx(): CapturedCtx {
     }),
     emitJson: vi.fn(),
     emitError: vi.fn(),
+    emitRaw: vi.fn(),
     emitEnvelope: vi.fn((envelope: unknown) => {
       envelopes.push(envelope);
     }),

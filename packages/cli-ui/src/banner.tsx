@@ -10,7 +10,7 @@
  *     make it read as a mug).
  *   - `sm` — half-height AND half-width (quarter-block wordmark, smaller mug).
  *   - `mini` — a compact, boxed identity card: a small amber coffee cup on
- *     the left and four info lines on the right (`opensip-cli vX.Y.Z`,
+ *     the left and four info lines on the right (`opensip-cli v1.0.0`,
  *     the tagline, the `www.opensip.ai` URL, and the project path), framed in
  *     a rounded amber border. Modeled on the Claude Code session card. Unlike
  *     the wordmark sizes it carries the version + project path inline, so
@@ -42,7 +42,7 @@ const UPGRADE_COMMAND = 'curl -fsSL https://opensip.ai/cli/install.sh | bash';
 /**
  * UpdateHint — a single dim line printed UNDER the `mini` banner box when an
  * update is available, giving the actionable upgrade command. The `mini`
- * card's version-line flag (`(vX.Y.Z available)`) announces the update but
+ * card's version-line flag (`(<new-version> available)`) announces the update but
  * isn't actionable on its own; this line closes that gap without growing the
  * fixed-height box. The other banner sizes get the same command via the
  * stderr update nag, so callers render this only for `mini`.
@@ -203,7 +203,7 @@ function walkedUpSuffix(walkedUp: number | undefined): string {
  * commands like init/configure have no project root), so the fourth line is
  * omitted while the cup keeps its four rows. `walkedUp` appends the discovery
  * hint to the path line when the project root was found above cwd. `update`,
- * when set, appends a `(vX.Y.Z available)` flag (in `theme.success`) to the
+ * when set, appends a `(<new-version> available)` flag (in `theme.success`) to the
  * version line — the in-banner counterpart to the stderr update nag.
  */
 function MiniBanner({
@@ -292,7 +292,7 @@ function CompactBannerView({ art }: { readonly art: CompactBanner }): React.Reac
  */
 export interface BannerProps {
   readonly size?: BannerSize;
-  /** CLI version, e.g. `2.2.1`. Rendered as `vX.Y.Z` in the `mini` card. */
+  /** CLI version, e.g. `1.0.0`. Rendered as `v<version>` in the `mini` card. */
   readonly version?: string;
   /** Absolute project root. Rendered as the third `mini` info line. */
   readonly projectPath?: string;
@@ -303,8 +303,8 @@ export interface BannerProps {
    */
   readonly walkedUp?: number;
   /**
-   * Newer published version (e.g. `2.3.0`) when an update is available. The
-   * `mini` card appends `(vX.Y.Z available)` to the version line; other sizes
+   * Newer published version (e.g. `1.0.1`) when an update is available. The
+   * `mini` card appends `(<new-version> available)` to the version line; other sizes
    * ignore it (they rely on the stderr update nag).
    */
   readonly update?: string;

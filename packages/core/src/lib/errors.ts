@@ -106,7 +106,7 @@ export class ConfigurationError extends ToolError {
 
 /**
  * Thrown when a tool plugin is rejected by the compatibility/trust gate
- * (release 2.8.0) and the rejection must fail the run rather than skip
+ * (launch) and the rejection must fail the run rather than skip
  * silently — i.e. the tool was explicitly requested but is incompatible,
  * or a project-local executable tool was not allowlisted (deny-by-default).
  *
@@ -129,7 +129,7 @@ export class PluginIncompatibleError extends ToolError {
 
 /**
  * Thrown when a contribution is routed to a capability domain that no tool
- * has declared (release 2.10.0, §5.3). A subclass of {@link NotFoundError}
+ * has declared (launch, §5.3). A subclass of {@link NotFoundError}
  * (so existing not-found handling still catches it) that additionally
  * carries the structured diagnostic the capability registry produced: the
  * unknown `domainId` and the set of `knownDomains`. Code defaults to
@@ -154,7 +154,7 @@ export class UnknownCapabilityDomainError extends NotFoundError {
 
 /**
  * Thrown when a contribution fails the schema check of the capability
- * domain it targets (release 2.10.0, §5.3). A subclass of
+ * domain it targets (launch, §5.3). A subclass of
  * {@link ValidationError} that carries the structured diagnostic: the
  * `domainId`, the owning tool's `ownerToolId`, and a human-readable
  * `diagnostic` reason. Code defaults to

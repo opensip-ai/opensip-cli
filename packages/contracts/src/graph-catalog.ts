@@ -71,7 +71,7 @@ export interface GraphFunctionOccurrence {
    * The package this occurrence belongs to — the `name` of its nearest
    * enclosing `package.json` (e.g. `@opensip-cli/fitness`), or the
    * top-level path segment when there is no manifest. Computed at build
-   * time (the dashboard has no filesystem access). Absent on pre-2.4.2
+   * time (the dashboard has no filesystem access). Absent on legacy
    * catalogs; consumers fall back to deriving it from `filePath`.
    */
   readonly package?: string;
@@ -149,16 +149,13 @@ export interface GraphFeatures {
 /**
  * Public catalog shape consumed by the dashboard.
  *
- * v3 (release 1.3.0) generic over language: the `language` field
- * carries the adapter id (e.g. 'typescript', 'python', 'rust') and
- * `cacheKey` is an opaque per-adapter invalidation string. The
- * pre-v3 fields `tsConfigPath` and `tsCompilerVersion` are gone
- * from the engine; v2 catalogs on disk classify as `invalid` at
- * load time.
+ * The `language` field carries the adapter id (e.g. 'typescript', 'python',
+ * 'rust') and `cacheKey` is an opaque per-adapter invalidation string. Legacy
+ * catalog payloads classify as `invalid` at load time.
  *
  * `cacheKey` is optional here because external callers parsing
- * a v2 catalog they have on disk would otherwise fail to load
- * the file with this type. Engine-internal code requires it.
+ * an older catalog they have on disk would otherwise fail to load the file with
+ * this type. Engine-internal code requires it.
  */
 export interface GraphCatalog {
   readonly version: string;

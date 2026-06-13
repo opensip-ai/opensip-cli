@@ -65,6 +65,7 @@ function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
+    emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve({ cloudAccepted: 0 })),

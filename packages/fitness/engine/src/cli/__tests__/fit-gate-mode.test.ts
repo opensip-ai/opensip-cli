@@ -54,6 +54,7 @@ function mockCli(): {
     setExitCode,
     deliverSignals,
     render: vi.fn(() => Promise.resolve()),
+    emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
     emitJson: vi.fn(),

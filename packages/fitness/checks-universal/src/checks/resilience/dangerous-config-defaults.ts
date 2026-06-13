@@ -6,12 +6,7 @@
  */
 
 import { logger } from '@opensip-cli/core';
-import {
-  defineCheck,
-  isTestFile,
-  type CheckViolation,
-  getLineNumber,
-} from '@opensip-cli/fitness';
+import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
 
 import { isDigit, isAlphanumericChar } from './_helpers/config-validation.js';
 

@@ -14,7 +14,13 @@
  */
 import { ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 
-import type { HostGovernance, HostAudit, HostEntitlements, Logger, ToolCliContext } from '@opensip-cli/core';
+import type {
+  HostGovernance,
+  HostAudit,
+  HostEntitlements,
+  Logger,
+  ToolCliContext,
+} from '@opensip-cli/core';
 
 /**
  * Build the hostPlanes bag.

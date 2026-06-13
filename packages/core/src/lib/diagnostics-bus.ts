@@ -1,7 +1,7 @@
 /**
  * DiagnosticsBus — the scope-owned collector that gathers {@link DiagnosticEvent}s
  * across the uniform tool lifecycle and snapshots them as {@link RunDiagnostics}
- * to ride on a `CommandOutcome` (north-star §5.10, release 2.12.0).
+ * to ride on a `CommandOutcome` (north-star §5.10, launch).
  *
  * Per-invocation state, held on {@link RunScope} (the no-module-singleton rule):
  * library code deep in the call tree emits via `currentScope()?.diagnostics`, and

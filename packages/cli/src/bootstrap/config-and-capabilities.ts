@@ -1,6 +1,6 @@
 /**
  * config-and-capabilities — the pre-dispatch composition seam for the
- * capability-configuration release (2.10.0, ADR-0023 / §5.3, Phase 4).
+ * capability-configuration release (ADR-0023 / §5.3, Phase 4).
  *
  * Two host responsibilities the composition root owns once per run, extracted
  * from the pre-action-hook to keep that hook within its complexity budget:
@@ -155,7 +155,7 @@ export function composeAndValidateToolConfig(args: {
   // Compose the host document-level declarations (cli/dashboard/schemaVersion,
   // and from Phase 1 the targeting blocks) BESIDE the tool declarations, so the
   // whole document — not just the tool namespaces — validates STRICT through the
-  // one composed schema (ADR-0023, the 2.10.1 seam).
+  // one composed schema (ADR-0023, the launch seam).
   const declarations: readonly ToolConfigDeclaration[] = [
     ...hostConfigDeclarations({ pluginConfigKeys: collectPluginConfigKeys(manifests) }),
     ...toolDeclarations,

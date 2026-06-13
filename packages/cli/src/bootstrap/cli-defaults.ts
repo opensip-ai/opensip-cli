@@ -11,7 +11,7 @@
  * (`loadCliDefaults`, `cliConfigSchema`) — the `cli:` block is
  * tool-agnostic and a project shipping only `simulation` shouldn't need
  * fitness installed just to read its own CLI defaults. Relocated out of
- * `@opensip-cli/contracts` in 2.10.1 (ADR-0023; restores contracts
+ * `@opensip-cli/contracts` in the launch contract (ADR-0023; restores contracts
  * types-only). Audit 2026-05-23 G2.
  */
 

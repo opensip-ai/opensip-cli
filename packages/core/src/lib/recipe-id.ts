@@ -1,8 +1,8 @@
 /**
  * deriveRecipeId — the one recipe-id derivation every domain shares (north-star
- * §5.8, release 2.13.0).
+ * §5.8, launch).
  *
- * Before 2.13.0 the three domains derived ids divergently — fitness `RCP_${name}`,
+ * Previously the three domains derived ids divergently — fitness `RCP_${name}`,
  * graph `GRCP_${name}`, sim hardcoded `BSCP_default`. The format is identical
  * (`<prefix>_<name>`); this hoists it so the derivation is one function, not three
  * inline templates. The prefix stays per-domain (so existing ids are unchanged),

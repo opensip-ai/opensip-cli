@@ -106,7 +106,7 @@ This pattern works at scale — the opensip codebase uses it for 308 fitness che
 ```json
 {
   "name": "@my-co/checks-internal",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "main": "dist/index.js",
   "type": "module",
   "opensipTools": { "kind": "fit-pack" },

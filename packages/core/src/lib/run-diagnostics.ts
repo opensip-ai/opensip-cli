@@ -1,6 +1,6 @@
 /**
  * RunDiagnostics — the shared, JSON-emittable diagnostics shape carried on a
- * {@link CommandOutcome} (north-star §5.10, release 2.12.0).
+ * {@link CommandOutcome} (north-star §5.10, launch).
  *
  * Today observability is per-subsystem: graph has OTEL spans, fitness has rich
  * callbacks, sim has simple progress, and the bootstrap writes loose log lines.
@@ -10,7 +10,7 @@
  * a flat metrics-counter map, and a thin bridge to the existing OTEL trace
  * context.
  *
- * The currency is deliberately **minimal-but-extensible** for 2.12.0 (spec
+ * The currency is deliberately **minimal-but-extensible** for launch (spec
  * decision): one `DiagnosticEvent` per lifecycle boundary that already exists,
  * not a metrics/timer rebuild. The `metrics`/`trace` slots are reserved so later
  * releases can enrich them without another outer-shape break.

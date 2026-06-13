@@ -111,7 +111,7 @@ export default defineLoadScenario({
 
 The two scenario kinds — `defineLoadScenario`, `defineChaosScenario` — each emit the same `RunnableScenario` shape with a different `kind:` discriminator. Recipes compose scenarios the same way fit recipes compose checks. Deeper detail: [scenarios and recipes](/docs/opensip-cli/30-sim/01-scenarios-and-recipes/).
 
-> Simulation is opt-in and experimental. The shapes are stable; the runtime mechanics are still being hardened.
+> Simulation is opt-in. The scenarios run against targets you own or control.
 
 ---
 

@@ -1,6 +1,7 @@
+// @fitness-ignore-file file-length-limit -- one cohesive manifest pipeline: the static reader (loadToolManifest), the single admission gate (admitTool), and their private validate/normalize/hash/diagnose helpers form one read→validate→admit subsystem over the raw-vs-admitted compatibility contract. The helpers are admission-internal (not reused elsewhere); hoisting them out would scatter one contract across files. Grew past the 400-line soft limit with the per-field normalization helpers.
 /**
  * @fileoverview Static manifest reader + the single admission gate
- * (release 3.0.0, raw-vs-admitted compatibility contract).
+ * (launch, raw-vs-admitted compatibility contract).
  *
  * `loadToolManifest` reads a tool's static front matter **before**
  * importing its runtime `Tool` module:
@@ -284,7 +285,7 @@ function validateManifest(
   const apiVersion = block.apiVersion;
   if (apiVersion !== undefined && typeof apiVersion !== 'number') return undefined;
 
-  // §5.3 (2.10.0): the `capabilities` slot, now concrete. Omitted ⇒ no
+  // §5.3 (launch): the `capabilities` slot, now concrete. Omitted ⇒ no
   // declared domains (additive). Present-but-malformed ⇒ manifest fails
   // validation, mirroring the strict `commands` parse above. The absent
   // case is handled HERE (not inside the normalizer) so the normalizer has

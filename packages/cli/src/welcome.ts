@@ -73,7 +73,7 @@ export function buildWelcome(opts: WelcomeOptions): string {
     '',
     `${bold('Primary commands:')}`,
     `  ${accent('opensip fit')}        Run fitness checks against your codebase`,
-    `  ${accent('opensip sim')}        Run simulation scenarios ${dim('(experimental)')}`,
+    `  ${accent('opensip sim')}        Run simulation scenarios`,
     '',
     `${bold('Getting started:')}`,
     `  $ cd your-project`,

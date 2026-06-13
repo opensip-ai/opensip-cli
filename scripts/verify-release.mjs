@@ -30,7 +30,7 @@
 //
 // Usage:
 //   node scripts/verify-release.mjs                     # local pre-flight
-//   node scripts/verify-release.mjs --expected-version v1.0.10
+//   node scripts/verify-release.mjs --expected-version v1.0.0
 //
 // The `v` prefix on --expected-version is stripped. In CI:
 //   node scripts/verify-release.mjs --expected-version "$GITHUB_REF_NAME"
@@ -130,7 +130,7 @@ if (versions.size === 1) {
 
 // 2 — Tag vs package version
 if (expectedVersion === null) {
-  skip(2, `tag check skipped — pass --expected-version <vX.Y.Z> to enable (used by CI).`);
+  skip(2, `tag check skipped — pass --expected-version v<version> to enable (used by CI).`);
 } else {
   const normalized = expectedVersion.startsWith('v') ? expectedVersion.slice(1) : expectedVersion;
   if (normalized === consensusVersion) {
@@ -148,7 +148,7 @@ const changelogPath = join(REPO_ROOT, 'CHANGELOG.md');
 const changelog = await fs.readFile(changelogPath, 'utf8');
 const topEntry = changelog.match(/^## \[([^\]]+)\]\s*[—-]\s*(\S+)/m);
 if (topEntry === null) {
-  fail(3, 'no top-level entry matching `## [X.Y.Z] — YYYY-MM-DD` found in CHANGELOG.md.');
+  fail(3, 'no top-level entry matching `## [<version>] — YYYY-MM-DD` found in CHANGELOG.md.');
   fail(6, 'cannot validate date — no parseable CHANGELOG entry.');
 } else {
   const [, entryVersion, entryDate] = topEntry;
@@ -288,7 +288,7 @@ try {
 // 11 — Every publishable package declares a `files` allowlist that ships `dist`.
 // Without `files`, npm has no .npmignore here to fall back on, so the published
 // tarball includes `src/`, `coverage/`, `.turbo/` build logs, etc. — bloat and
-// internal-artifact leakage (e.g. core shipped 167 junk files before 2.7.0).
+// internal-artifact leakage from stale package file lists.
 // The allowlist must contain `dist` (compiled output); wasm-bearing packages add
 // `wasm`. This is the regression guard for that class of packaging bug.
 {

@@ -1,6 +1,6 @@
 /**
  * View-model builders for the remaining result types: list-checks,
- * list-recipes, history, experimental, report, help, and the
+ * list-recipes, history, simulation notice, report, help, and the
  * clear/configure/uninstall "done" summaries. Each reproduces the visible
  * output of its retired Ink component as a renderer-agnostic ViewNode.
  */
@@ -18,11 +18,11 @@ import {
 import type {
   ClearDoneResult,
   ConfigureDoneResult,
-  ExperimentalResult,
   HistoryResult,
   ListChecksResult,
   ListRecipesResult,
   ReportResult,
+  SimNoticeResult,
   StoredSession,
   UninstallDoneResult,
 } from '@opensip-cli/contracts';
@@ -150,9 +150,9 @@ export function viewHistory(result: HistoryResult): ViewNode {
   ]);
 }
 
-// --- experimental (sim notice) --------------------------------------------
+// --- sim notice ------------------------------------------------------------
 
-export function viewExperimental(_result: ExperimentalResult): ViewNode {
+export function viewSimNotice(_result: SimNoticeResult): ViewNode {
   return group([
     group(
       [
@@ -167,11 +167,8 @@ export function viewExperimental(_result: ExperimentalResult): ViewNode {
     group(
       [
         SPACER,
-        line([
-          { text: 'Status:', tone: 'warning' },
-          { text: ' Under active development — not yet available for use.' },
-        ]),
-        line([{ text: "  We're looking for contributors to help build this out!" }]),
+        line([{ text: 'Status:', tone: 'success' }, { text: ' Available in OpenSIP CLI 1.0.0.' }]),
+        line([{ text: '  Use opensip sim --recipes to list registered recipes.' }]),
         SPACER,
         line([{ text: '  → https://github.com/opensip-ai/opensip-cli/issues', dim: true }]),
       ],
@@ -194,7 +191,7 @@ export function viewHelp(): ViewNode {
       line([
         { text: '  ' },
         { text: 'sim', tone: 'brand' },
-        { text: '     Run simulation scenarios [experimental]' },
+        { text: '     Run simulation scenarios' },
       ]),
       line([{ text: '  ' }, { text: 'plugin', tone: 'brand' }, { text: '  Manage plugins' }]),
       SPACER,

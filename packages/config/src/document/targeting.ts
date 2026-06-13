@@ -5,7 +5,7 @@
  *
  * This is cross-tool config, not a fitness concern — a project shipping only
  * `graph` resolves its scope through the same model. Relocated here from
- * `@opensip-cli/fitness` in 2.10.1 (ADR-0023). The data/runtime boundary:
+ * `@opensip-cli/fitness` under ADR-0023. The data/runtime boundary:
  *
  *   - config owns the **document shape** — the types below and the Zod field
  *     schemas — so the composed whole-document validation can strict-check the

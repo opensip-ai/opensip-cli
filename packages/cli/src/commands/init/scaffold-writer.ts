@@ -35,11 +35,7 @@ function ensureGitignore(cwd: string): boolean {
   }
 
   const sep = content.endsWith('\n') ? '' : '\n';
-  writeFileSync(
-    path,
-    `${content}${sep}\n# opensip-cli runtime state\n${GITIGNORE_LINE}\n`,
-    'utf8',
-  );
+  writeFileSync(path, `${content}${sep}\n# opensip-cli runtime state\n${GITIGNORE_LINE}\n`, 'utf8');
   return true;
 }
 

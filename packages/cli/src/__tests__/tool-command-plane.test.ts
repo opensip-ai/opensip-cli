@@ -39,6 +39,7 @@ function makeStubContext(): ToolCliContext {
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
+    emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),

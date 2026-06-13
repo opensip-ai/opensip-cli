@@ -61,7 +61,7 @@ export type {
   ReportResult,
   InitResult,
   PreExistingFile,
-  ExperimentalResult,
+  SimNoticeResult,
   PluginResult,
   PluginInfo,
   SyncEntry,
@@ -74,7 +74,7 @@ export type {
 } from './command-results.js';
 
 // Command outcome — the OUTER currency wrapping every result and error (§5.5,
-// release 2.12.0). `CommandOutcome<T>` nests the unchanged `SignalEnvelope` under
+// launch). `CommandOutcome<T>` nests the unchanged `SignalEnvelope` under
 // `.envelope` (run) / the `CommandResult` under `.data` (list/report) / errors
 // under `.errors` (incl. the pre-handler bootstrap path). The host ASSEMBLES it;
 // no tool chooses its own error JSON or success carrier. ADR-0024.
@@ -108,7 +108,7 @@ export { EXIT_CODES, getErrorSuggestion, mapToolErrorToExitCode } from './exit-c
 export type { ErrorSuggestion } from './exit-codes.js';
 
 // Static tool-plugin manifest + the plugin-API epoch + provenance types +
-// the pure compatibility gate (release 3.0.0 raw-vs-admitted contract).
+// the pure compatibility gate (launch raw-vs-admitted contract).
 // DEFINED in @opensip-cli/core (next to the Tool contract; core cannot
 // import contracts); re-exported here for the public Tool↔runner surface.
 export { PLUGIN_API_VERSION, checkCompatibility } from '@opensip-cli/core';
@@ -119,7 +119,7 @@ export type {
   ToolProvenance,
   ToolSource,
   CompatibilityVerdict,
-  // Capability domain model (release 2.10.0, §5.3) — the shape a tool's
+  // Capability domain model (launch, §5.3) — the shape a tool's
   // manifest `capabilities` slot now carries, plus the runtime domain spec.
   CapabilityDomainSpec,
   ToolCapabilityDeclaration,
@@ -127,11 +127,11 @@ export type {
 } from '@opensip-cli/core';
 
 // The `cli:` block loader (`loadCliDefaults` / `CliDefaults`) moved to
-// `@opensip-cli/config` in 2.10.1 (ADR-0023) — its runtime YAML projection
+// `@opensip-cli/config` in ADR-0023 — its runtime YAML projection
 // was the standing "contracts is types-only" charter violation. Importers now
 // take it from the config layer.
 
-// Command-plane types (release 2.11.0, §5.4) — the declarative CommandSpec a
+// Command-plane types (launch, §5.4) — the declarative CommandSpec a
 // tool exports for the host to mount, replacing raw-Commander access. DEFINED in
 // @opensip-cli/core (beside the Tool contract; core cannot import contracts);
 // re-exported here for the public Tool↔runner surface. `CommonFlagKey` is also

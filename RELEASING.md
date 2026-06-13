@@ -56,7 +56,7 @@ them in dependency order, with `opensip-cli` last.
 1. Bump versions for every publishable package and the root package:
 
    ```bash
-   node -e "const fs=require('fs');const {execSync}=require('child_process');const v=process.argv[1];const files=['package.json',...execSync('rg --files -g package.json packages').toString().trim().split('\n')];for(const f of files){const p=JSON.parse(fs.readFileSync(f,'utf8'));if(p.name==='opensip-cli'||p.name==='@opensip-cli/root'||p.name?.startsWith('@opensip-cli/')){p.version=v;fs.writeFileSync(f,JSON.stringify(p,null,2)+'\n');}}" X.Y.Z
+   node -e "const fs=require('fs');const {execSync}=require('child_process');const v=process.argv[1];const files=['package.json',...execSync('rg --files -g package.json packages').toString().trim().split('\n')];for(const f of files){const p=JSON.parse(fs.readFileSync(f,'utf8'));if(p.name==='opensip-cli'||p.name==='@opensip-cli/root'||p.name?.startsWith('@opensip-cli/')){p.version=v;fs.writeFileSync(f,JSON.stringify(p,null,2)+'\n');}}" 1.0.0
    pnpm install --lockfile-only
    ```
 
@@ -71,15 +71,15 @@ them in dependency order, with `opensip-cli` last.
    pnpm test
    pnpm docs:build
    pnpm docs:check
-   pnpm verify-release --expected-version vX.Y.Z
+   pnpm verify-release --expected-version v1.0.0
    ```
 
 4. Commit, tag, and push:
 
    ```bash
-   git commit -am "chore: release X.Y.Z"
-   git tag vX.Y.Z
-   git push origin main vX.Y.Z
+   git commit -am "chore: release 1.0.0"
+   git tag v1.0.0
+   git push origin main v1.0.0
    ```
 
 5. Watch the release workflow:

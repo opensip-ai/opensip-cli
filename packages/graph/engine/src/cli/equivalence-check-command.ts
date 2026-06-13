@@ -1,4 +1,5 @@
 // @fitness-ignore-file no-direct-stdout-in-tool-engine -- internal dogfood/CI guardrail subcommand: `graph-equivalence-check` writes its multi-line PASS/FAIL report to stdout and sets its own exit code (a CI gate, the documented non-Ink raw-stream exception). This is not the signal-envelope run output (ADR-0011).
+// @fitness-ignore-file only-documented-toolcli-seams -- same rationale as above: this internal CI-gate subcommand owns its stdout report and exit code; it is not user-facing run output through a ToolCliContext seam.
 /**
  * `graph-equivalence-check` — the REAL-REPO sharded≡exact equivalence guardrail
  * command handler.

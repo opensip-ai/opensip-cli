@@ -11,8 +11,8 @@
  * THIS LIST RUNS IN BOTH CI LANES. The PR lane
  * (`packages/cli/src/__tests__/packed-smoke-scenarios-e2e.test.ts`) imports this
  * exact module and drives the BUILT dist CLI through it on every PR, so a
- * `--json`/output-shape change that breaks a scenario fails the PR — not the
- * publish, days later (the pre-2.13 blind spot that blocked 2.12.0 twice). The
+ * `--json`/output-shape change that breaks a scenario fails the PR rather than
+ * surfacing only in the publish lane. The
  * release lane re-runs it against the PACKED, npm-installed bytes, which is the
  * half only it can do (inter-package export/ABI mismatches). If you change a
  * scenario here, the PR-lane suite is your fast local check:
@@ -44,7 +44,7 @@ import { join } from 'node:path';
 import { expectEnvelope } from './cli-acceptance-core.mjs';
 
 /**
- * 2.12.0 (§5.5): `--json` is a `CommandOutcome` wrapper. Non-run command results
+ * `--json` is a `CommandOutcome` wrapper. Non-run command results
  * (init / list / report / plugin / sessions) ride under `.data`; run-command
  * envelopes ride under `.envelope`. These unwrap the inner payload, tolerating a
  * bare shape too (forward/backward robustness — matches `expectEnvelope`).

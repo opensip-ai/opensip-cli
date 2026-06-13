@@ -1,11 +1,11 @@
 /**
- * @fileoverview Load-time manifest⇔Tool drift guard (release 2.8.0, Phase 1).
+ * @fileoverview Load-time manifest⇔Tool drift guard (launch, Phase 1).
  *
  * The static `ToolPluginManifest` (declared in `package.json#opensipTools`)
  * and the runtime `Tool` (`metadata.id` + `commands[]`) are two declarations
- * of the same identity. For 2.8.0 the open question is resolved as **assert
+ * of the same identity. For launch the open question is resolved as **assert
  * equality at load** — the manifest must match the tool it ships with;
- * single-sourcing the two is deferred to 3.0.0 (when `ToolMetadata` can change
+ * single-sourcing the two is deferred to launch (when `ToolMetadata` can change
  * shape). This helper is that assertion: a typed throw on the first sign of
  * drift, called by the Phase 5 as-if-external test and (defensively) by the
  * Phase 3 bundled-load path.

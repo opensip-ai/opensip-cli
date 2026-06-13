@@ -43,7 +43,7 @@ Once a Tool exists as a package, the customer-facing management surface is the [
 ```json
 {
   "name": "@my-co/audit-sec",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "main": "dist/index.js",
   "type": "module",
   "opensipTools": {
@@ -89,7 +89,7 @@ import { runAudit } from './audit.js';
 export const tool: Tool = {
   metadata: {
     id: 'audit-sec', // must equal opensipTools.id in package.json
-    version: '0.1.0',
+    version: '1.0.0',
     description: 'Lightweight security audit',
   },
   // Command metadata (name + description) — enumerated for --help/completion
@@ -157,7 +157,7 @@ carrying the same identity fields inline — `kind`, `id`, `name`, `version`,
   "kind": "tool",
   "id": "audit-sec",
   "name": "Security audit",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "apiVersion": 1,
   "main": "dist/index.js",
   "commands": [
@@ -191,6 +191,12 @@ discovers your package via the `opensipTools.kind: 'tool'` marker, admits it
 declared `commandSpecs` via `mountCommandSpec`. `commandSpecs` is the one
 command surface. For the architecture behind this decoupling, see
 [the tool-plugin model](/docs/opensip-cli/10-concepts/02-tool-plugin-model/).
+
+Contract versions (core `TOOL_CONTRACT_VERSION` + per-tool versions such as
+`FITNESS_CONTRACT_VERSION`) are documented in the same model page and the
+governing ADRs (0046/0047). Declare the relevant ones on your `Tool` object
+(under `extensionPoints` is the preferred path) so hosts and `agent-catalog`
+can see the exact surface you were written against.
 
 ## Tools that use the kernel registries
 

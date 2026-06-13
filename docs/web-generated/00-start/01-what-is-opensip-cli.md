@@ -79,9 +79,9 @@ opensip-cli ships three first-party tools, all invoked through the same CLI bina
 
 The primary loop. *"Is the codebase clean?"* A check runs once per file and returns violations. Checks compose into recipes; recipes drive CI. Project-local checks live as `.mjs` files under `opensip-cli/fit/checks/`; published packs live as npm packages. The whole loop is described in detail in [`../10-concepts/01-fitness-loop.md`](/docs/opensip-cli/10-concepts/01-fitness-loop/), the spine of this doc set.
 
-### `sim` — simulation scenarios *(experimental)*
+### `sim` — simulation scenarios
 
-The second loop, opt-in. *"Does it behave correctly under stress?"* A scenario simulates a workload — load, chaos — and asserts something about the system under test. Same Tool/Recipe/Engine/Renderer shape as `fit`; the API surface still moves between minor releases.
+The second loop, opt-in. *"Does it behave correctly under stress?"* A scenario simulates a workload — load, chaos — and asserts something about the system under test. Same Tool/Recipe/Engine/Renderer shape as `fit`.
 
 ### `graph` — static call-graph analysis
 

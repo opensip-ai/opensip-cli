@@ -72,6 +72,7 @@ function projectSignalersConfig(parsed: unknown, sourceLabel: string): Signalers
     const issues = result.error.issues
       .map((i) => `  ${i.path.join('.')}: ${i.message} (expected: ${i.code})`)
       .join('\n');
+    // @fitness-ignore-next-line result-pattern-consistency -- user config error surfaced as a thrown ValidationError (mapped to an exit code by the loader's caller); a malformed signalers config is fail-loud at load time, not an expected-failure Result flow.
     throw new ValidationError(`${sourceLabel} validation failed:\n${issues}`, {
       operation: 'load',
       loader: 'signalers',

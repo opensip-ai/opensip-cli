@@ -35,6 +35,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'same-recipe-semantics': ['🟰', 'Same Recipe Semantics'],
   'stale-build-artifacts': ['🏚️', 'Stale Build Artifacts'],
   'tool-has-manifest': ['🪪', 'Tool Has Manifest'],
+  'tool-contract-version-policy': ['📜', 'Tool Contract Version Policy'],
   'vitest-config-extends-base': ['🧪', 'Vitest Config Extends Base'],
   'vitest-config-required-with-tests': ['🧪', 'Vitest Config Required With Tests'],
 });

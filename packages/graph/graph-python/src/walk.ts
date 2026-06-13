@@ -53,12 +53,7 @@ import { digestPythonBody, digestSyntheticBody } from './body-digest.js';
 import { collectDependencySites } from './walk-dependencies.js';
 
 import type { PythonParsedFile, PythonParsedProject } from './parse.js';
-import type {
-  CallSiteRecord,
-  FunctionOccurrence,
-  WalkInput,
-  WalkOutput,
-} from '@opensip-cli/graph';
+import type { CallSiteRecord, FunctionOccurrence, WalkInput, WalkOutput } from '@opensip-cli/graph';
 import type { Node } from '@opensip-cli/tree-sitter';
 
 const TEST_PATH_RE = /(?:^|\/)tests?\//;

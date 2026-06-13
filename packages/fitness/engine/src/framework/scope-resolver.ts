@@ -8,11 +8,7 @@
  * Per-check resolution is a pure in-memory lookup — no redundant I/O.
  */
 
-import {
-  applyGlobalExcludes,
-  preResolveAllTargets,
-  resolveTargets,
-} from '@opensip-cli/targeting';
+import { applyGlobalExcludes, preResolveAllTargets, resolveTargets } from '@opensip-cli/targeting';
 
 import type { CheckScope } from './check-config.js';
 import type { TargetRegistry } from '../targets/target-registry.js';

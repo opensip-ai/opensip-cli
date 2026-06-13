@@ -22,7 +22,7 @@ import type { GraphConfig } from '../types.js';
 import type { SignalSeverity } from '@opensip-cli/core';
 
 /**
- * Clamp a rule's base severity per the opt-in override channel. Release 2.13.0
+ * Clamp a rule's base severity per the opt-in override channel. Launch
  * (§5.9): delegates the clamp to the central `SeverityPolicy.applyOverride`
  * (byte-identical — base unchanged with no override, `error → high`,
  * `warning → medium` when set); this stays as the graph-config lookup seam.

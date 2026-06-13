@@ -1,6 +1,6 @@
 /**
  * runWithTimeout — the per-unit timeout/abort/retry wrapper of the execution
- * substrate (north-star §5.8, release 2.13.0).
+ * substrate (north-star §5.8, launch).
  *
  * One unit's lifecycle: install an `AbortController` + `setTimeout`, run the
  * domain function under that signal (optionally with retry), and classify the

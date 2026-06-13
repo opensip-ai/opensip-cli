@@ -135,7 +135,7 @@ export class RunScope {
   /** Cloud signal sink for this invocation; `noopSignalSink` unless cloud sync is on. */
   readonly signalSink: SignalSink;
   /**
-   * Per-invocation diagnostics collector (north-star §5.10, release 2.12.0).
+   * Per-invocation diagnostics collector (north-star §5.10, launch).
    * Library code emits lifecycle events via `currentScope()?.diagnostics`; the
    * host assembler snapshots it onto every `CommandOutcome`. Scope-owned so
    * concurrent runs share no diagnostics state (the no-module-singleton rule).

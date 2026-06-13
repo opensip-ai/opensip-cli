@@ -7,7 +7,7 @@
  * also validates (the host declarations in {@link ./host-declarations}). This
  * removes the second, hand-written definition of the document shape that used to
  * live in the CLI's init templates and could drift from what the composed schema
- * accepts (ADR-0023, 2.10.1).
+ * accepts (ADR-0023).
  *
  * The CLI supplies the per-language target *content* (include/exclude globs) and
  * appends the per-tool blocks (e.g. `fitness:`) — those are tool-owned and the

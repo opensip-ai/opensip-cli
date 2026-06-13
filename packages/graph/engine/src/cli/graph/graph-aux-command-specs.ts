@@ -1,8 +1,9 @@
 // @fitness-ignore-file no-direct-stdout-in-tool-engine -- auxiliary subcommand status line: `graph-baseline-export` writes the JSON baseline to a file and prints a one-line "Exported graph baseline to <path>" confirmation (the --json path uses cli.emitJson). This is not the signal-envelope run output (ADR-0011), which routes through the composition root.
 // @fitness-ignore-file detached-promises -- async command handlers invoke synchronous helpers (runCatalogJsonMode/runSarifExportMode/handleGraphError all return void); the heuristic flags them inside the async handlers. Matches the sibling graph CLI files (graph.ts, graph-modes.ts, orchestrate.ts).
+// @fitness-ignore-file only-documented-toolcli-seams -- same rationale as the no-direct-stdout waiver above: the one-line "Exported graph baseline to <path>" status confirmation after a file write; the --json path uses cli.emitJson. Not run output through a ToolCliContext seam.
 /**
  * graph-aux-command-specs — the declarative graph auxiliary commands (release
- * 2.11.0 Phase 5 Task 5.2).
+ * launch Phase 5 Task 5.2).
  *
  * Replaces graph's hand-rolled `registerGraph*Command()` bodies. The host mounts
  * each spec via `mountCommandSpec`; the tool no longer touches Commander. Each

@@ -5,11 +5,7 @@
  */
 
 import { buildSignalEnvelope, type ErrorResult } from '@opensip-cli/contracts';
-import {
-  ConfigurationError,
-  HOST_VERDICT_POLICY_FALLBACK,
-  NotFoundError,
-} from '@opensip-cli/core';
+import { ConfigurationError, HOST_VERDICT_POLICY_FALLBACK, NotFoundError } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import {

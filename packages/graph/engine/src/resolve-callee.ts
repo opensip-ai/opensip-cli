@@ -31,7 +31,7 @@ export function packageOf(filePath: string): string {
  * The package an occurrence belongs to. Prefers the build-time-stamped
  * `occurrence.package` (nearest `package.json` name — accurate for any repo
  * layout); falls back to the `packages/<segment>` path heuristic for
- * pre-2.4.2 catalogs that predate the stamp.
+ * legacy catalogs that predate the stamp.
  */
 export function pkgOf(occ: Pick<FunctionOccurrence, 'package' | 'filePath'>): string {
   return occ.package ?? packageOf(occ.filePath);

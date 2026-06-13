@@ -56,7 +56,7 @@ function collectPackageJsonPaths(dir, out) {
   }
 }
 
-/** The release ref the README's source links pin to (e.g. `v2.6.1`). */
+/** The release ref the README's source links pin to (e.g. `v1.0.0`). */
 function readReleaseRef() {
   const pkg = JSON.parse(readFileSync(join(REPO_ROOT, 'packages/core/package.json'), 'utf8'));
   return `v${pkg.version}`;

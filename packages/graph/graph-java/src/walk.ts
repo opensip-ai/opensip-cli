@@ -78,12 +78,7 @@ import {
 } from './walk-metadata.js';
 
 import type { JavaParsedFile, JavaParsedProject } from './parse.js';
-import type {
-  CallSiteRecord,
-  FunctionOccurrence,
-  WalkInput,
-  WalkOutput,
-} from '@opensip-cli/graph';
+import type { CallSiteRecord, FunctionOccurrence, WalkInput, WalkOutput } from '@opensip-cli/graph';
 import type { Node } from '@opensip-cli/tree-sitter';
 
 const TEST_PATH_RE = /(?:^|\/)test\//;

@@ -3,12 +3,7 @@
  * use a wrapped HTTP client.
  */
 
-import {
-  defineCheck,
-  isCommentLine,
-  isTestFile,
-  type CheckViolation,
-} from '@opensip-cli/fitness';
+import { defineCheck, isCommentLine, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Pattern for detecting raw fetch() calls.

@@ -1,5 +1,5 @@
 /**
- * @fileoverview Capability domain model (release 2.10.0, §5.3).
+ * @fileoverview Capability domain model (launch, §5.3).
  *
  * A **capability domain** is a named extension point a tool OWNS — "fit
  * has checks", "sim has scenarios", "graph has language adapters". Today
@@ -208,7 +208,7 @@ export type CapabilityRegistrar = (contribution: unknown) => void;
 
 /**
  * A tool's namespaced configuration contribution, as the kernel sees it
- * (release 2.10.0, ADR-0023, Phase 4). The concrete schema-bearing type —
+ * (launch, ADR-0023, Phase 4). The concrete schema-bearing type —
  * `ToolConfigDeclaration` — lives in `@opensip-cli/config` (which carries
  * Zod); core must not depend on config or Zod, so this kernel-side carrier
  * keeps `schema` (and `defaults`/`env`) `unknown`. The composition root (the

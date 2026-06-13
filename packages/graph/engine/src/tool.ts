@@ -2,7 +2,7 @@
 /**
  * graphTool — graph as a Tool plugin.
  *
- * Since release 2.11.0 (Phase 5 — the largest migration) the Commander wiring is
+ * Since launch (Phase 5 — the largest migration) the Commander wiring is
  * no longer hand-rolled: the tool exports declarative {@link CommandSpec}s
  * (`commandSpecs`) and the host's `mountCommandSpec` mounts them
  * (name/description/aliases, the ADR-0021 common flags, each command's
@@ -28,7 +28,6 @@ import { logger, readPackageVersion } from '@opensip-cli/core';
 // (register-graph-adapters.ts). The historical engine-side bootstrap is
 // gone.
 import { graphFingerprintStrategy } from './baseline-strategy.js';
-import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/report-data.js';
 import {
   graphBaselineExportCommandSpec,
   graphCatalogExportCommandSpec,
@@ -42,6 +41,7 @@ import {
 import { graphCommandSpec } from './cli/graph/graph-command-spec.js';
 import { graphConfigDeclaration } from './cli/graph-config-schema.js';
 import { graphRunWorkerCommandSpec } from './cli/graph-worker.js';
+import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/report-data.js';
 import { createAdapterRegistry, currentAdapterRegistry } from './lang-adapter/registry.js';
 import { CatalogRepo } from './persistence/catalog-repo.js';
 import { graphReplayFromSession } from './persistence/session-replay.js';
@@ -128,7 +128,7 @@ const GRAPH_RECIPES: ToolCommandDescriptor = {
 // =============================================================================
 
 /**
- * graph's declarative command surface (release 2.11.0 Phase 5). The host mounts
+ * graph's declarative command surface (launch Phase 5). The host mounts
  * each spec via `mountCommandSpec`; graph no longer touches Commander. Order is
  * preserved from the former `register()` mount order (graph, graph-lookup,
  * graph-shard-worker, graph-symbol-index, graph-baseline-export, catalog-export,
@@ -229,6 +229,11 @@ function collectReportData(scope: ToolScope): Record<string, unknown> {
   }
 }
 
+/**
+ * Per-tool contract version (ADR-0047). Exported from the public barrel.
+ */
+export const GRAPH_CONTRACT_VERSION = '1.0.0';
+
 export const graphTool: Tool = {
   metadata: {
     id: 'graph',
@@ -247,7 +252,7 @@ export const graphTool: Tool = {
     GRAPH_SARIF_EXPORT,
     GRAPH_RECIPES,
   ],
-  // Release 2.11.0 Phase 5: graph declares its command surface; the host mounts
+  // Launch Phase 5: graph declares its command surface; the host mounts
   // each spec via mountCommandSpec. The deprecated `register()` fallback is gone
   // — graph no longer touches Commander.
   commandSpecs: graphCommandSpecs,
@@ -269,4 +274,11 @@ export const graphTool: Tool = {
   // ADR-0036: graph's byte-preserved baseline identity (ruleId|filePath|line|col),
   // read by the host baseline/ratchet seams when graph stamps its gate envelope.
   fingerprintStrategy: graphFingerprintStrategy,
+  // ADR-0047: per-tool contract version for graph's domain surface (rules, catalog,
+  // execution model, adapter contract, etc.). Independent of core
+  // TOOL_CONTRACT_VERSION. Declared under extensionPoints for discoverability
+  // by hosts, agent-catalog, and third-party graph packs.
+  extensionPoints: {
+    graphContractVersion: GRAPH_CONTRACT_VERSION,
+  },
 };

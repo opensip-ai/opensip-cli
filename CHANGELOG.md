@@ -16,8 +16,7 @@ Initial production launch of OpenSIP CLI.
 - Static `graph` analysis with architecture rules, blast-radius signals, cycle
   detection, large-function detection, and duplicated-body detection.
 - Self-contained HTML dashboard reports.
-- Experimental `sim` engine for scenario-based load, chaos, and adversarial
-  testing.
+- `sim` engine for scenario-based load, chaos, and adversarial testing.
 - Project scaffolding via `opensip init`.
 - Plugin system for custom checks, recipes, scenarios, graph adapters, and full
   tools.

@@ -116,7 +116,7 @@ export interface SarifDriver {
  * real engine version in the SARIF provenance pass it via {@link SarifDriver}
  * on {@link buildOpenSipSarif} directly.
  */
-const DEFAULT_DRIVER_VERSION = '2.0.0';
+const DEFAULT_DRIVER_VERSION = '1.0.0';
 
 /**
  * Build a SARIF v2.1.0 log from `Signal[]` and a driver identity.

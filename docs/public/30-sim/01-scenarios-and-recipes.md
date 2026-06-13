@@ -24,8 +24,6 @@ related-docs:
 
 The `sim` command is the simulation tool. Where `fit` answers "is the codebase clean?", `sim` answers "does it behave correctly under stress?" Same architecture (Tool, Recipe, Engine, Renderer), different primitives.
 
-> ⚠️ `sim` is **experimental**. The author-facing API (the `define*Scenario` entry points) shifts more aggressively than `fit`'s. Pin to a major version in your check pack; expect occasional breaking changes in minors.
-
 > **`sim` is a standalone driver — you bring the target.** Every scenario
 > supplies a `target`: an async function the harness calls once per request
 > (it resolves on success, throws on failure). Point it **only at a service you

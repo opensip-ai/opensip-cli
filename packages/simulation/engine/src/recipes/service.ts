@@ -180,7 +180,7 @@ function resolveSelector(selector: ScenarioSelector): readonly RunnableScenario[
 }
 
 // =============================================================================
-// EXECUTION (on the shared substrate, release 2.13.0 §5.8)
+// EXECUTION (on the shared substrate, launch §5.8)
 // =============================================================================
 
 /**

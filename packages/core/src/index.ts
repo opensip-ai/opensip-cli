@@ -9,7 +9,7 @@ export type {
 } from './types/signal.js';
 export { createSignal, isErrorSeverity, isErrorSignal } from './types/signal.js';
 
-// Severity & Signal policy (north-star §5.9, release 2.13.0). One home for
+// Severity & Signal policy (north-star §5.9, launch). One home for
 // author→wire severity mapping + the override clamp + the gate's error/warning
 // predicate, plus the generic identity-stamping factory `createSignalFromViolation`
 // (so tools stamp source/ruleId/severity instead of retyping them).
@@ -143,7 +143,7 @@ export type {
 // (discoverToolPackages and friends live under plugins/ and are
 // re-exported above; the Tool / Registry types are tool-shape, not
 // plugin-discovery-shape, hence the separate barrel.)
-export { ToolRegistry, UnknownLiveViewError } from './tools/index.js';
+export { ToolRegistry, UnknownLiveViewError, TOOL_CONTRACT_VERSION } from './tools/index.js';
 export type {
   Tool,
   ToolMetadata,
@@ -157,6 +157,10 @@ export type {
   ToolPluginExports,
   ToolSessionRecord,
   ToolSessionReplayContribution,
+  // Preferred place for new/rare/future tool capabilities (see JSDoc on the type).
+  // This is the official evolution path for the Tool contract instead of
+  // adding more top-level optionals to `Tool`.
+  ToolExtensionPoints,
   LiveViewRenderer,
   // Typed host planes (host-planes-scope-seams-hygiene Phase 0): public so Cloud + third-party tools
   // can type against the bag on ToolCliContext without subpath imports. OSS flexibility via toolState.
@@ -165,7 +169,7 @@ export type {
   HostEntitlements,
 } from './tools/index.js';
 // Static tool-plugin manifest + the plugin-API epoch + provenance types
-// (release 3.0.0 raw-vs-admitted contract). Re-exported by @opensip-cli/
+// (launch raw-vs-admitted contract). Re-exported by @opensip-cli/
 // contracts for the public surface.
 export { PLUGIN_API_VERSION } from './tools/index.js';
 export type {
@@ -175,7 +179,7 @@ export type {
   ToolProvenance,
   ToolSource,
 } from './tools/index.js';
-// Command-plane types (release 2.11.0, §5.4): the declarative CommandSpec a tool
+// Command-plane types (launch, §5.4): the declarative CommandSpec a tool
 // exports for the host to mount, plus the pure CommonFlagKey key type. The
 // Commander-touching applyCommonFlags runtime stays in @opensip-cli/contracts,
 // which re-exports CommonFlagKey from here. Re-exported by contracts.
@@ -191,7 +195,7 @@ export type {
   CommonFlagKey,
   RawStreamReason,
 } from './tools/index.js';
-// Capability domain model (release 2.10.0, §5.3): the data shape a tool
+// Capability domain model (launch, §5.3): the data shape a tool
 // uses to declare an extension point it owns. The scope-owned runtime
 // registry is exported from ./plugins/index.js below. Re-exported by
 // @opensip-cli/contracts for the public surface.
@@ -330,7 +334,7 @@ export type { Logger, LogLevel, LoggerOptions, RunIdProvider } from './lib/logge
 export { getTracer, withSpan, withSpanAsync, currentTraceparent } from './lib/telemetry.js';
 export type { Span, Attributes, Tracer } from '@opentelemetry/api';
 
-// Lib — environment registry (north-star §5.12, release 2.12.0). The kernel
+// Lib — environment registry (north-star §5.12, launch). The kernel
 // observability primitive that governs the env surface: a tool/host declares an
 // `EnvVarSpec` (canonical name, aliases, coercion, default, docs, deprecation) and
 // every env read flows through `EnvRegistry.get`. Reading `process.env` inside
@@ -340,7 +344,7 @@ export type { Span, Attributes, Tracer } from '@opentelemetry/api';
 export { EnvRegistry } from './lib/env-registry.js';
 export type { EnvVarSpec, EnvDeprecation, EnvReadResult } from './lib/env-registry.js';
 
-// Lib — run diagnostics (north-star §5.10, release 2.12.0). The shared,
+// Lib — run diagnostics (north-star §5.10, launch). The shared,
 // JSON-emittable diagnostics vocabulary carried on a `CommandOutcome`, produced
 // by the scope-owned `DiagnosticsBus`. Types DEFINED here (the bus that produces
 // them is here; contracts re-exports the types for `CommandOutcome`).
@@ -369,7 +373,7 @@ export { generateId, generatePrefixedId, extractTimestamp, generateUUID } from '
 export { withRetry } from './lib/retry.js';
 export type { RetryOptions } from './lib/retry.js';
 
-// Lib — execution substrate (north-star §5.8, release 2.13.0). One bounded
+// Lib — execution substrate (north-star §5.8, launch). One bounded
 // scheduler + per-unit timeout/retry that fit + sim recipes run on, so
 // timeout/maxParallel/stopOnFirstFailure mean the same thing in every domain
 // (and a declared `timeout` actually aborts — the §4.3 sim fix). Plus the shared

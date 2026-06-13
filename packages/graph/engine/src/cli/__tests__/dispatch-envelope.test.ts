@@ -25,6 +25,7 @@ const result = { signals: [], catalog: undefined } as unknown as Parameters<
 function mockCli(): ToolCliContext {
   return {
     setExitCode: vi.fn(),
+    emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
     render: vi.fn(() => Promise.resolve()),

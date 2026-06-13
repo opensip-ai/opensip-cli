@@ -1,6 +1,6 @@
 /**
  * assemble-outcome — the host-owned assembler that STAMPS a {@link CommandOutcome}
- * onto a handler's pure-domain return (release 2.12.0, north-star §5.5).
+ * onto a handler's pure-domain return (launch, north-star §5.5).
  *
  * The single load-bearing rule of the Output plane: **the host assembles, the
  * handler stays pure domain.** A tool handler returns (or hands the host) its

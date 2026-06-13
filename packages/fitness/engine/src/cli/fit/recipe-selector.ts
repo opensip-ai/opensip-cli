@@ -7,11 +7,7 @@
  * shape via `FitnessRecipeService`.
  */
 
-import {
-  BUILTIN_DEFAULT_RECIPE,
-  EXIT_CODES,
-  resolveToolRecipeName,
-} from '@opensip-cli/contracts';
+import { BUILTIN_DEFAULT_RECIPE, EXIT_CODES, resolveToolRecipeName } from '@opensip-cli/contracts';
 import { logger } from '@opensip-cli/core';
 
 import { currentRecipeRegistry } from '../../framework/scope-registry.js';

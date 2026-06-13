@@ -1,7 +1,7 @@
 /**
  * cli-config — the tool-agnostic `cli:` block of `opensip-cli.config.yml`.
  *
- * Owns three things, all relocated here in 2.10.1 (ADR-0023 §Amendment):
+ * Owns three things, all relocated here under ADR-0023 §Amendment:
  *   - {@link CliDefaults} — the structural type the CLI pre-action hook reads.
  *   - {@link loadCliDefaults} — the permissive loader the hook calls to merge
  *     project-wide defaults (`--report-to`, `--exclude`, `--json`, `--api-key`,

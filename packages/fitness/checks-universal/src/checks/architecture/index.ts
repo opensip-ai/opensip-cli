@@ -26,5 +26,6 @@ export * from './restrict-raw-db-access.js';
 export * from './same-recipe-semantics.js';
 export * from './stale-build-artifacts.js';
 export * from './tool-has-manifest.js';
+export * from './tool-contract-version-policy.js';
 export * from './vitest-config-extends-base.js';
 export * from './vitest-config-required-with-tests.js';

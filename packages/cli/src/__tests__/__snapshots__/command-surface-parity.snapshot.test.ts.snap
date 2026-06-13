@@ -1552,7 +1552,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         },
       ],
       "subcommands": [],
-      "synopsis": "Run simulation scenarios [experimental]",
+      "synopsis": "Run simulation scenarios",
       "usage": "[options]",
     },
     {

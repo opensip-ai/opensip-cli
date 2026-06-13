@@ -2,7 +2,7 @@
 #
 # One-time bootstrap publish for @opensip-cli/*.
 #
-# Use this when one or more workspace packages do not yet exist on
+# Use this when one or more workspace packages are not present on
 # npmjs.com. npm trusted publishing (OIDC) requires the package to
 # already exist on the registry before a trusted publisher can be
 # configured — there is no "pending trusted publisher" feature. This

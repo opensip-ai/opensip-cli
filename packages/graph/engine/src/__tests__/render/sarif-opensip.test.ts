@@ -125,7 +125,7 @@ describe('graph SARIF — invariants', () => {
       runs: { tool: { driver: { name: string; version: string } } }[];
     };
     expect(parsed.runs[0].tool.driver.name).toBe('opensip-cli-graph');
-    expect(parsed.runs[0].tool.driver.version).toBe('2.0.0');
+    expect(parsed.runs[0].tool.driver.version).toBe('1.0.0');
   });
 
   it('tool.driver.rules contains every OpenSIP rule ID emitted in results', () => {

@@ -1,4 +1,5 @@
 // @fitness-ignore-file no-direct-stdout-in-tool-engine -- auxiliary subcommand status line: `fit-baseline-export` writes the SARIF baseline to a file and prints a one-line "Exported fit baseline to <path>" confirmation (the --json path uses cli.emitJson). This is not the signal-envelope run output (ADR-0011), which routes through the composition root.
+// @fitness-ignore-file only-documented-toolcli-seams -- same rationale as above: the one-line "Exported fit baseline to <path>" status confirmation after a file write; the --json path uses cli.emitJson. Not run output through a ToolCliContext seam.
 /**
  * fit-aux-command-specs — the declarative `fit-list` / `fit-recipes` /
  * `fit-baseline-export` commands (release 2.11.0 Phase 4 Task 4.2).

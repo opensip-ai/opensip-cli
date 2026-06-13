@@ -42,12 +42,12 @@ import { renderOutcome } from './commands/render-outcome.js';
  * Commander error codes that denote an INVALID ARGUMENT VALUE — a declared
  * `choices` rejection or a custom `argParser` that threw `InvalidArgumentError`
  * (e.g. graph's `--resolution` once its value validation moved from an
- * in-handler `ValidationError` to a declarative `choices` in the 2.11.0 command
+ * in-handler `ValidationError` to a declarative `choices` in the launch command
  * plane). These are usage errors and must exit `CONFIGURATION_ERROR` (2) — the
  * same code `mapToolErrorToExitCode(ValidationError)` yields — preserving the
  * pre-command-plane contract. Every OTHER Commander code (unknown command /
  * option, missing argument, help/version display) keeps Commander's own
- * `exitCode`, which already matched 2.10.0.
+ * `exitCode`, which already matched launch.
  */
 const COMMANDER_INVALID_ARGUMENT_CODES: ReadonlySet<string> = new Set([
   'commander.invalidArgument',
@@ -112,7 +112,7 @@ export interface HandleParseErrorOptions {
    * these errors fire outside a handler, so no parsed opts are available). When
    * true, every error becomes a structured `CommandOutcome` on stdout (the
    * `one-outcome-shape` contract, §5.5); when false, human rendering is
-   * byte-identical to 2.11.0.
+   * byte-identical to launch.
    */
   readonly jsonRequested: boolean;
 }
@@ -122,8 +122,8 @@ const NOOP_RENDER = (): Promise<void> => Promise.resolve();
 
 /**
  * The catch handler for `program.parseAsync()`. Maps the thrown error to a
- * `CommandOutcome` (release 2.12.0, §5.5): `--json` emits the structured outcome
- * on stdout, human mode renders byte-identically to 2.11.0. Routes the exit code
+ * `CommandOutcome` (launch, §5.5): `--json` emits the structured outcome
+ * on stdout, human mode renders byte-identically to launch. Routes the exit code
  * through `setExitCode`. Never throws.
  */
 export async function handleParseError(
@@ -134,7 +134,7 @@ export async function handleParseError(
   // `.exitOverride()`). Commander has ALREADY written its error/usage line to
   // stderr (or the help text to stdout), so we set the exit code and render
   // nothing — re-rendering would duplicate Commander's output and regress the
-  // 2.10.0-identical stderr for unknown-command/option/missing-arg cases. Only
+  // legacy-identical stderr for unknown-command/option/missing-arg cases. Only
   // the invalid-argument-value codes are re-mapped to exit 2 (ValidationError
   // parity); every other code keeps Commander's exit code.
   if (error instanceof CommanderError) {
@@ -146,7 +146,7 @@ export async function handleParseError(
   // config-resolve, tool-init. The guard threw a typed BootstrapError carrying its
   // own exit code, a clean message, and the original multi-line human text. In
   // human mode we write that text to stderr verbatim — byte-identical to the
-  // pre-2.12.0 guard output; in `--json` we emit a structured `bootstrap.error`.
+  // legacy guard output; in `--json` we emit a structured `bootstrap.error`.
   if (error instanceof BootstrapError) {
     opts.setExitCode(error.exitCode);
     if (opts.jsonRequested) {
@@ -180,7 +180,7 @@ export async function handleParseError(
     return;
   }
 
-  // Human: the existing Ink `ErrorResult` render (byte-identical to 2.11.0).
+  // Human: the existing Ink `ErrorResult` render (byte-identical to launch).
   await opts.render({
     type: 'error',
     message: suggestion?.message ?? message,

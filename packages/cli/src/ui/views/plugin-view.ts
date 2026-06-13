@@ -24,7 +24,7 @@ function provenanceLine(p: ToolProvenance): ViewNode {
 }
 
 /**
- * Render the admitted-tool provenance recorded this run (release 2.8.0).
+ * Render the admitted-tool provenance recorded this run (launch).
  * Additive section below the discovered-plugin list — empty/omitted when
  * no tools were admitted (e.g. no bootstrap, isolated tests).
  */

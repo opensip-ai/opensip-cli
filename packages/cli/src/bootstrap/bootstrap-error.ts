@@ -1,6 +1,6 @@
 /**
  * BootstrapError — a typed pre-handler failure thrown by the `preAction` guards
- * instead of writing to a stream + `process.exit()` (release 2.12.0, §4.7).
+ * instead of writing to a stream + `process.exit()` (launch, §4.7).
  *
  * Bootstrap failures (no project, schema-too-old, config-resolve, tool-init) used
  * to bypass the central renderer: each guard wrote its own message and called
@@ -9,7 +9,7 @@
  * top-level boundary (the `parseAsync().catch`) renders it through the same
  * `CommandOutcome` seam as every other result — `--json` emits a structured,
  * suggestion-bearing `bootstrap.error` outcome; human mode writes the unchanged
- * formatted message to stderr (byte-identical to the pre-2.12.0 bytes).
+ * formatted message to stderr (byte-identical to the legacy bytes).
  *
  * The error carries BOTH a clean `message` (for the `--json` `errors[].message`)
  * and the original multi-line `humanMessage` (for the byte-identical stderr path),
@@ -25,7 +25,7 @@ export interface BootstrapErrorInput {
   readonly message: string;
   /**
    * The exact multi-line text the guard used to write to stderr. The human
-   * boundary writes `${humanMessage}\n` verbatim — preserving the pre-2.12.0
+   * boundary writes `${humanMessage}\n` verbatim — preserving the legacy
    * bytes — instead of routing through the Ink error renderer.
    */
   readonly humanMessage: string;

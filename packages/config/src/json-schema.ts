@@ -19,7 +19,7 @@ export type JsonSchema = Record<string, unknown>;
  *
  * @param composed The whole-document schema returned by `composeConfigSchema`.
  * @returns A JSON Schema object whose `properties` include each registered
- *   namespace. The document-level catchall (the 2.10.1 migration seam) renders
+ *   namespace. The document-level catchall renders
  *   as `additionalProperties`, so unclaimed top-level keys remain permitted.
  */
 export function toJsonSchema(composed: ZodType): JsonSchema {

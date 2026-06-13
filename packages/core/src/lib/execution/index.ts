@@ -1,5 +1,5 @@
 /**
- * Execution substrate (north-star §5.8, release 2.13.0) — one bounded scheduler +
+ * Execution substrate (north-star §5.8, launch) — one bounded scheduler +
  * per-unit timeout/retry that fit + sim recipes run on, so `timeout`/`maxParallel`/
  * `stopOnFirstFailure` mean the same thing in every domain.
  */

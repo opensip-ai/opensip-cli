@@ -2,15 +2,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ToolRegistry } from '@opensip-cli/core';
+import { ToolRegistry, currentScope } from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
+import { makeTestScope, withScope } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { executeSessionShow } from '../commands/session-show.js';
 import { SessionReplayRegistry } from '../session-replay-registry.js';
-import { makeTestScope, withScope } from '@opensip-cli/test-support';
-import { currentScope } from '@opensip-cli/core';
 
 import type {
   CommandResult,
@@ -99,13 +98,18 @@ function makeSinks() {
   const errors: { message: string; exitCode: number; code?: string }[] = [];
   const rendered: CommandResult[] = [];
   const exitCodes: number[] = [];
+  const rawEmitted: unknown[] = [];
   return {
     emitted,
     errors,
     rendered,
     exitCodes,
+    rawEmitted,
     emitJson: (value: unknown) => {
       emitted.push(value);
+    },
+    emitRaw: (value: unknown) => {
+      rawEmitted.push(value);
     },
     emitError: (detail: { message: string; exitCode: number; code?: string }) => {
       // Mirror the host seam: emitError sets the exit code itself.
@@ -141,6 +145,7 @@ describe('executeSessionShow', () => {
         json: true,
         render: s.render,
         emitJson: s.emitJson,
+        emitRaw: s.emitRaw,
         emitError: s.emitError,
         setExitCode: s.setExitCode,
       });
@@ -165,9 +170,10 @@ describe('executeSessionShow', () => {
         json: true,
         render: s.render,
         emitJson: s.emitJson,
+        emitRaw: s.emitRaw,
         emitError: s.emitError,
         setExitCode: s.setExitCode,
-      })
+      }),
     );
 
     expect(s.exitCodes).toContain(2);
@@ -191,6 +197,7 @@ describe('executeSessionShow', () => {
         ref: 'FIT_1',
         render: s.render,
         emitJson: s.emitJson,
+        emitRaw: s.emitRaw,
         emitError: s.emitError,
         setExitCode: s.setExitCode,
       });
@@ -219,9 +226,10 @@ describe('executeSessionShow', () => {
         ref: 'FIT_R',
         render: s.render,
         emitJson: s.emitJson,
+        emitRaw: s.emitRaw,
         emitError: s.emitError,
         setExitCode: s.setExitCode,
-      })
+      }),
     );
 
     expect(s.rendered[0]).toMatchObject({ type: 'session-replay', session: { recipe: 'example' } });
@@ -237,9 +245,10 @@ describe('executeSessionShow', () => {
         ref: 'NOPE',
         render: s.render,
         emitJson: s.emitJson,
+        emitRaw: s.emitRaw,
         emitError: s.emitError,
         setExitCode: s.setExitCode,
-      })
+      }),
     );
 
     expect(s.exitCodes).toContain(2);
@@ -271,9 +280,10 @@ describe('executeSessionShow', () => {
         json: true,
         render: s.render,
         emitJson: s.emitJson,
+        emitRaw: s.emitRaw,
         emitError: s.emitError,
         setExitCode: s.setExitCode,
-      })
+      }),
     );
 
     expect(s.errors[0]).toEqual({ message: 'corrupt payload', exitCode: 2, code: 'decode-error' });
@@ -292,9 +302,10 @@ describe('executeSessionShow', () => {
         json: true,
         render: s.render,
         emitJson: s.emitJson,
+        emitRaw: s.emitRaw,
         emitError: s.emitError,
         setExitCode: s.setExitCode,
-      })
+      }),
     );
 
     expect(s.errors[0]).toMatchObject({ code: 'replay-unavailable' });
@@ -313,9 +324,10 @@ describe('executeSessionShow', () => {
         json: true,
         render: s.render,
         emitJson: s.emitJson,
+        emitRaw: s.emitRaw,
         emitError: s.emitError,
         setExitCode: s.setExitCode,
-      })
+      }),
     );
 
     expect(s.errors[0]).toMatchObject({ code: 'replay-unavailable' });
@@ -346,9 +358,10 @@ describe('executeSessionShow', () => {
         json: true,
         render: s.render,
         emitJson: s.emitJson,
+        emitRaw: s.emitRaw,
         emitError: s.emitError,
         setExitCode: s.setExitCode,
-      })
+      }),
     );
 
     expect(s.errors[0]).toEqual({ message: 'boom-string', exitCode: 2, code: 'decode-error' });

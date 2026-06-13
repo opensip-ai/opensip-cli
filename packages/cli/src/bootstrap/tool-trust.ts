@@ -1,13 +1,13 @@
 /**
  * tool-trust — the project-local executable-tool trust policy (release
- * 2.8.0, Phase 3 Task 3.2).
+ * launch, Phase 3 Task 3.2).
  *
  * A `project-local` tool is authored code under `<project>/opensip-cli/…`
  * that changes with the repo (§5.2.1). Running it imports arbitrary code
  * from the working tree, so the host MUST make the trust decision explicit
  * rather than load-by-presence.
  *
- * Policy for 2.8.0 (signed off): **deny-by-default for non-interactive
+ * Policy for launch (signed off): **deny-by-default for non-interactive
  * runs; admit-with-allowlist when configured.** No interactive prompt UX
  * in this release. The allowlist is a comma/whitespace-separated list of
  * tool ids in the `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` environment variable

@@ -1,39 +1,23 @@
 /**
  * cli-context — live-view registry, scope construction, and
- * `ToolCliContext` factory.
+ * `ToolCliContext` factory. Three related concerns:
  *
- * Three related concerns live here:
+ *  1. `createLiveViewRegistry` — backs `registerLiveView` / `renderLive`. A tool
+ *     registers its Ink view by key; an unregistered key throws
+ *     `UnknownLiveViewError` rather than masking a mistyped key with a static render.
+ *  2. `setCliRuntimeContextForRun` — the one-time bootstrap handoff `main()` uses to
+ *     pass the locally-constructed `LanguageRegistry` / `ToolRegistry` / manifests to
+ *     the pre-action-hook (which reads them via `getCurrentRegistriesForScope()` /
+ *     `getToolManifestsForRun()` when it builds the per-run `RunScope`). Per-run
+ *     project + datastore hang off the entered scope, not module globals.
+ *  3. `buildToolCliContext` — assembles the `ToolCliContext` handed to each tool and
+ *     host command, including the output/raw/error emit seams (delegated to
+ *     `renderOutcome` / `renderRaw`) and the single `setExitCode` write path
+ *     (`process.exitCode` is mutated only here).
  *
- *  1. `createLiveViewRegistry` — backs `ToolCliContext.registerLiveView`
- *     / `renderLive`. A tool sets its live view up on the context (e.g.
- *     `setUpFitLiveView`) via `cli.registerLiveView(key, renderer)`;
- *     `renderLive(key, args)` looks the renderer up. An unregistered key throws
- *     `UnknownLiveViewError` rather than silently falling back to a
- *     static render — the latter masked bugs where a tool mistyped its
- *     view key.
- *
- *  2. `setCliRuntimeContextForRun` — invoked by `main()` once per
- *     invocation, after the `LanguageRegistry`, `ToolRegistry`, and
- *     plugin-admission metadata are constructed locally. The pre-action-hook
- *     reads them via `getCurrentRegistriesForScope()` /
- *     `getToolManifestsForRun()` when it builds the per-run `RunScope`.
- *     A single runtime-context holder keeps those pre-scope values together
- *     with the mirrored constructed `RunScope`. The legacy
- *     `currentProjectContext` and `datastoreCache` module globals retired in
- *     T1 deferred Item D — project + datastore now hang off the entered
- *     RunScope.
- *
- *  3. `buildToolCliContext` — assembles the `ToolCliContext` the
- *     dispatcher hands to each tool. Captures the exit code through a
- *     single `setExitCode` write path. `process.exitCode` is mutated
- *     in exactly one place (here); commands and the catch handler all
- *     route through `ctx.setExitCode`.
- *
- * Lazy datastore: pre-action-hook constructs a closure-based thunk
- * that caches the open DataStore on first access. The thunk lands on
- * `RunScope.datastore`; tools read it via `cli.scope.datastore()` (typed
- * as `unknown` per the Tool contract). Dry-runs and error paths that never
- * touch the datastore never materialise `.runtime/datastore.sqlite`.
+ * Lazy datastore: a closure-based thunk caches the open DataStore on first access and
+ * lands on `RunScope.datastore`; paths that never touch it never materialise
+ * `.runtime/datastore.sqlite`.
  */
 
 import {
@@ -64,7 +48,7 @@ import {
   outcomeFromErrorMessage,
   outcomeFromResult,
 } from './commands/assemble-outcome.js';
-import { renderOutcome } from './commands/render-outcome.js';
+import { renderOutcome, renderRaw } from './commands/render-outcome.js';
 import { resetTelemetryStartedForTest } from './telemetry/sdk-init.js';
 
 import type { CommandResult, SignalEnvelope } from '@opensip-cli/contracts';
@@ -127,32 +111,17 @@ export function setCliRegistriesForRun(opts: {
   readonly languages: LanguageRegistry;
   readonly tools: ToolRegistry;
 }): void {
+  // @fitness-ignore-next-line env-via-registry -- NODE_ENV is the test-runtime meta-guard that makes this pre-scope helper *throw* if reached outside tests; it is not governed application configuration (intentionally absent from host-env-specs), so it does not flow through EnvRegistry.
   if (process.env.NODE_ENV !== 'test') {
     throw new SystemError(
       'Direct use of pre-scope registry setter outside tests is forbidden. ' +
         'Registries are handed to the per-run scope at construction time.',
-      { code: 'SYSTEM.SCOPE.HOLDER_MISUSE' }
+      { code: 'SYSTEM.SCOPE.HOLDER_MISUSE' },
     );
   }
   resetInitializedToolIdsForTest();
   resetTelemetryStartedForTest();
   updateRuntimeContext({ languages: opts.languages, tools: opts.tools });
-}
-
-/** Test-only no-op retained so legacy holder tests in cli-context.test.ts compile during transition. */
-export function markScopeEntered(): void {
-  if (process.env.NODE_ENV !== 'test') {
-    throw new SystemError(
-      'markScopeEntered is test-only after Phase 3 (pre-scope holder removal). Production uses enterScope + currentScope() only.',
-      { code: 'SYSTEM.SCOPE.HOLDER_MISUSE' }
-    );
-  }
-}
-
-/** Test-only reset retained for transition. */
-// @fitness-ignore-next-line dead-code -- test-only surface for holder-test transition (Phase 6 will remove or call it)
-export function resetScopeEnteredForTest(): void {
-  // noop in Phase 3+
 }
 
 /**
@@ -177,7 +146,7 @@ export function getCurrentRegistriesForScope(): {
 }
 
 /**
- * Record the provenance for the tools admitted through the 2.8.0
+ * Record the provenance for the tools admitted through the launch
  * compatibility gate. Called by `main()` once per invocation from the
  * `bootstrapCli` result, BEFORE Commander dispatch. Read by `plugin list`
  * (Phase 4) via {@link getToolProvenanceForRun}.
@@ -197,7 +166,7 @@ export function getToolProvenanceForRun(): readonly ToolProvenance[] {
 
 /**
  * Read the admitted-tool manifests recorded for this invocation (release
- * 2.10.0, §5.3) — installed cohesively by {@link setCliRuntimeContextForRun}.
+ * launch, §5.3) — installed cohesively by {@link setCliRuntimeContextForRun}.
  * Read by the pre-action-hook to register each tool's manifest-declared
  * capability domains into the per-run capability registry. Empty until
  * bootstrap has run (e.g. in isolated unit tests that never bootstrap) — the
@@ -205,15 +174,6 @@ export function getToolProvenanceForRun(): readonly ToolProvenance[] {
  */
 export function getToolManifestsForRun(): readonly ToolPluginManifest[] {
   return currentRuntimeContext.toolManifests;
-}
-
-/**
- * (Deprecated internal) No longer mirrors scope to holder. Scope is entered via ALS only.
- * Kept as no-op stub during Phase 3 transition so old call sites in the same package do not
- * explode; will be removed after callers are cleaned.
- */
-export function setCurrentRunScope(_scope: RunScope): void {
-  // noop after Phase 3 (holder removal). Scope lives only in ALS via enterScope/runWithScope.
 }
 
 /**
@@ -382,7 +342,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     maybeOpenReport: opts.maybeOpenReport,
     logger: log,
     setExitCode,
-    // 2.12.0 (§5.5): every machine output the host emits is wrapped in a
+    // launch (§5.5): every machine output the host emits is wrapped in a
     // `CommandOutcome` through the single `renderOutcome` seam — `emitJson`
     // (general-purpose `.data`), `emitEnvelope` (run `.envelope`), and
     // `emitError` (`status:'error'` `.errors`). The host STAMPS the outer
@@ -418,6 +378,11 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
         { jsonRequested: true, render: opts.render },
       );
     },
+    // RAW_STREAM seam (§5.5): emit the bare, unwrapped value for a command that
+    // declares `output:'raw-stream'` (e.g. `sessions show --raw`). The single
+    // sanctioned write lives in `renderRaw` (the one stdout-JSON seam), so the
+    // command body never hand-rolls `process.stdout.write(JSON.stringify(...))`.
+    emitRaw: (value) => renderRaw(value),
     // The root owns all effectful egress (ADR-0011 / ADR-0008): cloud sync via
     // the run's signal sink + `--report-to` SARIF upload. Tools call this once
     // per run; `setExitCode` is threaded so a `--report-to` failure on an

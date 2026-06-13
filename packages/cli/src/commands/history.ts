@@ -1,7 +1,7 @@
 /**
  * history command — show run history.
  *
- * v2: backed by SessionRepo over the project-local SQLite DataStore.
+ * Backed by SessionRepo over the project-local SQLite DataStore.
  * The CLI bootstrap opens the DataStore in `preAction`; this command
  * receives the constructed repo from its caller.
  */
@@ -30,19 +30,18 @@ export function showHistory(datastore: DataStore, opts: ShowHistoryOptions = {})
 
 function toHistorySession(session: StoredSession, summaryOnly = false): HistorySession {
   const summary = sessionSummary(session.payload);
-  const base: HistorySession = {
-    ...session,
+  // In summary-only mode, drop the (potentially large) tool-owned payload for
+  // agent "menu" use cases — the lightweight summary (if present) + showCommand
+  // remain. `payload` is `readonly?`, so we omit it by spreading `rest` (without
+  // payload) and adding `payload` back only when NOT summary-only — no mutation /
+  // delete (which would need an `any` cast to bypass readonly).
+  const { payload, ...rest } = session;
+  return {
+    ...rest,
+    ...(summaryOnly ? {} : { payload }),
     ...(summary === undefined ? {} : { summary }),
     showCommand: `opensip sessions show ${session.id} --json`,
   };
-
-  if (summaryOnly) {
-    // Drop the (potentially large) tool-owned payload for agent "menu" use cases.
-    // The lightweight summary (if present) and showCommand remain.
-    delete (base as any).payload;
-  }
-
-  return base;
 }
 
 function sessionSummary(payload: unknown): HistorySession['summary'] | undefined {

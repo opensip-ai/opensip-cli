@@ -30,7 +30,8 @@ const VERSION_DEF = /([A-Z_]+CONTRACT_VERSION)\s*=\s*['"][^'"]+['"]/;
  * Must mention one of the governing ADRs (or the policy titles) so that a
  * change to any contract version constant is traceable.
  */
-const POLICY_REFERENCE = /(ADR-0046|ADR-0047|Tool Contract Versioning Policy|per-tool contract versioning)/i;
+const POLICY_REFERENCE =
+  /(ADR-0046|ADR-0047|Tool Contract Versioning Policy|per-tool contract versioning)/i;
 
 /**
  * How many lines upward we look for the policy reference in comments.
@@ -79,13 +80,12 @@ export function analyzeToolContractVersionPolicy(
 }
 
 export const toolContractVersionPolicy = defineCheck({
-  id: 'a1b2c3d4-e5f6-7890-abcd-ef0046000001', // placeholder; replace with a real uuid if/when promoted
+  id: 'c9f2e1a3-7b5d-4f8e-9c1a-2d3e4f5a6b7c', // promoted stable ID (was placeholder for ADR-0046/0047 work)
   slug: 'tool-contract-version-policy',
   description:
     'Any *_CONTRACT_VERSION (core + per-tool) may only be changed on actual contract deltas and the change must reference ADR-0046 or ADR-0047',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   tags: ['architecture', 'tool-contract', 'versioning', 'plugins'],
   fileTypes: ['ts', 'tsx'],
-  analyze: (content, filePath) =>
-    analyzeToolContractVersionPolicy(content, filePath),
+  analyze: (content, filePath) => analyzeToolContractVersionPolicy(content, filePath),
 });

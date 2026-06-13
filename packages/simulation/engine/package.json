@@ -41,7 +41,7 @@
     "commands": [
       {
         "name": "sim",
-        "description": "Run simulation scenarios [experimental]"
+        "description": "Run simulation scenarios"
       },
       {
         "name": "sim-run-worker",

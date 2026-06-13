@@ -1,6 +1,6 @@
 /**
  * createGraphSignal — the graph rule signal factory (north-star §5.9, release
- * 2.13.0).
+ * launch).
  *
  * Graph rules used to hand-assemble fingerprint-relevant identity in every body:
  * `createSignal({ source: 'graph', ruleId: 'graph:<slug>', severity:

@@ -17,15 +17,10 @@
 
 import v8 from 'node:v8';
 
-import {
-  EnvRegistry,
-  ToolError,
-  type EnvVarSpec,
-  type ToolErrorOptions,
-} from '@opensip-cli/core';
+import { EnvRegistry, ToolError, type EnvVarSpec, type ToolErrorOptions } from '@opensip-cli/core';
 
 /**
- * Graph-engine environment variables (release 2.12.0, §5.12). Read through the
+ * Graph-engine environment variables (launch, §5.12). Read through the
  * {@link EnvRegistry} primitive (immutable spec table) so the env surface is
  * governed and documentable; the `env-via-registry` guardrail forbids raw
  * `process.env` reads. (`NODE_OPTIONS`, mutated by the heap-preflight before any

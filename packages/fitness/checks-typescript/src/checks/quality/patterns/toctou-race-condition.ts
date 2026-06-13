@@ -23,12 +23,7 @@
  * SQL). All-local-receiver patterns are excluded.
  */
 
-import {
-  defineCheck,
-  getCheckConfig,
-  isTestFile,
-  type CheckViolation,
-} from '@opensip-cli/fitness';
+import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 

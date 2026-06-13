@@ -7,11 +7,13 @@
  *
  * The actual config I/O (read/write `~/.opensip-cli/config.yml`,
  * resolve the API key from flag → env → config) lives in
- * `@opensip-cli/config` (relocated there in 2.10.1, ADR-0023) so the
+ * `@opensip-cli/config` (relocated there in ADR-0023) so the
  * pre-action hook and this command both read it through the config
  * layer. This file is the prompt+UX wrapper around those primitives.
  * Audit 2026-05-23 M3.
  */
+
+// @fitness-ignore-file only-documented-toolcli-seams -- interactive TTY prompts: readline prompt text + masked-key verification UX, not machine run output through a ToolCliContext seam (mirrors the ESLint exemption for this file). Result lines route through the Ink `configure-done` CommandResult.
 
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';

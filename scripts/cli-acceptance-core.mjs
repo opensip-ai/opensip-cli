@@ -88,7 +88,7 @@ export function checkScenario(result, expect = {}) {
  * Shape-assert an opensip-cli `--json` Signal envelope. Returns a predicate
  * over the parsed stdout suitable for a scenario's `expect.json`.
  *
- * 2.12.0 (§5.5): `--json` is a `CommandOutcome` wrapper; the (unchanged) signal
+ * `--json` is a `CommandOutcome` wrapper; the signal
  * envelope rides under `.envelope`. This predicate unwraps it (tolerating a bare
  * envelope too, for forward/backward robustness) before shape-asserting.
  */

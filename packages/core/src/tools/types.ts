@@ -690,12 +690,13 @@ export interface ToolExtensionPoints {
   readonly stableExampleIds?: () => readonly string[];
   readonly scaffoldConfigBlock?: () => string;
 
-  // Per-tool contract versions (ADR-0047). Each tool may declare its own
-  // e.g. fitnessContractVersion, graphContractVersion, etc. These live here
-  // (the evolution bag) rather than on the main Tool interface so the core
-  // contract stays narrow while per-tool surfaces can evolve independently.
+  // Per-tool contract versions (ADR-0047). Each tool declares its own domain
+  // surface version here (the evolution bag) rather than on the main Tool
+  // interface, so the core contract stays narrow while per-tool surfaces evolve
+  // independently of core's TOOL_CONTRACT_VERSION.
   readonly fitnessContractVersion?: string;
-  // (Other tools add theirs when they adopt per-tool versioning.)
+  readonly graphContractVersion?: string;
+  readonly simulationContractVersion?: string;
 }
 
 /**

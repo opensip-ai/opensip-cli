@@ -1,6 +1,6 @@
 /**
  * CommandOutcome — the standard OUTER currency wrapping every command result and
- * error (north-star §5.5, release 2.12.0).
+ * error (north-star §5.5, launch).
  *
  * `SignalEnvelope` (ADR-0011) is the strong INNER currency, but the outer shape
  * drifted: run commands emitted a bare envelope, list/report commands a bare
@@ -16,7 +16,7 @@
  * `diagnostics` with neither payload. The host ASSEMBLES it — stamping
  * `kind`/`status`/`exitCode`/`diagnostics` from the handler's pure-domain return —
  * so no tool, first-party or external, chooses its own error JSON or success
- * carrier. The handler contract does not change (the 2.11.0 command-plane spec's
+ * carrier. The handler contract does not change (the command-plane spec's
  * "no handler contract change"); all the outer-shape change lands at the host
  * dispatch seam.
  *
@@ -55,7 +55,7 @@ export interface WarningDetail {
 
 /**
  * Hints the renderer consumes when materializing the outcome. RESERVED for
- * 2.12.0 — populated only with what the existing renderer already branches on
+ * launch — populated only with what the existing renderer already branches on
  * (`quiet`, `noColor`, `preferredFormat`); the field exists so later releases can
  * extend rendering policy without another outer-shape break. Do not invent new
  * hints here.

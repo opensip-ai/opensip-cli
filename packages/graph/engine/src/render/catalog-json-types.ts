@@ -88,7 +88,7 @@ export interface CatalogExportProvenance {
    *  short and the catalog reflects only a prefix of the discovery
    *  output. Phase 5 may filter on this. */
   readonly completeness: 'partial' | 'complete';
-  /** Engine package version (e.g., `'2.0.0'`) — provenance for the
+  /** Engine package version (e.g., `'1.0.0'`) — provenance for the
    *  derivation algorithm. If a future engine release changes the
    *  symbol-ID hashing, the version bump documents the substrate
    *  cutover boundary. */

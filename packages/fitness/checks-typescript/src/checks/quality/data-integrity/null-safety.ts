@@ -5,12 +5,7 @@
  * Detects unsafe property and method access without null checks.
  */
 
-import {
-  defineCheck,
-  getCheckConfig,
-  isTestFile,
-  type CheckViolation,
-} from '@opensip-cli/fitness';
+import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 

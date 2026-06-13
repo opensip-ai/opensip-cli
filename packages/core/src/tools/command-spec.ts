@@ -1,5 +1,5 @@
 /**
- * @fileoverview Command-plane types (release 2.11.0, north-star §5.4).
+ * @fileoverview Command-plane types (launch, north-star §5.4).
  *
  * The declarative command surface a tool exports so the **host** can mount it
  * — replacing each tool's raw-Commander access (`program.command(...).option(...).
@@ -18,7 +18,7 @@
  * `OptionSpec` is grounded in the *real* first-party flag corpus (graph 26 +
  * fit 10 + sim 1 + host commands), enumerated in the Phase 0 flag-corpus table.
  * Every flag shape maps to a field below — there is no raw-Commander escape
- * hatch by design (the 3.0.0 "one command surface" invariant). Any future flag
+ * hatch by design (the the "one command surface" invariant). Any future flag
  * that cannot be expressed is an OptionSpec EXTENSION, never an escape.
  */
 
@@ -131,7 +131,7 @@ export interface ArgSpec {
 
 /**
  * What the handler returns and how the host renders it through the single
- * dispatch seam (Phase 1). The 2.12.0 `CommandOutcome` swap happens at this seam
+ * dispatch seam (Phase 1). The launch `CommandOutcome` swap happens at this seam
  * without changing the handler contract.
  *
  * - `signal-envelope` — handler yields a `SignalEnvelope` (fit/graph runs); the

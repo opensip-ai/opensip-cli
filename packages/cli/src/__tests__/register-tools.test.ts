@@ -55,6 +55,7 @@ function makeStubContext(): ToolCliContext {
     },
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
+    emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),

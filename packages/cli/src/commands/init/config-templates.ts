@@ -102,7 +102,7 @@ export function generateConfig(
 ): string {
   // The document-level skeleton (header, schemaVersion, globalExcludes, targets)
   // is rendered by @opensip-cli/config — the package that also OWNS + validates
-  // those blocks (2.10.1, ADR-0023), so the scaffold cannot drift from what the
+  // those blocks (ADR-0023), so the scaffold cannot drift from what the
   // composed schema accepts (asserted by a round-trip test). The CLI supplies the
   // per-language target content; each registered tool contributes its own config
   // block (ADR-0038 Decision 2 — fitness owns `fitness:`, sim contributes none).

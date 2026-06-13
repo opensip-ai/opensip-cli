@@ -74,7 +74,7 @@ const RETIRED_TERMS = [
     name: 'Tool.register',
     re: /\bTool\.register\b|\bregister\(cli\)/,
     narratedRemoval: true,
-    hint: 'declarative commandSpecs (3.0.0; the raw-Commander hook is gone)',
+    hint: 'declarative commandSpecs (launch; the raw-Commander hook is gone)',
   },
   {
     name: 'shouldFail',

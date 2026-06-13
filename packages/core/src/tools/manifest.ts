@@ -1,6 +1,6 @@
 /**
  * @fileoverview Static tool-plugin manifest + the plugin-API epoch +
- * provenance types (release 3.0.0, raw-vs-admitted compatibility contract).
+ * provenance types (launch, raw-vs-admitted compatibility contract).
  *
  * The **manifest** is the static front matter the host reads *before*
  * importing a tool's runtime `Tool` module (north-star §5.1). It is
@@ -31,7 +31,7 @@ import type { ToolCapabilityDeclaration } from './capability.js';
  * A coarse integer, bumped only on a breaking change to the plugin
  * *input* contract. A tool manifest's `apiVersion` is compared against
  * this single value by `checkCompatibility()`. A missing `apiVersion`
- * is incompatible as of 3.0.0; raw manifests stay representable so the
+ * is incompatible as of launch; raw manifests stay representable so the
  * admission gate can diagnose unversioned inputs before rejecting them.
  */
 export const PLUGIN_API_VERSION = 1;
@@ -83,7 +83,7 @@ export interface ToolCommandManifest {
  * forward-shaped; they are deliberately `unknown`-shaped until a release gives
  * them concrete semantics.
  *
- * Release 2.10.0 (§5.3) gives `capabilities` its concrete shape — an
+ * Launch (§5.3) gives `capabilities` its concrete shape — an
  * array of {@link ToolCapabilityDeclaration} (the capability domains the
  * tool OWNS). It stays OPTIONAL and additive: a manifest with no
  * `capabilities` declares no domains, and `MARKER_KINDS` remains the
@@ -102,11 +102,11 @@ interface ToolPluginManifestBase {
   readonly commands: readonly ToolCommandManifest[];
 
   // ── Typed-but-not-consumed until later releases ────────────────────
-  // These keep a 3.0.0-authored manifest forward-shaped. They are
+  // These keep a current manifest forward-shaped. They are
   // `unknown` (not concrete) on purpose: the release that consumes each
   // one defines its shape; declaring a shape now would over-commit.
   /**
-   * §5.3 → 2.10.0: the capability domains this tool OWNS. Each entry is a
+   * §5.3 → Launch: the capability domains this tool OWNS. Each entry is a
    * {@link ToolCapabilityDeclaration} (id + contribution epoch + schema +
    * kind); the host stamps `ownerToolId = this.id` and registers each into
    * the per-run capability registry, EXTENDING the `MARKER_KINDS` bootstrap
@@ -125,11 +125,11 @@ interface ToolPluginManifestBase {
   readonly requires?: readonly unknown[];
 
   // ── Reserved for community / catalog (ecosystem vision) ─────────────
-  // These are additive reservations (not yet consumed) so manifests
+  // These are additive reservations (currently unused) so manifests
   // authored for GA remain forward-shaped for the future community
   // marketplace, distribution modes, compatibility declarations,
   // org-scoped registries, and paid-extension support described in the
-  // product ecosystem vision (docs/business/product-ecosystem-vision.md).
+  // product ecosystem vision (cross-repo product strategy doc).
   // See the second-pass architecture review (GA blocker on forward-compat
   // in manifests/admission). The shape will be defined by the release
   // that first consumes them.
@@ -144,7 +144,7 @@ interface ToolPluginManifestBase {
 /**
  * Structurally valid manifest front matter before compatibility admission.
  * `apiVersion` is optional here only so the loader can represent and diagnose
- * 3.0.0-incompatible unversioned tools without pretending they are admitted.
+ * manifest-incompatible unversioned tools without pretending they are admitted.
  */
 export interface RawToolPluginManifest extends ToolPluginManifestBase {
   /** The plugin-API epoch this tool was compiled against, if declared. */

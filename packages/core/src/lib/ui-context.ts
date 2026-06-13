@@ -21,13 +21,13 @@ export interface UiContext {
    * Stored untyped; narrowed via cli-ui's `normalizeBannerSize` at render.
    */
   readonly bannerSize: string;
-  /** CLI version (e.g. `2.2.1`), shown by the `mini` banner. */
+  /** CLI version (e.g. `1.0.0`), shown by the `mini` banner. */
   readonly version: string;
   /**
-   * Newer published version available on npm (e.g. `2.3.0`), or `undefined`
+   * Newer published version available on npm (e.g. `1.0.1`), or `undefined`
    * when up-to-date / the check is skipped or hasn't completed. Resolved by
    * the CLI bootstrap from the cached `update-notifier` result. The `mini`
-   * banner surfaces it inline as `(vX.Y.Z available)`; other sizes rely on
+   * banner surfaces it inline as `(<new-version> available)`; other sizes rely on
    * the separate stderr nag.
    */
   readonly update?: string;

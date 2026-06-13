@@ -22,15 +22,11 @@ describe('resolveProjectPaths', () => {
     const p = resolveProjectPaths(PROJECT);
     expect(p.userSourceDir).toBe(join(PROJECT, 'opensip-cli'));
     expect(p.userPluginDir('fit', 'checks')).toBe(join(PROJECT, 'opensip-cli', 'fit', 'checks'));
-    expect(p.userPluginDir('fit', 'recipes')).toBe(
-      join(PROJECT, 'opensip-cli', 'fit', 'recipes'),
-    );
+    expect(p.userPluginDir('fit', 'recipes')).toBe(join(PROJECT, 'opensip-cli', 'fit', 'recipes'));
     expect(p.userPluginDir('sim', 'scenarios')).toBe(
       join(PROJECT, 'opensip-cli', 'sim', 'scenarios'),
     );
-    expect(p.userPluginDir('sim', 'recipes')).toBe(
-      join(PROJECT, 'opensip-cli', 'sim', 'recipes'),
-    );
+    expect(p.userPluginDir('sim', 'recipes')).toBe(join(PROJECT, 'opensip-cli', 'sim', 'recipes'));
   });
 
   it('places runtime state under opensip-cli/.runtime', () => {

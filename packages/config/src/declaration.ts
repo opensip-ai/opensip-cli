@@ -48,7 +48,7 @@ export interface EnvBindingDeclaration {
  * `namespace` is the tool's top-level key (e.g. `fitness`, `graph`,
  * `simulation`); `schema` validates that namespace's block. The composer makes
  * each namespace schema `.strict()` so a typo inside a known namespace is
- * rejected, while tolerating not-yet-migrated top-level keys (the 2.10.1 seam).
+ * rejected, while tolerating unclaimed top-level keys for forward compatibility.
  */
 export interface ToolConfigDeclaration {
   /** Top-level config key owned by this tool. */

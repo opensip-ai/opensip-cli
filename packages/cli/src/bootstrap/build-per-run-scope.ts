@@ -23,6 +23,7 @@ import { join } from 'node:path';
 import { resolveEffectiveCloudConfig } from '@opensip-cli/config';
 import {
   createCapabilityRegistry,
+  type LanguageRegistry,
   type Logger,
   type ProjectContext,
   resolveUserPaths,
@@ -39,8 +40,6 @@ import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-a
 
 import type { loadCliDefaults } from './cli-defaults.js';
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any -- loose types from composition root extraction (build-per-run-scope); structural improvement, full strict typing is follow-up. */
-
 /** Inputs required to build a fully wired per-run scope. */
 export interface BuildPerRunScopeInput {
   readonly project: ProjectContext;
@@ -48,7 +47,7 @@ export interface BuildPerRunScopeInput {
   readonly cwd: string;
   readonly cliDefaults: ReturnType<typeof loadCliDefaults>; // or narrow if we extract a type
   readonly registries: {
-    readonly languages: any; // LanguageRegistry
+    readonly languages: LanguageRegistry;
     readonly tools: ToolRegistry;
   };
   readonly manifests: readonly ToolPluginManifest[];

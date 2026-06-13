@@ -1,6 +1,6 @@
 /**
  * tool-lifecycle — the NAMED, ordered tool-admission lifecycle (release
- * 2.11.0, §5.4). A thin sequencer/driver that documents + orders the existing
+ * launch, §5.4). A thin sequencer/driver that documents + orders the existing
  * bootstrap calls into one canonical sequence, rather than re-architecting the
  * individual hooks (which keep their own homes and contracts).
  *
@@ -55,7 +55,7 @@ import type { CliProgram } from '@opensip-cli/contracts';
 import type { ToolCliContext, ToolRegistry } from '@opensip-cli/core';
 
 /**
- * Canonical, ordered tool-lifecycle steps (release 2.11.0, §5.4). The numeric
+ * Canonical, ordered tool-lifecycle steps (launch, §5.4). The numeric
  * values are the step ordinals used in the JSDoc above and in
  * lifecycle-ordering tests; the string keys name each step. This is the single
  * source of truth for the sequence — a test asserts the STARTUP driver fires
@@ -94,7 +94,7 @@ export const TOOL_LIFECYCLE_STEPS = {
  *
  * Kept THIN deliberately: it delegates straight to
  * {@link mountAllToolCommands}, which mounts each tool's declared `commandSpecs`
- * (the one command surface, 3.0.0) with per-tool failure isolation. The naming +
+ * (the one command surface, launch) with per-tool failure isolation. The naming +
  * ordering is the value here, not new logic.
  *
  * @param registry The per-invocation tool registry, already populated by

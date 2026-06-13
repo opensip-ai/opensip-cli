@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   const langRegistry = new LanguageRegistry();
   const toolRegistry = new ToolRegistry();
 
-  // v2 persistence: datastore is opened LAZILY in cli-context.ts on
+  // Persistence: datastore is opened LAZILY in cli-context.ts on
   // first access via getOrOpenDatastore. bootstrapCli just registers
   // tools and adapters; no SQLite file is created here.
   const { provenance, manifests } = await bootstrapCli({
@@ -91,7 +91,7 @@ async function main(): Promise<void> {
 
   // Step 8 of the tool lifecycle (§5.4): mount each registered tool's commands
   // through the named sequencer seam. The host owns `program` and passes it in
-  // (3.0.0 — the tool context no longer carries a raw-Commander handle, §8); the
+  // (launch — the tool context no longer carries a raw-Commander handle, §8); the
   // one command surface is each tool's declarative commandSpecs.
   mountToolCommands(toolRegistry, program, ctx);
 
@@ -103,6 +103,7 @@ async function main(): Promise<void> {
     setExitCode: ctx.setExitCode,
     render: renderResult,
     emitJson: ctx.emitJson,
+    emitRaw: ctx.emitRaw,
     emitError: ctx.emitError,
     datastore: () => getOrOpenDatastore(logger),
     ...registrationInput,

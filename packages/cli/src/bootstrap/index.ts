@@ -31,7 +31,7 @@
  * `loadCliDefaults`, `registerFirstPartyTools`, `BUNDLED_TOOL_PACKAGES`,
  * `registerLanguageAdapters`) stay in their files; bootstrap siblings and
  * tests import them directly. (User-global config I/O moved to
- * `@opensip-cli/config` in 2.10.1.) Audit 2026-05-23 M1.
+ * `@opensip-cli/config` in the launch contract.) Audit 2026-05-23 M1.
  */
 
 import {
@@ -58,7 +58,7 @@ import {
 
 // Re-export only the symbols the CLI composition root (`index.ts`) consumes.
 // `mountToolCommands` is the named step-8 seam of the tool lifecycle (release
-// 2.11.0, §5.4); it delegates to `mountAllToolCommands` (kept exported for the
+// launch, §5.4); it delegates to `mountAllToolCommands` (kept exported for the
 // existing direct unit tests).
 export { mountAllToolCommands, EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
 // The shared admission callable (ADR-0041: one validator, four consumers) —
@@ -124,17 +124,17 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   initTelemetry(opts.cliEntryUrl);
   registerLanguageAdapters(opts.langRegistry);
 
-  // Release 2.8.0: bundled + installed tools both flow through the shared
+  // Launch: bundled + installed tools both flow through the shared
   // `admitTool` gate (register-tools.ts) and contribute a `ToolProvenance`
   // record into this collector. It's a plain array threaded by value — no
   // module singleton — handed back to the composition root so Phase 4's
   // `plugin list` can surface source / identity / manifestHash.
   const provenance: ToolProvenance[] = [];
-  // §5.3 (2.10.0): collect the admitted tools' manifests alongside provenance
+  // §5.3 (launch): collect the admitted tools' manifests alongside provenance
   // so the composition root can seed the per-run capability registry with each
   // manifest's declared domains.
   const manifests: ToolPluginManifest[] = [];
-  // 3.0.0: bundled tools load through the same dynamic-import path as installed
+  // Launch: bundled tools load through the same dynamic-import path as installed
   // tools, so registration is async — awaited before discovery so the bundled
   // manifests are loaded before we derive the built-in skip-set from them.
   // A bundled tool listed in OPENSIP_CLI_SKIP_BUNDLED is NOT loaded as bundled,
@@ -150,7 +150,7 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   await registerFirstPartyTools(opts.toolRegistry, provenance, manifests, bundledPackages);
   // The bundled-tool ids discovery must skip on a name collision, derived from
   // the manifests just loaded (not from an imported tool runtime — the host
-  // holds none in 3.0.0).
+  // holds none in the launch contract).
   const builtInIds = new Set(manifests.map((m) => m.id));
   await discoverAndRegisterToolPackages(
     opts.toolRegistry,

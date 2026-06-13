@@ -97,6 +97,9 @@ function makeFakeContext(): {
     emitJson: (value: unknown) => {
       emitted.push(value);
     },
+    emitRaw: (value: unknown) => {
+      emitted.push(value);
+    },
     emitEnvelope: (value: unknown) => {
       emitted.push(value);
     },
@@ -171,7 +174,7 @@ describe('simulationTool command surface (Phase 3 — CommandSpec migration)', (
   it('declares the sim command name/description/output/scope', () => {
     const spec = simSpec();
     expect(spec.name).toBe('sim');
-    expect(spec.description).toBe('Run simulation scenarios [experimental]');
+    expect(spec.description).toBe('Run simulation scenarios');
     // The handler owns its full output surface (TTY-vs-static branch + egress).
     expect(spec.output).toBe('raw-stream');
     expect(spec.scope).toBe('project');

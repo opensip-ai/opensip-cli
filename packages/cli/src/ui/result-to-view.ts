@@ -43,7 +43,7 @@ import {
   viewListChecks,
   viewListRecipes,
   viewHistory,
-  viewExperimental,
+  viewSimNotice,
   viewReport,
   viewClearDone,
   viewConfigureDone,
@@ -402,8 +402,8 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'init': {
       return viewInit(result);
     }
-    case 'experimental': {
-      return viewExperimental(result);
+    case 'sim-notice': {
+      return viewSimNotice(result);
     }
     case 'tools-list': {
       return viewToolsList(result);

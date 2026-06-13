@@ -189,7 +189,7 @@ This is why ignore directives are compatible with the gate: a directive suppress
 
 ## CI integration patterns
 
-In v2 the baseline lives in `<project>/opensip-cli/.runtime/datastore.sqlite`, which is gitignored. To get a shared baseline across CI runs the SQLite store (or just its baseline payload) has to travel with the workflow. Two shapes that work in practice:
+The baseline lives in `<project>/opensip-cli/.runtime/datastore.sqlite`, which is gitignored. To get a shared baseline across CI runs the SQLite store (or just its baseline payload) has to travel with the workflow. Two shapes that work in practice:
 
 ### Pattern 1 — rolling baseline via CI artifact
 
@@ -227,7 +227,7 @@ jobs:
       - run: opensip fit --gate-compare
 ```
 
-PRs are graded against a moving target, but the target only goes down (main never adds violations, by construction). This is the closest equivalent to v1's "committed baseline" workflow.
+PRs are graded against a moving target, but the target only goes down (main never adds violations, by construction). This is the closest equivalent to a committed-baseline workflow without committing runtime state.
 
 ### Pattern 2 — local-only baseline
 
@@ -235,7 +235,7 @@ The baseline lives in `.runtime/datastore.sqlite` (gitignored). Each developer's
 
 This is the loosest shape. Useful for early adoption, where the team isn't yet ready to enforce the gate in CI but wants the regression-detection workflow as a personal tool.
 
-> **Why no "committed baseline" pattern in v2?** Because the v2 baseline is a row in a SQLite database with WAL sidecars, committing it to git would mean committing a binary blob that diffs poorly and races on WAL writes. The artifact pattern above is the supported substitute. Teams that strongly need a text-shaped baseline in git can run `fit-baseline-export` to write the stored envelope as a SARIF file and commit that.
+> **Why no committed baseline file?** Because the baseline is a row in a SQLite database with WAL sidecars, committing it to git would mean committing a binary blob that diffs poorly and races on WAL writes. The artifact pattern above is the supported substitute. Teams that strongly need a text-shaped baseline in git can run `fit-baseline-export` to write the stored envelope as a SARIF file and commit that.
 
 ---
 

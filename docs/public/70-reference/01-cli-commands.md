@@ -58,13 +58,9 @@ report body" flag whose output is identical in a TTY and a pipe. The only
 
 ### OpenSIP Cloud signal sync
 
-> **Preview — not yet generally available.** The cloud ingestion, entitlement,
-> and storage endpoints live in the parent OpenSIP service and **do not exist
-> yet** ([ADR-0008](../10-concepts/06-cloud-signal-sync.md)). This repo ships the
-> client and the wire contract (`SignalBatch`) only. Until the server side ships,
-> an entitled run has no live endpoint to sync against; the description below is
-> the *intended* behavior, gated behind a key + entitlement the OSS majority
-> never sets.
+OpenSIP Cloud sync is optional. This repo ships the CLI client and the
+`SignalBatch` wire contract; sync runs only when an OpenSIP API key and a
+compatible endpoint are configured. Without a key, the CLI remains fully local.
 
 When configured (an OpenSIP API key via `opensip configure` or
 `OPENSIP_API_KEY`) **and** entitled to the cloud storage tier, each `fit`
@@ -149,7 +145,7 @@ opensip fit --gate-compare
 
 ## `sim` — run simulation scenarios
 
-Tool-owned: [`packages/simulation/engine/src/tool.ts`](../../../packages/simulation/engine/src/tool.ts). Marked **experimental** in `--help`.
+Tool-owned: [`packages/simulation/engine/src/tool.ts`](../../../packages/simulation/engine/src/tool.ts).
 
 ```
 opensip sim
@@ -771,7 +767,7 @@ curl -fsSL https://opensip.ai/cli/install.sh | bash
 
 The CLI checks npm for a newer version once a day (non-blocking, TTY-only). The *check* is rate-limited to once a day, but once a newer version is found the *notice* persists on **every** run until you upgrade — so it's never lost if you miss it once — and disappears on its own the run after you update. When an update is available it surfaces without nagging:
 
-- On the default `mini` banner, the version line shows `(vX.Y.Z available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
+- On the default `mini` banner, the version line shows `(<new-version> available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
 - On the `lg`/`md`/`sm` banners (and the `--json` path, which renders no banner), the same upgrade command is printed as a one-line note on stderr.
 
 Silence the check entirely with `OPENSIP_NO_UPDATE=1` (or the conventional `NO_UPDATE_NOTIFIER=1`). It's also skipped automatically when `CI` is set or stdout isn't a TTY. Check your installed version any time with `opensip --version`.

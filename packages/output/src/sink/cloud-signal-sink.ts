@@ -12,13 +12,7 @@ import { logger, withSpanAsync } from '@opensip-cli/core';
 
 import { postChunked } from './http-egress.js';
 
-import type {
-  EmitResult,
-  RepoIdentity,
-  Signal,
-  SignalBatch,
-  SignalSink,
-} from '@opensip-cli/core';
+import type { EmitResult, RepoIdentity, Signal, SignalBatch, SignalSink } from '@opensip-cli/core';
 
 const MODULE_TAG = 'cloud-signal-sink';
 const MAX_SIGNALS_PER_CHUNK = 500;

@@ -15,7 +15,7 @@
  * package keeps `commander` as an optional peer dependency (see index.ts).
  */
 
-// The CommonFlagKey KEY TYPE moved to @opensip-cli/core (release 2.11.0) so the
+// The CommonFlagKey KEY TYPE moved to @opensip-cli/core (launch) so the
 // command-plane `CommandSpec.commonFlags` can be typed at the kernel layer without
 // core importing contracts (a forbidden layering inversion). The Commander-touching
 // runtime below (applyCommonFlags + the commonFlags registry) stays here. We

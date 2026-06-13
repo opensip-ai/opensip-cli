@@ -69,6 +69,18 @@ The contract has been deliberately kept narrow. Each core member exists for a sp
 
 The optional contribution slots (`contributeScope`, `collectReportData`, `config`, `capabilityRegistrars`, `sessionReplay`) let a tool plug into the host's per-run scope, the cross-tool HTML report, the composed config document, a capability domain it owns, and `sessions show` replay — each only if the tool declares it. The `sessions show` surface (and the new `agent-catalog` discovery command) now include agent ergonomics such as `--filter` and `--raw` for focused historical inspection.
 
+### Tool contract versions (ADR-0046 / ADR-0047)
+
+The core `TOOL_CONTRACT_VERSION` (exported from `@opensip-cli/core`) is a marker for the generic `Tool` / `ToolExtensionPoints` / `ToolCliContext` "bus" surface. It is bumped **only** on actual changes to that surface and takes the major.minor of the CLI release that ships the change (it deliberately lags ordinary CLI releases).
+
+Each tool also has (or will have) its own independent contract version for its rich domain surface:
+- `FITNESS_CONTRACT_VERSION` (checks, recipes, defineCheck API, pack loading, etc.)
+- `GRAPH_CONTRACT_VERSION`, `SIMULATION_CONTRACT_VERSION`, etc.
+
+These per-tool versions are declared on the tool's `Tool` object (typically under `extensionPoints`) and follow the same ADR-driven bumping policy. They let a change to, say, the fitness check API evolve without forcing a bump to the core Tool contract or affecting graph/sim authors.
+
+See ADR-0046 (core) and ADR-0047 (per-tool) for the full rules, and the JSDoc on the constants themselves. Tool authors extending a specific tool can pin against the relevant per-tool version for compatibility.
+
 ### The `ToolCliContext` shape
 
 The context object is the inversion-of-control seam. A tool needs to render results, but it doesn't depend on Ink. It needs to set the exit code, but it doesn't mutate `process.exitCode`. The host provides those operations through the context:
@@ -143,7 +155,7 @@ A third-party tool advertises itself with an `opensipTools` block in its `packag
 ```json
 {
   "name": "@yourorg/audit-sec",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "main": "dist/index.js",
   "type": "module",
   "opensipTools": {
@@ -162,7 +174,7 @@ The package's main entry must export a `tool` symbol that satisfies the `Tool` c
 ```ts
 // dist/index.js
 export const tool = {
-  metadata: { id: 'audit-sec', version: '0.3.0', description: 'Security audit checks' },
+  metadata: { id: 'audit-sec', version: '1.0.0', description: 'Security audit checks' },
   commands: [{ name: 'audit-sec', description: 'Run security audit' }],
   commandSpecs: [/* defineCommand({ name: 'audit-sec', … }) */],
 };
@@ -202,7 +214,7 @@ import { runAudit } from './audit.js';
 export const auditSecTool: Tool = {
   metadata: {
     id: 'audit-sec',
-    version: '0.1.0',
+    version: '1.0.0',
     description: 'Lightweight security audit',
   },
   commands: [
@@ -231,7 +243,7 @@ export const tool = auditSecTool; // discovery export
 // packages/audit-sec/package.json
 {
   "name": "@yourorg/audit-sec",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "main": "dist/index.js",
   "type": "module",
   "opensipTools": {
@@ -266,7 +278,7 @@ If your tool also wants to ship checks (the way `@opensip-cli/checks-typescript`
 Three things, in order of importance:
 
 1. **A stable kernel.** `@opensip-cli/core` does not import any tool. The layer policy ([dependency-cruiser config](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/.config/dependency-cruiser.cjs)) enforces this — the build fails if `core` ever reached up. A kernel bump can't break a tool, because the kernel can't see the tool.
-2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to a major-version range of each first-party tool, but third-party tools release on their own cadence. A user can pin a third-party `@yourorg/audit-sec@0.x` while staying on the current `opensip-cli@3.x`.
+2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to compatible first-party tool releases, but third-party tools release on their own cadence. A user can pin a third-party `@yourorg/audit-sec` release while staying on `opensip-cli@1.0.0`.
 3. **A future where `fit` is just one of many tools.** The platform was designed for `audit-*`, `lint-*`, `report-*`, `bench-*`, and similar Tools to slot in by shipping a manifest + `commandSpecs`, inheriting every host-owned plane (output, progress, config, sessions, dashboard). Today there are three (`fit`, `sim`, `graph`); the CLI grows by zero lines for the fourth.
 
 ---

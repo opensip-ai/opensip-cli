@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 
-import * as composeMod from '../report-compose.js';
 import * as openReportMod from '../open-report.js';
+import * as composeMod from '../report-compose.js';
 
 afterEach(() => {
   vi.restoreAllMocks();

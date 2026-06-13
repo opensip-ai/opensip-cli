@@ -83,8 +83,7 @@ describe('no-bootstrap-tool-import (gate)', () => {
     expect(
       await findingsFor({
         path: 'packages/graph/engine/src/x.ts',
-        content:
-          "import { fitnessTool } from '@opensip-cli/fitness'\nexport const t = fitnessTool",
+        content: "import { fitnessTool } from '@opensip-cli/fitness'\nexport const t = fitnessTool",
       }),
     ).toBe(0);
   });
@@ -93,8 +92,7 @@ describe('no-bootstrap-tool-import (gate)', () => {
     expect(
       await findingsFor({
         path: 'packages/cli/src/__tests__/x.test.ts',
-        content:
-          "import { fitnessTool } from '@opensip-cli/fitness'\nexport const t = fitnessTool",
+        content: "import { fitnessTool } from '@opensip-cli/fitness'\nexport const t = fitnessTool",
       }),
     ).toBe(0);
   });

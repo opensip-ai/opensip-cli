@@ -291,10 +291,7 @@ describe('executeInit (fully-initialized state)', () => {
     executeInit(makeArgs());
     writeFileSync(join(testDir, 'opensip-cli.config.yml'), '# manually edited');
     // Custom file in the dir — should be removed by --remove.
-    writeFileSync(
-      join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'),
-      '// custom',
-    );
+    writeFileSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'), '// custom');
 
     const result = executeInit(makeArgs({ remove: true }));
     expect(result.created).toBe(true);
@@ -373,10 +370,7 @@ describe('executeInit (partial-dir-only state)', () => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
     // Create only the dir + a custom file (no config).
     mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), { recursive: true });
-    writeFileSync(
-      join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'),
-      '// custom',
-    );
+    writeFileSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'), '// custom');
   });
 
   it('refuses by default with a partial-state error listing the custom file', () => {

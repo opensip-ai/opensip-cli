@@ -14,12 +14,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  ConfigurationError,
-  createSignal,
-  enterScope,
-  LanguageRegistry,
-} from '@opensip-cli/core';
+import { ConfigurationError, createSignal, enterScope, LanguageRegistry } from '@opensip-cli/core';
 import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { diffBaseline } from '@opensip-cli/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';

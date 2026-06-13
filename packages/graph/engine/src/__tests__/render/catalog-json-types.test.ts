@@ -92,7 +92,7 @@ describe('CatalogExport wire shape', () => {
     const p: CatalogExportProvenance = {
       runId: '01j-test-run-id-uuid',
       completeness: 'complete',
-      engineVersion: '2.0.0',
+      engineVersion: '1.0.0',
       startedAt: '2026-05-27T00:00:00.000Z',
       completedAt: '2026-05-27T00:01:00.000Z',
       tenantId: 'tenant_x',
@@ -105,7 +105,7 @@ describe('CatalogExport wire shape', () => {
     const p: CatalogExportProvenance = {
       runId: '01j-test-run-id-uuid',
       completeness: 'partial',
-      engineVersion: '2.0.0',
+      engineVersion: '1.0.0',
       startedAt: '2026-05-27T00:00:00.000Z',
       completedAt: null,
       tenantId: 'tenant_x',
@@ -120,7 +120,7 @@ describe('CatalogExport wire shape', () => {
       provenance: {
         runId: 'run_x',
         completeness: 'complete',
-        engineVersion: '2.0.0',
+        engineVersion: '1.0.0',
         startedAt: '2026-05-27T00:00:00.000Z',
         completedAt: '2026-05-27T00:01:00.000Z',
         tenantId: 'tenant_x',

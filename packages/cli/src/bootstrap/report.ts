@@ -21,8 +21,8 @@
  * (audit 2026-05-22 F3) — tool packages now own their own renderers.
  */
 
-import { composeAndWriteReport } from '../report-compose.js';
 import { decideReportOpen } from '../open-report.js';
+import { composeAndWriteReport } from '../report-compose.js';
 
 /**
  * Open the HTML report in the user's browser when the run conditions

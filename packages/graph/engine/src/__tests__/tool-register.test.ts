@@ -179,6 +179,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     logger: console,
     setExitCode,
     emitJson,
+    emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError,
     deliverSignals: vi.fn().mockResolvedValue(undefined),

@@ -1,6 +1,6 @@
 /**
  * scheduleUnits — the bounded scheduler of the execution substrate (north-star
- * §5.8, release 2.13.0).
+ * §5.8, launch).
  *
  * Owns the scheduling SHAPE — a `parallel` sliding window bounded by `maxParallel`,
  * or a `sequential` one-at-a-time loop — plus the stop policy and an external

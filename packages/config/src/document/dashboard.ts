@@ -8,7 +8,7 @@
  * config is a host document-level block — structurally identical to `cli`,
  * registered beside it in {@link ./host-declarations}.
  *
- * Relocated here in 2.10.1 from fitness's `SignalersConfigSchema`. Fitness
+ * Relocated here from fitness's `SignalersConfigSchema`. Fitness
  * still reads `dashboard.editor` via `loadSignalersConfig` until it is repointed
  * to the composed scope config (Phase 4); it imports this schema rather than
  * re-defining it, so there is one definition of the block.

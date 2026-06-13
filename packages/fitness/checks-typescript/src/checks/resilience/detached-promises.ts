@@ -15,12 +15,7 @@
  * `getCheckConfig` and merges it into the effective sync-call sets.
  */
 
-import {
-  defineCheck,
-  getCheckConfig,
-  isTestFile,
-  type CheckViolation,
-} from '@opensip-cli/fitness';
+import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 import { getSharedSourceFile, isInAsyncContext } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 

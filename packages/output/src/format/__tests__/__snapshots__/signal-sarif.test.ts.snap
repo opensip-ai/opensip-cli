@@ -9,7 +9,7 @@ exports[`formatSignalSarif > renders the envelope as SARIF v2.1.0 (snapshot) 1`]
       "tool": {
         "driver": {
           "name": "opensip-cli-graph",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "informationUri": "https://github.com/opensip-ai/opensip-cli",
           "rules": [
             {

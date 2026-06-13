@@ -1,4 +1,5 @@
 // @fitness-ignore-file error-handling-quality -- file/dir walks for uninstall planning and best-effort tidy-up: missing/unreadable entries (TOCTOU vanish between readdir+stat, permission-denied subdirs, already-removed parent shells) are the expected non-terminal signal to skip; failure-IS-the-signal is the function contract in each catch.
+// @fitness-ignore-file only-documented-toolcli-seams -- interactive TTY UX: the readline confirmation prompt + human-readable removal-progress notes go to stdout via an injectable `write` (defaulted to process.stdout for the real run, stubbed in tests); this is not machine run output through a ToolCliContext seam (same category as clear.ts/configure.ts).
 /**
  * @fileoverview `opensip uninstall` — remove opensip-cli state
  * from a user account and/or project.
@@ -22,7 +23,7 @@
  *
  *    The recursive removal of `<path>/opensip-cli/` transitively
  *    sweeps up `.runtime/datastore.sqlite` and its `-wal`/`-shm` SQLite
- *    sidecars introduced in v2 — no datastore-specific path needs to be
+ *    sidecars — no datastore-specific path needs to be
  *    enumerated here. Caveat for Windows: open file handles can block
  *    removal of WAL/SHM files; ensure no opensip-cli CLI process is
  *    active when running uninstall.

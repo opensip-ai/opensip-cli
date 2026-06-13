@@ -16,7 +16,7 @@ import { defineSimulationRecipe } from './define-recipe.js';
 
 import type { SimulationRecipe } from './types.js';
 
-// Release 2.13.0 (§5.8): the built-in authors through the `defineSimulationRecipe`
+// Launch (§5.8): the built-in authors through the `defineSimulationRecipe`
 // factory and derives its id via the shared `deriveRecipeId('BSCP', name)` scheme
 // (`BSCP_default`, unchanged) — recipe-factory + id-scheme parity with fit/graph.
 const DEFAULT: SimulationRecipe = defineSimulationRecipe({

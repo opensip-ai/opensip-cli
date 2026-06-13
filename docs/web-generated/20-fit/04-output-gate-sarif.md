@@ -279,4 +279,4 @@ You've now seen the four mental-model docs and the four fit-loop docs. That's th
 - **[`../30-sim/`](/docs/opensip-cli/30-sim/)** — the simulation tool's parallel architecture. Read after `fit` is solid.
 - **[`../80-implementation/`](/docs/opensip-cli/80-implementation/)** — execution mechanics: dispatch, plugin loader, persistence.
 - **[`../10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/)** — the gate's full behavior, edge cases, CI patterns.
-- **[`../70-reference/04-json-output-schema.md`](/docs/opensip-cli/70-reference/04-json-output-schema/)** — every field of the `SignalEnvelope` with type and presence rules, plus the v1→v2 mapping.
+- **[`../70-reference/04-json-output-schema.md`](/docs/opensip-cli/70-reference/04-json-output-schema/)** — every field of the `SignalEnvelope` with type and presence rules.

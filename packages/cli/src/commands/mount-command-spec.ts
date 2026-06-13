@@ -11,15 +11,15 @@
  *     parse → handler → dispatch output → map error → exit
  *
  * pipeline. Tools never touch Commander; they export specs and the host mounts
- * them (release 2.11.0, north-star §5.4 Command contract).
+ * them (launch, north-star §5.4 Command contract).
  *
- * The single output-dispatch seam — {@link dispatchOutput} — was the **2.12.0
+ * The single output-dispatch seam — {@link dispatchOutput} — was the **launch
  * `CommandOutcome` hinge**, now landed: every machine output is wrapped in a
  * `CommandOutcome` and serialized through the one `renderOutcome` seam. The wrap
  * lives in the host emit seams this function delegates to (`emitCommandResult`,
  * `ctx.emitEnvelope`), so the handler contract and the mounter stayed
  * byte-identical — all the outer-shape change landed in those seams (release
- * 2.12.0, north-star §5.5).
+ * launch, north-star §5.5).
  */
 
 import {
@@ -61,7 +61,7 @@ export type HostCommandSpec<TOpts = Record<string, unknown>> = CommandSpec<TOpts
  * `ToolCliContext` (which provides all four as required members) is structurally
  * assignable to this — so the existing tool-mount call sites pass unchanged. The
  * generic `mountCommandSpec` lets host commands mount with a leaner context
- * (`CliCommandsContext`) through the SAME plane, satisfying the 2.11.0 "one
+ * (`CliCommandsContext`) through the SAME plane, satisfying the launch "one
  * command surface" invariant (no two-tier privilege).
  */
 export interface CommandMountContext {
@@ -150,7 +150,7 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
 }
 
 /**
- * The SINGLE output-dispatch seam. The 2.12.0 `CommandOutcome` wrap is LANDED:
+ * The SINGLE output-dispatch seam. The launch `CommandOutcome` wrap is LANDED:
  * the host emit seams this delegates to (`emitCommandResult`, `ctx.emitEnvelope`)
  * now build a `CommandOutcome` and serialize it through the one `renderOutcome`
  * seam. The handler contract and the mounter above stayed byte-identical — all

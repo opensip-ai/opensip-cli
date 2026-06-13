@@ -67,6 +67,7 @@ export type { ChaosOutcome, ChaosEvent, ChaosAssertionVerdict } from './kinds/ch
 // packages uniformly; dedup at register-tools.ts handles the
 // duplicate-id case.
 export { simulationTool, simulationTool as tool } from './tool.js';
+export { SIMULATION_CONTRACT_VERSION } from './tool.js';
 // CLI lifecycle helpers intentionally stay off the public barrel.
 // `executeSim` is NOT here — it lives in `cli/sim.ts` and is not part of the
 // public barrel; the CLI drives simulation through the Tool contract

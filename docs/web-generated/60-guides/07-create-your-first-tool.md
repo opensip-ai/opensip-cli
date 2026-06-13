@@ -37,7 +37,7 @@ Create `opensip-cli/tools/hello-tools/opensip-tool.manifest.json`:
   "kind": "tool",
   "id": "hello-tools",
   "name": "Hello Tools",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "apiVersion": 1,
   "main": "./index.mjs",
   "commands": [
@@ -56,7 +56,7 @@ Create `opensip-cli/tools/hello-tools/index.mjs`:
 export const tool = {
   metadata: {
     id: 'hello-tools',
-    version: '0.1.0',
+    version: '1.0.0',
     description: 'Small project-local Tool example',
   },
   commands: [

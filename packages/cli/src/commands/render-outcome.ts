@@ -1,6 +1,6 @@
 /**
  * render-outcome — the SINGLE serialization seam for a {@link CommandOutcome}
- * (release 2.12.0, north-star §5.5). This is the one place an outcome reaches a
+ * (launch, north-star §5.5). This is the one place an outcome reaches a
  * stream: `--json` writes the WHOLE outcome wrapper to stdout; human mode renders
  * the inner payload (`.envelope` / `.data`) through the existing Ink/text renderer
  * exactly as before.
@@ -14,7 +14,16 @@
  * The break: `--json` now nests the (byte-identical) envelope one level down under
  * `.envelope` (run commands) / `.data` (everything else). Human output is
  * unchanged — only the machine shape moves.
+ *
+ * RAW_STREAM mode ({@link renderRaw}): a command may declare `output:'raw-stream'`
+ * (e.g. `sessions show --raw`) to emit the bare inner payload WITHOUT the outer
+ * `CommandOutcome` wrapper — the smallest possible machine response for agents.
+ * That deliberately opts out of the one-outcome shape, so its single sanctioned
+ * write also lives HERE (the one stdout-JSON seam), reached via `cli.emitRaw`, not
+ * hand-rolled in each command body.
  */
+
+// @fitness-ignore-file only-documented-toolcli-seams -- this file IS the single sanctioned stdout-JSON serialization seam (north-star §5.5); the composition root delegates `cli.emitJson` / `emitEnvelope` / `emitError` / `emitRaw` here. The `process.stdout.write` calls are the seam implementation, not a bypass (mirrors the ESLint exemption + the `one-outcome-shape` allow-list for this file).
 
 import type { CommandOutcome, CommandResult } from '@opensip-cli/contracts';
 
@@ -35,7 +44,7 @@ export interface RenderOutcomeOptions {
  * Render a {@link CommandOutcome}. In `--json` mode, the entire outcome is
  * serialized (the machine consumer reads `.envelope` / `.data` / `.errors`). In
  * human mode, the inner payload is rendered through the supplied renderer — the
- * envelope or the `data` result, byte-identical to the pre-2.12.0 path; an outcome
+ * envelope or the `data` result, byte-identical to the legacy path; an outcome
  * with neither (a pure error/bootstrap outcome) renders nothing here (its human
  * presentation is owned by the error-render path).
  */
@@ -51,4 +60,15 @@ export async function renderOutcome(
   if (inner !== undefined) {
     await opts.render(inner as CommandResult);
   }
+}
+
+/**
+ * RAW_STREAM serialization seam (north-star §5.5, `output:'raw-stream'`). Writes
+ * a bare value as a single compact JSON line — the inner payload WITHOUT the
+ * `CommandOutcome` wrapper. This is the one sanctioned site for an
+ * intentionally-unwrapped machine response (the host binds it to `cli.emitRaw`),
+ * so no command body hand-rolls `process.stdout.write(JSON.stringify(...))`.
+ */
+export function renderRaw(value: unknown): void {
+  process.stdout.write(JSON.stringify(value) + '\n');
 }

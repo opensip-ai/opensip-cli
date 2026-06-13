@@ -10,7 +10,7 @@
  * sections and the CLI seam owns the `cli:` block
  * (`@opensip-cli/contracts` `loadCliDefaults`).
  *
- * Release 2.10.0 (ADR-0023, Phase 4): the block is now read through graph's
+ * Launch (ADR-0023, Phase 4): the block is now read through graph's
  * own Zod {@link GraphConfigSchema} (the same schema graph contributes to the
  * host's composed whole-document validation) instead of the old hand-rolled
  * `projectGraphConfig`. The composed dispatch-level validation is the STRICT

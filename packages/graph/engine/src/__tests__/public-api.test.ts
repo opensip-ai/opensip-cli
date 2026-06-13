@@ -51,6 +51,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'defineGraphRecipe',
   'defineRule',
   'graphTool',
+  'GRAPH_CONTRACT_VERSION',
   'hashBody',
   'isBuiltInGraphRecipe',
   'linkExported',

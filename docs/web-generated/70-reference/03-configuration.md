@@ -117,7 +117,7 @@ fitness:
   maxParallel: 8
   timeout: 30000
   failOnErrors: 1
-  disabledChecks: ['experimental-check']
+  disabledChecks: ['legacy-check']
   recipe: backend            # default recipe for `fit` (tool-scoped, ADR-0022)
 ```
 
@@ -319,7 +319,7 @@ targets:
 fitness:
   maxParallel: 8
   failOnErrors: 1
-  disabledChecks: ['experimental-check']
+  disabledChecks: ['legacy-check']
   recipe: backend            # default recipe for `fit` (tool-scoped, ADR-0022)
 
 graph:

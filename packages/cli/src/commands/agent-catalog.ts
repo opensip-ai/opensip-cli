@@ -1,5 +1,3 @@
-import type { CliCommandsContext } from './shared.js';
-
 /**
  * Structured catalog for AI agents.
  * Provides stable entry points, recommended patterns (including the new
@@ -13,22 +11,22 @@ import type { CliCommandsContext } from './shared.js';
 export interface AgentCatalog {
   readonly version: string;
   readonly description: string;
-  readonly entryPoints: ReadonlyArray<{
+  readonly entryPoints: readonly {
     readonly command: string;
     readonly description: string;
-    readonly examples: ReadonlyArray<string>;
-  }>;
-  readonly commonPatterns: ReadonlyArray<{
+    readonly examples: readonly string[];
+  }[];
+  readonly commonPatterns: readonly {
     readonly name: string;
     readonly description: string;
     readonly example: string;
-  }>;
+  }[];
   readonly outputShapes: {
     readonly signalEnvelope: string; // high-level note + reference
     readonly sessionReplay: string;
     readonly history: string;
   };
-  readonly notes: ReadonlyArray<string>;
+  readonly notes: readonly string[];
 }
 
 export function buildAgentCatalog(): AgentCatalog {
@@ -42,10 +40,7 @@ export function buildAgentCatalog(): AgentCatalog {
       {
         command: 'fit',
         description: 'Run fitness checks. Use --json for machine output (SignalEnvelope).',
-        examples: [
-          'opensip fit --recipe default --json',
-          'opensip fit --check some-check --json',
-        ],
+        examples: ['opensip fit --recipe default --json', 'opensip fit --check some-check --json'],
       },
       {
         command: 'graph',
@@ -54,7 +49,8 @@ export function buildAgentCatalog(): AgentCatalog {
       },
       {
         command: 'sessions list',
-        description: 'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
+        description:
+          'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
         examples: [
           'opensip sessions list --json --summary-only',
           'opensip sessions list --json --tool fit --limit 5',
@@ -81,12 +77,15 @@ export function buildAgentCatalog(): AgentCatalog {
     commonPatterns: [
       {
         name: 'Inspect latest fit with focus on errors',
-        description: 'After a fit run, pull only actionable errors (high severity) and limit count.',
-        example: 'opensip sessions show latest --tool fit --json --filter errors-only --filter top:10',
+        description:
+          'After a fit run, pull only actionable errors (high severity) and limit count.',
+        example:
+          'opensip sessions show latest --tool fit --json --filter errors-only --filter top:10',
       },
       {
         name: 'Lean session menu for agents',
-        description: 'Get pointers to interesting sessions without downloading full historical payloads.',
+        description:
+          'Get pointers to interesting sessions without downloading full historical payloads.',
         example: 'opensip sessions list --json --summary-only --tool fit',
       },
       {
@@ -146,8 +145,7 @@ export function executeAgentCatalog(opts: { json?: boolean } = {}) {
     'Primary patterns for agents:',
     ...catalog.commonPatterns.map((p) => `  • ${p.name}: ${p.example}`),
     '',
-    'Key entry points: ' +
-      catalog.entryPoints.map((e) => e.command).join(', '),
+    'Key entry points: ' + catalog.entryPoints.map((e) => e.command).join(', '),
     '',
     'See --json output or the docs for complete shapes and more examples.',
   ];

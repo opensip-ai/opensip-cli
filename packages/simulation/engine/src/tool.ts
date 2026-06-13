@@ -1,8 +1,8 @@
 /**
  * simulationTool — simulation as a Tool plugin.
  *
- * Owns the `sim` subcommand. Since release 2.11.0 (Phase 3, the reference
- * migration) the Commander wiring is no longer hand-rolled: the tool exports a
+ * Owns the `sim` subcommand. The Commander wiring is no longer hand-rolled:
+ * the tool exports a
  * declarative {@link CommandSpec} (`simCommand`) and the host's
  * `mountCommandSpec` mounts it (name/description/aliases, the ADR-0021 common
  * flags, the `--recipe` option) and owns the parse→handler→error→exit pipeline.
@@ -49,7 +49,7 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 const SIM: ToolCommandDescriptor = {
   name: 'sim',
-  description: 'Run simulation scenarios [experimental]',
+  description: 'Run simulation scenarios',
 };
 
 const SIM_RUN_WORKER: ToolCommandDescriptor = {
@@ -108,7 +108,7 @@ function setUpSimLiveView(cli: ToolCliContext): void {
  * spec handler. `output: 'raw-stream'` (handler owns its own IO): the host runs
  * this and renders nothing further, so the handler keeps full ownership of the
  * TTY-vs-static branch, the JSON/Ink dispatch, the cloud egress, the exit-code
- * decision, and the report auto-open — byte-identical to 2.10.0.
+ * decision, and the report auto-open.
  */
 async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   const opts = rawOpts as SimOptions;
@@ -138,7 +138,7 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
 
   if (result.type === 'error') {
     if (opts.json) {
-      // 2.12.0 (§5.5): structured error outcome (host wraps + sets exit code).
+      // Structured error outcome: the host wraps and sets the exit code.
       cli.emitError({ message: result.message, exitCode: result.exitCode });
     } else {
       cli.setExitCode(result.exitCode);
@@ -266,8 +266,8 @@ function sessionReplayResult(
 }
 
 /**
- * The declarative `sim` command (release 2.11.0 Phase 3 — the reference
- * migration). Replaces the hand-rolled `register()` body: the host mounts this
+ * The declarative `sim` command. Replaces the hand-rolled `register()` body:
+ * the host mounts this
  * spec, applies the ADR-0021 common flags + the `--recipe` option, and invokes
  * `runSim`.
  *
@@ -346,6 +346,11 @@ function contributeScope(): ScopeContribution {
   };
 }
 
+/**
+ * Per-tool contract version (ADR-0047).
+ */
+export const SIMULATION_CONTRACT_VERSION = '1.0.0';
+
 export const simulationTool: Tool = {
   metadata: {
     id: 'simulation',
@@ -354,8 +359,8 @@ export const simulationTool: Tool = {
   },
   commands: [SIM, SIM_RUN_WORKER],
   pluginLayout: SIM_PLUGIN_LAYOUT,
-  // Release 2.11.0 Phase 3 (reference migration): sim declares its command
-  // surface; the host mounts it via mountCommandSpec. The deprecated
+  // Sim declares its command surface; the host mounts it via mountCommandSpec.
+  // The deprecated
   // `register()` fallback is gone — sim no longer touches Commander.
   commandSpecs: [simCommand, simRunWorkerCommandSpec],
   contributeScope,
@@ -375,4 +380,10 @@ export const simulationTool: Tool = {
   // host writes each returned file under userPluginDir('sim', file.kind).
   scaffoldExamples: simScaffoldExamples,
   stableExampleIds: simStableExampleIds,
+  // ADR-0047: per-tool contract version for simulation's domain surface
+  // (scenarios, recipes, execution model, etc.). Independent of core
+  // TOOL_CONTRACT_VERSION. Declared under extensionPoints.
+  extensionPoints: {
+    simulationContractVersion: SIMULATION_CONTRACT_VERSION,
+  },
 };

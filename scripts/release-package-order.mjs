@@ -72,7 +72,7 @@ export const RELEASE_PACKAGE_ORDER = [
     dir: 'packages/contracts',
     filter: '@opensip-cli/contracts',
   },
-  // Layer 2 — session-store + output (extracted from contracts in the 2.1.0 split)
+  // Layer 2 — session-store + output (extracted from contracts)
   {
     unscoped: 'session-store',
     name: '@opensip-cli/session-store',

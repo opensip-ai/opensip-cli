@@ -2,7 +2,7 @@
  * session-payload-decode — the shared, generic decoder for a stored session's
  * opaque `payload` blob (the inverse of each tool's `build*SessionPayload`).
  *
- * Release 2.12.0's session-replay feature needs every tool (`fit`/`graph`/`sim`)
+ * Session replay needs every tool (`fit`/`graph`/`sim`)
  * to read a persisted session back into a {@link SignalEnvelope} projection. The
  * persisted detail shares ONE structural shape — `{ summary, checks[] }`, each
  * check a `{ checkSlug, passed, violationCount?, durationMs, findings[] }` — so

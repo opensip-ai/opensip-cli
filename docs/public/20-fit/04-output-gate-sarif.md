@@ -279,4 +279,4 @@ You've now seen the four mental-model docs and the four fit-loop docs. That's th
 - **[`../30-sim/`](../30-sim/)** — the simulation tool's parallel architecture. Read after `fit` is solid.
 - **[`../80-implementation/`](../80-implementation/)** — execution mechanics: dispatch, plugin loader, persistence.
 - **[`../10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md)** — the gate's full behavior, edge cases, CI patterns.
-- **[`../70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md)** — every field of the `SignalEnvelope` with type and presence rules, plus the v1→v2 mapping.
+- **[`../70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md)** — every field of the `SignalEnvelope` with type and presence rules.

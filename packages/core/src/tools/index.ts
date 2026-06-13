@@ -25,11 +25,12 @@ export type {
   HostEntitlements,
 } from './types.js';
 export { UnknownLiveViewError } from './types.js';
+export { TOOL_CONTRACT_VERSION } from './types.js';
 export { ToolRegistry } from './registry.js';
 // Static tool-plugin manifest + the plugin-API epoch + provenance types
-// (release 3.0.0 raw-vs-admitted contract).
+// (launch raw-vs-admitted contract).
 export { PLUGIN_API_VERSION } from './manifest.js';
-// Command-plane types (release 2.11.0, §5.4): the declarative command surface a
+// Command-plane types (launch, §5.4): the declarative command surface a
 // tool exports for the host to mount, plus the CommonFlagKey key type (the pure
 // type lives in core; the Commander-touching applyCommonFlags runtime stays in
 // contracts). Re-exported by @opensip-cli/contracts for the public surface.
@@ -52,7 +53,7 @@ export type {
   ToolProvenance,
   ToolSource,
 } from './manifest.js';
-// Capability domain model (release 2.10.0, §5.3): the data shape a tool
+// Capability domain model (launch, §5.3): the data shape a tool
 // uses to declare an extension point it owns. The runtime registry lives
 // in `plugins/capability-registry.ts`.
 export { isCapabilityValidator, isStructuralContributionSchema } from './capability.js';

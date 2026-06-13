@@ -62,8 +62,8 @@ Shape:
 
 ```ts
 type DocManifest = {
-  version: string;       // e.g. "1.0.4" — the opensip-cli release this docset matches
-  rawBase: string;       // e.g. "https://raw.githubusercontent.com/opensip-ai/opensip-cli/v1.0.4/"
+  version: string;       // e.g. "1.0.0" — the opensip-cli release this docset matches
+  rawBase: string;       // e.g. "https://raw.githubusercontent.com/opensip-ai/opensip-cli/v1.0.0/"
   pages: DocPage[];
   nav: NavSection[];
 };

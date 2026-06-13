@@ -37,7 +37,7 @@ function makeProvenance(): CatalogExportProvenance {
   return {
     runId: 'run_test_2026_05_27',
     completeness: 'complete',
-    engineVersion: '2.0.0',
+    engineVersion: '1.0.0',
     startedAt: '2026-05-27T00:00:00.000Z',
     completedAt: '2026-05-27T00:01:00.000Z',
     tenantId: TENANT_ID,

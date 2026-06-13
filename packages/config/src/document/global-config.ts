@@ -5,7 +5,7 @@
  * config that holds the cloud API key and per-user defaults.
  *
  * User-scoped config I/O is tool-agnostic, so it lives in the config layer
- * (relocated here from the CLI's `bootstrap/` in 2.10.1, ADR-0023). The CLI's
+ * (relocated here from the CLI's `bootstrap/`, ADR-0023). The CLI's
  * pre-action hook reads it on every invocation (`mergeConfigDefaults` falls back
  * to the saved API key when neither `--api-key` nor `OPENSIP_API_KEY` is
  * present), and the `configure` command's prompt+UX wrapper — which stays in
@@ -35,7 +35,7 @@ import { EnvRegistry, type EnvVarSpec } from '@opensip-cli/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 /**
- * Config-layer environment variables (release 2.12.0, §5.12). Declared as an
+ * Config-layer environment variables (§5.12). Declared as an
  * immutable spec table read through the {@link EnvRegistry} primitive, so the env
  * surface is governed and documentable (the `env-via-registry` guardrail forbids
  * raw `process.env` reads). Re-exported for the generated env-surface doc.

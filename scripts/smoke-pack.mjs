@@ -8,13 +8,10 @@
 // version-string and dependency-range checks (verify-release.mjs)
 // structurally cannot see.
 //
-// It exists because of the 2.0.0 incident: @opensip-cli/cli-ui@2.0.0
-// was published from a stale build that did not export `RunFooterHints`,
-// while @opensip-cli/fitness@2.0.0 imported it. Every version string
-// said "2.0.0" and every dep range resolved — but the CLI crashed on
-// startup with `SyntaxError: ... does not provide an export named
-// 'RunFooterHints'`. The only thing that catches that is loading the
-// packed bytes together.
+// It exists because version-string and dependency-range checks can still miss
+// stale build output: every package can agree on a version while one tarball is
+// missing an export another package imports. The only thing that catches that is
+// loading the packed bytes together.
 //
 // Why install from local tarballs instead of the registry: the versions
 // we are about to publish are not on npm yet. A normal
@@ -31,12 +28,12 @@
 // are identical in both lanes. `--version` alone already walks the whole
 // import graph (tool registration runs at CLI startup, before argument
 // parsing, transitively importing every tool module + cli-ui — precisely
-// where the 2.0.0 crash occurred); the broader scenario set additionally
+// where stale-build crashes occur); the broader scenario set additionally
 // exercises init/fit/graph/dashboard/sessions and both plugin-install paths.
 //
 // Usage:
 //   node scripts/smoke-pack.mjs                                  # /tmp/tarballs, version from packages/core
-//   node scripts/smoke-pack.mjs --dir <path> --expected-version vX.Y.Z
+//   node scripts/smoke-pack.mjs --dir <path> --expected-version v<version>
 //
 // Exits 0 on success, 1 on any failure (so it gates the publish step).
 
@@ -121,9 +118,7 @@ for (const file of tarballs) {
   const unscoped = file.slice(TARBALL_PREFIX.length, -tarballSuffix.length);
   overrides[`${SCOPE}${unscoped}`] = `file:${join(tarballDir, file)}`;
 }
-info(
-  `discovered ${Object.keys(overrides).length} @opensip-cli/* tarball(s) + the opensip-cli CLI`,
-);
+info(`discovered ${Object.keys(overrides).length} @opensip-cli/* tarball(s) + the opensip-cli CLI`);
 
 if (!cliTarball) {
   fail(

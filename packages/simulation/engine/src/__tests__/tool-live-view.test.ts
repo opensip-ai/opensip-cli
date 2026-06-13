@@ -88,6 +88,7 @@ function makeCtx(): Captured {
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     setExitCode: (code: number) => exitCodes.push(code),
     emitJson: vi.fn(),
+    emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
     deliverSignals: vi.fn((envelope: SignalEnvelope, opts: unknown) => {

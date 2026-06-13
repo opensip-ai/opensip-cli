@@ -1,10 +1,10 @@
 /**
  * SeverityPolicy — the one home for severity mapping + the gate's error/warning
- * predicate (north-star §5.9, release 2.13.0).
+ * predicate (north-star §5.9, launch).
  *
  * Severity lives at two levels: AUTHOR severity (`error | warning`, what a fitness
  * check or graph rule declares) and WIRE severity (the 4-level
- * {@link SignalSeverity} on the `Signal`). Before 2.13.0 the author→wire map was
+ * {@link SignalSeverity} on the `Signal`). Previously the author→wire map was
  * duplicated (fitness's `mapFindingSeverity` + `liftSeverity`) and the graph
  * override (`applySeverityOverride`) lived apart, while the gate's error/warning
  * counting was inlined in `buildSignalEnvelope`. This consolidates them so a

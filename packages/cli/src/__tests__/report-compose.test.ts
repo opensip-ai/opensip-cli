@@ -27,8 +27,8 @@ import {
 } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { composeAndWriteReport } from '../report-compose.js';
 import * as openReportMod from '../open-report.js';
+import { composeAndWriteReport } from '../report-compose.js';
 
 import type { ProjectContext, Tool, ToolScope } from '@opensip-cli/core';
 

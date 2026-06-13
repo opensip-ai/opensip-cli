@@ -66,7 +66,7 @@ export type CommandResult =
   | HistoryResult
   | ReportResult
   | InitResult
-  | ExperimentalResult
+  | SimNoticeResult
   | PluginResult
   | ClearDoneResult
   | ConfigureDoneResult
@@ -412,8 +412,8 @@ export interface InitResult {
   };
 }
 
-export interface ExperimentalResult {
-  type: 'experimental';
+export interface SimNoticeResult {
+  type: 'sim-notice';
   tool: 'sim';
   cwd: string;
 }
@@ -482,7 +482,7 @@ export type PluginResult =
       plugins: readonly PluginInfo[];
       totalCount: number;
       /**
-       * Provenance of the tools admitted through the 2.8.0 compatibility
+       * Provenance of the tools admitted through the launch compatibility
        * gate this run (source + identity + `manifestHash`). Additive — a
        * parallel section to the discovered-plugin list, sourced from the
        * per-run provenance holder, not from a disk re-scan. Empty array

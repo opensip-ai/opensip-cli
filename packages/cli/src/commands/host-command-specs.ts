@@ -1,7 +1,7 @@
 /**
  * host-command-specs — the CLI-owned (host) commands expressed as declarative
  * {@link CommandSpec}s, mounted through the SAME `mountCommandSpec` plane the
- * tools use (release 2.11.0 Phase 6).
+ * tools use (launch Phase 6).
  *
  * Host commands (`init` / `configure` / `sessions` / `plugin` / `report` /
  * `completion` / `uninstall`) are NOT tool plugins — they don't ride on a
@@ -34,6 +34,7 @@ import { ConfigurationError, defineCommand, type ProjectContext } from '@opensip
 
 import { composeAndWriteReport } from '../report-compose.js';
 
+import { executeAgentCatalog } from './agent-catalog.js';
 import {
   assembleCompletionInventory,
   printCompletionScript,
@@ -46,10 +47,12 @@ import { buildHostSubcommandGroups, type HostSpec } from './host-subcommand-grou
 import { executeInit } from './init.js';
 import { mountCommandSpec } from './mount-command-spec.js';
 import { executeUninstall } from './uninstall.js';
-import { executeAgentCatalog } from './agent-catalog.js';
 
 import type { CliCommandsContext } from './shared.js';
 import type { CliProgram, InitOptions } from '@opensip-cli/contracts';
+
+/** Shared `output` mode for the host commands that return a renderable result. */
+const COMMAND_RESULT = 'command-result' as const;
 
 // ---------------------------------------------------------------------------
 // init
@@ -87,7 +90,7 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
       },
     ],
     scope: 'project',
-    output: 'command-result',
+    output: COMMAND_RESULT,
     handler: (rawOpts) => {
       const opts = rawOpts as InitOpts;
       // `cwdExplicit` is stashed on opts by the pre-action hook (the single
@@ -124,7 +127,7 @@ function buildConfigureSpec(): HostSpec {
     description: 'Set up OpenSIP Cloud API key',
     commonFlags: ['json', 'debug'],
     scope: 'none',
-    output: 'command-result',
+    output: COMMAND_RESULT,
     handler: () => executeConfigure(),
   });
 }
@@ -146,7 +149,7 @@ function buildReportSpec(): HostSpec {
       },
     ],
     scope: 'project',
-    output: 'command-result',
+    output: COMMAND_RESULT,
     handler: (rawOpts) => {
       const opts = rawOpts as { open: boolean; json: boolean };
       // Commander stores `--no-open` as `opts.open === false`; default true.
@@ -253,7 +256,7 @@ function buildUninstallSpec(): HostSpec {
       { flag: '--json', description: 'Output structured JSON', default: false },
     ],
     scope: 'project',
-    output: 'command-result',
+    output: COMMAND_RESULT,
     handler: (rawOpts) => {
       const opts = rawOpts as UninstallOpts;
       if (opts.user === true && opts.project !== undefined) {
@@ -279,7 +282,7 @@ function buildUninstallSpec(): HostSpec {
 // agent-catalog (agent-first discovery surface)
 // ---------------------------------------------------------------------------
 
-function buildAgentCatalogSpec(ctx: CliCommandsContext): HostSpec {
+function buildAgentCatalogSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'agent-catalog',
     description:
@@ -287,7 +290,7 @@ function buildAgentCatalogSpec(ctx: CliCommandsContext): HostSpec {
       'Primary surface for AI agents to bootstrap usage of sessions, filtering, and historical results.',
     commonFlags: ['json'],
     scope: 'none',
-    output: 'command-result',
+    output: COMMAND_RESULT,
     handler: (rawOpts) => {
       const opts = rawOpts as { json?: boolean };
       return executeAgentCatalog({ json: opts.json });
@@ -323,7 +326,7 @@ function buildNonCompletionHostSpecs(ctx: CliCommandsContext): readonly HostSpec
     buildInitSpec(ctx),
     buildReportSpec(),
     buildConfigureSpec(),
-    buildAgentCatalogSpec(ctx),
+    buildAgentCatalogSpec(),
     buildUninstallSpec(),
   ];
 }
@@ -361,7 +364,7 @@ export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSp
     buildInitSpec(ctx),
     buildReportSpec(),
     buildConfigureSpec(),
-    buildAgentCatalogSpec(ctx),
+    buildAgentCatalogSpec(),
     buildCompletionSpec(ctx),
     buildUninstallSpec(),
   ];

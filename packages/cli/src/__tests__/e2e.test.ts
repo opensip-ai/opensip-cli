@@ -289,9 +289,9 @@ describe('CLI e2e', () => {
       expect(existsSync(join(tempDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'))).toBe(
         true,
       );
-      expect(
-        existsSync(join(tempDir, 'opensip-cli', 'fit', 'recipes', 'example-recipe.mjs')),
-      ).toBe(true);
+      expect(existsSync(join(tempDir, 'opensip-cli', 'fit', 'recipes', 'example-recipe.mjs'))).toBe(
+        true,
+      );
       expect(
         existsSync(join(tempDir, 'opensip-cli', 'sim', 'scenarios', 'example-scenario.mjs')),
       ).toBe(true);

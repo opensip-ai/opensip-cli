@@ -6,7 +6,7 @@
  * `payload` is opaque to persistence. Extracted from `@opensip-cli/contracts`
  * so that package carries types only (audit 2026-05-29, contracts split).
  *
- * Release 2.12.0 (session replay) adds the inverse of persistence:
+ * Session replay adds the inverse of persistence:
  * `decodeSessionPayload` reads a stored payload back into its STRUCTURAL shape
  * (`{ summary, checks[] }`) so each tool can project it to a `SignalEnvelope`.
  * That decoder still holds zero tool vocabulary — severity→category mapping and

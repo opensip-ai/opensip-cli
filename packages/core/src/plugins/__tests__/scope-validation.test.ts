@@ -46,11 +46,7 @@ describe('resolveScopes', () => {
   });
 
   it('deduplicates extra scopes that match the default', () => {
-    const out = resolveScopes(
-      '@opensip-cli',
-      ['@opensip-cli', '@other'],
-      'plugin.invalid_scope',
-    );
+    const out = resolveScopes('@opensip-cli', ['@opensip-cli', '@other'], 'plugin.invalid_scope');
     expect(out).toEqual(['@opensip-cli', '@other']);
   });
 

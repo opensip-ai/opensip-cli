@@ -1,6 +1,6 @@
 /**
  * createSignalFromViolation — the generic identity-stamping signal factory
- * (north-star §5.9, release 2.13.0).
+ * (north-star §5.9, launch).
  *
  * Generalizes fitness's `violationToSignal`: a tool hands a flat violation
  * (`message`, author `severity`, location, optional suggestion) plus its

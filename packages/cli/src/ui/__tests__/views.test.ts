@@ -131,11 +131,11 @@ describe('session-replay view', () => {
   });
 });
 
-describe('experimental + help + report views', () => {
-  it('renders the experimental sim notice', () => {
-    const out = text({ type: 'experimental', tool: 'sim', cwd: '/x' });
+describe('sim notice + help + report views', () => {
+  it('renders the sim notice', () => {
+    const out = text({ type: 'sim-notice', tool: 'sim', cwd: '/x' });
     expect(out).toContain('Simulation');
-    expect(out).toContain('Under active development');
+    expect(out).toContain('Available in OpenSIP CLI 1.0.0');
   });
 
   it('renders help commands', () => {

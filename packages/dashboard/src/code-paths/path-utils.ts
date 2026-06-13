@@ -28,7 +28,7 @@ function shortPkg(name) {
 
 // The package an occurrence belongs to. Prefers the build-time-stamped
 // occurrence.package (accurate for any repo layout); falls back to the path
-// heuristic for pre-2.4.2 catalogs. Scope-stripped for compact display.
+// heuristic for legacy catalogs. Scope-stripped for compact display.
 function pkgOf(occ) {
   if (occ && typeof occ.package === 'string' && occ.package.length > 0) return shortPkg(occ.package);
   return packageOfPath(occ ? occ.filePath : '');

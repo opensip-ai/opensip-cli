@@ -68,6 +68,9 @@ function makeContext(datastore: DataStore | undefined): {
     emitJson: (value: unknown) => {
       emitted.push(value);
     },
+    emitRaw: (value: unknown) => {
+      emitted.push(value);
+    },
     emitEnvelope: (value: unknown) => {
       emitted.push(value);
     },

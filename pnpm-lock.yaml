@@ -221,6 +221,9 @@ importers:
         specifier: ^2.9.0
         version: 2.9.0
     devDependencies:
+      '@opensip-cli/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2

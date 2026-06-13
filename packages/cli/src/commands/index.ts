@@ -11,7 +11,7 @@
  *   - `completion`   — print a shell-completion script
  *   - `uninstall`    — remove user-level / project-local state
  *
- * Release 2.11.0 Phase 6: every host command is now a declarative
+ * Launch Phase 6: every host command is now a declarative
  * `CommandSpec` mounted through the SAME `mountCommandSpec` plane the tools
  * use (`host-command-specs.ts`). The former per-command `register-*.ts`
  * registrars (hand-rolled `.command().option().action()` bodies) are gone —

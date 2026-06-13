@@ -24,9 +24,8 @@
  *      (`document/host-declarations.ts` claims `cli`, `targets`,
  *      `globalExcludes`, `checkOverrides`, `dashboard`, `plugins`,
  *      `schemaVersion`) — it gains the strict treatment of rule 1.
- *      (Historical note: pre-2.10.1 this catchall also covered the
- *      then-unclaimed host blocks; that migration use ended when
- *      host-declarations claimed them.)
+ *      (Historical note: this catchall once also covered then-unclaimed host
+ *      blocks; that migration use ended when host-declarations claimed them.)
  *
  * A validation failure in ANY namespace throws the same typed
  * {@link ConfigurationError} (→ `CONFIGURATION_ERROR` exit), so a typo in

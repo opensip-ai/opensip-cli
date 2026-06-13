@@ -13,7 +13,7 @@
  *
  * Two consumers, one resolved result:
  *   - {@link checkForUpdate} returns the newer version string (if any) so
- *     the `mini` banner can surface it inline as `(vX.Y.Z available)`.
+ *     the `mini` banner can surface it inline as `(<new-version> available)`.
  *   - {@link formatUpdateNag} builds the stderr one-liner shown for the
  *     other banner sizes (which have no version line to annotate).
  * The bootstrap calls `checkForUpdate` once and decides which surface to use.
@@ -73,7 +73,7 @@ export interface CheckForUpdateOptions {
   readonly stateFile?: string;
 }
 
-/** Split `2.2.1-beta.1` into `([2,2,1], 'beta.1')`; missing parts → 0 / ''. */
+/** Split `1.0.0-beta.1` into `([1,0,0], 'beta.1')`; missing parts → 0 / ''. */
 function splitPrerelease(version: string): [readonly number[], string] {
   const [core, ...rest] = version.split('-');
   const nums = core.split('.').map((p) => Number.parseInt(p, 10) || 0);
@@ -82,8 +82,8 @@ function splitPrerelease(version: string): [readonly number[], string] {
 
 /**
  * Strict semver "is `latest` newer than `current`". Compares the numeric
- * MAJOR.MINOR.PATCH core; with equal cores a prerelease (`2.2.1-beta`) is
- * treated as OLDER than its release (`2.2.1`), per semver.
+ * MAJOR.MINOR.PATCH core; with equal cores a prerelease (`1.0.0-beta`) is
+ * treated as OLDER than its release (`1.0.0`), per semver.
  *
  * This is the guard the nag relies on: the previous `latest !== current`
  * check fired on ANY difference, so running a build AHEAD of npm's `latest`
@@ -111,6 +111,7 @@ function shouldSkip(): boolean {
   // The update-notifier package already suppresses in CI and non-TTY,
   // but we short-circuit so we don't even construct the notifier —
   // keeps the startup path minimal.
+  // eslint-disable-next-line no-restricted-properties -- a `.isTTY` capability READ (terminal detection), not run output; the seam rule targets stdout writes, not TTY probing.
   if (!process.stdout.isTTY) return true;
   return false;
 }
@@ -118,7 +119,7 @@ function shouldSkip(): boolean {
 /**
  * Resolve whether a newer published version is available, scheduling the
  * hourly background fetch as a side effect. Returns the newer version
- * string (e.g. `2.3.0`) when one is known, or `undefined` when up-to-date,
+ * string (e.g. `1.0.1`) when one is known, or `undefined` when up-to-date,
  * opted-out, or non-TTY.
  *
  * Unlike `update-notifier`'s own delete-on-read result, this is **sticky**:
@@ -196,7 +197,7 @@ export function maybeNotify(opts: NotifyOptions): UpdateNotifier | null {
 
   const update = notifier.update;
   // Only nag when npm's latest is genuinely NEWER than what's running — not
-  // merely different. Guards against the "2.2.1 → 2.1.0 available" downgrade
+  // merely different. Guards against the "1.0.1 → 1.0.0 available" downgrade
   // prompt seen when running a build ahead of the published `latest` tag.
   if (update && isNewerVersion(update.latest, update.current)) {
     const write = opts.write ?? ((s: string) => process.stderr.write(s));

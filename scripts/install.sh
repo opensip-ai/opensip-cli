@@ -10,7 +10,7 @@ set -eu
 #   curl -fsSL https://opensip.ai/cli/install.sh | bash
 #
 # Optional:
-#   curl -fsSL https://opensip.ai/cli/install.sh | OPENSIP_CLI_VERSION=3.0.0 bash
+#   curl -fsSL https://opensip.ai/cli/install.sh | OPENSIP_CLI_VERSION=1.0.0 bash
 
 PACKAGE_NAME="${OPENSIP_CLI_PACKAGE:-opensip-cli}"
 PACKAGE_VERSION="${OPENSIP_CLI_VERSION:-latest}"

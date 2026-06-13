@@ -38,10 +38,10 @@ Out of scope:
 - Vulnerabilities in upstream dependencies, unless OpenSIP CLI usage creates a
   distinct exploitable path.
 
-## Supported Versions
+## Supported Release
 
 | Version | Supported |
 | ------- | --------- |
-| 1.x     | Yes       |
+| 1.0.0   | Yes       |
 
-We recommend running the latest `1.x` release.
+We recommend running the latest `opensip-cli` release.

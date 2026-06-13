@@ -59,7 +59,7 @@ opensip-cli
 │   ├── --gate-save        (writes baseline row into .runtime/datastore.sqlite)
 │   ├── --gate-compare
 │   └── … (see fit-list, fit-recipes for catalogs)
-├── sim                    (run simulation scenarios — experimental)
+├── sim                    (run simulation scenarios)
 ├── graph [paths...]       (static call-graph + dead-end analysis)
 │   ├── --json
 │   ├── --no-cache

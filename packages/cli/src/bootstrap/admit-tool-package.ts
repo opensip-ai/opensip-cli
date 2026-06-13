@@ -56,7 +56,7 @@ export type ToolRuntimeLoad =
 /**
  * Resolve a tool package's entry, DYNAMIC-IMPORT it, and validate the exported
  * `tool` shape. This is the ONE runtime-load path every installation source
- * travels (3.0.0 GA, north-star Figure 7): no static `import` of a tool runtime
+ * travels (1.0.0 launch, north-star Figure 7): no static `import` of a tool runtime
  * survives in the host — a bundled tool is imported by its resolved entry path
  * exactly as an installed one is. Import is by `pathToFileURL(meta.mainEntry)`,
  * not the bare package name, so a tool living in a host dir off the CLI's own

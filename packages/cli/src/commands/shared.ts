@@ -1,7 +1,7 @@
 /**
  * shared — the registrar context type used by every CLI-owned (host) command.
  *
- * Release 2.11.0 Phase 6 moved the host commands onto the declarative
+ * Launch Phase 6 moved the host commands onto the declarative
  * `CommandSpec` plane (`host-command-specs.ts` / `host-subcommand-groups.ts`),
  * which sources `--cwd` / `--json` from the ADR-0021 common-flag registry
  * directly (via `commonFlags: ['cwd', 'json']`). The former
@@ -39,13 +39,21 @@ export interface CliCommandsContext {
   readonly render: (result: CommandResult) => Promise<void>;
   /**
    * Success machine-output seam — wraps the value in a `CommandOutcome` via the
-   * single `renderOutcome` seam (2.12.0, §5.5). Always supplied by the host
+   * single `renderOutcome` seam (launch, §5.5). Always supplied by the host
    * (sourced from {@link ToolCliContext.emitJson}); required so raw-stream host
    * commands (`sessions show`) never fall back to a direct `process.stdout.write`.
    */
   readonly emitJson: (value: unknown) => void;
   /**
-   * Structured-error machine-output seam (2.12.0, §5.5) — the host-command
+   * RAW_STREAM machine-output seam — the host-command mirror of
+   * {@link ToolCliContext.emitRaw}. Emits the bare, unwrapped payload for a host
+   * command that declares `output:'raw-stream'` (`sessions show --raw`), so it
+   * never falls back to a direct `process.stdout.write`; the actual write lives
+   * in the single `renderRaw` seam.
+   */
+  readonly emitRaw: (value: unknown) => void;
+  /**
+   * Structured-error machine-output seam (launch, §5.5) — the host-command
    * mirror of {@link ToolCliContext.emitError}. A failed `--json` host command
    * (e.g. `sessions show`) emits its diagnosed failure through here so it rides
    * the single `renderOutcome` seam as a `status:'error'` `CommandOutcome`,
@@ -86,7 +94,7 @@ export interface CliCommandsContext {
    */
   readonly toolCommandSpecs?: readonly SpecLike[];
   /**
-   * v2 persistence accessor (thunk). Calling this returns the project-local
+   * Persistence accessor (thunk). Calling this returns the project-local
    * DataStore, opening it lazily on first access. Commands that don't read
    * the datastore (dry-runs, list-style commands, completion) never trigger
    * the SQLite open and therefore don't materialise `.runtime/`. Loosely

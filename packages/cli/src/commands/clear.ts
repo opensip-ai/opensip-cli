@@ -1,8 +1,8 @@
 /**
  * clear command — clear session data from the project-local SQLite DB.
  *
- * v2: rows in the `sessions` table (and cascaded findings/checks) are
- * the unit of deletion; the file-by-file purge of v1 is gone. The CLI
+ * Rows in the `sessions` table (and cascaded findings/checks) are
+ * the unit of deletion. The CLI
  * bootstrap opens the DataStore in `preAction`; this command receives
  * the constructed repo from its caller.
  *
@@ -11,6 +11,8 @@
  * Banners and result lines route through the Ink renderer via the
  * `clear-done` `CommandResult` shape — no raw ANSI escapes here.
  */
+
+// @fitness-ignore-file only-documented-toolcli-seams -- interactive TTY confirmation: the pre-prompt notes printed before "Continue? (y/n)" are human-readable readline UX, not machine run output through a ToolCliContext seam (mirrors the ESLint exemption for this file). Result lines route through the Ink `clear-done` CommandResult.
 
 import { createInterface } from 'node:readline';
 
@@ -41,7 +43,7 @@ function ask(question: string): Promise<string> {
  * + status line. The rendering is `App.tsx`'s `case 'clear-done':`
  * branch — this function is pure I/O for the prompt only.
  *
- * v2: deletion goes through `SessionRepo` against the project-local
+ * Deletion goes through `SessionRepo` against the project-local
  * SQLite DB. Cascaded findings/checks are removed by foreign-key
  * cascade rules in the schema.
  */
