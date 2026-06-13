@@ -1,37 +1,16 @@
 // @fitness-ignore-file detached-promises -- bootstrap calls the synchronous registerLanguageAdapters and awaits the async tool registration helpers (registerFirstPartyTools, discoverAndRegisterToolPackages) that the heuristic flags
 /**
- * bootstrap — composition-root for the CLI.
+ * bootstrap — performs the one-time (per-process) STARTUP phase registrations
+ * (language adapters + tool admission via the uniform dynamic path) and
+ * returns the populated registries + provenance/manifests to the composition
+ * root.
  *
- * `bootstrapCli({ langRegistry, toolRegistry })` performs the side-effect-y
- * registrations the dispatcher needs before Commander is wired up:
+ * The full 10-step canonical lifecycle (including the PER-RUN steps that
+ * happen later in the preAction hook) is documented in `tool-lifecycle.ts`.
+ * This module owns steps 1-4 (discover/compat/trust/import for bundled +
+ * installed + authored) plus the mount seam re-export.
  *
- *   1. Bundled language adapters land in the supplied `LanguageRegistry`.
- *   2. First-party tools (fitness / simulation / graph) land in the
- *      supplied `ToolRegistry`.
- *   3. Third-party tools — discovered via `discoverToolPackages` from
- *      core — are imported and registered as third-party. The built-in
- *      ids are skipped to avoid double-registration warnings.
- *   4. The project-local SQLite DataStore is opened so tools and CLI
- *      commands can persist sessions / baselines through it. Returned
- *      to the caller so the composition root can hand it to the
- *      `ToolCliContext` and the CLI-only commands.
- *
- * Discovery is async (dynamic `import()` of each tool package). The
- * caller awaits before walking the registry to mount Commander
- * subcommands so `--help` listings see every tool's commands.
- *
- * Datastore opening is sequenced AFTER tool / adapter registration so
- * registry side-effects (which never touch SQLite) land before the
- * file-system handle exists. If a tool's `register()` ever needs the
- * datastore at registration time, that's a contract change — flag it,
- * don't reorder silently.
- *
- * Barrel surface: only the symbols `index.ts` actually consumes are
- * re-exported from this barrel. Internal helpers (`mergeConfigDefaults`,
- * `loadCliDefaults`, `registerFirstPartyTools`, `BUNDLED_TOOL_PACKAGES`,
- * `registerLanguageAdapters`) stay in their files; bootstrap siblings and
- * tests import them directly. (User-global config I/O moved to
- * `@opensip-cli/config` in the launch contract.) Audit 2026-05-23 M1.
+ * See tool-lifecycle.ts for the ordered steps and phase split.
  */
 
 import {

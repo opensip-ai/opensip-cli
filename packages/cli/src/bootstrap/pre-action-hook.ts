@@ -318,10 +318,12 @@ export function installPreActionHook(
       });
     }
 
-    // Lifecycle diagnostics (§5.10): record plugin-load + config-validate facts on
-    // the per-run bus now that the scope is bound. These pre-handler events ride on
-    // the CommandOutcome the handler later produces, so `--json` consumers see
-    // capability health (how many tools loaded; the resolved project scope).
+    // Lifecycle diagnostics (§5.10): record key construction facts on the per-run bus.
+    // These (plus the per-domain events emitted from loadCapabilityDomain and the
+    // wiring events from buildPerRunScope) ride on every CommandOutcome so --json
+    // consumers see the full uniform lifecycle (tools loaded, subscopes contributed,
+    // capability domains wired + driven, config validated, etc.). This directly
+    // improves observability of the blast-radius bootstrap paths (architecture review).
     scope.diagnostics.event('load', 'debug', `${tools.list().length} tool(s) loaded`);
     scope.diagnostics.counter('tools.loaded', tools.list().length);
     scope.diagnostics.event(
@@ -375,7 +377,12 @@ export function installPreActionHook(
       configPath: project.scope === 'project' ? project.configPath : undefined,
     });
     if (driven > 0) {
-      scope.diagnostics.event('load', 'debug', `loaded ${String(driven)} capability domain(s)`);
+      scope.diagnostics.event(
+        'load',
+        'debug',
+        `drove ${String(driven)} owning-tool capability domain(s) (see per-domain 'capability ... loaded' events for contribution counts + errors)`,
+      );
+      scope.diagnostics.counter('capabilities.driven', driven);
     }
   });
 }

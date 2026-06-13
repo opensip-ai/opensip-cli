@@ -142,6 +142,17 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     toolProvenance: provenance,
   });
 
+  // Lifecycle diagnostics: record wiring steps (contributeScope + capabilities)
+  // on the bus *before* enterScope. These ride the eventual CommandOutcome so
+  // --json consumers and the uniform diagnostics snapshot see the full
+  // per-run construction (addresses architecture review findings on observability
+  // of steps 6/7 and blast-radius files).
+  const contributing = tools.list().filter((t) => !!t.contributeScope);
+  scope.diagnostics.event('load', 'debug', `${contributing.length} tool(s) contributed subscope`, {
+    tools: contributing.map((t) => t.metadata.id ?? t.metadata.name),
+  });
+  scope.diagnostics.counter('tools.subscope_contributions', contributing.length);
+
   // D7: each registered tool contributes its tool-specific subscope (e.g.
   // `scope.simulation`, `scope.graph`) BEFORE the scope is entered. IoC (M4):
   // the tool RETURNS its slot via `contributeScope()`; the kernel installs it
@@ -158,12 +169,26 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     registry: createCapabilityRegistry(logger),
   });
 
+  const wired = capabilities.listDomains().map((d) => d.id);
+  scope.diagnostics.event('load', 'debug', `wired ${wired.length} capability domain(s)`, {
+    domains: wired,
+  });
+  scope.diagnostics.counter('capabilities.wired', wired.length);
+
   Object.assign(scope, {
     capabilities,
     toolConfig,
     targets,
     ...configDocumentSlot(project, configDocument),
   });
+
+  // Also surface the config validation result for the uniform lifecycle view.
+  const toolConfigNamespaces = tools.list().filter((t) => !!t.config).length;
+  scope.diagnostics.event(
+    'validate',
+    'debug',
+    `config composed for ${toolConfigNamespaces} tool namespace(s)`,
+  );
 
   return scope;
 }

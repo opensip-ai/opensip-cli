@@ -182,6 +182,16 @@ export async function deliverEnvelope(
   const log = opts.logger ?? defaultLogger;
   const repo = opts.repo ?? resolveRepoIdentity(opts.cwd);
 
+  // Record delivery start on the scope diagnostics (if any) so the 'deliver' phase
+  // of the uniform lifecycle is visible in CommandOutcome for --json consumers.
+  // This improves observability of the root-owned egress path (architecture review).
+  currentScope()?.diagnostics.event('deliver', 'debug', `deliver start for ${envelope.tool}`, {
+    tool: envelope.tool,
+    recipe: envelope.recipe,
+    signalCount: envelope.signals.length,
+    reportTo: !!opts.reportTo,
+  });
+
   // ADR-0035: the host owns the findings exit code. For a normal run it is a pure
   // function of the run's single verdict — `envelope.verdict.passed` — so no tool
   // computes its own exit; gate-compare overrides with its baseline-diff verdict.
@@ -196,6 +206,13 @@ export async function deliverEnvelope(
     cloudAccepted,
     ...(cloud.skippedReason === undefined ? {} : { cloudSkippedReason: cloud.skippedReason }),
   };
+
+  const cloudSuffix = cloud.skippedReason ? ` (skipped:${cloud.skippedReason})` : '';
+  currentScope()?.diagnostics.event(
+    'deliver',
+    'debug',
+    `cloud egress: accepted=${cloudAccepted}${cloudSuffix}`,
+  );
 
   if (opts.reportTo === undefined || opts.reportTo.length === 0) {
     return cloudLeg;
@@ -215,6 +232,16 @@ export async function deliverEnvelope(
   if (!reportSuccess && !runFailed) {
     opts.setExitCode?.(EXIT_CODES.REPORT_FAILED);
   }
+
+  currentScope()?.diagnostics.event(
+    'deliver',
+    reportSuccess ? 'info' : 'warn',
+    `report-to ${reportSuccess ? 'succeeded' : 'failed'}`,
+    {
+      url: opts.reportTo,
+      success: reportSuccess,
+    },
+  );
 
   return { ...cloudLeg, reportSuccess, reportUrl: opts.reportTo };
 }

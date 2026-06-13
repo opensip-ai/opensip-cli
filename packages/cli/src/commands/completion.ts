@@ -22,7 +22,7 @@
  * that can query `opensip fit --list` at completion time.
  */
 
-// @fitness-ignore-file only-documented-toolcli-seams -- the `completion <shell>` command's whole purpose is to write a sourceable shell-completion script to stdout for the user to pipe/redirect; that script IS its output, not run findings through a ToolCliContext seam (mirrors the ESLint exemption for this file).
+// @fitness-ignore-file only-documented-toolcli-seams -- the `completion <shell>` command's whole purpose is to write a sourceable shell-completion script to stdout for the user to pipe/redirect; that script IS its output, not run findings through a ToolCliContext seam (mirrors the ESLint exemption for this file). See architecture review finding 5 (interactive host commands legitimately need a narrow TTY/script seam outside the run data path).
 
 import { commonFlags, type CommonFlagKey } from '@opensip-cli/contracts';
 

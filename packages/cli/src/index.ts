@@ -2,10 +2,22 @@
 
 // @fitness-ignore-file detached-promises -- composition root invokes synchronous bootstrap helpers (mountAllToolCommands, registerCliCommands, printWelcome) that the heuristic mistakes for promise-returning calls
 /**
- * OpenSIP CLI CLI — composition root. Reads top-to-bottom as wiring.
- * Bootstrap, context, command-mount, and error-handling each live in
- * their own module under `./bootstrap`, `./cli-context`, `./commands`,
- * and `./error-handler`. Adding a new tool requires zero changes here.
+ * OpenSIP CLI — composition root (sequencer, not a god file).
+ *
+ * The canonical ordered description of the full tool + host lifecycle lives in
+ * `bootstrap/tool-lifecycle.ts` (the 10 named steps, two phases: STARTUP in
+ * bootstrapCli + mountToolCommands, PER-RUN in the preAction hook + builders).
+ * This file wires the major seams (fresh registries per invocation, bootstrap,
+ * pre-action hook install, ToolCliContext construction, command mounting,
+ * host command registration, telemetry, top-level error paths) and then
+ * dispatches. Individual steps are factored into `./bootstrap/*` (admission,
+ * scope building, capability wiring, delivery) and `./commands/*`.
+ *
+ * Adding a new tool requires zero changes here — tools declare `commandSpecs`
+ * (and optional hooks) and are discovered/admitted/mounted uniformly.
+ *
+ * See also: bootstrap/tool-lifecycle.ts (TOOL_LIFECYCLE_STEPS + JSDoc),
+ * pre-action-hook.ts, build-per-run-scope.ts, register-tools.ts.
  */
 
 import { dirname } from 'node:path';

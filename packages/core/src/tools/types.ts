@@ -717,6 +717,18 @@ export interface ToolExtensionPoints {
  * The host (`cli`) loads every tool through the same dynamic-import plugin path;
  * nothing here distinguishes a bundled tool from an installed one (ADR-0027).
  *
+ * ## Design note (architecture review)
+ *
+ * The surface is deliberately *rich and cohesive* rather than a minimal set of
+ * narrow interfaces. New or rare concerns are routed through the `extensionPoints`
+ * bag (or top-level optionals that predate the bag) + per-tool `*ContractVersion`
+ * fields (ADR-0046, ADR-0047). This keeps the core Tool contract stable while
+ * allowing independent evolution of fitness/graph/simulation surfaces. The trade-off
+ * (larger surface for tool authors, coordination for new capability *domains*)
+ * was accepted in favor of a single place to look for "what can a tool do?" and
+ * to avoid a proliferation of tiny marker interfaces. See the evolution guidance
+ * in the JSDoc below and in tool-lifecycle / capability docs.
+ *
  * ## Contract Structure (for discoverability)
  *
  * The surface is intentionally one cohesive interface (see top-of-file comment).
