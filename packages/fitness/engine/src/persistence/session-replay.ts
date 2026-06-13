@@ -1,5 +1,6 @@
 import { decodeSessionPayload, type DecodedSessionFinding } from '@opensip-cli/session-store';
 
+import { currentScope, type Signal } from '@opensip-cli/core';
 import type {
   FitDoneResult,
   SignalEnvelope,
@@ -7,7 +8,6 @@ import type {
   ToolSessionReplay,
   UnitResult,
 } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
 
 /**
  * Project a stored fit session back into a {@link SignalEnvelope}/{@link FitDoneResult}.
@@ -21,14 +21,32 @@ import type { Signal } from '@opensip-cli/core';
  *   (propagated from `decodeSessionPayload`).
  */
 export function fitReplayFromSession(stored: StoredSession): ToolSessionReplay<FitDoneResult> {
-  const payload = decodeSessionPayload(stored.payload, { tool: 'fit' });
-  const units: UnitResult[] = payload.checks.map((check) => ({
+  const decoded = decodeSessionPayload(stored.payload, { tool: 'fit' });
+
+  // Version-aware handling per payload evolution plan.
+  // Use the version surfaced by the (structural) decoder; fall back to raw extract for safety.
+  const version = decoded.payloadVersion ?? /* raw extract for legacy path */ (stored.payload ? (stored.payload as any).__version : undefined) ?? 1;
+
+  if (version > 1) {
+    // Future version: warn via diagnostics (observable in --json outcomes) + logger.
+    // Still attempt best-effort projection using whatever the structural decoder produced.
+    const scope = currentScope();
+    scope?.diagnostics?.event(
+      'load',
+      'warn',
+      `fit session payload future version (v=${version}); using projection`,
+      { sessionId: stored.id, version },
+    );
+    // (logger is available via scope or module; diagnostics is the cross-cutting seam)
+  }
+
+  const units: UnitResult[] = decoded.checks.map((check) => ({
     slug: check.checkSlug,
     passed: check.passed,
     ...(check.violationCount === undefined ? {} : { violationCount: check.violationCount }),
     durationMs: check.durationMs,
   }));
-  const signals = payload.checks.flatMap((check, checkIndex) =>
+  const signals = decoded.checks.flatMap((check, checkIndex) =>
     check.findings.map((finding, findingIndex) =>
       replaySignal(stored, check.checkSlug, finding, checkIndex, findingIndex),
     ),
@@ -42,7 +60,7 @@ export function fitReplayFromSession(stored: StoredSession): ToolSessionReplay<F
     verdict: {
       score: stored.score,
       passed: stored.passed,
-      summary: payload.summary,
+      summary: decoded.summary,
     },
     units,
     signals,
