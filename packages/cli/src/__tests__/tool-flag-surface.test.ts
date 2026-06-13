@@ -134,9 +134,10 @@ const EXPECTED: Record<string, string[]> = {
 
 describe('first-party tool flag-surface contract', () => {
   for (const tool of BUNDLED_TOOLS) {
-    it(`${tool.metadata.id}: registers exactly its documented flag set`, () => {
-      const expected = EXPECTED[tool.metadata.id];
-      expect(expected, `no expected flag set for tool '${tool.metadata.id}'`).toBeDefined();
+    const human = tool.metadata.name ?? tool.metadata.id;
+    it(`${human}: registers exactly its documented flag set`, () => {
+      const expected = EXPECTED[human];
+      expect(expected, `no expected flag set for tool '${human}'`).toBeDefined();
       expect(recordSpecFlags(tool)).toEqual([...expected].sort());
     });
   }

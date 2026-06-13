@@ -112,7 +112,7 @@ describe('bundled policy parity — registerFirstPartyTools throws iff the repor
     expect(
       registry
         .list()
-        .map((t) => t.metadata.id)
+        .map((t) => t.metadata.name ?? t.metadata.id)
         .sort(),
     ).toEqual(['fitness', 'graph', 'simulation']);
   });
