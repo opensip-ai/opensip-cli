@@ -36,8 +36,8 @@ describe('analyzeNoKebabOptionIndexing', () => {
   });
 
   it('skips test files', () => {
-    expect(analyze("const x = opts['summary-only'];\n", `${SRC.replace('.ts', '.test.ts')}`)).toEqual(
-      [],
-    );
+    expect(
+      analyze("const x = opts['summary-only'];\n", `${SRC.replace('.ts', '.test.ts')}`),
+    ).toEqual([]);
   });
 });

@@ -62,6 +62,8 @@ export interface GraphSessionCheck {
  * session-detail renderer reads `summary` and `checks` structurally.
  */
 export interface GraphSessionPayload {
+  /** Inner version per the payload schema evolution convention (v1 shape). */
+  readonly __version: 1;
   readonly summary: {
     /** Total rules (checks) that emitted ≥1 signal. */
     readonly total: number;
@@ -147,6 +149,7 @@ export function buildGraphSessionPayload(signals: readonly Signal[]): GraphSessi
   const warnings = signals.length - errors;
 
   return {
+    __version: 1,
     summary: {
       total: checks.length,
       passed: checks.filter((c) => c.passed).length,

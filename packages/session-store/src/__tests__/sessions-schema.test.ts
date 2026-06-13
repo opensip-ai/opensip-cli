@@ -47,6 +47,11 @@ describe('sessions schema', () => {
     const ref = foreignKeys[0]?.reference();
     expect(ref?.foreignTable).toBe(sessions);
     // Opaque by construction: just the FK, the tool discriminator, and the blob.
-    expect(columns.map((c) => c.name).sort()).toEqual(['payload', 'session_id', 'tool']);
+    expect(columns.map((c) => c.name).sort()).toEqual([
+      'payload',
+      'payload_version',
+      'session_id',
+      'tool',
+    ]);
   });
 });

@@ -22,7 +22,7 @@ describe('extractPayloadVersion', () => {
   it('returns undefined for invalid numeric values (non-positive, non-finite)', () => {
     expect(extractPayloadVersion({ __version: 0 })).toBeUndefined();
     expect(extractPayloadVersion({ __version: -1 })).toBeUndefined();
-    expect(extractPayloadVersion({ __version: NaN })).toBeUndefined();
+    expect(extractPayloadVersion({ __version: Number.NaN })).toBeUndefined();
     expect(extractPayloadVersion({ __version: Infinity })).toBeUndefined();
     expect(extractPayloadVersion({ __version: '2' as any })).toBeUndefined();
     expect(extractPayloadVersion({ __version: true as any })).toBeUndefined();

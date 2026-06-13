@@ -24,8 +24,9 @@
  * skeleton + the detected `payloadVersion` when present.
  */
 
-import type { SignalEnvelope } from '@opensip-cli/contracts';
 import { extractPayloadVersion } from '@opensip-cli/core';
+
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 /** JSON-safe scalar — the metadata-value subset the persisted shape permits. */
 export type SessionPayloadScalar = string | number | boolean;

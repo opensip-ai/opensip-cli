@@ -1,6 +1,6 @@
+import { currentScope, extractPayloadVersion, type Signal } from '@opensip-cli/core';
 import { decodeSessionPayload, type DecodedSessionFinding } from '@opensip-cli/session-store';
 
-import { currentScope, type Signal } from '@opensip-cli/core';
 import type {
   FitDoneResult,
   SignalEnvelope,
@@ -24,8 +24,8 @@ export function fitReplayFromSession(stored: StoredSession): ToolSessionReplay<F
   const decoded = decodeSessionPayload(stored.payload, { tool: 'fit' });
 
   // Version-aware handling per payload evolution plan.
-  // Use the version surfaced by the (structural) decoder; fall back to raw extract for safety.
-  const version = decoded.payloadVersion ?? /* raw extract for legacy path */ (stored.payload ? (stored.payload as any).__version : undefined) ?? 1;
+  // Prefer the version surfaced by the structural decoder (from Phase 0); fall back via the pure helper.
+  const version = decoded.payloadVersion ?? extractPayloadVersion(stored.payload) ?? 1;
 
   if (version > 1) {
     // Future version: warn via diagnostics (observable in --json outcomes) + logger.

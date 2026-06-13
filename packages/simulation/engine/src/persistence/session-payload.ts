@@ -25,6 +25,8 @@ export interface SimulationSessionCheck {
 }
 
 export interface SimulationSessionPayload {
+  /** Inner version per the payload schema evolution convention (v1 shape). */
+  readonly __version: 1;
   readonly summary: {
     readonly total: number;
     readonly passed: number;
@@ -56,6 +58,7 @@ export function buildSimulationSessionPayload(envelope: SignalEnvelope): Simulat
 
   const { summary } = envelope.verdict;
   return {
+    __version: 1,
     summary: {
       total: summary.total,
       passed: summary.passed,

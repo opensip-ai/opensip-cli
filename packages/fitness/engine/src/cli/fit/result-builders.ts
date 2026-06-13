@@ -244,9 +244,13 @@ export function persistFitSession(
     const fitPayload = buildFitnessSessionPayload(envelope);
     // Guard (primarily exercised in tests/CI per phase 3.3): ensure the convention
     // is followed on new writes. No user-visible behavior change.
-    if (process.env.NODE_ENV === 'test' && typeof (fitPayload as any).__version !== 'number') {
-      // eslint-disable-next-line no-console
-      console.warn('fitness session payload missing __version in test build');
+    // Use the typed builder result; __version is guaranteed by the interface for v1+.
+    if (process.env.NODE_ENV === 'test' && fitPayload.__version !== 1) {
+      logger.warn({
+        evt: 'cli.fit.payload.missing_version',
+        module: 'cli:fit',
+        msg: 'fitness session payload missing or wrong __version in test build',
+      });
     }
     repo.save({
       id: generatePrefixedId('fit'),
