@@ -73,12 +73,32 @@ export class SessionRepo {
         // Tool-owned opaque detail. Written when the caller supplies it;
         // `contracts` never inspects the shape.
         if (session.payload !== undefined) {
+          const innerVersion = extractPayloadVersion(session.payload) ?? 1;
+          if (extractPayloadVersion(session.payload) === undefined) {
+            // Deprecation-style warning for transition: encourage tools to adopt the
+            // __version convention on new writes (per payload evolution rules).
+            logger.warn({
+              evt: "session.payload.missing_version",
+              module: MODULE_NAME,
+              sessionId: session.id,
+              tool: session.tool,
+              msg: "Tool wrote a session payload without top-level __version (treated as legacy v1). Update the tool's build*SessionPayload to include __version: 1.",
+            });
+            const scope = currentScope();
+            scope?.diagnostics?.event(
+              "persist",
+              "warn",
+              "session payload written without __version (legacy v1 treatment)",
+              { sessionId: session.id, tool: session.tool },
+            );
+          }
+
           tx.insert(sessionToolPayload)
             .values({
               sessionId: session.id,
               tool: session.tool,
               payload: session.payload,
-              payload_version: 1, // base version; tools may embed finer __version in the json payload itself
+              payload_version: 1, // outer storage contract version (inner __version lives inside the JSON blob)
             })
             .run();
         }
