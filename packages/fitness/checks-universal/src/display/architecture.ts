@@ -25,6 +25,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'no-direct-stdout-in-tool-engine': ['📤', 'No Direct Stdout In Tool Engine'],
   'no-config-loader-outside-config': ['🔐', 'No Config Loader Outside Config'],
   'no-duplicate-packages': ['📦', 'No Duplicate Packages'],
+  'no-kebab-option-indexing': ['🐫', 'No Kebab Option Indexing'],
   'no-module-singleton': ['🔒', 'No Module Singleton'],
   'no-placeholder-check-ids': ['🚫', 'No Placeholder Check IDs'],
   'node-version-consistency': ['📦', 'Node Version Consistency'],

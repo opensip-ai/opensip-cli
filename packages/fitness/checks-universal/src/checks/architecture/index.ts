@@ -15,6 +15,7 @@ export * from './no-bodyhash-keying-outside-identity.js';
 export * from './no-config-loader-outside-config.js';
 export * from './no-custom-event-emitter.js';
 export * from './no-direct-stdout-in-tool-engine.js';
+export * from './no-kebab-option-indexing.js';
 export * from './no-module-singleton.js';
 export * from './no-placeholder-check-ids.js';
 export * from './only-documented-toolcli-seams.js';
