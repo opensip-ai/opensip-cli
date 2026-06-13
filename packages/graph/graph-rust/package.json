@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/graph-rust",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Rust language adapter for the opensip graph engine",
   "keywords": [

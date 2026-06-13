@@ -61,7 +61,7 @@ import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic
 
 import { hostEnv } from '../env/host-env-specs.js';
 
-import { startProfiling, stopProfiling, resetProfilingForTests } from './profiling.js';
+import { stopProfiling, resetProfilingForTests } from './profiling.js';
 
 /**
  * Hard ceiling (ms) on the final span flush AND on each individual export

@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/targeting",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Host file-targeting runtime substrate for OpenSIP CLI — the generic TargetRegistry, uniform glob expansion (resolveTargets/preResolveAllTargets), and globalExcludes filtering any tool consumes via scope.targets",
   "keywords": [

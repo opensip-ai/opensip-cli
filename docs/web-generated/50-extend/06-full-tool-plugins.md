@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v1.0.0
+release: v0.1.0
 title: "Full Tool plugins"
 audience: [plugin-authors]
 purpose: "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph aren't the right shape and you want something fundamentally different."
@@ -55,8 +55,8 @@ Once a Tool exists as a package, the customer-facing management surface is the [
     ]
   },
   "peerDependencies": {
-    "@opensip-cli/contracts": "^1.0.0",
-    "@opensip-cli/core": "^1.0.0"
+    "@opensip-cli/contracts": "^0.1.0",
+    "@opensip-cli/core": "^0.1.0"
   }
 }
 ```
@@ -70,8 +70,10 @@ The `opensipTools` block is your tool's **static manifest** — read before your
   explicitly, or is skipped with a diagnostic when discovered).
 - **`commands`** — the command **names** (with descriptions) your tool mounts. The host asserts this set equals your runtime `tool.commands` at load (`assertManifestMatchesTool`) and throws on drift — the manifest is the cheap, no-import way to enumerate your surface for `--help`/completion, so it must stay in sync with the tool.
 
-Peer-dep on `@opensip-cli/contracts` and `@opensip-cli/core` at `^1.0.0`; the
-consumer brings their own version.
+Peer-dep on `@opensip-cli/contracts` and `@opensip-cli/core` at `^0.1.0`; the
+consumer brings their own version. (While opensip-cli is pre-1.0, a `^0.x`
+caret locks to the minor — `^0.1.0` is `>=0.1.0 <0.2.0` — so bump your peer
+range when you adopt a new `0.y` line.)
 
 ## `src/index.ts`
 
@@ -169,7 +171,7 @@ carrying the same identity fields inline — `kind`, `id`, `name`, `version`,
 The runtime contract is unchanged — the directory's resolved main must export
 `tool: Tool`, and the host runs the same `assertManifestMatchesTool` drift guard.
 Authored discovery, admission, dynamic import, and registration travel the exact
-same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/docs/decisions/ADR-0030-authored-tool-discovery.md)).
+same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/docs/decisions/ADR-0030-authored-tool-discovery.md)).
 
 > **Sidecar vs `plugin add --project`.** `plugin add --project` *installs an npm
 > package* into the gitignored `.runtime/plugins/tool/` and keeps provenance

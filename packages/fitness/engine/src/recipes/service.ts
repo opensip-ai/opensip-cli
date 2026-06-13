@@ -21,11 +21,7 @@ import {
   runWithScope,
 } from '@opensip-cli/core';
 
-import {
-  FileCache,
-  fileCache as globalFileCache,
-  DEFAULT_PREWARM_PATTERNS,
-} from '../framework/file-cache.js';
+import { FileCache, DEFAULT_PREWARM_PATTERNS } from '../framework/file-cache.js';
 import { type Check, type CheckRegistry } from '../framework/registry.js';
 import { currentCheckRegistry, currentRecipeRegistry } from '../framework/scope-registry.js';
 

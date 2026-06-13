@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/contracts",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Shared contract types for OpenSIP CLI — SignalEnvelope / CommandResult shapes, exit codes, session persistence",
   "keywords": [

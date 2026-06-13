@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v1.0.0
+release: v0.1.0
 title: "Publishable packs"
 audience: [plugin-authors]
 purpose: "Author and publish fit packs or sim scenario packs: workspace package skeleton, discovery contracts, and the migration recipe from loose .mjs files."
@@ -111,8 +111,8 @@ This pattern works at scale — the opensip codebase uses it for 308 fitness che
   "type": "module",
   "opensipTools": { "kind": "fit-pack" },
   "peerDependencies": {
-    "@opensip-cli/fitness": "^1.0.0",
-    "@opensip-cli/core": "^1.0.0"
+    "@opensip-cli/fitness": "^0.1.0",
+    "@opensip-cli/core": "^0.1.0"
   },
   "scripts": {
     "build": "tsc"

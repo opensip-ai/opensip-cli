@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v1.0.0
+release: v0.1.0
 title: "Check pack architecture"
 audience: [contributors, plugin-authors]
 purpose: "How check packs are structured, the bundled seven, scope filters, parameterization, and the marketplace shape."
@@ -242,13 +242,13 @@ export const checks = [noTodoBeforeDeploy];
 
 Package name and version come from the pack's `package.json` — there is no `metadata` export to maintain in lockstep.
 
-Peer-depend on `@opensip-cli/fitness` and `@opensip-cli/core` so a project at any compatible major version can install your pack:
+Peer-depend on `@opensip-cli/fitness` and `@opensip-cli/core` so a project on any compatible release line can install your pack (while opensip-cli is pre-1.0, `^0.1.0` locks to the `0.1.x` minor line):
 
 ```json
 {
   "peerDependencies": {
-    "@opensip-cli/fitness": "^1.0.0",
-    "@opensip-cli/core": "^1.0.0"
+    "@opensip-cli/fitness": "^0.1.0",
+    "@opensip-cli/core": "^0.1.0"
   }
 }
 ```

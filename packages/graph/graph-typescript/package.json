@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/graph-typescript",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "TypeScript language adapter for the opensip graph engine",
   "keywords": [

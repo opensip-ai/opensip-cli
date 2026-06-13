@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v1.0.0
+release: v0.1.0
 title: "Wire into CI"
 audience: [ci-integrators, getting-started]
 purpose: "Task-led: add opensip-cli to your CI pipeline with PR annotations and baseline gating. GitHub Actions and GitLab examples."

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v1.0.0
+release: v0.1.0
 title: "Session and persistence"
 audience: [contributors]
 purpose: "What gets written to disk during and after a run. The runtime dir layout, the SQLite store, logs, reports."

@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/checks-go",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Go fitness checks for opensip-cli",
   "keywords": [

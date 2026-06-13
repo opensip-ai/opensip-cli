@@ -28,7 +28,6 @@ import {
 } from './opensip-id-derivation.js';
 
 import type {
-  CatalogExport,
   CatalogExportEdge,
   CatalogExportProvenance,
   CatalogExportSymbol,
@@ -306,7 +305,13 @@ export interface RenderCatalogJsonInput {
  * Ordering of `symbols` and `edges` is stable across runs (sorted by
  * id) so byte-equivalence holds for golden-fixture tests and
  * idempotent re-ingestion via `ON CONFLICT DO UPDATE`.
+ *
+ * Cognitive complexity >15 from the double-nested occurrence walk that
+ * also fans out call+dependency edges, plus the chunked string assembly
+ * for memory safety on large repos. The logic must be kept together for
+ * the determinism contract. Disable scoped to the renderer.
  */
+/* eslint-disable sonarjs/cognitive-complexity */
 export function renderCatalogJson(input: RenderCatalogJsonInput): string {
   const { catalog, indexes, provenance, repoId, gitSha } = input;
   const language = catalog.language;
@@ -344,26 +349,31 @@ export function renderCatalogJson(input: RenderCatalogJsonInput): string {
   }
 
   // Stable ordering — deterministic output is the golden-fixture
-  // contract. Sort by id (sha256 hex string, lexicographic).
-  symbols.sort((a, b) => a.id.localeCompare(b.id));
-  edges.sort((a, b) => a.id.localeCompare(b.id));
+  // contract. Sort by id (sha256 hex string, lexicographic). Use spread to
+  // produce the sorted copy so the sort call does not immediately mutate a
+  // named array in statement position (unicorn/no-immediate-mutation).
+  const sortedSymbols = [...symbols].sort((a, b) => a.id.localeCompare(b.id));
+  const sortedEdges = [...edges].sort((a, b) => a.id.localeCompare(b.id));
 
   // Build the JSON in chunks to avoid materializing the *entire* export (symbols + edges
   // for 100k-file repos) as one giant JS string in a single JSON.stringify call.
   // This mitigates V8 string length / OOM risk for the documented large-repo target.
   // (Full streaming to fd without ever holding the complete string would be even better
   // for extreme sizes; this is the contained fix that still returns the string contract.)
+  /* eslint-disable unicorn/no-immediate-mutation -- the chunked parts.push builder below deliberately mutates a small string-segment array in a tight loop; this avoids N quadratic concat allocations and the single giant string materialization that the surrounding comment explains is the OOM risk for 100k-file repos. The mutation is confined to this builder; final .join produces the returned value. */
   const parts: string[] = ['{\n', '  "version": "1.0",\n'];
   parts.push('  "provenance": ' + JSON.stringify(provenance, null, 2) + ',\n', '  "symbols": [\n');
-  for (const [i, symbol_] of symbols.entries()) {
+  for (const [i, symbol_] of sortedSymbols.entries()) {
     if (i > 0) parts.push(',\n');
     parts.push(JSON.stringify(symbol_, null, 2));
   }
   parts.push('\n  ],\n', '  "edges": [\n');
-  for (const [i, edge] of edges.entries()) {
+  for (const [i, edge] of sortedEdges.entries()) {
     if (i > 0) parts.push(',\n');
     parts.push(JSON.stringify(edge, null, 2));
   }
   parts.push('\n  ]\n', '}');
+  /* eslint-enable unicorn/no-immediate-mutation */
   return parts.join('');
 }
+/* eslint-enable sonarjs/cognitive-complexity */

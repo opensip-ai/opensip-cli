@@ -59,10 +59,7 @@ const TOOL_ENGINE_PATH = /packages\/(fitness|graph|simulation)\/engine\/src\//;
  * `console.error`/`.warn` are intentionally absent — stderr is the
  * diagnostics channel (see the file header).
  */
-const STDOUT_PATTERNS = [
-  /\bprocess\.stdout\.write\s*\(/,
-  /\bconsole\.(?:log|info|debug)\s*\(/,
-];
+const STDOUT_PATTERNS = [/\bprocess\.stdout\.write\s*\(/, /\bconsole\.(?:log|info|debug)\s*\(/];
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the detection
@@ -101,7 +98,8 @@ export const checks = [
   defineCheck({
     id: '9968cdec-1541-4522-ac02-e9eff56a5c2a',
     slug: 'no-direct-stdout-in-tool-engine',
-    description: 'Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011)',
+    description:
+      'Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011)',
     scope: { languages: ['typescript'], concerns: ['backend'] },
     tags: ['architecture', 'quality'],
     fileTypes: ['ts', 'tsx'],

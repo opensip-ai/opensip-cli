@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/session-store",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Session persistence for OpenSIP CLI — the session SQLite schema and SessionRepo, extracted from contracts",
   "keywords": [

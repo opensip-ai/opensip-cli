@@ -105,6 +105,13 @@ export class Registry<T extends Registerable> {
     this.logger = opts.logger ?? defaultLogger;
   }
 
+  // register() centralizes the five DuplicatePolicy branches + orthogonal nameCollisionMode
+  // guard + internal bypass. The switch + nested ifs for the "exact same item" allow-internal
+  // fast-path and overwrite cleanup produce inherent branching complexity (19). It is the
+  // single implementation of the registry contract used by *all* registries in the system;
+  // extracting sub-fns would fragment the policy table that must be reviewed as a unit for
+  // ADR-0023/ADR-0037/etc. correctness. Disable scoped to this method only.
+  /* eslint-disable sonarjs/cognitive-complexity */
   register(item: T, callOpts: RegisterCallOptions = {}): void {
     const { byId, byName } = this;
     const internal = callOpts.internal === true;
@@ -171,7 +178,7 @@ export class Registry<T extends Registerable> {
         case 'allow-internal': {
           // First non-internal write was allowed. Subsequent duplicates throw unless { internal: true }.
           // Harden for idempotent re-registers (tests, reloads): if the exact same item (id+name), allow silently.
-          const existing = idIncumbent || nameIncumbent;
+          const existing = idIncumbent ?? nameIncumbent;
           if (existing && existing.id === item.id && existing.name === item.name) {
             return;
           }
@@ -187,6 +194,7 @@ export class Registry<T extends Registerable> {
     byId.set(item.id, item);
     byName.set(item.name, item);
   }
+  /* eslint-enable sonarjs/cognitive-complexity */
 
   registerAll(items: readonly T[], callOpts: RegisterCallOptions = {}): void {
     for (const item of items) this.register(item, callOpts);

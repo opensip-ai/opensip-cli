@@ -16,6 +16,7 @@ import type { ProcessorContext } from './check-result-processor.js';
 import type { FitnessRecipeServiceCallbacks, FitnessRecipeSession } from './service-types.js';
 import type { FitnessRecipe } from './types.js';
 import type { Check } from '../framework/check-types.js';
+import type { FileCache } from '../framework/file-cache.js';
 
 // =============================================================================
 // TYPES
@@ -35,7 +36,7 @@ export interface ExecutionOptions {
    */
   globalExcludes?: readonly string[];
   /** Per-service FileCache (for concurrent SaaS RunScope isolation). */
-  fileCache?: import('../framework/file-cache.js').FileCache;
+  fileCache?: FileCache;
 }
 
 /** Service context providing session state, callbacks, and abort control */

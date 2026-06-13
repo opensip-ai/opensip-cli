@@ -178,6 +178,15 @@ export interface PreActionRuntime {
  *   global — the composition root installs the hook AFTER `bootstrapCli`
  *   populates the registries (see {@link PreActionRuntime}).
  */
+// The body (including the preAction hook arrow it registers) sequences the full
+// per-invocation bootstrap: runId, defaults merge, project resolve + bailouts,
+// scope construction/enter, metrics, profiling start, lazy tool init, capability
+// drive. It has many explicit early-exit paths by design (the documented contract
+// for "only side effects after all bailouts"). Cognitive complexity exceeds 15
+// because it is the single source of truth for ordering; splitting would obscure
+// the load-bearing sequence and duplicate the guard/enter wiring. Acceptable for
+// this composition root (see similar disables on other bootstrap entry points).
+/* eslint-disable sonarjs/cognitive-complexity */
 export function installPreActionHook(
   program: Command,
   version: string,
@@ -257,7 +266,7 @@ export function installPreActionHook(
       for (const c of tool.commands || []) {
         if (c.scope === 'none') {
           extraAgnostic.add(c.name);
-          (c.aliases || []).forEach((a: string) => extraAgnostic.add(a));
+          (c.aliases ?? []).forEach((a: string) => extraAgnostic.add(a));
         }
       }
     }
@@ -411,3 +420,4 @@ export function installPreActionHook(
     }
   });
 }
+/* eslint-enable sonarjs/cognitive-complexity */

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v1.0.0
+release: v0.1.0
 title: "Website integration — opensip.ai"
 audience: [contributors]
 purpose: "How opensip.ai consumes docs/web-generated/ from this repo: backend proxy, frontend route, manifest contract."
@@ -62,8 +62,8 @@ Shape:
 
 ```ts
 type DocManifest = {
-  version: string;       // e.g. "1.0.0" — the opensip-cli release this docset matches
-  rawBase: string;       // e.g. "https://raw.githubusercontent.com/opensip-ai/opensip-cli/v1.0.0/"
+  version: string;       // e.g. "0.1.0" — the opensip-cli release this docset matches
+  rawBase: string;       // e.g. "https://raw.githubusercontent.com/opensip-ai/opensip-cli/v0.1.0/"
   pages: DocPage[];
   nav: NavSection[];
 };

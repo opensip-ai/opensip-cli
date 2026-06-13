@@ -87,10 +87,7 @@ const PERSISTENCE_BOUNDARY = [
 /**
  * Bad call shapes for run output.
  */
-const STDOUT_PATTERNS = [
-  /\bprocess\.stdout\.write\s*\(/,
-  /\bconsole\.(?:log|info|debug)\s*\(/,
-];
+const STDOUT_PATTERNS = [/\bprocess\.stdout\.write\s*\(/, /\bconsole\.(?:log|info|debug)\s*\(/];
 
 /**
  * Pre-scope handoff-bag symbols. The module-global `currentRuntimeContext` bag
@@ -119,10 +116,7 @@ const HOLDER_PATTERNS = [
  * access is deliberately NOT matched here — that is `restrict-raw-db-access`'s
  * boundary-aware concern (see the file header).
  */
-const RAW_DS_PATTERNS = [
-  /\bnew DataStoreFactory\b/,
-  /\bDataStoreFactory\.open\b/,
-];
+const RAW_DS_PATTERNS = [/\bnew DataStoreFactory\b/, /\bDataStoreFactory\.open\b/];
 
 /** One forbidden-shape rule: any matching pattern on a line is a violation. */
 const STDOUT_RULE = {

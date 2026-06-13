@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v1.0.0
+release: v0.1.0
 title: "vs. other tools"
 audience: [getting-started]
 purpose: "Honest comparison: what opensip-cli does that ESLint, Semgrep, Sonarqube, and Snyk don't — and what it deliberately doesn't try to do."

@@ -51,13 +51,74 @@ contract tests derive from or verify against that source.
 All publishable packages share the same version. The release workflow publishes
 them in dependency order, with `opensip-cli` last.
 
+## Version Surfaces (what a bump touches)
+
+The product version has **one source of truth** —
+`packages/core/package.json#version` — and fans out to three kinds of surface.
+The mechanical sweep is automated by **`scripts/bump-version.mjs`** (with a
+`--check` drift guard); this section explains what it touches so the manual
+parts are obvious. (`git grep -n '<old-version>'` after a bump is the backstop.)
+
+### 1. Version fields (hand-set, lockstep)
+
+All 33 publishable packages **plus** the private root (`@opensip-cli/root`) and
+the private `@opensip-cli/test-support` carry one shared version — 35
+`package.json` files. The bump script matches `name === 'opensip-cli'`,
+`name === '@opensip-cli/root'`, or `name.startsWith('@opensip-cli/')`. Fixture
+packages use other scopes (`@fixture/*`, `@example/*`, `@medium/*`,
+`@opensip-cli-fixture/*`, bare names) and are deliberately **not** touched.
+
+Internal dependencies all use `workspace:*`, so `pnpm pack` rewrites them to the
+concrete version at publish time. **A bump never edits dependency specifiers.**
+Refresh the lockfile afterward with `pnpm install --lockfile-only`.
+
+### 2. Derived surfaces (DO NOT hand-edit — regenerate)
+
+Each reads `packages/core/package.json#version`:
+
+| Surface | Regenerate with | Pins |
+| ------- | --------------- | ---- |
+| CLI `--version` | nothing — `readPackageVersion` walks to the nearest `package.json` at runtime | the installed version |
+| Per-package `README.md` (×33) | `pnpm docs:readmes` | `tree/vX.Y.Z/…` source + catalog links |
+| `docs/web-generated/**` + `manifest.json` | `pnpm docs:build` | `blob/vX.Y.Z/…` links; manifest `version` / `rawBase` |
+
+CI fails if these are stale — `pnpm docs:readmes:check` and `pnpm docs:check`,
+both run by `verify-release`.
+
+### 3. Hand-authored surfaces (the bump script swaps the version token; you own the prose)
+
+`scripts/bump-version.mjs` swaps the version token in: the `docs/public/**`
+`release: vX.Y.Z` frontmatter (~55 files, including the top-level `README.md`),
+the scope-qualified peer-dep ranges (`"@opensip-cli/x": "^X.Y.Z"`), the
+`SECURITY.md` supported-release row, the `CLAUDE.md` Project Status line, and the
+curated prose markers ("Last verified at vX.Y.Z", the package-catalog "(all at
+`X.Y.Z`)" line, the install-script `OPENSIP_CLI_VERSION=` example, the
+website-integration manifest example, the graph `cacheKey: "eng=X.Y.Z|…"`).
+
+It deliberately leaves to you: the **`CHANGELOG.md`** narrative entry, and — when
+crossing the `1.0` boundary — the **peer-dependency *guidance* prose** ("pin to
+the 0.x line" vs. "pin to majors"; a `^0.y` caret locks to the minor). Example
+third-party plugin/pack `"version"` fields in `docs/public` are the *example's
+own* version (independent of opensip-cli) and are intentionally left alone.
+
+### Pre-1.0 (`0.x`) caveat
+
+While opensip-cli is `0.x` the public API is not frozen (ADR-0012). Under
+npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
+`0.y` bump is a potential breaking change — peer-dependency guidance must read
+`^0.1.0`, not `^1.0.0`, and "pin to majors; minor is safe" only becomes true at
+`1.0.0`.
+
 ## Cutting A Release
 
-1. Bump versions for every publishable package and the root package:
+1. Bump the version across every hand-maintained surface, then regenerate the
+   derived ones (see "Version Surfaces" above):
 
    ```bash
-   node -e "const fs=require('fs');const {execSync}=require('child_process');const v=process.argv[1];const files=['package.json',...execSync('rg --files -g package.json packages').toString().trim().split('\n')];for(const f of files){const p=JSON.parse(fs.readFileSync(f,'utf8'));if(p.name==='opensip-cli'||p.name==='@opensip-cli/root'||p.name?.startsWith('@opensip-cli/')){p.version=v;fs.writeFileSync(f,JSON.stringify(p,null,2)+'\n');}}" 1.0.0
-   pnpm install --lockfile-only
+   node scripts/bump-version.mjs <new-version>   # 35 package.json + docs + SECURITY + prose
+   pnpm install --lockfile-only                  # refresh the lockfile
+   pnpm docs:readmes && pnpm docs:build          # regenerate version-pinned READMEs + web docs
+   node scripts/bump-version.mjs --check         # assert no surface drifted
    ```
 
 2. Update `CHANGELOG.md` with the release entry.
@@ -71,15 +132,15 @@ them in dependency order, with `opensip-cli` last.
    pnpm test
    pnpm docs:build
    pnpm docs:check
-   pnpm verify-release --expected-version v1.0.0
+   pnpm verify-release --expected-version v0.1.0
    ```
 
 4. Commit, tag, and push:
 
    ```bash
-   git commit -am "chore: release 1.0.0"
-   git tag v1.0.0
-   git push origin main v1.0.0
+   git commit -am "chore: release 0.1.0"
+   git tag v0.1.0
+   git push origin main v0.1.0
    ```
 
 5. Watch the release workflow:

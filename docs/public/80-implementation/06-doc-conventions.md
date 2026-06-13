@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v1.0.0
+release: v0.1.0
 title: "Doc conventions"
 audience: [contributors]
 purpose: "Voice, frontmatter, diagrams, and verification trail conventions for the architecture doc set."
@@ -154,7 +154,7 @@ Most docs end with a "What's next" section. A few — especially the reference d
 ```markdown
 ## Verification trail
 
-Last verified at v1.0.0 against:
+Last verified at v0.1.0 against:
 
 - `packages/` directory listing (33 publishable packages plus workspace-private support packages ...).
 - Each package's `package.json` `description` and `name` field, read directly.

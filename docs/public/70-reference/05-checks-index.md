@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-13
-release: v1.0.x
+release: v0.1.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."
@@ -20,51 +20,33 @@ related-docs:
 ---
 # Checks reference
 
-opensip-cli ships **170 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-cli ships **151 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-cli/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(112 checks)*
+## Universal  *(94 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(33)*
+### Architecture  *(15)*
 
 | Slug | Description |
 |---|---|
-| [`capability-by-manifest`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/capability-by-manifest.ts) | A capability domain must be declared in a tool manifest and registered via registerCapabilityDomainsFromManifest, not host-compiled (ADR-0023, §5.3) |
-| [`command-surface-parity`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/command-surface-parity.ts) | Every tool command resolves to a typed CommandSpec; no raw Commander access from a tool |
-| [`cross-tool-flag-parity`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/cross-tool-flag-parity.ts) | Cross-tool common CLI flags must come from the shared registry, not be hand-declared (ADR-0021) |
 | [`docker-ignore-validation`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-ignore-validation.ts) | Validate .dockerignore files exist alongside Dockerfiles with required patterns |
 | [`docker-version-sync`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-version-sync.ts) | Validate Docker Node/pnpm versions match package.json |
-| [`docs-teach-blessed-seam`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/docs-teach-blessed-seam.ts) | Extension docs must teach the blessed CommandSpec seam, not hand-rolled --json / stdout (§4.8) |
 | [`empty-package-detection`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/modules/empty-package-detection.ts) | Detects packages with empty or commented-out exports |
 | [`env-var-validation`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/env-var-validation.ts) | Detects environment variable access without proper validation |
-| [`graph-signal-stamped`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/graph-signal-stamped.ts) | Graph rules must stamp identity via createGraphSignal, not hand-assemble source/ruleId/severity (§5.9) |
 | [`heavy-import-detection`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/heavy-import-detection.ts) | Detects heavy/deprecated library imports and excessive named imports that bloat bundle size |
 | [`interface-implementation-consistency`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/modules/interface-implementation-consistency.ts) | Verifies interfaces match their implementations |
-| [`live-runs-off-thread`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/live-runs-off-thread.ts) | Live runners drive the engine off the main process; worker entries stay persistence-free (ADR-0028) |
-| [`no-bodyhash-keying-outside-identity`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-bodyhash-keying-outside-identity.ts) | The graph cross-shard merge must key/stitch edges through ownerEdgeKey in cli/orchestrate/edge-identity.ts, never by a bare bodyHash/ownerHash (ADR-0003) |
-| [`no-config-loader-outside-config`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-config-loader-outside-config.ts) | A tool-agnostic config block (cli/targets/globalExcludes/checkOverrides/dashboard) must be parsed only in @opensip-cli/config, not hand-rolled elsewhere (ADR-0023) |
 | [`no-custom-event-emitter`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-custom-event-emitter.ts) | Detects direct EventEmitter usage that should use infrastructure/events |
-| [`no-direct-stdout-in-tool-engine`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts) | Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011) |
 | [`no-duplicate-packages`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/dependencies/no-duplicate-packages.ts) | Detects packages that serve the same purpose |
-| [`no-module-singleton`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-module-singleton.ts) | No module-level mutable registry/loaded-state singleton; per-run state lives on RunScope via a factory (ADR-0023). fileCache/memoryProfiler are exempt. |
-| [`no-placeholder-check-ids`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-placeholder-check-ids.ts) | Check definitions must use real stable UUIDs for their `id` (not placeholder patterns) |
+| [`no-kebab-option-indexing`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-kebab-option-indexing.ts) | Command handlers must not index parsed options by a kebab-case key — Commander camelCases long flags, so the kebab key is always undefined (silent no-op flag) |
 | [`node-version-consistency`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/node-version-consistency.ts) | Validate Node.js version consistency across configs |
-| [`one-config-document`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/one-config-document.ts) | A tool must validate its config block through a composed Zod schema, not hand-project its own opensip-cli.config.yml namespace (ADR-0023) |
-| [`one-outcome-shape`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/one-outcome-shape.ts) | Machine output must be a CommandOutcome via renderOutcome, not a bare {error} / raw JSON (§5.5) |
-| [`only-documented-toolcli-seams`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/only-documented-toolcli-seams.ts) | Host command handlers and tool engines must only use the documented methods on ToolCliContext (render, emit*, deliverSignals, writeSarif, toolState, hostPlanes, baseline seams). No direct stdout, pre-scope holder, or raw datastore (host-planes hygiene). |
 | [`project-readme-existence`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/project-readme-existence.ts) | Ensures every package has a README.md file |
-| [`release-gate-parity`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/release-gate-parity.ts) | Ensure release.yml re-runs every PR-quality gate (lint, test:coverage, fit:ci, graph:ci) before pack/publish (ADR-0017) |
-| [`restrict-raw-db-access`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/restrict-raw-db-access.ts) | Confine the raw Drizzle handle (DataStore.db) to the persistence ownership boundary (ADR-0009) |
-| [`same-recipe-semantics`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/same-recipe-semantics.ts) | Recipe execution must run on the shared substrate; no per-tool scheduler reimplementation (§5.8/§4.3) |
 | [`stale-build-artifacts`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/stale-build-artifacts.ts) | Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/ |
-| [`tool-contract-version-policy`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-contract-version-policy.ts) | Any *_CONTRACT_VERSION (core + per-tool) may only be changed on actual contract deltas and the change must reference ADR-0046 or ADR-0047 |
 | [`tool-has-manifest`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-has-manifest.ts) | Every first-party tool package must declare a conformant opensipTools manifest (kind/id/apiVersion/commands) the host can read before import |
-| [`tool-stable-id`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-stable-id.ts) | Tool declarations must use real stable UUIDs for their `id` (matching Checks naming) |
 | [`vitest-config-extends-base`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-extends-base.ts) | Per-package vitest configs must extend the shared .config/vitest.base (when one exists) |
 | [`vitest-config-required-with-tests`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-required-with-tests.ts) | Ensures packages with tests have a vitest.config at the package root |
 
@@ -174,7 +156,7 @@ Language-agnostic; runs against every project.
 
 ---
 
-## TypeScript  *(52 checks)*
+## TypeScript  *(51 checks)*
 
 TypeScript/JavaScript projects; uses TS-AST analysis.
 
@@ -193,11 +175,10 @@ TypeScript/JavaScript projects; uses TS-AST analysis.
 | [`phantom-dependency-detection`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/phantom-dependency-detection.ts) | Detect phantom dependencies (used but not declared in package.json) |
 | [`tsconfig-extends-validation`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/tsconfig-extends-validation.ts) | Ensures all tsconfig.json files extend a shared base and the base file exists |
 
-### Security  *(5)*
+### Security  *(4)*
 
 | Slug | Description |
 |---|---|
-| [`cli-realpath-validation`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/security/cli-realpath-validation.ts) | Within packages/cli/src/ and packages/core/src/plugins/, forbid the legacy `<x>.startsWith(<projectRoot>)` path-traversal guard. Use realpathSync + path.relative (or isPathInside) instead. |
 | [`input-sanitization`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/security/input-sanitization.ts) | Detect unsanitized user input usage |
 | [`pii-exposure-in-logs`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/quality/observability/pii-exposure-in-logs.ts) | Detects potential PII exposure in log statements |
 | [`sql-injection`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/security/sql-injection.ts) | Detect potential SQL injection vulnerabilities |

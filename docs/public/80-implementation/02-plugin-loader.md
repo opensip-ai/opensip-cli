@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-09
-release: v1.0.0
+release: v0.1.0
 title: "Plugin loader"
 audience: [contributors, plugin-authors]
 purpose: "How plugins are discovered, loaded, and registered. Source files, npm packages, project pinning, the sync command."

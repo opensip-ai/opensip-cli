@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-09
-release: v1.0.0
+release: v0.1.0
 title: "The fitness loop"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "One check, end to end. Definition → loading → recipe selection → scope resolution → execution → signal → render → exit. The spine of the doc set."
@@ -32,7 +32,7 @@ This is the spine. Every other doc in the set is a deeper read on one stage of t
 > - What "the same check, run twice" actually means deterministically.
 > - Where the worked example (`acme-api`) lands at every stage.
 
-We trace one specific scenario: a single check named `no-console-log` (one of the `console-log` family of detectors in [`packages/fitness/checks-universal/src/checks/quality/code-structure/no-console-log.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/checks-universal/src/checks/quality/code-structure/no-console-log.ts)) running inside `acme-api`. We follow it from the moment you type `opensip fit` to the moment your shell prompt reappears.
+We trace one specific scenario: a single check named `no-console-log` (one of the `console-log` family of detectors in [`packages/fitness/checks-universal/src/checks/quality/code-structure/no-console-log.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/checks-universal/src/checks/quality/code-structure/no-console-log.ts)) running inside `acme-api`. We follow it from the moment you type `opensip fit` to the moment your shell prompt reappears.
 
 ---
 
@@ -98,14 +98,14 @@ Eight stages, every one a read away.
 
 ## Stage 1 — CLI dispatch
 
-Source: [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/cli/src/index.ts)
+Source: [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/cli/src/index.ts)
 
 `opensip fit` invokes the binary. The CLI's job at this stage is small:
 
 1. Parse global flags (`--debug`, `--quiet`).
 2. Set up the logger and assign a `runId` (`RUN_<ulid>`).
 3. Walk the per-invocation `ToolRegistry` (populated during bootstrap) and mount each registered Tool's declared `commandSpecs` via the host's `mountCommandSpec`. The fitness Tool declares `fit`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; the host builds the Commander commands, applies the shared cross-tool flags, and owns the parse → handler → render → `--json` → exit pipeline. The cross-tool `report` command is mounted separately by the CLI because it composes data from every registered Tool.
-4. Hand argv to Commander, which dispatches to the `fit` command spec's handler ([`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/tool.ts) assembles the `commandSpecs`; the handler bodies live in the `cli/` spec modules alongside it).
+4. Hand argv to Commander, which dispatches to the `fit` command spec's handler ([`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/tool.ts) assembles the `commandSpecs`; the handler bodies live in the `cli/` spec modules alongside it).
 
 The CLI does not know what `fit` does. It knows a Tool exists, it admitted and
 imported it, mounted the typed `commandSpecs` the Tool declared, and Commander
@@ -118,7 +118,7 @@ inside `@opensip-cli/fitness`; see [the tool-plugin model](/docs/opensip-cli/10-
 
 ## Stage 2 — Config and paths
 
-Source: [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/core/src/lib/paths.ts), the configure command for user-level settings, and `loadProjectConfig()` inside `executeFit()`.
+Source: [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/core/src/lib/paths.ts), the configure command for user-level settings, and `loadProjectConfig()` inside `executeFit()`.
 
 The handler resolves two things:
 
@@ -133,7 +133,7 @@ If the config is missing, the CLI exits 2 with a pointer to `opensip init`. If t
 
 ## Stage 3 — Plugin load
 
-Source: [`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/core/src/plugins/discover.ts), [`packages/fitness/engine/src/plugins/`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/plugins/), [`packages/cli/src/bootstrap/register-language-adapters.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/cli/src/bootstrap/register-language-adapters.ts) (language-adapter registration).
+Source: [`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/core/src/plugins/discover.ts), [`packages/fitness/engine/src/plugins/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/plugins/), [`packages/cli/src/bootstrap/register-language-adapters.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/cli/src/bootstrap/register-language-adapters.ts) (language-adapter registration).
 
 Three sources of checks get loaded, in order:
 
@@ -151,7 +151,7 @@ After this stage, the in-memory check registry has every available check address
 
 ## Stage 4 — Recipe selection
 
-Source: [`packages/fitness/engine/src/recipes/registry.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/recipes/registry.ts), [`packages/fitness/engine/src/recipes/built-in-recipes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/recipes/built-in-recipes.ts).
+Source: [`packages/fitness/engine/src/recipes/registry.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/recipes/registry.ts), [`packages/fitness/engine/src/recipes/built-in-recipes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/recipes/built-in-recipes.ts).
 
 The `--recipe <name>` flag selects which recipe to run. Without a flag, the default recipe runs (every enabled check, parallel execution, table output).
 
@@ -162,7 +162,7 @@ A recipe's `CheckSelector` decides which checks make it into the run:
 - `{ type: 'pattern', include: ['fit:no-*'], exclude?: [...] }` — slug glob match.
 - `{ type: 'explicit', checkIds: [...] }` — exact id list.
 
-The recipe service ([`packages/fitness/engine/src/recipes/service.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/recipes/service.ts)) projects the recipe's `config:` map (per-check parameter overrides) into module-level state so each check can read its slice via `getCheckConfig<T>(slug)`.
+The recipe service ([`packages/fitness/engine/src/recipes/service.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/recipes/service.ts)) projects the recipe's `config:` map (per-check parameter overrides) into module-level state so each check can read its slice via `getCheckConfig<T>(slug)`.
 
 > **Where the example lands:** the default recipe runs. Selector is `{ type: 'all' }`. `no-console-log` makes the cut because it's not in the exclude list.
 
@@ -170,7 +170,7 @@ The recipe service ([`packages/fitness/engine/src/recipes/service.ts`](https://g
 
 ## Stage 5 — Target / scope resolution
 
-Source: [`packages/targeting/src/resolve.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/targeting/src/resolve.ts), [`packages/fitness/engine/src/framework/path-matcher.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/framework/path-matcher.ts), [`packages/fitness/engine/src/framework/scope-resolver.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/framework/scope-resolver.ts).
+Source: [`packages/targeting/src/resolve.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/targeting/src/resolve.ts), [`packages/fitness/engine/src/framework/path-matcher.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/framework/path-matcher.ts), [`packages/fitness/engine/src/framework/scope-resolver.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/framework/scope-resolver.ts).
 
 For each check that survived selector filtering, the framework computes the file set it'll run against:
 
@@ -188,7 +188,7 @@ The end result is one resolved file list per check. If no files match, the check
 
 ## Stage 6 — Check execution
 
-Source: [`packages/fitness/engine/src/framework/define-check.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/framework/define-check.ts), [`packages/fitness/engine/src/recipes/parallel-execution.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/recipes/parallel-execution.ts), [`packages/fitness/engine/src/recipes/sequential-execution.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/recipes/sequential-execution.ts).
+Source: [`packages/fitness/engine/src/framework/define-check.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/framework/define-check.ts), [`packages/fitness/engine/src/recipes/parallel-execution.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/recipes/parallel-execution.ts), [`packages/fitness/engine/src/recipes/sequential-execution.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/recipes/sequential-execution.ts).
 
 The recipe's execution mode (`parallel` or `sequential`) decides the dispatcher. Each check runs inside an `ExecutionContext` carrying:
 
@@ -218,11 +218,11 @@ A timeout per check kicks in if `execution.timeout` is set. A timed-out check re
 
 ## Stage 7 — Signal aggregation
 
-Source: [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/core/src/types/signal.ts), [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/contracts/src/signal-envelope.ts), [`packages/fitness/engine/src/framework/result-builder.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/framework/result-builder.ts).
+Source: [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/core/src/types/signal.ts), [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/contracts/src/signal-envelope.ts), [`packages/fitness/engine/src/framework/result-builder.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/framework/result-builder.ts).
 
 Every check returns a `CheckResult` carrying `Signal[]`. The recipe service aggregates results into the run-level summary (totals, pass/fail counts, ignored counts), then assembles the `SignalEnvelope`.
 
-The `SignalEnvelope` ([`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/contracts/src/signal-envelope.ts)) is the canonical artifact: `schemaVersion`, `tool`, `recipe?`, `runId`, `createdAt`, a `verdict` (score, passed, summary), a `units[]` sidecar (per-check ran/errored/timing facts), and the flat `signals[]` list. Anything that consumes the JSON output (CI, dashboard, the gate) reads the envelope (ADR-0011).
+The `SignalEnvelope` ([`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/contracts/src/signal-envelope.ts)) is the canonical artifact: `schemaVersion`, `tool`, `recipe?`, `runId`, `createdAt`, a `verdict` (score, passed, summary), a `units[]` sidecar (per-check ran/errored/timing facts), and the flat `signals[]` list. Anything that consumes the JSON output (CI, dashboard, the gate) reads the envelope (ADR-0011).
 
 The aggregation pass is also where the score is computed — currently `Math.round((passedChecks / totalChecks) * 100)` (a simple pass-rate percent). The score is informational; the exit code is the gate.
 
@@ -232,7 +232,7 @@ The aggregation pass is also where the score is computed — currently `Math.rou
 
 ## Stage 8 — Render and exit
 
-Source: [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/cli/src/ui/), [`packages/fitness/engine/src/cli/fit.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/fitness/engine/src/cli/fit.ts), [`packages/cli/src/open-report.ts`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/cli/src/open-report.ts).
+Source: [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/cli/src/ui/), [`packages/fitness/engine/src/cli/fit.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/cli/fit.ts), [`packages/cli/src/open-report.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/cli/src/open-report.ts).
 
 The fitness Tool **returns its `SignalEnvelope`** via `CommandResult`; the CLI composition root dispatches by output mode (ADR-0011 — tools no longer render their own output):
 

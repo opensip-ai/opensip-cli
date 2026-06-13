@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/cli-ui",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Shared Ink/React presentational primitives for OpenSIP CLI CLI tools — banner, spinner, run header, theme. Used by every tool that ships an Ink live view.",
   "keywords": [

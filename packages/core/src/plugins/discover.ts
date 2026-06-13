@@ -24,8 +24,8 @@
  * deps) discovers nothing — an emergent property, not a special case.
  */
 
-import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs';
-import { join, basename, extname, sep } from 'node:path';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { join, basename, extname } from 'node:path';
 
 import { resolveProjectConfigPath } from '../config-resolution.js';
 import { logger } from '../lib/logger.js';

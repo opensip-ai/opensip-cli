@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v1.0.0
+release: v0.1.0
 title: "Stages and catalog (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "How `graph` builds its picture of the codebase — the seven-stage pipeline, the catalog format, and the content-keyed cache."
@@ -248,7 +248,7 @@ below).
   "tool": "graph",
   "language": "typescript",       // adapter id; Python catalog → "python", Rust → "rust", …
   "builtAt": "2026-05-18T12:00:00.000Z",
-  "cacheKey": "eng=1.0.0|ts-5.7.3-9bb6ef4d07c08140", // engine version + adapter-supplied invalidation key
+  "cacheKey": "eng=0.1.0|ts-5.7.3-9bb6ef4d07c08140", // engine version + adapter-supplied invalidation key
   "filesFingerprint": "694\n/abs/path/foo.ts|1715000000000|1234\n...",
   "functions": {
     "saveBaseline": [

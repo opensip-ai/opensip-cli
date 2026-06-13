@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/checks-universal",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Cross-language fitness checks for opensip-cli",
   "keywords": [

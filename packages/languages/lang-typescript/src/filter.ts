@@ -230,6 +230,7 @@ function filterContentImpl(content: string): FilteredContent {
   // characters. Using spread [...] produces a code-point array and desynchronizes
   // after the first emoji/etc, corrupting all subsequent positions, signals, SARIF,
   // baselines, suppression matching, etc.
+  // eslint-disable-next-line unicorn/prefer-spread -- correctness: must be UTF-16 code units to match TS scanner offsets; spread would be code points and corrupt token ranges for astral chars.
   const chars = content.split('');
 
   // Depth counter, not a boolean — a `${ `inner` }` construct nests two templates
@@ -299,6 +300,7 @@ function filterContentImpl(content: string): FilteredContent {
   const commentLines = linesToSet(content, commentRegions);
 
   // Compute `codeNoComments` ... (same UTF-16 alignment requirement as above)
+  // eslint-disable-next-line unicorn/prefer-spread -- correctness: must be UTF-16 code units to match TS scanner offsets; spread would be code points and corrupt token ranges for astral chars.
   const charsNoComments = content.split('');
   for (const region of stringRegions) {
     for (let i = region.start; i < region.end; i++) {

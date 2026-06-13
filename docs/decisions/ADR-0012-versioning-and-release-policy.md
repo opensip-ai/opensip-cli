@@ -1,19 +1,37 @@
 ---
 status: active
-last_verified: 2026-06-06
+last_verified: 2026-06-13
 owner: opensip-cli
 ---
 
-# ADR-0012: Versioning & release policy — semver-honest, output contract versioned independently, batch majors; stay pre-GA on 2.x, reserve 3.0.0 for the tool-plugin-parity north star
+# ADR-0012: Versioning & release policy — semver-honest, output contract versioned independently; rebranded to the @opensip-cli/* identity and restarted at 0.1.0 (pre-1.0)
 
-> **Amended 2026-06-06.** The original decision named `3.0.0` as the next tag /
-> first GA. That is reversed: GA is deferred to the **tool-plugin-parity north
-> star** (`docs/plans/tool-plugin-parity-architecture-2026-06-06.md`), which will
-> be `3.0.0`. The project stays pre-GA on the long-lived **2.x** major; the
-> accumulated breaking batch (ADR-0011 + ADR-0009 surface) ships as **`2.7.0`**.
-> The rest of the policy (semver-honest, independent output-contract version,
-> batch majors, deprecate-not-unpublish) is unchanged. Edited in place by
-> maintainer decision rather than via a superseding ADR.
+> **Amended 2026-06-13 (retires the prior conclusion).** The product
+> **rebranded** from the `@opensip-tools/*` identity (which reached `3.0.0` GA;
+> latest published `2.13.0`) to a **fresh npm identity** — the `@opensip-cli/*`
+> scope plus the unscoped `opensip-cli` CLI, nothing published yet (`npm view`
+> → 404 as of 2026-06-13) — and **restarts versioning at `0.1.0` (pre-1.0 /
+> `0.x`)** on that clean identity. This is the "intentional rebrand → clean low
+> version on a new name" path the 2026-06-04 Alternatives reserved as the *only*
+> justification for a rename; it has now happened, so the "stay pre-GA on `2.x`,
+> next tag `2.7.0`, reserve `3.0.0` for GA" conclusion below is **retired**.
+> New policy: the `@opensip-cli/*` identity is `0.x` until its public API
+> stabilizes — breaking changes may land on **minor** (`0.y`) bumps (npm/Cargo
+> caret locks `^0.y.z` to the minor) — and **`1.0.0` is earned** when the API
+> freezes and real users depend on it, declared by announcement, not by the
+> integer. The still-valid halves are unchanged: **semver-honest** package APIs,
+> the **independently-versioned machine-output contract**
+> (`SignalEnvelope.schemaVersion`, `SignalBatch.schemaVersion`), batched breaking
+> changes, and **deprecate-not-unpublish**. The old `@opensip-tools/*` packages
+> are retired via `npm deprecate` pointing at `@opensip-cli/*` — never
+> unpublished. Edited in place by maintainer decision.
+>
+> **Amended 2026-06-06 (historical — itself overtaken by the 2026-06-13
+> rebrand).** The original decision named `3.0.0` as the next tag / first GA.
+> That was reversed to: GA deferred to the tool-plugin-parity north star
+> (`3.0.0`), pre-GA on the long-lived **2.x**, accumulated breaking batch as
+> **`2.7.0`**. This applied to the `@opensip-tools/*` identity and is overtaken
+> by the rebrand above.
 
 ```yaml
 id: ADR-0012
@@ -49,13 +67,16 @@ apply it:
    per-change. Within a major, minor/patch stay non-breaking; accumulated
    breaks land together at the next major. Pre-GA, expect **long-lived majors**,
    not a fast-climbing integer.
-3. **The project stays pre-GA on the long-lived `2.x` major; the accumulated
-   breaking batch ships as `2.7.0`.** GA is **deferred** to the tool-plugin-parity
-   north star (`docs/plans/tool-plugin-parity-architecture-2026-06-06.md`), which
-   will be declared **`3.0.0`**. Expect several more `2.x` releases (breaking
-   changes batched into `2.x` minors) before then, on the existing
-   `@opensip-cli/*` + `opensip-cli` names. The "production-ready" signal is
-   the GA release announcement at the north star — **not** the version integer.
+3. **The product runs on the rebranded `@opensip-cli/*` + `opensip-cli`
+   identity, restarted at `0.1.0` (pre-1.0).** The prior `@opensip-tools/*`
+   identity reached `3.0.0` GA (latest published `2.13.0`) and is retired (see
+   Consequences). On the fresh identity the public API (the Tool contract, the
+   check authoring API, the config + payload schemas, the CLI surface) is **not
+   frozen while `0.x`**: breaking changes may land on **minor** (`0.y`) bumps —
+   a caret range locks `^0.y.z` to the minor, so each `0.y` is a deliberate
+   migration. **`1.0.0` (GA) is earned**, not scheduled: declared by
+   announcement when the API stabilizes and real users depend on it — **not** by
+   the version integer.
 
 When GA (`3.0.0`) is cut, the older pre-GA npm versions are retired with
 **`npm deprecate`** (a steering message that keeps them installable), never
@@ -64,18 +85,25 @@ When GA (`3.0.0`) is cut, the older pre-GA npm versions are retired with
 **Alternatives:**
 
 - *Reset to `1.0.0` on the existing package names ("relaunch as v1").* **Rejected
-  — technically impossible.** `@opensip-cli/core@1.0.0` (and other early
-  versions) were published then unpublished; npm permanently forbids
-  republishing a burned version (`npm view @opensip-cli/core@1.0.0` → 404,
-  verified 2026-06-04). A clean `1.0.0` is therefore only achievable at a *new*
-  package identity.
-- *Rename to a new scope/name to obtain a clean `1.0.0`, deprecating the old
-  packages.* **Rejected** — the rename cost (30 packages + the `opensip-cli`
-  CLI binary + every doc + the `opensip.ai/docs` paths + SEO/stars/link
-  continuity, and stranding existing installers — `@opensip-cli/core` ~4.3k,
-  `opensip-cli` ~476 downloads/week as of 2026-06-04) is not justified merely
-  to obtain a lower integer. Worth it ONLY as part of an intentional rebrand,
-  which is not on the table.
+  at the time — technically impossible on the then-current names.** Early
+  versions were published then unpublished; npm permanently forbids republishing
+  a burned version. A clean restart is therefore only achievable at a *new*
+  package identity. **Update (2026-06-13):** that *new identity* is exactly what
+  the rebrand created — the `@opensip-cli/*` scope and unscoped `opensip-cli`
+  have nothing published (`npm view` → 404), so a clean `0.1.0` publishes
+  cleanly there. (The burned-version constraint only ever bound the legacy
+  `@opensip-tools/*` names.)
+- *Rename to a new scope/name to obtain a clean low version, deprecating the old
+  packages.* **Rejected at the time** — the rename cost (30 packages + the
+  `opensip-cli` CLI binary + every doc + the `opensip.ai/docs` paths +
+  SEO/stars/link continuity, and stranding existing installers —
+  `@opensip-tools/core` ~4.3k, the legacy CLI ~476 downloads/week as of
+  2026-06-04) was judged not justified merely to obtain a lower integer; worth
+  it ONLY as part of an intentional rebrand. **Update (2026-06-13): this is now
+  the chosen path.** An intentional rebrand to `@opensip-cli/*` + `opensip-cli`
+  did happen (commit `a71a0c0d` "cut over to OpenSIP CLI"); the new identity
+  restarts at `0.1.0` and the legacy `@opensip-tools/*` packages are deprecated
+  toward it.
 - *Cut a new major for each breaking change, no batching policy.* **Rejected** —
   that is precisely the cadence-inflation that prompted this ADR (two majors in
   ~6 months: `1.0`→`2.0`→ proposed `3.0`). Many small majors read as churn; one
@@ -103,26 +131,31 @@ migration effort") instead of noisy.
 
 **Consequences:**
 
-- **`2.7.0` is the next tag.** It bundles the accumulated breaking changes —
-  ADR-0011 (signals as the universal output currency; `CliOutput` retired;
-  `reporting`→`output`; `recipeUnitConfig`; 4-level `--json` severity) and the
-  ADR-0009 surface tightening (audit Findings 2–4) — into one deliberate, batched
-  pre-GA `2.x` minor (consistent with how `2.6.0` / `2.3.0` / `2.0.0` shipped
-  their breaks).
-- Pre-GA, breaking changes continue to batch into `2.x` minors toward the GA
-  cutover. **At GA (`3.0.0`, the tool-plugin-parity north star) the strict
+- **`0.1.0` is the first tag on the `@opensip-cli/*` identity.** It is the
+  initial public release of the rebranded product. The 35 shared `package.json`
+  versions, `CHANGELOG.md`, the `SECURITY.md` supported-release table, and the
+  doc set all carry `0.1.0` — the full surface is enumerated in `RELEASING.md`
+  → "Version Surfaces (what a bump touches)", and the mechanical sweep is
+  automated by `scripts/bump-version.mjs` (with a `--check` drift guard).
+- While `0.x`, breaking changes batch into **minor** (`0.y`) bumps; there is no
+  no-break-within-a-major guarantee yet. **At `1.0.0` (GA) the strict
   no-break-within-a-major rule begins**, and from then on minor/patch within
-  `3.x` remain non-breaking.
+  `1.x` remain non-breaking.
 - Docs instruct machine-output consumers to pin `schemaVersion`, not the package
-  version (see the `--json` reference + the 2.7 migration guide,
-  `docs/public/70-reference/07-migrating-to-2.7.md`).
-- **At GA publish time (not before):** `npm deprecate '@opensip-cli/<pkg>@<3.0.0'`
-  (and the unscoped CLI) with a message pointing at the GA; do NOT unpublish.
+  version (see the `--json` reference). The legacy `2.7` migration guide
+  (`docs/public/70-reference/07-migrating-to-2.7.md`) belonged to the
+  `@opensip-tools/*` identity and does not apply to the fresh `0.x` line.
+- **Retire the legacy identity via deprecation, not unpublish.** The
+  `@opensip-tools/*` packages (latest `2.13.0`) are retired with
+  `npm deprecate '@opensip-tools/<pkg>@*'` (and the legacy CLI name) carrying a
+  message that points at the `@opensip-cli/*` / `opensip-cli` replacement —
+  **never `npm unpublish`** (irreversible, and blocked anyway by npm's
+  300-downloads/week threshold). Run at or after the `0.1.0` launch.
 - The release gate is unchanged: `scripts/verify-release.mjs` (single-version
   consistency, dated CHANGELOG entry, generated-doc freshness) + the tag-driven
   `release.yml`.
-- GA is declared via the release announcement + CHANGELOG at `3.0.0`, referencing
-  this ADR.
+- **`1.0.0` (GA) is declared via the release announcement + CHANGELOG** when the
+  public API freezes and real users depend on it, referencing this ADR.
 
 **Related specs / ADRs:** ADR-0011 (the breaking migration this batch ships, and
 the source of the independent `SignalEnvelope.schemaVersion`), ADR-0008

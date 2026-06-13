@@ -32,6 +32,9 @@ let isProfiling = false;
 let profilePath: string | null = null;
 let labelsPath: string | null = null;
 
+/** Module tag for structured logging (also dedupes the sonarjs/no-duplicate-string occurrences). */
+const MODULE = 'cli:telemetry';
+
 export interface ProfilingLabels {
   readonly runId?: string;
   readonly command?: string;
@@ -65,12 +68,12 @@ export function startProfiling(scope?: RunScope, command?: string): void {
     session = new Session();
     session.connect();
 
-    session.post('Profiler.enable', () => {
-      session!.post('Profiler.start', () => {
+    session.post('Profiler.enable', (_err?: Error | null, _res?: unknown) => {
+      session!.post('Profiler.start', (_err2?: Error | null, _res2?: unknown) => {
         isProfiling = true;
 
-        const runId = scope?.runId || 'unknown';
-        const safeCommand = (command || 'cli').replace(/[^a-z0-9_-]/gi, '_');
+        const runId = scope?.runId ?? 'unknown';
+        const safeCommand = (command ?? 'cli').replace(/[^a-z0-9_-]/gi, '_');
         const ts = new Date().toISOString().replace(/[:.]/g, '-');
 
         // Place profiles under project logs dir if available, else cwd/.runtime/profiles
@@ -86,7 +89,7 @@ export function startProfiling(scope?: RunScope, command?: string): void {
 
         const labels: ProfilingLabels = {
           runId,
-          command: command || 'unknown',
+          command: command ?? 'unknown',
           service: 'opensip-cli',
           // Add any OTEL_RESOURCE_ATTRIBUTES derived labels here if needed in future
         };
@@ -95,7 +98,7 @@ export function startProfiling(scope?: RunScope, command?: string): void {
 
         logger.info({
           evt: 'cli.profiling.started',
-          module: 'cli:telemetry',
+          module: MODULE,
           runId,
           command,
           profilePath,
@@ -105,7 +108,7 @@ export function startProfiling(scope?: RunScope, command?: string): void {
   } catch (error) {
     logger.warn({
       evt: 'cli.profiling.start_failed',
-      module: 'cli:telemetry',
+      module: MODULE,
       error: error instanceof Error ? error.message : String(error),
     });
     // Best effort — profiling failure must never break the run
@@ -124,28 +127,34 @@ export function stopProfiling(): void {
   }
 
   try {
-    session.post('Profiler.stop', (err, { profile }) => {
-      if (err) {
-        logger.warn({
-          evt: 'cli.profiling.stop_failed',
-          module: 'cli:telemetry',
-          error: err.message || String(err),
-        });
-      } else if (profile && profilePath) {
-        writeFileSync(profilePath, JSON.stringify(profile));
-        logger.info({
-          evt: 'cli.profiling.stopped',
-          module: 'cli:telemetry',
-          profilePath,
-          labelsPath,
-        });
-      }
-      cleanup();
-    });
+    // node:inspector post callbacks for Profiler.* use structural types not fully declared
+    // in the ambient types we consume; the result object (incl. profile) arrives as any.
+    // We narrow locally for the write path; the disable is scoped to the wire call.
+    session.post(
+      'Profiler.stop',
+      (err: Error | null | undefined, result: { profile?: unknown } = {}) => {
+        if (err) {
+          logger.warn({
+            evt: 'cli.profiling.stop_failed',
+            module: MODULE,
+            error: err.message || String(err),
+          });
+        } else if (result.profile && profilePath) {
+          writeFileSync(profilePath, JSON.stringify(result.profile));
+          logger.info({
+            evt: 'cli.profiling.stopped',
+            module: MODULE,
+            profilePath,
+            labelsPath,
+          });
+        }
+        cleanup();
+      },
+    );
   } catch (error) {
     logger.warn({
       evt: 'cli.profiling.stop_failed',
-      module: 'cli:telemetry',
+      module: MODULE,
       error: error instanceof Error ? error.message : String(error),
     });
     cleanup();

@@ -49,13 +49,26 @@ export interface ScheduleUnitsOptions<Unit> {
   readonly yieldBetweenUnits?: boolean;
 }
 
-/** Schedule `units` through `runUnit` per the mode/concurrency/stop policy. */
+/**
+ * Schedule `units` through `runUnit` per the mode/concurrency/stop policy.
+ *
+ * Cognitive complexity is high (19) because the implementation unifies two
+ * scheduling shapes (sliding-window parallel with dynamic refill, and
+ * sequential for-of) plus shared abort latching, drain detection, and the
+ * optional yieldToEventLoop wrapper for live UI. This is the single
+ * scheduler used by fitness and simulation engines (the "same-recipe-semantics"
+ * contract). Extracting helpers would make the refill-vs-drain state machine
+ * harder to audit as a whole. Disable is scoped to this function.
+ */
+/* eslint-disable sonarjs/cognitive-complexity */
 export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Promise<void> {
   const { units, mode, shouldAbort } = opts;
   if (units.length === 0) return;
 
   if (mode !== 'sequential' && mode !== 'parallel') {
-    throw new Error(`scheduleUnits: mode must be 'parallel' or 'sequential' (got '${mode}')`);
+    throw new Error(
+      `scheduleUnits: mode must be 'parallel' or 'sequential' (got '${String(mode)}')`,
+    );
   }
 
   // Each unit's promise resolves AFTER a macrotask yield when requested, so a
@@ -140,3 +153,4 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
     }
   });
 }
+/* eslint-enable sonarjs/cognitive-complexity */
