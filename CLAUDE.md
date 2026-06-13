@@ -320,6 +320,37 @@ fn)`, every async descendant of `fn` sees the same scope. The
 tools: new ToolRegistry(), ... }), () => ...)`. Several test helpers
   (`packages/core/src/test-utils/with-scope.ts`,
   `packages/fitness/.../__tests__/`) already wrap this pattern.
+- After the host-planes-scope-seams-hygiene (Phases 2-3), **every production
+  path** (tool actions + all host commands including `sessions list|show|purge`,
+  `agent-catalog`, plugin, configure, etc.) executes inside a properly
+  constructed and entered `RunScope` (via `enterScope` in the pre-action hook or
+  explicit `runWithScope` in tests). The former general pre-scope
+  `CliRuntimeContext` + `scopeEntered` holder is strictly test-only (hard
+  guards throw `SYSTEM.SCOPE.HOLDER_MISUSE` / `NOT_ENTERED` in prod).
+- The only way to reach per-run datastore, project context, registries, etc.
+  from production handler bodies is `currentScope()` (or `cli.scope` on the
+  ToolCliContext). 
+
+### Only documented ToolCliContext seams (output, delivery, host planes)
+
+Tools and host command handlers must only use the methods on the `ToolCliContext`
+they receive:
+- `render`, `emitJson`, `emitEnvelope`, `deliverSignals`, `writeSarif`
+- Baseline seams (`saveBaseline`, `compareBaseline`, `exportBaselineSarif`...)
+- `toolState` (ADR-0042)
+- `hostPlanes` (when present: the typed `governance`/`audit`/`entitlements`
+  bag — Cloud primary; OSS tools may ignore or supply compat impls and fall
+  back to `toolState` for custom records — see the hygiene spec/plan).
+
+Direct `process.stdout` (for run output), `console.*` for run data, the old
+pre-scope holder, or raw datastore from action bodies is forbidden and caught
+by ESLint (no-restricted-properties + imports) + a fitness architecture check
+(`only-documented-toolcli-seams`) + the hard runtime guards added in the
+hygiene pass. The composition root (bootstrap, error/report seams, the
+`buildToolCliContext` factory itself) is exempted by design. See
+`docs/plans/ready/host-planes-scope-seams-hygiene/`.
+
+This is the mechanical realization of "only use documented seams".
 
 ### Layering rules (enforced by dependency-cruiser)
 

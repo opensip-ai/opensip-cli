@@ -115,6 +115,13 @@ export function buildAgentCatalog(): AgentCatalog {
       'The fidelity field on replays is always "projection" (rebuilt from persisted data).',
       'Human-readable output (no --json) uses the same tables/banners as before — unchanged.',
       'Dogfood gate requires 0 errors + 0 warnings on fit:ci and graph:ci after any change.',
+      // Hygiene invariant (host-planes-scope-seams-hygiene Phases 2-4): everything runs inside an
+      // entered RunScope; the only sanctioned seams for output, delivery, baselines, toolState,
+      // and hostPlanes (governance/audit/entitlements) are the documented methods on ToolCliContext
+      // (render, emitJson, emitEnvelope, deliverSignals, writeSarif, + the baseline/toolState/hostPlanes
+      // accessors). Direct stdout, the old pre-scope holder, or raw datastore from handlers is
+      // forbidden and caught by ESLint + fitness check + runtime guards. Bootstrap root is exempted.
+      'Only the methods on the ToolCliContext you receive are allowed for emission/state/planes.',
     ],
   };
 }

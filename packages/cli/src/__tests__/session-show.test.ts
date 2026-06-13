@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { executeSessionShow } from '../commands/session-show.js';
 import { SessionReplayRegistry } from '../session-replay-registry.js';
 import { makeTestScope, withScope } from '@opensip-cli/test-support';
+import { currentScope } from '@opensip-cli/core';
 
 import type {
   CommandResult,
@@ -129,8 +130,11 @@ describe('executeSessionShow', () => {
     const s = makeSinks();
 
     const scope = makeTestScope({ datastore: () => ds });
-    await withScope(scope, () =>
-      executeSessionShow({
+    await withScope(scope, () => {
+      // Phase 2/6 hygiene: the handler body (via execute) must see a real entered scope.
+      expect(currentScope()).toBeTruthy();
+      expect(currentScope()?.datastore()).toBe(ds);
+      return executeSessionShow({
         replayRegistry: makeReplayRegistry(),
         ref: 'latest',
         tool: 'fit',
@@ -139,8 +143,8 @@ describe('executeSessionShow', () => {
         emitJson: s.emitJson,
         emitError: s.emitError,
         setExitCode: s.setExitCode,
-      })
-    );
+      });
+    });
 
     expect(s.emitted).toHaveLength(1);
     expect(s.emitted[0]).toMatchObject({
@@ -180,16 +184,17 @@ describe('executeSessionShow', () => {
     const s = makeSinks();
 
     const scope = makeTestScope({ datastore: () => ds });
-    await withScope(scope, () =>
-      executeSessionShow({
+    await withScope(scope, () => {
+      expect(currentScope()).toBeTruthy();
+      return executeSessionShow({
         replayRegistry: makeReplayRegistry(),
         ref: 'FIT_1',
         render: s.render,
         emitJson: s.emitJson,
         emitError: s.emitError,
         setExitCode: s.setExitCode,
-      })
-    );
+      });
+    });
 
     expect(s.rendered).toHaveLength(1);
     // Renders through the unified, envelope-driven session-replay view (not the

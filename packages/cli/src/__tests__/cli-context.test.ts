@@ -303,43 +303,44 @@ describe('getOrOpenDatastore', () => {
   it('throws when called in a non-project context (user scope)', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const { RunScope } = await import('@opensip-cli/core');
+    const { RunScope, runWithScopeSync } = await import('@opensip-cli/core');
     const project = {
       scope: 'user',
       projectRoot: '/anywhere',
       walkedUp: 0,
     } as never;
-    mod.setCurrentRunScope(
-      new RunScope({
-        projectContext: project,
-        datastore: mod.buildDatastoreThunk(project),
-      }),
-    );
-    mod.markScopeEntered(); // simulate proper pre-action enter for holder path
-    expect(() => mod.getOrOpenDatastore()).toThrow(/non-project context/);
+    const scope = new RunScope({
+      projectContext: project,
+      datastore: mod.buildDatastoreThunk(project),
+    });
+    // Enter properly (Phase 3+); the old holder simulation no longer wires readScope.
+    runWithScopeSync(scope, () => {
+      expect(() => mod.getOrOpenDatastore()).toThrow(/non-project context|Datastore accessed in a non-project context/);
+    });
   });
 
   it('opens the project-local sqlite datastore and caches it across calls', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const { RunScope, resolveProjectPaths } = await import('@opensip-cli/core');
+    const { RunScope, resolveProjectPaths, runWithScopeSync } = await import('@opensip-cli/core');
 
     const projectRoot = mkdtempSync(join(tmpdir(), 'opensip-clictx-ds-'));
     try {
       const project = { scope: 'project', projectRoot, walkedUp: 0 } as never;
       const thunk = mod.buildDatastoreThunk(project);
-      mod.setCurrentRunScope(new RunScope({ projectContext: project, datastore: thunk }));
-      mod.markScopeEntered(); // simulate proper pre-action enter for holder path
+      const scope = new RunScope({ projectContext: project, datastore: thunk });
 
-      const first = mod.getOrOpenDatastore();
-      expect(first).toBeDefined();
-      // The sqlite file lands under the resolved runtime dir.
-      const dbPath = join(resolveProjectPaths(projectRoot).runtimeDir, 'datastore.sqlite');
-      expect(existsSync(dbPath)).toBe(true);
+      runWithScopeSync(scope, () => {
+        const first = mod.getOrOpenDatastore();
+        expect(first).toBeDefined();
+        // The sqlite file lands under the resolved runtime dir.
+        const dbPath = join(resolveProjectPaths(projectRoot).runtimeDir, 'datastore.sqlite');
+        expect(existsSync(dbPath)).toBe(true);
 
-      // Second access returns the SAME cached instance (no re-open).
-      const second = mod.getOrOpenDatastore();
-      expect(second).toBe(first);
+        // Second access returns the SAME cached instance (no re-open).
+        const second = mod.getOrOpenDatastore();
+        expect(second).toBe(first);
+      });
     } finally {
       rmSync(projectRoot, { recursive: true, force: true });
     }

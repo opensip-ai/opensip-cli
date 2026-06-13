@@ -416,6 +416,93 @@ export default tseslint.config(
   },
 
   // ---------------------------------------------------------------------------
+  // CLI host command handlers + non-bootstrap production code — only the
+  // documented seams on ToolCliContext (and hostPlanes sub-bag).
+  //
+  // After the host-planes-scope-seams-hygiene (Phases 2-4):
+  //   - Every production path (tool actions, host commands like sessions/*,
+  //     agent-catalog, etc.) runs inside an entered RunScope.
+  //   - The ONLY sanctioned ways to emit output, deliver signals, write SARIF,
+  //     reach baselines/toolState, or use the governance/audit/entitlements planes
+  //     are the methods on the ToolCliContext passed to handlers:
+  //       render, emitJson, emitEnvelope, deliverSignals, writeSarif,
+  //       the baseline seams, toolState, hostPlanes (when present).
+  //   - Direct process.stdout (run output), console.log for run data, the old
+  //     pre-scope CliRuntimeContext holder (getCurrentRegistriesForScope etc.),
+  //     or raw DataStore construction from command bodies are forbidden.
+  //
+  // Exemptions: the composition root (bootstrap/*, cli-context.ts the builder,
+  // error-handler, reports, index registration, ui render seams) legitimately
+  // construct the contexts or own the final sinks. Tests are exempt.
+  // The rule is enforced by ESLint (lint gate) + the fitness architecture check
+  // (dogfood fit:ci gate).
+  // ---------------------------------------------------------------------------
+  {
+    files: [
+      'packages/cli/src/commands/**/*.ts',
+      'packages/cli/src/**/*.ts',
+    ],
+    ignores: [
+      'packages/cli/src/**/__tests__/**',
+      'packages/cli/src/**/*.test.ts',
+      'packages/cli/src/bootstrap/**', // pre-action, host-planes, build-per-run-scope, cli-context builder, etc.
+      'packages/cli/src/cli-context.ts', // the single place that constructs ToolCliContext with the seams
+      'packages/cli/src/error-handler.ts',
+      'packages/cli/src/report*.ts',
+      'packages/cli/src/ui/**',
+      'packages/cli/src/index.ts', // top-level registration + buildToolCliContext call site
+      'packages/cli/src/welcome.ts',
+      'packages/cli/src/commands/session-show.ts', // its --raw path implements the declared RAW_STREAM CommandSpec mode for this host command (sanctioned seam, not a bypass)
+    ],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'process',
+          property: 'stdout',
+          message:
+            'Use only documented ToolCliContext seams for run output (ctx.render / emitJson / emitEnvelope / deliverSignals / writeSarif, the baseline seams, or host renderOutcome in bootstrap). Direct stdout bypasses the ADR-0011 currency and the entered-scope contract (host-planes hygiene Phases 2-4).',
+        },
+        {
+          object: 'console',
+          property: 'log',
+          message:
+            'console.log (and .info/.debug) for run output is forbidden outside exempted bootstrap. Route through ToolCliContext seams so --json, SARIF, cloud, and formatters work uniformly.',
+        },
+        {
+          object: 'console',
+          property: 'info',
+          message: 'See process.stdout / console.log restriction (only blessed ToolCliContext seams for output).',
+        },
+        {
+          object: 'console',
+          property: 'debug',
+          message: 'See process.stdout / console.log restriction (only blessed ToolCliContext seams for output).',
+        },
+      ],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: './cli-context.js',
+              importNames: ['getCurrentRegistriesForScope', 'setCurrentRunScope', 'markScopeEntered'],
+              message:
+                'Pre-scope holder symbols are test-only (or internal to bootstrap) after hygiene Phase 3. Handlers must use currentScope() (after enterScope) and the blessed methods on the ToolCliContext they receive.',
+            },
+            {
+              name: '../cli-context.js',
+              importNames: ['getCurrentRegistriesForScope', 'setCurrentRunScope', 'markScopeEntered'],
+              message:
+                'Pre-scope holder symbols are test-only (or internal to bootstrap) after hygiene Phase 3. Handlers must use currentScope() (after enterScope) and the blessed methods on the ToolCliContext they receive.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // Dist files (some intermediate scripts emit JS during builds).
   // ---------------------------------------------------------------------------
   {

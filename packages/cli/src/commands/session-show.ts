@@ -98,6 +98,7 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
       // the higher-level outcome assembly for 'command-result' outputs).
       // This gives the smallest possible machine response containing the
       // session metadata + (filtered) envelope + hints.
+      // @fitness-ignore-file only-documented-toolcli-seams, no-direct-stdout-in-tool-engine -- this is the implementation of the declared RAW_STREAM output mode for the 'sessions show' command spec (see host-subcommand-groups.ts); it is a host seam, not a bypass.
       process.stdout.write(JSON.stringify(jsonPayload) + '\n');
       opts.setExitCode(0);
       return;
