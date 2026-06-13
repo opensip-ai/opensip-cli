@@ -58,7 +58,7 @@ function makeSession(
 function makeReplayRegistry(): SessionReplayRegistry {
   const registry = new ToolRegistry();
   registry.register({
-    metadata: { id: 'fit-replay-test', version: '0.0.0', description: 'test' },
+    metadata: { id: '00000000-0000-4000-8000-000000000000', name: 'fit-replay-test', version: '0.0.0', description: 'test' },
     commands: [],
     sessionReplay: {
       tool: 'fit',
@@ -261,7 +261,7 @@ describe('executeSessionShow', () => {
     repo.save(makeSession('FIT_1'));
     const registry = new ToolRegistry();
     registry.register({
-      metadata: { id: 'fit-throw', version: '0.0.0', description: 'test' },
+      metadata: { id: '00000000-0000-4000-8000-000000000000', name: 'fit-throw', version: '0.0.0', description: 'test' },
       commands: [],
       sessionReplay: {
         tool: 'fit',
@@ -338,7 +338,7 @@ describe('executeSessionShow', () => {
     repo.save(makeSession('FIT_1'));
     const registry = new ToolRegistry();
     registry.register({
-      metadata: { id: 'fit-throw-str', version: '0.0.0', description: 'test' },
+      metadata: { id: '00000000-0000-4000-8000-000000000000', name: 'fit-throw-str', version: '0.0.0', description: 'test' },
       commands: [],
       sessionReplay: {
         tool: 'fit',

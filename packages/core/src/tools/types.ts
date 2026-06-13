@@ -75,8 +75,18 @@ export const TOOL_CONTRACT_VERSION = '1.0.0';
 
 /** Static descriptor for a tool plugin: id, semver, and one-line description. */
 export interface ToolMetadata {
-  /** Stable identifier — e.g. 'fitness', 'simulation'. */
+  /**
+   * Stable identity (real UUID). Matches the `id` field used for Checks'
+   * stable UUID (per ADR-0048 and governing spec). Used for durable DB
+   * scoping, provenance, agent-catalog, future ratchets, etc.
+   */
   readonly id: string;
+  /**
+   * Human-facing name / current key (what was previously stored in the old
+   * `id` field). Used for UX, config namespaces, CLI short forms, on-disk
+   * hints, and current DB `tool` column values.
+   */
+  readonly name: string;
   readonly version: string;
   readonly description: string;
 }
