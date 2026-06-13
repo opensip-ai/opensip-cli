@@ -52,5 +52,49 @@ export function defineSimulationRecipe(config: SimulationRecipeConfig): Simulati
       { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_MISSING' },
     );
   }
+
+  // Stronger validation for execution semantics (audit fix). Previously only
+  // checked "is object", allowing JS-authored recipes (and therefore plugin
+  // recipes) to pass garbage that scheduleUnits would misinterpret (unknown
+  // mode -> treated as parallel, NaN/negative concurrency or timeout, etc.).
+  const exec = config.execution as {
+    mode?: unknown;
+    timeout?: unknown;
+    maxParallel?: unknown;
+    stopOnFirstFailure?: unknown;
+  };
+
+  if (exec.mode !== 'parallel' && exec.mode !== 'sequential') {
+    throw new ValidationError(
+      `SimulationRecipe '${config.name}' execution.mode must be 'parallel' or 'sequential'`,
+      { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_MODE' },
+    );
+  }
+
+  if (exec.timeout !== undefined) {
+    if (!Number.isFinite(exec.timeout) || (exec.timeout as number) < 0) {
+      throw new ValidationError(
+        `SimulationRecipe '${config.name}' execution.timeout must be a non-negative finite number (or omitted)`,
+        { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_TIMEOUT' },
+      );
+    }
+  }
+
+  if (exec.maxParallel !== undefined) {
+    if (!Number.isFinite(exec.maxParallel) || (exec.maxParallel as number) < 1) {
+      throw new ValidationError(
+        `SimulationRecipe '${config.name}' execution.maxParallel must be a positive finite integer (or omitted)`,
+        { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_MAX_PARALLEL' },
+      );
+    }
+  }
+
+  if (exec.stopOnFirstFailure !== undefined && typeof exec.stopOnFirstFailure !== 'boolean') {
+    throw new ValidationError(
+      `SimulationRecipe '${config.name}' execution.stopOnFirstFailure must be a boolean (or omitted)`,
+      { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_STOP_ON_FIRST_FAILURE' },
+    );
+  }
+
   return config;
 }

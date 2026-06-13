@@ -40,11 +40,13 @@ describe('error handling', () => {
       expect(suggestion!.exitCode).toBe(EXIT_CODES.CHECK_NOT_FOUND);
     });
 
-    it('detects generic "not found" errors', () => {
+    it('no longer claims generic "not found" phrasing as a check error (narrowed for correctness)', () => {
+      // Audit fix: broad "not found" substring was fragile and could steal
+      // recipe/file/etc not-founds. Only explicit "Check not found: ..." or
+      // a real NotFoundError (via mapToolErrorToExitCode) produce the CHECK_3 path.
       const err = new Error('Something not found: my-check');
       const suggestion = getErrorSuggestion(err);
-      expect(suggestion).not.toBeNull();
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.CHECK_NOT_FOUND);
+      expect(suggestion).toBeNull();
     });
 
     it('detects "Unknown recipe" errors', () => {

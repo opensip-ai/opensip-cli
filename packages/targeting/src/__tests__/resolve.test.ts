@@ -126,13 +126,30 @@ describe('preResolveAllTargets', () => {
 });
 
 describe('applyGlobalExcludes', () => {
-  it('is a no-op when there are no excludes', () => {
+  it('returns equivalent list (value equality) and drops outside-root paths when there are no excludes', () => {
+    // Create real files so the realpath-based isPathInside guard (defense against
+    // escape) can succeed for paths that are legitimately inside.
+    fixture('a.ts');
+    fixture('b.ts');
     const files = [join(testDir, 'a.ts'), join(testDir, 'b.ts')];
-    expect(applyGlobalExcludes(files, testDir, [])).toBe(files);
+    const out = applyGlobalExcludes(files, testDir, []);
+    expect(out).not.toBe(files); // new array (we always filter for the containment guard)
+    expect(out).toEqual(files);
   });
 
-  it('filters rootDir-relative matches with dot: true', () => {
+  it('filters rootDir-relative matches with dot: true (and guards containment)', () => {
+    fixture('src/a.ts');
+    fixture('.hidden/b.ts'); // would be kept without the global exclude, but we test drop by pattern
     const files = [join(testDir, 'src/a.ts'), join(testDir, '.hidden/b.ts')];
     expect(rel(applyGlobalExcludes(files, testDir, ['.hidden/**']))).toEqual(['src/a.ts']);
+  });
+
+  it('drops paths that are not inside the rootDir even if no globalExcludes (symlink/escape guard)', () => {
+    fixture('inside.ts');
+    const inside = join(testDir, 'inside.ts');
+    const outside = join(testDir, '..', 'outside.ts'); // non-existing is fine; isPathInside will fail realpath and drop
+    const files = [inside, outside];
+    const out = applyGlobalExcludes(files, testDir, []);
+    expect(rel(out)).toEqual(['inside.ts']);
   });
 });

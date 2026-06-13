@@ -36,4 +36,13 @@ describe('runWorkerPool', () => {
   it('handles an empty item list', async () => {
     expect(await runWorkerPool([], 4, () => Promise.resolve(1))).toEqual([]);
   });
+
+  it('throws on non-finite concurrency (NaN, Infinity) rather than producing zero workers', async () => {
+    await expect(runWorkerPool([1], NaN, (n) => Promise.resolve(n))).rejects.toThrow(
+      /concurrency must be a finite number/,
+    );
+    await expect(runWorkerPool([1], Infinity, (n) => Promise.resolve(n))).rejects.toThrow(
+      /concurrency must be a finite number/,
+    );
+  });
 });

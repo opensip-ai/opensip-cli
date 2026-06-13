@@ -15,6 +15,8 @@ import { relative, resolve } from 'node:path';
 import { globSync } from 'glob';
 import { minimatch, Minimatch } from 'minimatch';
 
+import { isPathInside } from '@opensip-cli/core';
+
 import type { TargetRegistry } from './target-registry.js';
 import type { Target } from '@opensip-cli/config';
 
@@ -34,9 +36,12 @@ export function applyGlobalExcludes(
   rootDir: string,
   globalExcludes: readonly string[],
 ): readonly string[] {
-  if (globalExcludes.length === 0) return files;
-
   return files.filter((filePath) => {
+    // Hard guard: anything not inside the project root after realpath resolution
+    // is never returned, regardless of globalExcludes patterns. This closes
+    // symlink / ../include / absolute-outside escape vectors.
+    if (!isPathInside(filePath, rootDir)) return false;
+    if (globalExcludes.length === 0) return true;
     const relativePath = relative(rootDir, filePath);
     return !globalExcludes.some((pattern) => minimatch(relativePath, pattern, { dot: true }));
   });
@@ -72,11 +77,18 @@ export function resolveTargets(
     for (const pattern of include) {
       const matches = globSync(pattern, {
         cwd: rootDir,
-        ignore: [...exclude],
         absolute: true,
+        nodir: true,
+        ignore: [...COMMON_IGNORE, ...exclude],
       });
       for (const match of matches) {
-        files.add(resolve(match));
+        const abs = resolve(match);
+        // Defense against glob patterns or symlinks that escape the project root.
+        // Only project-contained files are eligible for targeting (prevents
+        // external files leaking into analysis, baselines, SARIF, etc.).
+        if (isPathInside(abs, rootDir)) {
+          files.add(abs);
+        }
       }
     }
   }
@@ -99,7 +111,11 @@ function assembleTargetFiles(
   for (const pattern of targetConfig.include) {
     const matches = patternResults.get(pattern) ?? [];
     for (const match of matches) {
-      files.add(match);
+      // Apply the same inside-root guard as the non-pre-resolved path (defense
+      // in depth for any glob results that escaped, symlinks, etc.).
+      if (isPathInside(match, rootDir)) {
+        files.add(match);
+      }
     }
   }
 

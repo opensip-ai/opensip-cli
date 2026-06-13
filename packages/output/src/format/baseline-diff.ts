@@ -35,21 +35,48 @@ export interface GateCompareResult {
  * Reconstruct a `resolved`-bucket Signal from a baseline row whose payload is
  * absent (defensive — legacy/null rows; new rows always carry payload). Carries
  * the fingerprint so consumers can still identify the resolved finding.
+ *
+ * The synthetic is given a unique id (incorporating the fingerprint) and makes
+ * a best-effort attempt to parse the common default fingerprint strategy form
+ * (`ruleId|filePath|line|col`) so that resolved-bucket consumers see usable
+ * identity fields instead of a single colliding placeholder.
  */
 function syntheticSignal(fingerprint: string): Signal {
+  const parsed = parseDefaultFingerprint(fingerprint);
   return {
-    id: `sig_resolved`,
+    id: `resolved:${fingerprint}`,
     source: 'baseline',
     provider: 'opensip-cli',
     severity: 'low',
     category: 'quality',
-    ruleId: 'unknown',
+    ruleId: parsed.ruleId ?? 'resolved',
     message: '(resolved finding; baseline payload unavailable)',
-    filePath: '',
-    metadata: {},
+    filePath: parsed.filePath ?? '',
+    code: parsed.line !== undefined || parsed.column !== undefined
+      ? { file: parsed.filePath ?? '', line: parsed.line, column: parsed.column }
+      : undefined,
+    metadata: { originalFingerprint: fingerprint },
     fingerprint,
     createdAt: new Date(0).toISOString(),
   };
+}
+
+/** Best-effort parse of the host default fingerprintStrategy form. */
+function parseDefaultFingerprint(fp: string): { ruleId?: string; filePath?: string; line?: number; column?: number } {
+  // Common form used by defaultFingerprintStrategy and several tools: ruleId|filePath|line|col
+  const parts = fp.split('|');
+  if (parts.length >= 2) {
+    const [ruleId, filePath, lineStr, colStr] = parts;
+    const line = lineStr ? Number(lineStr) : undefined;
+    const column = colStr ? Number(colStr) : undefined;
+    return {
+      ruleId: ruleId || undefined,
+      filePath: filePath || undefined,
+      line: Number.isFinite(line) ? line : undefined,
+      column: Number.isFinite(column) ? column : undefined,
+    };
+  }
+  return {};
 }
 
 /**

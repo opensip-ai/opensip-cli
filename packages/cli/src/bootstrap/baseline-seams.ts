@@ -104,6 +104,11 @@ export function buildBaselineSeams(deps: {
     exportBaselineSarif: async (tool, path) => {
       const repo = repoFor();
       if (!repo.exists(tool)) throw missingBaseline(tool);
+      const capturedAt = repo.capturedAt(tool);
+      /* v8 ignore next 3 -- defensive: exists() returned true above (same as fingerprints export) */
+      if (capturedAt === undefined) {
+        throw new Error(`Baseline meta row for '${tool}' missing after exists() reported present.`);
+      }
       const signals = repo
         .load(tool)
         .map((r) => r.payload)
@@ -115,7 +120,7 @@ export function buildBaselineSeams(deps: {
         schemaVersion: 2,
         tool: tool as SignalEnvelope['tool'],
         runId: 'baseline',
-        createdAt: new Date(repo.capturedAt(tool) ?? 0).toISOString(),
+        createdAt: new Date(capturedAt).toISOString(),
         verdict: {
           score: 0,
           passed: true,

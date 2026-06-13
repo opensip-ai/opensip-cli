@@ -41,7 +41,8 @@
  */
 
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { join, sep } from 'node:path';
 
 import type { ToolShortId } from '../tools/ids.js';
 
@@ -169,4 +170,31 @@ export function resolveUserPaths(): UserPaths {
     authoredToolsDir: join(userHomeDir, 'tools'),
     pluginsDir: (domain) => join(userHomeDir, 'plugins', domain),
   };
+}
+
+// =============================================================================
+// SAFE PATH CONTAINMENT
+// =============================================================================
+
+/**
+ * Returns true iff `child`, after resolving symlinks via realpath, is the same
+ * path as `parent` or located inside it (native-separator prefix match after
+ * realpath). Returns false on any error (missing, unresolvable, permission, etc).
+ *
+ * Canonical helper for preventing path escape / symlink traversal in glob
+ * results, plugin discovery, targeting, etc. See also the cli-realpath-validation
+ * fitness check that enforces use of realpath-based containment over naive
+ * `.startsWith`.
+ */
+export function isPathInside(child: string, parent: string): boolean {
+  let realChild: string;
+  let realParent: string;
+  try {
+    realChild = realpathSync(child);
+    realParent = realpathSync(parent);
+  } catch {
+    return false;
+  }
+  if (realChild === realParent) return true;
+  return realChild.startsWith(realParent + sep);
 }

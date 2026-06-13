@@ -488,7 +488,15 @@ export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineComm
       flag: '--concurrency',
       value: '<n>',
       description: 'Concurrency cap for --workspace and the sharded build (default: cpus()-1)',
-      parse: (v) => Number.parseInt(v, 10),
+      parse: (v) => {
+        const n = Number.parseInt(v, 10);
+        if (!Number.isFinite(n) || n < 1) {
+          // Commander will surface this as a usage/parse error; the CLI
+          // boundary maps it to CONFIGURATION_ERROR (exit 2).
+          throw new Error(`--concurrency must be a positive integer (received '${v}')`);
+        }
+        return n;
+      },
     },
     {
       flag: '--language',

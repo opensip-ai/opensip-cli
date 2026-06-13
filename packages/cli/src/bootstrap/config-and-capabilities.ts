@@ -38,11 +38,11 @@ import {
   type CapabilityRegistry,
   ConfigurationError,
   logger,
+  readYamlFileOrThrow,
   type ResolvedToolConfig,
   type ToolPluginManifest,
   type ToolRegistry,
   registerCapabilityDomainsFromManifest,
-  readYamlFile,
 } from '@opensip-cli/core';
 
 /** A plain-object guard that treats arrays and null as non-objects. */
@@ -161,9 +161,14 @@ export function composeAndValidateToolConfig(args: {
     ...toolDeclarations,
   ];
 
-  // No config document → nothing to strict-validate. Resolve defaults + env so
-  // a flagless/fileless run still gets the declared defaults on the scope.
-  const raw: unknown = configPath === undefined ? {} : readYamlFile(configPath);
+  // When a configPath was resolved by the project context (i.e. a real
+  // opensip-cli.config.yml or a package.json pointer), read it *strictly*.
+  // Malformed YAML or unreadable file must fail before any dispatch (a
+  // silent `{}` would bypass targets, gates, cloud settings, etc.).
+  // When no configPath, fall back to defaults only (permissive discovery
+  // paths elsewhere still use the non-throwing reader).
+  const raw: unknown =
+    configPath === undefined ? {} : readYamlFileOrThrow(configPath, { loader: 'project-config' });
   const document = isPlainObject(raw) ? raw : {};
 
   const schema = composeConfigSchema(declarations);

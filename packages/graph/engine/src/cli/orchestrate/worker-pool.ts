@@ -15,8 +15,16 @@ export async function runWorkerPool<I, O>(
   concurrency: number,
   run: (item: I) => Promise<O>,
 ): Promise<O[]> {
+  if (!Number.isFinite(concurrency)) {
+    throw new Error(
+      `runWorkerPool: concurrency must be a finite number (received ${concurrency})`,
+    );
+  }
   const queue = [...items];
   const results: O[] = [];
+  // Clamp zero/negative to 1 to preserve prior tolerance (some callers/tests
+  // pass 0 expecting "at least one slot"); the dangerous case is NaN which
+  // previously produced zero workers and empty results.
   const slots = Math.max(1, concurrency);
 
   async function worker(): Promise<void> {

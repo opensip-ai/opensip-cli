@@ -123,6 +123,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'isErrorSignal',
   'isIdentChar',
   'isMarkerKind',
+  'isPathInside',
   'isRecognizedNonCodeFormat',
   'isRecord',
   'isStringArray',

@@ -82,6 +82,10 @@ describe('buildTargets — TargetResolver surface', () => {
   });
 
   it('applyGlobalExcludes filters cwd-relative paths', () => {
+    // Real files are required for the isPathInside(realpath) containment guard
+    // inside applyGlobalExcludes (prevents escaped paths from ever being kept).
+    fixture('src/a.ts');
+    fixture('dist/b.ts');
     const targets = buildTargets({
       document: {
         targets: { a: { description: 'a', include: ['a/**'] } },

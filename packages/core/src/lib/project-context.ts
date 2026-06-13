@@ -24,6 +24,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import { resolveProjectConfigPath } from '../config-resolution.js';
+import { ValidationError } from './errors.js';
 
 import { logger } from './logger.js';
 
@@ -136,6 +137,21 @@ function tryResolveConfig(dir: string, explicit: string | undefined): string | u
     return existsSync(resolved) ? resolved : undefined;
   } catch (error) {
     if (explicit !== undefined) throw error;
-    return undefined;
+    // Only swallow the terminal "no config discovered at this root after all
+    // attempts (default + package pointer + etc.)". This allows upward walking
+    // when a directory simply has no OpenSIP config.
+    //
+    // Propagate other ValidationErrors, notably:
+    //  - broken package.json#opensip-cli.configPath pointers ("points to a file that does not exist")
+    //  - other resolution problems
+    // So a misconfigured pointer fails loudly instead of the walk silently
+    // adopting an ancestor project's config.
+    if (
+      error instanceof ValidationError &&
+      /No .*? found\. Checked:/.test(error.message)
+    ) {
+      return undefined;
+    }
+    throw error;
   }
 }

@@ -20,21 +20,30 @@ import type { LanguageAdapter } from './adapter.js';
 const AUTO_CLEAR_MS = 10 * 60 * 1000;
 
 /**
- * Fast content fingerprint for the parse-cache key (FNV-1a 32-bit over the FULL
+ * Fast content fingerprint for the parse-cache key (FNV-1a 64-bit over the FULL
  * content + length). Distinguishes raw source from same-length filtered variants
  * (`filterContent` blanks string/comment regions to spaces, preserving length),
  * so an AST check that needs raw source never receives a strings-stripped tree.
- * O(n) but far cheaper than the parse it gates; the trailing length guards
- * against the (astronomically unlikely) per-file hash collision across the
- * handful of content variants seen for one path.
+ *
+ * 64-bit (vs prior 32-bit) materially reduces the chance of a silent collision
+ * between two *different* files of the same length under the same language
+ * adapter (the path component helps, but same-length generated/index/etc files
+ * are common in real trees). The hash is still cheap O(n) relative to parsing.
+ * The trailing length suffix provides an extra guard.
  */
 export function fingerprintContent(content: string): string {
-  let hash = 0x81_1c_9d_c5;
+  // FNV-1a 64-bit constants (big-endian words not needed; BigInt keeps it simple
+  // and portable, and this is only used for cache keys).
+  const FNV_OFFSET = 0xcbf29ce484222325n;
+  const FNV_PRIME = 0x100000001b3n;
+
+  let hash = FNV_OFFSET;
   for (let i = 0; i < content.length; i += 1) {
-    hash ^= content.codePointAt(i) ?? 0;
-    hash = Math.imul(hash, 0x01_00_01_93);
+    hash ^= BigInt(content.codePointAt(i) ?? 0);
+    hash = (hash * FNV_PRIME) & 0xffffffffffffffffn; // keep to 64 bits
   }
-  return `${(hash >>> 0).toString(36)}:${String(content.length)}`;
+  // toString(36) is compact; prefix with 'f64:' so readers know the scheme.
+  return `f64:${hash.toString(36)}:${String(content.length)}`;
 }
 
 /**

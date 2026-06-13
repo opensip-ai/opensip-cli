@@ -29,7 +29,7 @@ import { join, basename, extname, sep } from 'node:path';
 
 import { resolveProjectConfigPath } from '../config-resolution.js';
 import { logger } from '../lib/logger.js';
-import { resolveProjectPaths } from '../lib/paths.js';
+import { isPathInside, resolveProjectPaths } from '../lib/paths.js';
 import { readYamlFile } from '../lib/yaml.js';
 
 import { resolvePackageEntryPoint } from './package-entry.js';
@@ -315,20 +315,4 @@ function safeIsFile(path: string): boolean {
   }
 }
 
-/**
- * Returns true iff `child`, after resolving symlinks, is the same path
- * as `parent` or located inside it. Used as a security boundary check
- * against attacker-influenced paths in plugin discovery.
- */
-function isPathInside(child: string, parent: string): boolean {
-  let realChild: string;
-  let realParent: string;
-  try {
-    realChild = realpathSync(child);
-    realParent = realpathSync(parent);
-  } catch {
-    return false;
-  }
-  if (realChild === realParent) return true;
-  return realChild.startsWith(realParent + sep);
-}
+// isPathInside is centralized in core (lib/paths) for reuse by targeting etc.

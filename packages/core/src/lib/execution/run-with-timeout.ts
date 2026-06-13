@@ -49,32 +49,61 @@ export async function runWithTimeout<R>(
     return Date.now() - startTime;
   };
 
-  try {
-    if (opts.retry) {
-      const retry = await runWithRetry(() => opts.run(controller.signal), opts.retry);
+  // Execute the domain work (retry or direct) and always classify to an outcome.
+  // This promise may never settle if the callee ignores the abort signal.
+  const workPromise = (async (): Promise<UnitRunOutcome<R>> => {
+    try {
+      if (opts.retry) {
+        const retry = await runWithRetry(() => opts.run(controller.signal), opts.retry);
+        const durationMs = finish();
+        if (controller.signal.aborted) {
+          return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
+        }
+        if (retry.result === undefined) {
+          return { status: 'error', error: retry.lastError, durationMs };
+        }
+        return { status: 'ok', result: retry.result, durationMs };
+      }
+
+      const result = await opts.run(controller.signal);
+      const durationMs = finish();
+      // A run that resolved AFTER the timeout fired is reported as a timeout
+      // (single-source abort invariant), matching fitness's post-run check.
+      if (controller.signal.aborted) {
+        return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
+      }
+      return { status: 'ok', result, durationMs };
+    } catch (error) {
       const durationMs = finish();
       if (controller.signal.aborted) {
         return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
       }
-      if (retry.result === undefined) {
-        return { status: 'error', error: retry.lastError, durationMs };
-      }
-      return { status: 'ok', result: retry.result, durationMs };
+      return { status: 'error', error, durationMs };
     }
+  })();
 
-    const result = await opts.run(controller.signal);
-    const durationMs = finish();
-    // A run that resolved AFTER the timeout fired is reported as a timeout
-    // (single-source abort invariant), matching fitness's post-run check.
-    if (controller.signal.aborted) {
-      return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
-    }
-    return { status: 'ok', result, durationMs };
-  } catch (error) {
-    const durationMs = finish();
-    if (controller.signal.aborted) {
-      return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
-    }
-    return { status: 'error', error, durationMs };
-  }
+  // Hard timeout: this settles the *function* with a timeout outcome even if
+  // the domain work never settles. We still abort the controller so cooperative
+  // callees can stop.
+  const hardTimeout = new Promise<UnitRunOutcome<R>>((resolve) => {
+    setTimeout(() => {
+      controller.abort();
+      resolve({
+        status: 'timeout',
+        durationMs: Date.now() - startTime,
+        timeoutMs: opts.timeoutMs,
+      });
+    }, opts.timeoutMs);
+  });
+
+  // Race so a non-settling domain cannot hang the scheduler/recipe.
+  const outcome = await Promise.race([workPromise, hardTimeout]);
+
+  // If the hard timeout won, the domain promise may still settle (or reject) later.
+  // Attach a no-op handler so a late rejection does not become an unhandled promise rejection.
+  workPromise.catch(() => {
+    /* late settlement after timeout is expected and ignored; the abort signal was delivered */
+  });
+
+  return outcome;
 }

@@ -56,7 +56,16 @@ export class CheckRegistry {
   /** Get a check by slug. Supports both namespaced and bare slugs. */
   get(slug: string): Check {
     const check = this.resolve(slug);
-    if (!check) throw new NotFoundError(`Check not found: ${slug}`);
+    if (!check) {
+      const cands = !slug.includes(':') ? (this.bareSlugIndex.get(slug) ?? []) : [];
+      if (cands.length > 1) {
+        throw new NotFoundError(
+          `Check slug '${slug}' is ambiguous (${cands.length} matches: ${cands.join(', ')}). ` +
+            `Use a namespaced form (e.g. 'namespace:${slug}') or listByBareSlug().`,
+        );
+      }
+      throw new NotFoundError(`Check not found: ${slug}`);
+    }
     return check;
   }
 
@@ -114,7 +123,10 @@ export class CheckRegistry {
   /**
    * Resolve a slug to a Check.
    * - If slug contains ':', exact lookup.
-   * - If bare slug, use reverse index. Single match → return. Multiple → warn + return first.
+   * - If bare slug, use reverse index. Single match → return.
+   *   Multiple candidates → throw NotFoundError listing them (ambiguity is
+   *   now a hard failure rather than load-order-dependent silent choice of [0]).
+   *   Use listByBareSlug() when enumeration of all is desired.
    */
   private resolve(slug: string): Check | undefined {
     // Exact match (namespaced or bare)
@@ -129,13 +141,17 @@ export class CheckRegistry {
     if (!candidates || candidates.length === 0) return undefined;
 
     if (candidates.length > 1) {
+      // Hard failure on ambiguity — prevents non-deterministic "which check won?"
+      // behaviour across pack load order or plugin discovery. Callers that want
+      // the full list can use listByBareSlug().
       logger.warn({
-        evt: 'plugin.registry.collision',
-        module: 'core:registry',
+        evt: 'check.registry.ambiguous',
+        module: 'fitness:checks',
         bareSlug: slug,
         candidates,
-        msg: `Ambiguous slug '${slug}' matches ${candidates.length} checks — using first registered`,
+        msg: `Ambiguous bare slug '${slug}' matches ${candidates.length} checks (namespaced); refusing bare lookup`,
       });
+      return undefined; // get() will turn this into a NotFoundError with the slug
     }
 
     return this.inner.getById(candidates[0])?.check;

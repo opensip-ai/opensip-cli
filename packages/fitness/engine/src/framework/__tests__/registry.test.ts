@@ -199,12 +199,17 @@ describe('CheckRegistry', () => {
       expect(registry.get('plugin-b:check').config.id).toBe('second');
     });
 
-    it('returns first registered for ambiguous bare slug', () => {
+    it('throws NotFoundError (with candidates) for ambiguous bare slug (audit fix: no more silent first-wins)', () => {
       const registry = new CheckRegistry();
       registry.register(makeCheck({ slug: 'dup', id: 'first' }), 'ns-a');
       registry.register(makeCheck({ slug: 'dup', id: 'second' }), 'ns-b');
-      // Resolves to first registered
-      expect(registry.get('dup').config.id).toBe('first');
+
+      // Bare lookup now fails loudly instead of nondeterministically picking [0].
+      expect(() => registry.get('dup')).toThrow(/ambiguous.*ns-a:dup, ns-b:dup/);
+
+      // Introspection API still surfaces the collision for tools that need it.
+      const all = registry.listByBareSlug('dup');
+      expect(all.map((c) => c.config.id)).toEqual(['first', 'second']);
     });
 
     it('silently skips duplicate namespace:slug registration', () => {

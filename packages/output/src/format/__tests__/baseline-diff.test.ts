@@ -37,8 +37,22 @@ describe('diffBaseline', () => {
   it('falls back to a synthetic Signal when a resolved row has a null payload', () => {
     const [resolved] = diffBaseline([], [row('legacy', null)]).resolved;
     expect(resolved.fingerprint).toBe('legacy');
-    expect(resolved.ruleId).toBe('unknown');
+    // Unique per-fingerprint id (no more colliding 'sig_resolved' for all resolved items)
+    expect(resolved.id).toBe('resolved:legacy');
+    // Best-effort parse of default fp form not applicable here; ruleId gets a stable 'resolved' marker
+    expect(resolved.ruleId).toBe('resolved');
     expect(resolved.message).toContain('payload unavailable');
+    expect(resolved.metadata?.originalFingerprint).toBe('legacy');
+  });
+
+  it('synthetic for default-fp resolved row reconstructs identity fields', () => {
+    const fp = 'my-rule|/abs/path/src/foo.ts|42|7';
+    const [resolved] = diffBaseline([], [row(fp, null)]).resolved;
+    expect(resolved.ruleId).toBe('my-rule');
+    expect(resolved.filePath).toBe('/abs/path/src/foo.ts');
+    expect(resolved.code?.line).toBe(42);
+    expect(resolved.code?.column).toBe(7);
+    expect(resolved.id).toBe(`resolved:${fp}`);
   });
 
   it('throws when a current signal is not fingerprint-stamped (plane never fingerprints)', () => {

@@ -121,18 +121,20 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     }),
   },
 
-  // Check not found — captures the slug from "Check not found: <slug>"
-  // or the bare "not found: <slug>" form. The recipe-not-found rule
-  // above runs first to avoid mis-routing the recipe variant.
+  // Check not found — only the explicit "Check not found: <slug>" form (plus
+  // the substring for no-capture cases). We deliberately dropped the previous
+  // broad `/not found: (.+)/` and bare "not found" contains check to avoid
+  // mis-classifying other "not found" errors (recipes, files, symbols, etc.)
+  // as CHECK_NOT_FOUND via the string suggestion path. The *typed* mapper
+  // (mapToolErrorToExitCode) already routes real NotFoundError correctly; this
+  // table is only for unstructured Error messages.
   {
     match: (message) => {
-      const slugMatch = /Check not found: (.+)/.exec(message) ?? /not found: (.+)/.exec(message);
+      const slugMatch = /Check not found: (.+)/.exec(message);
       if (slugMatch) {
         return { capture: slugMatch[1] };
       }
-      // Substring forms with no extractable slug still match the rule;
-      // the suggest builder substitutes "unknown".
-      if (containsAny(message, ['Check not found:', 'not found'])) {
+      if (containsAny(message, ['Check not found:'])) {
         return { capture: null };
       }
       return null;

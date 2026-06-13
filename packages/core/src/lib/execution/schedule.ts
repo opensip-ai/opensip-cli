@@ -54,6 +54,10 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
   const { units, mode, shouldAbort } = opts;
   if (units.length === 0) return;
 
+  if (mode !== 'sequential' && mode !== 'parallel') {
+    throw new Error(`scheduleUnits: mode must be 'parallel' or 'sequential' (got '${mode}')`);
+  }
+
   // Each unit's promise resolves AFTER a macrotask yield when requested, so a
   // same-thread live-progress timer + renderer paint between units. Wrapping
   // `runUnit` (rather than the scheduling logic) keeps the parallel sliding
@@ -68,9 +72,22 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
         }
       : opts.runUnit;
 
+  // Shared abort observation that also latches a local flag so that once an
+  // external abort is seen we treat it as a terminal drain condition (prevents
+  // the "no more refills + active drains but resolve condition never fires"
+  // hang when there are still unlaunched units).
+  let aborted = false;
+  const observeAbort = (): boolean => {
+    if (shouldAbort?.() === true) {
+      aborted = true;
+      return true;
+    }
+    return false;
+  };
+
   if (mode === 'sequential') {
     for (const [index, unit] of units.entries()) {
-      if (shouldAbort?.() === true) break;
+      if (observeAbort()) break;
       const { shouldStop } = await runUnit(unit, index);
       if (shouldStop) break;
     }
@@ -78,7 +95,10 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
   }
 
   // Parallel sliding window — mirrors fitness's executeParallel.
-  const maxParallel = Math.max(1, opts.maxParallel ?? 1);
+  // Defensive: even though recipe authors go through defineSimulationRecipe (and
+  // fitness through its own paths), a direct caller or future plugin could pass
+  // NaN/0/negative. Force a safe minimum.
+  const maxParallel = Math.max(1, Number.isFinite(opts.maxParallel) ? (opts.maxParallel as number) : 1);
   let nextIndex = 0;
   let activeCount = 0;
   let stopping = false;
@@ -92,7 +112,8 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
         })
         .finally(() => {
           activeCount--;
-          if (!stopping && nextIndex < units.length && shouldAbort?.() !== true) {
+          // Only refill if we are not in any terminal state (stopping, list done, or aborted).
+          if (!stopping && !aborted && nextIndex < units.length && !observeAbort()) {
             const next = units[nextIndex];
             if (next !== undefined) {
               const idx = nextIndex;
@@ -100,7 +121,9 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
               launch(next, idx);
             }
           }
-          if (activeCount === 0 && (nextIndex >= units.length || stopping)) {
+          // Drain condition now includes external abort as a terminal reason.
+          // Once all in-flight units complete, we resolve even if units remain.
+          if (activeCount === 0 && (nextIndex >= units.length || stopping || aborted)) {
             resolve();
           }
         });
@@ -108,6 +131,7 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
 
     const initialBatch = Math.min(maxParallel, units.length);
     for (let i = 0; i < initialBatch; i++) {
+      if (observeAbort()) break;
       const unit = units[i];
       if (unit !== undefined) {
         nextIndex = i + 1;
