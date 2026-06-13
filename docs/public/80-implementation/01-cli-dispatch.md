@@ -20,6 +20,8 @@ related-docs:
   - ../70-reference/01-cli-commands.md
   - ../../decisions/ADR-0030-authored-tool-discovery.md
 ---
+# NOTE (host-planes hygiene)
+All host command paths (including sessions/* and agent-catalog) now execute after a RunScope has been entered via the pre-action hook (or explicit runWithScope in tests). The pre-scope holder is gone for production. Only the documented ToolCliContext seams may be used for output/state/hostPlanes. See the hygiene plan for details.
 # CLI dispatch
 
 `packages/cli/src/index.ts` is the binary's entry point. It does the same five things on every invocation and then hands argv to Commander. This doc walks those five things.
