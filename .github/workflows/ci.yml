@@ -48,6 +48,17 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # PR-time version-surface drift guard. verify-release.mjs (which enforces
+      # single-version lockstep) runs only in the tag-driven release.yml, so a
+      # half-bumped version — some package.json at the new version, some not, or
+      # a stale CHANGELOG/SECURITY/doc-frontmatter version string — would
+      # otherwise merge undetected and only surface at release time. This asserts
+      # all 35 owned package.json + docs frontmatter + SECURITY + CHANGELOG +
+      # curated prose agree with packages/core/package.json#version. Passes on
+      # normal PRs (everything consistent); fires only on an incomplete bump.
+      - name: Check version surfaces in sync
+        run: node scripts/bump-version.mjs --check
+
       - name: Verify package supply-chain policy
         run: pnpm supply-chain:verify
 
