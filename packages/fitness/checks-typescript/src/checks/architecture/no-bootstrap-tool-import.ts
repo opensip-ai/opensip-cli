@@ -20,7 +20,18 @@
  * EMIT user-project source) is correctly ignored — it is not a real import
  * declaration. Test code (`__tests__/`) is exempt: a white-box test may import a
  * tool runtime directly (see `cli/.../__tests__/test-utils/bundled-tools.ts`).
+ *
+ * WAIVED placement exception (the `//` directive below is what the suppressor
+ * reads): this is an opensip-internal dogfood check, but it is the one relocation
+ * that genuinely needs the TS-AST substrate (@opensip-cli/lang-typescript
+ * `getSharedSourceFile`) — it must tell a REAL `import { fitnessTool }` from the
+ * same symbol appearing as TEXT inside `init` scaffold template literals, which a
+ * raw-regex project-local .mjs cannot (the module-specifier string can't be
+ * stripped without losing import detection). `@opensip-cli/lang-*` is not
+ * resolvable from `opensip-cli/fit/checks/`, so it stays SHIPPED until lang-* is
+ * root-resolvable for project-local checks (then relocate it).
  */
+// @fitness-ignore-file shipped-checks-must-be-generic -- AST-dependent dogfood check; needs @opensip-cli/lang-typescript, which a project-local .mjs cannot import. See header.
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';

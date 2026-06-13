@@ -1,12 +1,10 @@
 /**
  * @fileoverview Flag Python functions that exceed a line budget.
  *
- * The FIRST AST-level Python check (ADR-0010) — proof that the tree-sitter
- * substrate is authorable. Unlike the regex-based `no-bare-except`, this parses
- * via `@opensip-cli/lang-python`'s `getSharedTree` (cached, shared with the
- * graph adapter) and walks the real tree-sitter AST: every `function_definition`
- * whose line span exceeds the budget is reported. Long functions are harder to
- * read and test; extracting helpers keeps them in scope.
+ * Parses the file with `@opensip-cli/lang-python`'s `getSharedTree` (cached) and
+ * walks the tree-sitter AST: every `function_definition` whose line span exceeds
+ * the budget is reported. Long functions are harder to read and test; extracting
+ * helpers keeps them in scope.
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';

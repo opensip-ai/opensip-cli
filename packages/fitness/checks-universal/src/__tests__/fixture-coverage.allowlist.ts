@@ -33,15 +33,10 @@ export const COMMAND_EXEMPTIONS: CommandExemptions = {
 // regex/text extractor could not distinguish a real import from import-like text
 // inside a string literal — was moved to checks-typescript and rewritten on the
 // TypeScript AST (a string literal is never an ImportDeclaration), where it is
-// fully fixtured.
-export const KNOWN_UNFIXTURABLE: CommandExemptions = {
-  // analyzeAll self-reads docs/public/50-extend from process.cwd() (the extend-docs
-  // are excluded from the code-scan targets), so an on-disk __fixtures__ file is
-  // never the thing it reads. Its teeth are proven by the analyzeBlessedSeam unit
-  // test + the live dogfood run over the real extend-docs.
-  'docs-teach-blessed-seam':
-    'analyzeAll self-reads docs/public/50-extend from cwd; exercised by its unit test + the dogfood',
-};
+// fully fixtured. docs-teach-blessed-seam was relocated to a project-local .mjs
+// dogfood self-check (it encodes opensip-cli local facts; see the placement sweep
+// + shipped-checks-must-be-generic), so it is no longer a shipped check here.
+export const KNOWN_UNFIXTURABLE: CommandExemptions = {};
 
 export const FILENAME_OVERRIDES: FilenameOverrides = {
   // env-secret-exposure declares languages [json, typescript, yaml] but fileTypes
