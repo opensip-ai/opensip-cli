@@ -17,7 +17,7 @@ import {
   type UnitResult,
   type FitDoneResult,
 } from '@opensip-cli/contracts';
-import { currentScope, generatePrefixedId, logger } from '@opensip-cli/core';
+import { currentScope, generatePrefixedId, logger, extractPayloadVersion } from '@opensip-cli/core';
 import { SessionRepo } from '@opensip-cli/session-store';
 
 import { fitnessFingerprintStrategy } from '../../baseline-strategy.js';
@@ -244,10 +244,10 @@ export function persistFitSession(
     const fitPayload = buildFitnessSessionPayload(envelope);
     // Guard (primarily exercised in tests/CI per phase 3.3): ensure the convention
     // is followed on new writes. No user-visible behavior change.
-    // Use the typed builder result; __version is guaranteed by the interface for v1+.
-    if (process.env.NODE_ENV === 'test' && fitPayload.__version !== 1) {
+    // Uses the shared extract helper (no any, no console).
+    if (process.env.NODE_ENV === 'test' && extractPayloadVersion(fitPayload) !== 1) {
       logger.warn({
-        evt: 'cli.fit.payload.missing_version',
+        evt: 'cli.fit.test.payload_version_guard',
         module: 'cli:fit',
         msg: 'fitness session payload missing or wrong __version in test build',
       });
