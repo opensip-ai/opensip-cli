@@ -15,7 +15,7 @@
  * FileAccessor then resolves `files.read('packages/...')` against cwd.
  */
 
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -417,13 +417,30 @@ describe('typescript-frontend — analyzeAll over a real app fixture', () => {
   beforeEach(() => {
     // Remove any cov-tsf-* fixtures a prior *interrupted* run left behind (the
     // afterEach below cleans up on normal completion, but SIGINT bypasses it).
+    // We also prune an empty `apps/` parent (which this test may create via
+    // recursive mkdir) so that `pnpm test` / `pnpm fit` runs never leave an
+    // empty apps/ directory in the project root.
     // This keeps the working tree — and a subsequent `pnpm fit` — free of stale
     // detritus that would otherwise be analyzed as real source.
     const appsRoot = join(repoRoot, 'apps');
     try {
-      for (const entry of readdirSync(appsRoot)) {
-        if (entry.startsWith('cov-tsf-')) {
-          rmSync(join(appsRoot, entry), { recursive: true, force: true });
+      if (existsSync(appsRoot)) {
+        let hasNonCov = false;
+        for (const entry of readdirSync(appsRoot)) {
+          if (entry.startsWith('cov-tsf-')) {
+            rmSync(join(appsRoot, entry), { recursive: true, force: true });
+          } else if (!entry.startsWith('.')) {
+            hasNonCov = true;
+          }
+        }
+        if (!hasNonCov) {
+          // After cleaning only our temp subdirs, the parent is now empty.
+          // Remove it so we don't leave an empty apps/ behind from prior runs.
+          try {
+            rmSync(appsRoot, { recursive: true, force: true });
+          } catch {
+            // ignore
+          }
         }
       }
     } catch {
@@ -449,11 +466,19 @@ describe('typescript-frontend — analyzeAll over a real app fixture', () => {
 
   afterEach(() => {
     rmSync(appsDir, { recursive: true, force: true });
-    // Remove the temp `apps/` dir if we created it and it's now empty.
+    // Remove the temp `apps/` dir if it is now empty (we may have created the
+    // parent as a side-effect of the recursive mkdir for the fixture).
+    // Only remove if empty to avoid touching a real apps/ layout a user has.
+    const appsRoot = join(repoRoot, 'apps');
     try {
-      rmSync(join(repoRoot, 'apps'), { recursive: false });
+      if (existsSync(appsRoot)) {
+        const entries = readdirSync(appsRoot).filter((e) => !e.startsWith('.'));
+        if (entries.length === 0) {
+          rmSync(appsRoot, { recursive: true, force: true });
+        }
+      }
     } catch {
-      // apps/ may be non-empty (a real one) or already gone — leave it.
+      // apps/ may be non-empty (a real one) or removal failed — leave it.
     }
   });
 
