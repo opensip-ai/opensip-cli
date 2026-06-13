@@ -13,7 +13,7 @@ import type { Tool } from '../types.js';
 /** Minimal Tool stub — only the fields the guard inspects are meaningful. */
 function makeTool(id: string, commandNames: readonly string[]): Tool {
   return {
-    metadata: { id, version: '0.0.0', description: 'test tool' },
+    metadata: { id: '00000000-0000-4000-8000-000000000000', name: id, version: '0.0.0', description: 'test tool' },
     commands: commandNames.map((name) => ({ name, description: `${name} desc` })),
   };
 }

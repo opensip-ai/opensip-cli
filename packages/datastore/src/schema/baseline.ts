@@ -14,7 +14,8 @@ import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 export const toolBaselineEntries = sqliteTable(
   'tool_baseline_entries',
   {
-    tool: text('tool').notNull(),
+    tool: text('tool').notNull(),           // human `name` value (for compat + current queries)
+    stableId: text('stable_id'),            // tool stable UUID (additive per ADR-0048; null for legacy rows)
     fingerprint: text('fingerprint').notNull(),
     payload: text('payload', { mode: 'json' }), // the Signal as JSON
     capturedAt: integer('captured_at').notNull(),
@@ -29,6 +30,7 @@ export const toolBaselineEntries = sqliteTable(
  * findings" from "never saved". `capturedAt` feeds the JSON export's timestamp.
  */
 export const toolBaselineMeta = sqliteTable('tool_baseline_meta', {
-  tool: text('tool').primaryKey(),
+  tool: text('tool').primaryKey(),      // human `name` value (for compat)
+  stableId: text('stable_id'),          // tool stable UUID (additive)
   capturedAt: integer('captured_at').notNull(),
 });

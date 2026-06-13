@@ -92,7 +92,12 @@ export interface ToolCommandManifest {
 interface ToolPluginManifestBase {
   /** Discriminator — always `'tool'` (matches `opensipTools.kind`). */
   readonly kind: 'tool';
-  /** Stable identifier — e.g. 'fitness', 'simulation', 'graph'. */
+  /**
+   * Human/programmatic key (the value used for current storage, short ids,
+   * config, etc.). For published tools this is the "declared" identifier.
+   * The stable UUID lives in `stableId` (additive) or (in runtime ToolMetadata)
+   * as the `id` field per ADR-0048.
+   */
   readonly id: string;
   /** Human-facing display name. */
   readonly name: string;
@@ -168,8 +173,10 @@ export interface ToolPluginManifest extends ToolPluginManifestBase {
 export interface ToolProvenance {
   /** Where the tool came from. */
   readonly source: ToolSource;
-  /** The tool's stable id (from the manifest). */
+  /** The tool's human/programmatic key (from the manifest). */
   readonly id: string;
+  /** The tool's stable identity (real UUID) when declared (additive per ADR-0048). */
+  readonly stableId?: string;
   /** The tool's display version (from the manifest). */
   readonly version: string;
   /** npm package name, when the tool is an installed/bundled package. */

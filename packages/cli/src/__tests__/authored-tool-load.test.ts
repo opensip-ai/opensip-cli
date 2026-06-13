@@ -50,7 +50,7 @@ function stageAuthoredTool(
   const runtime = opts.throwOnImport
     ? 'throw new Error("authored tool module must not be imported before its trust decision");\n'
     : `export const tool = {
-  metadata: { id: ${JSON.stringify(name)}, version: '1.0.0', description: ${JSON.stringify(`${name} tool`)} },
+  metadata: { id: '00000000-0000-4000-8000-000000000000', name: ${JSON.stringify(name)}, version: '1.0.0', description: ${JSON.stringify(`${name} tool`)} },
   commands: [{ name: ${JSON.stringify(name)}, description: ${JSON.stringify(`the ${name} command`)} }],
   commandSpecs: [{
     name: ${JSON.stringify(name)},

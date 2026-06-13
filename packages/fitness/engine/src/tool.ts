@@ -234,9 +234,12 @@ export const FITNESS_CONTRACT_VERSION = '1.0.0';
 // EXPORT
 // =============================================================================
 
+export const FITNESS_STABLE_ID = 'afd68bd3-ff3c-4935-a5b6-76d8fc7a5224';
+
 export const fitnessTool: Tool = {
   metadata: {
-    id: 'fitness',
+    id: FITNESS_STABLE_ID,  // stable UUID (per ADR-0048; matches Checks `id` naming)
+    name: 'fitness',        // human key (previously the value in `id`)
     version: readPackageVersion(import.meta.url),
     description: 'Run fitness checks against a codebase',
   },

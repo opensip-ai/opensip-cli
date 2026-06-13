@@ -37,6 +37,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'stale-build-artifacts': ['🏚️', 'Stale Build Artifacts'],
   'tool-has-manifest': ['🪪', 'Tool Has Manifest'],
   'tool-contract-version-policy': ['📜', 'Tool Contract Version Policy'],
+  'tool-stable-id': ['🪪', 'Tool Stable ID (UUID)'],
   'vitest-config-extends-base': ['🧪', 'Vitest Config Extends Base'],
   'vitest-config-required-with-tests': ['🧪', 'Vitest Config Required With Tests'],
 });

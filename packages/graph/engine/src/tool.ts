@@ -234,9 +234,12 @@ function collectReportData(scope: ToolScope): Record<string, unknown> {
  */
 export const GRAPH_CONTRACT_VERSION = '1.0.0';
 
+export const GRAPH_STABLE_ID = '3873f1c2-02a9-4719-930a-bca74b62b706';
+
 export const graphTool: Tool = {
   metadata: {
-    id: 'graph',
+    id: GRAPH_STABLE_ID,  // stable UUID (per ADR-0048; matches Checks `id` naming)
+    name: 'graph',        // human key (previously the value in `id`)
     version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },

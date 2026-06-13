@@ -351,9 +351,12 @@ function contributeScope(): ScopeContribution {
  */
 export const SIMULATION_CONTRACT_VERSION = '1.0.0';
 
+export const SIMULATION_STABLE_ID = '715d32c2-692c-4ed4-985b-a35deaf186aa';
+
 export const simulationTool: Tool = {
   metadata: {
-    id: 'simulation',
+    id: SIMULATION_STABLE_ID,  // stable UUID (per ADR-0048; matches Checks `id` naming)
+    name: 'simulation',        // human key (previously the value in `id`)
     version: readPackageVersion(import.meta.url),
     description: 'Run simulation scenarios against a codebase',
   },
