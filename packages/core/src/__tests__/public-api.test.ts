@@ -105,6 +105,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'enterScope',
   'err',
   'executePipeline',
+  'extractPayloadVersion',
   'extractTimestamp',
   'filterSignalsBySuppressions',
   'formatDuration',

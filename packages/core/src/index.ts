@@ -375,6 +375,12 @@ export type { ReadYamlFileOrThrowOptions } from './lib/yaml.js';
 // Lib — IDs
 export { generateId, generatePrefixedId, extractTimestamp, generateUUID } from './lib/ids.js';
 
+// Lib — payload version extraction (inner __version convention for
+// tool-owned opaque session payloads and toolState). Pure function with
+// no knowledge of any tool payload shape. Used by decode/hydrate/replay
+// paths and by tools for their own state versioning.
+export { extractPayloadVersion } from './lib/payload-version.js';
+
 // Lib — retry
 export { withRetry } from './lib/retry.js';
 export type { RetryOptions } from './lib/retry.js';
