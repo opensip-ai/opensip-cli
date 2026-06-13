@@ -45,6 +45,8 @@ interface FitnessSessionCheck {
 
 /** Opaque-to-contracts detail blob written for every `fit` session. */
 export interface FitnessSessionPayload {
+  /** Inner version per the payload schema evolution convention (v1 shape). */
+  readonly __version: 1;
   readonly summary: {
     readonly total: number;
     readonly passed: number;
@@ -83,6 +85,10 @@ function findingsFor(signals: readonly Signal[]): FitnessSessionFinding[] {
  * The 4-level signal severity is collapsed to the dashboard's `error|warning`.
  * `summary` is taken from the envelope's verdict, which already counts
  * `critical|high → errors`, else `warnings`.
+ *
+ * The returned payload includes `__version: 1` (the current v1 shape per the
+ * tool-owned payload evolution convention). Additive changes stay on v1;
+ * breaking changes will bump the number (with deprecation per the rules).
  */
 export function buildFitnessSessionPayload(envelope: SignalEnvelope): FitnessSessionPayload {
   const bySource = new Map<string, Signal[]>();
@@ -102,6 +108,7 @@ export function buildFitnessSessionPayload(envelope: SignalEnvelope): FitnessSes
 
   const { summary } = envelope.verdict;
   return {
+    __version: 1,
     summary: {
       total: summary.total,
       passed: summary.passed,
