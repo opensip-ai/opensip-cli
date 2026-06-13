@@ -31,9 +31,54 @@ export type FingerprintStrategy = (signal: Signal) => string;
  * `message` — a fingerprint is an *identity*, and several rules embed run-varying
  * counts in their message text, which would make the same logical finding
  * fingerprint differently across runs (a spurious "resolved + new" flap).
+ *
+ * WARNING for tool authors: this strategy collides for any two findings that
+ * share ruleId+filePath but lack a stable line/col (e.g. synthetic whole-file
+ * nodes like `<module-init>`, or rules that intentionally report at file level
+ * with line/col omitted or zero). Tools that emit such findings MUST declare
+ * their own `Tool.fingerprintStrategy` (see helpers below or a content hash)
+ * or risk baseline ratchet flapping / lost distinct findings.
  */
 export const defaultFingerprintStrategy: FingerprintStrategy = (s) =>
   `${s.ruleId}|${s.filePath}|${String(s.line ?? 0)}|${String(s.column ?? 0)}`;
+
+/**
+ * A stable identity for file-level or synthetic (no reliable line/col) findings.
+ * Differentiates by ruleId + filePath only. Suitable when the *rule* itself
+ * is the distinguishing fact and there is at most one such finding per
+ * (rule, file) in a run.
+ */
+export const fileLevelFingerprintStrategy: FingerprintStrategy = (s) => `${s.ruleId}|${s.filePath}`;
+
+/**
+ * A content-aware fallback that incorporates a short hash of the message when
+ * line/col are absent. This reduces (but does not eliminate) collisions for
+ * rules that legitimately emit multiple file-level findings that differ only
+ * in the human message text.
+ *
+ * Tools that care about exact stability should prefer a strategy that hashes
+ * the parts of the Signal that are semantically part of "the same finding"
+ * (often ruleId + filePath + a normalized key extracted from the finding).
+ */
+export const contentHashFallbackFingerprintStrategy: FingerprintStrategy = (s) => {
+  // Very small stable hash of message (or empty) to disambiguate file-level variants.
+  const msg = s.message ?? '';
+  let h = 2_166_136_261;
+  for (let i = 0; i < msg.length; i++) {
+    const cp = msg.codePointAt(i) ?? 0;
+    h ^= cp & 0xff_ff;
+    h = Math.imul(h, 16_777_619);
+    if (cp > 0xff_ff) i += 1;
+  }
+  const suffix = (h >>> 0).toString(16).padStart(8, '0');
+  const line = s.line ?? 0;
+  const col = s.column ?? 0;
+  // When we have real line/col prefer the default shape; otherwise use file+hash.
+  if (line || col) {
+    return defaultFingerprintStrategy(s);
+  }
+  return `${s.ruleId}|${s.filePath}|${suffix}`;
+};
 
 /**
  * Stamp `fingerprint` onto each signal using `strategy`, returning new signal

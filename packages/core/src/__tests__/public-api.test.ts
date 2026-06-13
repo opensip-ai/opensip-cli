@@ -49,7 +49,9 @@ const EXPECTED_VALUE_EXPORTS = [
   'policyPasses',
   'resolveVerdictPolicy',
   // Host-owned baseline/ratchet plane (ADR-0036).
+  'contentHashFallbackFingerprintStrategy',
   'defaultFingerprintStrategy',
+  'fileLevelFingerprintStrategy',
   'stampFingerprints',
   'DEFAULT_FAIL_ON_DEGRADED',
   'resolveFailOnDegraded',

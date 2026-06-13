@@ -142,10 +142,13 @@ export function buildBaselineSeams(deps: {
       // results from `signals` + the driver name from `tool` only, so the other
       // envelope fields are mostly inert filler. We now populate a plausible
       // verdict so downstream SARIF or machine consumers are not misled.
+      // The runId/createdAt make it obvious this is a reconstruction from a
+      // previously captured baseline (units and per-unit facts like filesValidated
+      // are not recoverable without storing the full original envelope).
       const synthetic: SignalEnvelope = {
         schemaVersion: 2,
         tool: tool as SignalEnvelope['tool'],
-        runId: 'baseline',
+        runId: `baseline:${tool}`,
         createdAt: new Date(capturedAt).toISOString(),
         verdict: {
           score: signals.length === 0 ? 1 : summary.passed / summary.total,
@@ -171,14 +174,18 @@ export function buildBaselineSeams(deps: {
           { code: 'CONFIGURATION.GATE.BASELINE_INCONSISTENT' },
         );
       }
-      const fingerprints = repo
-        .load(tool)
-        .map((r) => r.fingerprint)
-        .sort((a, b) => a.localeCompare(b));
+      const rows = repo.load(tool);
+      const fingerprints = rows.map((r) => r.fingerprint).sort((a, b) => a.localeCompare(b));
       const file = {
         version: '1',
         tool,
         capturedAt: new Date(capturedAt).toISOString(),
+        // Reconstruction note: this is a fingerprint list only. It does not
+        // contain the original per-unit (check/rule) metadata or validated counts.
+        // It is suitable for git-trackable ratchet comparison (graph) and for
+        // re-import via --gate-compare style flows that only need identities.
+        note: 'reconstructed from baseline entries; units and per-finding details are not preserved',
+        signalCount: fingerprints.length,
         fingerprints,
       };
       const serialized = JSON.stringify(file, null, 2);

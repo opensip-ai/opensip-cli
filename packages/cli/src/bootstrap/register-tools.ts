@@ -367,7 +367,7 @@ export function buildToolDiscoverySources(
  *     `plugin list` and the capability registry never see a tool whose import
  *     subsequently failed — matching the bundled/authored legs).
  *
- * 1.0.0 launch: the grace window ended. A discovered `kind:'tool'` package whose
+ * Public launch: the grace window ended. A discovered `kind:'tool'` package whose
  * manifest is missing/malformed (`loadToolManifest` → undefined) or declares no
  * `apiVersion` (`admitTool` → skip via {@link checkCompatibility}) is no longer
  * admitted off the marker alone — it is rejected with a diagnostic.
@@ -537,19 +537,26 @@ export interface AuthoredAdmission {
 }
 
 /**
- * The shared admission TAIL for both authored sources:
- * `loadToolManifest(source, dir)` → `admitTool({ explicitlyRequested: true })`
- * → throw on a non-`admit` decision → return `{ provenance, manifest }`. The
- * ONLY thing that differs between the two authored legs is the trust pre-check,
- * which stays AHEAD of this tail in `admitProjectLocalTool` (the first
- * statement of the project path), keeping trust-before-import structurally
- * obvious and avoiding a parallel admission hierarchy.
+ * The shared admission TAIL for both authored sources.
+ * When `preloadedManifest` is supplied we use that snapshot (no re-read) so a
+ * prior trust decision (project-local) and the compat gate see the identical
+ * declaration. This removes the TOCTOU between the trust-bearing read and the
+ * gate read for the deny-by-default authored path.
  *
  * @throws {PluginIncompatibleError} when the sidecar is missing/malformed or
  *   the tool is compatibility-incompatible.
  */
-function admitAuthoredTool(source: ToolSource, dir: string): AuthoredAdmission {
-  const rawManifest = loadToolManifest(source, dir);
+function admitAuthoredTool(
+  source: ToolSource,
+  dir: string,
+  preloadedManifest?: ReturnType<typeof loadToolManifest>,
+): AuthoredAdmission {
+  // When a preloaded manifest is supplied (project-local trust path), we use
+  // that exact snapshot for the compat gate. This eliminates a TOCTOU between
+  // the read that decided "this id is allowlisted" and the read that feeds the
+  // compatibility check. The later dynamic import of the .mjs still sees
+  // whatever is on disk at execution time (inherent for authored code).
+  const rawManifest = preloadedManifest ?? loadToolManifest(source, dir);
   if (rawManifest === undefined) {
     throw new PluginIncompatibleError(
       `${source} tool at '${dir}' has no conformant ${PROJECT_LOCAL_MANIFEST_FILE} sidecar`,
@@ -620,7 +627,10 @@ export function admitProjectLocalTool(args: {
       { diagnostic: 'project-local tool not allowlisted (deny-by-default)' },
     );
   }
-  return admitAuthoredTool('project-local', args.dir);
+  // Pass the manifest we just loaded (and whose id we just trusted) so the
+  // compat gate in the tail sees the identical declaration. Closes the
+  // read-re-read TOCTOU for the deny-by-default path.
+  return admitAuthoredTool('project-local', args.dir, manifest);
 }
 
 /**
@@ -781,7 +791,7 @@ async function admitAndRegisterAuthored(args: AuthoredRegisterArgs): Promise<voi
  * **step 8** of the tool lifecycle (launch, §5.4) — see
  * {@link runToolLifecycle}.
  *
- * 1.0.0 launch: there is ONE command surface — the tool's declared `commandSpecs`,
+ * Public launch: there is ONE command surface — the tool's declared `commandSpecs`,
  * mounted by `mountCommandSpec`. `register()` and the raw-Commander `program`
  * handle on the tool context are gone, so the host owns `program` and passes it
  * in here (the tool never touches Commander). A tool with no `commandSpecs` is a
@@ -826,7 +836,7 @@ export function mountAllToolCommands(
 
 /**
  * Mount ONE tool's commands from its declared `commandSpecs` — the only command
- * surface (1.0.0 launch). Extracted so {@link mountAllToolCommands} keeps its
+ * surface (public launch). Extracted so {@link mountAllToolCommands} keeps its
  * per-tool failure isolation around a single call. A tool with no `commandSpecs`
  * contributes nothing and is surfaced via `cli.tool.no_command_surface`.
  */

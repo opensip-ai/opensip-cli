@@ -320,14 +320,17 @@ function isLikelyCommanderCommand(x: unknown): boolean {
  *
  * Commander calls `action((...positionalArgs, optsObject, command))`: the
  * declared positionals come first, then the parsed-options object, then the
- * `Command` instance. We locate the opts object (the last non-Command object
- * argument) and treat everything before it as positionals.
+ * `Command` instance. We locate the opts object by scanning left from the
+ * slot before the final Command for the rightmost plain (non-array, non-Command)
+ * object. Everything before that index is treated as positionals.
  *
- * The implementation is deliberately defensive (beyond the documented
- * "last two are opts + Command") because a future Commander version, a
- * wrapped program, or an exotic call site could change arity. If we ever
- * mis-identify, we throw a loud internal error rather than handing a tool
- * or host command a Command instance as its `opts`.
+ * This scan is robust: positionals (typically strings/paths for variadics) are
+ * never inspected for "object-ness" during the search, so a defensive walk
+ * cannot accidentally eat legitimate leading positionals when an intermediate
+ * value looks unusual (future Commander arity change, wrappers, etc.).
+ *
+ * If no plausible opts object is found, we treat the entire prefix before the
+ * Command as positionals and opts as {} (fail-closed paranoia below still applies).
  */
 function splitActionArgs(actionArgs: readonly unknown[]): {
   opts: Record<string, unknown>;
@@ -337,9 +340,9 @@ function splitActionArgs(actionArgs: readonly unknown[]): {
     return { opts: {}, positionals: [] };
   }
 
+  const lastIdx = actionArgs.length - 1;
   // The final argument is (per Commander contract) the Command instance.
-  const last = actionArgs.at(-1);
-  if (!isLikelyCommanderCommand(last)) {
+  if (!isLikelyCommanderCommand(actionArgs[lastIdx])) {
     // Extremely unexpected — log via throw so tests/CI surface it loudly.
     throw new Error(
       'mountCommandSpec: splitActionArgs could not locate Commander Command as the final action argument. ' +
@@ -348,35 +351,28 @@ function splitActionArgs(actionArgs: readonly unknown[]): {
     );
   }
 
-  // The opts object is the one immediately before the Command (when present).
-  // It is always a plain object (never null/undefined per Commander).
-  let optsIndex = actionArgs.length - 2;
-  let candidate = actionArgs[optsIndex];
+  // Scan left from the slot immediately before the Command. The first (rightmost)
+  // plain non-array non-Command object we encounter is the parsed opts.
+  for (let i = lastIdx - 1; i >= 0; i--) {
+    const v = actionArgs[i];
+    if (v && typeof v === 'object' && !Array.isArray(v) && !isLikelyCommanderCommand(v)) {
+      const opts = v as Record<string, unknown>;
+      const positionals = actionArgs.slice(0, i);
 
-  // Walk backwards if needed until we find a plain object that is not a Command.
-  while (
-    optsIndex >= 0 &&
-    (candidate === undefined ||
-      candidate === null ||
-      typeof candidate !== 'object' ||
-      Array.isArray(candidate) ||
-      isLikelyCommanderCommand(candidate))
-  ) {
-    optsIndex -= 1;
-    candidate = actionArgs[optsIndex];
+      // Extra paranoia: if what we selected smells like Command, refuse.
+      if (isLikelyCommanderCommand(opts)) {
+        throw new Error(
+          'mountCommandSpec: splitActionArgs selected a Commander Command as the parsed opts. ' +
+            'Refusing to dispatch — this is a bug in argument splitting.',
+        );
+      }
+      return { opts, positionals };
+    }
   }
 
-  const opts = (candidate ?? {}) as Record<string, unknown>;
-  const positionals = optsIndex > 0 ? actionArgs.slice(0, optsIndex) : [];
-
-  // Extra paranoia: if what we are about to hand out still smells like Command,
-  // fail closed instead of letting it reach a handler.
-  if (isLikelyCommanderCommand(opts)) {
-    throw new Error(
-      'mountCommandSpec: splitActionArgs selected a Commander Command as the parsed opts. ' +
-        'Refusing to dispatch — this is a bug in argument splitting.',
-    );
-  }
-
-  return { opts, positionals };
+  // No plain opts object found before the Command (defensive). All prior args
+  // become positionals; the handler will see a bare {} for opts (still better
+  // than handing it a Command or corrupting _args).
+  const positionals = actionArgs.slice(0, lastIdx);
+  return { opts: {}, positionals };
 }

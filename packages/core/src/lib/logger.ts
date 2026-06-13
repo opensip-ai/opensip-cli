@@ -201,6 +201,9 @@ export class LoggerImpl implements Logger {
   initLogFile(dir: string): void {
     try {
       mkdirSync(dir, { recursive: true });
+      // Partition by the UTC calendar date (toISOString is always UTC).
+      // This makes log file names stable and sortable across timezones.
+      // pruneOldLogs respects the same UTC-bucket convention for retention.
       const today = new Date().toISOString().slice(0, 10);
       this.logFilePath = join(dir, `${today}.jsonl`);
       pruneOldLogs(dir);
@@ -295,13 +298,23 @@ function writeToStderr(entry: Record<string, unknown>): void {
 
 function pruneOldLogs(dir: string): void {
   try {
+    // Retention is based on the UTC calendar date embedded in the filename
+    // (which is produced by toISOString().slice(0,10) at creation time).
+    // Compute a cutoff as "N full UTC days before now" to avoid engine-
+    // dependent interpretation of bare "YYYY-MM-DD" strings and TZ skew.
     const cutoff = Date.now() - MAX_LOG_AGE_DAYS * 24 * 60 * 60 * 1000;
+
     const files = readdirSync(dir);
     for (const file of files) {
       if (!file.endsWith('.jsonl')) continue;
       const dateStr = file.replace('.jsonl', '');
-      const fileDate = new Date(dateStr).getTime();
-      if (!Number.isNaN(fileDate) && fileDate < cutoff) {
+      // Parse the bucket date as UTC midnight so comparisons are independent
+      // of local TZ and of how the JS engine treats new Date('YYYY-MM-DD').
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+      if (!m) continue;
+      const [, y, mo, d] = m;
+      const fileUtcMs = Date.UTC(Number(y), Number(mo) - 1, Number(d));
+      if (fileUtcMs < cutoff) {
         try {
           unlinkSync(join(dir, file));
         } catch {

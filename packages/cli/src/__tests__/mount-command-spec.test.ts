@@ -503,3 +503,93 @@ describe('mountCommandSpec — leaner host CommandMountContext', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// splitActionArgs fidelity (regression for defensive arg walking eating positionals)
+// The splitter is internal, but its contract is observable through any spec that
+// declares `args`. These tests exercise 0, 1, and N positionals (including variadic)
+// mixed with common flags, ensuring _args is exactly the declared positionals and
+// not corrupted by the opts/Command trailing pair.
+// ---------------------------------------------------------------------------
+
+describe('mountCommandSpec — positional args (_args) fidelity through splitActionArgs', () => {
+  it('preserves zero positionals when none are supplied', async () => {
+    const { ctx } = makeCtx();
+    const program = new Command();
+    const received: { opts: any; positionals: any }[] = [];
+    const spec: HostCommandSpec = defineCommand({
+      name: 'nopos',
+      description: 'no positionals',
+      commonFlags: ['json'],
+      scope: 'none',
+      output: 'command-result',
+      handler: (opts) => {
+        received.push({ opts, positionals: (opts as any)._args });
+        return { type: 'help' } as const;
+      },
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await program.parseAsync(['nopos'], { from: 'user' });
+    expect(received[0].positionals).toEqual([]);
+
+    await program.parseAsync(['nopos', '--json'], { from: 'user' });
+    expect(received[1].positionals).toEqual([]);
+    expect(received[1].opts.json).toBe(true);
+  });
+
+  it('preserves a single positional and trailing common flags', async () => {
+    const { ctx } = makeCtx();
+    const program = new Command();
+    const received: { opts: any; positionals: any }[] = [];
+    const spec: HostCommandSpec = defineCommand({
+      name: 'onepos',
+      description: 'one positional',
+      commonFlags: ['cwd'],
+      args: [{ name: 'target', optional: false, description: 'single target' }],
+      scope: 'none',
+      output: 'command-result',
+      handler: (opts) => {
+        received.push({ opts, positionals: (opts as any)._args });
+        return { type: 'help' } as const;
+      },
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await program.parseAsync(['onepos', 'src/foo'], { from: 'user' });
+    expect(received[0].positionals).toEqual(['src/foo']);
+    // cwd is seeded by applyCommonFlags when the flag is declared
+    expect(received[0].opts.cwd).toBeTruthy();
+
+    await program.parseAsync(['onepos', 'src/bar', '--cwd', 'some/tmp/x'], { from: 'user' });
+    expect(received[1].positionals).toEqual(['src/bar']);
+    expect(received[1].opts.cwd).toBe('some/tmp/x');
+  });
+
+  it('preserves multiple (variadic) positionals without eating them into opts', async () => {
+    const { ctx } = makeCtx();
+    const program = new Command();
+    const received: { opts: any; positionals: any }[] = [];
+    const spec: HostCommandSpec = defineCommand({
+      name: 'multipos',
+      description: 'variadic positionals',
+      commonFlags: ['json'],
+      args: [{ name: 'paths', variadic: true, optional: true, description: 'paths...' }],
+      scope: 'none',
+      output: 'command-result',
+      handler: (opts) => {
+        received.push({ opts, positionals: (opts as any)._args });
+        return { type: 'help' } as const;
+      },
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await program.parseAsync(['multipos', 'a', 'b', 'c'], { from: 'user' });
+    expect(received[0].positionals).toEqual(['a', 'b', 'c']);
+
+    await program.parseAsync(['multipos', 'x', '--json', 'y'], { from: 'user' });
+    // --json is a flag, not a positional; the two real positionals must survive
+    expect(received[1].positionals).toEqual(['x', 'y']);
+    expect(received[1].opts.json).toBe(true);
+  });
+});

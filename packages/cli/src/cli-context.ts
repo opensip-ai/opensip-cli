@@ -267,9 +267,12 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
         render: opts.render,
       }).catch((error) => {
         // Primary machine output path failed — do not swallow silently.
-        // Force a non-success exit and surface as error (not warn) so --json
-        // consumers and CI see the failure instead of missing / truncated output.
-        setExitCode(1);
+        // Only force a non-success exit if the primary run had not already
+        // decided on a failure code (preserve specific codes like REPORT_FAILED,
+        // RUNTIME_ERROR, etc.). Render failure of the outcome is secondary.
+        if ((exitCode ?? 0) === 0) {
+          setExitCode(1);
+        }
         log.error({
           evt: 'cli.emit_json.render_failed',
           module: 'cli:context',
@@ -282,7 +285,9 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
         jsonRequested: true,
         render: opts.render,
       }).catch((error) => {
-        setExitCode(1);
+        if ((exitCode ?? 0) === 0) {
+          setExitCode(1);
+        }
         log.error({
           evt: 'cli.emit_envelope.render_failed',
           module: 'cli:context',
@@ -307,7 +312,10 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
         { jsonRequested: true, render: opts.render },
       ).catch((error) => {
         // Even error emission failing is fatal for the json contract.
-        setExitCode(1);
+        // Only force 1 if the error detail itself indicated success (edge).
+        if ((exitCode ?? 0) === 0) {
+          setExitCode(1);
+        }
         log.error({
           evt: 'cli.emit_error.render_failed',
           module: 'cli:context',

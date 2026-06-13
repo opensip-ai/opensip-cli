@@ -17,7 +17,14 @@ import {
   type UnitResult,
   type FitDoneResult,
 } from '@opensip-cli/contracts';
-import { currentScope, generatePrefixedId, logger, extractPayloadVersion } from '@opensip-cli/core';
+import {
+  currentScope,
+  generatePrefixedId,
+  logger,
+  extractPayloadVersion,
+  type Signal,
+  type VerdictPolicy,
+} from '@opensip-cli/core';
 import { SessionRepo } from '@opensip-cli/session-store';
 
 import { fitnessFingerprintStrategy } from '../../baseline-strategy.js';
@@ -31,7 +38,6 @@ import { resolvedFitnessConfig } from './resolved-fitness-config.js';
 import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../../recipes/service-types.js';
 import type { FitnessRecipeResult, RecipeCheckResult } from '../../recipes/types.js';
 import type { SignalersConfig } from '../../signalers/types.js';
-import type { Signal, VerdictPolicy } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 /**
@@ -45,6 +51,26 @@ import type { DataStore } from '@opensip-cli/datastore';
  * `envelope.verdict.passed` is the single exit driver.
  */
 export function resolveFitVerdictPolicy(signalersConfig: SignalersConfig): VerdictPolicy {
+  // Prefer a host-stamped policy (computed in build-per-run-scope from the
+  // single fully-resolved toolConfig after flag/env/file/defaults precedence).
+  // This guarantees every reader in the run (result builders, gate modes,
+  // recipe execution) sees identical numbers for the verdict that drives
+  // both the envelope and the final exit code.
+  const scope = currentScope();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+  const stamped: any = (scope as any)?.fitnessVerdictPolicy;
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+  if (
+    stamped &&
+    typeof stamped.failOnErrors === 'number' &&
+    typeof stamped.failOnWarnings === 'number'
+  ) {
+    return {
+      failOnErrors: stamped.failOnErrors,
+      failOnWarnings: stamped.failOnWarnings,
+    };
+  }
+
   const resolved = resolvedFitnessConfig();
   return {
     failOnErrors: resolved?.failOnErrors ?? signalersConfig.fitness.failOnErrors ?? 1,
@@ -202,7 +228,13 @@ export function buildFitCallbacks(
   let completedCount = 0;
   return {
     onCheckStart(checkSlug: string, index: number, total: number) {
-      logger.debug({ evt: 'cli.check.start', module: 'cli:fit', checkSlug, index, total });
+      logger.debug({
+        evt: 'cli.check.start',
+        module: 'cli:fit',
+        checkSlug,
+        index,
+        total,
+      });
       onProgress?.(completedCount, total);
     },
     onCheckComplete(checkSlug: string, summary: CheckSummary, index: number, total: number) {

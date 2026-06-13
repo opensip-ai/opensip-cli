@@ -67,7 +67,10 @@ export interface BuildPerRunScopeInput {
    * Passed in — NOT derivable from `cliDefaults` (the `cli:` config block
    * carries no package version).
    */
-  readonly ui: { readonly version: string; readonly update: string | undefined };
+  readonly ui: {
+    readonly version: string;
+    readonly update: string | undefined;
+  };
 }
 
 /**
@@ -134,7 +137,11 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // cli-ui render sites narrow it with normalizeBannerSize.
     // bannerSize stays derivable from config; version/update are resolved by
     // the hook (package version + cached update-check result) and passed in.
-    ui: { bannerSize: cliDefaults.ui?.banner ?? 'mini', version: ui.version, update: ui.update },
+    ui: {
+      bannerSize: cliDefaults.ui?.banner ?? 'mini',
+      version: ui.version,
+      update: ui.update,
+    },
     // Per-run admitted-tool facts, recorded by the bootstrap. Stamped here (not
     // a module global) so host commands (`plugin list`, `tools list`, `tools
     // uninstall`) read them via `currentScope()` — the single source of truth.
@@ -175,10 +182,26 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   });
   scope.diagnostics.counter('capabilities.wired', wired.length);
 
+  // Host-resolved verdict policies (ADR-0035) are derived once from the fully
+  // precedence-resolved toolConfig (flag > env > file > defaults) and stamped
+  // onto the scope. All readers (result builders, gate compare, internal "is
+  // error?" logic) inside this run must use the stamped value (or a helper that
+  // reads it) so the numbers that drove `envelope.verdict.passed` and the exit
+  // code are identical everywhere. See fitness `resolveFitVerdictPolicy`.
+  const fitnessBlock: Record<string, unknown> | undefined = toolConfig
+    ? ((toolConfig as Record<string, unknown>).fitness as Record<string, unknown> | undefined)
+    : undefined;
+  const fitnessVerdictPolicy = {
+    failOnErrors: typeof fitnessBlock?.failOnErrors === 'number' ? fitnessBlock.failOnErrors : 1,
+    failOnWarnings:
+      typeof fitnessBlock?.failOnWarnings === 'number' ? fitnessBlock.failOnWarnings : 0,
+  };
+
   Object.assign(scope, {
     capabilities,
     toolConfig,
     targets,
+    fitnessVerdictPolicy,
     ...configDocumentSlot(project, configDocument),
   });
 

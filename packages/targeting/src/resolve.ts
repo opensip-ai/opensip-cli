@@ -71,6 +71,11 @@ export function resolveTargets(
 ): readonly string[] {
   const files = new Set<string>();
 
+  // Pre-compile globals once for the whole call (mirrors preResolveAllTargets).
+  const compiledGlobalExcludes = globalExcludes.map(
+    (pattern) => new Minimatch(pattern, { dot: true }),
+  );
+
   for (const target of targets) {
     const { include, exclude } = target.config;
     for (const pattern of include) {
@@ -80,55 +85,83 @@ export function resolveTargets(
         nodir: true,
         ignore: [...COMMON_IGNORE, ...exclude],
       });
-      for (const match of matches) {
-        const abs = resolve(match);
-        // Defense against glob patterns or symlinks that escape the project root.
-        // Only project-contained files are eligible for targeting (prevents
-        // external files leaking into analysis, baselines, SARIF, etc.).
-        if (isPathInside(abs, rootDir)) {
-          files.add(abs);
-        }
-      }
+      // Use the *exact same* post-glob filter as the pre-resolve assemble path
+      // (inside-root + target exclude + globalExcludes, dedup+sort) to guarantee
+      // identical output sets for equivalent inputs.
+      const filtered = filterOneTargetFiles(
+        matches.map((m) => resolve(m)),
+        exclude,
+        compiledGlobalExcludes,
+        rootDir,
+      );
+      for (const f of filtered) files.add(f);
     }
   }
 
-  return [...applyGlobalExcludes([...files], rootDir, globalExcludes)].sort();
+  // applyGlobalExcludes is still used by the legacy direct-file-cache fallback
+  // paths and external callers; keep it, but the per-target results above have
+  // already folded globals for the main resolveTargets contract.
+  return [...files].sort();
 }
 
 // =============================================================================
-// Pre-resolved target file cache (single deduplicated glob pass across targets)
+// Shared post-glob filtering (used by both resolve paths for exact parity)
 // =============================================================================
 
-/** Assemble a single target's file list from pre-resolved pattern results, applying excludes. */
-function assembleTargetFiles(
-  targetConfig: { include: readonly string[]; exclude: readonly string[]; name: string },
-  patternResults: Map<string, readonly string[]>,
+/**
+ * Filter a raw list of (already inside-root) absolute paths for one target:
+ * - apply the target's own `exclude` globs
+ * - apply the project `globalExcludes`
+ * - dedup + sort
+ *
+ * This helper is the single source of truth for "after glob, apply this target's
+ * exclude + globals" so that the single-pass `resolveTargets` and the
+ * optimized `preResolveAllTargets` (which does a cross-target deduped glob then
+ * per-target re-filter) produce byte-identical results for the same inputs.
+ */
+function filterOneTargetFiles(
+  rawMatches: readonly string[],
+  targetExclude: readonly string[],
   compiledGlobalExcludes: Minimatch[],
   rootDir: string,
 ): readonly string[] {
   const files = new Set<string>();
-  for (const pattern of targetConfig.include) {
-    const matches = patternResults.get(pattern) ?? [];
-    for (const match of matches) {
-      // Apply the same inside-root guard as the non-pre-resolved path (defense
-      // in depth for any glob results that escaped, symlinks, etc.).
-      if (isPathInside(match, rootDir)) {
-        files.add(match);
-      }
-    }
+  for (const m of rawMatches) {
+    if (isPathInside(m, rootDir)) files.add(m);
   }
-
-  if (targetConfig.exclude.length > 0 || compiledGlobalExcludes.length > 0) {
-    const compiledTargetExcludes = targetConfig.exclude.map(
-      (ex) => new Minimatch(ex, { dot: true }),
-    );
+  const hasTargetExcludes = targetExclude.length > 0;
+  const hasGlobals = compiledGlobalExcludes.length > 0;
+  if (hasTargetExcludes || hasGlobals) {
+    const compiledTargetExcludes = hasTargetExcludes
+      ? targetExclude.map((ex) => new Minimatch(ex, { dot: true }))
+      : [];
     const allExcludes = [...compiledTargetExcludes, ...compiledGlobalExcludes];
     return [...files]
       .filter((filePath) => !allExcludes.some((m) => m.match(relative(rootDir, filePath))))
       .sort();
   }
-
   return [...files].sort();
+}
+
+/** Assemble a single target's file list from pre-resolved pattern results, applying excludes. */
+function assembleTargetFiles(
+  targetConfig: {
+    include: readonly string[];
+    exclude: readonly string[];
+    name: string;
+  },
+  patternResults: Map<string, readonly string[]>,
+  compiledGlobalExcludes: Minimatch[],
+  rootDir: string,
+): readonly string[] {
+  // Collect raw matches for this target's includes (the shared glob may have
+  // over-collected for shared patterns; we filter precisely here).
+  const raw: string[] = [];
+  for (const pattern of targetConfig.include) {
+    const matches = patternResults.get(pattern) ?? [];
+    raw.push(...matches);
+  }
+  return filterOneTargetFiles(raw, targetConfig.exclude, compiledGlobalExcludes, rootDir);
 }
 
 /**
@@ -185,7 +218,11 @@ export function preResolveAllTargets(
   const result = new Map<string, readonly string[]>();
   for (const target of targets) {
     const files = assembleTargetFiles(
-      { include: target.config.include, exclude: target.config.exclude, name: target.config.name },
+      {
+        include: target.config.include,
+        exclude: target.config.exclude,
+        name: target.config.name,
+      },
       patternResults,
       compiledExcludes,
       rootDir,

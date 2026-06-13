@@ -24,7 +24,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { currentScope, resolveProjectPaths } from '@opensip-cli/core';
+import { currentScope, resolveProjectPaths, SystemError } from '@opensip-cli/core';
 import {
   generateDashboardHtml,
   type DashboardInput as HtmlReportInput,
@@ -54,8 +54,11 @@ import type { DataStore } from '@opensip-cli/datastore';
 async function composeReportInput(): Promise<HtmlReportInput> {
   const scope = currentScope();
   if (!scope) {
-    throw new Error(
+    // Use a typed error with code so the top-level handler + --json paths
+    // produce a clean, consistent failure instead of a raw Error.
+    throw new SystemError(
       'report composition requires an entered RunScope (run inside a CLI action body).',
+      { code: 'SYSTEM.SCOPE.NOT_ENTERED' },
     );
   }
 

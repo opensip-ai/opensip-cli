@@ -1,8 +1,14 @@
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
+import { preResolveAllTargets, resolveTargets } from '../resolve.js';
 import { TargetRegistry } from '../target-registry.js';
 
 import type { Target } from '@opensip-cli/config';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Substrate registry tests — the GENERIC surface only (register/get/byTag/has/
@@ -70,5 +76,69 @@ describe('TargetRegistry (substrate)', () => {
     reg.clear();
     expect(reg.size).toBe(0);
     expect(reg.getAll()).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-path parity: resolveTargets (per-call) vs preResolveAllTargets (optimized)
+// must produce identical file sets for the same (targets, root, globals).
+// This is the mechanical fix for the audit finding that the two globs+filter
+// implementations could drift on excludes, dotfiles, inside-root guards, etc.
+// We use the real source tree under packages/targeting/src as a stable, checked-in
+// set of files so the test has no tempdir or fixture-copy requirements.
+// ---------------------------------------------------------------------------
+
+function makeTarget(name: string, include: string[], exclude: string[] = []): Target {
+  return {
+    config: {
+      name,
+      description: name,
+      include,
+      exclude,
+    },
+  };
+}
+
+describe('target resolution path parity (resolveTargets vs preResolveAllTargets)', () => {
+  const rootDir = join(__dirname, '..'); // packages/targeting/src — stable files exist
+
+  it('produces identical results for identical single-target config (no excludes)', () => {
+    const reg = new TargetRegistry();
+    reg.register(makeTarget('src', ['*.ts']));
+    const globals: string[] = [];
+
+    const pre = preResolveAllTargets(reg, globals, rootDir);
+    const direct = resolveTargets(reg.getAll(), rootDir, globals);
+
+    const preForT = pre.get('src') ?? [];
+    // direct returns the flat union for the targets passed; for single it must match
+    expect(preForT.sort()).toEqual(direct.sort());
+  });
+
+  it('produces identical results when a target has its own excludes + project globals', () => {
+    const reg = new TargetRegistry();
+    // Target that deliberately excludes test files; also a global exclude for node_modules (though none here)
+    reg.register(makeTarget('all-ts', ['**/*.ts'], ['**/__tests__/**']));
+    const globals = ['**/node_modules/**'];
+
+    const pre = preResolveAllTargets(reg, globals, rootDir);
+    const directForAll = resolveTargets([reg.getByName('all-ts')!], rootDir, globals);
+
+    expect((pre.get('all-ts') ?? []).sort()).toEqual(directForAll.sort());
+  });
+
+  it('produces identical results for two targets sharing a pattern but with different per-target excludes', () => {
+    const reg = new TargetRegistry();
+    reg.register(makeTarget('no-tests', ['**/*.ts'], ['**/__tests__/**']));
+    reg.register(makeTarget('only-tests', ['**/*.ts'], ['!**/__tests__/**'])); // inverted intent via exclude of non-tests
+    // Note: the second will be almost empty because its exclude removes the non-test files.
+    const globals: string[] = [];
+
+    const pre = preResolveAllTargets(reg, globals, rootDir);
+    const directNoTests = resolveTargets([reg.getByName('no-tests')!], rootDir, globals);
+    const directOnlyTests = resolveTargets([reg.getByName('only-tests')!], rootDir, globals);
+
+    expect((pre.get('no-tests') ?? []).sort()).toEqual(directNoTests.sort());
+    expect((pre.get('only-tests') ?? []).sort()).toEqual(directOnlyTests.sort());
   });
 });

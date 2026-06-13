@@ -77,6 +77,10 @@ export async function executeClear(opts: ClearOptions): Promise<ClearDoneResult>
 
   let deletedCount: number;
   if (opts.olderThan !== undefined && opts.olderThan > 0) {
+    // Wall-time cutoff (N calendar-ish days ago by ms). Not sensitive to
+    // local date boundaries or DST; sessions are purged if their stored
+    // timestamp is older than (now - N*24h). This matches the user-facing
+    // "older than X days" language in the prompt.
     const cutoff = new Date(Date.now() - opts.olderThan * 24 * 60 * 60 * 1000);
     deletedCount = repo.purge(cutoff);
   } else {
