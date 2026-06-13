@@ -123,6 +123,8 @@ interface StoredSession {
 
 The old per-check / per-finding columns (`session_checks`, `session_findings`) are gone — that detail now rides inside `payload` (checks, findings, summaries, etc. for `fit`; whatever shape each tool defines). `contracts` treats `payload` as `unknown`; the dashboard, as presentation owner, reads and renders it — the same producer/consumer split used for `GraphCatalog`.
 
+Tool payloads follow a documented inner `__version` convention for evolution (see `StoredSession` JSDoc in contracts, the per-tool `build*SessionPayload` implementations, and `ToolStateRepo` JSDoc). Legacy rows are projected with `fidelity: 'projection'`. See the payload-schema-evolution plan and ADR-0050.
+
 The session is written via [`SessionRepo.save()`](https://github.com/opensip-ai/opensip-cli/blob/v1.0.0/packages/session-store/src/session-repo.ts) inside a single transaction (the `sessions` row plus, when `payload` is present, one `session_tool_payload` row), so even a run that crashes mid-render leaves a complete or no record — never a partial one.
 
 ### The `sessions` command
