@@ -70,61 +70,37 @@ import { resetTelemetryStartedForTest } from './telemetry/sdk-init.js';
 import type { CommandResult, SignalEnvelope } from '@opensip-cli/contracts';
 
 // ---------------------------------------------------------------------------
-// Per-invocation runtime context.
+// Minimal bootstrap handoff context (Phase 3 of host-planes-scope-seams-hygiene).
 //
-// The registries and admitted plugin metadata are constructed in `main()` and
-// need to be visible to pre-action-hook (which builds the scope). They CAN'T
-// live on the entered scope because they're needed BEFORE the scope is built.
-//
-// The `runScope` holder mirrors the entered AsyncLocalStorage scope.
-// It's strictly redundant with `currentScope()` for tools (which always
-// read via ALS), but the CLI's non-action paths — `maybeOpenReport`,
-// the host `sessions` command — call `getCurrentProjectRoot()` /
-// `getOrOpenDatastore()` from outside the ALS-tracked async chain in
-// rare cases (post-action handlers, error printers). The holder lets
-// those callers reach the scope without each one having to thread
-// `cli` through every signature.
+// Registries + manifests/provenance are created in `main()` *before* the pre-action
+// hook can construct+enter the RunScope, so a tiny process-scoped handoff bag carries
+// them to the hook. After the hook calls enterScope(), *all* per-run state
+// (project, datastore thunk, diagnostics, etc.) is read exclusively via currentScope()
+// (ALS). The old general "pre-scope holder + scopeEntered guard + runScope mirror"
+// has been removed from production paths.
 // ---------------------------------------------------------------------------
 
 interface CliRuntimeContext {
   readonly languages?: LanguageRegistry;
   readonly tools?: ToolRegistry;
-  readonly runScope?: RunScope;
   readonly toolProvenance: readonly ToolProvenance[];
   readonly toolManifests: readonly ToolPluginManifest[];
 }
 
-// Not a request context: the CLI is one run per process. This module-level holder
-// carries pre-scope CLI runtime state (registries, provenance, manifests) for the
-// non-action paths that cannot reach AsyncLocalStorage (post-action callbacks,
-// error printers); it is fully reset per invocation by setCliRuntimeContextForRun,
-// so nothing leaks between runs.
-// @fitness-ignore-next-line context-leakage -- single-process CLI holder, reset per run (see above)
+// Bootstrap handoff holder (minimal, production use only for registries/manifests/provenance
+// created in main() before the pre-action hook runs and can build/enter the RunScope).
+// Per-run *state* (scope, project, datastore thunk, etc.) MUST come from currentScope() after
+// enterScope (ALS). This tiny holder is *not* a general pre-scope state bag; after Phase 3 of
+// host-planes-scope-seams-hygiene it is used solely for the one-time bootstrap handoff of the
+// Language/Tool registries and manifests. Test helpers retain a narrow surface.
+// @fitness-ignore-next-line context-leakage -- single-process bootstrap handoff, reset per run.
 let currentRuntimeContext: CliRuntimeContext = {
   toolProvenance: [],
   toolManifests: [],
 };
 
-/**
- * Guard for the runtime holder fallback path.
- * Set true by the pre-action hook after a proper `enterScope` + `setCurrentRunScope`.
- * Used to make misuse of the holder (before scope is entered) a hard failure
- * rather than a confusing bootstrap error.
- */
-let scopeEntered = false;
-
 function updateRuntimeContext(patch: Partial<CliRuntimeContext>): void {
   currentRuntimeContext = { ...currentRuntimeContext, ...patch };
-}
-
-/** Mark that the scope has been properly entered (called from pre-action hook). */
-export function markScopeEntered(): void {
-  scopeEntered = true;
-}
-
-/** Reset for test harnesses and new invocations (called on context setup). */
-export function resetScopeEnteredForTest(): void {
-  scopeEntered = false;
 }
 
 export function setCliRuntimeContextForRun(opts: {
@@ -133,7 +109,6 @@ export function setCliRuntimeContextForRun(opts: {
   readonly toolProvenance?: readonly ToolProvenance[];
   readonly toolManifests?: readonly ToolPluginManifest[];
 }): void {
-  scopeEntered = false; // reset for new invocation
   resetInitializedToolIdsForTest();
   resetTelemetryStartedForTest();
   currentRuntimeContext = {
@@ -145,25 +120,44 @@ export function setCliRuntimeContextForRun(opts: {
 }
 
 /**
- * Back-compat helper for isolated tests that set only the registries. `main()`
- * uses `setCliRuntimeContextForRun` so all pre-scope CLI runtime state is
- * installed as one cohesive value.
+ * Back-compat / test-only helper. Kept for isolated tests; production code never uses the
+ * pre-scope holder for per-run state after hygiene Phase 3.
  */
 export function setCliRegistriesForRun(opts: {
   readonly languages: LanguageRegistry;
   readonly tools: ToolRegistry;
 }): void {
-  scopeEntered = false;
+  if (process.env.NODE_ENV !== 'test') {
+    throw new SystemError(
+      'Direct use of pre-scope registry setter outside tests is forbidden. ' +
+        'Registries are handed to the per-run scope at construction time.',
+      { code: 'SYSTEM.SCOPE.HOLDER_MISUSE' }
+    );
+  }
   resetInitializedToolIdsForTest();
   resetTelemetryStartedForTest();
   updateRuntimeContext({ languages: opts.languages, tools: opts.tools });
 }
 
+/** Test-only no-op retained so legacy holder tests in cli-context.test.ts compile during transition. */
+export function markScopeEntered(): void {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new SystemError(
+      'markScopeEntered is test-only after Phase 3 (pre-scope holder removal). Production uses enterScope + currentScope() only.',
+      { code: 'SYSTEM.SCOPE.HOLDER_MISUSE' }
+    );
+  }
+}
+
+/** Test-only reset retained for transition. */
+export function resetScopeEnteredForTest(): void {
+  // noop in Phase 3+
+}
+
 /**
- * Read the per-run registries set by `setCliRuntimeContextForRun`. Throws when
- * the registries have not been set — that indicates a bootstrap ordering bug
- * (the CLI composition root must install its runtime context before any
- * preAction hook fires).
+ * Read the per-run registries installed by `setCliRuntimeContextForRun` (bootstrap handoff only).
+ * Used by pre-action-hook to construct the RunScope before enterScope. After enter, all
+ * production code reads registries via currentScope().languages / .tools (see RunScope).
  */
 export function getCurrentRegistriesForScope(): {
   readonly languages: LanguageRegistry;
@@ -213,37 +207,28 @@ export function getToolManifestsForRun(): readonly ToolPluginManifest[] {
 }
 
 /**
- * Called by pre-action-hook AFTER `enterScope(scope)` so the constructed
- * scope is mirrored on a per-run holder.
- *
- * Tools always read via `currentScope()` (ALS).
- * The holder exists **only** for non-action paths that can't reach ALS
- * (post-action callbacks, error printers, `maybeOpenReport`, certain host commands).
- *
- * Contract: caller **must** also call `markScopeEntered()` immediately after
- * this (see pre-action-hook). Using the holder before the scope is properly
- * entered now throws a hard `SCOPE_HOLDER_MISUSE` error.
+ * (Deprecated internal) No longer mirrors scope to holder. Scope is entered via ALS only.
+ * Kept as no-op stub during Phase 3 transition so old call sites in the same package do not
+ * explode; will be removed after callers are cleaned.
  */
-export function setCurrentRunScope(scope: RunScope): void {
-  updateRuntimeContext({ runScope: scope });
+export function setCurrentRunScope(_scope: RunScope): void {
+  // noop after Phase 3 (holder removal). Scope lives only in ALS via enterScope/runWithScope.
 }
 
+/**
+ * Strict reader: after Phase 3 hygiene, the only way to obtain the per-run scope is
+ * currentScope() (entered by pre-action-hook or explicit runWithScope in tests).
+ * All previous holder fallbacks removed. Non-action paths (report, errors) that need
+ * scope must ensure entry or restructure to occur inside an entered action.
+ */
 function readScope(): RunScope {
-  const bound = currentScope() ?? currentRuntimeContext.runScope;
+  const bound = currentScope();
   if (!bound) {
     throw new SystemError(
-      'CLI scope accessed before pre-action-hook constructed it. ' +
-        'This indicates a bootstrap-order bug — tools and CLI commands must access ' +
-        'cli.scope / getCurrentProjectRoot() / getOrOpenDatastore() only inside an ' +
-        'action body.',
-      { code: 'SYSTEM.BOOTSTRAP.SCOPE_UNSET' },
-    );
-  }
-  if (!currentScope() && !scopeEntered) {
-    throw new SystemError(
-      'Non-action path accessed the runtime scope holder before the scope was properly entered. ' +
-        'This indicates a bootstrap ordering bug or misuse of holder paths (e.g. calling getCurrentProjectRoot outside an action body before preAction).',
-      { code: 'SYSTEM.BOOTSTRAP.SCOPE_HOLDER_MISUSE' },
+      'CLI scope accessed before pre-action-hook constructed and entered it (enterScope + ALS). ' +
+        'All production paths (tool actions, host commands, report/error seams) must run inside ' +
+        'an entered RunScope. See host-planes-scope-seams-hygiene plan Phase 3 and currentScope().',
+      { code: 'SYSTEM.SCOPE.NOT_ENTERED' },
     );
   }
   return bound;
@@ -384,12 +369,10 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
 
   const ctx: ToolCliContext = {
     get scope(): RunScope {
-      // The pre-action-hook constructs a RunScope and calls `enterScope`
-      // (AsyncLocalStorage.enterWith) so the scope is bound for the
-      // entire dynamic extent of the action body. `cli.scope` returns
-      // that entered scope so tools and `currentScope()` readers agree
-      // on identity. `readScope` falls back to `currentRunScope` for
-      // non-action paths that can't reach ALS.
+      // The pre-action-hook (or explicit runWithScope in tests) enters the
+      // RunScope via AsyncLocalStorage before the action body or any reader runs.
+      // `cli.scope` (and currentScope()) surface the identical entered scope.
+      // After Phase 3, readScope() no longer has holder fallbacks.
       return readScope();
     },
     render: (result) => opts.render(result as CommandResult),

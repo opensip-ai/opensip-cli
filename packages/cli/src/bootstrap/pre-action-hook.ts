@@ -31,11 +31,13 @@ import { existsSync } from 'node:fs';
 
 import {
   configureLogger,
+  currentScope,
   enterScope,
   generatePrefixedId,
   logger,
   resolveProjectContext,
   resolveProjectPaths,
+  SystemError,
   type ProjectContext,
   type Tool,
   type ToolRegistry,
@@ -44,8 +46,6 @@ import {
 import {
   getCurrentRegistriesForScope,
   getToolManifestsForRun,
-  setCurrentRunScope,
-  markScopeEntered,
 } from '../cli-context.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
@@ -276,8 +276,15 @@ export function installPreActionHook(program: Command, version: string): void {
     });
 
     enterScope(scope);
-    setCurrentRunScope(scope);
-    markScopeEntered(); // enables the narrowed holder guard in cli-context
+
+    // Phase 3 hygiene: scope entry via ALS (enterScope) is now the single source of truth
+    // for per-run state. No holder mirror or mark dance. All subsequent readers (including
+    // host command bodies) must see a valid currentScope().
+    if (!currentScope()) {
+      throw new SystemError('Scope was not entered before command dispatch', {
+        code: 'SYSTEM.SCOPE.NOT_ENTERED',
+      });
+    }
 
     // Lifecycle diagnostics (§5.10): record plugin-load + config-validate facts on
     // the per-run bus now that the scope is bound. These pre-handler events ride on

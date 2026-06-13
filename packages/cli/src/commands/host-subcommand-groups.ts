@@ -136,7 +136,6 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
       const ref = opts._args[0];
       const filters = Array.isArray(opts.filter) ? opts.filter : opts.filter ? [opts.filter] : undefined;
       await executeSessionShow({
-        datastore: ctx.datastore() as DataStore,
         replayRegistry: ctx.sessionReplayRegistry,
         ref,
         tool: opts.tool,

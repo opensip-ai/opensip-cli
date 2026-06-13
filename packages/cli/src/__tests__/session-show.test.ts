@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { executeSessionShow } from '../commands/session-show.js';
 import { SessionReplayRegistry } from '../session-replay-registry.js';
+import { makeTestScope, withScope } from '@opensip-cli/test-support';
 
 import type {
   CommandResult,
@@ -127,17 +128,19 @@ describe('executeSessionShow', () => {
     repo.save(makeSession('FIT_2', Date.now() + 1));
     const s = makeSinks();
 
-    await executeSessionShow({
-      datastore: ds,
-      replayRegistry: makeReplayRegistry(),
-      ref: 'latest',
-      tool: 'fit',
-      json: true,
-      render: s.render,
-      emitJson: s.emitJson,
-      emitError: s.emitError,
-      setExitCode: s.setExitCode,
-    });
+    const scope = makeTestScope({ datastore: () => ds });
+    await withScope(scope, () =>
+      executeSessionShow({
+        replayRegistry: makeReplayRegistry(),
+        ref: 'latest',
+        tool: 'fit',
+        json: true,
+        render: s.render,
+        emitJson: s.emitJson,
+        emitError: s.emitError,
+        setExitCode: s.setExitCode,
+      })
+    );
 
     expect(s.emitted).toHaveLength(1);
     expect(s.emitted[0]).toMatchObject({
@@ -150,16 +153,18 @@ describe('executeSessionShow', () => {
   it('reports ambiguous latest without a tool as a structured error', async () => {
     const s = makeSinks();
 
-    await executeSessionShow({
-      datastore: ds,
-      replayRegistry: makeReplayRegistry(),
-      ref: 'latest',
-      json: true,
-      render: s.render,
-      emitJson: s.emitJson,
-      emitError: s.emitError,
-      setExitCode: s.setExitCode,
-    });
+    const scope = makeTestScope({ datastore: () => ds });
+    await withScope(scope, () =>
+      executeSessionShow({
+        replayRegistry: makeReplayRegistry(),
+        ref: 'latest',
+        json: true,
+        render: s.render,
+        emitJson: s.emitJson,
+        emitError: s.emitError,
+        setExitCode: s.setExitCode,
+      })
+    );
 
     expect(s.exitCodes).toContain(2);
     expect(s.errors[0]).toEqual({
@@ -174,15 +179,17 @@ describe('executeSessionShow', () => {
     repo.save(makeSession('FIT_1'));
     const s = makeSinks();
 
-    await executeSessionShow({
-      datastore: ds,
-      replayRegistry: makeReplayRegistry(),
-      ref: 'FIT_1',
-      render: s.render,
-      emitJson: s.emitJson,
-      emitError: s.emitError,
-      setExitCode: s.setExitCode,
-    });
+    const scope = makeTestScope({ datastore: () => ds });
+    await withScope(scope, () =>
+      executeSessionShow({
+        replayRegistry: makeReplayRegistry(),
+        ref: 'FIT_1',
+        render: s.render,
+        emitJson: s.emitJson,
+        emitError: s.emitError,
+        setExitCode: s.setExitCode,
+      })
+    );
 
     expect(s.rendered).toHaveLength(1);
     // Renders through the unified, envelope-driven session-replay view (not the
@@ -200,15 +207,17 @@ describe('executeSessionShow', () => {
     repo.save(makeSession('FIT_R', Date.now(), { recipe: 'example' }));
     const s = makeSinks();
 
-    await executeSessionShow({
-      datastore: ds,
-      replayRegistry: makeReplayRegistry(),
-      ref: 'FIT_R',
-      render: s.render,
-      emitJson: s.emitJson,
-      emitError: s.emitError,
-      setExitCode: s.setExitCode,
-    });
+    const scope = makeTestScope({ datastore: () => ds });
+    await withScope(scope, () =>
+      executeSessionShow({
+        replayRegistry: makeReplayRegistry(),
+        ref: 'FIT_R',
+        render: s.render,
+        emitJson: s.emitJson,
+        emitError: s.emitError,
+        setExitCode: s.setExitCode,
+      })
+    );
 
     expect(s.rendered[0]).toMatchObject({ type: 'session-replay', session: { recipe: 'example' } });
   });
@@ -216,15 +225,17 @@ describe('executeSessionShow', () => {
   it('renders a structured error result when the session cannot be found (non-JSON)', async () => {
     const s = makeSinks();
 
-    await executeSessionShow({
-      datastore: ds,
-      replayRegistry: makeReplayRegistry(),
-      ref: 'NOPE',
-      render: s.render,
-      emitJson: s.emitJson,
-      emitError: s.emitError,
-      setExitCode: s.setExitCode,
-    });
+    const scope = makeTestScope({ datastore: () => ds });
+    await withScope(scope, () =>
+      executeSessionShow({
+        replayRegistry: makeReplayRegistry(),
+        ref: 'NOPE',
+        render: s.render,
+        emitJson: s.emitJson,
+        emitError: s.emitError,
+        setExitCode: s.setExitCode,
+      })
+    );
 
     expect(s.exitCodes).toContain(2);
     expect(s.rendered[0]).toMatchObject({ type: 'error' });
@@ -247,16 +258,18 @@ describe('executeSessionShow', () => {
     } satisfies Tool);
     const s = makeSinks();
 
-    await executeSessionShow({
-      datastore: ds,
-      replayRegistry: SessionReplayRegistry.fromTools(registry),
-      ref: 'FIT_1',
-      json: true,
-      render: s.render,
-      emitJson: s.emitJson,
-      emitError: s.emitError,
-      setExitCode: s.setExitCode,
-    });
+    const scope = makeTestScope({ datastore: () => ds });
+    await withScope(scope, () =>
+      executeSessionShow({
+        replayRegistry: SessionReplayRegistry.fromTools(registry),
+        ref: 'FIT_1',
+        json: true,
+        render: s.render,
+        emitJson: s.emitJson,
+        emitError: s.emitError,
+        setExitCode: s.setExitCode,
+      })
+    );
 
     expect(s.errors[0]).toEqual({ message: 'corrupt payload', exitCode: 2, code: 'decode-error' });
   });
@@ -266,16 +279,18 @@ describe('executeSessionShow', () => {
     repo.save(makeSession('FIT_1'));
     const s = makeSinks();
 
-    await executeSessionShow({
-      datastore: ds,
-      replayRegistry: SessionReplayRegistry.empty(),
-      ref: 'FIT_1',
-      json: true,
-      render: s.render,
-      emitJson: s.emitJson,
-      emitError: s.emitError,
-      setExitCode: s.setExitCode,
-    });
+    const scope = makeTestScope({ datastore: () => ds });
+    await withScope(scope, () =>
+      executeSessionShow({
+        replayRegistry: SessionReplayRegistry.empty(),
+        ref: 'FIT_1',
+        json: true,
+        render: s.render,
+        emitJson: s.emitJson,
+        emitError: s.emitError,
+        setExitCode: s.setExitCode,
+      })
+    );
 
     expect(s.errors[0]).toMatchObject({ code: 'replay-unavailable' });
   });
@@ -286,15 +301,17 @@ describe('executeSessionShow', () => {
     const s = makeSinks();
 
     // replayRegistry omitted entirely → the `?? empty()` fallback path.
-    await executeSessionShow({
-      datastore: ds,
-      ref: 'FIT_1',
-      json: true,
-      render: s.render,
-      emitJson: s.emitJson,
-      emitError: s.emitError,
-      setExitCode: s.setExitCode,
-    });
+    const scope = makeTestScope({ datastore: () => ds });
+    await withScope(scope, () =>
+      executeSessionShow({
+        ref: 'FIT_1',
+        json: true,
+        render: s.render,
+        emitJson: s.emitJson,
+        emitError: s.emitError,
+        setExitCode: s.setExitCode,
+      })
+    );
 
     expect(s.errors[0]).toMatchObject({ code: 'replay-unavailable' });
   });
@@ -316,16 +333,18 @@ describe('executeSessionShow', () => {
     } satisfies Tool);
     const s = makeSinks();
 
-    await executeSessionShow({
-      datastore: ds,
-      replayRegistry: SessionReplayRegistry.fromTools(registry),
-      ref: 'FIT_1',
-      json: true,
-      render: s.render,
-      emitJson: s.emitJson,
-      emitError: s.emitError,
-      setExitCode: s.setExitCode,
-    });
+    const scope = makeTestScope({ datastore: () => ds });
+    await withScope(scope, () =>
+      executeSessionShow({
+        replayRegistry: SessionReplayRegistry.fromTools(registry),
+        ref: 'FIT_1',
+        json: true,
+        render: s.render,
+        emitJson: s.emitJson,
+        emitError: s.emitError,
+        setExitCode: s.setExitCode,
+      })
+    );
 
     expect(s.errors[0]).toEqual({ message: 'boom-string', exitCode: 2, code: 'decode-error' });
   });
