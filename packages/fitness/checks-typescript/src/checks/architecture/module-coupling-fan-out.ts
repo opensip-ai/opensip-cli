@@ -72,7 +72,7 @@ function isBarrelFile(content: string): boolean {
 }
 
 export const moduleCouplingFanOut = defineCheck({
-  id: '4c2e1a8b-9f7d-4e3a-8b6c-1d0f2a3b4c5e',
+  id: 'c0b7289b-984c-4f39-b2be-7d9b0692abec',
   slug: 'module-coupling-fan-out',
   description: 'Flags files with high outbound import fan-out (god-files)',
   longDescription:

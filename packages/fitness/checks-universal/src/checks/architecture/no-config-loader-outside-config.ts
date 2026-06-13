@@ -134,7 +134,7 @@ export async function analyzeAllNoConfigLoaderOutsideConfig(
 }
 
 export const noConfigLoaderOutsideConfig = defineCheck({
-  id: 'b1e7c2a0-4d6f-4a8b-9c3e-1f2a3b4c5d6e',
+  id: '1e8a6367-e2f2-4acf-ac85-a85bb0e46955',
   slug: 'no-config-loader-outside-config',
   description:
     'A tool-agnostic config block (cli/targets/globalExcludes/checkOverrides/dashboard) must be parsed only in @opensip-cli/config, not hand-rolled elsewhere (ADR-0023)',

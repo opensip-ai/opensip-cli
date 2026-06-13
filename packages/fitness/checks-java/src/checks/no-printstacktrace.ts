@@ -40,7 +40,7 @@ export function analyzePrintStackTrace(content: string): CheckViolation[] {
 }
 
 export const noPrintStackTrace = defineCheck({
-  id: 'c1d2e3f4-9876-4321-cccc-300000000001',
+  id: '269ee25e-926d-4b0d-b105-ebd1019d1242',
   slug: 'java-no-print-stack-trace',
   description: 'e.printStackTrace() bypasses the logging framework — use a logger instead',
   scope: { languages: ['java'], concerns: [] },

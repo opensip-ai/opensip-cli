@@ -33,7 +33,7 @@ function isArtifactInSource(filePath: string): { ext: string } | null {
 }
 
 export const staleBuildArtifacts = defineCheck({
-  id: 'a8d3c1f2-4b5e-6a7d-8c9e-0f1a2b3c4d5e',
+  id: '8d36209b-5aeb-4ab0-8255-3134a20fdfd5',
   slug: 'stale-build-artifacts',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   confidence: 'high',

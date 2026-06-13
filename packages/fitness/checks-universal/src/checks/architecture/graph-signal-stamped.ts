@@ -70,7 +70,7 @@ export function analyzeGraphSignalStamped(content: string): CheckViolation[] {
 }
 
 export const graphSignalStamped = defineCheck({
-  id: 'b9572b0b-8693-4723-aaaa-9221105e4ebc',
+  id: 'a09a09f6-13c1-4988-9275-aec0ef3572e5',
   slug: 'graph-signal-stamped',
   description:
     'Graph rules must stamp identity via createGraphSignal, not hand-assemble source/ruleId/severity (§5.9)',

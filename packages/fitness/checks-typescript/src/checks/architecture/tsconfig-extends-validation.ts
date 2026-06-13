@@ -15,7 +15,7 @@ import { dirname, resolve } from 'node:path';
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 export const tsconfigExtendsValidation = defineCheck({
-  id: 'c7e2d4a1-5f8b-4c3e-9d1a-6b0f7e8a2c4d',
+  id: '842e7d00-c8e8-4a57-873a-c03caec7e603',
   slug: 'tsconfig-extends-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   confidence: 'high',

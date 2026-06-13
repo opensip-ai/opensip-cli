@@ -39,7 +39,7 @@ export function analyzeFileLength(content: string): CheckViolation[] {
 }
 
 export const fileLengthLimit = defineCheck({
-  id: 'a1b2c3d4-9876-4321-aaaa-100000000002',
+  id: 'fc8b5ec9-d020-4e76-b16f-f5f73ce9d21e',
   slug: 'file-length-limit',
   description: `Files longer than ${HARD_LIMIT} lines hint at insufficient module decomposition`,
   scope: { languages: [], concerns: [] },

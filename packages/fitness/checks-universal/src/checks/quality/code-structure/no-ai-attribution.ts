@@ -28,7 +28,7 @@ const VIOLATION_MESSAGE = `AI-attribution comment found. ${FIX_MESSAGE}`;
  * Detects AI-attribution metadata in comments.
  */
 export const noAiAttribution = defineRegexListCheck({
-  id: '5b9e7c8a-4f12-4c5d-93f1-1e2a3b4c5d6e',
+  id: '4281da0e-2af1-447b-8a25-1da675f41f56',
   slug: 'no-ai-attribution',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   contentFilter: 'raw',
@@ -51,7 +51,7 @@ export const noAiAttribution = defineRegexListCheck({
   },
   patterns: [
     {
-      id: '7a0b1c2d-3e4f-5061-7283-94a5b6c7d8e9',
+      id: '97fb9199-8a84-448e-9f6b-06eb468f63e9',
       slug: 'ai-generated-by-single',
       regex:
         /\/\/[^/]{0,200}\b(?:generated|created|written|assisted)\s{1,5}by\s{1,5}(?:ai|chatgpt|claude|copilot|gpt|llm|openai|anthropic|gemini|bard)\b/i,
@@ -60,7 +60,7 @@ export const noAiAttribution = defineRegexListCheck({
       suggestion: FIX_MESSAGE,
     },
     {
-      id: '8b1c2d3e-4f50-6172-8394-a5b6c7d8e9f0',
+      id: '8ebd2f1a-d146-4906-ac36-921e28d5847f',
       slug: 'ai-tool-action-single',
       regex:
         /\/\/[^/]{0,200}\b(?:ai|chatgpt|claude|copilot|gpt|llm)\s{1,5}(?:generated|created|wrote|suggested|assisted)\b/i,
@@ -69,7 +69,7 @@ export const noAiAttribution = defineRegexListCheck({
       suggestion: FIX_MESSAGE,
     },
     {
-      id: '9c2d3e4f-5061-7283-94a5-b6c7d8e9f0a1',
+      id: 'f1d68629-f299-4ee7-94ed-89cc246c57ba',
       slug: 'ai-generated-by-block',
       regex:
         /\/\*{1,5}[^*]{0,200}\b(?:generated|created|written|assisted)\s{1,5}by\s{1,5}(?:ai|chatgpt|claude|copilot|gpt|llm|openai|anthropic|gemini|bard)\b/i,

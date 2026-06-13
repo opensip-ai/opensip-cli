@@ -87,7 +87,7 @@ export function parseClangTidyOutput(
 }
 
 export const clangTidyPassthrough = defineCheck({
-  id: 'e1f2a3b4-9876-4321-eeee-500000000001',
+  id: 'e9769a00-b576-44a6-b73a-b340c597bc86',
   slug: 'cpp-clang-tidy',
   description: 'Run clang-tidy and surface its diagnostics as opensip-cli violations',
   scope: { languages: ['cpp'], concerns: [] },

@@ -48,7 +48,7 @@ const EXCESSIVE_NAMED_IMPORT_THRESHOLD = 15;
 const NAMED_IMPORT_PATTERN = /import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/;
 
 export const heavyImportDetection = defineCheck({
-  id: 'f3a4b5c6-d7e8-9f0a-1b2c-3d4e5f6a7b8c',
+  id: 'ebd495d1-ae48-478d-a1cc-4823a18cada6',
   slug: 'heavy-import-detection',
   scope: { languages: ['typescript', 'javascript'], concerns: ['backend', 'frontend'] },
   confidence: 'high',

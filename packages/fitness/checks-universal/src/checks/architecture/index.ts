@@ -16,6 +16,7 @@ export * from './no-config-loader-outside-config.js';
 export * from './no-custom-event-emitter.js';
 export * from './no-direct-stdout-in-tool-engine.js';
 export * from './no-module-singleton.js';
+export * from './no-placeholder-check-ids.js';
 export * from './only-documented-toolcli-seams.js';
 export * from './node-version-consistency.js';
 export * from './one-config-document.js';

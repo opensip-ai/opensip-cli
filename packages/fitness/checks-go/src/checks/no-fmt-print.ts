@@ -41,7 +41,7 @@ export function analyzeFmtPrint(content: string): CheckViolation[] {
 }
 
 export const noFmtPrint = defineCheck({
-  id: 'd1e2f3a4-9876-4321-dddd-400000000001',
+  id: '438e1324-0a85-4c21-a405-79bb12cfcf6e',
   slug: 'go-no-fmt-print',
   description: "fmt.Print/Println/Printf bypass the structured logger and shouldn't ship",
   scope: { languages: ['go'], concerns: [] },

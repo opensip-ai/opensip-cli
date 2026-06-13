@@ -55,7 +55,7 @@ export function analyzeFunctionTooLong(content: string, filePath: string): Check
 }
 
 export const pythonFunctionTooLong = defineCheck({
-  id: 'a7f3c1d2-4b5e-4c6a-9d8e-300000000002',
+  id: '2063a0cb-a1be-47da-b947-9f938ef485b9',
   slug: 'python-function-too-long',
   description: 'Python functions should stay under a line budget for readability and testability',
   scope: { languages: ['python'], concerns: [] },

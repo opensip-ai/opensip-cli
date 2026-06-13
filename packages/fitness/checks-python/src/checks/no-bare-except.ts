@@ -41,7 +41,7 @@ export function analyzeBareExcept(content: string): CheckViolation[] {
 }
 
 export const noBareExcept = defineCheck({
-  id: 'b1c2d3e4-9876-4321-bbbb-200000000001',
+  id: '1e273f06-7960-462d-b88c-dc9169f78cf8',
   slug: 'python-no-bare-except',
   description: 'Bare except clauses catch system-exiting exceptions like KeyboardInterrupt',
   scope: { languages: ['python'], concerns: [] },

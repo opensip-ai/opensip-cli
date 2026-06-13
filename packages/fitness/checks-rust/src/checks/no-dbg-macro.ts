@@ -42,7 +42,7 @@ export function analyzeDbgMacro(content: string): CheckViolation[] {
 }
 
 export const noDbgMacro = defineCheck({
-  id: 'e2f3a4b5-1234-4321-eeee-500000000001',
+  id: '1df601d7-ee5c-4ac2-8bd6-3a50b358e700',
   slug: 'rust-no-dbg-macro',
   description: "dbg!() is a debug-only macro and shouldn't ship",
   scope: { languages: ['rust'], concerns: [] },

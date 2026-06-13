@@ -42,7 +42,7 @@ export function analyzeTodoComments(content: string): CheckViolation[] {
 }
 
 export const noTodoComments = defineCheck({
-  id: 'a1b2c3d4-9876-4321-aaaa-100000000001',
+  id: '842e7d00-c8e8-4a57-873a-c03caec7e603',
   slug: 'no-todo-comments',
   description: 'TODO/FIXME/XXX/OPTIMIZE markers should not ship to production',
   scope: { languages: [], concerns: [] },

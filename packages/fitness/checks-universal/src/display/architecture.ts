@@ -26,6 +26,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'no-config-loader-outside-config': ['🔐', 'No Config Loader Outside Config'],
   'no-duplicate-packages': ['📦', 'No Duplicate Packages'],
   'no-module-singleton': ['🔒', 'No Module Singleton'],
+  'no-placeholder-check-ids': ['🚫', 'No Placeholder Check IDs'],
   'node-version-consistency': ['📦', 'Node Version Consistency'],
   'one-config-document': ['📄', 'One Config Document'],
   'one-outcome-shape': ['📦', 'One Outcome Shape'],

@@ -44,7 +44,7 @@ export const noEval = defineRegexListCheck({
   },
   patterns: [
     {
-      id: 'a48c7e1a-2acb-4be6-9f97-71f95dee9eef',
+      id: '1ea47b8c-18be-402b-ae19-8ac66a88d050',
       slug: 'eval-call',
       // Match only the global/bare `eval(` — NOT a member call `x.eval(`
       // (e.g. ioredis / Sequelize `redis.eval(luaScript, …)` is a Redis
@@ -58,7 +58,7 @@ export const noEval = defineRegexListCheck({
         'Replace eval() with safe alternatives: use JSON.parse() for JSON strings, use a proper expression parser for math, or restructure code to avoid dynamic evaluation entirely.',
     },
     {
-      id: 'b2c0d1aa-9d24-4d9c-8e22-2c2b78c2c021',
+      id: 'b7c3a2c2-0448-405f-86e3-8b5fca987bc7',
       slug: 'new-function',
       regex: /\bnew\s+Function\s*\(/,
       message: 'new Function() usage detected - avoid dynamic code generation',
@@ -67,7 +67,7 @@ export const noEval = defineRegexListCheck({
         'Replace new Function() with precompiled functions or safe alternatives. For templating, use a template engine. For dynamic behavior, use configuration objects or the strategy pattern.',
     },
     {
-      id: 'c3d1e2bb-ae34-4e0d-9f33-3d3c89d3d132',
+      id: 'a09a09f6-13c1-4988-9275-aec0ef3572e5',
       slug: 'set-timeout-string',
       regex: /setTimeout\s*\(\s*['"`][^'"`]+['"`]/,
       message: 'setTimeout with string argument detected - use function reference',
@@ -76,7 +76,7 @@ export const noEval = defineRegexListCheck({
         'Pass a function reference instead of a string: setTimeout(() => doSomething(), 1000) or setTimeout(doSomething, 1000). String arguments are evaluated like eval().',
     },
     {
-      id: 'd4e2f3cc-bf45-4f1e-a044-4e4d9ae4e243',
+      id: '9968cdec-1541-4522-ac02-e9eff56a5c2a',
       slug: 'set-interval-string',
       regex: /setInterval\s*\(\s*['"`][^'"`]+['"`]/,
       message: 'setInterval with string argument detected - use function reference',

@@ -49,7 +49,7 @@ export const noWindowAlert = defineRegexListCheck({
   },
   patterns: [
     {
-      id: 'aa11e90a-65b6-4e6c-9b62-9d3f0fae4b2a',
+      id: '7a0f6bc1-f4dd-4e55-9628-d797c877c6e0',
       slug: 'window-alert',
       regex: /window\.alert\s*\(/,
       message: 'window.alert() provides poor UX — replace with a proper UI component',
@@ -57,7 +57,7 @@ export const noWindowAlert = defineRegexListCheck({
       suggestion: 'Use a toast notification or modal dialog instead of window.alert()',
     },
     {
-      id: 'bb22e90a-65b6-4e6c-9b62-9d3f0fae4b2b',
+      id: '09a93ec8-7b08-47b2-946a-c635e135b67b',
       slug: 'window-confirm',
       regex: /window\.confirm\s*\(/,
       message: 'window.confirm() provides poor UX — replace with a proper UI component',
@@ -65,7 +65,7 @@ export const noWindowAlert = defineRegexListCheck({
       suggestion: 'Use a confirmation modal dialog instead of window.confirm()',
     },
     {
-      id: 'cc33e90a-65b6-4e6c-9b62-9d3f0fae4b2c',
+      id: 'e39edca8-ee4d-4de8-9a39-655f4d0eb86d',
       slug: 'window-prompt',
       regex: /window\.prompt\s*\(/,
       message: 'window.prompt() provides poor UX — replace with a proper UI component',

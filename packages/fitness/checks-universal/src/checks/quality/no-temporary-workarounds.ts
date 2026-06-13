@@ -28,7 +28,7 @@ function matchTemporaryWorkaround(line: string): boolean {
 }
 
 export const noTemporaryWorkarounds = defineCheck({
-  id: '6f9b3c2d-e4a5-4b6c-8d7e-8f9a0b1c2d3e',
+  id: '09a93ec8-7b08-47b2-946a-c635e135b67b',
   slug: 'no-temporary-workarounds',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   contentFilter: 'raw',

@@ -20,7 +20,7 @@ import {
 } from '@opensip-cli/fitness';
 
 export const circularImportDetection = defineCheck({
-  id: '7b3a9e1c-8d2f-4a5b-9c6d-0e1f2a3b4c5d',
+  id: 'fc8b5ec9-d020-4e76-b16f-f5f73ce9d21e',
   slug: 'circular-import-detection',
   description: 'Detects file-level circular import dependencies',
   longDescription:

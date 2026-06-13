@@ -17,7 +17,7 @@ import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cl
  * for documentation and discoverability.
  */
 export const projectReadmeExistence = defineCheck({
-  id: 'a7d3e1f2-8b4c-4d9e-af12-6c8b3d7e9f01',
+  id: 'b7c3a2c2-0448-405f-86e3-8b5fca987bc7',
   slug: 'project-readme-existence',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
 

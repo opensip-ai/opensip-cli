@@ -65,7 +65,7 @@ function matchesDeclaration(line: string, matcher: NameMatcher): boolean {
 }
 
 export const noCompatibilityLayerNames = defineCheck({
-  id: '5e8a2b1c-d3f4-4a5b-9c6d-7e8f9a0b1c2d',
+  id: 'e39edca8-ee4d-4de8-9a39-655f4d0eb86d',
   slug: 'no-compatibility-layer-names',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   contentFilter: 'raw',

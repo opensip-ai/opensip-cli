@@ -34,7 +34,7 @@ const DATE_FIX = 'Remove date stamp; git history tracks this information';
  * stamps, date stamps) in comments.
  */
 export const noProcessArtifacts = defineRegexListCheck({
-  id: '7c4d8e9f-2b3a-4d5e-89c1-2f3e4d5c6b7a',
+  id: '3aa07a17-4bde-4f17-9296-c035809bc938',
   slug: 'no-process-artifacts',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   contentFilter: 'raw',
@@ -64,7 +64,7 @@ export const noProcessArtifacts = defineRegexListCheck({
   },
   patterns: [
     {
-      id: 'a1b2c3d4-1111-4222-8333-444455556666',
+      id: '274c1f41-817d-4b88-be5e-7907435d92f0',
       slug: 'phase-artifact',
       regex: /\/\/\s{0,5}Phase\s{1,5}\d{1,3}\s{0,5}(?:Enhancement|Implementation|:|$)/i,
       message: `Process artifact comment found. ${PHASE_FIX}`,
@@ -72,7 +72,7 @@ export const noProcessArtifacts = defineRegexListCheck({
       suggestion: PHASE_FIX,
     },
     {
-      id: 'b2c3d4e5-2222-4333-8444-555566667777',
+      id: '0c6b412e-75e1-4a54-8642-ce9b27449568',
       slug: 'sprint-artifact',
       regex: /\/\/\s{0,5}Sprint\s{1,5}\d{1,5}\b/i,
       message: `Process artifact comment found. ${SPRINT_FIX}`,
@@ -80,7 +80,7 @@ export const noProcessArtifacts = defineRegexListCheck({
       suggestion: SPRINT_FIX,
     },
     {
-      id: 'c3d4e5f6-3333-4444-8555-666677778888',
+      id: '939c4391-e010-45db-90d6-af3c50b6dd3c',
       slug: 'version-stamp',
       regex: /\/\/\s{0,5}v\d{1,3}\.\d{1,3}(?:\.\d{1,5})?\s{0,5}$/i,
       message: `Process artifact comment found. ${VERSION_FIX}`,
@@ -88,7 +88,7 @@ export const noProcessArtifacts = defineRegexListCheck({
       suggestion: VERSION_FIX,
     },
     {
-      id: 'd4e5f6a7-4444-4555-8666-777788889999',
+      id: 'cdcdb9e5-36e3-4fc1-b315-b620354a835c',
       slug: 'added-in-version',
       regex: /\/\/\s{0,5}Added\s{1,5}in\s{1,5}v\d{1,5}\b/i,
       message: `Process artifact comment found. ${VERSION_FIX}`,
@@ -96,7 +96,7 @@ export const noProcessArtifacts = defineRegexListCheck({
       suggestion: VERSION_FIX,
     },
     {
-      id: 'e5f6a7b8-5555-4666-8777-88889999aaaa',
+      id: '5e8b6c7e-9197-4cd3-a33e-4b2247f4f65b',
       slug: 'date-stamp',
       regex: /\/\/\s{0,5}Updated?\s{1,5}\d{4}-\d{2}-\d{2}\b/i,
       message: `Process artifact comment found. ${DATE_FIX}`,

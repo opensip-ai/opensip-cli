@@ -66,7 +66,7 @@ export function analyzeCrossToolFlagParity(content: string): CheckViolation[] {
 }
 
 export const crossToolFlagParity = defineCheck({
-  id: 'c7f3e1a8-4b2d-4e6a-9f1c-3a8d5e2b7c04',
+  id: '534bf31f-41a2-4bec-b0a7-c08205770db1',
   slug: 'cross-tool-flag-parity',
   description:
     'Cross-tool common CLI flags must come from the shared registry, not be hand-declared (ADR-0021)',

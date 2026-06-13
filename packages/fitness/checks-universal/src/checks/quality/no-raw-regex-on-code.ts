@@ -14,7 +14,7 @@ const CONTENT_FILTER_PATTERN =
 const DEFINE_CHECK_PATTERN = /defineCheck\s*\(/;
 
 export const noRawRegexOnCode = defineCheck({
-  id: 'b7f3a1d2-94e8-4c5f-8b6a-3e2d1f9c8a7b',
+  id: '7a0f6bc1-f4dd-4e55-9628-d797c877c6e0',
   slug: 'no-raw-regex-on-code',
   scope: { languages: ['typescript'], concerns: ['fitness'] },
 

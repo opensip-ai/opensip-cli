@@ -65,7 +65,7 @@ export const noConsoleLog = defineRegexListCheck({
   },
   patterns: [
     {
-      id: '38b2df63-54c3-4ab9-8a4d-5050384fa56b',
+      id: 'e32068df-b100-4406-a8ba-caec5d53fa92',
       slug: 'console-log',
       // Non-global: matches the original `.test()`-based per-pattern-per-line semantics.
       regex: /console\.log\s{0,10}\(/,
@@ -74,7 +74,7 @@ export const noConsoleLog = defineRegexListCheck({
       suggestion: 'Use a structured logger (e.g., pino, winston)',
     },
     {
-      id: '766f1fdd-c257-4b56-b107-39fb83a92f2f',
+      id: '1e8a6367-e2f2-4acf-ac85-a85bb0e46955',
       slug: 'console-debug',
       regex: /console\.debug\s{0,10}\(/,
       message: 'console.debug detected',
@@ -82,7 +82,7 @@ export const noConsoleLog = defineRegexListCheck({
       suggestion: 'Use a structured logger (e.g., pino, winston) for debug output',
     },
     {
-      id: '3daf933d-551a-42af-9789-e24887df735c',
+      id: 'dfa66ae8-7230-417b-9711-d6659e1e8506',
       slug: 'console-info',
       regex: /console\.info\s{0,10}\(/,
       message: 'console.info detected',
@@ -90,7 +90,7 @@ export const noConsoleLog = defineRegexListCheck({
       suggestion: 'Use a structured logger (e.g., pino, winston) for info output',
     },
     {
-      id: 'dca59172-8f84-43b6-af5d-d9526b98248a',
+      id: '534bf31f-41a2-4bec-b0a7-c08205770db1',
       slug: 'console-warn',
       regex: /console\.warn\s{0,10}\(/,
       message: 'console.warn detected',
@@ -98,7 +98,7 @@ export const noConsoleLog = defineRegexListCheck({
       suggestion: 'Use a structured logger (e.g., pino, winston) for warnings',
     },
     {
-      id: '9a364012-3d09-414d-8d1d-2236c843b2e6',
+      id: 'ebd495d1-ae48-478d-a1cc-4823a18cada6',
       slug: 'console-error',
       regex: /console\.error\s{0,10}\(/,
       message: 'console.error detected',

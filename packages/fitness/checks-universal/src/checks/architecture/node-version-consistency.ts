@@ -214,7 +214,7 @@ function checkCiWorkflow(
  * Note: Dockerfile FROM node:XX checks are handled by docker-version-sync.
  */
 export const nodeVersionConsistency = defineCheck({
-  id: 'a7f1c2d3-4e5b-6a7c-8d9e-0f1a2b3c4d5e',
+  id: 'e32068df-b100-4406-a8ba-caec5d53fa92',
   slug: 'node-version-consistency',
   scope: { languages: ['json', 'typescript', 'yaml'], concerns: ['config'] },
   contentFilter: 'raw',

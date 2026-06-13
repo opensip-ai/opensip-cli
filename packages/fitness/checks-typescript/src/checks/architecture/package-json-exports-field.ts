@@ -16,7 +16,7 @@ const WORKSPACE_SEGMENT = /(?:^|\/)(?:packages|services)\//;
 const PACKAGES_SEGMENT = /(?:^|\/)packages\//;
 
 export const packageJsonExportsField = defineCheck({
-  id: 'e1f2a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b',
+  id: 'b4203be3-3308-4fb1-8b20-44e23b8e3eff',
   slug: 'package-json-exports-field',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   confidence: 'high',

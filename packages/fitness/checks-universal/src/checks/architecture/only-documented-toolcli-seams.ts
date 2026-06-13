@@ -163,7 +163,7 @@ export function analyzeOnlyDocumentedSeams(content: string, filePath: string): C
 }
 
 export const onlyDocumentedToolcliSeams = defineCheck({
-  id: '7f3c2a1b-8e9d-4f0a-9c1d-2e3f4a5b6c7d',
+  id: '1ea47b8c-18be-402b-ae19-8ac66a88d050',
   slug: 'only-documented-toolcli-seams',
   description:
     'Host command handlers and tool engines must only use the documented methods on ToolCliContext (render, emit*, deliverSignals, writeSarif, toolState, hostPlanes, baseline seams). No direct stdout, pre-scope holder, or raw datastore (host-planes hygiene).',

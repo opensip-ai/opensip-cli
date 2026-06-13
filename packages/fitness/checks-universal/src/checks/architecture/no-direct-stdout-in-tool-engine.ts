@@ -86,7 +86,7 @@ export function analyzeDirectStdout(content: string): CheckViolation[] {
 }
 
 export const noDirectStdoutInToolEngine = defineCheck({
-  id: '9a2a9d7a-2e40-4adf-b682-534c3412d4da',
+  id: '9968cdec-1541-4522-ac02-e9eff56a5c2a',
   slug: 'no-direct-stdout-in-tool-engine',
   description: 'Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011)',
   scope: { languages: ['typescript'], concerns: ['backend'] },

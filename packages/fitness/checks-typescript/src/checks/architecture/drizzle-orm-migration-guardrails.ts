@@ -58,7 +58,7 @@ const DANGEROUS_PATTERNS: DangerousPattern[] = [
 const DATA_LOSS_CONFIRMATION = /DATA-LOSS.*intentional/i;
 
 export const drizzleOrmMigrationGuardrails = defineCheck({
-  id: 'd4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a',
+  id: 'b67ccead-3731-40c5-9a90-6fc4b88c2bc5',
   slug: 'drizzle-orm-migration-guardrails',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   confidence: 'high',

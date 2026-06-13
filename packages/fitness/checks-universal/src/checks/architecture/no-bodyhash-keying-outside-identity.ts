@@ -132,7 +132,7 @@ export async function analyzeAllNoBodyhashKeyingOutsideIdentity(
 }
 
 export const noBodyhashKeyingOutsideIdentity = defineCheck({
-  id: 'f3a2c1d4-5b6e-4f70-8a9c-0d1e2f3a4b5c',
+  id: 'dfa66ae8-7230-417b-9711-d6659e1e8506',
   slug: 'no-bodyhash-keying-outside-identity',
   description:
     'The graph cross-shard merge must key/stitch edges through ownerEdgeKey in cli/orchestrate/edge-identity.ts, never by a bare bodyHash/ownerHash (ADR-0003)',
