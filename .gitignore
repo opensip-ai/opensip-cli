@@ -46,5 +46,11 @@ opensip-cli/.runtime/
 # Local-only implementation plans (kept out of the repo)
 docs/plans/
 
+# Ephemeral remediation artifacts from the Correctness Remediation Process.
+# These contain per-round findings, coverage reports, and the final summary.
+# They are created inside worktrees during remediation runs and are never
+# committed to the main repository.
+docs/remediation/
+
 # Claude Code session state
 .claude/scheduled_tasks.lock
