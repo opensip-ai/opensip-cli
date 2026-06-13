@@ -7,8 +7,9 @@
  * Every row derives from
  *
  *   - the CURRENT RUN's admitted set — the provenance + manifest pairs the
- *     bootstrap recorded (`getToolProvenanceForRun` /
- *     `getToolManifestsForRun`), status `loaded`; and
+ *     bootstrap recorded, passed in by the command handler from the entered
+ *     RunScope (`currentScope().toolProvenance` / `?.toolManifests`),
+ *     status `loaded`; and
  *   - marker scans of the two install hosts (user-global + project
  *     `.runtime`), `loadToolManifest` only (a file read), status
  *     `manifest-only` — covering installed-but-not-loaded packages (and, by
@@ -26,10 +27,10 @@ import {
   loadToolManifest,
   resolveProjectPaths,
   resolveUserPaths,
+  type ToolPluginManifest,
   type ToolProvenance,
 } from '@opensip-cli/core';
 
-import { getToolManifestsForRun, getToolProvenanceForRun } from '../../cli-context.js';
 import { TOOL_DOMAIN } from '../plugin/domain-resolution.js';
 
 import type { ToolsListResult, ToolsListRow } from '@opensip-cli/contracts';
@@ -43,6 +44,14 @@ export interface ToolsListOptions {
   /** Restrict to one install scope (mutually exclusive; neither = effective set). */
   readonly global?: boolean;
   readonly project?: boolean;
+  /**
+   * The admitted-tool provenance + manifests for this run (paired index-wise),
+   * read by the command handler from the entered RunScope and passed in so this
+   * function stays a pure function of its inputs. Default `[]` (no admitted set
+   * — e.g. an isolated unit test).
+   */
+  readonly provenance?: readonly ToolProvenance[];
+  readonly manifests?: readonly ToolPluginManifest[];
 }
 
 /**
@@ -72,8 +81,8 @@ export function toolsList(opts: ToolsListOptions): ToolsListResult {
   const projectHostDir = resolveProjectPaths(opts.cwd).pluginsDir(TOOL_DOMAIN);
   const globalHostDir = resolveUserPaths().pluginsDir(TOOL_DOMAIN);
 
-  const provenance = getToolProvenanceForRun();
-  const manifests = getToolManifestsForRun();
+  const provenance = opts.provenance ?? [];
+  const manifests = opts.manifests ?? [];
 
   const rows: ToolsListRow[] = [];
   const loadedPackageNames = new Set<string>();

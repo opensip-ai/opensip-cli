@@ -22,12 +22,7 @@ import {
   renderResult,
   buildCommandRegistrationInput,
 } from './bootstrap/index.js';
-import {
-  buildToolCliContext,
-  createLiveViewRegistry,
-  getOrOpenDatastore,
-  setCliRuntimeContextForRun,
-} from './cli-context.js';
+import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';
@@ -56,12 +51,9 @@ const program = new Command('opensip')
   // handler renders nothing extra for a CommanderError (no duplicate output).
   .exitOverride();
 
-installPreActionHook(program, cliVersion);
-
 async function main(): Promise<void> {
   // Fresh registries per CLI invocation. Tools read these via
-  // `cli.scope.languages` / `cli.scope.tools`; bootstrap populates them here
-  // and the runtime-context holder makes them visible to the pre-action hook.
+  // `cli.scope.languages` / `cli.scope.tools`; bootstrap populates them here.
   const langRegistry = new LanguageRegistry();
   const toolRegistry = new ToolRegistry();
 
@@ -75,11 +67,17 @@ async function main(): Promise<void> {
     cwd: process.cwd(),
     cliEntryUrl: import.meta.url,
   });
-  setCliRuntimeContextForRun({
+
+  // Install the pre-action hook AFTER bootstrap so the populated registries +
+  // admitted-tool manifests/provenance are captured directly in the hook
+  // closure — no module-global handoff bag. The hook builds + enters the
+  // per-run RunScope (stamping manifests/provenance onto it); from there every
+  // per-run read goes through `currentScope()`.
+  installPreActionHook(program, cliVersion, {
     languages: langRegistry,
     tools: toolRegistry,
-    toolProvenance: provenance,
-    toolManifests: manifests,
+    manifests,
+    provenance,
   });
 
   const { ctx } = buildToolCliContext({

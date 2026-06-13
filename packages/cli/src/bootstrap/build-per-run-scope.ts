@@ -29,6 +29,7 @@ import {
   resolveUserPaths,
   RunScope,
   type ToolPluginManifest,
+  type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-cli/core';
 import { resolveSignalSink } from '@opensip-cli/output';
@@ -51,6 +52,12 @@ export interface BuildPerRunScopeInput {
     readonly tools: ToolRegistry;
   };
   readonly manifests: readonly ToolPluginManifest[];
+  /**
+   * Provenance of the tools admitted this run, recorded by the bootstrap and
+   * stamped onto the scope (paired index-wise with `manifests`) so host
+   * commands read it via `currentScope()` rather than a module global.
+   */
+  readonly provenance: readonly ToolProvenance[];
   readonly apiKey?: string;
   readonly noCloud?: boolean;
   readonly logger: Logger;
@@ -72,7 +79,18 @@ export interface BuildPerRunScopeInput {
  * but all inputs are explicit and side effects are contained.
  */
 export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
-  const { project, runId, cliDefaults, registries, manifests, apiKey, noCloud, logger, ui } = input;
+  const {
+    project,
+    runId,
+    cliDefaults,
+    registries,
+    manifests,
+    provenance,
+    apiKey,
+    noCloud,
+    logger,
+    ui,
+  } = input;
 
   const { languages, tools } = registries;
 
@@ -117,6 +135,11 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // bannerSize stays derivable from config; version/update are resolved by
     // the hook (package version + cached update-check result) and passed in.
     ui: { bannerSize: cliDefaults.ui?.banner ?? 'mini', version: ui.version, update: ui.update },
+    // Per-run admitted-tool facts, recorded by the bootstrap. Stamped here (not
+    // a module global) so host commands (`plugin list`, `tools list`, `tools
+    // uninstall`) read them via `currentScope()` — the single source of truth.
+    toolManifests: manifests,
+    toolProvenance: provenance,
   });
 
   // D7: each registered tool contributes its tool-specific subscope (e.g.

@@ -11,7 +11,7 @@
  *
  * It drives the REAL Commander program + installPreActionHook against the
  * sample-project fixture (a valid project, so no no-project bailout), with
- * a fixture Tool injected via setCliRegistriesForRun.
+ * a fixture Tool handed to the hook via its `PreActionRuntime` closure.
  */
 
 import { dirname, join } from 'node:path';
@@ -22,8 +22,8 @@ import { Command } from 'commander';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { installPreActionHook, resolveOwningTool } from '../bootstrap/pre-action-hook.js';
+import { resetInitializedToolIdsForTest } from '../bootstrap/process-idempotency.js';
 import { mountAllToolCommands } from '../bootstrap/register-tools.js';
-import { setCliRegistriesForRun } from '../cli-context.js';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/sample-project');
 
@@ -95,16 +95,27 @@ function makeFixtureTool(
 function buildProgram(tool: Tool): Command {
   const tools = new ToolRegistry();
   tools.register(tool);
-  setCliRegistriesForRun({ languages: new LanguageRegistry(), tools });
   const program = new Command();
   program.exitOverride();
-  installPreActionHook(program, 'test');
+  // The hook captures the registries + admitted-tool facts in its closure
+  // (the production shape after eliminating the module-global handoff bag);
+  // this fixture run admits a single tool and no manifests/provenance.
+  installPreActionHook(program, 'test', {
+    languages: new LanguageRegistry(),
+    tools,
+    manifests: [],
+    provenance: [],
+  });
   mountAllToolCommands(tools, program, stubCtx());
   return program;
 }
 
 afterEach(() => {
   vi.restoreAllMocks();
+  // Tool.initialize() idempotency is process-scoped; reset between tests so each
+  // fixture tool's initialize() can run again (previously done as a side effect
+  // of the removed setCliRegistriesForRun).
+  resetInitializedToolIdsForTest();
 });
 
 describe('resolveOwningTool', () => {

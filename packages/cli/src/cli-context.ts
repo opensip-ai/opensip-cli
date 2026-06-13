@@ -1,19 +1,20 @@
 /**
- * cli-context — live-view registry, scope construction, and
- * `ToolCliContext` factory. Three related concerns:
+ * cli-context — live-view registry, scope readers, and `ToolCliContext`
+ * factory. Two related concerns:
  *
  *  1. `createLiveViewRegistry` — backs `registerLiveView` / `renderLive`. A tool
  *     registers its Ink view by key; an unregistered key throws
  *     `UnknownLiveViewError` rather than masking a mistyped key with a static render.
- *  2. `setCliRuntimeContextForRun` — the one-time bootstrap handoff `main()` uses to
- *     pass the locally-constructed `LanguageRegistry` / `ToolRegistry` / manifests to
- *     the pre-action-hook (which reads them via `getCurrentRegistriesForScope()` /
- *     `getToolManifestsForRun()` when it builds the per-run `RunScope`). Per-run
- *     project + datastore hang off the entered scope, not module globals.
- *  3. `buildToolCliContext` — assembles the `ToolCliContext` handed to each tool and
+ *  2. `buildToolCliContext` — assembles the `ToolCliContext` handed to each tool and
  *     host command, including the output/raw/error emit seams (delegated to
  *     `renderOutcome` / `renderRaw`) and the single `setExitCode` write path
  *     (`process.exitCode` is mutated only here).
+ *
+ * There is NO module-global bootstrap-handoff bag. The populated registries +
+ * admitted-tool manifests/provenance are captured in the pre-action-hook closure
+ * (`installPreActionHook` is called AFTER `bootstrapCli` in `main()`), the hook
+ * builds + enters the per-run `RunScope`, and from there every per-run read
+ * (project, datastore, manifests, provenance, …) goes through `currentScope()`.
  *
  * Lazy datastore: a closure-based thunk caches the open DataStore on first access and
  * lands on `RunScope.datastore`; paths that never touch it never materialise
@@ -27,21 +28,16 @@ import {
   currentScope,
   logger as defaultLogger,
   resolveProjectPaths,
-  type LanguageRegistry,
   type LiveViewRenderer,
   type Logger,
   type ProjectContext,
   type ToolCliContext,
-  type ToolPluginManifest,
-  type ToolProvenance,
-  type ToolRegistry,
 } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
 import { deliverEnvelope, writeEnvelopeSarif } from './bootstrap/deliver-envelope.js';
 import { buildHostPlanes } from './bootstrap/host-planes.js';
-import { resetInitializedToolIdsForTest } from './bootstrap/process-idempotency.js';
 import { buildStateSeams } from './bootstrap/state-seams.js';
 import {
   outcomeFromEnvelope,
@@ -49,132 +45,21 @@ import {
   outcomeFromResult,
 } from './commands/assemble-outcome.js';
 import { renderOutcome, renderRaw } from './commands/render-outcome.js';
-import { resetTelemetryStartedForTest } from './telemetry/sdk-init.js';
 
 import type { CommandResult, SignalEnvelope } from '@opensip-cli/contracts';
 
 // ---------------------------------------------------------------------------
-// Minimal bootstrap handoff context (Phase 3 of host-planes-scope-seams-hygiene).
+// No module-global bootstrap-handoff bag.
 //
-// Registries + manifests/provenance are created in `main()` *before* the pre-action
-// hook can construct+enter the RunScope, so a tiny process-scoped handoff bag carries
-// them to the hook. After the hook calls enterScope(), *all* per-run state
-// (project, datastore thunk, diagnostics, etc.) is read exclusively via currentScope()
-// (ALS). The old general "pre-scope holder + scopeEntered guard + runScope mirror"
-// has been removed from production paths.
+// The registries + admitted-tool manifests/provenance the pre-action hook needs
+// to BUILD the scope are captured in the hook closure (`installPreActionHook` is
+// called AFTER `bootstrapCli` in `main()`; see `PreActionRuntime`). Once the hook
+// calls `enterScope`, ALL per-run state — project, datastore thunk, diagnostics,
+// AND the admitted-tool manifests/provenance (now stamped onto `RunScope`) — is
+// read exclusively via `currentScope()` (ALS). Host commands that surface the
+// admitted set (`plugin list`, `tools list`, `tools uninstall`) read
+// `currentScope()?.toolProvenance` / `?.toolManifests`.
 // ---------------------------------------------------------------------------
-
-interface CliRuntimeContext {
-  readonly languages?: LanguageRegistry;
-  readonly tools?: ToolRegistry;
-  readonly toolProvenance: readonly ToolProvenance[];
-  readonly toolManifests: readonly ToolPluginManifest[];
-}
-
-// Bootstrap handoff holder (minimal, production use only for registries/manifests/provenance
-// created in main() before the pre-action hook runs and can build/enter the RunScope).
-// Per-run *state* (scope, project, datastore thunk, etc.) MUST come from currentScope() after
-// enterScope (ALS). This tiny holder is *not* a general pre-scope state bag; after Phase 3 of
-// host-planes-scope-seams-hygiene it is used solely for the one-time bootstrap handoff of the
-// Language/Tool registries and manifests. Test helpers retain a narrow surface.
-// @fitness-ignore-next-line context-leakage -- single-process bootstrap handoff, reset per run.
-let currentRuntimeContext: CliRuntimeContext = {
-  toolProvenance: [],
-  toolManifests: [],
-};
-
-function updateRuntimeContext(patch: Partial<CliRuntimeContext>): void {
-  currentRuntimeContext = { ...currentRuntimeContext, ...patch };
-}
-
-export function setCliRuntimeContextForRun(opts: {
-  readonly languages: LanguageRegistry;
-  readonly tools: ToolRegistry;
-  readonly toolProvenance?: readonly ToolProvenance[];
-  readonly toolManifests?: readonly ToolPluginManifest[];
-}): void {
-  resetInitializedToolIdsForTest();
-  resetTelemetryStartedForTest();
-  currentRuntimeContext = {
-    languages: opts.languages,
-    tools: opts.tools,
-    toolProvenance: opts.toolProvenance ?? [],
-    toolManifests: opts.toolManifests ?? [],
-  };
-}
-
-/**
- * Back-compat / test-only helper. Kept for isolated tests; production code never uses the
- * pre-scope holder for per-run state after hygiene Phase 3.
- */
-export function setCliRegistriesForRun(opts: {
-  readonly languages: LanguageRegistry;
-  readonly tools: ToolRegistry;
-}): void {
-  // @fitness-ignore-next-line env-via-registry -- NODE_ENV is the test-runtime meta-guard that makes this pre-scope helper *throw* if reached outside tests; it is not governed application configuration (intentionally absent from host-env-specs), so it does not flow through EnvRegistry.
-  if (process.env.NODE_ENV !== 'test') {
-    throw new SystemError(
-      'Direct use of pre-scope registry setter outside tests is forbidden. ' +
-        'Registries are handed to the per-run scope at construction time.',
-      { code: 'SYSTEM.SCOPE.HOLDER_MISUSE' },
-    );
-  }
-  resetInitializedToolIdsForTest();
-  resetTelemetryStartedForTest();
-  updateRuntimeContext({ languages: opts.languages, tools: opts.tools });
-}
-
-/**
- * Read the per-run registries installed by `setCliRuntimeContextForRun` (bootstrap handoff only).
- * Used by pre-action-hook to construct the RunScope before enterScope. After enter, all
- * production code reads registries via currentScope().languages / .tools (see RunScope).
- */
-export function getCurrentRegistriesForScope(): {
-  readonly languages: LanguageRegistry;
-  readonly tools: ToolRegistry;
-} {
-  const { languages, tools } = currentRuntimeContext;
-  if (!languages || !tools) {
-    throw new SystemError(
-      'getCurrentRegistriesForScope() called before setCliRuntimeContextForRun(). ' +
-        'main() must construct LanguageRegistry/ToolRegistry and install the ' +
-        'CLI runtime context before any preAction hook runs.',
-      { code: 'SYSTEM.BOOTSTRAP.REGISTRIES_UNSET' },
-    );
-  }
-  return { languages, tools };
-}
-
-/**
- * Record the provenance for the tools admitted through the launch
- * compatibility gate. Called by `main()` once per invocation from the
- * `bootstrapCli` result, BEFORE Commander dispatch. Read by `plugin list`
- * (Phase 4) via {@link getToolProvenanceForRun}.
- */
-export function setToolProvenanceForRun(records: readonly ToolProvenance[]): void {
-  updateRuntimeContext({ toolProvenance: records });
-}
-
-/**
- * Read the admitted-tool provenance recorded by
- * {@link setToolProvenanceForRun}. Empty until bootstrap has run (e.g. in
- * isolated unit tests that never bootstrap).
- */
-export function getToolProvenanceForRun(): readonly ToolProvenance[] {
-  return currentRuntimeContext.toolProvenance;
-}
-
-/**
- * Read the admitted-tool manifests recorded for this invocation (release
- * launch, §5.3) — installed cohesively by {@link setCliRuntimeContextForRun}.
- * Read by the pre-action-hook to register each tool's manifest-declared
- * capability domains into the per-run capability registry. Empty until
- * bootstrap has run (e.g. in isolated unit tests that never bootstrap) — the
- * pre-action-hook then registers no manifest domains.
- */
-export function getToolManifestsForRun(): readonly ToolPluginManifest[] {
-  return currentRuntimeContext.toolManifests;
-}
 
 /**
  * Strict reader: after Phase 3 hygiene, the only way to obtain the per-run scope is

@@ -160,7 +160,10 @@ describe('plugin spec — action bodies', () => {
 
     await program.parseAsync(['plugin', 'list'], { from: 'user' });
 
-    expect(pluginList).toHaveBeenCalledWith('/discovered/root', ctx.pluginLayouts);
+    // The handler reads the per-run admitted-tool provenance off the entered
+    // RunScope and passes it as the 3rd arg; no scope is entered in this unit
+    // test, so it is the empty default.
+    expect(pluginList).toHaveBeenCalledWith('/discovered/root', ctx.pluginLayouts, []);
     expect(rendered).toHaveLength(1);
   });
 
@@ -180,7 +183,7 @@ describe('plugin spec — action bodies', () => {
     } finally {
       spy.mockRestore();
     }
-    expect(pluginList).toHaveBeenCalledWith('/explicit/cwd', ctx.pluginLayouts);
+    expect(pluginList).toHaveBeenCalledWith('/explicit/cwd', ctx.pluginLayouts, []);
     expect(rendered).toHaveLength(0);
     expect(writes.join('')).toContain('"action": "list"');
   });

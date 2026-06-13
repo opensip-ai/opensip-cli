@@ -21,6 +21,7 @@
  */
 
 import {
+  currentScope,
   defineCommand,
   type CommandScopeRequirement,
   type CommandSpec,
@@ -254,7 +255,13 @@ function buildPluginListSpec(ctx: CliCommandsContext): HostSpec {
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
       const opts = rawOpts as PluginCwdOpts;
-      return pluginList(effectiveCwd(opts), ctx.pluginLayouts);
+      // Per-run admitted-tool provenance is on the entered RunScope (stamped by
+      // the bootstrap); read it here and pass it into the pure `pluginList`.
+      return pluginList(
+        effectiveCwd(opts),
+        ctx.pluginLayouts,
+        currentScope()?.toolProvenance ?? [],
+      );
     },
   });
 }

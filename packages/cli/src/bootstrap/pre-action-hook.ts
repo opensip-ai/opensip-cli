@@ -38,12 +38,14 @@ import {
   resolveProjectContext,
   resolveProjectPaths,
   SystemError,
+  type LanguageRegistry,
   type ProjectContext,
   type Tool,
+  type ToolPluginManifest,
+  type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-cli/core';
 
-import { getCurrentRegistriesForScope, getToolManifestsForRun } from '../cli-context.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { BootstrapError } from './bootstrap-error.js';
@@ -145,6 +147,23 @@ async function maybeInitializeOwningTool(
  */
 
 /**
+ * The per-invocation bootstrap result the hook needs to BUILD the scope —
+ * the populated registries plus the admitted-tool manifests/provenance. These
+ * are created in `main()` BEFORE the scope can be constructed (the registries
+ * are inputs to `RunScope`; you can't read them off a scope that doesn't exist
+ * yet), so the composition root captures them in this closure and hands them to
+ * `installPreActionHook`. After the hook calls `enterScope`, every per-run read
+ * (project, datastore, manifests, provenance, …) goes through `currentScope()`
+ * — there is NO module-global handoff bag (the former `currentRuntimeContext`).
+ */
+export interface PreActionRuntime {
+  readonly languages: LanguageRegistry;
+  readonly tools: ToolRegistry;
+  readonly manifests: readonly ToolPluginManifest[];
+  readonly provenance: readonly ToolProvenance[];
+}
+
+/**
  * Mount the bootstrap `preAction` hook on the supplied program.
  *
  * @param program The root Commander program.
@@ -152,8 +171,16 @@ async function maybeInitializeOwningTool(
  *   point). Threaded in rather than re-read here so the `mini` banner shows
  *   the SAME version `--version` reports — and so the kernel-adjacent hook
  *   doesn't resolve cli-ui's or its own package version by mistake.
+ * @param runtime The bootstrap result (registries + admitted manifests/
+ *   provenance). Captured in the hook closure instead of read from a module
+ *   global — the composition root installs the hook AFTER `bootstrapCli`
+ *   populates the registries (see {@link PreActionRuntime}).
  */
-export function installPreActionHook(program: Command, version: string): void {
+export function installPreActionHook(
+  program: Command,
+  version: string,
+  runtime: PreActionRuntime,
+): void {
   program.hook('preAction', async (_thisCommand, actionCommand) => {
     const runId = generatePrefixedId('run');
 
@@ -257,18 +284,22 @@ export function installPreActionHook(program: Command, version: string): void {
     // `cloud` layers the user-level opt-out (~/.opensip-cli/config.yml#cloud)
     // over the project's `cli.cloud:` block (audit P0-2): a user `sync: false`
     // disables sync for every project on this machine.
-    const { languages, tools } = getCurrentRegistriesForScope();
+    const { languages, tools, manifests, provenance } = runtime;
 
     // Extracted to thin the composition root (GA architectural blocker #2).
     // All scope construction + wiring now lives in a dedicated small builder
-    // with explicit inputs. The hook remains the high-level sequencer.
+    // with explicit inputs. The hook remains the high-level sequencer. The
+    // registries + admitted-tool manifests/provenance come from the closure
+    // the composition root captured (no module-global handoff bag); the
+    // builder stamps manifests/provenance onto the scope for host commands.
     const scope = buildPerRunScope({
       project,
       runId,
       cwd,
       cliDefaults,
       registries: { languages, tools },
-      manifests: getToolManifestsForRun(),
+      manifests,
+      provenance,
       apiKey: opts.apiKey as string | undefined,
       // @fitness-ignore-next-line null-safety -- Commander's optsWithGlobals() always returns an OptionValues object (never null/undefined); the heuristic misreads the method-call-then-property access. `.cloud` is an absent-or-boolean flag, compared with `=== false`.
       noCloud: actionCommand.optsWithGlobals().cloud === false,

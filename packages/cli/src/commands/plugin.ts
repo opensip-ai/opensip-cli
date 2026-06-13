@@ -52,9 +52,8 @@ import {
   resolveProjectPaths,
   resolveUserPaths,
   type PluginLayout,
+  type ToolProvenance,
 } from '@opensip-cli/core';
-
-import { getToolProvenanceForRun } from '../cli-context.js';
 
 import { addToConfigPluginList, removeFromConfigPluginList } from './plugin/config-edit.js';
 import {
@@ -102,6 +101,9 @@ export const __test = { editPluginList };
 export async function pluginList(
   cwd: string = process.cwd(),
   layouts: readonly PluginLayout[] = [],
+  // The admitted-tool provenance for this run, read by the command handler from
+  // the entered RunScope and passed in (keeps this function pure). Default `[]`.
+  toolProvenance: readonly ToolProvenance[] = [],
 ): Promise<PluginResult> {
   const { discoverPlugins } = await import('@opensip-cli/core');
 
@@ -133,13 +135,11 @@ export async function pluginList(
     }
   }
 
-  // Additive provenance section (launch): the tools admitted through
-  // the compatibility gate this run, read from the per-run holder set at
-  // bootstrap — NOT a disk re-scan. Surfaces source/identity/manifestHash
-  // for bundled/installed/project-local tools alongside the discovered
-  // fit/sim/tool plugin list above.
-  const toolProvenance = getToolProvenanceForRun();
-
+  // Additive provenance section (launch): the tools admitted through the
+  // compatibility gate this run — passed in by the command handler from the
+  // entered RunScope (`currentScope().toolProvenance`), NOT a disk re-scan.
+  // Surfaces source/identity/manifestHash for bundled/installed/project-local
+  // tools alongside the discovered fit/sim/tool plugin list above.
   return {
     type: 'plugin-list',
     domains: [...domainsForList(layouts), TOOL_DOMAIN],

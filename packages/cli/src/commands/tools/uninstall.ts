@@ -16,9 +16,9 @@ import {
   loadToolManifest,
   resolveProjectPaths,
   resolveUserPaths,
+  type ToolProvenance,
 } from '@opensip-cli/core';
 
-import { getToolProvenanceForRun } from '../../cli-context.js';
 import { TOOL_DOMAIN } from '../plugin/domain-resolution.js';
 import { removeToolPlugin } from '../plugin-host-ops.js';
 
@@ -31,6 +31,12 @@ export interface ToolsUninstallOptions {
   readonly cwd: string;
   readonly global?: boolean;
   readonly project?: boolean;
+  /**
+   * The admitted-tool provenance for this run, read by the command handler from
+   * the entered RunScope and passed in (keeps this function pure). Used only to
+   * reject uninstalling a bundled tool. Default `[]`.
+   */
+  readonly provenance?: readonly ToolProvenance[];
 }
 
 interface InstalledCandidate {
@@ -64,9 +70,7 @@ export function toolsUninstall(opts: ToolsUninstallOptions): ToolsUninstallResul
   // Bundled tools are not uninstallable — resolve the bundled id set from the
   // run's provenance (always present: bundled admission is fail-closed).
   const bundledIds = new Set(
-    getToolProvenanceForRun()
-      .filter((p) => p.source === 'bundled')
-      .map((p) => p.id),
+    (opts.provenance ?? []).filter((p) => p.source === 'bundled').map((p) => p.id),
   );
   if (bundledIds.has(opts.target)) {
     return failed(

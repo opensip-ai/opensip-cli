@@ -1,14 +1,14 @@
 /**
  * Phase 4 (release 2.8.0): `plugin list` surfaces the admitted-tool
- * provenance recorded this run. The provenance is read from the per-run
- * holder (set via setToolProvenanceForRun), NOT re-derived from disk, and
- * is carried on the `plugin-list` result so `--json` serializes the full
- * ToolProvenance (source + manifestHash) for every admitted tool.
+ * provenance recorded this run. The provenance is the per-run set the host
+ * command handler reads off the entered RunScope (`currentScope().toolProvenance`)
+ * and passes into the pure `pluginList`, NOT re-derived from disk, and is carried
+ * on the `plugin-list` result so `--json` serializes the full ToolProvenance
+ * (source + manifestHash) for every admitted tool.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { setToolProvenanceForRun } from '../cli-context.js';
 import { pluginList } from '../commands/plugin.js';
 
 import type { ToolProvenance } from '@opensip-cli/contracts';
@@ -31,16 +31,9 @@ const GRAPH_PROVENANCE: ToolProvenance = {
   manifestHash: 'graph0000000000000000000000000000000000000000000000000000000gr',
 };
 
-afterEach(() => {
-  // Reset the per-run holder so leakage can't mask a regression.
-  setToolProvenanceForRun([]);
-});
-
 describe('plugin list — tool provenance', () => {
   it('carries the per-run provenance on the plugin-list result', async () => {
-    setToolProvenanceForRun([FIT_PROVENANCE, GRAPH_PROVENANCE]);
-
-    const result = await pluginList('/no/such/project', []);
+    const result = await pluginList('/no/such/project', [], [FIT_PROVENANCE, GRAPH_PROVENANCE]);
 
     expect(result.type).toBe('plugin-list');
     if (result.type !== 'plugin-list') throw new Error('unreachable');
@@ -48,9 +41,7 @@ describe('plugin list — tool provenance', () => {
   });
 
   it('--json output includes source + manifestHash for the bundled tools', async () => {
-    setToolProvenanceForRun([FIT_PROVENANCE, GRAPH_PROVENANCE]);
-
-    const result = await pluginList('/no/such/project', []);
+    const result = await pluginList('/no/such/project', [], [FIT_PROVENANCE, GRAPH_PROVENANCE]);
     // Round-trip through the exact serializer `mountResultCommand`'s --json
     // branch uses, then re-parse, to assert the wire shape a machine sees.
     // NB: intentionally exercises the JSON.stringify --json path, not a deep
@@ -66,8 +57,6 @@ describe('plugin list — tool provenance', () => {
   });
 
   it('is an empty array when no tools were admitted (no bootstrap)', async () => {
-    setToolProvenanceForRun([]);
-
     const result = await pluginList('/no/such/project', []);
 
     if (result.type !== 'plugin-list') throw new Error('unreachable');

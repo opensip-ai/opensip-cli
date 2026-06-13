@@ -15,10 +15,12 @@
  *   writeSarif, plus the baseline seams, toolState, and hostPlanes (when present).
  *
  * Direct process.stdout (run output), console.* for run data, the old
- * pre-scope CliRuntimeContext holder (getCurrentRegistriesForScope etc. — now
- * test-only), or raw DataStore *construction* (`new DataStoreFactory` /
- * `DataStoreFactory.open`) from command bodies bypass the contract (ADR-0011,
- * entered-scope invariant, host-owned planes).
+ * pre-scope CliRuntimeContext holder (getCurrentRegistriesForScope /
+ * setCliRuntimeContextForRun / getToolProvenanceForRun etc. — now REMOVED;
+ * these patterns are a reintroduction tripwire), or raw DataStore
+ * *construction* (`new DataStoreFactory` / `DataStoreFactory.open`) from command
+ * bodies bypass the contract (ADR-0011, entered-scope invariant, host-owned
+ * planes).
  *
  * RAW `.db` QUERY ACCESS IS DELEGATED, NOT DUPLICATED: confining the raw Drizzle
  * handle (`DataStore.db.select(...)` etc.) to the persistence ownership boundary
@@ -79,10 +81,21 @@ const STDOUT_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
- * Pre-scope holder symbols (test-only or bootstrap-internal after Phase 3).
+ * Pre-scope handoff-bag symbols. The module-global `currentRuntimeContext` bag
+ * and its accessors were REMOVED — per-run registries are captured in the
+ * pre-action-hook closure, and the admitted-tool manifests/provenance ride the
+ * entered `RunScope` (read via `currentScope()`). These patterns are now a
+ * reintroduction tripwire: a handler/engine reaching a (re-added) module-global
+ * handoff bag instead of the entered scope is a regression. Call-shaped so prose
+ * mentions of the names don't false-fire.
  */
 const HOLDER_PATTERNS: readonly RegExp[] = [
   /\bgetCurrentRegistriesForScope\s*\(/,
+  /\bsetCliRuntimeContextForRun\s*\(/,
+  /\bsetCliRegistriesForRun\s*\(/,
+  /\bgetToolProvenanceForRun\s*\(/,
+  /\bgetToolManifestsForRun\s*\(/,
+  /\bsetToolProvenanceForRun\s*\(/,
   /\bmarkScopeEntered\s*\(/,
   /\bsetCurrentRunScope\s*\(/,
   /\bcurrentRuntimeContext\b/,
@@ -117,9 +130,9 @@ const STDOUT_RULE: SeamRule = {
 const HOLDER_RULE: SeamRule = {
   patterns: HOLDER_PATTERNS,
   message:
-    'The pre-scope holder (getCurrentRegistriesForScope, markScopeEntered, setCurrentRunScope, currentRuntimeContext) is test-only after hygiene Phase 3. Production code (handlers, engines) must use currentScope() after a proper enterScope and the blessed methods on ToolCliContext.',
+    'The pre-scope module-global handoff bag (currentRuntimeContext + setCliRuntimeContextForRun / getCurrentRegistriesForScope / getToolProvenanceForRun / getToolManifestsForRun, and the historical markScopeEntered / setCurrentRunScope) was REMOVED. Per-run registries are captured in the pre-action-hook closure; admitted-tool manifests/provenance ride the entered RunScope. Handlers/engines must use currentScope() (or the ToolCliContext) — reintroducing a module-global handoff bag is a regression.',
   suggestion:
-    'Remove the holder access; the context you receive already carries everything via the entered scope.',
+    'Read per-run state via currentScope() after enterScope (or the ToolCliContext you receive); do not stand up a module-global handoff bag.',
 };
 
 const RAW_DS_RULE: SeamRule = {

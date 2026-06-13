@@ -9,7 +9,12 @@
  */
 
 import { EXIT_CODES, type CommandResult } from '@opensip-cli/contracts';
-import { defineCommand, type CommandSpec, type ProjectContext } from '@opensip-cli/core';
+import {
+  currentScope,
+  defineCommand,
+  type CommandSpec,
+  type ProjectContext,
+} from '@opensip-cli/core';
 
 import { toolsDataPurge } from './data-purge.js';
 import { toolsInstall } from './install.js';
@@ -55,11 +60,16 @@ function buildToolsListSpec(): HostSpec {
     output: COMMAND_RESULT_OUTPUT,
     handler: (rawOpts) => {
       const opts = rawOpts as ScopeFilterOpts;
+      // The admitted-tool set is per-run state on the entered RunScope (stamped
+      // by the bootstrap), read here and passed into the pure `toolsList`.
+      const scope = currentScope();
       return Promise.resolve(
         toolsList({
           cwd: effectiveCwd(opts),
           global: opts.global,
           project: opts.project,
+          provenance: scope?.toolProvenance ?? [],
+          manifests: scope?.toolManifests ?? [],
         }),
       );
     },
@@ -171,6 +181,8 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
         cwd: effectiveCwd(opts),
         global: opts.global,
         project: opts.project,
+        // Per-run admitted-tool provenance (bundled-id guard) from the scope.
+        provenance: currentScope()?.toolProvenance ?? [],
       });
       if (!result.success) {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);

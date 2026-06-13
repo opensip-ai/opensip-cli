@@ -33,6 +33,7 @@ import type { ProjectContext } from './project-context.js';
 import type { DataStoreThunk, RecipeUnitConfigSlot, ToolScope } from './scope-types.js';
 import type { UiContext } from './ui-context.js';
 import type { SignalSink } from '../signals/signal-sink.js';
+import type { ToolPluginManifest, ToolProvenance } from '../tools/manifest.js';
 
 // RecipeUnitConfigSlot, DataStoreThunk, ToolScope, and ScopeContribution
 // live in the leaf `scope-types.ts` (audit 2026-05-29, M4) so the `Tool`
@@ -95,6 +96,23 @@ export interface RunScopeOptions {
    * state: selection is always explicit at the composition root.
    */
   readonly signalSink?: SignalSink;
+  /**
+   * The manifests of the tools admitted through the compatibility gate this
+   * run, in registration order. Recorded by the CLI bootstrap and stamped on
+   * the scope so host commands (`tools list`) read them via `currentScope()`
+   * instead of a module global. Defaults to `[]` (no tools admitted — e.g. an
+   * isolated test scope). HOST-only: tools never read these, so they live on
+   * `RunScope`, not the tool-facing `ToolScope`.
+   */
+  readonly toolManifests?: readonly ToolPluginManifest[];
+  /**
+   * The provenance records of the tools admitted this run (source, identity,
+   * manifest hash), paired index-wise with {@link toolManifests}. Recorded by
+   * the CLI bootstrap and stamped on the scope so host commands (`plugin list`,
+   * `tools list`, `tools uninstall`) read them via `currentScope()` rather than
+   * a module global. Defaults to `[]`.
+   */
+  readonly toolProvenance?: readonly ToolProvenance[];
 }
 
 /**
@@ -141,6 +159,16 @@ export class RunScope {
    * concurrent runs share no diagnostics state (the no-module-singleton rule).
    */
   readonly diagnostics: DiagnosticsBus;
+  /**
+   * Manifests of the tools admitted this run (registration order). Empty unless
+   * the CLI bootstrap recorded them. Read by host commands via `currentScope()`.
+   */
+  readonly toolManifests: readonly ToolPluginManifest[];
+  /**
+   * Provenance of the tools admitted this run, paired index-wise with
+   * {@link toolManifests}. Empty unless the CLI bootstrap recorded them.
+   */
+  readonly toolProvenance: readonly ToolProvenance[];
 
   constructor(opts: RunScopeOptions = {}) {
     this.logger = opts.logger ?? defaultLogger;
@@ -155,6 +183,8 @@ export class RunScope {
     this.runId = opts.runId ?? '';
     this.signalSink = opts.signalSink ?? noopSignalSink;
     this.diagnostics = new DiagnosticsBus(this.runId);
+    this.toolManifests = opts.toolManifests ?? [];
+    this.toolProvenance = opts.toolProvenance ?? [];
   }
 
   /** Release per-run resources (caches, recipe-config slot). */

@@ -2,13 +2,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  UnknownLiveViewError,
-  type LiveViewRenderer,
-  type Logger,
-  type ToolPluginManifest,
-  type ToolProvenance,
-} from '@opensip-cli/core';
+import { UnknownLiveViewError, type LiveViewRenderer, type Logger } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildToolCliContext, createLiveViewRegistry } from '../cli-context.js';
@@ -219,44 +213,29 @@ describe('getCurrentProjectRoot / entered scope', () => {
   });
 });
 
-describe('setCliRegistriesForRun / getCurrentRegistriesForScope', () => {
-  it('throws when read before write — bootstrap-ordering safety', async () => {
-    vi.resetModules();
-    const mod = await import('../cli-context.js');
-    expect(() => mod.getCurrentRegistriesForScope()).toThrow(/setCliRuntimeContextForRun/);
+describe('admitted-tool facts ride the RunScope (no module-global handoff bag)', () => {
+  it('defaults toolManifests / toolProvenance to empty arrays', async () => {
+    const { RunScope } = await import('@opensip-cli/core');
+    const scope = new RunScope({});
+    expect(scope.toolManifests).toEqual([]);
+    expect(scope.toolProvenance).toEqual([]);
   });
 
-  it('round-trips the registries set by main()', async () => {
-    vi.resetModules();
-    const mod = await import('../cli-context.js');
+  it('carries the admitted-tool provenance + manifests the bootstrap stamps on it', async () => {
     const core = await import('@opensip-cli/core');
-    const languages = new core.LanguageRegistry();
-    const tools = new core.ToolRegistry();
-    mod.setCliRegistriesForRun({ languages, tools });
-    const out = mod.getCurrentRegistriesForScope();
-    expect(out.languages).toBe(languages);
-    expect(out.tools).toBe(tools);
-  });
-
-  it('installs registries and plugin metadata as one runtime context', async () => {
-    vi.resetModules();
-    const mod = await import('../cli-context.js');
-    const core = await import('@opensip-cli/core');
-    const languages = new core.LanguageRegistry();
-    const tools = new core.ToolRegistry();
-    const provenance: ToolProvenance[] = [
+    const toolProvenance = [
       {
         id: 'plugin-a',
         version: '1.0.0',
-        source: 'bundled',
+        source: 'bundled' as const,
         packageName: '@opensip-cli/plugin-a',
         resolvedPath: '/plugins/a/package.json',
         manifestHash: 'hash-a',
       },
     ];
-    const manifests: ToolPluginManifest[] = [
+    const toolManifests = [
       {
-        kind: 'tool',
+        kind: 'tool' as const,
         apiVersion: core.PLUGIN_API_VERSION,
         id: 'plugin-a',
         name: 'Plugin A',
@@ -264,19 +243,15 @@ describe('setCliRegistriesForRun / getCurrentRegistriesForScope', () => {
         commands: [],
       },
     ];
-
-    mod.setCliRuntimeContextForRun({
-      languages,
-      tools,
-      toolProvenance: provenance,
-      toolManifests: manifests,
+    const scope = new core.RunScope({ toolProvenance, toolManifests });
+    // Readable directly and via currentScope() inside the entered scope — the
+    // single source of truth host commands now read instead of a module global.
+    expect(scope.toolProvenance).toBe(toolProvenance);
+    expect(scope.toolManifests).toBe(toolManifests);
+    core.runWithScopeSync(scope, () => {
+      expect(core.currentScope()?.toolProvenance).toBe(toolProvenance);
+      expect(core.currentScope()?.toolManifests).toBe(toolManifests);
     });
-
-    const out = mod.getCurrentRegistriesForScope();
-    expect(out.languages).toBe(languages);
-    expect(out.tools).toBe(tools);
-    expect(mod.getToolProvenanceForRun()).toBe(provenance);
-    expect(mod.getToolManifestsForRun()).toBe(manifests);
   });
 });
 
