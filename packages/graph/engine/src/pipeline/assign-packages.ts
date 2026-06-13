@@ -17,26 +17,33 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { logger } from '@opensip-cli/core';
+import { logger, withSpan } from '@opensip-cli/core';
 
 import type { Catalog, FunctionOccurrence } from '../types.js';
 
 const UNKNOWN = '<unknown>';
 
 export function assignPackages(catalog: Catalog, projectRoot: string): Catalog {
-  const nameByDir = new Map<string, string | null>();
-  const labelOf = (filePath: string): string => {
-    const nearest = nearestManifestName(dirOf(filePath), projectRoot, nameByDir);
-    if (nearest !== null) return nearest;
-    const seg = filePath.split('/')[0];
-    return seg && seg !== filePath ? seg : UNKNOWN;
-  };
+  return withSpan(
+    'opensip-cli-graph',
+    'graph.assign_packages',
+    () => {
+      const nameByDir = new Map<string, string | null>();
+      const labelOf = (filePath: string): string => {
+        const nearest = nearestManifestName(dirOf(filePath), projectRoot, nameByDir);
+        if (nearest !== null) return nearest;
+        const seg = filePath.split('/')[0];
+        return seg && seg !== filePath ? seg : UNKNOWN;
+      };
 
-  const functions: Record<string, FunctionOccurrence[]> = {};
-  for (const [name, occs] of Object.entries(catalog.functions)) {
-    functions[name] = occs.map((occ) => ({ ...occ, package: labelOf(occ.filePath) }));
-  }
-  return { ...catalog, functions };
+      const functions: Record<string, FunctionOccurrence[]> = {};
+      for (const [name, occs] of Object.entries(catalog.functions)) {
+        functions[name] = occs.map((occ) => ({ ...occ, package: labelOf(occ.filePath) }));
+      }
+      return { ...catalog, functions };
+    },
+    { 'graph.assign_packages.project': projectRoot }
+  );
 }
 
 /** Project-relative posix directory of a file ('' for a root-level file). */

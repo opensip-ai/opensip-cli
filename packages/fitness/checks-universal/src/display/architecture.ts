@@ -28,6 +28,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'no-module-singleton': ['🔒', 'No Module Singleton'],
   'no-placeholder-check-ids': ['🚫', 'No Placeholder Check IDs'],
   'node-version-consistency': ['📦', 'Node Version Consistency'],
+  'hot-paths-require-spans': ['📡', 'Hot Paths Require Spans'],
   'one-config-document': ['📄', 'One Config Document'],
   'one-outcome-shape': ['📦', 'One Outcome Shape'],
   'project-readme-existence': ['📝', 'Project README Existence'],

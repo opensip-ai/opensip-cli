@@ -46,6 +46,9 @@ import {
   type ToolRegistry,
 } from '@opensip-cli/core';
 
+import { startProfiling } from '../telemetry/profiling.js';
+import { getMeter } from '@opensip-cli/core';
+
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { BootstrapError } from './bootstrap-error.js';
@@ -326,6 +329,11 @@ export function installPreActionHook(
     // improves observability of the blast-radius bootstrap paths (architecture review).
     scope.diagnostics.event('load', 'debug', `${tools.list().length} tool(s) loaded`);
     scope.diagnostics.counter('tools.loaded', tools.list().length);
+
+    // Phase 2 metrics (low cardinality)
+    getMeter('opensip-cli').createCounter('opensip_cli.commands.started').add(1, {
+      command: actionCommand.name(),
+    });
     scope.diagnostics.event(
       'validate',
       'debug',
@@ -358,6 +366,10 @@ export function installPreActionHook(
         walkedUp: project.walkedUp,
       });
     }
+
+    // Optional profiling (Phase 3, severable). Start after scope (runId available).
+    // Respects the dual-gate (OPENSIP_PROFILING + OTEL) or OTEL-only fallback.
+    startProfiling(scope, actionCommand.name());
 
     // 8. Lazy, memoized Tool.initialize() — runs the owning tool's
     //    optional one-time init here, AFTER enterScope (so eager setup that

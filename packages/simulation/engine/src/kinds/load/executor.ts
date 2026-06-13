@@ -19,6 +19,7 @@ import type { LoadScenarioConfig } from './config.js';
 import type { RunnableScenario } from '../../framework/runnable-scenario.js';
 import type { LoadScenarioExecutorResult } from '../../framework/scenario-executor-result.js';
 import type { ScenarioExecutionContext } from '../../types/framework-types.js';
+import { withSpanAsync } from '@opensip-cli/core';
 
 /**
  * Run the load window against the BYO target and wrap the measured metrics +
@@ -34,10 +35,19 @@ async function executeLoad(
     rps: config.workload.rps,
   });
 
-  const window = await runLoadWindow({ workload: config.workload }, context, {
-    windowMs: config.duration * 1000,
-    target: config.target,
-  });
+  const window = await withSpanAsync(
+    'opensip-cli-simulation',
+    'simulation.scenario.execute',
+    async () =>
+      runLoadWindow({ workload: config.workload }, context, {
+        windowMs: config.duration * 1000,
+        target: config.target,
+      }),
+    {
+      'simulation.scenario.id': config.id,
+      'simulation.kind': 'load',
+    }
+  );
 
   const built = ScenarioResultBuilder.create(config.id)
     .withMetrics(window.metrics)

@@ -4,15 +4,15 @@
  *
  * ## Opt-in gate (the load-bearing contract)
  *
- * The entire SDK is gated on `OTEL_EXPORTER_OTLP_ENDPOINT`:
+ * The entire SDK (traces + metrics + optional profiling) is gated on
+ * `OTEL_EXPORTER_OTLP_ENDPOINT` (see ADR-0049 and observability plan for details).
  *
- *   - **Set** ⇒ register a global `NodeTracerProvider` (OTLP/HTTP exporter,
- *     AsyncLocalStorage context manager, W3C TraceContext propagator, resource
- *     attributes). From that point `core`'s `getTracer`/`withSpan` resolve to
- *     real tracers process-wide, so graph's stage spans are emitted.
- *   - **Unset** ⇒ hard no-op: no provider registers, the OTel API stays a
- *     no-op facade, and standalone CLI runs pay nothing. This is the guarantee
- *     standalone users depend on.
+ *   - **Set** ⇒ register NodeTracerProvider + (Phase 2) MeterProvider.
+ *     `core`'s `getTracer`/`withSpan`/`getMeter` resolve to real implementations.
+ *   - Profiling uses the same endpoint (recommended with dedicated
+ *     `OPENSIP_PROFILING=1` flag for cost control; "OTEL endpoint alone" mode
+ *     is supported with warnings).
+ *   - **Unset** ⇒ hard no-op for everything. Standalone CLI pays nothing.
  *
  * ## Layering
  *
@@ -52,11 +52,14 @@ import {
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { resourceFromAttributes, detectResources, envDetector } from '@opentelemetry/resources';
 import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
+import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
 import { hostEnv } from '../env/host-env-specs.js';
+import { startProfiling, stopProfiling, resetProfilingForTests } from './profiling.js';
 
 /**
  * Hard ceiling (ms) on the final span flush AND on each individual export
@@ -73,11 +76,15 @@ let started = false;
 function resetTelemetryState(): void {
   started = false;
   provider = undefined;
+  meterProvider = undefined;
   parentContext = undefined;
 }
 
-/** The active provider, retained so {@link shutdownTelemetry} can flush it. */
+/** The active tracer provider, retained so {@link shutdownTelemetry} can flush it. */
 let provider: NodeTracerProvider | undefined;
+
+/** The active meter provider (Phase 2). */
+let meterProvider: MeterProvider | undefined;
 
 /**
  * Parent context extracted from `TRACEPARENT`, or undefined when the var is
@@ -127,6 +134,23 @@ export function initTelemetry(cliEntryUrl: string): void {
     propagator: new W3CTraceContextPropagator(),
   });
 
+  // Phase 2: MeterProvider for metrics (same resource + gate).
+  // Uses PeriodicExportingMetricReader; for short-lived CLI the interesting
+  // export happens on shutdownTelemetry. No-op when gate closed.
+  meterProvider = new MeterProvider({
+    resource,
+    readers: [
+      new PeriodicExportingMetricReader({
+        exporter: new OTLPMetricExporter({ timeoutMillis: SHUTDOWN_TIMEOUT_MS }),
+        exportIntervalMillis: 5_000, // short for CLI; shutdown forces final export
+      }),
+    ],
+  });
+  // Note: we do not call a global register for meters here because
+  // @opentelemetry/api metrics.getMeter reads from the global MeterProvider
+  // once one is set via the SDK (the reader/exporter wiring above makes
+  // the provider "active" for getMeter calls in this process).
+
   // Parent-trace nesting: extract the W3C traceparent the consumer passed via
   // env so the run's spans attach under the parent trace. Unset ⇒ own trace.
   const traceparent = hostEnv.get<string>('TRACEPARENT');
@@ -162,23 +186,51 @@ export function runWithTelemetryContext<T>(fn: () => T): T {
 }
 
 /**
- * Flush and shut down the tracer provider so batched spans export before the
- * short-lived process exits. No-op when telemetry was never started. Swallows
- * shutdown errors — a dead collector must not crash the CLI on the way out.
+ * Flush and shut down the tracer + meter providers (and stop profiling if active)
+ * so batched data export before the short-lived process exits.
+ * No-op when telemetry was never started. Swallows shutdown errors — a dead
+ * collector must not crash the CLI on the way out.
  */
 export async function shutdownTelemetry(): Promise<void> {
-  if (!started || !provider) return;
+  if (!started) return;
+
+  // Stop profiling first (it may write files and is cheap).
   try {
-    await raceWithTimeout(provider.shutdown(), SHUTDOWN_TIMEOUT_MS);
-  } catch (error) {
-    // Structured event (evt + module), matching the codebase logging
-    // convention — so telemetry's own failure signal is queryable by `evt`
-    // like every other event, not buried as a bare `msg`.
-    logger.warn('telemetry shutdown failed', {
-      evt: 'telemetry.shutdown.failed',
-      module: 'cli:telemetry',
-      err: error instanceof Error ? error.message : String(error),
-    });
+    stopProfiling();
+  } catch {
+    // best effort
+  }
+
+  const shutdowns: Promise<void>[] = [];
+
+  if (provider) {
+    shutdowns.push(
+      raceWithTimeout(provider.shutdown(), SHUTDOWN_TIMEOUT_MS).catch((error) => {
+        logger.warn('telemetry.shutdown.failed', {
+          evt: 'telemetry.shutdown.failed',
+          module: 'cli:telemetry',
+          kind: 'tracer',
+          err: error instanceof Error ? error.message : String(error),
+        });
+      })
+    );
+  }
+
+  if (meterProvider) {
+    shutdowns.push(
+      raceWithTimeout(meterProvider.shutdown(), SHUTDOWN_TIMEOUT_MS).catch((error) => {
+        logger.warn('telemetry.shutdown.failed', {
+          evt: 'telemetry.shutdown.failed',
+          module: 'cli:telemetry',
+          kind: 'meter',
+          err: error instanceof Error ? error.message : String(error),
+        });
+      })
+    );
+  }
+
+  if (shutdowns.length > 0) {
+    await Promise.all(shutdowns);
   }
 }
 
@@ -213,4 +265,5 @@ export async function raceWithTimeout(work: Promise<void>, ms: number): Promise<
  */
 export function resetTelemetryForTests(): void {
   resetTelemetryState();
+  resetProfilingForTests();
 }

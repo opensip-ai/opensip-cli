@@ -26,11 +26,13 @@
 
 import {
   context,
+  metrics,
   propagation,
   trace,
   SpanStatusCode,
   type Span,
   type Attributes,
+  type Meter,
   type Tracer,
 } from '@opentelemetry/api';
 
@@ -139,3 +141,24 @@ export function currentTraceparent(): string | undefined {
   propagation.inject(context.active(), carrier);
   return carrier.traceparent;
 }
+
+/**
+ * Resolve a `Meter` for a given instrumentation scope name (e.g.
+ * `'opensip-cli'`). Reads the *global* meter provider set by the SDK
+ * at the application boundary; returns a no-op meter when no SDK is registered.
+ *
+ * Same no-op-until-SDK contract as tracing. SDK registration (including
+ * `@opentelemetry/sdk-metrics`) happens only in the CLI composition root,
+ * gated on `OTEL_EXPORTER_OTLP_ENDPOINT`.
+ */
+export function getMeter(name: string): Meter {
+  return metrics.getMeter(name);
+}
+
+// Profiling support is intentionally minimal in core (thin seam only).
+// The actual profiler (labels, start/stop, flush) lives in the CLI root
+// (`packages/cli/src/telemetry/profiling.ts`) behind the OPENSIP_PROFILING
+// (recommended) + OTEL_EXPORTER_OTLP_ENDPOINT gate (or OTEL-only mode).
+// Core only provides correlation primitives (currentTraceparent, runId via scope)
+// that the CLI uses to label profiles. This keeps the kernel free of any
+// profiling SDK bits. See ADR-0049 and the observability-hardening plan.

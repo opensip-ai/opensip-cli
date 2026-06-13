@@ -76,6 +76,7 @@ export class SessionRepo {
         msg: 'Failed to save session',
         sessionId: session.id,
         error: error instanceof Error ? error.message : String(error),
+        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
       });
       throw error;
     }

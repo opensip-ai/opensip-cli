@@ -13,6 +13,7 @@
 
 import { logger } from '../lib/logger.js';
 import { currentScope } from '../lib/run-scope.js';
+import { withSpan } from '../lib/telemetry.js';
 
 /**
  * One-shot guard so the degradation warning fires at most once per process.

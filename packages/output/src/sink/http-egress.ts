@@ -140,7 +140,7 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
 
         if (res.status === 401 || res.status === 403) {
           authRejected = true;
-          logger.info({
+          logger.warn({
             evt: `${evtPrefix}.auth-rejected`,
             module: MODULE_TAG,
             status: res.status,
@@ -148,7 +148,7 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
           break outer; // permanent auth failure — stop everything
         }
         if (!isTransient(res.status)) {
-          logger.info({
+          logger.warn({
             evt: `${evtPrefix}.abort`,
             module: MODULE_TAG,
             status: res.status,
@@ -170,7 +170,7 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
 
       // Transient: retry if attempts remain and the deadline allows.
       if (attempt >= policy.maxAttempts) {
-        logger.info({
+        logger.warn({
           evt: `${evtPrefix}.error`,
           module: MODULE_TAG,
           chunk: `${ci + 1}/${chunks.length}`,

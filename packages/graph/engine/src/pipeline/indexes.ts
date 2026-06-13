@@ -6,7 +6,7 @@
  * Data → data.
  */
 
-import { logger } from '@opensip-cli/core';
+import { logger, withSpan } from '@opensip-cli/core';
 
 import { occId, pkgOf } from '../resolve-callee.js';
 
@@ -44,26 +44,33 @@ export function buildHashMaps(catalog: Catalog): HashMaps {
 
 /** Builds query-side indexes (by-body-hash, by-occ-id, by-simple-name, adjacency) over the catalog. */
 export function buildIndexes(catalog: Catalog): Indexes {
-  const { byBodyHash, occurrencesByHash, bySimpleName, byOccId } = buildHashMaps(catalog);
-  const { callees, callers } = buildAdjacency(occurrencesByHash, byBodyHash);
-  const importedPackagesByFile = buildImportedPackagesByFile(occurrencesByHash, byBodyHash);
+  return withSpan(
+    'opensip-cli-graph',
+    'graph.indexes',
+    () => {
+      const { byBodyHash, occurrencesByHash, bySimpleName, byOccId } = buildHashMaps(catalog);
+      const { callees, callers } = buildAdjacency(occurrencesByHash, byBodyHash);
+      const importedPackagesByFile = buildImportedPackagesByFile(occurrencesByHash, byBodyHash);
 
-  logger.info({
-    evt: 'graph.indexes.build.complete',
-    module: 'graph:indexes',
-    nodes: byBodyHash.size,
-    edges: [...callees.values()].reduce((n, arr) => n + arr.length, 0),
-  });
+      logger.info({
+        evt: 'graph.indexes.build.complete',
+        module: 'graph:indexes',
+        nodes: byBodyHash.size,
+        edges: [...callees.values()].reduce((n, arr) => n + arr.length, 0),
+      });
 
-  return {
-    byBodyHash,
-    byOccId,
-    occurrencesByHash,
-    importedPackagesByFile,
-    bySimpleName,
-    callees,
-    callers,
-  };
+      return {
+        byBodyHash,
+        byOccId,
+        occurrencesByHash,
+        importedPackagesByFile,
+        bySimpleName,
+        callees,
+        callers,
+      };
+    },
+    { 'graph.indexes.nodes': /* approximate */ 0 } // can be set post in caller if needed
+  );
 }
 
 /**

@@ -80,6 +80,7 @@ export class BaselineRepo {
         msg: 'Failed to save tool baseline',
         tool,
         error: error instanceof Error ? error.message : String(error),
+        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
       });
       throw error;
       /* v8 ignore stop */

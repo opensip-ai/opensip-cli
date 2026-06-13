@@ -115,7 +115,7 @@ export function createCloudSignalSink(opts: CloudSignalSinkOptions): SignalSink 
         };
       } catch (error) {
         // Defense in depth — postChunked never throws, but emit MUST NOT either.
-        logger.info({
+        logger.warn({
           evt: 'cli.signal-sync.error',
           module: MODULE_TAG,
           error: error instanceof Error ? error.message : String(error),

@@ -19,7 +19,7 @@
  * signal as a timeout.
  */
 
-import { TimeoutError, logger, runWithTimeout } from '@opensip-cli/core';
+import { TimeoutError, logger, runWithTimeout, withSpanAsync } from '@opensip-cli/core';
 
 import { CheckAbortedError } from '../framework/execution-context.js';
 import { memoryProfiler } from '../framework/memory-profiler.js';
@@ -106,20 +106,31 @@ export async function runOneCheck(
   // `timeout` outcome IS a real timeout, exactly as the former inline
   // AbortController+setTimeout body computed it. `CheckAbortedError` is never
   // retried (the timeout abort surfaces as a `timeout` outcome, not a retry).
-  const outcome = await runWithTimeout({
-    run: (signal) =>
-      check.run(opts.cwd, {
-        signal,
-        ...(targetFiles ? { targetFiles } : {}),
-        ...(opts.globalExcludes ? { globalExcludes: opts.globalExcludes } : {}),
-      }),
-    timeoutMs: checkTimeout,
-    retry: {
-      enabled: opts.retryEnabled,
-      maxRetries: opts.maxRetries,
-      shouldNotRetry: (error) => error instanceof CheckAbortedError,
+  const outcome = await withSpanAsync(
+    'opensip-cli-fitness',
+    'fitness.check.execute',
+    async () => {
+      return await runWithTimeout({
+        run: (signal) =>
+          check.run(opts.cwd, {
+            signal,
+            ...(targetFiles ? { targetFiles } : {}),
+            ...(opts.globalExcludes ? { globalExcludes: opts.globalExcludes } : {}),
+          }),
+        timeoutMs: checkTimeout,
+        retry: {
+          enabled: opts.retryEnabled,
+          maxRetries: opts.maxRetries,
+          shouldNotRetry: (error) => error instanceof CheckAbortedError,
+        },
+      });
     },
-  });
+    {
+      'fitness.check.slug': checkSlug,
+      'fitness.check.id': checkId,
+      'fitness.check.timeout_ms': checkTimeout,
+    }
+  );
   const { durationMs } = outcome;
 
   // The result PROCESSING (which fires user callbacks like onCheckComplete) is

@@ -113,6 +113,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'generateUUID',
   'getParseTree',
   'getParseTreeForFile',
+  'getMeter',
   'getTracer',
   'getUnitConfig',
   'hasPackageJson',

@@ -138,7 +138,7 @@ async function emitToCloud(
     }
     return { accepted: 0, skippedReason };
   } catch (error) {
-    log.info({
+    log.warn({
       evt: 'cli.signal-egress.error',
       module: MODULE_TAG,
       error: error instanceof Error ? error.message : String(error),

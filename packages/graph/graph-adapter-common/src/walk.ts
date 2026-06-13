@@ -21,6 +21,7 @@
 
 import { relative } from 'node:path';
 
+import { withSpan } from '@opensip-cli/core';
 import { nameOf, childrenOf, namedChildrenOf } from '@opensip-cli/tree-sitter';
 
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
@@ -130,25 +131,34 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
 
   const sortedPaths = [...input.files].filter((p) => input.project.files.has(p)).sort();
 
-  for (const path of sortedPaths) {
-    const file = input.project.files.get(path);
-    if (!file) continue;
-    try {
-      walkFile(
-        path,
-        file as P['files'] extends ReadonlyMap<string, infer F> ? F : never,
-        input.projectDirAbs,
-        sinks,
-      );
-    } catch (error) {
-      parseErrors.push({
-        filePath: relative(input.projectDirAbs, path),
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
+  return withSpan(
+    'opensip-cli-graph',
+    'graph.walk',
+    () => {
+      for (const path of sortedPaths) {
+        const file = input.project.files.get(path);
+        if (!file) continue;
+        try {
+          walkFile(
+            path,
+            file as P['files'] extends ReadonlyMap<string, infer F> ? F : never,
+            input.projectDirAbs,
+            sinks,
+          );
+        } catch (error) {
+          parseErrors.push({
+            filePath: relative(input.projectDirAbs, path),
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
 
-  return { occurrences, callSites, dependencySites, parseErrors };
+      return { occurrences, callSites, dependencySites, parseErrors };
+    },
+    {
+      'graph.walk.file_count': sortedPaths.length,
+    }
+  );
 }
 
 // ── module-init synthesis ─────────────────────────────────────────

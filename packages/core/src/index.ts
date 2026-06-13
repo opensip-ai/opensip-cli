@@ -331,7 +331,7 @@ export type { Logger, LogLevel, LoggerOptions, RunIdProvider } from './lib/logge
 // registers a global provider at the application boundary (the CLI). Tools emit
 // spans via `withSpan` and reach span types through this barrel so they never
 // import `@opentelemetry/api` directly — the kernel is the single seam.
-export { getTracer, withSpan, withSpanAsync, currentTraceparent } from './lib/telemetry.js';
+export { getTracer, withSpan, withSpanAsync, currentTraceparent, getMeter } from './lib/telemetry.js';
 export type { Span, Attributes, Tracer } from '@opentelemetry/api';
 
 // Lib — environment registry (north-star §5.12, launch). The kernel
