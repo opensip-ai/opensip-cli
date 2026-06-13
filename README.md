@@ -1,22 +1,41 @@
 # OpenSIP CLI
 
+Codebase intelligence from your terminal.
+
+OpenSIP CLI helps engineering teams understand code health, architecture risk,
+and change impact before problems reach production. Run polyglot fitness
+checks, map dependency blast radius, gate regressions in CI, and generate
+local reports without sending your code to a SaaS by default.
+
 [![npm](https://img.shields.io/npm/v/opensip-cli)](https://www.npmjs.com/package/opensip-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](#license)
 [![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen)](https://nodejs.org)
 [![Docs](https://img.shields.io/badge/docs-opensip.ai-2563eb)](https://opensip.ai/docs/opensip-cli/)
 [![OpenSIP](https://img.shields.io/badge/part%20of-OpenSIP-7c3aed)](https://opensip.ai)
 
-OpenSIP CLI is the command-line interface for measuring, mapping, and gating
-codebase health. The npm package is `opensip-cli`; the installed command is
-`opensip`.
+OpenSIP is built for teams that need to move quickly inside large or changing
+codebases. It gives platform teams, staff engineers, architecture owners, and
+product teams a shared way to see what is healthy, what is risky, and what
+should not get worse.
 
-It ships as a pluggable tool platform with three first-party tools:
+- **Measure code health across languages** with 160+ included checks for
+  TypeScript, Python, Go, Java, Rust, and C/C++.
+- **See change impact before you merge** with static call graphs,
+  blast-radius analysis, cycles, duplicated bodies, oversized functions, and
+  architecture rules.
+- **Turn tech debt into a managed baseline** by saving today's findings and
+  failing CI only when new regressions appear.
+- **Test operational behavior as code** with load, chaos, and adversarial
+  simulation scenarios.
+- **Stay local by default** with self-contained HTML reports and optional
+  OpenSIP Cloud sync when teams want history, visibility, and customer-facing
+  workflows.
 
-- `fit`: polyglot fitness checks and CI ratchets.
-- `graph`: static call graph, blast-radius analysis, and architecture rules.
-- `sim`: simulation scenarios for load, chaos, and adversarial behavior.
+The npm package is `opensip-cli`; the installed command is `opensip`.
 
-## Install
+## Quick Start
+
+Install the CLI:
 
 ```bash
 curl -fsSL https://opensip.ai/cli/install.sh | bash
@@ -26,44 +45,103 @@ Or install from npm:
 
 ```bash
 npm install -g opensip-cli
-opensip --help
 ```
 
-## Quick Start
+Run OpenSIP in your project:
 
 ```bash
 cd your-project
 opensip init
-opensip fit --recipe example
-opensip sim --recipe example
-```
-
-After the example runs pass, edit or remove the scaffolded files under
-`opensip-cli/{fit,sim}/` and run the real checks:
-
-```bash
 opensip fit
 opensip graph
 opensip report
 ```
 
-## Launch Features
+Want a smoke test before pointing it at real checks?
 
-- **Fitness checks**: roughly 165 included checks across TypeScript, Python,
-  Go, Java, Rust, and C/C++ from one CLI.
-- **CI ratchet**: baseline existing findings and surface only net-new
-  violations on pull requests.
-- **Code graph**: answer "what breaks if I touch this?" before you make the
-  change, including oversized functions, cycles, high-blast-radius code, and
-  duplicated bodies.
-- **HTML reports**: generate a self-contained report with no server or SaaS
-  login required.
-- **Simulation**: define load, chaos, and adversarial scenarios as code with
-  personas, invariants, and assertions.
-- **Extensible tools**: write custom checks, recipes, scenarios, graph rules,
-  or full tools that mount as first-class `opensip` subcommands.
-- **OpenSIP Cloud sync**: optionally send run signals to OpenSIP Cloud for
-  team visibility, history, and customer-facing workflows.
+```bash
+opensip fit --recipe example
+opensip sim --recipe example
+```
+
+After the example runs pass, edit or remove the scaffolded files under
+`opensip-cli/{fit,sim}/` and run the checks that matter for your codebase.
+
+## What You Can Do
+
+### Fitness Checks
+
+Run first-party and custom checks across multiple languages from one CLI. Use
+fitness checks to find risky patterns, enforce team standards, and catch
+architectural drift before it spreads.
+
+```bash
+opensip fit
+opensip fit --list
+opensip fit --check <slug>
+opensip fit --tags <tags>
+```
+
+### CI Ratchets
+
+Baseline the findings you already have, then fail pull requests only when they
+introduce net-new violations.
+
+```bash
+opensip fit --gate-save
+opensip fit --gate-compare
+```
+
+### Code Graph
+
+Build a static graph of your codebase so reviewers can answer the question
+every risky change raises: "what breaks if this changes?"
+
+```bash
+opensip graph
+opensip graph --json
+opensip graph --sarif graph.sarif
+```
+
+### Simulation
+
+Define simulation scenarios as code with personas, invariants, and assertions.
+Use them to explore load, chaos, and adversarial behavior with repeatable
+recipes.
+
+```bash
+opensip sim
+opensip sim --recipes
+opensip sim --recipe <name>
+```
+
+### Reports
+
+Generate a self-contained HTML report that can be opened locally, shared as a
+build artifact, or used as a lightweight review companion.
+
+```bash
+opensip report
+```
+
+### Extensible Tools
+
+OpenSIP ships with `fit`, `graph`, and `sim`, but the CLI is a pluggable tool
+platform. Add project-local checks, npm-packaged recipes, custom graph rules,
+or entire tools that mount as first-class `opensip` subcommands.
+
+## How It Works
+
+```text
+init -> analyze -> baseline -> gate -> report -> sync optionally
+```
+
+1. `opensip init` detects your project and writes a local OpenSIP layout.
+2. `opensip fit`, `opensip graph`, and `opensip sim` run local analysis.
+3. Gate commands compare against saved baselines so existing debt does not
+   block every pull request.
+4. `opensip report` creates local HTML output for review and sharing.
+5. OpenSIP Cloud sync is optional when teams want centralized visibility.
 
 ## Commands
 
@@ -100,7 +178,7 @@ opensip sim --recipe <name>   # run one recipe
 opensip sim --json
 ```
 
-### Project And Reports
+### Project and Reports
 
 ```bash
 opensip init
@@ -139,6 +217,46 @@ your-project/
 User-authored checks, recipes, scenarios, and tools live under
 `opensip-cli/`. Generated runtime data lives under `opensip-cli/.runtime/`.
 
+## CI Integration
+
+OpenSIP can be used as a ratchet in CI: save a baseline once, then compare new
+runs against it on pull requests.
+
+```bash
+opensip fit --gate-save
+opensip graph --gate-save
+
+opensip fit --gate-compare
+opensip graph --gate-compare
+```
+
+Use JSON or SARIF output when you want to feed findings into other systems:
+
+```bash
+opensip fit --json
+opensip graph --sarif graph.sarif
+```
+
+## OpenSIP Cloud
+
+OpenSIP CLI runs fully local by default. When your team wants shared history,
+trend visibility, or customer-facing workflows, it can also send run signals to
+OpenSIP Cloud.
+
+```bash
+opensip configure
+opensip fit --report-to https://your-opensip-instance/api/ingest
+```
+
+API key resolution order:
+
+1. `--api-key`
+2. `cli.apiKey` in `opensip-cli.config.yml`
+3. `OPENSIP_API_KEY`
+4. `~/.opensip-cli/config.yml`
+
+Use `--no-cloud` when you want a fully local run.
+
 ## Extensibility
 
 OpenSIP CLI is built to be extended.
@@ -158,25 +276,6 @@ OPENSIP_CLI_ALLOW_PROJECT_TOOLS=my-tool opensip my-tool
 ```
 
 Global tools under `~/.opensip-cli/tools/` are trusted by default.
-
-## OpenSIP Cloud
-
-OpenSIP CLI can run fully local, and it can also send run signals to OpenSIP
-Cloud.
-
-```bash
-opensip configure
-opensip fit --report-to https://your-opensip-instance/api/ingest
-```
-
-API key resolution order:
-
-1. `--api-key`
-2. `cli.apiKey` in `opensip-cli.config.yml`
-3. `OPENSIP_API_KEY`
-4. `~/.opensip-cli/config.yml`
-
-Use `--no-cloud` when you want a fully local run.
 
 ## Development
 
