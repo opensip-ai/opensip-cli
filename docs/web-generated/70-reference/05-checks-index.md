@@ -20,17 +20,17 @@ related-docs:
 ---
 # Checks reference
 
-opensip-cli ships **167 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-cli ships **170 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-cli/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(109 checks)*
+## Universal  *(112 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(30)*
+### Architecture  *(33)*
 
 | Slug | Description |
 |---|---|
@@ -52,6 +52,7 @@ Language-agnostic; runs against every project.
 | [`no-direct-stdout-in-tool-engine`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts) | Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011) |
 | [`no-duplicate-packages`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/dependencies/no-duplicate-packages.ts) | Detects packages that serve the same purpose |
 | [`no-module-singleton`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-module-singleton.ts) | No module-level mutable registry/loaded-state singleton; per-run state lives on RunScope via a factory (ADR-0023). fileCache/memoryProfiler are exempt. |
+| [`no-placeholder-check-ids`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-placeholder-check-ids.ts) | Check definitions must use real stable UUIDs for their `id` (not placeholder patterns) |
 | [`node-version-consistency`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/node-version-consistency.ts) | Validate Node.js version consistency across configs |
 | [`one-config-document`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/one-config-document.ts) | A tool must validate its config block through a composed Zod schema, not hand-project its own opensip-cli.config.yml namespace (ADR-0023) |
 | [`one-outcome-shape`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/one-outcome-shape.ts) | Machine output must be a CommandOutcome via renderOutcome, not a bare {error} / raw JSON (§5.5) |
@@ -61,7 +62,9 @@ Language-agnostic; runs against every project.
 | [`restrict-raw-db-access`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/restrict-raw-db-access.ts) | Confine the raw Drizzle handle (DataStore.db) to the persistence ownership boundary (ADR-0009) |
 | [`same-recipe-semantics`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/same-recipe-semantics.ts) | Recipe execution must run on the shared substrate; no per-tool scheduler reimplementation (§5.8/§4.3) |
 | [`stale-build-artifacts`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/stale-build-artifacts.ts) | Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/ |
+| [`tool-contract-version-policy`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-contract-version-policy.ts) | Any *_CONTRACT_VERSION (core + per-tool) may only be changed on actual contract deltas and the change must reference ADR-0046 or ADR-0047 |
 | [`tool-has-manifest`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-has-manifest.ts) | Every first-party tool package must declare a conformant opensipTools manifest (kind/id/apiVersion/commands) the host can read before import |
+| [`tool-stable-id`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-stable-id.ts) | Tool declarations must use real stable UUIDs for their `id` (matching Checks naming) |
 | [`vitest-config-extends-base`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-extends-base.ts) | Per-package vitest configs must extend the shared .config/vitest.base (when one exists) |
 | [`vitest-config-required-with-tests`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-required-with-tests.ts) | Ensures packages with tests have a vitest.config at the package root |
 

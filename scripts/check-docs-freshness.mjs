@@ -104,11 +104,7 @@ const ALLOW = [
   { file: '80-implementation/03-session-and-persistence.md', term: 'fit_baseline' },
   { file: '80-implementation/03-session-and-persistence.md', term: 'graph_baseline_signals' },
   { file: '80-implementation/03-session-and-persistence.md', term: 'graph_baseline_meta' },
-  { file: '70-reference/11-migrating-to-3.0.md', term: 'Tool.register' },
   { file: '80-implementation/01-cli-dispatch.md', term: 'defaultToolRegistry' },
-  { file: '10-concepts/04-contract-surfaces.md', term: 'CliOutput' },
-  { file: '70-reference/04-json-output-schema.md', term: 'CliOutput' },
-  { file: '70-reference/07-migrating-to-2.7.md', term: 'CliOutput' },
 ];
 
 function isAllowed(relFile, termName) {

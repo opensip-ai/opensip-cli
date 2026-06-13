@@ -69,12 +69,7 @@ const SHUTDOWN_TIMEOUT_MS = 2000;
 /** Idempotency guard — provider registration is process-wide and one-shot. */
 let started = false;
 
-/** Reset for test harnesses and fresh invocations (GA Low hygiene). */
-export function resetTelemetryStartedForTest(): void {
-  resetTelemetryState();
-}
-
-/** Internal shared reset to avoid identical function bodies (sonar). */
+/** Internal shared reset of the process-wide telemetry state. */
 function resetTelemetryState(): void {
   started = false;
   provider = undefined;

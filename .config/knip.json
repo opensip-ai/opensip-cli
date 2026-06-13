@@ -13,7 +13,14 @@
         "@opensip-cli/checks-go",
         "@opensip-cli/checks-java",
         "@opensip-cli/checks-python",
-        "@opensip-cli/checks-rust"
+        "@opensip-cli/checks-rust",
+        "@opensip-cli/checks-typescript",
+        "@opensip-cli/checks-universal",
+        "@opensip-cli/graph-go",
+        "@opensip-cli/graph-java",
+        "@opensip-cli/graph-python",
+        "@opensip-cli/graph-rust",
+        "@opensip-cli/graph-typescript"
       ]
     },
     "packages/cli": {
