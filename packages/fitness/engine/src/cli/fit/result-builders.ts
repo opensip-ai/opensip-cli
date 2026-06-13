@@ -241,6 +241,13 @@ export function persistFitSession(
 ): void {
   try {
     const repo = new SessionRepo(datastore);
+    const fitPayload = buildFitnessSessionPayload(envelope);
+    // Guard (primarily exercised in tests/CI per phase 3.3): ensure the convention
+    // is followed on new writes. No user-visible behavior change.
+    if (process.env.NODE_ENV === 'test' && typeof (fitPayload as any).__version !== 'number') {
+      // eslint-disable-next-line no-console
+      console.warn('fitness session payload missing __version in test build');
+    }
     repo.save({
       id: generatePrefixedId('fit'),
       tool: 'fit',
@@ -254,7 +261,7 @@ export function persistFitSession(
       // from the envelope's signals/units. The generic session row above
       // holds zero fitness vocabulary; the dashboard reads this payload to
       // render the Fitness tab.
-      payload: buildFitnessSessionPayload(envelope),
+      payload: fitPayload,
     });
   } catch (error) {
     logger.warn({
