@@ -38,7 +38,7 @@ describe('runWorkerPool', () => {
   });
 
   it('throws on non-finite concurrency (NaN, Infinity) rather than producing zero workers', async () => {
-    await expect(runWorkerPool([1], NaN, (n) => Promise.resolve(n))).rejects.toThrow(
+    await expect(runWorkerPool([1], Number.NaN, (n) => Promise.resolve(n))).rejects.toThrow(
       /concurrency must be a finite number/,
     );
     await expect(runWorkerPool([1], Infinity, (n) => Promise.resolve(n))).rejects.toThrow(

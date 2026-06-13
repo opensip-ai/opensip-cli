@@ -353,22 +353,17 @@ export function renderCatalogJson(input: RenderCatalogJsonInput): string {
   // This mitigates V8 string length / OOM risk for the documented large-repo target.
   // (Full streaming to fd without ever holding the complete string would be even better
   // for extreme sizes; this is the contained fix that still returns the string contract.)
-  const parts: string[] = [];
-  parts.push('{\n');
-  parts.push('  "version": "1.0",\n');
-  parts.push('  "provenance": ' + JSON.stringify(provenance, null, 2) + ',\n');
-  parts.push('  "symbols": [\n');
-  for (let i = 0; i < symbols.length; i++) {
+  const parts: string[] = ['{\n', '  "version": "1.0",\n'];
+  parts.push('  "provenance": ' + JSON.stringify(provenance, null, 2) + ',\n', '  "symbols": [\n');
+  for (const [i, symbol_] of symbols.entries()) {
     if (i > 0) parts.push(',\n');
-    parts.push(JSON.stringify(symbols[i], null, 2));
+    parts.push(JSON.stringify(symbol_, null, 2));
   }
-  parts.push('\n  ],\n');
-  parts.push('  "edges": [\n');
-  for (let i = 0; i < edges.length; i++) {
+  parts.push('\n  ],\n', '  "edges": [\n');
+  for (const [i, edge] of edges.entries()) {
     if (i > 0) parts.push(',\n');
-    parts.push(JSON.stringify(edges[i], null, 2));
+    parts.push(JSON.stringify(edge, null, 2));
   }
-  parts.push('\n  ]\n');
-  parts.push('}');
+  parts.push('\n  ]\n', '}');
   return parts.join('');
 }

@@ -12,9 +12,8 @@ import { dirname, join } from 'node:path';
 
 import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
 import { fileCache } from '@opensip-cli/fitness';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
 import { typescriptAdapter } from '@opensip-cli/lang-typescript';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';
 

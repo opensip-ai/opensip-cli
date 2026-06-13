@@ -19,8 +19,8 @@
  * SDK bits stay in the CLI root.
  */
 
-import { Session } from 'node:inspector';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { Session } from 'node:inspector';
 import { join } from 'node:path';
 
 import { logger, type RunScope } from '@opensip-cli/core';

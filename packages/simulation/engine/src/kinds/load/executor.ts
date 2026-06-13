@@ -14,7 +14,6 @@ import { withSpanAsync } from '@opensip-cli/core';
 
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js';
 import { runLoadWindow } from '../../framework/execution/run-load-window.js';
-
 import { ScenarioResultBuilder } from '../../framework/result-builder.js';
 import { createScenarioLogger } from '../../framework/scenario-logger.js';
 

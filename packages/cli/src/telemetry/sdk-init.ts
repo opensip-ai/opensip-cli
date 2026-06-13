@@ -52,14 +52,15 @@ import {
 } from '@opentelemetry/api';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes, detectResources, envDetector } from '@opentelemetry/resources';
-import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
 import { hostEnv } from '../env/host-env-specs.js';
+
 import { startProfiling, stopProfiling, resetProfilingForTests } from './profiling.js';
 
 /**
@@ -143,7 +144,7 @@ export function initTelemetry(cliEntryUrl: string): void {
     readers: [
       new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporter({ timeoutMillis: SHUTDOWN_TIMEOUT_MS }),
-        exportIntervalMillis: 5_000, // short for CLI; shutdown forces final export
+        exportIntervalMillis: 5000, // short for CLI; shutdown forces final export
       }),
     ],
   });

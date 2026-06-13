@@ -45,10 +45,9 @@ import {
   type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-cli/core';
-
-import { startProfiling } from '../telemetry/profiling.js';
 import { getMeter } from '@opensip-cli/core';
 
+import { startProfiling } from '../telemetry/profiling.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { BootstrapError } from './bootstrap-error.js';

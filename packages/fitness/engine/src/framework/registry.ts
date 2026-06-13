@@ -57,7 +57,7 @@ export class CheckRegistry {
   get(slug: string): Check {
     const check = this.resolve(slug);
     if (!check) {
-      const cands = !slug.includes(':') ? (this.bareSlugIndex.get(slug) ?? []) : [];
+      const cands = slug.includes(':') ? [] : (this.bareSlugIndex.get(slug) ?? []);
       if (cands.length > 1) {
         throw new NotFoundError(
           `Check slug '${slug}' is ambiguous (${cands.length} matches: ${cands.join(', ')}). ` +

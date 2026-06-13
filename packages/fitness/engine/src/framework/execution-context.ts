@@ -14,7 +14,7 @@ import { SystemError, currentScope, logger as defaultLogger } from '@opensip-cli
 import { applyGlobalExcludes } from '../targets/index.js';
 
 import { DEFAULT_EXCLUSION_PATTERNS } from './constants.js';
-import { fileCache as globalFileCache, FileCache } from './file-cache.js';
+import { fileCache as globalFileCache, type FileCache } from './file-cache.js';
 import { PathMatcher } from './path-matcher.js';
 import { extractSnippet } from './result-builder.js';
 

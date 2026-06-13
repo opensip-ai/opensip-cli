@@ -6,7 +6,6 @@
  */
 
 import type { FitnessRecipeRegistry } from './registry.js';
-import type { FileCache } from '../framework/file-cache.js';
 import type {
   FitnessRecipe,
   FitnessRecipeResult,
@@ -14,6 +13,7 @@ import type {
   IgnoresByType,
 } from './types.js';
 import type { DirectiveEntry } from '../framework/directive-inventory.js';
+import type { FileCache } from '../framework/file-cache.js';
 import type { CheckMemoryProfile } from '../framework/memory-profiler.js';
 import type { CheckRegistry } from '../framework/registry.js';
 

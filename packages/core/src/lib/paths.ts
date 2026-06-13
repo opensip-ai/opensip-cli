@@ -40,8 +40,8 @@
  * change to the layout is a single-file edit.
  */
 
-import { homedir } from 'node:os';
 import { realpathSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, sep } from 'node:path';
 
 import type { ToolShortId } from '../tools/ids.js';

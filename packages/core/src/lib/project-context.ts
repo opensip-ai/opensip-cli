@@ -24,8 +24,8 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import { resolveProjectConfigPath } from '../config-resolution.js';
-import { ValidationError } from './errors.js';
 
+import { ValidationError } from './errors.js';
 import { logger } from './logger.js';
 
 const MODULE_TAG = 'core:project-context';
