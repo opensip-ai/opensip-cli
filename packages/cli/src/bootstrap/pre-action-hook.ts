@@ -248,7 +248,21 @@ export function installPreActionHook(
     //    top-level boundary) before any side effects. Phantom warn is non-fatal;
     //    warns then continues.
     checkSchemaVersionAndBailout(project, runId);
-    checkNoProjectAndBailout(project, cwd, actionCommand.name(), runId);
+
+    // Build the effective set of project-agnostic command names from the base list
+    // PLUS any tool CommandSpecs that declare scope: 'none'. This makes the
+    // declared `CommandSpec.scope` drive enforcement (previously the hardcoded
+    // name list made the field dead for tools and third-party commands).
+    const extraAgnostic = new Set<string>();
+    for (const tool of runtime.tools.list()) {
+      for (const c of tool.commands || []) {
+        if (c.scope === 'none') {
+          extraAgnostic.add(c.name);
+          (c.aliases || []).forEach((a: string) => extraAgnostic.add(a));
+        }
+      }
+    }
+    checkNoProjectAndBailout(project, cwd, actionCommand.name(), runId, extraAgnostic);
     warnAboutPhantomRuntimes(project, opts.json === true);
 
     // 5. Side-effect setup, gated on a real project being present.

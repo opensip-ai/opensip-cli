@@ -8,7 +8,7 @@
  * coordinates parallel/sequential execution, and builds results.
  */
 
-import { passRate } from '@opensip-cli/contracts';
+import { passRate } from "@opensip-cli/contracts";
 import {
   logger,
   NotFoundError,
@@ -19,37 +19,47 @@ import {
   RunScope,
   currentScope,
   runWithScope,
-} from '@opensip-cli/core';
+} from "@opensip-cli/core";
 
-import { fileCache, DEFAULT_PREWARM_PATTERNS } from '../framework/file-cache.js';
-import { type Check, type CheckRegistry } from '../framework/registry.js';
-import { currentCheckRegistry, currentRecipeRegistry } from '../framework/scope-registry.js';
+import {
+  FileCache,
+  fileCache as globalFileCache,
+  DEFAULT_PREWARM_PATTERNS,
+} from "../framework/file-cache.js";
+import { type Check, type CheckRegistry } from "../framework/registry.js";
+import {
+  currentCheckRegistry,
+  currentRecipeRegistry,
+} from "../framework/scope-registry.js";
 
-import { setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } from './check-config.js';
-import { resolveChecks, validateCheckReferences } from './check-resolution.js';
+import {
+  setCurrentRecipeCheckConfig,
+  clearCurrentRecipeCheckConfig,
+} from "./check-config.js";
+import { resolveChecks, validateCheckReferences } from "./check-resolution.js";
 import {
   executeParallel,
   type ExecutionOptions,
   type ExecutionServiceContext,
-} from './parallel-execution.js';
-import { type FitnessRecipeRegistry } from './registry.js';
-import { executeSequential } from './sequential-execution.js';
+} from "./parallel-execution.js";
+import { type FitnessRecipeRegistry } from "./registry.js";
+import { executeSequential } from "./sequential-execution.js";
 import {
   DEFAULT_MAX_PARALLEL,
   type CheckSelector,
   type FitnessRecipe,
   type FitnessRecipeResult,
   type RecipeRunSummary,
-} from './types.js';
+} from "./types.js";
 
 import type {
   FitnessRecipeServiceCallbacks,
   FitnessRecipeServiceConfig,
   FitnessRecipeSession,
-} from './service-types.js';
-import type { DirectiveEntry } from '../framework/directive-inventory.js';
+} from "./service-types.js";
+import type { DirectiveEntry } from "../framework/directive-inventory.js";
 
-const MODULE_FITNESS_RECIPES = 'fitness:recipes';
+const MODULE_FITNESS_RECIPES = "fitness:recipes";
 
 /** Default success threshold percentage when none is configured. */
 const DEFAULT_SUCCESS_THRESHOLD_PERCENT = 85;
@@ -80,6 +90,7 @@ export class FitnessRecipeService {
   private readonly config: FitnessRecipeServiceConfig;
   private readonly checkRegistry: CheckRegistry;
   private readonly recipeRegistry: FitnessRecipeRegistry;
+  private readonly fileCache: FileCache;
   private activeSession: FitnessRecipeSession | null = null;
   private abortController?: AbortController;
 
@@ -91,11 +102,17 @@ export class FitnessRecipeService {
     // programmatic callers can inject their own without a scope.
     this.checkRegistry = config?.checkRegistry ?? currentCheckRegistry();
     this.recipeRegistry = config?.recipeRegistry ?? currentRecipeRegistry();
+    // Per-service FileCache instance for SaaS concurrent RunScope isolation.
+    // Global singleton is for tests / non-service paths; each service gets its
+    // own so prewarm/clear in one run does not affect another.
+    this.fileCache = config?.fileCache ?? new FileCache();
   }
 
   private get session(): FitnessRecipeSession {
     if (!this.activeSession) {
-      throw new SystemError('No active session', { code: 'SYSTEM.FITNESS.NO_SESSION' });
+      throw new SystemError("No active session", {
+        code: "SYSTEM.FITNESS.NO_SESSION",
+      });
     }
     return this.activeSession;
   }
@@ -113,28 +130,36 @@ export class FitnessRecipeService {
    * @throws {NotFoundError} If the recipe name is not found in the registry.
    */
   // @fitness-ignore-next-line result-pattern-consistency -- return type is FitnessRecipeResult (not Result<T,E>); throw is appropriate for precondition failures
-  async start(recipeOrName: FitnessRecipe | string): Promise<FitnessRecipeResult> {
+  async start(
+    recipeOrName: FitnessRecipe | string,
+  ): Promise<FitnessRecipeResult> {
     if (this.activeSession) {
-      throw new SystemError('Recipe execution already in progress', {
-        code: 'SYSTEM.FITNESS.SESSION_IN_PROGRESS',
+      throw new SystemError("Recipe execution already in progress", {
+        code: "SYSTEM.FITNESS.SESSION_IN_PROGRESS",
       });
     }
 
-    const recipe = typeof recipeOrName === 'string' ? this.getRecipe(recipeOrName) : recipeOrName;
+    const recipe =
+      typeof recipeOrName === "string"
+        ? this.getRecipe(recipeOrName)
+        : recipeOrName;
 
     if (!recipe) {
-      const identifier = typeof recipeOrName === 'string' ? recipeOrName : recipeOrName.name;
+      const identifier =
+        typeof recipeOrName === "string" ? recipeOrName : recipeOrName.name;
       // @fitness-ignore-next-line result-pattern-consistency -- internal method, exceptions propagate to CLI boundary
       throw new NotFoundError(`Recipe not found: ${identifier}`, {
-        code: 'RESOURCE.NOT_FOUND.RECIPE',
-        metadata: { entity: 'recipe', identifier },
+        code: "RESOURCE.NOT_FOUND.RECIPE",
+        metadata: { entity: "recipe", identifier },
       });
     }
 
     return this.executeRecipe(recipe);
   }
 
-  private async executeRecipe(recipe: FitnessRecipe): Promise<FitnessRecipeResult> {
+  private async executeRecipe(
+    recipe: FitnessRecipe,
+  ): Promise<FitnessRecipeResult> {
     // Two paths: if we're already inside a `runWithScope`, project the
     // recipe-config slot onto the existing scope and run inline. Otherwise
     // construct an ad-hoc scope and enter `runWithScope` so the dynamic
@@ -157,8 +182,8 @@ export class FitnessRecipeService {
 
     this.abortController = new AbortController();
 
-    logger.info('Starting recipe session', {
-      evt: 'fitness.recipe.session.start',
+    logger.info("Starting recipe session", {
+      evt: "fitness.recipe.session.start",
       module: MODULE_FITNESS_RECIPES,
       sessionId,
       recipeName: recipe.name,
@@ -187,7 +212,10 @@ export class FitnessRecipeService {
         cwd,
         recipe,
         checkTargetFiles: this.config.checkTargetFiles,
-        ...(this.config.globalExcludes ? { globalExcludes: this.config.globalExcludes } : {}),
+        ...(this.config.globalExcludes
+          ? { globalExcludes: this.config.globalExcludes }
+          : {}),
+        fileCache: this.fileCache,
       };
       const execCtx: ExecutionServiceContext = {
         session: this.activeSession,
@@ -205,17 +233,17 @@ export class FitnessRecipeService {
       // lookup and let the compiler enforce exhaustiveness. The
       // two-mode ternary is small enough that the table is premature
       // today (audit 2026-05-23 F5).
-      await (recipe.execution.mode === 'parallel'
+      await (recipe.execution.mode === "parallel"
         ? executeParallel(execCtx, execOpts)
         : executeSequential(execCtx, execOpts));
 
       this.activeSession.directives = this.collectAppliedDirectives();
 
-      this.activeSession.status = 'completed';
+      this.activeSession.status = "completed";
       const result = this.buildResult();
 
-      logger.info('Recipe session completed', {
-        evt: 'fitness.recipe.session.complete',
+      logger.info("Recipe session completed", {
+        evt: "fitness.recipe.session.complete",
         module: MODULE_FITNESS_RECIPES,
         sessionId,
         recipeName: recipe.name,
@@ -226,21 +254,21 @@ export class FitnessRecipeService {
       void this.callbacks.onComplete?.(result);
       return result;
     } catch (error) {
-      logger.error('Recipe session failed', {
-        evt: 'fitness.recipe.session.error',
+      logger.error("Recipe session failed", {
+        evt: "fitness.recipe.session.error",
         module: MODULE_FITNESS_RECIPES,
         sessionId,
         recipeName: recipe.name,
         err: error instanceof Error ? error : undefined,
       });
       if (this.activeSession) {
-        this.activeSession.status = 'failed';
+        this.activeSession.status = "failed";
       }
       throw error;
     } finally {
       clearCurrentRecipeCheckConfig(recipeScope);
       void clearParseCache();
-      fileCache.clear();
+      this.fileCache.clear();
       this.abortController?.abort();
       delete this.abortController;
       this.activeSession = null;
@@ -261,12 +289,15 @@ export class FitnessRecipeService {
     return result;
   }
 
-  private createSession(sessionId: string, recipe: FitnessRecipe): FitnessRecipeSession {
+  private createSession(
+    sessionId: string,
+    recipe: FitnessRecipe,
+  ): FitnessRecipeSession {
     return {
       sessionId,
       recipe,
       startedAt: new Date(),
-      status: 'running',
+      status: "running",
       totalChecks: 0,
       completedChecks: 0,
       passedChecks: 0,
@@ -284,12 +315,14 @@ export class FitnessRecipeService {
     const checkSlugs = resolveChecks(recipe.checks, this.checkRegistry);
 
     // Validate explicit references
-    if (recipe.checks.type === 'explicit') {
+    if (recipe.checks.type === "explicit") {
       const allSlugs = this.checkRegistry.listSlugs();
-      const { missing } = validateCheckReferences(recipe.checks.checkIds, [...allSlugs]);
+      const { missing } = validateCheckReferences(recipe.checks.checkIds, [
+        ...allSlugs,
+      ]);
       if (missing.length > 0) {
         logger.warn(`Recipe references ${missing.length} unknown check(s)`, {
-          evt: 'fitness.recipe.checks.missing',
+          evt: "fitness.recipe.checks.missing",
           module: MODULE_FITNESS_RECIPES,
           missing,
           recipeName: recipe.name,
@@ -304,25 +337,31 @@ export class FitnessRecipeService {
     // Warn about unknown slugs in disabledChecks config
     if (configDisabled.size > 0) {
       const allSlugs = new Set(this.checkRegistry.listSlugs());
-      const unknownDisabled = [...configDisabled].filter((s) => !allSlugs.has(s));
+      const unknownDisabled = [...configDisabled].filter(
+        (s) => !allSlugs.has(s),
+      );
       if (unknownDisabled.length > 0) {
-        logger.warn(`disabledChecks references ${unknownDisabled.length} unknown slug(s)`, {
-          evt: 'fitness.recipe.disabled.unknown',
-          module: MODULE_FITNESS_RECIPES,
-          unknownDisabled,
-        });
+        logger.warn(
+          `disabledChecks references ${unknownDisabled.length} unknown slug(s)`,
+          {
+            evt: "fitness.recipe.disabled.unknown",
+            module: MODULE_FITNESS_RECIPES,
+            unknownDisabled,
+          },
+        );
       }
     }
 
     for (const slug of checkSlugs) {
       const check = this.checkRegistry.getBySlug(slug);
       if (!check) continue;
-      const bareSlug = slug.includes(':') ? slug.split(':').pop()! : slug;
+      const bareSlug = slug.includes(":") ? slug.split(":").pop()! : slug;
       const isDisabled =
         (check.config.disabled ?? false) ||
         configDisabled.has(slug) ||
         configDisabled.has(bareSlug);
-      const isForceIncluded = includeDisabledSet.has(slug) || includeDisabledSet.has(bareSlug);
+      const isForceIncluded =
+        includeDisabledSet.has(slug) || includeDisabledSet.has(bareSlug);
       if (!isDisabled || isForceIncluded) {
         checks.push(check);
       }
@@ -345,8 +384,9 @@ export class FitnessRecipeService {
 
     // Prewarm file cache with only the extensions needed by resolved checks
     if (this.config.prewarmCache !== false) {
-      const patterns = this.config.prewarmPatterns ?? computePrewarmPatterns(checks);
-      await fileCache.prewarm(cwd, patterns);
+      const patterns =
+        this.config.prewarmPatterns ?? computePrewarmPatterns(checks);
+      await this.fileCache.prewarm(cwd, patterns);
     }
 
     // Initialize shared AST parse cache for cross-check deduplication
@@ -362,22 +402,31 @@ export class FitnessRecipeService {
       passedChecks: session.passedChecks,
       failedChecks: session.failedChecks,
       skippedChecks: session.totalChecks - session.completedChecks,
-      erroredChecks: session.checkResults.filter((r) => r.error !== undefined).length,
-      totalViolations: session.checkResults.reduce((sum, r) => sum + r.violationCount, 0),
+      erroredChecks: session.checkResults.filter((r) => r.error !== undefined)
+        .length,
+      totalViolations: session.checkResults.reduce(
+        (sum, r) => sum + r.violationCount,
+        0,
+      ),
       totalErrors: session.totalErrors,
       totalWarnings: session.totalWarnings,
       totalIgnored: session.totalIgnored,
     };
 
-    const score = passRate({ total: session.totalChecks, passed: session.passedChecks });
+    const score = passRate({
+      total: session.totalChecks,
+      passed: session.passedChecks,
+    });
 
     const result: FitnessRecipeResult = {
       recipeId: session.recipe.id,
       recipeName: session.recipe.name,
       sessionId: session.sessionId,
       success:
-        score >= (session.recipe.execution.successThreshold ?? DEFAULT_SUCCESS_THRESHOLD_PERCENT) &&
-        session.status === 'completed',
+        score >=
+          (session.recipe.execution.successThreshold ??
+            DEFAULT_SUCCESS_THRESHOLD_PERCENT) &&
+        session.status === "completed",
       startedAt: session.startedAt,
       completedAt,
       durationMs: completedAt.getTime() - session.startedAt.getTime(),
@@ -388,7 +437,9 @@ export class FitnessRecipeService {
     return {
       ...result,
       ...(session.ignoreCounts ? { ignoreCounts: session.ignoreCounts } : {}),
-      ...(session.directives.length > 0 ? { directives: session.directives } : {}),
+      ...(session.directives.length > 0
+        ? { directives: session.directives }
+        : {}),
     };
   }
 
@@ -413,26 +464,26 @@ export class FitnessRecipeService {
     let includeDisabled: string[] | undefined;
 
     if (args.check) {
-      if (args.check.includes('*') || args.check.includes('?')) {
-        checks = { type: 'pattern', include: [args.check] };
+      if (args.check.includes("*") || args.check.includes("?")) {
+        checks = { type: "pattern", include: [args.check] };
       } else {
-        checks = { type: 'explicit', checkIds: [args.check] };
+        checks = { type: "explicit", checkIds: [args.check] };
         includeDisabled = [args.check];
       }
     } else if (args.tagFilters?.length) {
-      checks = { type: 'tags', include: args.tagFilters };
+      checks = { type: "tags", include: args.tagFilters };
     } else {
-      checks = { type: 'all', exclude: [] };
+      checks = { type: "all", exclude: [] };
     }
 
     return {
-      id: 'RCP_cli-adhoc',
-      name: 'cli-adhoc',
-      displayName: 'CLI Ad-Hoc',
-      description: 'Dynamically created recipe from CLI arguments',
+      id: "RCP_cli-adhoc",
+      name: "cli-adhoc",
+      displayName: "CLI Ad-Hoc",
+      description: "Dynamically created recipe from CLI arguments",
       checks,
       execution: {
-        mode: args.parallel === false ? 'sequential' : 'parallel',
+        mode: args.parallel === false ? "sequential" : "parallel",
         stopOnFirstFailure: false,
         timeout: args.timeout ?? 30_000,
         maxParallel: args.maxParallel ?? DEFAULT_MAX_PARALLEL,
@@ -442,8 +493,8 @@ export class FitnessRecipeService {
       },
       reporting: {
         format: (() => {
-          if (!args.json) return 'table' as const;
-          return args.unified ? ('unified' as const) : ('json' as const);
+          if (!args.json) return "table" as const;
+          return args.unified ? ("unified" as const) : ("json" as const);
         })(),
         verbose: args.verbose ?? false,
       },
@@ -477,7 +528,7 @@ export class FitnessRecipeService {
   }
 
   protected generateSessionId(): string {
-    return generateId('SES');
+    return generateId("SES");
   }
 
   protected get callbacks(): FitnessRecipeServiceCallbacks {

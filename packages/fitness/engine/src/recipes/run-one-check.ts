@@ -129,7 +129,7 @@ export async function runOneCheck(
       'fitness.check.slug': checkSlug,
       'fitness.check.id': checkId,
       'fitness.check.timeout_ms': checkTimeout,
-    }
+    },
   );
   const { durationMs } = outcome;
 

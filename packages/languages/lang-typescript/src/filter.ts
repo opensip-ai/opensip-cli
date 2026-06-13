@@ -225,7 +225,12 @@ function filterContentImpl(content: string): FilteredContent {
 
   const stringRegions: Region[] = [];
   const commentRegions: Region[] = [];
-  const chars = [...content];
+  // Use UTF-16 code-unit array (split('')) so that scanner.getTokenStart()/getTokenEnd()
+  // (which are UTF-16 code unit offsets) align with indices, even for astral (non-BMP)
+  // characters. Using spread [...] produces a code-point array and desynchronizes
+  // after the first emoji/etc, corrupting all subsequent positions, signals, SARIF,
+  // baselines, suppression matching, etc.
+  const chars = content.split('');
 
   // Depth counter, not a boolean — a `${ `inner` }` construct nests two templates
   // and each `}` that closes a template-expression must be rescanned. A plain
@@ -293,12 +298,8 @@ function filterContentImpl(content: string): FilteredContent {
   const code = chars.join('');
   const commentLines = linesToSet(content, commentRegions);
 
-  // Compute `codeNoComments` by additionally replacing comment regions
-  // with whitespace. Done as a second pass on a fresh array so `code`
-  // (strings-stripped only) and `codeNoComments` (strings + comments
-  // stripped) remain available — most checks want one or the other,
-  // not both.
-  const charsNoComments = [...content];
+  // Compute `codeNoComments` ... (same UTF-16 alignment requirement as above)
+  const charsNoComments = content.split('');
   for (const region of stringRegions) {
     for (let i = region.start; i < region.end; i++) {
       if (charsNoComments[i] !== '\n') charsNoComments[i] = ' ';

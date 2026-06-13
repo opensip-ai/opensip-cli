@@ -6,6 +6,7 @@
  */
 
 import type { FitnessRecipeRegistry } from './registry.js';
+import type { FileCache } from '../framework/file-cache.js';
 import type {
   FitnessRecipe,
   FitnessRecipeResult,
@@ -85,6 +86,8 @@ export interface FitnessRecipeServiceConfig {
    * to `loadTargetsConfig`.
    */
   globalExcludes?: readonly string[];
+  /** Optional file cache instance (defaults to a fresh per-service one for SaaS isolation). */
+  fileCache?: FileCache;
 }
 
 // =============================================================================

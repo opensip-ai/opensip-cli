@@ -101,6 +101,13 @@ export interface ToolCommandDescriptor {
   readonly name: string;
   readonly description: string;
   readonly aliases?: readonly string[];
+  /**
+   * Whether this command requires a project context (RunScope with datastore etc.).
+   * Mirrors CommandSpec.scope. 'project' (default for most) vs 'none' (e.g. configure).
+   * Populated from the tool's CommandSpec so the declared scope drives host behavior
+   * (pre-action guards, etc.) instead of a hardcoded name list.
+   */
+  readonly scope?: 'project' | 'none';
 }
 
 /** Generic stored-session shape accepted by tool replay hooks.

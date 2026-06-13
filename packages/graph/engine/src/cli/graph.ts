@@ -35,6 +35,7 @@ import {
   currentScope,
   generatePrefixedId,
   logger,
+  SystemError,
   ToolError,
   ValidationError,
 } from '@opensip-cli/core';
@@ -250,6 +251,20 @@ export async function executeGraph(
             onProgress: profileRun?.onProgress,
           });
     profileRun?.finish(result);
+    // Propagate shard failures so incomplete catalogs do not silently produce
+    // baselines or pass --gate-compare (per-audit: failedShardIds was computed
+    // but never surfaced to the gate or as a hard error).
+    if (shards.length > 1) {
+      const sharded = result as { failedShardIds?: readonly string[] };
+      if (sharded.failedShardIds && sharded.failedShardIds.length > 0) {
+        throw new SystemError(
+          `Sharded graph build had ${sharded.failedShardIds.length} shard failure(s); ` +
+            `catalog and any --gate-* / baseline artifacts are incomplete. ` +
+            `See 'graph.sharded.shard_failed' log events for per-shard details.`,
+          { code: 'GRAPH.SHARD.FAILURES' },
+        );
+      }
+    }
     enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
     // `runCwd` (= positionalPaths[0] ?? opts.cwd) is the build root the signals
     // are relative to — the correct base for resolving `@graph-ignore` directive
@@ -677,6 +692,12 @@ function validateMutuallyExclusiveFlags(opts: GraphCommandOptions): void {
   if (opts.workspace === true && (opts.paths?.length ?? 0) > 0) {
     throw new ConfigurationError(
       '--workspace and positional paths are mutually exclusive. Use one or the other.',
+    );
+  }
+  if (opts.workspace === true && (opts.gateSave === true || opts.gateCompare === true)) {
+    throw new ConfigurationError(
+      '--workspace and --gate-save/--gate-compare are mutually exclusive. ' +
+        'Gates and baselines apply to production code; --workspace intentionally scans the full project (including dependencies and test fixtures).',
     );
   }
 }

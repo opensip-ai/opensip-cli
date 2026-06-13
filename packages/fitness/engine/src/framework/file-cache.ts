@@ -9,7 +9,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-import { ValidationError } from '@opensip-cli/core';
+import { SystemError, ValidationError } from '@opensip-cli/core';
 import { glob } from 'glob';
 
 /**
@@ -34,7 +34,7 @@ interface PrewarmStats {
  */
 const PREWARM_BATCH_SIZE = 100;
 
-class FileCache {
+export class FileCache {
   private readonly cache = new Map<string, string>();
   private _prewarmed = false;
   private _cleared = false;
@@ -84,8 +84,17 @@ class FileCache {
 
       for (const result of results) {
         if (result.status === 'fulfilled' && result.value !== null) {
-          this.cache.set(result.value.filePath, result.value.content);
-          totalBytes += result.value.content.length;
+          const { filePath, content } = result.value;
+          // Enforce the same 10 MiB per-file limit that ExecutionContext.readFile
+          // guarantees to checks. Huge files are skipped during prewarm (they will
+          // still fail loudly with a clear error if a check later tries to read them
+          // explicitly). This keeps the cache from holding data that no check is
+          // allowed to consume.
+          if (content.length > 10_000_000) {
+            continue;
+          }
+          this.cache.set(filePath, content);
+          totalBytes += content.length;
         }
       }
     }
@@ -128,6 +137,15 @@ class FileCache {
       });
     }
     const content = await fs.readFile(absolutePath, 'utf8');
+
+    if (content.length > 10_000_000) {
+      // Consistent with ExecutionContext.readFile and prewarm: never surface
+      // >10 MiB of content to a check. Throw here so even direct cache.get
+      // callers (and any future direct users of fileCache) are protected.
+      throw new SystemError(`File too large (${content.length} bytes, max 10MB): ${absolutePath}`, {
+        code: 'SYSTEM.FITNESS.FILE_TOO_LARGE',
+      });
+    }
 
     this.cache.set(absolutePath, content);
 

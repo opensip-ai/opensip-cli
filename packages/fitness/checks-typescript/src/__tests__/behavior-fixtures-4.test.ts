@@ -10,13 +10,18 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RunScope, runWithScope } from '@opensip-cli/core';
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
 import { fileCache } from '@opensip-cli/fitness';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { typescriptAdapter } from '@opensip-cli/lang-typescript';
+
 import { checks } from '../index.js';
 
-const testScope = new RunScope();
+// Production simulation: register the TS adapter (see behavior-fixtures.test.ts).
+const langRegistry = new LanguageRegistry();
+langRegistry.register(typescriptAdapter);
+const testScope = new RunScope({ languages: langRegistry });
 
 let cwd: string;
 let written: string[] = [];

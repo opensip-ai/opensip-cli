@@ -247,9 +247,13 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
   // custom adapter ships, and dropping them here would silently break
   // checks. When `defineCheck` runs at module-load time before a scope
   // is bound (the typical case for top-level `export const x =
-  // defineCheck(...)`), we cannot canonicalise — just lowercase. The
-  // engine canonicalises again at scope-match time, so any miss here
-  // is recovered there.
+  // defineCheck(...)`), we cannot canonicalise — just lowercase.
+  //
+  // Recovery: the engine *always* re-canonicalizes check-declared languages
+  // at scope-match / file-resolution time (see scope-resolver.ts: liveScopeLangs
+  // map + target-registry.ts:toCanonical + findByScope). This makes define-time
+  // canonicalization best-effort only; execution-time canonicalization against
+  // the entered RunScope's LanguageRegistry is the source of truth for matching.
   const scope = currentScope();
   const canonicalLanguages = config.scope
     ? config.scope.languages.map((lang) => {

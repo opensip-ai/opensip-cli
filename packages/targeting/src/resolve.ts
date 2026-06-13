@@ -12,10 +12,9 @@
 
 import { relative, resolve } from 'node:path';
 
+import { isPathInside } from '@opensip-cli/core';
 import { globSync } from 'glob';
 import { minimatch, Minimatch } from 'minimatch';
-
-import { isPathInside } from '@opensip-cli/core';
 
 import type { TargetRegistry } from './target-registry.js';
 import type { Target } from '@opensip-cli/config';

@@ -42,7 +42,7 @@ export function assignPackages(catalog: Catalog, projectRoot: string): Catalog {
       }
       return { ...catalog, functions };
     },
-    { 'graph.assign_packages.project': projectRoot }
+    { 'graph.assign_packages.project': projectRoot },
   );
 }
 

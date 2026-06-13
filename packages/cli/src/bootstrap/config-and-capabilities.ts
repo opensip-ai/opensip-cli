@@ -214,8 +214,8 @@ function reportUnclaimedNamespaces(args: {
   const report = analyzeNamespaceClaims(args.declarations, args.document);
   if (report.unclaimed.length === 0) return;
 
-  const loadedToolIds = new Set(args.tools.list().map((t) => t.metadata.id));
-  const toolBugs = report.unclaimed.filter((u) => loadedToolIds.has(u.namespace));
+  const loadedToolNames = new Set(args.tools.list().map((t) => t.metadata.name ?? t.metadata.id));
+  const toolBugs = report.unclaimed.filter((u) => loadedToolNames.has(u.namespace));
   if (toolBugs.length > 0) {
     const names = toolBugs.map((u) => `'${u.namespace}'`).join(', ');
     throw new ConfigurationError(

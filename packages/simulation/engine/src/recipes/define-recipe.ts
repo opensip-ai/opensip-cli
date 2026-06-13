@@ -17,9 +17,9 @@
  * registers each into the current scope's `SimulationRecipeRegistry`.
  */
 
-import { ValidationError } from '@opensip-cli/core';
+import { ValidationError } from "@opensip-cli/core";
 
-import type { SimulationRecipe, SimulationRecipeConfig } from './types.js';
+import type { SimulationRecipe, SimulationRecipeConfig } from "./types.js";
 
 /**
  * Define a sim recipe. Validates the config and returns the canonical
@@ -29,27 +29,32 @@ import type { SimulationRecipe, SimulationRecipeConfig } from './types.js';
  * @throws ValidationError if `id` or `name` is missing, or if the
  *   selector / execution shape is invalid.
  */
-export function defineSimulationRecipe(config: SimulationRecipeConfig): SimulationRecipe {
-  if (!config.id || typeof config.id !== 'string') {
-    throw new ValidationError('SimulationRecipe missing required `id`', {
-      code: 'VALIDATION.SIMULATION.RECIPE_ID_MISSING',
+export function defineSimulationRecipe(
+  config: SimulationRecipeConfig,
+): SimulationRecipe {
+  if (!config.id || typeof config.id !== "string") {
+    throw new ValidationError("SimulationRecipe missing required `id`", {
+      code: "VALIDATION.SIMULATION.RECIPE_ID_MISSING",
     });
   }
-  if (!config.name || typeof config.name !== 'string') {
-    throw new ValidationError(`SimulationRecipe '${config.id}' missing required \`name\``, {
-      code: 'VALIDATION.SIMULATION.RECIPE_NAME_MISSING',
-    });
-  }
-  if (!config.scenarios || typeof config.scenarios !== 'object') {
+  if (!config.name || typeof config.name !== "string") {
     throw new ValidationError(
-      `SimulationRecipe '${config.name}' missing required \`scenarios\` selector`,
-      { code: 'VALIDATION.SIMULATION.RECIPE_SELECTOR_MISSING' },
+      `SimulationRecipe '${config.id}' missing required \`name\``,
+      {
+        code: "VALIDATION.SIMULATION.RECIPE_NAME_MISSING",
+      },
     );
   }
-  if (!config.execution || typeof config.execution !== 'object') {
+  if (!config.scenarios || typeof config.scenarios !== "object") {
+    throw new ValidationError(
+      `SimulationRecipe '${config.name}' missing required \`scenarios\` selector`,
+      { code: "VALIDATION.SIMULATION.RECIPE_SELECTOR_MISSING" },
+    );
+  }
+  if (!config.execution || typeof config.execution !== "object") {
     throw new ValidationError(
       `SimulationRecipe '${config.name}' missing required \`execution\` block`,
-      { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_MISSING' },
+      { code: "VALIDATION.SIMULATION.RECIPE_EXECUTION_MISSING" },
     );
   }
 
@@ -64,35 +69,42 @@ export function defineSimulationRecipe(config: SimulationRecipeConfig): Simulati
     stopOnFirstFailure?: unknown;
   };
 
-  if (exec.mode !== 'parallel' && exec.mode !== 'sequential') {
+  if (exec.mode !== "parallel" && exec.mode !== "sequential") {
     throw new ValidationError(
       `SimulationRecipe '${config.name}' execution.mode must be 'parallel' or 'sequential'`,
-      { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_MODE' },
+      { code: "VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_MODE" },
     );
   }
 
-  if (exec.timeout !== undefined) {
-    if (!Number.isFinite(exec.timeout) || (exec.timeout as number) < 0) {
-      throw new ValidationError(
-        `SimulationRecipe '${config.name}' execution.timeout must be a non-negative finite number (or omitted)`,
-        { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_TIMEOUT' },
-      );
-    }
+  if (
+    exec.timeout !== undefined &&
+    (!Number.isFinite(exec.timeout) || (exec.timeout as number) < 0)
+  ) {
+    throw new ValidationError(
+      `SimulationRecipe '${config.name}' execution.timeout must be a non-negative finite number (or omitted)`,
+      { code: "VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_TIMEOUT" },
+    );
   }
 
-  if (exec.maxParallel !== undefined) {
-    if (!Number.isFinite(exec.maxParallel) || (exec.maxParallel as number) < 1) {
-      throw new ValidationError(
-        `SimulationRecipe '${config.name}' execution.maxParallel must be a positive finite integer (or omitted)`,
-        { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_MAX_PARALLEL' },
-      );
-    }
+  if (
+    exec.maxParallel !== undefined &&
+    (!Number.isFinite(exec.maxParallel) || (exec.maxParallel as number) < 1)
+  ) {
+    throw new ValidationError(
+      `SimulationRecipe '${config.name}' execution.maxParallel must be a positive finite integer (or omitted)`,
+      { code: "VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_MAX_PARALLEL" },
+    );
   }
 
-  if (exec.stopOnFirstFailure !== undefined && typeof exec.stopOnFirstFailure !== 'boolean') {
+  if (
+    exec.stopOnFirstFailure !== undefined &&
+    typeof exec.stopOnFirstFailure !== "boolean"
+  ) {
     throw new ValidationError(
       `SimulationRecipe '${config.name}' execution.stopOnFirstFailure must be a boolean (or omitted)`,
-      { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_STOP_ON_FIRST_FAILURE' },
+      {
+        code: "VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_STOP_ON_FIRST_FAILURE",
+      },
     );
   }
 

@@ -146,10 +146,7 @@ function tryResolveConfig(dir: string, explicit: string | undefined): string | u
     //  - other resolution problems
     // So a misconfigured pointer fails loudly instead of the walk silently
     // adopting an ancestor project's config.
-    if (
-      error instanceof ValidationError &&
-      /No .*? found\. Checked:/.test(error.message)
-    ) {
+    if (error instanceof ValidationError && /No .*? found\. Checked:/.test(error.message)) {
       return undefined;
     }
     throw error;

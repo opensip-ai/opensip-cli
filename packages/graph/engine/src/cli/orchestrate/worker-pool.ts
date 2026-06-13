@@ -16,9 +16,7 @@ export async function runWorkerPool<I, O>(
   run: (item: I) => Promise<O>,
 ): Promise<O[]> {
   if (!Number.isFinite(concurrency)) {
-    throw new Error(
-      `runWorkerPool: concurrency must be a finite number (received ${concurrency})`,
-    );
+    throw new Error(`runWorkerPool: concurrency must be a finite number (received ${concurrency})`);
   }
   const queue = [...items];
   const results: O[] = [];

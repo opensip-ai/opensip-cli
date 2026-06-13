@@ -6,18 +6,21 @@
  * builds check summaries, and determines whether execution should stop.
  */
 
-import { logger, SystemError } from '@opensip-cli/core';
+import { logger, SeverityPolicy, SystemError } from "@opensip-cli/core";
 
-import { memoryProfiler, type CheckMemoryProfile } from '../framework/memory-profiler.js';
-import { countErrors, countWarnings } from '../types/severity.js';
+import {
+  memoryProfiler,
+  type CheckMemoryProfile,
+} from "../framework/memory-profiler.js";
+import { countErrors, countWarnings } from "../types/severity.js";
 
 import type {
   CheckSummary,
   FitnessRecipeServiceCallbacks,
   FitnessRecipeSession,
-} from './service-types.js';
-import type { FitnessRecipe, RecipeCheckResult } from './types.js';
-import type { CheckResult } from '../types/findings.js';
+} from "./service-types.js";
+import type { FitnessRecipe, RecipeCheckResult } from "./types.js";
+import type { CheckResult } from "../types/findings.js";
 
 // =============================================================================
 // TYPES
@@ -143,7 +146,10 @@ function updateSessionForSuccess(
   session.totalWarnings += checkResult.warningCount;
   session.totalIgnored += checkResult.ignoredCount;
   for (const tag of tags) {
-    session.ignoresByTag.set(tag, (session.ignoresByTag.get(tag) ?? 0) + checkResult.ignoredCount);
+    session.ignoresByTag.set(
+      tag,
+      (session.ignoresByTag.get(tag) ?? 0) + checkResult.ignoredCount,
+    );
   }
 }
 
@@ -166,18 +172,32 @@ export function processSuccessResult(
   ctx: ProcessorContext,
   input: ProcessSuccessInput,
 ): ProcessResultOutput {
-  const { checkId, checkSlug, tags, checkIndex, totalChecks, result, durationMs, memoryBeforeMB } =
-    input;
+  const {
+    checkId,
+    checkSlug,
+    tags,
+    checkIndex,
+    totalChecks,
+    result,
+    durationMs,
+    memoryBeforeMB,
+  } = input;
   const { session, callbacks, recipe } = ctx;
 
   // Apply file filter if set
   let effectiveSignals = result.signals;
   if (recipe.fileFilter) {
-    effectiveSignals = result.signals.filter((s) => s.code?.file === recipe.fileFilter);
+    effectiveSignals = result.signals.filter(
+      (s) => s.code?.file === recipe.fileFilter,
+    );
   }
   const signalCount = effectiveSignals.length;
-  const errorCount = recipe.fileFilter ? countErrors(effectiveSignals) : result.errors;
-  const warningCount = recipe.fileFilter ? countWarnings(effectiveSignals) : result.warnings;
+  const errorCount = recipe.fileFilter
+    ? countErrors(effectiveSignals)
+    : result.errors;
+  const warningCount = recipe.fileFilter
+    ? countWarnings(effectiveSignals)
+    : result.warnings;
   const ignoredCount = result.ignoredCount ?? 0;
   const passed = recipe.fileFilter ? errorCount === 0 : result.passed;
 
@@ -190,9 +210,9 @@ export function processSuccessResult(
 
   /* v8 ignore start -- memory threshold is sized for production-scale (100MB+); not exercised by unit tests that operate on tiny fixture inputs */
   if (memoryProfiler.exceedsThreshold(memoryProfile.memoryDeltaMB)) {
-    logger.warn('Check exceeded memory threshold', {
-      evt: 'fitness.check.memory.exceeded',
-      module: 'fitness:recipes',
+    logger.warn("Check exceeded memory threshold", {
+      evt: "fitness.check.memory.exceeded",
+      module: "fitness:recipes",
       checkId,
       checkSlug,
       memoryDeltaMB: memoryProfile.memoryDeltaMB,
@@ -219,11 +239,13 @@ export function processSuccessResult(
     ...(ctx.includeViolations
       ? {
           violations: effectiveSignals.map((s) => ({
-            file: s.code?.file ?? 'unknown',
+            file: s.code?.file ?? "unknown",
             line: s.code?.line ?? 0,
             column: s.code?.column,
             message: s.message,
-            severity: s.severity === 'high' ? ('error' as const) : ('warning' as const),
+            severity: SeverityPolicy.isError(s.severity)
+              ? ("error" as const)
+              : ("warning" as const),
             suggestion: s.suggestion,
           })),
         }
@@ -243,7 +265,19 @@ export function processSuccessResult(
     ignoredCount,
     filesScanned: result.metadata.filesScanned ?? 0,
   });
-  callbacks.onCheckComplete?.(checkSlug, summary, checkIndex, totalChecks);
+  try {
+    callbacks.onCheckComplete?.(checkSlug, summary, checkIndex, totalChecks);
+  } catch (cbError) {
+    // Callback (e.g. progress renderer) threw after the check itself succeeded.
+    // Log but do not turn this into an error result or double-count the session
+    // (success path already updated counts). The check run is still a success.
+    logger.warn({
+      evt: "fitness.check.callback_error",
+      module: "fitness:check-result-processor",
+      checkSlug,
+      error: cbError instanceof Error ? cbError.message : String(cbError),
+    });
+  }
 
   const shouldStop = recipe.execution.stopOnFirstFailure && !passed;
 
@@ -276,7 +310,12 @@ export function processErrorResult(
     errMsg = error instanceof Error ? error.message : String(error);
   }
 
-  const memoryProfile = memoryProfiler.recordCheckComplete(checkId, memoryBeforeMB, 0, durationMs);
+  const memoryProfile = memoryProfiler.recordCheckComplete(
+    checkId,
+    memoryBeforeMB,
+    0,
+    durationMs,
+  );
 
   const checkResult: RecipeCheckResult = {
     checkId,
@@ -306,7 +345,7 @@ export function processErrorResult(
     checkSlug,
     error instanceof Error
       ? error
-      : new SystemError(errMsg, { code: 'SYSTEM.FITNESS.CHECK_ERROR' }),
+      : new SystemError(errMsg, { code: "SYSTEM.FITNESS.CHECK_ERROR" }),
   );
   callbacks.onCheckComplete?.(checkSlug, summary, checkIndex, totalChecks);
 

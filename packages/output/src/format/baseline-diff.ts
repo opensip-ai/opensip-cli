@@ -52,9 +52,10 @@ function syntheticSignal(fingerprint: string): Signal {
     ruleId: parsed.ruleId ?? 'resolved',
     message: '(resolved finding; baseline payload unavailable)',
     filePath: parsed.filePath ?? '',
-    code: parsed.line !== undefined || parsed.column !== undefined
-      ? { file: parsed.filePath ?? '', line: parsed.line, column: parsed.column }
-      : undefined,
+    code:
+      parsed.line !== undefined || parsed.column !== undefined
+        ? { file: parsed.filePath ?? '', line: parsed.line, column: parsed.column }
+        : undefined,
     metadata: { originalFingerprint: fingerprint },
     fingerprint,
     createdAt: new Date(0).toISOString(),
@@ -62,7 +63,12 @@ function syntheticSignal(fingerprint: string): Signal {
 }
 
 /** Best-effort parse of the host default fingerprintStrategy form. */
-function parseDefaultFingerprint(fp: string): { ruleId?: string; filePath?: string; line?: number; column?: number } {
+function parseDefaultFingerprint(fp: string): {
+  ruleId?: string;
+  filePath?: string;
+  line?: number;
+  column?: number;
+} {
   // Common form used by defaultFingerprintStrategy and several tools: ruleId|filePath|line|col
   const parts = fp.split('|');
   if (parts.length >= 2) {

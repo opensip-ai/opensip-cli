@@ -22,6 +22,7 @@
  */
 
 import {
+  ConfigurationError,
   type RunScope,
   SystemError,
   UnknownLiveViewError,
@@ -146,6 +147,30 @@ export function getOrOpenDatastore(_log: Logger = defaultLogger): DataStore {
   return thunk() as DataStore;
 }
 
+/**
+ * Project-scoped datastore accessor for the host-owned planes (baseline, toolState, hostPlanes).
+ * Converts the internal DATASTORE_OUTSIDE_PROJECT SystemError into a clear
+ * ConfigurationError so callers of the documented ToolCliContext seams get a
+ * user-actionable error (exit 2) instead of an internal SYSTEM.* code.
+ */
+function getProjectDatastore(): DataStore {
+  try {
+    return getOrOpenDatastore();
+  } catch (error) {
+    if (
+      error instanceof SystemError &&
+      error.code === 'SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT'
+    ) {
+      throw new ConfigurationError(
+        'This operation requires an OpenSIP CLI project (an opensip-cli.config.yml with a targets: block or similar). ' +
+          'Run from within a project directory, or pass --cwd to an initialized project.',
+        { code: 'CONFIGURATION.REQUIRES_PROJECT' },
+      );
+    }
+    throw error;
+  }
+}
+
 export interface LiveViewRegistry {
   readonly register: (key: string, renderer: LiveViewRenderer) => void;
   readonly render: (key: string, args: unknown) => Promise<void>;
@@ -207,11 +232,9 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     process.exitCode = code;
   };
 
-  // Host baseline/ratchet plane seams (ADR-0036): persistence + diff + exports.
-  // Bound to the lazy project datastore (resolved per call, like the run paths).
-  const baselineSeams = buildBaselineSeams({ getDatastore: getOrOpenDatastore, logger: log });
-  const stateSeams = buildStateSeams({ getDatastore: getOrOpenDatastore }); // ADR-0042, same lazy resolver
-  const hostPlanes = buildHostPlanes({ getDatastore: getOrOpenDatastore, logger: log });
+  const baselineSeams = buildBaselineSeams({ getDatastore: getProjectDatastore, logger: log });
+  const stateSeams = buildStateSeams({ getDatastore: getProjectDatastore }); // ADR-0042, same lazy resolver
+  const hostPlanes = buildHostPlanes({ getDatastore: getProjectDatastore, logger: log });
 
   const ctx: ToolCliContext = {
     get scope(): RunScope {
@@ -234,16 +257,37 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     // currency; the tool only hands over its pure-domain payload. `--json` is
     // implicit here: these seams are only ever called on the `--json` path, so
     // they always serialize the outcome (the `render` arg is inert).
+    //
+    // Errors during renderOutcome are attached to a catch so they are not
+    // completely swallowed by the `void` (they surface in logs and as
+    // unhandled-rejection diagnostics instead of silent loss).
     emitJson: (value) => {
-      void renderOutcome(outcomeFromResult(value, exitCode ?? 0), {
+      renderOutcome(outcomeFromResult(value, exitCode ?? 0), {
         jsonRequested: true,
         render: opts.render,
+      }).catch((error) => {
+        // Primary machine output path failed — do not swallow silently.
+        // Force a non-success exit and surface as error (not warn) so --json
+        // consumers and CI see the failure instead of missing / truncated output.
+        setExitCode(1);
+        log.error({
+          evt: 'cli.emit_json.render_failed',
+          module: 'cli:context',
+          error: error instanceof Error ? error.message : String(error),
+        });
       });
     },
     emitEnvelope: (envelope) => {
-      void renderOutcome(outcomeFromEnvelope(envelope as SignalEnvelope, exitCode ?? 0), {
+      renderOutcome(outcomeFromEnvelope(envelope as SignalEnvelope, exitCode ?? 0), {
         jsonRequested: true,
         render: opts.render,
+      }).catch((error) => {
+        setExitCode(1);
+        log.error({
+          evt: 'cli.emit_envelope.render_failed',
+          module: 'cli:context',
+          error: error instanceof Error ? error.message : String(error),
+        });
       });
     },
     // Structured error machine-output (retires the bare `emitJson({ error })`
@@ -253,7 +297,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     // `setExitCode` so the process exit and the reported outcome agree.
     emitError: (detail) => {
       setExitCode(detail.exitCode);
-      void renderOutcome(
+      renderOutcome(
         outcomeFromErrorMessage({
           message: detail.message,
           exitCode: detail.exitCode,
@@ -261,7 +305,15 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
           ...(detail.code === undefined ? {} : { code: detail.code }),
         }),
         { jsonRequested: true, render: opts.render },
-      );
+      ).catch((error) => {
+        // Even error emission failing is fatal for the json contract.
+        setExitCode(1);
+        log.error({
+          evt: 'cli.emit_error.render_failed',
+          module: 'cli:context',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
     },
     // RAW_STREAM seam (§5.5): emit the bare, unwrapped value for a command that
     // declares `output:'raw-stream'` (e.g. `sessions show --raw`). The single

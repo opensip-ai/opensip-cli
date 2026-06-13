@@ -297,6 +297,24 @@ function formatArgUsage(spec: ArgSpec): string {
 }
 
 /**
+ * Best-effort guard: does `x` look like a Commander `Command` instance?
+ * Used defensively in splitActionArgs so we never treat the Command object
+ * as the parsed opts (which would silently give every handler a weird
+ * `opts` bag containing Commander internals and produce very confusing bugs).
+ */
+function isLikelyCommanderCommand(x: unknown): boolean {
+  if (!x || typeof x !== 'object') return false;
+  const c = x as Record<string, unknown>;
+  // Commander Command instances have these characteristic members.
+  return (
+    typeof c.name === 'function' ||
+    typeof c.opts === 'function' ||
+    typeof c.command === 'function' ||
+    (typeof c.constructor === 'function' && /Command/i.test(c.constructor.name || ''))
+  );
+}
+
+/**
  * Split a Commander action callback's variadic arguments into the parsed-opts
  * object and the trailing positional args.
  *
@@ -304,15 +322,61 @@ function formatArgUsage(spec: ArgSpec): string {
  * declared positionals come first, then the parsed-options object, then the
  * `Command` instance. We locate the opts object (the last non-Command object
  * argument) and treat everything before it as positionals.
+ *
+ * The implementation is deliberately defensive (beyond the documented
+ * "last two are opts + Command") because a future Commander version, a
+ * wrapped program, or an exotic call site could change arity. If we ever
+ * mis-identify, we throw a loud internal error rather than handing a tool
+ * or host command a Command instance as its `opts`.
  */
 function splitActionArgs(actionArgs: readonly unknown[]): {
   opts: Record<string, unknown>;
   positionals: readonly unknown[];
 } {
-  // The Command instance is always last; the opts object is second-to-last.
-  // (Commander always passes both, even for zero-argument commands.)
-  const optsIndex = actionArgs.length - 2;
-  const opts = (actionArgs[optsIndex] ?? {}) as Record<string, unknown>;
+  if (actionArgs.length === 0) {
+    return { opts: {}, positionals: [] };
+  }
+
+  // The final argument is (per Commander contract) the Command instance.
+  const last = actionArgs.at(-1);
+  if (!isLikelyCommanderCommand(last)) {
+    // Extremely unexpected — log via throw so tests/CI surface it loudly.
+    throw new Error(
+      'mountCommandSpec: splitActionArgs could not locate Commander Command as the final action argument. ' +
+        'This indicates an incompatible Commander version or a wrapped dispatch. ' +
+        'Please report this with your Commander version.',
+    );
+  }
+
+  // The opts object is the one immediately before the Command (when present).
+  // It is always a plain object (never null/undefined per Commander).
+  let optsIndex = actionArgs.length - 2;
+  let candidate = actionArgs[optsIndex];
+
+  // Walk backwards if needed until we find a plain object that is not a Command.
+  while (
+    optsIndex >= 0 &&
+    (candidate === undefined ||
+      candidate === null ||
+      typeof candidate !== 'object' ||
+      Array.isArray(candidate) ||
+      isLikelyCommanderCommand(candidate))
+  ) {
+    optsIndex -= 1;
+    candidate = actionArgs[optsIndex];
+  }
+
+  const opts = (candidate ?? {}) as Record<string, unknown>;
   const positionals = optsIndex > 0 ? actionArgs.slice(0, optsIndex) : [];
+
+  // Extra paranoia: if what we are about to hand out still smells like Command,
+  // fail closed instead of letting it reach a handler.
+  if (isLikelyCommanderCommand(opts)) {
+    throw new Error(
+      'mountCommandSpec: splitActionArgs selected a Commander Command as the parsed opts. ' +
+        'Refusing to dispatch — this is a bug in argument splitting.',
+    );
+  }
+
   return { opts, positionals };
 }

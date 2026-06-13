@@ -1,17 +1,22 @@
-import { SystemError, isToolShortId, logger } from '@opensip-cli/core';
+import {
+  SystemError,
+  ValidationError,
+  isToolShortId,
+  logger,
+} from "@opensip-cli/core";
 import {
   requireDrizzleDataStore,
   type DataStore,
   type DrizzleDataStore,
-} from '@opensip-cli/datastore';
-import { desc, eq, lt } from 'drizzle-orm';
+} from "@opensip-cli/datastore";
+import { desc, eq, lt } from "drizzle-orm";
 
-import { sessions, sessionToolPayload } from './schema/sessions.js';
+import { sessions, sessionToolPayload } from "./schema/sessions.js";
 
-import type { StoredSession } from '@opensip-cli/contracts';
-import type { ToolShortId } from '@opensip-cli/core';
+import type { StoredSession } from "@opensip-cli/contracts";
+import type { ToolShortId } from "@opensip-cli/core";
 
-const MODULE_NAME = 'session-store:session-repo';
+const MODULE_NAME = "session-store:session-repo";
 
 /** Filters for {@link SessionRepo.list}: tool short-id and/or max row count. */
 export interface SessionListOptions {
@@ -36,12 +41,26 @@ export class SessionRepo {
 
   save(session: StoredSession): void {
     try {
+      // Validate timestamp eagerly so we never write NaN / "Invalid Date" into
+      // the durable session log. A bad timestamp from a tool (or replay path)
+      // becomes a clear ValidationError instead of silent corruption that later
+      // surfaces as confusing history / replay output.
+      const ts = new Date(session.timestamp);
+      const tsMs = ts.getTime();
+      if (!Number.isFinite(tsMs)) {
+        throw new ValidationError(
+          `Invalid session timestamp for session ${session.id} (tool=${session.tool}): ${JSON.stringify(session.timestamp)}`,
+          { code: "VALIDATION.SESSION.INVALID_TIMESTAMP" },
+        );
+      }
+
       this.datastore.transaction((tx) => {
         tx.insert(sessions)
           .values({
             id: session.id,
             tool: session.tool,
-            timestamp: new Date(session.timestamp).getTime(),
+            timestamp: tsMs,
+            timestamp_iso: session.timestamp, // preserve original for fidelity (avoids Date roundtrip loss of sub-ms/lexical form)
             cwd: session.cwd,
             recipe: session.recipe ?? null,
             score: session.score,
@@ -57,26 +76,29 @@ export class SessionRepo {
               sessionId: session.id,
               tool: session.tool,
               payload: session.payload,
+              payload_version: 1, // base version; tools may embed finer __version in the json payload itself
             })
             .run();
         }
       });
       logger.info({
-        evt: 'session.save.complete',
+        evt: "session.save.complete",
         module: MODULE_NAME,
-        msg: 'Session saved',
+        msg: "Session saved",
         sessionId: session.id,
         tool: session.tool,
         hasPayload: session.payload !== undefined,
       });
     } catch (error) {
       logger.error({
-        evt: 'session.save.error',
+        evt: "session.save.error",
         module: MODULE_NAME,
-        msg: 'Failed to save session',
+        msg: "Failed to save session",
         sessionId: session.id,
         error: error instanceof Error ? error.message : String(error),
-        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+        ...(error instanceof Error && error.stack
+          ? { stack: error.stack }
+          : {}),
       });
       throw error;
     }
@@ -85,26 +107,31 @@ export class SessionRepo {
   list(opts: SessionListOptions = {}): readonly StoredSession[] {
     try {
       const baseQuery = opts.tool
-        ? this.datastore.db.select().from(sessions).where(eq(sessions.tool, opts.tool))
+        ? this.datastore.db
+            .select()
+            .from(sessions)
+            .where(eq(sessions.tool, opts.tool))
         : this.datastore.db.select().from(sessions);
       const ordered = baseQuery.orderBy(desc(sessions.timestamp));
-      const sessionRows = opts.limit ? ordered.limit(opts.limit).all() : ordered.all();
+      const sessionRows = opts.limit
+        ? ordered.limit(opts.limit).all()
+        : ordered.all();
       const results: StoredSession[] = [];
       for (const row of sessionRows) {
         results.push(this.hydrateSession(row));
       }
       logger.info({
-        evt: 'session.list.complete',
+        evt: "session.list.complete",
         module: MODULE_NAME,
-        msg: 'Listed sessions',
+        msg: "Listed sessions",
         count: results.length,
       });
       return results;
     } catch (error) {
       logger.error({
-        evt: 'session.list.error',
+        evt: "session.list.error",
         module: MODULE_NAME,
-        msg: 'Failed to list sessions',
+        msg: "Failed to list sessions",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -112,7 +139,11 @@ export class SessionRepo {
   }
 
   get(id: string): StoredSession | null {
-    const row = this.datastore.db.select().from(sessions).where(eq(sessions.id, id)).get();
+    const row = this.datastore.db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, id))
+      .get();
     return row ? this.hydrateSession(row) : null;
   }
 
@@ -122,7 +153,10 @@ export class SessionRepo {
   }
 
   count(): number {
-    const rows = this.datastore.db.select({ id: sessions.id }).from(sessions).all();
+    const rows = this.datastore.db
+      .select({ id: sessions.id })
+      .from(sessions)
+      .all();
     return rows.length;
   }
 
@@ -135,18 +169,18 @@ export class SessionRepo {
         .where(lt(sessions.timestamp, cutoff))
         .run();
       logger.info({
-        evt: 'session.purge.complete',
+        evt: "session.purge.complete",
         module: MODULE_NAME,
-        msg: 'Purged sessions older than cutoff',
+        msg: "Purged sessions older than cutoff",
         cutoff: before.toISOString(),
         deleted: removed.changes,
       });
       return removed.changes;
     } catch (error) {
       logger.error({
-        evt: 'session.purge.error',
+        evt: "session.purge.error",
         module: MODULE_NAME,
-        msg: 'Failed to purge sessions',
+        msg: "Failed to purge sessions",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -157,9 +191,9 @@ export class SessionRepo {
   clearAll(): number {
     const removed = this.datastore.db.delete(sessions).run();
     logger.info({
-      evt: 'session.clear.complete',
+      evt: "session.clear.complete",
       module: MODULE_NAME,
-      msg: 'Cleared all sessions',
+      msg: "Cleared all sessions",
       deleted: removed.changes,
     });
     return removed.changes;
@@ -172,11 +206,14 @@ export class SessionRepo {
    * session count.
    */
   clearForTool(toolId: string): number {
-    const removed = this.datastore.db.delete(sessions).where(eq(sessions.tool, toolId)).run();
+    const removed = this.datastore.db
+      .delete(sessions)
+      .where(eq(sessions.tool, toolId))
+      .run();
     logger.info({
-      evt: 'session.clear_for_tool.complete',
+      evt: "session.clear_for_tool.complete",
       module: MODULE_NAME,
-      msg: 'Cleared sessions for tool',
+      msg: "Cleared sessions for tool",
       tool: toolId,
       deleted: removed.changes,
     });
@@ -191,21 +228,37 @@ export class SessionRepo {
     if (!isToolShortId(row.tool)) {
       throw new SystemError(
         `Session ${row.id} has unknown tool value: ${JSON.stringify(row.tool)}`,
-        { code: 'SYSTEM.DATA.UNKNOWN_TOOL' },
+        { code: "SYSTEM.DATA.UNKNOWN_TOOL" },
       );
     }
     // Tool-owned opaque detail. drizzle returns the JSON column already
     // parsed; contracts does not inspect or validate the shape — that is
     // the owning tool's responsibility.
     const payloadRow = this.datastore.db
-      .select({ payload: sessionToolPayload.payload })
+      .select({
+        payload: sessionToolPayload.payload,
+        payload_version: sessionToolPayload.payload_version,
+      })
       .from(sessionToolPayload)
       .where(eq(sessionToolPayload.sessionId, row.id))
       .get();
+    if (
+      payloadRow &&
+      typeof payloadRow.payload_version === "number" &&
+      payloadRow.payload_version > 1
+    ) {
+      logger.warn({
+        evt: "session.payload.future_version",
+        module: MODULE_NAME,
+        sessionId: row.id,
+        version: payloadRow.payload_version,
+        msg: "Payload schema version newer than this CLI knows; treating as opaque (may lose fields on display).",
+      });
+    }
     return {
       id: row.id,
       tool: row.tool,
-      timestamp: new Date(row.timestamp).toISOString(),
+      timestamp: row.timestamp_iso ?? new Date(row.timestamp).toISOString(), // prefer original for fidelity
       cwd: row.cwd,
       recipe: row.recipe ?? undefined,
       score: row.score,

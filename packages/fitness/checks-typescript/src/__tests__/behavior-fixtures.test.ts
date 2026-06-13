@@ -12,18 +12,23 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RunScope, runWithScope } from '@opensip-cli/core';
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
 import { fileCache } from '@opensip-cli/fitness';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { typescriptAdapter } from '@opensip-cli/lang-typescript';
+
 import { checks } from '../index.js';
 
-// Engine reads `currentScope()?.languages` to dispatch the per-check
-// contentFilter. An empty scope makes applyContentFilter fall through
-// to its no-adapter "return raw" branch — matching the prior default-
-// registry behaviour when no TS adapter was registered in the test
-// process.
-const testScope = new RunScope();
+// Production path (real CLI bootstrap) registers the TypeScript language
+// adapter into the per-run LanguageRegistry. This enables contentFilter:
+// 'strip-strings' (and strip-comments) for checks that declare it.
+// Tests must do the same, otherwise applyContentFilter degrades to raw
+// and we never exercise (or catch regressions in) the actual production
+// filtering that many checks rely on for correctness vs false positives.
+const langRegistry = new LanguageRegistry();
+langRegistry.register(typescriptAdapter);
+const testScope = new RunScope({ languages: langRegistry });
 
 let cwd: string;
 let written: string[] = [];

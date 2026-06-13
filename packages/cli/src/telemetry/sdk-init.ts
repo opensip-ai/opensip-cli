@@ -46,6 +46,7 @@ import {
   ROOT_CONTEXT,
   context as otelContext,
   defaultTextMapGetter,
+  metrics,
   trace,
   type Context,
 } from '@opentelemetry/api';
@@ -146,10 +147,12 @@ export function initTelemetry(cliEntryUrl: string): void {
       }),
     ],
   });
-  // Note: we do not call a global register for meters here because
-  // @opentelemetry/api metrics.getMeter reads from the global MeterProvider
-  // once one is set via the SDK (the reader/exporter wiring above makes
-  // the provider "active" for getMeter calls in this process).
+  // Register globally so that core's getMeter() (and any tool code using
+  // @opentelemetry/api metrics.getMeter) resolves to this provider's meters.
+  // Without this, all CLI + tool metrics are silently no-op even when the
+  // OTLP endpoint is configured (the reader/exporter wiring is useless if
+  // nothing ever creates instruments against the provider).
+  metrics.setGlobalMeterProvider(meterProvider);
 
   // Parent-trace nesting: extract the W3C traceparent the consumer passed via
   // env so the run's spans attach under the parent trace. Unset ⇒ own trace.
@@ -212,7 +215,7 @@ export async function shutdownTelemetry(): Promise<void> {
           kind: 'tracer',
           err: error instanceof Error ? error.message : String(error),
         });
-      })
+      }),
     );
   }
 
@@ -225,7 +228,7 @@ export async function shutdownTelemetry(): Promise<void> {
           kind: 'meter',
           err: error instanceof Error ? error.message : String(error),
         });
-      })
+      }),
     );
   }
 

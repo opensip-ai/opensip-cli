@@ -34,15 +34,24 @@ const AUTO_CLEAR_MS = 10 * 60 * 1000;
 export function fingerprintContent(content: string): string {
   // FNV-1a 64-bit constants (big-endian words not needed; BigInt keeps it simple
   // and portable, and this is only used for cache keys).
-  const FNV_OFFSET = 0xcbf29ce484222325n;
-  const FNV_PRIME = 0x100000001b3n;
+  const FNV_OFFSET = 0xcb_f2_9c_e4_84_22_23_25n;
+  const FNV_PRIME = 0x1_00_00_00_01_b3n;
 
   let hash = FNV_OFFSET;
-  for (let i = 0; i < content.length; i += 1) {
-    hash ^= BigInt(content.codePointAt(i) ?? 0);
-    hash = (hash * FNV_PRIME) & 0xffffffffffffffffn; // keep to 64 bits
+  // Iterate over Unicode code points (not UTF-16 code units). String iteration
+  // (`for...of`) yields full code points, correctly handling surrogate pairs
+  // (astral-plane characters such as emoji, certain CJK, mathematical symbols, etc.).
+  // Using codePointAt on individual code units previously produced incorrect
+  // fingerprints (and thus wrong/missed cache hits) for any content containing
+  // characters outside the BMP.
+  for (const char of content) {
+    const cp = char.codePointAt(0) ?? 0;
+    hash ^= BigInt(cp);
+    hash = (hash * FNV_PRIME) & 0xff_ff_ff_ff_ff_ff_ff_ffn; // keep to 64 bits
   }
   // toString(36) is compact; prefix with 'f64:' so readers know the scheme.
+  // The length suffix is intentionally UTF-16 code-unit length (content.length)
+  // for compatibility with filterContent (same-length string/comment blanks).
   return `f64:${hash.toString(36)}:${String(content.length)}`;
 }
 

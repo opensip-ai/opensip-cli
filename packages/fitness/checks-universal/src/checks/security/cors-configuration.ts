@@ -79,7 +79,7 @@ export const corsConfiguration = defineCheck({
   slug: 'cors-configuration',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
 
   confidence: 'medium',
   description: 'Validate CORS configuration follows security best practices',

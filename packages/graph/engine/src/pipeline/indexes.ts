@@ -69,7 +69,7 @@ export function buildIndexes(catalog: Catalog): Indexes {
         callers,
       };
     },
-    { 'graph.indexes.nodes': /* approximate */ 0 } // can be set post in caller if needed
+    { 'graph.indexes.nodes': /* approximate */ 0 }, // can be set post in caller if needed
   );
 }
 

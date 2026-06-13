@@ -19,7 +19,7 @@
  */
 
 import { globalExcludesSchema, targetsRecordSchema, type Target } from '@opensip-cli/config';
-import { type TargetResolver } from '@opensip-cli/core';
+import { ConfigurationError, type TargetResolver } from '@opensip-cli/core';
 import { TargetRegistry, applyGlobalExcludes, resolveTargets } from '@opensip-cli/targeting';
 
 /**
@@ -89,16 +89,34 @@ export function buildTargets(args: { readonly document: unknown }): TargetResolv
   // (graph/sim namespaces) with no file targeting, exactly like a config-less run.
   if (document.targets === undefined) return undefined;
 
-  const targets = targetsRecordSchema.parse(document.targets);
-  const globalExcludes: readonly string[] = Object.freeze(
-    document.globalExcludes === undefined
-      ? []
-      : [...globalExcludesSchema.parse(document.globalExcludes)],
-  );
+  let targetsRecord: Record<string, unknown>;
+  try {
+    targetsRecord = targetsRecordSchema.parse(document.targets);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new ConfigurationError(`Invalid 'targets:' block in opensip-cli.config.yml: ${detail}`, {
+      code: 'CONFIGURATION.TARGETS.INVALID',
+    });
+  }
+
+  let globalExcludes: readonly string[];
+  try {
+    globalExcludes = Object.freeze(
+      document.globalExcludes === undefined
+        ? []
+        : [...globalExcludesSchema.parse(document.globalExcludes)],
+    );
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new ConfigurationError(
+      `Invalid 'globalExcludes:' block in opensip-cli.config.yml: ${detail}`,
+      { code: 'CONFIGURATION.TARGETS.INVALID' },
+    );
+  }
 
   const registry = new TargetRegistry();
-  for (const [name, entry] of Object.entries(targets)) {
-    registry.register(toTarget(name, entry));
+  for (const [name, entry] of Object.entries(targetsRecord)) {
+    registry.register(toTarget(name, entry as Parameters<typeof toTarget>[1]));
   }
 
   return {

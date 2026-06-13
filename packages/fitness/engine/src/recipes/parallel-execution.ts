@@ -34,6 +34,8 @@ export interface ExecutionOptions {
    * of scanning every file in the prewarmed cache.
    */
   globalExcludes?: readonly string[];
+  /** Per-service FileCache (for concurrent SaaS RunScope isolation). */
+  fileCache?: import('../framework/file-cache.js').FileCache;
 }
 
 /** Service context providing session state, callbacks, and abort control */

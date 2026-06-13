@@ -34,6 +34,11 @@ const MODULE_TAG = 'cli:bootstrap';
  * Note: `uninstall --user` is project-agnostic, but `uninstall --project`
  * requires one. The check is per-command name here; uninstall's own
  * mode-specific guarding lives in its action body.
+ *
+ * The base list covers pure host commands. Tool CommandSpecs that declare
+ * `scope: 'none'` are added dynamically at runtime (see pre-action-hook)
+ * so the declared `CommandSpec.scope` actually controls behavior (previously
+ * this list was the only source of truth, making the field dead for tools).
  */
 const PROJECT_AGNOSTIC_COMMANDS: ReadonlySet<string> = new Set([
   'init',
@@ -105,8 +110,10 @@ export function checkNoProjectAndBailout(
   cwd: string,
   cmdName: string,
   runId: string,
+  extraAgnostic: ReadonlySet<string> = new Set(),
 ): void {
-  if (project.scope !== 'none' || PROJECT_AGNOSTIC_COMMANDS.has(cmdName)) return;
+  const effective = new Set([...PROJECT_AGNOSTIC_COMMANDS, ...extraAgnostic]);
+  if (project.scope !== 'none' || effective.has(cmdName)) return;
   logger.warn({
     evt: 'cli.project.not-found',
     module: MODULE_TAG,

@@ -348,12 +348,27 @@ export function renderCatalogJson(input: RenderCatalogJsonInput): string {
   symbols.sort((a, b) => a.id.localeCompare(b.id));
   edges.sort((a, b) => a.id.localeCompare(b.id));
 
-  const doc: CatalogExport = {
-    version: '1.0',
-    provenance,
-    symbols,
-    edges,
-  };
-
-  return JSON.stringify(doc, null, 2);
+  // Build the JSON in chunks to avoid materializing the *entire* export (symbols + edges
+  // for 100k-file repos) as one giant JS string in a single JSON.stringify call.
+  // This mitigates V8 string length / OOM risk for the documented large-repo target.
+  // (Full streaming to fd without ever holding the complete string would be even better
+  // for extreme sizes; this is the contained fix that still returns the string contract.)
+  const parts: string[] = [];
+  parts.push('{\n');
+  parts.push('  "version": "1.0",\n');
+  parts.push('  "provenance": ' + JSON.stringify(provenance, null, 2) + ',\n');
+  parts.push('  "symbols": [\n');
+  for (let i = 0; i < symbols.length; i++) {
+    if (i > 0) parts.push(',\n');
+    parts.push(JSON.stringify(symbols[i], null, 2));
+  }
+  parts.push('\n  ],\n');
+  parts.push('  "edges": [\n');
+  for (let i = 0; i < edges.length; i++) {
+    if (i > 0) parts.push(',\n');
+    parts.push(JSON.stringify(edges[i], null, 2));
+  }
+  parts.push('\n  ]\n');
+  parts.push('}');
+  return parts.join('');
 }

@@ -112,7 +112,15 @@ async function emitToCloud(
   log: Logger,
 ): Promise<CloudEmitOutcome> {
   try {
-    const sink = currentScope()?.signalSink;
+    const scope = currentScope();
+    if (!scope) {
+      log.warn({
+        evt: 'cli.deliver.no_scope',
+        module: MODULE_TAG,
+      });
+      return { accepted: 0, skippedReason: 'error' };
+    }
+    const sink = scope.signalSink;
     // Behavioral discriminator, not identity: ANY no-op sink (a host's own
     // included) means "the user asked for no delivery" → stay silent.
     if (!sink || sink.noop === true) return { accepted: 0 };
@@ -182,10 +190,18 @@ export async function deliverEnvelope(
   const log = opts.logger ?? defaultLogger;
   const repo = opts.repo ?? resolveRepoIdentity(opts.cwd);
 
+  const scope = currentScope();
+  if (!scope) {
+    log.warn({
+      evt: 'cli.deliver.no_scope',
+      module: MODULE_TAG,
+    });
+  }
+
   // Record delivery start on the scope diagnostics (if any) so the 'deliver' phase
   // of the uniform lifecycle is visible in CommandOutcome for --json consumers.
   // This improves observability of the root-owned egress path (architecture review).
-  currentScope()?.diagnostics.event('deliver', 'debug', `deliver start for ${envelope.tool}`, {
+  scope?.diagnostics.event('deliver', 'debug', `deliver start for ${envelope.tool}`, {
     tool: envelope.tool,
     recipe: envelope.recipe,
     signalCount: envelope.signals.length,
@@ -208,7 +224,7 @@ export async function deliverEnvelope(
   };
 
   const cloudSuffix = cloud.skippedReason ? ` (skipped:${cloud.skippedReason})` : '';
-  currentScope()?.diagnostics.event(
+  scope?.diagnostics.event(
     'deliver',
     'debug',
     `cloud egress: accepted=${cloudAccepted}${cloudSuffix}`,
@@ -233,7 +249,7 @@ export async function deliverEnvelope(
     opts.setExitCode?.(EXIT_CODES.REPORT_FAILED);
   }
 
-  currentScope()?.diagnostics.event(
+  scope?.diagnostics.event(
     'deliver',
     reportSuccess ? 'info' : 'warn',
     `report-to ${reportSuccess ? 'succeeded' : 'failed'}`,

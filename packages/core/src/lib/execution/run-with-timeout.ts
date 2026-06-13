@@ -84,13 +84,14 @@ export async function runWithTimeout<R>(
 
   // Hard timeout: this settles the *function* with a timeout outcome even if
   // the domain work never settles. We still abort the controller so cooperative
-  // callees can stop.
+  // callees can stop. Report the exact budget as duration for the timeout case
+  // (avoids sampling skew from the setTimeout fire time).
   const hardTimeout = new Promise<UnitRunOutcome<R>>((resolve) => {
     setTimeout(() => {
       controller.abort();
       resolve({
         status: 'timeout',
-        durationMs: Date.now() - startTime,
+        durationMs: opts.timeoutMs,
         timeoutMs: opts.timeoutMs,
       });
     }, opts.timeoutMs);

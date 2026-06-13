@@ -98,7 +98,10 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
   // Defensive: even though recipe authors go through defineSimulationRecipe (and
   // fitness through its own paths), a direct caller or future plugin could pass
   // NaN/0/negative. Force a safe minimum.
-  const maxParallel = Math.max(1, Number.isFinite(opts.maxParallel) ? (opts.maxParallel as number) : 1);
+  const maxParallel = Math.max(
+    1,
+    Number.isFinite(opts.maxParallel) ? (opts.maxParallel as number) : 1,
+  );
   let nextIndex = 0;
   let activeCount = 0;
   let stopping = false;

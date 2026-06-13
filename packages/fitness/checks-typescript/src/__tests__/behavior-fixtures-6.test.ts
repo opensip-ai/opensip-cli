@@ -19,9 +19,11 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
+import { LanguageRegistry, RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
 import { fileCache } from '@opensip-cli/fitness';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { typescriptAdapter } from '@opensip-cli/lang-typescript';
 
 import { analyzeNullSafety } from '../checks/quality/data-integrity/null-safety.js';
 import { analyzeFileForToctou } from '../checks/quality/patterns/toctou-race-condition.js';
@@ -33,7 +35,10 @@ import { checks } from '../index.js';
 
 import type { CheckResult, CheckViolation } from '@opensip-cli/fitness';
 
-const testScope = new RunScope();
+// Production simulation: register the TS adapter (see behavior-fixtures.test.ts).
+const langRegistry = new LanguageRegistry();
+langRegistry.register(typescriptAdapter);
+const testScope = new RunScope({ languages: langRegistry });
 
 // The vitest process cwd is the checks-typescript package dir; captured at
 // module load so the tsc fixture can locate the monorepo root reliably even

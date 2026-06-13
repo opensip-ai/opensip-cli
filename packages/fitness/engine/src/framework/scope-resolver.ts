@@ -8,6 +8,7 @@
  * Per-check resolution is a pure in-memory lookup — no redundant I/O.
  */
 
+import { currentScope } from '@opensip-cli/core';
 import { applyGlobalExcludes, preResolveAllTargets, resolveTargets } from '@opensip-cli/targeting';
 
 import type { CheckScope } from './check-config.js';
@@ -109,7 +110,17 @@ function resolveFilesForCheck(
 
   // 2. Scope-based matching
   if (scope && (scope.languages.length > 0 || scope.concerns.length > 0)) {
-    const matchedTargets = registry.findByScope(scope.languages, scope.concerns);
+    // Re-canonicalize the check-declared languages at *execution* time against
+    // the current per-run LanguageRegistry. This makes `defineCheck` timing
+    // irrelevant: checks defined at module load (before any scope or language
+    // adapters are registered) still match correctly once a real RunScope with
+    // registered adapters is active. The TargetRegistry.findByScope also
+    // canonicalizes defensively, but doing it at the resolver call site makes
+    // the "always canonicalize at match time" contract explicit and local.
+    const liveScopeLangs = scope.languages.map(
+      (l) => currentScope()?.languages.canonicalize(l) ?? l.toLowerCase(),
+    );
+    const matchedTargets = registry.findByScope(liveScopeLangs, scope.concerns);
     if (matchedTargets.length === 0) {
       return [];
     }

@@ -153,11 +153,19 @@ export async function runLoadWindow(
   };
   const start = Date.now();
   const rampUpMs = (workload.rampUp ?? 0) * 1000;
+  let fractionalRequests = 0; // carry for low/non-integer rps across ticks
 
   while (Date.now() - start < options.windowMs && !context.abortSignal.aborted) {
     const elapsed = Date.now() - start;
     const rampUpProgress = rampUpMs > 0 ? Math.min(1, elapsed / rampUpMs) : 1;
-    const requestsThisTick = Math.floor((targetRps * rampUpProgress) / (1000 / TICK_INTERVAL_MS));
+    // Use fractional accumulator so low rps (e.g. 5) or non-integer rates don't floor to 0 requests
+    // every tick. Each tick we add the due fraction; floor gives whole requests this tick,
+    // remainder carries forward. This fixes under-delivery / zero-work for rps < 10 (100ms tick).
+    // (See AUDIT-FINDINGS and original correctness audit.)
+    const dueThisTick = (targetRps * rampUpProgress) / (1000 / TICK_INTERVAL_MS);
+    fractionalRequests += dueThisTick;
+    const requestsThisTick = Math.floor(fractionalRequests);
+    fractionalRequests -= requestsThisTick;
 
     for (let i = 0; i < requestsThisTick; i++) {
       // Backpressure: block until below the in-flight cap, which paces RPS

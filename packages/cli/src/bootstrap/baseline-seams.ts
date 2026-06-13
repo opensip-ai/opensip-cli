@@ -18,6 +18,7 @@ import {
   ConfigurationError,
   type GateCompareResult,
   type Logger,
+  SeverityPolicy,
   type Signal,
 } from '@opensip-cli/core';
 import { BaselineRepo, type DataStore } from '@opensip-cli/datastore';
@@ -56,9 +57,10 @@ function requireStampedEntries(
 ): { fingerprint: string; payload: Signal }[] {
   return signals.map((s) => {
     if (!s.fingerprint) {
-      throw new Error(
+      throw new ConfigurationError(
         `saveBaseline(${tool}): signal ${s.ruleId} is not fingerprint-stamped. The tool must ` +
           `stamp its signals (stampFingerprints) before the seam — the plane never fingerprints.`,
+        { code: 'CONFIGURATION.GATE.UNSTAMPED_SIGNAL' },
       );
     }
     return { fingerprint: s.fingerprint, payload: s };
@@ -107,24 +109,48 @@ export function buildBaselineSeams(deps: {
       const capturedAt = repo.capturedAt(tool);
       /* v8 ignore next 3 -- defensive: exists() returned true above (same as fingerprints export) */
       if (capturedAt === undefined) {
-        throw new Error(`Baseline meta row for '${tool}' missing after exists() reported present.`);
+        throw new ConfigurationError(
+          `Baseline meta row for '${tool}' missing after exists() reported present.`,
+          { code: 'CONFIGURATION.GATE.BASELINE_INCONSISTENT' },
+        );
       }
       const signals = repo
         .load(tool)
         .map((r) => r.payload)
         .filter((s): s is Signal => s !== null);
+
+      // Compute a minimal but truthful verdict/summary from the captured signals
+      // so that SARIF consumers (and any envelope-level logic) see consistent
+      // counts instead of an all-zeroes synthetic. This is a reconstruction of
+      // historical findings; "passed" here means "the captured set contained no
+      // error-severity findings" (matching the spirit of the run verdict).
+      let errors = 0;
+      let warnings = 0;
+      for (const s of signals) {
+        if (SeverityPolicy.isError(s.severity)) errors += 1;
+        else warnings += 1;
+      }
+      const summary = {
+        total: signals.length,
+        passed: signals.length - errors,
+        failed: errors,
+        errors,
+        warnings,
+      };
+
       // SARIF export RECONSTRUCTS (no stored envelope): formatSignalSarif derives
       // results from `signals` + the driver name from `tool` only, so the other
-      // envelope fields are inert filler.
+      // envelope fields are mostly inert filler. We now populate a plausible
+      // verdict so downstream SARIF or machine consumers are not misled.
       const synthetic: SignalEnvelope = {
         schemaVersion: 2,
         tool: tool as SignalEnvelope['tool'],
         runId: 'baseline',
         createdAt: new Date(capturedAt).toISOString(),
         verdict: {
-          score: 0,
-          passed: true,
-          summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+          score: signals.length === 0 ? 1 : summary.passed / summary.total,
+          passed: errors === 0,
+          summary,
         },
         units: [],
         signals,
@@ -140,7 +166,10 @@ export function buildBaselineSeams(deps: {
       const capturedAt = repo.capturedAt(tool);
       /* v8 ignore next 3 -- defensive: exists() returned true above */
       if (capturedAt === undefined) {
-        throw new Error(`Baseline meta row for '${tool}' missing after exists() reported present.`);
+        throw new ConfigurationError(
+          `Baseline meta row for '${tool}' missing after exists() reported present.`,
+          { code: 'CONFIGURATION.GATE.BASELINE_INCONSISTENT' },
+        );
       }
       const fingerprints = repo
         .load(tool)

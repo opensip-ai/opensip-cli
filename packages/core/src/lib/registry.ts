@@ -169,9 +169,12 @@ export class Registry<T extends Registerable> {
           break;
         }
         case 'allow-internal': {
-          // First non-internal write was allowed (it landed without
-          // a dup condition). Subsequent duplicates throw unless
-          // `{ internal: true }` is passed.
+          // First non-internal write was allowed. Subsequent duplicates throw unless { internal: true }.
+          // Harden for idempotent re-registers (tests, reloads): if the exact same item (id+name), allow silently.
+          const existing = idIncumbent || nameIncumbent;
+          if (existing && existing.id === item.id && existing.name === item.name) {
+            return;
+          }
           // @fitness-ignore-next-line result-pattern-consistency -- registration guard, throw is appropriate
           throw new ValidationError(
             `${this.module}: '${item.name}' (${item.id}) already registered (allow-internal: only the first write is permitted without { internal: true })`,

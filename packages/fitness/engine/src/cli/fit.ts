@@ -144,11 +144,19 @@ export async function executeFit(
   const scopeMap = buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd);
   const checkTargetFiles = scopeMap.size > 0 ? scopeMap : undefined;
 
+  // CLI --exclude (and any config-level per-run exclude) are additive runtime filters for this invocation.
+  // They are merged into disabledChecks so the recipe service skips them exactly as permanently-disabled checks.
+  // This makes the documented --exclude flag actually affect execution and the gate.
+  const runtimeExcludes = [
+    ...(fitnessResolved?.disabledChecks ?? []),
+    ...(signalersConfig.fitness.disabledChecks ?? []),
+    ...(args.exclude ?? []),
+  ];
   const service = new FitnessRecipeService({
     cwd: args.cwd,
     checkTargetFiles,
     callbacks: buildFitCallbacks(opts.onProgress),
-    disabledChecks: fitnessResolved?.disabledChecks ?? signalersConfig.fitness.disabledChecks,
+    disabledChecks: runtimeExcludes,
     includeViolations: true,
     globalExcludes: targetsConfig.globalExcludes,
   });

@@ -345,7 +345,7 @@ export const sqlInjection = defineCheck({
   id: '73c198ff-3d68-4e9b-a2aa-9e5d511cd89c',
   slug: 'sql-injection',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
   description: 'Detect potential SQL injection vulnerabilities',
   longDescription: `**Purpose:** Detects potential SQL injection vulnerabilities by using AST analysis to find user-supplied values interpolated or concatenated into SQL strings.
 

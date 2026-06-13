@@ -145,10 +145,10 @@ export function buildOpenSipSarif(signals: readonly Signal[], driver: SarifDrive
 
     const physicalLocation: SarifLocation['physicalLocation'] = {
       artifactLocation: { uri: filePath },
-      ...(startLine !== undefined || startColumn !== undefined
+      ...(startLine !== undefined
         ? {
             region: {
-              ...(startLine !== undefined && { startLine }),
+              startLine,
               ...(startColumn !== undefined && { startColumn }),
             },
           }

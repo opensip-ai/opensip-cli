@@ -157,7 +157,7 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
     },
     {
       'graph.walk.file_count': sortedPaths.length,
-    }
+    },
   );
 }
 

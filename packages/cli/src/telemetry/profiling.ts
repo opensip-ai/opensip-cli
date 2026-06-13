@@ -58,9 +58,10 @@ export function isProfilingEnabled(): boolean {
  * Safe to call multiple times (idempotent).
  */
 export function startProfiling(scope?: RunScope, command?: string): void {
-  if (isProfiling || !isProfilingEnabled()) return;
+  if (isProfiling) return;
 
   try {
+    if (!isProfilingEnabled()) return;
     session = new Session();
     session.connect();
 
@@ -73,9 +74,10 @@ export function startProfiling(scope?: RunScope, command?: string): void {
         const ts = new Date().toISOString().replace(/[:.]/g, '-');
 
         // Place profiles under project logs dir if available, else cwd/.runtime/profiles
-        const baseDir = scope?.projectContext?.scope === 'project'
-          ? join(scope.projectContext.projectRoot, 'opensip-cli/.runtime/profiles')
-          : join(process.cwd(), 'opensip-cli/.runtime/profiles');
+        const baseDir =
+          scope?.projectContext?.scope === 'project'
+            ? join(scope.projectContext.projectRoot, 'opensip-cli/.runtime/profiles')
+            : join(process.cwd(), 'opensip-cli/.runtime/profiles');
 
         mkdirSync(baseDir, { recursive: true });
 

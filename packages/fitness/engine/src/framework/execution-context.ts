@@ -14,7 +14,7 @@ import { SystemError, currentScope, logger as defaultLogger } from '@opensip-cli
 import { applyGlobalExcludes } from '../targets/index.js';
 
 import { DEFAULT_EXCLUSION_PATTERNS } from './constants.js';
-import { fileCache } from './file-cache.js';
+import { fileCache as globalFileCache, FileCache } from './file-cache.js';
 import { PathMatcher } from './path-matcher.js';
 import { extractSnippet } from './result-builder.js';
 
@@ -105,6 +105,8 @@ export interface RunOptions {
    * `tests/fixtures/`, etc., contrary to user intent.
    */
   readonly globalExcludes?: readonly string[];
+  /** Per-service FileCache instance (for SaaS isolation; falls back to global). */
+  readonly fileCache?: FileCache;
 }
 
 /**
@@ -135,10 +137,12 @@ function createMatchFilesFunction(
   matcher: PathMatcher,
   targetFiles?: readonly string[],
   globalExcludes?: readonly string[],
+  fileCacheInstance?: FileCache,
 ): (
   patterns?: readonly string[],
   options?: { ignore?: readonly string[] },
 ) => Promise<readonly string[]> {
+  const fc = fileCacheInstance ?? globalFileCache;
   return async (
     patterns?: readonly string[],
     options?: { ignore?: readonly string[] },
@@ -165,7 +169,7 @@ function createMatchFilesFunction(
     // must be applied, otherwise scope-empty checks scan every prewarmed
     // file regardless of project intent.
     if (matcher.includePatterns.length === 0) {
-      return applyGlobalExcludes(fileCache.paths(), cwd, globalExcludes ?? []);
+      return applyGlobalExcludes(fc.paths(), cwd, globalExcludes ?? []);
     }
 
     return matcher.files();
@@ -181,26 +185,44 @@ export function createExecutionContext(
   matcher: PathMatcher,
   options?: RunOptions,
 ): ExecutionContext {
+  const fc = options?.fileCache ?? globalFileCache;
   return {
     cwd,
     checkId: config.id,
     checkSlug: config.slug,
     verbose: options?.verbose ?? false,
 
-    // @fitness-ignore-next-line unbounded-memory -- size validation via fs.stat() is on the next line; false positive on method name
     /** @throws {SystemError} When the file exceeds 10MB */
     async readFile(filePath: string): Promise<string> {
-      const fileStats = await fs.stat(filePath);
-      if (fileStats.size > 10_000_000) {
-        throw new SystemError(`File too large (${fileStats.size} bytes, max 10MB): ${filePath}`, {
+      // Fast-fail on obvious on-disk size before pulling content (optimization).
+      // The authoritative check is performed on the *actual* bytes returned
+      // (closes TOCTOU between stat and read, and protects against a cache
+      // entry that grew or was prewarmed with a larger version).
+      try {
+        const fileStats = await fs.stat(filePath);
+        if (fileStats.size > 10_000_000) {
+          throw new SystemError(`File too large (${fileStats.size} bytes, max 10MB): ${filePath}`, {
+            code: 'SYSTEM.FITNESS.FILE_TOO_LARGE',
+          });
+        }
+      } catch (error) {
+        // If stat itself fails, let the subsequent get() surface the real FS error
+        // (directory, permission, etc.). Only swallow the size error we just threw.
+        if (error instanceof SystemError && error.code === 'SYSTEM.FITNESS.FILE_TOO_LARGE')
+          throw error;
+      }
+
+      const content = await fc.get(filePath);
+      if (content.length > 10_000_000) {
+        throw new SystemError(`File too large (${content.length} bytes, max 10MB): ${filePath}`, {
           code: 'SYSTEM.FITNESS.FILE_TOO_LARGE',
         });
       }
-      return fileCache.get(filePath);
+      return content;
     },
 
     fileExists(filePath: string): Promise<boolean> {
-      return fileCache.exists(filePath);
+      return fc.exists(filePath);
     },
 
     matchFiles: createMatchFilesFunction(
@@ -208,6 +230,7 @@ export function createExecutionContext(
       matcher,
       options?.targetFiles,
       options?.globalExcludes,
+      fc,
     ),
 
     getMatcher(): PathMatcher {

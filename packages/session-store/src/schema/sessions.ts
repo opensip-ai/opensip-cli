@@ -11,7 +11,8 @@ export const sessions = sqliteTable(
   {
     id: text('id').primaryKey(),
     tool: text('tool').notNull(),
-    timestamp: integer('timestamp').notNull(),
+    timestamp: integer('timestamp').notNull(), // ms epoch for ordering/index; see timestamp_iso for fidelity
+    timestamp_iso: text('timestamp_iso'), // original ISO string from tool for replay fidelity (preserves lexical form, sub-ms if any in future)
     cwd: text('cwd').notNull(),
     recipe: text('recipe'),
     score: integer('score').notNull(),
@@ -36,4 +37,5 @@ export const sessionToolPayload = sqliteTable('session_tool_payload', {
     .references(() => sessions.id, { onDelete: 'cascade' }),
   tool: text('tool').notNull(),
   payload: text('payload', { mode: 'json' }).notNull(),
+  payload_version: integer('payload_version').notNull().default(1), // tool-owned payload schema version; future versions may require CLI upgrade to interpret
 });

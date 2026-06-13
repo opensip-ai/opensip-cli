@@ -23,7 +23,13 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { LanguageRegistry, ToolRegistry, logger, readPackageVersion, getMeter } from '@opensip-cli/core';
+import {
+  LanguageRegistry,
+  ToolRegistry,
+  logger,
+  readPackageVersion,
+  getMeter,
+} from '@opensip-cli/core';
 import { Command } from 'commander';
 
 import {
@@ -150,9 +156,11 @@ async function main(): Promise<void> {
   );
   // Phase 2: command duration histogram (low cardinality labels)
   const durationMs = Date.now() - commandStart;
-  getMeter('opensip-cli').createHistogram('opensip_cli.command.duration_ms').record(durationMs, {
-    command: process.argv[2] || 'welcome', // rough; real commands go through pre-action
-  });
+  getMeter('opensip-cli')
+    .createHistogram('opensip_cli.command.duration_ms')
+    .record(durationMs, {
+      command: process.argv[2] || 'welcome', // rough; real commands go through pre-action
+    });
 }
 
 // Top-level fatal handler. Errors that escape `main` predate Commander's

@@ -87,11 +87,11 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
-      const opts = rawOpts as { tool?: ToolShortId; limit?: number; 'summary-only'?: boolean };
+      const opts = rawOpts as { tool?: ToolShortId; limit?: number; summaryOnly?: boolean };
       return showHistory(ctx.datastore() as DataStore, {
         tool: opts.tool,
         limit: opts.limit,
-        summaryOnly: !!opts['summary-only'],
+        summaryOnly: !!opts.summaryOnly,
       });
     },
   });
@@ -116,6 +116,8 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
         description:
           'Filter replayed signals (repeatable): errors-only | warnings-only | top:<n>. ' +
           'Composable, e.g. --filter errors-only --filter top:20. Agent ergonomics for historical results.',
+        arrayDefault: [],
+        parse: (val, prev) => [...(prev as string[]), val],
       },
       {
         flag: '--raw',
@@ -132,7 +134,7 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
         _args: string[];
         tool?: ToolShortId;
         json?: boolean;
-        filter?: string | string[];
+        filter?: string[];
         raw?: boolean;
       };
       const ref = opts._args[0];

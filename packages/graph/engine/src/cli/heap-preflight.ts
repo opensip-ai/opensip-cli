@@ -212,7 +212,8 @@ async function reExecWithHeap(
         resolve();
         return;
       }
-      process.exit(code ?? 1);
+      process.exitCode = code ?? 1;
+      resolve();
     });
   });
 }

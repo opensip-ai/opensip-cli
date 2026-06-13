@@ -10,8 +10,11 @@
  * (no fault injection).
  */
 
+import { withSpanAsync } from '@opensip-cli/core';
+
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js';
 import { runLoadWindow } from '../../framework/execution/run-load-window.js';
+
 import { ScenarioResultBuilder } from '../../framework/result-builder.js';
 import { createScenarioLogger } from '../../framework/scenario-logger.js';
 
@@ -19,7 +22,6 @@ import type { LoadScenarioConfig } from './config.js';
 import type { RunnableScenario } from '../../framework/runnable-scenario.js';
 import type { LoadScenarioExecutorResult } from '../../framework/scenario-executor-result.js';
 import type { ScenarioExecutionContext } from '../../types/framework-types.js';
-import { withSpanAsync } from '@opensip-cli/core';
 
 /**
  * Run the load window against the BYO target and wrap the measured metrics +
@@ -46,7 +48,7 @@ async function executeLoad(
     {
       'simulation.scenario.id': config.id,
       'simulation.kind': 'load',
-    }
+    },
   );
 
   const built = ScenarioResultBuilder.create(config.id)

@@ -53,8 +53,15 @@ export class BaselineRepo {
 
       this.datastore.transaction((tx) => {
         tx.delete(toolBaselineEntries).where(eq(toolBaselineEntries.tool, tool)).run();
+        // Chunked insert to avoid hitting SQLite's SQLITE_MAX_VARIABLE_NUMBER (~32766 vars).
+        // Each row uses 4 bound parameters (tool, fingerprint, payload, capturedAt).
+        // 2000-row chunks are comfortably safe even on older SQLite builds.
         if (rows.length > 0) {
-          tx.insert(toolBaselineEntries).values(rows).run();
+          const CHUNK = 2000;
+          for (let i = 0; i < rows.length; i += CHUNK) {
+            const chunk = rows.slice(i, i + CHUNK);
+            tx.insert(toolBaselineEntries).values(chunk).run();
+          }
         }
         // Upsert the existence marker keyed on `tool`.
         tx.insert(toolBaselineMeta)

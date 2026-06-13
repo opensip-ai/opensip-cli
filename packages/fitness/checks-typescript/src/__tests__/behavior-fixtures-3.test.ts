@@ -9,15 +9,18 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RunScope, runWithScope } from '@opensip-cli/core';
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
 import { fileCache } from '@opensip-cli/fitness';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { typescriptAdapter } from '@opensip-cli/lang-typescript';
+
 import { checks } from '../index.js';
 
-// Engine reads `currentScope()?.languages` for contentFilter dispatch.
-// An empty scope falls through to the no-adapter "raw" branch.
-const testScope = new RunScope();
+// Production simulation: register the TS adapter (see behavior-fixtures.test.ts).
+const langRegistry = new LanguageRegistry();
+langRegistry.register(typescriptAdapter);
+const testScope = new RunScope({ languages: langRegistry });
 
 let cwd: string;
 let written: string[] = [];

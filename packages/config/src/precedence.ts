@@ -57,7 +57,9 @@ function coerceBoolean(raw: string): boolean | undefined {
 function coerceEnvValue(raw: string, type: EnvBindingType | undefined): unknown {
   switch (type) {
     case 'number': {
-      const n = Number(raw);
+      const trimmed = raw.trim();
+      if (trimmed.length === 0) return undefined; // empty or whitespace → treat as unset (prevents CI footguns like FAIL_ON_ERRORS=${UNSET} becoming 0)
+      const n = Number(trimmed);
       return Number.isFinite(n) ? n : undefined;
     }
     case 'boolean': {

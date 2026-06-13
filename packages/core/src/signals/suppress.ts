@@ -133,20 +133,47 @@ function isIdChar(char: string): boolean {
  * Extract the id token a directive names, or `null` when `line` is not a
  * `<comment> <directiveKeyword> <id>` directive.
  */
-function extractDirectiveId(line: string, directiveKeyword: string): string | null {
-  let commentIndex = -1;
-  let sliceLen = 0;
-  for (const [opener, length] of COMMENT_OPENERS) {
-    const idx = line.indexOf(opener);
-    if (idx !== -1) {
-      commentIndex = idx;
-      sliceLen = length;
-      break;
+/**
+ * Find the first comment opener that is not inside a string literal.
+ * This prevents matching `//` inside "http://..." or "foo//bar" or directives
+ * hidden inside string literals (false positives) and ensures trailing
+ * directives after code-with-embedded-// are found (false negatives).
+ */
+function findFirstRealCommentOpener(line: string): { index: number; length: number } | null {
+  let i = 0;
+  const len = line.length;
+  let inString: string | null = null; // ' or "
+  while (i < len) {
+    const ch = line[i];
+    if (inString) {
+      if (ch === inString) {
+        // naive: no escape handling (sufficient for directive scanner; escaped quotes are rare in practice here)
+        inString = null;
+      }
+      i++;
+      continue;
     }
+    if (ch === '"' || ch === "'") {
+      inString = ch;
+      i++;
+      continue;
+    }
+    // check for openers
+    for (const [opener, length] of COMMENT_OPENERS) {
+      if (line.startsWith(opener, i)) {
+        return { index: i, length };
+      }
+    }
+    i++;
   }
-  if (commentIndex === -1) return null;
+  return null;
+}
 
-  const afterComment = line.slice(commentIndex + sliceLen).trimStart();
+function extractDirectiveId(line: string, directiveKeyword: string): string | null {
+  const openerHit = findFirstRealCommentOpener(line);
+  if (!openerHit) return null;
+
+  const afterComment = line.slice(openerHit.index + openerHit.length).trimStart();
   if (!afterComment.startsWith(directiveKeyword)) return null;
 
   const afterDirective = afterComment.slice(directiveKeyword.length);
