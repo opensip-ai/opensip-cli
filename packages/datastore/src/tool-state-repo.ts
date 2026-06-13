@@ -20,6 +20,17 @@ export const TOOL_STATE_MAX_PAYLOAD_BYTES = 256 * 1024;
  * durable keyed JSON persistence without owning schema, the same generic-table
  * pattern the ADR-0036 baseline pair proved. Tools consume it through the
  * `cli.toolState` seams; the payload is opaque to the host.
+ *
+ * ## Versioning convention for toolState values
+ *
+ * For any key whose value shape a tool treats as versioned, the tool SHOULD
+ * include a top-level numeric `"__version": N` (starting at 1) inside the
+ * object it puts. The host never reads or enforces it — use
+ * `extractPayloadVersion` (from '@opensip-cli/core') inside your tool code
+ * when you `get` a key to decide projection/migration.
+ *
+ * Keys that are truly schemaless (arbitrary user data) may omit `__version`.
+ * See the payload schema evolution plan / ADR-0050 for safe vs. major rules.
  */
 export class ToolStateRepo {
   private readonly datastore: DrizzleDataStore;
@@ -41,6 +52,11 @@ export class ToolStateRepo {
 
   /**
    * Upsert one payload under `(tool, key)`.
+   *
+   * Callers that version the state for a stable key SHOULD put an object
+   * whose top level contains `"__version": 1` (or higher after a breaking change
+   * per the evolution rules). The host stores it opaquely; on read the caller
+   * uses `extractPayloadVersion(payload)` to inspect.
    *
    * @throws {ValidationError} when the JSON serialization exceeds
    *   {@link TOOL_STATE_MAX_PAYLOAD_BYTES} (error, never evict).
