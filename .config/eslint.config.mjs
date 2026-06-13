@@ -453,6 +453,10 @@ export default tseslint.config(
       'packages/cli/src/index.ts', // top-level registration + buildToolCliContext call site
       'packages/cli/src/welcome.ts',
       'packages/cli/src/commands/session-show.ts', // its --raw path implements the declared RAW_STREAM CommandSpec mode for this host command (sanctioned seam, not a bypass)
+      'packages/cli/src/commands/configure.ts', // interactive TTY prompts, readline + human key verification/masking (not run output)
+      'packages/cli/src/commands/clear.ts', // confirmation prompts and pre-prompt notes (human TTY UX, not run output; has explicit comment)
+      'packages/cli/src/commands/completion.ts', // completion script writer (sanctioned output for the completion command)
+      'packages/cli/src/commands/render-outcome.ts', // host implementation of the --json emit* seams (the actual machine output write)
     ],
     rules: {
       'no-restricted-properties': [

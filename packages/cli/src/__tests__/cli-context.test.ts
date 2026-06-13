@@ -179,39 +179,39 @@ describe('buildToolCliContext', () => {
   });
 });
 
-describe('getCurrentProjectRoot / setCurrentRunScope', () => {
-  it('throws when called before scope is set', async () => {
+describe('getCurrentProjectRoot / entered scope', () => {
+  it('throws when called before scope is entered', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    expect(() => mod.getCurrentProjectRoot()).toThrow(/pre-action-hook|action body/);
+    expect(() => mod.getCurrentProjectRoot()).toThrow(/pre-action-hook constructed and entered it|SYSTEM.SCOPE.NOT_ENTERED/);
   });
 
-  it('returns the configured project root once the run scope is set', async () => {
+  it('returns the configured project root once inside an entered RunScope', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const { RunScope } = await import('@opensip-cli/core');
-    mod.setCurrentRunScope(
-      new RunScope({
-        projectContext: {
-          scope: 'project',
-          projectRoot: '/path/to/proj',
-          walkedUp: 0,
-        } as never,
-      }),
-    );
-    mod.markScopeEntered();
-    expect(mod.getCurrentProjectRoot()).toBe('/path/to/proj');
+    const { RunScope, runWithScopeSync } = await import('@opensip-cli/core');
+    const scope = new RunScope({
+      projectContext: {
+        scope: 'project',
+        projectRoot: '/path/to/proj',
+        walkedUp: 0,
+      } as never,
+    });
+    runWithScopeSync(scope, () => {
+      expect(mod.getCurrentProjectRoot()).toBe('/path/to/proj');
+    });
   });
 
-  it('throws when the scope is set but carries no project context', async () => {
+  it('throws when inside a scope that carries no project context', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const { RunScope } = await import('@opensip-cli/core');
+    const { RunScope, runWithScopeSync } = await import('@opensip-cli/core');
     // A scope with no projectContext (e.g. a bare bootstrap scope) ⇒
     // getCurrentProjectRoot must surface the PROJECT_UNSET error.
-    mod.setCurrentRunScope(new RunScope({}));
-    mod.markScopeEntered();
-    expect(() => mod.getCurrentProjectRoot()).toThrow(/pre-action-hook resolved the context/);
+    const scope = new RunScope({});
+    runWithScopeSync(scope, () => {
+      expect(() => mod.getCurrentProjectRoot()).toThrow(/pre-action-hook resolved the context|PROJECT_UNSET/);
+    });
   });
 });
 
@@ -277,19 +277,19 @@ describe('setCliRegistriesForRun / getCurrentRegistriesForScope', () => {
 });
 
 describe('ToolCliContext.scope getter', () => {
-  it('returns the RunScope set via setCurrentRunScope', async () => {
+  it('returns the RunScope from the entered scope (ALS)', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    const { RunScope } = await import('@opensip-cli/core');
+    const { RunScope, runWithScopeSync } = await import('@opensip-cli/core');
     const scope = new RunScope({
       projectContext: { scope: 'project', projectRoot: '/p', walkedUp: 0 } as never,
     });
-    mod.setCurrentRunScope(scope);
-    mod.markScopeEntered();
 
     const opts = makeBuildOpts();
-    const { ctx } = mod.buildToolCliContext(opts);
-    expect(ctx.scope).toBe(scope);
+    runWithScopeSync(scope, () => {
+      const { ctx } = mod.buildToolCliContext(opts);
+      expect(ctx.scope).toBe(scope);
+    });
   });
 });
 
