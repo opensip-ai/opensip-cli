@@ -1,6 +1,8 @@
 import {
   SystemError,
   ValidationError,
+  currentScope,
+  extractPayloadVersion,
   isToolShortId,
   logger,
 } from "@opensip-cli/core";
@@ -242,19 +244,31 @@ export class SessionRepo {
       .from(sessionToolPayload)
       .where(eq(sessionToolPayload.sessionId, row.id))
       .get();
-    if (
-      payloadRow &&
-      typeof payloadRow.payload_version === "number" &&
-      payloadRow.payload_version > 1
-    ) {
+
+    const outerVersion = (payloadRow?.payload_version ?? 1) as number;
+    const innerVersion = extractPayloadVersion(payloadRow?.payload);
+
+    if (outerVersion > 1 || (innerVersion !== undefined && innerVersion > 1)) {
       logger.warn({
         evt: "session.payload.future_version",
         module: MODULE_NAME,
         sessionId: row.id,
-        version: payloadRow.payload_version,
+        outerVersion,
+        innerVersion: innerVersion ?? null,
         msg: "Payload schema version newer than this CLI knows; treating as opaque (may lose fields on display).",
       });
+
+      // Emit on the per-run DiagnosticsBus for --json / CommandOutcome consumers (cross-cutting observability).
+      // Uses currentScope per RunScope rules; safe no-op when no scope (e.g. some tests).
+      const scope = currentScope();
+      scope?.diagnostics?.event(
+        "load",
+        "warn",
+        `session payload future version (outer=${outerVersion}, inner=${innerVersion ?? "legacy"})`,
+        { sessionId: row.id, outerVersion, innerVersion: innerVersion ?? undefined },
+      );
     }
+
     return {
       id: row.id,
       tool: row.tool,
