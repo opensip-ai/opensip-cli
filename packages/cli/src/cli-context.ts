@@ -150,6 +150,7 @@ export function markScopeEntered(): void {
 }
 
 /** Test-only reset retained for transition. */
+// @fitness-ignore-next-line dead-code -- test-only surface for holder-test transition (Phase 6 will remove or call it)
 export function resetScopeEnteredForTest(): void {
   // noop in Phase 3+
 }

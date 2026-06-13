@@ -158,6 +158,11 @@ export type {
   ToolSessionRecord,
   ToolSessionReplayContribution,
   LiveViewRenderer,
+  // Typed host planes (host-planes-scope-seams-hygiene Phase 0): public so Cloud + third-party tools
+  // can type against the bag on ToolCliContext without subpath imports. OSS flexibility via toolState.
+  HostGovernance,
+  HostAudit,
+  HostEntitlements,
 } from './tools/index.js';
 // Static tool-plugin manifest + the plugin-API epoch + provenance types
 // (release 3.0.0 raw-vs-admitted contract). Re-exported by @opensip-cli/
