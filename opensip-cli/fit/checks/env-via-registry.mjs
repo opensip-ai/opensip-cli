@@ -77,6 +77,94 @@ export function analyzeEnvViaRegistry(content) {
   return violations;
 }
 
+// ===========================================================================
+// SECOND project-local self-check in this file: env-registry-undeclared-read
+// ---------------------------------------------------------------------------
+// The sibling above mandates reading env THROUGH the registry. This one closes
+// the other half: a registry read must name a DECLARED variable.
+//
+// WHY: `hostEnv.get('NAME')` resolves through `EnvRegistry`, which THROWS
+// `EnvRegistry: unknown variable 'NAME'` for any canonical with no EnvVarSpec.
+// The read often sits OUTSIDE a try/catch (e.g. the profiling gate that aborted
+// every telemetry-enabled run — the audit's CRITICAL finding), so an undeclared
+// read is not a quiet `undefined` fallback: it crashes the command before its
+// body runs. This guard fails the build the moment a governed read names a
+// variable that has no spec.
+//
+// Cross-file (`analyzeAll`): pass 1 collects every declared `canonical: 'NAME'`
+// across the scanned sources; pass 2 flags any `hostEnv.get/read('NAME')` whose
+// NAME is absent. If NO declarations are found (the spec table wasn't in scope),
+// it bails rather than flag everything. Limitation: a name declared in ANY spec
+// table counts as declared — it does not model which registry loads which table.
+// ===========================================================================
+
+/** A governed env-var declaration: `canonical: 'NAME'`. */
+const CANONICAL_DECL_RE = /\bcanonical:\s*(['"])([A-Z][A-Z0-9_]*)\1/g;
+
+/**
+ * A governed read through the host env registry: `hostEnv.get('NAME')`,
+ * `hostEnv.read('NAME')`, or `<x>EnvRegistry.get/read('NAME')` (optional generic
+ * type arg). The UPPER_SNAKE argument keeps `someMap.get('aKey')` from matching.
+ */
+const REGISTRY_READ_RE =
+  /\b(?:hostEnv|envRegistry|[A-Za-z]\w*EnvRegistry)\.(?:get|read)\s*(?:<[^>]*>)?\s*\(\s*(['"])([A-Z][A-Z0-9_]*)\1/g;
+
+/** A comment-only line — raw content, so prose mentioning the patterns must be skipped. */
+function isEnvCommentLine(line) {
+  const t = line.trimStart();
+  return t.startsWith('*') || t.startsWith('//') || t.startsWith('/*');
+}
+
+/**
+ * Pure two-pass analysis over a path→content map (what `FileAccessor.readAll()`
+ * returns). Exported for direct exercise if this check grows a test harness.
+ */
+export function analyzeEnvRegistryUndeclaredRead(filesByPath) {
+  // Pass 1: every declared canonical name across the scanned sources.
+  const declared = new Set();
+  for (const content of filesByPath.values()) {
+    for (const line of content.split('\n')) {
+      if (isEnvCommentLine(line)) continue;
+      CANONICAL_DECL_RE.lastIndex = 0;
+      let m;
+      while ((m = CANONICAL_DECL_RE.exec(line)) !== null) declared.add(m[2]);
+    }
+  }
+  // No declarations in scope → cannot validate; bail rather than false-flag.
+  if (declared.size === 0) return [];
+
+  // Pass 2: flag governed reads of an undeclared variable.
+  const violations = [];
+  for (const [filePath, content] of filesByPath) {
+    if (CHECK_PACK_PATH.test(filePath) || TEST_PATH.test(filePath)) continue;
+    for (const [i, line] of content.split('\n').entries()) {
+      if (isEnvCommentLine(line)) continue;
+      REGISTRY_READ_RE.lastIndex = 0;
+      let m;
+      while ((m = REGISTRY_READ_RE.exec(line)) !== null) {
+        const name = m[2];
+        if (declared.has(name)) continue;
+        violations.push({
+          filePath,
+          line: i + 1,
+          message:
+            `Env read of '${name}' has no declared EnvVarSpec. EnvRegistry throws ` +
+            `"unknown variable '${name}'" for an undeclared canonical name — and the ` +
+            `read often sits outside a try/catch, so it crashes the command before its ` +
+            `body runs (the profiling-gate CRITICAL).`,
+          severity: 'error',
+          suggestion:
+            `Declare '${name}' as an EnvVarSpec in the appropriate *_ENV_SPECS table ` +
+            `(e.g. CLI_ENV_SPECS in host-env-specs.ts) so hostEnv.get returns undefined ` +
+            `when unset instead of throwing, and it appears in the env-surface reference.`,
+          type: 'env-registry-undeclared-read',
+        });
+      }
+    }
+  }
+  return violations;
+}
+
 export const checks = [
   defineCheck({
     id: '992a80ac-58b5-422d-8a86-12f22f82d6e5',
@@ -92,5 +180,18 @@ export const checks = [
       if (ALLOWLISTED_BASENAMES.has(basename)) return [];
       return analyzeEnvViaRegistry(content);
     },
+  }),
+  defineCheck({
+    id: '0ea42b99-95bf-4846-b4fc-4066b3b1fecf',
+    slug: 'env-registry-undeclared-read',
+    description:
+      'Every EnvRegistry read (hostEnv.get/read("NAME")) must reference a declared EnvVarSpec — an undeclared canonical name throws "unknown variable" at runtime, aborting the command',
+    scope: { languages: ['typescript'], concerns: ['backend'] },
+    tags: ['architecture', 'quality'],
+    fileTypes: ['ts', 'tsx'],
+    // raw: the canonical declaration strings AND the read-argument strings are the
+    // signal — strip-strings would blank both. Comment lines are skipped in the analyzer.
+    contentFilter: 'raw',
+    analyzeAll: async (files) => analyzeEnvRegistryUndeclaredRead(await files.readAll()),
   }),
 ];
