@@ -21,8 +21,9 @@ const PKG = JSON.parse(readFileSync(resolve(HERE, '../../package.json'), 'utf8')
 };
 
 describe('fitnessTool contract conformance', () => {
-  it("metadata.id is 'fitness'", () => {
-    expect(fitnessTool.metadata.id).toBe('fitness');
+  it("metadata.name is the human key 'fitness'; id is the stable UUID", () => {
+    expect(fitnessTool.metadata.name).toBe('fitness');
+    expect(fitnessTool.metadata.id).toBe('afd68bd3-ff3c-4935-a5b6-76d8fc7a5224');
   });
 
   it('metadata.version matches package.json', () => {

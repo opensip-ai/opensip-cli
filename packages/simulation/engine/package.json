@@ -37,6 +37,7 @@
   "opensipTools": {
     "kind": "tool",
     "id": "simulation",
+    "stableId": "715d32c2-692c-4ed4-985b-a35deaf186aa",
     "apiVersion": 1,
     "commands": [
       {

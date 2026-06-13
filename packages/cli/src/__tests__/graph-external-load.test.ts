@@ -88,7 +88,8 @@ describe('graph externalization acceptance test (§1 / §8 — invariant 1, grap
       tool?: Tool;
     };
     expect(mod.tool, 'the built module must export `tool`').toBeDefined();
-    expect(mod.tool?.metadata.id).toBe('graph');
+    expect(mod.tool?.metadata.name).toBe('graph');
+    expect(mod.tool?.metadata.id).toBe('3873f1c2-02a9-4719-930a-bca74b62b706');
     const names = (mod.tool?.commandSpecs ?? []).map((s) => s.name);
     expect(names).toEqual(expect.arrayContaining([...PUBLIC_COMMANDS]));
   });

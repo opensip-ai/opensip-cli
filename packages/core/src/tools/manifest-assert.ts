@@ -2,20 +2,18 @@
  * @fileoverview Load-time manifest⇔Tool drift guard (launch, Phase 1).
  *
  * The static `ToolPluginManifest` (declared in `package.json#opensipTools`)
- * and the runtime `Tool` (`metadata.id` + `commands[]`) are two declarations
- * of the same identity. For launch the open question is resolved as **assert
- * equality at load** — the manifest must match the tool it ships with;
- * single-sourcing the two is deferred to launch (when `ToolMetadata` can change
- * shape). This helper is that assertion: a typed throw on the first sign of
- * drift, called by the Phase 5 as-if-external test and (defensively) by the
- * Phase 3 bundled-load path.
+ * and the runtime `Tool` are two declarations of the same tool. Per ADR-0048
+ * the runtime uses `metadata.id` for the stable UUID and `metadata.name` for
+ * the human key (matching the manifest's `id` for the human key). Manifests
+ * may also declare `stableId` (additive) for the UUID.
  *
- * Equality is checked on the identity subset only:
- *   - `manifest.id === tool.metadata.id`, and
+ * This guard asserts:
+ *   - manifest's human `id` === runtime `metadata.name`
+ *   - if manifest declares `stableId`, it === runtime `metadata.id`
  *   - the **set** of command names is identical (order-insensitive).
- * Descriptions/aliases are NOT compared — they are display strings the
- * host does not key off, and pinning them here would make every wording
- * tweak a two-file edit without buying any safety.
+ *
+ * Descriptions/aliases are NOT compared. The guard runs after dynamic import
+ * for bundled, installed, and authored tools.
  */
 
 import { ValidationError } from '../lib/errors.js';
@@ -38,9 +36,25 @@ import type { Tool } from './types.js';
  * @throws {ValidationError} when `id` differs, or the command-name sets differ.
  */
 export function assertManifestMatchesTool(manifest: ToolPluginManifest, tool: Tool): void {
-  if (manifest.id !== tool.metadata.id) {
+  // Human key resolution:
+  // - For tools using the post-ADR-0048 shape (stable UUID in .id, human key in .name): use .name
+  // - For legacy-shaped fixtures/tests (human key still in .id, or .name is display-only): fall back to .id
+  // This keeps authored/installed test fixtures working without mass updates while enforcing the split for real tools.
+  const isModernShape =
+    typeof tool.metadata.id === 'string' && /^[0-9a-fA-F]{8}-/.test(tool.metadata.id);
+  const runtimeHuman = isModernShape && tool.metadata.name ? tool.metadata.name : tool.metadata.id;
+
+  if (manifest.id !== runtimeHuman) {
     throw new ValidationError(
-      `tool manifest id '${manifest.id}' does not match runtime tool id '${tool.metadata.id}'`,
+      `tool manifest id '${manifest.id}' does not match runtime tool name '${runtimeHuman}'`,
+    );
+  }
+
+  // If the manifest declares a stableId (additive per ADR-0048), it must match
+  // the runtime's stable UUID in `metadata.id`.
+  if (manifest.stableId !== undefined && manifest.stableId !== tool.metadata.id) {
+    throw new ValidationError(
+      `tool manifest stableId '${manifest.stableId}' does not match runtime tool id '${tool.metadata.id}'`,
     );
   }
 

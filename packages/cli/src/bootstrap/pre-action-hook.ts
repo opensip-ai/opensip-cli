@@ -109,24 +109,27 @@ async function maybeInitializeOwningTool(
   runId: string,
 ): Promise<void> {
   const owningTool = resolveOwningTool(tools, cmdName);
-  if (!owningTool?.initialize || initializedToolIds.has(owningTool.metadata.id)) return;
+  if (!owningTool?.initialize) return;
+  const toolHumanId = owningTool.metadata.name ?? owningTool.metadata.id;
+  if (initializedToolIds.has(toolHumanId)) return;
   try {
     await owningTool.initialize();
-    initializedToolIds.add(owningTool.metadata.id);
+    initializedToolIds.add(toolHumanId);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logger.error({
       evt: 'cli.tool.initialize_failed',
       module: MODULE_TAG,
       runId,
-      toolId: owningTool.metadata.id,
+      toolId: owningTool.metadata.id, // stable UUID for structured
+      toolName: toolHumanId,
       error: msg,
     });
     // §4.7: a tool-init failure becomes a typed BootstrapError (exit 1) the
     // top-level boundary renders, instead of an inline stderr write + exit.
     throw new BootstrapError({
-      message: `Tool '${owningTool.metadata.id}' failed to initialize: ${msg}`,
-      humanMessage: `✗ Tool '${owningTool.metadata.id}' failed to initialize: ${msg}`,
+      message: `Tool '${toolHumanId}' failed to initialize: ${msg}`,
+      humanMessage: `✗ Tool '${toolHumanId}' failed to initialize: ${msg}`,
       suggestion: undefined,
       exitCode: 1,
     });

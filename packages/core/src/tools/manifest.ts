@@ -95,10 +95,19 @@ interface ToolPluginManifestBase {
   /**
    * Human/programmatic key (the value used for current storage, short ids,
    * config, etc.). For published tools this is the "declared" identifier.
-   * The stable UUID lives in `stableId` (additive) or (in runtime ToolMetadata)
-   * as the `id` field per ADR-0048.
+   * This remains the manifest-side key for backward compat (ADR-0048).
+   * The tool's stable machine identity (UUID) is declared here as `stableId`
+   * (additive) when the tool author pins one; at runtime it appears as
+   * `ToolMetadata.id` (with the human key in `ToolMetadata.name`).
    */
   readonly id: string;
+  /**
+   * Stable machine identity (real UUID) for this tool, matching the semantics
+   * and field name of Checks' `id`. Declared additively by tools that opt into
+   * durable identity (first-party tools declare it; community tools should too).
+   * When present, the drift guard and provenance capture it.
+   */
+  readonly stableId?: string;
   /** Human-facing display name. */
   readonly name: string;
   /** Display semver of the tool itself (NOT the contract epoch). */

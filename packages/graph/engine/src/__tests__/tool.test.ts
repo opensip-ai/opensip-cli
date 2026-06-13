@@ -2,7 +2,7 @@
  * Tool contract conformance test (AC-2).
  *
  * Asserts:
- *  - graphTool.metadata.id === 'graph'
+ *  - graphTool.metadata.name === 'graph' (human key); .id is stable UUID
  *  - graphTool.metadata.version matches package.json
  *  - graphTool.commands lists the unified `graph` analysis subcommand
  *    plus the two read-only catalog query commands (`graph-lookup`,
@@ -29,8 +29,9 @@ describe('graphTool contract conformance (AC-2)', () => {
   const pkgPath = resolve(HERE, '../../package.json');
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version: string };
 
-  it("metadata.id is 'graph'", () => {
-    expect(graphTool.metadata.id).toBe('graph');
+  it("metadata.name is the human key 'graph'; id is the stable UUID", () => {
+    expect(graphTool.metadata.name).toBe('graph');
+    expect(graphTool.metadata.id).toBe('3873f1c2-02a9-4719-930a-bca74b62b706');
   });
 
   it('metadata.version matches package.json', () => {

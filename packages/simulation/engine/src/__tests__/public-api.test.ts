@@ -54,7 +54,8 @@ describe('@opensip-cli/simulation public barrel', () => {
 
   it('exposes `simulationTool` (and its `tool` alias) as the Tool descriptor', () => {
     expect(barrel.simulationTool).toBeDefined();
-    expect(barrel.simulationTool.metadata.id).toBe('simulation');
+    expect(barrel.simulationTool.metadata.name).toBe('simulation');
+    expect(barrel.simulationTool.metadata.id).toBe('715d32c2-692c-4ed4-985b-a35deaf186aa');
     expect(barrel.tool).toBe(barrel.simulationTool);
   });
 

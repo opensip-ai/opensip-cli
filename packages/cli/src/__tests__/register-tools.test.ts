@@ -32,7 +32,8 @@ function makeRegistry(): ToolRegistry {
   const list = (): Tool[] => [...map.values()];
   return {
     register: (tool: Tool) => {
-      if (!map.has(tool.metadata.id)) map.set(tool.metadata.id, tool);
+      const key = tool.metadata.name ?? tool.metadata.id;
+      if (!map.has(key)) map.set(key, tool);
     },
     get: (id: string) => map.get(id),
     list,
@@ -65,9 +66,9 @@ function makeStubContext(): ToolCliContext {
 }
 
 describe('BUNDLED_TOOLS', () => {
-  it('contains fitness, simulation, and graph', () => {
-    const ids = BUNDLED_TOOLS.map((t) => t.metadata.id);
-    expect(ids).toEqual(expect.arrayContaining(['fitness', 'simulation', 'graph']));
+  it('contains fitness, simulation, and graph (by human name)', () => {
+    const names = BUNDLED_TOOLS.map((t) => t.metadata.name ?? t.metadata.id);
+    expect(names).toEqual(expect.arrayContaining(['fitness', 'simulation', 'graph']));
   });
 });
 
@@ -94,7 +95,7 @@ describe('registerFirstPartyTools', () => {
     const provenance: ToolProvenance[] = [];
     await registerFirstPartyTools(registry, provenance);
 
-    expect(registry.list().map((t) => t.metadata.id)).toEqual(
+    expect(registry.list().map((t) => t.metadata.name ?? t.metadata.id)).toEqual(
       expect.arrayContaining(['fitness', 'simulation', 'graph']),
     );
     expect(provenance).toHaveLength(BUNDLED_TOOLS.length);
@@ -153,7 +154,7 @@ describe('registerFirstPartyTools', () => {
     );
     writeFileSync(
       join(dir, 'index.js'),
-      "export const tool = { metadata: { id: 'no-manifest', name: 'NM', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
+      "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000a1', name: 'no-manifest', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
       'utf8',
     );
     const registry = new ToolRegistryClass();
@@ -254,7 +255,7 @@ describe('mountAllToolCommands', () => {
         description: 'empty',
       },
       commands: [],
-    } as never);
+    });
     registry.register(specTool('tool-ok', 'ok'));
     const program = new Command('opensip');
 
@@ -298,7 +299,7 @@ describe('mountAllToolCommands', () => {
           handler: () => Promise.resolve({ type: 'noop' }),
         },
       ] as never,
-    } as never);
+    });
     registry.register(specTool('tool-good', 'good'));
     const program = new Command('opensip');
 
@@ -391,7 +392,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           },
         },
         indexJs:
-          "export const tool = { metadata: { id: 'fixture-valid', name: 'Fixture', version: '0.0.0' }, commands: [{ name: 'fixture-valid', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
+          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000b2', name: 'fixture-valid', version: '0.0.0' }, commands: [{ name: 'fixture-valid', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();
@@ -427,7 +428,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           },
         },
         indexJs:
-          "export const tool = { metadata: { id: 'fixture-drift', name: 'Drift', version: '0.0.0' }, commands: [{ name: 'something-else', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
+          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000c3', name: 'fixture-drift', version: '0.0.0' }, commands: [{ name: 'something-else', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();
@@ -533,7 +534,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           },
         },
         indexJs:
-          "export const tool = { metadata: { id: 'fitness', name: 'Shadow', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
+          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000f4', name: 'fitness', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();

@@ -11,17 +11,26 @@ import type { ToolPluginManifest } from '../manifest.js';
 import type { Tool } from '../types.js';
 
 /** Minimal Tool stub — only the fields the guard inspects are meaningful. */
-function makeTool(id: string, commandNames: readonly string[]): Tool {
+function makeTool(
+  humanName: string,
+  commandNames: readonly string[],
+  stableId = '00000000-0000-4000-8000-000000000000',
+): Tool {
   return {
-    metadata: { id: '00000000-0000-4000-8000-000000000000', name: id, version: '0.0.0', description: 'test tool' },
+    metadata: { id: stableId, name: humanName, version: '0.0.0', description: 'test tool' },
     commands: commandNames.map((name) => ({ name, description: `${name} desc` })),
   };
 }
 
-function makeManifest(id: string, commandNames: readonly string[]): ToolPluginManifest {
+function makeManifest(
+  humanId: string,
+  commandNames: readonly string[],
+  stableId?: string,
+): ToolPluginManifest {
   return {
     kind: 'tool',
-    id,
+    id: humanId,
+    ...(stableId ? { stableId } : {}),
     name: '@scope/test',
     version: '0.0.0',
     apiVersion: 1,
@@ -30,9 +39,17 @@ function makeManifest(id: string, commandNames: readonly string[]): ToolPluginMa
 }
 
 describe('assertManifestMatchesTool', () => {
-  it('passes when id and command-name set match exactly', () => {
-    const tool = makeTool('fitness', ['fit', 'fit-list', 'fit-recipes']);
-    const manifest = makeManifest('fitness', ['fit', 'fit-list', 'fit-recipes']);
+  it('passes when human id/name and command-name set match exactly', () => {
+    const tool = makeTool(
+      'fitness',
+      ['fit', 'fit-list', 'fit-recipes'],
+      'afd68bd3-ff3c-4935-a5b6-76d8fc7a5224',
+    );
+    const manifest = makeManifest(
+      'fitness',
+      ['fit', 'fit-list', 'fit-recipes'],
+      'afd68bd3-ff3c-4935-a5b6-76d8fc7a5224',
+    );
     expect(() => assertManifestMatchesTool(manifest, tool)).not.toThrow();
   });
 
@@ -42,12 +59,27 @@ describe('assertManifestMatchesTool', () => {
     expect(() => assertManifestMatchesTool(manifest, tool)).not.toThrow();
   });
 
-  it('throws a ValidationError when the id differs', () => {
+  it('passes when manifest omits stableId (additive, legacy compat)', () => {
+    const tool = makeTool('fitness', ['fit'], 'afd68bd3-ff3c-4935-a5b6-76d8fc7a5224');
+    const manifest = makeManifest('fitness', ['fit']); // no stableId
+    expect(() => assertManifestMatchesTool(manifest, tool)).not.toThrow();
+  });
+
+  it('throws a ValidationError when the human id (manifest) differs from runtime name', () => {
     const tool = makeTool('fitness', ['fit']);
     const manifest = makeManifest('fit', ['fit']);
     expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(ValidationError);
     expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(
-      /manifest id 'fit'.*runtime tool id 'fitness'/,
+      /manifest id 'fit'.*runtime tool name 'fitness'/,
+    );
+  });
+
+  it('throws when manifest stableId differs from runtime id', () => {
+    const tool = makeTool('fitness', ['fit'], 'afd68bd3-ff3c-4935-a5b6-76d8fc7a5224');
+    const manifest = makeManifest('fitness', ['fit'], '11111111-1111-4111-8111-111111111111');
+    expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(ValidationError);
+    expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(
+      /manifest stableId '11111111-1111-4111-8111-111111111111'.*runtime tool id 'afd68bd3-ff3c-4935-a5b6-76d8fc7a5224'/,
     );
   });
 

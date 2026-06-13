@@ -31,7 +31,7 @@ if (dir === undefined || dir.length === 0) {
     ok: report.ok,
     sections: report.sections,
     toolConfigNamespace: report.tool?.config?.namespace ?? null,
-    toolId: report.tool?.metadata.id ?? null,
+    toolId: report.tool?.metadata.name ?? report.tool?.metadata.id ?? null,
   };
   process.stdout.write(`${JSON.stringify(slim)}\n`);
   process.exitCode = report.ok ? 0 : 1;

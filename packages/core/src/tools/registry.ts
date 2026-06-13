@@ -27,7 +27,7 @@ interface RegisterableTool extends Registerable {
   readonly tool: Tool;
 }
 
-/** Per-run registry of {@link Tool} plugins, indexed by id. */
+/** Per-run registry of {@link Tool} plugins, indexed by the human name (metadata.name). */
 export class ToolRegistry {
   private readonly inner = new Registry<RegisterableTool>({
     module: 'core:tools',
@@ -37,11 +37,15 @@ export class ToolRegistry {
 
   /**
    * Register a tool. **First writer wins** — re-registering the same
-   * id is a no-op and emits a `tool.registry.duplicate` warning.
+   * (human) id is a no-op and emits a `tool.registry.duplicate` warning.
+   *
+   * The registry is keyed by the human `metadata.name` (the former `id` value)
+   * for continuity with callers that do registry.get('fitness') etc. The stable
+   * UUID lives in metadata.id and is not used as the registry key.
    */
   register(tool: Tool, opts: { sourcePackage?: string } = {}): void {
-    const id = tool.metadata.id;
-    this.inner.register({ id, name: id, tool }, { sourcePackage: opts.sourcePackage });
+    const key = tool.metadata.name ?? tool.metadata.id;
+    this.inner.register({ id: key, name: key, tool }, { sourcePackage: opts.sourcePackage });
   }
 
   list(): readonly Tool[] {

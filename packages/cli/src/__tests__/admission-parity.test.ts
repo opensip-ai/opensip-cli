@@ -40,7 +40,8 @@ describe('admitToolPackage — section verdicts per fixture', () => {
       'tool-shape',
       'manifest-runtime-coherence',
     ]);
-    expect(report.tool?.metadata.id).toBe('audit-demo-tool');
+    const reported = report.tool?.metadata;
+    expect(reported?.name ?? reported?.id).toBe('audit-demo-tool');
     expect(report.provenance?.source).toBe('installed');
   });
 

@@ -76,7 +76,7 @@ export function buildCommandRegistrationInput(registry: ToolRegistry): CommandRe
   // lives beside BUNDLED_TOOL_PACKAGES (register-tools.ts) — see its JSDoc for
   // why it is a historical constant rather than derived from loaded manifests.
   for (const expectedId of EXPECTED_SCAFFOLDING_TOOL_IDS) {
-    if (!registry.list().some((t) => t.metadata.id === expectedId)) {
+    if (!registry.list().some((t) => (t.metadata.name ?? t.metadata.id) === expectedId)) {
       logger.warn({
         evt: 'cli.tool.expected_bundled_absent',
         module: 'cli:bootstrap',

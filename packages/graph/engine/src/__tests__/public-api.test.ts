@@ -76,7 +76,8 @@ describe('@opensip-cli/graph public barrel', () => {
 
   it('exposes `graphTool` (and its `tool` alias) as the Tool descriptor', () => {
     expect(barrel.graphTool).toBeDefined();
-    expect(barrel.graphTool.metadata.id).toBe('graph');
+    expect(barrel.graphTool.metadata.name).toBe('graph');
+    expect(barrel.graphTool.metadata.id).toBe('3873f1c2-02a9-4719-930a-bca74b62b706');
     expect(barrel.tool).toBe(barrel.graphTool);
   });
 

@@ -69,12 +69,16 @@ describe('registerFirstPartyTools', () => {
   it('registers fitness, simulation, and graph in the documented order', async () => {
     const registry = new ToolRegistry();
     await registerFirstPartyTools(registry);
-    const ids = registry.list().map((t) => t.metadata.id);
-    expect(ids).toEqual(BUNDLED_TOOLS.map((t) => t.metadata.id));
+    const names = registry.list().map((t) => t.metadata.name ?? t.metadata.id);
+    expect(names).toEqual(BUNDLED_TOOLS.map((t) => t.metadata.name ?? t.metadata.id));
   });
 
-  it('produces a deterministic ordering matching BUNDLED_TOOLS', () => {
-    expect(BUNDLED_TOOLS.map((t) => t.metadata.id)).toEqual(['fitness', 'simulation', 'graph']);
+  it('produces a deterministic ordering matching BUNDLED_TOOLS (human names)', () => {
+    expect(BUNDLED_TOOLS.map((t) => t.metadata.name ?? t.metadata.id)).toEqual([
+      'fitness',
+      'simulation',
+      'graph',
+    ]);
   });
 });
 

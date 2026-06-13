@@ -168,6 +168,7 @@ export function admitTool(args: {
   const provenance: ToolProvenance = {
     source,
     id: manifest.id,
+    ...(manifest.stableId ? { stableId: manifest.stableId } : {}),
     version: manifest.version,
     ...(packageName === undefined ? {} : { packageName }),
     resolvedPath: dir,

@@ -148,8 +148,9 @@ function registerProbeScenario(): void {
 }
 
 describe('simulationTool metadata', () => {
-  it('exposes id, version, description', () => {
-    expect(simulationTool.metadata.id).toBe('simulation');
+  it('exposes name (human), id (stable UUID), version, description', () => {
+    expect(simulationTool.metadata.name).toBe('simulation');
+    expect(simulationTool.metadata.id).toBe('715d32c2-692c-4ed4-985b-a35deaf186aa');
     expect(simulationTool.metadata.version).toBe(PKG.version);
     expect(simulationTool.metadata.description).toContain('simulation');
   });

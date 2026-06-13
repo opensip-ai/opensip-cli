@@ -1,0 +1,9 @@
+{
+  "opensipTools": {
+    "kind": "tool",
+    "id": "demo-tool",
+    "stableId": "3873f1c2-02a9-4719-930a-bca74b62b706",
+    "apiVersion": 1,
+    "commands": []
+  }
+}

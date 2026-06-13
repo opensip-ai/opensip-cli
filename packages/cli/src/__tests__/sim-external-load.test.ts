@@ -69,7 +69,8 @@ describe('sim externalization proof slice (§8)', () => {
       tool?: Tool;
     };
     expect(mod.tool, 'the built module must export `tool`').toBeDefined();
-    expect(mod.tool?.metadata.id).toBe('simulation');
+    expect(mod.tool?.metadata.name).toBe('simulation');
+    expect(mod.tool?.metadata.id).toBe('715d32c2-692c-4ed4-985b-a35deaf186aa');
     expect(mod.tool?.commandSpecs?.length).toBeGreaterThan(0);
   });
 

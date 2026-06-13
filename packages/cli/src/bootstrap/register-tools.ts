@@ -390,7 +390,7 @@ function admitInstalledTool(
     });
     return undefined;
   }
-  if (builtInIds.has(manifest.id)) return undefined;
+  if (builtInIds.has(manifest.id)) return undefined; // builtInIds are human ids from manifests (compat)
 
   const result = admitTool({
     manifest,
@@ -469,10 +469,10 @@ export async function discoverAndRegisterToolPackages(
   provenance: ToolProvenance[] = [],
   manifests: ToolPluginManifest[] = [],
 ): Promise<void> {
-  // `builtInIds` is the set of already-registered bundled-tool ids to skip on
-  // a name collision (launch — passed explicitly by the composition root, which
-  // derives it from the bundled MANIFESTS it just loaded; the host holds no
-  // imported tool runtime to read `tool.metadata.id` from).
+  // `builtInIds` is the set of already-registered bundled-tool *human ids* (manifest.id)
+  // to skip on a name collision (launch — passed explicitly by the composition root, which
+  // derives it from the bundled MANIFESTS it just loaded; compare against runtime
+  // metadata.name for the human key).
   const discovered = discoverToolPackagesFromAnchors(opts.sources);
 
   for (const pkg of discovered) {
@@ -494,7 +494,8 @@ export async function discoverAndRegisterToolPackages(
         emitInstalledLoadFailure(pkg.name, load);
         continue;
       }
-      if (builtInIds.has(load.tool.metadata.id)) continue;
+      // builtInIds holds human ids (from bundled manifests); compare against runtime human name
+      if (builtInIds.has(load.tool.metadata.name ?? load.tool.metadata.id)) continue;
 
       // Drift guard — the SAME manifest⇔runtime identity check the bundled and
       // authored legs run. For an installed tool a mismatch throws into the
@@ -806,11 +807,13 @@ export function mountAllToolCommands(
       mountOneTool(program, tool, ctx);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`opensip: tool ${tool.metadata.id} failed to mount: ${msg}\n`);
+      const human = tool.metadata.name ?? tool.metadata.id;
+      process.stderr.write(`opensip: tool ${human} failed to mount: ${msg}\n`);
       logger.warn({
         evt: 'cli.tool.register_failed',
         module: BOOTSTRAP_MODULE,
-        toolId: tool.metadata.id,
+        toolId: tool.metadata.id, // stable UUID
+        toolName: human,
         error: msg,
       });
     }
@@ -842,7 +845,8 @@ function mountOneTool(program: CliProgram, tool: Tool, ctx: ToolCliContext): voi
   logger.warn({
     evt: 'cli.tool.no_command_surface',
     module: BOOTSTRAP_MODULE,
-    toolId: tool.metadata.id,
+    toolId: tool.metadata.id, // stable
+    toolName: tool.metadata.name ?? tool.metadata.id,
     detail: 'tool declares no commandSpecs; no commands mounted',
   });
 }
