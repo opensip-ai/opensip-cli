@@ -86,4 +86,21 @@ describe('BaselineRepo', () => {
     expect(repo.load('fitness').map((r) => r.fingerprint)).toEqual(['f']);
     expect(repo.exists('simulation')).toBe(false);
   });
+
+  it('clear removes entries + meta marker (unlike empty save)', () => {
+    repo.save('graph', [{ fingerprint: 'g1', payload: sig('r', 'f') }]);
+    expect(repo.exists('graph')).toBe(true);
+    expect(repo.load('graph')).toHaveLength(1);
+
+    const cleared = repo.clear('graph');
+    expect(cleared.entries).toBe(1);
+    expect(cleared.meta).toBe(true);
+    expect(repo.exists('graph')).toBe(false);
+    expect(repo.load('graph')).toEqual([]);
+
+    // clear on never-saved is no-op (0 entries, no meta)
+    const cleared2 = repo.clear('never');
+    expect(cleared2.entries).toBe(0);
+    expect(cleared2.meta).toBe(false);
+  });
 });

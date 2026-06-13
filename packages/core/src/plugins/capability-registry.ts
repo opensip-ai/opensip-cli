@@ -309,8 +309,10 @@ export function currentCapabilityRegistry(): CapabilityRegistry {
 
 /**
  * Register every capability domain a manifest declares into the per-run
- * {@link CapabilityRegistry}, stamping `ownerToolId = manifest.id` on each
- * (§5.3 / Task 2.2). This is how `MARKER_KINDS` becomes a BOOTSTRAP DEFAULT:
+ * {@link CapabilityRegistry}, stamping `ownerToolId = manifest.stableId ??
+ * manifest.id` on each (§5.3 / Task 2.2; ADR-0048 — the owner key must equal the
+ * owning tool's `metadata.id`, which is the stable UUID for modern tools). This
+ * is how `MARKER_KINDS` becomes a BOOTSTRAP DEFAULT:
  * the marker enum still seeds the discovery vocabulary, and a
  * manifest-declared domain EXTENDS that set — registered here without any
  * host-enum edit. Additive: a manifest with no `capabilities` registers
@@ -339,7 +341,13 @@ export function registerCapabilityDomainsFromManifest(
   for (const decl of declarations) {
     const spec: CapabilityDomainSpec = {
       id: decl.id,
-      ownerToolId: manifest.id,
+      // ADR-0048: `ownerToolId` must equal the OWNING TOOL'S `metadata.id`, which
+      // the capability loader filters on (`d.ownerToolId === owningTool.metadata.id`).
+      // Post-ADR-0048 `metadata.id` is the stable UUID (== `manifest.stableId`) and
+      // `manifest.id` is the human name (== `metadata.name`). Prefer the stableId so
+      // the owner match works; fall back to the human `id` for legacy tools that
+      // declare no `stableId` (where `metadata.id` is still the human id).
+      ownerToolId: manifest.stableId ?? manifest.id,
       apiVersion: decl.apiVersion,
       contributionSchema: decl.contributionSchema,
       contributionKind: decl.contributionKind,

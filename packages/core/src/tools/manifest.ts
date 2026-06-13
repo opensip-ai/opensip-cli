@@ -122,9 +122,11 @@ interface ToolPluginManifestBase {
   /**
    * §5.3 → Launch: the capability domains this tool OWNS. Each entry is a
    * {@link ToolCapabilityDeclaration} (id + contribution epoch + schema +
-   * kind); the host stamps `ownerToolId = this.id` and registers each into
-   * the per-run capability registry, EXTENDING the `MARKER_KINDS` bootstrap
-   * vocabulary without a host-enum edit. Optional + additive.
+   * kind); the host stamps `ownerToolId = this.stableId ?? this.id` (ADR-0048:
+   * the owner key must equal the owning tool's `metadata.id` — the stable UUID
+   * for modern tools) and registers each into the per-run capability registry,
+   * EXTENDING the `MARKER_KINDS` bootstrap vocabulary without a host-enum edit.
+   * Optional + additive.
    */
   readonly capabilities?: readonly ToolCapabilityDeclaration[];
   /** §5.7 → 2.9.0: tool-owned config schema descriptor. */

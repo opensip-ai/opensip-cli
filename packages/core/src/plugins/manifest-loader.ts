@@ -270,15 +270,39 @@ function readSidecar(dir: string): RawManifest | undefined {
  * fields (bundled/installed) or inline (sidecar). Returns `undefined` (with
  * a `reason` is reported by the caller) on any identity violation.
  */
+/** Narrow an unknown value to a non-empty string (the manifest identity-field guard). */
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value !== '';
+}
+
+/** Narrow to an optional non-empty string: absent, or a non-empty string. */
+function isAbsentOrNonEmptyString(value: unknown): value is string | undefined {
+  return value === undefined || isNonEmptyString(value);
+}
+
+/**
+ * Validate the optional `capabilities` slot. Returns `undefined` when absent
+ * (additive — no declared domains), the normalized array when valid, or the
+ * `'invalid'` sentinel when present-but-malformed (the caller then rejects the
+ * whole manifest). Keeps the absent/invalid distinction out of the main
+ * validator's control flow.
+ */
+function validateOptionalCapabilities(
+  raw: unknown,
+): readonly ToolCapabilityDeclaration[] | undefined | 'invalid' {
+  if (raw === undefined) return undefined;
+  return normalizeCapabilities(raw) ?? 'invalid';
+}
+
 function validateManifest(
   block: Record<string, unknown>,
   name: unknown,
   version: unknown,
 ): RawToolPluginManifest | undefined {
   if (block.kind !== 'tool') return undefined;
-  if (typeof block.id !== 'string' || block.id === '') return undefined;
-  if (typeof name !== 'string' || name === '') return undefined;
-  if (typeof version !== 'string' || version === '') return undefined;
+  if (!isNonEmptyString(block.id)) return undefined;
+  if (!isNonEmptyString(name)) return undefined;
+  if (!isNonEmptyString(version)) return undefined;
 
   const commands = normalizeCommands(block.commands);
   if (commands === undefined) return undefined;
@@ -286,16 +310,21 @@ function validateManifest(
   const apiVersion = block.apiVersion;
   if (apiVersion !== undefined && typeof apiVersion !== 'number') return undefined;
 
-  // §5.3 (launch): the `capabilities` slot, now concrete. Omitted ⇒ no
-  // declared domains (additive). Present-but-malformed ⇒ manifest fails
-  // validation, mirroring the strict `commands` parse above. The absent
-  // case is handled HERE (not inside the normalizer) so the normalizer has
-  // a single return type — `undefined` from it means INVALID.
-  let capabilities: readonly ToolCapabilityDeclaration[] | undefined;
-  if (block.capabilities !== undefined) {
-    capabilities = normalizeCapabilities(block.capabilities);
-    if (capabilities === undefined) return undefined; // present but malformed
-  }
+  // ADR-0048: the tool's stable machine identity (UUID). Additive + optional —
+  // present-but-non-string fails validation, mirroring the `id` guard above.
+  // MUST be carried onto the manifest: the drift guard (assertManifestMatchesTool)
+  // matches it against the runtime `metadata.id`, and capability-domain ownership
+  // (registerCapabilityDomainsFromManifest) stamps `ownerToolId = stableId ?? id`.
+  // Dropping it here silently breaks graph-adapter discovery (owner never matches
+  // the tool's UUID `metadata.id`).
+  if (!isAbsentOrNonEmptyString(block.stableId)) return undefined;
+  const stableId = block.stableId;
+
+  // §5.3 (launch): the `capabilities` slot. Absent ⇒ no declared domains;
+  // present-but-malformed ⇒ the whole manifest is invalid (the `'invalid'`
+  // sentinel), mirroring the strict `commands` parse above.
+  const capabilities = validateOptionalCapabilities(block.capabilities);
+  if (capabilities === 'invalid') return undefined;
 
   // Reserved for future community/catalog (see ToolPluginManifestBase).
   // We explicitly copy them through as `unknown` (additive) so they survive
@@ -311,6 +340,7 @@ function validateManifest(
   return {
     kind: 'tool',
     id: block.id,
+    ...(stableId === undefined ? {} : { stableId }),
     name,
     version,
     ...(apiVersion === undefined ? {} : { apiVersion }),

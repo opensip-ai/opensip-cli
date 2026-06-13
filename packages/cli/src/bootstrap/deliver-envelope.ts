@@ -125,15 +125,17 @@ async function emitToCloud(
     }
     if (batch.signals.length === 0) return { accepted: 0 };
     const skippedReason = result.skippedReason ?? 'error';
-    const detail =
-      skippedReason === 'unentitled'
-        ? 'this API key is not entitled to signal sync'
-        : 'the upload failed (see the run log)';
-    process.stderr.write(
-      `opensip: cloud sync skipped — ${detail}; ` +
-        `${batch.signals.length} signal(s) were NOT uploaded. ` +
-        `Local results are unaffected (silence this with --no-cloud).\n`,
-    );
+    // Only surface a human stderr notice for transient upload errors.
+    // "unentitled" is a steady-state property of the key/plan (configure already
+    // warned the user, and local results are always unaffected per ADR-0008).
+    // The Deliver result still carries cloudSkippedReason for hosts/observability.
+    if (skippedReason === 'error') {
+      process.stderr.write(
+        `opensip: cloud sync skipped — the upload failed (see the run log); ` +
+          `${batch.signals.length} signal(s) were NOT uploaded. ` +
+          `Local results are unaffected (silence this with --no-cloud).\n`,
+      );
+    }
     return { accepted: 0, skippedReason };
   } catch (error) {
     log.info({

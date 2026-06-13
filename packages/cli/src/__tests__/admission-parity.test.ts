@@ -41,7 +41,12 @@ describe('admitToolPackage — section verdicts per fixture', () => {
       'manifest-runtime-coherence',
     ]);
     const reported = report.tool?.metadata;
-    expect(reported?.name ?? reported?.id).toBe('audit-demo-tool');
+    // ADR-0048 split tool identity into a stable `id` and a human `name`.
+    // Assert the stable id (the manifest⇔runtime coherence key) plus the
+    // display name explicitly, rather than the old `name ?? id` fallback which
+    // now resolves to the display name.
+    expect(reported?.id).toBe('audit-demo-tool');
+    expect(reported?.name).toBe('Audit Demo');
     expect(report.provenance?.source).toBe('installed');
   });
 

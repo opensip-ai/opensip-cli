@@ -37,9 +37,30 @@ importers:
       '@opensip-cli/checks-rust':
         specifier: workspace:*
         version: link:packages/fitness/checks-rust
+      '@opensip-cli/checks-typescript':
+        specifier: workspace:*
+        version: link:packages/fitness/checks-typescript
+      '@opensip-cli/checks-universal':
+        specifier: workspace:*
+        version: link:packages/fitness/checks-universal
       '@opensip-cli/fitness':
         specifier: workspace:*
         version: link:packages/fitness/engine
+      '@opensip-cli/graph-go':
+        specifier: workspace:*
+        version: link:packages/graph/graph-go
+      '@opensip-cli/graph-java':
+        specifier: workspace:*
+        version: link:packages/graph/graph-java
+      '@opensip-cli/graph-python':
+        specifier: workspace:*
+        version: link:packages/graph/graph-python
+      '@opensip-cli/graph-rust':
+        specifier: workspace:*
+        version: link:packages/graph/graph-rust
+      '@opensip-cli/graph-typescript':
+        specifier: workspace:*
+        version: link:packages/graph/graph-typescript
       '@vitest/coverage-v8':
         specifier: ^4.1.8
         version: 4.1.8(vitest@4.1.8)

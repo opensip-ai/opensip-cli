@@ -24,7 +24,17 @@ import { distRunner, expectEnvelope } from './harness/cli-acceptance.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const LANG_DIR = join(__dirname, 'fixtures/languages');
+const MONOREPO_ROOT = join(__dirname, '../../../../..');
 const cli = distRunner();
+
+/** Run with explicit --cwd so the CLI treats the tiny fixture as the project
+ * (for its config + targets), while spawning from the monorepo root so that
+ * check-pack and graph-adapter discovery (which walks ancestor node_modules
+ * and package roots) sees the full set of @opensip-cli/checks-* and
+ * @opensip-cli/graph-* workspace packages declared at the root. */
+function runInFixture(args: readonly string[], fixtureLang: string) {
+  return cli.run([...args, '--cwd', cwdFor(fixtureLang)], { cwd: MONOREPO_ROOT });
+}
 
 interface LangRow {
   readonly lang: string;
@@ -65,7 +75,7 @@ beforeEach(() => {
 
 describe.each(LANGS)('language acceptance: $lang', (row) => {
   it('fit --json runs with no adapter-load error', () => {
-    const res = cli.run(['fit', '--json'], { cwd: cwdFor(row.lang) });
+    const res = runInFixture(['fit', '--json'], row.lang);
     expect(res.exitCode, `fit exited ${res.exitCode}; stderr: ${res.stderr}`).toBe(0);
     for (const marker of ['plugin failed to load', 'lang plugin failed to load']) {
       expect(res.stderr).not.toContain(marker);
@@ -79,7 +89,7 @@ describe.each(LANGS)('language acceptance: $lang', (row) => {
     // files by running a universal check over them (it executes even though its
     // finding is suppressed under __tests__/), asserting no adapter error.
     it('C++ adapter discovers .cpp files (smoke)', () => {
-      const res = cli.run(['fit', '--json'], { cwd: cwdFor('cpp') });
+      const res = runInFixture(['fit', '--json'], 'cpp');
       expect(res.exitCode).toBe(0);
       const parsed = (
         JSON.parse(res.stdout) as { envelope: { units?: { filesValidated?: number }[] } }
@@ -94,7 +104,7 @@ describe.each(LANGS)('language acceptance: $lang', (row) => {
   }
 
   it(`bad file fires ${row.slug}; clean file does not`, () => {
-    const res = cli.run(['fit', '--json', '--check', row.slug], { cwd: cwdFor(row.lang) });
+    const res = runInFixture(['fit', '--json', '--check', row.slug], row.lang);
     expect(res.exitCode, `stderr: ${res.stderr}`).toBe(0);
     const env = (
       JSON.parse(res.stdout) as {
@@ -126,7 +136,7 @@ describe.each(LANGS)('language acceptance: $lang', (row) => {
 
 describe.each(LANGS.filter((l) => l.graph))('graph acceptance: $lang', (row) => {
   it('graph --json yields a well-formed, non-empty envelope', () => {
-    const res = cli.run(['graph', '--json'], { cwd: cwdFor(row.lang) });
+    const res = runInFixture(['graph', '--json'], row.lang);
     expect(res.exitCode, `graph exited ${res.exitCode}; stderr: ${res.stderr}`).toBe(0);
     for (const marker of ADAPTER_ERROR_MARKERS) {
       if (marker === 'adapter') continue; // 'adapter' substring is too broad for a hard assert

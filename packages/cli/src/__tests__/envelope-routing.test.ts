@@ -268,10 +268,13 @@ describe('root cloud egress (deliverEnvelope → scope.signalSink)', () => {
     expect(out.cloudSkippedReason).toBe('error');
   });
 
-  it('surfaces an unentitled skip: reason on the result + a one-line stderr notice', async () => {
-    // Best-effort ≠ silent: an ACTIVE sink that ships nothing (entitlement said
-    // no) must tell the user their signals did NOT upload — previously this was
-    // indistinguishable from success.
+  it('surfaces an unentitled skip as a reason on the result (no noisy stderr; configure already informed the user)', async () => {
+    // Unentitled is a steady-state fact about the key/plan. We still surface the
+    // reason in the structured Deliver result (for hosts, logs, and any caller
+    // that wants to know "signals did not reach cloud"), but we no longer spam
+    // a per-run stderr line for it (the configure flow already warned, and
+    // local results are unaffected per ADR-0008). Transient 'error' cases still
+    // notify on stderr.
     const writes: string[] = [];
     const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
       writes.push(String(chunk));
@@ -288,8 +291,8 @@ describe('root cloud egress (deliverEnvelope → scope.signalSink)', () => {
       expect(out.cloudAccepted).toBe(0);
       expect(out.cloudSkippedReason).toBe('unentitled');
       const stderr = writes.join('');
-      expect(stderr).toContain('not entitled');
-      expect(stderr).toContain('NOT uploaded');
+      expect(stderr).not.toContain('cloud sync skipped');
+      expect(stderr).not.toContain('not entitled');
     } finally {
       spy.mockRestore();
     }

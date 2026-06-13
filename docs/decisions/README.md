@@ -28,6 +28,13 @@ distinct from:
   IDs never collide across repos.
 - **Append-only:** never rewrite a shipped decision. To change one, write a new
   ADR, set the old one's `status: superseded` + `superseded_by: ADR-NNNN`, and the
+
+## Index (most recent first)
+
+- [ADR-0048](ADR-0048-tool-stable-uuid-identity.md) — Tool Stable UUID Identity (`id` for stable UUID on Tools, matching Checks; human string renamed to `name`; persisted in DB for collision safety).
+- ADR-0047 — Per-Tool Contract Versioning
+- ADR-0046 — Tool Contract Versioning Policy
+- (earlier ADRs follow the numbered files in this directory)
   new one's `supersedes: [ADR-NNNN]`.
 - **Status** lives in each file's YAML block: `active` | `superseded` | `deferred`.
 - Start from [`TEMPLATE.md`](./TEMPLATE.md). The parent's SaaS-specific
