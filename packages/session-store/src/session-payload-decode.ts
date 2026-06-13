@@ -16,9 +16,16 @@
  * structural shape session-store persists — a faithful counterpart to the
  * package's opaque-payload charter: session-store owns persistence AND the
  * structural decode for replay, while tool semantics remain in the engines.
+ *
+ * The decoder tolerates legacy payloads that lack a top-level `__version`
+ * (treated as v1 with best-effort projection). Tools should prefer their own
+ * `*ReplayFromSession` functions (which call this decoder) for full projection
+ * to their live result types; this module only gives the common structural
+ * skeleton + the detected `payloadVersion` when present.
  */
 
 import type { SignalEnvelope } from '@opensip-cli/contracts';
+import { extractPayloadVersion } from '@opensip-cli/core';
 
 /** JSON-safe scalar — the metadata-value subset the persisted shape permits. */
 export type SessionPayloadScalar = string | number | boolean;
@@ -48,6 +55,12 @@ export interface DecodedSessionCheck {
 export interface DecodedSessionPayload {
   readonly summary: SignalEnvelope['verdict']['summary'];
   readonly checks: readonly DecodedSessionCheck[];
+  /**
+   * Detected inner `__version` from the opaque tool payload (or undefined for
+   * legacy pre-__version rows, which callers treat as v1 with projection).
+   * This is the value of the top-level numeric key if present and valid.
+   */
+  readonly payloadVersion?: number;
 }
 
 /** Per-tool decode options — the only points where the tools' payloads differ. */
@@ -67,7 +80,9 @@ export interface DecodeSessionPayloadOptions {
  *
  * @param payload - the opaque `StoredSession.payload` blob.
  * @param opts - per-tool decode options (label + required-field toggles).
- * @returns the decoded `{ summary, checks[] }` structure.
+ * @returns the decoded `{ summary, checks[] }` structure, plus `payloadVersion`
+ *   (the detected inner `__version` if present and valid; undefined for legacy
+ *   payloads that pre-date the convention — callers treat missing as v1).
  * @throws {TypeError} when `payload`/`checks`/`findings` are not the expected
  *   object/array shapes.
  * @throws {Error} when a required scalar field is missing or mistyped, or a
@@ -85,7 +100,12 @@ export function decodeSessionPayload(
   if (!Array.isArray(candidate.checks)) {
     throw new TypeError(`${opts.tool} session payload is missing checks[]`);
   }
-  return { summary, checks: candidate.checks.map((check) => decodeCheck(check, opts)) };
+  const payloadVersion = extractPayloadVersion(payload);
+  return {
+    summary,
+    checks: candidate.checks.map((check) => decodeCheck(check, opts)),
+    ...(payloadVersion === undefined ? {} : { payloadVersion }),
+  };
 }
 
 /**
