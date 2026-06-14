@@ -85,6 +85,7 @@ describe('hostEnv reads (CLI infra)', () => {
   it('CLI_ENV_SPECS covers the infra variables', () => {
     expect(CLI_ENV_SPECS.map((s) => s.canonical)).toEqual([
       'OTEL_EXPORTER_OTLP_ENDPOINT',
+      'OPENSIP_PROFILING',
       'TRACEPARENT',
       'OPENSIP_NO_UPDATE',
       'NO_UPDATE_NOTIFIER',

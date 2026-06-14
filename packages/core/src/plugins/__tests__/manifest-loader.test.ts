@@ -191,7 +191,7 @@ describe('loadToolManifest', () => {
     expect(loadToolManifest('bundled', testDir)).toBeUndefined();
   });
 
-  it('READ-BEFORE-IMPORT: loads a throw-on-import tool WITHOUT importing its module', () => {
+  it('READ-BEFORE-IMPORT: loads a throw-on-import tool WITHOUT importing its module', async () => {
     // The fixture's main module throws synchronously on import. If
     // loadToolManifest imported it, this test would throw. Reaching the
     // assertions proves the loader read the static package.json only.
@@ -204,7 +204,7 @@ describe('loadToolManifest', () => {
 
     // And importing it for real DOES throw — proving the fixture is a real
     // landmine, so the load above genuinely avoided importing it.
-    void expect(import(join(THROW_ON_IMPORT_DIR, 'index.mjs'))).rejects.toThrow(
+    await expect(import(join(THROW_ON_IMPORT_DIR, 'index.mjs'))).rejects.toThrow(
       /read-before-import violated/,
     );
   });

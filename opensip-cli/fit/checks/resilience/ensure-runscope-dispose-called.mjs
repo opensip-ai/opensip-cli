@@ -12,34 +12,26 @@
  */
 
 export const ensureRunScopeDisposeCalled = {
-  id: "local:resilience-ensure-runscope-dispose-called",
-  slug: "ensure-runscope-dispose-called",
+  id: 'local:resilience-ensure-runscope-dispose-called',
+  slug: 'ensure-runscope-dispose-called',
   description:
-    "RunScope must have its dispose() called (or guaranteed via finally/postAction) in all production construction/enter sites. Prevents unbounded growth of per-run caches and state across invocations or in SaaS hosts.",
-  tags: ["resilience", "lifecycle", "dispose", "scope"],
+    'RunScope must have its dispose() called (or guaranteed via finally/postAction) in all production construction/enter sites. Prevents unbounded growth of per-run caches and state across invocations or in SaaS hosts.',
+  tags: ['resilience', 'lifecycle', 'dispose', 'scope'],
   analyze(content, filePath) {
     const violations = [];
     if (!/\.(ts|tsx)$/.test(filePath)) return violations;
-    if (
-      /node_modules|\/dist\/|\/__tests__\/|resilience\/|test-support\//.test(
-        filePath,
-      )
-    )
+    if (/node_modules|\/dist\/|\/__tests__\/|resilience\/|test-support\//.test(filePath))
       return violations;
 
     const lines = content.split(/\r?\n/);
-    const hasEnterOrConstruct = /enterScope\s*\(|new RunScope\s*\(/.test(
-      content,
-    );
+    const hasEnterOrConstruct = /enterScope\s*\(|new RunScope\s*\(/.test(content);
     if (!hasEnterOrConstruct) return violations;
 
     const hasDisposeCall =
       /\.dispose\s*\(\s*\)/.test(content) ||
       /scope\.dispose|currentScope\(\)\s*\?\.\s*dispose/.test(content);
     const hasPostActionOrFinallyNear =
-      /postAction|finally\s*\{[\s\S]{0,200}dispose|try\s*\{[\s\S]{0,300}enterScope/.test(
-        content,
-      );
+      /postAction|finally\s*\{[\s\S]{0,200}dispose|try\s*\{[\s\S]{0,300}enterScope/.test(content);
 
     if (hasEnterOrConstruct && !hasDisposeCall && !hasPostActionOrFinallyNear) {
       // Find a representative line
@@ -49,7 +41,7 @@ export const ensureRunScopeDisposeCalled = {
             violations.push({
               line: i + 1,
               message: `Scope construction/enter without visible dispose() call or finally/postAction guard in the same file or nearby. RunScope.dispose() releases parseCache + recipeUnitConfig + any contributed state. Add postAction hook, try/finally { enter...; scope.dispose() }, or // resilience-ok with strong justification.`,
-              severity: "warning",
+              severity: 'warning',
             });
           }
           break;

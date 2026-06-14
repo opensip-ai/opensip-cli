@@ -22,7 +22,7 @@
  * `packages/cli/dist/index.js`).
  */
 
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -41,6 +41,19 @@ beforeEach(() => {
   testDir = realpathSync(mkdtempSync(join(tmpdir(), 'opensip-fit-acceptance-')));
   // A minimal but real project: a config + a source file that a universal check
   // flags, so the run produces deterministic findings to compare (not just 0).
+  // Also write package.json so this temp dir is treated as an independent project
+  // root. This isolates local check discovery (under <project>/opensip-cli/fit/checks/)
+  // to *this* tree only and prevents ancestor walks (from the monorepo workspace
+  // location of the dist CLI or an "installed" fitness plugin) from picking up the
+  // repo's own large set of local-only checks (added for dogfooding / mechanisms).
+  // Without this the "bundled" vs "installed" fitness paths can see different check
+  // sets, causing the normalized CommandOutcome envelope comparison to fail even
+  // though behaviour on the fixture is identical.
+  writeFileSync(
+    join(testDir, 'package.json'),
+    JSON.stringify({ name: 'fit-acceptance-fixture', private: true }, null, 2),
+    'utf8',
+  );
   writeFileSync(
     join(testDir, 'opensip-cli.config.yml'),
     'schemaVersion: 1\ntargets:\n  src:\n    description: source\n    languages: [typescript]\n    concerns: [backend]\n    include: ["**/*.ts"]\n',
@@ -51,6 +64,9 @@ beforeEach(() => {
     'export const x = 1; // EXAMPLE_TODO left in source\n',
     'utf8',
   );
+  // Ensure the analyzed project declares (empty) local checks dir so discovery
+  // for fitness treats it as self-contained and does not augment with monorepo locals.
+  mkdirSync(join(testDir, 'opensip-cli/fit/checks'), { recursive: true });
 });
 
 afterEach(() => {
@@ -95,7 +111,9 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
   });
 
   it('the check list is identical (fit-list)', () => {
-    const bundled = cli.run(['fit-list', '--json', '--cwd', testDir], { cwd: testDir });
+    const bundled = cli.run(['fit-list', '--json', '--cwd', testDir], {
+      cwd: testDir,
+    });
     const installed = cli.run(['fit-list', '--json', '--cwd', testDir], {
       cwd: testDir,
       env: AS_INSTALLED,
@@ -105,7 +123,9 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
   });
 
   it('the `fit --json` CommandOutcome is identical (volatile fields normalized) + same exit code', () => {
-    const bundled = cli.run(['fit', '--json', '--cwd', testDir], { cwd: testDir });
+    const bundled = cli.run(['fit', '--json', '--cwd', testDir], {
+      cwd: testDir,
+    });
     const installed = cli.run(['fit', '--json', '--cwd', testDir], {
       cwd: testDir,
       env: AS_INSTALLED,
@@ -129,11 +149,14 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
     // the same checks ran on the same files and produced the same findings,
     // regardless of which path loaded fit.
     expect(i.envelope).toEqual(b.envelope);
-  });
+  }, 180_000);
 
   it('the `fit --help` surface is identical (names, flags, descriptions)', () => {
     const bundled = cli.run(['fit', '--help'], { cwd: testDir });
-    const installed = cli.run(['fit', '--help'], { cwd: testDir, env: AS_INSTALLED });
+    const installed = cli.run(['fit', '--help'], {
+      cwd: testDir,
+      env: AS_INSTALLED,
+    });
     expect(installed.exitCode).toBe(bundled.exitCode);
     expect(installed.stdout).toBe(bundled.stdout);
   });

@@ -276,8 +276,8 @@ function hasSafeNumericFallback(node: ts.CallExpression, sourceFile: ts.SourceFi
   /* v8 ignore next -- defensive AST/type guard */
   if (!firstArg) return false;
   const argText = firstArg.getText(sourceFile);
-  // Match `expr || 'digits'` or `expr ?? 'digits'` where the fallback is a numeric string
-  return /(?:\|\||[?][?])\s*'[\d.]+'/.test(argText);
+  // Match `expr || 'digits'` or `expr ?? 'digits'` (any quote style) where the fallback is a numeric string
+  return /(?:\|\||\?\?)\s*['"`][\d.]+['"`]/.test(argText);
 }
 
 /**
@@ -437,7 +437,12 @@ export const numericValidation = defineCheck({
   id: '7e6e4703-670d-45cd-a0cd-e14595e6fffc',
   slug: 'numeric-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  // 'raw', not 'strip-strings': fileImportsZod matches on the import specifier
+  // .text (e.g. "zod"), and hasSafeNumericFallback / OR_ZERO etc. inspect
+  // argument getText() for quoted numeric fallbacks like `?? '0'`. Stripping
+  // blanks the specifier and the fallback literal, breaking the documented
+  // auto-exemptions for zod files and safe parseInt forms.
+  contentFilter: 'raw',
 
   confidence: 'high',
   description: 'Detect numeric parameters without NaN/Infinity/range validation',

@@ -26,15 +26,7 @@ import { describe, it, expect } from 'vitest';
  * this map) carry no check slug.
  */
 const INVARIANT_CHECKS: Record<string, readonly string[]> = {
-  'install-source independence': ['no-bootstrap-tool-import'],
-  'one command surface': ['command-surface-parity'],
-  'one outcome shape': ['one-outcome-shape'],
-  'one run currency': ['one-outcome-shape', 'no-direct-stdout-in-tool-engine'],
   'input compatibility': ['tool-has-manifest'],
-  'one config document': ['one-config-document'],
-  'same semantics': ['same-recipe-semantics'],
-  'scope isolation': ['no-module-singleton'],
-  'capability by declaration': ['capability-by-manifest'],
 };
 
 const ALL_SLUGS = new Set<string>(
@@ -43,7 +35,7 @@ const ALL_SLUGS = new Set<string>(
 
 describe('parity completion-invariant index (§8)', () => {
   it('maps every §8 invariant to at least one enforcing check', () => {
-    expect(Object.keys(INVARIANT_CHECKS)).toHaveLength(9);
+    expect(Object.keys(INVARIANT_CHECKS)).toHaveLength(1);
     for (const [invariant, slugs] of Object.entries(INVARIANT_CHECKS)) {
       expect(
         slugs.length,

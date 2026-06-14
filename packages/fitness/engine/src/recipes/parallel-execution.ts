@@ -98,6 +98,7 @@ export async function executeParallel(
           maxRetries: recipe.execution.maxRetries ?? 2,
           ...(checkTargetFiles ? { checkTargetFiles } : {}),
           ...(globalExcludes ? { globalExcludes } : {}),
+          ...(opts.fileCache ? { fileCache: opts.fileCache } : {}),
         },
         processorCtx,
       );

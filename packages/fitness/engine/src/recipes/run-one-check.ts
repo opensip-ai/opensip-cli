@@ -32,6 +32,7 @@ import {
 } from './check-result-processor.js';
 
 import type { Check } from '../framework/check-types.js';
+import type { FileCache } from '../framework/file-cache.js';
 
 /** Logger module tag used by every event emitted from per-check execution. */
 const MODULE_TAG = 'fitness:execution';
@@ -50,6 +51,8 @@ export interface RunOneCheckOptions {
   readonly maxRetries: number;
   readonly checkTargetFiles?: ReadonlyMap<string, readonly string[]>;
   readonly globalExcludes?: readonly string[];
+  /** Per-service FileCache (for SaaS isolation; forwarded from ExecutionOptions). */
+  readonly fileCache?: FileCache;
 }
 
 /** Outcome of running a single check. */
@@ -116,6 +119,7 @@ export async function runOneCheck(
             signal,
             ...(targetFiles ? { targetFiles } : {}),
             ...(opts.globalExcludes ? { globalExcludes: opts.globalExcludes } : {}),
+            ...(opts.fileCache ? { fileCache: opts.fileCache } : {}),
           }),
         timeoutMs: checkTimeout,
         retry: {

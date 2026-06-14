@@ -14,15 +14,14 @@
  */
 
 export const noLeakInternalImprovementPatterns = {
-  id: "local:public-docs-no-leak-internal-improvement-patterns",
-  slug: "no-leak-internal-improvement-patterns",
+  id: 'local:public-docs-no-leak-internal-improvement-patterns',
+  slug: 'no-leak-internal-improvement-patterns',
   description:
-    "Public docs must not inadvertently document or leak internal improvement process machinery (local mechanisms, inter-cycle gates, remediation records, autonomous cycles) as if they were user-facing or shipped features.",
-  tags: ["documentation", "drift", "internal-vs-public"],
+    'Public docs must not inadvertently document or leak internal improvement process machinery (local mechanisms, inter-cycle gates, remediation records, autonomous cycles) as if they were user-facing or shipped features.',
+  tags: ['documentation', 'drift', 'internal-vs-public'],
   analyze(content, filePath) {
     const violations = [];
-    if (!/docs\/public\//.test(filePath) || !/\.md$/.test(filePath))
-      return violations;
+    if (!/docs\/public\//.test(filePath) || !/\.md$/.test(filePath)) return violations;
     if (/80-implementation|50-extend/.test(filePath)) return violations; // sanctioned for contributor docs
     if (/\/\/\s*public-docs-ok\b/.test(content)) return violations;
 
@@ -41,7 +40,7 @@ export const noLeakInternalImprovementPatterns = {
           line: i + 1,
           message:
             'Public docs page references an internal improvement process detail, local mechanism slug, or remediation artifact. These belong in docs/internal/ or are not user-facing. Move, remove, or add // public-docs-ok with justification if this is deliberate (e.g. high-level "the project uses local checks for self-improvement").',
-          severity: "warning",
+          severity: 'warning',
         });
         break;
       }

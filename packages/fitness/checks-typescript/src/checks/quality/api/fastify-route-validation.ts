@@ -322,7 +322,13 @@ export const fastifyRouteValidation = defineCheck({
   id: '0de8bce9-e6fd-45c2-83ea-013bedfd3346',
   slug: 'fastify-route-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  // 'raw', not 'strip-strings': the check extracts the route *path string literal*
+  // value (first arg to fastify.post/patch/put) to embed the real path in the
+  // violation message, and uses content includes() on import/usage strings for
+  // fallback validation detection when no inline handler. Stripping blanks those,
+  // producing useless messages (e.g. "POST        - ...") and false violations.
+  // See auth-route-guard.ts for identical rationale on route paths.
+  contentFilter: 'raw',
 
   confidence: 'high',
   description: 'Ensure all Fastify POST/PATCH/PUT routes validate request bodies with Zod schemas',

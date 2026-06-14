@@ -14,7 +14,8 @@
  * asserts the adapter loads and `fit` runs, not a specific finding.
  */
 
-import { rmSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -27,13 +28,34 @@ const LANG_DIR = join(__dirname, 'fixtures/languages');
 const MONOREPO_ROOT = join(__dirname, '../../../../..');
 const cli = distRunner();
 
-/** Run with explicit --cwd so the CLI treats the tiny fixture as the project
- * (for its config + targets), while spawning from the monorepo root so that
- * check-pack and graph-adapter discovery (which walks ancestor node_modules
- * and package roots) sees the full set of @opensip-cli/checks-* and
- * @opensip-cli/graph-* workspace packages declared at the root. */
+/**
+ * Run the CLI against an *isolated* copy of the language fixture.
+ *
+ * We copy the fixture (bad/clean sources + any per-fixture opensip-cli/ setup)
+ * to a fresh /tmp temp dir on every call. This makes the temp the "project root"
+ * for the run (it has the sources + we ensure an opensip-cli/fit/checks/ dir).
+ * Because the temp lives in /tmp (no ancestor opensip layout), project-local
+ * check discovery stops at the temp and never climbs to the monorepo root's
+ * opensip-cli/fit/checks/ (the dozens of local-only checks added for dogfooding
+ * and improvement processes). This keeps the acceptance matrix focused on
+ * shipped adapter + check behaviour and prevents the locals from affecting
+ * exit codes, unit counts, violation totals, or filesValidated sums.
+ *
+ * The outer spawn cwd remains the monorepo so shipped check-pack / graph-adapter
+ * discovery (workspace packages) still works exactly as before.
+ */
 function runInFixture(args: readonly string[], fixtureLang: string) {
-  return cli.run([...args, '--cwd', cwdFor(fixtureLang)], { cwd: MONOREPO_ROOT });
+  const srcDir = cwdFor(fixtureLang);
+  const tmp = mkdtempSync(join(tmpdir(), `lang-accept-${fixtureLang}-`));
+  // Copy the entire fixture (sources + any committed per-lang opensip-cli/ layout)
+  cpSync(srcDir, tmp, { recursive: true });
+  // Claim the local checks slot so ancestor walk does not pick up monorepo locals.
+  mkdirSync(join(tmp, 'opensip-cli', 'fit', 'checks'), { recursive: true });
+  // Run with --cwd pointing at the isolated temp. Keep outer cwd = monorepo
+  // for shipped pack discovery (same as the original implementation).
+  const result = cli.run([...args, '--cwd', tmp], { cwd: MONOREPO_ROOT });
+  rmSync(tmp, { recursive: true, force: true });
+  return result;
 }
 
 interface LangRow {
@@ -47,9 +69,27 @@ interface LangRow {
 // Slugs verified to fire from the fixture location (see Phase 2 notes):
 // TS uses no-ai-attribution (no-console-log self-skips a /cli/ path allowlist).
 const LANGS: readonly LangRow[] = [
-  { lang: 'typescript', slug: 'no-ai-attribution', bad: 'bad.ts', clean: 'clean.ts', graph: true },
-  { lang: 'python', slug: 'python-no-bare-except', bad: 'bad.py', clean: 'clean.py', graph: true },
-  { lang: 'go', slug: 'go-no-fmt-print', bad: 'bad.go', clean: 'clean.go', graph: true },
+  {
+    lang: 'typescript',
+    slug: 'no-ai-attribution',
+    bad: 'bad.ts',
+    clean: 'clean.ts',
+    graph: true,
+  },
+  {
+    lang: 'python',
+    slug: 'python-no-bare-except',
+    bad: 'bad.py',
+    clean: 'clean.py',
+    graph: true,
+  },
+  {
+    lang: 'go',
+    slug: 'go-no-fmt-print',
+    bad: 'bad.go',
+    clean: 'clean.go',
+    graph: true,
+  },
   {
     lang: 'java',
     slug: 'java-no-print-stack-trace',
@@ -57,8 +97,20 @@ const LANGS: readonly LangRow[] = [
     clean: 'Clean.java',
     graph: true,
   },
-  { lang: 'rust', slug: 'rust-no-dbg-macro', bad: 'bad.rs', clean: 'clean.rs', graph: true },
-  { lang: 'cpp', slug: 'no-todo-comments', bad: 'bad.cpp', clean: 'clean.cpp', graph: false },
+  {
+    lang: 'rust',
+    slug: 'rust-no-dbg-macro',
+    bad: 'bad.rs',
+    clean: 'clean.rs',
+    graph: true,
+  },
+  {
+    lang: 'cpp',
+    slug: 'no-todo-comments',
+    bad: 'bad.cpp',
+    clean: 'clean.cpp',
+    graph: false,
+  },
 ];
 
 const ADAPTER_ERROR_MARKERS = ['plugin failed to load', 'failed to load', 'adapter'] as const;
@@ -69,13 +121,21 @@ function cwdFor(lang: string): string {
 
 beforeEach(() => {
   for (const { lang } of LANGS) {
-    rmSync(join(cwdFor(lang), 'opensip-cli', '.runtime'), { recursive: true, force: true });
+    rmSync(join(cwdFor(lang), 'opensip-cli', '.runtime'), {
+      recursive: true,
+      force: true,
+    });
   }
 });
 
 describe.each(LANGS)('language acceptance: $lang', (row) => {
   it('fit --json runs with no adapter-load error', () => {
-    const res = runInFixture(['fit', '--json'], row.lang);
+    // For C++ the plain --json pulls non-hermetic checks (clang-tidy etc.).
+    // Use the hermetic universal one (no-todo-comments) so the "runs" assertion
+    // is reliable in envs without the external tools, while still proving no
+    // adapter load error and that the command succeeded.
+    const extra = row.lang === 'cpp' ? ['--check', 'no-todo-comments'] : [];
+    const res = runInFixture(['fit', '--json', ...extra], row.lang);
     expect(res.exitCode, `fit exited ${res.exitCode}; stderr: ${res.stderr}`).toBe(0);
     for (const marker of ['plugin failed to load', 'lang plugin failed to load']) {
       expect(res.stderr).not.toContain(marker);
@@ -89,10 +149,18 @@ describe.each(LANGS)('language acceptance: $lang', (row) => {
     // files by running a universal check over them (it executes even though its
     // finding is suppressed under __tests__/), asserting no adapter error.
     it('C++ adapter discovers .cpp files (smoke)', () => {
-      const res = runInFixture(['fit', '--json'], 'cpp');
-      expect(res.exitCode).toBe(0);
+      // Use explicit --check on the hermetic universal check (no-todo-comments).
+      // The plain --json would pull in non-hermetic cpp checks (e.g. clang-tidy
+      // based) that are not available in all test envs and can cause non-zero
+      // exit. The smoke only needs to prove the cpp adapter made the .cpp files
+      // visible to checks (filesValidated > 0) and that the adapter loaded
+      // without error.
+      const res = runInFixture(['fit', '--json', '--check', 'no-todo-comments'], 'cpp');
+      expect(res.exitCode, `fit exited ${res.exitCode}; stderr: ${res.stderr}`).toBe(0);
       const parsed = (
-        JSON.parse(res.stdout) as { envelope: { units?: { filesValidated?: number }[] } }
+        JSON.parse(res.stdout) as {
+          envelope: { units?: { filesValidated?: number }[] };
+        }
       ).envelope;
       const filesSeen = (parsed.units ?? []).reduce((a, u) => a + (u.filesValidated ?? 0), 0);
       expect(
@@ -110,7 +178,11 @@ describe.each(LANGS)('language acceptance: $lang', (row) => {
       JSON.parse(res.stdout) as {
         envelope: {
           verdict?: { summary?: { total?: number } };
-          units?: { slug?: string; violationCount?: number; filesValidated?: number }[];
+          units?: {
+            slug?: string;
+            violationCount?: number;
+            filesValidated?: number;
+          }[];
           signals?: { filePath?: string }[];
         };
       }
@@ -142,7 +214,9 @@ describe.each(LANGS.filter((l) => l.graph))('graph acceptance: $lang', (row) => 
       if (marker === 'adapter') continue; // 'adapter' substring is too broad for a hard assert
       expect(res.stderr).not.toContain(marker);
     }
-    const outcome = JSON.parse(res.stdout) as { envelope: { units?: unknown; signals?: unknown } };
+    const outcome = JSON.parse(res.stdout) as {
+      envelope: { units?: unknown; signals?: unknown };
+    };
     expect(expectEnvelope({ tool: 'graph' })(outcome)).toEqual([]);
     expect(Array.isArray(outcome.envelope.units)).toBe(true);
   });

@@ -172,9 +172,13 @@ describe('runOneCheck — timeout-detection invariant (audit F7)', () => {
 
     const cr = outcome.processOutput?.checkResult;
     expect(cr).toBeDefined();
-    expect(cr?.timedOut).toBe(false);
-    expect(cr?.passed).toBe(false);
-    expect(cr?.error).toContain('callback exploded');
+    // Callback errors raised from onCheckComplete during success processing are now
+    // swallowed inside processSuccessResult (to keep the check as a success for session
+    // counts and avoid double-counting). The error is only logged as a warning
+    // ('fitness.check.callback_error'). The returned processOutput remains the success one.
+    expect(cr?.timedOut).toBeUndefined();
+    expect(cr?.passed).toBe(true);
+    expect(cr?.error).toBeUndefined();
   });
 
   it('does NOT flag timedOut=true when the check completes well within the timeout', async () => {

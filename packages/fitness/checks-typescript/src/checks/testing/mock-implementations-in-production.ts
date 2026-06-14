@@ -211,7 +211,12 @@ export const mockImplementationsInProduction = defineCheck({
   id: 'f7507280-993b-4dde-9270-52b30478cca8',
   slug: 'mock-implementations-in-production',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  // 'raw', not 'strip-strings': STUB_IMPL_PATTERN matches the exact sentinel
+  // string inside `throw new Error("Not implemented")` (and MOCK_DATA looks
+  // for keys in object returns). Stripping blanks the string content in the
+  // parsed source used for body.getText(), so the patterns would never match
+  // even for real placeholder stubs in prod code.
+  contentFilter: 'raw',
 
   confidence: 'high',
   description: 'Detects mock, stub, or fake implementations in production code',

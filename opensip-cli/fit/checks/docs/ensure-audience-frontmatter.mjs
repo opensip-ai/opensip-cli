@@ -13,7 +13,8 @@
 export const ensureAudienceFrontmatter = {
   id: 'local:public-docs-ensure-audience-frontmatter',
   slug: 'ensure-audience-frontmatter',
-  description: 'Guide and extend pages should declare an audience: frontmatter array so readers know the intended persona and writers keep the page focused.',
+  description:
+    'Guide and extend pages should declare an audience: frontmatter array so readers know the intended persona and writers keep the page focused.',
   tags: ['documentation', 'writing-quality', 'audience', 'frontmatter'],
   analyze(content, filePath) {
     const violations = [];
@@ -25,7 +26,8 @@ export const ensureAudienceFrontmatter = {
     if (!hasAudience) {
       violations.push({
         line: 1,
-        message: 'Missing `audience:` frontmatter array (e.g. audience: [getting-started, plugin-authors]). Add it near the top of the file so the page has a clear target reader. This improves scannability and helps the improvement process target writing-quality fixes.',
+        message:
+          'Missing `audience:` frontmatter array (e.g. audience: [getting-started, plugin-authors]). Add it near the top of the file so the page has a clear target reader. This improves scannability and helps the improvement process target writing-quality fixes.',
         severity: 'warning',
       });
     }

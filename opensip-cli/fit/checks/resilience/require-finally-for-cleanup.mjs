@@ -12,11 +12,11 @@
  */
 
 export const requireFinallyForCleanup = {
-  id: "local:resilience-require-finally-for-cleanup",
-  slug: "require-finally-for-cleanup",
+  id: 'local:resilience-require-finally-for-cleanup',
+  slug: 'require-finally-for-cleanup',
   description:
-    "Acquire/release (setTimeout/AbortController, fs temps, connections, listeners) must be released in finally {} or on abort. Heuristic; production hot paths and abortable units are in scope.",
-  tags: ["resilience", "cleanup", "abort"],
+    'Acquire/release (setTimeout/AbortController, fs temps, connections, listeners) must be released in finally {} or on abort. Heuristic; production hot paths and abortable units are in scope.',
+  tags: ['resilience', 'cleanup', 'abort'],
   analyze(content, filePath) {
     const violations = [];
     if (!/\.(ts|tsx|js|mjs)$/.test(filePath)) return violations;
@@ -54,7 +54,7 @@ export const requireFinallyForCleanup = {
         violations.push({
           line: i + 1,
           message: `Acquire of potentially-leaky resource without any finally block in file (AbortController/setTimeout/timer/fs listener etc.). On abort/timeout/error the release may be skipped. Add finally { clearTimeout(...); controller.abort(); ... } or // resilience-ok with justification.`,
-          severity: "warning",
+          severity: 'warning',
         });
       }
     }

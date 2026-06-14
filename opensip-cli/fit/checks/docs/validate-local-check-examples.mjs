@@ -16,7 +16,8 @@
 export const validateLocalCheckExamples = {
   id: 'local:public-docs-validate-local-check-examples',
   slug: 'validate-local-check-examples',
-  description: 'Examples of project-local checks in public docs must reflect current layout (id/slug/analyze, placed in opensip-cli/fit/checks/<category>/) and not misrepresent the local-only nature for self-improvement.',
+  description:
+    'Examples of project-local checks in public docs must reflect current layout (id/slug/analyze, placed in opensip-cli/fit/checks/<category>/) and not misrepresent the local-only nature for self-improvement.',
   tags: ['documentation', 'drift', 'examples', 'local-checks'],
   analyze(content, filePath) {
     const violations = [];
@@ -26,18 +27,27 @@ export const validateLocalCheckExamples = {
     // Look for example code blocks showing local checks
     const codeBlocks = content.match(/```[\s\S]*?```/g) || [];
     for (const block of codeBlocks) {
-      if (block.includes('opensip-cli/fit/checks/') && (block.includes('export const') || block.includes('defineCheck'))) {
+      if (
+        block.includes('opensip-cli/fit/checks/') &&
+        (block.includes('export const') || block.includes('defineCheck'))
+      ) {
         if (!block.includes('id:') || !block.includes('slug:') || !block.includes('analyze')) {
           violations.push({
             line: content.indexOf(block) + 1,
-            message: 'Example of local check in public docs appears incomplete or outdated (missing id/slug/analyze or proper structure). Update to match current mechanism pattern from opensip-cli/fit/checks/ or the improvement process docs.',
+            message:
+              'Example of local check in public docs appears incomplete or outdated (missing id/slug/analyze or proper structure). Update to match current mechanism pattern from opensip-cli/fit/checks/ or the improvement process docs.',
             severity: 'warning',
           });
         }
-        if (block.includes('shipped') && !block.includes('local-only') && !block.includes('never shipped')) {
+        if (
+          block.includes('shipped') &&
+          !block.includes('local-only') &&
+          !block.includes('never shipped')
+        ) {
           violations.push({
             line: content.indexOf(block) + 1,
-            message: 'Example claims or implies local checks are shipped/published. Local mechanisms (in opensip-cli/fit/checks/) are project-only for self-improvement and never added to published packs.',
+            message:
+              'Example claims or implies local checks are shipped/published. Local mechanisms (in opensip-cli/fit/checks/) are project-only for self-improvement and never added to published packs.',
             severity: 'warning',
           });
         }

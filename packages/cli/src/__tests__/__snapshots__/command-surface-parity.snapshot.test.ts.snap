@@ -1394,7 +1394,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
           "options": [
             {
               "choices": undefined,
-              "defaultValue": undefined,
+              "defaultValue": [],
               "description": "Filter replayed signals (repeatable): errors-only | warnings-only | top:<n>. Composable, e.g. --filter errors-only --filter top:20. Agent ergonomics for historical results.",
               "flags": "--filter <type>",
               "negate": false,

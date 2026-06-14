@@ -34,6 +34,7 @@ bypasses the registry.
 | Variable | Effect |
 |---|---|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP endpoint. When set, the CLI enables OpenTelemetry tracing; unset is a hard no-op (standalone runs pay nothing). |
+| `OPENSIP_PROFILING` | Explicit gate for the optional CPU profiling path (ADR-0049). "1" or "true" forces on when OTEL_EXPORTER_OTLP_ENDPOINT is set; "0"/"false" forces off. When omitted and the OTLP endpoint is present, falls back to the documented OTEL-only mode (with cost warnings emitted). |
 | `TRACEPARENT` | W3C traceparent of a parent trace (read only when telemetry is on); run spans nest under it. |
 
 ## Update notifier
