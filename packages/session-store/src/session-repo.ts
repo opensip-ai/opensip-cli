@@ -351,12 +351,15 @@ export class SessionRepo {
    */
   upsertHostMetrics(sessionId: string, metrics: StoredSessionHostMetrics): void {
     try {
-      const patch: Record<string, number> = {};
-      if (metrics.ttyBusyMs !== undefined) patch.tty_busy_ms = metrics.ttyBusyMs;
-      if (metrics.renderMs !== undefined) patch.render_ms = metrics.renderMs;
-      if (metrics.persistMs !== undefined) patch.persist_ms = metrics.persistMs;
-      if (metrics.egressMs !== undefined) patch.egress_ms = metrics.egressMs;
-      if (metrics.totalCommandMs !== undefined) patch.total_command_ms = metrics.totalCommandMs;
+      // `set` keys are the Drizzle COLUMN PROPERTY names (camelCase), NOT the
+      // SQL column names — Drizzle silently ignores unknown keys, so snake_case
+      // here would no-op the ON CONFLICT update and the merge would be lost.
+      const patch: Partial<typeof sessionHostMetrics.$inferInsert> = {};
+      if (metrics.ttyBusyMs !== undefined) patch.ttyBusyMs = metrics.ttyBusyMs;
+      if (metrics.renderMs !== undefined) patch.renderMs = metrics.renderMs;
+      if (metrics.persistMs !== undefined) patch.persistMs = metrics.persistMs;
+      if (metrics.egressMs !== undefined) patch.egressMs = metrics.egressMs;
+      if (metrics.totalCommandMs !== undefined) patch.totalCommandMs = metrics.totalCommandMs;
       if (Object.keys(patch).length === 0) return;
       this.datastore.db
         .insert(sessionHostMetrics)

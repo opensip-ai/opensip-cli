@@ -405,3 +405,39 @@ describe('SessionRepo — dashboard contribution round-trip', () => {
     expect(repo.listDashboardContributions([])).toEqual([]);
   });
 });
+
+describe('SessionRepo — host metrics (upsert merge)', () => {
+  it('hydrates host metrics onto the session via get()', () => {
+    repo.save(makeSession({ id: 'hm-1' }));
+    repo.upsertHostMetrics('hm-1', { persistMs: 12, renderMs: 4 });
+    expect(repo.get('hm-1')?.hostMetrics).toEqual({ persistMs: 12, renderMs: 4 });
+  });
+
+  it('merges a later upsert onto the existing row instead of nulling prior fields', () => {
+    // Regression: the ON CONFLICT update keys are Drizzle column PROPERTIES
+    // (camelCase), not SQL column names — a snake_case `set` silently no-ops the
+    // merge, so the second write (e.g. live-path ttyBusyMs) would be lost.
+    repo.save(makeSession({ id: 'hm-2' }));
+    repo.upsertHostMetrics('hm-2', { persistMs: 9 }); // first write (insert)
+    repo.upsertHostMetrics('hm-2', { ttyBusyMs: 21, renderMs: 3 }); // conflict → merge
+
+    expect(repo.get('hm-2')?.hostMetrics).toEqual({
+      persistMs: 9, // survives the merge
+      ttyBusyMs: 21, // added by the conflicting upsert
+      renderMs: 3,
+    });
+  });
+
+  it('overwrites a previously-set field when the same key is upserted again', () => {
+    repo.save(makeSession({ id: 'hm-3' }));
+    repo.upsertHostMetrics('hm-3', { persistMs: 5 });
+    repo.upsertHostMetrics('hm-3', { persistMs: 50 });
+    expect(repo.get('hm-3')?.hostMetrics?.persistMs).toBe(50);
+  });
+
+  it('is a no-op for an empty metrics object (no row created)', () => {
+    repo.save(makeSession({ id: 'hm-4' }));
+    repo.upsertHostMetrics('hm-4', {});
+    expect(repo.get('hm-4')?.hostMetrics).toBeUndefined();
+  });
+});
