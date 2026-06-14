@@ -193,8 +193,12 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
       runPlane.beginRun();
     },
     completeRun: (result) => {
-      const session = (result as ToolRunCompletion | undefined)?.session;
-      if (session) runPlane.current().completeAndPersist(session);
+      const completion = result as ToolRunCompletion | undefined;
+      const session = completion?.session;
+      // host-owned-run-timing Phase 5: forward the optional per-run dashboard
+      // contribution alongside the session so the host persists both keyed by
+      // the same session id. Best-effort; no dashboard ⇒ session-only persist.
+      if (session) runPlane.current().completeAndPersist(session, completion?.dashboard);
     },
   };
 

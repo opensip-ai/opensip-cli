@@ -165,6 +165,14 @@ export type { CommonFlagKey, CommonFlagSpec } from './cli-flags.js';
 export { buildFindingGroups } from './verbose-detail.js';
 export type { FindingGroupUnit } from './verbose-detail.js';
 
+// Per-run dashboard contribution builder (host-owned-run-timing Phase 5 §7) —
+// shared SignalEnvelope → ToolDashboardContribution mapping so fit/sim/graph all
+// produce their per-run dashboard tab through the SAME declarative seam a
+// third-party tool uses. The dashboard package renders it generically (no tool
+// import); the host persists it keyed by session id.
+export { buildRunDashboardContribution } from './run-dashboard.js';
+export type { BuildRunDashboardOptions } from './run-dashboard.js';
+
 // Session persistence type. The cross-tool StoredSession shape stays here
 // as the contract surface; SessionRepo + the sessions schema +
 // generateSessionId/sanitizeForFilename moved to @opensip-cli/session-store

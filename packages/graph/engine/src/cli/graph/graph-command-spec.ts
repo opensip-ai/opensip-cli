@@ -24,7 +24,12 @@
  * before the handler runs), so the handler trusts the parsed value.
  */
 
-import { EXIT_CODES, type SignalEnvelope, type StoredSession } from '@opensip-cli/contracts';
+import {
+  buildRunDashboardContribution,
+  EXIT_CODES,
+  type SignalEnvelope,
+  type StoredSession,
+} from '@opensip-cli/contracts';
 import { defineCommand } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
@@ -314,11 +319,33 @@ async function runGraphCommand(
 
   await deliverNonGateEgress(opts, outcome?.envelope, cli);
 
-  // host-owned-run-timing Phase 3: RETURN the generic-session contribution; the
-  // host run plane persists it after this handler resolves (no tool-side write).
-  // The TTY live path returns earlier (it persists via renderLive), and the
-  // export/carrier modes (`--json`, gate, `--report-to`) carry no `session`.
-  return { session: outcome?.session };
+  // host-owned-run-timing Phases 3 + 5: RETURN the generic-session contribution
+  // AND (on the human render path, where a session exists) the per-run dashboard
+  // contribution; the host run plane persists both keyed by the same session id
+  // after this handler resolves (no tool-side write).
+  return graphRunCompletion(outcome);
+}
+
+/**
+ * Build graph's run completion (session + per-run dashboard tab) from the run
+ * outcome (host-owned-run-timing Phases 3 + 5). A dashboard tab is produced only
+ * on the human render path — where `outcome.session` AND `outcome.envelope`
+ * exist; the export/carrier modes (`--json`, gate, `--report-to`) carry no
+ * session → no dashboard tab. The dashboard tab is built via the SHARED
+ * declarative seam, so the dashboard renders graph's latest-run panel without
+ * importing the graph engine.
+ */
+function graphRunCompletion(
+  outcome: { readonly envelope?: SignalEnvelope; readonly session?: unknown } | undefined,
+): ToolRunCompletion {
+  const dashboard =
+    outcome?.session !== undefined && outcome.envelope !== undefined
+      ? buildRunDashboardContribution(outcome.envelope, { idPrefix: 'graph', label: 'Graph' })
+      : undefined;
+  return {
+    session: outcome?.session as ToolRunCompletion['session'],
+    ...(dashboard === undefined ? {} : { dashboard }),
+  };
 }
 
 /**

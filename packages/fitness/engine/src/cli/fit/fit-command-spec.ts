@@ -52,16 +52,18 @@ async function runFit(
   setUpLiveView: (cli: ToolCliContext) => void,
 ): Promise<ToolRunCompletion | void> {
   const opts = rawOpts as FitOptions;
-  // host-owned-run-timing Phase 3: the run-producing modes RETURN a
-  // ToolSessionContribution; runFit wraps it in a ToolRunCompletion and the host
-  // run plane persists it after this handler resolves (the TTY live path already
-  // persisted via renderLive, so it returns undefined — no double-write).
+  // host-owned-run-timing Phases 3 + 5: the run-producing modes RETURN a
+  // `{ session, dashboard }` completion; runFit forwards it as a
+  // ToolRunCompletion and the host run plane persists the session row AND the
+  // per-run dashboard contribution after this handler resolves (the TTY live
+  // path already persisted via renderLive, so it returns undefined — no
+  // double-write).
   if (opts.show !== undefined && opts.show.length > 0) {
     await runShowMode(opts, cli);
     return;
   }
   if (opts.gateSave === true || opts.gateCompare === true) {
-    return { session: await runGateMode(opts, cli) };
+    return await runGateMode(opts, cli);
   }
   if (opts.list) {
     await runListMode(opts, cli);
@@ -72,14 +74,14 @@ async function runFit(
     return;
   }
   if (opts.json) {
-    return { session: await runJsonMode(opts, cli) };
+    return await runJsonMode(opts, cli);
   }
   // Live mode is the only branch that needs fitness's Ink renderer. Register it
   // lazily here (idempotent map write) — the spec-mounted world has no
   // mount-time `register()` hook, so we set the renderer up on the host context
   // before the `cli.renderLive` lookup inside runLiveMode.
   setUpLiveView(cli);
-  return { session: await runLiveMode(opts, cli, FIT_LIVE_VIEW_KEY, opts.open === true) };
+  return await runLiveMode(opts, cli, FIT_LIVE_VIEW_KEY, opts.open === true);
 }
 
 /**

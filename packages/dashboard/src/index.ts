@@ -18,4 +18,4 @@
  */
 
 export { generateDashboardHtml } from './generator.js';
-export type { DashboardInput } from './generator.js';
+export type { DashboardInput, ContributedTab, ContributedView } from './generator.js';

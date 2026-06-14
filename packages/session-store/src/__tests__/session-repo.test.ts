@@ -1,3 +1,4 @@
+import { buildRunDashboardContribution, buildSignalEnvelope } from '@opensip-cli/contracts';
 import { DataStoreFactory, type DataStore, type DrizzleDataStore } from '@opensip-cli/datastore';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -6,6 +7,7 @@ import { sessions } from '../schema/sessions.js';
 import { SessionRepo } from '../session-repo.js';
 
 import type { StoredSession } from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 // A representative opaque payload. `contracts` never inspects the shape;
 // these tests exercise verbatim round-tripping of whatever a tool writes.
@@ -341,5 +343,65 @@ describe('SessionRepo — hydration guards', () => {
     datastore.db.update(sessions).set({ tool: 'not-a-real-tool' }).run();
     expect(() => repo.get('tool-corrupt')).toThrow(/unknown tool value/);
     expect(() => repo.list()).toThrow(/unknown tool value/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-run dashboard contribution round-trip (host-owned-run-timing Phase 5 §7).
+// A tool run builds a ToolDashboardContribution from its envelope via the shared
+// declarative builder; the host persists it keyed by (session id, tool) and the
+// report composer reads it back for those exact session ids. This proves a
+// first-party tool's per-run tab travels the SAME durable seam a third-party
+// tool uses, surviving a later `opensip report` process.
+// ---------------------------------------------------------------------------
+
+describe('SessionRepo — dashboard contribution round-trip', () => {
+  it('round-trips a tool-built ToolDashboardContribution by (session id, tool)', () => {
+    const signals: Signal[] = [];
+    const envelope = buildSignalEnvelope({
+      tool: 'fit',
+      recipe: 'default',
+      runId: 'run-1',
+      createdAt: '2026-06-14T10:00:00.000Z',
+      units: [
+        { slug: 'check-a', passed: true, violationCount: 0, durationMs: 10 },
+        { slug: 'check-b', passed: false, violationCount: 2, durationMs: 20 },
+      ],
+      signals,
+      policy: { failOnErrors: 1, failOnWarnings: 0 },
+      runFaulted: false,
+    });
+
+    // The tool builds its contribution with the SHARED builder (the same call
+    // fit/sim/graph make). Tab ids are namespaced by the idPrefix.
+    const contribution = buildRunDashboardContribution(envelope, {
+      idPrefix: 'fit',
+      label: 'Fitness',
+    });
+    expect(contribution.tabs?.map((t) => t.id)).toEqual(['fit-run-summary', 'fit-run-units']);
+
+    repo.save(makeSession({ id: 'dash-rt-1', tool: 'fit' }));
+    repo.saveDashboardContribution('dash-rt-1', 'fit', contribution);
+
+    const loaded = repo.listDashboardContributions(['dash-rt-1']);
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]?.sessionId).toBe('dash-rt-1');
+    expect(loaded[0]?.tool).toBe('fit');
+    // The opaque contribution round-trips byte-for-byte (verbatim JSON).
+    expect(loaded[0]?.contribution).toEqual(contribution);
+  });
+
+  it('replaces a prior contribution for the same (session id, tool) pair', () => {
+    repo.save(makeSession({ id: 'dash-rt-2', tool: 'sim' }));
+    repo.saveDashboardContribution('dash-rt-2', 'sim', { data: { v: 1 }, tabs: [] });
+    repo.saveDashboardContribution('dash-rt-2', 'sim', { data: { v: 2 }, tabs: [] });
+
+    const loaded = repo.listDashboardContributions(['dash-rt-2']);
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]?.contribution).toEqual({ data: { v: 2 }, tabs: [] });
+  });
+
+  it('returns [] for an empty session-id list', () => {
+    expect(repo.listDashboardContributions([])).toEqual([]);
   });
 });

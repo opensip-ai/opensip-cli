@@ -11,7 +11,12 @@
  * old `register()` action body did (byte-identical behaviour).
  */
 
-import { EXIT_CODES, type StoredSession, type ToolOptions } from '@opensip-cli/contracts';
+import {
+  buildRunDashboardContribution,
+  EXIT_CODES,
+  type StoredSession,
+  type ToolOptions,
+} from '@opensip-cli/contracts';
 import { defineCommand, readPackageVersion } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
@@ -166,8 +171,11 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
     jsonOutput: Boolean(opts.json),
   });
 
-  // host-owned-run-timing Phase 3: RETURN the generic-session contribution; the
-  // host run plane persists it after this handler resolves (no tool-side write).
+  // host-owned-run-timing Phases 3 + 5: RETURN the generic-session contribution
+  // AND the per-run dashboard contribution; the host run plane persists both
+  // (keyed by the same session id) after this handler resolves (no tool-side
+  // write). The dashboard tab is built via the SHARED declarative seam, so the
+  // dashboard renders sim's latest-run panel without importing simulation.
   const { buildSimulationSessionPayload } = await import('./persistence/session-payload.js');
   return {
     session: {
@@ -178,6 +186,10 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
       passed: result.envelope.verdict.passed,
       payload: buildSimulationSessionPayload(result.envelope),
     },
+    dashboard: buildRunDashboardContribution(result.envelope, {
+      idPrefix: 'sim',
+      label: 'Simulation',
+    }),
   };
 }
 

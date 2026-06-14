@@ -48,6 +48,7 @@ import {
   type ProgressSurface,
 } from '@opensip-cli/cli-ui';
 import {
+  buildRunDashboardContribution,
   type FitOptions,
   type ErrorResult,
   type FitDoneResult,
@@ -443,5 +444,12 @@ export async function renderFitLive(
   await app.waitUntilExit();
   // Trailing newline so shell prompt starts on a new line.
   process.stdout.write('\n');
-  return { envelope, session };
+  // host-owned-run-timing Phase 5: surface the per-run dashboard contribution
+  // (the host persists it keyed by the session id after this resolves). Built
+  // from the SAME shared declarative seam the static path uses.
+  const dashboard =
+    envelope === undefined
+      ? undefined
+      : buildRunDashboardContribution(envelope, { idPrefix: 'fit', label: 'Fitness' });
+  return { envelope, session, dashboard };
 }

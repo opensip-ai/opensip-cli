@@ -41,6 +41,7 @@ import {
   type ProgressSurface,
 } from '@opensip-cli/cli-ui';
 import {
+  buildRunDashboardContribution,
   type ErrorResult,
   type SignalEnvelope,
   type ToolOptions,
@@ -341,5 +342,12 @@ export async function renderSimLive(
   );
   await app.waitUntilExit();
   process.stdout.write('\n');
-  return { envelope, session };
+  // host-owned-run-timing Phase 5: surface the per-run dashboard contribution
+  // built from the same shared declarative seam the static path uses; the host
+  // persists it keyed by the session id after this resolves.
+  const dashboard =
+    envelope === undefined
+      ? undefined
+      : buildRunDashboardContribution(envelope, { idPrefix: 'sim', label: 'Simulation' });
+  return { envelope, session, dashboard };
 }

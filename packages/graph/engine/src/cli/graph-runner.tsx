@@ -51,11 +51,12 @@ import {
   type ProgressEvent,
   type ProgressSurface,
 } from '@opensip-cli/cli-ui';
-import { passRate } from '@opensip-cli/contracts';
+import { buildRunDashboardContribution, passRate } from '@opensip-cli/contracts';
 import {
   runOffThreadOrInProcess,
   currentScope,
   type LiveViewContext,
+  type ToolDashboardContribution,
   type ToolRunCompletion,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
@@ -232,6 +233,12 @@ interface GraphRunnerProps {
    * must NOT write the session itself.
    */
   readonly onSession?: (contribution: ToolSessionContribution) => void;
+  /**
+   * Surfaces the run's per-run dashboard contribution (host-owned-run-timing
+   * Phase 5). The host persists it keyed by the session id after the live view
+   * exits; the dashboard renders it generically.
+   */
+  readonly onDashboard?: (contribution: ToolDashboardContribution) => void;
   /** LiveViewContext from host — carries the run timer for the RunTimingProvider. */
   readonly liveContext?: LiveViewContext;
 }
@@ -241,6 +248,7 @@ function GraphRunner({
   datastore,
   setExitCode,
   onSession,
+  onDashboard,
   liveContext,
 }: GraphRunnerProps): React.ReactElement {
   const { exit } = useApp();
@@ -342,11 +350,18 @@ function GraphRunner({
           payload,
         });
         // Compute the summary for TTY (duration omitted; provider supplies host value).
-        const verdict = buildGraphEnvelope({
+        const envelope = buildGraphEnvelope({
           signals: finalized.signals,
           runId: currentScope()?.runId ?? '',
           createdAt: new Date().toISOString(),
-        }).verdict;
+        });
+        const { verdict } = envelope;
+        // host-owned-run-timing Phase 5: surface the per-run dashboard
+        // contribution built from the SAME envelope, via the shared declarative
+        // seam; the host persists it keyed by the session id after the view exits.
+        onDashboard?.(
+          buildRunDashboardContribution(envelope, { idPrefix: 'graph', label: 'Graph' }),
+        );
         const summary: RunSummaryShape = {
           passed: verdict.passed,
           errors: verdict.summary.errors,
@@ -493,6 +508,7 @@ export async function renderGraphLive(
   liveContext?: LiveViewContext,
 ): Promise<ToolRunCompletion> {
   let session: ToolSessionContribution | undefined;
+  let dashboard: ToolDashboardContribution | undefined;
   const app = render(
     <ThemeProvider>
       <ClockProvider>
@@ -503,6 +519,9 @@ export async function renderGraphLive(
           onSession={(c) => {
             session = c;
           }}
+          onDashboard={(d) => {
+            dashboard = d;
+          }}
           liveContext={liveContext}
         />
       </ClockProvider>
@@ -510,5 +529,5 @@ export async function renderGraphLive(
   );
   await app.waitUntilExit();
   process.stdout.write('\n');
-  return { session };
+  return { session, dashboard };
 }

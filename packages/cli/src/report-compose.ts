@@ -32,6 +32,7 @@ import {
 } from '@opensip-cli/core';
 import {
   generateDashboardHtml,
+  type ContributedTab,
   type DashboardInput as HtmlReportInput,
 } from '@opensip-cli/dashboard';
 import { SessionRepo } from '@opensip-cli/session-store';
@@ -40,7 +41,90 @@ import { getCurrentProjectRoot } from './cli-context.js';
 import { launchReport } from './open-report.js';
 
 import type { ReportResult } from '@opensip-cli/contracts';
+import type {
+  DashboardTabContribution,
+  Logger,
+  ToolDashboardContribution,
+} from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
+
+/**
+ * Host-reserved top-level keys on the dashboard input that a tool's
+ * `collectReportData` must never set. `sessions` is the durable cross-tool run
+ * history; `contributedTabs` is the host-owned per-run tab shell
+ * (host-owned-run-timing Phase 5 §9.3). A tool that returns one of these is
+ * ignored (best-effort) with a warning — it cannot clobber the host shell.
+ */
+const RESERVED_DASHBOARD_KEYS = new Set(['sessions', 'contributedTabs']);
+
+/**
+ * Resolve the durable per-run dashboard contributions (host-owned-run-timing
+ * Phase 5 §7.3) for the given sessions into the flat {@link ContributedTab}
+ * list the dashboard renders generically.
+ *
+ * Each contribution's tab is namespaced by its producing tool id
+ * (`contrib-<tool>-<tabId>`) so one tool cannot collide with another's tab — or
+ * with a registered tool tab / the overview shell. A duplicate namespaced id
+ * within a single report is dropped with a warning (best-effort; never corrupts
+ * the output). The view's inline rows are resolved from the contribution's
+ * `data[dataKey]` (always coerced to an array; `cards` reads `rows[0]`).
+ */
+function resolveContributedTabs(
+  contributions: readonly { sessionId: string; tool: string; contribution: unknown }[],
+  log: Logger,
+): ContributedTab[] {
+  const tabs: ContributedTab[] = [];
+  const seen = new Set<string>();
+  for (const entry of contributions) {
+    const dashboard = entry.contribution as ToolDashboardContribution | null | undefined;
+    const contributedTabs = dashboard?.tabs;
+    if (!Array.isArray(contributedTabs)) continue;
+    const data = dashboard?.data ?? {};
+    for (const tab of contributedTabs as readonly DashboardTabContribution[]) {
+      const resolved = resolveOneTab(entry.tool, tab, data, seen, log);
+      if (resolved) tabs.push(resolved);
+    }
+  }
+  return tabs;
+}
+
+/**
+ * Resolve a single {@link DashboardTabContribution} into a {@link ContributedTab}
+ * (namespaced id + resolved inline rows), or `undefined` when the namespaced id
+ * collides with one already produced this report (warn + drop).
+ */
+function resolveOneTab(
+  tool: string,
+  tab: DashboardTabContribution,
+  data: Record<string, unknown>,
+  seen: Set<string>,
+  log: Logger,
+): ContributedTab | undefined {
+  const namespacedId = `contrib-${tool}-${tab.id}`;
+  if (seen.has(namespacedId)) {
+    void log.warn({
+      evt: 'cli.report.compose.duplicate_tab_dropped',
+      module: 'cli:report',
+      tool,
+      tabId: tab.id,
+      namespacedId,
+      msg: 'Duplicate contributed dashboard tab id; the later one was dropped.',
+    });
+    return undefined;
+  }
+  seen.add(namespacedId);
+  const rawRows = tab.dataKey === undefined ? undefined : data[tab.dataKey];
+  const rows = Array.isArray(rawRows)
+    ? (rawRows as Record<string, unknown>[])
+    : ([] as Record<string, unknown>[]);
+  return {
+    id: namespacedId,
+    title: tab.title,
+    order: tab.order ?? 0,
+    view: tab.view as ContributedTab['view'],
+    rows,
+  };
+}
 
 /**
  * Build the merged HTML report input from every registered tool's
@@ -67,21 +151,33 @@ async function composeReportInput(): Promise<HtmlReportInput> {
     );
   }
 
+  const log = scope.logger ?? defaultLogger;
   const datastore = scope.datastore() as DataStore | undefined;
-  const sessions = datastore ? [...new SessionRepo(datastore).list({ limit: 20 })] : [];
+  const repo = datastore ? new SessionRepo(datastore) : undefined;
+  const sessions = repo ? [...repo.list({ limit: 20 })] : [];
 
-  const input: HtmlReportInput = { sessions };
+  // Durable per-run dashboard contributions (host-owned-run-timing Phase 5):
+  // pull the rich tabs tools persisted keyed by these exact session ids. This
+  // survives a later `opensip report` process — it does not rely on any
+  // same-process in-memory state from the original run. Best-effort: a backend
+  // that cannot list contributions yields none, and the report still composes.
+  const contributedTabs = repo
+    ? resolveContributedTabs(repo.listDashboardContributions(sessions.map((s) => s.id)), log)
+    : [];
+
+  const input: HtmlReportInput = { sessions, contributedTabs };
 
   for (const tool of scope.tools.list()) {
     const contribution = await tool.collectReportData?.(scope);
     if (contribution) {
-      // Guardrail (host-owned-run-timing Phase 6 + spec §8): tools must never
-      // clobber host-owned top-level keys (sessions today; future may add more
-      // like runTiming). Ignore with warning (best-effort, like other contribution
-      // faults). The host `sessions` list is the durable history for the report.
-      const reserved = Object.keys(contribution).filter((k) => k === 'sessions');
+      // Guardrail (host-owned-run-timing Phase 5 §9.3 / spec §8): tools must
+      // never clobber host-owned top-level shell keys (`sessions`,
+      // `contributedTabs`; future shell keys join RESERVED_DASHBOARD_KEYS).
+      // Ignore with a warning (best-effort, like other contribution faults) —
+      // the host owns the run history AND the per-run contributed tabs.
+      const reserved = Object.keys(contribution).filter((k) => RESERVED_DASHBOARD_KEYS.has(k));
       if (reserved.length > 0) {
-        void (scope.logger ?? defaultLogger).warn({
+        void log.warn({
           evt: 'cli.report.compose.reserved_key_ignored',
           module: 'cli:report',
           tool: tool.metadata.id,

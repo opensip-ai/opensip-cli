@@ -17,6 +17,16 @@ export function dashboardCssCards(): string {
 .section { margin-bottom: 32px; }
 .empty { color: var(--text-dim); font-style: italic; padding: 24px; text-align: center; }
 
+/* Contributed per-run tabs (host-owned-run-timing Phase 5) — generic
+   declarative views rendered without any tool import. */
+.panel-title { font-size: 18px; font-weight: 600; margin: 0 0 16px; }
+.chart-title { font-size: 14px; font-weight: 600; color: var(--text-dim); margin-bottom: 8px; }
+.timeline { display: flex; flex-direction: column; gap: 8px; }
+.timeline-row { display: flex; gap: 12px; align-items: baseline; padding: 8px 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.timeline-time { font-variant-numeric: tabular-nums; color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+.timeline-detail { font-size: 13px; }
+.contributed-html { white-space: pre-wrap; word-break: break-word; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; font-size: 12px; overflow-x: auto; }
+
 /* Trend chart */
 .trend-chart { display: flex; align-items: flex-end; gap: 4px; height: 80px; padding: 16px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 24px; }
 .trend-bar { flex: 1; border-radius: 2px 2px 0 0; min-width: 8px; max-width: 40px; position: relative; cursor: pointer; }

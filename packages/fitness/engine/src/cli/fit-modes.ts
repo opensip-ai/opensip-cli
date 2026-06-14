@@ -14,6 +14,7 @@
  */
 
 import {
+  buildRunDashboardContribution,
   EXIT_CODES,
   mapToolErrorToExitCode,
   type FitOptions,
@@ -25,6 +26,7 @@ import {
   resolveFailOnDegraded,
   SystemError,
   type ToolCliContext,
+  type ToolRunCompletion,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
@@ -38,6 +40,14 @@ import { listRecipes } from './fit-recipes.js';
 import { executeFit } from './fit.js';
 
 import type { DataStore } from '@opensip-cli/datastore';
+
+/**
+ * The portion of a {@link ToolRunCompletion} fit's static modes return: the
+ * generic-session contribution plus the per-run dashboard contribution
+ * (host-owned-run-timing Phases 3 + 5). The host persists both keyed by the same
+ * session id after the handler resolves; the tool writes neither itself.
+ */
+type FitRunCompletion = Pick<ToolRunCompletion, 'session' | 'dashboard'>;
 
 /**
  * Build fit's generic-session contribution from a completed run envelope
@@ -55,6 +65,20 @@ function fitSessionContribution(
     score: envelope.verdict.score,
     passed: envelope.verdict.passed,
     payload: buildFitnessSessionPayload(envelope),
+  };
+}
+
+/**
+ * Build fit's full run completion (session + per-run dashboard tab) from the run
+ * envelope. The dashboard contribution uses the SHARED declarative builder
+ * (`buildRunDashboardContribution`) — the same seam sim/graph and any
+ * third-party tool use — so the dashboard renders fit's latest-run tab without
+ * importing fitness (host-owned-run-timing Phase 5 §7).
+ */
+function fitRunCompletion(args: FitOptions, envelope: SignalEnvelope): FitRunCompletion {
+  return {
+    session: fitSessionContribution(args, envelope),
+    dashboard: buildRunDashboardContribution(envelope, { idPrefix: 'fit', label: 'Fitness' }),
   };
 }
 
@@ -160,7 +184,7 @@ export async function runShowMode(args: FitOptions, cli: ToolCliContext): Promis
 export async function runJsonMode(
   args: FitOptions,
   cli: ToolCliContext,
-): Promise<ToolSessionContribution | undefined> {
+): Promise<FitRunCompletion | undefined> {
   const fitResult = await executeFit(args);
   if (fitResult.envelope === undefined) {
     // 2.12.0 (§5.5): a failed `--json` run emits a structured `status:'error'`
@@ -178,9 +202,10 @@ export async function runJsonMode(
   // `--report-to`, exit 4) AND the findings exit code (derived from the
   // envelope verdict). Called once, after the JSON is on stdout.
   await deliverFitSignals(cli, fitResult.envelope, args);
-  // Host-owned persistence (host-owned-run-timing Phase 3): RETURN the
-  // contribution; the host persists it after the handler resolves.
-  return fitSessionContribution(args, fitResult.envelope);
+  // Host-owned persistence (host-owned-run-timing Phases 3 + 5): RETURN the
+  // session + dashboard contribution; the host persists both after the handler
+  // resolves.
+  return fitRunCompletion(args, fitResult.envelope);
 }
 
 /**
@@ -194,11 +219,11 @@ export async function runLiveMode(
   cli: ToolCliContext,
   liveViewKey: string,
   openRequested: boolean,
-): Promise<ToolSessionContribution | undefined> {
+): Promise<FitRunCompletion | undefined> {
   // The TTY live path persists via the host (renderLive → completeLiveRender),
   // so this returns undefined there (no double-write). The non-TTY path returns
   // the contribution for the host to persist after the handler resolves.
-  let session: ToolSessionContribution | undefined;
+  let completion: FitRunCompletion | undefined;
   if (process.stdout.isTTY === true) {
     await cli.renderLive(liveViewKey, args);
   } else {
@@ -219,20 +244,20 @@ export async function runLiveMode(
       // Effectful egress + host-owned findings exit at the composition root
       // (ADR-0035), composing with non-TTY runs (CI), not just the TTY live view.
       await deliverFitSignals(cli, fitResult.envelope, args);
-      session = fitSessionContribution(args, fitResult.envelope);
+      completion = fitRunCompletion(args, fitResult.envelope);
     }
   }
   await cli.maybeOpenReport({
     openRequested,
     jsonOutput: Boolean(args.json),
   });
-  return session;
+  return completion;
 }
 
 export async function runGateMode(
   args: FitOptions,
   cli: ToolCliContext,
-): Promise<ToolSessionContribution | undefined> {
+): Promise<FitRunCompletion | undefined> {
   if (args.gateSave === true && args.gateCompare === true) {
     cli.logger.warn({
       evt: 'cli.gate.config_error',
@@ -263,7 +288,7 @@ export async function runGateMode(
   // passes fit's message-hash strategy to `buildSignalEnvelope`, which stamps
   // at construction. The host seams only read `signal.fingerprint`.
   const envelope: SignalEnvelope = fitResult.envelope;
-  const session = fitSessionContribution(args, envelope);
+  const completion = fitRunCompletion(args, envelope);
   // Surface non-fatal warnings before the gate output so the user sees them
   // alongside the run summary. Safe here because gate mode is non-Ink.
   emitWarningsToStderr(fitResult.result);
@@ -290,7 +315,7 @@ export async function runGateMode(
       // failOnErrors/failOnWarnings), so the host sets the exit from the envelope
       // verdict in deliverFitSignals — no per-path setExitCode needed.
       await deliverFitSignals(cli, envelope, args);
-      return session;
+      return completion;
     }
     const result = await cli.compareBaseline('fitness', envelope);
     await cli.render({ type: 'gate-done', lines: renderGateCompareOutput(result).split('\n') });
@@ -305,7 +330,7 @@ export async function runGateMode(
       args,
       result.degraded && resolveFailOnDegraded('fitness'),
     );
-    return session;
+    return completion;
   } catch (error) {
     // Gate mode is plain-text (not Ink), so we render the error
     // ourselves to stderr instead of letting it escape to the CLI's

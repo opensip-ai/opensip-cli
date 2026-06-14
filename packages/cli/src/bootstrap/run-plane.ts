@@ -28,9 +28,11 @@ import {
   type RecordedToolRunSession,
   type RunLifecycle,
   type RunTimingSnapshot,
+  type ToolDashboardContribution,
   type ToolRunCompletion,
   type ToolRunSessionInput,
   type ToolSessionContribution,
+  type ToolShortId,
 } from '@opensip-cli/core';
 import { SessionRepo } from '@opensip-cli/session-store';
 
@@ -63,8 +65,17 @@ export interface RunPlaneInvocation {
    * The launch path: freeze the lifecycle (`complete()`) and persist the
    * contribution with the frozen `startedAt` / `completedAt` / `durationMs`.
    * Idempotent on the lifecycle; best-effort on persistence.
+   *
+   * If the run also produced a {@link ToolDashboardContribution} (Phase 5), it
+   * is persisted keyed by the same session id once the row is written — so a
+   * later `opensip report` process can hydrate the per-run tab without any
+   * in-memory state. Best-effort: a missing/failed dashboard write never throws
+   * and never affects the session row.
    */
-  completeAndPersist(contribution: ToolSessionContribution): RecordedToolRunSession | undefined;
+  completeAndPersist(
+    contribution: ToolSessionContribution,
+    dashboard?: ToolDashboardContribution,
+  ): RecordedToolRunSession | undefined;
   /** Best-effort upsert of host-side overhead metrics for the persisted session. */
   recordHostMetrics(metrics: StoredSessionHostMetrics): void;
   /**
@@ -198,10 +209,43 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
       }
     }
 
+    /**
+     * Best-effort persist of a tool's per-run dashboard contribution
+     * (host-owned-run-timing Phase 5 §7), keyed by the session id just written
+     * + the contributing tool. No-op when no session row exists (no datastore,
+     * or the session write itself was skipped). Never throws — a failed
+     * dashboard write must never affect the run or the persisted session row.
+     */
+    function persistDashboard(tool: ToolShortId, dashboard: ToolDashboardContribution): void {
+      if (sessionId === undefined) return;
+      const datastore = safeDatastore();
+      if (!datastore) return;
+      try {
+        new SessionRepo(datastore).saveDashboardContribution(sessionId, tool, dashboard);
+      } catch (error) {
+        // @swallow-ok best-effort dashboard contribution; the SessionRepo write
+        // already warns, but guard the construction too.
+        log.warn?.({
+          evt: 'cli.run-session.dashboard_contribution_failed',
+          module: MODULE_TAG,
+          sessionId,
+          tool,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     function completeAndPersist(
       contribution: ToolSessionContribution,
+      dashboard?: ToolDashboardContribution,
     ): RecordedToolRunSession | undefined {
-      return persist(contribution, lifecycle.complete());
+      const recorded = persist(contribution, lifecycle.complete());
+      // Persist the per-run dashboard contribution after the session row exists
+      // (it is keyed by the session id). Best-effort and additive.
+      if (recorded !== undefined && dashboard !== undefined) {
+        persistDashboard(contribution.tool, dashboard);
+      }
+      return recorded;
     }
 
     async function completeLiveRender(
@@ -211,7 +255,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
       const completion = await render();
       const ttyBusyMs = Math.max(0, performance.now() - ttyStart);
       if (completion?.session) {
-        completeAndPersist(completion.session);
+        completeAndPersist(completion.session, completion.dashboard);
         recordHostMetrics({ ttyBusyMs });
       }
       return completion;
