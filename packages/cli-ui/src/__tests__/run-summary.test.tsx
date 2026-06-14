@@ -1,12 +1,15 @@
-import { createRunTimer } from '@opensip-cli/core';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
 import { renderToText } from '../render-to-text.js';
 import { RunSummary, viewRunSummary } from '../run-summary.js';
-import { RunTimingProvider } from '../run-timing-provider.js';
+import { RunTimingProvider, type RunTimerLike } from '../run-timing-provider.js';
 import { ThemeProvider } from '../theme.js';
+
+// cli-ui is a leaf package with ZERO workspace deps (spec §9.1/§11): the test
+// uses a local RunTimerLike fake rather than importing core's createRunTimer.
+const fakeTimer = (elapsedMs: number): RunTimerLike => ({ elapsedMs: () => elapsedMs });
 
 describe('RunSummary', () => {
   it('renders the PASS verdict + errors/warnings/duration line (ADR-0035)', () => {
@@ -96,12 +99,7 @@ describe('RunSummary', () => {
   });
 
   it('when durationMs omitted, reads from RunTimingProvider (host timer) and renders Duration line', () => {
-    const timer = createRunTimer();
-    // Let a tiny bit of time pass so duration > 0
-    const start = Date.now();
-    while (Date.now() - start < 1) {
-      /* busy-wait so the host timer accrues a non-zero duration */
-    }
+    const timer = fakeTimer(5);
     const { lastFrame } = render(
       <ThemeProvider>
         <RunTimingProvider timer={timer}>

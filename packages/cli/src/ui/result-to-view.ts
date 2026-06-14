@@ -32,7 +32,6 @@ import {
   type Tone,
   type ViewNode,
 } from '@opensip-cli/cli-ui';
-import { currentScope } from '@opensip-cli/core';
 import {
   formatSignalTableRows,
   formatSignalTableSummary,
@@ -73,34 +72,17 @@ const SPACER: ViewNode = { kind: 'spacer' };
 
 /**
  * Resolve the top-level run duration for a summary line.
- * Prefers an explicit value carried on the done result (compat during
- * migration); when absent (post-migration tools), falls back to a host
- * RunTimer snapshot obtained from the entered scope (if the host stashed
- * the timer or runSession on it) or 0.
- * This ensures the static (renderToText / piped) summary uses the same
- * host-owned timing that will be in StoredSession.
+ *
+ * host-owned-run-timing Phase 4: this is the EXPLICIT value the host caller
+ * stamps onto the done result from the host run lifecycle (the same duration
+ * the host writes to `StoredSession.durationMs`). The former `currentScope()`
+ * scope-stash heuristic — which probed an imagined `runSession.timing` on the
+ * RunScope — is gone (nothing ever stashed it; it always degraded to 0). The
+ * `?? 0` is only a defensive default for an error path or a very early failure
+ * before any lifecycle/duration exists.
  */
 function resolveSummaryDuration(explicit?: number): number {
-  if (typeof explicit === 'number') return explicit;
-  try {
-    const scope = currentScope() as
-      | { runSession?: { timing?: unknown }; timing?: unknown }
-      | undefined;
-    const t = (scope?.runSession?.timing ?? scope?.timing) as
-      | { snapshot?: () => { durationMs?: number }; elapsedMs?: () => number }
-      | undefined;
-    if (t) {
-      if (typeof t.snapshot === 'function') {
-        return t.snapshot().durationMs ?? 0;
-      }
-      if (typeof t.elapsedMs === 'function') {
-        return t.elapsedMs();
-      }
-    }
-  } catch {
-    // @swallow-ok best-effort timing read; falls through to 0
-  }
-  return 0;
+  return explicit ?? 0;
 }
 
 /** `✗ <message>` plus an optional dim suggestion — mirrors ErrorMessage. */
