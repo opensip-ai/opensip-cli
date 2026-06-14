@@ -12,6 +12,12 @@ This directory contains a family of repeatable improvement processes for the Ope
   - All previously created mechanisms must be re-executed/validated in every round.
   - Mechanisms are created as project-local only (e.g. in `opensip-cli/fit/checks/` or equivalent local areas) and are never added to the published check packs without going through the spec + human-review path.
 
+**Inter-cycle Merge Gate (required when running domains in sequence)**: After a domain cycle reaches termination (final summary written and code changes committed on the worktree branch), the valuable artifacts — primarily the new project-local mechanisms under `opensip-cli/fit/checks/<domain>/` plus any small production fixes — must be reviewed and merged to `main` by a human *before* a new worktree is created for the next domain in the order. This ensures:
+  - The next cycle's baseline and delta work run against an up-to-date codebase that includes prior improvements.
+  - All previously created local mechanisms (the "living catalog") are present in the fresh worktree so they can be re-validated in Step 1 of the new domain.
+  - Coverage Reports and delta focus accumulate correctly across the family of processes.
+  The agent never performs this merge. The human does the review + merge, then (when ready) instructs the agent to start the next domain (which will then `git worktree add` from the updated main). This is a direct consequence of the "human review before integration" rule when processes are executed sequentially.
+
 These processes exist so that different quality and improvement concerns can be attacked with the same disciplined, auditable, and safe methodology.
 
 ## The Family
