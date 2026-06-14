@@ -2,7 +2,8 @@
  * executeFit boundary test (ADR-0028 — worker-safe, persistence-free engine).
  *
  * `executeFit` does NOT touch the datastore: it returns the envelope + the run's
- * `durationMs`, and the CALLER persists via `persistFitSession` on the main
+ * (host timing removed). The CALLER (modes / live runner with ToolCliContext) persists
+ * via the `cli.runSession.record` seam (or legacy persistFitSession for some tests).
  * thread (the datastore handle cannot cross the worker boundary). These tests
  * lock both halves: the engine is pure-compute, and the explicit persist writes
  * exactly one session. `onProgress` wiring is also covered.
