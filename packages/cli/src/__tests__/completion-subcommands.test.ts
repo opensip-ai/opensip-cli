@@ -47,6 +47,15 @@ function makeStubToolContext(): ToolCliContext {
     maybeOpenReport: vi.fn(() => Promise.resolve()),
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     setExitCode: vi.fn(),
+    runSession: {
+      timing: {
+        startedAt: new Date().toISOString(),
+        startedAtEpochMs: Date.now(),
+        elapsedMs: () => 0,
+        snapshot: () => ({ startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), durationMs: 0 }),
+      },
+      record: () => undefined,
+    },
     emitJson: vi.fn(),
     emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),

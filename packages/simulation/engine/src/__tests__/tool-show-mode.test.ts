@@ -91,6 +91,15 @@ function makeContext(datastore: DataStore | undefined): {
       delete: () => Promise.resolve(),
       list: () => Promise.resolve([]),
     },
+    runSession: {
+      timing: {
+        startedAt: new Date().toISOString(),
+        startedAtEpochMs: Date.now(),
+        elapsedMs: () => 0,
+        snapshot: () => ({ startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), durationMs: 0 }),
+      },
+      record: () => undefined,
+    },
   };
   return { ctx, rendered, emitted, exitCodes };
 }

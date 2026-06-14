@@ -103,8 +103,6 @@ function makeFakeContext(): {
     emitEnvelope: (value: unknown) => {
       emitted.push(value);
     },
-    // 2.12.0: the structured-error seam. Mirrors the real host seam — it sets
-    // the exit code and emits the error detail (`{ message, exitCode }`).
     emitError: (detail: { message: string; exitCode: number; suggestion?: string }) => {
       exitCodes.push(detail.exitCode);
       emitted.push(detail);
@@ -121,6 +119,15 @@ function makeFakeContext(): {
       put: () => Promise.resolve(),
       delete: () => Promise.resolve(),
       list: () => Promise.resolve([]),
+    },
+    runSession: {
+      timing: {
+        startedAt: new Date().toISOString(),
+        startedAtEpochMs: Date.now(),
+        elapsedMs: () => 0,
+        snapshot: () => ({ startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), durationMs: 0 }),
+      },
+      record: () => undefined,
     },
   };
   return { ctx, rendered, exitCodes, emitted };
