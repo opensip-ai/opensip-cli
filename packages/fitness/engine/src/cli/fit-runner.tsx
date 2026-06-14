@@ -105,7 +105,7 @@ function executeFitWithProgress(
 type FitState =
   | { phase: 'loading' }
   | { phase: 'running'; checkCount: number; subscribe: (cb: ProgressCallback) => void }
-  | { phase: 'done'; result: FitDoneResult; checkCount: number }
+  | { phase: 'done'; result: FitDoneResult; checkCount: number; durationMs: number }
   | { phase: 'error'; result: ErrorResult };
 
 interface FitRunnerProps {
@@ -181,7 +181,13 @@ function FitRunner({
         fitResult.durationMs !== undefined &&
         fitResult.startedAt !== undefined
       ) {
-        persistFitSession(datastore, args, result.envelope, fitResult.durationMs, fitResult.startedAt);
+        persistFitSession(
+          datastore,
+          args,
+          result.envelope,
+          fitResult.durationMs,
+          fitResult.startedAt,
+        );
       }
 
       // Effectful egress (cloud + `--report-to`) lives at the composition root
@@ -189,7 +195,8 @@ function FitRunner({
       // `registerLiveView` callback delivers it once the Ink app exits.
       onEnvelope?.(result.envelope);
 
-      setState({ phase: 'done', result, checkCount });
+      const durationMs = fitResult.durationMs ?? 0;
+      setState({ phase: 'done', result, checkCount, durationMs });
       setTimeout(() => exit(), 100);
     })();
 
@@ -282,7 +289,13 @@ function FitRunner({
     case 'done': {
       const { envelope, verboseDetail } = state.result;
       const { summary } = envelope.verdict;
-      const durationMs = envelope.units.reduce((total, u) => total + u.durationMs, 0);
+      // Use the engine-reported overall recipe duration (wall time of the
+      // checks phase) for the summary line. This matches what is persisted
+      // into the session (for `sessions` / `report`) and is consistent with
+      // how graph and sim report their run durations. The per-unit durations
+      // in the envelope are the individual check times (which overcount when
+      // checks execute in parallel).
+      const durationMs = state.durationMs;
       // ADR-0021: the verbose surface is driven by args.verbose alone. The
       // detail body renders through the shared viewFindingsGroups producer (same
       // path as the static `fit --verbose | cat` render), not the retired local

@@ -239,12 +239,10 @@ describe('persistSimSession', () => {
   it('writes exactly one sim session row (the engine no longer persists; the caller does)', async () => {
     const ds: DataStore = DataStoreFactory.open({ backend: 'memory' });
     try {
-      const exec = await executeSim(args());
-      const startedAt = (exec as { startedAt?: string }).startedAt;
-      if (exec.result.type !== 'sim-done' || startedAt === undefined) {
-        throw new Error('expected sim success with startedAt');
-      }
-      persistSimSession(ds, exec.result, startedAt);
+      const result = await simDone();
+      // Exercise the persist seam with an explicit start time (the executeSim
+      // wrapper supplies it in real callers; here we test the best-effort write).
+      persistSimSession(ds, result, '2026-06-13T12:00:00.000Z');
       const sessions = new SessionRepo(ds).list({ tool: 'sim' });
       expect(sessions).toHaveLength(1);
       expect(sessions[0]?.recipe).toBe('default');

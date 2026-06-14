@@ -105,7 +105,13 @@ describe('executeFit — persistence-free boundary (ADR-0028)', () => {
     )
       throw new Error('expected a fit-done result');
 
-    persistFitSession(datastore, args, fitResult.envelope, fitResult.durationMs, fitResult.startedAt);
+    persistFitSession(
+      datastore,
+      args,
+      fitResult.envelope,
+      fitResult.durationMs,
+      fitResult.startedAt,
+    );
 
     const sessions = new SessionRepo(datastore).list({ tool: 'fit' });
     expect(sessions.length).toBe(1);

@@ -210,8 +210,7 @@ export async function executeSim(
   args: ToolOptions & { readonly verbose?: boolean },
   opts: ExecuteSimOptions = {},
 ): Promise<
-  | { result: SimDoneResult; startedAt: string }
-  | { result: ErrorResult; startedAt?: undefined }
+  { result: SimDoneResult; startedAt: string } | { result: ErrorResult; startedAt?: undefined }
 > {
   // Lifecycle: load .mjs plugins + scenario packages before the recipe
   // registry is read. Idempotent per project dir.

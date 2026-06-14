@@ -20,6 +20,11 @@ import type { ToolShortId } from '@opensip-cli/core';
  * vocabulary. Each tool owns the shape of its own payload; the dashboard,
  * as the presentation owner, reads the payload and renders it — the same
  * producer/consumer split used for `GraphCatalog`.
+ *
+ * `timestamp` is the *start* of the user-initiated run (captured early in the
+ * command dispatch / live runner before heavy analysis work). `durationMs`
+ * is the measured wall time of the analysis itself. Together they let history,
+ * `sessions list`, and the report reconstruct "started at T, took D".
  */
 export interface StoredSession {
   readonly id: string;
