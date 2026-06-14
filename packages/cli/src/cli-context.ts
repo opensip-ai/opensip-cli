@@ -27,13 +27,21 @@ import {
   SystemError,
   UnknownLiveViewError,
   currentScope,
+  generatePrefixedId,
   logger as defaultLogger,
   resolveProjectPaths,
   type LiveViewRenderer,
   type Logger,
   type ProjectContext,
+  type RecordedToolRunSession,
+  type RunTimer,
   type ToolCliContext,
+  type ToolRunSessionInput,
+  type ToolRunSessions,
+  type ToolShortId,
+  createRunTimer,
 } from '@opensip-cli/core';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
@@ -236,6 +244,65 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   const stateSeams = buildStateSeams({ getDatastore: getProjectDatastore }); // ADR-0042, same lazy resolver
   const hostPlanes = buildHostPlanes({ getDatastore: getProjectDatastore, logger: log });
 
+  // Host-owned run timer (per host-owned-run-timing spec/plan Phase 1):
+  // created exactly once here (inside buildToolCliContext, which is invoked
+  // from the pre-action hook AFTER the RunScope has been entered). The same
+  // instance is closed over by record() and exposed on both the static
+  // ToolCliContext and (via LiveViewContext) to live renderers. No tool code
+  // can observe or run before this point.
+  const runTimer: RunTimer = createRunTimer();
+
+  const runSession: ToolRunSessions = {
+    timing: runTimer,
+    record(input: ToolRunSessionInput): RecordedToolRunSession | undefined {
+      // Best-effort, never throws, matches prior persist*Session contract.
+      // Must read datastore via the entered scope thunk (no direct/global access).
+      let datastore: DataStore | undefined;
+      try {
+        const thunk = readScope().datastore;
+        datastore = thunk ? (thunk() as DataStore | undefined) : undefined;
+      } catch {
+        datastore = undefined;
+      }
+      if (!datastore) {
+        return undefined;
+      }
+      const id = generatePrefixedId(input.tool);
+      const timing = runTimer.snapshot();
+      try {
+        new SessionRepo(datastore).save({
+          id,
+          tool: input.tool,
+          timestamp: timing.startedAt,
+          cwd: input.cwd,
+          recipe: input.recipe,
+          score: input.score,
+          passed: input.passed,
+          durationMs: timing.durationMs,
+          payload: input.payload,
+        });
+        // Observability per cross-cutting: log the record event (best effort).
+        log.info?.({
+          evt: 'cli.run-session.recorded',
+          module: 'cli:context',
+          tool: input.tool,
+          sessionId: id,
+          durationMs: timing.durationMs,
+        });
+      } catch (e) {
+        // Swallow; best-effort persistence must not affect primary outcome.
+        log.warn?.({
+          evt: 'cli.run-session.record_failed',
+          module: 'cli:context',
+          tool: input.tool,
+          error: e instanceof Error ? e.message : String(e),
+        });
+        return undefined;
+      }
+      return { id, tool: input.tool, timestamp: timing.startedAt, durationMs: timing.durationMs };
+    },
+  };
+
   const ctx: ToolCliContext = {
     get scope(): RunScope {
       // The pre-action-hook (or explicit runWithScope in tests) enters the
@@ -353,6 +420,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     exportBaselineSarif: baselineSeams.exportBaselineSarif,
     exportBaselineFingerprints: baselineSeams.exportBaselineFingerprints,
     toolState: stateSeams, // ADR-0042: durable per-tool keyed JSON state
+    runSession, // host-owned; created above, shared with live views
     hostPlanes, // Host-owned governance / entitlements / audit plane (H1-H3)
   };
 
