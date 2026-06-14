@@ -11,7 +11,7 @@ Do not open a public GitHub issue for security vulnerabilities.
 
 1. Use GitHub private vulnerability reporting:
    <https://github.com/opensip-ai/opensip-cli/security/advisories/new>
-2. Email security@opensip.ai
+2. Email admin@opensip.ai
 
 ## What To Include
 
