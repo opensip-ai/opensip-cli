@@ -2,7 +2,7 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
-## [0.1.0] - 2026-06-13
+## [0.1.0] - 2026-06-14
 
 Initial public release of OpenSIP CLI on the `@opensip-cli/*` + `opensip-cli`
 identity. This is a `0.x` release: the public API (the Tool contract, the check

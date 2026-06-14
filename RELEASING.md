@@ -123,16 +123,26 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
 
 2. Update `CHANGELOG.md` with the release entry.
 
-3. Run the local preflight:
+3. Run the local preflight. This mirrors the tag-driven release lane closely
+   enough that local results should predict CI:
 
    ```bash
    pnpm install
+   pnpm -r run clean
    pnpm build
    pnpm typecheck
-   pnpm test
-   pnpm docs:build
-   pnpm docs:check
+   pnpm supply-chain:verify
+   pnpm lint
+   pnpm test:coverage
+   pnpm fit:ci
+   pnpm graph:ci
    pnpm verify-release --expected-version v0.1.0
+   mkdir -p /tmp/opensip-cli-release-tarballs
+   rm -f /tmp/opensip-cli-release-tarballs/*.tgz
+   while IFS= read -r filter; do
+     pnpm --filter "$filter" pack --pack-destination /tmp/opensip-cli-release-tarballs
+   done < <(node scripts/release-package-order.mjs --print pack)
+   node scripts/smoke-pack.mjs --dir /tmp/opensip-cli-release-tarballs --expected-version v0.1.0
    ```
 
 4. Commit, tag, and push:
