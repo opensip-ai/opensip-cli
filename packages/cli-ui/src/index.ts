@@ -30,6 +30,12 @@ export {
 export { RunHeader, type RunHeaderProps, type RunHeaderMeta } from './run-header.js';
 export { RunSummary, viewRunSummary, type RunSummaryProps } from './run-summary.js';
 export {
+  RunTimingProvider,
+  useRunTiming,
+  useRunDuration,
+  type RunTimingProviderProps,
+} from './run-timing-provider.js';
+export {
   RunFooterHints,
   viewFooterHints,
   type RunFooterHint,
