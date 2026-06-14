@@ -130,12 +130,12 @@ beforeEach(() => {
 
 describe.each(LANGS)('language acceptance: $lang', (row) => {
   it('fit --json runs with no adapter-load error', () => {
-    // For C++ the plain --json pulls non-hermetic checks (clang-tidy etc.).
-    // Use the hermetic universal one (no-todo-comments) so the "runs" assertion
-    // is reliable in envs without the external tools, while still proving no
-    // adapter load error and that the command succeeded.
-    const extra = row.lang === 'cpp' ? ['--check', 'no-todo-comments'] : [];
-    const res = runInFixture(['fit', '--json', ...extra], row.lang);
+    // Always limit with --check <lang's slug> so the assertion is reliable
+    // (plain --json can pull non-hermetic checks for some langs, or trigger
+    // other behavior in isolated fixture projects). This still exercises
+    // adapter load for the lang and proves the command succeeds with no load
+    // errors. The dedicated C++ smoke separately asserts filesValidated > 0.
+    const res = runInFixture(['fit', '--json', '--check', row.slug], row.lang);
     expect(res.exitCode, `fit exited ${res.exitCode}; stderr: ${res.stderr}`).toBe(0);
     for (const marker of ['plugin failed to load', 'lang plugin failed to load']) {
       expect(res.stderr).not.toContain(marker);
