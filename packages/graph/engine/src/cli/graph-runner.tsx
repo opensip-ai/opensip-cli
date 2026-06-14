@@ -58,6 +58,8 @@ import React, { useEffect, useState } from 'react';
 import { assertFinalizedAcrossBoundary } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { SHARDED_STAGE_LABELS, STAGE_LABELS, toProgressEvent } from './graph-progress.js';
+import { buildGraphSessionPayload } from '../persistence/session-payload.js';
+import { passRate } from '@opensip-cli/contracts';
 import {
   buildLiveGraphOutput,
   persistSession,
@@ -311,19 +313,21 @@ function GraphRunner({ args, datastore, setExitCode, liveContext }: GraphRunnerP
         // here — an assertion of the prior finalize, NOT a second suppression —
         // so the host record (and the verdict) consume the branded, already-waived signals.
         const finalized = assertFinalizedAcrossBoundary(result.signals, result.suppressedCount);
-        // Host record using liveContext (Phase 1) — no local startedAt/duration for StoredSession.
+        // Host record using liveContext (Phase 1) — real payload/verdict from finalized signals.
+        // Timing (startedAt / durationMs) comes from the host RunTimer snapshot inside record().
+        const payload = buildGraphSessionPayload(finalized.signals);
         const rs = liveContext?.runSession;
         if (rs) {
           rs.record({
             tool: 'graph',
             cwd: args.cwd,
             recipe: args.recipe,
-            score: 0,
-            passed: true,
-            payload: undefined,
+            score: passRate(payload.summary),
+            passed: payload.summary.errors === 0,
+            payload,
           });
         }
-        // Compute the summary (duration omitted below; provider supplies host value).
+        // Compute the summary for TTY (duration omitted; provider supplies host value).
         const verdict = buildGraphEnvelope({
           signals: finalized.signals,
           runId: currentScope()?.runId ?? '',
@@ -460,7 +464,7 @@ export interface RenderGraphLiveOptions {
  * Render the live `graph` view. Returns once the underlying Ink app exits.
  *
  * The graph tool wires this in via `setUpGraphLiveView`, which calls
- * `cli.registerLiveView('graph', (args) => renderGraphLive(args, { ... }))`
+ * `cli.registerLiveView('graph', (args, liveContext) => renderGraphLive(args, { ... }, liveContext))`
  * lazily on the interactive path (there is no `register()` mount hook).
  * `setExitCode` is the single mutator path on `process.exitCode`; the
  * runner calls it for error outcomes so the CLI's exit-code seam stays

@@ -335,7 +335,11 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     render: (result) => opts.render(result as CommandResult),
     registerLiveView: opts.liveViews.register,
     renderLive: (key: string, args: unknown, liveContext?: LiveViewContext) =>
-      opts.liveViews.render(key, args, liveContext),
+      // Default to the host-owned runSession so tools that call renderLive directly
+      // (fit/sim/graph runLiveMode) still thread the host RunTimer + record seam to
+      // their live view — not only commands routed through mountCommandSpec's live
+      // dispatch. Without this, live runs neither record a session nor show duration.
+      opts.liveViews.render(key, args, liveContext ?? { runSession }),
     maybeOpenReport: opts.maybeOpenReport,
     logger: log,
     setExitCode,

@@ -87,7 +87,7 @@ interface GraphCommandOptions {
  * needs it — is equivalent to the old mount-time registration.
  */
 function setUpGraphLiveView(cli: ToolCliContext): void {
-  cli.registerLiveView(GRAPH_LIVE_VIEW_KEY, async (args) => {
+  cli.registerLiveView(GRAPH_LIVE_VIEW_KEY, async (args, liveContext) => {
     await renderGraphLive(
       args as {
         cwd: string;
@@ -103,6 +103,7 @@ function setUpGraphLiveView(cli: ToolCliContext): void {
       },
       cli.scope.datastore() as DataStore | undefined,
       { setExitCode: cli.setExitCode },
+      liveContext,
     );
   });
 }

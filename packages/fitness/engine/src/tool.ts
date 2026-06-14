@@ -137,11 +137,17 @@ const FIT_RUN_WORKER: ToolCommandDescriptor = {
  * to the old mount-time registration.
  */
 function setUpFitLiveView(cli: ToolCliContext): void {
-  cli.registerLiveView(FIT_LIVE_VIEW_KEY, async (args) => {
+  cli.registerLiveView(FIT_LIVE_VIEW_KEY, async (args, liveContext) => {
     const fitArgs = args as FitOptions;
-    const envelope = await renderFitLive(fitArgs, cli.scope.datastore() as DataStore | undefined, {
-      setExitCode: cli.setExitCode,
-    });
+    // Forward liveContext (as 2nd positional for renderFitLive's contextOrDatastore union)
+    // so the runner receives the host RunTimer / runSession for persistence + summary provider.
+    const envelope = await renderFitLive(
+      fitArgs,
+      liveContext ?? (cli.scope.datastore() as DataStore | undefined),
+      {
+        setExitCode: cli.setExitCode,
+      },
+    );
     // Effectful egress lives at the composition root (ADR-0011 / ADR-0008):
     // best-effort cloud sync + `--report-to` (which owns exit 4). Delivered
     // ONCE, after the interactive Ink view exits. A content failure
