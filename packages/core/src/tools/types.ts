@@ -191,12 +191,10 @@ export interface ToolRunCompletion {
 }
 
 /**
- * Return value from a successful `runSession.record(...)` call.
- *
- * Contains the id assigned by the host and the timing values that were
- * stamped from the host `RunTimer.snapshot()` at record time. Tools that
- * need the stamped values for their own live summaries can read them here
- * (rather than threading their own clocks).
+ * The host-recorded session, returned by the host run plane after it persists a
+ * {@link ToolSessionContribution}. Carries the id the host assigned and the
+ * timing it stamped from the run lifecycle. This is a HOST-internal return shape
+ * (the run plane → host), not a tool-facing seam.
  */
 export interface RecordedToolRunSession {
   readonly id: string;
@@ -207,21 +205,16 @@ export interface RecordedToolRunSession {
 }
 
 /**
- * The host-provided run-session seam on `ToolCliContext`.
+ * The host-provided run seam on `ToolCliContext` (host-owned-run-timing §6.5).
  *
- * `timing` is the host run lifecycle for this invocation (shared between the
- * static command path and any live renderers); tools may read it for
- * display-only elapsed time.
- *
- * `record` is the TRANSITIONAL generic-session writer. The launch model is
- * "return a {@link ToolSessionContribution} (inside a {@link
- * ToolRunCompletion}) from your handler / live renderer and let the host
- * persist it" — `record` is removed once the host run plane owns persistence
- * (host-owned-run-timing Phases 3/6). Do not build new code against it.
+ * `timing` is the host run lifecycle for this invocation — READ-ONLY lifecycle
+ * inspection for display (e.g. live elapsed in a summary). The launch surface
+ * intentionally exposes NO generic-session writer: tools return a
+ * {@link ToolSessionContribution} (inside a {@link ToolRunCompletion}) from
+ * their handler / live renderer and the host persists it after they resolve.
  */
 export interface ToolRunSessions {
   readonly timing: RunTimer;
-  record(input: ToolRunSessionInput): RecordedToolRunSession | undefined;
 }
 
 /**

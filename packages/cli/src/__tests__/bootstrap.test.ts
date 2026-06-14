@@ -63,7 +63,6 @@ function makeStubContext(): ToolCliContext {
           durationMs: 0,
         }),
       },
-      record: () => undefined,
     },
   };
 }

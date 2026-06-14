@@ -169,7 +169,6 @@ function makeCli(): CapturedCli {
           durationMs: 0,
         }),
       },
-      record: () => undefined,
     },
   };
   return { cli, exitCodes, datastore, render };

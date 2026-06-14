@@ -136,7 +136,6 @@ function makeFakeContext(): {
           durationMs: 0,
         }),
       },
-      record: () => undefined,
     },
   };
   return { ctx, rendered, exitCodes, emitted };

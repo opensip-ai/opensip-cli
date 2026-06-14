@@ -30,7 +30,7 @@ import {
   type RunTimingSnapshot,
   type ToolDashboardContribution,
   type ToolRunCompletion,
-  type ToolRunSessionInput,
+  type ToolRunSessions,
   type ToolSessionContribution,
   type ToolShortId,
 } from '@opensip-cli/core';
@@ -55,12 +55,6 @@ export interface RunPlaneDeps {
 export interface RunPlaneInvocation {
   /** The lifecycle for this invocation (display elapsed; host completion source). */
   readonly lifecycle: RunLifecycle;
-  /**
-   * TRANSITIONAL: persist a contribution using a *live* snapshot (does not
-   * freeze the lifecycle). Backs the legacy `runSession.record(...)` seam until
-   * tools return contributions (Phase 3). Best-effort.
-   */
-  record(input: ToolRunSessionInput): RecordedToolRunSession | undefined;
   /**
    * The launch path: freeze the lifecycle (`complete()`) and persist the
    * contribution with the frozen `startedAt` / `completedAt` / `durationMs`.
@@ -107,8 +101,8 @@ export interface RunActionHooks {
    * Called after the handler returns. If the result carries a
    * {@link ToolSessionContribution} (a `ToolRunCompletion`), the host freezes
    * the lifecycle and persists it. A plain `CommandResult` (no `session`) is a
-   * no-op — the transitional `record(...)` path still owns persistence until
-   * tools return contributions (Phase 3).
+   * no-op — every first-party tool now returns a contribution (Phase 3); there
+   * is no transitional generic-session writer left on the launch surface.
    */
   readonly completeRun?: (result: unknown) => void;
 }
@@ -263,7 +257,6 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
 
     return {
       lifecycle,
-      record: (input) => persist(input, lifecycle.snapshot()),
       completeAndPersist,
       recordHostMetrics,
       completeLiveRender,
@@ -279,6 +272,46 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
     current() {
       invocation ??= makeInvocation();
       return invocation;
+    },
+  };
+}
+
+/**
+ * The public run seam (host-owned-run-timing §6.5): `timing` exposes the current
+ * invocation lifecycle for display-only elapsed. There is NO public
+ * generic-session writer — tools return a {@link ToolSessionContribution} (inside
+ * a {@link ToolRunCompletion}) and the host run plane persists it via the action
+ * hooks below. The getter lazily begins the lifecycle so a tool that reads
+ * `timing` before the action hook fires still observes a live timer.
+ */
+export function createRunSessionSeam(factory: RunPlaneFactory): ToolRunSessions {
+  return {
+    get timing() {
+      return factory.current().lifecycle;
+    },
+  };
+}
+
+/**
+ * The internal run-lifecycle hooks the command-mount dispatch reads (via cast,
+ * like `runSession`) to mark the lifecycle boundaries. `beginRun` starts the
+ * lifecycle at the command-action boundary (after RunScope entry, before the
+ * handler); `completeRun` freezes + persists when the handler returned a
+ * {@link ToolRunCompletion} carrying a session contribution. A plain
+ * `CommandResult` (no `session`) is a no-op.
+ */
+export function createRunActionHooks(factory: RunPlaneFactory): RunActionHooks {
+  return {
+    beginRun: () => {
+      factory.beginRun();
+    },
+    completeRun: (result) => {
+      const completion = result as ToolRunCompletion | undefined;
+      const session = completion?.session;
+      // host-owned-run-timing Phase 5: forward the optional per-run dashboard
+      // contribution alongside the session so the host persists both keyed by
+      // the same session id. Best-effort; no dashboard ⇒ session-only persist.
+      if (session) factory.current().completeAndPersist(session, completion?.dashboard);
     },
   };
 }

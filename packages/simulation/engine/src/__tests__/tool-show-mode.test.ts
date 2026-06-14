@@ -108,7 +108,6 @@ function makeContext(datastore: DataStore | undefined): {
           durationMs: 0,
         }),
       },
-      record: () => undefined,
     },
   };
   return { ctx, rendered, emitted, exitCodes };

@@ -98,7 +98,6 @@ function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
           durationMs: 0,
         }),
       },
-      record: () => undefined,
     },
     ...overrides,
   };
