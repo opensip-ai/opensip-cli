@@ -59,6 +59,12 @@ export function buildWorkspaceJsonDocument(
     tool: 'graph',
     command: 'graph',
     mode: 'workspace',
+    // Workspace-specific artifact timestamp (for the --workspace JSON/report document).
+    // This is *not* the StoredSession row (host `runSession.record` in the parent
+    // handler owns the single aggregate session for the whole --workspace invocation;
+    // children are carrier --json and do not write sessions). Per phase 5.3 this
+    // keeps user-facing workspace docs with their own clocks while the durable
+    // history row is host-stamped.
     timestamp: new Date().toISOString(),
     durationMs,
     units: perUnit.map((r) => ({
