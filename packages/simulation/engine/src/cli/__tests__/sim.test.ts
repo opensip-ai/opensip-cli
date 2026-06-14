@@ -239,8 +239,7 @@ describe('persistSimSession', () => {
   it('writes exactly one sim session row (the engine no longer persists; the caller does)', async () => {
     const ds: DataStore = DataStoreFactory.open({ backend: 'memory' });
     try {
-      const scope = makeSimTestScope();
-      const exec = await scope.run(() => executeSim(args()));
+      const exec = await executeSim(args());
       const startedAt = (exec as { startedAt?: string }).startedAt;
       if (exec.result.type !== 'sim-done' || startedAt === undefined) {
         throw new Error('expected sim success with startedAt');
