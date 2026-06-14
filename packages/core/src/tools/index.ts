@@ -18,6 +18,10 @@ export type {
   ToolSessionRecord,
   ToolSessionReplayContribution,
   LiveViewRenderer,
+  LiveViewContext,
+  ToolRunSessionInput,
+  RecordedToolRunSession,
+  ToolRunSessions,
   ToolExtensionPoints,
   // Typed host planes (hygiene plan Phase 0)
   HostGovernance,
