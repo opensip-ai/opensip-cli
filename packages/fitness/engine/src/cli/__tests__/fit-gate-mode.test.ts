@@ -20,7 +20,7 @@ vi.mock('../fit.js', () => ({ executeFit: vi.fn() }));
 import { runGateMode } from '../fit-modes.js';
 import { executeFit } from '../fit.js';
 
-import type { ToolCliContext } from '@opensip-cli/core';
+import { createRunTimer, type ToolCliContext } from '@opensip-cli/core';
 
 let datastore: DataStore;
 
@@ -69,6 +69,10 @@ function mockCli(): {
     exportBaselineSarif: vi.fn(() => Promise.resolve()),
     exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
     scope: { datastore: () => datastore },
+    runSession: {
+      timing: createRunTimer(),
+      record: () => undefined,
+    },
   } as unknown as ToolCliContext;
   return { cli, setExitCode, deliverSignals };
 }
