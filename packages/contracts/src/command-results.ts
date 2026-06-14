@@ -173,7 +173,14 @@ export interface GraphDoneResult {
     readonly errors: number;
     readonly warnings: number;
   };
-  readonly durationMs: number;
+  /**
+   * Duration for the top-level summary line (host-owned-run-timing).
+   * After migration this field will be omitted from the result (the host
+   * timer supplies the value that matches the persisted StoredSession so
+   * CLI summary, sessions list, and report agree). Optional during the
+   * transition; when absent the render layer falls back to the host RunTimer.
+   */
+  readonly durationMs?: number;
   /**
    * Verbose detail body (ADR-0021). Graph populates the `lines` kind (its
    * catalog / findings-by-rule / entry-point dump). Rendered by the shared
@@ -423,7 +430,11 @@ export interface SimDoneResult {
   type: 'sim-done';
   recipeName: string;
   cwd: string;
-  durationMs: number;
+  /**
+   * Duration for the top-level summary line (host-owned-run-timing).
+   * See GraphDoneResult.durationMs for rationale; optional in transition.
+   */
+  durationMs?: number;
   /**
    * The run's signal envelope (ADR-0011). REQUIRED since Phase 4 (sim is
    * migrated): the composition root derives the terminal table (one row per
