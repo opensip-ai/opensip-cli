@@ -17,17 +17,9 @@ import {
   type UnitResult,
   type FitDoneResult,
 } from '@opensip-cli/contracts';
-import {
-  currentScope,
-  generatePrefixedId,
-  logger,
-  type Signal,
-  type VerdictPolicy,
-} from '@opensip-cli/core';
-import { SessionRepo } from '@opensip-cli/session-store';
+import { currentScope, logger, type Signal, type VerdictPolicy } from '@opensip-cli/core';
 
 import { fitnessFingerprintStrategy } from '../../baseline-strategy.js';
-import { buildFitnessSessionPayload } from '../../persistence/session-payload.js';
 import { violationToSignal } from '../../signalers/violation-to-signal.js';
 
 import { getPluginLoadErrors } from './check-loader.js';
@@ -37,7 +29,6 @@ import { resolvedFitnessConfig } from './resolved-fitness-config.js';
 import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../../recipes/service-types.js';
 import type { FitnessRecipeResult, RecipeCheckResult } from '../../recipes/types.js';
 import type { SignalersConfig } from '../../signalers/types.js';
-import type { DataStore } from '@opensip-cli/datastore';
 
 /**
  * Resolve fit's findings policy (ADR-0035). Reserved keys
@@ -255,63 +246,9 @@ export function buildFitCallbacks(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Session persistence (best-effort side effect)
-// ---------------------------------------------------------------------------
-
-/**
- * Best-effort session persistence — invoked when `executeFit` is called
- * with a `datastore` opt. Maps the run's {@link SignalEnvelope} onto the
- * generic `StoredSession` row (`score`/`passed`/`startedAt`/`completedAt` from the
- * envelope's verdict + identity) and the dashboard-shaped opaque payload
- * (derived from the envelope's signals/units, 4→2 severity). Errors are
- * caught and logged so a write failure never fails the run.
- */
-export function persistFitSession(
-  datastore: DataStore,
-  args: FitOptions,
-  envelope: SignalEnvelope,
-): void {
-  // NOTE (host-owned-run-timing Phase 3): this helper no longer accepts or
-  // captures timing for the StoredSession row. Real production paths call the
-  // host `cli.runSession.record(...)` seam (which stamps from the host RunTimer).
-  // This is kept for a few direct-test callers during the transition; it uses
-  // a dummy timing here so that no `new Date`/`Date.now` for StoredSession timing
-  // purpose lives in the prod persist path. The test assertions only care that
-  // a row was written.
-  try {
-    const repo = new SessionRepo(datastore);
-    // The payload's `__version` is a literal `1` on a `readonly __version: 1`
-    // field (session-payload.ts), so the shape is guaranteed by construction —
-    // no runtime version guard (and no ungoverned `process.env.NODE_ENV` read)
-    // is needed here.
-    const fitPayload = buildFitnessSessionPayload(envelope);
-    repo.save({
-      id: generatePrefixedId('fit'),
-      tool: 'fit',
-      // Dummy timing for legacy direct test calls only. Real sessions use host
-      // timer via the record seam (no tool code Date capture for these columns).
-      startedAt: '1970-01-01T00:00:00.000Z',
-      completedAt: '1970-01-01T00:00:00.000Z',
-      cwd: args.cwd,
-      recipe: envelope.recipe,
-      score: envelope.verdict.score,
-      passed: envelope.verdict.passed,
-      durationMs: 0,
-      // Fitness-owned opaque detail (summary + per-check findings), derived
-      // from the envelope's signals/units. The generic session row above
-      // holds zero fitness vocabulary; the dashboard reads this payload to
-      // render the Fitness tab.
-      payload: fitPayload,
-    });
-  } catch (error) {
-    logger.warn({
-      evt: 'cli.fit.session.save_failed',
-      module: 'cli:fit',
-      msg: 'Failed to persist fit session — continuing without history write',
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
+// host-owned-run-timing Phase 3: the production `persistFitSession` helper was
+// removed. Generic session rows are now persisted exclusively by the host run
+// plane from the `ToolSessionContribution` the fit modes RETURN (see fit-modes /
+// fit-command-spec). The only remaining session writer is the host.
 
 export { buildFitnessSessionPayload } from '../../persistence/session-payload.js';

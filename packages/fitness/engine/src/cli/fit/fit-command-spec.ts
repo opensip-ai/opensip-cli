@@ -26,7 +26,7 @@ import {
 } from '../fit-modes.js';
 
 import type { FitOptions } from '@opensip-cli/contracts';
-import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
+import type { CommandSpec, ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 
 // Live-view key fitness contributes to the CLI's renderer registry. Owned by
 // this package — the CLI dispatcher does NOT key off this literal; each tool
@@ -50,15 +50,18 @@ async function runFit(
   rawOpts: unknown,
   cli: ToolCliContext,
   setUpLiveView: (cli: ToolCliContext) => void,
-): Promise<void> {
+): Promise<ToolRunCompletion | void> {
   const opts = rawOpts as FitOptions;
+  // host-owned-run-timing Phase 3: the run-producing modes RETURN a
+  // ToolSessionContribution; runFit wraps it in a ToolRunCompletion and the host
+  // run plane persists it after this handler resolves (the TTY live path already
+  // persisted via renderLive, so it returns undefined — no double-write).
   if (opts.show !== undefined && opts.show.length > 0) {
     await runShowMode(opts, cli);
     return;
   }
   if (opts.gateSave === true || opts.gateCompare === true) {
-    await runGateMode(opts, cli);
-    return;
+    return { session: await runGateMode(opts, cli) };
   }
   if (opts.list) {
     await runListMode(opts, cli);
@@ -69,15 +72,14 @@ async function runFit(
     return;
   }
   if (opts.json) {
-    await runJsonMode(opts, cli);
-    return;
+    return { session: await runJsonMode(opts, cli) };
   }
   // Live mode is the only branch that needs fitness's Ink renderer. Register it
   // lazily here (idempotent map write) — the spec-mounted world has no
   // mount-time `register()` hook, so we set the renderer up on the host context
   // before the `cli.renderLive` lookup inside runLiveMode.
   setUpLiveView(cli);
-  await runLiveMode(opts, cli, FIT_LIVE_VIEW_KEY, opts.open === true);
+  return { session: await runLiveMode(opts, cli, FIT_LIVE_VIEW_KEY, opts.open === true) };
 }
 
 /**

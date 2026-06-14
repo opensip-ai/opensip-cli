@@ -44,6 +44,7 @@ import type {
   Tool,
   ToolCliContext,
   ToolCommandDescriptor,
+  ToolRunCompletion,
 } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -110,16 +111,16 @@ function setUpSimLiveView(cli: ToolCliContext): void {
  * TTY-vs-static branch, the JSON/Ink dispatch, the cloud egress, the exit-code
  * decision, and the report auto-open.
  */
-async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
+async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCompletion | void> {
   const opts = rawOpts as SimOptions;
   if (opts.show !== undefined && opts.show.length > 0) {
     await runSimShowMode(opts, cli);
     return;
   }
 
-  // Interactive TTY (non-json): the animated live view. Egress + exit code
-  // are handled inside the registerLiveView callback / renderSimLive after
-  // the Ink app exits.
+  // Interactive TTY (non-json): the animated live view. Egress + exit code +
+  // host session persistence are handled via the registerLiveView callback /
+  // renderSimLive (host completeLiveRender) after the Ink app exits.
   if (opts.json !== true && process.stdout.isTTY === true) {
     setUpSimLiveView(cli);
     await cli.renderLive(SIM_LIVE_VIEW_KEY, opts);
@@ -131,20 +132,6 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   // animated Ink view is a TTY-only affordance. Output is byte-for-byte the
   // pre-live-view behavior.
   const { result } = await executeSim(opts);
-  // Host-owned record (Phase 4): timing from the RunTimer on cli.runSession (same
-  // instance the live path receives via LiveViewContext).
-  if (result.type === 'sim-done') {
-    const { buildSimulationSessionPayload } = await import('./persistence/session-payload.js');
-    const payload = buildSimulationSessionPayload(result.envelope);
-    void cli.runSession.record({
-      tool: 'sim',
-      cwd: result.cwd,
-      recipe: result.recipeName,
-      score: result.envelope.verdict.score,
-      passed: result.envelope.verdict.passed,
-      payload,
-    });
-  }
 
   if (result.type === 'error') {
     if (opts.json) {
@@ -178,6 +165,20 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
     openRequested: Boolean(opts.open),
     jsonOutput: Boolean(opts.json),
   });
+
+  // host-owned-run-timing Phase 3: RETURN the generic-session contribution; the
+  // host run plane persists it after this handler resolves (no tool-side write).
+  const { buildSimulationSessionPayload } = await import('./persistence/session-payload.js');
+  return {
+    session: {
+      tool: 'sim',
+      cwd: result.cwd,
+      recipe: result.recipeName,
+      score: result.envelope.verdict.score,
+      passed: result.envelope.verdict.passed,
+      payload: buildSimulationSessionPayload(result.envelope),
+    },
+  };
 }
 
 async function runSimShowMode(opts: SimOptions, cli: ToolCliContext): Promise<void> {

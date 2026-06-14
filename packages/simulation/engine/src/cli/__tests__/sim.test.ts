@@ -1,4 +1,4 @@
-import { createSignal, enterScope } from '@opensip-cli/core';
+import { createSignal, enterScope, generatePrefixedId } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -8,7 +8,8 @@ import { makeSimTestScope } from '../../__tests__/test-utils/with-sim-scope.js';
 import { ASSERTIONS } from '../../framework/assertions.js';
 import { clearScenarioRegistry, currentScenarioRegistry } from '../../framework/registry.js';
 import { defineLoadScenario } from '../../kinds/load/define.js';
-import { executeSim, persistSimSession } from '../sim.js';
+import { buildSimulationSessionPayload } from '../../persistence/session-payload.js';
+import { executeSim } from '../sim.js';
 
 import type { ScenarioExecutorResult } from '../../framework/scenario-executor-result.js';
 import type { ToolOptions } from '@opensip-cli/contracts';
@@ -235,26 +236,32 @@ async function simDone(): Promise<
   return result;
 }
 
-describe('persistSimSession', () => {
-  it('writes exactly one sim session row (the engine no longer persists; the caller does)', async () => {
+describe('sim session contribution → SessionRepo', () => {
+  it('a sim contribution persisted via SessionRepo writes exactly one row', async () => {
+    // host-owned-run-timing Phase 3 removed the production `persistSimSession`
+    // helper — the host run plane owns persistence. This test-only write mirrors
+    // the row the host writes from the sim handler's returned ToolSessionContribution.
+    // (Best-effort persistence semantics are covered by the run-plane tests.)
     const ds: DataStore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const result = await simDone();
-      // Exercise the (now data-only) persist seam. Real runs use cli.runSession.record
-      // (host stamps timing); this tests the best-effort write path for legacy callers.
-      persistSimSession(ds, result);
+      new SessionRepo(ds).save({
+        id: generatePrefixedId('sim'),
+        tool: 'sim',
+        startedAt: '1970-01-01T00:00:00.000Z',
+        completedAt: '1970-01-01T00:00:00.000Z',
+        cwd: result.cwd,
+        recipe: result.recipeName,
+        score: result.envelope.verdict.score,
+        passed: result.envelope.verdict.passed,
+        durationMs: 0,
+        payload: buildSimulationSessionPayload(result.envelope),
+      });
       const sessions = new SessionRepo(ds).list({ tool: 'sim' });
       expect(sessions).toHaveLength(1);
       expect(sessions[0]?.recipe).toBe('default');
     } finally {
       ds.close?.();
     }
-  });
-
-  it('is best-effort: a datastore write failure never throws', async () => {
-    const result = await simDone();
-    // A datastore whose handle is unusable makes SessionRepo.save throw; the
-    // best-effort wrapper must swallow + log, not propagate.
-    expect(() => persistSimSession({} as unknown as DataStore, result)).not.toThrow();
   });
 });

@@ -2,15 +2,23 @@
  * D12: one CLI invocation = one session.
  *
  * Regression test asserting that every dispatch branch of executeGraph
- * either writes exactly one session or zero (for opt-out modes). The
+ * either CONTRIBUTES exactly one session or zero (for opt-out modes). The
  * commit 2ed25d3 contract must not regress.
+ *
+ * host-owned-run-timing Phase 3: graph no longer writes the generic session
+ * row itself — `executeGraph` RETURNS a `GraphRunOutcome` whose optional
+ * `session` the HOST persists after the handler resolves. So "one invocation =
+ * one session" is now pinned on the RETURNED contribution (present ⇔ the host
+ * persists one row; absent ⇔ opt-out). The payload-shape test persists the
+ * returned contribution inline (as the host would) to verify it round-trips
+ * through the StoredSession contract.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry } from '@opensip-cli/core';
+import { enterScope, generatePrefixedId, LanguageRegistry } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
@@ -27,7 +35,13 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { GraphSessionPayload } from '../../persistence/session-payload.js';
-import type { LanguageAdapter, ToolCliContext, WorkspaceUnit } from '@opensip-cli/core';
+import type { StoredSession } from '@opensip-cli/contracts';
+import type {
+  LanguageAdapter,
+  ToolCliContext,
+  ToolSessionContribution,
+  WorkspaceUnit,
+} from '@opensip-cli/core';
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
   return {
@@ -107,8 +121,27 @@ function workspaceLangRegistry(units: readonly WorkspaceUnit[]): LanguageRegistr
   return r;
 }
 
-function countSessions(datastore: DataStore): number {
-  return new SessionRepo(datastore).count();
+/**
+ * Persist a returned {@link ToolSessionContribution} exactly as the host run
+ * plane would (stamping `startedAt`/`completedAt`/`durationMs`/`id` — timing is
+ * host-owned now). Mirrors the StoredSession contract so the payload-shape test
+ * exercises the same round-trip the production host path produces.
+ */
+function hostPersist(datastore: DataStore, contribution: ToolSessionContribution): void {
+  const now = '2026-01-01T00:00:00.000Z';
+  const row: StoredSession = {
+    id: generatePrefixedId('graph'),
+    tool: contribution.tool,
+    startedAt: now,
+    completedAt: now,
+    ...(contribution.recipe === undefined ? {} : { recipe: contribution.recipe }),
+    cwd: contribution.cwd,
+    score: contribution.score,
+    passed: contribution.passed,
+    durationMs: 0,
+    ...(contribution.payload === undefined ? {} : { payload: contribution.payload }),
+  };
+  new SessionRepo(datastore).save(row);
 }
 
 let stdoutSpy: MockInstance<typeof process.stdout.write>;
@@ -134,24 +167,25 @@ afterEach(() => {
 });
 
 describe('D12 — one CLI invocation = one session', () => {
-  it('default run writes exactly one session', async () => {
-    await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore));
-    expect(countSessions(datastore)).toBe(1);
+  it('default run contributes exactly one session', async () => {
+    const outcome = await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore));
+    expect(outcome?.session).toBeDefined();
+    expect(outcome?.session?.tool).toBe('graph');
   });
 
-  it('single positional path writes exactly one session', async () => {
+  it('single positional path contributes exactly one session', async () => {
     mkdirSync(join(projectDir, 'sub'));
-    await executeGraph(
+    const outcome = await executeGraph(
       { cwd: projectDir, noCache: true, paths: [join(projectDir, 'sub')] },
       mockCli(datastore),
     );
-    expect(countSessions(datastore)).toBe(1);
+    expect(outcome?.session).toBeDefined();
   });
 
-  it('multiple positional paths write exactly one aggregate session', async () => {
+  it('multiple positional paths contribute exactly one aggregate session', async () => {
     mkdirSync(join(projectDir, 'a'));
     mkdirSync(join(projectDir, 'b'));
-    await executeGraph(
+    const outcome = await executeGraph(
       {
         cwd: projectDir,
         noCache: true,
@@ -159,10 +193,11 @@ describe('D12 — one CLI invocation = one session', () => {
       },
       mockCli(datastore),
     );
-    expect(countSessions(datastore)).toBe(1);
+    // One aggregate contribution for the whole multi-path invocation.
+    expect(outcome?.session).toBeDefined();
   });
 
-  it('--workspace writes exactly one aggregate session (not one per unit)', async () => {
+  it('--workspace contributes exactly one aggregate session (not one per unit)', async () => {
     const pkgA = join(projectDir, 'packages', 'a');
     mkdirSync(pkgA, { recursive: true });
     writeFileSync(join(pkgA, 'tsconfig.json'), '{}');
@@ -175,7 +210,7 @@ describe('D12 — one CLI invocation = one session', () => {
     const units: WorkspaceUnit[] = [
       { id: 'a', rootDir: pkgA, configPath: join(pkgA, 'tsconfig.json') },
     ];
-    await executeGraph(
+    const outcome = await executeGraph(
       {
         cwd: projectDir,
         noCache: true,
@@ -185,31 +220,44 @@ describe('D12 — one CLI invocation = one session', () => {
       },
       mockCli(datastore, workspaceLangRegistry(units)),
     );
-    expect(countSessions(datastore)).toBe(1);
+    // One aggregate contribution, and NO deliverable envelope (audit P1-2).
+    expect(outcome?.session).toBeDefined();
+    expect(outcome?.envelope).toBeUndefined();
   });
 
-  it('--json opts out of session persistence', async () => {
-    await executeGraph({ cwd: projectDir, noCache: true, json: true }, mockCli(datastore));
-    expect(countSessions(datastore)).toBe(0);
+  it('--json opts out of session contribution', async () => {
+    const outcome = await executeGraph(
+      { cwd: projectDir, noCache: true, json: true },
+      mockCli(datastore),
+    );
+    expect(outcome?.session).toBeUndefined();
   });
 
-  it('--gate-save opts out of session persistence', async () => {
-    await executeGraph({ cwd: projectDir, noCache: true, gateSave: true }, mockCli(datastore));
-    expect(countSessions(datastore)).toBe(0);
+  it('--gate-save opts out of session contribution', async () => {
+    const outcome = await executeGraph(
+      { cwd: projectDir, noCache: true, gateSave: true },
+      mockCli(datastore),
+    );
+    expect(outcome?.session).toBeUndefined();
   });
 
-  it('--report-to opts out of session persistence (even on failure)', async () => {
-    await executeGraph(
+  it('--report-to opts out of session contribution (even on failure)', async () => {
+    const outcome = await executeGraph(
       { cwd: projectDir, noCache: true, reportTo: 'http://127.0.0.1:1' },
       mockCli(datastore),
     );
-    expect(countSessions(datastore)).toBe(0);
+    expect(outcome?.session).toBeUndefined();
   });
 });
 
 describe('graph session payload — rule-grouped detail is persisted', () => {
-  it('default run writes a payload with summary + checks (not summary-only)', async () => {
-    await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore));
+  it('default run contributes a payload with summary + checks (not summary-only)', async () => {
+    const outcome = await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore));
+    expect(outcome?.session).toBeDefined();
+
+    // Persist the returned contribution exactly as the host run plane would,
+    // then verify it round-trips through the StoredSession contract.
+    hostPersist(datastore, outcome!.session!);
 
     const session = new SessionRepo(datastore).latest();
     expect(session).not.toBeNull();

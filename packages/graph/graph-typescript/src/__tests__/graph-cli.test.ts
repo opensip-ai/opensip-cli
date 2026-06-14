@@ -339,9 +339,11 @@ describe('executeGraph', () => {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
     const { cli, exitCodes } = makeCli();
-    const envelope = await runExecuteGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
-    expect(envelope?.tool).toBe('graph');
-    expect(envelope?.schemaVersion).toBe(2);
+    // host-owned-run-timing Phase 3: executeGraph now returns a GraphRunOutcome
+    // ({ envelope?, session? }); the deliverable envelope is on `.envelope`.
+    const outcome = await runExecuteGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
+    expect(outcome?.envelope?.tool).toBe('graph');
+    expect(outcome?.envelope?.schemaVersion).toBe(2);
     expect(exitCodes).toContain(0);
   });
 
@@ -394,11 +396,11 @@ describe('executeGraph', () => {
     // "report sent" status line now that delivery lives at the root.
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes, render } = makeCli();
-    const envelope = await runExecuteGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
+    const outcome = await runExecuteGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
     const done = render.mock.calls[0]?.[0] as GraphDoneLike;
     expect(done.type).toBe('graph-done');
-    expect(envelope?.tool).toBe('graph');
-    expect(envelope?.verdict.passed).toBe(true);
+    expect(outcome?.envelope?.tool).toBe('graph');
+    expect(outcome?.envelope?.verdict.passed).toBe(true);
     expect(exitCodes).toContain(0);
   });
 

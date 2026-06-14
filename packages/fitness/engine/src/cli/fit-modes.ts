@@ -20,22 +20,43 @@ import {
   type SignalEnvelope,
   type StoredSession,
 } from '@opensip-cli/contracts';
-import { ConfigurationError, resolveFailOnDegraded, SystemError } from '@opensip-cli/core';
+import {
+  ConfigurationError,
+  resolveFailOnDegraded,
+  SystemError,
+  type ToolCliContext,
+  type ToolSessionContribution,
+} from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { fitReplayFromSession } from '../persistence/session-replay.js';
 
 import { renderGateCompareOutput } from './fit/gate-compare-render.js';
 import { buildFitnessSessionPayload } from './fit/result-builders.js';
-// Real persistence for runs now goes through the host `cli.runSession.record` seam
-// (called from the mode bodies below and from the live runner). Legacy persistFitSession
-// in result-builders is only for a few direct test paths during transition.
 import { listChecks } from './fit-list.js';
 import { listRecipes } from './fit-recipes.js';
 import { executeFit } from './fit.js';
 
-import type { ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
+
+/**
+ * Build fit's generic-session contribution from a completed run envelope
+ * (host-owned-run-timing Phase 3). The static modes RETURN this; the host run
+ * plane persists it after the handler resolves — no tool-side session write.
+ */
+function fitSessionContribution(
+  args: FitOptions,
+  envelope: SignalEnvelope,
+): ToolSessionContribution {
+  return {
+    tool: 'fit',
+    cwd: args.cwd,
+    recipe: envelope.recipe,
+    score: envelope.verdict.score,
+    passed: envelope.verdict.passed,
+    payload: buildFitnessSessionPayload(envelope),
+  };
+}
 
 // persistFitRun removed (Phase 3.2). The three mode bodies (json/live-fallback/gate)
 // that previously called it now directly do:
@@ -136,25 +157,16 @@ export async function runShowMode(args: FitOptions, cli: ToolCliContext): Promis
  * history alongside live-mode and gate-mode runs. No `onProgress`: JSON
  * output is one-shot, no progress UI.
  */
-export async function runJsonMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
+export async function runJsonMode(
+  args: FitOptions,
+  cli: ToolCliContext,
+): Promise<ToolSessionContribution | undefined> {
   const fitResult = await executeFit(args);
-  // Host-owned session record (timing stamped by RunTimer in cli-context).
-  if (fitResult.envelope !== undefined) {
-    const payload = buildFitnessSessionPayload(fitResult.envelope);
-    cli.runSession.record({
-      tool: 'fit',
-      cwd: args.cwd,
-      recipe: fitResult.envelope.recipe,
-      score: fitResult.envelope.verdict.score,
-      passed: fitResult.envelope.verdict.passed,
-      payload,
-    });
-  }
   if (fitResult.envelope === undefined) {
     // 2.12.0 (§5.5): a failed `--json` run emits a structured `status:'error'`
     // CommandOutcome (the host wraps + sets the exit code), not a bare `{ error }`.
     cli.emitError({ message: fitResult.result.message, exitCode: fitResult.result.exitCode });
-    return;
+    return undefined;
   }
   // ADR-0011: emit the signal envelope through the shared `formatSignalJson`
   // formatter (the root owns stdout). No per-tool re-stringification.
@@ -166,6 +178,9 @@ export async function runJsonMode(args: FitOptions, cli: ToolCliContext): Promis
   // `--report-to`, exit 4) AND the findings exit code (derived from the
   // envelope verdict). Called once, after the JSON is on stdout.
   await deliverFitSignals(cli, fitResult.envelope, args);
+  // Host-owned persistence (host-owned-run-timing Phase 3): RETURN the
+  // contribution; the host persists it after the handler resolves.
+  return fitSessionContribution(args, fitResult.envelope);
 }
 
 /**
@@ -179,7 +194,11 @@ export async function runLiveMode(
   cli: ToolCliContext,
   liveViewKey: string,
   openRequested: boolean,
-): Promise<void> {
+): Promise<ToolSessionContribution | undefined> {
+  // The TTY live path persists via the host (renderLive → completeLiveRender),
+  // so this returns undefined there (no double-write). The non-TTY path returns
+  // the contribution for the host to persist after the handler resolves.
+  let session: ToolSessionContribution | undefined;
   if (process.stdout.isTTY === true) {
     await cli.renderLive(liveViewKey, args);
   } else {
@@ -192,17 +211,6 @@ export async function runLiveMode(
     // threshold exits RUNTIME_ERROR. Warnings are rendered inline by the
     // fit-done view, so we don't also write them to stderr here.
     const fitResult = await executeFit(args);
-    if (fitResult.envelope !== undefined) {
-      const payload = buildFitnessSessionPayload(fitResult.envelope);
-      cli.runSession.record({
-        tool: 'fit',
-        cwd: args.cwd,
-        recipe: fitResult.envelope.recipe,
-        score: fitResult.envelope.verdict.score,
-        passed: fitResult.envelope.verdict.passed,
-        payload,
-      });
-    }
     if (fitResult.envelope === undefined) {
       cli.setExitCode(fitResult.result.exitCode);
       await cli.render(fitResult.result);
@@ -211,15 +219,20 @@ export async function runLiveMode(
       // Effectful egress + host-owned findings exit at the composition root
       // (ADR-0035), composing with non-TTY runs (CI), not just the TTY live view.
       await deliverFitSignals(cli, fitResult.envelope, args);
+      session = fitSessionContribution(args, fitResult.envelope);
     }
   }
   await cli.maybeOpenReport({
     openRequested,
     jsonOutput: Boolean(args.json),
   });
+  return session;
 }
 
-export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
+export async function runGateMode(
+  args: FitOptions,
+  cli: ToolCliContext,
+): Promise<ToolSessionContribution | undefined> {
   if (args.gateSave === true && args.gateCompare === true) {
     cli.logger.warn({
       evt: 'cli.gate.config_error',
@@ -229,23 +242,12 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
     });
     cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
     process.stderr.write('Error: --gate-save and --gate-compare are mutually exclusive.\n');
-    return;
+    return undefined;
   }
-  // Persist the run on the main thread (ADR-0028 — engine is persistence-free)
-  // via the host `cli.runSession.record` seam, so gate-save / gate-compare runs
-  // land in the session history alongside live-mode runs.
+  // Run on the main thread (ADR-0028 — engine is persistence-free). The session
+  // contribution is RETURNED (host-owned-run-timing Phase 3); the host persists
+  // it so gate-save / gate-compare runs land in history alongside live runs.
   const fitResult = await executeFit(args);
-  if (fitResult.envelope !== undefined) {
-    const payload = buildFitnessSessionPayload(fitResult.envelope);
-    cli.runSession.record({
-      tool: 'fit',
-      cwd: args.cwd,
-      recipe: fitResult.envelope.recipe,
-      score: fitResult.envelope.verdict.score,
-      passed: fitResult.envelope.verdict.passed,
-      payload,
-    });
-  }
   if (fitResult.envelope === undefined) {
     cli.logger.warn({
       evt: 'cli.gate.fit_failed',
@@ -255,12 +257,13 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
     });
     cli.setExitCode(fitResult.result.exitCode);
     process.stderr.write(`Error: ${fitResult.result.message}\n`);
-    return;
+    return undefined;
   }
   // ADR-0036: the envelope arrives fingerprint-stamped — `buildFitEnvelope`
   // passes fit's message-hash strategy to `buildSignalEnvelope`, which stamps
   // at construction. The host seams only read `signal.fingerprint`.
   const envelope: SignalEnvelope = fitResult.envelope;
+  const session = fitSessionContribution(args, envelope);
   // Surface non-fatal warnings before the gate output so the user sees them
   // alongside the run summary. Safe here because gate mode is non-Ink.
   emitWarningsToStderr(fitResult.result);
@@ -287,7 +290,7 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
       // failOnErrors/failOnWarnings), so the host sets the exit from the envelope
       // verdict in deliverFitSignals — no per-path setExitCode needed.
       await deliverFitSignals(cli, envelope, args);
-      return;
+      return session;
     }
     const result = await cli.compareBaseline('fitness', envelope);
     await cli.render({ type: 'gate-done', lines: renderGateCompareOutput(result).split('\n') });
@@ -302,7 +305,7 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
       args,
       result.degraded && resolveFailOnDegraded('fitness'),
     );
-    return;
+    return session;
   } catch (error) {
     // Gate mode is plain-text (not Ink), so we render the error
     // ourselves to stderr instead of letting it escape to the CLI's
@@ -322,7 +325,7 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
       });
       cli.setExitCode(mapToolErrorToExitCode(error));
       process.stderr.write(`Error: ${error.message}\n`);
-      return;
+      return undefined;
     }
     throw error;
   }

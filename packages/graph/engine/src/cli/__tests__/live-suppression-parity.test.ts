@@ -28,10 +28,10 @@ import { createSignal, runWithScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
-import { assertFinalizedAcrossBoundary } from '../apply-suppressions.js';
 import { buildLiveGraphOutput } from '../graph-report.js';
-import { dispatchGraphResult, persistSession } from '../graph.js';
+import { dispatchGraphResult } from '../graph.js';
 
+import type { GraphSessionPayload } from '../../persistence/session-payload.js';
 import type { Catalog } from '../../types.js';
 import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
@@ -161,34 +161,36 @@ describe('live-view suppression parity', () => {
     expect(fileOf(live)).toEqual(fileOf(stat));
   });
 
-  it('COMPILE-TIME guardrail: persistSession rejects raw, un-finalized signals', () => {
-    const raw: readonly Signal[] = [sig('walk.ts', 2)];
+  it('the returned session contribution is built from the WAIVED set (host-owned-run-timing Phase 3)', async () => {
+    // host-owned-run-timing Phase 3: graph no longer writes the generic session
+    // row itself — `dispatchGraphResult` RETURNS a `GraphRunOutcome.session` and
+    // the host persists it. The branding guardrail is preserved INSIDE
+    // `deliverGraphResult`: the contribution is built from the branded
+    // `FinalizedSignals`, so the session payload can only ever carry post-waiver
+    // findings. This pins that the default-render outcome's session reflects the
+    // waiver (walk.ts:2 suppressed; other.ts:9 kept).
+    await writeFile(
+      join(buildRoot, 'walk.ts'),
+      ['// @graph-ignore-next-line graph:large-function -- intentional', 'function big() {}'].join(
+        '\n',
+      ),
+      'utf8',
+    );
+    const signals = [sig('walk.ts', 2), sig('other.ts', 9)];
 
-    // The branded FinalizedSignals type is the structural guardrail: a future
-    // 4th output path CANNOT persist un-waived signals because the compiler
-    // rejects a raw `Signal[]` here. If this `@ts-expect-error` ever stops
-    // erroring (someone widened persistSession back to `readonly Signal[]`), the
-    // build fails — the leak class is re-openable only by deleting this guard.
-    // @ts-expect-error — raw Signal[] is not assignable to FinalizedSignals
-    // Updated for host-owned timing (phase 5): tests that directly exercised the old
-    // 5-arg persist now use minimal (or the host record seam in prod paths). Legacy
-    // persist still accepts the extra args for transition; real StoredSession timing
-    // no longer comes from here.
-    persistSession({ cwd: buildRoot }, raw, undefined, 0, '2026-01-01T00:00:00.000Z');
-
-    // The ONLY way in is via the finalize seam (or its post-IPC re-brand assert),
-    // which type-checks cleanly. `datastore: undefined` makes this a no-op call.
-    const ok = persistSession(
-      { cwd: buildRoot },
-      assertFinalizedAcrossBoundary(raw, 0),
-      undefined,
-      0,
-      '2026-01-01T00:00:00.000Z',
+    const opts = { cwd: buildRoot } as unknown as Parameters<typeof dispatchGraphResult>[0];
+    const result = { signals, catalog: emptyCatalog() } as unknown as Parameters<
+      typeof dispatchGraphResult
+    >[1];
+    const outcome = await runWithScope(makeGraphTestScope(), () =>
+      dispatchGraphResult(opts, result, mockCli(), '2026-06-09T00:00:00.000Z', buildRoot),
     );
 
-    // The real assertion of this test is the `@ts-expect-error` above (a
-    // compile-time guarantee). This runtime check just confirms the branded
-    // call is the no-op we expect when datastore is absent.
-    expect(ok).toBeUndefined();
+    const payload = outcome?.session?.payload as GraphSessionPayload | undefined;
+    expect(payload).toBeDefined();
+    // Exactly one finding survives the waiver (other.ts:9) and lands in the
+    // payload's rule-grouped detail; walk.ts:2 was suppressed before the build.
+    const allFindings = (payload?.checks ?? []).flatMap((c) => c.findings);
+    expect(allFindings.map((f) => f.filePath)).toEqual(['other.ts']);
   });
 });

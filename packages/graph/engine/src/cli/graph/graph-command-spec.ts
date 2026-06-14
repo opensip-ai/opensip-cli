@@ -38,7 +38,7 @@ import { loadGraphConfig, resolveGraphRecipeSelection } from '../orchestrate.js'
 
 import type { GraphConfig, ResolutionMode, Rule } from '../../types.js';
 import type { Shard } from '../orchestrate/shard-model.js';
-import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
+import type { CommandSpec, ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 /**
@@ -175,12 +175,22 @@ async function dispatchGraphLiveView(
 
 /**
  * The `graph` command handler — the former `registerGraphCommand()` action body,
- * lifted verbatim to a spec handler. Returns `void`: the host (`raw-stream`)
- * renders nothing, so the handler keeps full ownership of the
- * list-files/live/static dispatch, the `--sarif` write, the cloud egress, and
- * the exit-code decision — byte-identical to launch.
+ * lifted to a spec handler. The host (`raw-stream`) renders nothing, so the
+ * handler keeps full ownership of the list-files/live/static dispatch, the
+ * `--sarif` write, the cloud egress, and the exit-code decision.
+ *
+ * host-owned-run-timing Phase 3: the static render path RETURNS a
+ * {@link ToolRunCompletion} carrying the run's `session` contribution; the host
+ * run plane persists it after this handler resolves (graph no longer writes the
+ * generic session row itself). The early-return branches (show / list-files /
+ * heap-preflight re-exec / TTY live view) return `void` — the live view path
+ * persists its own session via `renderLive`, and the other branches produce no
+ * session.
  */
-async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
+async function runGraphCommand(
+  rawOpts: unknown,
+  cli: ToolCliContext,
+): Promise<ToolRunCompletion | void> {
   const opts = rawOpts as GraphCommandOptions;
   // `--resolution`'s value is `exact`/`fast` by construction now (declared
   // `choices`); the mount layer rejected any other value before we got here.
@@ -269,7 +279,7 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
     return;
   }
 
-  const envelope = await executeGraph(
+  const outcome = await executeGraph(
     {
       cwd: opts.cwd,
       json: opts.json,
@@ -298,11 +308,17 @@ async function runGraphCommand(rawOpts: unknown, cli: ToolCliContext): Promise<v
   // --gate-save: executeGraph has already set the gate exit code, but the
   // handler body still runs, so the SARIF lands even when the gate fails —
   // GitHub Code Scanning then surfaces net-new graph findings on PRs.
-  if (opts.sarif !== undefined && opts.sarif !== '' && envelope !== undefined) {
-    await cli.writeSarif(envelope, opts.sarif);
+  if (opts.sarif !== undefined && opts.sarif !== '' && outcome?.envelope !== undefined) {
+    await cli.writeSarif(outcome.envelope, opts.sarif);
   }
 
-  await deliverNonGateEgress(opts, envelope, cli);
+  await deliverNonGateEgress(opts, outcome?.envelope, cli);
+
+  // host-owned-run-timing Phase 3: RETURN the generic-session contribution; the
+  // host run plane persists it after this handler resolves (no tool-side write).
+  // The TTY live path returns earlier (it persists via renderLive), and the
+  // export/carrier modes (`--json`, gate, `--report-to`) carry no `session`.
+  return { session: outcome?.session };
 }
 
 /**

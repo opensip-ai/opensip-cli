@@ -68,10 +68,11 @@ export { getDisplayName, getIcon } from './fit/display-registry.js';
  *     drives the live progress bar from this callback.
  *
  * Persistence is NOT done here (ADR-0028): the engine is worker-safe — it returns
- * the envelope + result and the CALLER (or host via runSession seam) persists.
- * The datastore handle cannot cross the worker boundary. The non-TTY/`--json`
- * path persists at its call site; the live runner persists on the main thread
- * after the worker returns (now using the host `cli.runSession.record` seam).
+ * the envelope + result and the host persists. The datastore handle cannot cross
+ * the worker boundary. The fit modes (json / non-TTY live / gate) RETURN a
+ * `ToolSessionContribution` and the host run plane writes the generic session row
+ * after the handler resolves (host-owned-run-timing Phase 3); the TTY live runner
+ * returns its contribution to the host via `renderLive`.
  */
 export interface ExecuteFitOptions {
   onProgress?: (completed: number, total: number) => void;

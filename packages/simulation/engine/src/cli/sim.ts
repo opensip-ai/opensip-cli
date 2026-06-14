@@ -1,4 +1,3 @@
-// @fitness-ignore-file detached-promises -- persistSimSession is a synchronous best-effort SQLite write; heuristic flags it inside the async sim runner
 /**
  * sim command — run simulation scenarios via a named recipe.
  *
@@ -29,16 +28,13 @@ import {
 } from '@opensip-cli/contracts';
 import {
   currentScope,
-  generatePrefixedId,
   loadCapabilityDomain,
   logger,
   resolveScopes,
   resolveVerdictPolicy,
 } from '@opensip-cli/core';
-import { SessionRepo } from '@opensip-cli/session-store';
 
 import { currentScenarioRegistry, currentSimulationLoadState } from '../framework/registry.js';
-import { buildSimulationSessionPayload } from '../persistence/session-payload.js';
 import { loadAllSimPlugins } from '../plugins/loader.js';
 import { readScenarioPackagePreferences } from '../plugins/scenario-package-discovery.js';
 import { currentSimulationRecipeRegistry } from '../recipes/registry.js';
@@ -55,7 +51,6 @@ import type {
   VerboseDetail,
 } from '@opensip-cli/contracts';
 import type { Signal } from '@opensip-cli/core';
-import type { DataStore } from '@opensip-cli/datastore';
 
 // ---------------------------------------------------------------------------
 // Lazy-load simulation scenarios
@@ -329,38 +324,8 @@ export async function executeSim(
     envelope,
     ...(verboseDetail === undefined ? {} : { verboseDetail }),
   };
-  // Persistence is the CALLER's job (ADR-0028 — worker-safe engine, now host-owned
-  // timing via runSession.record). The engine returns only the result.
+  // Persistence is host-owned (host-owned-run-timing Phase 3): the engine returns
+  // only the result; the sim handler RETURNS a ToolSessionContribution and the
+  // host run plane writes the generic session row. No tool-side persist helper.
   return { result };
-}
-
-/** Persist a completed sim run. Best-effort — a SQLite write failure never fails
- *  an otherwise-successful run. Called by the run-mode callers on the main thread.
- *  (host-owned-run-timing: real calls now use cli.runSession.record; this helper
- *  kept for legacy direct test callers and uses dummy timing to avoid tool code
- *  capturing Date for StoredSession columns.)
- */
-export function persistSimSession(datastore: DataStore, result: SimDoneResult): void {
-  try {
-    const repo = new SessionRepo(datastore);
-    repo.save({
-      id: generatePrefixedId('sim'),
-      tool: 'sim',
-      startedAt: '1970-01-01T00:00:00.000Z',
-      completedAt: '1970-01-01T00:00:00.000Z',
-      cwd: result.cwd,
-      recipe: result.recipeName,
-      score: result.envelope.verdict.score,
-      passed: result.envelope.verdict.passed,
-      durationMs: result.durationMs ?? 0,
-      payload: buildSimulationSessionPayload(result.envelope),
-    });
-  } catch (error) {
-    logger.warn({
-      evt: 'cli.sim.session.save_failed',
-      module: 'cli:sim',
-      msg: 'Failed to persist sim session — continuing without history write',
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
 }

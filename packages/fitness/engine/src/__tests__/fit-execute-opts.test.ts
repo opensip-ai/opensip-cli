@@ -16,12 +16,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
+import { LanguageRegistry, RunScope, generatePrefixedId, runWithScope } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { persistFitSession } from '../cli/fit/result-builders.js';
+import { buildFitnessSessionPayload } from '../cli/fit/result-builders.js';
 import { executeFit } from '../cli/fit.js';
 import { fitnessTool } from '../tool.js';
 
@@ -97,11 +97,26 @@ describe('executeFit — persistence-free boundary (ADR-0028)', () => {
     expect(sessions.length).toBe(0);
   });
 
-  it('persistFitSession (the caller path) writes exactly one session', async () => {
+  it('a fit session contribution persisted via SessionRepo writes exactly one row', async () => {
     const args = makeArgs(projectDir);
     const fitResult = await withFitScope(() => executeFit(args));
     expect(fitResult.envelope).toBeDefined();
-    persistFitSession(datastore, args, fitResult.envelope!);
+    const envelope = fitResult.envelope!;
+    // host-owned-run-timing Phase 3 removed the production `persistFitSession`
+    // helper — the host run plane owns persistence. This test-only write mirrors
+    // the row the host writes from the tool's returned ToolSessionContribution.
+    new SessionRepo(datastore).save({
+      id: generatePrefixedId('fit'),
+      tool: 'fit',
+      startedAt: '1970-01-01T00:00:00.000Z',
+      completedAt: '1970-01-01T00:00:00.000Z',
+      cwd: args.cwd,
+      recipe: envelope.recipe,
+      score: envelope.verdict.score,
+      passed: envelope.verdict.passed,
+      durationMs: 0,
+      payload: buildFitnessSessionPayload(envelope),
+    });
 
     const sessions = new SessionRepo(datastore).list({ tool: 'fit' });
     expect(sessions.length).toBe(1);
