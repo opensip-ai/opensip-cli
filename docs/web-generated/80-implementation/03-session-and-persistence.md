@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-06-14
 release: v0.1.0
 title: "Session and persistence"
 audience: [contributors]
@@ -25,7 +25,7 @@ related-docs:
   - ./01-cli-dispatch.md
   - ./02-plugin-loader.md
   - ../80-implementation/05-layer-policy.md
-  - docs/plans/host-owned-run-timing/ (implementation plan for host-owned `RunTimer` + `runSession.record`)
+  - docs/plans/ready/host-owned-run-timing/ (implementation plan for the final host-owned run lifecycle, metrics, and dashboard contribution model)
 ---
 # Session and persistence
 
@@ -50,7 +50,8 @@ A run produces three kinds of on-disk artifacts: the SQLite database, structured
 ├── logs/<YYYY-MM-DD>.jsonl                     ← one log file per local day, shared across runs
 └── plugins/                                    ← npm-installed project plugins
     ├── fit/node_modules/
-    └── sim/node_modules/
+    ├── sim/node_modules/
+    └── tool/node_modules/
 ```
 
 Source of truth: [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/core/src/lib/paths.ts). Every consumer reads paths through `resolveProjectPaths(cwd)`. The directory is created lazily by whichever consumer needs a subpath first; `mkdirSync(..., { recursive: true })` is the standard idiom.
@@ -87,7 +88,7 @@ flowchart TB
   Dashboard["dashboard compose"]
   Report["reports/latest.html"]
   Plugins["plugin command"]
-  PluginDirs["plugins/fit + plugins/sim<br/>node_modules hosts"]
+  PluginDirs["plugins/fit + plugins/sim + plugins/tool<br/>node_modules hosts"]
 
   CLI --> Store
   Store --> Migrations
@@ -167,7 +168,7 @@ The `--filter` (errors-only / warnings-only / top:<n>) and `--raw` options on `s
 
 The persisted catalog document carries an optional **`features`** layer — derived columns the engine computes from the raw catalog: per-function `bodyLines` / `blast` (direct + transitive blast radius) / reachability flags, per-package coupling degrees, SCC membership, and directed package-coupling edges. The contract shape is [`GraphFeatures`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/contracts/src/graph-catalog.ts) (structurally mirrored from the engine's `PersistedFeatures` so the decoupled dashboard reads features without importing `@opensip-cli/graph`).
 
-## Host-owned run timing (ADR-00XX / host-owned-run-timing plan)
+## Host-owned run timing (current v0.1.0 seam)
 
 `StoredSession.timestamp` and `durationMs` are produced exclusively by the host from a single `RunTimer` created in `buildToolCliContext` (after `RunScope` entry, before any tool handler or `renderLive`). Tools receive it via `ToolCliContext.runSession.timing` (and as the optional second argument `LiveViewContext` to live renderers registered with `cli.registerLiveView`).
 
@@ -176,11 +177,11 @@ The only documented way to write a generic session row is `cli.runSession.record
 **Rules enforced by architecture check + hygiene:**
 - No first-party tool code may capture `new Date()`, `Date.now()`, or `performance.now()` *for the purpose of* populating the two generic `StoredSession` timing fields.
 - Internal per-unit, per-stage, per-recipe, or profile timers are explicitly allowed and encouraged for diagnostics — they stay inside the tool's own payload or `collectReportData` and never feed the generic columns.
-- The old per-tool `persist*Session(..., durationMs, startedAt)` and "return timing for the caller" patterns have been removed; the host `record` seam is the replacement.
+- New production paths should use the host `record` seam rather than tool-owned generic timing. A small number of legacy/test-transition helpers still exist in first-party code and are tracked by the host-owned run lifecycle plan; they should not be copied into new code.
 
 The live and static render paths (via `RunTimingProvider` in cli-ui + `RunSummary` reading the provider when `durationMs` is omitted, and static `result-to-view` falling back to a host snapshot) ensure the "Duration X" line the user sees is the same value that ends up in `sessions list`, `sessions show`, and the HTML report.
 
-See the local plan `docs/plans/host-owned-run-timing/` and the cross-cutting contracts in `plan.md` for the full seam, logging, and hardening details.
+The active follow-up plan at [`docs/plans/ready/host-owned-run-timing/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/docs/plans/ready/host-owned-run-timing/plan.md) replaces this intermediate `record` model with a final return-contribution lifecycle: tools will return session/dashboard contributions and the host will own `startedAt`, `completedAt`, `durationMs`, host metrics, persistence, and dashboard tab composition. Public extending docs should switch to that model only after the code lands.
 
 The persistence policy is **materialize only when forced** (ADR-0006): features are a *plain view* recomputed on demand for in-engine rules, and **materialized into the catalog JSON only for the columns the decoupled dashboard renders** (blast, SCC, package coupling). The `features` field is therefore present only on catalogs produced by a dashboard-bound run; the dashboard falls back to a no-data state when it's absent. Everything else (callers/callees indexes) is recomputed cheaply on every load and never stored.
 

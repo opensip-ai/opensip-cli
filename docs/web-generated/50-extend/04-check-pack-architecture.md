@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-06-14
 release: v0.1.0
 title: "Check pack architecture"
 audience: [contributors, plugin-authors]
@@ -312,7 +312,7 @@ src/checks/<category>/
 - `@opensip-cli/checks-python` — `no-bare-except`.
 - Project-local `<project>/opensip-cli/fit/checks/` — three custom checks.
 
-The dashboard groups by category (universal pack's display map provides the icons), shows pack-of-origin in the verbose view, and highlights checks with project-level overrides. The CLI's `fit-list` command shows the full inventory: 166 checks across the bundled packs, source-tagged.
+The dashboard groups by category (universal pack's display map provides the icons), shows pack-of-origin in the verbose view, and highlights checks with project-level overrides. The CLI's `fit-list` command shows the full inventory: 151 checks across the bundled packs, source-tagged.
 
 ---
 

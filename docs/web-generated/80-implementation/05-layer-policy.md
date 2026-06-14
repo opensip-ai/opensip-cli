@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-11
+last_verified: 2026-06-14
 release: v0.1.0
 title: "Layer policy"
 audience: [contributors]
@@ -196,7 +196,7 @@ A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typesc
 
   All three are production-source-only — test files are globally excluded, so graph's relocated golden SARIF test may import `formatSignalSarif` from the barrel.
 
-- **`no-direct-stdout-in-tool-engine`** (a fitness check, slug `no-direct-stdout-in-tool-engine`, [`packages/fitness/checks-universal/src/checks/architecture/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts)) — catches the call shape no import can catch: a tool engine writing run output straight to **stdout** (`process.stdout.write`, `console.log`/`.info`/`.debug`). Scope is **stdout only** — `console.error`/`.warn` are deliberately absent because stderr is the legitimate diagnostics channel (error messages, warnings, failure notices are not run output). The check fires only inside the three tool engines. Legitimate direct stdout (subprocess IPC, machine `--json` paths that deliberately bypass the render seam, auxiliary-subcommand status lines) is exempted per-file via `@fitness-ignore-file no-direct-stdout-in-tool-engine` with a justification.
+- **`no-direct-stdout-in-tool-engine`** (a project-local dogfood fitness check, slug `no-direct-stdout-in-tool-engine`, [`opensip-cli/fit/checks/no-direct-stdout-in-tool-engine.mjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/opensip-cli/fit/checks/no-direct-stdout-in-tool-engine.mjs)) — catches the call shape no import can catch: a tool engine writing run output straight to **stdout** (`process.stdout.write`, `console.log`/`.info`/`.debug`). Scope is **stdout only** — `console.error`/`.warn` are deliberately absent because stderr is the legitimate diagnostics channel (error messages, warnings, failure notices are not run output). The check fires only inside the three tool engines. Legitimate direct stdout (subprocess IPC, machine `--json` paths that deliberately bypass the render seam, auxiliary-subcommand status lines) is exempted per-file via `@fitness-ignore-file no-direct-stdout-in-tool-engine` with a justification.
 
   The complementary positive contract is the `CommandResult` return type: a tool returns its envelope and routes any output through the `ToolCliContext` seam (`cli.render` / `cli.emitEnvelope` / `cli.deliverSignals` / `cli.writeSarif`).
 

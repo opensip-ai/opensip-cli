@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-06-14
 release: v0.1.0
 owner: opensip-cli
 indexable: true
@@ -18,7 +18,7 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 
 | Need | Use |
 |---|---|
-| Enforce project-specific quality, security, and architecture rules | `opensip fit` with 166 built-in checks across seven packs, plus your own checks |
+| Enforce project-specific quality, security, and architecture rules | `opensip fit` with 151 built-in checks across seven packs, plus your own checks |
 | Adopt without fixing every historical issue first | `fit --gate-save` once, then `fit --gate-compare` in CI |
 | Understand reachability, dead ends, duplication, cycles, and blast radius | `opensip graph` with five graph adapters and ten built-in graph rules |
 | Run load or chaos scenarios against a service you control | `opensip sim` |
@@ -175,9 +175,9 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 
 ## Factual Baseline
 
-This v0.1.0 doc set was rechecked against the source on 2026-06-12:
+This v0.1.0 doc set was rechecked against the source on 2026-06-14:
 
-- 166 built-in fitness checks across seven packs.
+- 151 built-in fitness checks across seven packs.
 - 33 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
 - Six fitness language adapters: TypeScript/JavaScript, Python, Rust, Go, Java, and C/C++.
 - Five graph language adapters: TypeScript, Python, Rust, Go, and Java.

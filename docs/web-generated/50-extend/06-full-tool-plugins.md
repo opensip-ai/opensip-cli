@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-06-14
 release: v0.1.0
 title: "Full Tool plugins"
 audience: [plugin-authors]
@@ -119,17 +119,11 @@ export const tool: Tool = {
       },
     }),
   ],
-  // Host-owned run timing (host-owned-run-timing): if your tool writes a
-  // cross-tool history row (sessions list / report), call the documented seam
+  // Current v0.1.0 history seam: if your tool writes a cross-tool history row
+  // (sessions list / report), call the documented host seam from the handler:
   // `cli.runSession.record({ tool: 'your-tool', cwd, score, passed, payload? })`.
-  // The host `RunTimer` (available as `cli.runSession.timing` and passed to
-  // live renderers as the optional second `LiveViewContext` arg) supplies
-  // `timestamp` + `durationMs`. Tools never capture their own Date for those
-  // two generic columns. Internal per-scenario/per-check timers are fine and
-  // belong in your `payload`.
-});
-    }),
-  ],
+  // The host `RunTimer` supplies `timestamp` + `durationMs`; tools should keep
+  // their own timers inside their payload.
 };
 ```
 
@@ -251,7 +245,7 @@ program.
 
 - **Test every check with the same content filter the framework will use.** The strip behavior is per-language; a check that works on raw content might break on filtered content. Use the language adapter's `stripComments` directly in tests if needed.
 - **Use `--debug` aggressively while authoring.** Your check's log lines (`ctx.log(...)`) appear in stderr; the day-level log file under `<project>/opensip-cli/.runtime/logs/<YYYY-MM-DD>.jsonl` archives them. Filter by `runId` with `jq` if multiple runs landed in the same file.
-- **Pin your peer-deps to majors, not minors.** Minor opensip-cli releases are non-breaking; pinning to a minor unnecessarily blocks consumers who are already on a newer minor.
+- **For pre-1.0 peer dependencies, pin to the current minor line.** A caret range such as `^0.1.0` allows patch updates but not `0.2.0`; revisit the range when you adopt a new `0.y` line.
 - **Use the right discovery shape for the right export.** A package marked `opensipTools.kind: 'tool'` is treated as a Tool by the discovery walker — it must export `tool: Tool`. A check pack uses `kind: 'fit-pack'` and exports `checks` / `recipes`; simulation scenario packs use the `scenarios-*` package-name convention or an explicit `plugins.scenarioPackages:` list. Mismatching these shapes leads to a load failure that's logged but not fatal.
 - **An authored sidecar tool is discovered by file presence, not a marker.** A tool under a `tools/` root (`<project>/opensip-cli/tools/` or `~/.opensip-cli/tools/`) is found by the presence of `opensip-tool.manifest.json`, not by a `node_modules` `opensipTools.kind` marker. Remember the project (`project-local`) location is deny-by-default — allowlist its `id` in `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` or it fail-closes before import.
 
