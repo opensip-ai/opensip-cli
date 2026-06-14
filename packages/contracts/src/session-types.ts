@@ -25,6 +25,9 @@ import type { ToolShortId } from '@opensip-cli/core';
  * command dispatch / live runner before heavy analysis work). `durationMs`
  * is the measured wall time of the analysis itself. Together they let history,
  * `sessions list`, and the report reconstruct "started at T, took D".
+ *
+ * These two fields are stamped exclusively by the host `RunTimer` via the
+ * `ToolCliContext.runSession` seam; tools must not supply their own values.
  */
 export interface StoredSession {
   readonly id: string;

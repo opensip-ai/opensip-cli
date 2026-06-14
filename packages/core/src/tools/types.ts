@@ -35,6 +35,7 @@ import type { Logger } from '../lib/logger.js';
 import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
 import type { PluginLayout } from '../plugins/types.js';
 import type { Signal } from '../types/signal.js';
+import type { RunTimer, RunTimingSnapshot } from '../lib/run-timer.js';
 
 // `ToolScope` (the Tool-facing scope view) and `ScopeContribution` (the
 // augmentable subscope bag a tool returns from `contributeScope`) live in
@@ -135,6 +136,68 @@ export interface ToolSessionReplayContribution {
 }
 
 /**
+ * Input a tool supplies to the host `runSession.record(...)` seam.
+ *
+ * Tools provide only verdict + payload + provenance. The host stamps
+ * `timestamp` + `durationMs` (from the shared `RunTimer`), generates the
+ * stable `id`, and performs the actual `SessionRepo.save`. This is the
+ * mechanical realization of "host-owned run timing".
+ *
+ * `record` is best-effort: when no datastore is available (non-project
+ * commands, or tests without a scope) it returns `undefined` and does
+ * nothing observable. Callers must never assume a row was written.
+ */
+export interface ToolRunSessionInput {
+  readonly tool: ToolShortId;
+  readonly cwd: string;
+  readonly recipe?: string;
+  readonly score: number;
+  readonly passed: boolean;
+  /** Tool-owned opaque payload (same contract as StoredSession.payload). */
+  readonly payload?: unknown;
+}
+
+/**
+ * Return value from a successful `runSession.record(...)` call.
+ *
+ * Contains the id assigned by the host and the timing values that were
+ * stamped from the host `RunTimer.snapshot()` at record time. Tools that
+ * need the stamped values for their own live summaries can read them here
+ * (rather than threading their own clocks).
+ */
+export interface RecordedToolRunSession {
+  readonly id: string;
+  readonly tool: ToolShortId;
+  readonly timestamp: string;
+  readonly durationMs: number;
+}
+
+/**
+ * The host-provided run-session seam on `ToolCliContext`.
+ *
+ * `timing` is the early-created `RunTimer` for this invocation (shared
+ * between the static command path and any live renderers).
+ *
+ * `record` is the only documented way for tools (or their live views) to
+ * contribute a row to the cross-tool `sessions` history. The host
+ * implements it using the `RunScope` datastore thunk + `SessionRepo`.
+ */
+export interface ToolRunSessions {
+  readonly timing: RunTimer;
+  record(input: ToolRunSessionInput): RecordedToolRunSession | undefined;
+}
+
+/**
+ * Context object passed as the (optional) second argument to a
+ * `LiveViewRenderer`. Carries the same host `runSession` seam that the
+ * static `ToolCliContext` exposes, so live renderers can call `record`
+ * using the identical timer instance.
+ */
+export interface LiveViewContext {
+  readonly runSession: ToolRunSessions;
+}
+
+/**
  * Renderer signature for a tool-contributed live view. The CLI looks up
  * the registered renderer by key when a tool calls
  * `ToolCliContext.renderLive(key, args)` and invokes it with the tool's
@@ -147,8 +210,17 @@ export interface ToolSessionReplayContribution {
  * The `args` parameter is `unknown` at the contract layer because each
  * tool defines its own args shape; tools narrow the type inside their
  * own renderer body via a runtime cast.
+ *
+ * In the host-owned run timing model (and future host-plane evolutions),
+ * a second optional `context` argument carries the host `runSession` seam
+ * (the timer + record() for session persistence). Existing renderers that
+ * only declare one parameter continue to work (the second arg is optional
+ * during the migration window and for forward compatibility).
  */
-export type LiveViewRenderer = (args: unknown) => Promise<void>;
+export type LiveViewRenderer = (
+  args: unknown,
+  context?: LiveViewContext,
+) => Promise<void>;
 
 /**
  * Thrown by `ToolCliContext.renderLive(key, args)` when no renderer has
@@ -260,6 +332,26 @@ export interface ToolCliContext {
    * evolution bag). See the plan and spec for H1-H3.
    */
   readonly scope: ToolScope;
+
+  /**
+   * Host-owned run timing + session persistence seam (host-owned-run-timing).
+   *
+   * `timing` is the single `RunTimer` created by the CLI host at command
+   * entry (before any tool handler or live view). It is the source of truth
+   * for `StoredSession.timestamp` and `durationMs`.
+   *
+   * `record(...)` is the *only* documented way for a tool (or its live
+   * renderer via the `LiveViewContext`) to persist a generic session row.
+   * The tool supplies verdict/payload; the host stamps timing + id and
+   * writes via `SessionRepo` (best-effort; returns undefined when there is
+   * no datastore in scope).
+   *
+   * Architectural rule: tools must not capture `Date` / `performance` for
+   * these two fields, and must not import or call `SessionRepo` directly
+   * for the generic columns.
+   */
+  readonly runSession: ToolRunSessions;
+
   /** Render an Ink result (CommandResult shape from @opensip-cli/contracts). */
   readonly render: (result: unknown) => Promise<void>;
   /**
@@ -285,7 +377,7 @@ export interface ToolCliContext {
    * `key` is a string instead of a typed enum so new tools can
    * contribute additional live views without touching the core type.
    */
-  readonly renderLive: (key: string, args: unknown) => Promise<void>;
+  readonly renderLive: (key: string, args: unknown, liveContext?: LiveViewContext) => Promise<void>;
   /**
    * Open the HTML report in the user's browser when the run
    * conditions allow it (TTY, not JSON-mode, opt-in). Tools call this

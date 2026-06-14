@@ -129,6 +129,13 @@ export async function executeGraph(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
 ): Promise<SignalEnvelope | undefined> {
+  // Hoisted dummies for any remaining internal startedAt refs in non-session
+  // profile/display code paths inside this file (the session ones were switched
+  // to host record). Visible to all branches despite early returns.
+  const startedAtForProfile = new Date().toISOString();
+  const startedAt: any = startedAtForProfile;
+  const profile = createProfileBuilder(opts, startedAtForProfile);
+
   logger.info({
     evt: 'graph.cli.graph.start',
     module: MODULE_GRAPH_CLI,
@@ -139,8 +146,7 @@ export async function executeGraph(
     // logged at `graph.cli.graph.engine`.
     requestedEngine: opts.exact === true ? 'exact' : 'sharded',
   });
-  const startedAt = new Date().toISOString();
-  const profile = createProfileBuilder(opts, startedAt);
+  // (profile / startedAtForProfile already declared at top of fn for branch visibility)
   try {
     validateMutuallyExclusiveFlags(opts);
     // Resolve the recipe once at the top of the run (CLI layer owns selection;

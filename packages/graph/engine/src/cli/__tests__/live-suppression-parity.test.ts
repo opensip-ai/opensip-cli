@@ -170,6 +170,10 @@ describe('live-view suppression parity', () => {
     // erroring (someone widened persistSession back to `readonly Signal[]`), the
     // build fails — the leak class is re-openable only by deleting this guard.
     // @ts-expect-error — raw Signal[] is not assignable to FinalizedSignals
+    // Updated for host-owned timing (phase 5): tests that directly exercised the old
+    // 5-arg persist now use minimal (or the host record seam in prod paths). Legacy
+    // persist still accepts the extra args for transition; real StoredSession timing
+    // no longer comes from here.
     persistSession({ cwd: buildRoot }, raw, undefined, 0, '2026-01-01T00:00:00.000Z');
 
     // The ONLY way in is via the finalize seam (or its post-IPC re-brand assert),

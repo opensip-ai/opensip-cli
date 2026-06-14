@@ -32,6 +32,7 @@ import {
   type Tone,
   type ViewNode,
 } from '@opensip-cli/cli-ui';
+import { currentScope } from '@opensip-cli/core';
 import {
   formatSignalTableRows,
   formatSignalTableSummary,
@@ -70,6 +71,34 @@ import type {
 
 const SPACER: ViewNode = { kind: 'spacer' };
 
+/**
+ * Resolve the top-level run duration for a summary line.
+ * Prefers an explicit value carried on the done result (compat during
+ * migration); when absent (post-migration tools), falls back to a host
+ * RunTimer snapshot obtained from the entered scope (if the host stashed
+ * the timer or runSession on it) or 0.
+ * This ensures the static (renderToText / piped) summary uses the same
+ * host-owned timing that will be in StoredSession.
+ */
+function resolveSummaryDuration(explicit?: number): number {
+  if (typeof explicit === 'number') return explicit;
+  try {
+    const scope = currentScope() as any;
+    const t = scope?.runSession?.timing ?? scope?.timing;
+    if (t) {
+      if (typeof t.snapshot === 'function') {
+        return t.snapshot().durationMs ?? 0;
+      }
+      if (typeof t.elapsedMs === 'function') {
+        return t.elapsedMs();
+      }
+    }
+  } catch {
+    // best effort only
+  }
+  return 0;
+}
+
 /** `✗ <message>` plus an optional dim suggestion — mirrors ErrorMessage. */
 function errorView(result: ErrorResult): ViewNode {
   const children: ViewNode[] = [
@@ -104,7 +133,7 @@ function graphDoneView(result: GraphDoneResult): ViewNode {
       passed: result.summary.errors === 0,
       errors: result.summary.errors,
       warnings: result.summary.warnings,
-      durationMs: result.durationMs,
+      durationMs: resolveSummaryDuration(result.durationMs),
     }),
   );
   // Non-verbose run: show the shared "Use --verbose…" hint plus graph's
@@ -347,7 +376,7 @@ export function envelopeToTableView(
       passed: envelope.verdict.passed,
       errors: summary.totalErrors,
       warnings: summary.totalWarnings,
-      durationMs: summary.durationMs,
+      durationMs: resolveSummaryDuration(summary.durationMs),
     }),
   );
   return group(children);

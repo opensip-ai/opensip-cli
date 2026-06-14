@@ -26,7 +26,10 @@ import { resolveSession } from '@opensip-cli/session-store';
 import { fitReplayFromSession } from '../persistence/session-replay.js';
 
 import { renderGateCompareOutput } from './fit/gate-compare-render.js';
-import { persistFitSession } from './fit/result-builders.js';
+import { buildFitnessSessionPayload } from './fit/result-builders.js';
+// Real persistence for runs now goes through the host `cli.runSession.record` seam
+// (called from the mode bodies below and from the live runner). Legacy persistFitSession
+// in result-builders is only for a few direct test paths during transition.
 import { listChecks } from './fit-list.js';
 import { listRecipes } from './fit-recipes.js';
 import { executeFit } from './fit.js';
@@ -34,32 +37,11 @@ import { executeFit } from './fit.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
-/**
- * Persist a completed fit run on the main thread (ADR-0028 — the engine is
- * persistence-free; the caller owns the write). No-op when there's no datastore
- * or the run errored before producing an envelope. Best-effort inside
- * `persistFitSession` (a SQLite hiccup never fails the run).
- */
-function persistFitRun(
-  datastore: DataStore | undefined,
-  args: FitOptions,
-  fitResult: Awaited<ReturnType<typeof executeFit>>,
-): void {
-  if (
-    datastore !== undefined &&
-    fitResult.envelope !== undefined &&
-    fitResult.durationMs !== undefined &&
-    fitResult.startedAt !== undefined
-  ) {
-    persistFitSession(
-      datastore,
-      args,
-      fitResult.envelope,
-      fitResult.durationMs,
-      fitResult.startedAt,
-    );
-  }
-}
+// persistFitRun removed (Phase 3.2). The three mode bodies (json/live-fallback/gate)
+// that previously called it now directly do:
+//   cli.runSession.record({ tool: 'fit', cwd: args.cwd, recipe: ..., score: ..., passed: ..., payload: build... })
+// using the ToolCliContext they receive. This is the host seam; timing is stamped
+// by the RunTimer the host created for the invocation.
 
 /**
  * Emit any non-fatal warnings collected during the run to stderr. Safe to
@@ -155,9 +137,19 @@ export async function runShowMode(args: FitOptions, cli: ToolCliContext): Promis
  * output is one-shot, no progress UI.
  */
 export async function runJsonMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
-  const datastore = cli.scope.datastore() as DataStore | undefined;
   const fitResult = await executeFit(args);
-  persistFitRun(datastore, args, fitResult);
+  // Host-owned session record (timing stamped by RunTimer in cli-context).
+  if (fitResult.envelope !== undefined) {
+    const payload = buildFitnessSessionPayload(fitResult.envelope);
+    cli.runSession.record({
+      tool: 'fit',
+      cwd: args.cwd,
+      recipe: fitResult.envelope.recipe,
+      score: fitResult.envelope.verdict.score,
+      passed: fitResult.envelope.verdict.passed,
+      payload,
+    });
+  }
   if (fitResult.envelope === undefined) {
     // 2.12.0 (§5.5): a failed `--json` run emits a structured `status:'error'`
     // CommandOutcome (the host wraps + sets the exit code), not a bare `{ error }`.
@@ -199,9 +191,18 @@ export async function runLiveMode(
     // error result carries its own code; a passing run that breached the fail
     // threshold exits RUNTIME_ERROR. Warnings are rendered inline by the
     // fit-done view, so we don't also write them to stderr here.
-    const datastore = cli.scope.datastore() as DataStore | undefined;
     const fitResult = await executeFit(args);
-    persistFitRun(datastore, args, fitResult);
+    if (fitResult.envelope !== undefined) {
+      const payload = buildFitnessSessionPayload(fitResult.envelope);
+      cli.runSession.record({
+        tool: 'fit',
+        cwd: args.cwd,
+        recipe: fitResult.envelope.recipe,
+        score: fitResult.envelope.verdict.score,
+        passed: fitResult.envelope.verdict.passed,
+        payload,
+      });
+    }
     if (fitResult.envelope === undefined) {
       cli.setExitCode(fitResult.result.exitCode);
       await cli.render(fitResult.result);
@@ -235,7 +236,17 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
   // using the same handle the host gate seam writes against, so gate-save /
   // gate-compare runs land in the session history alongside live-mode runs.
   const fitResult = await executeFit(args);
-  persistFitRun(datastore, args, fitResult);
+  if (fitResult.envelope !== undefined) {
+    const payload = buildFitnessSessionPayload(fitResult.envelope);
+    cli.runSession.record({
+      tool: 'fit',
+      cwd: args.cwd,
+      recipe: fitResult.envelope.recipe,
+      score: fitResult.envelope.verdict.score,
+      passed: fitResult.envelope.verdict.passed,
+      payload,
+    });
+  }
   if (fitResult.envelope === undefined) {
     cli.logger.warn({
       evt: 'cli.gate.fit_failed',

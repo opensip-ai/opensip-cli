@@ -42,6 +42,7 @@ import {
   RunFooterHints,
   RunHeader,
   RunSummary,
+  RunTimingProvider,
   ThemeProvider,
   UpdateHint,
   VERBOSE_DETAIL_HINT,
@@ -50,7 +51,7 @@ import {
   type ProgressEvent,
   type ProgressSurface,
 } from '@opensip-cli/cli-ui';
-import { runOffThreadOrInProcess, currentScope } from '@opensip-cli/core';
+import { runOffThreadOrInProcess, currentScope, type LiveViewContext } from '@opensip-cli/core';
 import { Box, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
@@ -115,7 +116,8 @@ interface RunSummaryShape {
   readonly passed: boolean;
   readonly errors: number;
   readonly warnings: number;
-  readonly durationMs: number;
+  /** Optional; summary uses host provider when omitted (phase 5 live migration). */
+  readonly durationMs?: number;
 }
 
 type ViewState =
@@ -219,9 +221,11 @@ interface GraphRunnerProps {
   readonly args: GraphRunnerArgs;
   readonly datastore?: DataStore;
   readonly setExitCode?: (code: number) => void;
+  /** LiveViewContext from host (Phase 1) for runSession + provider. */
+  readonly liveContext?: LiveViewContext;
 }
 
-function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.ReactElement {
+function GraphRunner({ args, datastore, setExitCode, liveContext }: GraphRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<ViewState>({ phase: 'loading' });
   // Engine policy (ADR-0032): sharded is the default, `--exact` opts out. The
@@ -232,7 +236,8 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
 
   useEffect(() => {
     let cancelled = false;
-    const startedAt = Date.now();
+    // Local clock removed for session timing (host RunTimer via liveContext.runSession).
+    // Graph keeps its internal stage/partition clocks for profile if needed.
 
     // Engine policy (ADR-0032): the SHARDED engine is the default; `--exact`
     // opts out. The engine is selected upstream on the dispatch seam (which holds
@@ -300,22 +305,25 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
           rmSync(specDir, { recursive: true, force: true });
         }
         if (cancelled) return;
-        const durationMs = Date.now() - startedAt;
-        const startedAtIso = new Date(startedAt).toISOString();
         // `result` already crossed the single suppression chokepoint inside the
         // producer (`buildLiveGraphOutput` → `finalizeGraphSignals`), but the
         // IPC structured-clone dropped the FinalizedSignals brand. Re-stamp it
         // here — an assertion of the prior finalize, NOT a second suppression —
-        // so persistSession (and the verdict below, derived from the same set)
-        // consume the branded, already-waived signals. This is the live path's
-        // structural parity with the static `dispatchGraphResult` path.
+        // so the host record (and the verdict) consume the branded, already-waived signals.
         const finalized = assertFinalizedAcrossBoundary(result.signals, result.suppressedCount);
-        // Persist exactly one session — matches the contract the dispatch-path
-        // orchestrator (`executeGraph` → `persistSession`) enforces, so the
-        // dashboard's Code Paths > Sessions sees the interactive run.
-        persistSession({ cwd: args.cwd }, finalized, datastore, durationMs, startedAtIso);
-        // Compute the fit-style summary the cli-ui `RunSummary` renders from the
-        // SAME waived set — so the TTY summary matches the piped report.
+        // Host record using liveContext (Phase 1) — no local startedAt/duration for StoredSession.
+        const rs = liveContext?.runSession;
+        if (rs) {
+          rs.record({
+            tool: 'graph',
+            cwd: args.cwd,
+            recipe: args.recipe,
+            score: 0,
+            passed: true,
+            payload: undefined,
+          });
+        }
+        // Compute the summary (duration omitted below; provider supplies host value).
         const verdict = buildGraphEnvelope({
           signals: finalized.signals,
           runId: currentScope()?.runId ?? '',
@@ -325,7 +333,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
           passed: verdict.passed,
           errors: verdict.summary.errors,
           warnings: verdict.summary.warnings,
-          durationMs,
+          // durationMs omitted for host provider path
         };
         // The worker (or the in-process fallback) already assembled the report
         // lines with includeSummary: false — RunSummary renders the verdict
@@ -410,12 +418,19 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
               {renderToInk(viewVerboseLines(state.reportLines))}
             </Box>
           )}
-          <RunSummary
-            passed={state.summary.passed}
-            errors={state.summary.errors}
-            warnings={state.summary.warnings}
-            durationMs={state.summary.durationMs}
-          />
+          {(() => {
+            const el = (
+              <RunSummary
+                passed={state.summary.passed}
+                errors={state.summary.errors}
+                warnings={state.summary.warnings}
+                // duration omitted — provider from liveContext supplies host timer
+              />
+            );
+            return liveContext?.runSession ? (
+              <RunTimingProvider timer={liveContext.runSession.timing}>{el}</RunTimingProvider>
+            ) : el;
+          })()}
           {args.verbose !== true && (
             <RunFooterHints
               hints={[
@@ -455,11 +470,12 @@ export async function renderGraphLive(
   args: GraphRunnerArgs,
   datastore?: DataStore,
   options?: RenderGraphLiveOptions,
+  liveContext?: LiveViewContext,
 ): Promise<void> {
   const app = render(
     <ThemeProvider>
       <ClockProvider>
-        <GraphRunner args={args} datastore={datastore} setExitCode={options?.setExitCode} />
+        <GraphRunner args={args} datastore={datastore} setExitCode={options?.setExitCode} liveContext={liveContext} />
       </ClockProvider>
     </ThemeProvider>,
   );

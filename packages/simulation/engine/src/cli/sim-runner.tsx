@@ -32,6 +32,7 @@ import {
   RunFooterHints,
   RunHeader,
   RunSummary,
+  RunTimingProvider,
   ThemeProvider,
   UpdateHint,
   VERBOSE_DETAIL_HINT,
@@ -45,11 +46,12 @@ import {
   type ToolOptions,
   type VerboseDetail,
 } from '@opensip-cli/contracts';
-import { runOffThreadOrInProcess, currentScope } from '@opensip-cli/core';
+import { runOffThreadOrInProcess, currentScope, type LiveViewContext } from '@opensip-cli/core';
 import { Box, Static, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
 import { executeSim, persistSimSession } from './sim.js';
+import { buildSimulationSessionPayload } from '../persistence/session-payload.js';
 
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -64,7 +66,8 @@ type SimLiveArgs = ToolOptions & { readonly quiet?: boolean; readonly verbose?: 
 
 interface SimDoneShape {
   readonly envelope: SignalEnvelope;
-  readonly durationMs: number;
+  /** Optional — only for internal; summary duration now from host provider (phase 4.3). */
+  readonly durationMs?: number;
   readonly verboseDetail?: VerboseDetail;
 }
 
@@ -103,6 +106,8 @@ export interface SimRunnerProps {
   readonly setExitCode?: (code: number) => void;
   readonly onEnvelope?: (envelope: SignalEnvelope) => void;
   readonly datastore?: DataStore;
+  /** From host LiveViewContext (Phase 1) for runSession.record + provider. */
+  readonly liveContext?: LiveViewContext;
 }
 
 /** The sim live-view component (loading → running → done/error). Exported for
@@ -112,6 +117,7 @@ export function SimRunner({
   setExitCode,
   onEnvelope,
   datastore,
+  liveContext,
 }: SimRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<SimState>({ phase: 'loading' });
@@ -150,16 +156,27 @@ export function SimRunner({
         // ADR-0035: the host owns the findings exit. The live renderer hands the
         // envelope to `setUpSimLiveView` via `onEnvelope`, which calls
         // `deliverSignals`; the root sets the exit from `envelope.verdict.passed`.
-        // Persist on the MAIN thread (ADR-0028 — engine is persistence-free).
-        if (datastore !== undefined && simResult.startedAt !== undefined) {
-          persistSimSession(datastore, result, simResult.startedAt);
+        // Host record (Phase 4): use the runSession from liveContext (same timer
+        // the static tool.ts path uses). Best-effort, never throws.
+        const rs = liveContext?.runSession;
+        if (rs && result.type === 'sim-done') {
+          const payload = buildSimulationSessionPayload(result.envelope);
+          rs.record({
+            tool: 'sim',
+            cwd: result.cwd,
+            recipe: result.recipeName,
+            score: result.envelope.verdict.score,
+            passed: result.envelope.verdict.passed,
+            payload,
+          });
         }
         onEnvelope?.(result.envelope);
         setState({
           phase: 'done',
           result: {
             envelope: result.envelope,
-            durationMs: result.durationMs,
+            // duration omitted for summary (host provider supplies); keep if present for other internal use
+            ...(result.durationMs === undefined ? {} : { durationMs: result.durationMs }),
             verboseDetail: result.verboseDetail,
           },
         });
@@ -239,12 +256,23 @@ export function SimRunner({
         {args.quiet !== true && findingsDetail !== undefined && (
           <Box>{renderToInk(viewFindingsGroups(findingsDetail.groups))}</Box>
         )}
-        <RunSummary
-          passed={state.result.envelope.verdict.passed}
-          errors={summary.errors}
-          warnings={summary.warnings}
-          durationMs={state.result.durationMs}
-        />
+        {(() => {
+          const summaryEl = (
+            <RunSummary
+              passed={state.result.envelope.verdict.passed}
+              errors={summary.errors}
+              warnings={summary.warnings}
+              // durationMs omitted — provider (from liveContext) supplies host timer
+            />
+          );
+          return liveContext?.runSession ? (
+            <RunTimingProvider timer={liveContext.runSession.timing}>
+              {summaryEl}
+            </RunTimingProvider>
+          ) : (
+            summaryEl
+          );
+        })()}
         {args.quiet !== true && (
           <RunFooterHints
             hints={
@@ -283,6 +311,7 @@ export interface RenderSimLiveOptions {
 export async function renderSimLive(
   args: SimLiveArgs,
   options?: RenderSimLiveOptions,
+  liveContext?: LiveViewContext,
 ): Promise<SignalEnvelope | undefined> {
   let envelope: SignalEnvelope | undefined;
   const app = render(
@@ -295,6 +324,7 @@ export async function renderSimLive(
             envelope = e;
           }}
           datastore={options?.datastore}
+          liveContext={liveContext}
         />
       </ClockProvider>
     </ThemeProvider>,

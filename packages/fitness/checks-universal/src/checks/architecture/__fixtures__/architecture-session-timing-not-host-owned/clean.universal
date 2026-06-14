@@ -1,0 +1,5 @@
+// clean: no persist hint + no direct Date for session timing
+export function doWork() {
+  const t = Date.now(); // internal timer, no persist hint in file, so check skips
+  return t;
+}

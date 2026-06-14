@@ -2,8 +2,10 @@ import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
+import { createRunTimer } from '@opensip-cli/core';
 import { renderToText } from '../render-to-text.js';
 import { RunSummary, viewRunSummary } from '../run-summary.js';
+import { RunTimingProvider } from '../run-timing-provider.js';
 import { ThemeProvider } from '../theme.js';
 
 describe('RunSummary', () => {
@@ -91,5 +93,23 @@ describe('RunSummary', () => {
     expect(out).toContain('PASS');
     expect(out).toContain('0 Errors');
     expect(out).toContain('0 Warnings');
+  });
+
+  it('when durationMs omitted, reads from RunTimingProvider (host timer) and renders Duration line', () => {
+    const timer = createRunTimer();
+    // Let a tiny bit of time pass so duration > 0
+    const start = Date.now();
+    while (Date.now() - start < 1) {}
+    const { lastFrame } = render(
+      <ThemeProvider>
+        <RunTimingProvider timer={timer}>
+          <RunSummary passed={true} errors={0} warnings={0} />
+        </RunTimingProvider>
+      </ThemeProvider>,
+    );
+    const out = lastFrame() ?? '';
+    expect(out).toContain('PASS');
+    expect(out).toContain('Duration');
+    // Not asserting exact value (live elapsed), but that provider path was taken instead of 0ms default.
   });
 });

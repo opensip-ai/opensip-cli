@@ -167,6 +167,10 @@ export type {
   // adding more top-level optionals to `Tool`.
   ToolExtensionPoints,
   LiveViewRenderer,
+  LiveViewContext,
+  ToolRunSessionInput,
+  RecordedToolRunSession,
+  ToolRunSessions,
   // Typed host planes (host-planes-scope-seams-hygiene Phase 0): public so Cloud + third-party tools
   // can type against the bag on ToolCliContext without subpath imports. OSS flexibility via toolState.
   HostGovernance,
@@ -422,6 +426,14 @@ export { readPackageVersion } from './lib/package-version.js';
 // tool's CLI/report layer; centralized here since tools cannot depend on
 // each other.
 export { formatDuration } from './lib/format.js';
+
+// Lib — host-owned run timer (host-owned-run-timing). The single
+// RunTimer created by the CLI host at the command boundary; exposed to
+// tools exclusively via ToolCliContext.runSession.timing (and via the
+// optional LiveViewContext second arg to live renderers). Tools must
+// not construct their own for StoredSession timing.
+export { createRunTimer } from './lib/run-timer.js';
+export type { RunTimer, RunTimingSnapshot } from './lib/run-timer.js';
 
 // Lib — path resolver (project-local opensip-cli/.runtime, user-level
 // ~/.opensip-cli/config.yml). Every consumer constructs paths through

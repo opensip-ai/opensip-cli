@@ -2,7 +2,8 @@
  * executeFit boundary test (ADR-0028 — worker-safe, persistence-free engine).
  *
  * `executeFit` does NOT touch the datastore: it returns the envelope + the run's
- * `durationMs`, and the CALLER persists via `persistFitSession` on the main
+ * (host timing removed). The CALLER (modes / live runner with ToolCliContext) persists
+ * via the `cli.runSession.record` seam (or legacy persistFitSession for some tests).
  * thread (the datastore handle cannot cross the worker boundary). These tests
  * lock both halves: the engine is pure-compute, and the explicit persist writes
  * exactly one session. `onProgress` wiring is also covered.
@@ -86,8 +87,10 @@ describe('executeFit — persistence-free boundary (ADR-0028)', () => {
     // Sanity — executeFit shouldn't error on a minimal project.
     expect(fitResult.result.type).not.toBe('error');
     expect(fitResult.envelope).toBeDefined();
-    expect(typeof fitResult.durationMs).toBe('number');
-    expect(typeof fitResult.startedAt).toBe('string');
+    // timing removed from executeFit return (Phase 3.1 host-owned); the top-level
+    // result no longer carries duration/startedAt. (Test updated in Task 3.4.)
+    expect((fitResult as any).durationMs).toBeUndefined();
+    expect((fitResult as any).startedAt).toBeUndefined();
 
     // The engine is pure-compute now: nothing was written.
     const sessions = new SessionRepo(datastore).list({ tool: 'fit' });
@@ -98,19 +101,12 @@ describe('executeFit — persistence-free boundary (ADR-0028)', () => {
     const args = makeArgs(projectDir);
     const fitResult = await withFitScope(() => executeFit(args));
     expect(fitResult.envelope).toBeDefined();
-    if (
-      fitResult.envelope === undefined ||
-      fitResult.durationMs === undefined ||
-      fitResult.startedAt === undefined
-    )
-      throw new Error('expected a fit-done result');
-
+    // timing removed; bypass old guard (updated properly in Task 3.4)
+    const fr: any = fitResult;
     persistFitSession(
       datastore,
       args,
-      fitResult.envelope,
-      fitResult.durationMs,
-      fitResult.startedAt,
+      fitResult.envelope!,
     );
 
     const sessions = new SessionRepo(datastore).list({ tool: 'fit' });

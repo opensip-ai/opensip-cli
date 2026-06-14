@@ -210,7 +210,7 @@ export async function executeSim(
   args: ToolOptions & { readonly verbose?: boolean },
   opts: ExecuteSimOptions = {},
 ): Promise<
-  { result: SimDoneResult; startedAt: string } | { result: ErrorResult; startedAt?: undefined }
+  { result: SimDoneResult } | { result: ErrorResult }
 > {
   // Lifecycle: load .mjs plugins + scenario packages before the recipe
   // registry is read. Idempotent per project dir.
@@ -244,7 +244,6 @@ export async function executeSim(
     };
   }
 
-  const startedAt = new Date().toISOString();
   const service = new SimulationRecipeService({ cwd: args.cwd, onProgress: opts.onProgress });
   const recipeResult = await service.runRecipe(recipe);
 
@@ -324,37 +323,40 @@ export async function executeSim(
     type: 'sim-done',
     recipeName,
     cwd: args.cwd,
-    durationMs: recipeResult.durationMs,
+    // durationMs optional on SimDoneResult (phase2 host timing); internal recipe makespan may be present.
+    ...(recipeResult.durationMs === undefined ? {} : { durationMs: recipeResult.durationMs }),
     // ADR-0035: the run verdict is the single host verdict. With Phase 0 a failed
     // scenario emits an error signal, so `envelope.verdict.passed` (with the {1,0}
     // policy) is exactly the old `failed > 0`; the host derives the exit from it.
     envelope,
     ...(verboseDetail === undefined ? {} : { verboseDetail }),
   };
-  // Persistence is the CALLER's job (ADR-0028 — worker-safe engine): the engine
-  // returns the result and the caller persists on the main thread via
-  // `persistSimSession` (the datastore handle cannot cross the worker boundary).
-  return { result, startedAt };
+  // Persistence is the CALLER's job (ADR-0028 — worker-safe engine, now host-owned
+  // timing via runSession.record). The engine returns only the result.
+  return { result };
 }
 
 /** Persist a completed sim run. Best-effort — a SQLite write failure never fails
- *  an otherwise-successful run. Called by the run-mode callers on the main thread. */
+ *  an otherwise-successful run. Called by the run-mode callers on the main thread.
+ *  (host-owned-run-timing: real calls now use cli.runSession.record; this helper
+ *  kept for legacy direct test callers and uses dummy timing to avoid tool code
+ *  capturing Date for StoredSession columns.)
+ */
 export function persistSimSession(
   datastore: DataStore,
   result: SimDoneResult,
-  startedAt: string,
 ): void {
   try {
     const repo = new SessionRepo(datastore);
     repo.save({
       id: generatePrefixedId('sim'),
       tool: 'sim',
-      timestamp: startedAt,
+      timestamp: '1970-01-01T00:00:00.000Z',
       cwd: result.cwd,
       recipe: result.recipeName,
       score: result.envelope.verdict.score,
       passed: result.envelope.verdict.passed,
-      durationMs: result.durationMs,
+      durationMs: result.durationMs ?? 0,
       payload: buildSimulationSessionPayload(result.envelope),
     });
   } catch (error) {

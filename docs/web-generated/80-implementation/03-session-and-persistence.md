@@ -25,6 +25,7 @@ related-docs:
   - ./01-cli-dispatch.md
   - ./02-plugin-loader.md
   - ../80-implementation/05-layer-policy.md
+  - docs/plans/host-owned-run-timing/ (implementation plan for host-owned `RunTimer` + `runSession.record`)
 ---
 # Session and persistence
 
@@ -165,6 +166,21 @@ The `--filter` (errors-only / warnings-only / top:<n>) and `--raw` options on `s
 ### The derived `features` surface (ADR-0006)
 
 The persisted catalog document carries an optional **`features`** layer — derived columns the engine computes from the raw catalog: per-function `bodyLines` / `blast` (direct + transitive blast radius) / reachability flags, per-package coupling degrees, SCC membership, and directed package-coupling edges. The contract shape is [`GraphFeatures`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/contracts/src/graph-catalog.ts) (structurally mirrored from the engine's `PersistedFeatures` so the decoupled dashboard reads features without importing `@opensip-cli/graph`).
+
+## Host-owned run timing (ADR-00XX / host-owned-run-timing plan)
+
+`StoredSession.timestamp` and `durationMs` are produced exclusively by the host from a single `RunTimer` created in `buildToolCliContext` (after `RunScope` entry, before any tool handler or `renderLive`). Tools receive it via `ToolCliContext.runSession.timing` (and as the optional second argument `LiveViewContext` to live renderers registered with `cli.registerLiveView`).
+
+The only documented way to write a generic session row is `cli.runSession.record({ tool, cwd, recipe?, score, passed, payload? })`. The host snapshots the timer, generates the id via `generatePrefixedId(tool)`, writes via `SessionRepo`, and returns the stamped `{ id, timestamp, durationMs }` (or `undefined` if no datastore — best-effort, never throws).
+
+**Rules enforced by architecture check + hygiene:**
+- No first-party tool code may capture `new Date()`, `Date.now()`, or `performance.now()` *for the purpose of* populating the two generic `StoredSession` timing fields.
+- Internal per-unit, per-stage, per-recipe, or profile timers are explicitly allowed and encouraged for diagnostics — they stay inside the tool's own payload or `collectReportData` and never feed the generic columns.
+- The old per-tool `persist*Session(..., durationMs, startedAt)` and "return timing for the caller" patterns have been removed; the host `record` seam is the replacement.
+
+The live and static render paths (via `RunTimingProvider` in cli-ui + `RunSummary` reading the provider when `durationMs` is omitted, and static `result-to-view` falling back to a host snapshot) ensure the "Duration X" line the user sees is the same value that ends up in `sessions list`, `sessions show`, and the HTML report.
+
+See the local plan `docs/plans/host-owned-run-timing/` and the cross-cutting contracts in `plan.md` for the full seam, logging, and hardening details.
 
 The persistence policy is **materialize only when forced** (ADR-0006): features are a *plain view* recomputed on demand for in-engine rules, and **materialized into the catalog JSON only for the columns the decoupled dashboard renders** (blast, SCC, package coupling). The `features` field is therefore present only on catalogs produced by a dashboard-bound run; the dashboard falls back to a no-data state when it's absent. Everything else (callers/callees indexes) is recomputed cheaply on every load and never stored.
 

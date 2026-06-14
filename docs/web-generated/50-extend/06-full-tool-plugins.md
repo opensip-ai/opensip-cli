@@ -119,6 +119,17 @@ export const tool: Tool = {
       },
     }),
   ],
+  // Host-owned run timing (host-owned-run-timing): if your tool writes a
+  // cross-tool history row (sessions list / report), call the documented seam
+  // `cli.runSession.record({ tool: 'your-tool', cwd, score, passed, payload? })`.
+  // The host `RunTimer` (available as `cli.runSession.timing` and passed to
+  // live renderers as the optional second `LiveViewContext` arg) supplies
+  // `timestamp` + `durationMs`. Tools never capture their own Date for those
+  // two generic columns. Internal per-scenario/per-check timers are fine and
+  // belong in your `payload`.
+});
+    }),
+  ],
 };
 ```
 

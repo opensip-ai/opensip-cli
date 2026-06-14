@@ -11,14 +11,13 @@
  */
 
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
-import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
+import { createRunTimer, HOST_VERDICT_POLICY_FALLBACK, type ToolCliContext } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { runJsonMode, runLiveMode } from '../fit-modes.js';
 import { executeFit } from '../fit.js';
 
 import type { SignalEnvelope } from '@opensip-cli/contracts';
-import type { ToolCliContext } from '@opensip-cli/core';
 
 vi.mock('../fit.js', () => ({ executeFit: vi.fn() }));
 
@@ -56,6 +55,10 @@ function mockCli(): MockCliBag {
     deliverSignals,
     logger: console,
     scope: { datastore: () => undefined },
+    runSession: {
+      timing: createRunTimer(),
+      record: () => undefined,
+    },
   } as unknown as ToolCliContext;
   return {
     cli,

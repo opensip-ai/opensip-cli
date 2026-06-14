@@ -27,13 +27,22 @@ import {
   SystemError,
   UnknownLiveViewError,
   currentScope,
+  generatePrefixedId,
   logger as defaultLogger,
   resolveProjectPaths,
   type LiveViewRenderer,
   type Logger,
   type ProjectContext,
+  type RecordedToolRunSession,
+  type RunTimer,
   type ToolCliContext,
+  type ToolRunSessionInput,
+  type ToolRunSessions,
+  type ToolShortId,
+  type LiveViewContext,
+  createRunTimer,
 } from '@opensip-cli/core';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
@@ -176,7 +185,14 @@ function getProjectDatastore(): DataStore {
 
 export interface LiveViewRegistry {
   readonly register: (key: string, renderer: LiveViewRenderer) => void;
-  readonly render: (key: string, args: unknown) => Promise<void>;
+  /**
+   * Render the live view. The optional third parameter is the LiveViewContext
+   * (carrying runSession) to forward as the *second* argument to the renderer
+   * function itself. This lets the host dispatch site (mount) supply the
+   * shared run timer without changing the public ToolCliContext.renderLive
+   * (tools still call renderLive(key, args)).
+   */
+  readonly render: (key: string, args: unknown, liveContext?: LiveViewContext) => Promise<void>;
   readonly has: (key: string) => boolean;
 }
 
@@ -198,12 +214,22 @@ export function createLiveViewRegistry(log: Logger = defaultLogger): LiveViewReg
     /**
      * @throws {UnknownLiveViewError} When `key` has no registered live-view renderer.
      */
-    async render(key, args) {
+    async render(key, args, liveContext) {
       const renderer = renderers.get(key);
       if (!renderer) {
         throw new UnknownLiveViewError(key);
       }
-      await renderer(args);
+      // Support both legacy 1-param renderers and new 2-param (args, LiveViewContext).
+      // Always pass the liveContext (when supplied) as the renderer's second arg.
+      if (liveContext !== undefined) {
+        if ((renderer as any).length <= 1) {
+          await renderer(args);
+        } else {
+          await renderer(args, liveContext);
+        }
+      } else {
+        await renderer(args);
+      }
     },
     has(key) {
       return renderers.has(key);
@@ -239,6 +265,64 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   const stateSeams = buildStateSeams({ getDatastore: getProjectDatastore }); // ADR-0042, same lazy resolver
   const hostPlanes = buildHostPlanes({ getDatastore: getProjectDatastore, logger: log });
 
+  // Host-owned run timer per spec: created before any tool handler or renderLive.
+  // Same instance used for static paths and live renderers.
+  // (host-owned-run-timing plan Phase 1 + cross-cutting: after scope enter via
+  // pre-action, inside the documented buildToolCliContext factory; no tool
+  // work precedes ctx construction.)
+  const runTimer: RunTimer = createRunTimer();
+
+  const runSession: ToolRunSessions = {
+    timing: runTimer,
+    record(input: ToolRunSessionInput): RecordedToolRunSession | undefined {
+      // Best-effort, never throws, matches prior persist*Session contract.
+      // Must read datastore via the entered scope thunk (no direct/global access).
+      let datastore: DataStore | undefined;
+      try {
+        const thunk = readScope().datastore;
+        datastore = thunk ? (thunk() as DataStore | undefined) : undefined;
+      } catch {
+        datastore = undefined;
+      }
+      if (!datastore) {
+        return undefined;
+      }
+      const id = generatePrefixedId(input.tool);
+      const timing = runTimer.snapshot();
+      try {
+        new SessionRepo(datastore).save({
+          id,
+          tool: input.tool,
+          timestamp: timing.startedAt,
+          cwd: input.cwd,
+          recipe: input.recipe,
+          score: input.score,
+          passed: input.passed,
+          durationMs: timing.durationMs,
+          payload: input.payload,
+        });
+        // Observability per cross-cutting: log the record event (best effort).
+        log.info?.({
+          evt: 'cli.run-session.recorded',
+          module: 'cli:context',
+          tool: input.tool,
+          sessionId: id,
+          durationMs: timing.durationMs,
+        });
+      } catch (e) {
+        // Swallow; best-effort persistence must not affect primary outcome.
+        log.warn?.({
+          evt: 'cli.run-session.record_failed',
+          module: 'cli:context',
+          tool: input.tool,
+          error: e instanceof Error ? e.message : String(e),
+        });
+        return undefined;
+      }
+      return { id, tool: input.tool, timestamp: timing.startedAt, durationMs: timing.durationMs };
+    },
+  };
+
   const ctx: ToolCliContext = {
     get scope(): RunScope {
       // The pre-action-hook (or explicit runWithScope in tests) enters the
@@ -249,7 +333,8 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     },
     render: (result) => opts.render(result as CommandResult),
     registerLiveView: opts.liveViews.register,
-    renderLive: opts.liveViews.render,
+    renderLive: (key: string, args: unknown, liveContext?: LiveViewContext) =>
+      opts.liveViews.render(key, args, liveContext),
     maybeOpenReport: opts.maybeOpenReport,
     logger: log,
     setExitCode,
@@ -356,6 +441,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     exportBaselineSarif: baselineSeams.exportBaselineSarif,
     exportBaselineFingerprints: baselineSeams.exportBaselineFingerprints,
     toolState: stateSeams, // ADR-0042: durable per-tool keyed JSON state
+    runSession, // host-owned; created above, shared with live views
     hostPlanes, // Host-owned governance / entitlements / audit plane (H1-H3)
   };
 
