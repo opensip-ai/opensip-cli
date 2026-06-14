@@ -68,10 +68,10 @@ export { getDisplayName, getIcon } from './fit/display-registry.js';
  *     drives the live progress bar from this callback.
  *
  * Persistence is NOT done here (ADR-0028): the engine is worker-safe — it returns
- * the envelope + `durationMs` and the CALLER persists via `persistFitSession`
- * (the datastore handle cannot cross the worker boundary). The non-TTY/`--json`
+ * the envelope + result and the CALLER (or host via runSession seam) persists.
+ * The datastore handle cannot cross the worker boundary. The non-TTY/`--json`
  * path persists at its call site; the live runner persists on the main thread
- * after the worker returns.
+ * after the worker returns (now using the host `cli.runSession.record` seam).
  */
 export interface ExecuteFitOptions {
   onProgress?: (completed: number, total: number) => void;
@@ -104,8 +104,8 @@ export async function executeFit(
   args: FitOptions,
   opts: ExecuteFitOptions = {},
 ): Promise<
-  | { result: FitDoneResult; envelope: SignalEnvelope; durationMs: number; startedAt: string }
-  | { result: ErrorResult; envelope?: undefined; durationMs?: undefined; startedAt?: undefined }
+  | { result: FitDoneResult; envelope: SignalEnvelope }
+  | { result: ErrorResult; envelope?: undefined }
 > {
   logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
@@ -172,10 +172,6 @@ export async function executeFit(
   // `@opensip-cli/output` dependency in Phase 6).
   const envelope = buildFitEnvelope(fitnessResult, recipeName, signalersConfig);
 
-  // Persistence is the CALLER's job (ADR-0028 — worker-safe engine). `executeFit`
-  // returns `durationMs` so the caller can `persistFitSession(datastore, args,
-  // envelope, durationMs)` on the main thread with the exact wall-clock duration.
-
   // Collect warnings from check loading (ensureChecksLoaded → loadWarnings)
   // and from config validation (validateLanguagesAgainstAdapters). Both flow
   // through the result rather than direct stderr writes so the live renderer
@@ -203,7 +199,5 @@ export async function executeFit(
   return {
     result,
     envelope,
-    durationMs: fitnessResult.durationMs,
-    startedAt: fitnessResult.startedAt.toISOString(),
   };
 }
