@@ -74,4 +74,14 @@ describe('createRunTimer / RunTimer', () => {
       }
     }
   });
+
+  it('snapshot after a pause has non-decreasing duration and stable startedAt (enriched per Phase 7 scaffold)', () => {
+    const timer = createRunTimer();
+    const s1 = timer.snapshot();
+    const start = Date.now();
+    while (Date.now() - start < 2) {}
+    const s2 = timer.snapshot();
+    expect(s2.startedAt).toBe(s1.startedAt);
+    expect(s2.durationMs).toBeGreaterThanOrEqual(s1.durationMs);
+  });
 });
