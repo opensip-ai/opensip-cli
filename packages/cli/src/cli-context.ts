@@ -262,12 +262,11 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   const stateSeams = buildStateSeams({ getDatastore: getProjectDatastore }); // ADR-0042, same lazy resolver
   const hostPlanes = buildHostPlanes({ getDatastore: getProjectDatastore, logger: log });
 
-  // Host-owned run timer (per host-owned-run-timing spec/plan Phase 1):
-  // created exactly once here (inside buildToolCliContext, which is invoked
-  // from the pre-action hook AFTER the RunScope has been entered). The same
-  // instance is closed over by record() and exposed on both the static
-  // ToolCliContext and (via LiveViewContext) to live renderers. No tool code
-  // can observe or run before this point.
+  // Host-owned run timer per spec: created before any tool handler or renderLive.
+  // Same instance used for static paths and live renderers.
+  // (host-owned-run-timing plan Phase 1 + cross-cutting: after scope enter via
+  // pre-action, inside the documented buildToolCliContext factory; no tool
+  // work precedes ctx construction.)
   const runTimer: RunTimer = createRunTimer();
 
   const runSession: ToolRunSessions = {
