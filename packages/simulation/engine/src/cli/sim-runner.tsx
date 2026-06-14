@@ -32,6 +32,7 @@ import {
   RunFooterHints,
   RunHeader,
   RunSummary,
+  RunTimingProvider,
   ThemeProvider,
   UpdateHint,
   VERBOSE_DETAIL_HINT,
@@ -65,7 +66,8 @@ type SimLiveArgs = ToolOptions & { readonly quiet?: boolean; readonly verbose?: 
 
 interface SimDoneShape {
   readonly envelope: SignalEnvelope;
-  readonly durationMs: number;
+  /** Optional — only for internal; summary duration now from host provider (phase 4.3). */
+  readonly durationMs?: number;
   readonly verboseDetail?: VerboseDetail;
 }
 
@@ -173,7 +175,8 @@ export function SimRunner({
           phase: 'done',
           result: {
             envelope: result.envelope,
-            durationMs: result.durationMs ?? 0,
+            // duration omitted for summary (host provider supplies); keep if present for other internal use
+            ...(result.durationMs === undefined ? {} : { durationMs: result.durationMs }),
             verboseDetail: result.verboseDetail,
           },
         });
@@ -253,12 +256,23 @@ export function SimRunner({
         {args.quiet !== true && findingsDetail !== undefined && (
           <Box>{renderToInk(viewFindingsGroups(findingsDetail.groups))}</Box>
         )}
-        <RunSummary
-          passed={state.result.envelope.verdict.passed}
-          errors={summary.errors}
-          warnings={summary.warnings}
-          durationMs={state.result.durationMs}
-        />
+        {(() => {
+          const summaryEl = (
+            <RunSummary
+              passed={state.result.envelope.verdict.passed}
+              errors={summary.errors}
+              warnings={summary.warnings}
+              // durationMs omitted — provider (from liveContext) supplies host timer
+            />
+          );
+          return liveContext?.runSession ? (
+            <RunTimingProvider timer={liveContext.runSession.timing}>
+              {summaryEl}
+            </RunTimingProvider>
+          ) : (
+            summaryEl
+          );
+        })()}
         {args.quiet !== true && (
           <RunFooterHints
             hints={
