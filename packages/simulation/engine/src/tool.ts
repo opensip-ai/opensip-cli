@@ -18,7 +18,7 @@ import { resolveSession } from '@opensip-cli/session-store';
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { renderSimLive } from './cli/sim-runner.js';
 import { simRunWorkerCommandSpec } from './cli/sim-worker.js';
-import { executeSim, persistSimSession } from './cli/sim.js';
+import { executeSim } from './cli/sim.js';
 import {
   createScenarioRegistry,
   createSimulationLoadState,
@@ -131,11 +131,20 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   // animated Ink view is a TTY-only affordance. Output is byte-for-byte the
   // pre-live-view behavior.
   const datastore = cli.scope.datastore() as DataStore | undefined;
-  const { result, startedAt } = await executeSim(opts);
-  // Persist on the main thread (ADR-0028 — engine is persistence-free).
-  // @fitness-ignore-next-line detached-promises -- persistSimSession is synchronous (SQLite write; returns void), not a promise
-  if (datastore !== undefined && result.type === 'sim-done' && startedAt !== undefined) {
-    persistSimSession(datastore, result, startedAt);
+  const { result } = await executeSim(opts);
+  // Host-owned record (Phase 4): timing from the RunTimer on cli.runSession (same
+  // instance the live path receives via LiveViewContext).
+  if (result.type === 'sim-done') {
+    const { buildSimulationSessionPayload } = await import('./persistence/session-payload.js');
+    const payload = buildSimulationSessionPayload(result.envelope);
+    cli.runSession.record({
+      tool: 'sim',
+      cwd: result.cwd,
+      recipe: result.recipeName,
+      score: result.envelope.verdict.score,
+      passed: result.envelope.verdict.passed,
+      payload,
+    });
   }
 
   if (result.type === 'error') {

@@ -337,18 +337,21 @@ export async function executeSim(
 }
 
 /** Persist a completed sim run. Best-effort — a SQLite write failure never fails
- *  an otherwise-successful run. Called by the run-mode callers on the main thread. */
+ *  an otherwise-successful run. Called by the run-mode callers on the main thread.
+ *  (host-owned-run-timing: real calls now use cli.runSession.record; this helper
+ *  kept for legacy direct test callers and uses dummy timing to avoid tool code
+ *  capturing Date for StoredSession columns.)
+ */
 export function persistSimSession(
   datastore: DataStore,
   result: SimDoneResult,
-  startedAt: string,
 ): void {
   try {
     const repo = new SessionRepo(datastore);
     repo.save({
       id: generatePrefixedId('sim'),
       tool: 'sim',
-      timestamp: startedAt,
+      timestamp: '1970-01-01T00:00:00.000Z',
       cwd: result.cwd,
       recipe: result.recipeName,
       score: result.envelope.verdict.score,

@@ -240,9 +240,9 @@ describe('persistSimSession', () => {
     const ds: DataStore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const result = await simDone();
-      // Exercise the persist seam with an explicit start time (the executeSim
-      // wrapper supplies it in real callers; here we test the best-effort write).
-      persistSimSession(ds, result, '2026-06-13T12:00:00.000Z');
+      // Exercise the (now data-only) persist seam. Real runs use cli.runSession.record
+      // (host stamps timing); this tests the best-effort write path for legacy callers.
+      persistSimSession(ds, result);
       const sessions = new SessionRepo(ds).list({ tool: 'sim' });
       expect(sessions).toHaveLength(1);
       expect(sessions[0]?.recipe).toBe('default');
@@ -256,7 +256,7 @@ describe('persistSimSession', () => {
     // A datastore whose handle is unusable makes SessionRepo.save throw; the
     // best-effort wrapper must swallow + log, not propagate.
     expect(() =>
-      persistSimSession({} as unknown as DataStore, result, '2026-01-01T00:00:00.000Z'),
+      persistSimSession({} as unknown as DataStore, result),
     ).not.toThrow();
   });
 });
