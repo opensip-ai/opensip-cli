@@ -1,9 +1,10 @@
 # Project-local fitness checks for opensip-cli
 
-This directory holds **project-local** fit checks that the
-opensip-cli repo uses to analyze itself. They are auto-discovered
-by the plugin loader (see `packages/core/src/plugins/discover.ts`)
-and run as part of every `pnpm fit` invocation against this repo.
+Direct `.js` and `.mjs` files in this directory hold **project-local**
+fit checks that the opensip-cli repo uses to analyze itself. They are
+auto-discovered by the plugin loader (see
+`packages/core/src/plugins/discover.ts`) and run as part of every
+`pnpm fit` invocation against this repo.
 
 ## Dual purpose
 
@@ -22,15 +23,21 @@ These checks serve two audiences:
 ## Conventions for new project-local checks
 
 - **File shape:** ES modules with `.mjs` extension. The plugin
-  loader auto-discovers `.js` and `.mjs` (not `.ts`).
-- **Required export:** `export const checks = [defineCheck({...})]`
-  — see `packages/core/src/plugins/__tests__/discover.test.ts:68-104`
-  for the contract.
+  loader auto-discovers direct child `.js` and `.mjs` files (not `.ts`,
+  and not nested subdirectories).
+- **Supported exports:** prefer `export const checks = [defineCheck({...})]`
+  for dogfood files that may grow to multiple rules. The loader also accepts
+  named `defineCheck(...)` exports and a default single-check export. See
+  `packages/fitness/engine/src/plugins/loader.ts` for registration semantics
+  and `packages/core/src/plugins/__tests__/discover.test.ts` for loose-file
+  discovery.
 - **Imports:** `import { defineCheck, isTestFile, ... } from '@opensip-cli/fitness'`.
   Resolves via workspace linkage in this monorepo and via the
   published package in any other consumer.
-- **UUID:** every check needs a fresh `id` field — generate with
-  `uuidgen`.
+- **ID:** every check needs a stable, unique `id` field. For local-only
+  dogfood checks, use a readable `local:<area>-<slug>` id and do not change
+  it after the check has run in baselines. For promoted or shipped checks,
+  follow the first-party pack convention in the destination package.
 - **Comments:** prioritize "why this shape" over "what this code
   does." A reader landing here is learning the pattern, not
   reviewing the implementation.

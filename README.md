@@ -18,7 +18,7 @@ codebases. It gives platform teams, staff engineers, architecture owners, and
 product teams a shared way to see what is healthy, what is risky, and what
 should not get worse.
 
-- **Measure code health across languages** with 160+ included checks for
+- **Measure code health across languages** with 150+ included checks for
   TypeScript, Python, Go, Java, Rust, and C/C++.
 - **See change impact before you merge** with static call graphs,
   blast-radius analysis, cycles, duplicated bodies, oversized functions, and
@@ -128,7 +128,9 @@ opensip report
 
 OpenSIP ships with `fit`, `graph`, and `sim`, but the CLI is a pluggable tool
 platform. Add project-local checks, npm-packaged recipes, custom graph rules,
-or entire tools that mount as first-class `opensip` subcommands.
+or entire tools that mount as first-class `opensip` subcommands. Use
+`opensip plugin ...` for fit/sim packs and `opensip tools ...` for whole Tool
+plugins.
 
 ## How It Works
 
@@ -197,6 +199,15 @@ opensip plugin remove <package>
 opensip plugin sync
 ```
 
+### Tools
+
+```bash
+opensip tools list
+opensip tools validate <spec>
+opensip tools install <spec> [--global|--project]
+opensip tools uninstall <name-or-id> [--global|--project]
+```
+
 ## Project Layout
 
 `opensip init` writes a small project-local layout:
@@ -211,11 +222,13 @@ your-project/
     sim/
       scenarios/
       recipes/
+    tools/           # optional authored Tool sidecars
     .runtime/        # generated state, gitignored
 ```
 
-User-authored checks, recipes, scenarios, and tools live under
-`opensip-cli/`. Generated runtime data lives under `opensip-cli/.runtime/`.
+User-authored checks, recipes, scenarios, and authored Tool sidecars live
+under `opensip-cli/`. Generated runtime data and project-installed plugins live
+under `opensip-cli/.runtime/`.
 
 ## CI Integration
 
@@ -265,17 +278,21 @@ OpenSIP CLI is built to be extended.
 - Package reusable checks, recipes, scenarios, or graph adapters as npm
   plugins.
 - Build a full tool when `fit`, `graph`, or `sim` is not the right shape.
+- Manage whole Tool plugins with `opensip tools list`, `opensip tools validate`,
+  and `opensip tools install`.
 - Share tools and packs with the OpenSIP community when they are useful beyond
   one codebase.
 
-Project-local tools are deny-by-default because they run code from the repo.
-Allowlist them explicitly:
+Project-authored Tool sidecars under `opensip-cli/tools/` are deny-by-default
+because they run code from the repo. Allowlist them explicitly:
 
 ```bash
 OPENSIP_CLI_ALLOW_PROJECT_TOOLS=my-tool opensip my-tool
 ```
 
-Global tools under `~/.opensip-cli/tools/` are trusted by default.
+npm-installed Tool plugins live under `~/.opensip-cli/plugins/tool/` by default,
+or under `opensip-cli/.runtime/plugins/tool/` with `--project`. Authored
+sidecar tools under `~/.opensip-cli/tools/` are trusted by default.
 
 ## Development
 
