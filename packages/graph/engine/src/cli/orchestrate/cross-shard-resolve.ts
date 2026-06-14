@@ -177,9 +177,9 @@ function mergeFragmentReExports(fragments: readonly Catalog[]): readonly ReExpor
   }
   return out.sort(
     (a, b) =>
-      a.fromFile.localeCompare(b.fromFile) ||
-      a.exportedName.localeCompare(b.exportedName) ||
-      a.specifier.localeCompare(b.specifier),
+      Number(a.fromFile > b.fromFile) - Number(a.fromFile < b.fromFile) ||
+      Number(a.exportedName > b.exportedName) - Number(a.exportedName < b.exportedName) ||
+      Number(a.specifier > b.specifier) - Number(a.specifier < b.specifier),
   );
 }
 
@@ -211,21 +211,19 @@ function canonicalizeFunctions(
 /** Stable occurrence order: filePath, then line, then bodyHash. */
 function compareOccurrences(a: FunctionOccurrence, b: FunctionOccurrence): number {
   return (
-    a.filePath.localeCompare(b.filePath) || a.line - b.line || a.bodyHash.localeCompare(b.bodyHash)
+    Number(a.filePath > b.filePath) - Number(a.filePath < b.filePath) ||
+    a.line - b.line ||
+    Number(a.bodyHash > b.bodyHash) - Number(a.bodyHash < b.bodyHash)
   );
 }
 
 /** Stable edge order within an occurrence: line, then column, then sorted(to). */
 function sortCalls(calls: readonly CallEdge[]): CallEdge[] {
-  return [...calls].sort(
-    (a, b) =>
-      a.line - b.line ||
-      a.column - b.column ||
-      [...a.to]
-        .sort()
-        .join(',')
-        .localeCompare([...b.to].sort().join(',')),
-  );
+  return [...calls].sort((a, b) => {
+    const toA = [...a.to].sort().join(',');
+    const toB = [...b.to].sort().join(',');
+    return a.line - b.line || a.column - b.column || (Number(toA > toB) - Number(toA < toB));
+  });
 }
 
 /** Append one fragment's occurrences into the merged map, deduping by

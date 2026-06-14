@@ -86,8 +86,8 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
     else failures.push({ shardId: o.shardId, exitCode: o.exitCode, stderr: o.stderr });
   }
   // Deterministic order regardless of completion order.
-  fragments.sort((a, b) => a.shardId.localeCompare(b.shardId));
-  failures.sort((a, b) => a.shardId.localeCompare(b.shardId));
+  fragments.sort((a, b) => Number(a.shardId > b.shardId) - Number(a.shardId < b.shardId));
+  failures.sort((a, b) => Number(a.shardId > b.shardId) - Number(a.shardId < b.shardId));
 
   logger.info({
     evt: 'graph.shard.runner.complete',

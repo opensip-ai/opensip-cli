@@ -24,14 +24,14 @@ describe('extractPayloadVersion', () => {
     expect(extractPayloadVersion({ __version: -1 })).toBeUndefined();
     expect(extractPayloadVersion({ __version: Number.NaN })).toBeUndefined();
     expect(extractPayloadVersion({ __version: Infinity })).toBeUndefined();
-    expect(extractPayloadVersion({ __version: '2' as any })).toBeUndefined();
-    expect(extractPayloadVersion({ __version: true as any })).toBeUndefined();
+    expect(extractPayloadVersion({ __version: '2' })).toBeUndefined();
+    expect(extractPayloadVersion({ __version: true })).toBeUndefined();
   });
 
   it('does not throw on weird inputs', () => {
     expect(() => extractPayloadVersion(Object.create(null))).not.toThrow();
     expect(extractPayloadVersion(Object.create(null))).toBeUndefined();
-    const circular: any = {};
+    const circular: Record<string, unknown> = {};
     circular.self = circular;
     expect(() => extractPayloadVersion(circular)).not.toThrow();
     expect(extractPayloadVersion(circular)).toBeUndefined();

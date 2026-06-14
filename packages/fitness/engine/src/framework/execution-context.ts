@@ -1,5 +1,6 @@
 // @fitness-ignore-file concurrency-safety -- single-threaded execution context
 // @fitness-ignore-file error-handling-suite -- catch blocks delegate errors through established patterns
+// @fitness-ignore-file unbounded-memory -- readFile IS the size-validating wrapper: fs.stat guard + post-read content.length guard both throw FILE_TOO_LARGE (>10MB)
 /**
  * @fileoverview Execution context creation for fitness checks
  *

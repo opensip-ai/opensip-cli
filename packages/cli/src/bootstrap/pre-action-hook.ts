@@ -186,7 +186,7 @@ export interface PreActionRuntime {
 // because it is the single source of truth for ordering; splitting would obscure
 // the load-bearing sequence and duplicate the guard/enter wiring. Acceptable for
 // this composition root (see similar disables on other bootstrap entry points).
-/* eslint-disable sonarjs/cognitive-complexity */
+/* eslint-disable sonarjs/cognitive-complexity -- single source of truth for scope construction/enter ordering; splitting would obscure the load-bearing sequence (rationale above) */
 export function installPreActionHook(
   program: Command,
   version: string,
@@ -433,7 +433,7 @@ export function installPreActionHook(
         s.dispose();
       }
     } catch {
-      // Swallow dispose errors on shutdown; the run has already produced its outcome.
+      // @swallow-ok dispose errors on shutdown; the run has already produced its outcome.
     }
   });
 }

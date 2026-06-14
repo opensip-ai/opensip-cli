@@ -331,6 +331,9 @@ function isLikelyCommanderCommand(x: unknown): boolean {
  *
  * If no plausible opts object is found, we treat the entire prefix before the
  * Command as positionals and opts as {} (fail-closed paranoia below still applies).
+ *
+ * @throws {Error} On the defensive, normally-unreachable path where no opts object
+ *   can be located among the action arguments (surfaced loudly so tests/CI catch it).
  */
 function splitActionArgs(actionArgs: readonly unknown[]): {
   opts: Record<string, unknown>;

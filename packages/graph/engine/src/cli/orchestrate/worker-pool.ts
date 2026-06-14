@@ -9,6 +9,8 @@
  *
  * Results are returned in COMPLETION order, not input order — callers that
  * need determinism sort afterward (shards sort by shardId).
+ *
+ * @throws {TypeError} When `concurrency` is not a finite number.
  */
 export async function runWorkerPool<I, O>(
   items: readonly I[],

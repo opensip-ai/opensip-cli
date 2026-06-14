@@ -48,7 +48,7 @@ export class BaselineRepo {
       const byFingerprint = new Map<string, Signal>();
       for (const e of entries) byFingerprint.set(e.fingerprint, e.payload);
       const rows = [...byFingerprint.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
+        .sort(([a], [b]) => Number(a > b) - Number(a < b))
         .map(([fingerprint, payload]) => ({ tool, fingerprint, payload, capturedAt }));
 
       this.datastore.transaction((tx) => {

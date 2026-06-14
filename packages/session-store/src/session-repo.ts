@@ -41,6 +41,12 @@ export class SessionRepo {
     this.datastore = requireDrizzleDataStore(datastore);
   }
 
+  /**
+   * Persist a completed session row and its tool payload.
+   *
+   * @throws {ValidationError} When `session.timestamp` is not a finite date — guarded
+   *   eagerly so a bad timestamp never corrupts the durable session log.
+   */
   save(session: StoredSession): void {
     try {
       // Validate timestamp eagerly so we never write NaN / "Invalid Date" into
@@ -50,6 +56,7 @@ export class SessionRepo {
       const ts = new Date(session.timestamp);
       const tsMs = ts.getTime();
       if (!Number.isFinite(tsMs)) {
+        // @fitness-ignore-next-line result-pattern-consistency -- persistence boundary (DEC-015): an invalid timestamp is a write-time data-integrity guard the caller cannot recover from, so throw (not Result) is correct
         throw new ValidationError(
           `Invalid session timestamp for session ${session.id} (tool=${session.tool}): ${JSON.stringify(session.timestamp)}`,
           { code: 'VALIDATION.SESSION.INVALID_TIMESTAMP' },

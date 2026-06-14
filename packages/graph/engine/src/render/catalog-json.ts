@@ -352,8 +352,8 @@ export function renderCatalogJson(input: RenderCatalogJsonInput): string {
   // contract. Sort by id (sha256 hex string, lexicographic). Use spread to
   // produce the sorted copy so the sort call does not immediately mutate a
   // named array in statement position (unicorn/no-immediate-mutation).
-  const sortedSymbols = [...symbols].sort((a, b) => a.id.localeCompare(b.id));
-  const sortedEdges = [...edges].sort((a, b) => a.id.localeCompare(b.id));
+  const sortedSymbols = [...symbols].sort((a, b) => Number(a.id > b.id) - Number(a.id < b.id));
+  const sortedEdges = [...edges].sort((a, b) => Number(a.id > b.id) - Number(a.id < b.id));
 
   // Build the JSON in chunks to avoid materializing the *entire* export (symbols + edges
   // for 100k-file repos) as one giant JS string in a single JSON.stringify call.

@@ -102,6 +102,6 @@ function stableStringify(options: ts.CompilerOptions): string {
   const LOCATION_KEYS = new Set(['configFilePath', 'pathsBasePath']);
   const entries = Object.entries(options as Record<string, unknown>)
     .filter(([k]) => !LOCATION_KEYS.has(k))
-    .sort(([a], [b]) => a.localeCompare(b));
+    .sort(([a], [b]) => Number(a > b) - Number(a < b));
   return JSON.stringify(entries);
 }

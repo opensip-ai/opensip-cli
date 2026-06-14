@@ -152,6 +152,9 @@ export function getOrOpenDatastore(_log: Logger = defaultLogger): DataStore {
  * Converts the internal DATASTORE_OUTSIDE_PROJECT SystemError into a clear
  * ConfigurationError so callers of the documented ToolCliContext seams get a
  * user-actionable error (exit 2) instead of an internal SYSTEM.* code.
+ *
+ * @throws {ConfigurationError} When called outside a project scope (no open datastore);
+ *   other datastore-open failures propagate unchanged.
  */
 function getProjectDatastore(): DataStore {
   try {

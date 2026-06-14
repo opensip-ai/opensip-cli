@@ -428,9 +428,9 @@ function mergeReExports(
 function sortReExports(reExports: readonly ReExportRecord[]): readonly ReExportRecord[] {
   return [...reExports].sort(
     (a, b) =>
-      a.fromFile.localeCompare(b.fromFile) ||
-      a.exportedName.localeCompare(b.exportedName) ||
-      a.specifier.localeCompare(b.specifier),
+      Number(a.fromFile > b.fromFile) - Number(a.fromFile < b.fromFile) ||
+      Number(a.exportedName > b.exportedName) - Number(a.exportedName < b.exportedName) ||
+      Number(a.specifier > b.specifier) - Number(a.specifier < b.specifier),
   );
 }
 

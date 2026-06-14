@@ -69,7 +69,8 @@ export function startProfiling(scope?: RunScope, command?: string): void {
     session.connect();
 
     session.post('Profiler.enable', (_err?: Error | null, _res?: unknown) => {
-      session!.post('Profiler.start', (_err2?: Error | null, _res2?: unknown) => {
+      if (!session) return;
+      session.post('Profiler.start', (_err2?: Error | null, _res2?: unknown) => {
         isProfiling = true;
 
         const runId = scope?.runId ?? 'unknown';
@@ -166,7 +167,7 @@ function cleanup(): void {
     try {
       session.disconnect();
     } catch {
-      // ignore
+      // @swallow-ok best-effort inspector session disconnect during profiling teardown
     }
   }
   session = null;

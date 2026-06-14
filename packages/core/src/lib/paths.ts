@@ -193,6 +193,7 @@ export function isPathInside(child: string, parent: string): boolean {
     realChild = realpathSync(child);
     realParent = realpathSync(parent);
   } catch {
+    // @swallow-ok realpathSync throws when a path does not exist; fail closed (treat as "not inside")
     return false;
   }
   if (realChild === realParent) return true;

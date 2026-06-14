@@ -200,9 +200,9 @@ export async function shutdownTelemetry(): Promise<void> {
 
   // Stop profiling first (it may write files and is cheap).
   try {
-    stopProfiling();
+    void stopProfiling();
   } catch {
-    // best effort
+    // @swallow-ok best-effort profiling stop during SDK shutdown
   }
 
   const shutdowns: Promise<void>[] = [];

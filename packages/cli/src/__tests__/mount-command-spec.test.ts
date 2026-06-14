@@ -516,7 +516,7 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
   it('preserves zero positionals when none are supplied', async () => {
     const { ctx } = makeCtx();
     const program = new Command();
-    const received: { opts: any; positionals: any }[] = [];
+    const received: { opts: Record<string, unknown>; positionals: unknown }[] = [];
     const spec: HostCommandSpec = defineCommand({
       name: 'nopos',
       description: 'no positionals',
@@ -524,7 +524,7 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
       scope: 'none',
       output: 'command-result',
       handler: (opts) => {
-        received.push({ opts, positionals: (opts as any)._args });
+        received.push({ opts, positionals: opts._args });
         return { type: 'help' } as const;
       },
     });
@@ -541,7 +541,7 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
   it('preserves a single positional and trailing common flags', async () => {
     const { ctx } = makeCtx();
     const program = new Command();
-    const received: { opts: any; positionals: any }[] = [];
+    const received: { opts: Record<string, unknown>; positionals: unknown }[] = [];
     const spec: HostCommandSpec = defineCommand({
       name: 'onepos',
       description: 'one positional',
@@ -550,7 +550,7 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
       scope: 'none',
       output: 'command-result',
       handler: (opts) => {
-        received.push({ opts, positionals: (opts as any)._args });
+        received.push({ opts, positionals: opts._args });
         return { type: 'help' } as const;
       },
     });
@@ -569,7 +569,7 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
   it('preserves multiple (variadic) positionals without eating them into opts', async () => {
     const { ctx } = makeCtx();
     const program = new Command();
-    const received: { opts: any; positionals: any }[] = [];
+    const received: { opts: Record<string, unknown>; positionals: unknown }[] = [];
     const spec: HostCommandSpec = defineCommand({
       name: 'multipos',
       description: 'variadic positionals',
@@ -578,7 +578,7 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
       scope: 'none',
       output: 'command-result',
       handler: (opts) => {
-        received.push({ opts, positionals: (opts as any)._args });
+        received.push({ opts, positionals: opts._args });
         return { type: 'help' } as const;
       },
     });

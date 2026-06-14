@@ -49,6 +49,7 @@ export interface ScheduleUnitsOptions<Unit> {
   readonly yieldBetweenUnits?: boolean;
 }
 
+/* eslint-disable sonarjs/cognitive-complexity -- unifies parallel sliding-window and sequential scheduling with shared abort/drain latching; one scheduler for fitness and simulation (rationale below) */
 /**
  * Schedule `units` through `runUnit` per the mode/concurrency/stop policy.
  *
@@ -59,8 +60,9 @@ export interface ScheduleUnitsOptions<Unit> {
  * scheduler used by fitness and simulation engines (the "same-recipe-semantics"
  * contract). Extracting helpers would make the refill-vs-drain state machine
  * harder to audit as a whole. Disable is scoped to this function.
+ *
+ * @throws {Error} When `mode` is neither 'sequential' nor 'parallel'.
  */
-/* eslint-disable sonarjs/cognitive-complexity */
 export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Promise<void> {
   const { units, mode, shouldAbort } = opts;
   if (units.length === 0) return;

@@ -488,6 +488,7 @@ export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineComm
       flag: '--concurrency',
       value: '<n>',
       description: 'Concurrency cap for --workspace and the sharded build (default: cpus()-1)',
+      /** @throws {Error} When the value is not a positive integer (Commander maps it to exit 2). */
       parse: (v) => {
         const n = Number.parseInt(v, 10);
         if (!Number.isFinite(n) || n < 1) {

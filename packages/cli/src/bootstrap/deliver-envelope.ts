@@ -201,7 +201,7 @@ export async function deliverEnvelope(
   // Record delivery start on the scope diagnostics (if any) so the 'deliver' phase
   // of the uniform lifecycle is visible in CommandOutcome for --json consumers.
   // This improves observability of the root-owned egress path (architecture review).
-  scope?.diagnostics.event('deliver', 'debug', `deliver start for ${envelope.tool}`, {
+  void scope?.diagnostics.event('deliver', 'debug', `deliver start for ${envelope.tool}`, {
     tool: envelope.tool,
     recipe: envelope.recipe,
     signalCount: envelope.signals.length,
@@ -224,7 +224,7 @@ export async function deliverEnvelope(
   };
 
   const cloudSuffix = cloud.skippedReason ? ` (skipped:${cloud.skippedReason})` : '';
-  scope?.diagnostics.event(
+  void scope?.diagnostics.event(
     'deliver',
     'debug',
     `cloud egress: accepted=${cloudAccepted}${cloudSuffix}`,
@@ -249,7 +249,7 @@ export async function deliverEnvelope(
     opts.setExitCode?.(EXIT_CODES.REPORT_FAILED);
   }
 
-  scope?.diagnostics.event(
+  void scope?.diagnostics.event(
     'deliver',
     reportSuccess ? 'info' : 'warn',
     `report-to ${reportSuccess ? 'succeeded' : 'failed'}`,

@@ -111,7 +111,7 @@ export class Registry<T extends Registerable> {
   // single implementation of the registry contract used by *all* registries in the system;
   // extracting sub-fns would fragment the policy table that must be reviewed as a unit for
   // ADR-0023/ADR-0037/etc. correctness. Disable scoped to this method only.
-  /* eslint-disable sonarjs/cognitive-complexity */
+  /* eslint-disable sonarjs/cognitive-complexity -- single registry contract: DuplicatePolicy table and nameCollision guard reviewed as a unit (rationale above) */
   register(item: T, callOpts: RegisterCallOptions = {}): void {
     const { byId, byName } = this;
     const internal = callOpts.internal === true;

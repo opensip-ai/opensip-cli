@@ -469,11 +469,11 @@ function computePackageCoupling(indexes: Indexes): {
       edge.push({ callerPackage, calleePackage, count });
     }
   }
-  edge.sort((a, b) =>
-    a.callerPackage === b.callerPackage
-      ? a.calleePackage.localeCompare(b.calleePackage)
-      : a.callerPackage.localeCompare(b.callerPackage),
-  );
+  edge.sort((a, b) => {
+    const x = a.callerPackage === b.callerPackage ? a.calleePackage : a.callerPackage;
+    const y = a.callerPackage === b.callerPackage ? b.calleePackage : b.callerPackage;
+    return Number(x > y) - Number(x < y);
+  });
 
   // package rows: couplingOut = distinct callee packages per caller;
   // couplingIn = distinct caller packages per callee. Self-edges included
