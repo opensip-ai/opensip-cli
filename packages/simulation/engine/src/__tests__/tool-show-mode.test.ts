@@ -29,7 +29,8 @@ function simSession(overrides: Partial<StoredSession> = {}): StoredSession {
     id: 'SIM_1',
     tool: 'sim',
     cwd: '/repo',
-    timestamp: '2026-06-08T00:00:00.000Z',
+    startedAt: '2026-06-08T00:00:00.000Z',
+    completedAt: '2026-06-08T00:00:00.000Z',
     score: 100,
     passed: true,
     durationMs: 5,
@@ -97,6 +98,11 @@ function makeContext(datastore: DataStore | undefined): {
         startedAtEpochMs: Date.now(),
         elapsedMs: () => 0,
         snapshot: () => ({
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          durationMs: 0,
+        }),
+        complete: () => ({
           startedAt: new Date().toISOString(),
           completedAt: new Date().toISOString(),
           durationMs: 0,

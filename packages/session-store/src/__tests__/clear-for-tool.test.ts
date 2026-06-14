@@ -18,7 +18,8 @@ function session(id: string, tool: StoredSession['tool']): StoredSession {
   return {
     id,
     tool,
-    timestamp: '2026-06-12T00:00:00.000Z',
+    startedAt: '2026-06-12T00:00:00.000Z',
+    completedAt: '2026-06-12T00:00:00.000Z',
     cwd: '/tmp',
     recipe: 'default',
     score: 100,

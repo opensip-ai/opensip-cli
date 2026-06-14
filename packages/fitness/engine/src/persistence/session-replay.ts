@@ -55,7 +55,7 @@ export function fitReplayFromSession(stored: StoredSession): ToolSessionReplay<F
     schemaVersion: 2,
     tool: 'fit',
     runId: stored.id,
-    createdAt: stored.timestamp,
+    createdAt: stored.startedAt,
     ...(stored.recipe === undefined ? {} : { recipe: stored.recipe }),
     verdict: {
       score: stored.score,
@@ -107,6 +107,6 @@ function replaySignal(
           },
         }),
     metadata: {},
-    createdAt: stored.timestamp,
+    createdAt: stored.startedAt,
   };
 }

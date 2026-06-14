@@ -111,7 +111,7 @@ function historyRow(s: StoredSession): Span[] {
   return [
     { text: s.id, dim: true },
     { text: s.tool, tone: 'brand', bold: true },
-    { text: new Date(s.timestamp).toLocaleString(), dim: true },
+    { text: new Date(s.startedAt).toLocaleString(), dim: true },
     { text: `${s.score}%`, tone: scoreTone(s.score) },
     { text: s.passed ? 'PASS' : 'FAIL', tone: s.passed ? 'success' : 'error' },
     { text: counts ? `${counts.passed}/${counts.total}` : '—' },

@@ -1169,7 +1169,8 @@ function saveGraphSession(
     repo.save({
       id: generatePrefixedId('graph'),
       tool: 'graph',
-      timestamp: startedAt,
+      startedAt: startedAt,
+      completedAt: startedAt,
       cwd: opts.cwd,
       // Pass rate over passed/total rules — same definition fit uses (a
       // warnings-only run is all-rules-passed → 100). `passed` ⇔ no

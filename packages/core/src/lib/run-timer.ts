@@ -1,20 +1,25 @@
 /**
- * @fileoverview Host-owned RunTimer primitive (host-owned-run-timing plan).
+ * @fileoverview Host-owned RunTimer / RunLifecycle primitive
+ * (host-owned-run-timing plan).
  *
- * Single source of truth for wall-clock start + monotonic elapsed for the
- * duration of a user-visible CLI tool run. The host (CLI composition root)
- * creates one `RunTimer` early (before tool command handlers and live views)
- * and exposes it (plus the `record` seam) through `ToolCliContext.runSession`.
+ * Single source of truth for wall-clock start + monotonic elapsed for one
+ * user-visible CLI tool run. The host run-lifecycle plane creates one lifecycle
+ * inside the selected command action (after `RunScope` entry, before any
+ * tool-owned work) and `complete()`s it once the tool handler / live renderer
+ * returns its completion data — that frozen snapshot feeds the generic
+ * `StoredSession.startedAt` / `completedAt` / `durationMs`.
  *
  * Tools and engines must never capture their own `Date.now` / `new Date` for
- * the generic `StoredSession.timestamp` and `durationMs` columns; only the
- * host timer feeds those. Internal tool timers (per-unit, per-stage, etc.)
- * remain tool-owned for diagnostics.
+ * the generic session timing fields; only the host lifecycle feeds those.
+ * Internal tool timers (per-unit, per-stage, etc.) remain tool-owned for
+ * diagnostics.
  *
- * `startedAt` is ISO wall time captured at construction (the user-initiated
- * start). `durationMs` and `completedAt` come from `snapshot()` at record time.
- * Elapsed uses a monotonic clock (`performance.now` when available) to avoid
- * skew on long runs or system clock adjustments.
+ * `startedAt` is ISO wall time captured at construction. `complete()` is
+ * idempotent: the first call freezes `completedAt` + `durationMs`; later calls
+ * return the same frozen snapshot. `snapshot()` reads live before completion
+ * (for the ticking live display) and the frozen values after. Elapsed uses a
+ * monotonic clock (`performance.now` when available) to avoid skew on long runs
+ * or system clock adjustments.
  */
 
 export interface RunTimingSnapshot {
@@ -45,11 +50,28 @@ export interface RunTimer {
   elapsedMs(): number;
 
   /**
-   * Capture a point-in-time snapshot for persisting a `StoredSession`.
-   * `startedAt` is stable; `completedAt` and `durationMs` reflect now.
+   * Capture a point-in-time snapshot. `startedAt` is stable; `completedAt`
+   * and `durationMs` reflect now — unless the lifecycle has already been
+   * `complete()`d, in which case the frozen completion snapshot is returned.
    */
   snapshot(): RunTimingSnapshot;
+
+  /**
+   * Freeze the run lifecycle. Idempotent: the first call captures
+   * `completedAt` + `durationMs`; subsequent calls return the same frozen
+   * snapshot. The host run-lifecycle plane calls this once the tool handler /
+   * live renderer has returned, before host persistence / render / egress.
+   */
+  complete(): RunTimingSnapshot;
 }
+
+/**
+ * The run lifecycle object the host owns for a single tool invocation
+ * (host-owned-run-timing §6.1). Structurally identical to {@link RunTimer};
+ * the alias gives the spec-named type and creator without churning the many
+ * existing `RunTimer` references.
+ */
+export type RunLifecycle = RunTimer;
 
 /**
  * Create a fresh host-owned run timer.
@@ -80,14 +102,38 @@ export function createRunTimer(): RunTimer {
     return Math.max(0, raw);
   }
 
+  let frozen: RunTimingSnapshot | undefined;
+
+  function snapshot(): RunTimingSnapshot {
+    if (frozen) return frozen;
+    return {
+      startedAt,
+      completedAt: new Date().toISOString(),
+      durationMs: Math.max(0, elapsedMs()),
+    };
+  }
+
+  function complete(): RunTimingSnapshot {
+    // Idempotent: the first completion freezes completedAt + durationMs.
+    frozen ??= {
+      startedAt,
+      completedAt: new Date().toISOString(),
+      durationMs: Math.max(0, elapsedMs()),
+    };
+    return frozen;
+  }
+
   return {
     startedAt,
     startedAtEpochMs,
     elapsedMs,
-    snapshot(): RunTimingSnapshot {
-      const completedAt = new Date().toISOString();
-      const durationMs = Math.max(0, elapsedMs());
-      return { startedAt, completedAt, durationMs };
-    },
+    snapshot,
+    complete,
   };
 }
+
+/**
+ * Create a fresh host-owned run lifecycle. Alias of {@link createRunTimer}
+ * under the spec-named factory (host-owned-run-timing §6.1).
+ */
+export const createRunLifecycle: () => RunLifecycle = createRunTimer;

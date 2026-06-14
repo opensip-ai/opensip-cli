@@ -8,7 +8,8 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {
     id: 'sess-1',
     tool: 'fit',
-    timestamp: new Date().toISOString(),
+    startedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
     cwd: '/proj',
     score: 92,
     passed: true,

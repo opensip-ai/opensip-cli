@@ -61,7 +61,7 @@ function renderSessionTable(panel, toolSessions, accentColor) {
       row.classList.add('selected');
       renderDetail(s, idx);
     }});
-    row.appendChild(el('td', {class:'cell-nowrap', text: new Date(s.timestamp).toLocaleString()}));
+    row.appendChild(el('td', {class:'cell-nowrap', text: new Date(s.startedAt).toLocaleString()}));
     row.appendChild(el('td', {text: s.recipe || 'default', style:'color:var(--text-muted)'}));
     const scoreCell = el('td', {style: 'font-weight:600;' + sc});
     scoreCell.textContent = s.score + '%';
@@ -95,7 +95,7 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     // that from "payload present but empty" so the panel says so explicitly
     // rather than rendering a silent empty table.
     if (!session.payload) {
-      detailContainer.appendChild(el('h3', {text: 'Session Detail — ' + new Date(session.timestamp).toLocaleString(), style:'margin-bottom:4px'}));
+      detailContainer.appendChild(el('h3', {text: 'Session Detail — ' + new Date(session.startedAt).toLocaleString(), style:'margin-bottom:4px'}));
       detailContainer.appendChild(el('div', {class:'empty', text:'No detail recorded for this session.'}));
       return;
     }
@@ -118,7 +118,7 @@ function renderSessionTable(panel, toolSessions, accentColor) {
 
     const headerRow = el('div', {style:'display:flex;align-items:center;justify-content:space-between;margin-bottom:16px'});
     const headerLeft = el('div');
-    headerLeft.appendChild(el('h3', {text: 'Session Detail \u2014 ' + new Date(session.timestamp).toLocaleString(), style:'margin-bottom:4px'}));
+    headerLeft.appendChild(el('h3', {text: 'Session Detail \u2014 ' + new Date(session.startedAt).toLocaleString(), style:'margin-bottom:4px'}));
     const sub = el('div', {style:'color:var(--text-dim);font-size:12px'});
     const countParts = [];
     if (totalErrors > 0) countParts.push(totalErrors + ' error' + (totalErrors !== 1 ? 's' : ''));

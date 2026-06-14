@@ -104,7 +104,7 @@ export function buildAgentCatalog(): AgentCatalog {
         'The canonical cross-tool currency (schemaVersion, tool, runId, verdict, units, signals). ' +
         'Every fit/graph/sim result (live or replayed) carries one. See contracts for full type.',
       sessionReplay:
-        'For sessions show: { session: {id,tool,timestamp,score,passed,...}, fidelity: "projection", envelope: SignalEnvelope, filtersApplied?, ...counts }',
+        'For sessions show: { session: {id,tool,startedAt,completedAt,score,passed,...}, fidelity: "projection", envelope: SignalEnvelope, filtersApplied?, ...counts }',
       history:
         'For sessions list: { type: "history", sessions: HistorySession[] } where each has showCommand + optional summary.',
     },

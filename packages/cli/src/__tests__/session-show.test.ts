@@ -43,7 +43,8 @@ function makeSession(
     id,
     tool: 'fit',
     cwd: '/x',
-    timestamp: new Date(ts).toISOString(),
+    startedAt: new Date(ts).toISOString(),
+    completedAt: new Date(ts).toISOString(),
     score: 100,
     passed: true,
     durationMs: 10,
@@ -78,7 +79,7 @@ function replayFitSession(stored: ToolSessionRecord): ToolSessionReplay<CommandR
     schemaVersion: 2,
     tool: 'fit',
     runId: stored.id,
-    createdAt: stored.timestamp,
+    createdAt: stored.startedAt,
     verdict: {
       score: stored.score,
       passed: stored.passed,

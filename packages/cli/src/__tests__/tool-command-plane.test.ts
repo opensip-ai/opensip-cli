@@ -54,6 +54,11 @@ function makeStubContext(): ToolCliContext {
           completedAt: new Date().toISOString(),
           durationMs: 0,
         }),
+        complete: () => ({
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          durationMs: 0,
+        }),
       },
       record: () => undefined,
     },

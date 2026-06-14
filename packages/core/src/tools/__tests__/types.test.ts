@@ -3,7 +3,7 @@ import { describe, it, expect, expectTypeOf } from 'vitest';
 import { ToolError } from '../../lib/errors.js';
 import { UnknownLiveViewError } from '../types.js';
 
-import type { LiveViewRenderer } from '../types.js';
+import type { LiveViewRenderer, ToolRunCompletion } from '../types.js';
 
 describe('UnknownLiveViewError', () => {
   it('is constructible with a viewKey and produces an actionable message', () => {
@@ -37,7 +37,9 @@ describe('LiveViewRenderer', () => {
   it('is exported as a structural type that accepts an unknown args payload', () => {
     expectTypeOf<LiveViewRenderer>().toBeFunction();
     expectTypeOf<LiveViewRenderer>().parameter(0).toBeUnknown();
-    expectTypeOf<LiveViewRenderer>().returns.resolves.toBeVoid();
+    // Host-owned-run-timing: live renderers return completion data to the host
+    // (or void) instead of persisting sessions themselves.
+    expectTypeOf<LiveViewRenderer>().returns.resolves.toEqualTypeOf<ToolRunCompletion | void>();
   });
 
   it('accepts a function value at runtime', () => {

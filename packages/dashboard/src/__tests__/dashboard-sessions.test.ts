@@ -22,7 +22,8 @@ import { dashboardSortableJs } from '../shared/sortable.js';
 interface StoredSessionLike {
   id: string;
   tool: 'fit' | 'sim' | 'graph';
-  timestamp: string;
+  startedAt: string;
+  completedAt: string;
   cwd: string;
   recipe?: string;
   score: number;
@@ -60,7 +61,8 @@ function makeSession(over: Partial<StoredSessionLike> = {}): StoredSessionLike {
   return {
     id: 's1',
     tool: 'fit',
-    timestamp: '2026-05-29T10:30:00.000Z',
+    startedAt: '2026-05-29T10:30:00.000Z',
+    completedAt: '2026-05-29T10:30:00.000Z',
     cwd: '/repo',
     recipe: 'default',
     score: 100,

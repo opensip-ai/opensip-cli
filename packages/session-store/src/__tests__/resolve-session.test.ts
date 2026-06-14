@@ -10,7 +10,8 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {
     id: 'FIT_01',
     tool: 'fit',
-    timestamp: '2026-05-21T12:00:00.000Z',
+    startedAt: '2026-05-21T12:00:00.000Z',
+    completedAt: '2026-05-21T12:00:00.000Z',
     cwd: '/proj',
     recipe: 'default',
     score: 100,
@@ -44,10 +45,29 @@ describe('resolveSession', () => {
   });
 
   it('resolves latest scoped to a tool', () => {
-    repo.save(makeSession({ id: 'FIT_OLD', tool: 'fit', timestamp: '2026-05-01T00:00:00.000Z' }));
-    repo.save(makeSession({ id: 'FIT_NEW', tool: 'fit', timestamp: '2026-05-02T00:00:00.000Z' }));
     repo.save(
-      makeSession({ id: 'GRAPH_NEWER', tool: 'graph', timestamp: '2026-05-03T00:00:00.000Z' }),
+      makeSession({
+        id: 'FIT_OLD',
+        tool: 'fit',
+        startedAt: '2026-05-01T00:00:00.000Z',
+        completedAt: '2026-05-01T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'FIT_NEW',
+        tool: 'fit',
+        startedAt: '2026-05-02T00:00:00.000Z',
+        completedAt: '2026-05-02T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'GRAPH_NEWER',
+        tool: 'graph',
+        startedAt: '2026-05-03T00:00:00.000Z',
+        completedAt: '2026-05-03T00:00:00.000Z',
+      }),
     );
     const result = resolveSession(datastore, { ref: 'latest', tool: 'fit' });
     expect(result.ok).toBe(true);

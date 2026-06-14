@@ -346,7 +346,8 @@ export function persistSimSession(datastore: DataStore, result: SimDoneResult): 
     repo.save({
       id: generatePrefixedId('sim'),
       tool: 'sim',
-      timestamp: '1970-01-01T00:00:00.000Z',
+      startedAt: '1970-01-01T00:00:00.000Z',
+      completedAt: '1970-01-01T00:00:00.000Z',
       cwd: result.cwd,
       recipe: result.recipeName,
       score: result.envelope.verdict.score,

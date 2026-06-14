@@ -35,7 +35,8 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {
     id: 'test-session-1',
     tool: 'fit',
-    timestamp: '2025-06-15T10:30:00.000Z',
+    startedAt: '2025-06-15T10:30:00.000Z',
+    completedAt: '2025-06-15T10:30:00.000Z',
     // eslint-disable-next-line sonarjs/publicly-writable-directories -- test fixture cwd; not a runtime filesystem operation
     cwd: '/tmp/my-project',
     score: 85,
@@ -144,9 +145,24 @@ describe('generateDashboardHtml', () => {
 
   it('handles multiple sessions for trend chart', () => {
     const sessions = [
-      makeSession({ id: 's1', timestamp: '2025-06-15T10:30:00.000Z', score: 95 }),
-      makeSession({ id: 's2', timestamp: '2025-06-14T10:30:00.000Z', score: 80 }),
-      makeSession({ id: 's3', timestamp: '2025-06-13T10:30:00.000Z', score: 65 }),
+      makeSession({
+        id: 's1',
+        startedAt: '2025-06-15T10:30:00.000Z',
+        completedAt: '2025-06-15T10:30:00.000Z',
+        score: 95,
+      }),
+      makeSession({
+        id: 's2',
+        startedAt: '2025-06-14T10:30:00.000Z',
+        completedAt: '2025-06-14T10:30:00.000Z',
+        score: 80,
+      }),
+      makeSession({
+        id: 's3',
+        startedAt: '2025-06-13T10:30:00.000Z',
+        completedAt: '2025-06-13T10:30:00.000Z',
+        score: 65,
+      }),
     ];
     const html = generateDashboardHtml({ sessions });
     // All session data should be embedded

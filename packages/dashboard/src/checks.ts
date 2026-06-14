@@ -22,7 +22,7 @@ function computeCheckStats() {
       const st = stats[ch.checkSlug];
       st.runs++;
       if (ch.passed) st.passed++; else st.failed++;
-      if (!st.lastRun || s.timestamp > st.lastRun) st.lastRun = s.timestamp;
+      if (!st.lastRun || s.startedAt > st.lastRun) st.lastRun = s.startedAt;
     }
   }
   return stats;

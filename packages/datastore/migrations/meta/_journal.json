@@ -85,6 +85,13 @@
       "when": 1781336873000,
       "tag": "0011_payload_version_safety_and_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1781466317892,
+      "tag": "0012_overrated_talon",
+      "breakpoints": true
     }
   ]
 }

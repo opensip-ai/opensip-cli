@@ -68,7 +68,7 @@ ${badgeStylesEntries}
       const panel = document.getElementById('panel-' + tabName);
       if (panel) panel.classList.add('active');
     }});
-    row.appendChild(el('td', {class:'cell-nowrap', text: new Date(s.timestamp).toLocaleString(), style:'color:var(--text-dim)'}));
+    row.appendChild(el('td', {class:'cell-nowrap', text: new Date(s.startedAt).toLocaleString(), style:'color:var(--text-dim)'}));
     const toolCell = el('td');
     toolCell.appendChild(el('span', {class:'badge', style: toolBadgeStyles[s.tool] || '', text: s.tool.toUpperCase()}));
     row.appendChild(toolCell);

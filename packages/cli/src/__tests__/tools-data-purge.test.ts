@@ -28,7 +28,8 @@ function fitSession(id: string): StoredSession {
   return {
     id,
     tool: 'fit',
-    timestamp: '2026-06-12T00:00:00.000Z',
+    startedAt: '2026-06-12T00:00:00.000Z',
+    completedAt: '2026-06-12T00:00:00.000Z',
     cwd: '/tmp',
     recipe: 'default',
     score: 100,

@@ -120,7 +120,8 @@ export interface ToolCommandDescriptor {
 export interface ToolSessionRecord {
   readonly id: string;
   readonly tool: ToolShortId;
-  readonly timestamp: string;
+  readonly startedAt: string;
+  readonly completedAt: string;
   readonly cwd: string;
   readonly recipe?: string;
   readonly score: number;
@@ -136,18 +137,20 @@ export interface ToolSessionReplayContribution {
 }
 
 /**
- * Input a tool supplies to the host `runSession.record(...)` seam.
+ * The generic-session contribution a tool returns from its command handler or
+ * live renderer (host-owned-run-timing §6.2).
  *
- * Tools provide only verdict + payload + provenance. The host stamps
- * `timestamp` + `durationMs` (from the shared `RunTimer`), generates the
- * stable `id`, and performs the actual `SessionRepo.save`. This is the
- * mechanical realization of "host-owned run timing".
+ * Tools provide only verdict + payload + provenance. The host run-lifecycle
+ * plane stamps `startedAt` / `completedAt` / `durationMs` (from the shared
+ * `RunLifecycle`), generates the stable `id`, and performs the actual
+ * `SessionRepo.save` *after* the tool returns. Tools never capture run timing
+ * and never call a generic-session writer themselves.
  *
- * `record` is best-effort: when no datastore is available (non-project
- * commands, or tests without a scope) it returns `undefined` and does
- * nothing observable. Callers must never assume a row was written.
+ * Persistence is best-effort: when no datastore is available (non-project
+ * commands, or tests without a scope) the host writes nothing observable.
+ * Tools must never assume a row was written.
  */
-export interface ToolRunSessionInput {
+export interface ToolSessionContribution {
   readonly tool: ToolShortId;
   readonly cwd: string;
   readonly recipe?: string;
@@ -155,6 +158,36 @@ export interface ToolRunSessionInput {
   readonly passed: boolean;
   /** Tool-owned opaque payload (same contract as StoredSession.payload). */
   readonly payload?: unknown;
+}
+
+/**
+ * Legacy alias for {@link ToolSessionContribution} — the input shape the
+ * transitional `runSession.record(...)` seam accepts. Removed once the
+ * record seam is deleted (host-owned-run-timing Phase 3); new code returns a
+ * {@link ToolRunCompletion} instead of calling `record`.
+ */
+export type ToolRunSessionInput = ToolSessionContribution;
+
+/**
+ * What a tool command handler or live renderer returns to the host so the
+ * host can complete the run lifecycle, persist the generic session row, and
+ * compose dashboard contributions (host-owned-run-timing §6.2).
+ *
+ * - `result` / `envelope` are the tool's domain outputs (the same shapes the
+ *   handler already produced) — optional so a live renderer that only persists
+ *   can return just `session`.
+ * - `session` is the generic-session contribution the host persists.
+ * - `dashboard` is the optional per-run rich dashboard contribution
+ *   (Phase 5), persisted keyed by session id for later `opensip report`.
+ *
+ * The host receives this and owns the rest; the tool supplies no lifecycle
+ * timing and performs no generic-session write.
+ */
+export interface ToolRunCompletion {
+  readonly result?: unknown;
+  readonly envelope?: unknown;
+  readonly session?: ToolSessionContribution;
+  readonly dashboard?: ToolDashboardContribution;
 }
 
 /**
@@ -168,19 +201,23 @@ export interface ToolRunSessionInput {
 export interface RecordedToolRunSession {
   readonly id: string;
   readonly tool: ToolShortId;
-  readonly timestamp: string;
+  readonly startedAt: string;
+  readonly completedAt: string;
   readonly durationMs: number;
 }
 
 /**
  * The host-provided run-session seam on `ToolCliContext`.
  *
- * `timing` is the early-created `RunTimer` for this invocation (shared
- * between the static command path and any live renderers).
+ * `timing` is the host run lifecycle for this invocation (shared between the
+ * static command path and any live renderers); tools may read it for
+ * display-only elapsed time.
  *
- * `record` is the only documented way for tools (or their live views) to
- * contribute a row to the cross-tool `sessions` history. The host
- * implements it using the `RunScope` datastore thunk + `SessionRepo`.
+ * `record` is the TRANSITIONAL generic-session writer. The launch model is
+ * "return a {@link ToolSessionContribution} (inside a {@link
+ * ToolRunCompletion}) from your handler / live renderer and let the host
+ * persist it" — `record` is removed once the host run plane owns persistence
+ * (host-owned-run-timing Phases 3/6). Do not build new code against it.
  */
 export interface ToolRunSessions {
   readonly timing: RunTimer;
@@ -188,10 +225,11 @@ export interface ToolRunSessions {
 }
 
 /**
- * Context object passed as the (optional) second argument to a
- * `LiveViewRenderer`. Carries the same host `runSession` seam that the
- * static `ToolCliContext` exposes, so live renderers can call `record`
- * using the identical timer instance.
+ * Context object passed as the second argument to a `LiveViewRenderer`.
+ * Carries the host run seam so a live renderer reads the same lifecycle
+ * (timer) the host will snapshot on completion. In the launch model the
+ * renderer returns its {@link ToolRunCompletion} to the host rather than
+ * calling `record` itself.
  */
 export interface LiveViewContext {
   readonly runSession: ToolRunSessions;
@@ -211,13 +249,89 @@ export interface LiveViewContext {
  * tool defines its own args shape; tools narrow the type inside their
  * own renderer body via a runtime cast.
  *
- * In the host-owned run timing model (and future host-plane evolutions),
- * a second optional `context` argument carries the host `runSession` seam
- * (the timer + record() for session persistence). Existing renderers that
- * only declare one parameter continue to work (the second arg is optional
- * during the migration window and for forward compatibility).
+ * In the host-owned run-lifecycle model, the second `context` argument carries
+ * the host run seam (the {@link LiveViewContext}) and is supplied by the host
+ * for every live tool command. A live renderer must NOT call a generic-session
+ * writer itself; instead it returns a {@link ToolRunCompletion} (or `void`)
+ * once the underlying Ink app exits, and the host completes the lifecycle and
+ * persists the session contribution after `await renderLive(...)`. The
+ * parameter stays optional at the type level during the migration window
+ * (Phase 2 makes it effectively required for live tool commands).
  */
-export type LiveViewRenderer = (args: unknown, context?: LiveViewContext) => Promise<void>;
+export type LiveViewRenderer = (
+  args: unknown,
+  context?: LiveViewContext,
+) => Promise<ToolRunCompletion | void>;
+
+// ---------------------------------------------------------------------------
+// Rich dashboard contribution model (host-owned-run-timing §7)
+// ---------------------------------------------------------------------------
+
+/** A column in a declarative dashboard table view. */
+export interface DashboardColumn {
+  readonly key: string;
+  readonly label: string;
+  /** Optional value formatting hint the renderer may honor. */
+  readonly format?: 'text' | 'number' | 'duration' | 'date' | 'boolean';
+}
+
+/** A labeled field in a declarative cards / timeline view. */
+export interface DashboardField {
+  readonly key: string;
+  readonly label: string;
+  readonly format?: 'text' | 'number' | 'duration' | 'date' | 'boolean';
+}
+
+/** A declarative chart specification (renderer-interpreted). */
+export interface DashboardChartSpec {
+  readonly kind: 'bar' | 'line' | 'pie';
+  readonly xKey: string;
+  readonly yKey: string;
+  readonly title?: string;
+}
+
+/**
+ * A declarative dashboard view model. Launch prefers declarative views over
+ * arbitrary plugin JavaScript; `custom-html` is sanitized/restricted because
+ * self-contained reports are often shared outside the generating machine
+ * (host-owned-run-timing §7.2, open decision §12).
+ */
+export type DashboardViewContribution =
+  | { readonly kind: 'table'; readonly columns: readonly DashboardColumn[] }
+  | { readonly kind: 'cards'; readonly fields: readonly DashboardField[] }
+  | {
+      readonly kind: 'timeline';
+      readonly timeField: string;
+      readonly fields: readonly DashboardField[];
+    }
+  | { readonly kind: 'chart'; readonly chart: DashboardChartSpec }
+  | { readonly kind: 'custom-html'; readonly html: string };
+
+/**
+ * One contributed dashboard tab. `id` must be stable kebab-case and unique
+ * within the producing tool; the host namespaces it by tool id at composition
+ * time. `dataKey` references a key in {@link ToolDashboardContribution.data}
+ * (or the view carries inline data).
+ */
+export interface DashboardTabContribution {
+  readonly id: string;
+  readonly title: string;
+  readonly order?: number;
+  readonly dataKey?: string;
+  readonly view: DashboardViewContribution;
+}
+
+/**
+ * A tool's per-run dashboard contribution (host-owned-run-timing §7.1).
+ * Returned in {@link ToolRunCompletion.dashboard}; the host persists it keyed
+ * by session id so a later `opensip report` process can hydrate it without
+ * relying on in-memory state. `data` is namespaced by the producing tool; the
+ * host rejects/ignores reserved top-level keys.
+ */
+export interface ToolDashboardContribution {
+  readonly data?: Record<string, unknown>;
+  readonly tabs?: readonly DashboardTabContribution[];
+}
 
 /**
  * Thrown by `ToolCliContext.renderLive(key, args)` when no renderer has
@@ -331,21 +445,22 @@ export interface ToolCliContext {
   readonly scope: ToolScope;
 
   /**
-   * Host-owned run timing + session persistence seam (host-owned-run-timing).
+   * Host-owned run lifecycle seam (host-owned-run-timing).
    *
-   * `timing` is the single `RunTimer` created by the CLI host at command
-   * entry (before any tool handler or live view). It is the source of truth
-   * for `StoredSession.timestamp` and `durationMs`.
+   * `timing` is the single `RunLifecycle` the CLI host creates inside the
+   * command action (after `RunScope` entry, before any tool handler or live
+   * view). It is the source of truth for `StoredSession.startedAt` /
+   * `completedAt` / `durationMs`; tools may read it for display-only elapsed.
    *
-   * `record(...)` is the *only* documented way for a tool (or its live
-   * renderer via the `LiveViewContext`) to persist a generic session row.
-   * The tool supplies verdict/payload; the host stamps timing + id and
-   * writes via `SessionRepo` (best-effort; returns undefined when there is
-   * no datastore in scope).
+   * `record(...)` is TRANSITIONAL and slated for removal (Phases 3/6). The
+   * launch model is: return a `ToolSessionContribution` (inside a
+   * `ToolRunCompletion`) from your command handler / live renderer and let the
+   * host complete the lifecycle and persist after you return.
    *
-   * Architectural rule: tools must not capture `Date` / `performance` for
-   * these two fields, and must not import or call `SessionRepo` directly
-   * for the generic columns.
+   * Architectural rule: tools must not capture `Date` / `performance` for the
+   * generic session timing fields, must not import or call `SessionRepo`
+   * directly for the generic columns, and must not build new code against
+   * `record(...)`.
    */
   readonly runSession: ToolRunSessions;
 

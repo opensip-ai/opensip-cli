@@ -49,7 +49,8 @@ describe('history view', () => {
         {
           id: 'FIT_1',
           tool: 'fit',
-          timestamp: '2026-01-01T00:00:00.000Z',
+          startedAt: '2026-01-01T00:00:00.000Z',
+          completedAt: '2026-01-01T00:00:00.000Z',
           score: 95,
           passed: true,
           durationMs: 1500,
@@ -60,7 +61,8 @@ describe('history view', () => {
         {
           id: 'GRAPH_2',
           tool: 'graph',
-          timestamp: '2026-01-02T00:00:00.000Z',
+          startedAt: '2026-01-02T00:00:00.000Z',
+          completedAt: '2026-01-02T00:00:00.000Z',
           score: 40,
           passed: false,
           durationMs: 500,
@@ -110,7 +112,8 @@ describe('session-replay view', () => {
       session: {
         id: 'GRAPH_X',
         tool: 'graph',
-        timestamp: '2026-01-01T00:00:00.000Z',
+        startedAt: '2026-01-01T00:00:00.000Z',
+        completedAt: '2026-01-01T00:00:00.000Z',
         recipe: 'strict',
         score: 60,
         passed: false,

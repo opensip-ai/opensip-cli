@@ -162,7 +162,7 @@ function graphDoneView(result: GraphDoneResult): ViewNode {
  */
 function sessionReplayView(result: SessionReplayResult): ViewNode {
   const s = result.session;
-  const when = new Date(s.timestamp).toLocaleString();
+  const when = new Date(s.startedAt).toLocaleString();
   const verdictTone: Tone = s.passed ? 'success' : 'error';
   return group([
     line([

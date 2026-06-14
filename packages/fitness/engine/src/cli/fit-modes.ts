@@ -355,7 +355,8 @@ function sessionShowJson(
     session: {
       id: session.id,
       tool: session.tool,
-      timestamp: session.timestamp,
+      startedAt: session.startedAt,
+      completedAt: session.completedAt,
       recipe: session.recipe,
       cwd: session.cwd,
       score: session.score,

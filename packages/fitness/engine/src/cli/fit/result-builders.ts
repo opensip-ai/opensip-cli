@@ -262,7 +262,7 @@ export function buildFitCallbacks(
 /**
  * Best-effort session persistence — invoked when `executeFit` is called
  * with a `datastore` opt. Maps the run's {@link SignalEnvelope} onto the
- * generic `StoredSession` row (`score`/`passed`/`timestamp` from the
+ * generic `StoredSession` row (`score`/`passed`/`startedAt`/`completedAt` from the
  * envelope's verdict + identity) and the dashboard-shaped opaque payload
  * (derived from the envelope's signals/units, 4→2 severity). Errors are
  * caught and logged so a write failure never fails the run.
@@ -291,7 +291,8 @@ export function persistFitSession(
       tool: 'fit',
       // Dummy timing for legacy direct test calls only. Real sessions use host
       // timer via the record seam (no tool code Date capture for these columns).
-      timestamp: '1970-01-01T00:00:00.000Z',
+      startedAt: '1970-01-01T00:00:00.000Z',
+      completedAt: '1970-01-01T00:00:00.000Z',
       cwd: args.cwd,
       recipe: envelope.recipe,
       score: envelope.verdict.score,

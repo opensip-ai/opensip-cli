@@ -36,7 +36,8 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {
     id: 'ses-test-1',
     tool: 'fit',
-    timestamp: '2026-05-21T12:00:00.000Z',
+    startedAt: '2026-05-21T12:00:00.000Z',
+    completedAt: '2026-05-21T12:00:00.000Z',
     cwd: '/proj',
     recipe: 'default',
     score: 95,
@@ -94,9 +95,27 @@ describe('SessionRepo — save / get', () => {
 
 describe('SessionRepo — list', () => {
   it('lists sessions newest-first by timestamp', () => {
-    repo.save(makeSession({ id: 'a', timestamp: '2026-05-01T00:00:00.000Z' }));
-    repo.save(makeSession({ id: 'b', timestamp: '2026-05-02T00:00:00.000Z' }));
-    repo.save(makeSession({ id: 'c', timestamp: '2026-05-03T00:00:00.000Z' }));
+    repo.save(
+      makeSession({
+        id: 'a',
+        startedAt: '2026-05-01T00:00:00.000Z',
+        completedAt: '2026-05-01T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'b',
+        startedAt: '2026-05-02T00:00:00.000Z',
+        completedAt: '2026-05-02T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'c',
+        startedAt: '2026-05-03T00:00:00.000Z',
+        completedAt: '2026-05-03T00:00:00.000Z',
+      }),
+    );
     const ordered = repo.list();
     expect(ordered.map((s) => s.id)).toEqual(['c', 'b', 'a']);
   });
@@ -104,7 +123,7 @@ describe('SessionRepo — list', () => {
   it('honors limit', () => {
     for (let i = 0; i < 5; i++) {
       const ts = new Date(2026, 0, i + 1).toISOString();
-      repo.save(makeSession({ id: `s${String(i)}`, timestamp: ts }));
+      repo.save(makeSession({ id: `s${String(i)}`, startedAt: ts, completedAt: ts }));
     }
     expect(repo.list({ limit: 2 })).toHaveLength(2);
   });
@@ -128,8 +147,20 @@ describe('SessionRepo — purge / clearAll / count', () => {
   });
 
   it('purge(date) deletes sessions older than the cutoff', () => {
-    repo.save(makeSession({ id: 'old', timestamp: '2026-01-01T00:00:00.000Z' }));
-    repo.save(makeSession({ id: 'recent', timestamp: '2026-05-21T00:00:00.000Z' }));
+    repo.save(
+      makeSession({
+        id: 'old',
+        startedAt: '2026-01-01T00:00:00.000Z',
+        completedAt: '2026-01-01T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'recent',
+        startedAt: '2026-05-21T00:00:00.000Z',
+        completedAt: '2026-05-21T00:00:00.000Z',
+      }),
+    );
     const cutoff = new Date('2026-03-01T00:00:00.000Z');
     const removed = repo.purge(cutoff);
     expect(removed).toBe(1);
@@ -160,16 +191,47 @@ describe('SessionRepo — latest', () => {
   });
 
   it('returns the most recent session by timestamp', () => {
-    repo.save(makeSession({ id: 'old', timestamp: '2026-05-01T00:00:00.000Z' }));
-    repo.save(makeSession({ id: 'newer', timestamp: '2026-05-15T00:00:00.000Z' }));
+    repo.save(
+      makeSession({
+        id: 'old',
+        startedAt: '2026-05-01T00:00:00.000Z',
+        completedAt: '2026-05-01T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'newer',
+        startedAt: '2026-05-15T00:00:00.000Z',
+        completedAt: '2026-05-15T00:00:00.000Z',
+      }),
+    );
     expect(repo.latest()?.id).toBe('newer');
   });
 
   it('returns the most recent session scoped to a tool', () => {
-    repo.save(makeSession({ id: 'fit-old', tool: 'fit', timestamp: '2026-05-01T00:00:00.000Z' }));
-    repo.save(makeSession({ id: 'fit-new', tool: 'fit', timestamp: '2026-05-02T00:00:00.000Z' }));
     repo.save(
-      makeSession({ id: 'graph-newer', tool: 'graph', timestamp: '2026-05-03T00:00:00.000Z' }),
+      makeSession({
+        id: 'fit-old',
+        tool: 'fit',
+        startedAt: '2026-05-01T00:00:00.000Z',
+        completedAt: '2026-05-01T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'fit-new',
+        tool: 'fit',
+        startedAt: '2026-05-02T00:00:00.000Z',
+        completedAt: '2026-05-02T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'graph-newer',
+        tool: 'graph',
+        startedAt: '2026-05-03T00:00:00.000Z',
+        completedAt: '2026-05-03T00:00:00.000Z',
+      }),
     );
     expect(repo.latest({ tool: 'fit' })?.id).toBe('fit-new');
     expect(repo.latest()?.id).toBe('graph-newer');

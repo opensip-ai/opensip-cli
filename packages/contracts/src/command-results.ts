@@ -524,7 +524,8 @@ export interface SessionReplayResult {
   readonly session: {
     readonly id: string;
     readonly tool: string;
-    readonly timestamp: string;
+    readonly startedAt: string;
+    readonly completedAt: string;
     readonly recipe?: string;
     readonly score: number;
     readonly passed: boolean;

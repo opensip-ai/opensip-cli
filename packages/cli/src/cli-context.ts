@@ -183,7 +183,8 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
         new SessionRepo(datastore).save({
           id,
           tool: input.tool,
-          timestamp: timing.startedAt,
+          startedAt: timing.startedAt,
+          completedAt: timing.completedAt,
           cwd: input.cwd,
           recipe: input.recipe,
           score: input.score,
@@ -210,7 +211,13 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
         // @swallow-ok best-effort session persistence already warned above; degrade to undefined
         return undefined;
       }
-      return { id, tool: input.tool, timestamp: timing.startedAt, durationMs: timing.durationMs };
+      return {
+        id,
+        tool: input.tool,
+        startedAt: timing.startedAt,
+        completedAt: timing.completedAt,
+        durationMs: timing.durationMs,
+      };
     },
   };
 

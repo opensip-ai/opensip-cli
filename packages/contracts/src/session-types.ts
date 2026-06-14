@@ -15,29 +15,54 @@ import type { ToolShortId } from '@opensip-cli/core';
  * A persisted tool-run session.
  *
  * Holds only **generic** columns every tool shares — score, pass/fail,
- * timing, provenance. Per-session detail is tool-specific and lives in the
- * opaque {@link StoredSession.payload}: `contracts` holds ZERO tool
- * vocabulary. Each tool owns the shape of its own payload; the dashboard,
- * as the presentation owner, reads the payload and renders it — the same
- * producer/consumer split used for `GraphCatalog`.
+ * lifecycle timing, host metrics, provenance. Per-session detail is
+ * tool-specific and lives in the opaque {@link StoredSession.payload}:
+ * `contracts` holds ZERO tool vocabulary. Each tool owns the shape of its own
+ * payload; the dashboard, as the presentation owner, reads the payload and
+ * renders it — the same producer/consumer split used for `GraphCatalog`.
  *
- * `timestamp` is the *start* of the user-initiated run (captured early in the
- * command dispatch / live runner before heavy analysis work). `durationMs`
- * is the measured wall time of the analysis itself. Together they let history,
- * `sessions list`, and the report reconstruct "started at T, took D".
+ * ## Host-owned run lifecycle timing (host-owned-run-timing)
  *
- * These two fields are stamped exclusively by the host `RunTimer` via the
- * `ToolCliContext.runSession` seam; tools must not supply their own values.
+ * - `startedAt` is the wall-clock start of the user-initiated tool run,
+ *   captured by the host run-lifecycle plane *after* the per-run `RunScope`
+ *   exists and *before* any tool-owned setup / handler / live-renderer work.
+ * - `completedAt` is the wall-clock instant the tool handler / live renderer
+ *   returned its completion data to the host, *before* host persistence,
+ *   render, egress, or report side effects.
+ * - `durationMs` is the canonical tool-invocation duration (monotonic
+ *   elapsed between the two boundaries), **not** TTY-busy time.
+ *
+ * All three are stamped exclusively by the host run-lifecycle plane from a
+ * single `RunLifecycle`. Tools never capture `new Date()` / `Date.now()` /
+ * `performance.now()` for these fields and never supply them — they return a
+ * `ToolSessionContribution` (verdict/score/recipe/payload) and the host owns
+ * the timing. See the clock taxonomy in the spec / session docs.
+ *
+ * `hostMetrics` (when present) explains *host-side* overhead — TTY occupancy,
+ * render, persist, egress, total command time — separately from the canonical
+ * `durationMs`. It is a hydrated projection of the sibling host-metrics record
+ * keyed by session id, not necessarily a column on the `sessions` table.
  */
 export interface StoredSession {
   readonly id: string;
   readonly tool: ToolShortId;
-  readonly timestamp: string;
+  /** Wall-clock start of the tool run (host run-lifecycle plane). */
+  readonly startedAt: string;
+  /** Wall-clock completion of the tool run (when the tool returned to the host). */
+  readonly completedAt: string;
   readonly cwd: string;
   readonly recipe?: string;
   readonly score: number;
   readonly passed: boolean;
+  /** Canonical tool-invocation duration (monotonic), not TTY-busy time. */
   readonly durationMs: number;
+  /**
+   * Host-side overhead metrics for this run, hydrated from the sibling
+   * host-metrics record. Absent when no metrics were captured. These are NOT
+   * a replacement for `durationMs` — they answer "where did host-side cost
+   * accumulate", not "how long did the tool take".
+   */
+  readonly hostMetrics?: StoredSessionHostMetrics;
   /**
    * Tool-owned opaque per-session detail. `contracts` treats this as
    * `unknown` and never inspects it; the producing tool owns and validates
@@ -70,6 +95,30 @@ export interface StoredSession {
    *   deprecation window (see extending guide and ADR-0050).
    */
   readonly payload?: unknown;
+}
+
+/**
+ * Host-side overhead metrics for a single tool run, captured on separate
+ * clocks from the canonical `durationMs` (host-owned-run-timing §5.3/§5.4).
+ *
+ * Stored in a sibling host-metrics record keyed by session id (so render /
+ * egress metrics — known only *after* the initial session write — can be
+ * upserted without rewriting the session row) and hydrated back onto
+ * {@link StoredSession.hostMetrics} for readers. Every field is optional: a
+ * given run only populates the metrics observable for its path (e.g.
+ * `ttyBusyMs` only for live/TTY runs).
+ */
+export interface StoredSessionHostMetrics {
+  /** Time the interactive TTY was occupied by the live view. */
+  readonly ttyBusyMs?: number;
+  /** Time spent rendering the final static/live completion output. */
+  readonly renderMs?: number;
+  /** Time spent writing the session row + payload. */
+  readonly persistMs?: number;
+  /** Time spent in host-owned post-run signal/report delivery. */
+  readonly egressMs?: number;
+  /** Elapsed time for the full command action, including host pre/post work. */
+  readonly totalCommandMs?: number;
 }
 
 /** A tool-owned replay of a stored session projection. */

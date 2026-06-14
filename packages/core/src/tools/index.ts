@@ -20,8 +20,17 @@ export type {
   LiveViewRenderer,
   LiveViewContext,
   ToolRunSessionInput,
+  ToolSessionContribution,
+  ToolRunCompletion,
   RecordedToolRunSession,
   ToolRunSessions,
+  // Rich dashboard contribution model (host-owned-run-timing §7)
+  ToolDashboardContribution,
+  DashboardTabContribution,
+  DashboardViewContribution,
+  DashboardColumn,
+  DashboardField,
+  DashboardChartSpec,
   ToolExtensionPoints,
   // Typed host planes (hygiene plan Phase 0)
   HostGovernance,

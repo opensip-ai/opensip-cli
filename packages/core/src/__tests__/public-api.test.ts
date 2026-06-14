@@ -86,6 +86,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'configureLogger',
   'createCapabilityRegistry',
   'createInProcessTransport',
+  'createRunLifecycle',
   'createRunTimer',
   'createSignal',
   'createSignalFromViolation',
