@@ -71,6 +71,20 @@
       "when": 1781290000000,
       "tag": "0009_stable_tool_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1781333902000,
+      "tag": "0010_add_timestamp_iso_and_payload_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1781336873000,
+      "tag": "0011_payload_version_safety_and_notes",
+      "breakpoints": true
     }
   ]
 }
