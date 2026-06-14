@@ -2,7 +2,7 @@
   "name": "@opensip-cli/root",
   "version": "0.1.0",
   "private": true,
-  "license": "MIT",
+  "license": "Apache-2.0",
   "description": "OpenSIP CLI — open-source codebase analysis toolkit",
   "repository": {
     "type": "git",

@@ -85,7 +85,7 @@ const GENERATED_MARKER =
 
 /** Build the full README text for one package. Deterministic. */
 function renderReadme(pkg, releaseRef) {
-  const { name, description, license = 'MIT', repository } = pkg;
+  const { name, description, license = 'Apache-2.0', repository } = pkg;
   const dir = repository?.directory;
   const repoRootUrl = `https://github.com/${REPO_OWNER}/${REPO_NAME}`;
   const sourceUrl = dir ? `${repoRootUrl}/tree/${releaseRef}/${dir}` : repoRootUrl;

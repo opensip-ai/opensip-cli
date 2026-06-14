@@ -1,7 +1,7 @@
 {
   "name": "@opensip-cli/lang-cpp",
   "version": "0.1.0",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "description": "C/C++ language adapter for opensip-cli (clang-tidy backed)",
   "keywords": [
     "opensip-cli",

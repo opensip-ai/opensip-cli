@@ -26,7 +26,7 @@ OpenSIP CLI is not a replacement for ESLint, Semgrep, or Sonarqube — it comple
 | **CI gate with baselines** | ✓ (`--gate-save` / `--gate-compare`) | partial (snapshot files) | ✓ | ✓ | ✓ |
 | **SARIF output for PR annotations** | ✓ | partial | ✓ | ✓ | ✓ |
 | **Runs offline (no SaaS required)** | ✓ | ✓ | ✓ | partial | ✗ |
-| **Free / open source** | ✓ MIT | ✓ | ✓ (OSS engine + paid cloud) | partial (Community Edition) | ✗ (commercial) |
+| **Free / open source** | ✓ Apache-2.0 | ✓ | ✓ (OSS engine + paid cloud) | partial (Community Edition) | ✗ (commercial) |
 | **Per-project plugins via `.mjs` files** | ✓ | partial | ✗ | ✗ | ✗ |
 | **Marketplace of rules** | partial (npm packages) | ✓ (huge) | ✓ (large registry) | partial | partial |
 

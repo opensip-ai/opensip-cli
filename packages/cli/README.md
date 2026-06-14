@@ -48,4 +48,4 @@ See the [repository README](https://github.com/opensip-ai/opensip-cli) for the c
 
 ## License
 
-MIT
+Apache-2.0

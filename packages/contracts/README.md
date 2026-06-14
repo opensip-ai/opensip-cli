@@ -28,4 +28,4 @@ This package is published for the CLI and advanced plugin authors; most users sh
 
 ## License
 
-MIT © opensip-ai
+Apache-2.0 © opensip-ai

@@ -1,7 +1,7 @@
 {
   "name": "@opensip-cli/datastore",
   "version": "0.1.0",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "description": "SQLite + Drizzle persistence layer for OpenSIP CLI — DataStore interface, backends, factory, schema migrations",
   "keywords": [
     "opensip-cli",

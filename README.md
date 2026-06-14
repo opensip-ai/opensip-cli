@@ -8,7 +8,7 @@ checks, map dependency blast radius, gate regressions in CI, and generate
 local reports without sending your code to a SaaS by default.
 
 [![npm](https://img.shields.io/npm/v/opensip-cli)](https://www.npmjs.com/package/opensip-cli)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](#license)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](#license)
 [![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen)](https://nodejs.org)
 [![Docs](https://img.shields.io/badge/docs-opensip.ai-2563eb)](https://opensip.ai/docs/opensip-cli/)
 [![OpenSIP](https://img.shields.io/badge/part%20of-OpenSIP-7c3aed)](https://opensip.ai)
@@ -299,4 +299,4 @@ pnpm fit --no-cloud
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

@@ -2,7 +2,7 @@
   "name": "@opensip-cli/test-support",
   "version": "0.1.0",
   "private": true,
-  "license": "MIT",
+  "license": "Apache-2.0",
   "description": "Cross-package test scaffolding for opensip-cli (unpublished; never a runtime dependency)",
   "type": "module",
   "main": "./dist/index.js",
