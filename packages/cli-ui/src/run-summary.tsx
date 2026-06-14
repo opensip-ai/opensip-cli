@@ -23,6 +23,7 @@ import React from 'react';
 
 import { formatDuration } from './format-duration.js';
 import { renderToInk } from './render-to-ink.js';
+import { useRunDuration } from './run-timing-provider.js';
 import { line, type Span, type ViewNode } from './view-model.js';
 
 export interface RunSummaryProps {
@@ -30,7 +31,16 @@ export interface RunSummaryProps {
   readonly passed: boolean;
   readonly errors: number;
   readonly warnings: number;
-  readonly durationMs: number;
+  /**
+   * Explicit duration. When omitted, the component reads from the nearest
+   * `RunTimingProvider` (host-owned run timer). This is the preferred path
+   * after the host-owned-run-timing migration.
+   *
+   * Kept optional for compat during Phases 3-5 (tools still passing the old
+   * per-tool numbers); once tools omit it the provider supplies the value
+   * that matches the persisted StoredSession.
+   */
+  readonly durationMs?: number;
 }
 
 /**
@@ -42,7 +52,7 @@ export function viewRunSummary({
   passed,
   errors,
   warnings,
-  durationMs,
+  durationMs = 0,
 }: RunSummaryProps): ViewNode {
   const spans: Span[] = [
     { text: passed ? 'PASS' : 'FAIL', tone: passed ? 'success' : 'error' },
@@ -62,9 +72,14 @@ export function viewRunSummary({
  *  live summary line aligns with the run header + footer hints (both also at 2)
  *  instead of sitting flush-left against the indented rest of the output. */
 export function RunSummary(props: RunSummaryProps): React.ReactElement {
+  // When durationMs omitted, read from the RunTimingProvider (host timer).
+  // This makes the displayed duration match the value that will be (or was)
+  // recorded to StoredSession via the host `runSession.record` seam.
+  const resolvedDuration = props.durationMs ?? useRunDuration();
+  const viewProps: RunSummaryProps = { ...props, durationMs: resolvedDuration };
   return (
     <Box paddingTop={1} paddingLeft={2}>
-      {renderToInk(viewRunSummary(props))}
+      {renderToInk(viewRunSummary(viewProps))}
     </Box>
   );
 }
