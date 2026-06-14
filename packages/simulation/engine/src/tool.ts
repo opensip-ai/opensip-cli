@@ -86,12 +86,16 @@ type SimOptions = ToolOptions & {
  * equivalent to the old mount-time registration.
  */
 function setUpSimLiveView(cli: ToolCliContext): void {
-  cli.registerLiveView(SIM_LIVE_VIEW_KEY, async (args) => {
+  cli.registerLiveView(SIM_LIVE_VIEW_KEY, async (args, liveContext) => {
     const simArgs = args as ToolOptions;
-    const envelope = await renderSimLive(simArgs, {
-      setExitCode: cli.setExitCode,
-      datastore: cli.scope.datastore() as DataStore | undefined,
-    });
+    const envelope = await renderSimLive(
+      simArgs,
+      {
+        setExitCode: cli.setExitCode,
+        datastore: cli.scope.datastore() as DataStore | undefined,
+      },
+      liveContext,
+    );
     if (envelope !== undefined) {
       // ADR-0035: the host derives the findings exit from envelope.verdict.passed.
       await cli.deliverSignals(envelope, {
@@ -137,7 +141,7 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   if (result.type === 'sim-done') {
     const { buildSimulationSessionPayload } = await import('./persistence/session-payload.js');
     const payload = buildSimulationSessionPayload(result.envelope);
-    cli.runSession.record({
+    void cli.runSession.record({
       tool: 'sim',
       cwd: result.cwd,
       recipe: result.recipeName,

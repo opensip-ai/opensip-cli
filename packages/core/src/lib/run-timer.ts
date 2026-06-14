@@ -26,6 +26,12 @@ export interface RunTimingSnapshot {
   readonly durationMs: number;
 }
 
+/**
+ * Host-owned run timer: the single source of run start time and wall duration
+ * for a tool invocation. Tools read timing through `ToolCliContext.runSession`
+ * rather than capturing their own `Date.now()` (see the
+ * `no-tool-owned-session-timing` check).
+ */
 export interface RunTimer {
   /** ISO-8601 timestamp of run start (fixed for the lifetime of this timer). */
   readonly startedAt: string;

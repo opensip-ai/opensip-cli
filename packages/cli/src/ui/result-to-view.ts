@@ -83,8 +83,12 @@ const SPACER: ViewNode = { kind: 'spacer' };
 function resolveSummaryDuration(explicit?: number): number {
   if (typeof explicit === 'number') return explicit;
   try {
-    const scope = currentScope() as any;
-    const t = scope?.runSession?.timing ?? scope?.timing;
+    const scope = currentScope() as
+      | { runSession?: { timing?: unknown }; timing?: unknown }
+      | undefined;
+    const t = (scope?.runSession?.timing ?? scope?.timing) as
+      | { snapshot?: () => { durationMs?: number }; elapsedMs?: () => number }
+      | undefined;
     if (t) {
       if (typeof t.snapshot === 'function') {
         return t.snapshot().durationMs ?? 0;
@@ -94,7 +98,7 @@ function resolveSummaryDuration(explicit?: number): number {
       }
     }
   } catch {
-    // best effort only
+    // @swallow-ok best-effort timing read; falls through to 0
   }
   return 0;
 }

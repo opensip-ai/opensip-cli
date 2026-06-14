@@ -133,7 +133,7 @@ export async function executeGraph(
   // profile/display code paths inside this file (the session ones were switched
   // to host record). Visible to all branches despite early returns.
   const startedAtForProfile = new Date().toISOString();
-  const startedAt: any = startedAtForProfile;
+  const startedAt: string = startedAtForProfile;
   const profile = createProfileBuilder(opts, startedAtForProfile);
 
   logger.info({

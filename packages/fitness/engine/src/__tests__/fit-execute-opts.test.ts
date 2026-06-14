@@ -89,8 +89,8 @@ describe('executeFit — persistence-free boundary (ADR-0028)', () => {
     expect(fitResult.envelope).toBeDefined();
     // timing removed from executeFit return (Phase 3.1 host-owned); the top-level
     // result no longer carries duration/startedAt. (Test updated in Task 3.4.)
-    expect((fitResult as any).durationMs).toBeUndefined();
-    expect((fitResult as any).startedAt).toBeUndefined();
+    expect((fitResult as Record<string, unknown>).durationMs).toBeUndefined();
+    expect((fitResult as Record<string, unknown>).startedAt).toBeUndefined();
 
     // The engine is pure-compute now: nothing was written.
     const sessions = new SessionRepo(datastore).list({ tool: 'fit' });
@@ -101,8 +101,6 @@ describe('executeFit — persistence-free boundary (ADR-0028)', () => {
     const args = makeArgs(projectDir);
     const fitResult = await withFitScope(() => executeFit(args));
     expect(fitResult.envelope).toBeDefined();
-    // timing removed; bypass old guard (updated properly in Task 3.4)
-    const fr: any = fitResult;
     persistFitSession(
       datastore,
       args,

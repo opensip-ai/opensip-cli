@@ -222,7 +222,7 @@ export function createLiveViewRegistry(log: Logger = defaultLogger): LiveViewReg
       // Support both legacy 1-param renderers and new 2-param (args, LiveViewContext).
       // Always pass the liveContext (when supplied) as the renderer's second arg.
       if (liveContext !== undefined) {
-        if ((renderer as any).length <= 1) {
+        if ((renderer as { length: number }).length <= 1) {
           await renderer(args);
         } else {
           await renderer(args, liveContext);
@@ -317,6 +317,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
           tool: input.tool,
           error: e instanceof Error ? e.message : String(e),
         });
+        // @swallow-ok best-effort session persistence already warned above; degrade to undefined
         return undefined;
       }
       return { id, tool: input.tool, timestamp: timing.startedAt, durationMs: timing.durationMs };

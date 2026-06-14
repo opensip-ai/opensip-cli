@@ -70,7 +70,7 @@ describe('createRunTimer / RunTimer', () => {
       vi.restoreAllMocks();
       // ensure Date.now is real
       if (Date.now !== realNow) {
-        (Date as any).now = realNow;
+        (Date as { now: () => number }).now = realNow;
       }
     }
   });
