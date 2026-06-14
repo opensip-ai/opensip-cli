@@ -18,15 +18,24 @@
  * time and cost.
  *
  * The check is intentionally simple (text/regex over AST) to avoid pulling in
- * lang-* parsers for a universal architecture rule. It errs on the side of
- * loudness for engine code and provides clear `@fitness-ignore-file` escape.
+ * lang-* parsers for a universal architecture rule. It is scoped to engine /
+ * adapter IMPLEMENTATION files that do RUNTIME first-party work. It deliberately
+ * skips, as NON-hot-paths: check-* packs (their execution is traced once,
+ * centrally, by the engine runner — `run-one-check` withSpanAsync — so a per-check
+ * span is redundant nesting; the file only imports the `defineCheck` API), the
+ * cli dispatcher/wiring layer, barrels (`index.ts`), type modules (`*types.ts`),
+ * display maps, scaffolds (run once at `init`), and type-only imports (erased at
+ * runtime). A clear `@fitness-ignore-file` escape remains for genuine exceptions.
  */
 
 import { defineCheck } from '@opensip-cli/fitness';
 
+// First-party packages whose RUNTIME (value) import marks engine hot-path work.
+// `graph-adapter-common` is the shared discover/parse/walk/resolve scaffolding the
+// language graph adapters call at runtime — as load-bearing as `graph/engine`.
 const HOT_IMPORTS = [
   /from ['"]@opensip-cli\/fitness['"]/,
-  /from ['"]@opensip-cli\/graph['"]/,
+  /from ['"]@opensip-cli\/graph(-adapter-common)?['"]/,
   /from ['"]@opensip-cli\/simulation['"]/,
   /from ['"]@opensip-cli\/lang-(typescript|rust|python|go|java|cpp)['"]/,
   /from ['"].*\/(fitness|graph|simulation)\/engine['"]/,
@@ -34,20 +43,26 @@ const HOT_IMPORTS = [
 
 const HAS_SPAN = /withSpan(Async)?\s*\(/;
 
+// `import type … from '…'` is erased at runtime, so it is NOT a hot-path use.
+// Stripped before the HOT_IMPORTS test so type-only consumers do not false-fire.
+const TYPE_ONLY_IMPORT = /import\s+type\s[\s\S]*?from\s*['"][^'"]+['"];?/g;
+
+// Paths that import first-party code but are NOT engine hot paths — see file header.
+const NOT_HOT_PATH =
+  /\/checks-[a-z]+\/src\/|\/cli\/src\/|\/index\.ts$|[/.-]types\.ts$|\/display\/|\/scaffold\/|__tests__|test-support|telemetry\.ts|profiling\.ts/;
+
 /** Pure analysis. Exported for direct exercise if this check grows a test harness. */
 export function analyzeHotPathsRequireSpans(content, filePath) {
   const violations = [];
+  const path = filePath.replaceAll('\\', '/');
 
-  const importsHot = HOT_IMPORTS.some((re) => re.test(content));
-  if (!importsHot) return violations;
+  // Only engine/adapter IMPLEMENTATION files are hot paths; skip the rest.
+  if (NOT_HOT_PATH.test(path)) return violations;
+  if (/@fitness-ignore-file.*(needs-telemetry|hot-paths)/.test(content)) return violations;
 
-  // Allow test files and the telemetry seam itself
-  if (
-    /__tests__|test-support|telemetry\.ts|profiling\.ts/.test(filePath) ||
-    /@fitness-ignore-file.*(needs-telemetry|hot-paths)/.test(content)
-  ) {
-    return violations;
-  }
+  // A type-only import of first-party code carries no runtime work.
+  const runtime = content.replace(TYPE_ONLY_IMPORT, '');
+  if (!HOT_IMPORTS.some((re) => re.test(runtime))) return violations;
 
   if (!HAS_SPAN.test(content)) {
     violations.push({
