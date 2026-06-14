@@ -24,7 +24,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { currentScope, resolveProjectPaths, SystemError } from '@opensip-cli/core';
+import { currentScope, resolveProjectPaths, SystemError, logger as defaultLogger } from '@opensip-cli/core';
 import {
   generateDashboardHtml,
   type DashboardInput as HtmlReportInput,
@@ -69,7 +69,24 @@ async function composeReportInput(): Promise<HtmlReportInput> {
 
   for (const tool of scope.tools.list()) {
     const contribution = await tool.collectReportData?.(scope);
-    if (contribution) Object.assign(input, contribution);
+    if (contribution) {
+      // Guardrail (host-owned-run-timing Phase 6 + spec §8): tools must never
+      // clobber host-owned top-level keys (sessions today; future may add more
+      // like runTiming). Ignore with warning (best-effort, like other contribution
+      // faults). The host `sessions` list is the durable history for the report.
+      const reserved = Object.keys(contribution).filter((k) => k === 'sessions');
+      if (reserved.length > 0) {
+        (scope.logger ?? defaultLogger).warn({
+          evt: 'cli.report.compose.reserved_key_ignored',
+          module: 'cli:report',
+          tool: tool.metadata.id,
+          keys: reserved,
+          msg: 'Tool collectReportData returned a reserved host key; it was ignored.',
+        });
+        for (const k of reserved) delete (contribution as any)[k];
+      }
+      Object.assign(input, contribution);
+    }
   }
 
   return input;
