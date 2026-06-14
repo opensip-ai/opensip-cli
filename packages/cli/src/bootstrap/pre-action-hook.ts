@@ -27,7 +27,7 @@
  * underlying ValidationError surfaces with exit 2 — no silent walk-up.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync } from 'node:fs';
 
 import {
   configureLogger,
@@ -44,29 +44,29 @@ import {
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
-} from "@opensip-cli/core";
-import { getMeter } from "@opensip-cli/core";
+} from '@opensip-cli/core';
+import { getMeter } from '@opensip-cli/core';
 
-import { startProfiling } from "../telemetry/profiling.js";
-import { checkForUpdate, formatUpdateNag } from "../update-notifier.js";
+import { startProfiling } from '../telemetry/profiling.js';
+import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
-import { BootstrapError } from "./bootstrap-error.js";
-import { buildPerRunScope } from "./build-per-run-scope.js";
-import { loadCliDefaults, mergeConfigDefaults } from "./cli-defaults.js";
-import { loadOwningToolCapabilities } from "./load-tool-capabilities.js";
+import { BootstrapError } from './bootstrap-error.js';
+import { buildPerRunScope } from './build-per-run-scope.js';
+import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
+import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
 import {
   checkNoProjectAndBailout,
   checkSchemaVersionAndBailout,
   warnAboutPhantomRuntimes,
-} from "./pre-action-guards.js";
-import { initializedToolIds } from "./process-idempotency.js";
+} from './pre-action-guards.js';
+import { initializedToolIds } from './process-idempotency.js';
 
-import type { Command } from "commander";
+import type { Command } from 'commander';
 
 /** npm package whose version the update check compares against. */
-const CLI_PACKAGE_NAME = "opensip-cli";
+const CLI_PACKAGE_NAME = 'opensip-cli';
 
-const MODULE_TAG = "cli:bootstrap";
+const MODULE_TAG = 'cli:bootstrap';
 
 /**
  * Process-scoped idempotency for Tool.initialize() (see process-idempotency.ts).
@@ -84,16 +84,11 @@ const MODULE_TAG = "cli:bootstrap";
  * CLI-only commands (init/sessions/configure/plugin/...) — they belong to
  * no tool, so no `initialize()` runs for them.
  */
-export function resolveOwningTool(
-  tools: ToolRegistry,
-  cmdName: string,
-): Tool | undefined {
+export function resolveOwningTool(tools: ToolRegistry, cmdName: string): Tool | undefined {
   return tools
     .list()
     .find((tool) =>
-      tool.commands.some(
-        (c) => c.name === cmdName || (c.aliases?.includes(cmdName) ?? false),
-      ),
+      tool.commands.some((c) => c.name === cmdName || (c.aliases?.includes(cmdName) ?? false)),
     );
 }
 
@@ -127,7 +122,7 @@ async function maybeInitializeOwningTool(
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logger.error({
-      evt: "cli.tool.initialize_failed",
+      evt: 'cli.tool.initialize_failed',
       module: MODULE_TAG,
       runId,
       toolId: owningTool.metadata.id, // stable UUID for structured
@@ -197,12 +192,12 @@ export function installPreActionHook(
   version: string,
   runtime: PreActionRuntime,
 ): void {
-  program.hook("preAction", async (_thisCommand, actionCommand) => {
-    const runId = generatePrefixedId("run");
+  program.hook('preAction', async (_thisCommand, actionCommand) => {
+    const runId = generatePrefixedId('run');
 
     const opts = actionCommand.opts();
     const cwd = (opts.cwd as string) ?? process.cwd();
-    const cwdExplicit = actionCommand.getOptionValueSource("cwd") === "cli";
+    const cwdExplicit = actionCommand.getOptionValueSource('cwd') === 'cli';
 
     // Keep the loaded defaults around: `mergeConfigDefaults` only copies the
     // flag-shaped fields onto opts, but `ui.banner` has no flag — we read it
@@ -241,7 +236,7 @@ export function installPreActionHook(
       throw new BootstrapError({
         message: msg,
         humanMessage: `✗ ${msg}`,
-        suggestion: "Check opensip-cli.config.yml (or your --config path).",
+        suggestion: 'Check opensip-cli.config.yml (or your --config path).',
         exitCode: 2,
       });
     }
@@ -269,23 +264,17 @@ export function installPreActionHook(
     const extraAgnostic = new Set<string>();
     for (const tool of runtime.tools.list()) {
       for (const c of tool.commands || []) {
-        if (c.scope === "none") {
+        if (c.scope === 'none') {
           extraAgnostic.add(c.name);
           (c.aliases ?? []).forEach((a: string) => extraAgnostic.add(a));
         }
       }
     }
-    checkNoProjectAndBailout(
-      project,
-      cwd,
-      actionCommand.name(),
-      runId,
-      extraAgnostic,
-    );
+    checkNoProjectAndBailout(project, cwd, actionCommand.name(), runId, extraAgnostic);
     warnAboutPhantomRuntimes(project, opts.json === true);
 
     // 5. Side-effect setup, gated on a real project being present.
-    if (project.scope === "project" && existsSync(project.projectRoot)) {
+    if (project.scope === 'project' && existsSync(project.projectRoot)) {
       const projectPaths = resolveProjectPaths(project.projectRoot);
       // Second configureLogger call — fills in the project-scoped logDir
       // now that the project context is resolved. Leaves silent/debugMode/runId
@@ -306,9 +295,9 @@ export function installPreActionHook(
     // up-to-date / opted-out / non-TTY). The `mini` banner shows it inline;
     // other sizes — and the banner-less `--json` path — fall back to the
     // stderr nag so the signal is never silently lost.
-    const bannerSize = cliDefaults.ui?.banner ?? "mini";
+    const bannerSize = cliDefaults.ui?.banner ?? 'mini';
     const update = checkForUpdate({ name: CLI_PACKAGE_NAME, version });
-    if (update && (bannerSize !== "mini" || opts.json === true)) {
+    if (update && (bannerSize !== 'mini' || opts.json === true)) {
       process.stderr.write(formatUpdateNag(version, update));
     }
 
@@ -349,8 +338,8 @@ export function installPreActionHook(
     // for per-run state. No holder mirror or mark dance. All subsequent readers (including
     // host command bodies) must see a valid currentScope().
     if (!currentScope()) {
-      throw new SystemError("Scope was not entered before command dispatch", {
-        code: "SYSTEM.SCOPE.NOT_ENTERED",
+      throw new SystemError('Scope was not entered before command dispatch', {
+        code: 'SYSTEM.SCOPE.NOT_ENTERED',
       });
     }
 
@@ -360,22 +349,16 @@ export function installPreActionHook(
     // consumers see the full uniform lifecycle (tools loaded, subscopes contributed,
     // capability domains wired + driven, config validated, etc.). This directly
     // improves observability of the blast-radius bootstrap paths (architecture review).
-    scope.diagnostics.event(
-      "load",
-      "debug",
-      `${tools.list().length} tool(s) loaded`,
-    );
-    scope.diagnostics.counter("tools.loaded", tools.list().length);
+    scope.diagnostics.event('load', 'debug', `${tools.list().length} tool(s) loaded`);
+    scope.diagnostics.counter('tools.loaded', tools.list().length);
 
     // Phase 2 metrics (low cardinality)
-    getMeter("opensip-cli")
-      .createCounter("opensip_cli.commands.started")
-      .add(1, {
-        command: actionCommand.name(),
-      });
+    getMeter('opensip-cli').createCounter('opensip_cli.commands.started').add(1, {
+      command: actionCommand.name(),
+    });
     scope.diagnostics.event(
-      "validate",
-      "debug",
+      'validate',
+      'debug',
       `project config resolved (scope: ${project.scope})`,
     );
 
@@ -386,7 +369,7 @@ export function installPreActionHook(
 
     // Structured start log.
     logger.info({
-      evt: "cli.run.start",
+      evt: 'cli.run.start',
       module: MODULE_TAG,
       runId,
       command: actionCommand.name(),
@@ -397,7 +380,7 @@ export function installPreActionHook(
 
     if (project.walkedUp > 0) {
       logger.info({
-        evt: "cli.project.discovered",
+        evt: 'cli.project.discovered',
         module: MODULE_TAG,
         runId,
         cwd,
@@ -425,15 +408,15 @@ export function installPreActionHook(
     const driven = await loadOwningToolCapabilities({
       owningTool: resolveOwningTool(tools, actionCommand.name()),
       projectDir: project.projectRoot,
-      configPath: project.scope === "project" ? project.configPath : undefined,
+      configPath: project.scope === 'project' ? project.configPath : undefined,
     });
     if (driven > 0) {
       scope.diagnostics.event(
-        "load",
-        "debug",
+        'load',
+        'debug',
         `drove ${String(driven)} owning-tool capability domain(s) (see per-domain 'capability ... loaded' events for contribution counts + errors)`,
       );
-      scope.diagnostics.counter("capabilities.driven", driven);
+      scope.diagnostics.counter('capabilities.driven', driven);
     }
   });
 
@@ -443,10 +426,10 @@ export function installPreActionHook(
   // many paths. postAction fires for normal completion; error paths are covered by
   // handleParseError + handleFatalBootstrapError (which may also dispose in future passes).
   // Idempotent: dispose is cheap and safe to call more than once.
-  program.hook("postAction", async () => {
+  program.hook('postAction', () => {
     try {
       const s = currentScope();
-      if (s && typeof s.dispose === "function") {
+      if (s && typeof s.dispose === 'function') {
         s.dispose();
       }
     } catch {
