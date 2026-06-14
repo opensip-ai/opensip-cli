@@ -22,32 +22,27 @@
  */
 
 import {
-  ConfigurationError,
   type RunScope,
-  SystemError,
   UnknownLiveViewError,
-  currentScope,
   generatePrefixedId,
   logger as defaultLogger,
-  resolveProjectPaths,
   type LiveViewRenderer,
   type Logger,
-  type ProjectContext,
   type RecordedToolRunSession,
   type RunTimer,
   type ToolCliContext,
   type ToolRunSessionInput,
   type ToolRunSessions,
-  type ToolShortId,
   type LiveViewContext,
   createRunTimer,
 } from '@opensip-cli/core';
+import { type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
-import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
 import { deliverEnvelope, writeEnvelopeSarif } from './bootstrap/deliver-envelope.js';
 import { buildHostPlanes } from './bootstrap/host-planes.js';
+import { getProjectDatastore, readScope } from './bootstrap/scope-access.js';
 import { buildStateSeams } from './bootstrap/state-seams.js';
 import {
   outcomeFromEnvelope,
@@ -57,6 +52,9 @@ import {
 import { renderOutcome, renderRaw } from './commands/render-outcome.js';
 
 import type { CommandResult, SignalEnvelope } from '@opensip-cli/contracts';
+
+/** Structured-log `module` tag for this composition-root module. */
+const MODULE_TAG = 'cli:context';
 
 // ---------------------------------------------------------------------------
 // No module-global bootstrap-handoff bag.
@@ -71,117 +69,15 @@ import type { CommandResult, SignalEnvelope } from '@opensip-cli/contracts';
 // `currentScope()?.toolProvenance` / `?.toolManifests`.
 // ---------------------------------------------------------------------------
 
-/**
- * Strict reader: after Phase 3 hygiene, the only way to obtain the per-run scope is
- * currentScope() (entered by pre-action-hook or explicit runWithScope in tests).
- * All previous holder fallbacks removed. Non-action paths (report, errors) that need
- * scope must ensure entry or restructure to occur inside an entered action.
- */
-function readScope(): RunScope {
-  const bound = currentScope();
-  if (!bound) {
-    throw new SystemError(
-      'CLI scope accessed before pre-action-hook constructed and entered it (enterScope + ALS). ' +
-        'All production paths (tool actions, host commands, report/error seams) must run inside ' +
-        'an entered RunScope. See host-planes-scope-seams-hygiene plan Phase 3 and currentScope().',
-      { code: 'SYSTEM.SCOPE.NOT_ENTERED' },
-    );
-  }
-  return bound;
-}
-
-/**
- * Read the current project root. Convenience for non-tool bootstrap
- * helpers (e.g. `maybeOpenReport`) that need the project root but
- * don't carry a ToolCliContext. Throws if accessed before pre-action-hook
- * constructed the scope.
- */
-export function getCurrentProjectRoot(): string {
-  const project = readScope().projectContext;
-  if (!project) {
-    throw new SystemError(
-      'getCurrentProjectRoot() called before pre-action-hook resolved the context.',
-      { code: 'SYSTEM.BOOTSTRAP.PROJECT_UNSET' },
-    );
-  }
-  return project.projectRoot;
-}
-
-/**
- * Build a closure-based datastore thunk for the given project.
- * Caches the open DataStore on first access. The pre-action-hook
- * wires the result into `RunScope.datastore` so tools and CLI
- * commands reach the same instance.
- *
- * Throws when called outside a project scope — callers must check
- * `project.scope === 'project'` first or handle the throw as a
- * "no project found" error.
- */
-export function buildDatastoreThunk(
-  project: ProjectContext,
-  log: Logger = defaultLogger,
-): () => DataStore {
-  let cached: DataStore | undefined;
-  return () => {
-    if (cached) return cached;
-    if (project.scope !== 'project') {
-      throw new SystemError(
-        'Datastore accessed in a non-project context. The action body should have ' +
-          'errored earlier with "No OpenSIP CLI project found" before touching this.',
-        { code: 'SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT' },
-      );
-    }
-    const path = `${resolveProjectPaths(project.projectRoot).runtimeDir}/datastore.sqlite`;
-    cached = DataStoreFactory.open({ backend: 'sqlite', path });
-    log.info({
-      evt: 'cli.datastore.opened',
-      module: 'cli:context',
-      path,
-    });
-    return cached;
-  };
-}
-
-/**
- * Open (or return cached) project-local SQLite DataStore via the
- * scope's datastore thunk. Shared between tool action bodies and
- * the host commands (e.g. `sessions`, in `host-subcommand-groups.ts`) so
- * both paths are equally lazy.
- *
- * Throws when called outside a project scope — see
- * `buildDatastoreThunk`'s contract.
- */
-export function getOrOpenDatastore(_log: Logger = defaultLogger): DataStore {
-  const thunk = readScope().datastore;
-  return thunk() as DataStore;
-}
-
-/**
- * Project-scoped datastore accessor for the host-owned planes (baseline, toolState, hostPlanes).
- * Converts the internal DATASTORE_OUTSIDE_PROJECT SystemError into a clear
- * ConfigurationError so callers of the documented ToolCliContext seams get a
- * user-actionable error (exit 2) instead of an internal SYSTEM.* code.
- *
- * @throws {ConfigurationError} When called outside a project scope (no open datastore);
- *   other datastore-open failures propagate unchanged.
- */
-function getProjectDatastore(): DataStore {
-  try {
-    return getOrOpenDatastore();
-  } catch (error) {
-    if (
-      error instanceof SystemError &&
-      error.code === 'SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT'
-    ) {
-      throw new ConfigurationError(
-        'This operation requires an OpenSIP CLI project (an opensip-cli.config.yml with a targets: block or similar). ' +
-          'Run from within a project directory, or pass --cwd to an initialized project.',
-        { code: 'CONFIGURATION.REQUIRES_PROJECT' },
-      );
-    }
-    throw error;
-  }
-}
+// Per-run scope + datastore readers live in `bootstrap/scope-access.ts`. They
+// are re-exported here so existing importers (and the dynamic-import tests)
+// keep their stable `cli-context.js` entry point while this module focuses on
+// context assembly (live-view registry + buildToolCliContext).
+export {
+  buildDatastoreThunk,
+  getCurrentProjectRoot,
+  getOrOpenDatastore,
+} from './bootstrap/scope-access.js';
 
 export interface LiveViewRegistry {
   readonly register: (key: string, renderer: LiveViewRenderer) => void;
@@ -220,16 +116,10 @@ export function createLiveViewRegistry(log: Logger = defaultLogger): LiveViewReg
         throw new UnknownLiveViewError(key);
       }
       // Support both legacy 1-param renderers and new 2-param (args, LiveViewContext).
-      // Always pass the liveContext (when supplied) as the renderer's second arg.
-      if (liveContext !== undefined) {
-        if ((renderer as { length: number }).length <= 1) {
-          await renderer(args);
-        } else {
-          await renderer(args, liveContext);
-        }
-      } else {
-        await renderer(args);
-      }
+      // Pass the liveContext as the second arg only to a 2-param renderer (a
+      // legacy 1-param renderer would ignore it anyway).
+      const passContext = liveContext !== undefined && (renderer as { length: number }).length > 1;
+      await (passContext ? renderer(args, liveContext) : renderer(args));
     },
     has(key) {
       return renderers.has(key);
@@ -304,18 +194,18 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
         // Observability per cross-cutting: log the record event (best effort).
         log.info?.({
           evt: 'cli.run-session.recorded',
-          module: 'cli:context',
+          module: MODULE_TAG,
           tool: input.tool,
           sessionId: id,
           durationMs: timing.durationMs,
         });
-      } catch (e) {
+      } catch (error) {
         // Swallow; best-effort persistence must not affect primary outcome.
         log.warn?.({
           evt: 'cli.run-session.record_failed',
-          module: 'cli:context',
+          module: MODULE_TAG,
           tool: input.tool,
-          error: e instanceof Error ? e.message : String(e),
+          error: error instanceof Error ? error.message : String(error),
         });
         // @swallow-ok best-effort session persistence already warned above; degrade to undefined
         return undefined;
@@ -368,7 +258,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
         }
         log.error({
           evt: 'cli.emit_json.render_failed',
-          module: 'cli:context',
+          module: MODULE_TAG,
           error: error instanceof Error ? error.message : String(error),
         });
       });
@@ -383,7 +273,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
         }
         log.error({
           evt: 'cli.emit_envelope.render_failed',
-          module: 'cli:context',
+          module: MODULE_TAG,
           error: error instanceof Error ? error.message : String(error),
         });
       });
@@ -411,7 +301,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
         }
         log.error({
           evt: 'cli.emit_error.render_failed',
-          module: 'cli:context',
+          module: MODULE_TAG,
           error: error instanceof Error ? error.message : String(error),
         });
       });

@@ -73,12 +73,10 @@ export function createRunTimer(): RunTimer {
   const monotonicStart = perfNow ? perfNow() : undefined;
 
   function elapsedMs(): number {
-    let raw: number;
-    if (monotonicStart !== undefined && perfNow) {
-      raw = perfNow() - monotonicStart;
-    } else {
-      raw = Date.now() - startedAtEpochMs;
-    }
+    const raw =
+      monotonicStart !== undefined && perfNow
+        ? perfNow() - monotonicStart
+        : Date.now() - startedAtEpochMs;
     return Math.max(0, raw);
   }
 

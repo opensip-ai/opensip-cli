@@ -24,7 +24,12 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { currentScope, resolveProjectPaths, SystemError, logger as defaultLogger } from '@opensip-cli/core';
+import {
+  currentScope,
+  resolveProjectPaths,
+  SystemError,
+  logger as defaultLogger,
+} from '@opensip-cli/core';
 import {
   generateDashboardHtml,
   type DashboardInput as HtmlReportInput,

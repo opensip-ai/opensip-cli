@@ -12,20 +12,31 @@
  * positional args (name, variadic/optional), and the one-line synopsis. Any
  * future drift from this surface fails CI loudly.
  *
- * ── BASELINE = 2.10.0, WITH ONE SANCTIONED DELTA ─────────────────────────────
- * The captured surface equals the 2.10.0 surface EXCEPT for one intentional,
- * reviewer-approved change: the three graph commands that bear `--resolution`
- * (`graph`, `catalog-export`, `sarif-export`) now render
+ * ── BASELINE = 2.10.0, WITH SANCTIONED DELTAS ────────────────────────────────
+ * The captured surface equals the 2.10.0 surface EXCEPT for these intentional,
+ * reviewer-approved changes:
  *
- *     (choices: "exact", "fast", default: "exact")
+ * 1. The three graph commands that bear `--resolution` (`graph`,
+ *    `catalog-export`, `sarif-export`) now render
  *
- * in their `--resolution` help, because the command plane moved `--resolution`
- * validation OUT of the handler (which used to throw on a bad string) and INTO
- * the host-owned declared `choices: ['exact','fast']` on the OptionSpec. That is
- * the migration making validation declarative — NOT surface drift. It is the
- * ONLY difference from 2.10.0; every other command is byte-identical. If a
- * reviewer sees a `--resolution` choices/default line in the snapshot, that is
- * expected. Any OTHER change is a regression to investigate.
+ *        (choices: "exact", "fast", default: "exact")
+ *
+ *    in their `--resolution` help, because the command plane moved
+ *    `--resolution` validation OUT of the handler (which used to throw on a bad
+ *    string) and INTO the host-owned declared `choices: ['exact','fast']` on the
+ *    OptionSpec. That is the migration making validation declarative — NOT
+ *    surface drift.
+ *
+ * 2. `fit --tags` and `init --language` now declare an array accumulator
+ *    (`arrayDefault: []` + a `parse` reducer), so their snapshot shows
+ *    `defaultValue: []` and a "repeatable or comma-separated" description.
+ *    This fixes the `repeatable-option-needs-accumulator` dogfood finding:
+ *    Commander keeps only the LAST value of a value option without a reducer, so
+ *    `--tags a --tags b` silently dropped `a`. Both forms (`--tags a,b` and
+ *    `--tags a --tags b`) now accumulate.
+ *
+ * Every other command is byte-identical to 2.10.0. Any change OTHER than the two
+ * deltas above is a regression to investigate.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 

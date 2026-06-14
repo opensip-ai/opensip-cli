@@ -26,6 +26,26 @@
  * cli dispatcher/wiring layer, barrels (`index.ts`), type modules (`*types.ts`),
  * display maps, scaffolds (run once at `init`), and type-only imports (erased at
  * runtime). A clear `@fitness-ignore-file` escape remains for genuine exceptions.
+ *
+ * It ALSO skips the graph language-ADAPTER packages (`graph/graph-<lang>/src/`
+ * and `graph/graph-adapter-common/src/`) for the SAME reason check-* packs are
+ * skipped: the graph engine owns the span boundary and traces adapter work once,
+ * centrally, per pipeline stage. Every production path wraps the adapter calls
+ * (`discoverFiles`/`parseProject`/`walkProject`/`resolveCallSites`) in a
+ * `withSpanAsync('opensip_cli.graph.<stage>')` span:
+ *   - exact engine — `cli/orchestrate.ts` + `orchestrate/catalog-builder.ts`
+ *     run each stage through `runStage` (→ withSpanAsync);
+ *   - sharded engine (the default) — `orchestrate/sharded-graph.ts` opens a
+ *     `sharded_build` parent span and the per-shard workers
+ *     (`cli/shard-worker.ts` → `buildAndResolveCatalog` with `spanRunStage`)
+ *     emit per-stage spans that nest under it via TRACEPARENT;
+ *   - background worker — `cli/graph-worker.ts` re-runs `runGraph` (exact path).
+ * The adapters are pure transforms the engine INVOKES inside those stage spans;
+ * a per-adapter-file span would be redundant nesting that adds no attribution
+ * (the stage span already attributes the time) AND would wrongly couple a
+ * pluggable adapter to the engine's tracer. The engine itself
+ * (`graph/engine/src/`) is NOT exempt — genuinely uninstrumented hot work there
+ * is still a real finding.
  */
 
 import { defineCheck } from '@opensip-cli/fitness';
@@ -48,8 +68,12 @@ const HAS_SPAN = /withSpan(Async)?\s*\(/;
 const TYPE_ONLY_IMPORT = /import\s+type\s[\s\S]*?from\s*['"][^'"]+['"];?/g;
 
 // Paths that import first-party code but are NOT engine hot paths — see file header.
+// `\/graph\/graph-[a-z-]+\/src\/` matches the graph language-adapter packages
+// (graph-go|java|python|rust|typescript, graph-adapter-common) but NOT the engine
+// (`graph/engine/src/`): adapter work is traced centrally by the engine's
+// per-stage spans, so a per-adapter span is redundant nesting (see file header).
 const NOT_HOT_PATH =
-  /\/checks-[a-z]+\/src\/|\/cli\/src\/|\/index\.ts$|[/.-]types\.ts$|\/display\/|\/scaffold\/|__tests__|test-support|telemetry\.ts|profiling\.ts/;
+  /\/checks-[a-z]+\/src\/|\/cli\/src\/|\/graph\/graph-[a-z-]+\/src\/|\/index\.ts$|[/.-]types\.ts$|\/display\/|\/scaffold\/|__tests__|test-support|telemetry\.ts|profiling\.ts/;
 
 /** Pure analysis. Exported for direct exercise if this check grows a test harness. */
 export function analyzeHotPathsRequireSpans(content, filePath) {

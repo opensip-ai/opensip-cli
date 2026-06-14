@@ -68,7 +68,7 @@ function read(rel: string): string {
 describe('init golden — single language (typescript)', () => {
   it('scaffolds the exact fit+sim layout, config bytes, ids, .gitignore, and dirs', () => {
     const result = executeInit({
-      ...makeArgs({ language: 'typescript' }),
+      ...makeArgs({ language: ['typescript'] }),
       toolScaffolds: firstPartyScaffolds(),
     });
     expect(result.created).toBe(true);
@@ -105,7 +105,10 @@ describe('init golden — single language (typescript)', () => {
   });
 
   it('the config contains the host-rendered fitness: block (Phase 3 must reproduce it)', () => {
-    executeInit({ ...makeArgs({ language: 'typescript' }), toolScaffolds: firstPartyScaffolds() });
+    executeInit({
+      ...makeArgs({ language: ['typescript'] }),
+      toolScaffolds: firstPartyScaffolds(),
+    });
     const config = read('opensip-cli.config.yml');
     expect(config).toContain('fitness:');
     // Lock the block bytes (from the first `fitness:` line to the end of its block).
@@ -117,7 +120,7 @@ describe('init golden — single language (typescript)', () => {
 describe('init golden — polyglot (rust,typescript)', () => {
   it('scaffolds per-language check files + the polyglot recipe slug list', () => {
     const result = executeInit({
-      ...makeArgs({ language: 'rust,typescript' }),
+      ...makeArgs({ language: ['rust', 'typescript'] }),
       toolScaffolds: firstPartyScaffolds(),
     });
     expect(result.created).toBe(true);

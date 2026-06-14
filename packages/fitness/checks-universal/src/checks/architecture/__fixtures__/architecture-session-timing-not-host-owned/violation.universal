@@ -1,8 +1,0 @@
-// violation: touches persist surface (hint) + direct Date capture (anti-pattern)
-import { persistSession } from 'some-session';
-
-export function bad() {
-  const t = new Date().toISOString();
-  persistSession({ startedAt: t, duration: 10 });
-  return t;
-}

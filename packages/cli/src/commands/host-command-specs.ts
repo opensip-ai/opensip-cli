@@ -76,7 +76,9 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
         flag: '--language',
         value: '<list>',
         description:
-          'Comma-separated language list (typescript|rust|python|go|java|cpp). Default: detect from filesystem markers.',
+          'Language list (typescript|rust|python|go|java|cpp), repeatable or comma-separated. Default: detect from filesystem markers.',
+        arrayDefault: [],
+        parse: (val, prev) => [...(prev as string[]), val],
       },
       {
         flag: '--keep',

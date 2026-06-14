@@ -118,7 +118,7 @@ opensip fit --gate-compare
 |---|---|---|---|
 | `--recipe <name>` | string | `default` | Use a named recipe. Built-in `default` runs every enabled check. |
 | `--check <slug>` | string | — | Run a single check by slug. Mutually informative with `--recipe`. |
-| `--tags <list>` | comma-list | — | Filter checks by tag (intersected with the recipe's selector). |
+| `--tags <list>` | repeatable / comma-list | `[]` | Filter checks by tag (intersected with the recipe's selector). Repeatable (`--tags a --tags b`) or comma-separated (`--tags a,b`). |
 | `--exclude <slug>` | repeatable | `[]` | Exclude check by slug. Can be passed multiple times. |
 | `--list` | bool | `false` | List available checks instead of running. |
 | `--recipes` | bool | `false` | List available recipes instead of running. |
@@ -490,7 +490,7 @@ The scaffold output is loose `.mjs` files — the lightest-weight starting point
 
 | Flag | Effect |
 |---|---|
-| `--language <list>` | Comma-separated language list (`typescript,rust`). Overrides detection. |
+| `--language <list>` | Language list (`typescript`, `rust`, …). Repeatable (`--language ts --language rust`) or comma-separated (`--language ts,rust`). Overrides detection. |
 | `--keep` | Re-scaffold examples; preserve any custom files in `opensip-cli/`. |
 | `--remove` | Delete `opensip-cli/` entirely, then scaffold fresh. |
 | `--cwd <path>` | Target directory (default: `process.cwd()`). |

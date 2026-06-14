@@ -23,7 +23,6 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'tool-has-manifest': ['🪪', 'Tool Has Manifest'],
   'vitest-config-extends-base': ['🧪', 'Vitest Config Extends Base'],
   'vitest-config-required-with-tests': ['🧪', 'Vitest Config Required With Tests'],
-  'architecture-session-timing-not-host-owned': ['⏱️', 'Session Timing Must Be Host-Owned'],
 });
 
 /** Documentation check display entries (UNIVERSAL only) */

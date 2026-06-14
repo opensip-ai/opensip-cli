@@ -21,7 +21,6 @@ import {
   currentScope,
   generatePrefixedId,
   logger,
-  extractPayloadVersion,
   type Signal,
   type VerdictPolicy,
 } from '@opensip-cli/core';
@@ -183,7 +182,10 @@ export function buildFitDoneResult({
   recipeName,
   warnings,
 }: BuildFitDoneArgs): FitDoneResult {
-  const label = args.tags ? `tags: ${args.tags}` : `recipe ${recipeName ?? 'default'}`;
+  const label =
+    args.tags && args.tags.length > 0
+      ? `tags: ${args.tags.join(',')}`
+      : `recipe ${recipeName ?? 'default'}`;
 
   // ADR-0021: carry the verbose findings body on the result so the shared
   // resultToView seam renders it identically in a TTY and a pipe (the old
@@ -279,17 +281,11 @@ export function persistFitSession(
   // a row was written.
   try {
     const repo = new SessionRepo(datastore);
+    // The payload's `__version` is a literal `1` on a `readonly __version: 1`
+    // field (session-payload.ts), so the shape is guaranteed by construction —
+    // no runtime version guard (and no ungoverned `process.env.NODE_ENV` read)
+    // is needed here.
     const fitPayload = buildFitnessSessionPayload(envelope);
-    // Guard (primarily exercised in tests/CI per phase 3.3): ensure the convention
-    // is followed on new writes. No user-visible behavior change.
-    // Uses the shared extract helper (no any, no console).
-    if (process.env.NODE_ENV === 'test' && extractPayloadVersion(fitPayload) !== 1) {
-      logger.warn({
-        evt: 'cli.fit.test.payload_version_guard',
-        module: 'cli:fit',
-        msg: 'fitness session payload missing or wrong __version in test build',
-      });
-    }
     repo.save({
       id: generatePrefixedId('fit'),
       tool: 'fit',
@@ -317,4 +313,4 @@ export function persistFitSession(
   }
 }
 
-export { buildFitnessSessionPayload };
+export { buildFitnessSessionPayload } from '../../persistence/session-payload.js';

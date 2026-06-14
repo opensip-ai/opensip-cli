@@ -1,8 +1,8 @@
+import { createRunTimer } from '@opensip-cli/core';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
-import { createRunTimer } from '@opensip-cli/core';
 import { renderToText } from '../render-to-text.js';
 import { RunSummary, viewRunSummary } from '../run-summary.js';
 import { RunTimingProvider } from '../run-timing-provider.js';
@@ -99,7 +99,9 @@ describe('RunSummary', () => {
     const timer = createRunTimer();
     // Let a tiny bit of time pass so duration > 0
     const start = Date.now();
-    while (Date.now() - start < 1) {}
+    while (Date.now() - start < 1) {
+      /* busy-wait so the host timer accrues a non-zero duration */
+    }
     const { lastFrame } = render(
       <ThemeProvider>
         <RunTimingProvider timer={timer}>

@@ -425,6 +425,22 @@ function sessionReplayResult(
 }
 
 /**
+ * Parse the `--concurrency <n>` value into a positive integer. A named
+ * declaration (not an inline arrow) so the `@throws` JSDoc attaches to the
+ * function node the throws-documentation check inspects.
+ *
+ * @throws {Error} When the value is not a positive integer (Commander surfaces
+ *   it as a usage/parse error, which the CLI boundary maps to exit 2).
+ */
+function parseConcurrency(v: string): number {
+  const n = Number.parseInt(v, 10);
+  if (!Number.isFinite(n) || n < 1) {
+    throw new Error(`--concurrency must be a positive integer (received '${v}')`);
+  }
+  return n;
+}
+
+/**
  * The declarative primary `graph` command (launch Phase 5 Task 5.1).
  * The host mounts this spec, applies the ADR-0021 common flags + graph's options
  * + the `[paths...]` variadic argument, and invokes {@link runGraphCommand}.
@@ -489,16 +505,7 @@ export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineComm
       flag: '--concurrency',
       value: '<n>',
       description: 'Concurrency cap for --workspace and the sharded build (default: cpus()-1)',
-      /** @throws {Error} When the value is not a positive integer (Commander maps it to exit 2). */
-      parse: (v) => {
-        const n = Number.parseInt(v, 10);
-        if (!Number.isFinite(n) || n < 1) {
-          // Commander will surface this as a usage/parse error; the CLI
-          // boundary maps it to CONFIGURATION_ERROR (exit 2).
-          throw new Error(`--concurrency must be a positive integer (received '${v}')`);
-        }
-        return n;
-      },
+      parse: parseConcurrency,
     },
     {
       flag: '--language',

@@ -185,7 +185,7 @@ describe('executeInit (single language)', () => {
   });
 
   it('scaffolds for TypeScript when --language is explicit', () => {
-    const result = executeInit(makeArgs({ language: 'typescript' }));
+    const result = executeInit(makeArgs({ language: ['typescript'] }));
     expect(result.languages).toEqual(['typescript']);
     const config = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(config).toContain('typescript-source:');
@@ -194,7 +194,7 @@ describe('executeInit (single language)', () => {
 
 describe('executeInit (polyglot)', () => {
   it('scaffolds one example check per language with distinct slugs', () => {
-    const result = executeInit(makeArgs({ language: 'rust,typescript' }));
+    const result = executeInit(makeArgs({ language: ['rust', 'typescript'] }));
     expect(result.languages).toEqual(['rust', 'typescript']);
 
     expect(
@@ -249,7 +249,7 @@ describe('executeInit (ambiguous language)', () => {
   });
 
   it('returns an error result when --language is unknown', () => {
-    const result = executeInit(makeArgs({ language: 'cobol' }));
+    const result = executeInit(makeArgs({ language: ['cobol'] }));
     expect(result.created).toBe(false);
     expect(result.ambiguousLanguageError?.message).toContain("Unknown language 'cobol'");
   });
@@ -410,7 +410,7 @@ describe('executeInit (partial-dir-only state)', () => {
 describe('executeInit (polyglot drift)', () => {
   it('classifies a stale-language scaffold and surfaces it under --keep', () => {
     // Initial polyglot scaffold.
-    executeInit(makeArgs({ language: 'typescript,rust' }));
+    executeInit(makeArgs({ language: ['typescript', 'rust'] }));
     expect(
       existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check-rust.mjs')),
     ).toBe(true);
@@ -418,7 +418,7 @@ describe('executeInit (polyglot drift)', () => {
     // Re-init with only typescript + --keep. The rust example should be
     // tagged stale-scaffolded and preserved (we don't remove it; user
     // may have been working with it).
-    const result = executeInit(makeArgs({ language: 'typescript', keep: true }));
+    const result = executeInit(makeArgs({ language: ['typescript'], keep: true }));
     expect(result.created).toBe(true);
     expect(result.state).toBe('fully-initialized');
 
@@ -490,7 +490,7 @@ describe('SupportedLanguage', () => {
   it('exhausts the known set', () => {
     const all: SupportedLanguage[] = ['typescript', 'rust', 'python', 'go', 'java', 'cpp'];
     for (const lang of all) {
-      const result = executeInit(makeArgs({ language: lang }));
+      const result = executeInit(makeArgs({ language: [lang] }));
       expect(result.languages).toEqual([lang]);
       // Cleanup so each language gets a fresh testDir state
       rmSync(join(testDir, 'opensip-cli.config.yml'), { force: true });

@@ -12,6 +12,7 @@
  */
 
 import { type FitOptions, type SignalEnvelope } from '@opensip-cli/contracts';
+import { createRunTimer, type ToolCliContext } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,8 +20,6 @@ vi.mock('../fit.js', () => ({ executeFit: vi.fn() }));
 
 import { runGateMode } from '../fit-modes.js';
 import { executeFit } from '../fit.js';
-
-import { createRunTimer, type ToolCliContext } from '@opensip-cli/core';
 
 let datastore: DataStore;
 

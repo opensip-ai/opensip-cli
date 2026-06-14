@@ -66,7 +66,7 @@ function makeArgs(toolScaffolds: ToolScaffold[], overrides: Record<string, unkno
     json: false,
     cwd: testDir,
     debug: false,
-    language: 'typescript',
+    language: ['typescript'],
     toolScaffolds,
     ...overrides,
   } as Parameters<typeof executeInit>[0];

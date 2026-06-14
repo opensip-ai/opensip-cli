@@ -209,9 +209,7 @@ export interface ExecuteSimOptions {
 export async function executeSim(
   args: ToolOptions & { readonly verbose?: boolean },
   opts: ExecuteSimOptions = {},
-): Promise<
-  { result: SimDoneResult } | { result: ErrorResult }
-> {
+): Promise<{ result: SimDoneResult } | { result: ErrorResult }> {
   // Lifecycle: load .mjs plugins + scenario packages before the recipe
   // registry is read. Idempotent per project dir.
   await ensureScenariosLoaded(args.cwd);
@@ -342,10 +340,7 @@ export async function executeSim(
  *  kept for legacy direct test callers and uses dummy timing to avoid tool code
  *  capturing Date for StoredSession columns.)
  */
-export function persistSimSession(
-  datastore: DataStore,
-  result: SimDoneResult,
-): void {
+export function persistSimSession(datastore: DataStore, result: SimDoneResult): void {
   try {
     const repo = new SessionRepo(datastore);
     repo.save({

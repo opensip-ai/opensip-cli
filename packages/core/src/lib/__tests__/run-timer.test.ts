@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 import { createRunTimer } from '../run-timer.js';
 
@@ -79,7 +79,9 @@ describe('createRunTimer / RunTimer', () => {
     const timer = createRunTimer();
     const s1 = timer.snapshot();
     const start = Date.now();
-    while (Date.now() - start < 2) {}
+    while (Date.now() - start < 2) {
+      /* busy-wait to let real elapsed time accrue */
+    }
     const s2 = timer.snapshot();
     expect(s2.startedAt).toBe(s1.startedAt);
     expect(s2.durationMs).toBeGreaterThanOrEqual(s1.durationMs);

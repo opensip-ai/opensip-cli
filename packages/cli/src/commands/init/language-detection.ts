@@ -104,11 +104,15 @@ export type LanguageResolution =
  */
 export function resolveLanguages(
   cwd: string,
-  languageFlag: string | undefined,
+  languageFlag: readonly string[] | undefined,
 ): LanguageResolution {
-  if (languageFlag) {
+  if (languageFlag && languageFlag.length > 0) {
     try {
-      return { ok: true, languages: parseLanguageFlag(languageFlag) };
+      // The flag is an accumulator (`--language ts --language rust`) whose
+      // elements may also be comma-separated (`--language ts,rust`). Join into
+      // one canonical comma-list and delegate to the established parser, which
+      // splits, trims, dedupes, and validates.
+      return { ok: true, languages: parseLanguageFlag(languageFlag.join(',')) };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       return { ok: false, error: { detected: [], message: msg } };

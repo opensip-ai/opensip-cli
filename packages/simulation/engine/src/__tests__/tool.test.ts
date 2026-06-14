@@ -125,7 +125,11 @@ function makeFakeContext(): {
         startedAt: new Date().toISOString(),
         startedAtEpochMs: Date.now(),
         elapsedMs: () => 0,
-        snapshot: () => ({ startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), durationMs: 0 }),
+        snapshot: () => ({
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          durationMs: 0,
+        }),
       },
       record: () => undefined,
     },

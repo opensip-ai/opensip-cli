@@ -231,10 +231,9 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
     process.stderr.write('Error: --gate-save and --gate-compare are mutually exclusive.\n');
     return;
   }
-  const datastore = cli.scope.datastore() as DataStore;
-  // Persist the run on the main thread (ADR-0028 — engine is persistence-free),
-  // using the same handle the host gate seam writes against, so gate-save /
-  // gate-compare runs land in the session history alongside live-mode runs.
+  // Persist the run on the main thread (ADR-0028 — engine is persistence-free)
+  // via the host `cli.runSession.record` seam, so gate-save / gate-compare runs
+  // land in the session history alongside live-mode runs.
   const fitResult = await executeFit(args);
   if (fitResult.envelope !== undefined) {
     const payload = buildFitnessSessionPayload(fitResult.envelope);

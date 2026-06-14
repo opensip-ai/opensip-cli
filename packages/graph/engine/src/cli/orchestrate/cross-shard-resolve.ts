@@ -222,7 +222,7 @@ function sortCalls(calls: readonly CallEdge[]): CallEdge[] {
   return [...calls].sort((a, b) => {
     const toA = [...a.to].sort().join(',');
     const toB = [...b.to].sort().join(',');
-    return a.line - b.line || a.column - b.column || (Number(toA > toB) - Number(toA < toB));
+    return a.line - b.line || a.column - b.column || Number(toA > toB) - Number(toA < toB);
   });
 }
 

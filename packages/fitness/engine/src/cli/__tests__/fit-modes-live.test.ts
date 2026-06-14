@@ -11,7 +11,11 @@
  */
 
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
-import { createRunTimer, HOST_VERDICT_POLICY_FALLBACK, type ToolCliContext } from '@opensip-cli/core';
+import {
+  createRunTimer,
+  HOST_VERDICT_POLICY_FALLBACK,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { runJsonMode, runLiveMode } from '../fit-modes.js';

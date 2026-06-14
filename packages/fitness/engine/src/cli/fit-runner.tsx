@@ -114,7 +114,6 @@ type FitState =
 
 interface FitRunnerProps {
   readonly args: FitOptions;
-  readonly datastore?: DataStore;
   readonly setExitCode?: (code: number) => void;
   /** Called with the run's envelope once it completes, for root-owned egress. */
   readonly onEnvelope?: (envelope: SignalEnvelope) => void;
@@ -124,7 +123,6 @@ interface FitRunnerProps {
 
 function FitRunner({
   args,
-  datastore,
   setExitCode,
   onEnvelope,
   liveContext,
@@ -210,7 +208,8 @@ function FitRunner({
     };
   }, []);
 
-  const recipe = args.tags ? `tags: ${args.tags}` : (args.recipe ?? 'default');
+  const recipe =
+    args.tags && args.tags.length > 0 ? `tags: ${args.tags.join(',')}` : (args.recipe ?? 'default');
 
   // Banner + RunHeader both live in <Static> so Ink writes them once above the
   // dynamic redraw region and never touches those bytes again. The dynamic
@@ -316,9 +315,7 @@ function FitRunner({
         />
       );
       const timedSummary = liveContext?.runSession ? (
-        <RunTimingProvider timer={liveContext.runSession.timing}>
-          {summaryEl}
-        </RunTimingProvider>
+        <RunTimingProvider timer={liveContext.runSession.timing}>{summaryEl}</RunTimingProvider>
       ) : (
         summaryEl
       );
@@ -409,21 +406,18 @@ export async function renderFitLive(
   options?: RenderFitLiveOptions,
 ): Promise<SignalEnvelope | undefined> {
   let envelope: SignalEnvelope | undefined;
-  let datastore: DataStore | undefined;
-  let liveContext: LiveViewContext | undefined;
-  if (contextOrDatastore) {
-    if ((contextOrDatastore as LiveViewContext).runSession) {
-      liveContext = contextOrDatastore as LiveViewContext;
-    } else {
-      datastore = contextOrDatastore as DataStore;
-    }
-  }
+  // Persistence is host-owned via `liveContext.runSession`; a raw DataStore arm
+  // is accepted for backward compat but no longer threaded (the runner ignores
+  // it). Only a LiveViewContext is forwarded to the runner.
+  const liveContext =
+    contextOrDatastore && (contextOrDatastore as LiveViewContext).runSession
+      ? (contextOrDatastore as LiveViewContext)
+      : undefined;
   const app = render(
     <ThemeProvider>
       <ClockProvider>
         <FitRunner
           args={args}
-          datastore={datastore}
           setExitCode={options?.setExitCode}
           onEnvelope={(e) => {
             envelope = e;

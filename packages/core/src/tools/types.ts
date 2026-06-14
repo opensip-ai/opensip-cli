@@ -32,10 +32,10 @@ import type { CommandSpec } from './command-spec.js';
 import type { ToolShortId } from './ids.js';
 import type { FingerprintStrategy } from '../baseline/fingerprint-strategy.js';
 import type { Logger } from '../lib/logger.js';
+import type { RunTimer } from '../lib/run-timer.js';
 import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
 import type { PluginLayout } from '../plugins/types.js';
 import type { Signal } from '../types/signal.js';
-import type { RunTimer, RunTimingSnapshot } from '../lib/run-timer.js';
 
 // `ToolScope` (the Tool-facing scope view) and `ScopeContribution` (the
 // augmentable subscope bag a tool returns from `contributeScope`) live in
@@ -217,10 +217,7 @@ export interface LiveViewContext {
  * only declare one parameter continue to work (the second arg is optional
  * during the migration window and for forward compatibility).
  */
-export type LiveViewRenderer = (
-  args: unknown,
-  context?: LiveViewContext,
-) => Promise<void>;
+export type LiveViewRenderer = (args: unknown, context?: LiveViewContext) => Promise<void>;
 
 /**
  * Thrown by `ToolCliContext.renderLive(key, args)` when no renderer has

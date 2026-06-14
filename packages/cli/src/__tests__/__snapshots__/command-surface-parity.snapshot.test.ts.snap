@@ -353,8 +353,8 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         },
         {
           "choices": undefined,
-          "defaultValue": undefined,
-          "description": "Filter checks by tags (comma-separated)",
+          "defaultValue": [],
+          "description": "Filter checks by tags (repeatable or comma-separated)",
           "flags": "--tags <tags>",
           "negate": false,
           "optional": false,
@@ -953,8 +953,8 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         },
         {
           "choices": undefined,
-          "defaultValue": undefined,
-          "description": "Comma-separated language list (typescript|rust|python|go|java|cpp). Default: detect from filesystem markers.",
+          "defaultValue": [],
+          "description": "Language list (typescript|rust|python|go|java|cpp), repeatable or comma-separated. Default: detect from filesystem markers.",
           "flags": "--language <list>",
           "negate": false,
           "optional": false,

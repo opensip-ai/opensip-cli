@@ -255,8 +255,6 @@ describe('persistSimSession', () => {
     const result = await simDone();
     // A datastore whose handle is unusable makes SessionRepo.save throw; the
     // best-effort wrapper must swallow + log, not propagate.
-    expect(() =>
-      persistSimSession({} as unknown as DataStore, result),
-    ).not.toThrow();
+    expect(() => persistSimSession({} as unknown as DataStore, result)).not.toThrow();
   });
 });

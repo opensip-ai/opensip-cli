@@ -101,11 +101,7 @@ describe('executeFit — persistence-free boundary (ADR-0028)', () => {
     const args = makeArgs(projectDir);
     const fitResult = await withFitScope(() => executeFit(args));
     expect(fitResult.envelope).toBeDefined();
-    persistFitSession(
-      datastore,
-      args,
-      fitResult.envelope!,
-    );
+    persistFitSession(datastore, args, fitResult.envelope!);
 
     const sessions = new SessionRepo(datastore).list({ tool: 'fit' });
     expect(sessions.length).toBe(1);

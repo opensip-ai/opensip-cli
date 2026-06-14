@@ -6,7 +6,13 @@
 export interface FitOptions {
   recipe?: string;
   check?: string;
-  tags?: string;
+  /**
+   * Tag filters for ad-hoc check selection. Repeatable and/or
+   * comma-separated: `--tags a --tags b` and `--tags a,b` both accumulate
+   * (the `--tags` OptionSpec declares an array accumulator). Each element
+   * may itself be a comma-separated list; consumers flatten + trim.
+   */
+  tags?: string[];
   list: boolean;
   recipes: boolean;
   json: boolean;
@@ -36,12 +42,14 @@ export interface InitOptions {
   json: boolean;
   debug: boolean;
   /**
-   * Comma-separated language list. When omitted, init detects the
-   * project's primary language(s) by inspecting filesystem markers
-   * (Cargo.toml, pyproject.toml, etc.) and exits 2 with a prompt if
+   * Language list. Repeatable and/or comma-separated: `--language ts
+   * --language rust` and `--language ts,rust` both accumulate (the
+   * `--language` OptionSpec declares an array accumulator). When omitted,
+   * init detects the project's primary language(s) by inspecting filesystem
+   * markers (Cargo.toml, pyproject.toml, etc.) and exits 2 with a prompt if
    * the result is ambiguous.
    */
-  language?: string;
+  language?: string[];
   /**
    * Re-scaffold example files. Preserve any custom files in
    * `opensip-cli/`. Mutually exclusive with `remove`.

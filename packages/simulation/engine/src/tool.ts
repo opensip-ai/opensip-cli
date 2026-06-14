@@ -88,14 +88,7 @@ type SimOptions = ToolOptions & {
 function setUpSimLiveView(cli: ToolCliContext): void {
   cli.registerLiveView(SIM_LIVE_VIEW_KEY, async (args, liveContext) => {
     const simArgs = args as ToolOptions;
-    const envelope = await renderSimLive(
-      simArgs,
-      {
-        setExitCode: cli.setExitCode,
-        datastore: cli.scope.datastore() as DataStore | undefined,
-      },
-      liveContext,
-    );
+    const envelope = await renderSimLive(simArgs, { setExitCode: cli.setExitCode }, liveContext);
     if (envelope !== undefined) {
       // ADR-0035: the host derives the findings exit from envelope.verdict.passed.
       await cli.deliverSignals(envelope, {
@@ -134,7 +127,6 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
   // json / non-TTY (pipe / CI): run the engine and render statically — the
   // animated Ink view is a TTY-only affordance. Output is byte-for-byte the
   // pre-live-view behavior.
-  const datastore = cli.scope.datastore() as DataStore | undefined;
   const { result } = await executeSim(opts);
   // Host-owned record (Phase 4): timing from the RunTimer on cli.runSession (same
   // instance the live path receives via LiveViewContext).

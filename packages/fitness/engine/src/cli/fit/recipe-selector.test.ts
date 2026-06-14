@@ -48,7 +48,7 @@ describe('selectRecipe (ADR-0022 tool-scoped + tolerant)', () => {
     expect(selectRecipe({ ...base, check: 'some-check' }, { toolRecipe: 'backend' })).toEqual({
       recipeName: undefined,
     });
-    expect(selectRecipe({ ...base, tags: 'quality' }, { toolRecipe: 'backend' })).toEqual({
+    expect(selectRecipe({ ...base, tags: ['quality'] }, { toolRecipe: 'backend' })).toEqual({
       recipeName: undefined,
     });
   });

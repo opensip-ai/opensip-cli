@@ -51,21 +51,17 @@ import {
   type ProgressEvent,
   type ProgressSurface,
 } from '@opensip-cli/cli-ui';
+import { passRate } from '@opensip-cli/contracts';
 import { runOffThreadOrInProcess, currentScope, type LiveViewContext } from '@opensip-cli/core';
 import { Box, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
+import { buildGraphSessionPayload } from '../persistence/session-payload.js';
+
 import { assertFinalizedAcrossBoundary } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { SHARDED_STAGE_LABELS, STAGE_LABELS, toProgressEvent } from './graph-progress.js';
-import { buildGraphSessionPayload } from '../persistence/session-payload.js';
-import { passRate } from '@opensip-cli/contracts';
-import {
-  buildLiveGraphOutput,
-  persistSession,
-  runShardedLiveBuild,
-  type LiveGraphOutput,
-} from './graph.js';
+import { buildLiveGraphOutput, runShardedLiveBuild, type LiveGraphOutput } from './graph.js';
 import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 
 import type { Shard } from './orchestrate/shard-model.js';
@@ -227,7 +223,12 @@ interface GraphRunnerProps {
   readonly liveContext?: LiveViewContext;
 }
 
-function GraphRunner({ args, datastore, setExitCode, liveContext }: GraphRunnerProps): React.ReactElement {
+function GraphRunner({
+  args,
+  datastore,
+  setExitCode,
+  liveContext,
+}: GraphRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<ViewState>({ phase: 'loading' });
   // Engine policy (ADR-0032): sharded is the default, `--exact` opts out. The
@@ -433,7 +434,9 @@ function GraphRunner({ args, datastore, setExitCode, liveContext }: GraphRunnerP
             );
             return liveContext?.runSession ? (
               <RunTimingProvider timer={liveContext.runSession.timing}>{el}</RunTimingProvider>
-            ) : el;
+            ) : (
+              el
+            );
           })()}
           {args.verbose !== true && (
             <RunFooterHints
@@ -479,7 +482,12 @@ export async function renderGraphLive(
   const app = render(
     <ThemeProvider>
       <ClockProvider>
-        <GraphRunner args={args} datastore={datastore} setExitCode={options?.setExitCode} liveContext={liveContext} />
+        <GraphRunner
+          args={args}
+          datastore={datastore}
+          setExitCode={options?.setExitCode}
+          liveContext={liveContext}
+        />
       </ClockProvider>
     </ThemeProvider>,
   );

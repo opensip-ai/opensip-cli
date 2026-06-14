@@ -40,7 +40,6 @@ import {
   SystemError,
   type LanguageRegistry,
   type ProjectContext,
-  type Tool,
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
@@ -54,12 +53,12 @@ import { BootstrapError } from './bootstrap-error.js';
 import { buildPerRunScope } from './build-per-run-scope.js';
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
+import { maybeInitializeOwningTool, resolveOwningTool } from './owning-tool-init.js';
 import {
   checkNoProjectAndBailout,
   checkSchemaVersionAndBailout,
   warnAboutPhantomRuntimes,
 } from './pre-action-guards.js';
-import { initializedToolIds } from './process-idempotency.js';
 
 import type { Command } from 'commander';
 
@@ -68,77 +67,11 @@ const CLI_PACKAGE_NAME = 'opensip-cli';
 
 const MODULE_TAG = 'cli:bootstrap';
 
-/**
- * Process-scoped idempotency for Tool.initialize() (see process-idempotency.ts).
- * The Set is intentionally process-scoped per the Tool contract ("at most once per process").
- * Resets are called on per-invocation context setup to prevent leakage.
- *
- * GA Low hygiene: centralized in process-idempotency.ts for better isolation and auditability.
- */
-
-// Re-export the reset for consumers that imported it from here (e.g. cli-context.ts for per-invocation resets).
-
-/**
- * Find the registered tool that owns the invoked subcommand, matching the
- * descriptor's canonical name or any alias. Returns undefined for
- * CLI-only commands (init/sessions/configure/plugin/...) — they belong to
- * no tool, so no `initialize()` runs for them.
- */
-export function resolveOwningTool(tools: ToolRegistry, cmdName: string): Tool | undefined {
-  return tools
-    .list()
-    .find((tool) =>
-      tool.commands.some((c) => c.name === cmdName || (c.aliases?.includes(cmdName) ?? false)),
-    );
-}
-
-/**
- * Lazy, memoized Tool.initialize() (P1a). Resolve the tool owning the
- * invoked subcommand and run its initialize() exactly once per process,
- * after the scope is entered and immediately before the action body. Tools
- * not invoked this run pay nothing; `--help`/welcome run no initialize().
- *
- * Fail-fast: a throwing initialize() fails the run closed rather than letting a
- * half-initialised tool run its command and silently appear to work. The
- * id is recorded only on success, so a transient failure can retry in a
- * long-lived host. Extracted from the hook body to keep its complexity
- * within budget.
- *
- * @throws {BootstrapError} (exit 1) when the owning tool's initialize() throws —
- *   the top-level boundary renders it (human stderr / structured `--json`).
- */
-async function maybeInitializeOwningTool(
-  tools: ToolRegistry,
-  cmdName: string,
-  runId: string,
-): Promise<void> {
-  const owningTool = resolveOwningTool(tools, cmdName);
-  if (!owningTool?.initialize) return;
-  const toolHumanId = owningTool.metadata.name ?? owningTool.metadata.id;
-  if (initializedToolIds.has(toolHumanId)) return;
-  try {
-    await owningTool.initialize();
-    initializedToolIds.add(toolHumanId);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.error({
-      evt: 'cli.tool.initialize_failed',
-      module: MODULE_TAG,
-      runId,
-      toolId: owningTool.metadata.id, // stable UUID for structured
-      toolName: toolHumanId,
-      error: msg,
-    });
-    // §4.7: a tool-init failure becomes a typed BootstrapError (exit 1) the
-    // top-level boundary renders, instead of an inline stderr write + exit.
-    throw new BootstrapError({
-      message: `Tool '${toolHumanId}' failed to initialize: ${msg}`,
-      humanMessage: `✗ Tool '${toolHumanId}' failed to initialize: ${msg}`,
-      suggestion: undefined,
-      exitCode: 1,
-    });
-  }
-}
+// Owning-tool resolution + lazy `Tool.initialize()` live in `owning-tool-init.ts`
+// (also imported below for local use). `resolveOwningTool` is re-exported so
+// existing importers (e.g. the lifecycle test) keep their stable
+// `pre-action-hook.js` entry point.
+export { resolveOwningTool } from './owning-tool-init.js';
 
 /**
  * The `scope.configDocument` slot value (ADR-0023 one-reader): the validated

@@ -50,10 +50,9 @@ import { runOffThreadOrInProcess, currentScope, type LiveViewContext } from '@op
 import { Box, Static, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
-import { executeSim, persistSimSession } from './sim.js';
 import { buildSimulationSessionPayload } from '../persistence/session-payload.js';
 
-import type { DataStore } from '@opensip-cli/datastore';
+import { executeSim } from './sim.js';
 
 const SIM_TOOL_TITLE = 'Simulation Scenarios';
 const SIM_TOOL_DESCRIPTION = 'Running simulation scenarios against your codebase.';
@@ -105,7 +104,6 @@ export interface SimRunnerProps {
   readonly args: SimLiveArgs;
   readonly setExitCode?: (code: number) => void;
   readonly onEnvelope?: (envelope: SignalEnvelope) => void;
-  readonly datastore?: DataStore;
   /** From host LiveViewContext (Phase 1) for runSession.record + provider. */
   readonly liveContext?: LiveViewContext;
 }
@@ -116,7 +114,6 @@ export function SimRunner({
   args,
   setExitCode,
   onEnvelope,
-  datastore,
   liveContext,
 }: SimRunnerProps): React.ReactElement {
   const { exit } = useApp();
@@ -266,9 +263,7 @@ export function SimRunner({
             />
           );
           return liveContext?.runSession ? (
-            <RunTimingProvider timer={liveContext.runSession.timing}>
-              {summaryEl}
-            </RunTimingProvider>
+            <RunTimingProvider timer={liveContext.runSession.timing}>{summaryEl}</RunTimingProvider>
           ) : (
             summaryEl
           );
@@ -300,7 +295,6 @@ export function SimRunner({
 
 export interface RenderSimLiveOptions {
   readonly setExitCode?: (code: number) => void;
-  readonly datastore?: DataStore;
 }
 
 /**
@@ -323,7 +317,6 @@ export async function renderSimLive(
           onEnvelope={(e) => {
             envelope = e;
           }}
-          datastore={options?.datastore}
           liveContext={liveContext}
         />
       </ClockProvider>

@@ -25,6 +25,17 @@ export interface FitRecipeDefaults {
 }
 
 /**
+ * Flatten the (repeatable, possibly comma-separated) `--tags` values into a
+ * trimmed, non-empty tag-filter list. `--tags a,b --tags c` → `['a','b','c']`.
+ */
+export function tagFiltersFrom(tags: readonly string[] | undefined): string[] {
+  return (tags ?? [])
+    .flatMap((t) => t.split(','))
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+/**
  * Decide which recipe to execute. `--check` and `--tags` each create an
  * ad-hoc recipe (recipeName=undefined); otherwise resolve a named recipe with
  * tool-scoped precedence (ADR-0022): `--recipe` flag > `fitness.recipe` >
@@ -42,7 +53,7 @@ export function selectRecipe(
   args: FitOptions,
   defaults: FitRecipeDefaults = {},
 ): { recipeName: string | undefined } | { error: ErrorResult } {
-  const useAdHoc = args.check != null || args.tags != null;
+  const useAdHoc = args.check != null || tagFiltersFrom(args.tags).length > 0;
   if (useAdHoc) return { recipeName: undefined };
 
   const resolved = resolveToolRecipeName({
@@ -92,11 +103,8 @@ export async function runRecipeOrAdHoc(
     if (args.check) {
       return await service.start(FitnessRecipeService.createAdHocRecipe({ check: args.check }));
     }
-    if (args.tags) {
-      const tagFilters = args.tags
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean);
+    const tagFilters = tagFiltersFrom(args.tags);
+    if (tagFilters.length > 0) {
       return await service.start(FitnessRecipeService.createAdHocRecipe({ tagFilters }));
     }
     // selectRecipe sets recipeName to undefined only when args.check or

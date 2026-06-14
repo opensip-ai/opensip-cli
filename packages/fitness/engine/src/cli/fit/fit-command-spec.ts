@@ -102,7 +102,13 @@ export function buildFitCommandSpec(
         description: 'Use a named recipe (default, quick-smoke, backend, etc.)',
       },
       { flag: '--check', value: '<slug>', description: 'Run a single check by slug' },
-      { flag: '--tags', value: '<tags>', description: 'Filter checks by tags (comma-separated)' },
+      {
+        flag: '--tags',
+        value: '<tags>',
+        description: 'Filter checks by tags (repeatable or comma-separated)',
+        arrayDefault: [],
+        parse: (val, prev) => [...(prev as string[]), val],
+      },
       { flag: '--list', description: 'List available checks', default: false },
       { flag: '--recipes', description: 'List available recipes', default: false },
       {

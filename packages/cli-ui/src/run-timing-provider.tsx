@@ -20,14 +20,25 @@
 
 import React, { createContext, useContext, type ReactNode } from 'react';
 
-import type { RunTimer } from '@opensip-cli/core';
+/**
+ * Structural shape of the host `RunTimer` (from `@opensip-cli/core`) that this
+ * presentational kit consumes. Defined locally so `@opensip-cli/cli-ui` keeps
+ * ZERO workspace dependencies — it is a pure Ink/React primitives package and
+ * must not depend on the kernel (enforced by dependency-cruiser). Core's
+ * `RunTimer` is structurally assignable, so callers pass `cli.runSession.timing`
+ * (or `LiveViewContext.runSession.timing`) unchanged.
+ */
+export interface RunTimerLike {
+  /** Monotonic elapsed time since the run started, in milliseconds. */
+  elapsedMs(): number;
+}
 
-const RunTimingContext = createContext<RunTimer | null>(null);
+const RunTimingContext = createContext<RunTimerLike | null>(null);
 
 /** Props for the provider that wraps a live view subtree. */
 export interface RunTimingProviderProps {
   /** The host timer from `cli.runSession.timing` (or LiveViewContext). */
-  readonly timer: RunTimer;
+  readonly timer: RunTimerLike;
   readonly children: ReactNode;
 }
 
@@ -44,7 +55,7 @@ export function RunTimingProvider({ timer, children }: RunTimingProviderProps) {
  * Read the current host `RunTimer` (or null if no provider in tree).
  * Components should handle null (falls back to explicit prop or 0).
  */
-export function useRunTiming(): RunTimer | null {
+export function useRunTiming(): RunTimerLike | null {
   return useContext(RunTimingContext);
 }
 
