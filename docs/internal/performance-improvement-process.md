@@ -105,6 +105,8 @@ The agent performing the process is expected to:
 - Upon termination, create the final summary document in `docs/remediation/`.
 - Never merge or push changes from the worktree to main (or any shared branch). Human review is required.
 
+**Inter-cycle Merge Gate**: When running the family of improvement processes in the agreed order, the code changes from one domain (new local mechanisms + any direct fixes) must be merged to main by a human before the agent creates a worktree for the next domain. See the central note in `improvement-processes.md` ("Inter-cycle Merge Gate") for the rationale: it guarantees that each new cycle starts with an up-to-date baseline and the full accumulated set of prevention mechanisms for re-validation.
+
 ### Worktree Setup (Typical)
 A common pattern at the start of the process:
 ```bash
