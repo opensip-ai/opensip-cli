@@ -30,7 +30,9 @@
   },
   "files": [
     "dist",
-    "wasm"
+    "wasm",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc",

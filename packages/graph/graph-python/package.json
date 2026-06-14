@@ -30,7 +30,9 @@
     "kind": "graph-adapter"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc",

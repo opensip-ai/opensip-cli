@@ -27,7 +27,9 @@
     ".": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc && node scripts/copy-vendor.mjs",

@@ -33,7 +33,9 @@
     "./languages/parse-cache.js": "./dist/languages/parse-cache.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc",

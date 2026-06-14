@@ -32,7 +32,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "opensipTools": {
     "kind": "tool",

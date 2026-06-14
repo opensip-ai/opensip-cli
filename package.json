@@ -46,6 +46,8 @@
     "docs:readmes:check": "node scripts/build-package-readmes.mjs --check",
     "docs:keywords": "node scripts/build-package-keywords.mjs",
     "docs:keywords:check": "node scripts/build-package-keywords.mjs --check",
+    "licenses:sync": "node scripts/sync-package-licenses.mjs",
+    "licenses:check": "node scripts/sync-package-licenses.mjs --check",
     "verify-release": "node scripts/verify-release.mjs",
     "supply-chain:verify": "node scripts/verify-supply-chain.mjs",
     "smoke-pack": "node scripts/smoke-pack.mjs",

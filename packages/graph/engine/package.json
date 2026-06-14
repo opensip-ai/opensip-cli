@@ -29,7 +29,9 @@
     "./internal": "./dist/internal.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "publishConfig": {
     "exports": {

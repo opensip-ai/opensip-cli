@@ -183,3 +183,10 @@ jobs:
       # ships with stale/missing keywords fails here.
       - name: Check package keywords in sync
         run: pnpm docs:keywords:check
+
+      # Every publishable package must ship the root LICENSE + NOTICE (Apache-2.0
+      # §4(d) carries the NOTICE) and declare them in `files`. Synced from the
+      # repo root by `pnpm licenses:sync`; a new package, or root LICENSE/NOTICE
+      # edits not propagated, fails here.
+      - name: Check per-package LICENSE/NOTICE in sync
+        run: pnpm licenses:check

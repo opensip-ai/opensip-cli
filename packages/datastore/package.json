@@ -28,7 +28,9 @@
   },
   "files": [
     "dist",
-    "migrations"
+    "migrations",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc",
