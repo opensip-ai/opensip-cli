@@ -28,7 +28,7 @@ import {
   type CliProgram,
   type CommandResult,
 } from '@opensip-cli/contracts';
-import { ToolError, currentScope } from '@opensip-cli/core';
+import { ToolError, currentScope, type LiveViewContext, type ToolRunSessions } from '@opensip-cli/core';
 import { Option } from 'commander';
 
 import { emitCommandResult } from './mount-result-command.js';
@@ -68,7 +68,13 @@ export interface CommandMountContext {
   readonly render: (result: CommandResult) => Promise<void>;
   readonly setExitCode: (code: number) => void;
   readonly emitEnvelope?: (envelope: unknown) => void;
-  readonly renderLive?: (key: string, args: unknown) => Promise<void>;
+  /**
+   * Optional live view dispatch. When the command declares output:'live-view',
+   * the host calls this with an optional third argument carrying the LiveViewContext
+   * (with the host runSession). The impl (registry) forwards it as the second
+   * arg to the registered renderer fn.
+   */
+  readonly renderLive?: (key: string, args: unknown, liveContext?: LiveViewContext) => Promise<void>;
 }
 
 /**
@@ -224,7 +230,15 @@ export async function dispatchOutput<TCtx extends CommandMountContext>(
             "'command-result' / 'raw-stream' only).",
         );
       }
-      await ctx.renderLive(spec.name, { ...opts, _args: positionals });
+      // Thread the host-owned runSession (via LiveViewContext) so the live
+      // renderer receives the *same* timer the static path used. Only full
+      // ToolCliContext (tool live-view commands) will have runSession; lean
+      // host contexts won't reach here.
+      const liveContext: LiveViewContext | undefined =
+        (ctx as unknown as { runSession?: ToolRunSessions }).runSession
+          ? { runSession: (ctx as unknown as { runSession: ToolRunSessions }).runSession }
+          : undefined;
+      await ctx.renderLive(spec.name, { ...opts, _args: positionals }, liveContext);
       return;
     }
   }

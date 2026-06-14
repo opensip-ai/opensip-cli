@@ -39,6 +39,7 @@ import {
   type ToolRunSessionInput,
   type ToolRunSessions,
   type ToolShortId,
+  type LiveViewContext,
   createRunTimer,
 } from '@opensip-cli/core';
 import { SessionRepo } from '@opensip-cli/session-store';
@@ -181,7 +182,14 @@ function getProjectDatastore(): DataStore {
 
 export interface LiveViewRegistry {
   readonly register: (key: string, renderer: LiveViewRenderer) => void;
-  readonly render: (key: string, args: unknown) => Promise<void>;
+  /**
+   * Render the live view. The optional third parameter is the LiveViewContext
+   * (carrying runSession) to forward as the *second* argument to the renderer
+   * function itself. This lets the host dispatch site (mount) supply the
+   * shared run timer without changing the public ToolCliContext.renderLive
+   * (tools still call renderLive(key, args)).
+   */
+  readonly render: (key: string, args: unknown, liveContext?: LiveViewContext) => Promise<void>;
   readonly has: (key: string) => boolean;
 }
 
@@ -203,12 +211,22 @@ export function createLiveViewRegistry(log: Logger = defaultLogger): LiveViewReg
     /**
      * @throws {UnknownLiveViewError} When `key` has no registered live-view renderer.
      */
-    async render(key, args) {
+    async render(key, args, liveContext) {
       const renderer = renderers.get(key);
       if (!renderer) {
         throw new UnknownLiveViewError(key);
       }
-      await renderer(args);
+      // Support both legacy 1-param renderers and new 2-param (args, LiveViewContext).
+      // Always pass the liveContext (when supplied) as the renderer's second arg.
+      if (liveContext !== undefined) {
+        if ((renderer as any).length <= 1) {
+          await renderer(args);
+        } else {
+          await renderer(args, liveContext);
+        }
+      } else {
+        await renderer(args);
+      }
     },
     has(key) {
       return renderers.has(key);
@@ -313,7 +331,8 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     },
     render: (result) => opts.render(result as CommandResult),
     registerLiveView: opts.liveViews.register,
-    renderLive: opts.liveViews.render,
+    renderLive: (key: string, args: unknown, liveContext?: LiveViewContext) =>
+      opts.liveViews.render(key, args, liveContext),
     maybeOpenReport: opts.maybeOpenReport,
     logger: log,
     setExitCode,

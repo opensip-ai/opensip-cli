@@ -377,7 +377,7 @@ export interface ToolCliContext {
    * `key` is a string instead of a typed enum so new tools can
    * contribute additional live views without touching the core type.
    */
-  readonly renderLive: (key: string, args: unknown) => Promise<void>;
+  readonly renderLive: (key: string, args: unknown, liveContext?: LiveViewContext) => Promise<void>;
   /**
    * Open the HTML report in the user's browser when the run
    * conditions allow it (TTY, not JSON-mode, opt-in). Tools call this
