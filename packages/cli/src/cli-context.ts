@@ -24,24 +24,20 @@
 import {
   type RunScope,
   UnknownLiveViewError,
-  generatePrefixedId,
   logger as defaultLogger,
   type LiveViewRenderer,
   type Logger,
-  type RecordedToolRunSession,
-  type RunTimer,
   type ToolCliContext,
-  type ToolRunSessionInput,
+  type ToolRunCompletion,
   type ToolRunSessions,
   type LiveViewContext,
-  createRunTimer,
 } from '@opensip-cli/core';
 import { type DataStore } from '@opensip-cli/datastore';
-import { SessionRepo } from '@opensip-cli/session-store';
 
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
 import { deliverEnvelope, writeEnvelopeSarif } from './bootstrap/deliver-envelope.js';
 import { buildHostPlanes } from './bootstrap/host-planes.js';
+import { createRunPlaneFactory, type RunActionHooks } from './bootstrap/run-plane.js';
 import { getProjectDatastore, readScope } from './bootstrap/scope-access.js';
 import { buildStateSeams } from './bootstrap/state-seams.js';
 import {
@@ -155,73 +151,48 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   const stateSeams = buildStateSeams({ getDatastore: getProjectDatastore }); // ADR-0042, same lazy resolver
   const hostPlanes = buildHostPlanes({ getDatastore: getProjectDatastore, logger: log });
 
-  // Host-owned run timer per spec: created before any tool handler or renderLive.
-  // Same instance used for static paths and live renderers.
-  // (host-owned-run-timing plan Phase 1 + cross-cutting: after scope enter via
-  // pre-action, inside the documented buildToolCliContext factory; no tool
-  // work precedes ctx construction.)
-  const runTimer: RunTimer = createRunTimer();
-
-  const runSession: ToolRunSessions = {
-    timing: runTimer,
-    record(input: ToolRunSessionInput): RecordedToolRunSession | undefined {
-      // Best-effort, never throws, matches prior persist*Session contract.
-      // Must read datastore via the entered scope thunk (no direct/global access).
-      let datastore: DataStore | undefined;
+  // Host run-lifecycle plane (host-owned-run-timing Phase 1). The FACTORY is
+  // created here with stable deps only — it must NOT start a lifecycle. The
+  // lifecycle is created inside the command action (mount-command-spec calls
+  // `beginRun()` after RunScope entry, before the handler) or lazily on first
+  // access to `runSession.timing` / `.record`.
+  const runPlane = createRunPlaneFactory({
+    // Best-effort datastore resolver via the entered scope thunk (no direct /
+    // global access). Returns undefined when no project/datastore is in scope.
+    getDatastore: () => {
       try {
         const thunk = readScope().datastore;
-        datastore = thunk ? (thunk() as DataStore | undefined) : undefined;
+        return thunk ? (thunk() as DataStore) : undefined;
       } catch {
-        datastore = undefined;
+        return;
       }
-      if (!datastore) {
-        return undefined;
-      }
-      const id = generatePrefixedId(input.tool);
-      const timing = runTimer.snapshot();
-      try {
-        new SessionRepo(datastore).save({
-          id,
-          tool: input.tool,
-          startedAt: timing.startedAt,
-          completedAt: timing.completedAt,
-          cwd: input.cwd,
-          recipe: input.recipe,
-          score: input.score,
-          passed: input.passed,
-          durationMs: timing.durationMs,
-          payload: input.payload,
-        });
-        // Observability per cross-cutting: log the record event (best effort).
-        log.info?.({
-          evt: 'cli.run-session.recorded',
-          module: MODULE_TAG,
-          tool: input.tool,
-          sessionId: id,
-          durationMs: timing.durationMs,
-        });
-      } catch (error) {
-        // Swallow; best-effort persistence must not affect primary outcome.
-        log.warn?.({
-          evt: 'cli.run-session.record_failed',
-          module: MODULE_TAG,
-          tool: input.tool,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // @swallow-ok best-effort session persistence already warned above; degrade to undefined
-        return undefined;
-      }
-      return {
-        id,
-        tool: input.tool,
-        startedAt: timing.startedAt,
-        completedAt: timing.completedAt,
-        durationMs: timing.durationMs,
-      };
+    },
+    logger: log,
+  });
+
+  // The public run seam. `timing` exposes the current invocation lifecycle (for
+  // display-only elapsed); `record` is the TRANSITIONAL writer that routes
+  // through the plane (removed once tools return contributions, Phase 3).
+  const runSession: ToolRunSessions = {
+    get timing() {
+      return runPlane.current().lifecycle;
+    },
+    record: (input) => runPlane.current().record(input),
+  };
+
+  // Internal run-lifecycle hooks for the mount dispatch (not part of the public
+  // ToolCliContext; read via cast at the dispatch site like `runSession`).
+  const runActionHooks: RunActionHooks = {
+    beginRun: () => {
+      runPlane.beginRun();
+    },
+    completeRun: (result) => {
+      const session = (result as ToolRunCompletion | undefined)?.session;
+      if (session) runPlane.current().completeAndPersist(session);
     },
   };
 
-  const ctx: ToolCliContext = {
+  const ctx: ToolCliContext & RunActionHooks = {
     get scope(): RunScope {
       // The pre-action-hook (or explicit runWithScope in tests) enters the
       // RunScope via AsyncLocalStorage before the action body or any reader runs.
@@ -345,6 +316,10 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     toolState: stateSeams, // ADR-0042: durable per-tool keyed JSON state
     runSession, // host-owned; created above, shared with live views
     hostPlanes, // Host-owned governance / entitlements / audit plane (H1-H3)
+    // Internal run-lifecycle hooks (not public ToolCliContext members; the mount
+    // dispatch reads them via cast). beginRun marks the lifecycle start at the
+    // command-action boundary; completeRun persists a returned contribution.
+    ...runActionHooks,
   };
 
   return {

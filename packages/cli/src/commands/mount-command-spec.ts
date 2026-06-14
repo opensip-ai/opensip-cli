@@ -40,6 +40,8 @@ import {
 } from '@opensip-cli/core';
 import { Option } from 'commander';
 
+import { type RunActionHooks } from '../bootstrap/run-plane.js';
+
 import { emitCommandResult } from './mount-result-command.js';
 
 /**
@@ -151,9 +153,22 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
     // the pre-action hook's enterScope; a no-op when no scope is present (tests).
     const diagnostics = currentScope()?.diagnostics;
     diagnostics?.event('execute', 'debug', `command '${spec.name}' started`);
+    // Host run lifecycle (host-owned-run-timing): mark the start boundary at the
+    // command-action entry — after RunScope is entered, before the tool handler
+    // runs. The hooks ride on the host ctx (not the public ToolCliContext type);
+    // read via cast, like `runSession` below. No-op for host commands whose
+    // leaner context carries no run plane.
+    const runHooks = ctx as unknown as RunActionHooks;
+    runHooks.beginRun?.();
     try {
       const result = await spec.handler(optsWithArgs, ctx);
       diagnostics?.event('execute', 'debug', `command '${spec.name}' completed`);
+      // Static-path completion: if the handler returned a ToolRunCompletion with
+      // a session contribution, the host freezes the lifecycle and persists it.
+      // A plain CommandResult is a no-op (the transitional record(...) path still
+      // owns persistence until Phase 3). The live-view path persists after
+      // renderLive (Phase 2).
+      runHooks.completeRun?.(result);
       await dispatchOutput(result, spec, optsWithArgs, positionals, ctx);
     } catch (error) {
       if (error instanceof ToolError) {
