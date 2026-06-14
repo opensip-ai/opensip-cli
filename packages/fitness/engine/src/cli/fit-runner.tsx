@@ -53,7 +53,13 @@ import {
   type FitDoneResult,
   type SignalEnvelope,
 } from '@opensip-cli/contracts';
-import { runOffThreadOrInProcess, currentScope, type LiveViewContext } from '@opensip-cli/core';
+import {
+  runOffThreadOrInProcess,
+  currentScope,
+  type LiveViewContext,
+  type ToolRunCompletion,
+  type ToolSessionContribution,
+} from '@opensip-cli/core';
 import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
@@ -117,7 +123,13 @@ interface FitRunnerProps {
   readonly setExitCode?: (code: number) => void;
   /** Called with the run's envelope once it completes, for root-owned egress. */
   readonly onEnvelope?: (envelope: SignalEnvelope) => void;
-  /** LiveViewContext from host (Phase 1) — carries the shared runSession for record + provider. */
+  /**
+   * Called with the run's generic-session contribution once it completes
+   * (host-owned-run-timing Phase 2). The host persists it after the live view
+   * exits — the component must NOT write the session itself.
+   */
+  readonly onSession?: (contribution: ToolSessionContribution) => void;
+  /** LiveViewContext from host — carries the run timer for the RunTimingProvider. */
   readonly liveContext?: LiveViewContext;
 }
 
@@ -125,6 +137,7 @@ function FitRunner({
   args,
   setExitCode,
   onEnvelope,
+  onSession,
   liveContext,
 }: FitRunnerProps): React.ReactElement {
   const { exit } = useApp();
@@ -179,18 +192,17 @@ function FitRunner({
       // envelope to `setUpFitLiveView`, which calls `deliverSignals`; the root
       // sets the exit from `envelope.verdict.passed` there. No setExitCode here.
 
-      // Host-owned persistence (record seam) — timing stamped by the RunTimer the
-      // CLI host created for this invocation (shared with static paths).
-      const rs = liveContext?.runSession;
-      if (rs && result.envelope) {
-        const payload = buildFitnessSessionPayload(result.envelope); // may need import if not hoisted
-        rs.record({
+      // Host-owned persistence (host-owned-run-timing Phase 2): the component no
+      // longer writes the session. It surfaces the contribution; the host
+      // completes the lifecycle and persists after `renderLive` resolves.
+      if (result.envelope) {
+        onSession?.({
           tool: 'fit',
           cwd: args.cwd,
           recipe: result.envelope.recipe,
           score: result.envelope.verdict.score,
           passed: result.envelope.verdict.passed,
-          payload,
+          payload: buildFitnessSessionPayload(result.envelope),
         });
       }
 
@@ -387,28 +399,26 @@ export interface RenderFitLiveOptions {
 }
 
 /**
- * Render the live `fit` view. Returns the run's {@link SignalEnvelope} once
- * the underlying Ink app exits (or `undefined` on an error / no-result run).
+ * Render the live `fit` view. Resolves once the underlying Ink app exits with a
+ * {@link ToolRunCompletion} carrying the run's `envelope` (for root-owned
+ * egress) and `session` contribution (which the HOST persists after this
+ * resolves — host-owned-run-timing Phase 2; the component no longer writes the
+ * session itself).
  *
- * The fitness tool wires this in via `setUpFitLiveView`, which calls
- * `cli.registerLiveView('fit', (args, liveContext) => renderFitLive(args, liveContext ?? { ... }, { ... }))`
- * lazily on the interactive path (there is no `register()` mount hook).
- * `setExitCode` is the single mutator path on `process.exitCode`; the
- * runner calls it for error-result outcomes (the findings exit is host-owned via
- * the delivered envelope verdict, ADR-0035) so the CLI's exit-code seam stays the
- * only writer. The returned envelope lets the tool's
- * registration deliver signals (cloud + `--report-to`) at the composition
- * root after the interactive view exits (ADR-0011 — egress is not in-view).
+ * The fitness tool wires this in via `setUpFitLiveView` / `registerLiveView`.
+ * `setExitCode` is the single mutator path on `process.exitCode`; the runner
+ * calls it for error-result outcomes (the findings exit is host-owned via the
+ * delivered envelope verdict, ADR-0035).
  */
 export async function renderFitLive(
   args: FitOptions,
   contextOrDatastore?: DataStore | LiveViewContext,
   options?: RenderFitLiveOptions,
-): Promise<SignalEnvelope | undefined> {
+): Promise<ToolRunCompletion> {
   let envelope: SignalEnvelope | undefined;
-  // Persistence is host-owned via `liveContext.runSession`; a raw DataStore arm
-  // is accepted for backward compat but no longer threaded (the runner ignores
-  // it). Only a LiveViewContext is forwarded to the runner.
+  let session: ToolSessionContribution | undefined;
+  // A raw DataStore arm is accepted for backward compat but no longer threaded
+  // (the host owns persistence). Only a LiveViewContext is forwarded.
   const liveContext =
     contextOrDatastore && (contextOrDatastore as LiveViewContext).runSession
       ? (contextOrDatastore as LiveViewContext)
@@ -422,6 +432,9 @@ export async function renderFitLive(
           onEnvelope={(e) => {
             envelope = e;
           }}
+          onSession={(c) => {
+            session = c;
+          }}
           liveContext={liveContext}
         />
       </ClockProvider>
@@ -430,5 +443,5 @@ export async function renderFitLive(
   await app.waitUntilExit();
   // Trailing newline so shell prompt starts on a new line.
   process.stdout.write('\n');
-  return envelope;
+  return { envelope, session };
 }

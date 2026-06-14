@@ -32,6 +32,7 @@ import {
   ToolError,
   currentScope,
   type LiveViewContext,
+  type ToolRunCompletion,
   type ToolRunSessions,
   type ArgSpec,
   type CommandSpec,
@@ -87,7 +88,7 @@ export interface CommandMountContext {
     key: string,
     args: unknown,
     liveContext?: LiveViewContext,
-  ) => Promise<void>;
+  ) => Promise<ToolRunCompletion | void>;
 }
 
 /**

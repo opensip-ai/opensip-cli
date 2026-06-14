@@ -84,7 +84,11 @@ export interface LiveViewRegistry {
    * shared run timer without changing the public ToolCliContext.renderLive
    * (tools still call renderLive(key, args)).
    */
-  readonly render: (key: string, args: unknown, liveContext?: LiveViewContext) => Promise<void>;
+  readonly render: (
+    key: string,
+    args: unknown,
+    liveContext?: LiveViewContext,
+  ) => Promise<ToolRunCompletion | void>;
   readonly has: (key: string) => boolean;
 }
 
@@ -109,13 +113,15 @@ export function createLiveViewRegistry(log: Logger = defaultLogger): LiveViewReg
     async render(key, args, liveContext) {
       const renderer = renderers.get(key);
       if (!renderer) {
+        // async so the throw surfaces as a rejected promise (the contract
+        // callers `await` / assert `.rejects` against).
         throw new UnknownLiveViewError(key);
       }
-      // Support both legacy 1-param renderers and new 2-param (args, LiveViewContext).
-      // Pass the liveContext as the second arg only to a 2-param renderer (a
-      // legacy 1-param renderer would ignore it anyway).
-      const passContext = liveContext !== undefined && (renderer as { length: number }).length > 1;
-      await (passContext ? renderer(args, liveContext) : renderer(args));
+      // Always pass the host-supplied LiveViewContext (host-owned-run-timing
+      // Phase 2): live tool commands receive it; JS safely ignores the extra arg
+      // for any renderer that declares only one parameter. Return the renderer's
+      // ToolRunCompletion so the host can complete the lifecycle + persist.
+      return renderer(args, liveContext);
     },
     has(key) {
       return renderers.has(key);
@@ -203,11 +209,15 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     render: (result) => opts.render(result as CommandResult),
     registerLiveView: opts.liveViews.register,
     renderLive: (key: string, args: unknown, liveContext?: LiveViewContext) =>
-      // Default to the host-owned runSession so tools that call renderLive directly
-      // (fit/sim/graph runLiveMode) still thread the host RunTimer + record seam to
-      // their live view — not only commands routed through mountCommandSpec's live
-      // dispatch. Without this, live runs neither record a session nor show duration.
-      opts.liveViews.render(key, args, liveContext ?? { runSession }),
+      // Host owns the live run lifecycle (host-owned-run-timing Phase 2): time
+      // the TTY occupancy, then complete the lifecycle + persist the renderer's
+      // returned `session` contribution. The host always supplies the
+      // LiveViewContext (carrying the run seam + timer) so tools that call
+      // renderLive directly (fit/sim/graph runLiveMode) get it without passing
+      // it themselves. The renderer no longer writes the session itself.
+      runPlane
+        .current()
+        .completeLiveRender(() => opts.liveViews.render(key, args, liveContext ?? { runSession })),
     maybeOpenReport: opts.maybeOpenReport,
     logger: log,
     setExitCode,

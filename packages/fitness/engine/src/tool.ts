@@ -86,7 +86,6 @@ import type {
   ToolCliContext,
   ToolCommandDescriptor,
 } from '@opensip-cli/core';
-import type { DataStore } from '@opensip-cli/datastore';
 
 // =============================================================================
 // COMMAND DESCRIPTORS — used by --help listings and conflict detection.
@@ -139,29 +138,29 @@ const FIT_RUN_WORKER: ToolCommandDescriptor = {
 function setUpFitLiveView(cli: ToolCliContext): void {
   cli.registerLiveView(FIT_LIVE_VIEW_KEY, async (args, liveContext) => {
     const fitArgs = args as FitOptions;
-    // Forward liveContext (as 2nd positional for renderFitLive's contextOrDatastore union)
-    // so the runner receives the host RunTimer / runSession for persistence + summary provider.
-    const envelope = await renderFitLive(
-      fitArgs,
-      liveContext ?? (cli.scope.datastore() as DataStore | undefined),
-      {
-        setExitCode: cli.setExitCode,
-      },
-    );
+    // The host always supplies the LiveViewContext (carrying the run timer for
+    // the summary provider). The renderer returns a ToolRunCompletion; the HOST
+    // persists its `session` after this resolves (host-owned-run-timing Phase 2).
+    const completion = await renderFitLive(fitArgs, liveContext, {
+      setExitCode: cli.setExitCode,
+    });
     // Effectful egress lives at the composition root (ADR-0011 / ADR-0008):
     // best-effort cloud sync + `--report-to` (which owns exit 4). Delivered
     // ONCE, after the interactive Ink view exits. A content failure
     // (critical/high signals) dominates a `--report-to` upload failure so a
     // real failure is never masked by exit 4.
-    if (envelope !== undefined) {
+    if (completion.envelope !== undefined) {
       // ADR-0035: the host derives the findings exit from envelope.verdict.passed
       // inside deliverSignals — no runFailed override on a normal run.
-      await cli.deliverSignals(envelope, {
+      await cli.deliverSignals(completion.envelope, {
         cwd: fitArgs.cwd,
         reportTo: fitArgs.reportTo,
         apiKey: fitArgs.apiKey,
       });
     }
+    // Return the completion so the host completes the lifecycle + persists the
+    // session contribution (the renderer no longer writes the session).
+    return completion;
   });
 }
 

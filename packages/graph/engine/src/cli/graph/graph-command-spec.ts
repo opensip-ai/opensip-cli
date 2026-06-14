@@ -88,7 +88,10 @@ interface GraphCommandOptions {
  */
 function setUpGraphLiveView(cli: ToolCliContext): void {
   cli.registerLiveView(GRAPH_LIVE_VIEW_KEY, async (args, liveContext) => {
-    await renderGraphLive(
+    // The renderer returns a ToolRunCompletion; the HOST persists its `session`
+    // after this resolves (host-owned-run-timing Phase 2). Graph's cloud egress
+    // is on the static gate path, so the live wrapper emits no envelope.
+    return renderGraphLive(
       args as {
         cwd: string;
         noCache?: boolean;

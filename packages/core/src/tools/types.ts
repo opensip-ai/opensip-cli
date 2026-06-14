@@ -480,16 +480,25 @@ export interface ToolCliContext {
   readonly registerLiveView: (key: string, renderer: LiveViewRenderer) => void;
   /**
    * Render the live view registered under `key`, passing `args` through
-   * to the registered renderer. Returns once the underlying Ink app
-   * exits. Throws `UnknownLiveViewError` if no renderer has been
-   * registered for `key` (rather than silently falling back to a static
-   * render — the latter would mask bugs where a tool mistypes its view
-   * key).
+   * to the registered renderer. Resolves once the underlying Ink app exits,
+   * with the renderer's {@link ToolRunCompletion} (or `void`). The host
+   * completes the run lifecycle and persists the returned `session`
+   * contribution after the renderer resolves — the renderer must NOT call a
+   * generic-session writer itself. Throws `UnknownLiveViewError` if no
+   * renderer has been registered for `key` (rather than silently falling back
+   * to a static render — the latter would mask bugs where a tool mistypes its
+   * view key).
    *
    * `key` is a string instead of a typed enum so new tools can
-   * contribute additional live views without touching the core type.
+   * contribute additional live views without touching the core type. The
+   * host supplies the `LiveViewContext` for live tool commands; tools should
+   * not pass it themselves.
    */
-  readonly renderLive: (key: string, args: unknown, liveContext?: LiveViewContext) => Promise<void>;
+  readonly renderLive: (
+    key: string,
+    args: unknown,
+    liveContext?: LiveViewContext,
+  ) => Promise<ToolRunCompletion | void>;
   /**
    * Open the HTML report in the user's browser when the run
    * conditions allow it (TTY, not JSON-mode, opt-in). Tools call this

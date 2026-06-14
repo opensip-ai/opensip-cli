@@ -35,7 +35,9 @@ describe('createLiveViewRegistry', () => {
     await registry.render('fake-view', { hello: 'world' });
 
     expect(renderer).toHaveBeenCalledOnce();
-    expect(renderer).toHaveBeenCalledWith({ hello: 'world' });
+    // host-owned-run-timing Phase 2: the registry always forwards the (here
+    // absent) LiveViewContext as the renderer's 2nd argument.
+    expect(renderer).toHaveBeenCalledWith({ hello: 'world' }, undefined);
   });
 
   it('throws UnknownLiveViewError when renderLive is called with an unknown key', async () => {
@@ -136,7 +138,12 @@ describe('buildToolCliContext', () => {
     const { ctx } = buildToolCliContext(opts);
 
     await ctx.renderLive('fake', { v: 1 });
-    expect(renderer).toHaveBeenCalledWith({ v: 1 });
+    // host-owned-run-timing Phase 2: the host always supplies the LiveViewContext
+    // (carrying the run seam) as the renderer's 2nd argument.
+    expect(renderer).toHaveBeenCalledWith(
+      { v: 1 },
+      expect.objectContaining({ runSession: expect.anything() }),
+    );
   });
 
   it('renderLive throws UnknownLiveViewError for unregistered keys', async () => {

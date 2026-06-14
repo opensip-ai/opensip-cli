@@ -88,15 +88,18 @@ type SimOptions = ToolOptions & {
 function setUpSimLiveView(cli: ToolCliContext): void {
   cli.registerLiveView(SIM_LIVE_VIEW_KEY, async (args, liveContext) => {
     const simArgs = args as ToolOptions;
-    const envelope = await renderSimLive(simArgs, { setExitCode: cli.setExitCode }, liveContext);
-    if (envelope !== undefined) {
+    // The renderer returns a ToolRunCompletion; the HOST persists its `session`
+    // after this resolves (host-owned-run-timing Phase 2).
+    const completion = await renderSimLive(simArgs, { setExitCode: cli.setExitCode }, liveContext);
+    if (completion.envelope !== undefined) {
       // ADR-0035: the host derives the findings exit from envelope.verdict.passed.
-      await cli.deliverSignals(envelope, {
+      await cli.deliverSignals(completion.envelope, {
         cwd: simArgs.cwd,
         reportTo: simArgs.reportTo,
         apiKey: simArgs.apiKey,
       });
     }
+    return completion;
   });
 }
 

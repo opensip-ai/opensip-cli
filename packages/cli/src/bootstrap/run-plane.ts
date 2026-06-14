@@ -28,6 +28,7 @@ import {
   type RecordedToolRunSession,
   type RunLifecycle,
   type RunTimingSnapshot,
+  type ToolRunCompletion,
   type ToolRunSessionInput,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
@@ -66,6 +67,19 @@ export interface RunPlaneInvocation {
   completeAndPersist(contribution: ToolSessionContribution): RecordedToolRunSession | undefined;
   /** Best-effort upsert of host-side overhead metrics for the persisted session. */
   recordHostMetrics(metrics: StoredSessionHostMetrics): void;
+  /**
+   * Run a live render and own its completion: time the TTY occupancy, then —
+   * if the renderer returned a `session` contribution — freeze the lifecycle,
+   * persist it, and record `ttyBusyMs`. Returns the renderer's completion
+   * unchanged so the caller can still read `.envelope` for egress.
+   *
+   * This is the live-path analogue of `completeAndPersist`: the renderer no
+   * longer calls a session writer inside the Ink tree; the host persists here
+   * after `await render()`.
+   */
+  completeLiveRender(
+    render: () => Promise<ToolRunCompletion | void>,
+  ): Promise<ToolRunCompletion | void>;
   /** The persisted session id, once a row has been written (else undefined). */
   sessionId(): string | undefined;
 }
@@ -168,25 +182,47 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
       };
     }
 
+    function recordHostMetrics(metrics: StoredSessionHostMetrics): void {
+      if (sessionId === undefined) return;
+      const datastore = safeDatastore();
+      if (!datastore) return;
+      try {
+        new SessionRepo(datastore).upsertHostMetrics(sessionId, metrics);
+      } catch (error) {
+        log.warn?.({
+          evt: 'cli.run-session.host_metrics_failed',
+          module: MODULE_TAG,
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    function completeAndPersist(
+      contribution: ToolSessionContribution,
+    ): RecordedToolRunSession | undefined {
+      return persist(contribution, lifecycle.complete());
+    }
+
+    async function completeLiveRender(
+      render: () => Promise<ToolRunCompletion | void>,
+    ): Promise<ToolRunCompletion | void> {
+      const ttyStart = performance.now();
+      const completion = await render();
+      const ttyBusyMs = Math.max(0, performance.now() - ttyStart);
+      if (completion?.session) {
+        completeAndPersist(completion.session);
+        recordHostMetrics({ ttyBusyMs });
+      }
+      return completion;
+    }
+
     return {
       lifecycle,
       record: (input) => persist(input, lifecycle.snapshot()),
-      completeAndPersist: (contribution) => persist(contribution, lifecycle.complete()),
-      recordHostMetrics: (metrics) => {
-        if (sessionId === undefined) return;
-        const datastore = safeDatastore();
-        if (!datastore) return;
-        try {
-          new SessionRepo(datastore).upsertHostMetrics(sessionId, metrics);
-        } catch (error) {
-          log.warn?.({
-            evt: 'cli.run-session.host_metrics_failed',
-            module: MODULE_TAG,
-            sessionId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      },
+      completeAndPersist,
+      recordHostMetrics,
+      completeLiveRender,
       sessionId: () => sessionId,
     };
   }

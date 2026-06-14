@@ -52,7 +52,13 @@ import {
   type ProgressSurface,
 } from '@opensip-cli/cli-ui';
 import { passRate } from '@opensip-cli/contracts';
-import { runOffThreadOrInProcess, currentScope, type LiveViewContext } from '@opensip-cli/core';
+import {
+  runOffThreadOrInProcess,
+  currentScope,
+  type LiveViewContext,
+  type ToolRunCompletion,
+  type ToolSessionContribution,
+} from '@opensip-cli/core';
 import { Box, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
@@ -217,9 +223,16 @@ async function runGraphWithProgress(
 
 interface GraphRunnerProps {
   readonly args: GraphRunnerArgs;
+  /** The catalog-cache datastore threaded into the graph build (not session persistence). */
   readonly datastore?: DataStore;
   readonly setExitCode?: (code: number) => void;
-  /** LiveViewContext from host (Phase 1) for runSession + provider. */
+  /**
+   * Surfaces the run's generic-session contribution (host-owned-run-timing
+   * Phase 2). The host persists it after the live view exits — the component
+   * must NOT write the session itself.
+   */
+  readonly onSession?: (contribution: ToolSessionContribution) => void;
+  /** LiveViewContext from host — carries the run timer for the RunTimingProvider. */
   readonly liveContext?: LiveViewContext;
 }
 
@@ -227,6 +240,7 @@ function GraphRunner({
   args,
   datastore,
   setExitCode,
+  onSession,
   liveContext,
 }: GraphRunnerProps): React.ReactElement {
   const { exit } = useApp();
@@ -314,20 +328,19 @@ function GraphRunner({
         // here — an assertion of the prior finalize, NOT a second suppression —
         // so the host record (and the verdict) consume the branded, already-waived signals.
         const finalized = assertFinalizedAcrossBoundary(result.signals, result.suppressedCount);
-        // Host record using liveContext (Phase 1) — real payload/verdict from finalized signals.
-        // Timing (startedAt / durationMs) comes from the host RunTimer snapshot inside record().
+        // Host-owned persistence (host-owned-run-timing Phase 2): surface the
+        // contribution built from the finalized (branded, already-waived)
+        // signals; the host persists after the live view exits. Timing is
+        // host-stamped from the lifecycle.
         const payload = buildGraphSessionPayload(finalized.signals);
-        const rs = liveContext?.runSession;
-        if (rs) {
-          rs.record({
-            tool: 'graph',
-            cwd: args.cwd,
-            recipe: args.recipe,
-            score: passRate(payload.summary),
-            passed: payload.summary.errors === 0,
-            payload,
-          });
-        }
+        onSession?.({
+          tool: 'graph',
+          cwd: args.cwd,
+          recipe: args.recipe,
+          score: passRate(payload.summary),
+          passed: payload.summary.errors === 0,
+          payload,
+        });
         // Compute the summary for TTY (duration omitted; provider supplies host value).
         const verdict = buildGraphEnvelope({
           signals: finalized.signals,
@@ -464,21 +477,22 @@ export interface RenderGraphLiveOptions {
 }
 
 /**
- * Render the live `graph` view. Returns once the underlying Ink app exits.
+ * Render the live `graph` view. Resolves once the underlying Ink app exits with
+ * a {@link ToolRunCompletion} carrying the run's `session` contribution (the
+ * HOST persists it after this resolves — host-owned-run-timing Phase 2; the
+ * component no longer writes the session itself). Graph's cloud egress lives on
+ * the static gate path, so the live wrapper returns no envelope.
  *
- * The graph tool wires this in via `setUpGraphLiveView`, which calls
- * `cli.registerLiveView('graph', (args, liveContext) => renderGraphLive(args, { ... }, liveContext))`
- * lazily on the interactive path (there is no `register()` mount hook).
- * `setExitCode` is the single mutator path on `process.exitCode`; the
- * runner calls it for error outcomes so the CLI's exit-code seam stays
- * the only writer.
+ * `setExitCode` is the single mutator path on `process.exitCode`; the runner
+ * calls it for error outcomes so the CLI's exit-code seam stays the only writer.
  */
 export async function renderGraphLive(
   args: GraphRunnerArgs,
   datastore?: DataStore,
   options?: RenderGraphLiveOptions,
   liveContext?: LiveViewContext,
-): Promise<void> {
+): Promise<ToolRunCompletion> {
+  let session: ToolSessionContribution | undefined;
   const app = render(
     <ThemeProvider>
       <ClockProvider>
@@ -486,6 +500,9 @@ export async function renderGraphLive(
           args={args}
           datastore={datastore}
           setExitCode={options?.setExitCode}
+          onSession={(c) => {
+            session = c;
+          }}
           liveContext={liveContext}
         />
       </ClockProvider>
@@ -493,4 +510,5 @@ export async function renderGraphLive(
   );
   await app.waitUntilExit();
   process.stdout.write('\n');
+  return { session };
 }

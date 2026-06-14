@@ -46,7 +46,13 @@ import {
   type ToolOptions,
   type VerboseDetail,
 } from '@opensip-cli/contracts';
-import { runOffThreadOrInProcess, currentScope, type LiveViewContext } from '@opensip-cli/core';
+import {
+  runOffThreadOrInProcess,
+  currentScope,
+  type LiveViewContext,
+  type ToolRunCompletion,
+  type ToolSessionContribution,
+} from '@opensip-cli/core';
 import { Box, Static, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
@@ -104,7 +110,13 @@ export interface SimRunnerProps {
   readonly args: SimLiveArgs;
   readonly setExitCode?: (code: number) => void;
   readonly onEnvelope?: (envelope: SignalEnvelope) => void;
-  /** From host LiveViewContext (Phase 1) for runSession.record + provider. */
+  /**
+   * Surfaces the run's generic-session contribution (host-owned-run-timing
+   * Phase 2). The host persists it after the live view exits — the component
+   * must NOT write the session itself.
+   */
+  readonly onSession?: (contribution: ToolSessionContribution) => void;
+  /** From host LiveViewContext — carries the run timer for the RunTimingProvider. */
   readonly liveContext?: LiveViewContext;
 }
 
@@ -114,6 +126,7 @@ export function SimRunner({
   args,
   setExitCode,
   onEnvelope,
+  onSession,
   liveContext,
 }: SimRunnerProps): React.ReactElement {
   const { exit } = useApp();
@@ -153,18 +166,16 @@ export function SimRunner({
         // ADR-0035: the host owns the findings exit. The live renderer hands the
         // envelope to `setUpSimLiveView` via `onEnvelope`, which calls
         // `deliverSignals`; the root sets the exit from `envelope.verdict.passed`.
-        // Host record (Phase 4): use the runSession from liveContext (same timer
-        // the static tool.ts path uses). Best-effort, never throws.
-        const rs = liveContext?.runSession;
-        if (rs && result.type === 'sim-done') {
-          const payload = buildSimulationSessionPayload(result.envelope);
-          rs.record({
+        // Host-owned persistence (host-owned-run-timing Phase 2): surface the
+        // contribution; the host persists after the live view exits.
+        if (result.type === 'sim-done') {
+          onSession?.({
             tool: 'sim',
             cwd: result.cwd,
             recipe: result.recipeName,
             score: result.envelope.verdict.score,
             passed: result.envelope.verdict.passed,
-            payload,
+            payload: buildSimulationSessionPayload(result.envelope),
           });
         }
         onEnvelope?.(result.envelope);
@@ -298,16 +309,19 @@ export interface RenderSimLiveOptions {
 }
 
 /**
- * Render the live `sim` view. Returns the run's SignalEnvelope once the Ink app
- * exits (or undefined on an error / no-result run) so the composition root can
- * deliver signals (cloud + --report-to) after the interactive view exits.
+ * Render the live `sim` view. Resolves once the Ink app exits with a
+ * {@link ToolRunCompletion} carrying the run's `envelope` (for root-owned
+ * egress) and `session` contribution (persisted by the HOST after this
+ * resolves — host-owned-run-timing Phase 2; the component no longer writes the
+ * session itself).
  */
 export async function renderSimLive(
   args: SimLiveArgs,
   options?: RenderSimLiveOptions,
   liveContext?: LiveViewContext,
-): Promise<SignalEnvelope | undefined> {
+): Promise<ToolRunCompletion> {
   let envelope: SignalEnvelope | undefined;
+  let session: ToolSessionContribution | undefined;
   const app = render(
     <ThemeProvider>
       <ClockProvider>
@@ -317,6 +331,9 @@ export async function renderSimLive(
           onEnvelope={(e) => {
             envelope = e;
           }}
+          onSession={(c) => {
+            session = c;
+          }}
           liveContext={liveContext}
         />
       </ClockProvider>
@@ -324,5 +341,5 @@ export async function renderSimLive(
   );
   await app.waitUntilExit();
   process.stdout.write('\n');
-  return envelope;
+  return { envelope, session };
 }

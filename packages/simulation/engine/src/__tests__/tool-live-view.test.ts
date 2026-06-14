@@ -33,8 +33,11 @@ const fakeEnvelope = {
   verdict: { passed: false, summary: { passed: 0, failed: 1, errors: 0, warnings: 0 } },
 } as unknown as SignalEnvelope;
 
+// host-owned-run-timing Phase 2: renderSimLive resolves a ToolRunCompletion
+// ({ envelope, session }); the tool reads `.envelope` for egress and the host
+// persists `.session`.
 vi.mock('../cli/sim-runner.js', () => ({
-  renderSimLive: vi.fn(() => Promise.resolve(fakeEnvelope)),
+  renderSimLive: vi.fn(() => Promise.resolve({ envelope: fakeEnvelope })),
 }));
 
 const { renderSimLive } = await import('../cli/sim-runner.js');
@@ -141,10 +144,11 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     process.stdout.isTTY = true;
     // The handler's own renderLive (the live view) is dispatched through
     // cli.renderLive (mocked to a no-op), so it does not invoke renderSimLive;
-    // only the directly-invoked callback below does, returning undefined.
+    // only the directly-invoked callback below does, returning a completion with
+    // no envelope (host-owned-run-timing Phase 2).
     (
       renderSimLive as unknown as { mockResolvedValueOnce: (v: unknown) => void }
-    ).mockResolvedValueOnce(undefined);
+    ).mockResolvedValueOnce({ envelope: undefined });
     const cap = makeCtx();
     await simHandler()({ cwd: '/proj' }, cap.ctx);
 
