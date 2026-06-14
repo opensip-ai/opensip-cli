@@ -301,6 +301,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
         }
         if (cancelled) return;
         const durationMs = Date.now() - startedAt;
+        const startedAtIso = new Date(startedAt).toISOString();
         // `result` already crossed the single suppression chokepoint inside the
         // producer (`buildLiveGraphOutput` → `finalizeGraphSignals`), but the
         // IPC structured-clone dropped the FinalizedSignals brand. Re-stamp it
@@ -312,7 +313,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
         // Persist exactly one session — matches the contract the dispatch-path
         // orchestrator (`executeGraph` → `persistSession`) enforces, so the
         // dashboard's Code Paths > Sessions sees the interactive run.
-        persistSession({ cwd: args.cwd }, finalized, datastore, durationMs);
+        persistSession({ cwd: args.cwd }, finalized, datastore, durationMs, startedAtIso);
         // Compute the fit-style summary the cli-ui `RunSummary` renders from the
         // SAME waived set — so the TTY summary matches the piped report.
         const verdict = buildGraphEnvelope({

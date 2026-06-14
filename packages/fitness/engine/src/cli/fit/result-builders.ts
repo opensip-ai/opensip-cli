@@ -270,6 +270,7 @@ export function persistFitSession(
   args: FitOptions,
   envelope: SignalEnvelope,
   durationMs: number,
+  startedAt: string,
 ): void {
   try {
     const repo = new SessionRepo(datastore);
@@ -287,7 +288,7 @@ export function persistFitSession(
     repo.save({
       id: generatePrefixedId('fit'),
       tool: 'fit',
-      timestamp: envelope.createdAt,
+      timestamp: startedAt,
       cwd: args.cwd,
       recipe: envelope.recipe,
       score: envelope.verdict.score,

@@ -48,9 +48,10 @@ function persistFitRun(
   if (
     datastore !== undefined &&
     fitResult.envelope !== undefined &&
-    fitResult.durationMs !== undefined
+    fitResult.durationMs !== undefined &&
+    fitResult.startedAt !== undefined
   ) {
-    persistFitSession(datastore, args, fitResult.envelope, fitResult.durationMs);
+    persistFitSession(datastore, args, fitResult.envelope, fitResult.durationMs, fitResult.startedAt);
   }
 }
 

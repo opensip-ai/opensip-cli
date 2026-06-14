@@ -87,6 +87,7 @@ describe('executeFit — persistence-free boundary (ADR-0028)', () => {
     expect(fitResult.result.type).not.toBe('error');
     expect(fitResult.envelope).toBeDefined();
     expect(typeof fitResult.durationMs).toBe('number');
+    expect(typeof fitResult.startedAt).toBe('string');
 
     // The engine is pure-compute now: nothing was written.
     const sessions = new SessionRepo(datastore).list({ tool: 'fit' });
@@ -97,10 +98,14 @@ describe('executeFit — persistence-free boundary (ADR-0028)', () => {
     const args = makeArgs(projectDir);
     const fitResult = await withFitScope(() => executeFit(args));
     expect(fitResult.envelope).toBeDefined();
-    if (fitResult.envelope === undefined || fitResult.durationMs === undefined)
+    if (
+      fitResult.envelope === undefined ||
+      fitResult.durationMs === undefined ||
+      fitResult.startedAt === undefined
+    )
       throw new Error('expected a fit-done result');
 
-    persistFitSession(datastore, args, fitResult.envelope, fitResult.durationMs);
+    persistFitSession(datastore, args, fitResult.envelope, fitResult.durationMs, fitResult.startedAt);
 
     const sessions = new SessionRepo(datastore).list({ tool: 'fit' });
     expect(sessions.length).toBe(1);

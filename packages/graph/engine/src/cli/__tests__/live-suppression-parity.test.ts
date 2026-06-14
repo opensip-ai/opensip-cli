@@ -170,7 +170,7 @@ describe('live-view suppression parity', () => {
     // erroring (someone widened persistSession back to `readonly Signal[]`), the
     // build fails — the leak class is re-openable only by deleting this guard.
     // @ts-expect-error — raw Signal[] is not assignable to FinalizedSignals
-    persistSession({ cwd: buildRoot }, raw, undefined, 0);
+    persistSession({ cwd: buildRoot }, raw, undefined, 0, '2026-01-01T00:00:00.000Z');
 
     // The ONLY way in is via the finalize seam (or its post-IPC re-brand assert),
     // which type-checks cleanly. `datastore: undefined` makes this a no-op call.
@@ -179,6 +179,7 @@ describe('live-view suppression parity', () => {
       assertFinalizedAcrossBoundary(raw, 0),
       undefined,
       0,
+      '2026-01-01T00:00:00.000Z',
     );
 
     // The real assertion of this test is the `@ts-expect-error` above (a

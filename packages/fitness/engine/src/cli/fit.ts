@@ -104,8 +104,8 @@ export async function executeFit(
   args: FitOptions,
   opts: ExecuteFitOptions = {},
 ): Promise<
-  | { result: FitDoneResult; envelope: SignalEnvelope; durationMs: number }
-  | { result: ErrorResult; envelope?: undefined; durationMs?: undefined }
+  | { result: FitDoneResult; envelope: SignalEnvelope; durationMs: number; startedAt: string }
+  | { result: ErrorResult; envelope?: undefined; durationMs?: undefined; startedAt?: undefined }
 > {
   logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
@@ -200,5 +200,10 @@ export async function executeFit(
     durationMs: fitnessResult.durationMs,
   });
 
-  return { result, envelope, durationMs: fitnessResult.durationMs };
+  return {
+    result,
+    envelope,
+    durationMs: fitnessResult.durationMs,
+    startedAt: fitnessResult.startedAt.toISOString(),
+  };
 }

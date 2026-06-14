@@ -176,8 +176,12 @@ function FitRunner({
 
       // Persist on the MAIN thread (ADR-0028 — the engine is persistence-free and
       // worker-safe; the datastore handle never crosses the worker boundary).
-      if (datastore !== undefined && fitResult.durationMs !== undefined) {
-        persistFitSession(datastore, args, result.envelope, fitResult.durationMs);
+      if (
+        datastore !== undefined &&
+        fitResult.durationMs !== undefined &&
+        fitResult.startedAt !== undefined
+      ) {
+        persistFitSession(datastore, args, result.envelope, fitResult.durationMs, fitResult.startedAt);
       }
 
       // Effectful egress (cloud + `--report-to`) lives at the composition root

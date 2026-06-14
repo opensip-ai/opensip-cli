@@ -151,7 +151,9 @@ export function SimRunner({
         // envelope to `setUpSimLiveView` via `onEnvelope`, which calls
         // `deliverSignals`; the root sets the exit from `envelope.verdict.passed`.
         // Persist on the MAIN thread (ADR-0028 — engine is persistence-free).
-        if (datastore !== undefined) persistSimSession(datastore, result);
+        if (datastore !== undefined && simResult.startedAt !== undefined) {
+          persistSimSession(datastore, result, simResult.startedAt);
+        }
         onEnvelope?.(result.envelope);
         setState({
           phase: 'done',

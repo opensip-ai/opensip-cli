@@ -239,7 +239,13 @@ describe('persistSimSession', () => {
   it('writes exactly one sim session row (the engine no longer persists; the caller does)', async () => {
     const ds: DataStore = DataStoreFactory.open({ backend: 'memory' });
     try {
-      persistSimSession(ds, await simDone());
+      const scope = makeSimTestScope();
+      const exec = await scope.run(() => executeSim(args()));
+      const startedAt = (exec as { startedAt?: string }).startedAt;
+      if (exec.result.type !== 'sim-done' || startedAt === undefined) {
+        throw new Error('expected sim success with startedAt');
+      }
+      persistSimSession(ds, exec.result, startedAt);
       const sessions = new SessionRepo(ds).list({ tool: 'sim' });
       expect(sessions).toHaveLength(1);
       expect(sessions[0]?.recipe).toBe('default');
@@ -252,6 +258,8 @@ describe('persistSimSession', () => {
     const result = await simDone();
     // A datastore whose handle is unusable makes SessionRepo.save throw; the
     // best-effort wrapper must swallow + log, not propagate.
-    expect(() => persistSimSession({} as unknown as DataStore, result)).not.toThrow();
+    expect(() =>
+      persistSimSession({} as unknown as DataStore, result, '2026-01-01T00:00:00.000Z'),
+    ).not.toThrow();
   });
 });

@@ -209,7 +209,10 @@ export interface ExecuteSimOptions {
 export async function executeSim(
   args: ToolOptions & { readonly verbose?: boolean },
   opts: ExecuteSimOptions = {},
-): Promise<{ result: SimDoneResult | ErrorResult }> {
+): Promise<
+  | { result: SimDoneResult; startedAt: string }
+  | { result: ErrorResult; startedAt?: undefined }
+> {
   // Lifecycle: load .mjs plugins + scenario packages before the recipe
   // registry is read. Idempotent per project dir.
   await ensureScenariosLoaded(args.cwd);
@@ -242,6 +245,7 @@ export async function executeSim(
     };
   }
 
+  const startedAt = new Date().toISOString();
   const service = new SimulationRecipeService({ cwd: args.cwd, onProgress: opts.onProgress });
   const recipeResult = await service.runRecipe(recipe);
 
@@ -331,18 +335,22 @@ export async function executeSim(
   // Persistence is the CALLER's job (ADR-0028 — worker-safe engine): the engine
   // returns the result and the caller persists on the main thread via
   // `persistSimSession` (the datastore handle cannot cross the worker boundary).
-  return { result };
+  return { result, startedAt };
 }
 
 /** Persist a completed sim run. Best-effort — a SQLite write failure never fails
  *  an otherwise-successful run. Called by the run-mode callers on the main thread. */
-export function persistSimSession(datastore: DataStore, result: SimDoneResult): void {
+export function persistSimSession(
+  datastore: DataStore,
+  result: SimDoneResult,
+  startedAt: string,
+): void {
   try {
     const repo = new SessionRepo(datastore);
     repo.save({
       id: generatePrefixedId('sim'),
       tool: 'sim',
-      timestamp: result.envelope.createdAt,
+      timestamp: startedAt,
       cwd: result.cwd,
       recipe: result.recipeName,
       score: result.envelope.verdict.score,

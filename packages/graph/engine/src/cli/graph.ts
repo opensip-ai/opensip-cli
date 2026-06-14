@@ -920,7 +920,13 @@ async function deliverGraphResult(
     // Persist the branded FinalizedSignals — persistSession accepts ONLY the
     // post-finalize type, so the dashboard history can never record un-waived
     // findings regardless of which output path reached here.
-    persistSession(opts, finalized, cli.scope.datastore() as DataStore | undefined, durationMs);
+    persistSession(
+      opts,
+      finalized,
+      cli.scope.datastore() as DataStore | undefined,
+      durationMs,
+      startedAt,
+    );
   }
   cli.setExitCode(EXIT_CODES.SUCCESS);
   logger.info({
@@ -1033,6 +1039,7 @@ async function executeWorkspaceGraph(
 
   const profileRun = profile?.startRun({ label: 'workspace', cwd: opts.cwd, mode: 'workspace' });
   const startedAt = Date.now();
+  const startedAtIso = new Date(startedAt).toISOString();
   const result = await runWorkspaceUnitsInParallel({
     cwd: opts.cwd,
     units,
@@ -1070,7 +1077,7 @@ async function executeWorkspaceGraph(
     // the dashboard, not for the cloud, and the --json children skip emit to
     // avoid fragmented per-unit batches. A whole-project `graph` run emits
     // normally (the root's deliverSignals on the returned envelope).
-    persistWorkspaceSession(opts, allSignals, durationMs, cli);
+    persistWorkspaceSession(opts, allSignals, durationMs, startedAtIso, cli);
   }
 
   // If any child failed to spawn or exited with an error, surface it
@@ -1112,17 +1119,19 @@ export function persistSession(
   finalized: FinalizedSignals,
   datastore: DataStore | undefined,
   durationMs: number,
+  startedAt: string,
 ): void {
   if (!datastore) return;
   // The single-process path holds the raw engine signals (engine slugs), so
   // the session payload's per-rule keys are engine slugs directly.
-  saveGraphSession(opts, finalized.signals, durationMs, datastore);
+  saveGraphSession(opts, finalized.signals, durationMs, startedAt, datastore);
 }
 
 function persistWorkspaceSession(
   opts: GraphCommandOptions,
   signals: readonly Signal[],
   durationMs: number,
+  startedAt: string,
   cli: ToolCliContext,
 ): void {
   const datastore = cli.scope.datastore() as DataStore | undefined;
@@ -1134,13 +1143,14 @@ function persistWorkspaceSession(
     const ruleId = mapOpenSipRuleIdToEngineSlug(s.ruleId);
     return { ...s, ruleId, source: ruleId };
   });
-  saveGraphSession(opts, engineSignals, durationMs, datastore);
+  saveGraphSession(opts, engineSignals, durationMs, startedAt, datastore);
 }
 
 function saveGraphSession(
   opts: Pick<GraphCommandOptions, 'cwd'>,
   signals: readonly Signal[],
   durationMs: number,
+  startedAt: string,
   datastore: DataStore,
 ): void {
   try {
@@ -1153,7 +1163,7 @@ function saveGraphSession(
     repo.save({
       id: generatePrefixedId('graph'),
       tool: 'graph',
-      timestamp: new Date().toISOString(),
+      timestamp: startedAt,
       cwd: opts.cwd,
       // Pass rate over passed/total rules — same definition fit uses (a
       // warnings-only run is all-rules-passed → 100). `passed` ⇔ no
