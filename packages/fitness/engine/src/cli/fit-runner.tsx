@@ -38,6 +38,7 @@ import {
   RunFooterHints,
   RunHeader,
   RunSummary,
+  RunTimingProvider,
   ThemeProvider,
   UpdateHint,
   VERBOSE_DETAIL_HINT,
@@ -52,12 +53,12 @@ import {
   type FitDoneResult,
   type SignalEnvelope,
 } from '@opensip-cli/contracts';
-import { runOffThreadOrInProcess, currentScope } from '@opensip-cli/core';
+import { runOffThreadOrInProcess, currentScope, type LiveViewContext } from '@opensip-cli/core';
 import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
 import { envelopeToFitRows } from './fit/envelope-view.js';
-import { persistFitSession } from './fit/result-builders.js';
+import { buildFitnessSessionPayload } from './fit/result-builders.js';
 import { ResultsTable, WarningsBlock } from './fit-runner-views.js';
 import { ensureChecksLoaded, executeFit, getEnabledCheckCount } from './fit.js';
 
@@ -105,7 +106,10 @@ function executeFitWithProgress(
 type FitState =
   | { phase: 'loading' }
   | { phase: 'running'; checkCount: number; subscribe: (cb: ProgressCallback) => void }
-  | { phase: 'done'; result: FitDoneResult; checkCount: number; durationMs: number }
+  // durationMs dropped (host-owned run timing); the RunTimingProvider + RunSummary
+  // (or internal clock for live progress) supply timing. Keep only internal recipe
+  // makespan if the component needs it for non-summary UI.
+  | { phase: 'done'; result: FitDoneResult; checkCount: number }
   | { phase: 'error'; result: ErrorResult };
 
 interface FitRunnerProps {
@@ -114,6 +118,8 @@ interface FitRunnerProps {
   readonly setExitCode?: (code: number) => void;
   /** Called with the run's envelope once it completes, for root-owned egress. */
   readonly onEnvelope?: (envelope: SignalEnvelope) => void;
+  /** LiveViewContext from host (Phase 1) — carries the shared runSession for record + provider. */
+  readonly liveContext?: LiveViewContext;
 }
 
 function FitRunner({
@@ -121,6 +127,7 @@ function FitRunner({
   datastore,
   setExitCode,
   onEnvelope,
+  liveContext,
 }: FitRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<FitState>({ phase: 'loading' });
@@ -174,20 +181,19 @@ function FitRunner({
       // envelope to `setUpFitLiveView`, which calls `deliverSignals`; the root
       // sets the exit from `envelope.verdict.passed` there. No setExitCode here.
 
-      // Persist on the MAIN thread (ADR-0028 — the engine is persistence-free and
-      // worker-safe; the datastore handle never crosses the worker boundary).
-      if (
-        datastore !== undefined &&
-        fitResult.durationMs !== undefined &&
-        fitResult.startedAt !== undefined
-      ) {
-        persistFitSession(
-          datastore,
-          args,
-          result.envelope,
-          fitResult.durationMs,
-          fitResult.startedAt,
-        );
+      // Host-owned persistence (record seam) — timing stamped by the RunTimer the
+      // CLI host created for this invocation (shared with static paths).
+      const rs = liveContext?.runSession;
+      if (rs && result.envelope) {
+        const payload = buildFitnessSessionPayload(result.envelope); // may need import if not hoisted
+        rs.record({
+          tool: 'fit',
+          cwd: args.cwd,
+          recipe: result.envelope.recipe,
+          score: result.envelope.verdict.score,
+          passed: result.envelope.verdict.passed,
+          payload,
+        });
       }
 
       // Effectful egress (cloud + `--report-to`) lives at the composition root
@@ -195,8 +201,7 @@ function FitRunner({
       // `registerLiveView` callback delivers it once the Ink app exits.
       onEnvelope?.(result.envelope);
 
-      const durationMs = fitResult.durationMs ?? 0;
-      setState({ phase: 'done', result, checkCount, durationMs });
+      setState({ phase: 'done', result, checkCount });
       setTimeout(() => exit(), 100);
     })();
 
@@ -289,13 +294,10 @@ function FitRunner({
     case 'done': {
       const { envelope, verboseDetail } = state.result;
       const { summary } = envelope.verdict;
-      // Use the engine-reported overall recipe duration (wall time of the
-      // checks phase) for the summary line. This matches what is persisted
-      // into the session (for `sessions` / `report`) and is consistent with
-      // how graph and sim report their run durations. The per-unit durations
-      // in the envelope are the individual check times (which overcount when
-      // checks execute in parallel).
-      const durationMs = state.durationMs;
+      // Host-owned timing (via provider from liveContext or outer host wrap):
+      // omit explicit durationMs so RunSummary reads from RunTimingProvider.
+      // The displayed Duration now matches the value stamped into StoredSession
+      // by the host RunTimer at record time.
       // ADR-0021: the verbose surface is driven by args.verbose alone. The
       // detail body renders through the shared viewFindingsGroups producer (same
       // path as the static `fit --verbose | cat` render), not the retired local
@@ -304,6 +306,23 @@ function FitRunner({
         verboseDetail?.kind === 'findings' && verboseDetail.groups.length > 0
           ? verboseDetail
           : undefined;
+
+      const summaryEl = (
+        <RunSummary
+          passed={envelope.verdict.passed}
+          errors={summary.errors}
+          warnings={summary.warnings}
+          // durationMs omitted — provider supplies host timer value
+        />
+      );
+      const timedSummary = liveContext?.runSession ? (
+        <RunTimingProvider timer={liveContext.runSession.timing}>
+          {summaryEl}
+        </RunTimingProvider>
+      ) : (
+        summaryEl
+      );
+
       return (
         <>
           {staticHeader}
@@ -313,12 +332,7 @@ function FitRunner({
                 <ResultsTable rows={envelopeToFitRows(envelope)} />
               </Box>
             )}
-            <RunSummary
-              passed={envelope.verdict.passed}
-              errors={summary.errors}
-              warnings={summary.warnings}
-              durationMs={durationMs}
-            />
+            {timedSummary}
             {!args.quiet && state.result.warnings && state.result.warnings.length > 0 && (
               <WarningsBlock warnings={state.result.warnings} />
             )}
@@ -391,10 +405,19 @@ export interface RenderFitLiveOptions {
  */
 export async function renderFitLive(
   args: FitOptions,
-  datastore?: DataStore,
+  contextOrDatastore?: DataStore | LiveViewContext,
   options?: RenderFitLiveOptions,
 ): Promise<SignalEnvelope | undefined> {
   let envelope: SignalEnvelope | undefined;
+  let datastore: DataStore | undefined;
+  let liveContext: LiveViewContext | undefined;
+  if (contextOrDatastore) {
+    if ((contextOrDatastore as LiveViewContext).runSession) {
+      liveContext = contextOrDatastore as LiveViewContext;
+    } else {
+      datastore = contextOrDatastore as DataStore;
+    }
+  }
   const app = render(
     <ThemeProvider>
       <ClockProvider>
@@ -405,6 +428,7 @@ export async function renderFitLive(
           onEnvelope={(e) => {
             envelope = e;
           }}
+          liveContext={liveContext}
         />
       </ClockProvider>
     </ThemeProvider>,
