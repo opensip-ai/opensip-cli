@@ -24,7 +24,24 @@ related-docs:
 
 # Adding a language to graph
 
-The `graph` tool started as a TypeScript-only call-graph engine. The language-pluggability work introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language. There are **five first-party adapters** — each as its own publishable npm package under `packages/graph/graph-<lang>/`: TypeScript (symbol-resolved via the TS compiler API), Python (tree-sitter), Rust (tree-sitter), Go (tree-sitter), and Java (tree-sitter). The four tree-sitter adapters are backed by **vendored `web-tree-sitter` WASM grammars** (no native build / node-gyp at install) and share the parse/discover/walk/cache-key scaffolding in [`@opensip-cli/graph-adapter-common`](../../../packages/graph/graph-adapter-common/src/parse.ts). Auto-discovery is by **name pattern + marker**: a package must match `@opensip-cli/graph-*` and declare `opensipTools.kind: "graph-adapter"`, or you can pin an exact list in `plugins.graphAdapters` in `opensip-cli.config.yml`. Any first-party or third-party adapter slots in by implementing the contract and shipping under that name/marker pair (or via the explicit-pin form).
+The `graph` tool started as a TypeScript-only call-graph engine.
+
+### Language Pluggability
+
+The language-pluggability work introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language.
+
+There are **five first-party adapters** — each as its own publishable npm package under `packages/graph/graph-<lang>/`:
+
+- TypeScript (symbol-resolved via the TS compiler API)
+- Python, Rust, Go, and Java (all tree-sitter based)
+
+The four tree-sitter adapters are backed by **vendored `web-tree-sitter` WASM grammars** (no native build / node-gyp at install) and share the parse/discover/walk/cache-key scaffolding in [`@opensip-cli/graph-adapter-common`](../../../packages/graph/graph-adapter-common/src/parse.ts).
+
+### Discovery and Registration
+
+Auto-discovery is by **name pattern + marker**: a package must match `@opensip-cli/graph-*` and declare `opensipTools.kind: "graph-adapter"`, or you can pin an exact list in `plugins.graphAdapters` in `opensip-cli.config.yml`.
+
+Any first-party or third-party adapter slots in by implementing the contract and shipping under that name/marker pair (or via the explicit-pin form).
 
 This doc walks a contributor through that workflow.
 
