@@ -120,13 +120,17 @@ export const tool: Tool = {
     }),
   ],
   // Host-owned run timing (host-owned-run-timing): if your tool writes a
-  // cross-tool history row (sessions list / report), call the documented seam
-  // `cli.runSession.record({ tool: 'your-tool', cwd, score, passed, payload? })`.
-  // The host `RunTimer` (available as `cli.runSession.timing` and passed to
-  // live renderers as the optional second `LiveViewContext` arg) supplies
-  // `timestamp` + `durationMs`. Tools never capture their own Date for those
-  // two generic columns. Internal per-scenario/per-check timers are fine and
-  // belong in your `payload`.
+  // cross-tool history row (sessions list / report), do NOT persist it
+  // yourself. RETURN a `ToolRunCompletion` from your handler (or live renderer)
+  // — i.e. `{ result?, envelope?, session?, dashboard? }` — whose `session` is a
+  // `ToolSessionContribution` `{ tool, cwd, recipe?, score, passed, payload? }`.
+  // The host run plane stamps `startedAt`/`completedAt`/`durationMs` from the
+  // single `RunTimer` and persists the row. The timer is read-only on the
+  // context (`cli.runSession.timing`, also passed to live renderers as the
+  // optional second `LiveViewContext` arg) for a display clock only — there is
+  // no `record(...)` writer. Tools never capture their own Date for the generic
+  // columns; internal per-scenario/per-check timers are fine and belong in your
+  // `payload` (or the `dashboard` contribution for a per-run report tab).
 });
     }),
   ],

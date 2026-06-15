@@ -341,7 +341,14 @@ they receive:
 - `hostPlanes` (when present: the typed `governance`/`audit`/`entitlements`
   bag — Cloud primary; OSS tools may ignore or supply compat impls and fall
   back to `toolState` for custom records — see the hygiene spec/plan).
-- `runSession` (host-owned-run-timing): `{ timing: RunTimer; record(input: ToolRunSessionInput): RecordedToolRunSession | undefined }`. The *only* seam for writing generic `StoredSession` rows (timestamp + durationMs are stamped exclusively by the host `RunTimer` created at the command boundary; tools supply only `tool`/`cwd`/`recipe?`/`score`/`passed`/`payload?`).
+- `runSession` (host-owned-run-timing): `{ timing: RunTimer }` — **read-only**.
+  `timing` exposes the current invocation's `RunTimer` for display-only elapsed
+  (e.g. a live header clock). There is **no** generic-session writer on the
+  context. To record a run, a tool RETURNS a `ToolSessionContribution` (the
+  `session` field of a `ToolRunCompletion`) from its command handler or live
+  renderer; the host run plane stamps `startedAt`/`completedAt`/`durationMs` from
+  that single `RunTimer` and persists the `StoredSession` row. Tools supply only
+  `tool`/`cwd`/`recipe?`/`score`/`passed`/`payload?` (never timing).
 
 Direct `process.stdout` (for run output), `console.*` for run data, the old
 pre-scope holder, or raw datastore from action bodies is forbidden and caught
@@ -351,14 +358,21 @@ hygiene pass. The composition root (bootstrap, error/report seams, the
 `buildToolCliContext` factory itself) is exempted by design. See
 `docs/plans/ready/host-planes-scope-seams-hygiene/`.
 
-**Session timing rule (host-owned-run-timing):** `StoredSession.timestamp` and
-`durationMs` are produced exclusively by the CLI host from a single `RunTimer`.
-First-party tools (and third-party) must never capture `new Date()` / `Date.now()`
-/ `performance.now()` for these two fields, and must never import `SessionRepo`
-to write the generic columns. Internal per-unit/stage/recipe timers remain
-tool-owned for diagnostics and belong in the tool payload or `collectReportData`.
-The `only-documented-toolcli-seams` fitness check (plus the new
-`architecture-session-timing-not-host-owned` rule) and ESLint rules enforce this.
+**Session timing rule (host-owned-run-timing):** `StoredSession.startedAt`,
+`completedAt`, and `durationMs` are produced exclusively by the CLI host from a
+single `RunTimer` (created at the command-action boundary). Tools never own the
+generic row: they return a `ToolSessionContribution` and the host run plane
+stamps the timing + persists. First-party tools (and third-party) must never
+import `SessionRepo`, re-introduce a `persist*Session` helper, or call a
+`runSession.record(...)` writer (removed) — there is no tool-side generic-session
+writer. Internal per-unit/stage/recipe timers (and the SignalEnvelope's own
+timing) remain tool-owned for diagnostics and belong in the tool payload /
+envelope or `collectReportData`, never the generic columns. Host-side overhead
+(persistMs/ttyBusyMs/renderMs/egressMs/totalCommandMs) lives on a sibling
+`StoredSessionHostMetrics` record the host writes, keyed by session id. The
+`architecture-session-timing-not-host-owned` fitness check (path-gated to the
+first-party tool packages; forbids the persistence symbols above) plus
+`only-documented-toolcli-seams` and ESLint rules enforce this.
 
 This is the mechanical realization of "only use documented seams".
 

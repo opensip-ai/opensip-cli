@@ -31,6 +31,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0051](ADR-0051-host-owned-run-lifecycle-timing.md) — Host-Owned Run Lifecycle, Timing, and Persistence (one host `RunTimer` stamps `StoredSession.startedAt`/`completedAt`/`durationMs`; tools return a `ToolSessionContribution`; the `runSession.record` writer is removed).
 - [ADR-0048](ADR-0048-tool-stable-uuid-identity.md) — Tool Stable UUID Identity (`id` for stable UUID on Tools, matching Checks; human string renamed to `name`; persisted in DB for collision safety).
 - ADR-0047 — Per-Tool Contract Versioning
 - ADR-0046 — Tool Contract Versioning Policy

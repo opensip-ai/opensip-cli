@@ -158,6 +158,66 @@ The cost: dynamic features (filtering, sorting, expand-collapse) are JS in the b
 
 ---
 
+## Per-run dashboard tab contributions (tool authors)
+
+A tool can add its **own per-run tab** to the report **without writing any
+`@opensip-cli/dashboard` code** (host-owned-run-timing Phase 5 /
+[ADR-0051](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/docs/decisions/ADR-0051-host-owned-run-lifecycle-timing.md)). Alongside
+its session contribution, a tool returns a `ToolDashboardContribution` in the
+`dashboard` field of its `ToolRunCompletion`:
+
+```ts
+return {
+  session: { tool: 'fit', cwd, score, passed, payload },
+  dashboard: {
+    // Inline data referenced by a tab's `dataKey` (coerced to an array of rows).
+    data: { findings: [{ rule: 'no-x', file: 'a.ts', line: 3 }] },
+    tabs: [
+      {
+        id: 'run-findings',            // stable kebab-case, unique WITHIN your tool
+        title: 'Run findings',
+        order: 10,                     // tab-bar order hint (lower first)
+        dataKey: 'findings',           // resolves rows from data[dataKey]
+        view: { kind: 'table', columns: [/* … */] },
+      },
+    ],
+  },
+};
+```
+
+The host run plane persists the contribution durably, keyed by the **session
+id**, so a later `opensip report` (a different process) hydrates the tab from the
+datastore — it does not rely on any same-process state. Constraints:
+
+- **Declarative views only for launch.** `view.kind` is one of `table`, `cards`,
+  `timeline`, or `chart` — structured models the host renders generically.
+  `custom-html` exists but is **escaped/sandboxed**, not raw HTML injection; treat
+  it as a last resort, not the default. (Open decision: whether `custom-html` is
+  allowed at all at GA — prefer the declarative kinds.)
+- **Stable, tool-unique tab `id`.** Use kebab-case; it must be unique *within your
+  tool*. The host namespaces every contributed tab as `contrib-<tool>-<id>`, so
+  two different tools can both ship a `run-findings` tab without colliding. A
+  duplicate namespaced id within one report is dropped with a warning.
+- **Reserved top-level keys.** `sessions` and `contributedTabs` are host-owned
+  shell keys. A tool's `collectReportData` that returns one of them is ignored
+  with a warning — you cannot clobber the run history or the per-run tab shell.
+- **Namespaced data.** Inline rows come from your contribution's own `data`
+  object; nothing leaks across tools or into the host shell.
+
+This is distinct from extending the renderer package itself (below): the
+contribution path needs no dashboard-package change and is the recommended path
+for a tool's per-run view. The in-package seams below are for first-party,
+cross-run renderer features.
+
+> **Clock/host-metric note.** A run's `startedAt`/`completedAt`/`durationMs` and
+> the host-overhead metrics (`persistMs`, `ttyBusyMs`, `renderMs`, `egressMs`,
+> `totalCommandMs` — the last measured from command-action entry) are host-owned
+> and live on the `StoredSession` / sibling host-metrics record, not in your
+> contribution. Put tool-internal timings in your session `payload` instead. See
+> [session & persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/#host-owned-run-timing-adr-0051--host-owned-run-timing-plan).
+
+---
+
 ## Extending the report renderer
 
 The `@opensip-cli/dashboard` package exposes three contributor-facing seams. New
