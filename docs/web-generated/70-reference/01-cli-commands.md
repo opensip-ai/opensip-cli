@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-06-14
 release: v0.1.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
@@ -402,11 +402,11 @@ JSON shape:
 {
   "type": "list-checks",
   "checks": [{ "slug": "...", "description": "...", "tags": ["..."] }],
-  "totalCount": 166
+  "totalCount": 151
 }
 ```
 
-Useful for scripting (`opensip fit-list --json | jq '.checks[].slug'`) and for verifying that a `plugin add` actually registered the new pack's checks.
+Useful for scripting (`opensip fit-list --json | jq '.checks[].slug'`) and for verifying that a `plugin add` actually registered the new pack's checks. `totalCount` is the loaded inventory for the current project, so it increases when project-local checks or installed packs are present.
 
 ---
 

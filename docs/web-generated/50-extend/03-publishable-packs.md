@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-06-14
 release: v0.1.0
 title: "Publishable packs"
 audience: [plugin-authors]
@@ -263,4 +263,4 @@ For a tighter unit test, call the analyzer directly — `defineCheck` keeps the 
 | Understand the platform side: pack contract, scope filters, discovery internals | [Check pack architecture](/docs/opensip-cli/50-extend/04-check-pack-architecture/) |
 | Author a Tool with its own subcommand | [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/) |
 | Walk the monorepo adoption flow end-to-end | [Adopt in a monorepo](/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/) |
-| Browse all 166 built-in checks for inspiration | [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/) |
+| Browse all 151 built-in checks for inspiration | [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/) |

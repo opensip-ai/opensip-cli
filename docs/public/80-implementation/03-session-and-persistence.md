@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-06-14
 release: v0.1.0
 title: "Session and persistence"
 audience: [contributors]
@@ -50,7 +50,8 @@ A run produces three kinds of on-disk artifacts: the SQLite database, structured
 ├── logs/<YYYY-MM-DD>.jsonl                     ← one log file per local day, shared across runs
 └── plugins/                                    ← npm-installed project plugins
     ├── fit/node_modules/
-    └── sim/node_modules/
+    ├── sim/node_modules/
+    └── tool/node_modules/
 ```
 
 Source of truth: [`packages/core/src/lib/paths.ts`](../../../packages/core/src/lib/paths.ts). Every consumer reads paths through `resolveProjectPaths(cwd)`. The directory is created lazily by whichever consumer needs a subpath first; `mkdirSync(..., { recursive: true })` is the standard idiom.
@@ -87,7 +88,7 @@ flowchart TB
   Dashboard["dashboard compose"]
   Report["reports/latest.html"]
   Plugins["plugin command"]
-  PluginDirs["plugins/fit + plugins/sim<br/>node_modules hosts"]
+  PluginDirs["plugins/fit + plugins/sim + plugins/tool<br/>node_modules hosts"]
 
   CLI --> Store
   Store --> Migrations
@@ -171,7 +172,7 @@ The `--filter` (errors-only / warnings-only / top:<n>) and `--raw` options on `s
 
 The persisted catalog document carries an optional **`features`** layer — derived columns the engine computes from the raw catalog: per-function `bodyLines` / `blast` (direct + transitive blast radius) / reachability flags, per-package coupling degrees, SCC membership, and directed package-coupling edges. The contract shape is [`GraphFeatures`](../../../packages/contracts/src/graph-catalog.ts) (structurally mirrored from the engine's `PersistedFeatures` so the decoupled dashboard reads features without importing `@opensip-cli/graph`).
 
-## Host-owned run timing (ADR-0048 / host-owned-run-timing plan)
+## Host-owned run timing (ADR-0051 / host-owned-run-timing plan)
 
 `StoredSession.startedAt`, `completedAt`, and `durationMs` are produced exclusively by the host from a single `RunTimer` (a.k.a. `RunLifecycle`). The host run plane (`packages/cli/src/bootstrap/run-plane.ts`) creates the lifecycle inside the command action — after `RunScope` entry, before any tool handler or `renderLive` — and freezes it (`complete()`, idempotent) once the tool returns. Tools read the timer only for a **display clock** via `ToolCliContext.runSession.timing` (also passed as the optional second `LiveViewContext` arg to live renderers registered with `cli.registerLiveView`). There is **no** generic-session writer on the context.
 

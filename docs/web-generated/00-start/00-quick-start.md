@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-06-14
 release: v0.1.0
 title: "Quick start"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
@@ -33,14 +33,14 @@ opensip-cli auto-detects your project's language(s) from filesystem markers and 
 
 | Language | Detection marker | Language-specific checks | Universal checks |
 |---|---|---|---|
-| **TypeScript** / JS / TSX | `tsconfig.json` (or `package.json` alone) | 52 | ✓ |
+| **TypeScript** / JS / TSX | `tsconfig.json` (or `package.json` alone) | 51 | ✓ |
 | **Python** | `pyproject.toml`, `setup.py` | 2 | ✓ |
 | **Java** | `pom.xml`, `build.gradle` | 1 | ✓ |
 | **Go** | `go.mod` | 1 | ✓ |
 | **C / C++** | `CMakeLists.txt` | 1 (clang-tidy backed) | ✓ |
 | **Rust** | `Cargo.toml` | 1 | ✓ |
 
-All six get the **108 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment through 52 TypeScript-specific checks for typed-inject, drizzle-orm, React patterns, package.json exports, and tsconfig posture.
+Every detected language gets the **94 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment through 51 TypeScript-specific checks for typed-inject, drizzle-orm, React patterns, package.json exports, and tsconfig posture.
 
 For the full per-language breakdown, see [`../70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/).
 
