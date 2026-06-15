@@ -1,1 +1,0 @@
-DROP TABLE `session_dashboard_contributions`;
