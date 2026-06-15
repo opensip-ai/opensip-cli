@@ -158,9 +158,8 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
       diagnostics?.event('execute', 'debug', `command '${spec.name}' completed`);
       // Static-path completion: if the handler returned a ToolRunCompletion with
       // a session contribution, the host freezes the lifecycle and persists it.
-      // A plain CommandResult is a no-op (the transitional record(...) path still
-      // owns persistence until Phase 3). The live-view path persists after
-      // renderLive (Phase 2).
+      // A plain CommandResult (no session) is a no-op — there is no tool-side
+      // generic-session writer. The live-view path persists after renderLive.
       runHooks.completeRun?.(result);
       await dispatchOutput(result, spec, optsWithArgs, positionals, ctx);
     } catch (error) {

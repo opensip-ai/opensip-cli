@@ -17,14 +17,21 @@
  */
 
 import { ConfigurationError, defineCommand } from '@opensip-cli/core';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { Command } from 'commander';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  createRunActionHooks,
+  createRunPlaneFactory,
+  createRunSessionSeam,
+} from '../bootstrap/run-plane.js';
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
 import type { CommandMountContext, HostCommandSpec } from '../commands/mount-command-spec.js';
 import type { CommandResult } from '@opensip-cli/contracts';
-import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
+import type { CommandSpec, Logger, ToolCliContext } from '@opensip-cli/core';
 
 /** A Commander argParser reducer that accumulates repeated flag values into an array. */
 function accumulateReducer(raw: string, previous: unknown): string[] {
@@ -85,7 +92,6 @@ function makeCtx(): CapturedCtx {
           durationMs: 0,
         }),
       },
-      record: () => undefined,
     },
   };
   return { ctx, rendered, envelopes, liveViews, exitCodes };
@@ -611,5 +617,153 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
     // Current _args delivery for the variadic collects them as a nested array in this handler context.
     expect(received[1].positionals).toEqual([['x', 'y']]);
     expect(received[1].opts.json).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Host run-lifecycle hooks (host-owned-run-timing Phase 8). The mount dispatch
+// reads beginRun/completeRun off the ctx via cast (RunActionHooks). These prove
+// the wiring the run-plane unit tests exercise in isolation actually fires
+// through the real command action, in the right order, exactly once.
+// ---------------------------------------------------------------------------
+
+/** Silent logger for the integration run plane (no warn/info spam). */
+const SILENT_LOG: Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
+describe('mountCommandSpec — host run-lifecycle hooks', () => {
+  it('calls beginRun before the handler and completeRun(result) after — exactly once each, in order', async () => {
+    const { ctx } = makeCtx();
+    const order: string[] = [];
+    const beginRun = vi.fn(() => order.push('beginRun'));
+    const completeRun = vi.fn(() => order.push('completeRun'));
+    const result = { type: 'help' as const };
+    const handler = vi.fn(() => {
+      order.push('handler');
+      return result;
+    });
+    const hookedCtx = Object.assign({}, ctx, { beginRun, completeRun }) as ToolCliContext;
+    const program = new Command();
+    const spec: HostCommandSpec = defineCommand({
+      name: 'lc',
+      description: 'lifecycle',
+      commonFlags: [],
+      scope: 'none',
+      output: 'command-result',
+      handler,
+    });
+    mountCommandSpec(program, spec, hookedCtx);
+
+    await program.parseAsync(['lc'], { from: 'user' });
+
+    expect(beginRun).toHaveBeenCalledOnce();
+    expect(completeRun).toHaveBeenCalledOnce();
+    expect(order).toEqual(['beginRun', 'handler', 'completeRun']);
+    // completeRun receives the handler's return value (so it can read .session).
+    expect(completeRun).toHaveBeenCalledWith(result);
+  });
+
+  it('calls beginRun once but NOT completeRun when the handler throws a ToolError', async () => {
+    const { ctx, exitCodes } = makeCtx();
+    const beginRun = vi.fn();
+    const completeRun = vi.fn();
+    const handler = vi.fn(() => {
+      throw new ConfigurationError('bad', { code: 'CONFIGURATION_ERROR' });
+    });
+    const hookedCtx = Object.assign({}, ctx, { beginRun, completeRun }) as ToolCliContext;
+    const program = new Command();
+    const spec: HostCommandSpec = defineCommand({
+      name: 'boom',
+      description: 'boom',
+      commonFlags: [],
+      scope: 'none',
+      output: 'command-result',
+      handler,
+    });
+    mountCommandSpec(program, spec, hookedCtx);
+
+    await program.parseAsync(['boom'], { from: 'user' });
+
+    expect(beginRun).toHaveBeenCalledOnce();
+    expect(completeRun).not.toHaveBeenCalled(); // handler threw before the completeRun line
+    expect(exitCodes.length).toBeGreaterThan(0); // ToolError → mapped non-zero exit
+  });
+});
+
+describe('mountCommandSpec — dispatch persists a returned contribution through the host run plane', () => {
+  let datastore: DataStore;
+  afterEach(() => {
+    datastore?.close();
+  });
+
+  /** Build a ctx whose run seam + action hooks are backed by a REAL run plane. */
+  function ctxWithRealRunPlane(ds: DataStore): ToolCliContext {
+    const factory = createRunPlaneFactory({ getDatastore: () => ds, logger: SILENT_LOG });
+    return Object.assign({}, makeCtx().ctx, {
+      runSession: createRunSessionSeam(factory),
+      ...createRunActionHooks(factory),
+    });
+  }
+
+  it('writes exactly one host-stamped StoredSession (+ persistMs) for a returned ToolRunCompletion', async () => {
+    datastore = DataStoreFactory.open({ backend: 'memory' });
+    const ctx = ctxWithRealRunPlane(datastore);
+    const handler = vi.fn(() => ({
+      session: {
+        tool: 'fit',
+        cwd: '/proj',
+        recipe: 'example',
+        score: 88,
+        passed: true,
+        payload: { x: 1 },
+      },
+    }));
+    const program = new Command();
+    const spec: HostCommandSpec = defineCommand({
+      name: 'persisted',
+      description: 'persists a session',
+      commonFlags: [],
+      scope: 'none',
+      output: 'command-result',
+      handler,
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await program.parseAsync(['persisted'], { from: 'user' });
+
+    const rows = new SessionRepo(datastore).list();
+    expect(rows).toHaveLength(1);
+    const row = rows[0];
+    expect(row?.tool).toBe('fit');
+    expect(row?.recipe).toBe('example');
+    expect(row?.score).toBe(88);
+    expect(row?.passed).toBe(true);
+    // Timing is HOST-stamped (the tool supplied none).
+    expect(typeof row?.startedAt).toBe('string');
+    expect(typeof row?.completedAt).toBe('string');
+    expect(row?.durationMs).toBeGreaterThanOrEqual(0);
+    // Sibling host-metrics row hydrated onto the session.
+    expect(row?.hostMetrics?.persistMs).toBeGreaterThanOrEqual(0);
+    // Tool payload round-trips opaquely.
+    expect(row?.payload).toEqual({ x: 1 });
+  });
+
+  it('persists no row when the handler returns a plain CommandResult (no session)', async () => {
+    datastore = DataStoreFactory.open({ backend: 'memory' });
+    const ctx = ctxWithRealRunPlane(datastore);
+    const handler = vi.fn(() => ({ type: 'help' as const }));
+    const program = new Command();
+    const spec: HostCommandSpec = defineCommand({
+      name: 'nopersist',
+      description: 'no session',
+      commonFlags: [],
+      scope: 'none',
+      output: 'command-result',
+      handler,
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await program.parseAsync(['nopersist'], { from: 'user' });
+
+    expect(new SessionRepo(datastore).list()).toHaveLength(0);
   });
 });

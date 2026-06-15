@@ -264,3 +264,44 @@ describe('composeAndWriteReport — contributed per-run dashboard tabs (Phase 5)
     expect(panelMatches).toHaveLength(1);
   });
 });
+
+describe('composeAndWriteReport — durable contributions survive a fresh process (Phase 8)', () => {
+  it('hydrates contributed tabs from a CLOSED + REOPENED sqlite datastore (not same-process memory)', async () => {
+    vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
+    const dbPath = join(projectRoot, 'fresh-process.sqlite');
+
+    // "Run process": persist a session + its dashboard contribution, then CLOSE
+    // the datastore entirely (drop all in-memory state).
+    const writer = DataStoreFactory.open({ backend: 'sqlite', path: dbPath });
+    seedSessionWithDashboard(writer, 'graph', {
+      data: { graphRunSummary: [{ functions: 42 }] },
+      tabs: [
+        {
+          id: 'graph-run',
+          title: 'Code Paths — Latest Run',
+          order: 1,
+          dataKey: 'graphRunSummary',
+          view: {
+            kind: 'cards',
+            fields: [{ key: 'functions', label: 'Functions', format: 'number' }],
+          },
+        },
+      ],
+    });
+    writer.close();
+
+    // "report process": a BRAND-NEW DataStore on the same file — proves the
+    // contribution is read back from disk by session id, with zero reliance on
+    // the original run's in-memory state (host-owned-run-timing §11 #7).
+    const reader = DataStoreFactory.open({ backend: 'sqlite', path: dbPath });
+    try {
+      const scope = makeScope([makeTool('graph')], reader);
+      const result = await runWithScope(scope, () => composeAndWriteReport({ open: false }));
+      const html = readFileSync(result.path, 'utf8');
+      expect(html).toContain('data-tab="contrib-graph-graph-run"');
+      expect(html).toContain('Code Paths — Latest Run');
+    } finally {
+      reader.close();
+    }
+  });
+});
