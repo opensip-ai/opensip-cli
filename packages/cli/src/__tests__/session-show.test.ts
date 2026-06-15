@@ -431,6 +431,14 @@ function mixedSignals(): Signal[] {
   ];
 }
 
+/** The `sessions show --json` payload shape the filter tests assert against. */
+interface FilterPayload {
+  readonly envelope: SignalEnvelope;
+  readonly filtersApplied?: readonly string[];
+  readonly originalSignalCount?: number;
+  readonly returnedSignalCount?: number;
+}
+
 describe('executeSessionShow — agent filters', () => {
   let showCounter = 0;
 
@@ -439,7 +447,7 @@ describe('executeSessionShow — agent filters', () => {
     signals: readonly Signal[],
     filters: string[],
     extra: { raw?: boolean } = {},
-  ): Promise<{ payload: any; sinks: ReturnType<typeof makeSinks> }> {
+  ): Promise<{ payload: FilterPayload; sinks: ReturnType<typeof makeSinks> }> {
     // Unique id per call so a single test can run the helper more than once
     // against the shared per-test datastore without a primary-key collision.
     showCounter += 1;
@@ -462,7 +470,7 @@ describe('executeSessionShow — agent filters', () => {
         ...extra,
       }),
     );
-    const payload = (extra.raw ? s.rawEmitted[0] : s.emitted[0]) as any;
+    const payload = (extra.raw ? s.rawEmitted[0] : s.emitted[0]) as FilterPayload;
     return { payload, sinks: s };
   }
 
