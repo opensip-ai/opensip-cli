@@ -256,6 +256,37 @@ describe('CLI e2e', () => {
       const { exitCode } = cli.run(['sessions', 'list'], { cwd: FIXTURE });
       expect(exitCode).toBe(0);
     });
+
+    // host-owned-run-timing Phase 9 (§11 #5/#6): a REAL fit run through the
+    // actual binary persists a StoredSession whose lifecycle timing is stamped
+    // by the host RunTimer (the tool supplies none), with host-side overhead on
+    // a sibling metrics record — proven end-to-end, not just at the unit level.
+    it('a real fit run persists a host-stamped StoredSession (new timing fields + host metrics)', () => {
+      // Human path (no --json) persists the session via the host run plane.
+      const fit = cli.run(['fit', '--check', 'no-eval'], { cwd: FIXTURE });
+      expect([0, 1]).toContain(fit.exitCode);
+
+      const { stdout, exitCode } = cli.run(['sessions', 'list', '--json'], { cwd: FIXTURE });
+      expect(exitCode).toBe(0);
+      const outcome = JSON.parse(stdout) as { data?: { sessions?: Record<string, unknown>[] } };
+      const sessions = outcome.data?.sessions ?? [];
+      expect(sessions.length).toBeGreaterThanOrEqual(1);
+
+      const s = sessions[0];
+      expect(s.tool).toBe('fit');
+      // Host-stamped lifecycle timing (the tool never supplies these).
+      expect(typeof s.startedAt).toBe('string');
+      expect(typeof s.completedAt).toBe('string');
+      expect(typeof s.durationMs).toBe('number');
+      expect(s.durationMs as number).toBeGreaterThanOrEqual(0);
+      // The legacy single `timestamp` field is gone (split into startedAt/completedAt).
+      expect(s).not.toHaveProperty('timestamp');
+      // Sibling host-metrics record is hydrated onto the session, separate from
+      // the canonical durationMs (host write cost lives in persistMs).
+      const hostMetrics = s.hostMetrics as Record<string, unknown> | undefined;
+      expect(hostMetrics).toBeDefined();
+      expect(typeof hostMetrics?.persistMs).toBe('number');
+    });
   });
 
   describe('plugin list', () => {
