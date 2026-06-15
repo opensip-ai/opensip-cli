@@ -178,8 +178,10 @@ try {
     );
   }
 
-  // The real consumer entry point: the bin shim npm created.
-  const bin = join(workDir, 'node_modules', '.bin', 'opensip-cli');
+  // The real consumer entry point: the bin shim npm created. The package is
+  // `opensip-cli` but it declares `bin: { opensip: … }`, so the shim npm writes
+  // is `.bin/opensip` (the installed command), NOT `.bin/opensip-cli`.
+  const bin = join(workDir, 'node_modules', '.bin', 'opensip');
   if (!existsSync(bin)) {
     fail(`installed CLI bin not found at ${bin} — the cli package did not install correctly`);
   }
