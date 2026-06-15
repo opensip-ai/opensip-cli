@@ -1,0 +1,56 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "ignore": ["**/__fixtures__/**"],
+  "rules": {
+    "duplicates": "off"
+  },
+  "workspaces": {
+    ".": {
+      "entry": ["opensip-cli/fit/checks/*.mjs"],
+      "ignoreDependencies": [
+        "@opensip-cli/checks-cpp",
+        "@opensip-cli/checks-go",
+        "@opensip-cli/checks-java",
+        "@opensip-cli/checks-python",
+        "@opensip-cli/checks-rust",
+        "@opensip-cli/checks-typescript",
+        "@opensip-cli/checks-universal",
+        "@opensip-cli/graph-go",
+        "@opensip-cli/graph-java",
+        "@opensip-cli/graph-python",
+        "@opensip-cli/graph-rust",
+        "@opensip-cli/graph-typescript"
+      ]
+    },
+    "packages/cli": {
+      "entry": ["src/__tests__/fixtures/**/*.{ts,js}"],
+      "ignoreDependencies": [
+        "@opensip-cli/checks-cpp",
+        "@opensip-cli/checks-go",
+        "@opensip-cli/checks-java",
+        "@opensip-cli/checks-python",
+        "@opensip-cli/checks-rust",
+        "@opensip-cli/graph-typescript",
+        "@opensip-cli/graph-python",
+        "@opensip-cli/graph-rust",
+        "@opensip-cli/graph-go",
+        "@opensip-cli/graph-java"
+      ]
+    },
+    "packages/dashboard": {
+      "ignore": ["src/vendor/cytoscape-bundle.js"],
+      "ignoreDependencies": ["cytoscape", "cytoscape-dagre"]
+    },
+    "packages/fitness/checks-cpp": {
+      "ignoreDependencies": ["@opensip-cli/core"]
+    },
+    "packages/fitness/engine": {
+      "entry": ["src/tool.ts", "src/cli/{fit,dashboard,fit-list,fit-recipes}.ts"],
+      "ignoreDependencies": ["drizzle-orm"]
+    },
+    "packages/simulation/engine": {
+      "entry": ["src/tool.ts", "src/cli/sim.ts"]
+    }
+  }
+}

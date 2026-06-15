@@ -1,0 +1,53 @@
+{
+  "name": "@opensip-cli/checks-python",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Python fitness checks for opensip-cli",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "fitness-checks",
+    "linting",
+    "python"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/fitness/checks-python"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "opensipTools": {
+    "kind": "fit-pack"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/fitness": "workspace:*",
+    "@opensip-cli/lang-python": "workspace:*"
+  },
+  "devDependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/test-support": "workspace:*",
+    "@types/node": "^24.13.2",
+    "vitest": "^4.1.8"
+  }
+}

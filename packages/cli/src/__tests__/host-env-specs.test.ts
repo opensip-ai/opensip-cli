@@ -1,0 +1,119 @@
+/**
+ * host-env-specs — the composed CLI registry + the aggregate env-surface for the
+ * reference doc. Asserts every layer's variables are present exactly once and the
+ * CLI infra reads coerce as the migrated sites expect.
+ */
+
+import { GRAPH_ENV_SPECS } from '@opensip-cli/graph';
+import { afterEach, describe, it, expect } from 'vitest';
+
+import {
+  BUNDLED_TOOL_ENV_SPECS,
+  CLI_ENV_SPECS,
+  PRE_SCOPE_ENV_SPECS,
+  describeHostEnv,
+  hostEnv,
+} from '../env/host-env-specs.js';
+
+const TOUCHED = ['OPENSIP_NO_UPDATE', 'NO_UPDATE_NOTIFIER', 'OTEL_EXPORTER_OTLP_ENDPOINT'];
+
+afterEach(() => {
+  for (const key of TOUCHED) delete process.env[key];
+});
+
+describe('describeHostEnv', () => {
+  it('aggregates every layer (config + bundled-tool + cli + pre-scope) with no duplicate canonical names', () => {
+    const canonicals = describeHostEnv().map((s) => s.canonical);
+    // One representative from each contributing layer.
+    expect(canonicals).toContain('OPENSIP_API_KEY'); // config
+    expect(canonicals).toContain('OPENSIP_HEAP_NO_MONITOR'); // bundled tool (graph)
+    expect(canonicals).toContain('OTEL_EXPORTER_OTLP_ENDPOINT'); // cli
+    expect(canonicals).toContain('NO_COLOR'); // pre-scope (cli-ui)
+    expect(canonicals).toContain('NODE_OPTIONS'); // pre-scope (graph heap-preflight)
+    // The project-authored-tool allowlist var is declared (Phase 3) so the
+    // generated env reference is complete; tool-trust reads it via an injectable
+    // env seam (pre-scope), documented here.
+    expect(canonicals).toContain('OPENSIP_CLI_ALLOW_PROJECT_TOOLS');
+    // No duplicates — each variable is declared once across the whole surface.
+    expect(new Set(canonicals).size).toBe(canonicals.length);
+    // Every spec carries docs (the reference is generated from these).
+    expect(describeHostEnv().every((s) => s.docs.length > 0)).toBe(true);
+  });
+
+  it('documents every bundled-tool env var (drift guard vs graph GRAPH_ENV_SPECS)', () => {
+    // 3.0.0: the host documents bundled tools' env vars WITHOUT importing the
+    // tool runtime (the `no-bootstrap-tool-import` guardrail). This test (test
+    // code is exempt) keeps BUNDLED_TOOL_ENV_SPECS a superset of graph's actual
+    // registry specs — graph adding an env var fails CI until it's documented.
+    const documented = new Set(BUNDLED_TOOL_ENV_SPECS.map((s) => s.canonical));
+    for (const spec of GRAPH_ENV_SPECS) {
+      expect(
+        documented.has(spec.canonical),
+        `graph env var '${spec.canonical}' must be documented in BUNDLED_TOOL_ENV_SPECS (host-env-specs.ts)`,
+      ).toBe(true);
+    }
+  });
+
+  it('declares the pre-scope allowance vars (theme colours + NODE_OPTIONS)', () => {
+    const c = PRE_SCOPE_ENV_SPECS.map((s) => s.canonical);
+    expect(c).toEqual([
+      'NO_COLOR',
+      'FORCE_COLOR',
+      'COLORTERM',
+      'TERM',
+      'TERM_PROGRAM',
+      'NODE_OPTIONS',
+    ]);
+  });
+});
+
+describe('hostEnv reads (CLI infra)', () => {
+  it('coerces the update opt-outs to booleans (non-empty = true)', () => {
+    expect(hostEnv.get<boolean>('OPENSIP_NO_UPDATE')).toBe(false); // unset → default
+    process.env.OPENSIP_NO_UPDATE = '1';
+    expect(hostEnv.get<boolean>('OPENSIP_NO_UPDATE')).toBe(true);
+    process.env.NO_UPDATE_NOTIFIER = 'yes';
+    expect(hostEnv.get<boolean>('NO_UPDATE_NOTIFIER')).toBe(true);
+  });
+
+  it('reads the OTEL endpoint as a raw string (the SDK gate)', () => {
+    expect(hostEnv.get('OTEL_EXPORTER_OTLP_ENDPOINT')).toBeUndefined();
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'https://collector:4318';
+    expect(hostEnv.get('OTEL_EXPORTER_OTLP_ENDPOINT')).toBe('https://collector:4318');
+  });
+
+  it('CLI_ENV_SPECS covers the infra variables', () => {
+    expect(CLI_ENV_SPECS.map((s) => s.canonical)).toEqual([
+      'OTEL_EXPORTER_OTLP_ENDPOINT',
+      'OPENSIP_PROFILING',
+      'TRACEPARENT',
+      'OPENSIP_NO_UPDATE',
+      'NO_UPDATE_NOTIFIER',
+      'OPENSIP_CLI_SKIP_BUNDLED',
+      'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
+    ]);
+  });
+
+  it('OPENSIP_CLI_SKIP_BUNDLED coerces to a trimmed id list (default empty)', () => {
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_SKIP_BUNDLED')).toEqual([]);
+    process.env.OPENSIP_CLI_SKIP_BUNDLED = ' fitness , graph ';
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_SKIP_BUNDLED')).toEqual([
+      'fitness',
+      'graph',
+    ]);
+    delete process.env.OPENSIP_CLI_SKIP_BUNDLED;
+  });
+
+  it('OPENSIP_CLI_ALLOW_PROJECT_TOOLS coerces on whitespace AND comma (default empty), agreeing with parseAllowlist', () => {
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_PROJECT_TOOLS')).toEqual([]);
+    process.env.OPENSIP_CLI_ALLOW_PROJECT_TOOLS = 'my-audit, my-lint  my-bench';
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_PROJECT_TOOLS')).toEqual([
+      'my-audit',
+      'my-lint',
+      'my-bench',
+    ]);
+    process.env.OPENSIP_CLI_ALLOW_PROJECT_TOOLS = '*';
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_PROJECT_TOOLS')).toEqual(['*']);
+    delete process.env.OPENSIP_CLI_ALLOW_PROJECT_TOOLS;
+  });
+});

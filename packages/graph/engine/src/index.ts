@@ -1,0 +1,204 @@
+// @fitness-ignore-file module-coupling-fan-out -- Public barrel: re-exports the surface of each pipeline stage; fan-out is the contract of this file
+/**
+ * @opensip-cli/graph — public barrel.
+ *
+ * The graph tool implements a strict six-stage pipeline:
+ * discover → inventory → edges → indexes → rules → render.
+ */
+
+// Side-effect import: surfaces the `scope.graph` augmentation on
+// @opensip-cli/core's RunScope interface (D7 — tool subscopes via
+// module augmentation).
+import './scope-augmentation.js';
+export type { GraphSubscope } from './scope-augmentation.js';
+
+// Re-exported as `tool` so the third-party plugin-discovery walker
+// (which keys on `mod.tool`) treats first-party and third-party Tool
+// packages uniformly; dedup at register-tools.ts handles the
+// duplicate-id case.
+export { graphTool, graphTool as tool } from './tool.js';
+export { GRAPH_CONTRACT_VERSION } from './tool.js';
+// Graph-engine environment-variable specs (launch, §5.12) — the CLI
+// composition root imports these to aggregate the env-surface reference doc.
+export { GRAPH_ENV_SPECS } from './cli/pressure-monitor.js';
+// Orchestration / CLI-handler / heap-preflight / shard-model / report
+// helpers (runGraph, executeGraph, GRAPH_STAGES, the heap-preflight
+// surface, MemoryPressureError, Shard*, buildUnifiedReportLines, and
+// their I/O types) are NOT public API — they are consumed only by the
+// engine itself and the cross-package adapter/telemetry test suites.
+// They moved to `@opensip-cli/graph/internal` per ADR-0009 (Finding 3):
+// the CLI drives graph via `graphTool.commandSpecs` (host-mounted), not
+// these symbols, and the parent-repo contract spawns the `catalog-export` subcommand rather
+// than importing the orchestrator. See ./internal.ts.
+// `CatalogRepo` (graph catalog persistence) was previously public — exposed so
+// fitness's old report path could read the catalog. That coupling is gone
+// (the report is CLI-composed and graph contributes via `collectReportData`,
+// which uses CatalogRepo internally). With no external consumer, a concrete
+// SQLite/Drizzle repo does not belong on the module contract, so it moved to
+// `@opensip-cli/graph/internal` (boundary audit 2026-06-05).
+export type {
+  Catalog,
+  ReExportRecord,
+  FunctionOccurrence,
+  CallEdge,
+  DependencyEdge,
+  Param,
+  Indexes,
+  Rule,
+  RuleHints,
+  ResolutionStats,
+  ResolverVerdict,
+  ParseError,
+  FunctionKind,
+  CallResolution,
+  CallConfidence,
+  ResolutionMode,
+  CrossBoundaryCall,
+  Visibility,
+  FeatureTable,
+  FunctionFeatures,
+  PackageFeatures,
+  SccFeatures,
+  PackageEdgeFeature,
+  BlastScore,
+  FeatureColumn,
+  PersistedFeatures,
+  PersistedFunctionFeatures,
+} from './types.js';
+// `Shard` / `ShardBuildResult` are orchestration internals (sharded build
+// model) consumed only by tests — moved to ./internal (ADR-0009, Finding 3).
+
+// EdgeResolver, ResolverContext, InventoryVisitor, VisitorContext used
+// to live here as TS-specific re-exports. PR 1b moved them to
+// @opensip-cli/graph-typescript along with the rest of the lang-
+// typescript subtree. Adapter-pack tests that need these types now
+// import them from the adapter-pack barrel directly.
+
+// ── GraphLanguageAdapter contract surface ─────────────────────────
+//
+// Promoted to the public barrel by PR 1a of plan
+// docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
+// External adapter packs (e.g. @opensip-cli/graph-typescript) import
+// these types to satisfy the contract defined in lang-adapter/types.ts.
+//
+// The set is locked at the eight contract types + four edge-helper
+// symbols from the per-symbol justification table in that plan. Adding
+// a new symbol incurs a major-version revision; promote with care.
+//
+// MutableStats is intentionally NOT promoted — adapters receive the
+// instance via ResolveInput.stats and call its methods; the constructor
+// stays internal. (`createMutableStats` IS exposed because the test
+// suites of the relocated adapter packs use it; the engine itself
+// hands a stats instance into resolveCallSites at runtime.)
+export type {
+  GraphLanguageAdapter,
+  DiscoverInput,
+  DiscoverOutput,
+  ParseInput,
+  ParseOutput,
+  WalkInput,
+  WalkOutput,
+  ResolveInput,
+  ResolveOutput,
+  CallSiteRecord,
+  DependencySiteRecord,
+  CacheKeyInput,
+  ParsedProject,
+} from './lang-adapter/types.js';
+export type { CallConfidence as AdapterCallConfidence } from './types.js';
+export {
+  pickAdapter,
+  createAdapterRegistry,
+  currentAdapterRegistry,
+  GraphAdapterRegistry,
+} from './lang-adapter/registry.js';
+export { GraphAdapterSelector } from './lang-adapter/selector.js';
+export {
+  truncateForCallEdge,
+  CALL_EDGE_TEXT_MAX,
+  CREATION_EDGE_PREFIX,
+  CREATION_EDGE_TEXT_MAX,
+  appendEdge,
+  createMutableStats,
+  pushCreationEdge,
+} from './lang-adapter/edge-helpers.js';
+// MutableStats is the return TYPE of createMutableStats. Adapter packs
+// receive instances and pass them down the resolver call chain — the
+// type annotation is required at internal helper boundaries. The
+// constructor (`createMutableStats`) is the public construction
+// surface; the interface name is just necessary to spell parameter
+// types. Exporting the type alone preserves the plan's intent (no
+// alternate construction path) without forcing adapter packs to
+// inline the structural type at every helper boundary.
+export type { EdgePosition, EdgeSink, MutableStats } from './lang-adapter/edge-helpers.js';
+
+// ── Shared body-digest primitives ─────────────────────────────────
+//
+// The normalize-to-hash tail of the `bodyHash` pipeline (BodyDigest
+// shape + whitespace normalizer + hash/size step) was byte-identical
+// across the tree-sitter adapter packs. Hoisted here so each pack keeps
+// only its language-specific comment stripper / normalizer (round-3
+// audit 2026-05-30, finding D). Mirrors the edge-helpers rationale.
+export { normalizeWhitespace, hashBody } from './lang-adapter/body-digest.js';
+export type { BodyDigest } from './lang-adapter/body-digest.js';
+
+// PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md:
+// first-party adapters live in their own graph-* packages, so the
+// engine no longer re-exports any adapter, parsed-project type, or
+// rule-hints constant. Cross-package tests import directly from each
+// adapter pack.
+
+// `ownerEdgeKey` is public API: the tree-sitter adapter packs consume it to
+// emit owner edges consistently with the engine (part of the adapter contract).
+export { ownerEdgeKey } from './owner-key.js';
+
+// ── Cross-package resolution primitives ────────────────────────────
+//
+// The SINGLE (import specifier + callee name) → unique exported SOURCE
+// occurrence resolution model both graph engines link `@scope/pkg` calls
+// through. The sharded orchestrator's cross-shard linker uses it; the
+// TypeScript adapter's exact resolvers use it too, so the exact engine
+// resolves cross-package calls the SAME way sharded does (binding-required,
+// decline-beats-guess) instead of following the type-checker alias into a
+// bodiless `dist/*.d.ts`. Pure, language-agnostic — part of the adapter
+// contract surface alongside the edge-helpers and body-digest primitives.
+export {
+  buildExportIndex,
+  buildPackageManifestIndex,
+  buildPackageManifestIndexFromRoots,
+  resolveSpecifierToPackage,
+} from './cross-package/export-index.js';
+export type {
+  ExportIndex,
+  PackageManifest,
+  PackageManifestIndex,
+  ResolvedSpecifier,
+} from './cross-package/export-index.js';
+export { resolveCrossPackageCall, linkExported } from './cross-package/resolve.js';
+export type { CrossPackageCallInput } from './cross-package/resolve.js';
+// `buildIndexes` and the individual built-in rule instances are NOT public —
+// they're consumed only by the cross-package rule tests and moved to
+// `@opensip-cli/graph/internal` (rules run via recipes by id). See ADR-0009.
+export { defineRule } from './rules/define-rule.js';
+export type { RuleDataset, GraphFeatures, DefineRuleConfig } from './rules/define-rule.js';
+// ── Graph recipes (Plan B — symmetric with fitness recipes) ────────
+export { defineGraphRecipe } from './recipes/types.js';
+export type {
+  GraphRecipe,
+  GraphRecipeDefinition,
+  RuleSelector,
+  RuleConfigMap,
+} from './recipes/types.js';
+export {
+  builtInGraphRecipes,
+  builtInGraphRecipesByName,
+  defaultGraphRecipe,
+  deadCodeGraphRecipe,
+  isBuiltInGraphRecipe,
+} from './recipes/built-in-recipes.js';
+export {
+  GraphRecipeRegistry,
+  createRecipeRegistry,
+  currentGraphRecipes,
+} from './recipes/registry.js';
+export { resolveRecipeToRules } from './recipes/resolve.js';

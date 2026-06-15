@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+coverage/
+
+# Turbo
+.turbo/
+
+# In-repo git worktrees (parallel sessions). Tracked via .git/worktrees;
+# ignoring the checkout dir prevents accidental `git add` of a worktree.
+.worktrees/
+
+# Logs
+*.log
+
+# Packed tarballs (from `pnpm pack` / `npm pack`)
+*.tgz
+
+# v3 per-project runtime state — sessions, logs, dashboard reports,
+# baselines, AST cache, plugin installs. Test fixtures, the
+# opensip-cli repo itself, and any consumer all generate this.
+opensip-cli/.runtime/
+**/opensip-cli/.runtime/
+
+# Local-only implementation plans (kept out of the repo)
+docs/plans/
+
+# Ephemeral remediation artifacts from the Correctness Remediation Process.
+# These contain per-round findings, coverage reports, and the final summary.
+# They are created inside worktrees during remediation runs and are never
+# committed to the main repository.
+docs/remediation/
+
+# Internal contributor process and improvement docs (correctness remediation
+# process, per-domain quality improvement processes, etc.). These were
+# previously committed but are now treated as local-only (like plans/ and
+# remediation artifacts).
+docs/internal/
+
+# Claude Code session state
+.claude/scheduled_tasks.lock

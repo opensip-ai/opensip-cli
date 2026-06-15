@@ -1,0 +1,69 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatSignalSarif > renders the envelope as SARIF v2.1.0 (snapshot) 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "opensip-cli-graph",
+          "version": "1.0.0",
+          "informationUri": "https://github.com/opensip-ai/opensip-cli",
+          "rules": [
+            {
+              "id": "graph:large-function"
+            },
+            {
+              "id": "graph:orphan-subtree"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "graph:orphan-subtree",
+          "level": "error",
+          "message": {
+            "text": "Unreachable function"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/foo.ts"
+                },
+                "region": {
+                  "startLine": 10,
+                  "startColumn": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "graph:large-function",
+          "level": "warning",
+          "message": {
+            "text": "Function too large"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/bar.ts"
+                },
+                "region": {
+                  "startLine": 42,
+                  "startColumn": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}"
+`;

@@ -1,0 +1,52 @@
+{
+  "name": "@opensip-cli/dashboard",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Self-contained HTML dashboard generator for OpenSIP CLI — renders the fit/sim/graph report from session data and graph catalogs",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "html-report",
+    "visualization",
+    "reporting"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/dashboard"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc && node scripts/copy-vendor.mjs",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "vendor:cytoscape": "node scripts/vendor-cytoscape.mjs",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "cytoscape": "3.34.0",
+    "cytoscape-dagre": "4.0.0",
+    "jsdom": "^29.1.1",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

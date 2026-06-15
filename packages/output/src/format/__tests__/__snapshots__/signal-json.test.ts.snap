@@ -1,0 +1,76 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatSignalJson > serialises the envelope as pretty JSON (snapshot) 1`] = `
+"{
+  "schemaVersion": 2,
+  "tool": "graph",
+  "recipe": "example",
+  "runId": "run_fixture0001",
+  "createdAt": "2026-06-04T00:00:00.000Z",
+  "verdict": {
+    "score": 50,
+    "passed": false,
+    "summary": {
+      "total": 2,
+      "passed": 1,
+      "failed": 1,
+      "errors": 1,
+      "warnings": 1
+    }
+  },
+  "units": [
+    {
+      "slug": "graph:orphan-subtree",
+      "passed": false,
+      "violationCount": 1,
+      "durationMs": 12
+    },
+    {
+      "slug": "graph:large-function",
+      "passed": true,
+      "violationCount": 1,
+      "durationMs": 7
+    }
+  ],
+  "signals": [
+    {
+      "id": "sig_fixture0001",
+      "source": "graph:orphan-subtree",
+      "provider": "opensip-cli",
+      "severity": "high",
+      "category": "architecture",
+      "ruleId": "graph:orphan-subtree",
+      "message": "Unreachable function",
+      "filePath": "src/foo.ts",
+      "line": 10,
+      "column": 3,
+      "code": {
+        "file": "src/foo.ts",
+        "line": 10,
+        "column": 3
+      },
+      "metadata": {},
+      "createdAt": "2026-06-04T00:00:00.000Z"
+    },
+    {
+      "id": "sig_fixture0002",
+      "source": "graph:large-function",
+      "provider": "opensip-cli",
+      "severity": "medium",
+      "category": "quality",
+      "ruleId": "graph:large-function",
+      "message": "Function too large",
+      "filePath": "src/bar.ts",
+      "line": 42,
+      "column": 1,
+      "code": {
+        "file": "src/bar.ts",
+        "line": 42,
+        "column": 1
+      },
+      "metadata": {},
+      "createdAt": "2026-06-04T00:00:00.000Z"
+    }
+  ]
+}"
+`;

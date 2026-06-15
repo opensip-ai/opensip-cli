@@ -1,0 +1,192 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          # Single source of truth: the Node version is pinned in .nvmrc and
+          # kept in lockstep with package.json engines.node by the
+          # node-version-consistency fitness check. CI reads the file rather
+          # than carrying its own literal.
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Clean every package's dist/ before build so the dogfood gates
+      # (fit:ci / graph:ci, which run the compiled engine from dist) can
+      # never execute a stale or Turbo-cache-restored binary that lags the
+      # source. Matches release.yml's pre-build clean; cheap on a fresh
+      # checkout and guarantees the analyzed source and running engine agree.
+      - name: Clean dist
+        run: pnpm -r run clean
+
+      - name: Build
+        run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      # PR-time version-surface drift guard. verify-release.mjs (which enforces
+      # single-version lockstep) runs only in the tag-driven release.yml, so a
+      # half-bumped version — some package.json at the new version, some not, or
+      # a stale CHANGELOG/SECURITY/doc-frontmatter version string — would
+      # otherwise merge undetected and only surface at release time. This asserts
+      # all 35 owned package.json + docs frontmatter + SECURITY + CHANGELOG +
+      # curated prose agree with packages/core/package.json#version. Passes on
+      # normal PRs (everything consistent); fires only on an incomplete bump.
+      - name: Check version surfaces in sync
+        run: node scripts/bump-version.mjs --check
+
+      - name: Verify package supply-chain policy
+        run: pnpm supply-chain:verify
+
+      # Runs the full test suite WITH coverage so the per-package thresholds
+      # in each vitest.config.ts are enforced on every PR. Coverage had
+      # silently drifted below threshold in 13 packages because the gate only
+      # ran `pnpm test` (no `--coverage`); test:coverage closes that hole.
+      #
+      # This step also runs the per-check pass/fail fixture-coverage meta-tests
+      # (each pack's src/__tests__/fixture-coverage.test.ts) — they are ordinary
+      # vitest files, so a shipped check with no clean/violation fixture fails CI
+      # here with no separate step. See docs/public/50-extend/04-check-pack-architecture.md.
+      #
+      # It also runs the per-language CLI acceptance matrix
+      # (packages/cli/src/__tests__/language-acceptance.test.ts) and the e2e
+      # suites, which spawn the built CLI via the shared acceptance harness —
+      # hence the `pnpm build` step above is a prerequisite. (Register PR lane.)
+      - name: Test (with coverage thresholds)
+        run: pnpm test:coverage
+
+      # Dogfood: run opensip-cli fit against this repo. The CI step itself
+      # hard-fails on any error-level finding: `fit --gate-save` returns the
+      # `failOnErrors`/`failOnWarnings` exit code (ADR-0020), so enforcement does
+      # not depend solely on the downstream Code Scanning net-new ratchet. The
+      # baseline + SARIF still export below under `if: always()`, surviving a
+      # failed gate. See CLAUDE.md "Dogfood Gate" for the contributor workflow.
+      - name: Fit (dogfood)
+        id: fit
+        run: pnpm fit:ci
+
+      - name: Export fit baseline to SARIF
+        if: always() && steps.fit.outcome != 'skipped'
+        run: node packages/cli/dist/index.js fit-baseline-export --out fit.sarif
+
+      - name: Upload fit SARIF
+        if: always() && hashFiles('fit.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: fit.sarif
+          category: opensip-cli-fit
+
+      # Dogfood the graph tool the same way as fit. `graph --gate-save --sarif`
+      # does both in one run: --gate-save records the current Signals into the
+      # (CI-ephemeral) datastore AND hard-fails the CI step on any error-level
+      # graph finding (core's isErrorSignal rung — `critical`/`high`; ADR-0020),
+      # mirroring fit:ci; --sarif emits this run's findings as SARIF 2.1.0 via the
+      # shared `cli.writeSarif` seam (the same envelope→SARIF path `fit` uses, not
+      # the fingerprint-only `graph-baseline-export` baseline). The findings
+      # reaching the gate are already `@graph-ignore`-suppression-filtered
+      # (ADR-0014), so only UNSUPPRESSED error-level findings trip it. The
+      # `--sarif` write happens in the action body after the gate exit code is set,
+      # so the file lands even when the gate fails — hence the upload runs under
+      # `if: always()`. GH compares against the latest main-branch graph SARIF and
+      # surfaces NET-NEW graph findings on PR diffs as the annotation layer.
+      - name: Graph (dogfood)
+        id: graph
+        run: node packages/cli/dist/index.js graph --gate-save --sarif graph.sarif
+
+      - name: Upload graph SARIF
+        if: always() && hashFiles('graph.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: graph.sarif
+          category: opensip-cli-graph
+
+      # REAL-REPO equivalence guardrail (ADR-0032): assert the SHARDED build is
+      # byte-equivalent to the EXACT single-program build on THIS repo — a genuine
+      # multi-package TS monorepo whose `@opensip-cli/*` imports resolve to built
+      # `dist/*.d.ts`, the exact divergence class the unit fixtures cannot model
+      # (they reuse the production cross-package helpers, so the two engines agree
+      # by construction). This dogfood step builds BOTH catalogs cold with the real
+      # adapter (real dist/*.d.ts resolution), classifies the residual by owner file
+      # (test/fixture-owned ⇒ gate-invisible/benign; production ⇒ the gated signal),
+      # and hard-fails on a budget breach (`.config/graph-equivalence-budget.json`):
+      # a resolver regression (e.g. reintroduced dist/*.d.ts under-resolution) drops
+      # real cross-package edges → the production divergence spikes past budget. A
+      # decrease passes with a tighten hint (a ratchet, like the SARIF net-new
+      # philosophy). functionsOnly{Exact,Sharded} must be 0 (a hard failure). Runs
+      # only on the CI/dogfood lane — the exact build over ~1500 files is too slow
+      # for the fast unit PR gate, so it needs the larger heap (NODE_OPTIONS) and
+      # runs the compiled engine from dist (build step above is the prerequisite).
+      - name: Graph engine equivalence (exact ≡ sharded on this repo)
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm graph:equivalence:ci
+
+      # Verify docs/web-generated/ (the website-facing transformed copy
+      # of docs/public/) is in sync with its source. Editors who change
+      # docs/public/*.md must regenerate docs/web-generated/ by running
+      # `node scripts/build-web-docs.mjs` and committing the result. The
+      # website at opensip.ai/docs/opensip-cli/ fetches
+      # docs/web-generated/ directly, so stale output is a user-visible
+      # bug.
+      - name: Check generated web docs in sync
+        run: node scripts/build-web-docs.mjs --check
+
+      # Verify docs/public/ cites the CURRENT runtime: no retired concept
+      # names outside sanctioned migration-history mentions, and no dead
+      # frontmatter source-files / repo-relative links (those become pinned
+      # GitHub URLs on the website, so a dead path ships as a 404). Added
+      # after the 2026-06-11 audits found seven pages still documenting the
+      # pre-ADR-0036 per-tool baseline tables.
+      - name: Check docs freshness (retired terms + source links)
+        run: pnpm docs:freshness
+
+      # Verify docs/public/70-reference/05-checks-index.md is in sync with
+      # the checks corpus. Adding, removing, or re-describing a check
+      # changes the generated index; regenerate via `pnpm docs:checks-index`
+      # and commit the result. The `last_verified` date stamp is ignored.
+      - name: Check generated checks index in sync
+        run: pnpm docs:checks-index:check
+
+      # npm renders each package's page from the README inside *that* package's
+      # tarball, so a stale or missing per-package README ships straight to
+      # npmjs.com. The READMEs are generated from package.json metadata via
+      # `pnpm docs:readmes`; regenerate and commit if this fails.
+      - name: Check generated package READMEs in sync
+        run: pnpm docs:readmes:check
+
+      # npm weights the keywords field in package search. They're derived from
+      # each package's identity by `pnpm docs:keywords`; a new package that
+      # ships with stale/missing keywords fails here.
+      - name: Check package keywords in sync
+        run: pnpm docs:keywords:check
+
+      # Every publishable package must ship the root LICENSE + NOTICE (Apache-2.0
+      # §4(d) carries the NOTICE) and declare them in `files`. Synced from the
+      # repo root by `pnpm licenses:sync`; a new package, or root LICENSE/NOTICE
+      # edits not propagated, fails here.
+      - name: Check per-package LICENSE/NOTICE in sync
+        run: pnpm licenses:check

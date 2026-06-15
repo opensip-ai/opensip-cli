@@ -1,0 +1,51 @@
+{
+  "name": "@opensip-cli/session-store",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Session persistence for OpenSIP CLI — the session SQLite schema and SessionRepo, extracted from contracts",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "sqlite",
+    "persistence"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/session-store"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/datastore": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@opensip-cli-fixture/no-apiversion",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "opensipTools": {
+    "kind": "tool",
+    "id": "no-apiversion-tool",
+    "commands": [
+      {
+        "name": "noop-cmd",
+        "description": "noop"
+      }
+    ]
+  }
+}

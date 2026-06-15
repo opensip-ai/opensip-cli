@@ -1,0 +1,10 @@
+# Revisions ignored by `git blame` so mechanical, whole-tree reformats don't
+# obscure real authorship. GitHub honors this file automatically; locally,
+# enable it once with:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Only add commits that are PURE formatting (no behavior change).
+
+# style: apply Prettier formatting baseline across the tree (2026-06-10)
+1dbbf1847cdcbcdf91e298f242e9cbbca4fa489a

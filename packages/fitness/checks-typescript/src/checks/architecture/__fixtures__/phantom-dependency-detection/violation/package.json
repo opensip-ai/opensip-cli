@@ -1,0 +1,7 @@
+{
+  "name": "phantom-violation-fixture",
+  "version": "0.0.0",
+  "dependencies": {
+    "declared-pkg": "^1.0.0"
+  }
+}

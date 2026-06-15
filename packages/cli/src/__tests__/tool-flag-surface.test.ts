@@ -1,0 +1,144 @@
+/**
+ * Capability guard (Tier-2): lock the registered flag surface of every
+ * first-party tool. A flag added or removed from any command — across all of
+ * fit / graph / sim's subcommands — must be a deliberate change to the
+ * expected set here, so the CLI's promised surface can't drift undocumented.
+ *
+ * This is the cross-tool counterpart to the sim-specific capability test; it
+ * derives flags directly from the declarative `CommandSpec`s, so it needs no
+ * commander dependency and never invokes a command action.
+ */
+
+import { commonFlags } from '@opensip-cli/contracts';
+import { describe, expect, it } from 'vitest';
+
+import { BUNDLED_TOOLS } from './test-utils/bundled-tools.js';
+
+import type { Tool } from '@opensip-cli/core';
+
+/**
+ * Derive a tool's long-flag set from its `CommandSpec`s: the ADR-0021
+ * `commonFlags` keys mapped to their registry `--long` strings, plus each
+ * tool-specific `OptionSpec.flag`.
+ */
+function recordSpecFlags(tool: Tool): string[] {
+  const flags = new Set<string>();
+  for (const spec of tool.commandSpecs ?? []) {
+    for (const key of spec.commonFlags) {
+      const match = /--[a-z][a-z-]*/.exec(commonFlags[key].flags);
+      if (match) flags.add(match[0]);
+    }
+    for (const opt of spec.options ?? []) {
+      const match = /--[a-z][a-z-]*/.exec(opt.flag);
+      if (match) flags.add(match[0]);
+    }
+  }
+  return [...flags].sort();
+}
+
+// The locked flag surface per tool (union across all of each tool's
+// subcommands). Adding/removing a flag is a deliberate edit here.
+const EXPECTED: Record<string, string[]> = {
+  fitness: [
+    // release 2.11.0 Phase 4: fitness migrated to commandSpecs, so this set is
+    // now derived via recordSpecFlags. That surfaces `--out` (the
+    // `fit-baseline-export --out <path>` required flag), which the old
+    // register()-recorder missed: it only trapped `.option(...)` calls and
+    // `--out` was declared via `.requiredOption(...)`. The flag was always part
+    // of the real surface; the spec-based recorder records it faithfully.
+    '--api-key',
+    '--check',
+    '--config',
+    '--cwd',
+    '--debug',
+    '--exclude',
+    '--gate-compare',
+    '--gate-save',
+    '--json',
+    '--list',
+    '--open',
+    '--out',
+    '--quiet',
+    '--recipe',
+    '--recipes',
+    '--report-to',
+    '--show',
+    '--tags',
+    '--verbose',
+  ],
+  graph: [
+    // ADR-0011 (Phase 5): graph gained --api-key for --report-to cloud egress.
+    // ADR-0021: graph gained -q/--quiet for cross-tool flag parity.
+    // Post-2.7.0: graph gained --sarif (real SARIF 2.1.0 for Code Scanning via
+    // the shared cli.writeSarif seam, replacing the broken graph-baseline-export
+    // → upload path).
+    //
+    // release 2.11.0 Phase 5: graph migrated to commandSpecs, so this set is now
+    // derived via recordSpecFlags. That surfaces the catalog-export/sarif-export
+    // REQUIRED flags — `--catalog-output`, `--git-sha`, `--output-sarif`,
+    // `--repo-id`, `--tenant-id` — which the old register()-recorder missed: it
+    // only trapped `.option(...)` calls and these were declared via
+    // `.requiredOption(...)`. They were always part of the real surface (the
+    // opensip EngineSubprocessPort contracts depend on them); the spec-based
+    // recorder records them faithfully.
+    //
+    // graph-equivalence-check (internal real-repo sharded≡exact guardrail) adds
+    // `--budget` (committed budget path) and `--update-budget` (capture/tighten).
+    '--api-key',
+    '--budget',
+    '--catalog-output',
+    '--changed-file',
+    '--concurrency',
+    '--cwd',
+    '--debug',
+    '--exact',
+    '--gate-compare',
+    '--gate-save',
+    '--git-sha',
+    '--json',
+    '--language',
+    '--list-files',
+    '--mode',
+    '--no-cache',
+    '--out',
+    '--output-sarif',
+    '--profile',
+    '--quiet',
+    '--recipe',
+    '--repo-id',
+    '--report-to',
+    '--resolution',
+    '--run-id',
+    '--sarif',
+    '--show',
+    '--tenant-id',
+    '--update-budget',
+    '--verbose',
+    '--workspace',
+  ],
+  // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
+  // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).
+  simulation: [
+    '--api-key',
+    '--cwd',
+    '--debug',
+    '--json',
+    '--open',
+    '--quiet',
+    '--recipe',
+    '--report-to',
+    '--show',
+    '--verbose',
+  ],
+};
+
+describe('first-party tool flag-surface contract', () => {
+  for (const tool of BUNDLED_TOOLS) {
+    const human = tool.metadata.name ?? tool.metadata.id;
+    it(`${human}: registers exactly its documented flag set`, () => {
+      const expected = EXPECTED[human];
+      expect(expected, `no expected flag set for tool '${human}'`).toBeDefined();
+      expect(recordSpecFlags(tool)).toEqual([...expected].sort());
+    });
+  }
+});

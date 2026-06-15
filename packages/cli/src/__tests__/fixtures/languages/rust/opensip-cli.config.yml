@@ -1,0 +1,15 @@
+globalExcludes:
+  - 'node_modules/**'
+
+targets:
+  rust-source:
+    description: 'Rust acceptance source'
+    languages: [rust]
+    concerns: [backend]
+    include:
+      - 'src/**/*.rs'
+
+fitness:
+  failOnErrors: 0
+  failOnWarnings: 0
+  disabledChecks: []

@@ -1,0 +1,12 @@
+targets:
+  klingon-source:
+    description: "Files in a language we don't recognize"
+    languages: [klingon]
+    concerns: [backend]
+    include:
+      - 'src/**/*.kl'
+
+fitness:
+  failOnErrors: 0
+  failOnWarnings: 0
+  disabledChecks: []

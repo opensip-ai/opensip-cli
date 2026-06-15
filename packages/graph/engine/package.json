@@ -1,0 +1,142 @@
+{
+  "name": "@opensip-cli/graph",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Static call-graph + dead-end analysis (seven-stage pipeline)",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "call-graph",
+    "dependency-graph",
+    "code-analysis",
+    "architecture"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/graph/engine"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./internal": "./dist/internal.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js"
+    }
+  },
+  "opensipTools": {
+    "kind": "tool",
+    "id": "graph",
+    "stableId": "3873f1c2-02a9-4719-930a-bca74b62b706",
+    "apiVersion": 1,
+    "commands": [
+      {
+        "name": "graph",
+        "description": "Run static call-graph analysis (rules, entry points, catalog summary in one report)"
+      },
+      {
+        "name": "graph-lookup",
+        "description": "Look up function occurrences by simple name from the persisted catalog"
+      },
+      {
+        "name": "graph-symbol-index",
+        "description": "Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog"
+      },
+      {
+        "name": "graph-baseline-export",
+        "description": "Export the graph gate baseline (JSON) from the datastore to a file"
+      },
+      {
+        "name": "graph-shard-worker",
+        "description": "[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)"
+      },
+      {
+        "name": "graph-equivalence-check",
+        "description": "[internal] Verify the sharded build is byte-equivalent to the exact build on a real repo (gates production edge divergence against a committed budget)"
+      },
+      {
+        "name": "graph-run-worker",
+        "description": "[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)"
+      },
+      {
+        "name": "catalog-export",
+        "description": "Run graph analysis and write the CatalogExport JSON document (symbols + edges + provenance) to a file"
+      },
+      {
+        "name": "sarif-export",
+        "description": "Run graph analysis and write OpenSIP-convention SARIF v2.1.0 findings to a file"
+      },
+      {
+        "name": "graph-recipes",
+        "description": "List available graph recipes"
+      }
+    ],
+    "capabilities": [
+      {
+        "id": "graph-adapter",
+        "apiVersion": 1,
+        "contributionKind": "module-export",
+        "contributionSchema": {
+          "requiredKeys": [
+            "id"
+          ]
+        },
+        "discovery": {
+          "discovery": {
+            "mode": "marker",
+            "markerKind": "graph-adapter"
+          },
+          "exportName": "adapter",
+          "exportShape": "single",
+          "configKeys": {
+            "packages": "graphAdapters",
+            "autoDiscover": "autoDiscoverGraphAdapters"
+          },
+          "builtinScope": "@opensip-cli"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/cli-ui": "workspace:*",
+    "@opensip-cli/config": "workspace:*",
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/datastore": "workspace:*",
+    "@opensip-cli/session-store": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "commander": "^15.0.0",
+    "drizzle-orm": "^0.45.2",
+    "glob": "^13.0.0",
+    "ink": "^7.0.5",
+    "react": "^19.2.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@opensip-cli/output": "workspace:*",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

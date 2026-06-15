@@ -1,0 +1,91 @@
+/**
+ * clear command — clear session data from the project-local SQLite DB.
+ *
+ * Rows in the `sessions` table (and cascaded findings/checks) are
+ * the unit of deletion. The CLI
+ * bootstrap opens the DataStore in `preAction`; this command receives
+ * the constructed repo from its caller.
+ *
+ * Uses Node `readline` for interactive confirmation (Ink's `useInput`
+ * raw-mode requirement is incompatible with prompts on every TTY).
+ * Banners and result lines route through the Ink renderer via the
+ * `clear-done` `CommandResult` shape — no raw ANSI escapes here.
+ */
+
+// @fitness-ignore-file only-documented-toolcli-seams -- interactive TTY confirmation: the pre-prompt notes printed before "Continue? (y/n)" are human-readable readline UX, not machine run output through a ToolCliContext seam (mirrors the ESLint exemption for this file). Result lines route through the Ink `clear-done` CommandResult. (Architecture review finding 5.)
+
+import { createInterface } from 'node:readline';
+
+import { SessionRepo } from '@opensip-cli/session-store';
+
+import type { ClearDoneResult } from '@opensip-cli/contracts';
+import type { DataStore } from '@opensip-cli/datastore';
+
+export interface ClearOptions {
+  olderThan?: number;
+  yes: boolean;
+  datastore: DataStore;
+}
+
+function ask(question: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase());
+    });
+  });
+}
+
+/**
+ * Prompt for confirmation (unless --yes), then delete sessions.
+ * Returns a `ClearDoneResult` that the renderer turns into the banner
+ * + status line. The rendering is `App.tsx`'s `case 'clear-done':`
+ * branch — this function is pure I/O for the prompt only.
+ *
+ * Deletion goes through `SessionRepo` against the project-local
+ * SQLite DB. Cascaded findings/checks are removed by foreign-key
+ * cascade rules in the schema.
+ */
+export async function executeClear(opts: ClearOptions): Promise<ClearDoneResult> {
+  const repo = new SessionRepo(opts.datastore);
+  const sessionCount = repo.count();
+  if (sessionCount === 0) {
+    return { type: 'clear-done', action: 'empty', deletedCount: 0, sessionCount: 0 };
+  }
+
+  if (!opts.yes) {
+    // Pre-prompt note. Stdout `process.stdout.write` is fine here:
+    // Ink can't own this since it conflicts with `readline.question()`,
+    // and there are no ANSI escapes — just plain text the user reads
+    // before answering. Ink renders the result message after.
+    const dayWord = opts.olderThan === 1 ? 'day' : 'days';
+    const description = opts.olderThan
+      ? `This will delete session data older than ${opts.olderThan} ${dayWord} from the project-local SQLite store.`
+      : 'This will delete ALL session data from the project-local SQLite store.';
+    process.stdout.write(`\n  ${description}\n`);
+    process.stdout.write(
+      `  ${sessionCount} session${sessionCount === 1 ? '' : 's'} currently stored.\n`,
+    );
+    process.stdout.write(`  This includes run history and dashboard data.\n\n`);
+
+    const answer = await ask('  Continue? (y/n) ');
+    if (answer !== 'y') {
+      return { type: 'clear-done', action: 'cancelled', deletedCount: 0, sessionCount };
+    }
+  }
+
+  let deletedCount: number;
+  if (opts.olderThan !== undefined && opts.olderThan > 0) {
+    // Wall-time cutoff (N calendar-ish days ago by ms). Not sensitive to
+    // local date boundaries or DST; sessions are purged if their stored
+    // timestamp is older than (now - N*24h). This matches the user-facing
+    // "older than X days" language in the prompt.
+    const cutoff = new Date(Date.now() - opts.olderThan * 24 * 60 * 60 * 1000);
+    deletedCount = repo.purge(cutoff);
+  } else {
+    deletedCount = repo.clearAll();
+  }
+
+  return { type: 'clear-done', action: 'done', deletedCount, sessionCount };
+}

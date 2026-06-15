@@ -1,0 +1,251 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # softprops/action-gh-release creates the GitHub Release
+      id-token: write # OIDC token for npm trusted publishing
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          # Single source of truth: pinned in .nvmrc (see ci.yml).
+          node-version-file: .nvmrc
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      # npm 11.5+ is required for the OIDC token-exchange handshake with
+      # GitHub Actions. Install npm 11 to a separate prefix and prepend to
+      # $PATH because `npm install -g npm@11` corrupts mid-install on hosted
+      # runners (npm unlinks files of its own running process: "Cannot find
+      # module 'promise-retry'").
+      - name: Install npm 11 to separate prefix (avoids self-replace bug)
+        run: |
+          npm install --prefix "$HOME/.npm-cli" npm@11
+          echo "$HOME/.npm-cli/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - run: npm --version
+      - run: pnpm install --frozen-lockfile
+
+      # Release consistency gate. Catches half-bumped versions, tag
+      # mismatch, missing CHANGELOG entry, stale generated docs, and
+      # cross-package dep ranges that drifted off-consensus. Cheap (~1s);
+      # fail-fast here saves a wasted build + the post-publish blast
+      # radius of a broken release.
+      - name: Verify release consistency
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/verify-release.mjs --expected-version "$RELEASE_TAG"
+
+      - name: Verify package supply-chain policy
+        run: pnpm supply-chain:verify
+
+      # Clean every package's dist/ before build. tsc never deletes orphan
+      # output files when their source is moved or removed, and `files:
+      # ["dist"]` in package.json blindly globs the whole tree — so a
+      # stale dist (from a local build or a Turbo cache restore) can
+      # leak ghost modules into the published tarball, which is exactly
+      # how v1.0.4 shipped with orphaned commands/{fit,sim,dashboard,
+      # list-checks,list-recipes}.js after they moved into the tool
+      # packages. Cleaning here is cheap and guarantees a fresh dist.
+      - run: pnpm -r run clean
+      - run: pnpm build
+      - run: pnpm typecheck
+
+      # ADR-0017 — the release gate must be at least as strict as the PR gate.
+      # npm versions are immutable; the release lane is the last gate before an
+      # unrecoverable artifact, so it re-runs the same correctness gates PR CI
+      # (.github/workflows/ci.yml) runs, BEFORE pack/publish. Without these, a
+      # tag could publish after a path that failed PR CI (lint regression,
+      # coverage drift, or a net-new dogfood finding) and reach npm.
+      #
+      # These four steps mirror ci.yml exactly (same commands — do not invent a
+      # stricter or looser variant):
+      #   - `pnpm lint`          — ESLint + both dependency-cruiser passes + gate:verify
+      #   - `pnpm test:coverage` — full suite WITH per-package coverage thresholds
+      #     (replaces the former plain `pnpm test`, which skipped thresholds)
+      #   - `pnpm fit:ci`        — dogfood: fails on any error-level fit finding
+      #     (failOnErrors: 1 in opensip-cli.config.yml; ADR-0020)
+      #   - `pnpm graph:ci`      — dogfood: fails on any error-level graph finding
+      #     (the `critical`/`high` rung, core's isErrorSignal), mirroring fit:ci
+      #     (ADR-0020). Net-new (ratchet) detection is the complementary Code
+      #     Scanning annotation layer in ci.yml, not what gates the release here.
+      #
+      # The dogfood gates run the COMPILED engine from dist
+      # (node packages/cli/dist/index.js …), so they must run AFTER `pnpm -r run
+      # clean` + `pnpm build` above — the same ordering ci.yml's "Clean dist"
+      # step documents.
+      #
+      # The SARIF export/upload steps from ci.yml are intentionally NOT mirrored
+      # here: Code Scanning is a PR-DIFF ratchet; the release gate needs only the
+      # pass/fail exit, which both fit:ci and graph:ci now provide directly —
+      # `--gate-save` returns the error-level exit code (ADR-0020), so the gate
+      # enforces itself without depending on the external Code Scanning ratchet.
+      # Do not "complete the symmetry" by adding SARIF uploads.
+      #
+      # The generated-artifact sync (docs/web-generated, per-package READMEs,
+      # keywords, checks-index) that ci.yml runs as separate steps is ALREADY
+      # enforced above by the first `verify-release.mjs` step (checks 4/7/8/9),
+      # so no extra sync steps are needed here.
+      - name: Lint (mirror ci.yml — ADR-0017)
+        run: pnpm lint
+      - name: Test with coverage thresholds (mirror ci.yml — ADR-0017)
+        run: pnpm test:coverage
+      - name: Fit (dogfood — mirror ci.yml; ADR-0017)
+        run: pnpm fit:ci
+      - name: Graph (dogfood — mirror ci.yml; ADR-0017)
+        run: pnpm graph:ci
+
+      # Probe the registry for every package we are about to publish. A
+      # package whose name is not yet on npm needs trusted publishing
+      # configured on npmjs.com (org opensip-ai → package settings →
+      # Publishing access) before the publish step will succeed — see
+      # RELEASING.md "Prerequisites". We only warn here; the publish step
+      # is the authoritative gate. The warning gives a named, predictable
+      # failure point so a later 404 from `npm publish` is easy to map
+      # back to "trusted publisher missing" rather than "registry flake".
+      #
+      # The package list is DERIVED from scripts/release-package-order.mjs
+      # (the single source of truth — ADR-0017). Do NOT hand-list packages
+      # here; edit that script and every release surface follows. This is the
+      # fix for the historical drift where `tree-sitter` was packed + published
+      # but missing from this preflight loop — `--print names` cannot omit it.
+      - name: Preflight — detect packages not yet on npm
+        run: |
+          set -u
+          new_count=0
+          while IFS= read -r pkg ; do
+            # The CLI publishes under the UNSCOPED name `opensip-cli`; every
+            # other entry is `@opensip-cli/<pkg>`. The source-of-truth lists
+            # the CLI as the bare `opensip-cli` token.
+            if [ "$pkg" = "opensip-cli" ] ; then
+              name="opensip-cli"
+            else
+              name="@opensip-cli/$pkg"
+            fi
+            if npm view "$name" version >/dev/null 2>&1 ; then
+              echo "  ok  $name"
+            else
+              echo "::warning title=New package detected::$name is not yet on npm. Publish will fail unless trusted publisher is registered on npmjs.com (org opensip-ai → package settings → Publishing access)."
+              new_count=$((new_count + 1))
+            fi
+          done < <(node scripts/release-package-order.mjs --print names)
+          if [ "$new_count" -gt 0 ] ; then
+            echo "::notice::$new_count new package(s) detected. Continuing — publish step will fail loudly for any unregistered trusted publisher."
+          fi
+
+      # Pack every workspace package into a tarball. `pnpm pack` resolves
+      # workspace:* deps into concrete versions, which `npm publish` then
+      # uploads. We pack all 33 up front so the publish step can run
+      # against a known-good set of tarballs in dependency order.
+      #
+      # The pack list + ORDER is DERIVED from scripts/release-package-order.mjs
+      # (the single source of truth — ADR-0017): `--print pack` emits the
+      # `pnpm --filter` selectors in dependency order. Do NOT re-hand-list the
+      # packages here; edit that script and every release surface follows.
+      - name: Pack all workspace packages (resolves workspace:*)
+        run: |
+          mkdir -p /tmp/tarballs
+          while IFS= read -r filter ; do
+            pnpm --filter "$filter" pack --pack-destination /tmp/tarballs
+          done < <(node scripts/release-package-order.mjs --print pack)
+          ls -la /tmp/tarballs
+
+      # Post-pack / pre-publish smoke test. Installs the freshly-packed
+      # tarballs *together* into a throwaway consumer project (forcing
+      # every @opensip-cli/* dep to its local tarball via npm
+      # overrides) and actually loads the CLI. This is the gate that
+      # would have caught the 2.0.0 incident: a stale cli-ui tarball that
+      # did not export `RunFooterHints` while fitness imported it — every
+      # version string and dep range was valid, but the CLI crashed on
+      # startup. verify-release checks strings and ranges; only loading
+      # the packed bytes together catches an inter-package export/ABI
+      # mismatch. Runs BEFORE publish, so a bad set never reaches npm
+      # (where version immutability makes it unrecoverable).
+      #
+      # smoke-pack.mjs now runs a COMMAND-LEVEL scenario set (init/fit/graph/
+      # sessions/dashboard + `plugin add` for a tool and a fit-pack plugin)
+      # against the INSTALLED tarball bin via the shared CLI-acceptance harness
+      # core (scripts/cli-acceptance-core.mjs) — the same core the PR-lane
+      # Vitest suites use, so scenario semantics can't diverge (parity test in
+      # packages/cli/src/__tests__/harness/). See the register's "Release Lane".
+      # No flag change here: the script packs its own fixture plugins into the
+      # work dir; this step just hands it the workspace tarballs.
+      - name: Smoke-test packed tarballs (load CLI before publishing)
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/smoke-pack.mjs --expected-version "$RELEASE_TAG"
+
+      # Publish in strict dependency order. Sequential (not parallel) by
+      # design — racing a downstream publish ahead of its upstream
+      # produces a broken release because the upstream version isn't in
+      # the registry yet when downstream's `dependencies` field is
+      # resolved by consumers.
+      #
+      # `npm publish <tarball>` performs the OIDC handshake (unlike
+      # `pnpm publish`, which uses its own HTTP client and skips OIDC).
+      #
+      # Idempotent — already-published versions are skipped, so re-running
+      # the workflow on the same tag is safe (e.g. after a network blip
+      # halfway through the publish loop).
+      - name: Publish via npm (OIDC trusted publishing)
+        run: |
+          set -e
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          echo "Publishing version: $VERSION"
+
+          publish_if_new() {
+            local pkg="$1"
+            local name="@opensip-cli/$pkg"
+            if npm view "${name}@${VERSION}" version >/dev/null 2>&1; then
+              echo "::notice::skip ${name}@${VERSION} (already on npm)"
+              return 0
+            fi
+            # Pin the tarball filename to the exact version rather than a
+            # `-*.tgz` glob. The glob form bites when one package's name is
+            # a prefix of another's — e.g. `graph` matches `graph-typescript`,
+            # `graph-python`, `graph-rust`, `graph-go`, `graph-java` — and
+            # `npm publish` receives multiple paths and errors EUSAGE.
+            npm publish /tmp/tarballs/opensip-cli-${pkg}-${VERSION}.tgz --access public --provenance
+          }
+
+          # The CLI publishes under the UNSCOPED name `opensip-cli`, so its
+          # tarball is `opensip-cli-<version>.tgz` (no `<unscoped>` segment)
+          # and the registry lookup uses the bare name.
+          publish_unscoped() {
+            local name="$1"
+            if npm view "${name}@${VERSION}" version >/dev/null 2>&1; then
+              echo "::notice::skip ${name}@${VERSION} (already on npm)"
+              return 0
+            fi
+            npm publish /tmp/tarballs/${name}-${VERSION}.tgz --access public --provenance
+          }
+
+          # The publish ORDER is DERIVED from scripts/release-package-order.mjs
+          # (the single source of truth — ADR-0017): `--print names` emits the
+          # unscoped tarball-segment tokens in strict dependency order, CLI
+          # last. The bare `opensip-cli` token routes to publish_unscoped
+          # (unscoped tarball name); every other token to publish_if_new
+          # (scoped `@opensip-cli/<pkg>`). Do NOT re-hand-list the packages
+          # here; edit that script and every release surface follows.
+          while IFS= read -r pkg ; do
+            if [ "$pkg" = "opensip-cli" ] ; then
+              publish_unscoped opensip-cli
+            else
+              publish_if_new "$pkg"
+            fi
+          done < <(node scripts/release-package-order.mjs --print names)
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true

@@ -1,0 +1,56 @@
+{
+  "name": "@opensip-cli/contracts",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Shared contract types for OpenSIP CLI — SignalEnvelope / CommandResult shapes, exit codes, session persistence",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "types",
+    "contracts"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/contracts"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "commander": "^14.0.0 || ^15.0.0"
+  },
+  "peerDependenciesMeta": {
+    "commander": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "commander": "^15.0.0",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

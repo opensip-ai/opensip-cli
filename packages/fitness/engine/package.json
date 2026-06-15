@@ -1,0 +1,143 @@
+{
+  "name": "@opensip-cli/fitness",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Fitness checks engine for OpenSIP CLI",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "fitness-functions",
+    "linting",
+    "architecture",
+    "code-review"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/fitness/engine"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./internal": "./dist/internal.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js"
+    }
+  },
+  "opensipTools": {
+    "kind": "tool",
+    "id": "fitness",
+    "stableId": "afd68bd3-ff3c-4935-a5b6-76d8fc7a5224",
+    "apiVersion": 1,
+    "commands": [
+      {
+        "name": "fit",
+        "description": "Run fitness checks"
+      },
+      {
+        "name": "fit-list",
+        "description": "List available fitness checks"
+      },
+      {
+        "name": "fit-recipes",
+        "description": "List available fitness recipes"
+      },
+      {
+        "name": "fit-baseline-export",
+        "description": "Export the fit gate baseline (SARIF) from the datastore to a file"
+      },
+      {
+        "name": "fit-run-worker",
+        "description": "[internal] Run fit headless and stream progress + result over IPC (forked by the live view)"
+      }
+    ],
+    "capabilities": [
+      {
+        "id": "fit-pack",
+        "apiVersion": 1,
+        "contributionKind": "module-export",
+        "contributionSchema": {
+          "requiredKeys": [
+            "config",
+            "run"
+          ]
+        },
+        "discovery": {
+          "discovery": {
+            "mode": "marker",
+            "markerKind": "fit-pack"
+          },
+          "exportName": "checks",
+          "exportShape": "array",
+          "configKeys": {
+            "packages": "checkPackages"
+          },
+          "builtinScope": "@opensip-cli",
+          "explicitListMode": "augment",
+          "coContributions": [
+            {
+              "exportName": "recipes",
+              "exportShape": "array",
+              "domainId": "fit-recipe"
+            }
+          ]
+        }
+      },
+      {
+        "id": "fit-recipe",
+        "apiVersion": 1,
+        "contributionKind": "module-export",
+        "contributionSchema": {
+          "requiredKeys": [
+            "id",
+            "name"
+          ]
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/cli-ui": "workspace:*",
+    "@opensip-cli/config": "workspace:*",
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/datastore": "workspace:*",
+    "@opensip-cli/session-store": "workspace:*",
+    "@opensip-cli/targeting": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "commander": "^15.0.0",
+    "drizzle-orm": "^0.45.2",
+    "glob": "^13.0.0",
+    "ink": "^7.0.5",
+    "minimatch": "^10.2.5",
+    "react": "^19.2.7",
+    "typescript": "~6.0.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@opensip-cli/lang-typescript": "workspace:*",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "vitest": "^4.1.8"
+  }
+}

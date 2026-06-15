@@ -1,0 +1,18 @@
+import { m1 } from './mods/m1.js'
+import { m2 } from './mods/m2.js'
+import { m3 } from './mods/m3.js'
+import { m4 } from './mods/m4.js'
+import { m5 } from './mods/m5.js'
+import { m6 } from './mods/m6.js'
+import { m7 } from './mods/m7.js'
+import { m8 } from './mods/m8.js'
+import { m9 } from './mods/m9.js'
+import { m10 } from './mods/m10.js'
+import { m11 } from './mods/m11.js'
+import { m12 } from './mods/m12.js'
+import { m13 } from './mods/m13.js'
+import { m14 } from './mods/m14.js'
+import { m15 } from './mods/m15.js'
+import { m16 } from './mods/m16.js'
+
+export const total = m1 + m2 + m3 + m4 + m5 + m6 + m7 + m8 + m9 + m10 + m11 + m12 + m13 + m14 + m15 + m16

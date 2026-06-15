@@ -1,0 +1,100 @@
+{
+  "name": "opensip-cli",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "OpenSIP CLI — codebase analysis from the command line (the CLI; `npm i -g opensip-cli`)",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "cli",
+    "fitness-functions",
+    "call-graph",
+    "architecture",
+    "linting",
+    "code-review",
+    "devtools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "bin": {
+    "opensip": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/checks-cpp": "workspace:*",
+    "@opensip-cli/checks-go": "workspace:*",
+    "@opensip-cli/checks-java": "workspace:*",
+    "@opensip-cli/checks-python": "workspace:*",
+    "@opensip-cli/checks-rust": "workspace:*",
+    "@opensip-cli/checks-typescript": "workspace:*",
+    "@opensip-cli/checks-universal": "workspace:*",
+    "@opensip-cli/cli-ui": "workspace:*",
+    "@opensip-cli/config": "workspace:*",
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/dashboard": "workspace:*",
+    "@opensip-cli/datastore": "workspace:*",
+    "@opensip-cli/fitness": "workspace:*",
+    "@opensip-cli/graph": "workspace:*",
+    "@opensip-cli/graph-go": "workspace:*",
+    "@opensip-cli/graph-java": "workspace:*",
+    "@opensip-cli/graph-python": "workspace:*",
+    "@opensip-cli/graph-rust": "workspace:*",
+    "@opensip-cli/graph-typescript": "workspace:*",
+    "@opensip-cli/lang-cpp": "workspace:*",
+    "@opensip-cli/lang-go": "workspace:*",
+    "@opensip-cli/lang-java": "workspace:*",
+    "@opensip-cli/lang-python": "workspace:*",
+    "@opensip-cli/lang-rust": "workspace:*",
+    "@opensip-cli/lang-typescript": "workspace:*",
+    "@opensip-cli/output": "workspace:*",
+    "@opensip-cli/session-store": "workspace:*",
+    "@opensip-cli/simulation": "workspace:*",
+    "@opensip-cli/targeting": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/context-async-hooks": "^2.8.0",
+    "@opentelemetry/core": "^2.8.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.219.0",
+    "@opentelemetry/resources": "^2.8.0",
+    "@opentelemetry/sdk-metrics": "^2.8.0",
+    "@opentelemetry/sdk-trace-node": "^2.8.0",
+    "@opentelemetry/semantic-conventions": "^1.41.1",
+    "commander": "^15.0.0",
+    "ink": "^7.0.5",
+    "open": "^11.0.0",
+    "react": "^19.2.7",
+    "update-notifier": "^7.3.1",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@opensip-cli/test-support": "workspace:*",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/update-notifier": "^6.0.8",
+    "ink-testing-library": "^4.0.0",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8",
+    "zod": "^4.4.3"
+  }
+}

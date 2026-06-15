@@ -1,0 +1,9 @@
+{
+  "name": "@example/no-apiversion-tool",
+  "version": "1.0.0",
+  "opensipTools": {
+    "kind": "tool",
+    "id": "missing-api-version",
+    "commands": [{ "name": "missing-api-version", "description": "A tool manifest that omits apiVersion" }]
+  }
+}

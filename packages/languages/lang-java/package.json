@@ -1,0 +1,50 @@
+{
+  "name": "@opensip-cli/lang-java",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Java language adapter for opensip-cli",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "parser",
+    "ast",
+    "tree-sitter",
+    "java"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/languages/lang-java"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "wasm",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/tree-sitter": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "vitest": "^4.1.8"
+  }
+}

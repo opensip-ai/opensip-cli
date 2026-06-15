@@ -1,0 +1,15 @@
+globalExcludes:
+  - 'node_modules/**'
+
+targets:
+  go-source:
+    description: 'Go acceptance source'
+    languages: [go]
+    concerns: [backend]
+    include:
+      - 'src/**/*.go'
+
+fitness:
+  failOnErrors: 0
+  failOnWarnings: 0
+  disabledChecks: []

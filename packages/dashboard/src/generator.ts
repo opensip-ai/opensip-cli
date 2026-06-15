@@ -1,0 +1,211 @@
+/**
+ * Dashboard HTML generator — orchestrates all modules into a single self-contained HTML file.
+ *
+ * Composes CSS, shared JS, and tab-specific JS into one HTML string with all data inlined.
+ * Each tool tab (Fitness, Simulation) has subtabs: Sessions, Catalog, Recipes.
+ */
+
+import { dashboardChecksJs } from './checks.js';
+import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js';
+import { dashboardCodePathsJs } from './code-paths.js';
+import { dashboardCss } from './css.js';
+import { dashboardOverviewJs } from './overview.js';
+import { dashboardRecipesJs } from './recipes.js';
+import { dashboardSessionsJs } from './sessions.js';
+import { dashboardSharedJs } from './shared.js';
+import { dashboardSubtabBarJs } from './subtab-bar.js';
+import { listToolTabs } from './tool-tab-registry.js';
+import './tool-tabs-registrations.js'; // side-effect: registers fit/sim/graph
+import { dashboardToolTabsJs } from './tool-tabs.js';
+
+import type { StoredSession, GraphCatalog } from '@opensip-cli/contracts';
+
+/**
+ * Inputs to the dashboard HTML generator.
+ *
+ * `sessions` is required; everything else has a sensible default
+ * (empty array / null) so a Tool that does not produce a catalog or
+ * recipes can call `generateDashboardHtml({ sessions })` and get a
+ * working dashboard.
+ *
+ * Future tool-shaped data — alarm history, dependency graphs, simulation
+ * traces — will land as new optional fields on this interface rather
+ * than as new positional parameters. That keeps the call site
+ * order-independent and the public API source-stable.
+ */
+export interface DashboardInput {
+  sessions: StoredSession[];
+  // Tool-owned catalog data, consumed structurally by the dashboard's
+  // renderers (audit 2026-05-29, L1). Typed `unknown[]` because the entry
+  // shapes (fitness's CheckCatalogEntry / RecipeCatalogEntry) are tool
+  // domain vocabulary owned by the producing tool, not contracts. The
+  // dashboard inlines them as JSON and its JS reads fields structurally.
+  checkCatalog?: readonly unknown[];
+  recipeCatalog?: readonly unknown[];
+  graphCatalog?: GraphCatalog | null;
+  // Graph-owned catalog data (Plan B). DISTINCT keys from fitness's
+  // `checkCatalog`/`recipeCatalog` because the CLI merges every tool's
+  // contribution via Object.assign — same key would clobber fitness. The
+  // dashboard reads them structurally (entry shapes are graph domain
+  // vocabulary owned by @opensip-cli/graph, not contracts).
+  graphRuleCatalog?: readonly unknown[];
+  graphRecipeCatalog?: readonly unknown[];
+  editorProtocol?: string | null;
+}
+
+// Escape all < and > to prevent script injection in HTML <script> context
+function escapeForScriptContext(json: string): string {
+  return json.replaceAll('<', String.raw`\u003c`).replaceAll('>', String.raw`\u003e`);
+}
+
+// Coerce a session.score into a finite number safe for HTML interpolation
+// in the <title> tag. Returns 0 for non-finite values so the rendered
+// title remains well-formed even if a legacy or corrupted session row
+// somehow carries a non-numeric score.
+function coerceScoreForTitle(score: unknown): number {
+  const n = Number(score);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Serialize an optional value into either a `<script type="application/json">`
+ * blob (kind `'json'`) or a JS `const X = …;` literal (kind `'literal'`).
+ *
+ * Both call sites used to inline the same escape-then-stringify dance;
+ * folding them into one helper means the script-context escape is
+ * applied uniformly and the null-vs-supplied branching is in one place.
+ *
+ * - `'json'`: emits `<script type="application/json" id="<id>">…</script>`
+ *   when `value` is not null/undefined; emits the empty string otherwise.
+ * - `'literal'`: emits `const <id> = …;` always — `null` is rendered as
+ *   the JS literal `null`, anything else as `JSON.stringify(value)`.
+ */
+function serializeOptionalBlob(id: string, value: unknown, kind: 'json' | 'literal'): string {
+  switch (kind) {
+    case 'json': {
+      if (value === null || value === undefined) return '';
+      const escaped = escapeForScriptContext(JSON.stringify(value));
+      return `<script type="application/json" id="${id}">${escaped}</script>`;
+    }
+    case 'literal': {
+      // Apply the same script-context escape as the 'json' arm — without it,
+      // a value containing the literal sequence `</script>` would close the
+      // surrounding inline <script> block (JSON.stringify does not escape `<`).
+      const rendered =
+        value === null || value === undefined
+          ? 'null'
+          : escapeForScriptContext(JSON.stringify(value));
+      return `const ${id} = ${rendered};`;
+    }
+  }
+}
+
+/** Renders a self-contained HTML dashboard string from sessions and catalog inputs. */
+export function generateDashboardHtml(input: DashboardInput): string {
+  const {
+    sessions,
+    checkCatalog = [],
+    recipeCatalog = [],
+    graphCatalog = null,
+    graphRuleCatalog = [],
+    graphRecipeCatalog = [],
+    editorProtocol = null,
+  } = input;
+
+  const latest = sessions[0];
+  // Coerce score to a finite number before interpolating into the <title>
+  // tag — `latest.score` is typed `number` but originates from a SQLite
+  // column and a corrupt or legacy row could carry an arbitrary value.
+  // Number(NaN-ish) on a string still yields NaN; we substitute 0 to keep
+  // the page title well-formed in the pathological case.
+  const latestScoreSafe = latest ? coerceScoreForTitle(latest.score) : 0;
+  const safeDataJson = escapeForScriptContext(JSON.stringify(sessions));
+  const safeCatalogJson = escapeForScriptContext(JSON.stringify(checkCatalog));
+  const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog));
+  const safeGraphRuleCatalogJson = escapeForScriptContext(JSON.stringify(graphRuleCatalog));
+  const safeGraphRecipeCatalogJson = escapeForScriptContext(JSON.stringify(graphRecipeCatalog));
+  const graphCatalogBlock = serializeOptionalBlob('graph-catalog', graphCatalog, 'json');
+  // The Visualization view (view-graph.ts) consumes a slim, pre-projected
+  // view-model rather than the raw catalog: projection aggregates the
+  // function call graph up to PACKAGE nodes + package→package edges (with
+  // coupling weights + cross-package SCCs) here at generation time and embeds
+  // it as its own JSON blob, sized for the renderer rather than for storage.
+  // See code-paths/graph-view-model.ts.
+  const graphViewModel = graphCatalog ? projectCatalogToGraphViewModel(graphCatalog) : null;
+  const graphViewModelBlock = serializeOptionalBlob('graph-view-model', graphViewModel, 'json');
+  const editorProtocolJs = serializeOptionalBlob('EDITOR_PROTOCOL', editorProtocol, 'literal');
+
+  // Tool tabs are registered into a single registry; Overview is a
+  // cross-tool aggregate kept fixed at position 0. The HTML tab
+  // buttons, panel containers, and the renderXxxTab() invocation list
+  // all derive from the same iteration so adding a new tab is a single
+  // defineToolTab() call (see tool-tabs-registrations.ts).
+  const toolTabs = listToolTabs();
+  const toolTabButtons = toolTabs
+    .map((t) => `  <div class="tab" data-tab="${t.id}">${t.icon} ${t.label}</div>`)
+    .join('\n');
+  const toolTabPanels = toolTabs
+    .map((t) => `<div id="panel-${t.id}" class="tab-panel"></div>`)
+    .join('\n');
+  const toolTabRenderCalls = toolTabs.map((t) => `${t.renderFunctionName}();`).join('\n');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenSIP CLI${latest ? ` — Pass Rate: ${latestScoreSafe}%` : ''}</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M4 8h12a4 4 0 0 1 0 8h-1M4 8v8a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V8M4 8H2M6 4c0 1 .5 2 1 2.5M10 3c0 1.5.5 2.5 1 3M14 4c0 1 .5 2 1 2.5' stroke='%23c4956a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+${dashboardCss()}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M4 8h12a4 4 0 0 1 0 8h-1M4 8v8a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V8M4 8H2M6 4c0 1 .5 2 1 2.5M10 3c0 1.5.5 2.5 1 3M14 4c0 1 .5 2 1 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+  <div><h1><span class="brand-open">Open</span>SIP Tools</h1></div>
+</div>
+
+<div class="tab-bar" id="tab-bar">
+  <div class="tab active" data-tab="overview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Overview</div>
+${toolTabButtons}
+</div>
+
+<div id="panel-overview" class="tab-panel active"></div>
+${toolTabPanels}
+
+<div class="footer">Generated by <strong>OpenSIP CLI</strong> &mdash; <a href="https://opensip.ai">opensip.ai</a></div>
+
+${graphCatalogBlock}
+${graphViewModelBlock}
+<script>
+const sessions = ${safeDataJson};
+const checkCatalog = ${safeCatalogJson};
+const recipeCatalog = ${safeRecipeJson};
+const graphRuleCatalog = ${safeGraphRuleCatalogJson};
+const graphRecipeCatalog = ${safeGraphRecipeCatalogJson};
+${editorProtocolJs}
+const fitSessions = sessions.filter(s => s.tool === 'fit');
+const simSessions = sessions.filter(s => s.tool === 'sim');
+
+${dashboardSharedJs()}
+${dashboardSubtabBarJs()}
+${dashboardOverviewJs()}
+${dashboardSessionsJs()}
+${dashboardChecksJs()}
+${dashboardRecipesJs()}
+${dashboardToolTabsJs()}
+${dashboardCodePathsJs()}
+
+// =======================================================
+// RENDER TABS
+// =======================================================
+renderOverview();
+${toolTabRenderCalls}
+</script>
+</body>
+</html>`;
+}

@@ -1,0 +1,12 @@
+[
+  "graph:always-throws-branch|packages/a/src/throws.ts|70|0",
+  "graph:duplicated-function-body|packages/a/src/dup.ts|80|0",
+  "graph:no-side-effect-path|packages/a/src/pure.ts|30|0",
+  "graph:orphan-subtree|packages/a/src/helper.ts|20|4",
+  "graph:orphan-subtree|packages/a/src/orphan.ts|10|2",
+  "graph:orphan-subtree|packages/a/src/pure.ts|50|0",
+  "graph:orphan-subtree|packages/a/src/pure.ts|55|0",
+  "graph:orphan-subtree|packages/a/src/pure.ts|60|0",
+  "graph:orphan-subtree|packages/a/src/throws.ts|70|0",
+  "graph:test-only-reachable|packages/a/src/helper.ts|20|4"
+]

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "opensip-cli-graph",
+          "version": "1.0.0",
+          "informationUri": "https://github.com/opensip-ai/opensip-cli",
+          "rules": [
+            {
+              "id": "graph.dead-code.orphan-subtree"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "graph.dead-code.orphan-subtree",
+          "level": "warning",
+          "message": {
+            "text": "Function 'processOrder' appears unreachable from any entry point."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/order/process.ts"
+                },
+                "region": {
+                  "startLine": 42
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

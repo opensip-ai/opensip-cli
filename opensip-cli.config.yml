@@ -1,0 +1,214 @@
+# OpenSIP CLI — Signalers Configuration
+#
+# Defines named file sets (targets) for fitness checks and configures
+# how each signal producer analyzes the codebase.
+
+# =============================================================================
+# Targets
+# =============================================================================
+
+globalExcludes:
+  - 'docs/**'
+  # Historical changelog — append-only by definition, expected to grow.
+  # Not source; source-shape checks (file length, complexity) do not apply.
+  - 'CHANGELOG.md'
+  # Test fixtures intentionally contain stub patterns, TODO markers,
+  # and other shapes that exercise checks; excluding them prevents
+  # fixture content from being analyzed as production code.
+  - '**/__tests__/fixtures/**'
+  - '**/__fixtures__/**'
+  - '**/fixtures/**'
+  # Drizzle-generated migration snapshots are data, not source. They have
+  # no comment syntax for inline directives and grow with schema changes.
+  - 'packages/datastore/migrations/**'
+  # Vitest coverage output is generated, gitignored, vendored HTML/JS — never
+  # first-party source. Keep generated artifacts out of analysis.
+  - '**/coverage/**'
+
+targets:
+  backend:
+    description: Core packages and CLI
+    languages: [typescript]
+    concerns: [backend, server, api]
+    include:
+      - 'packages/*/src/**/*.ts'
+    exclude:
+      - '**/*.test.ts'
+      - '**/__tests__/**'
+      - '**/node_modules/**'
+      - '**/dist/**'
+    tags:
+      - production
+      - node
+      - typescript
+
+  cli:
+    description: CLI application
+    languages: [typescript]
+    concerns: [cli]
+    include:
+      - 'packages/cli/src/**/*.ts'
+    exclude:
+      - '**/*.test.ts'
+      - '**/__tests__/**'
+      - '**/node_modules/**'
+      - '**/dist/**'
+    tags:
+      - production
+      - node
+      - typescript
+
+  tests:
+    description: All test files
+    languages: [typescript]
+    concerns: [testing]
+    include:
+      - '**/*.test.ts'
+      - '**/__tests__/**/*.ts'
+    exclude:
+      - '**/node_modules/**'
+      - '**/dist/**'
+    tags:
+      - testing
+      - typescript
+
+  all-ts:
+    description: All TypeScript files
+    languages: [typescript]
+    include:
+      - '**/*.ts'
+    exclude:
+      - '**/node_modules/**'
+      - '**/dist/**'
+    tags:
+      - typescript
+
+  fitness-checks:
+    description: Fitness check definitions
+    languages: [typescript]
+    concerns: [fitness]
+    include:
+      - 'packages/fitness/checks-*/src/checks/**/*.ts'
+    exclude:
+      - '**/*.test.ts'
+      - '**/__tests__/**'
+      - '**/index.ts'
+      - '**/node_modules/**'
+      - '**/dist/**'
+    tags:
+      - fitness
+      - typescript
+
+  configs:
+    description: Configuration files
+    languages: [typescript]
+    concerns: [config]
+    include:
+      - '**/tsconfig.json'
+      - '**/package.json'
+      - '**/vitest.config.ts'
+      - 'turbo.json'
+    exclude:
+      - '**/node_modules/**'
+    tags:
+      - config
+
+# =============================================================================
+# Per-check target overrides
+# =============================================================================
+#
+# These checks declare broad scopes (e.g. concerns: [backend, frontend, cli])
+# which causes them to match this repo's `all-ts` target (empty concerns →
+# matches any target). `all-ts` includes test files. Several of these checks
+# are quality/compliance gates whose patterns appear by design in test
+# fixtures (the tests feed the checks code that should trip them), in the
+# check implementations themselves (they detect markers like TODO/nosemgrep),
+# or in docs/markdown that aren't part of any production target.
+#
+# Pinning each check to `[backend, cli]` excludes test files, fixtures, and
+# markdown — the surfaces where these patterns are load-bearing — while
+# keeping the gate active for real production source.
+
+checkOverrides:
+  eslint-justifications: [backend, cli]
+  no-eval: [backend, cli]
+  semgrep-justifications: [backend, cli]
+  no-todo-comments: [backend, cli]
+  # Same rationale as no-todo-comments: the "not implemented" throw/macro
+  # idioms appear by design in this check's own fixtures and in markdown/docs;
+  # pin to production source so the gate fires only on real shipped code.
+  no-unimplemented-markers: [backend, cli]
+  # file-length is a *source-shape* norm: it should measure production
+  # TypeScript, not test files (legitimately long: many cases) nor vendored
+  # third-party assets (e.g. the committed Cytoscape UMD bundle, a `.js`
+  # file we don't author). Pinning to [backend, cli] scopes it to
+  # `packages/*/src/**/*.ts` minus tests — still covering all first-party
+  # source while dropping the test-file and vendored-bundle noise.
+  file-length-limit: [backend, cli]
+  # architecture-session-timing-not-host-owned governs the NESTED tool engine
+  # packages (packages/{fitness,simulation,graph}/*/src) — which the flat
+  # `backend` glob (packages/*/src) does NOT reach. Pin to `all-ts` so those
+  # files are scanned; the check itself path-gates to first-party tool packages
+  # and strips comments, so host code and tests are inert (ADR-0048 / Phase 7).
+  architecture-session-timing-not-host-owned: [all-ts]
+
+# =============================================================================
+# Graph Configuration
+# =============================================================================
+#
+# Per-rule knobs for the `graph` tool's static call-graph rules. Each field
+# overrides the corresponding in-rule default.
+
+graph:
+  # graph:duplicated-function-body — aggregate cross-package code path.
+  # A body hash appearing in >= minCrossPackageDuplicatePackages DISTINCT
+  # packages — that ALSO clears minCrossPackageDuplicateBodySize (chars) —
+  # emits a single aggregate "hoist to a shared package" signal and
+  # suppresses the per-instance signals for that hash.
+  #
+  # Package threshold: default 3 (safe for arbitrary repos). We keep it at 2
+  # HERE as a deliberately-aggressive lens — a genuinely-shared helper is
+  # caught the moment it appears across two packages. The real shared helpers
+  # it found were hoisted (nameOf / skipBlockComment / isReturnValueDiscarded
+  # -> graph-adapter-common; isIdentChar -> core).
+  #
+  # Body-size floor: the ENGINE default is 80 chars (a customer-friendly
+  # watchdog that still catches small shared utilities). We raise it to 200
+  # HERE because our remaining cross-package bodies in the 80-200 band are
+  # KNOWN-INTENTIONAL and deliberately NOT shared — thin Registry<T>/getter
+  # delegators, DataStore DI-constructor shims, per-tool plugin-loader state
+  # accessors (fitness's load-error state != sim's; see check-loader.ts
+  # header, audit F6). At 200 the lens stays a clean watchdog for NEW
+  # SUBSTANTIAL cross-package duplication without re-flagging that boilerplate.
+  minCrossPackageDuplicatePackages: 2
+  minCrossPackageDuplicateBodySize: 200
+
+# =============================================================================
+# Fitness Configuration
+# =============================================================================
+
+fitness:
+  failOnErrors: 1
+  # Zero-warnings gate: `fit` fails locally on ANY warning, not just net-new in
+  # CI. This makes warning-severity incomplete-work signals (e.g. no-todo-comments
+  # TODO/FIXME/XXX markers) a hard local failure — we do not ship deferred work.
+  # The repo is at 0 warnings; this keeps it there.
+  failOnWarnings: 1
+  disabledChecks:
+    # Testing — architectural mismatch with this repo's testing approach
+    # (integration tests over 1:1 file pairing). See Phase 0 audit findings
+    # in docs/plans/ready/dogfood-fit-against-self/phase-0-audit-and-design.md.
+    - test-file-pairing
+    # Docker
+    - docker-version-sync
+    - docker-best-practices
+    - docker-ignore-validation
+    # Hasura / GraphQL
+    - hasura-production-config
+    - graphql-offset-pagination
+    # React / Accessibility / Mobile — real checks that simply never apply
+    # to this Node CLI codebase (no React/Expo/mobile surface).
+    - a11y-form-labels
+    - a11y-semantic-html
+    - expo-vector-icons
+    - image-optimization

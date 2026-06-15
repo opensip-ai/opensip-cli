@@ -1,0 +1,56 @@
+{
+  "name": "@opensip-cli/datastore",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "SQLite + Drizzle persistence layer for OpenSIP CLI — DataStore interface, backends, factory, schema migrations",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "sqlite",
+    "drizzle",
+    "persistence"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/datastore"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "migrations",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check"
+  },
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "better-sqlite3": "^12.10.0",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.13.2",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

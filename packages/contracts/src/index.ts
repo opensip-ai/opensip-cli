@@ -1,0 +1,230 @@
+/**
+ * @opensip-cli/contracts — shared contract types.
+ *
+ * Tool packages (fitness, simulation) and the CLI entry-point both
+ * depend on this package for:
+ *   - CLI option / output / result types
+ *   - Exit code constants and error suggestions
+ *   - The cross-tool StoredSession type (the SessionRepo runtime + the
+ *     sessions schema live in @opensip-cli/session-store)
+ *
+ * The GraphCatalog shape is DEFINED here (./graph-catalog.ts), not
+ * re-exported from elsewhere. It is the contract surface between the
+ * graph tool (which writes catalog.json) and @opensip-cli/dashboard
+ * (which renders it): both producer and consumer depend on contracts
+ * from below, so the shape lives in the layer beneath both. contracts
+ * holds zero runtime dependency on dashboard or graph — these are
+ * type-only declarations.
+ *
+ * contracts depends only on @opensip-cli/core. Tools depend on
+ * contracts. The CLI entry-point depends on contracts and on every
+ * tool package — the dependency graph stays acyclic.
+ */
+
+// CLI option / argument types
+export type { FitOptions, InitOptions, ToolOptions } from './types.js';
+
+// Signal envelope — the universal tool-run output currency (ADR-0011). The
+// `CommandResult` payload every tool returns; it replaced the fitness-shaped
+// `CliOutput`/`CheckOutput`/`FindingOutput` husk, which was retired in Phase 7.
+export type {
+  SignalEnvelope,
+  RunVerdict,
+  UnitResult,
+  BuildEnvelopeInput,
+} from './signal-envelope.js';
+export { buildSignalEnvelope } from './signal-envelope.js';
+
+// Command result types (the CommandResult union + per-command variants)
+export type {
+  CommandResult,
+  ClearDoneResult,
+  ConfigureDoneResult,
+  UninstallDoneResult,
+  FitDoneResult,
+  SimDoneResult,
+  GraphDoneResult,
+  GateDoneResult,
+  GraphStatusResult,
+  TextLinesResult,
+  ToolsListResult,
+  ToolsListRow,
+  ToolsValidateResult,
+  ToolsValidateSection,
+  ToolsInstallResult,
+  ToolsUninstallResult,
+  ToolsDataPurgeResult,
+  ListChecksResult,
+  ListRecipesResult,
+  HistorySession,
+  HistoryResult,
+  ReportResult,
+  InitResult,
+  PreExistingFile,
+  SimNoticeResult,
+  PluginResult,
+  PluginInfo,
+  SyncEntry,
+  SessionReplayResult,
+  HelpResult,
+  ErrorResult,
+  VerboseDetail,
+  FindingGroup,
+  FindingLine,
+} from './command-results.js';
+
+// Command outcome — the OUTER currency wrapping every result and error (§5.5,
+// launch). `CommandOutcome<T>` nests the unchanged `SignalEnvelope` under
+// `.envelope` (run) / the `CommandResult` under `.data` (list/report) / errors
+// under `.errors` (incl. the pre-handler bootstrap path). The host ASSEMBLES it;
+// no tool chooses its own error JSON or success carrier. ADR-0024.
+export type {
+  CommandOutcome,
+  CommandOutcomeStatus,
+  ErrorDetail,
+  WarningDetail,
+  RenderHints,
+} from './command-outcome.js';
+
+// Run diagnostics — the shared, JSON-emittable diagnostics stream carried on a
+// `CommandOutcome` (§5.10). One event vocabulary across the uniform tool
+// lifecycle (discover → … → persist). DEFINED in @opensip-cli/core (beside the
+// scope-owned diagnostics bus that PRODUCES it; core cannot import contracts);
+// re-exported here so `CommandOutcome` (and machine consumers) can name it.
+export type {
+  RunDiagnostics,
+  DiagnosticEvent,
+  DiagnosticPhase,
+  DiagnosticLevel,
+} from '@opensip-cli/core';
+
+// Canonical pass-rate (`score`) computation — shared by every tool that
+// builds a signal envelope so the dashboard "PASS RATE" stays consistent
+// across fit/graph and cannot drift back into per-tool formulas.
+export { passRate } from './score.js';
+
+// Exit codes + error suggestion helper + typed-error → exit-code mapping
+export { EXIT_CODES, getErrorSuggestion, mapToolErrorToExitCode } from './exit-codes.js';
+export type { ErrorSuggestion } from './exit-codes.js';
+
+// Static tool-plugin manifest + the plugin-API epoch + provenance types +
+// the pure compatibility gate (launch raw-vs-admitted contract).
+// DEFINED in @opensip-cli/core (next to the Tool contract; core cannot
+// import contracts); re-exported here for the public Tool↔runner surface.
+export { PLUGIN_API_VERSION, checkCompatibility } from '@opensip-cli/core';
+export type {
+  RawToolPluginManifest,
+  ToolPluginManifest,
+  ToolCommandManifest,
+  ToolProvenance,
+  ToolSource,
+  CompatibilityVerdict,
+  // Capability domain model (launch, §5.3) — the shape a tool's
+  // manifest `capabilities` slot now carries, plus the runtime domain spec.
+  CapabilityDomainSpec,
+  ToolCapabilityDeclaration,
+  CapabilityContributionKind,
+} from '@opensip-cli/core';
+
+// The `cli:` block loader (`loadCliDefaults` / `CliDefaults`) moved to
+// `@opensip-cli/config` in ADR-0023 — its runtime YAML projection
+// was the standing "contracts is types-only" charter violation. Importers now
+// take it from the config layer.
+
+// Command-plane types (launch, §5.4) — the declarative CommandSpec a
+// tool exports for the host to mount, replacing raw-Commander access. DEFINED in
+// @opensip-cli/core (beside the Tool contract; core cannot import contracts);
+// re-exported here for the public Tool↔runner surface. `CommonFlagKey` is also
+// re-exported from ./cli-flags (which now sources it from core) — both paths
+// resolve to the same kernel type.
+export { defineCommand, COMMON_FLAG_KEYS, RAW_STREAM_REASONS } from '@opensip-cli/core';
+export type {
+  CommandSpec,
+  OptionSpec,
+  ArgSpec,
+  CommandHandler,
+  CommandContext,
+  CommandOutputMode,
+  CommandScopeRequirement,
+  RawStreamReason,
+} from '@opensip-cli/core';
+
+// Tool-scoped recipe-default resolution (ADR-0022). The pure resolver every
+// tool uses to pick its recipe name from --recipe / <tool>.recipe / default.
+export { resolveToolRecipeName, BUILTIN_DEFAULT_RECIPE } from './recipe-default.js';
+export type { ResolvedRecipe, RecipeSource } from './recipe-default.js';
+
+// Cross-tool common-flag registry (ADR-0021). One source of truth for the flags
+// every tool's run command shares; tools apply them via applyCommonFlags rather
+// than re-declaring `--json`/`--cwd`/`--report-to`/… per tool.
+export { commonFlags, applyCommonFlags, MANDATORY_COMMON_FLAGS } from './cli-flags.js';
+export type { CommonFlagKey, CommonFlagSpec } from './cli-flags.js';
+
+// Verbose-detail builder (ADR-0021) — shared Signal[] → FindingGroup[] mapping
+// for the tools' `verboseDetail` carrier (fit + sim; one source, not per-tool).
+export { buildFindingGroups } from './verbose-detail.js';
+export type { FindingGroupUnit } from './verbose-detail.js';
+
+// Session persistence type. The cross-tool StoredSession shape stays here
+// as the contract surface; SessionRepo + the sessions schema +
+// generateSessionId/sanitizeForFilename moved to @opensip-cli/session-store
+// (audit 2026-05-29, contracts split).
+export type {
+  StoredSession,
+  StoredSessionHostMetrics,
+  ToolSessionReplay,
+} from './session-types.js';
+
+// Graph catalog type surface. This is the contract surface between the
+// graph tool (which writes catalog.json) and the dashboard package
+// (which renders it). Lives in contracts because both producer and
+// consumer depend on the shape — contracts is the layer below both.
+export type {
+  GraphCatalog,
+  GraphFunctionOccurrence,
+  GraphCallEdge,
+  GraphParam,
+  GraphFunctionKind,
+  GraphCallResolution,
+  GraphCallConfidence,
+  GraphResolutionMode,
+  GraphVisibility,
+  GraphFeatures,
+  GraphFunctionFeatures,
+  GraphPackageFeatures,
+  GraphSccFeatures,
+  GraphPackageEdgeFeature,
+  GraphBlastScore,
+} from './graph-catalog.js';
+
+// SARIF + cloud reporting moved to @opensip-cli/output (audit
+// 2026-05-29, contracts split; package renamed reporting→output in Phase 2,
+// ADR-0011). The formatter/sink runtime + its types live there; contracts
+// no longer re-exports them.
+
+// `commander` is referenced here purely as a type — `import type` keeps
+// the runtime bundle (`dist/index.js`) free of any commander require.
+// The package declares `commander` as an OPTIONAL peer dependency
+// (see package.json `peerDependencies` + `peerDependenciesMeta`) so
+// consumers who want to use `CliProgram` get commander surfaced in
+// their dependency graph, while plugins that never touch `CliProgram`
+// pay no install cost.
+import type { Command } from 'commander';
+
+/**
+ * Type alias for Commander's `Command` class — re-exported here so the
+ * host's command-spec mounting (`mountCommandSpec`) and the tool lifecycle
+ * can type the root `program` handle without a direct `commander` import or
+ * an `as Command` cast. (Tools themselves no longer touch Commander — they
+ * declare `commandSpecs`; the host owns `program`.)
+ *
+ * `commander` is an OPTIONAL peer dependency of
+ * `@opensip-cli/contracts`. `CliProgram` is now primarily a host-side
+ * type (the `Tool` contract no longer surfaces it — tools declare
+ * `commandSpecs`), so any code referencing it needs `commander` resolvable
+ * in its own `node_modules`; pnpm/npm will surface the peer requirement in
+ * install output. Code that never touches `CliProgram` can skip commander
+ * entirely. The alias erases at compile time — no runtime commander require
+ * lands in `dist/index.js`.
+ */
+export type CliProgram = Command;

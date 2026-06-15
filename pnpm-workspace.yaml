@@ -1,0 +1,80 @@
+packages:
+  # Top-level packages: cli, contracts, core
+  - 'packages/*'
+  # Tool-grouped subdirectories: each tool's engine + sub-packages
+  - 'packages/fitness/*'
+  - 'packages/simulation/*'
+  - 'packages/languages/*'
+  - 'packages/graph/*'
+
+# --- Settings migrated from the package.json "pnpm" field ---
+# pnpm 11 no longer reads `pnpm.*` in package.json; this is the new home.
+
+# Inject workspace packages as hard-linked copies (not symlinks) so the
+# node_modules discovery walker finds the bundled check packs. Without this,
+# `pnpm fit` discovers 0 checks. See CLAUDE.md "Dogfood Gate".
+injectWorkspacePackages: true
+
+# Keep peer dependencies explicit. In particular, this avoids auto-installing
+# eslint-plugin-import when the workspace intentionally uses import-x instead.
+autoInstallPeers: false
+
+# Supply-chain guard: only these dependencies may run install/build scripts
+# (pnpm 11 renamed the array `onlyBuiltDependencies` to the `allowBuilds` map).
+# better-sqlite3 needs its native binary built/fetched; esbuild and
+# unrs-resolver ship their binaries via platform optional-deps and never needed
+# their own postinstall (they ran fine excluded under pnpm 10).
+allowBuilds:
+  better-sqlite3: true
+  esbuild: false
+  unrs-resolver: false
+
+# Supply-chain guard: delay fresh npm publishes long enough for ecosystem
+# takedowns/advisories to land, and keep lockfile verification active in CI.
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+# OpenTelemetry 2026-06-11 update was intentionally taken before the
+# 24-hour release-age window elapsed.
+minimumReleaseAgeExclude:
+  - '@opentelemetry/api-logs@0.219.0'
+  - '@opentelemetry/context-async-hooks@2.8.0'
+  - '@opentelemetry/core@2.8.0'
+  - '@opentelemetry/exporter-trace-otlp-http@0.219.0'
+  - '@opentelemetry/exporter-metrics-otlp-http@0.219.0'
+  - '@opentelemetry/otlp-exporter-base@0.219.0'
+  - '@opentelemetry/otlp-transformer@0.219.0'
+  - '@opentelemetry/resources@2.8.0'
+  - '@opentelemetry/sdk-logs@0.219.0'
+  - '@opentelemetry/sdk-metrics@2.8.0'
+  - '@opentelemetry/sdk-trace-base@2.8.0'
+  - '@opentelemetry/sdk-trace-node@2.8.0'
+trustPolicy: no-downgrade
+trustLockfile: false
+blockExoticSubdeps: true
+
+# Reviewed trust-policy exemptions. `trustPolicy: no-downgrade` rejects a
+# version when an earlier-published version of the same package carried
+# stronger publish-date trust evidence (npm provenance/attestation) than the
+# locked version — pnpm flags it as a possible takeover. The entries below are
+# stable transitive/direct deps the graph legitimately pins at versions that
+# predate (or lack) that attestation; each has been reviewed as known-good.
+# Pinned to EXACT versions on purpose: a future bump drops the exemption and
+# re-triggers the check, so the review is revisited rather than silently
+# inherited. Revisit when these publish a provenance-attested release we can
+# move to.
+trustPolicyExclude:
+  - 'ast-v8-to-istanbul@1.0.2' # vitest coverage transitive (via @vitest/coverage-v8)
+  - 'dependency-cruiser@17.4.3' # direct devDep; no provenance attestation
+  - 'tinyexec@1.2.2' # transitive (tinyglobby / tooling)
+
+# Security pins — transitive-dependency version floors.
+overrides:
+  'postcss@<8.5.10': '>=8.5.10'
+  'ws@<8.21.0': '>=8.21.0'
+  'brace-expansion@1': '^1.1.12'
+  'brace-expansion@2': '^2.0.2'
+  'brace-expansion@4': '^4.0.2'
+  'brace-expansion@5': '^5.0.6'
+  'esbuild@<0.25.0': '>=0.25.0'
+  'vite@5': '^7.1.0'

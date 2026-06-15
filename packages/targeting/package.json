@@ -1,0 +1,48 @@
+{
+  "name": "@opensip-cli/targeting",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Host file-targeting runtime substrate for OpenSIP CLI — the generic TargetRegistry, uniform glob expansion (resolveTargets/preResolveAllTargets), and globalExcludes filtering any tool consumes via scope.targets",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/targeting"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/config": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "glob": "^13.0.0",
+    "minimatch": "^10.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

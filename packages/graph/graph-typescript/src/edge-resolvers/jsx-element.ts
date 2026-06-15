@@ -1,0 +1,76 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (catalog entries for a single JSX element resolution)
+/**
+ * Resolve JSX elements: `<Foo />` / `<Foo>...</Foo>`.
+ *
+ * Component identifiers (PascalCase) resolve to their declarations
+ * via the type checker. Lower-cased intrinsic elements (`<div />`)
+ * are ignored — they have no catalog entry.
+ *
+ * Returns `UNRESOLVED` only when the JSX tag is intrinsic or the type checker
+ * cannot connect the component tag back to a cataloged declaration.
+ */
+
+import ts from 'typescript';
+
+import { DeclShape, functionLikeFromDeclaration } from '../edge-helpers/declaration-to-node.js';
+import { resolveDeclToHash } from '../edge-helpers/resolve-decl.js';
+import { unaliasSymbol } from '../edge-helpers/unalias-symbol.js';
+
+import type { EdgeResolver } from './types.js';
+
+const UNRESOLVED = {
+  to: [] as readonly string[],
+  resolution: 'unknown' as const,
+  confidence: 'low' as const,
+};
+
+const ACCEPT =
+  DeclShape.FunctionDeclaration |
+  DeclShape.ArrowFunction |
+  DeclShape.FunctionExpression |
+  DeclShape.VariableInitializer;
+
+type JsxOpeningLike = ts.JsxOpeningElement | ts.JsxSelfClosingElement;
+
+export const resolveJsxElement: EdgeResolver<JsxOpeningLike> = (node, ctx) => {
+  const tagName = node.tagName;
+  // Intrinsic elements (`<div />`) are never tracked.
+  if (ts.isIdentifier(tagName) && /^[a-z]/.test(tagName.text)) return UNRESOLVED;
+  // Identifier or PropertyAccessExpression — both resolvable via the type checker.
+  const symbol = ctx.typeChecker.getSymbolAtLocation(tagName);
+  if (!symbol) return UNRESOLVED;
+  const real = unaliasSymbol(symbol, ctx.typeChecker);
+  const decls = real.getDeclarations() ?? [];
+
+  const candidateName = ts.isIdentifier(tagName) ? tagName.text : tagName.getText();
+  // Cross-package binding name: `<Foo/>` binds `Foo`; `<A.B/>` binds the leftmost
+  // identifier `A` (the namespace import). The exported callee name to look up
+  // stays `candidateName`.
+  const bindingNames = jsxBindingNames(tagName, candidateName);
+  for (const d of decls) {
+    const sf = d.getSourceFile();
+    const declNode = functionLikeFromDeclaration(d, ACCEPT);
+    if (!declNode) continue;
+    const hash = resolveDeclToHash(declNode, sf, [candidateName], ctx, bindingNames);
+    if (hash) {
+      return { to: [hash], resolution: 'jsx', confidence: 'high' };
+    }
+  }
+  return UNRESOLVED;
+};
+
+/**
+ * The local binding name(s) a JSX tag could be imported under: the tag itself
+ * for `<Foo/>`, plus the leftmost identifier for a qualified `<A.B.C/>` tag (the
+ * namespace import `A`). Deduped, binding candidates first.
+ */
+function jsxBindingNames(
+  tagName: ts.JsxTagNameExpression,
+  candidateName: string,
+): readonly string[] {
+  const names = new Set<string>([candidateName]);
+  let cur: ts.Node = tagName;
+  while (ts.isPropertyAccessExpression(cur)) cur = cur.expression;
+  if (ts.isIdentifier(cur)) names.add(cur.text);
+  return [...names];
+}

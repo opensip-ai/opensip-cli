@@ -1,0 +1,65 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`projectCatalogToGraphViewModel (package-level) > projects the real fixture into a stable view-model (snapshot) 1`] = `
+{
+  "edges": [
+    {
+      "isCycleEdge": true,
+      "source": "fit",
+      "target": "graph",
+      "weight": 2,
+    },
+    {
+      "isCycleEdge": true,
+      "source": "fit",
+      "target": "core",
+      "weight": 5,
+    },
+    {
+      "isCycleEdge": true,
+      "source": "graph",
+      "target": "fit",
+      "weight": 2,
+    },
+    {
+      "isCycleEdge": true,
+      "source": "core",
+      "target": "fit",
+      "weight": 3,
+    },
+    {
+      "isCycleEdge": true,
+      "source": "graph",
+      "target": "core",
+      "weight": 4,
+    },
+    {
+      "isCycleEdge": true,
+      "source": "core",
+      "target": "core",
+      "weight": 2,
+    },
+  ],
+  "language": "typescript",
+  "nodes": [
+    {
+      "id": "core",
+      "label": "core",
+      "sccId": "scc:core",
+      "totalCoupling": 16,
+    },
+    {
+      "id": "fit",
+      "label": "fit",
+      "sccId": "scc:core",
+      "totalCoupling": 12,
+    },
+    {
+      "id": "graph",
+      "label": "graph",
+      "sccId": "scc:core",
+      "totalCoupling": 8,
+    },
+  ],
+}
+`;

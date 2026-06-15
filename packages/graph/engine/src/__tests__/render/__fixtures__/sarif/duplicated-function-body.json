@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "opensip-cli-graph",
+          "version": "1.0.0",
+          "informationUri": "https://github.com/opensip-ai/opensip-cli",
+          "rules": [
+            {
+              "id": "graph.duplication.duplicated-function-body"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "graph.duplication.duplicated-function-body",
+          "level": "note",
+          "message": {
+            "text": "Function 'formatDate' has the same body as 3 other functions."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/utils/format.ts"
+                },
+                "region": {
+                  "startLine": 8
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

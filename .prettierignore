@@ -1,0 +1,36 @@
+# Prettier ignore. Lives at the repo root (not .config/) so patterns anchor to
+# the repo root — like .gitignore. A .config/-located ignore file anchors
+# slash-bearing patterns to .config/ itself, which silently fails to match
+# repo-root paths. The prettier *config* still lives in .config/prettier.config.mjs;
+# this is data (an ignore list), whose conventional home is the root.
+#
+# node_modules is ignored by Prettier automatically; everything else is listed.
+# Mirrors the ESLint global ignores in .config/eslint.config.mjs.
+
+# Build + tooling output
+**/dist/**
+**/.turbo/**
+**/coverage/**
+
+# Vendored third-party bundles (e.g. the minified Cytoscape bundle the
+# dashboard ships). Pretty-printing them inflates their byte size and breaks
+# the bundle-weight budget tests — they must stay exactly as vendored.
+**/vendor/**
+
+# Claude Code worktrees — parallel-session checkouts live here. Never format
+# another session's working tree (the `**/*` format glob would otherwise
+# recurse into them).
+.claude/**
+
+# Test fixtures (intentionally unformatted — they encode exact input bytes)
+fixtures/**
+**/__fixtures__/**
+**/*.snap
+
+# Docs: prose is author-owned and docs/web-generated/ is machine-generated
+# (web:skip/web:only voice markers must not be disturbed). Markdown is out of
+# the chosen format scope; excluding all of docs/ keeps the boundary clean.
+docs/**
+
+# Lockfile is pnpm-owned
+pnpm-lock.yaml

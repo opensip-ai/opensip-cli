@@ -1,0 +1,10 @@
+# Minimal config for e2e fixture. Real repos define richer targets;
+# this fixture just needs the file to exist and define at least one
+# target so scope-based checks have something to scan.
+targets:
+  backend:
+    description: 'Sample project source'
+    languages: [typescript]
+    concerns: [backend]
+    include:
+      - 'src/**/*.ts'

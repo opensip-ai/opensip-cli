@@ -1,0 +1,57 @@
+{
+  "name": "@opensip-cli/core",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Core kernel for OpenSIP CLI — language adapters, plugin loader, errors, logger, IDs, retry, project config",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "kernel",
+    "plugin-system"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./errors": "./dist/lib/errors.js",
+    "./logger": "./dist/lib/logger.js",
+    "./types": "./dist/types/index.js",
+    "./signal": "./dist/types/signal.js",
+    "./plugins": "./dist/plugins/index.js",
+    "./languages": "./dist/languages/index.js",
+    "./languages/parse-cache.js": "./dist/languages/parse-cache.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "js-yaml": "^4.2.0",
+    "ulid": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.0",
+    "@types/node": "^24.13.2",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

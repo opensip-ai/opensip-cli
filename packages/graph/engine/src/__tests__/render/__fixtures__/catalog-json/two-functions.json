@@ -1,0 +1,69 @@
+{
+  "version": "1.0",
+  "provenance": {
+  "runId": "run_test_2026_05_27",
+  "completeness": "complete",
+  "engineVersion": "1.0.0",
+  "startedAt": "2026-05-27T00:00:00.000Z",
+  "completedAt": "2026-05-27T00:01:00.000Z",
+  "tenantId": "tenant_test"
+},
+  "symbols": [
+{
+  "id": "8f93df2711ff467df5a4ee7c00de903f744a32430ac8da60ed47d1790ed99f77",
+  "repoId": "REP_test_repo",
+  "kind": "function",
+  "language": "typescript",
+  "qualifiedName": "src/greet.greet",
+  "modulePath": "src/greet",
+  "arity": 0,
+  "filePath": "src/greet.ts",
+  "startLine": 5,
+  "endLine": 12,
+  "isExported": false,
+  "signature": "(): void",
+  "docSummary": null,
+  "gitSha": "abc1234567890abc1234567890abc1234567890a"
+},
+{
+  "id": "f6008c06ca5dcee2864b1891b2cd6b8045657287997f853060dc0505af88d4f7",
+  "repoId": "REP_test_repo",
+  "kind": "function",
+  "language": "typescript",
+  "qualifiedName": "src/format.formatName",
+  "modulePath": "src/format",
+  "arity": 1,
+  "filePath": "src/format.ts",
+  "startLine": 10,
+  "endLine": 15,
+  "isExported": true,
+  "signature": "(raw): string",
+  "docSummary": null,
+  "gitSha": "abc1234567890abc1234567890abc1234567890a"
+}
+  ],
+  "edges": [
+{
+  "id": "7a118fad7203d0120ca1d248fe7f54c4d10ca157fde4be7fda777b303ab39506",
+  "repoId": "REP_test_repo",
+  "edgeKind": "calls",
+  "fromSymbolId": "8f93df2711ff467df5a4ee7c00de903f744a32430ac8da60ed47d1790ed99f77",
+  "toSymbolId": null,
+  "toQualifiedNameUnresolved": "externalLib.log(\"hi\")",
+  "sourceFile": "src/greet.ts",
+  "sourceLine": 8,
+  "gitSha": "abc1234567890abc1234567890abc1234567890a"
+},
+{
+  "id": "de85db30fd09f289ef22db815cb1c80eaafaea68c1481a1929e7cd5e552f1d41",
+  "repoId": "REP_test_repo",
+  "edgeKind": "calls",
+  "fromSymbolId": "8f93df2711ff467df5a4ee7c00de903f744a32430ac8da60ed47d1790ed99f77",
+  "toSymbolId": "f6008c06ca5dcee2864b1891b2cd6b8045657287997f853060dc0505af88d4f7",
+  "toQualifiedNameUnresolved": null,
+  "sourceFile": "src/greet.ts",
+  "sourceLine": 7,
+  "gitSha": "abc1234567890abc1234567890abc1234567890a"
+}
+  ]
+}

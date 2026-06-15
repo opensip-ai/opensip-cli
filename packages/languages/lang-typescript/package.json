@@ -1,0 +1,50 @@
+{
+  "name": "@opensip-cli/lang-typescript",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "TypeScript/JavaScript language adapter for opensip-cli",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "parser",
+    "ast",
+    "tree-sitter",
+    "typescript",
+    "javascript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/languages/lang-typescript"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "typescript": "~6.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "vitest": "^4.1.8"
+  }
+}

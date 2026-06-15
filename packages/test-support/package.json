@@ -1,0 +1,33 @@
+{
+  "name": "@opensip-cli/test-support",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Cross-package test scaffolding for opensip-cli (unpublished; never a runtime dependency)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/fitness": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "vitest": "^4.1.8"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

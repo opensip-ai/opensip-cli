@@ -1,0 +1,55 @@
+{
+  "name": "@opensip-cli/graph-go",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Go language adapter for the opensip graph engine",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "call-graph",
+    "dependency-graph",
+    "go",
+    "golang"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/graph/graph-go"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "opensipTools": {
+    "kind": "graph-adapter"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/graph": "workspace:*",
+    "@opensip-cli/graph-adapter-common": "workspace:*",
+    "@opensip-cli/lang-go": "workspace:*",
+    "@opensip-cli/tree-sitter": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "vitest": "^4.1.8"
+  }
+}

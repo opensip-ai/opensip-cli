@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook: guard against stale docs/web-generated/.
+#
+# docs/web-generated/ is generated from docs/public/ by
+# scripts/build-web-docs.mjs and is consumed live by opensip.ai. CI
+# enforces sync via `node scripts/build-web-docs.mjs --check`, but
+# discovering the failure in CI means N more commits stack on top of
+# a red main before anyone notices (this is exactly what happened
+# 2026-05-23 → 2026-05-25: 13 commits piled on a single uncaught
+# drift).
+#
+# Strategy: if any staged file is under docs/public/, run the
+# drift check and refuse the commit on stale output. We do NOT run
+# the check unconditionally — most commits don't touch docs and
+# paying the script's startup cost on every commit would train people
+# to add --no-verify.
+#
+# To bypass intentionally (rare): `git commit --no-verify`.
+# To uninstall: `git config --unset core.hooksPath`.
+
+set -e
+
+# Look at the staged set, not the working tree, so unstaged churn in
+# docs/public/ doesn't trigger this gate.
+if git diff --cached --name-only | grep -q '^docs/public/'; then
+  if ! node scripts/build-web-docs.mjs --check >/dev/null 2>&1; then
+    echo "pre-commit: docs/web-generated/ is stale relative to docs/public/." >&2
+    echo "pre-commit: run 'pnpm docs:build' and stage the regenerated files." >&2
+    echo "pre-commit: (or 'git commit --no-verify' to override — CI will still fail.)" >&2
+    exit 1
+  fi
+fi
