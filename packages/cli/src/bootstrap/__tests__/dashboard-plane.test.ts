@@ -8,7 +8,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  RESERVED_DASHBOARD_KEYS,
+  isReservedDashboardKey,
   resolveContributedTabs,
   type PersistedDashboardContribution,
 } from '../dashboard-plane.js';
@@ -35,11 +35,11 @@ function entry(
   return { sessionId, tool, contribution };
 }
 
-describe('RESERVED_DASHBOARD_KEYS', () => {
+describe('isReservedDashboardKey', () => {
   it('reserves the host-owned top-level shell keys', () => {
-    expect(RESERVED_DASHBOARD_KEYS.has('sessions')).toBe(true);
-    expect(RESERVED_DASHBOARD_KEYS.has('contributedTabs')).toBe(true);
-    expect(RESERVED_DASHBOARD_KEYS.has('graphCatalog')).toBe(false);
+    expect(isReservedDashboardKey('sessions')).toBe(true);
+    expect(isReservedDashboardKey('contributedTabs')).toBe(true);
+    expect(isReservedDashboardKey('graphCatalog')).toBe(false);
   });
 });
 

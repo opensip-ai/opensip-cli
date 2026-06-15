@@ -41,6 +41,9 @@ import { buildStateSeams } from './bootstrap/state-seams.js';
 
 import type { CommandResult } from '@opensip-cli/contracts';
 
+/** Structured-log `module` tag for this composition-root module. */
+const MODULE_TAG = 'cli:context';
+
 // ---------------------------------------------------------------------------
 // No module-global bootstrap-handoff bag.
 //
@@ -109,7 +112,15 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
       try {
         const thunk = readScope().datastore;
         return thunk ? (thunk() as DataStore) : undefined;
-      } catch {
+      } catch (error) {
+        // @swallow-ok no entered scope / no datastore in scope is normal for
+        // non-project commands and tests; degrade to "no datastore" (the run
+        // plane then no-ops). Debug-log for diagnosability.
+        log.debug?.({
+          evt: 'cli.context.datastore_unavailable',
+          module: MODULE_TAG,
+          error: error instanceof Error ? error.message : String(error),
+        });
         return;
       }
     },

@@ -36,7 +36,7 @@ import {
 } from '@opensip-cli/dashboard';
 import { SessionRepo } from '@opensip-cli/session-store';
 
-import { RESERVED_DASHBOARD_KEYS, resolveContributedTabs } from './bootstrap/dashboard-plane.js';
+import { isReservedDashboardKey, resolveContributedTabs } from './bootstrap/dashboard-plane.js';
 import { getCurrentProjectRoot } from './cli-context.js';
 import { launchReport } from './open-report.js';
 
@@ -89,10 +89,10 @@ async function composeReportInput(): Promise<HtmlReportInput> {
     if (contribution) {
       // Guardrail (host-owned-run-timing Phase 5 §9.3 / spec §8): tools must
       // never clobber host-owned top-level shell keys (`sessions`,
-      // `contributedTabs`; future shell keys join RESERVED_DASHBOARD_KEYS).
-      // Ignore with a warning (best-effort, like other contribution faults) —
-      // the host owns the run history AND the per-run contributed tabs.
-      const reserved = Object.keys(contribution).filter((k) => RESERVED_DASHBOARD_KEYS.has(k));
+      // `contributedTabs`; see isReservedDashboardKey). Ignore with a warning
+      // (best-effort, like other contribution faults) — the host owns the run
+      // history AND the per-run contributed tabs.
+      const reserved = Object.keys(contribution).filter(isReservedDashboardKey);
       if (reserved.length > 0) {
         void log.warn({
           evt: 'cli.report.compose.reserved_key_ignored',

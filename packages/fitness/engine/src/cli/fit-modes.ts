@@ -82,11 +82,12 @@ function fitRunCompletion(args: FitOptions, envelope: SignalEnvelope): FitRunCom
   };
 }
 
-// persistFitRun removed (Phase 3.2). The three mode bodies (json/live-fallback/gate)
-// that previously called it now directly do:
-//   cli.runSession.record({ tool: 'fit', cwd: args.cwd, recipe: ..., score: ..., passed: ..., payload: build... })
-// using the ToolCliContext they receive. This is the host seam; timing is stamped
-// by the RunTimer the host created for the invocation.
+// persistFitRun removed (Phase 3). The three mode bodies (json/live-fallback/gate)
+// now RETURN a FitRunCompletion (the `session` contribution above, plus the
+// dashboard contribution) from the handler/live renderer; the host run plane
+// persists it and stamps startedAt/completedAt/durationMs from the invocation
+// RunTimer. There is no tool-side generic-session writer (the `runSession.record`
+// seam was removed in Phase 6).
 
 /**
  * Emit any non-fatal warnings collected during the run to stderr. Safe to

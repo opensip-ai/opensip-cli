@@ -27,8 +27,16 @@ import type { ContributedTab } from '@opensip-cli/dashboard';
  * history; `contributedTabs` is the host-owned per-run tab shell
  * (host-owned-run-timing Phase 5 §9.3). A tool that returns one of these is
  * ignored (best-effort) with a warning — it cannot clobber the host shell.
+ *
+ * Kept module-private and exposed via {@link isReservedDashboardKey} (a behaviour,
+ * not a shared mutable Set) so no module-level singleton crosses the boundary.
  */
-export const RESERVED_DASHBOARD_KEYS = new Set(['sessions', 'contributedTabs']);
+const RESERVED_DASHBOARD_KEYS = new Set(['sessions', 'contributedTabs']);
+
+/** True when `key` is a host-reserved top-level dashboard-input shell key. */
+export function isReservedDashboardKey(key: string): boolean {
+  return RESERVED_DASHBOARD_KEYS.has(key);
+}
 
 /** One durable per-run dashboard contribution row, as `SessionRepo` lists them. */
 export interface PersistedDashboardContribution {

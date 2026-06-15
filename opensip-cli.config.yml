@@ -142,6 +142,12 @@ checkOverrides:
   # `packages/*/src/**/*.ts` minus tests — still covering all first-party
   # source while dropping the test-file and vendored-bundle noise.
   file-length-limit: [backend, cli]
+  # architecture-session-timing-not-host-owned governs the NESTED tool engine
+  # packages (packages/{fitness,simulation,graph}/*/src) — which the flat
+  # `backend` glob (packages/*/src) does NOT reach. Pin to `all-ts` so those
+  # files are scanned; the check itself path-gates to first-party tool packages
+  # and strips comments, so host code and tests are inert (ADR-0048 / Phase 7).
+  architecture-session-timing-not-host-owned: [all-ts]
 
 # =============================================================================
 # Graph Configuration

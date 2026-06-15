@@ -32,11 +32,9 @@ export interface SessionListOptions {
 }
 
 /**
- * Persistence layer for tool-run sessions.
- *
- * Stores generic session columns plus one opaque per-tool `payload`
- * blob. This layer holds ZERO tool vocabulary — it never inspects or
- * validates the payload shape; the producing tool owns that. (Audit
+ * Persistence layer for tool-run sessions. Stores generic session columns plus
+ * one opaque per-tool `payload` blob; holds ZERO tool vocabulary — it never
+ * inspects/validates the payload shape (the producing tool owns that). (Audit
  * 2026-05-29, session split.)
  */
 export class SessionRepo {
@@ -47,23 +45,18 @@ export class SessionRepo {
   }
 
   /**
-   * Persist a completed session row and its tool payload.
-   *
-   * Writes the generic columns including host-owned `startedAt` / `completedAt`
-   * (mapped to the physical `timestamp*` / `completed_at*` columns). Any
-   * `session.hostMetrics` is IGNORED here — host metrics arrive at different
-   * times (persistMs after this write, egressMs after egress) and are attached
-   * via the best-effort {@link SessionRepo.upsertHostMetrics} sibling upsert.
+   * Persist a completed session row and its tool payload. Writes the generic
+   * columns including host-owned `startedAt` / `completedAt` (mapped to the
+   * physical `timestamp*` / `completed_at*` columns); `session.hostMetrics` is
+   * IGNORED here — metrics arrive later and attach via {@link SessionRepo.upsertHostMetrics}.
    *
    * @throws {ValidationError} When `startedAt` / `completedAt` are not finite
    *   dates — guarded eagerly so a bad value never corrupts the durable log.
    */
   save(session: StoredSession): void {
     try {
-      // Validate timing eagerly so we never write NaN / "Invalid Date" into the
-      // durable session log. A bad value from a tool (or replay path) becomes a
-      // clear ValidationError instead of silent corruption that later surfaces
-      // as confusing history / replay output.
+      // Validate timing eagerly: a bad value becomes a clear ValidationError
+      // instead of silent NaN/"Invalid Date" corruption in the durable log.
       const startedMs = new Date(session.startedAt).getTime();
       const completedMs = new Date(session.completedAt).getTime();
       if (!Number.isFinite(startedMs) || !Number.isFinite(completedMs)) {
@@ -90,13 +83,11 @@ export class SessionRepo {
             durationMs: session.durationMs,
           })
           .run();
-        // Tool-owned opaque detail. Written when the caller supplies it;
-        // `contracts` never inspects the shape.
+        // Tool-owned opaque detail (contracts never inspects the shape).
         if (session.payload !== undefined) {
           const hasInnerVersion = extractPayloadVersion(session.payload) !== undefined;
           if (!hasInnerVersion) {
-            // Deprecation-style warning for transition: encourage tools to adopt the
-            // __version convention on new writes (per payload evolution rules).
+            // Encourage tools to adopt the __version convention on new writes.
             logger.warn({
               evt: 'session.payload.missing_version',
               module: MODULE_NAME,
@@ -344,10 +335,9 @@ export class SessionRepo {
 
   /**
    * Best-effort upsert of host-side overhead metrics for a session
-   * (host-owned-run-timing §5.3). Called by the host run plane as render /
-   * persist / egress metrics become known; only the provided (non-undefined)
-   * fields are written, merging onto any existing row. Never throws — metrics
-   * are observability, not correctness.
+   * (host-owned-run-timing §5.3). The host run plane calls this as render /
+   * persist / egress metrics become known; only the provided fields are written,
+   * merging onto any existing row. Never throws — metrics are observability.
    */
   upsertHostMetrics(sessionId: string, metrics: StoredSessionHostMetrics): void {
     try {
@@ -385,9 +375,8 @@ export class SessionRepo {
 
   /**
    * Best-effort save of a tool's opaque per-run dashboard contribution
-   * (host-owned-run-timing §7), keyed by (session id, tool). Replaces any
-   * prior contribution for the same pair. The persistence layer holds zero
-   * tool vocabulary — `contribution` is an opaque JSON blob. Never throws.
+   * (host-owned-run-timing §7), keyed by (session id, tool); replaces any prior
+   * contribution for that pair. `contribution` is an opaque JSON blob; never throws.
    */
   saveDashboardContribution(sessionId: string, tool: ToolShortId, contribution: unknown): void {
     try {

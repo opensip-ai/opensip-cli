@@ -2,24 +2,16 @@
  * mount-command-spec — the host-owned layer that turns a declarative
  * {@link CommandSpec} (core, Phase 0) into a wired Commander command.
  *
- * This is the generalization of {@link mountResultCommand}: where that helper
- * mounts a single CLI-owned `CommandResult` action body, `mountCommandSpec`
- * mounts ANY command (tool or host) from its typed spec — translating each
- * declared `OptionSpec`/`ArgSpec` into Commander wiring, applying the shared
- * common flags (ADR-0021), and owning the uniform
+ * Generalizes {@link mountResultCommand}: it mounts ANY command (tool or host)
+ * from its typed spec — translating each `OptionSpec`/`ArgSpec` into Commander
+ * wiring, applying the shared common flags (ADR-0021), and owning the uniform
+ * `parse → handler → dispatch output → map error → exit` pipeline. Tools never
+ * touch Commander; they export specs and the host mounts them (north-star §5.4).
  *
- *     parse → handler → dispatch output → map error → exit
- *
- * pipeline. Tools never touch Commander; they export specs and the host mounts
- * them (launch, north-star §5.4 Command contract).
- *
- * The single output-dispatch seam — {@link dispatchOutput} — was the **launch
- * `CommandOutcome` hinge**, now landed: every machine output is wrapped in a
- * `CommandOutcome` and serialized through the one `renderOutcome` seam. The wrap
- * lives in the host emit seams this function delegates to (`emitCommandResult`,
- * `ctx.emitEnvelope`), so the handler contract and the mounter stayed
- * byte-identical — all the outer-shape change landed in those seams (release
- * launch, north-star §5.5).
+ * The single output-dispatch seam — {@link dispatchOutput} — wraps every machine
+ * output in a `CommandOutcome` serialized through the one `renderOutcome` seam.
+ * The wrap lives in the host emit seams this delegates to (`emitCommandResult`,
+ * `ctx.emitEnvelope`), so the handler contract stayed byte-identical (§5.5).
  */
 
 import {

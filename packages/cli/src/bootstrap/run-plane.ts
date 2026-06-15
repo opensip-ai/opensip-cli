@@ -1,4 +1,3 @@
-// @fitness-ignore-file architecture-session-timing-not-host-owned -- THIS IS the host run-lifecycle plane (spec §9.2 "Allowed: host run lifecycle plane"). It is the single sanctioned owner of generic StoredSession timing + persistence; the host-side persistMs clock (performance.now) and the SessionRepo write live here by design. Phase 7 replaces this blanket ignore with a path-based allow in the check.
 /**
  * run-plane — the host-owned run lifecycle plane (host-owned-run-timing §6, §8).
  *
@@ -126,7 +125,15 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
   function safeDatastore(): DataStore | undefined {
     try {
       return deps.getDatastore();
-    } catch {
+    } catch (error) {
+      // @swallow-ok absence of a datastore is a NORMAL control-flow signal
+      // (non-project commands / tests) — the resolver throwing means the same.
+      // Debug-log for diagnosability and degrade to "no datastore".
+      log.debug?.({
+        evt: 'cli.run-plane.datastore_unavailable',
+        module: MODULE_TAG,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return;
     }
   }
@@ -249,7 +256,12 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
       const completion = await render();
       const ttyBusyMs = Math.max(0, performance.now() - ttyStart);
       if (completion?.session) {
+        // Both calls are SYNCHRONOUS best-effort writes (they return a value /
+        // void, not a promise); the detached-promise heuristic flags un-awaited
+        // calls inside this async fn by name. Nothing to await.
+        // @fitness-ignore-next-line detached-promises -- completeAndPersist is synchronous (returns RecordedToolRunSession | undefined)
         completeAndPersist(completion.session, completion.dashboard);
+        // @fitness-ignore-next-line detached-promises -- recordHostMetrics is synchronous (returns void)
         recordHostMetrics({ ttyBusyMs });
       }
       return completion;
