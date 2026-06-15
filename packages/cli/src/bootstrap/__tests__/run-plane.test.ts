@@ -43,6 +43,22 @@ describe('createRunPlaneFactory — invocation lifecycle', () => {
     expect(a.lifecycle.startedAt).toBe(b.lifecycle.startedAt);
   });
 
+  it('does NOT start a lifecycle at construction — startedAt reflects first beginRun, not factory creation', () => {
+    // Command-scoping invariant: the factory holds stable deps only; the
+    // lifecycle (and its startedAt wall clock) must be created when the command
+    // action calls beginRun, NOT eagerly at buildToolCliContext time. Capture a
+    // boundary AFTER construction, spin, then begin — a lazily-created lifecycle
+    // starts after the boundary; an eagerly-created one would start before it.
+    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
+    const afterConstruction = Date.now();
+    const spinStart = Date.now();
+    while (Date.now() - spinStart < 5) {
+      /* spin so the boundary is measurably before beginRun */
+    }
+    const inv = factory.beginRun();
+    expect(inv.lifecycle.startedAtEpochMs).toBeGreaterThanOrEqual(afterConstruction);
+  });
+
   it('completeAndPersist is best-effort with no datastore — returns undefined, never throws', () => {
     const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
     const inv = factory.current();
