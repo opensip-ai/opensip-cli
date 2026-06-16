@@ -104,3 +104,20 @@ describe('renderOutcome — human', () => {
     expect(stdout).toHaveLength(0);
   });
 });
+
+/** Task 2 contract: renderOutcome + the emit* seams produce uniform outcomes. */
+describe('renderOutcome contract — uniform across emitJson / emitEnvelope / emitError / result paths', () => {
+  it('json path (used by emitJson/emitEnvelope under --json, emitError) always serializes the full wrapper', async () => {
+    spyStdout();
+    const render = vi.fn();
+    const outcome: CommandOutcome = {
+      kind: 'x.run',
+      status: 'ok',
+      exitCode: 0,
+      data: { type: 'x' },
+    };
+    await renderOutcome(outcome, { jsonRequested: true, render });
+    expect(stdout[0]).toContain('"kind": "x.run"');
+    expect(render).not.toHaveBeenCalled();
+  });
+});

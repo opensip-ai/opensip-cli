@@ -110,3 +110,42 @@ describe('outcomeFromErrorMessage', () => {
     });
   });
 });
+
+/**
+ * Task 2: Outcome Assembly Contract (high-signal).
+ * Every host machine-output path must emit the same CommandOutcome envelope:
+ *  - emitJson / emitError (output-plane via outcomeFromErrorMessage + renderOutcome)
+ *  - emitEnvelope (via outcomeFromEnvelope)
+ *  - command-result dispatch (via outcomeFromResult)
+ *  - signal-envelope dispatch (via outcomeFromEnvelope)
+ * The assemblers + withDiagnostics + renderOutcome are the single source.
+ * (diagnostics attachment is scope-dependent and omitted in these pure tests.)
+ */
+describe('outcome assembly contract — uniform CommandOutcome across host paths', () => {
+  it('signal-envelope path (fit/graph run) uses outcomeFromEnvelope → .envelope + run kind', () => {
+    const o = outcomeFromEnvelope(ENVELOPE, 0);
+    expect(o.kind).toBe('graph.run');
+    expect(o.status).toBe('ok');
+    expect(o.envelope).toBe(ENVELOPE);
+    expect('data' in o).toBe(false);
+  });
+
+  it('command-result path (lists, host cmds) uses outcomeFromResult → .data', () => {
+    const o = outcomeFromResult({ type: 'fit-list' }, 0);
+    expect(o.kind).toBe('fit-list');
+    expect(o.data).toEqual({ type: 'fit-list' });
+  });
+
+  it('emitError path (diagnosed handler error) uses outcomeFromErrorMessage → status:error + errors', () => {
+    const o = outcomeFromErrorMessage({ message: 'bad', exitCode: 2, kind: 'command.error' });
+    expect(o.status).toBe('error');
+    expect(o.errors?.[0]?.message).toBe('bad');
+  });
+
+  it('unknown error path uses outcomeFromError → RUNTIME_ERROR + command.error', () => {
+    const o = outcomeFromError('boom');
+    expect(o.status).toBe('error');
+    expect(o.exitCode).toBe(1);
+    expect(o.kind).toBe('command.error');
+  });
+});

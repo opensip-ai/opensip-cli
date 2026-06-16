@@ -198,6 +198,7 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
  *   but the mount context provides no `emitEnvelope` / `renderLive` emitter — a
  *   mis-declared host spec fails loudly here rather than silently no-op'ing.
  */
+
 export async function dispatchOutput<TCtx extends CommandMountContext>(
   result: unknown,
   spec: CommandSpec<unknown, TCtx>,

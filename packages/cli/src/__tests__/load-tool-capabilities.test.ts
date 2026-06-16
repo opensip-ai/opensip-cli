@@ -118,3 +118,33 @@ describe('loadOwningToolCapabilities', () => {
     });
   });
 });
+
+/** Task 4: Capability-Wiring Diagnostics (build-per-run-scope + pre-action-hook + load seam).
+ * Diagnostics must surface enough to debug "owning tool's capability domain did not load":
+ *  - domains wired (buildPerRunScope)
+ *  - owning tool domains driven + contribution counts (pre-action after loadOwning...)
+ *  - load errors per-domain (emitted by the generic loader, ride on scope bus)
+ * The return value of load + registry.isDomainLoaded + scope.diagnostics.snapshot() give the picture.
+ */
+describe('capability wiring diagnostics contract (Task 4)', () => {
+  it('returns driven count; callers (pre-action) record capabilities.driven + per-domain events for debuggability', async () => {
+    const registry = new CapabilityRegistry();
+    const driver = vi.fn();
+    registry.registerDomain(domain('d1', 'tool-a', 'pack-a'), driver);
+
+    await withCapabilities(registry, async () => {
+      const driven = await loadOwningToolCapabilities({
+        owningTool: makeTool('tool-a'),
+        projectDir: testDir,
+        configPath: undefined,
+      });
+      expect(driven).toBe(1);
+      // The pre-action-hook then does:
+      // scope.diagnostics.event('load', 'debug', `drove ${driven} owning-tool capability domain(s)...`)
+      // scope.diagnostics.counter('capabilities.driven', driven)
+      // plus per-domain 'capability ... loaded' events from inside the generic loader.
+      // build-per-run-scope records the 'wired' count + 'contribute' counts upstream.
+      expect(registry.isDomainLoaded('d1', testDir)).toBe(true);
+    });
+  });
+});

@@ -359,15 +359,23 @@ export function installPreActionHook(
   // many paths. postAction fires for normal completion; error paths are covered by
   // handleParseError + handleFatalBootstrapError (which may also dispose in future passes).
   // Idempotent: dispose is cheap and safe to call more than once.
-  program.hook('postAction', () => {
-    try {
-      const s = currentScope();
-      if (s && typeof s.dispose === 'function') {
-        s.dispose();
-      }
-    } catch {
-      // @swallow-ok dispose errors on shutdown; the run has already produced its outcome.
-    }
-  });
+  program.hook('postAction', disposeCurrentScope);
 }
+
+/**
+ * Extracted seam (Task 3) for postAction disposal + error-path coverage.
+ * Narrow, testable, no Commander dep. Called from the hook; can be called
+ * explicitly in tests or future finally blocks on thrown handler paths.
+ */
+export function disposeCurrentScope(): void {
+  try {
+    const s = currentScope();
+    if (s && typeof s.dispose === 'function') {
+      s.dispose();
+    }
+  } catch {
+    // @swallow-ok dispose errors on shutdown; the run has already produced its outcome.
+  }
+}
+
 /* eslint-enable sonarjs/cognitive-complexity */

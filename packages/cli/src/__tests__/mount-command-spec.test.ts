@@ -335,6 +335,28 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
     expect(rendered).toHaveLength(1); // not rendered under --json
   });
 
+  // Task 2: the dispatchOutput seam (used by mount for command-result / signal-envelope)
+  // plus the ctx emits, all funnel through the same assemble/render for uniform CommandOutcome.
+  it('command-result dispatch (used by emitCommandResult) participates in the one-outcome contract', async () => {
+    const { ctx, rendered } = makeCtx();
+    const program = new Command();
+    const spec: HostCommandSpec = defineCommand({
+      name: 'res',
+      description: 'result cmd',
+      commonFlags: ['json'],
+      scope: 'none',
+      output: 'command-result',
+      handler: () => ({ type: 'list' }),
+    });
+    mountCommandSpec(program, spec, ctx);
+    // For the fake lean ctx here, command-result under --json still goes through
+    // emitCommandResult which (in real) assembles via renderOutcome; we just
+    // assert the dispatch arm and non-crash (the full uniform-shape contract is
+    // pinned in assemble-outcome + render-outcome tests + e2e json-contract).
+    await program.parseAsync(['res', '--json'], { from: 'user' });
+    expect(rendered).toHaveLength(0); // json short-circuits render in the emit path
+  });
+
   it('raw-stream: the host renders nothing (handler owns its own IO)', async () => {
     const { ctx, rendered, envelopes } = makeCtx();
     const sideEffect = vi.fn();

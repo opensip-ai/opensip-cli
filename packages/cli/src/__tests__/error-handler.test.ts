@@ -14,6 +14,7 @@ import {
   ConfigurationError,
   NetworkError,
   NotFoundError,
+  PluginIncompatibleError,
   ValidationError,
 } from '@opensip-cli/core';
 import { CommanderError } from 'commander';
@@ -128,6 +129,25 @@ describe('handleParseError', () => {
     );
   });
 
+  it('handleFatalBootstrapError for typed ToolError uses mapToolErrorToExitCode (e.g. PLUGIN_INCOMPATIBLE)', () => {
+    const savedExitCode = process.exitCode;
+    process.exitCode = 0;
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const errorLog = vi.fn();
+    try {
+      handleFatalBootstrapError(
+        new PluginIncompatibleError('bad bundled', { diagnostic: 'manifest' }),
+        { error: errorLog },
+      );
+    } finally {
+      spy.mockRestore();
+      process.exitCode = savedExitCode;
+    }
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({ exitCode: EXIT_CODES.PLUGIN_INCOMPATIBLE }),
+    );
+  });
+
   // ── Commander exitOverride errors (2.11.0 command plane) ──────────────────
   // The root program calls `.exitOverride()` so Commander's parse failures
   // surface here instead of `process.exit(N)`. Invalid-argument-value codes
@@ -181,6 +201,16 @@ describe('handleParseError', () => {
     // substring rule mentions --recipes. We assert the typed-rule
     // suggestion wins.
     expect(opts.rendered[0]?.suggestion).toContain('opensip-cli.config.yml');
+  });
+
+  // Task 1 focused matrix coverage (composition-root-hardening): Commander parse,
+  // typed ToolError subclasses (incl. PluginIncompatible), BootstrapError,
+  // unknown, non-Error. Report-upload vs findings lives in deliver + exit-parity.
+  it('routes PluginIncompatibleError (typed ToolError) to PLUGIN_INCOMPATIBLE exit', async () => {
+    const opts = makeOpts();
+    await handleParseError(new PluginIncompatibleError('bad plugin', { diagnostic: 'x' }), opts);
+    expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.PLUGIN_INCOMPATIBLE);
+    expect(opts.rendered[0]?.exitCode).toBe(EXIT_CODES.PLUGIN_INCOMPATIBLE);
   });
 });
 

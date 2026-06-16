@@ -155,6 +155,24 @@ async function emitToCloud(
   }
 }
 
+/**
+ * Pure seam for the report-upload vs findings-failure exit precedence (ADR-0008 / Task 1).
+ * Extracted so the matrix is unit-testable without IO / full deliverEnvelope.
+ * A report failure (exit 4) is only honoured when the run otherwise passed
+ * (real findings / gate / override failure always dominates; last-write-wins on RUNTIME_ERROR).
+ */
+export function deriveReportExitDecision(
+  reportTo: string | undefined,
+  reportSuccess: boolean,
+  runFailed: boolean,
+): number | undefined {
+  if (reportTo === undefined || reportTo.length === 0) return undefined;
+  if (!reportSuccess && !runFailed) {
+    return EXIT_CODES.REPORT_FAILED;
+  }
+  return undefined;
+}
+
 /** POST the envelope's SARIF to a `--report-to` receiver via the chunked transport. */
 async function reportSarif(
   envelope: SignalEnvelope,
@@ -244,9 +262,10 @@ export async function deliverEnvelope(
   }
   // Exit-code contract (ADR-0008): a report-upload failure exits 4 — but only
   // when the run otherwise passed; a real failure (`runFailed`, derived from the
-  // verdict above) dominates.
-  if (!reportSuccess && !runFailed) {
-    opts.setExitCode?.(EXIT_CODES.REPORT_FAILED);
+  // verdict above) dominates. Uses the extracted pure seam for the matrix.
+  const reportExit = deriveReportExitDecision(opts.reportTo, reportSuccess, runFailed);
+  if (reportExit !== undefined) {
+    opts.setExitCode?.(reportExit);
   }
 
   void scope?.diagnostics.event(

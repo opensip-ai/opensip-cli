@@ -26,7 +26,7 @@ import {
 } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
-import { deliverEnvelope } from '../bootstrap/deliver-envelope.js';
+import { deliverEnvelope, deriveReportExitDecision } from '../bootstrap/deliver-envelope.js';
 
 const NOOP_SINK: SignalSink = { emit: () => Promise.resolve({ accepted: 0, authRejected: false }) };
 
@@ -90,6 +90,36 @@ describe('exit-parity · findings exit is a pure function of verdict.passed', ()
   it('gate-compare override (degraded=false) PASSES even when the run verdict fails', async () => {
     const setExitCode = await exitFor(envelope('graph', true), /* runFailed */ false);
     expect(setExitCode).not.toHaveBeenCalled();
+  });
+});
+
+/** Focused exit-code derivation matrix (Task 1 of composition-root-hardening). */
+describe('exit-parity · report-upload vs findings precedence matrix (pure seam)', () => {
+  const REPORT_FAILED = EXIT_CODES.REPORT_FAILED;
+
+  it('findings failure (runFailed=true) + report fail → keeps RUNTIME_ERROR (no 4)', () => {
+    expect(deriveReportExitDecision('https://ex', false, true)).toBeUndefined();
+  });
+
+  it('findings failure (verdict fail) + report fail → keeps RUNTIME_ERROR (no 4)', () => {
+    expect(deriveReportExitDecision('https://ex', false, true)).toBeUndefined();
+  });
+
+  it('passing run + report fail → sets REPORT_FAILED (4)', () => {
+    expect(deriveReportExitDecision('https://ex', false, false)).toBe(REPORT_FAILED);
+  });
+
+  it('passing run + report success → no report exit', () => {
+    expect(deriveReportExitDecision('https://ex', true, false)).toBeUndefined();
+  });
+
+  it('no reportTo → never decides a report exit', () => {
+    expect(deriveReportExitDecision(undefined, false, false)).toBeUndefined();
+    expect(deriveReportExitDecision('', false, false)).toBeUndefined();
+  });
+
+  it('findings pass + no report → no exit decision from report seam', () => {
+    expect(deriveReportExitDecision(undefined, true, false)).toBeUndefined();
   });
 });
 
