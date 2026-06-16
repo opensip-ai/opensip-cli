@@ -35,7 +35,7 @@
     "NOTICE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"const {cpSync,mkdirSync}=require('fs');const p='dist/bootstrap';mkdirSync(p,{recursive:true});cpSync('src/bootstrap/bundled-tools.manifest.json',p+'/bundled-tools.manifest.json');\"",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"

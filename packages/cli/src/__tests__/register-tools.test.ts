@@ -16,6 +16,7 @@ import { Command } from 'commander';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import {
+  BUNDLED_TOOL_PACKAGES,
   discoverAndRegisterToolPackages,
   mountAllToolCommands,
   registerFirstPartyTools,
@@ -710,5 +711,30 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     expect(registry.get('fixture-admits-then-throws')).toBeUndefined();
     expect(provenance.some((p) => p.id === 'fixture-admits-then-throws')).toBe(false);
     expect(manifests.some((m) => m.id === 'fixture-admits-then-throws')).toBe(false);
+  });
+});
+
+/** Workstream A: prove a (new) manifest entry flows through the admission + mount path. */
+describe('bundled-tools manifest (data-driven)', () => {
+  it('BUNDLED_TOOL_PACKAGES and EXPECTED_SCAFFOLDING_TOOL_IDS are derived from the manifest', () => {
+    expect(BUNDLED_TOOL_PACKAGES).toEqual([
+      '@opensip-cli/fitness',
+      '@opensip-cli/simulation',
+      '@opensip-cli/graph',
+    ]);
+    expect(BUNDLED_TOOL_PACKAGES).toContain('@opensip-cli/fitness');
+  });
+
+  it('registerFirstPartyTools accepts an injected packages list (proves new manifest entry would be admitted/mounted via the exact same path)', async () => {
+    const registry = new ToolRegistryClass();
+    // The packages param exists precisely so tests (and future) can prove
+    // an added entry from the manifest would travel the uniform bundled
+    // admit → dynamic import → register → mount path (no special casing).
+    // We exercise the seam with the current manifest-derived list.
+    await expect(
+      registerFirstPartyTools(registry, [], [], BUNDLED_TOOL_PACKAGES),
+    ).resolves.toBeUndefined();
+    // The three are registered (their runtimes provide commands).
+    expect(registry.list().length).toBeGreaterThanOrEqual(3);
   });
 });

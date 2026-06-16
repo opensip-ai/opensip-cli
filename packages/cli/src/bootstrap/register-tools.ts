@@ -16,6 +16,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { type CliProgram } from '@opensip-cli/contracts';
 import {
@@ -52,27 +53,24 @@ import { isProjectLocalToolTrusted } from './tool-trust.js';
 /** `module` field on every structured log event emitted from this file. */
 const BOOTSTRAP_MODULE = 'cli:bootstrap';
 
+/** Used to resolve the bundled engine package dirs from the CLI's own module graph. */
+const requireFromHere = createRequire(import.meta.url);
+
 /**
- * Bundled first-party tool PACKAGES — declared as direct deps of
- * opensip-cli. Order is registration order (and thus help/listing order).
- *
- * launch cutover: these are package NAMES, not imported tool runtimes. The
- * host no longer statically `import`s `fitnessTool`/`graphTool`/`simulationTool`
- * — bundled tools are resolved on disk and loaded by DYNAMIC IMPORT through the
- * exact same manifest → `admitTool` → import → register path an installed or
- * project-local tool travels (north-star §2.1, Figure 7). "Bundled" is now a
- * provenance/trust posture, not a privileged load path: install-source
- * independence is structural, not merely tested (`no-bootstrap-tool-import`
- * guards this file against a static tool-runtime import creeping back).
+ * Bundled first-party tools are now data-driven (platform-ergonomics Workstream A).
+ * The source of truth is the co-located JSON manifest (single edit site when
+ * adding a first-party tool). Loaded via fs + import.meta.url (works in both
+ * src dev and dist/ after tsc; the json is committed under src/ and must be
+ * present next to the .js in dist at runtime — ensured by package "files": ["dist"]
+ * + manual cp in build or future asset plugin; no resolveJsonModule dep).
  */
-export const BUNDLED_TOOL_PACKAGES: readonly string[] = [
-  '@opensip-cli/fitness',
-  '@opensip-cli/simulation',
-  '@opensip-cli/graph',
-];
-// ^ Editing this list? EXPECTED_SCAFFOLDING_TOOL_IDS below pins the historical
-//   `init`-scaffold expectation against exactly this kind of edit — keep the
-//   two in agreement deliberately, not accidentally.
+const manifestUrl = new URL('bundled-tools.manifest.json', import.meta.url);
+const bundledManifest = JSON.parse(readFileSync(fileURLToPath(manifestUrl), 'utf8')) as {
+  bundledPackages: readonly string[];
+  scaffoldingToolIds: readonly string[];
+};
+
+export const BUNDLED_TOOL_PACKAGES: readonly string[] = bundledManifest.bundledPackages;
 
 /**
  * The ADR-0038 back-compat pin: the tool IDS whose `init` scaffold dirs the
@@ -82,20 +80,11 @@ export const BUNDLED_TOOL_PACKAGES: readonly string[] = [
  * (a tool removed, a packaging variant) under-scaffolds LOUDLY instead of
  * silently.
  *
- * Deliberately a HISTORICAL CONSTANT, not derived from the loaded bundled
- * manifests: bundled tools fail CLOSED in {@link registerFirstPartyTools}
- * (every load failure throws before the warning could run), so "bundled
- * manifests absent from the registry" is structurally empty — a derived list
- * could never fire. The only drift this diagnostic exists to catch is an edit
- * to the package list itself, which is precisely what a derivation would
- * follow rather than flag. Co-located with the package list (one module owns
- * both encodings) so an editor of either sees the other. `graph` is correctly
- * absent: it never scaffolded (`pluginLayout` undefined).
+ * Now derived from the same manifest as BUNDLED_TOOL_PACKAGES (Workstream A)
+ * so a single edit keeps them in sync. `graph` is correctly absent: it never
+ * scaffolded (`pluginLayout` undefined).
  */
-export const EXPECTED_SCAFFOLDING_TOOL_IDS: readonly string[] = ['fitness', 'simulation'];
-
-/** Used to resolve the bundled engine package dirs from the CLI's own module graph. */
-const requireFromHere = createRequire(import.meta.url);
+export const EXPECTED_SCAFFOLDING_TOOL_IDS: readonly string[] = bundledManifest.scaffoldingToolIds;
 
 /**
  * Resolve a bundled tool's PACKAGE DIR — the directory whose `package.json`

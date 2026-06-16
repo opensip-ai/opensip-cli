@@ -116,12 +116,15 @@ The flow lives in [`packages/cli/src/bootstrap/register-tools.ts`](https://githu
    const toolRegistry = new ToolRegistry();
 
 2. Bundled tools load by PACKAGE NAME (not a static import):
-   FIRST_PARTY_TOOLS = ['@opensip-cli/fitness',
-                        '@opensip-cli/simulation',
-                        '@opensip-cli/graph']   // names, not runtimes
-   For each: loadToolManifest → admitTool → dynamic import → register.
+   The list is data-driven from `packages/cli/src/bootstrap/bundled-tools.manifest.json`
+   (Workstream A). For each: loadToolManifest → admitTool → dynamic import → register.
    The host holds NO `import { fitnessTool }` — the `no-bootstrap-tool-import`
    fitness check fails the build if a static tool-runtime import creeps back.
+
+   To add a new first-party (bundled) tool: add its npm package name (and id for
+   scaffolding expectation) to the manifest JSON; the uniform admission path is
+   used automatically. Update contributor docs + the architecture ratchet if
+   needed.
 
 3. Discovery (third-party): walk, in precedence order, the project's
    .runtime/plugins/tool/ → the project node_modules → the user-global
