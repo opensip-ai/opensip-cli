@@ -168,7 +168,6 @@ export type {
   ToolExtensionPoints,
   LiveViewRenderer,
   LiveViewContext,
-  ToolRunSessionInput,
   ToolSessionContribution,
   ToolRunCompletion,
   RecordedToolRunSession,
@@ -334,7 +333,7 @@ export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 // `getRunId()` free function was removed in Item 2 — read
 // `currentScope()?.runId` instead. The instance methods
 // `LoggerImpl.{get,set}RunId` survive for isolated-instance test use.
-export { logger, LoggerImpl, configureLogger } from './lib/logger.js';
+export { logger, LoggerImpl, configureLogger, createRunLogger } from './lib/logger.js';
 export type { Logger, LogLevel, LoggerOptions, RunIdProvider } from './lib/logger.js';
 
 // Lib — telemetry (tracing). The kernel sibling of `logger`: a thin seam over

@@ -28,9 +28,10 @@
  *      (`setSilent`, `setDebugMode`, `setRunId`, `initLogFile`) were
  *      collapsed into `configureLogger` in T1 deferred Item C.
  *
- *   2. The exported `LoggerImpl` class. Used by tests (or tools that
- *      need an isolated logger) to construct a fresh instance whose
- *      state is independent of the singleton.
+ *   2. The exported `LoggerImpl` class + `createRunLogger(opts)`. Used
+ *      for per-run isolation (ADR-0053): each `RunScope` carries its own
+ *      `LoggerImpl` instance. Tests also use fresh instances so state is
+ *      independent of the singleton.
  */
 
 import { appendFileSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
@@ -348,15 +349,24 @@ const _logger = new LoggerImpl();
 export const logger: Logger = _logger;
 
 /**
+ * Construct a fresh per-run logger (ADR-0053). Each `RunScope` should
+ * carry one of these so concurrent hosted runs do not share file paths,
+ * silent/debug policy, or runId through the process-wide singleton.
+ */
+export function createRunLogger(opts: LoggerOptions): Logger {
+  return new LoggerImpl(opts);
+}
+
+/**
  * One-shot configuration for the process-wide `logger` singleton.
  * Replaces the four free mutators that previously each mutated one
- * field. The CLI's pre-action-hook calls this once with all relevant
- * options after flags are parsed and the project context is resolved.
+ * field. Pre-scope compatibility code may call this; per-run logging
+ * should use {@link createRunLogger} and stamp the result on
+ * `RunScope.logger` instead.
  *
  * SaaS hosts that run multiple invocations concurrently should NOT use
- * this — they construct per-invocation `new LoggerImpl({...})` and
- * wire it into the `RunScope.logger` field so each run has its own
- * file path and runId.
+ * this for per-run configuration — they construct per-invocation
+ * `createRunLogger({...})` and wire it into `RunScope.logger`.
  */
 export function configureLogger(opts: LoggerOptions): void {
   _logger.applyOptions(opts);

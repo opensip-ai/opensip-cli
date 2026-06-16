@@ -161,14 +161,6 @@ export interface ToolSessionContribution {
 }
 
 /**
- * Legacy alias for {@link ToolSessionContribution} — the input shape the
- * transitional `runSession.record(...)` seam accepts. Removed once the
- * record seam is deleted (host-owned-run-timing Phase 3); new code returns a
- * {@link ToolRunCompletion} instead of calling `record`.
- */
-export type ToolRunSessionInput = ToolSessionContribution;
-
-/**
  * What a tool command handler or live renderer returns to the host so the
  * host can complete the run lifecycle and persist the generic session row
  * (host-owned-run-timing §6.2).
@@ -244,9 +236,7 @@ export interface LiveViewContext {
  * for every live tool command. A live renderer must NOT call a generic-session
  * writer itself; instead it returns a {@link ToolRunCompletion} (or `void`)
  * once the underlying Ink app exits, and the host completes the lifecycle and
- * persists the session contribution after `await renderLive(...)`. The
- * parameter stays optional at the type level during the migration window
- * (Phase 2 makes it effectively required for live tool commands).
+ * persists the session contribution after `await renderLive(...)`.
  */
 export type LiveViewRenderer = (
   args: unknown,

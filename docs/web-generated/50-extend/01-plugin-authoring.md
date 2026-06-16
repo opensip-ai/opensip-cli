@@ -49,6 +49,10 @@ OpenSIP CLI is extensible across five shapes, listed in increasing order of effo
 
 Every shape above plugs into the same kernel. The CLI is a generic dispatcher; it discovers your package (by marker, exact pin, or the sim `scenarios-*` naming pattern), reads a known declaration (a Tool's `commandSpecs` that the host mounts, or the `checks` / `recipes` / `scenarios` arrays for packs), and routes the rest. There are no hooks, no middleware, no event buses — just a registry walk at startup.
 
+## `raw-stream` output (sanctioned escape hatch)
+
+Most tool commands return a `signal-envelope` or `command-result` and let the host dispatch output. Primary commands with **multi-mode runtime dispatch** (`fit`, `graph`, `sim`) declare `output: 'raw-stream'` instead: the handler owns render, egress, and exit-code decisions. This is intentional, not a seam bypass — but new commands should default to host dispatch unless multi-mode IO is required. In-repo fitness checks (`raw-stream-output-guarded`) require an in-file justification when a command spec uses `raw-stream`.
+
 That's by design. The whole point of the platform is that adding a new tool or pack requires zero CLI changes. For the architecture: [the tool-plugin model](/docs/opensip-cli/10-concepts/02-tool-plugin-model/) walks through it end-to-end.
 
 ## Where to go next

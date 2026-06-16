@@ -30,6 +30,17 @@ related-docs:
 >
 > They are siblings, not the same thing. A given language has one of each (e.g. TypeScript has both a fitness `typescriptAdapter` shipped by `@opensip-cli/lang-typescript` and a graph `typescriptGraphAdapter` shipped by `@opensip-cli/graph-typescript`). For graph adapters, see [`40-graph/03-adding-a-language.md`](/docs/opensip-cli/40-graph/03-adding-a-language/). The rest of this doc covers the fitness `LanguageAdapter` only.
 
+## How adapters reach the CLI (registration asymmetry)
+
+Fitness and graph use **different registration paths** by design:
+
+| Subsystem | Registration | Adding a bundled adapter |
+|-----------|--------------|-------------------------|
+| **Fitness** `LanguageAdapter` | Static import in [`register-language-adapters.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.2/packages/cli/src/bootstrap/register-language-adapters.ts) at CLI startup | Edit that file + add `@opensip-cli/lang-*` to `opensip-cli` `package.json` dependencies |
+| **Graph** `GraphLanguageAdapter` | Capability discovery via each tool's `capabilityRegistrars` (`graph-adapter` domain) | Ship `@opensip-cli/graph-*` with `opensipTools.kind: "graph-adapter"`; no CLI source edit |
+
+Fitness adapters are always required for check execution (string/comment stripping), so the CLI wires all six in one place and keeps fitness free of hard deps on every `lang-*` pack. Graph adapters are optional per language and load only when the graph tool's capability loader runs for an admitted `graph-*` package.
+
 A check is a regex over `console.log`. The naive run flags `// console.log("debug")` (a comment) and `"console.log"` (a string literal). A `LanguageAdapter` is what makes the regex correct — it strips comments and string literals before the check sees the content.
 
 That's the load-bearing part. Adapters also expose a richer query API (functions, imports, call sites) for AST-shaped checks, but that surface is opt-in. The minimum viable adapter is "given source, produce filtered source."

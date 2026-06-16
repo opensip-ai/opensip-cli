@@ -3,7 +3,12 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { LanguageParseCache } from '../../languages/parse-cache.js';
 import { LanguageRegistry } from '../../languages/registry.js';
 import { ToolRegistry } from '../../tools/registry.js';
-import { logger as defaultLogger, configureLogger } from '../logger.js';
+import {
+  logger as defaultLogger,
+  configureLogger,
+  createRunLogger,
+  type LoggerImpl,
+} from '../logger.js';
 import {
   RunScope,
   runWithScope,
@@ -208,6 +213,32 @@ describe('runId — scope-bound propagation to logger event-stamping', () => {
       .map((c) => JSON.parse(c.trim()) as { evt?: string; runId?: string })
       .find((e) => e.evt === 'test.outside');
     expect(matched?.runId).toBe('RUN_singleton');
+  });
+});
+
+describe('RunScope — per-run logger isolation (ADR-0053)', () => {
+  it('concurrent scopes use independent loggers', async () => {
+    const a = createRunLogger({ runId: 'RUN_a', silent: true, debugMode: true });
+    const b = createRunLogger({ runId: 'RUN_b', silent: true, debugMode: false });
+
+    const scopeA = new RunScope({ runId: 'RUN_a', logger: a });
+    const scopeB = new RunScope({ runId: 'RUN_b', logger: b });
+
+    await Promise.all([
+      runWithScope(scopeA, () => {
+        expect((a as LoggerImpl).getRunId()).toBe('RUN_a');
+        expect((b as LoggerImpl).getRunId()).toBe('RUN_b');
+        return Promise.resolve();
+      }),
+      runWithScope(scopeB, () => {
+        expect((a as LoggerImpl).getRunId()).toBe('RUN_a');
+        expect((b as LoggerImpl).getRunId()).toBe('RUN_b');
+        return Promise.resolve();
+      }),
+    ]);
+
+    scopeA.dispose();
+    scopeB.dispose();
   });
 });
 

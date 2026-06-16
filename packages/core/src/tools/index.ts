@@ -19,7 +19,6 @@ export type {
   ToolSessionReplayContribution,
   LiveViewRenderer,
   LiveViewContext,
-  ToolRunSessionInput,
   ToolSessionContribution,
   ToolRunCompletion,
   RecordedToolRunSession,

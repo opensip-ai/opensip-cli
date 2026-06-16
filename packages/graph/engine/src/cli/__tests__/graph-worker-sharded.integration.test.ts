@@ -5,22 +5,22 @@
  * render parent -> graph-run-worker -> shard workers.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { runWithScope, runWithScopeSync } from "@opensip-cli/core";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runWithScope, runWithScopeSync } from '@opensip-cli/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { makeGraphTestScope } from "../../__tests__/test-utils/with-graph-scope.js";
-import { currentAdapterRegistry } from "../../lang-adapter/registry.js";
-import { executeGraphWorker } from "../graph-worker.js";
+import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
+import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
+import { executeGraphWorker } from '../graph-worker.js';
 
-import type { GraphLanguageAdapter } from "../../lang-adapter/types.js";
-import type { LiveGraphOutput } from "../graph.js";
-import type { Shard } from "../orchestrate/shard-model.js";
-import type { ProgressEvent } from "@opensip-cli/cli-ui";
-import type { ToolCliContext, WorkerMessage } from "@opensip-cli/core";
+import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
+import type { LiveGraphOutput } from '../graph.js';
+import type { Shard } from '../orchestrate/shard-model.js';
+import type { ProgressEvent } from '@opensip-cli/cli-ui';
+import type { ToolCliContext, WorkerMessage } from '@opensip-cli/core';
 
 type Msg = WorkerMessage<ProgressEvent, LiveGraphOutput>;
 
@@ -67,9 +67,9 @@ process.exit(0);
 `;
 
 const adapter = {
-  id: "typescript",
-  fileExtensions: [".ts"],
-  cacheKey: () => "unused-no-cache",
+  id: 'typescript',
+  fileExtensions: ['.ts'],
+  cacheKey: () => 'unused-no-cache',
   ruleHints: undefined,
 } as unknown as GraphLanguageAdapter;
 
@@ -77,7 +77,7 @@ function mockCli(): ToolCliContext {
   return { scope: { datastore: () => undefined } } as unknown as ToolCliContext;
 }
 
-describe("executeGraphWorker sharded integration", () => {
+describe('executeGraphWorker sharded integration', () => {
   let dir: string;
   let cliScript: string;
   let originalArgv1: string | undefined;
@@ -87,9 +87,9 @@ describe("executeGraphWorker sharded integration", () => {
   beforeEach(() => {
     scope = makeGraphTestScope();
     runWithScopeSync(scope, () => currentAdapterRegistry().register(adapter));
-    dir = mkdtempSync(join(tmpdir(), "graph-worker-sharded-"));
-    cliScript = join(dir, "fake-cli.cjs");
-    writeFileSync(cliScript, SHARD_WORKER_SCRIPT, "utf8");
+    dir = mkdtempSync(join(tmpdir(), 'graph-worker-sharded-'));
+    cliScript = join(dir, 'fake-cli.cjs');
+    writeFileSync(cliScript, SHARD_WORKER_SCRIPT, 'utf8');
     originalArgv1 = process.argv[1];
     process.argv[1] = cliScript;
     messages = [];
@@ -115,47 +115,47 @@ describe("executeGraphWorker sharded integration", () => {
     };
   }
 
-  it("coordinates real shard workers and returns a live output over IPC", async () => {
-    const specPath = join(dir, "spec.json");
+  it('coordinates real shard workers and returns a live output over IPC', async () => {
+    const specPath = join(dir, 'spec.json');
     writeFileSync(
       specPath,
       JSON.stringify({
         cwd: dir,
         noCache: true,
-        resolution: "exact",
+        resolution: 'exact',
         exact: false,
-        shards: [shard("pkg:a"), shard("pkg:b")],
+        shards: [shard('pkg:a'), shard('pkg:b')],
       }),
-      "utf8",
+      'utf8',
     );
 
     await runWithScope(scope, () => executeGraphWorker(specPath, mockCli()));
 
-    const progress = messages.filter((m) => m.kind === "progress");
+    const progress = messages.filter((m) => m.kind === 'progress');
     expect(progress).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          kind: "progress",
+          kind: 'progress',
           event: expect.objectContaining({
-            type: "stage-start",
-            stage: "parse",
-            label: "Build shards",
+            type: 'stage-start',
+            stage: 'parse',
+            label: 'Build shards',
           }),
         }),
         expect.objectContaining({
-          kind: "progress",
+          kind: 'progress',
           event: expect.objectContaining({
-            type: "stage-start",
-            stage: "resolve",
-            label: "Link cross-package",
+            type: 'stage-start',
+            stage: 'resolve',
+            label: 'Link cross-package',
           }),
         }),
       ]),
     );
     const result = messages.at(-1);
-    expect(result?.kind).toBe("result");
-    if (result?.kind !== "result") throw new Error("no result message");
-    expect(result.value.reportLines.join("\n")).toContain("== Catalog ==");
+    expect(result?.kind).toBe('result');
+    if (result?.kind !== 'result') throw new Error('no result message');
+    expect(result.value.reportLines.join('\n')).toContain('== Catalog ==');
     expect(Array.isArray(result.value.signals)).toBe(true);
   });
 });

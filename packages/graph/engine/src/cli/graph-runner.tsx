@@ -28,9 +28,9 @@
  * CLI keeps its only `process.exitCode` mutator.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   Banner,
@@ -51,58 +51,54 @@ import {
   type ProgressCallback,
   type ProgressEvent,
   type ProgressSurface,
-} from "@opensip-cli/cli-ui";
+} from '@opensip-cli/cli-ui';
 import {
   runOffThreadOrInProcess,
   currentScope,
   type LiveViewContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
-} from "@opensip-cli/core";
-import { Box, Text, useApp, render } from "ink";
-import React, { useEffect, useState } from "react";
+} from '@opensip-cli/core';
+import { Box, Text, useApp, render } from 'ink';
+import React, { useEffect, useState } from 'react';
 
-import { assertFinalizedAcrossBoundary } from "./apply-suppressions.js";
-import { buildGraphEnvelope } from "./build-envelope.js";
-import {
-  SHARDED_STAGE_LABELS,
-  STAGE_LABELS,
-  toProgressEvent,
-} from "./graph-progress.js";
+import { assertFinalizedAcrossBoundary } from './apply-suppressions.js';
+import { buildGraphEnvelope } from './build-envelope.js';
+import { SHARDED_STAGE_LABELS, STAGE_LABELS, toProgressEvent } from './graph-progress.js';
 import {
   buildLiveGraphOutput,
   contributionFromSignals,
   evaluatedRuleSlugs,
   runShardedLiveBuild,
   type LiveGraphOutput,
-} from "./graph.js";
-import { GRAPH_STAGES, runGraph } from "./orchestrate.js";
+} from './graph.js';
+import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 
-import type { Shard } from "./orchestrate/shard-model.js";
-import type { GraphStage } from "./orchestrate.js";
-import type { GraphConfig, ResolutionMode, Rule } from "../types.js";
-import type { DataStore } from "@opensip-cli/datastore";
+import type { Shard } from './orchestrate/shard-model.js';
+import type { GraphStage } from './orchestrate.js';
+import type { GraphConfig, ResolutionMode, Rule } from '../types.js';
+import type { DataStore } from '@opensip-cli/datastore';
 
-const GRAPH_TOOL_TITLE = "Code Graph";
-const GRAPH_TOOL_DESCRIPTION = "Building call-graph from source";
+const GRAPH_TOOL_TITLE = 'Code Graph';
+const GRAPH_TOOL_DESCRIPTION = 'Building call-graph from source';
 
 const STAGE_RUNNING_DETAIL: Readonly<Record<GraphStage, string>> = {
-  discover: "Scanning source tree...",
-  parse: "Building program AST...",
-  walk: "Walking files for occurrences...",
-  resolve: "Binding symbols to edges...",
-  index: "Computing reverse indexes...",
-  features: "Computing feature columns...",
-  rules: "Evaluating rule set...",
+  discover: 'Scanning source tree...',
+  parse: 'Building program AST...',
+  walk: 'Walking files for occurrences...',
+  resolve: 'Binding symbols to edges...',
+  index: 'Computing reverse indexes...',
+  features: 'Computing feature columns...',
+  rules: 'Evaluating rule set...',
 };
 
 // Sharded-engine running sub-labels — mirror SHARDED_STAGE_LABELS: the parallel
 // shard build (parse), the fragment merge (walk), the cross-package link (resolve).
 const SHARDED_STAGE_RUNNING_DETAIL: Readonly<Record<GraphStage, string>> = {
   ...STAGE_RUNNING_DETAIL,
-  parse: "Building shards in parallel...",
-  walk: "Merging shard fragments...",
-  resolve: "Linking cross-package calls...",
+  parse: 'Building shards in parallel...',
+  walk: 'Merging shard fragments...',
+  resolve: 'Linking cross-package calls...',
 };
 
 // The phases surface the shared renderer consumes: graph's fixed, ordered stages,
@@ -112,11 +108,9 @@ const SHARDED_STAGE_RUNNING_DETAIL: Readonly<Record<GraphStage, string>> = {
 // single-program "Parse / Walk / Resolve" shape.
 function graphSurface(sharded: boolean): ProgressSurface {
   const labels = sharded ? SHARDED_STAGE_LABELS : STAGE_LABELS;
-  const runningDetail = sharded
-    ? SHARDED_STAGE_RUNNING_DETAIL
-    : STAGE_RUNNING_DETAIL;
+  const runningDetail = sharded ? SHARDED_STAGE_RUNNING_DETAIL : STAGE_RUNNING_DETAIL;
   return {
-    shape: "phases",
+    shape: 'phases',
     stages: GRAPH_STAGES.map((id) => ({
       id,
       label: labels[id],
@@ -135,15 +129,15 @@ interface RunSummaryShape {
 }
 
 type ViewState =
-  | { phase: "loading" }
-  | { phase: "running"; subscribe: (cb: ProgressCallback) => void }
+  | { phase: 'loading' }
+  | { phase: 'running'; subscribe: (cb: ProgressCallback) => void }
   | {
-      phase: "done";
+      phase: 'done';
       subscribe: (cb: ProgressCallback) => void;
       reportLines: readonly string[];
       summary: RunSummaryShape;
     }
-  | { phase: "error"; message: string };
+  | { phase: 'error'; message: string };
 
 interface GraphRunnerArgs {
   readonly cwd: string;
@@ -252,7 +246,7 @@ function GraphRunner({
   liveContext,
 }: GraphRunnerProps): React.ReactElement {
   const { exit } = useApp();
-  const [state, setState] = useState<ViewState>({ phase: "loading" });
+  const [state, setState] = useState<ViewState>({ phase: 'loading' });
   // Engine policy (ADR-0032): sharded is the default, `--exact` opts out. The
   // engine is selected upstream and handed to us as `args.shards` (length > 1 ⇒
   // sharded). Drives the engine-aware checklist labels below. `isTTY` never
@@ -284,8 +278,8 @@ function GraphRunner({
     //
     // Both transports converge on one `LiveGraphOutput` — already crossed the
     // single suppression chokepoint (`buildLiveGraphOutput` → `finalizeGraphSignals`).
-    const specDir = mkdtempSync(join(tmpdir(), "graph-worker-"));
-    const specPath = join(specDir, "spec.json");
+    const specDir = mkdtempSync(join(tmpdir(), 'graph-worker-'));
+    const specPath = join(specDir, 'spec.json');
     writeFileSync(
       specPath,
       JSON.stringify({
@@ -296,13 +290,13 @@ function GraphRunner({
         ...(sharded ? { shards: args.shards ?? [] } : {}),
         ...(args.recipe === undefined ? {} : { recipe: args.recipe }),
       }),
-      "utf8",
+      'utf8',
     );
     const run = runOffThreadOrInProcess<ProgressEvent, LiveGraphOutput>({
       preferWorker: true,
       descriptor: {
-        command: process.argv[1] ?? "",
-        argv: ["graph-run-worker", specPath],
+        command: process.argv[1] ?? '',
+        argv: ['graph-run-worker', specPath],
       },
       inProcess: (emit) =>
         sharded
@@ -322,7 +316,7 @@ function GraphRunner({
             )
           : runGraphWithProgress(args, datastore, emit),
     });
-    setState({ phase: "running", subscribe: run.onProgress });
+    setState({ phase: 'running', subscribe: run.onProgress });
 
     void (async () => {
       try {
@@ -338,10 +332,7 @@ function GraphRunner({
         // IPC structured-clone dropped the FinalizedSignals brand. Re-stamp it
         // here — an assertion of the prior finalize, NOT a second suppression —
         // so the host record (and the verdict) consume the branded, already-waived signals.
-        const finalized = assertFinalizedAcrossBoundary(
-          result.signals,
-          result.suppressedCount,
-        );
+        const finalized = assertFinalizedAcrossBoundary(result.signals, result.suppressedCount);
         // Host-owned persistence (host-owned-run-timing Phase 2): surface the
         // contribution built from the finalized (branded, already-waived)
         // signals; the host persists after the live view exits. Timing is
@@ -363,7 +354,7 @@ function GraphRunner({
         // Compute the summary for TTY (duration omitted; provider supplies host value).
         const envelope = buildGraphEnvelope({
           signals: finalized.signals,
-          runId: currentScope()?.runId ?? "",
+          runId: currentScope()?.runId ?? '',
           createdAt: new Date().toISOString(),
         });
         const { verdict } = envelope;
@@ -378,8 +369,8 @@ function GraphRunner({
         // footer in place of the text "== Summary ==" block.
         const reportLines = result.reportLines;
         setState((prev) => ({
-          phase: "done",
-          subscribe: prev.phase === "running" ? prev.subscribe : run.onProgress,
+          phase: 'done',
+          subscribe: prev.phase === 'running' ? prev.subscribe : run.onProgress,
           reportLines,
           summary,
         }));
@@ -387,7 +378,7 @@ function GraphRunner({
       } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
-        setState({ phase: "error", message });
+        setState({ phase: 'error', message });
         setExitCode?.(1);
         setTimeout(() => exit(), 50);
       }
@@ -416,18 +407,13 @@ function GraphRunner({
           walkedUp={walkedUp}
           update={ui?.update}
         />
-        {bannerSize === "mini" && ui?.update !== undefined && <UpdateHint />}
-        {bannerSize !== "mini" && (
-          <ProjectHeader root={args.cwd} walkedUp={walkedUp} />
-        )}
-        <RunHeader
-          tool={GRAPH_TOOL_TITLE}
-          description={GRAPH_TOOL_DESCRIPTION}
-        />
+        {bannerSize === 'mini' && ui?.update !== undefined && <UpdateHint />}
+        {bannerSize !== 'mini' && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
+        <RunHeader tool={GRAPH_TOOL_TITLE} description={GRAPH_TOOL_DESCRIPTION} />
       </>
     );
 
-  if (state.phase === "error") {
+  if (state.phase === 'error') {
     return (
       <Box flexDirection="column">
         {header}
@@ -436,7 +422,7 @@ function GraphRunner({
     );
   }
 
-  if (state.phase === "loading") {
+  if (state.phase === 'loading') {
     return (
       <Box flexDirection="column">
         {header}
@@ -453,11 +439,8 @@ function GraphRunner({
   return (
     <Box flexDirection="column">
       {header}
-      <LiveProgress
-        surface={graphSurface(sharded)}
-        subscribe={state.subscribe}
-      />
-      {state.phase === "done" && (
+      <LiveProgress surface={graphSurface(sharded)} subscribe={state.subscribe} />
+      {state.phase === 'done' && (
         <>
           {args.verbose === true && (
             <Box flexDirection="column" paddingTop={1}>
@@ -474,9 +457,7 @@ function GraphRunner({
               />
             );
             return liveContext?.runSession ? (
-              <RunTimingProvider timer={liveContext.runSession.timing}>
-                {el}
-              </RunTimingProvider>
+              <RunTimingProvider timer={liveContext.runSession.timing}>{el}</RunTimingProvider>
             ) : (
               el
             );
@@ -486,8 +467,8 @@ function GraphRunner({
               hints={[
                 VERBOSE_DETAIL_HINT,
                 {
-                  text: "opensip report for HTML report",
-                  bold: ["opensip report"],
+                  text: 'opensip report for HTML report',
+                  bold: ['opensip report'],
                 },
               ]}
             />
@@ -539,6 +520,6 @@ export async function renderGraphLive(
     </ThemeProvider>,
   );
   await app.waitUntilExit();
-  process.stdout.write("\n");
+  process.stdout.write('\n');
   return { session };
 }

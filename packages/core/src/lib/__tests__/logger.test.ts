@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { LoggerImpl, logger, configureLogger } from '../../lib/logger.js';
+import { LoggerImpl, logger, configureLogger, createRunLogger } from '../../lib/logger.js';
 
 describe('logger', () => {
   const stderrCalls: string[] = [];
@@ -334,6 +334,14 @@ describe('logger', () => {
       b.setRunId('b');
       expect(a.getRunId()).toBe('a');
       expect(b.getRunId()).toBe('b');
+    });
+
+    it('createRunLogger returns an isolated instance (ADR-0053)', () => {
+      const run = createRunLogger({ runId: 'RUN_iso', silent: true });
+      expect(run).toBeInstanceOf(LoggerImpl);
+      configureLogger({ runId: 'SINGLETON_OTHER' });
+      run.info({ evt: 'iso.probe' });
+      expect((run as LoggerImpl).getRunId()).toBe('RUN_iso');
     });
 
     it('configureLogger still targets the singleton', () => {

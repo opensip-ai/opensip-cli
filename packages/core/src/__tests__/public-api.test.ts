@@ -84,6 +84,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'clearCurrentRecipeUnitConfig',
   'clearParseCache',
   'configureLogger',
+  'createRunLogger',
   'createCapabilityRegistry',
   'createInProcessTransport',
   'createRunLifecycle',
