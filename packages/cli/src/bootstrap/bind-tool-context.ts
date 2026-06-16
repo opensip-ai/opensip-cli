@@ -33,6 +33,10 @@ function describeTool(tool: Tool): string {
   return tool.metadata.name || tool.metadata.id;
 }
 
+/**
+ * @throws {PluginIncompatibleError} When a mounted tool attempts to use a
+ * host-owned seam with another tool's namespace.
+ */
 function assertOwnToolKey(
   tool: Tool,
   allowed: ReadonlySet<string>,
@@ -56,86 +60,81 @@ function wrapHostPlanes(
   hostPlanes: ToolCliContext['hostPlanes'],
 ): ToolCliContext['hostPlanes'] {
   if (hostPlanes === undefined) return undefined;
-  return {
-    ...(hostPlanes.governance
-      ? {
-          governance: {
-            getGovernanceState: (toolId) => {
-              assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.getGovernanceState');
-              return hostPlanes.governance!.getGovernanceState(toolId);
-            },
-            listForProject: hostPlanes.governance.listForProject.bind(hostPlanes.governance),
-            queryAudit: (toolId, filter) => {
-              assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.queryAudit');
-              return hostPlanes.governance!.queryAudit(toolId, filter);
-            },
-            recordInstallation: (toolId, record) => {
-              assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.recordInstallation');
-              return hostPlanes.governance!.recordInstallation(toolId, record);
-            },
-            recordApprovalDecision: (toolId, decision) => {
-              assertOwnToolKey(
-                tool,
-                allowed,
-                toolId,
-                'hostPlanes.governance.recordApprovalDecision',
-              );
-              return hostPlanes.governance!.recordApprovalDecision(toolId, decision);
-            },
-            setBlock: (toolId, blocked, reason) => {
-              assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.setBlock');
-              return hostPlanes.governance!.setBlock(toolId, blocked, reason);
-            },
-            checkAllowed: (toolId, action) => {
-              assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.checkAllowed');
-              return hostPlanes.governance!.checkAllowed(toolId, action);
-            },
-          },
-        }
-      : {}),
-    ...(hostPlanes.audit
-      ? {
-          audit: {
-            append: (toolId, entry) => {
-              assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.audit.append');
-              return hostPlanes.audit!.append(toolId, entry);
-            },
-            query: (toolId, filter) => {
-              assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.audit.query');
-              return hostPlanes.audit!.query(toolId, filter);
-            },
-            ...(hostPlanes.audit.exportForCloud
-              ? { exportForCloud: hostPlanes.audit.exportForCloud.bind(hostPlanes.audit) }
-              : {}),
-          },
-        }
-      : {}),
-    ...(hostPlanes.entitlements
-      ? {
-          entitlements: {
-            check: (toolId, action) => {
-              assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.entitlements.check');
-              return hostPlanes.entitlements!.check(toolId, action);
-            },
-            recordUsage: (toolId, usage) => {
-              assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.entitlements.recordUsage');
-              return hostPlanes.entitlements!.recordUsage(toolId, usage);
-            },
-            getLicenseState: (toolId) => {
-              assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.entitlements.getLicenseState');
-              return hostPlanes.entitlements!.getLicenseState(toolId);
-            },
-          },
-        }
-      : {}),
-  };
+  const wrapped: NonNullable<ToolCliContext['hostPlanes']> = {};
+  const governance = hostPlanes.governance;
+  if (governance !== undefined) {
+    wrapped.governance = {
+      getGovernanceState: (toolId) => {
+        assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.getGovernanceState');
+        return governance.getGovernanceState(toolId);
+      },
+      listForProject: governance.listForProject.bind(governance),
+      queryAudit: (toolId, filter) => {
+        assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.queryAudit');
+        return governance.queryAudit(toolId, filter);
+      },
+      recordInstallation: (toolId, record) => {
+        assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.recordInstallation');
+        return governance.recordInstallation(toolId, record);
+      },
+      recordApprovalDecision: (toolId, decision) => {
+        assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.recordApprovalDecision');
+        return governance.recordApprovalDecision(toolId, decision);
+      },
+      setBlock: (toolId, blocked, reason) => {
+        assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.setBlock');
+        return governance.setBlock(toolId, blocked, reason);
+      },
+      checkAllowed: (toolId, action) => {
+        assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.checkAllowed');
+        return governance.checkAllowed(toolId, action);
+      },
+    };
+  }
+
+  const audit = hostPlanes.audit;
+  if (audit !== undefined) {
+    wrapped.audit = {
+      append: (toolId, entry) => {
+        assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.audit.append');
+        return audit.append(toolId, entry);
+      },
+      query: (toolId, filter) => {
+        assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.audit.query');
+        return audit.query(toolId, filter);
+      },
+      ...(audit.exportForCloud ? { exportForCloud: audit.exportForCloud.bind(audit) } : {}),
+    };
+  }
+
+  const entitlements = hostPlanes.entitlements;
+  if (entitlements !== undefined) {
+    wrapped.entitlements = {
+      check: (toolId, action) => {
+        assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.entitlements.check');
+        return entitlements.check(toolId, action);
+      },
+      recordUsage: (toolId, usage) => {
+        assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.entitlements.recordUsage');
+        return entitlements.recordUsage(toolId, usage);
+      },
+      getLicenseState: (toolId) => {
+        assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.entitlements.getLicenseState');
+        return entitlements.getLicenseState(toolId);
+      },
+    };
+  }
+
+  return wrapped;
 }
 
 export function bindToolCliContext(tool: Tool, ctx: ToolCliContext): BoundToolCliContext {
   const allowed = toolOwnedKeys(tool);
-  const source = ctx as object;
-  const bound = {} as BoundToolCliContext;
-  Object.defineProperties(bound, Object.getOwnPropertyDescriptors(source));
+  const source: object = ctx;
+  const bound = Object.defineProperties(
+    {},
+    Object.getOwnPropertyDescriptors(source),
+  ) as BoundToolCliContext;
 
   Object.defineProperties(bound, {
     saveBaseline: {

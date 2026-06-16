@@ -46,6 +46,10 @@ import type { loadCliDefaults } from './cli-defaults.js';
 
 const FORBIDDEN_SCOPE_CONTRIBUTION_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
+/**
+ * @throws {PluginIncompatibleError} When a tool returns an invalid scope
+ * contribution or attempts to overwrite an existing scope key.
+ */
 function installScopeContribution(
   scope: RunScope,
   tool: Tool,
