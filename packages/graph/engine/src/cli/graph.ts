@@ -26,10 +26,10 @@
  * above; see docs/plans/graph-cli-language-neutral-scoping/.
  */
 
-import { realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
 
-import { EXIT_CODES, passRate } from '@opensip-cli/contracts';
+import { EXIT_CODES, passRate } from "@opensip-cli/contracts";
 import {
   ConfigurationError,
   currentScope,
@@ -37,53 +37,62 @@ import {
   SystemError,
   ToolError,
   ValidationError,
-} from '@opensip-cli/core';
+} from "@opensip-cli/core";
 
-import { pickAdapter } from '../lang-adapter/registry.js';
-import { CatalogRepo } from '../persistence/catalog-repo.js';
-import { buildGraphSessionPayload } from '../persistence/session-payload.js';
-import { resolveRecipeToRules } from '../recipes/resolve.js';
-import { mapOpenSipRuleIdToEngineSlug } from '../render/rule-id-mapping.js';
-import { currentRules } from '../rules/registry.js';
+import { pickAdapter } from "../lang-adapter/registry.js";
+import { CatalogRepo } from "../persistence/catalog-repo.js";
+import { buildGraphSessionPayload } from "../persistence/session-payload.js";
+import { resolveRecipeToRules } from "../recipes/resolve.js";
+import { mapOpenSipRuleIdToEngineSlug } from "../render/rule-id-mapping.js";
+import { currentRules } from "../rules/registry.js";
 
 import {
   assertFinalizedAcrossBoundary,
   finalizeGraphSignals,
   type FinalizedSignals,
-} from './apply-suppressions.js';
-import { buildGraphEnvelope } from './build-envelope.js';
-import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
+} from "./apply-suppressions.js";
+import { buildGraphEnvelope } from "./build-envelope.js";
+import { runCatalogJsonMode, runGateMode } from "./graph-modes.js";
 import {
   buildLiveGraphOutput,
   buildUnifiedReportLines,
   countFiles,
   resolutionBannerText,
   type LiveGraphOutput,
-} from './graph-report.js';
-import { resolveCanonicalFileSet } from './orchestrate/canonical-file-set.js';
+} from "./graph-report.js";
+import { resolveCanonicalFileSet } from "./orchestrate/canonical-file-set.js";
 import {
   detectMonorepoLayout,
   partitionFlatRepo,
   selectStrategyForLayout,
-} from './orchestrate/flat-monorepo-strategy.js';
-import { partitionFilesIntoShards } from './orchestrate/partition-files.js';
+} from "./orchestrate/flat-monorepo-strategy.js";
+import { partitionFilesIntoShards } from "./orchestrate/partition-files.js";
 import {
   loadGraphConfig,
   resolveGraphRecipeSelection,
   runGraph,
   runShardedGraph,
-} from './orchestrate.js';
-import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
-import { MemoryPressureError } from './pressure-monitor.js';
-import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
-import { resolveAdaptersForRun } from './resolve-adapters.js';
-import { buildWorkspaceJsonDocument, writeWorkspaceReport } from './workspace-report.js';
-import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-runner.js';
+} from "./orchestrate.js";
+import {
+  positionalPathLabel,
+  resolvePositionalPaths,
+} from "./positional-paths.js";
+import { MemoryPressureError } from "./pressure-monitor.js";
+import { GraphProfileBuilder, writeGraphProfile } from "./profile.js";
+import { resolveAdaptersForRun } from "./resolve-adapters.js";
+import {
+  buildWorkspaceJsonDocument,
+  writeWorkspaceReport,
+} from "./workspace-report.js";
+import {
+  discoverPolyglotUnits,
+  runWorkspaceUnitsInParallel,
+} from "./workspace-runner.js";
 
-import type { GraphCommandOptions } from './graph-options.js';
-import type { Shard } from './orchestrate/shard-model.js';
-import type { GraphProgressCallback, RunGraphResult } from './orchestrate.js';
-import type { GraphProfileRunRecorder } from './profile.js';
+import type { GraphCommandOptions } from "./graph-options.js";
+import type { Shard } from "./orchestrate/shard-model.js";
+import type { GraphProgressCallback, RunGraphResult } from "./orchestrate.js";
+import type { GraphProfileRunRecorder } from "./profile.js";
 import type {
   Catalog,
   FeatureColumn,
@@ -91,16 +100,24 @@ import type {
   PartitionStrategy,
   ResolutionMode,
   Rule,
-} from '../types.js';
-import type { GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-cli/contracts';
-import type { Signal, ToolCliContext, ToolSessionContribution } from '@opensip-cli/core';
-import type { DataStore } from '@opensip-cli/datastore';
+} from "../types.js";
+import type {
+  GraphDoneResult,
+  SignalEnvelope,
+  VerboseDetail,
+} from "@opensip-cli/contracts";
+import type {
+  Signal,
+  ToolCliContext,
+  ToolSessionContribution,
+} from "@opensip-cli/core";
+import type { DataStore } from "@opensip-cli/datastore";
 
 // Re-exports kept so the package barrel + cli/graph-runner.tsx + tests
 // keep using `cli/graph.js` as a single import site for these shapes.
-export type { GraphCommandOptions } from './graph-options.js';
+export type { GraphCommandOptions } from "./graph-options.js";
 
-export type { UnifiedReportInput, LiveGraphOutput } from './graph-report.js';
+export type { UnifiedReportInput, LiveGraphOutput } from "./graph-report.js";
 
 /**
  * The result of a static graph run that the command handler returns to the
@@ -127,9 +144,9 @@ export interface GraphRunOutcome {
   readonly session?: ToolSessionContribution;
 }
 
-const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
-const MODULE_GRAPH_CLI = 'graph:cli';
-const MODULE_GRAPH_RENDER = 'graph:render';
+const EVT_GRAPH_COMPLETE = "graph.cli.graph.complete";
+const MODULE_GRAPH_CLI = "graph:cli";
+const MODULE_GRAPH_RENDER = "graph:render";
 
 /**
  * The feature columns the decoupled dashboard renders (ADR-0006): only these
@@ -137,7 +154,11 @@ const MODULE_GRAPH_RENDER = 'graph:render';
  * (catalog-producing) `graph` run. Export-only paths (sarif/catalog export)
  * do not go through this dispatch, so they stay lean (no features persisted).
  */
-const DASHBOARD_FEATURE_COLUMNS: readonly FeatureColumn[] = ['blast', 'scc', 'packageCoupling'];
+const DASHBOARD_FEATURE_COLUMNS: readonly FeatureColumn[] = [
+  "blast",
+  "scc",
+  "packageCoupling",
+];
 
 /**
  * Run graph and return the run's {@link GraphRunOutcome} — the deliverable
@@ -165,14 +186,14 @@ export async function executeGraph(
   const profile = createProfileBuilder(opts, startedAtForProfile);
 
   logger.info({
-    evt: 'graph.cli.graph.start',
+    evt: "graph.cli.graph.start",
     module: MODULE_GRAPH_CLI,
     cwd: opts.cwd,
     // Observability: which build engine the user requested. Sharded is the
     // default (ADR-0032), so a bare run requests `sharded`; `--exact` opts back
     // to the single-program engine. The RESOLVED engine (after shardability) is
     // logged at `graph.cli.graph.engine`.
-    requestedEngine: opts.exact === true ? 'exact' : 'sharded',
+    requestedEngine: opts.exact === true ? "exact" : "sharded",
   });
   // Run-level lifecycle event on the per-run DiagnosticsBus (north-star §5.10).
   // The host emits COMMAND-level lifecycle (mount-command-spec / pre-action
@@ -184,9 +205,14 @@ export async function executeGraph(
   // through the ambient `currentScope()?.diagnostics` accessor (the documented
   // idiom; `cli.scope`/ToolScope deliberately omits the bus — see
   // diagnostics-bus.ts header).
-  currentScope()?.diagnostics?.event('execute', 'debug', 'graph build started', {
-    requestedEngine: opts.exact === true ? 'exact' : 'sharded',
-  });
+  currentScope()?.diagnostics?.event(
+    "execute",
+    "debug",
+    "graph build started",
+    {
+      requestedEngine: opts.exact === true ? "exact" : "sharded",
+    },
+  );
   // (profile / startedAtForProfile already declared at top of fn for branch visibility)
   try {
     validateMutuallyExclusiveFlags(opts);
@@ -254,24 +280,27 @@ export async function executeGraph(
     const resolution = await resolveEngineShards(opts, cli, positionalPaths);
     const shards = resolution.shards;
     logger.info({
-      evt: 'graph.cli.graph.engine',
+      evt: "graph.cli.graph.engine",
       module: MODULE_GRAPH_CLI,
-      mode: shards.length > 1 ? 'sharded' : 'exact',
+      mode: shards.length > 1 ? "sharded" : "exact",
       requestedExact: opts.exact === true,
       shards: shards.length,
       reason: engineSelectionReason(opts, positionalPaths, shards.length > 1),
     });
     const profileRun = profile?.startRun({
-      label: positionalPaths.length === 0 ? 'root' : positionalPathLabel(runCwd, opts.cwd),
+      label:
+        positionalPaths.length === 0
+          ? "root"
+          : positionalPathLabel(runCwd, opts.cwd),
       cwd: runCwd,
-      mode: shards.length > 1 ? 'sharded' : 'single-process',
+      mode: shards.length > 1 ? "sharded" : "single-process",
     });
     // The synthetic partitioner runs BEFORE the profile run recorder exists
     // (its `mode` label needs the shard count), so its wall time is measured
     // where it runs and recorded here (ADR-0045 measurement plane).
     if (resolution.partition !== undefined) {
       profileRun?.recordStage(
-        'partition',
+        "partition",
         resolution.partition.durationMs,
         resolution.partition.detail,
       );
@@ -308,23 +337,34 @@ export async function executeGraph(
           `Sharded graph build had ${sharded.failedShardIds.length} shard failure(s); ` +
             `catalog and any --gate-* / baseline artifacts are incomplete. ` +
             `See 'graph.sharded.shard_failed' log events for per-shard details.`,
-          { code: 'GRAPH.SHARD.FAILURES' },
+          { code: "GRAPH.SHARD.FAILURES" },
         );
       }
     }
     enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
-    currentScope()?.diagnostics?.event('execute', 'debug', 'graph build complete', {
-      mode: shards.length > 1 ? 'sharded' : 'exact',
-      shards: shards.length,
-    });
+    currentScope()?.diagnostics?.event(
+      "execute",
+      "debug",
+      "graph build complete",
+      {
+        mode: shards.length > 1 ? "sharded" : "exact",
+        shards: shards.length,
+      },
+    );
     // `runCwd` (= positionalPaths[0] ?? opts.cwd) is the build root the signals
     // are relative to — the correct base for resolving `@graph-ignore` directive
     // files. For the sharded build it equals `projectRoot` passed above.
-    const outcome = await dispatchGraphResult(opts, result, cli, startedAt, runCwd);
+    const outcome = await dispatchGraphResult(
+      opts,
+      result,
+      cli,
+      startedAt,
+      runCwd,
+    );
     writeProfileIfRequested(opts, profile);
     return outcome;
   } catch (error) {
-    handleGraphError('graph', error, cli);
+    handleGraphError("graph", error, cli);
     return undefined;
   }
 }
@@ -396,10 +436,10 @@ function engineSelectionReason(
   positionalPaths: readonly string[],
   sharded: boolean,
 ): string {
-  if (sharded) return 'sharded-default';
-  if (opts.exact === true) return 'exact-opt-out';
-  if (positionalPaths.length > 0) return 'exact-positional-paths';
-  return 'exact-not-shardable';
+  if (sharded) return "sharded-default";
+  if (opts.exact === true) return "exact-opt-out";
+  if (positionalPaths.length > 0) return "exact-positional-paths";
+  return "exact-not-shardable";
 }
 
 /**
@@ -418,11 +458,15 @@ async function resolveShards(
   cli: ToolCliContext,
 ): Promise<ShardResolution> {
   const cliScript = opts.cliScript ?? process.argv[1];
-  if (typeof cliScript !== 'string' || cliScript.length === 0) return { shards: [] };
+  if (typeof cliScript !== "string" || cliScript.length === 0)
+    return { shards: [] };
 
   let units: readonly { id: string; rootDir: string; configPath?: string }[];
   try {
-    units = await discoverPolyglotUnits(opts.cwd, resolveAdaptersForRun(opts, cli));
+    units = await discoverPolyglotUnits(
+      opts.cwd,
+      resolveAdaptersForRun(opts, cli),
+    );
   } catch {
     /* v8 ignore next */
     return resolveSyntheticFlatShards(opts);
@@ -474,7 +518,10 @@ export async function resolveShardsForCwd(
   cliScript: string,
   cli: ToolCliContext,
 ): Promise<readonly Shard[]> {
-  const resolution = await resolveShards({ cwd, cliScript, noCache: true }, cli);
+  const resolution = await resolveShards(
+    { cwd, cliScript, noCache: true },
+    cli,
+  );
   return resolution.shards;
 }
 
@@ -485,10 +532,13 @@ export async function resolveShardsForCwd(
  * threshold as heap preflight's 12 GB tier, synthesize directory-coherent
  * shards and feed them into the existing sharded build.
  */
-function resolveSyntheticFlatShards(opts: GraphCommandOptions): ShardResolution {
-  if (typeof opts.language === 'string' && opts.language.length > 0) return { shards: [] };
+function resolveSyntheticFlatShards(
+  opts: GraphCommandOptions,
+): ShardResolution {
+  if (typeof opts.language === "string" && opts.language.length > 0)
+    return { shards: [] };
   const adapter = pickAdapter(opts.cwd);
-  if (adapter.id !== 'typescript') return { shards: [] };
+  if (adapter.id !== "typescript") return { shards: [] };
   let discovery: ReturnType<typeof adapter.discoverFiles>;
   try {
     discovery = adapter.discoverFiles({ cwd: opts.cwd });
@@ -508,7 +558,10 @@ function resolveSyntheticFlatShards(opts: GraphCommandOptions): ShardResolution 
     files: canonicalFiles,
   });
   const selection = selectStrategyForLayout(layout);
-  if (layout.kind !== 'flat-large' || selection.mode !== 'synthetic-partition') {
+  if (
+    layout.kind !== "flat-large" ||
+    selection.mode !== "synthetic-partition"
+  ) {
     return { shards: [] };
   }
   // Strategy precedence: `graph.partitionStrategy` (config/env, ADR-0045) >
@@ -516,7 +569,7 @@ function resolveSyntheticFlatShards(opts: GraphCommandOptions): ShardResolution 
   // scope-first and cheap, so reading it here (off the hot path) is safe.
   const graphConfig = loadGraphConfig(opts.cwd);
   const strategy: PartitionStrategy =
-    graphConfig.partitionStrategy ?? selection.partitionStrategy ?? 'hybrid';
+    graphConfig.partitionStrategy ?? selection.partitionStrategy ?? "hybrid";
   const partitions = partitionFlatRepo({
     files: layout.files,
     repoRoot: discovery.projectDirAbs,
@@ -565,15 +618,17 @@ interface ShardedBuildContext {
 }
 
 /** Drive the sharded build and adapt it to the RunGraphResult dispatch shape. */
-async function runShardedBuild(ctx: ShardedBuildContext): Promise<RunGraphResult> {
+async function runShardedBuild(
+  ctx: ShardedBuildContext,
+): Promise<RunGraphResult> {
   const { opts, shards, projectRoot, cli, config, rules } = ctx;
   const datastore = cli.scope.datastore() as DataStore | undefined;
   const sharded = await runShardedGraph({
     shards,
     projectRoot,
-    cliScript: opts.cliScript ?? process.argv[1] ?? '',
+    cliScript: opts.cliScript ?? process.argv[1] ?? "",
     adapter: pickAdapter(projectRoot, opts.language),
-    resolutionMode: opts.resolution ?? 'exact',
+    resolutionMode: opts.resolution ?? "exact",
     concurrency: opts.concurrency,
     useCache: opts.noCache !== true,
     config,
@@ -601,7 +656,7 @@ async function runProfiledShardedBuild(
   const started = Date.now();
   const result = await runShardedBuild(ctx);
   profileRun?.recordStage(
-    'sharded-build',
+    "sharded-build",
     Date.now() - started,
     `${String(ctx.shards.length)} shard(s)`,
   );
@@ -614,7 +669,8 @@ async function runProfiledShardedBuild(
  * whole-project live view exercises: cwd scope, cache/resolution tier, the
  * resolved rule subset + config, and `exact` (which, with the project's
  * shardability, selects the engine — ADR-0032). `cliScript` is needed to spawn
- * the shard subprocesses for the in-process sharded path.
+ * the shard subprocesses when the sharded path runs in the worker or degraded
+ * in-process fallback.
  */
 export interface GraphLiveBuildArgs {
   readonly cwd: string;
@@ -631,10 +687,9 @@ export interface GraphLiveBuildArgs {
  * `executeGraph` uses (ADR-0032): the SHARDED engine when `--exact` is absent
  * and the project yields >1 non-empty shard, the EXACT (single-program) engine
  * otherwise. Returns the shard set (`length > 1` ⇒ sharded) so the live runner
- * can decide its transport: sharded runs in-process (its shards are already
- * subprocesses), exact runs off-process in the `graph-run-worker` (ADR-0028).
- * `isTTY` is NEVER consulted — the engine is a pure function of the request +
- * shardability, identical to the static path.
+ * can choose engine-aware labels and pass the plain-data plan to
+ * `graph-run-worker` (ADR-0028). `isTTY` is NEVER consulted — the engine is a
+ * pure function of the request + shardability, identical to the static path.
  */
 export async function resolveLiveEngineShards(
   args: GraphLiveBuildArgs,
@@ -654,14 +709,15 @@ export async function resolveLiveEngineShards(
 }
 
 /**
- * Run the SHARDED build in-process for the live view and reduce it to the slim,
- * serializable {@link LiveGraphOutput} the interactive runner consumes —
- * IDENTICAL in shape to what the off-process exact worker streams back, so both
- * live transports converge on one payload. The heavy per-shard parse/walk/resolve
- * runs in the shard SUBPROCESSES, so the main thread (which animates the Ink
- * checklist) is only orchestrating + merging — no off-process worker is needed
- * for the sharded path (ADR-0032). Progress events flow through `onProgress`,
- * mapped onto the same seven canonical stages the exact engine emits.
+ * Run the SHARDED live build and reduce it to the slim, serializable
+ * {@link LiveGraphOutput} the interactive runner consumes — IDENTICAL in shape
+ * to what the exact worker streams back, so live transports converge on one
+ * payload. In the normal path this runs inside `graph-run-worker`, keeping the
+ * render process free while the worker coordinates shard subprocesses and the
+ * synchronous merge/link/rules work. The same function remains the degraded
+ * in-process fallback when worker execution is explicitly disabled or unavailable.
+ * Progress events flow through `onProgress`, mapped onto the same seven
+ * canonical stages the exact engine emits.
  *
  * Crosses the single suppression chokepoint via {@link buildLiveGraphOutput}
  * (against `args.cwd`, the build root) — so the live sharded path waives
@@ -676,9 +732,9 @@ export async function runShardedLiveBuild(
   const result = await runShardedGraph({
     shards,
     projectRoot: args.cwd,
-    cliScript: args.cliScript ?? process.argv[1] ?? '',
+    cliScript: args.cliScript ?? process.argv[1] ?? "",
     adapter: pickAdapter(args.cwd),
-    resolutionMode: args.resolution ?? 'exact',
+    resolutionMode: args.resolution ?? "exact",
     useCache: args.noCache !== true,
     config: args.config ?? {},
     // The live dispatch always resolves the recipe → rules; fall back to the
@@ -702,16 +758,19 @@ export async function runShardedLiveBuild(
 
 /** Profile bucket for the run shape: workspace fan-out, multi-path, or single graph. */
 function profileMode(opts: GraphCommandOptions): string {
-  if (opts.workspace === true) return 'workspace';
-  if ((opts.paths?.length ?? 0) > 1) return 'multi-path';
-  return 'graph';
+  if (opts.workspace === true) return "workspace";
+  if ((opts.paths?.length ?? 0) > 1) return "multi-path";
+  return "graph";
 }
 
 function createProfileBuilder(
   opts: GraphCommandOptions,
   startedAt: string,
 ): GraphProfileBuilder | undefined {
-  if (typeof opts.profileOutput !== 'string' || opts.profileOutput.length === 0) {
+  if (
+    typeof opts.profileOutput !== "string" ||
+    opts.profileOutput.length === 0
+  ) {
     return undefined;
   }
   return new GraphProfileBuilder({
@@ -727,10 +786,15 @@ function writeProfileIfRequested(
   profile: GraphProfileBuilder | undefined,
 ): void {
   if (profile === undefined) return;
-  if (typeof opts.profileOutput !== 'string' || opts.profileOutput.length === 0) return;
-  const outPath = writeGraphProfile(opts.profileOutput, opts.cwd, profile.complete());
+  if (typeof opts.profileOutput !== "string" || opts.profileOutput.length === 0)
+    return;
+  const outPath = writeGraphProfile(
+    opts.profileOutput,
+    opts.cwd,
+    profile.complete(),
+  );
   logger.info({
-    evt: 'graph.profile.write.complete',
+    evt: "graph.profile.write.complete",
     module: MODULE_GRAPH_CLI,
     output: outPath,
   });
@@ -738,17 +802,22 @@ function writeProfileIfRequested(
 
 function validateMutuallyExclusiveFlags(opts: GraphCommandOptions): void {
   if (opts.gateSave === true && opts.gateCompare === true) {
-    throw new ConfigurationError('--gate-save and --gate-compare are mutually exclusive.');
+    throw new ConfigurationError(
+      "--gate-save and --gate-compare are mutually exclusive.",
+    );
   }
   if (opts.workspace === true && (opts.paths?.length ?? 0) > 0) {
     throw new ConfigurationError(
-      '--workspace and positional paths are mutually exclusive. Use one or the other.',
+      "--workspace and positional paths are mutually exclusive. Use one or the other.",
     );
   }
-  if (opts.workspace === true && (opts.gateSave === true || opts.gateCompare === true)) {
+  if (
+    opts.workspace === true &&
+    (opts.gateSave === true || opts.gateCompare === true)
+  ) {
     throw new ConfigurationError(
-      '--workspace and --gate-save/--gate-compare are mutually exclusive. ' +
-        'Gates and baselines apply to production code; --workspace intentionally scans the full project (including dependencies and test fixtures).',
+      "--workspace and --gate-save/--gate-compare are mutually exclusive. " +
+        "Gates and baselines apply to production code; --workspace intentionally scans the full project (including dependencies and test fixtures).",
     );
   }
 }
@@ -770,10 +839,12 @@ function enforceLanguageMismatchPolicy(
   catalog: Catalog | null,
   paths: readonly string[],
 ): void {
-  if (typeof opts.language !== 'string' || opts.language.length === 0) return;
+  if (typeof opts.language !== "string" || opts.language.length === 0) return;
   const fileCount = catalog === null ? 0 : countFiles(catalog);
   if (fileCount > 0) return;
-  const pathLabel = paths.map((p) => positionalPathLabel(p, opts.cwd)).join(', ');
+  const pathLabel = paths
+    .map((p) => positionalPathLabel(p, opts.cwd))
+    .join(", ");
   throw new ConfigurationError(
     `--language ${opts.language} matched 0 files under ${pathLabel}; check the flag or paths.`,
   );
@@ -807,7 +878,7 @@ async function executeMultiPathGraph(
     const profileRun = profile?.startRun({
       label: positionalPathLabel(p, opts.cwd),
       cwd: p,
-      mode: 'single-process',
+      mode: "single-process",
     });
     const r = await runGraph({
       cwd: p,
@@ -836,9 +907,13 @@ async function executeMultiPathGraph(
   }
   // D14: count files across every analyzed path. Zero files + a
   // `--language` override → exit 2 with the canonical message.
-  if (typeof opts.language === 'string' && opts.language.length > 0 && combinedFiles === 0) {
+  if (
+    typeof opts.language === "string" &&
+    opts.language.length > 0 &&
+    combinedFiles === 0
+  ) {
     throw new ConfigurationError(
-      `--language ${opts.language} matched 0 files under ${paths.map((p) => positionalPathLabel(p, opts.cwd)).join(', ')}; check the flag or paths.`,
+      `--language ${opts.language} matched 0 files under ${paths.map((p) => positionalPathLabel(p, opts.cwd)).join(", ")}; check the flag or paths.`,
     );
   }
   /* v8 ignore next */
@@ -856,8 +931,17 @@ async function executeMultiPathGraph(
   // root and risk re-resolving paths under the wrong base. Re-brand the
   // aggregate FinalizedSignals (each member already crossed finalizeGraphSignals
   // above) so deliverGraphResult's persist call gets the type it requires.
-  const finalizedAggregate = assertFinalizedAcrossBoundary(allSignals, totalSuppressed);
-  return await deliverGraphResult(opts, combined, cli, startedAt, finalizedAggregate);
+  const finalizedAggregate = assertFinalizedAcrossBoundary(
+    allSignals,
+    totalSuppressed,
+  );
+  return await deliverGraphResult(
+    opts,
+    combined,
+    cli,
+    startedAt,
+    finalizedAggregate,
+  );
 }
 
 /**
@@ -874,7 +958,7 @@ function envelopeFor(
   return buildGraphEnvelope({
     signals: result.signals,
     recipe: opts.recipe,
-    runId: currentScope()?.runId ?? '',
+    runId: currentScope()?.runId ?? "",
     createdAt: new Date().toISOString(),
     durationMs,
     resolutionMode: result.catalog?.resolutionMode,
@@ -917,7 +1001,10 @@ export async function dispatchGraphResult(
   // session-contribution builder (and, transitively, the verdict + render) will
   // accept, so a future fourth output path cannot deliver un-waived signals: the
   // compiler rejects it.
-  const finalized = await finalizeGraphSignals(rawResult.signals, suppressionRoot);
+  const finalized = await finalizeGraphSignals(
+    rawResult.signals,
+    suppressionRoot,
+  );
   return deliverGraphResult(
     opts,
     { ...rawResult, signals: finalized.signals },
@@ -958,12 +1045,20 @@ async function deliverGraphResult(
     // (host-derived exit), so the command-spec skips it.
     const envelope = envelopeFor(opts, result, durationMs);
     await runGateMode(opts, envelope, cli, result.catalog?.resolutionMode);
-    logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI, suppressed: suppressedCount });
+    logger.info({
+      evt: EVT_GRAPH_COMPLETE,
+      module: MODULE_GRAPH_CLI,
+      suppressed: suppressedCount,
+    });
     return { envelope };
   }
-  if (typeof opts.catalogOutput === 'string' && opts.catalogOutput.length > 0) {
+  if (typeof opts.catalogOutput === "string" && opts.catalogOutput.length > 0) {
     runCatalogJsonMode(opts, result, cli, startedAt);
-    logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI, suppressed: suppressedCount });
+    logger.info({
+      evt: EVT_GRAPH_COMPLETE,
+      module: MODULE_GRAPH_CLI,
+      suppressed: suppressedCount,
+    });
     return { envelope: envelopeFor(opts, result, durationMs) };
   }
   const envelope = await renderGraphResult(opts, result, startedAt, cli);
@@ -977,9 +1072,12 @@ async function deliverGraphResult(
   // The host persists the returned `session` after the handler resolves; graph
   // builds it here from the BRANDED FinalizedSignals so the contribution can
   // only ever carry post-waiver findings regardless of which path reached here.
-  const isReportTo = typeof opts.reportTo === 'string' && opts.reportTo.length > 0;
+  const isReportTo =
+    typeof opts.reportTo === "string" && opts.reportTo.length > 0;
   const session =
-    opts.json !== true && !isReportTo ? buildGraphSessionContribution(opts, finalized) : undefined;
+    opts.json !== true && !isReportTo
+      ? buildGraphSessionContribution(opts, finalized)
+      : undefined;
   cli.setExitCode(EXIT_CODES.SUCCESS);
   logger.info({
     evt: EVT_GRAPH_COMPLETE,
@@ -992,7 +1090,9 @@ async function deliverGraphResult(
   // aggregate, not per-unit signal batches — audit P1-2). Every other mode
   // (default render, `--report-to`) returns the outcome for root delivery; only
   // the non-export render path carries a `session`.
-  return opts.json === true ? undefined : { envelope, ...(session ? { session } : {}) };
+  return opts.json === true
+    ? undefined
+    : { envelope, ...(session ? { session } : {}) };
 }
 
 /**
@@ -1020,12 +1120,18 @@ async function renderGraphResult(
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
   const envelope = envelopeFor(opts, result, durationMs);
   if (opts.json === true) {
-    logger.info({ evt: 'graph.render.json.start', module: MODULE_GRAPH_RENDER });
+    logger.info({
+      evt: "graph.render.json.start",
+      module: MODULE_GRAPH_RENDER,
+    });
     cli.emitEnvelope(envelope);
-    logger.info({ evt: 'graph.render.json.complete', module: MODULE_GRAPH_RENDER });
+    logger.info({
+      evt: "graph.render.json.complete",
+      module: MODULE_GRAPH_RENDER,
+    });
     return envelope;
   }
-  logger.info({ evt: 'graph.render.table.start', module: MODULE_GRAPH_RENDER });
+  logger.info({ evt: "graph.render.table.start", module: MODULE_GRAPH_RENDER });
   const verbose = opts.verbose === true;
   // ADR-0021: graph's verbose body is carried as VerboseDetail{kind:'lines'} and
   // rendered through the shared resultToView seam — the same path the live runner
@@ -1033,7 +1139,7 @@ async function renderGraphResult(
   // non-verbose footer hints are emitted by the seam (`graphDoneView`).
   const verboseDetail: VerboseDetail | undefined = verbose
     ? {
-        kind: 'lines',
+        kind: "lines",
         lines: buildUnifiedReportLines(
           {
             catalog: result.catalog,
@@ -1048,7 +1154,7 @@ async function renderGraphResult(
   const resolutionBanner = resolutionBannerText(result.catalog?.resolutionMode);
   const { summary } = envelope.verdict;
   const done: GraphDoneResult = {
-    type: 'graph-done',
+    type: "graph-done",
     ...(verboseDetail === undefined ? {} : { verboseDetail }),
     ...(resolutionBanner === undefined ? {} : { resolutionBanner }),
     summary: {
@@ -1060,7 +1166,10 @@ async function renderGraphResult(
     durationMs,
   };
   await cli.render(done);
-  logger.info({ evt: 'graph.render.table.complete', module: MODULE_GRAPH_RENDER });
+  logger.info({
+    evt: "graph.render.table.complete",
+    module: MODULE_GRAPH_RENDER,
+  });
   return envelope;
 }
 
@@ -1076,21 +1185,27 @@ async function executeWorkspaceGraph(
   profile?: GraphProfileBuilder,
 ): Promise<GraphRunOutcome | undefined> {
   const cliScript = opts.cliScript ?? process.argv[1];
-  if (typeof cliScript !== 'string' || cliScript.length === 0) {
+  if (typeof cliScript !== "string" || cliScript.length === 0) {
     throw new ConfigurationError(
-      '--workspace: could not determine the CLI entry script (process.argv[1] is empty).',
+      "--workspace: could not determine the CLI entry script (process.argv[1] is empty).",
     );
   }
   const adapters = resolveAdaptersForRun(opts, cli);
   const units = await discoverPolyglotUnits(opts.cwd, adapters);
   if (units.length === 0) {
-    const adapterLabel = adapters.map((a) => a.id).join(', ') || '(no language adapters available)';
+    const adapterLabel =
+      adapters.map((a) => a.id).join(", ") ||
+      "(no language adapters available)";
     throw new ConfigurationError(
       `--workspace: no workspace units detected for [${adapterLabel}]. Use 'opensip graph' for whole-project analysis.`,
     );
   }
 
-  const profileRun = profile?.startRun({ label: 'workspace', cwd: opts.cwd, mode: 'workspace' });
+  const profileRun = profile?.startRun({
+    label: "workspace",
+    cwd: opts.cwd,
+    mode: "workspace",
+  });
   // Internal per-run timer for the workspace REPORT artifact (durationMs in the
   // JSON document / report header + the profile stage). NOT a session timestamp:
   // the generic session row's timing is host-owned (host-owned-run-timing Phase
@@ -1107,7 +1222,11 @@ async function executeWorkspaceGraph(
     ...(opts.language === undefined ? {} : { language: opts.language }),
   });
   const durationMs = Date.now() - startedAt;
-  profileRun?.recordStage('workspace-fanout', durationMs, `${String(units.length)} unit(s)`);
+  profileRun?.recordStage(
+    "workspace-fanout",
+    durationMs,
+    `${String(units.length)} unit(s)`,
+  );
 
   const allSignals: Signal[] = [];
   for (const r of result.perUnit) allSignals.push(...r.signals);
@@ -1182,7 +1301,7 @@ async function executeWorkspaceGraph(
  * session payload's per-rule keys are engine slugs directly.
  */
 function buildGraphSessionContribution(
-  opts: Pick<GraphCommandOptions, 'cwd' | 'recipe'>,
+  opts: Pick<GraphCommandOptions, "cwd" | "recipe">,
   finalized: FinalizedSignals,
 ): ToolSessionContribution {
   return contributionFromSignals(opts, finalized.signals);
@@ -1197,7 +1316,7 @@ function buildGraphSessionContribution(
  * `persistWorkspaceSession` did before handing off to the shared save.
  */
 function buildWorkspaceSessionContribution(
-  opts: Pick<GraphCommandOptions, 'cwd' | 'recipe'>,
+  opts: Pick<GraphCommandOptions, "cwd" | "recipe">,
   signals: readonly Signal[],
 ): ToolSessionContribution {
   const engineSignals = signals.map((s) => {
@@ -1235,7 +1354,9 @@ function buildWorkspaceSessionContribution(
  * threaded it, so a clean run on the live (interactive) path persisted an empty
  * `checks[]` and the report rendered "no results" instead of the rule list.
  */
-export function evaluatedRuleSlugs(explicitRules?: readonly Rule[]): readonly string[] {
+export function evaluatedRuleSlugs(
+  explicitRules?: readonly Rule[],
+): readonly string[] {
   if (explicitRules) return explicitRules.map((r) => r.slug);
   try {
     return currentRules().map((r) => r.slug);
@@ -1261,13 +1382,13 @@ export function evaluatedRuleSlugs(explicitRules?: readonly Rule[]): readonly st
  * live runner passes its `args.rules`-derived set explicitly.
  */
 export function contributionFromSignals(
-  opts: Pick<GraphCommandOptions, 'cwd' | 'recipe'>,
+  opts: Pick<GraphCommandOptions, "cwd" | "recipe">,
   signals: readonly Signal[],
   evaluatedSlugs: readonly string[] = evaluatedRuleSlugs(),
 ): ToolSessionContribution {
   const payload = buildGraphSessionPayload(signals, evaluatedSlugs);
   return {
-    tool: 'graph',
+    tool: "graph",
     cwd: opts.cwd,
     ...(opts.recipe === undefined ? {} : { recipe: opts.recipe }),
     score: passRate(payload.summary),
@@ -1276,7 +1397,11 @@ export function contributionFromSignals(
   };
 }
 
-export function handleGraphError(label: string, error: unknown, cli: ToolCliContext): void {
+export function handleGraphError(
+  label: string,
+  error: unknown,
+  cli: ToolCliContext,
+): void {
   logger.error({
     evt: `graph.cli.${label}.error`,
     module: MODULE_GRAPH_CLI,
@@ -1297,7 +1422,12 @@ export function handleGraphError(label: string, error: unknown, cli: ToolCliCont
     }
     /* v8 ignore stop */
   }
-  process.stderr.write(`${label}: ${error instanceof Error ? error.message : String(error)}\n`);
+  process.stderr.write(
+    `${label}: ${error instanceof Error ? error.message : String(error)}\n`,
+  );
 }
 
-export { buildUnifiedReportLines, buildLiveGraphOutput } from './graph-report.js';
+export {
+  buildUnifiedReportLines,
+  buildLiveGraphOutput,
+} from "./graph-report.js";
