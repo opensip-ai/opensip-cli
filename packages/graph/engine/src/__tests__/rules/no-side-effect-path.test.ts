@@ -320,4 +320,125 @@ describe('no-side-effect-path rule', () => {
     const signals = noSideEffectPathRule.evaluate(catalog, indexes, {});
     expect(signals.some((s) => s.message.includes('inferredPure'))).toBe(true);
   });
+
+  // ── Regression: verified false positives (purity over-eagerness) ──────
+  //
+  // The textual purity walk only inspected call-edge text against a narrow
+  // primitive list, so functions that emit observability or mutate
+  // module-level collections looked "pure" and were flagged. The
+  // structural side-effect detector now treats these call sites as
+  // effecting. Each case: an effecting callee whose own edge text declares
+  // the effect (telemetry helper / mutator method), reached via TWO calls
+  // so the >= 2-call eligibility gate is satisfied, with a discarding
+  // caller — i.e. eligible in every OTHER respect, so the only thing that
+  // can suppress the flag is correct side-effect classification.
+
+  // NOTE: each effecting call edge resolves to a real target (`['ha']`) so
+  // the occurrence is NOT rejected by the unresolved-edge gate — the ONLY
+  // thing that can suppress the flag is the side-effect classification of
+  // the edge TEXT. The `helperA`/`helperB` callee bodies stay pure.
+  it('does not flag a function that calls a telemetry/observability helper (recordX)', () => {
+    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
+    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const effecting = occ({
+      bodyHash: 'p',
+      simpleName: 'classifyComplexity',
+      ...exportedDefaults,
+      returnType: 'number',
+      calls: [ed('helperA()', ['ha']), ed('recordComplexityClassified(score)', ['hb'])],
+    });
+    const caller = occ({
+      bodyHash: 'c',
+      simpleName: 'caller',
+      ...exportedDefaults,
+      calls: [ed('classifyComplexity()', ['p'], true)],
+    });
+    const catalog = makeCatalog([effecting, helperA, helperB, caller]);
+    const indexes = buildIndexes(catalog);
+    const signals = noSideEffectPathRule.evaluate(catalog, indexes, {});
+    expect(signals.some((s) => s.message.includes('classifyComplexity'))).toBe(false);
+  });
+
+  it('does not flag a function that calls a withSpan-style tracing helper', () => {
+    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
+    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const effecting = occ({
+      bodyHash: 'p',
+      simpleName: 'runQuery',
+      ...exportedDefaults,
+      returnType: 'number',
+      calls: [ed('helperA()', ['ha']), ed('withQuerySpan(name, fn)', ['hb'])],
+    });
+    const caller = occ({
+      bodyHash: 'c',
+      simpleName: 'caller',
+      ...exportedDefaults,
+      calls: [ed('runQuery()', ['p'], true)],
+    });
+    const catalog = makeCatalog([effecting, helperA, helperB, caller]);
+    const indexes = buildIndexes(catalog);
+    const signals = noSideEffectPathRule.evaluate(catalog, indexes, {});
+    expect(signals.some((s) => s.message.includes('runQuery'))).toBe(false);
+  });
+
+  it('does not flag a function that mutates module-level state (Map.set / array.push)', () => {
+    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
+    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const effecting = occ({
+      bodyHash: 'p',
+      simpleName: 'cacheResult',
+      ...exportedDefaults,
+      returnType: 'number',
+      calls: [ed('helperA()', ['ha']), ed('moduleCache.set(key, value)', ['hb'])],
+    });
+    const caller = occ({
+      bodyHash: 'c',
+      simpleName: 'caller',
+      ...exportedDefaults,
+      calls: [ed('cacheResult()', ['p'], true)],
+    });
+    const catalog = makeCatalog([effecting, helperA, helperB, caller]);
+    const indexes = buildIndexes(catalog);
+    const signals = noSideEffectPathRule.evaluate(catalog, indexes, {});
+    expect(signals.some((s) => s.message.includes('cacheResult'))).toBe(false);
+  });
+
+  // ── Regression: "caller discards" leg — return consumed via .map / bind ─
+  //
+  // The upstream resolver marks a call inside `arr.map(x => f(x))` or a
+  // binding `const r = f(...)` as `discarded: false` (neither is an
+  // ExpressionStatement). When ANY caller provably consumes the return,
+  // the result is live computation — never dead — so the rule must not
+  // flag even if another caller happens to discard the same function.
+
+  it('does not flag when one caller consumes the return via .map even though another discards', () => {
+    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
+    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const pure = occ({
+      bodyHash: 'p',
+      simpleName: 'transformItem',
+      ...exportedDefaults,
+      returnType: 'number',
+      calls: [ed('helperA()', ['ha']), ed('helperB()', ['hb'])],
+    });
+    // One caller maps the result (consumed → discarded:false), another
+    // calls it as a bare statement (discarded:true). The consuming caller
+    // must veto the signal.
+    const mappingCaller = occ({
+      bodyHash: 'cm',
+      simpleName: 'mapper',
+      ...exportedDefaults,
+      calls: [ed('arr.map((x) => transformItem(x))', ['p'], false)],
+    });
+    const discardingCaller = occ({
+      bodyHash: 'cd',
+      simpleName: 'discarder',
+      ...exportedDefaults,
+      calls: [ed('transformItem(x)', ['p'], true)],
+    });
+    const catalog = makeCatalog([pure, helperA, helperB, mappingCaller, discardingCaller]);
+    const indexes = buildIndexes(catalog);
+    const signals = noSideEffectPathRule.evaluate(catalog, indexes, {});
+    expect(signals.some((s) => s.message.includes('transformItem'))).toBe(false);
+  });
 });

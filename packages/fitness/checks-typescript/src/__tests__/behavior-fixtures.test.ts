@@ -171,6 +171,57 @@ describe('stubbed-implementation-detection — branch coverage', () => {
     expect(stubs).toHaveLength(0);
   });
 
+  it('skips {} cast to dictionary/record shapes (wrapped Record, index-signature, mapped)', async () => {
+    // Regression: an empty object literal cast to a plain dictionary/record
+    // shape is a legitimate, complete empty dictionary — iterating it yields
+    // zero iterations and never crashes — and must NOT be flagged.
+    fx(
+      'src/stubs/map-shapes.ts',
+      [
+        'interface PlatformRoleDefault { perms: string[] }',
+        // The original false-positive case: Record wrapped in Readonly<>.
+        'export const teamRoleMap = {} as Readonly<Record<string, PlatformRoleDefault>>',
+        // Plain annotated Record default (no cast).
+        'export const direct: Record<string, PlatformRoleDefault> = {}',
+        // Partial<Record<...>> wrapper.
+        'export const partial = {} as Partial<Record<string, number>>',
+        // Object type with an index signature.
+        'export const idx = {} as { [key: string]: number }',
+      ].join('\n'),
+    );
+    const result = await runCheck('stubbed-implementation-detection');
+    expect(result.signals.filter((s) => s.message?.includes('Empty object stub'))).toHaveLength(0);
+  });
+
+  it('flags {} cast to Map/ReadonlyMap — a broken stub, not a valid empty collection', async () => {
+    // `{} as Map<...>` is NOT a working empty Map: `({}).get()` / `.set()` throw
+    // "is not a function" at runtime. So it is a genuine stub and must be flagged
+    // — the dictionary/record skip above must not extend to the Map family.
+    fx(
+      'src/stubs/map-cast.ts',
+      [
+        'export const m = {} as Map<string, number>',
+        'export const rm = {} as ReadonlyMap<string, number>',
+      ].join('\n'),
+    );
+    const result = await runCheck('stubbed-implementation-detection');
+    expect(result.signals.some((s) => s.message?.includes('Empty object stub'))).toBe(true);
+  });
+
+  it('still flags {} cast to a non-collection domain type (true-positive preserved)', async () => {
+    // A genuine stub: empty object cast to a concrete domain interface that has
+    // required properties. This is the behavior that must be preserved.
+    fx(
+      'src/stubs/domain.ts',
+      [
+        'export interface User { id: string; email: string }',
+        'export function getUser(): User { return {} as User }',
+      ].join('\n'),
+    );
+    const result = await runCheck('stubbed-implementation-detection');
+    expect(result.signals.some((s) => s.message?.includes('Empty object stub'))).toBe(true);
+  });
+
   it('skips {} cast to a generic type parameter', async () => {
     fx(
       'src/stubs/generic.ts',

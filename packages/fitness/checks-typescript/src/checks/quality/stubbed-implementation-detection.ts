@@ -16,6 +16,10 @@
  *   - { success: true, data: [] } inside conditional branches or functions with multiple returns
  *   - ({}) as T where T is a generic type parameter
  *   - ({}) as T used as Proxy target
+ *   - ({}) as Record<...> / Readonly<Record<...>> / index-signature / mapped
+ *     type — an empty object cast to a plain dictionary/record shape is a valid
+ *     empty dictionary, not a stub. (Map/Set are NOT skipped — `{} as Map` is a
+ *     broken stub; see isDictionaryOrRecordType.)
  */
 
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
@@ -192,6 +196,53 @@ function isGenericTypeParameter(
 }
 
 /**
+ * Determine whether a cast target is a plain dictionary/record shape, for which
+ * an empty object literal (`{}`) is a legitimate, complete value — an empty
+ * dictionary — rather than an unimplemented stub.
+ *
+ * Iterating an empty plain object (`Object.entries({})`, `for (const k in {})`)
+ * yields zero iterations and never crashes; a Zod `.default({})` on a record
+ * schema accepts it. Flagging these as "will crash at runtime" is a false
+ * positive.
+ *
+ * Deliberately EXCLUDES `Map` / `ReadonlyMap` / `WeakMap` (and `Set`): an empty
+ * object literal is NOT a working Map — `({} as Map).get()` / `.set()` throw
+ * "is not a function" at runtime — so `{} as Map<...>` is a genuine broken stub
+ * and must stay flagged.
+ *
+ * Recognized as dictionary/record shapes:
+ *   - `Record<K, V>` and any wrapper around it (e.g. `Readonly<Record<...>>`,
+ *     `Partial<Record<...>>`) — detected by containing `Record<` token-wise.
+ *   - Object types with an index signature: `{ [key: string]: V }`.
+ *   - Mapped types: `{ [K in Keys]: V }`.
+ */
+function isDictionaryOrRecordType(typeNode: ts.TypeNode, typeText: string): boolean {
+  // Record<...> anywhere in the type text (covers Readonly<Record<...>>,
+  // Partial<Record<...>>, unions, etc.). Token-bounded to avoid matching an
+  // identifier that merely ends in "Record".
+  if (/(^|[^A-Za-z0-9_$])Record</.test(typeText)) return true;
+
+  // (No Map/Set family here — an empty object literal cannot satisfy them, so
+  // `{} as Map<...>` stays flagged; see the doc comment above.)
+
+  // Inspect the AST for index-signature object types and mapped types, which
+  // the string heuristics above don't cover. Unwrap parenthesized/array-free
+  // type literals; mapped types parse as TypeLiteral with a single
+  // MappedTypeNode-like member in the TS AST.
+  let node: ts.TypeNode = typeNode;
+  if (ts.isParenthesizedTypeNode(node)) node = node.type;
+
+  if (ts.isMappedTypeNode(node)) return true;
+
+  // `{ [key: string]: V }` — an index signature makes this a dictionary shape.
+  if (ts.isTypeLiteralNode(node) && node.members.some((m) => ts.isIndexSignatureDeclaration(m))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Check whether the as-expression is the target argument of a `new Proxy(...)` call.
  */
 function isProxyTarget(node: ts.Node, sourceFile: ts.SourceFile): boolean {
@@ -225,11 +276,19 @@ function checkEmptyObjectStub(options: CheckNodeOptions): CheckViolation | null 
   if (!ts.isObjectLiteralExpression(expression) || expression.properties.length > 0) return null;
 
   const typeText = node.type.getText(sourceFile);
-  // Skip primitives and Record types
+  // Skip primitives — `{} as unknown` etc. is not a stub.
   const isPrimitive = PRIMITIVE_TYPES.has(typeText);
-  const isRecordType = typeText.startsWith('Record<') && typeText.endsWith('>');
 
-  if (isPrimitive || isRecordType) return null;
+  // Skip map/dictionary/collection shapes: an empty object literal cast to a
+  // Record / index-signature / mapped / Map type is a legitimate empty
+  // dictionary/record (a secure-by-default empty object), not an unimplemented
+  // stub. It cannot crash — iterating an empty plain object yields zero
+  // iterations. Covers `Record<...>`, `Readonly<Record<...>>`,
+  // `{ [k: string]: V }`, and mapped types — but NOT `Map`/`Set`, which an empty
+  // object literal cannot satisfy, so those stay flagged.
+  const isDictShape = isDictionaryOrRecordType(node.type, typeText);
+
+  if (isPrimitive || isDictShape) return null;
 
   // Skip if type is a generic type parameter (e.g., T in deepMerge<T>)
   if (isGenericTypeParameter(typeText, node, sourceFile)) return null;
@@ -351,7 +410,7 @@ export const stubbedImplementationDetection = defineCheck({
   longDescription: `**Purpose:** Detects incomplete or placeholder implementations that will fail at runtime or silently do nothing.
 
 **Detects:**
-- Empty object stubs: \`({}) as Type\` where Type is not a primitive or Record (will crash at runtime)
+- Empty object stubs: \`({}) as Type\` where Type is a non-collection domain type — not a primitive and not a map/dictionary shape (will crash at runtime)
 - Placeholder returns: \`return Promise.resolve(undefined|null|void 0)\` indicating a no-op async method
 - Hardcoded stub returns: \`return { success: true, data: []|null|{} }\` patterns
 - Placeholder comments: \`// Placeholder implementation\`, \`// STUB:\`, \`// Not implemented\`
@@ -365,6 +424,7 @@ export const stubbedImplementationDetection = defineCheck({
 - Hardcoded stub returns in functions with await/call expressions before the return
 - \`({}) as T\` where T is a generic type parameter
 - \`({}) as T\` used as a Proxy target
+- \`({}) as Record<...>\` / \`Readonly<Record<...>>\` / \`{ [k: string]: V }\` / mapped types / \`Map<...>\` — an empty object cast to a map/dictionary/collection shape is a valid empty collection (a secure-by-default empty map), not a stub
 
 **Why it matters:** Stubbed implementations pass type checks but fail at runtime. Detecting them early prevents production crashes and silent data loss.
 

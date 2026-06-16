@@ -35,7 +35,54 @@ import type { FeatureTable, FunctionOccurrence, Indexes, RuleHints } from '../ty
 import type { Signal } from '@opensip-cli/core';
 
 const TYPESCRIPT_FALLBACK_REGEX =
-  /\b(?:console|logger|fs\.|http\.|fetch|process\.exit|throw\s+new)\b/;
+  /\b(?:console|logger|log|fs\.|http\.|fetch|process\.exit|throw\s+new)\b/;
+
+/**
+ * Language-agnostic structural side-effect patterns, applied to EVERY call
+ * text regardless of which adapter (or fallback) supplies the primitive
+ * list. These cover effect classes the narrow primitive lists miss and that
+ * caused verified false positives downstream:
+ *
+ *   1. Mutator method calls — `.push(`, `.set(`, `.add(`, `.delete(`,
+ *      `.clear(`, `.pop(`, `.shift(`, `.unshift(`, `.splice(`, `.fill(`,
+ *      `.sort(`, `.reverse(`, `.copyWithin(`, `.append(`, `.write(`,
+ *      `.emit(`. A call mutating a Map/Set/array/stream IS a side effect
+ *      even when the array/map is module-scoped (which the call-edge model
+ *      cannot otherwise see).
+ *   2. Observability / telemetry / logging helper calls — names containing
+ *      `record…`, `report…`, `track…`, `withSpan` / `with*Span`, `log`,
+ *      `emit`, `metric`, `trace`, `span`, `instrument`, `audit`. These are
+ *      effect-only helpers (they write to OTel / metrics / logs) but the
+ *      transitive purity walk can't prove that when the helper is imported
+ *      from another module whose body isn't in the catalog, or whose body
+ *      reaches the effect through a tracer object method the primitive list
+ *      doesn't enumerate. Treating the CALL SITE as effecting is the
+ *      conservative answer — it can only ever SUPPRESS a flag, never add a
+ *      false one.
+ *
+ * Conservative by construction: a match removes a candidate from the flag
+ * set, so the worst case is a missed true positive (false negative), never
+ * a new false positive — exactly the direction this rule must err.
+ */
+// Split into four independent patterns (mutator method call / telemetry helper
+// call / span wrapper / bare telemetry word), OR-composed in
+// {@link hasStructuralSideEffect}. This is behaviorally identical to the former
+// single alternation but keeps each pattern under the regex-complexity bound.
+const SE_MUTATOR_REGEX =
+  /\.(?:push|pop|shift|unshift|splice|fill|sort|reverse|copyWithin|set|add|delete|clear|append|write|emit)\s*\(/;
+const SE_TELEMETRY_REGEX = /\b(?:record|report|track|emit|instrument|audit)[A-Z][A-Za-z0-9]*\s*\(/;
+const SE_SPAN_REGEX = /\bwith[A-Za-z0-9]*[Ss]pan\s*\(/;
+const SE_BAREWORD_REGEX = /\b(?:logger|log|metric|metrics|tracer|trace|span)\b/;
+
+/** True when the call text contains any structural side-effect primitive. */
+function hasStructuralSideEffect(text: string): boolean {
+  return (
+    SE_MUTATOR_REGEX.test(text) ||
+    SE_TELEMETRY_REGEX.test(text) ||
+    SE_SPAN_REGEX.test(text) ||
+    SE_BAREWORD_REGEX.test(text)
+  );
+}
 
 /**
  * Detector for "the call text contains a side-effect primitive."
@@ -43,10 +90,20 @@ const TYPESCRIPT_FALLBACK_REGEX =
  * `sideEffectPrimitives`, we precompile a Set<string> for substring
  * matching at the start of the call text (after stripping common
  * prefixes); otherwise we fall back to the legacy TS-shaped regex.
+ *
+ * Either layer is composed with the language-agnostic
+ * {@link hasStructuralSideEffect} (mutators + telemetry/logging helper
+ * conventions) so the rule never classifies a mutating or
+ * observability-emitting function as pure regardless of adapter.
  */
 type SideEffectDetector = (callText: string) => boolean;
 
 function buildSideEffectDetector(hints: RuleHints | undefined): SideEffectDetector {
+  const primitiveDetector = buildPrimitiveDetector(hints);
+  return (text) => primitiveDetector(text) || hasStructuralSideEffect(text);
+}
+
+function buildPrimitiveDetector(hints: RuleHints | undefined): SideEffectDetector {
   const primitives = hints?.sideEffectPrimitives;
   if (!primitives || primitives.length === 0) {
     return (text) => TYPESCRIPT_FALLBACK_REGEX.test(text);
@@ -100,22 +157,40 @@ export const noSideEffectPathRule = defineRule({
 });
 
 /**
- * True when at least one caller invokes this function as an
- * ExpressionStatement (return value discarded). Catalogs that
- * predate the `discarded` field surface every edge as undefined,
- * which we treat as "unknown" — fall back to the prior behavior
- * (always pass) so older catalogs aren't silently filtered out.
+ * Aggregate of every inbound call edge that targets this occurrence.
+ *
+ * The actionable signal is "this function's result is dead computation" —
+ * which is only true when EVERY caller throws the return value away. A
+ * return value that flows into a binding (`const r = f()`), an argument, a
+ * `return`, or an `arr.map(x => f(x))` mapping IS consumed (the upstream
+ * resolver records those edges as `discarded: false`, since none is an
+ * ExpressionStatement). A single consuming caller is enough to make the
+ * call non-dead, so we must NOT flag when any resolved caller consumes.
+ *
+ * Catalogs that predate the `discarded` field surface every edge as
+ * `undefined`, which we treat as "unknown" — fall back to the prior
+ * behavior (flag) so older catalogs aren't silently filtered out.
  */
 interface CallerScanResult {
-  readonly foundDiscarded: boolean;
+  /** At least one inbound edge targets this occurrence. */
   readonly sawMatchingEdge: boolean;
+  /** At least one inbound edge carried a concrete `discarded` value. */
   readonly sawDiscardedField: boolean;
+  /** At least one inbound edge has `discarded === true`. */
+  readonly anyDiscarded: boolean;
+  /**
+   * At least one inbound edge with a concrete `discarded` value has
+   * `discarded === false` — i.e. a caller PROVABLY consumes the return.
+   */
+  readonly anyConsumed: boolean;
 }
 
 function scanCallerEdges(occ: FunctionOccurrence, indexes: Indexes): CallerScanResult {
   const callerHashes = indexes.callers.get(occ.bodyHash) ?? [];
   let sawMatchingEdge = false;
   let sawDiscardedField = false;
+  let anyDiscarded = false;
+  let anyConsumed = false;
   for (const callerHash of callerHashes) {
     const caller = indexes.byBodyHash.get(callerHash);
     /* v8 ignore next */
@@ -125,20 +200,34 @@ function scanCallerEdges(occ: FunctionOccurrence, indexes: Indexes): CallerScanR
       sawMatchingEdge = true;
       if (edge.discarded === undefined) continue;
       sawDiscardedField = true;
-      if (edge.discarded) return { foundDiscarded: true, sawMatchingEdge, sawDiscardedField };
+      if (edge.discarded) anyDiscarded = true;
+      else anyConsumed = true;
     }
   }
-  return { foundDiscarded: false, sawMatchingEdge, sawDiscardedField };
+  return { sawMatchingEdge, sawDiscardedField, anyDiscarded, anyConsumed };
 }
 
+/**
+ * True only when EVERY resolved caller provably discards the return value.
+ *
+ * Narrowed from the prior "any caller discards" to eliminate the verified
+ * false positive where a value reached via `arr.map(x => f(x))` or bound
+ * (`const r = f(...)`) and later used was flagged: the mapped/bound result
+ * IS consumed, so a single consuming caller (`anyConsumed`) must veto the
+ * signal even if another caller happens to discard.
+ */
 function hasDiscardedCaller(occ: FunctionOccurrence, indexes: Indexes): boolean {
   const scan = scanCallerEdges(occ, indexes);
-  if (scan.foundDiscarded) return true;
-  // Legacy fallback (`!sawDiscardedField`) only applies when we
-  // actually observed an edge that targets this occurrence — otherwise
-  // the index pointed at this occ but no caller edge resolved to it
-  // (stale index / unresolved catalog), and the right answer is "no
-  // discarded caller" not "assume yes".
+  // A provably-consuming caller means the function's result is live — never
+  // dead computation. This veto is what fixes the `.map(...)` / bound-and-
+  // used false positive.
+  if (scan.anyConsumed) return false;
+  if (scan.anyDiscarded) return true;
+  // Legacy fallback only applies when we actually observed an edge that
+  // targets this occurrence but NONE carried a concrete `discarded` value
+  // (a pre-discard catalog) — otherwise the index pointed at this occ but
+  // no caller edge resolved to it (stale index / unresolved catalog), and
+  // the right answer is "no discarded caller" not "assume yes".
   return scan.sawMatchingEdge && !scan.sawDiscardedField;
 }
 

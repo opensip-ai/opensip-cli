@@ -156,6 +156,48 @@ function emitPerInstanceSignals(
   return signals;
 }
 
+/**
+ * A function's stable physical identity: where it is declared. The catalog's
+ * `functions` record is keyed by simple name, and the same physical function
+ * can surface more than once across that index (e.g. indexed under both its
+ * simple and qualified name, or a recursive function whose self-reference is
+ * walked as an extra occurrence). Two entries that share this identity are the
+ * SAME function — they must never count as a duplicate of each other. Keying on
+ * file + declaration position + simple name keeps genuinely-distinct functions
+ * (same body, different file/line) in separate identities while collapsing
+ * self-matches.
+ */
+function identityOf(occ: FunctionOccurrence): string {
+  return `${occ.filePath}:${String(occ.line)}:${String(occ.column)}:${occ.simpleName}`;
+}
+
+/**
+ * Add an occurrence to its body-hash bucket, deduping by physical identity so a
+ * function never appears twice in its own bucket. Without this, a function that
+ * surfaces more than once in the catalog index (self-reference, dual name
+ * indexing) would form a phantom 2-member group and self-report as a duplicate.
+ */
+function pushDeduped(
+  buckets: Map<string, FunctionOccurrence[]>,
+  seenByHash: Map<string, Set<string>>,
+  occ: FunctionOccurrence,
+): void {
+  let bucket = buckets.get(occ.bodyHash);
+  let seen = seenByHash.get(occ.bodyHash);
+  if (!bucket) {
+    bucket = [];
+    buckets.set(occ.bodyHash, bucket);
+    seen = new Set<string>();
+    seenByHash.set(occ.bodyHash, seen);
+  }
+  /* v8 ignore next */
+  if (!seen) return;
+  const id = identityOf(occ);
+  if (seen.has(id)) return;
+  seen.add(id);
+  bucket.push(occ);
+}
+
 function groupByHash(
   catalog: Catalog,
   minLines: number,
@@ -165,18 +207,14 @@ function groupByHash(
   // Walk the catalog directly; the byBodyHash index dedupes by hash,
   // which is exactly what we need to NOT do here.
   const buckets = new Map<string, FunctionOccurrence[]>();
+  const seenByHash = new Map<string, Set<string>>();
   for (const name of Object.keys(catalog.functions)) {
     const occs: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
     /* v8 ignore next */
     if (!occs) continue;
     for (const occ of occs) {
       if (!isInterestingForDup(occ, minLines, minBodySize, features)) continue;
-      let bucket = buckets.get(occ.bodyHash);
-      if (!bucket) {
-        bucket = [];
-        buckets.set(occ.bodyHash, bucket);
-      }
-      bucket.push(occ);
+      pushDeduped(buckets, seenByHash, occ);
     }
   }
   return [...buckets.values()];
@@ -190,18 +228,14 @@ function groupByHash(
  */
 function groupByHashUnfloored(catalog: Catalog): ReadonlyMap<string, FunctionOccurrence[]> {
   const buckets = new Map<string, FunctionOccurrence[]>();
+  const seenByHash = new Map<string, Set<string>>();
   for (const name of Object.keys(catalog.functions)) {
     const occs: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
     /* v8 ignore next */
     if (!occs) continue;
     for (const occ of occs) {
       if (!isEligibleKind(occ)) continue;
-      let bucket = buckets.get(occ.bodyHash);
-      if (!bucket) {
-        bucket = [];
-        buckets.set(occ.bodyHash, bucket);
-      }
-      bucket.push(occ);
+      pushDeduped(buckets, seenByHash, occ);
     }
   }
   return buckets;
