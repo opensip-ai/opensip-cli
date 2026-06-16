@@ -69,7 +69,7 @@ export function buildWelcome(opts: WelcomeOptions): string {
 
   return [
     '',
-    `${bold('OpenSIP CLI')} ${dim(opts.version)} — codebase analysis toolkit`,
+    `${bold('OpenSIP CLI')} ${dim(opts.version)} — codebase intelligence from your terminal`,
     '',
     `${bold('Primary commands:')}`,
     `  ${accent('opensip fit')}        Run fitness checks against your codebase`,

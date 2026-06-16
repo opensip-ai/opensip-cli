@@ -34,7 +34,7 @@ export type BannerSize = 'lg' | 'md' | 'sm' | 'mini';
 const BANNER_SIZES: ReadonlySet<string> = new Set<BannerSize>(['lg', 'md', 'sm', 'mini']);
 
 /** Product tagline shown in the `mini` banner — mirrors the welcome screen. */
-const MINI_TAGLINE = 'codebase analysis toolkit';
+const MINI_TAGLINE = 'codebase intelligence from your terminal';
 
 /** The command that installs/upgrades the CLI via the hosted install script. */
 const UPGRADE_COMMAND = 'curl -fsSL https://opensip.ai/cli/install.sh | bash';

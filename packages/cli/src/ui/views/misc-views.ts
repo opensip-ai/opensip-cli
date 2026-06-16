@@ -183,7 +183,7 @@ export function viewHelp(): ViewNode {
   return group(
     [
       line([{ text: 'opensip-cli', bold: true }]),
-      line([{ text: 'Codebase analysis toolkit', dim: true }]),
+      line([{ text: 'Codebase intelligence from your terminal', dim: true }]),
       SPACER,
       line([{ text: 'Commands:', bold: true }]),
       line([{ text: '  ' }, { text: 'fit', tone: 'brand' }, { text: '     Run fitness checks' }]),

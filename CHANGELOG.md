@@ -2,6 +2,20 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.1] - 2026-06-15
+
+A maintenance release: a product-tagline refresh and an internal database
+migration consolidation. No tool behavior or public-API changes.
+
+### Changed
+
+- Refreshed the product tagline to "codebase intelligence from your terminal"
+  across the CLI banner, `--help` output, and package metadata/READMEs.
+- Consolidated the bundled SQLite migrations into a single initial migration
+  (no schema change). On the first run after upgrading from 0.1.0, the
+  disposable `opensip-cli/.runtime/` cache re-initializes — sessions, baselines,
+  and caches are re-captured on the next `fit`/`graph` run.
+
 ## [0.1.0] - 2026-06-15
 
 Initial public release of OpenSIP CLI on the `@opensip-cli/*` + `opensip-cli`

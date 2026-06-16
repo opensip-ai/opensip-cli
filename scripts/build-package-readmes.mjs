@@ -96,8 +96,8 @@ function renderReadme(pkg, releaseRef) {
     `# ${name}\n\n` +
     `> ${description}\n\n` +
     `${roleSentence(pkg.opensipTools?.kind)}\n\n` +
-    `Part of [**opensip-cli**](${repoRootUrl}) — an open-source codebase-analysis ` +
-    `toolkit: fitness checks (\`fit\`), static call-graph analysis (\`graph\`), and ` +
+    `Part of [**opensip-cli**](${repoRootUrl}) — an open-source codebase intelligence ` +
+    `CLI: fitness checks (\`fit\`), static call-graph analysis (\`graph\`), and ` +
     `simulation (\`sim\`).\n\n` +
     `## Install\n\n` +
     'Most users install the CLI, which bundles the first-party tools:\n\n' +

@@ -8,7 +8,7 @@
 
 This package is the **engine** behind a first-party `opensip-cli` tool. The CLI bundles it — you do not normally install it directly.
 
-Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase-analysis toolkit: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
+Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase intelligence CLI: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
 
 ## Install
 
@@ -23,8 +23,8 @@ This package is published for the CLI and advanced plugin authors; most users sh
 ## Documentation
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-cli/
-- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.1.0/packages/graph/engine
+- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.1.1/docs/public/70-reference/02-package-catalog.md
+- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.1.1/packages/graph/engine
 
 ## License
 

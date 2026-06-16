@@ -8,7 +8,7 @@
 
 This is an **internal library** of the opensip-cli toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.
 
-Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase-analysis toolkit: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
+Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase intelligence CLI: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
 
 ## Install
 
@@ -23,8 +23,8 @@ This package is published for the CLI and advanced plugin authors; most users sh
 ## Documentation
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-cli/
-- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.1.0/packages/datastore
+- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.1.1/docs/public/70-reference/02-package-catalog.md
+- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.1.1/packages/datastore
 
 ## License
 

@@ -57,7 +57,7 @@ describe('Banner', () => {
         ).lastFrame() ?? '';
       expect(frame).toContain('OpenSIP CLI');
       expect(frame).toContain('v2.2.1');
-      expect(frame).toContain('codebase analysis toolkit');
+      expect(frame).toContain('codebase intelligence from your terminal');
       expect(frame).toContain('www.opensip.ai');
       expect(frame).toContain('/home/me/opensip-cli');
       // Rounded amber box frames the card.

@@ -1855,7 +1855,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "usage": "[options]",
     },
   ],
-  "synopsis": "Codebase analysis toolkit — pluggable tools for fitness, simulation, and more",
+  "synopsis": "Codebase intelligence from your terminal — pluggable tools for fitness, simulation, and more",
   "usage": "[options] [command]",
 }
 `;

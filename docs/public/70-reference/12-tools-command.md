@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v0.1.0
+release: v0.1.1
 title: "`tools` command"
 audience: [plugin-authors, contributors]
 purpose: "Customer-facing command group for managing whole Tool plugins: list, validate, install, uninstall, and data-purge."

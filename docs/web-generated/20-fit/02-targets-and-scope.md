@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.1.0
+release: v0.1.1
 title: "Targets and scope"
 audience: [contributors, plugin-authors]
 purpose: "How the framework decides which files a check runs against. Targets, scope, glob expansion, and the marketplace shape."
@@ -87,7 +87,7 @@ checkOverrides:
   no-todos: ['backend', 'frontend']
 ```
 
-A user can pin a check to a specific target by slug, regardless of what the check declared. This is the escape hatch when a third-party check's scope doesn't match your project's reality. `checkOverrides` is a top-level key alongside `targets:` and `globalExcludes:`. Lives in [`TargetsConfig.checkOverrides`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/targets/types.ts).
+A user can pin a check to a specific target by slug, regardless of what the check declared. This is the escape hatch when a third-party check's scope doesn't match your project's reality. `checkOverrides` is a top-level key alongside `targets:` and `globalExcludes:`. Lives in [`TargetsConfig.checkOverrides`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.1/packages/fitness/engine/src/targets/types.ts).
 
 ### 4. No declaration at all
 
@@ -97,7 +97,7 @@ A check that declares neither `scope:` nor `fileTypes:` matches *every* file the
 
 ## Anatomy of a target
 
-The shape lives in [`packages/fitness/engine/src/targets/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/targets/types.ts):
+The shape lives in [`packages/fitness/engine/src/targets/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.1/packages/fitness/engine/src/targets/types.ts):
 
 ```ts
 interface TargetConfig {
@@ -166,7 +166,7 @@ A universal check with `scope: { languages: [], concerns: [] }` matches all four
 
 ## How the resolution actually runs
 
-[`packages/fitness/engine/src/framework/scope-resolver.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/framework/scope-resolver.ts) is where it happens. The flow:
+[`packages/fitness/engine/src/framework/scope-resolver.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.1/packages/fitness/engine/src/framework/scope-resolver.ts) is where it happens. The flow:
 
 ```
 1. Load TargetsConfig from opensip-cli.config.yml.
@@ -212,7 +212,7 @@ Use this rather than repeating the same exclusions on every target. The historic
 
 ## The `PathMatcher`
 
-[`packages/fitness/engine/src/framework/path-matcher.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.0/packages/fitness/engine/src/framework/path-matcher.ts) is the per-check matcher object. It compiles include/exclude globs once and answers `match(filePath)` queries with a single pass through the compiled `Minimatch` instances.
+[`packages/fitness/engine/src/framework/path-matcher.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.1/packages/fitness/engine/src/framework/path-matcher.ts) is the per-check matcher object. It compiles include/exclude globs once and answers `match(filePath)` queries with a single pass through the compiled `Minimatch` instances.
 
 You won't usually instantiate one. The framework constructs it for each check inside `executeUnifiedCheck()` and exposes `ctx.matchFiles()` to the check. If you're writing an `analyzeAll`-mode check that needs additional filtering on top of the resolved file list, the matcher is available via `check.getMatcher(cwd)`.
 

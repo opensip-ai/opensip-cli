@@ -192,7 +192,9 @@ describe('resultToView', () => {
   });
 
   it('renders help and list views (every result type is now total)', () => {
-    expect(renderToText(resultToView({ type: 'help' }))).toContain('Codebase analysis toolkit');
+    expect(renderToText(resultToView({ type: 'help' }))).toContain(
+      'Codebase intelligence from your terminal',
+    );
     expect(
       renderToText(
         resultToView({

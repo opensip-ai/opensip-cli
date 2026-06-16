@@ -80,7 +80,7 @@ function buildFullProgram(): Command {
   const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
   return runWithScopeSync(scope, () => {
     const program = new Command('opensip').description(
-      'Codebase analysis toolkit — pluggable tools for fitness, simulation, and more',
+      'Codebase intelligence from your terminal — pluggable tools for fitness, simulation, and more',
     );
     program.option('--no-cloud', 'Disable OpenSIP Cloud signal sync for this run');
 

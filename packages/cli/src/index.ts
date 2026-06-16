@@ -51,7 +51,9 @@ export * from './api.js';
 const cliVersion = readPackageVersion(import.meta.url);
 
 const program = new Command('opensip')
-  .description('Codebase analysis toolkit — pluggable tools for fitness, simulation, and more')
+  .description(
+    'Codebase intelligence from your terminal — pluggable tools for fitness, simulation, and more',
+  )
   // ADR-0008: per-run opt-out of OpenSIP Cloud signal sync. `--no-cloud` sets
   // `cloud` to false; the pre-action hook reads it via optsWithGlobals().
   .option('--no-cloud', 'Disable OpenSIP Cloud signal sync for this run')

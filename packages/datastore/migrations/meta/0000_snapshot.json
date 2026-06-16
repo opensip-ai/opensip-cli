@@ -56,12 +56,8 @@
           "name": "session_host_metrics_session_id_sessions_id_fk",
           "tableFrom": "session_host_metrics",
           "tableTo": "sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -109,12 +105,8 @@
           "name": "session_tool_payload_session_id_sessions_id_fk",
           "tableFrom": "session_tool_payload",
           "tableTo": "sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -207,10 +199,7 @@
       "indexes": {
         "sessions_tool_timestamp_idx": {
           "name": "sessions_tool_timestamp_idx",
-          "columns": [
-            "tool",
-            "\"timestamp\" DESC"
-          ],
+          "columns": ["tool", "\"timestamp\" DESC"],
           "isUnique": false
         }
       },
@@ -359,10 +348,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "tool_baseline_entries_tool_fingerprint_pk": {
-          "columns": [
-            "tool",
-            "fingerprint"
-          ],
+          "columns": ["tool", "fingerprint"],
           "name": "tool_baseline_entries_tool_fingerprint_pk"
         }
       },
@@ -443,10 +429,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "tool_state_tool_key_pk": {
-          "columns": [
-            "tool",
-            "key"
-          ],
+          "columns": ["tool", "key"],
           "name": "tool_state_tool_key_pk"
         }
       },
