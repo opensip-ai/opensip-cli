@@ -25,9 +25,12 @@ import {
   createCapabilityRegistry,
   type LanguageRegistry,
   type Logger,
+  PluginIncompatibleError,
   type ProjectContext,
   resolveUserPaths,
   RunScope,
+  type ScopeContribution,
+  type Tool,
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
@@ -40,6 +43,52 @@ import { buildTargets } from './build-targets.js';
 import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
 
 import type { loadCliDefaults } from './cli-defaults.js';
+
+const FORBIDDEN_SCOPE_CONTRIBUTION_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
+function installScopeContribution(
+  scope: RunScope,
+  tool: Tool,
+  contribution: ScopeContribution,
+): void {
+  if (typeof contribution !== 'object' || contribution === null || Array.isArray(contribution)) {
+    throw new PluginIncompatibleError(
+      `tool '${tool.metadata.name || tool.metadata.id}' returned a non-object scope contribution`,
+      {
+        code: 'PLUGIN.SCOPE_CONTRIBUTION_INVALID',
+        diagnostic: 'contributeScope must return a plain object',
+      },
+    );
+  }
+
+  for (const key of Object.keys(contribution)) {
+    if (FORBIDDEN_SCOPE_CONTRIBUTION_KEYS.has(key)) {
+      throw new PluginIncompatibleError(
+        `tool '${tool.metadata.name || tool.metadata.id}' returned forbidden scope key '${key}'`,
+        {
+          code: 'PLUGIN.SCOPE_CONTRIBUTION_FORBIDDEN_KEY',
+          diagnostic: `forbidden scope key '${key}'`,
+        },
+      );
+    }
+    // `key in scope` (not `hasOwnProperty`) so prototype members are protected
+    // too: `RunScope.dispose()` lives on the prototype, and an own-property
+    // shadow would silently hijack `disposeCurrentScope()`. This also rejects
+    // `Object.prototype` names; no namespaced tool subscope key collides with
+    // those, so the stricter check has no legitimate false positive.
+    if (key in scope) {
+      throw new PluginIncompatibleError(
+        `tool '${tool.metadata.name || tool.metadata.id}' attempted to overwrite scope key '${key}'`,
+        {
+          code: 'PLUGIN.SCOPE_CONTRIBUTION_COLLISION',
+          diagnostic: `scope key '${key}' already exists`,
+        },
+      );
+    }
+  }
+
+  Object.assign(scope, contribution);
+}
 
 /** Inputs required to build a fully wired per-run scope. */
 export interface BuildPerRunScopeInput {
@@ -166,7 +215,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // with `Object.assign` (registration order; a tool with no hook is skipped).
   for (const tool of tools.list()) {
     const contribution = tool.contributeScope?.();
-    if (contribution) Object.assign(scope, contribution);
+    if (contribution) installScopeContribution(scope, tool, contribution);
   }
 
   // §5.3 Phase 4: per-run capability registry (manifest domains → real registrars).

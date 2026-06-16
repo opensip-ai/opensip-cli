@@ -66,7 +66,7 @@ export type HostCommandSpec<TOpts = Record<string, unknown>> = CommandSpec<TOpts
  * (`CliCommandsContext`) through the SAME plane, satisfying the launch "one
  * command surface" invariant (no two-tier privilege).
  */
-export interface CommandMountContext {
+export interface CommandMountContext extends RunActionHooks {
   readonly render: (result: CommandResult) => Promise<void>;
   readonly setExitCode: (code: number) => void;
   readonly emitEnvelope?: (envelope: unknown) => void;
@@ -148,11 +148,8 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
     diagnostics?.event('execute', 'debug', `command '${spec.name}' started`);
     // Host run lifecycle (host-owned-run-timing): mark the start boundary at the
     // command-action entry — after RunScope is entered, before the tool handler
-    // runs. The hooks ride on the host ctx (not the public ToolCliContext type);
-    // read via cast, like `runSession` below. No-op for host commands whose
-    // leaner context carries no run plane.
-    const runHooks = ctx as unknown as RunActionHooks;
-    runHooks.beginRun?.();
+    // runs. No-op for host commands whose leaner context carries no run plane.
+    ctx.beginRun?.();
     try {
       const result = await spec.handler(optsWithArgs, ctx);
       diagnostics?.event('execute', 'debug', `command '${spec.name}' completed`);
@@ -160,7 +157,7 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
       // a session contribution, the host freezes the lifecycle and persists it.
       // A plain CommandResult (no session) is a no-op — there is no tool-side
       // generic-session writer. The live-view path persists after renderLive.
-      runHooks.completeRun?.(result);
+      ctx.completeRun?.(result);
       await dispatchOutput(result, spec, optsWithArgs, positionals, ctx);
     } catch (error) {
       if (error instanceof ToolError) {

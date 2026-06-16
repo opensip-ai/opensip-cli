@@ -4,7 +4,7 @@
 
 # @opensip-cli/contracts
 
-> Shared contract types for OpenSIP CLI — SignalEnvelope / CommandResult shapes, exit codes, session persistence
+> Public Tool↔runner contract facade for OpenSIP CLI — envelopes, command results, exit codes, manifests
 
 This is an **internal library** of the opensip-cli toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.
 

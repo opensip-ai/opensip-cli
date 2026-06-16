@@ -54,7 +54,7 @@ describe('describeHostEnv', () => {
     }
   });
 
-  it('declares the pre-scope allowance vars (theme colours + NODE_OPTIONS)', () => {
+  it('declares the pre-scope allowance vars (theme colours + graph heap-preflight)', () => {
     const c = PRE_SCOPE_ENV_SPECS.map((s) => s.canonical);
     expect(c).toEqual([
       'NO_COLOR',
@@ -63,6 +63,7 @@ describe('describeHostEnv', () => {
       'TERM',
       'TERM_PROGRAM',
       'NODE_OPTIONS',
+      'OPENSIP_HEAP_ELEVATED',
     ]);
   });
 });

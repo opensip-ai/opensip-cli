@@ -14,9 +14,10 @@
  *
  * Pre-scope exceptions: the terminal-theme color vars (`@opensip-cli/cli-ui` has
  * no `core` dependency and resolves colors before any scope exists) and
- * `NODE_OPTIONS` (the graph heap-preflight mutates it before any opensip module
- * loads) are read raw at their sites. They are declared here for documentation
- * only and allow-listed by the `env-via-registry` guardrail.
+ * `NODE_OPTIONS` / `OPENSIP_HEAP_ELEVATED` (the graph heap-preflight reads and
+ * mutates them before any opensip module loads) are read raw at their sites.
+ * They are declared here for documentation only and allow-listed by the
+ * `env-via-registry` guardrail.
  */
 
 import { CONFIG_ENV_SPECS } from '@opensip-cli/config';
@@ -126,6 +127,10 @@ export const PRE_SCOPE_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
   {
     canonical: 'NODE_OPTIONS',
     docs: 'Node flags; the graph heap-preflight reads/extends this before relaunch (pre-module).',
+  },
+  {
+    canonical: 'OPENSIP_HEAP_ELEVATED',
+    docs: 'Internal graph heap-preflight sentinel set on the relaunched child process to prevent recursive relaunch.',
   },
 ];
 

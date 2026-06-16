@@ -1,10 +1,10 @@
 /**
- * Structural guard: @opensip-cli/contracts is TYPES-ONLY again (2.10.1,
- * ADR-0023). The `cli:` block loader (`loadCliDefaults`) — a runtime YAML
- * projection — moved to @opensip-cli/config, restoring the charter the
- * package's own docs assert. This test fails if any contracts source reintroduces
- * config-document parsing (a `readYamlFile(...)` / `resolveProjectConfigPath(...)`
- * call), complementing the `no-config-loader-outside-config` fitness guardrail.
+ * Structural guard: @opensip-cli/contracts is a public Tool↔runner facade, not
+ * a host-runtime package. The `cli:` block loader (`loadCliDefaults`) — a
+ * runtime YAML projection — moved to @opensip-cli/config in ADR-0023. This test
+ * fails if any contracts source reintroduces config-document parsing
+ * (a `readYamlFile(...)` / `resolveProjectConfigPath(...)` call),
+ * complementing the `no-config-loader-outside-config` fitness guardrail.
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -27,7 +27,7 @@ function sourceFiles(dir: string): string[] {
   return out;
 }
 
-describe('@opensip-cli/contracts is types-only', () => {
+describe('@opensip-cli/contracts stays out of host runtime ownership', () => {
   const files = sourceFiles(SRC);
 
   it('discovers source files (sanity)', () => {

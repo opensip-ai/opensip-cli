@@ -31,6 +31,8 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0053](ADR-0053-per-run-logger-scope.md) — Per-Run Logger Scope (production runs construct one `LoggerImpl` per `RunScope`; singleton logging becomes a pre-scope/compatibility adapter).
+- [ADR-0052](ADR-0052-bootstrap-orchestration-state-machine.md) — Bootstrap Orchestration State Machine (the Commander hook remains the adapter, while bailout ordering and side-effect gates become explicit, testable phases).
 - [ADR-0051](ADR-0051-host-owned-run-lifecycle-timing.md) — Host-Owned Run Lifecycle, Timing, and Persistence (one host `RunTimer` stamps `StoredSession.startedAt`/`completedAt`/`durationMs`; tools return a `ToolSessionContribution`; the `runSession.record` writer is removed).
 - [ADR-0048](ADR-0048-tool-stable-uuid-identity.md) — Tool Stable UUID Identity (`id` for stable UUID on Tools, matching Checks; human string renamed to `name`; persisted in DB for collision safety).
 - ADR-0047 — Per-Tool Contract Versioning

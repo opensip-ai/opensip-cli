@@ -77,3 +77,4 @@ documented here for completeness.
 | `TERM` | Terminal type; consulted for colour support. |
 | `TERM_PROGRAM` | Terminal program (e.g. `iTerm.app`); consulted for colour support. |
 | `NODE_OPTIONS` | Node flags; the graph heap-preflight reads/extends this before relaunch (pre-module). |
+| `OPENSIP_HEAP_ELEVATED` | Internal graph heap-preflight sentinel set on the relaunched child process to prevent recursive relaunch. |

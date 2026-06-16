@@ -1,12 +1,15 @@
 /**
- * @opensip-cli/contracts — shared contract types.
+ * @opensip-cli/contracts — public Tool↔runner contract facade.
  *
- * Tool packages (fitness, simulation) and the CLI entry-point both
- * depend on this package for:
+ * Tool packages (fitness, simulation, graph, and third-party plugins) and the
+ * CLI entry-point both depend on this package for:
  *   - CLI option / output / result types
  *   - Exit code constants and error suggestions
  *   - The cross-tool StoredSession type (the SessionRepo runtime + the
  *     sessions schema live in @opensip-cli/session-store)
+ *   - Runtime helpers that are part of the plugin authoring surface but whose
+ *     implementation belongs in @opensip-cli/core (defineCommand,
+ *     checkCompatibility, PLUGIN_API_VERSION)
  *
  * The GraphCatalog shape is DEFINED here (./graph-catalog.ts), not
  * re-exported from elsewhere. It is the contract surface between the
@@ -16,9 +19,14 @@
  * holds zero runtime dependency on dashboard or graph — these are
  * type-only declarations.
  *
- * contracts depends only on @opensip-cli/core. Tools depend on
- * contracts. The CLI entry-point depends on contracts and on every
- * tool package — the dependency graph stays acyclic.
+ * This package is intentionally not "types-only": it may re-export small,
+ * tool-facing runtime helpers from @opensip-cli/core and may own pure contract
+ * helpers such as buildSignalEnvelope. It must not own host/runtime services
+ * such as config loading, persistence, output delivery, or tool execution.
+ *
+ * contracts depends only on @opensip-cli/core. Tools depend on contracts. The
+ * CLI entry-point depends on contracts and on every tool package — the
+ * dependency graph stays acyclic.
  */
 
 // CLI option / argument types
@@ -127,9 +135,8 @@ export type {
 } from '@opensip-cli/core';
 
 // The `cli:` block loader (`loadCliDefaults` / `CliDefaults`) moved to
-// `@opensip-cli/config` in ADR-0023 — its runtime YAML projection
-// was the standing "contracts is types-only" charter violation. Importers now
-// take it from the config layer.
+// `@opensip-cli/config` in ADR-0023. Its runtime YAML projection was outside
+// the contracts facade charter: importers now take it from the config layer.
 
 // Command-plane types (launch, §5.4) — the declarative CommandSpec a
 // tool exports for the host to mount, replacing raw-Commander access. DEFINED in

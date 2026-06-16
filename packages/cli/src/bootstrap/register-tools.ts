@@ -48,6 +48,7 @@ import {
   type AdmissionReport,
   type ToolRuntimeLoad,
 } from './admit-tool-package.js';
+import { bindToolCliContext } from './bind-tool-context.js';
 import { isProjectLocalToolTrusted } from './tool-trust.js';
 
 /** `module` field on every structured log event emitted from this file. */
@@ -831,11 +832,12 @@ export function mountAllToolCommands(
  */
 function mountOneTool(program: CliProgram, tool: Tool, ctx: ToolCliContext): void {
   if (tool.commandSpecs !== undefined && tool.commandSpecs.length > 0) {
+    const toolCtx = bindToolCliContext(tool, ctx);
     for (const spec of tool.commandSpecs) {
       // `Tool.commandSpecs` is `CommandSpec<unknown, ToolCliContext>[]`, which
       // is assignable to the mounter's `HostCommandSpec` (handler contravariance
       // — an `unknown`-opts handler accepts a `Record`-opts call). No cast.
-      mountCommandSpec(program, spec, ctx);
+      mountCommandSpec(program, spec, toolCtx);
     }
     return;
   }
