@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.1.1
+release: v0.1.2
 title: "Adopt in a monorepo"
 audience: [plugin-authors, ci-integrators]
 purpose: "Task-led: introduce opensip-cli to a large polyglot monorepo. Workspace-package graduation, per-package targets, scoped baselines."

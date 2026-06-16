@@ -2,6 +2,31 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.2] - 2026-06-16
+
+A maintenance release focused on analyzer accuracy. No public-API changes.
+
+### Fixed
+
+- Fewer false positives across the static analyzers, each narrowed without
+  losing real findings:
+  - `graph` orphan-subtree now treats a dynamic `import()` as a reachability
+    edge; `duplicated-function-body` dedupes by physical identity so a function
+    can't match itself; `always-throws-branch` no longer reads a `throw` inside
+    a nested/returned closure as the outer function always throwing;
+    `no-side-effect-path` no longer classifies telemetry/mutation-emitting
+    helpers as pure.
+  - `fit`'s `stubbed-implementation-detection` treats `{}` cast to a
+    dictionary/record shape (`Record<…>`, index signature, mapped type) as a
+    valid empty collection — while still flagging `{} as Map<…>`, which is a
+    broken stub (`({}).get()` throws at runtime).
+
+### Changed
+
+- The bundled first-party tool set is now data-driven (a manifest) rather than
+  hand-maintained CLI constants — lowering the cost of adding a first-party
+  tool. No user-facing behavior change; bundled tools still fail closed.
+
 ## [0.1.1] - 2026-06-15
 
 A maintenance release: a product-tagline refresh and an internal database
