@@ -42,10 +42,13 @@ export async function runWithTimeout<R>(
 ): Promise<UnitRunOutcome<R>> {
   const controller = new AbortController();
   const startTime = Date.now();
-  const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs);
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const finish = (): number => {
-    clearTimeout(timeoutId);
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+      timeoutId = undefined;
+    }
     return Date.now() - startTime;
   };
 
@@ -87,7 +90,8 @@ export async function runWithTimeout<R>(
   // callees can stop. Report the exact budget as duration for the timeout case
   // (avoids sampling skew from the setTimeout fire time).
   const hardTimeout = new Promise<UnitRunOutcome<R>>((resolve) => {
-    setTimeout(() => {
+    timeoutId = setTimeout(() => {
+      timeoutId = undefined;
       controller.abort();
       resolve({
         status: 'timeout',

@@ -1,4 +1,5 @@
 // @fitness-ignore-file performance-anti-patterns -- sequential await across discovered tool packages preserves load order for plugin-conflict detection; bounded by installed plugin count
+// @fitness-ignore-file file-length-limit -- discovery admission remains one policy unit after the register-tools split; below the hard limit and slated for a later source-boundary split.
 import {
   admitTool,
   assertManifestMatchesTool,

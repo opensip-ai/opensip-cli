@@ -39,7 +39,7 @@ export function installPreActionHook(
       tools: runtime.tools,
     });
 
-    await executePostBailoutBootstrap({
+    const { scope } = await executePostBailoutBootstrap({
       plan,
       runtime,
       version,
@@ -47,6 +47,11 @@ export function installPreActionHook(
       noCloud: actionCommand.optsWithGlobals().cloud === false,
       apiKey: opts.apiKey as string | undefined,
     });
+    scope.diagnostics.event(
+      'load',
+      'debug',
+      `preAction bootstrap completed for '${actionCommand.name()}'`,
+    );
   });
 
   program.hook('postAction', disposeCurrentScope);

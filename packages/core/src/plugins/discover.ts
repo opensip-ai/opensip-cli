@@ -39,6 +39,8 @@ import type { DiscoveredPlugin, PluginLayout } from './types.js';
 
 /** Logger module tag used by every event in this file. */
 const MODULE_TAG = 'core:plugins';
+const DISCOVER_REJECT_EVENT = 'plugin.loader.discover.reject';
+const DISCOVER_SKIP_EVENT = 'plugin.loader.discover.skip';
 
 // =============================================================================
 // PUBLIC ENTRY POINT
@@ -167,7 +169,7 @@ function discoverNpmPackages(
     // act as an attacker-influenced input flowing into a path join.
     if (name.length === 0 || name.includes('..') || name.startsWith('/') || name.includes('\0')) {
       logger.warn({
-        evt: 'plugin.loader.discover.reject',
+        evt: DISCOVER_REJECT_EVENT,
         module: MODULE_TAG,
         reason: 'invalid plugin name',
         name,
@@ -180,7 +182,7 @@ function discoverNpmPackages(
     // attacker plants a symlink.
     if (!isPathInside(packageDir, nodeModulesDir)) {
       logger.warn({
-        evt: 'plugin.loader.discover.reject',
+        evt: DISCOVER_REJECT_EVENT,
         module: MODULE_TAG,
         reason: 'package path resolves outside node_modules',
         name,
@@ -200,7 +202,7 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
   const resolved = resolvePackageEntryPoint(packageDir, name);
   if (!resolved) {
     logger.debug({
-      evt: 'plugin.loader.discover.skip',
+      evt: DISCOVER_SKIP_EVENT,
       module: MODULE_TAG,
       reason: 'invalid package.json',
       name,
@@ -216,7 +218,7 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
   // the entry-file path, so we re-check it here.
   if (!isPathInside(resolved.entry, packageDir)) {
     logger.warn({
-      evt: 'plugin.loader.discover.reject',
+      evt: DISCOVER_REJECT_EVENT,
       module: MODULE_TAG,
       reason: 'entry point resolves outside package directory',
       name,
@@ -227,7 +229,7 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
 
   if (!existsSync(resolved.entry)) {
     logger.debug({
-      evt: 'plugin.loader.discover.skip',
+      evt: DISCOVER_SKIP_EVENT,
       module: MODULE_TAG,
       reason: 'entry point not found',
       packageName: resolved.name,
@@ -273,7 +275,7 @@ function discoverLooseFilesInDir(
     if (safeIsDirectory(fullPath)) {
       if (!isPathInside(fullPath, rootDir)) {
         logger.warn({
-          evt: 'plugin.loader.discover.reject',
+          evt: DISCOVER_REJECT_EVENT,
           module: MODULE_TAG,
           reason: 'loose file directory resolves outside plugin dir',
           entry,
@@ -289,7 +291,7 @@ function discoverLooseFilesInDir(
     if (!safeIsFile(fullPath)) continue;
     if (!isPathInside(fullPath, rootDir)) {
       logger.warn({
-        evt: 'plugin.loader.discover.reject',
+        evt: DISCOVER_REJECT_EVENT,
         module: MODULE_TAG,
         reason: 'loose file resolves outside plugin dir',
         entry,

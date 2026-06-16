@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-14
-release: v0.1.2
+release: v0.1.3
 title: "Full Tool plugins"
 audience: [plugin-authors]
 purpose: "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph aren't the right shape and you want something fundamentally different."
@@ -55,8 +55,8 @@ Once a Tool exists as a package, the customer-facing management surface is the [
     ]
   },
   "peerDependencies": {
-    "@opensip-cli/contracts": "^0.1.2",
-    "@opensip-cli/core": "^0.1.2"
+    "@opensip-cli/contracts": "^0.1.3",
+    "@opensip-cli/core": "^0.1.3"
   }
 }
 ```

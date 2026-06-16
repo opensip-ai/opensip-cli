@@ -1,3 +1,4 @@
+// @fitness-ignore-file detached-promises -- phase recorder, diagnostics, OTel meter, logger, and enterScope calls are synchronous; the async tool lifecycle calls are awaited below.
 /**
  * execute-post-bailout-bootstrap — post-bailout phases 5–9 (ADR-0052).
  *
@@ -125,7 +126,7 @@ export async function executePostBailoutBootstrap(
   });
 
   record(PRE_ACTION_PHASES.enterScope);
-  d.enterScope(scope);
+  d.enterScope(scope); // resilience-ok: Commander postAction in pre-action-hook.ts disposes the entered RunScope after the action completes.
 
   if (!currentScope()) {
     throw new SystemError('Scope was not entered before command dispatch', {

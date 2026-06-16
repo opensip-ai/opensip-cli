@@ -4,7 +4,7 @@
  * (the combinator), and deriveRecipeId.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 import { deriveRecipeId } from '../../recipe-id.js';
 import { executePipeline } from '../pipeline.js';
@@ -25,6 +25,17 @@ describe('runWithTimeout', () => {
     const out = await runWithTimeout({ run: () => Promise.resolve(42), timeoutMs: 1000 });
     expect(out.status).toBe('ok');
     expect(out.status === 'ok' && out.result).toBe(42);
+  });
+
+  it('clears the hard-timeout timer when the unit finishes first', async () => {
+    vi.useFakeTimers();
+    try {
+      const out = await runWithTimeout({ run: () => Promise.resolve(42), timeoutMs: 1000 });
+      expect(out.status).toBe('ok');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('ABORTS a runaway run and classifies it as timeout (the §4.3 sim fix)', async () => {

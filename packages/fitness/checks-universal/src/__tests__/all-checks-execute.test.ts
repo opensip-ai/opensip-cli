@@ -24,6 +24,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';
 
+const CHECK_EXECUTION_TIMEOUT_MS = 60_000;
+
 let cwd: string;
 let allFixturePaths: string[] = [];
 
@@ -655,7 +657,9 @@ afterAll(() => {
 
 describe('checks-universal — every check runs to completion', () => {
   // Use it.each for one test row per check so failures point straight
-  // at the offending check.
+  // at the offending check. Command-mode checks such as `dead-code` may
+  // shell to external tools, so this matches the dedicated command-mode
+  // smoke budget rather than Vitest's default.
   it.each(checks.map((c) => [c.config.slug, c]))(
     '%s runs and returns a CheckResult',
     async (_slug, check) => {
@@ -670,6 +674,6 @@ describe('checks-universal — every check runs to completion', () => {
       expect(result.info).toBeDefined();
       expect(result.metadata).toBeDefined();
     },
-    20_000,
+    CHECK_EXECUTION_TIMEOUT_MS,
   );
 });

@@ -2,6 +2,29 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.3] - 2026-06-16
+
+A platform-hardening maintenance release focused on release-readiness and the
+bootstrap/graph reliability work identified in the architecture review. No
+intended user-facing CLI behavior changes.
+
+### Changed
+
+- Extracted the CLI pre-action bootstrap flow into an explicit planner and
+  post-bailout executor, with table-driven phase-order tests for bailout
+  safety.
+- Split bundled-tool registration/discovery/mounting into smaller composition
+  modules while preserving the shared tool-admission path.
+- Moved sharded graph live builds through the graph worker path and added an
+  operational smoke test for graph orchestration.
+
+### Fixed
+
+- Tightened per-run scope and logger guardrails so bootstrap context binding is
+  easier to test and less prone to cross-run state leakage.
+- Added architecture fitness checks that guard scoped logger configuration and
+  documented raw-stream output exceptions.
+
 ## [0.1.2] - 2026-06-16
 
 A maintenance release focused on analyzer accuracy. No public-API changes.

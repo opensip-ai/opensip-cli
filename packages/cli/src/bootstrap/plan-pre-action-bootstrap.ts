@@ -72,6 +72,9 @@ export function collectExtraAgnosticCommands(tools: ToolRegistry): ReadonlySet<s
 /**
  * Plan phases 1–4 (read options through bailout window). Throws
  * {@link BootstrapError} on config-resolve or bailout failures.
+ *
+ * @throws {BootstrapError} When config resolution fails or an early bootstrap
+ *   guard bails out before project side effects are allowed.
  */
 export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreActionBootstrapPlan {
   const { opts, cwd, cwdExplicit, runId, commandName, tools, explicitConfigPath } = input;
