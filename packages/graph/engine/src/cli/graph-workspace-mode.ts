@@ -8,7 +8,11 @@ import {
 } from '@opensip-cli/core';
 
 import { buildWorkspaceSessionContribution } from './graph-session-contribution.js';
-import { type GraphProfileBuilder } from './profile.js';
+import {
+  type GraphProfileBuilder,
+  type GraphProfileRunRecorder,
+  type GraphProfileRunSummary,
+} from './profile.js';
 import { resolveAdaptersForRun } from './resolve-adapters.js';
 import { buildWorkspaceJsonDocument, writeWorkspaceReport } from './workspace-report.js';
 import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-runner.js';
@@ -18,6 +22,25 @@ import type { GraphRunOutcome } from './graph-run-outcome.js';
 
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
 const MODULE_GRAPH_CLI = 'graph:cli';
+
+function setProfileStageRecorded(
+  profileRun: GraphProfileRunRecorder | undefined,
+  durationMs: number,
+  unitCount: number,
+): void {
+  if (profileRun !== undefined) {
+    profileRun.recordStage('workspace-fanout', durationMs, `${String(unitCount)} unit(s)`);
+  }
+}
+
+function setProfileSummaryFinished(
+  profileRun: GraphProfileRunRecorder | undefined,
+  summary: GraphProfileRunSummary,
+): void {
+  if (profileRun !== undefined) {
+    profileRun.finishSummary(summary);
+  }
+}
 
 /**
  * `graph --workspace` fan-out. The parent aggregates per-unit child runs for
@@ -63,11 +86,11 @@ export async function executeWorkspaceGraph(
     ...(opts.language === undefined ? {} : { language: opts.language }),
   });
   const durationMs = Date.now() - startedAt;
-  profileRun?.recordStage('workspace-fanout', durationMs, `${String(units.length)} unit(s)`);
+  setProfileStageRecorded(profileRun, durationMs, units.length);
 
   const allSignals: Signal[] = [];
   for (const r of result.perUnit) allSignals.push(...r.signals);
-  profileRun?.finishSummary({
+  setProfileSummaryFinished(profileRun, {
     cacheHit: false,
     signals: allSignals.length,
   });

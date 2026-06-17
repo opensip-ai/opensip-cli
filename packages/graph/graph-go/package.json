@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/graph-go",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "license": "Apache-2.0",
   "description": "Go language adapter for the opensip graph engine",
   "keywords": [

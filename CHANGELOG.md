@@ -2,6 +2,31 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.5] - 2026-06-17
+
+A maintenance release focused on architecture-review follow-through and release
+gate hygiene. No intended breaking CLI behavior changes.
+
+### Changed
+
+- Centralized host-reserved gate config keys so tool namespaces accept
+  `failOnErrors`, `failOnWarnings`, and boolean `failOnDegraded` consistently
+  while host config blocks remain strict.
+- Split graph workspace and multi-path orchestration out of the main graph
+  command handler while preserving finalized-signal delivery boundaries.
+- Moved CLI profiling state onto per-run scope telemetry instead of module-level
+  run state.
+
+### Fixed
+
+- Corrected the documented `failOnDegraded` config value from numeric `0` to
+  boolean `false`, and added schema coverage so invalid numeric values are
+  rejected.
+- Hardened scoped config loading so graph, fitness targets/signalers, and
+  simulation no longer re-read YAML behind an active run scope.
+- Added structural `CommandSpec` validation to plugin admission and cleaned the
+  resulting dogfood `fit` findings.
+
 ## [0.1.4] - 2026-06-16
 
 A focused maintenance release for installer feedback and graph-rule runtime

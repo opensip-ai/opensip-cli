@@ -578,7 +578,7 @@ npm's self-replacement and pnpm's lack of OIDC support.
 
 ## Project Status
 
-**v0.1.4 (initial production launch)** — OpenSIP CLI is a tool-plugin
+**v0.1.5 (initial production launch)** — OpenSIP CLI is a tool-plugin
 platform: `core` is a strict kernel, and `fitness`, `graph`, and
 `simulation` are peer tools implementing a shared Tool contract, with
 `cli` as a generic dispatcher. Adding a new tool requires zero CLI

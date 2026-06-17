@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.1.4
+release: v0.1.5
 title: "Cloud signal sync"
 audience: [getting-started, ci-integrators, contributors]
 purpose: "How OpenSIP Cloud signal sync works end to end — the pipeline, exactly what is sent, the entitlement and best-effort guarantees, and the three ways to turn it off."

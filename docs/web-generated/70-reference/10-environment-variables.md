@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-08
-release: v0.1.4
+release: v0.1.5
 title: "Environment variables"
 audience: [ci-integrators, operators]
 purpose: "Every environment variable the opensip-cli CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
@@ -17,9 +17,9 @@ related-docs:
 # Environment variables
 
 Every environment variable the CLI reads is declared as an `EnvVarSpec` and read
-through a single `EnvRegistry` ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/docs/decisions/ADR-0024-command-outcome-and-observability.md)),
+through a single `EnvRegistry` ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.1.5/docs/decisions/ADR-0024-command-outcome-and-observability.md)),
 so the surface is governed, coerced, and documented. The source of truth is
-`describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/cli/src/env/host-env-specs.ts);
+`describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.5/packages/cli/src/env/host-env-specs.ts);
 the `env-via-registry` fitness check fails CI on any raw `process.env` read that
 bypasses the registry.
 
@@ -61,7 +61,7 @@ bypasses the registry.
 
 | Variable | Effect |
 |---|---|
-| `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. |
+| `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-cli/blob/v0.1.5/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. |
 
 ## Terminal / pre-scope
 

@@ -9,7 +9,7 @@ import { DASHBOARD_FEATURE_COLUMNS } from './graph-feature-columns.js';
 import { countFiles } from './graph-report.js';
 import { loadGraphConfig, runGraph, type RunGraphResult } from './orchestrate.js';
 import { positionalPathLabel } from './positional-paths.js';
-import { type GraphProfileBuilder } from './profile.js';
+import { type GraphProfileBuilder, type GraphProfileRunRecorder } from './profile.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { GraphRunOutcome } from './graph-run-outcome.js';
@@ -36,6 +36,15 @@ export interface MultiPathContext {
   readonly startedAt: string;
   readonly profile?: GraphProfileBuilder;
   readonly deliverGraphResult: DeliverGraphResult;
+}
+
+function setProfileRunFinished(
+  profileRun: GraphProfileRunRecorder | undefined,
+  result: RunGraphResult,
+): void {
+  if (profileRun !== undefined) {
+    profileRun.finish(result);
+  }
 }
 
 export async function executeMultiPathGraph(
@@ -65,7 +74,7 @@ export async function executeMultiPathGraph(
       emitFeatures: DASHBOARD_FEATURE_COLUMNS,
       onProgress: profileRun?.onProgress,
     });
-    profileRun?.finish(r);
+    setProfileRunFinished(profileRun, r);
     lastResult = r;
     // Each path's signals are relative to that path's root, so waive them
     // against the same root before aggregating. The aggregate is re-branded

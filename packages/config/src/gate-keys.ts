@@ -38,6 +38,13 @@ function decorateSchemaWithGateKeys(schema: ZodType): ZodType {
   return schema.extend(extensions);
 }
 
+/**
+ * Return tool config declarations whose object schemas accept host-reserved gate keys.
+ *
+ * Apply this only to tool-owned declarations before host document declarations
+ * are appended; host namespaces such as `cli` and `plugins` intentionally stay
+ * strict and must not accept gate policy keys.
+ */
 export function decorateToolConfigDeclarationsWithGateKeys(
   declarations: readonly ToolConfigDeclaration[],
 ): readonly ToolConfigDeclaration[] {

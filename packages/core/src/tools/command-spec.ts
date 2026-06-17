@@ -259,17 +259,9 @@ function describeUnknownValue(value: unknown): string {
   return typeof value;
 }
 
-/**
- * Assert that an unknown value satisfies the runtime {@link CommandSpec} shape.
- *
- * This is the shared structural check for first-party `defineCommand` and
- * third-party tool admission. It deliberately stays Commander-free: flag syntax
- * and option mounting remain CLI-layer concerns, while the kernel-level command
- * contract is rejected before mount.
- */
-export function assertCommandSpec(value: unknown): asserts value is CommandSpec {
+function commandSpecValidationError(value: unknown): Error | undefined {
   if (!isPlainObject(value)) {
-    throw new TypeError('defineCommand: command spec must be an object.');
+    return new TypeError('defineCommand: command spec must be an object.');
   }
 
   const spec = value as {
@@ -283,64 +275,77 @@ export function assertCommandSpec(value: unknown): asserts value is CommandSpec 
   };
 
   if (typeof spec.name !== 'string' || spec.name.trim() === '') {
-    throw new Error('defineCommand: `name` must be a non-empty string.');
+    return new Error('defineCommand: `name` must be a non-empty string.');
   }
   if (typeof spec.description !== 'string' || spec.description.trim() === '') {
-    throw new Error(`defineCommand: command '${spec.name}' must have a non-empty description.`);
+    return new Error(`defineCommand: command '${spec.name}' must have a non-empty description.`);
   }
   if (!Array.isArray(spec.commonFlags)) {
-    throw new TypeError(
+    return new TypeError(
       `defineCommand: command '${spec.name}' must declare commonFlags as an array.`,
     );
   }
   if (!COMMAND_SCOPE_REQUIREMENTS.includes(spec.scope as CommandScopeRequirement)) {
-    throw new Error(
+    return new Error(
       `defineCommand: command '${spec.name}' declares unknown scope '${describeUnknownValue(spec.scope)}'. ` +
         `Valid scopes: ${COMMAND_SCOPE_REQUIREMENTS.join(', ')}.`,
     );
   }
   if (!COMMAND_OUTPUT_MODES.includes(spec.output as CommandOutputMode)) {
-    throw new Error(
+    return new Error(
       `defineCommand: command '${spec.name}' declares unknown output '${describeUnknownValue(spec.output)}'. ` +
         `Valid outputs: ${COMMAND_OUTPUT_MODES.join(', ')}.`,
     );
   }
   if (typeof spec.handler !== 'function') {
-    throw new TypeError(`defineCommand: command '${spec.name}' must have a function handler.`);
+    return new TypeError(`defineCommand: command '${spec.name}' must have a function handler.`);
   }
 
-  validateRawStreamDeclaration({
+  const rawStreamError = rawStreamDeclarationError({
     name: spec.name,
     output: spec.output as CommandOutputMode,
     rawStreamReason: spec.rawStreamReason,
   });
+  if (rawStreamError !== undefined) return rawStreamError;
 
   const seen = new Set<CommonFlagKey>();
   for (const key of spec.commonFlags as readonly unknown[]) {
     if (typeof key !== 'string' || !COMMON_FLAG_KEYS.includes(key as CommonFlagKey)) {
-      throw new Error(
+      return new Error(
         `defineCommand: command '${spec.name}' declares unknown common flag '${describeUnknownValue(key)}'. ` +
           `Valid keys: ${COMMON_FLAG_KEYS.join(', ')}.`,
       );
     }
     const commonFlag = key as CommonFlagKey;
     if (seen.has(commonFlag)) {
-      throw new Error(
+      return new Error(
         `defineCommand: command '${spec.name}' declares duplicate common flag '${commonFlag}'.`,
       );
     }
     seen.add(commonFlag);
   }
+
+  return undefined;
+}
+
+/**
+ * Assert that an unknown value satisfies the runtime {@link CommandSpec} shape.
+ *
+ * This is the shared structural check for first-party `defineCommand` and
+ * third-party tool admission. It deliberately stays Commander-free: flag syntax
+ * and option mounting remain CLI-layer concerns, while the kernel-level command
+ * contract is rejected before mount.
+ *
+ * @throws {Error | TypeError} When the value violates the command contract.
+ */
+export function assertCommandSpec(value: unknown): asserts value is CommandSpec {
+  const error = commandSpecValidationError(value);
+  if (error !== undefined) throw error;
 }
 
 /** Boolean form of {@link assertCommandSpec} for untrusted plugin admission. */
 export function validateCommandSpec(value: unknown): value is CommandSpec {
-  try {
-    assertCommandSpec(value);
-    return true;
-  } catch {
-    return false;
-  }
+  return commandSpecValidationError(value) === undefined;
 }
 
 /**
@@ -368,37 +373,33 @@ export function defineCommand<TOpts = unknown, TCtx = CommandContext>(
   return spec;
 }
 
-/**
- * Validate that a `raw-stream` command documents why it owns its own output.
- *
- * @throws {Error} when `output` is `'raw-stream'` but no `rawStreamReason` is
- *   declared (or the reason is not a recognized value).
- */
-function validateRawStreamDeclaration(spec: {
+/** Return an error when a `raw-stream` declaration is missing or inconsistent. */
+function rawStreamDeclarationError(spec: {
   readonly name: string;
   readonly output: CommandOutputMode;
   readonly rawStreamReason?: unknown;
-}): void {
+}): Error | undefined {
   if (spec.output === 'raw-stream') {
     if (spec.rawStreamReason === undefined) {
-      throw new Error(
+      return new Error(
         `defineCommand: command '${spec.name}' declares output 'raw-stream' without ` +
           'rawStreamReason. Raw-stream commands must document why the host render seam ' +
           'cannot own their output.',
       );
     }
     if (!RAW_STREAM_REASONS.includes(spec.rawStreamReason as RawStreamReason)) {
-      throw new Error(
+      return new Error(
         `defineCommand: command '${spec.name}' declares unknown rawStreamReason ` +
           `'${describeUnknownValue(spec.rawStreamReason)}'. Valid reasons: ${RAW_STREAM_REASONS.join(', ')}.`,
       );
     }
-    return;
+    return undefined;
   }
   if (spec.rawStreamReason !== undefined) {
-    throw new Error(
+    return new Error(
       `defineCommand: command '${spec.name}' declares rawStreamReason but output is ` +
         `'${spec.output}'. rawStreamReason is only valid for raw-stream commands.`,
     );
   }
+  return undefined;
 }

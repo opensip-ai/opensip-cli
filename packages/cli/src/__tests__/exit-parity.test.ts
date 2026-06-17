@@ -137,8 +137,10 @@ describe('exit-parity · structural guard (no tool computes its own findings exi
     // Allowlist: the host seam (deliver-envelope) owns the findings exit. The
     // remaining writers are NON-findings exits owned by distinct commands: the
     // gate-mode commands (graph-modes gate-save/compare), the --workspace
-    // child-aggregation (graph.ts), and the graph equivalence-check subcommand.
-    const allow = /deliver-envelope|graph-modes|graph\.ts|equivalence-check-command/;
+    // child-aggregation (graph-workspace-mode.ts), graph's top-level error
+    // mapper (graph.ts), and the graph equivalence-check subcommand.
+    const allow =
+      /deliver-envelope|graph-modes|graph-workspace-mode|graph\.ts|equivalence-check-command/;
     const hits = grep(repoRoot, 'setExitCode(EXIT_CODES.RUNTIME_ERROR)').filter(
       (f) => !allow.test(f),
     );
