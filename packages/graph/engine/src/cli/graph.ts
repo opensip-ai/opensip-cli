@@ -31,7 +31,6 @@ import {
   ConfigurationError,
   currentScope,
   logger,
-  SystemError,
   ToolError,
   ValidationError,
 } from '@opensip-cli/core';
@@ -40,29 +39,21 @@ import { resolveRecipeToRules } from '../recipes/resolve.js';
 
 import { finalizeGraphSignals, type FinalizedSignals } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
-import { DASHBOARD_FEATURE_COLUMNS } from './graph-feature-columns.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
 import { executeMultiPathGraph } from './graph-multi-path-mode.js';
-import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './graph-report.js';
+import { buildUnifiedReportLines, resolutionBannerText } from './graph-report.js';
 import { buildGraphSessionContribution } from './graph-session-contribution.js';
-import {
-  engineSelectionReason,
-  realpathOrSelf,
-  resolveEngineShards,
-  runProfiledShardedBuild,
-} from './graph-sharded-engine.js';
+import { executeSinglePathGraph } from './graph-single-run-mode.js';
 import { executeWorkspaceGraph } from './graph-workspace-mode.js';
-import { loadGraphConfig, resolveGraphRecipeSelection, runGraph } from './orchestrate.js';
-import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
+import { resolveGraphRecipeSelection, type RunGraphResult } from './orchestrate.js';
+import { resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
 import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { GraphRunOutcome } from './graph-run-outcome.js';
-import type { Catalog } from '../types.js';
 import type { GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-cli/contracts';
 import type { ToolCliContext } from '@opensip-cli/core';
-import type { DataStore } from '@opensip-cli/datastore';
 
 // Re-exports kept so the package barrel + cli/graph-runner.tsx + tests
 // keep using `cli/graph.js` as a single import site for these shapes.
@@ -158,104 +149,10 @@ export async function executeGraph(
       writeProfileIfRequested(opts, profile);
       return outcome;
     }
-    // Realpath the run root ONCE, before engine selection (F3 path parity). The
-    // EXACT engine normalizes its project dir via realpathSync internally
-    // (graph-typescript normalize-project-dir); the SHARDED worker derives
-    // project-relative `code.file` paths against this `projectRoot`. Under a
-    // symlinked cwd a RAW root would make the sharded paths gain `../..` prefixes
-    // while exact stays canonical → the two engines emit different `code.file`,
-    // and since the engine choice is environment-sensitive, a `--gate-save`
-    // baseline written by one engine would flag everything new under the other.
-    // Canonicalizing here (idempotent for non-symlinks) keeps both engines'
-    // emitted paths byte-identical. Shard discovery already realpaths internally
-    // (discoverFiles → normalizeProjectDir), so the shard files and this root now
-    // share the same canonical base.
-    const runCwd = realpathOrSelf(positionalPaths[0] ?? opts.cwd, opts.cwd);
-    // Honor the project's `graph:` config block (rule knobs like
-    // minCrossPackageDuplicatePackages). Resolved from the original cwd so a
-    // positional subtree run still picks up the project-root config.
-    const config = loadGraphConfig(opts.cwd);
-    // Determinism (ADR-0033, superseding ADR-0032/0031): the build engine is
-    // chosen by an explicit, deterministic policy — the SHARDED engine is the
-    // DEFAULT (both engines resolve through one shared model — exact = the
-    // 1-shard case — held equivalent by the directional soundness invariant +
-    // completeness floor; ADR-0033), and
-    // `--exact` opts OUT to the single-program engine. It is NOT chosen by
-    // `process.stdout.isTTY` or on-disk discovery state, so a bare `graph` builds
-    // the same catalog whether run in a terminal, piped, or under
-    // `--gate-*`/`--json`. When the project can't shard (no worker script,
-    // single-unit, discovery failure) we fall back to the exact engine — the
-    // natural single-package/small-repo path — rather than failing.
-    const resolution = await resolveEngineShards(opts, cli, positionalPaths);
-    const shards = resolution.shards;
-    logger.info({
-      evt: 'graph.cli.graph.engine',
-      module: MODULE_GRAPH_CLI,
-      mode: shards.length > 1 ? 'sharded' : 'exact',
-      requestedExact: opts.exact === true,
-      shards: shards.length,
-      reason: engineSelectionReason(opts, positionalPaths, shards.length > 1),
-    });
-    const profileRun = profile?.startRun({
-      label: positionalPaths.length === 0 ? 'root' : positionalPathLabel(runCwd, opts.cwd),
-      cwd: runCwd,
-      mode: shards.length > 1 ? 'sharded' : 'single-process',
-    });
-    // The synthetic partitioner runs BEFORE the profile run recorder exists
-    // (its `mode` label needs the shard count), so its wall time is measured
-    // where it runs and recorded here (ADR-0045 measurement plane).
-    if (resolution.partition !== undefined) {
-      profileRun?.recordStage(
-        'partition',
-        resolution.partition.durationMs,
-        resolution.partition.detail,
-      );
-    }
-    const result =
-      shards.length > 1
-        ? await runProfiledShardedBuild(profileRun, {
-            opts,
-            shards,
-            projectRoot: runCwd,
-            cli,
-            config,
-            rules,
-          })
-        : await runGraph({
-            cwd: runCwd,
-            noCache: opts.noCache,
-            resolution: opts.resolution,
-            language: opts.language,
-            config,
-            rules,
-            datastore: cli.scope.datastore() as DataStore | undefined,
-            emitFeatures: DASHBOARD_FEATURE_COLUMNS,
-            onProgress: profileRun?.onProgress,
-          });
-    profileRun?.finish(result);
-    // Propagate shard failures so incomplete catalogs do not silently produce
-    // baselines or pass --gate-compare (per-audit: failedShardIds was computed
-    // but never surfaced to the gate or as a hard error).
-    if (shards.length > 1) {
-      const sharded = result as { failedShardIds?: readonly string[] };
-      if (sharded.failedShardIds && sharded.failedShardIds.length > 0) {
-        throw new SystemError(
-          `Sharded graph build had ${sharded.failedShardIds.length} shard failure(s); ` +
-            `catalog and any --gate-* / baseline artifacts are incomplete. ` +
-            `See 'graph.sharded.shard_failed' log events for per-shard details.`,
-          { code: 'GRAPH.SHARD.FAILURES' },
-        );
-      }
-    }
-    enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
-    currentScope()?.diagnostics?.event('execute', 'debug', 'graph build complete', {
-      mode: shards.length > 1 ? 'sharded' : 'exact',
-      shards: shards.length,
-    });
-    // `runCwd` (= positionalPaths[0] ?? opts.cwd) is the build root the signals
-    // are relative to — the correct base for resolving `@graph-ignore` directive
-    // files. For the sharded build it equals `projectRoot` passed above.
-    const outcome = await dispatchGraphResult(opts, result, cli, startedAt, runCwd);
+    const outcome = await executeSinglePathGraph(
+      { opts, cli, rules, startedAt, profile, dispatchGraphResult },
+      positionalPaths,
+    );
     writeProfileIfRequested(opts, profile);
     return outcome;
   } catch (error) {
@@ -344,27 +241,6 @@ function resolvePositionalScope(opts: GraphCommandOptions): readonly string[] {
 }
 
 /**
- * D14 mixed policy. When `--language X` was specified and the run
- * discovered zero files matching that adapter, exit 2 with the
- * canonical error. Auto-detection paths (no `--language`) do NOT
- * trigger this check — a "zero files" outcome there is a valid
- * (non-error) state.
- */
-function enforceLanguageMismatchPolicy(
-  opts: GraphCommandOptions,
-  catalog: Catalog | null,
-  paths: readonly string[],
-): void {
-  if (typeof opts.language !== 'string' || opts.language.length === 0) return;
-  const fileCount = catalog === null ? 0 : countFiles(catalog);
-  if (fileCount > 0) return;
-  const pathLabel = paths.map((p) => positionalPathLabel(p, opts.cwd)).join(', ');
-  throw new ConfigurationError(
-    `--language ${opts.language} matched 0 files under ${pathLabel}; check the flag or paths.`,
-  );
-}
-
-/**
  * Assemble the run's {@link SignalEnvelope} from its raw engine signals
  * (ADR-0011). Centralises `runId`/`createdAt` resolution off the live scope so
  * cloud egress correlates with the run id the logger stamps; the envelope is
@@ -372,7 +248,7 @@ function enforceLanguageMismatchPolicy(
  */
 function envelopeFor(
   opts: GraphCommandOptions,
-  result: Awaited<ReturnType<typeof runGraph>>,
+  result: RunGraphResult,
   durationMs: number,
 ): SignalEnvelope {
   return buildGraphEnvelope({
@@ -396,7 +272,7 @@ function envelopeFor(
 // children must not each emit cloud signals).
 export async function dispatchGraphResult(
   opts: GraphCommandOptions,
-  rawResult: Awaited<ReturnType<typeof runGraph>>,
+  rawResult: RunGraphResult,
   cli: ToolCliContext,
   startedAt: string,
   suppressionRoot: string,
@@ -446,7 +322,7 @@ export async function dispatchGraphResult(
  */
 async function deliverGraphResult(
   opts: GraphCommandOptions,
-  result: Awaited<ReturnType<typeof runGraph>>,
+  result: RunGraphResult,
   cli: ToolCliContext,
   startedAt: string,
   finalized: FinalizedSignals,
@@ -525,7 +401,7 @@ async function deliverGraphResult(
  */
 async function renderGraphResult(
   opts: GraphCommandOptions,
-  result: Awaited<ReturnType<typeof runGraph>>,
+  result: RunGraphResult,
   startedAt: string,
   cli: ToolCliContext,
 ): Promise<SignalEnvelope> {

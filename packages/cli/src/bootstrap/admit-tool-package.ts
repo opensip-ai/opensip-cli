@@ -20,6 +20,13 @@
  * module. Callers that need isolation (e.g. `tools validate` probing a
  * not-yet-trusted package) pass `staticOnly: true` here and run the runtime
  * sections in a child-process probe instead.
+ *
+ * ADR-0054 transition: external runtimes still import in the host process until
+ * the manifest/RPC contract can carry executable command specs across a worker
+ * boundary. Every host-process import must therefore pass an explicit policy:
+ * bundled imports are normal, non-bundled imports are named as temporary
+ * `adr0054Transition` exceptions so the fitness check can keep the boundary
+ * visible and narrow.
  */
 
 import { pathToFileURL } from 'node:url';
@@ -53,6 +60,18 @@ export type ToolRuntimeLoad =
       readonly detail?: string;
     };
 
+export type ToolRuntimeImportPolicy =
+  | { readonly source: 'bundled' }
+  | {
+      readonly source: Exclude<ToolSource, 'bundled'>;
+      readonly adr0054Transition: true;
+    };
+
+export function hostRuntimeImportPolicyFor(source: ToolSource): ToolRuntimeImportPolicy {
+  if (source === 'bundled') return { source };
+  return { source, adr0054Transition: true };
+}
+
 /**
  * Resolve a tool package's entry, DYNAMIC-IMPORT it, and validate the exported
  * `tool` shape. This is the ONE runtime-load path every installation source
@@ -65,7 +84,19 @@ export type ToolRuntimeLoad =
  *
  * Never throws: returns a discriminated result the caller acts on.
  */
-export async function importToolRuntime(dir: string): Promise<ToolRuntimeLoad> {
+export async function importToolRuntime(
+  dir: string,
+  policy: ToolRuntimeImportPolicy,
+): Promise<ToolRuntimeLoad> {
+  if (policy.source !== 'bundled' && policy.adr0054Transition !== true) {
+    return {
+      ok: false,
+      reason: 'import-failed',
+      detail:
+        'external tool runtime import attempted without ADR-0054 transition policy; ' +
+        'load through the worker boundary instead',
+    };
+  }
   const meta = readToolPackageMetadata(dir);
   if (!meta) return { ok: false, reason: 'no-entry' };
   let mod: { tool?: unknown };
@@ -210,7 +241,7 @@ export async function admitToolPackage(opts: AdmitToolPackageOptions): Promise<A
 
   // Section 3+4 — runtime load + tool shape: dynamic import (UNTRUSTED code
   // executes here) and the exported-symbol gate.
-  const load = await importToolRuntime(opts.dir);
+  const load = await importToolRuntime(opts.dir, hostRuntimeImportPolicyFor(opts.source));
   if (!load.ok) {
     if (load.reason === 'invalid-shape') {
       sections.push(

@@ -112,11 +112,13 @@ export interface ToolCommandDescriptor {
   readonly scope?: 'project' | 'none';
 }
 
-/** Generic stored-session shape accepted by tool replay hooks.
+/**
+ * Canonical generic stored-session leaf shape accepted by tool replay hooks.
  *
- * This mirrors `@opensip-cli/contracts` `StoredSession` structurally without
- * importing contracts into core. The CLI passes hydrated session-store rows;
- * tools narrow their opaque payloads inside their own replay builders.
+ * Core owns the contract leaf because replay hooks live on the core `Tool`
+ * interface and core cannot import contracts. `@opensip-cli/contracts`
+ * extends this shape for the persisted `StoredSession` facade by adding
+ * host-side metrics.
  */
 export interface ToolSessionRecord {
   readonly id: string;

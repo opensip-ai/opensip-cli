@@ -14,7 +14,7 @@ import {
   type ToolDiscoverySource,
 } from '@opensip-cli/core';
 
-import { importToolRuntime } from './admit-tool-package.js';
+import { hostRuntimeImportPolicyFor, importToolRuntime } from './admit-tool-package.js';
 import {
   admitProjectLocalTool,
   admitUserGlobalTool,
@@ -120,7 +120,7 @@ export async function discoverAndRegisterToolPackages(
       // module-resolution path still loads. An installed tool is best-effort:
       // any load failure skips-with-diagnostic (it must not take fit/graph/sim
       // down), in contrast to the bundled path's fail-closed.
-      const load = await importToolRuntime(pkg.packageDir);
+      const load = await importToolRuntime(pkg.packageDir, hostRuntimeImportPolicyFor('installed'));
       if (!load.ok) {
         emitInstalledLoadFailure(pkg.name, load);
         continue;
@@ -267,7 +267,7 @@ async function admitAndRegisterAuthored(args: AuthoredRegisterArgs): Promise<voi
   // Never shadow a bundled tool (defense in depth; the registry also dedupes).
   if (builtInIds.has(prov.id)) return;
 
-  const load = await importToolRuntime(dir);
+  const load = await importToolRuntime(dir, hostRuntimeImportPolicyFor(prov.source));
   if (!load.ok) {
     const detailSuffix = load.detail ? `: ${load.detail}` : '';
     throw new PluginIncompatibleError(

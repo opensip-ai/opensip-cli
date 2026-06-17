@@ -14,6 +14,7 @@ import {
   runWithScope,
   runWithScopeSync,
   currentScope,
+  currentLogger,
   enterScope,
 } from '../run-scope.js';
 
@@ -94,6 +95,17 @@ describe('runWithScope / currentScope', () => {
 
   it('currentScope returns undefined outside any runWithScope block', () => {
     expect(currentScope()).toBeUndefined();
+  });
+
+  it('currentLogger returns the scoped logger and falls back to the singleton outside scope', () => {
+    const scopedLogger = createRunLogger({ runId: 'RUN_scoped_logger', silent: true });
+    const scope = new RunScope({ runId: 'RUN_scoped_logger', logger: scopedLogger });
+
+    expect(currentLogger()).toBe(defaultLogger);
+    expect(runWithScopeSync(scope, () => currentLogger())).toBe(scopedLogger);
+    expect(currentLogger()).toBe(defaultLogger);
+
+    scope.dispose();
   });
 
   it('enterScope sets the current scope for the rest of the async context', async () => {

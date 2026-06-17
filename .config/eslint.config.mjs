@@ -446,6 +446,7 @@ export default tseslint.config(
       'packages/cli/src/cli-context.ts', // the single place that constructs ToolCliContext with the seams
       'packages/cli/src/error-handler.ts',
       'packages/cli/src/report*.ts',
+      'packages/cli/src/telemetry/**', // process-global SDK/profiler setup; not an entered-scope command path
       'packages/cli/src/ui/**',
       'packages/cli/src/index.ts', // top-level registration + buildToolCliContext call site
       'packages/cli/src/welcome.ts',
@@ -508,6 +509,12 @@ export default tseslint.config(
               ],
               message:
                 'Pre-scope holder symbols are test-only (or internal to bootstrap) after hygiene Phase 3. Handlers must use currentScope() (after enterScope) and the blessed methods on the ToolCliContext they receive.',
+            },
+            {
+              name: '@opensip-cli/core',
+              importNames: ['logger', 'configureLogger'],
+              message:
+                'Scoped CLI paths must use the per-run logger (ctx.scope.logger, currentScope()?.logger, or currentLogger()). The core logger singleton is for pre-scope compatibility/bootstrap only.',
             },
           ],
         },

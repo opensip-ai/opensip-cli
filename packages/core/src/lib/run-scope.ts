@@ -261,6 +261,15 @@ export function currentScope(): RunScope | undefined {
   return scopeStorage.getStore();
 }
 
+/**
+ * Read the current run logger, falling back to the compatibility singleton
+ * before a RunScope exists. Scoped production code should prefer this helper
+ * over importing the singleton logger directly.
+ */
+export function currentLogger(): Logger {
+  return currentScope()?.logger ?? defaultLogger;
+}
+
 // ─── Logger ↔ RunScope wiring ────────────────────────────────────────
 //
 // Inject `currentScope()?.runId` as the logger singleton's runId source

@@ -26,15 +26,14 @@ import {
   type LiveViewContext,
   type ToolRunCompletion,
   type ToolRunSessions,
-  type ArgSpec,
   type CommandSpec,
-  type OptionSpec,
   type ToolCliContext,
 } from '@opensip-cli/core';
-import { Option } from 'commander';
 
 import { type RunActionHooks } from '../bootstrap/run-plane.js';
 
+import { splitActionArgs } from './mount-command-action.js';
+import { buildOption, formatArgUsage } from './mount-command-spec-wiring.js';
 import { emitCommandResult } from './mount-result-command.js';
 
 /**
@@ -259,154 +258,4 @@ export async function dispatchOutput<TCtx extends CommandMountContext>(
       return;
     }
   }
-}
-
-/**
- * Build a Commander {@link Option} from an {@link OptionSpec}, covering every
- * shape in the first-party flag corpus: boolean / value, negatable `--no-`,
- * literal `default` and repeatable `arrayDefault`, `choices`, the pure `parse`
- * argParser, variadic, and `required` (mandatory).
- *
- * @throws {Error} When the spec marks a boolean (valueless) option `required`
- *   — only value options can be made mandatory.
- */
-function buildOption(spec: OptionSpec, commandName: string): Option {
-  const valuePlaceholder = resolveValuePlaceholder(spec);
-  const flags = valuePlaceholder === undefined ? spec.flag : `${spec.flag} ${valuePlaceholder}`;
-  const option = new Option(flags, spec.description);
-
-  if (spec.choices !== undefined && spec.choices.length > 0) {
-    option.choices([...spec.choices]);
-  }
-  if (spec.parse !== undefined) {
-    // Commander's argParser is `(value, previous) => next` — exactly the
-    // declared `OptionSpec.parse` reducer shape (Number coercion, repeatable
-    // accumulation, validated ints).
-    option.argParser(spec.parse);
-  }
-  // `arrayDefault` (repeatable accumulators) wins over a scalar `default`;
-  // Commander uses it as the seed the `parse` reducer accumulates onto.
-  if (spec.arrayDefault !== undefined) {
-    option.default([...spec.arrayDefault]);
-  } else if (spec.default !== undefined) {
-    option.default(spec.default);
-  }
-  if (spec.required === true) {
-    if (valuePlaceholder === undefined) {
-      throw new Error(
-        `mountCommandSpec: command '${commandName}' option '${spec.flag}' is required but takes no value; ` +
-          'only value options can be required.',
-      );
-    }
-    option.makeOptionMandatory(true);
-  }
-  return option;
-}
-
-/**
- * Resolve the value placeholder for an option, applying variadic `...` when
- * declared. Returns `undefined` for a boolean / negatable flag (no value).
- */
-function resolveValuePlaceholder(spec: OptionSpec): string | undefined {
-  if (spec.negatable === true) return undefined;
-  if (spec.value === undefined) return undefined;
-  if (spec.variadic === true && !spec.value.includes('...')) {
-    // Inject the variadic ellipsis inside the existing bracket pair, e.g.
-    // `<slug>` → `<slug...>`, `[path]` → `[path...]`.
-    return spec.value.replace(/([>\]])$/, '...$1');
-  }
-  return spec.value;
-}
-
-/**
- * Format an {@link ArgSpec} into Commander argument-usage syntax: `<name>`
- * (required), `[name]` (optional), with `...` appended for variadic.
- */
-function formatArgUsage(spec: ArgSpec): string {
-  const inner = spec.variadic === true ? `${spec.name}...` : spec.name;
-  return spec.optional === true ? `[${inner}]` : `<${inner}>`;
-}
-
-/**
- * Best-effort guard: does `x` look like a Commander `Command` instance?
- * Used defensively in splitActionArgs so we never treat the Command object
- * as the parsed opts (which would silently give every handler a weird
- * `opts` bag containing Commander internals and produce very confusing bugs).
- */
-function isLikelyCommanderCommand(x: unknown): boolean {
-  if (!x || typeof x !== 'object') return false;
-  const c = x as Record<string, unknown>;
-  // Commander Command instances have these characteristic members.
-  return (
-    typeof c.name === 'function' ||
-    typeof c.opts === 'function' ||
-    typeof c.command === 'function' ||
-    (typeof c.constructor === 'function' && /Command/i.test(c.constructor.name || ''))
-  );
-}
-
-/**
- * Split a Commander action callback's variadic arguments into the parsed-opts
- * object and the trailing positional args.
- *
- * Commander calls `action((...positionalArgs, optsObject, command))`: the
- * declared positionals come first, then the parsed-options object, then the
- * `Command` instance. We locate the opts object by scanning left from the
- * slot before the final Command for the rightmost plain (non-array, non-Command)
- * object. Everything before that index is treated as positionals.
- *
- * This scan is robust: positionals (typically strings/paths for variadics) are
- * never inspected for "object-ness" during the search, so a defensive walk
- * cannot accidentally eat legitimate leading positionals when an intermediate
- * value looks unusual (future Commander arity change, wrappers, etc.).
- *
- * If no plausible opts object is found, we treat the entire prefix before the
- * Command as positionals and opts as {} (fail-closed paranoia below still applies).
- *
- * @throws {Error} On the defensive, normally-unreachable path where no opts object
- *   can be located among the action arguments (surfaced loudly so tests/CI catch it).
- */
-function splitActionArgs(actionArgs: readonly unknown[]): {
-  opts: Record<string, unknown>;
-  positionals: readonly unknown[];
-} {
-  if (actionArgs.length === 0) {
-    return { opts: {}, positionals: [] };
-  }
-
-  const lastIdx = actionArgs.length - 1;
-  // The final argument is (per Commander contract) the Command instance.
-  if (!isLikelyCommanderCommand(actionArgs[lastIdx])) {
-    // Extremely unexpected — log via throw so tests/CI surface it loudly.
-    throw new Error(
-      'mountCommandSpec: splitActionArgs could not locate Commander Command as the final action argument. ' +
-        'This indicates an incompatible Commander version or a wrapped dispatch. ' +
-        'Please report this with your Commander version.',
-    );
-  }
-
-  // Scan left from the slot immediately before the Command. The first (rightmost)
-  // plain non-array non-Command object we encounter is the parsed opts.
-  for (let i = lastIdx - 1; i >= 0; i--) {
-    const v = actionArgs[i];
-    if (v && typeof v === 'object' && !Array.isArray(v) && !isLikelyCommanderCommand(v)) {
-      const opts = v as Record<string, unknown>;
-      const positionals = actionArgs.slice(0, i);
-
-      // Extra paranoia: if what we selected smells like Command, refuse.
-      if (isLikelyCommanderCommand(opts)) {
-        throw new Error(
-          'mountCommandSpec: splitActionArgs selected a Commander Command as the parsed opts. ' +
-            'Refusing to dispatch — this is a bug in argument splitting.',
-        );
-      }
-      return { opts, positionals };
-    }
-  }
-
-  // No plain opts object found before the Command (defensive). All prior args
-  // become positionals; the handler will see a bare {} for opts (still better
-  // than handing it a Command or corrupting _args).
-  const positionals = actionArgs.slice(0, lastIdx);
-  return { opts: {}, positionals };
 }

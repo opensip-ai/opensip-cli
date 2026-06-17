@@ -133,7 +133,7 @@ For the deeper rationale (why a separate package, why not core, why not contract
 
 `contracts` depends only on `core`. It can't reach up to a tool, the CLI, or check packs.
 
-The reasoning: contracts exists to define the contract surface (`SignalEnvelope`, `CommandResult`, `EXIT_CODES`) that *every* Tool consumes. If it took a dep on one Tool, it'd be coupled to that Tool's lifecycle.
+The reasoning: contracts exists to define the contract facade (`SignalEnvelope`, `CommandResult`, `EXIT_CODES`, `StoredSession`, and small tool-facing helpers such as `defineCommand`) that *every* Tool consumes. If it took a dep on one Tool, it'd be coupled to that Tool's lifecycle. Runtime services such as persistence, rendering, config loading, and tool execution stay outside contracts.
 
 ### `fitness-no-cli` and `simulation-no-cli`
 

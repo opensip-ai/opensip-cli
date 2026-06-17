@@ -13,7 +13,7 @@ import {
   type ToolPluginManifest,
   type ToolProvenance,
 } from '@opensip-cli/core';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { BootstrapError } from '../bootstrap-error.js';
 import { executePostBailoutBootstrap } from '../execute-post-bailout-bootstrap.js';
@@ -140,7 +140,6 @@ describe('planPreActionBootstrap', () => {
 describe('executePostBailoutBootstrap phase ordering', () => {
   it('records post-bailout phases in ADR-0052 order', async () => {
     const phases: string[] = [];
-    const { RunScope } = await import('@opensip-cli/core');
 
     const plan = planPreActionBootstrap({
       opts: {},
@@ -160,7 +159,8 @@ describe('executePostBailoutBootstrap phase ordering', () => {
       },
       {
         recordPhase: (p) => phases.push(p),
-        buildPerRunScope: (input) => new RunScope({ runId: input.runId, logger: input.logger }),
+        enterScope: () => undefined,
+        isScopeEntered: () => true,
         checkForUpdate: () => undefined,
         startProfiling: () => undefined,
         maybeInitializeOwningTool: () => Promise.resolve(),
@@ -171,24 +171,76 @@ describe('executePostBailoutBootstrap phase ordering', () => {
     expect(phases).toEqual([...POST_BAILOUT_PHASE_ORDER]);
   });
 
-  it('bailout prevents post-bailout side effects (buildPerRunScope not called)', () => {
-    const buildPerRunScope = vi.fn();
-    const tmp = mkdtempSync(join(tmpdir(), 'opensip-bail-'));
+  it('builds a real project RunScope before tool preflight', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'opensip-post-'));
+    writeFileSync(join(tmp, 'opensip-cli.config.yml'), 'schemaVersion: 1\ntargets: {}\n', 'utf8');
+    const tool = {
+      ...noopTool('scoped-tool'),
+      contributeScope: () => ({ scopedTool: { ready: true } }),
+    } satisfies Tool;
+    const runtime = runtimeWith([tool]);
+    const plan = planPreActionBootstrap({
+      opts: {},
+      cwd: tmp,
+      cwdExplicit: false,
+      runId: 'RUN_scope',
+      commandName: 'fit-list',
+      tools: runtime.tools,
+    });
 
-    try {
+    const result = await executePostBailoutBootstrap(
+      {
+        plan,
+        runtime,
+        version: '0.0.0-test',
+        noCloud: true,
+      },
+      {
+        enterScope: () => undefined,
+        isScopeEntered: () => true,
+        checkForUpdate: () => undefined,
+        startProfiling: () => undefined,
+        maybeInitializeOwningTool: () => Promise.resolve(),
+        loadOwningToolCapabilities: () => Promise.resolve(0),
+      },
+    );
+
+    expect(result.scope.runId).toBe('RUN_scope');
+    expect(result.scope.projectContext?.scope).toBe('project');
+    expect(result.scope.configDocument).toBeDefined();
+    expect((result.scope as unknown as { scopedTool?: { ready: boolean } }).scopedTool?.ready).toBe(
+      true,
+    );
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it.each([
+    {
+      label: 'schema-version',
+      writeConfig: (dir: string) =>
+        writeFileSync(join(dir, 'opensip-cli.config.yml'), 'schemaVersion: 99\ntargets: {}\n'),
+      commandName: 'fit-list',
+    },
+    {
+      label: 'no-project',
+      writeConfig: () => undefined,
+      commandName: 'fit',
+    },
+  ])('planner bailout stops before post-bailout phase: $label', ({ writeConfig, commandName }) => {
+    const tmp = mkdtempSync(join(tmpdir(), 'opensip-bail-'));
+    writeConfig(tmp);
+
+    expect(() =>
       planPreActionBootstrap({
         opts: {},
         cwd: tmp,
         cwdExplicit: false,
         runId: 'RUN_bail',
-        commandName: 'fit',
+        commandName,
         tools: new ToolRegistry(),
-      });
-    } catch {
-      // expected no-project bailout
-    }
+      }),
+    ).toThrow(BootstrapError);
 
-    expect(buildPerRunScope).not.toHaveBeenCalled();
     rmSync(tmp, { recursive: true, force: true });
   });
 });

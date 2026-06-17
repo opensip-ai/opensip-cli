@@ -94,6 +94,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'createSignalFromViolation',
   'createSubprocessProgressRun',
   'currentCapabilityRegistry',
+  'currentLogger',
   'currentScope',
   'currentTraceparent',
   'defineCommand',

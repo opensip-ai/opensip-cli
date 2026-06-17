@@ -78,9 +78,18 @@ owns both the shard pool and the synchronous coordinator work.
 the worker primitive to first-party graph live rendering only. It moves sharded
 live graph coordination out of the Ink render process; it does not remove
 host-side `importToolRuntime(...)` for external tools, migrate external config or
-capability discovery, move lifecycle hooks behind worker RPC, or disable unsafe
-in-process fallback for external provenance. Those are the migration workstreams
-below.
+tool command execution behind worker IPC, or claim sandboxing for installed /
+authored Tool packages. It also does not move capability discovery or lifecycle
+hooks behind worker RPC, or disable unsafe in-process fallback for external
+provenance. Those are the migration workstreams below.
+
+**2026-06-17 transition guard:** until the manifest/RPC contract can carry
+executable command specs across a worker boundary, host-side runtime imports are
+still required for admitted tools. The host now requires an explicit
+`hostRuntimeImportPolicyFor(source)` policy at every `importToolRuntime` call,
+and the `host-tool-runtime-import-boundary` fitness check confines those calls
+to the admission/discovery boundary. This is a staging guardrail, not the final
+fault-isolation boundary.
 
 **Config semantics:** Config validation is a two-pass contract.
 

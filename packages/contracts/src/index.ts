@@ -181,6 +181,7 @@ export type {
   StoredSessionHostMetrics,
   ToolSessionReplay,
 } from './session-types.js';
+export type { ToolSessionRecord } from '@opensip-cli/core';
 
 // Graph catalog type surface. This is the contract surface between the
 // graph tool (which writes catalog.json) and the dashboard package

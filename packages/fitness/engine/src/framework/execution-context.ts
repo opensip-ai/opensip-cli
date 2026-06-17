@@ -10,7 +10,7 @@
 
 import * as fs from 'node:fs/promises';
 
-import { SystemError, currentScope, logger as defaultLogger } from '@opensip-cli/core';
+import { SystemError, currentLogger } from '@opensip-cli/core';
 
 import { applyGlobalExcludes } from '../targets/index.js';
 
@@ -247,7 +247,7 @@ export function createExecutionContext(
       // that exercise an ExecutionContext directly). Audit-round-2
       // Finding D: this was previously `console.log` which bypassed
       // the structured channel and could not be suppressed.
-      const log = currentScope()?.logger ?? defaultLogger;
+      const log = currentLogger();
       log.info({
         evt: 'fitness.check.verbose',
         module: 'fitness:framework',

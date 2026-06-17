@@ -51,6 +51,7 @@ export interface PostBailoutBootstrapDeps {
   readonly createRunLogger?: typeof createRunLogger;
   readonly buildPerRunScope?: typeof buildPerRunScope;
   readonly enterScope?: typeof enterScope;
+  readonly isScopeEntered?: () => boolean;
   readonly checkForUpdate?: typeof checkForUpdate;
   readonly startProfiling?: typeof startProfiling;
   readonly maybeInitializeOwningTool?: typeof maybeInitializeOwningTool;
@@ -69,6 +70,7 @@ const defaultDeps: Required<
     | 'createRunLogger'
     | 'buildPerRunScope'
     | 'enterScope'
+    | 'isScopeEntered'
     | 'checkForUpdate'
     | 'startProfiling'
     | 'maybeInitializeOwningTool'
@@ -79,6 +81,7 @@ const defaultDeps: Required<
   createRunLogger,
   buildPerRunScope,
   enterScope,
+  isScopeEntered: () => currentScope() !== undefined,
   checkForUpdate,
   startProfiling,
   maybeInitializeOwningTool,
@@ -128,7 +131,7 @@ export async function executePostBailoutBootstrap(
   record(PRE_ACTION_PHASES.enterScope);
   d.enterScope(scope); // resilience-ok: Commander postAction in pre-action-hook.ts disposes the entered RunScope after the action completes.
 
-  if (!currentScope()) {
+  if (!d.isScopeEntered()) {
     throw new SystemError('Scope was not entered before command dispatch', {
       code: 'SYSTEM.SCOPE.NOT_ENTERED',
     });

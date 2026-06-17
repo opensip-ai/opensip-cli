@@ -81,6 +81,35 @@ export const tool = {
 
 This example uses a plain object so it has no package dependencies. A publishable Tool package can use `defineCommand` and TypeScript types from `@opensip-cli/core`.
 
+If your TypeScript Tool contributes a typed per-run subscope, add a
+`scope-augmentation.ts` file and import it from the Tool entry for side effects:
+
+```ts
+// scope-augmentation.ts
+export interface HelloScope {
+  readonly greetings: string[];
+}
+
+declare module '@opensip-cli/core' {
+  interface ScopeContribution {
+    helloTools?: HelloScope;
+  }
+}
+```
+
+```ts
+// index.ts
+import './scope-augmentation.js';
+
+export const tool = {
+  // ...
+  contributeScope: () => ({ helloTools: { greetings: [] } }),
+};
+```
+
+The import is required even though it has no bindings; it loads the module
+augmentation so `cli.scope.helloTools` is typed when the package is compiled.
+
 ## 4. Allowlist the project-local Tool
 
 Tracked project-local Tools are executable code, so they are deny-by-default. Admit this Tool for the current shell:

@@ -298,6 +298,7 @@ export {
   runWithScopeSync,
   enterScope,
   currentScope,
+  currentLogger,
 } from './lib/run-scope.js';
 export type { RunScopeOptions } from './lib/run-scope.js';
 // The Tool-contract scope types live in the leaf `scope-types.ts` so the

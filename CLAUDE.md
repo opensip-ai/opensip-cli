@@ -22,8 +22,9 @@ opensip-cli/
 │   ├── core/                    # @opensip-cli/core — kernel: errors, logger,
 │   │                            #   IDs, language adapters, plugin loader,
 │   │                            #   Tool contract
-│   ├── contracts/               # @opensip-cli/contracts — contract types
-│   │                            #   between Tools and the runner: SignalEnvelope
+│   ├── contracts/               # @opensip-cli/contracts — Tool↔runner contract
+│   │                            #   facade: types, constants, and small
+│   │                            #   tool-facing runtime helpers. SignalEnvelope
 │   │                            #   (ADR-0011; replaced CliOutput), CommandResult,
 │   │                            #   exit codes, the StoredSession type (runtime in
 │   │                            #   session-store), GraphCatalog type surface
@@ -386,7 +387,7 @@ This is the mechanical realization of "only use documented seams".
 ```
 core (kernel)
   ↑
-contracts (Tool↔runner contract types)
+contracts (Tool↔runner contract facade)
   ↑
 lang-* / fitness / simulation (peer layer)
   ↑

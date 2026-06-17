@@ -69,6 +69,38 @@ The contract has been deliberately kept narrow. Each core member exists for a sp
 
 The optional contribution slots (`contributeScope`, `collectReportData`, `config`, `capabilityRegistrars`, `sessionReplay`) let a tool plug into the host's per-run scope, the cross-tool HTML report, the composed config document, a capability domain it owns, and `sessions show` replay — each only if the tool declares it. The `sessions show` surface (and the new `agent-catalog` discovery command) now include agent ergonomics such as `--filter` and `--raw` for focused historical inspection.
 
+When a TypeScript tool contributes a typed subscope, keep the module
+augmentation in a leaf file and import it for side effects from the tool entry:
+
+```ts
+// scope-augmentation.ts
+import type { ScopeContribution } from '@opensip-cli/core';
+
+export interface AuditScope {
+  readonly cache: Map<string, unknown>;
+}
+
+declare module '@opensip-cli/core' {
+  interface ScopeContribution {
+    audit?: AuditScope;
+  }
+}
+```
+
+```ts
+// index.ts
+import './scope-augmentation.js';
+
+export const tool = {
+  // ...
+  contributeScope: () => ({ audit: { cache: new Map() } }),
+};
+```
+
+The side-effect import is intentional: it makes `scope.audit` visible to the
+TypeScript compiler wherever the tool entry is loaded. First-party tools use the
+same pattern in their `tool.ts` entry modules.
+
 ### Tool contract versions (ADR-0046 / ADR-0047)
 
 The core `TOOL_CONTRACT_VERSION` (exported from `@opensip-cli/core`) is a marker for the generic `Tool` / `ToolExtensionPoints` / `ToolCliContext` "bus" surface. It is bumped **only** on actual changes to that surface and takes the major.minor of the CLI release that ships the change (it deliberately lags ordinary CLI releases).
