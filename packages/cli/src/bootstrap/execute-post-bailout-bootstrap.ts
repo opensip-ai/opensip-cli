@@ -178,7 +178,7 @@ export async function executePostBailoutBootstrap(
   const driven = await d.loadOwningToolCapabilities({
     owningTool: d.resolveOwningTool(tools, plan.commandName),
     projectDir: plan.project.projectRoot,
-    configPath: plan.project.scope === 'project' ? plan.project.configPath : undefined,
+    pluginsConfig: scope.configDocument?.plugins ?? {},
   });
   if (driven > 0) {
     scope.diagnostics.event(

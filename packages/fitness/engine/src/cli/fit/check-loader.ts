@@ -22,10 +22,10 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { resolveCapabilityPreferences } from '@opensip-cli/config';
 import { currentScope, loadCapabilityDomain, logger } from '@opensip-cli/core';
 
 import { currentCheckRegistry, currentFitnessLoadState } from '../../framework/scope-registry.js';
-import { readCheckPackagePreferences } from '../../plugins/check-package-discovery.js';
 import { loadAllPlugins } from '../../plugins/loader.js';
 
 // ---------------------------------------------------------------------------
@@ -132,14 +132,18 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
  * discovery/routing errors (foreign-core skips, load failures) as warning
  * strings. A no-op when the run carries no capability registry (a programmatic
  * fitness use that never wired the host capability plane) or the fit-pack domain
- * is unregistered. Preferences come from fitness's own `plugins.checkPackages`
- * reader — no dependency on `@opensip-cli/config`.
+ * is unregistered. Preferences come from the host-validated `plugins:` block
+ * on `scope.configDocument`, using the domain's manifest-declared config keys.
  */
 async function loadFitCheckPackages(projectDir: string): Promise<readonly string[]> {
-  const registry = currentScope()?.capabilities;
+  const scope = currentScope();
+  const registry = scope?.capabilities;
   if (!registry?.hasDomain('fit-pack')) return [];
-  const prefs = readCheckPackagePreferences(projectDir);
-  const preferences = prefs.checkPackages === undefined ? {} : { packages: prefs.checkPackages };
+  const descriptor = registry.getDomain('fit-pack')?.discovery;
+  const preferences =
+    descriptor === undefined
+      ? {}
+      : resolveCapabilityPreferences(descriptor, scope?.configDocument?.plugins ?? {});
   return registry.isDomainLoaded('fit-pack', projectDir)
     ? registry.domainLoadErrors('fit-pack')
     : loadCapabilityDomain({

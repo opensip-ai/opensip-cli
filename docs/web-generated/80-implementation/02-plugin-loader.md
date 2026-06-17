@@ -10,8 +10,9 @@ source-files:
   - packages/core/src/plugins/marker-discovery.ts
   - packages/core/src/plugins/tool-package-discovery.ts
   - packages/core/src/plugins/types.ts
+  - packages/config/src/capability-preferences.ts
   - packages/cli/src/commands/plugin.ts
-  - packages/fitness/engine/src/plugins/check-package-discovery.ts
+  - packages/fitness/engine/src/cli/fit/check-loader.ts
   - packages/fitness/engine/src/plugins/
 related-docs:
   - ../10-concepts/02-tool-plugin-model.md
@@ -162,7 +163,7 @@ Beyond the project-pinned form, fitness runs marker discovery on every fit invoc
 
 **Pass A — marker scan, canonical path** ([`packages/core/src/plugins/marker-discovery.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/core/src/plugins/marker-discovery.ts)). The `node_modules` walker scans every installed package for `package.json` declaring `opensipTools.kind === 'fit-pack'`. Discovery is publication-scope-independent — a pack can use any npm name (`@acme/fit`, `@my-internal-org/checks-platform`, anything) and still be discovered.
 
-**Pass B — exact package list** ([`packages/fitness/engine/src/plugins/check-package-discovery.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/fitness/engine/src/plugins/check-package-discovery.ts)). `plugins.checkPackages:` names additional packages to resolve from project `node_modules`. This is the compatibility path for packages that do not declare the marker yet:
+**Pass B — exact package list** ([`packages/config/src/capability-preferences.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/config/src/capability-preferences.ts), driven by [`packages/fitness/engine/src/cli/fit/check-loader.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/fitness/engine/src/cli/fit/check-loader.ts)). `plugins.checkPackages:` names additional packages to resolve from project `node_modules`. This is the compatibility path for packages that do not declare the marker yet:
 
 ```yaml
 plugins:

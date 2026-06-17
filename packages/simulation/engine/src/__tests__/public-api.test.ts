@@ -70,7 +70,6 @@ describe('@opensip-cli/simulation public barrel', () => {
       'ensureScenariosLoaded',
       'getRegisteredScenarios',
       'loadAllSimPlugins',
-      'readScenarioPackagePreferences',
     ]) {
       expect(barrel).not.toHaveProperty(leak);
     }

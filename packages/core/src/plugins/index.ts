@@ -3,9 +3,8 @@
  *
  * Public API for plugin discovery and the kernel-level plugin types.
  * The generic plugin loader lives here too — tools (fitness, sim) plug
- * a domain-specific registerExports callback in. Tool-specific
- * discovery helpers (check-package-discovery, scenario-package-
- * discovery) still live with the tool that owns them.
+ * a domain-specific registerExports callback in. Capability package discovery
+ * uses the descriptor-driven substrate exported from this package.
  */
 
 export { discoverPlugins, readProjectPluginsList } from './discover.js';

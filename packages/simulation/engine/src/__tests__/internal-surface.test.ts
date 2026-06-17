@@ -28,7 +28,6 @@ const EXPECTED_INTERNAL_EXPORTS = [
   'getScenariosByTag',
   'isBuiltInSimulationRecipe',
   'loadAllSimPlugins',
-  'readScenarioPackagePreferences',
 ].sort();
 
 describe('@opensip-cli/simulation/internal surface', () => {

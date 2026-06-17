@@ -13,7 +13,8 @@ source-files:
   - packages/fitness/checks-go/src/index.ts
   - packages/fitness/checks-cpp/src/index.ts
   - packages/fitness/checks-rust/src/index.ts
-  - packages/fitness/engine/src/plugins/check-package-discovery.ts
+  - packages/fitness/engine/src/cli/fit/check-loader.ts
+  - packages/config/src/capability-preferences.ts
   - packages/core/src/plugins/marker-discovery.ts
   - packages/core/src/plugins/types.ts
 related-docs:

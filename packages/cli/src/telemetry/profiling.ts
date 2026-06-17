@@ -31,6 +31,7 @@ let session: Session | null = null;
 let isProfiling = false;
 let profilePath: string | null = null;
 let labelsPath: string | null = null;
+let warnedOtelOnlyProfiling = false;
 
 /** Module tag for structured logging (also dedupes the sonarjs/no-duplicate-string occurrences). */
 const MODULE = 'cli:telemetry';
@@ -46,13 +47,28 @@ export function isProfilingEnabled(): boolean {
   const endpoint = hostEnv.get<string>('OTEL_EXPORTER_OTLP_ENDPOINT');
   if (!endpoint) return false;
 
-  const explicit = hostEnv.get<string>('OPENSIP_PROFILING');
+  const explicit = hostEnv.get<string>('OPENSIP_PROFILING')?.toLowerCase();
+  if (explicit === '0' || explicit === 'false') return false;
   if (explicit === '1' || explicit === 'true') return true;
 
   // Supported "just the OTEL endpoint" alternative (with warnings in docs/ADR-0049).
   // Many teams prefer one knob; we honor it but log at warn so cost is visible.
   // Operators who do not want this can set OPENSIP_PROFILING=0 explicitly.
   return true; // OTEL endpoint present ⇒ profiling on in this fallback mode
+}
+
+function warnIfOtelOnlyProfilingMode(): void {
+  const endpoint = hostEnv.get<string>('OTEL_EXPORTER_OTLP_ENDPOINT');
+  const explicit = hostEnv.get<string>('OPENSIP_PROFILING');
+  if (!endpoint || explicit !== undefined || warnedOtelOnlyProfiling) return;
+  warnedOtelOnlyProfiling = true;
+  logger.warn({
+    evt: 'cli.profiling.otel_only_enabled',
+    module: MODULE,
+    msg:
+      'CPU profiling is enabled because OTEL_EXPORTER_OTLP_ENDPOINT is set and ' +
+      'OPENSIP_PROFILING is unset; set OPENSIP_PROFILING=0 to disable profile artifacts.',
+  });
 }
 
 /**
@@ -65,6 +81,7 @@ export function startProfiling(scope?: RunScope, command?: string): void {
 
   try {
     if (!isProfilingEnabled()) return;
+    warnIfOtelOnlyProfilingMode();
     session = new Session();
     session.connect();
 
@@ -179,4 +196,5 @@ function cleanup(): void {
 /** Exposed for tests / shutdown. */
 export function resetProfilingForTests(): void {
   cleanup();
+  warnedOtelOnlyProfiling = false;
 }

@@ -6,7 +6,7 @@
  * CLI-only commands.
  */
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -44,6 +44,21 @@ function domain(id: string, ownerToolId: string, marker: string): CapabilityDoma
   };
 }
 
+/** Write an explicit capability package that has no discovery marker. */
+function writeExplicitAdapterPackage(name: string, exportSource: string): void {
+  const dir = join(testDir, 'node_modules', name);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, 'package.json'),
+    JSON.stringify({
+      name,
+      type: 'module',
+      main: './index.mjs',
+    }),
+  );
+  writeFileSync(join(dir, 'index.mjs'), `export const adapter = ${exportSource};\n`);
+}
+
 /** Run `fn` inside a scope carrying `registry` as scope.capabilities. */
 async function withCapabilities(
   registry: CapabilityRegistry,
@@ -73,12 +88,31 @@ describe('loadOwningToolCapabilities', () => {
       const driven = await loadOwningToolCapabilities({
         owningTool: makeTool('mytool'),
         projectDir: testDir, // empty → 0 packages discovered, but the domain is driven + marked loaded
-        configPath: undefined,
+        pluginsConfig: {},
       });
       expect(driven).toBe(1);
       expect(registry.isDomainLoaded('mine', testDir)).toBe(true);
       // The other tool's domain was NOT driven this run.
       expect(registry.isDomainLoaded('other', testDir)).toBe(false);
+    });
+  });
+
+  it('uses pluginsConfig to resolve explicit package preferences for the owning domain', async () => {
+    const registry = new CapabilityRegistry();
+    const registrar = vi.fn();
+    registry.registerDomain(domain('mine', 'mytool', 'mine-pack'), registrar);
+    writeExplicitAdapterPackage('@acme/configured-adapter', "{ id: 'from-config' }");
+
+    await withCapabilities(registry, async () => {
+      const driven = await loadOwningToolCapabilities({
+        owningTool: makeTool('mytool'),
+        projectDir: testDir,
+        pluginsConfig: { pkgs: ['@acme/configured-adapter'] },
+      });
+
+      expect(driven).toBe(1);
+      expect(registrar).toHaveBeenCalledTimes(1);
+      expect(registrar).toHaveBeenCalledWith({ id: 'from-config' });
     });
   });
 
@@ -90,7 +124,7 @@ describe('loadOwningToolCapabilities', () => {
       const driven = await loadOwningToolCapabilities({
         owningTool: undefined,
         projectDir: testDir,
-        configPath: undefined,
+        pluginsConfig: {},
       });
       expect(driven).toBe(0);
       expect(registry.isDomainLoaded('mine', testDir)).toBe(false);
@@ -112,7 +146,7 @@ describe('loadOwningToolCapabilities', () => {
       const driven = await loadOwningToolCapabilities({
         owningTool: makeTool('mytool'),
         projectDir: testDir,
-        configPath: undefined,
+        pluginsConfig: {},
       });
       expect(driven).toBe(0);
     });
@@ -136,7 +170,7 @@ describe('capability wiring diagnostics contract (Task 4)', () => {
       const driven = await loadOwningToolCapabilities({
         owningTool: makeTool('tool-a'),
         projectDir: testDir,
-        configPath: undefined,
+        pluginsConfig: {},
       });
       expect(driven).toBe(1);
       // The pre-action-hook then does:

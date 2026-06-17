@@ -38,7 +38,7 @@ A contract is a promise to a consumer outside your control. Break it, and the co
 | 3 | JSON output (`SignalEnvelope`) | CI, dashboards, the gate, OpenSIP Cloud | **stable** (semver-major) | `packages/contracts/src/signal-envelope.ts` |
 | 4 | SARIF output | GitHub Code Scanning, IDEs | **stable** (versioned by SARIF spec) | `packages/output/src/format/signal-sarif.ts` |
 | 5 | Tool plugin contract (`Tool`) | third-party tools | **stable** (semver-major) | `packages/core/src/tools/types.ts` |
-| 6 | Plugin discovery (`opensipTools.kind` markers; exact check-package pins; sim `scenarios-*` scope scan) | third-party tools, check packs, sim packs | **stable** (semver-major) | `packages/core/src/plugins/tool-package-discovery.ts`, `packages/fitness/engine/src/plugins/check-package-discovery.ts`, `packages/simulation/engine/src/plugins/scenario-package-discovery.ts` |
+| 6 | Plugin discovery (`opensipTools.kind` markers; exact check-package pins; sim `scenarios-*` scope scan) | third-party tools, check packs, sim packs | **stable** (semver-major) | `packages/core/src/plugins/tool-package-discovery.ts`, `packages/core/src/plugins/capability-discovery.ts`, `packages/config/src/capability-preferences.ts` |
 
 Anything else — internal types, framework helpers, the recipe registry shape, the language-adapter content-filter API — is **internal**. It can move between minors. Don't depend on it from outside the workspace; if you do, you're on your own when it shifts.
 

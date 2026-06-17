@@ -12,8 +12,6 @@ export type {
   ToolCliContext,
   GateCompareResult,
   SignalDeliveryResult,
-  ScaffoldContext,
-  ScaffoldFile,
   ToolPluginExports,
   ToolSessionRecord,
   ToolSessionReplayContribution,
@@ -29,6 +27,7 @@ export type {
   HostAudit,
   HostEntitlements,
 } from './types.js';
+export type { ScaffoldContext, ScaffoldFile } from './scaffold.js';
 export { UnknownLiveViewError } from './types.js';
 export { TOOL_CONTRACT_VERSION } from './types.js';
 export { ToolRegistry } from './registry.js';

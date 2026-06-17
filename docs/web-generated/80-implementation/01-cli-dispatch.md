@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-09
+last_verified: 2026-06-16
 release: v0.1.4
 title: "CLI dispatch"
 audience: [contributors]
@@ -103,10 +103,14 @@ sequenceDiagram
   CLI->>Output: render, deliver, persist, set exit code
 ```
 
-The whole thing fits in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/cli/src/index.ts)
-at ~530 lines. Every step is direct — no DI container, no startup phases.
+The entry point remains small ([`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/cli/src/index.ts)
+is ~190 lines) and delegates the phase-heavy work to named bootstrap modules
+such as `bootstrapCli`, `createPreActionHook`, and
+`executePostBailoutBootstrap` (ADR-0052). There is still no DI container, but
+startup now has explicit phase seams so scope construction, config validation,
+capability loading, and host start effects are testable independently.
 Bundled tools are **not** statically imported: the host lists their package names
-in `BUNDLED_TOOL_PACKAGES` ([`bootstrap/register-tools.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/cli/src/bootstrap/register-tools.ts))
+in `BUNDLED_TOOL_PACKAGES` ([`bootstrap/register-tools-bundled.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/cli/src/bootstrap/register-tools-bundled.ts))
 and loads each through the same manifest → `admitTool` → dynamic-import →
 register path an installed or project-local tool travels. "Bundled" is a trust
 posture, not a privileged load path — a guardrail (`no-bootstrap-tool-import`)
@@ -155,6 +159,25 @@ each Tool's declared `commandSpecs`; the Tool decides what commands and handlers
 it declares.
 
 The split is functional, not arbitrary. CLI-owned commands deal with concerns that span every Tool — initialization, plugins, sessions, user config. Tool-owned commands deal with concerns specific to that Tool's domain. A new Tool doesn't need to provide its own `init`; it inherits the CLI's.
+
+## Adding a host-owned command result
+
+`CommandResult` is a closed discriminated union, and
+[`resultToView`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/cli/src/ui/result-to-view.ts) is exhaustively
+checked. When a host-owned command needs a new result variant, update these
+surfaces in the same change:
+
+1. Add the result interface and union member in
+   [`packages/contracts/src/command-results.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/contracts/src/command-results.ts).
+2. Return that variant from the command handler or action body.
+3. Add a `resultToView` switch case and a focused render test in
+   `packages/cli/src/ui/__tests__/result-to-view.test.ts`.
+4. If the result is machine-visible, update
+   [`70-reference/04-json-output-schema.md`](/docs/opensip-cli/70-reference/04-json-output-schema/).
+
+Third-party or custom tool commands that only need lines of terminal output
+should use the existing `text-lines` variant instead of adding a bespoke host
+result type.
 
 ---
 

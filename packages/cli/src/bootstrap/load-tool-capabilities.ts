@@ -21,12 +21,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { resolveCapabilityPreferences } from '@opensip-cli/config';
-import {
-  currentCapabilityRegistry,
-  loadCapabilityDomain,
-  readYamlFile,
-  type Tool,
-} from '@opensip-cli/core';
+import { currentCapabilityRegistry, loadCapabilityDomain, type Tool } from '@opensip-cli/core';
 
 /**
  * Resolve the directory the CLI was installed into. BUILT-IN capability packs
@@ -39,22 +34,14 @@ function cliInstallDir(): string {
   return dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 }
 
-/** Read the raw `plugins` block from a project config file (or `{}` when absent). */
-function readPluginsBlock(configPath: string | undefined): unknown {
-  if (configPath === undefined) return {};
-  const doc = readYamlFile(configPath);
-  if (doc === null || typeof doc !== 'object') return {};
-  return (doc as Record<string, unknown>).plugins ?? {};
-}
-
 /** Options for {@link loadOwningToolCapabilities}. */
 export interface LoadOwningToolCapabilitiesOptions {
   /** The tool that owns the invoked command (from `resolveOwningTool`); `undefined` for CLI-only commands. */
   readonly owningTool: Tool | undefined;
   /** Discovery anchor for consumer-owned packages (the project root). */
   readonly projectDir: string;
-  /** The resolved project config path (for the `plugins` preference block), or `undefined`. */
-  readonly configPath: string | undefined;
+  /** The host-validated `plugins:` block from `scope.configDocument`, or `{}` when absent. */
+  readonly pluginsConfig?: unknown;
   /** Discovery anchor for built-in packs (those under a descriptor's `builtinScope`). */
   readonly cliDir?: string;
 }
@@ -72,7 +59,7 @@ export interface LoadOwningToolCapabilitiesOptions {
 export async function loadOwningToolCapabilities(
   options: LoadOwningToolCapabilitiesOptions,
 ): Promise<number> {
-  const { owningTool, projectDir, configPath } = options;
+  const { owningTool, projectDir, pluginsConfig = {} } = options;
   if (!owningTool) return 0;
   // Built-in packs (those under a descriptor's `builtinScope`, e.g. the bundled
   // @opensip-cli/graph-* adapters) resolve from the CLI's own install tree.
@@ -85,7 +72,6 @@ export async function loadOwningToolCapabilities(
   const ownedDomains = registry
     .listDomains()
     .filter((d) => d.ownerToolId === owningTool.metadata.id);
-  const pluginsConfig = readPluginsBlock(configPath);
 
   let driven = 0;
   for (const domain of ownedDomains) {

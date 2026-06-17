@@ -20,7 +20,6 @@ export {
 } from './framework/registry.js';
 
 export { loadAllSimPlugins } from './plugins/loader.js';
-export { readScenarioPackagePreferences } from './plugins/scenario-package-discovery.js';
 export type { SimPluginExports } from './plugins/types.js';
 
 export {

@@ -8,7 +8,7 @@
  * facts: it hardcodes the first-party config-reading paths by package
  * (`packages/{cli,fitness,graph,simulation}/(engine/)?src/`), the tool-agnostic
  * document-level block keys owned by `@opensip-cli/config`
- * (`cli`/`targets`/`globalExcludes`/`checkOverrides`/`dashboard`), and cites the
+ * (`cli`/`targets`/`globalExcludes`/`checkOverrides`/`dashboard`/`plugins`), and cites the
  * config-consolidation release 2.10.1 / ADR-0023 (Phase 4, north-star
  * Principle 6). A consumer repo has none of those packages or blocks, so the
  * rule is opensip-internal, not universal. Inert for adopters per
@@ -48,7 +48,14 @@ import { defineCheck } from '@opensip-cli/fitness';
 const CONFIG_READER_PATH = /packages\/(?:cli|fitness|graph|simulation)\/(?:engine\/)?src\//;
 
 /** The tool-agnostic, document-level blocks owned by @opensip-cli/config. */
-const DOCUMENT_LEVEL_KEYS = ['cli', 'targets', 'globalExcludes', 'checkOverrides', 'dashboard'];
+const DOCUMENT_LEVEL_KEYS = [
+  'cli',
+  'targets',
+  'globalExcludes',
+  'checkOverrides',
+  'dashboard',
+  'plugins',
+];
 
 /**
  * Identifiers bound to a parsed YAML document in this file — the result of a
@@ -114,7 +121,7 @@ export function analyzeNoConfigLoaderOutsideConfig(content, filePath) {
         `Hand-rolled loader for the document-level '${info.key}:' block of ` +
         `opensip-cli.config.yml (projects ${readList}) outside ` +
         `@opensip-cli/config. The tool-agnostic document blocks (cli/targets/` +
-        `globalExcludes/checkOverrides/dashboard) are owned, schema'd, and ` +
+        `globalExcludes/checkOverrides/dashboard/plugins) are owned, schema'd, and ` +
         `strict-validated by @opensip-cli/config (ADR-0023).`,
       severity: 'error',
       suggestion:

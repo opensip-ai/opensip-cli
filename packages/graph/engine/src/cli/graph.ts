@@ -4,7 +4,7 @@
 // @fitness-ignore-file performance-anti-patterns -- spread in CLI report aggregation iterates bounded result sets (rule counts, entry-point lists).
 // @fitness-ignore-file no-markdown-references -- docs/plans/* pointers in JSDoc are stable internal references.
 // @fitness-ignore-file public-api-jsdoc -- GraphCommandOptions interface and executeGraph are already documented with rich JSDoc on each field; the check counts the top-level export line, not the fields.
-// @fitness-ignore-file file-length-limit -- top-level graph command handler with rich JSDoc on options; splitting would fragment the unified subcommand surface (gate/persist/output dispatch).
+// @fitness-ignore-file file-length-limit -- remaining top-level graph command handler still coordinates mode dispatch, output delivery, workspace aggregation, and CLI error mapping; sharded engine/session helpers are split out.
 /**
  * `opensip graph` — main subcommand handler.
  *
@@ -26,10 +26,7 @@
  * above; see docs/plans/graph-cli-language-neutral-scoping/.
  */
 
-import { realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
-
-import { EXIT_CODES, passRate } from '@opensip-cli/contracts';
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   currentScope,
@@ -39,12 +36,7 @@ import {
   ValidationError,
 } from '@opensip-cli/core';
 
-import { pickAdapter } from '../lang-adapter/registry.js';
-import { CatalogRepo } from '../persistence/catalog-repo.js';
-import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { resolveRecipeToRules } from '../recipes/resolve.js';
-import { mapOpenSipRuleIdToEngineSlug } from '../render/rule-id-mapping.js';
-import { currentRules } from '../rules/registry.js';
 
 import {
   assertFinalizedAcrossBoundary,
@@ -52,27 +44,20 @@ import {
   type FinalizedSignals,
 } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
+import { DASHBOARD_FEATURE_COLUMNS } from './graph-feature-columns.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
+import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './graph-report.js';
 import {
-  buildLiveGraphOutput,
-  buildUnifiedReportLines,
-  countFiles,
-  resolutionBannerText,
-  type LiveGraphOutput,
-} from './graph-report.js';
-import { resolveCanonicalFileSet } from './orchestrate/canonical-file-set.js';
+  buildGraphSessionContribution,
+  buildWorkspaceSessionContribution,
+} from './graph-session-contribution.js';
 import {
-  detectMonorepoLayout,
-  partitionFlatRepo,
-  selectStrategyForLayout,
-} from './orchestrate/flat-monorepo-strategy.js';
-import { partitionFilesIntoShards } from './orchestrate/partition-files.js';
-import {
-  loadGraphConfig,
-  resolveGraphRecipeSelection,
-  runGraph,
-  runShardedGraph,
-} from './orchestrate.js';
+  engineSelectionReason,
+  realpathOrSelf,
+  resolveEngineShards,
+  runProfiledShardedBuild,
+} from './graph-sharded-engine.js';
+import { loadGraphConfig, resolveGraphRecipeSelection, runGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
 import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
@@ -81,17 +66,7 @@ import { buildWorkspaceJsonDocument, writeWorkspaceReport } from './workspace-re
 import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-runner.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
-import type { Shard } from './orchestrate/shard-model.js';
-import type { GraphProgressCallback, RunGraphResult } from './orchestrate.js';
-import type { GraphProfileRunRecorder } from './profile.js';
-import type {
-  Catalog,
-  FeatureColumn,
-  GraphConfig,
-  PartitionStrategy,
-  ResolutionMode,
-  Rule,
-} from '../types.js';
+import type { Catalog, Rule } from '../types.js';
 import type { GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-cli/contracts';
 import type { Signal, ToolCliContext, ToolSessionContribution } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
@@ -130,14 +105,6 @@ export interface GraphRunOutcome {
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
 const MODULE_GRAPH_CLI = 'graph:cli';
 const MODULE_GRAPH_RENDER = 'graph:render';
-
-/**
- * The feature columns the decoupled dashboard renders (ADR-0006): only these
- * are materialized into the persisted catalog, and only on the standard
- * (catalog-producing) `graph` run. Export-only paths (sarif/catalog export)
- * do not go through this dispatch, so they stay lean (no features persisted).
- */
-const DASHBOARD_FEATURE_COLUMNS: readonly FeatureColumn[] = ['blast', 'scc', 'packageCoupling'];
 
 /**
  * Run graph and return the run's {@link GraphRunOutcome} — the deliverable
@@ -350,357 +317,6 @@ export async function executeGraph(
  *     no worker script is available — a graceful fall-through to exact, the
  *     natural single-package path.
  */
-/**
- * Resolve a path to absolute (a RELATIVE input resolves against `base` —
- * the command's `opts.cwd`, NOT `process.cwd()`, which may differ when the
- * CLI is hosted), then realpath it (follow symlinks) — the SAME normalization
- * the exact engine's `normalizeProjectDir` applies, so both engines see one
- * canonical run root (F3). Falls back to the absolute path if realpath fails
- * (e.g. the path doesn't exist yet — discovery reports the error downstream).
- * Idempotent on an already-canonical path.
- */
-function realpathOrSelf(input: string, base: string): string {
-  // `resolve(base, input)` returns `input` unchanged when it is already absolute.
-  const absolute = resolve(base, input);
-  try {
-    return realpathSync(absolute);
-  } catch {
-    /* v8 ignore next */
-    return absolute;
-  }
-}
-
-/** Shard resolution + optional synthetic-partition timing (profile stage). */
-interface ShardResolution {
-  readonly shards: Shard[];
-  readonly partition?: { readonly durationMs: number; readonly detail: string };
-}
-
-async function resolveEngineShards(
-  opts: GraphCommandOptions,
-  cli: ToolCliContext,
-  positionalPaths: readonly string[],
-): Promise<ShardResolution> {
-  if (opts.exact === true) return { shards: [] };
-  if (positionalPaths.length > 0) return { shards: [] };
-  return resolveShards(opts, cli);
-}
-
-/**
- * Human-readable explanation of the engine decision for the
- * `graph.cli.graph.engine` observability event. Pure; mirrors
- * {@link resolveEngineShards}'s branches.
- */
-function engineSelectionReason(
-  opts: GraphCommandOptions,
-  positionalPaths: readonly string[],
-  sharded: boolean,
-): string {
-  if (sharded) return 'sharded-default';
-  if (opts.exact === true) return 'exact-opt-out';
-  if (positionalPaths.length > 0) return 'exact-positional-paths';
-  return 'exact-not-shardable';
-}
-
-/**
- * Resolve a project to its shards (one per workspace package). Returns an
- * empty array — signalling the caller to use the single-process build —
- * when the project isn't multi-package, when no worker script is
- * available to spawn, or when discovery fails. Each unit's file set is
- * enumerated via the graph adapter; partitions with no files are dropped.
- *
- * ADR-0032: reached for any run that did NOT pass `--exact` (see
- * {@link resolveEngineShards}) — sharded is the default. A project that yields
- * ≤1 non-empty shard falls back to the exact single-program engine naturally.
- */
-async function resolveShards(
-  opts: GraphCommandOptions,
-  cli: ToolCliContext,
-): Promise<ShardResolution> {
-  const cliScript = opts.cliScript ?? process.argv[1];
-  if (typeof cliScript !== 'string' || cliScript.length === 0) return { shards: [] };
-
-  let units: readonly { id: string; rootDir: string; configPath?: string }[];
-  try {
-    units = await discoverPolyglotUnits(opts.cwd, resolveAdaptersForRun(opts, cli));
-  } catch {
-    /* v8 ignore next */
-    return resolveSyntheticFlatShards(opts);
-  }
-  if (units.length <= 1) return resolveSyntheticFlatShards(opts);
-
-  // Phase 1 (graph-sharded-exact-parity): enumerate the canonical file set ONCE
-  // from project-wide root discovery — the SAME source + filter the exact engine
-  // uses — then PARTITION it across the discovered unit boundaries. The old loop
-  // re-derived each shard's files from that package's own tsconfig, which
-  // excludes the package's __fixtures__ tree and (for some) its test files, so
-  // the sharded engine silently dropped files the exact engine kept. Partitioning
-  // the canonical set guarantees both engines see the identical files.
-  const adapter = pickAdapter(opts.cwd);
-  let rootDiscovery: ReturnType<typeof adapter.discoverFiles>;
-  try {
-    rootDiscovery = adapter.discoverFiles({ cwd: opts.cwd });
-  } catch {
-    /* v8 ignore next */
-    return resolveSyntheticFlatShards(opts);
-  }
-  const canonicalFiles = resolveCanonicalFileSet(rootDiscovery.files);
-  const shards = partitionFilesIntoShards({
-    canonicalFiles,
-    units: units.map((u) => ({
-      id: u.id,
-      rootDir: u.rootDir,
-      ...(u.configPath === undefined ? {} : { configPathAbs: u.configPath }),
-    })),
-    projectRoot: rootDiscovery.projectDirAbs,
-    rootConfigPathAbs: rootDiscovery.configPathAbs,
-  });
-  // Need at least two non-empty shards to justify the parallel/merge overhead.
-  if (shards.length > 1) return { shards };
-  return resolveSyntheticFlatShards(opts);
-}
-
-/**
- * Resolve a project's shard set the SAME way a production `graph` run does
- * (workspace units → canonical-file partition, else synthetic flat shards),
- * exposed for the real-repo equivalence guardrail (`graph-equivalence-check`).
- * Returns `[]` when the project isn't shardable (≤1 shard / no worker script) —
- * the guardrail rejects that, since the comparison is only meaningful on a
- * shardable multi-package repo. Reuses the private {@link resolveShards} so
- * there is ONE shard-resolution model, never a drifting copy.
- */
-export async function resolveShardsForCwd(
-  cwd: string,
-  cliScript: string,
-  cli: ToolCliContext,
-): Promise<readonly Shard[]> {
-  const resolution = await resolveShards({ cwd, cliScript, noCache: true }, cli);
-  return resolution.shards;
-}
-
-/**
- * Flat-large fallback for single-tsconfig TypeScript repos. Workspace
- * sharding is preferred because package boundaries are semantically real. When
- * no workspace split exists and the TypeScript file count crosses the same
- * threshold as heap preflight's 12 GB tier, synthesize directory-coherent
- * shards and feed them into the existing sharded build.
- */
-function resolveSyntheticFlatShards(opts: GraphCommandOptions): ShardResolution {
-  if (typeof opts.language === 'string' && opts.language.length > 0) return { shards: [] };
-  const adapter = pickAdapter(opts.cwd);
-  if (adapter.id !== 'typescript') return { shards: [] };
-  let discovery: ReturnType<typeof adapter.discoverFiles>;
-  try {
-    discovery = adapter.discoverFiles({ cwd: opts.cwd });
-  } catch {
-    return { shards: [] };
-  }
-  // Canonical set (Phase 1): drop fixtures before partitioning so the flat-large
-  // fallback shards match the exact engine's file set just like the workspace path.
-  const canonicalFiles = resolveCanonicalFileSet(discovery.files);
-  // Measure the partition compute (layout detection + strategy resolution +
-  // partitioning) where it runs — the profile run recorder does not exist yet
-  // (its `mode` label needs the shard count), so executeGraph records the
-  // timing afterwards via `recordStage` (ADR-0045 measurement plane).
-  const partitionStart = Date.now();
-  const layout = detectMonorepoLayout({
-    repoRoot: discovery.projectDirAbs,
-    files: canonicalFiles,
-  });
-  const selection = selectStrategyForLayout(layout);
-  if (layout.kind !== 'flat-large' || selection.mode !== 'synthetic-partition') {
-    return { shards: [] };
-  }
-  // Strategy precedence: `graph.partitionStrategy` (config/env, ADR-0045) >
-  // the layout-recommended default > 'hybrid'. `loadGraphConfig` is
-  // scope-first and cheap, so reading it here (off the hot path) is safe.
-  const graphConfig = loadGraphConfig(opts.cwd);
-  const strategy: PartitionStrategy =
-    graphConfig.partitionStrategy ?? selection.partitionStrategy ?? 'hybrid';
-  const partitions = partitionFlatRepo({
-    files: layout.files,
-    repoRoot: discovery.projectDirAbs,
-    strategy,
-  });
-  const shards = partitions
-    .filter((p) => p.files.length > 0)
-    .map(
-      (p): Shard => ({
-        id: `partition:${p.id}`,
-        rootDir: discovery.projectDirAbs,
-        files: p.files,
-        configPathAbs: discovery.configPathAbs,
-      }),
-    );
-  if (shards.length <= 1) return { shards: [] };
-  return {
-    shards,
-    partition: {
-      durationMs: Date.now() - partitionStart,
-      detail: `${strategy}: ${String(shards.length)} partition(s)`,
-    },
-  };
-}
-
-/**
- * The inputs the sharded build path threads from {@link executeGraph}: the
- * parsed options, the resolved shard set + its root, the CLI context, and
- * the run's config + recipe rules. Grouped so the build helpers stay under
- * the wide-function parameter budget and share one named shape.
- */
-interface ShardedBuildContext {
-  readonly opts: GraphCommandOptions;
-  readonly shards: readonly Shard[];
-  readonly projectRoot: string;
-  readonly cli: ToolCliContext;
-  readonly config: GraphConfig;
-  readonly rules: readonly Rule[];
-  /**
-   * Optional progress callback (ADR-0032). The interactive live path threads the
-   * Ink renderer's emitter here so the sharded build emits the SAME seven-stage
-   * checklist the exact engine does. The static dispatch path leaves it
-   * undefined (the `--profile` recorder hooks the per-build timing separately).
-   */
-  readonly onProgress?: GraphProgressCallback;
-}
-
-/** Drive the sharded build and adapt it to the RunGraphResult dispatch shape. */
-async function runShardedBuild(ctx: ShardedBuildContext): Promise<RunGraphResult> {
-  const { opts, shards, projectRoot, cli, config, rules } = ctx;
-  const datastore = cli.scope.datastore() as DataStore | undefined;
-  const sharded = await runShardedGraph({
-    shards,
-    projectRoot,
-    cliScript: opts.cliScript ?? process.argv[1] ?? '',
-    adapter: pickAdapter(projectRoot, opts.language),
-    resolutionMode: opts.resolution ?? 'exact',
-    concurrency: opts.concurrency,
-    useCache: opts.noCache !== true,
-    config,
-    rules,
-    catalogRepo: datastore ? new CatalogRepo(datastore) : null,
-    emitFeatures: DASHBOARD_FEATURE_COLUMNS,
-    ...(ctx.onProgress === undefined ? {} : { onProgress: ctx.onProgress }),
-    ...(opts.language === undefined ? {} : { language: opts.language }),
-  });
-  return {
-    catalog: sharded.catalog,
-    indexes: sharded.indexes,
-    signals: sharded.signals,
-    resolutionStats: sharded.resolutionStats,
-    cacheHit: sharded.cacheHit,
-    features: sharded.features,
-    shardStats: sharded.shardStats,
-  };
-}
-
-async function runProfiledShardedBuild(
-  profileRun: GraphProfileRunRecorder | undefined,
-  ctx: ShardedBuildContext,
-): Promise<RunGraphResult> {
-  const started = Date.now();
-  const result = await runShardedBuild(ctx);
-  profileRun?.recordStage(
-    'sharded-build',
-    Date.now() - started,
-    `${String(ctx.shards.length)} shard(s)`,
-  );
-  return result;
-}
-
-/**
- * The serializable live-build request the interactive runner (`graph-runner.tsx`)
- * hands the engine. Mirrors the subset of {@link GraphCommandOptions} the
- * whole-project live view exercises: cwd scope, cache/resolution tier, the
- * resolved rule subset + config, and `exact` (which, with the project's
- * shardability, selects the engine — ADR-0032). `cliScript` is needed to spawn
- * the shard subprocesses when the sharded path runs in the worker or degraded
- * in-process fallback.
- */
-export interface GraphLiveBuildArgs {
-  readonly cwd: string;
-  readonly noCache?: boolean;
-  readonly resolution?: ResolutionMode;
-  readonly exact?: boolean;
-  readonly config?: GraphConfig;
-  readonly rules?: readonly Rule[];
-  readonly cliScript?: string;
-}
-
-/**
- * Resolve the build engine for the interactive live path — the SAME policy
- * `executeGraph` uses (ADR-0032): the SHARDED engine when `--exact` is absent
- * and the project yields >1 non-empty shard, the EXACT (single-program) engine
- * otherwise. Returns the shard set (`length > 1` ⇒ sharded) so the live runner
- * can choose engine-aware labels and pass the plain-data plan to
- * `graph-run-worker` (ADR-0028). `isTTY` is NEVER consulted — the engine is a
- * pure function of the request + shardability, identical to the static path.
- */
-export async function resolveLiveEngineShards(
-  args: GraphLiveBuildArgs,
-  cli: ToolCliContext,
-): Promise<Shard[]> {
-  const opts: GraphCommandOptions = {
-    cwd: args.cwd,
-    noCache: args.noCache,
-    resolution: args.resolution,
-    exact: args.exact,
-    ...(args.cliScript === undefined ? {} : { cliScript: args.cliScript }),
-  };
-  // No positional paths in the whole-project live view, so the engine decision
-  // is `--exact` + shardability alone.
-  const resolution = await resolveEngineShards(opts, cli, []);
-  return resolution.shards;
-}
-
-/**
- * Run the SHARDED live build and reduce it to the slim, serializable
- * {@link LiveGraphOutput} the interactive runner consumes — IDENTICAL in shape
- * to what the exact worker streams back, so live transports converge on one
- * payload. In the normal path this runs inside `graph-run-worker`, keeping the
- * render process free while the worker coordinates shard subprocesses and the
- * synchronous merge/link/rules work. The same function remains the degraded
- * in-process fallback when worker execution is explicitly disabled or unavailable.
- * Progress events flow through `onProgress`, mapped onto the same seven
- * canonical stages the exact engine emits.
- *
- * Crosses the single suppression chokepoint via {@link buildLiveGraphOutput}
- * (against `args.cwd`, the build root) — so the live sharded path waives
- * `@graph-ignore` directives IDENTICALLY to the static/exact paths (ADR-0014/0031).
- */
-export async function runShardedLiveBuild(
-  args: GraphLiveBuildArgs,
-  shards: readonly Shard[],
-  datastore: DataStore | undefined,
-  onProgress: GraphProgressCallback,
-): Promise<LiveGraphOutput> {
-  const result = await runShardedGraph({
-    shards,
-    projectRoot: args.cwd,
-    cliScript: args.cliScript ?? process.argv[1] ?? '',
-    adapter: pickAdapter(args.cwd),
-    resolutionMode: args.resolution ?? 'exact',
-    useCache: args.noCache !== true,
-    config: args.config ?? {},
-    // The live dispatch always resolves the recipe → rules; fall back to the
-    // full registered set if a programmatic caller omits them (parity with the
-    // exact path, where `runGraph` applies the same `?? currentRules()` default).
-    rules: args.rules ?? currentRules(),
-    catalogRepo: datastore ? new CatalogRepo(datastore) : null,
-    emitFeatures: DASHBOARD_FEATURE_COLUMNS,
-    onProgress,
-  });
-  return buildLiveGraphOutput(
-    {
-      catalog: result.catalog,
-      indexes: result.indexes,
-      signals: result.signals,
-      cacheHit: result.cacheHit,
-    },
-    args.cwd,
-  );
-}
-
 /** Profile bucket for the run shape: workspace fan-out, multi-path, or single graph. */
 function profileMode(opts: GraphCommandOptions): string {
   if (opts.workspace === true) return 'workspace';
@@ -1187,117 +803,6 @@ async function executeWorkspaceGraph(
   return session === undefined ? undefined : { session };
 }
 
-/**
- * Build the generic-session contribution for a single-process graph run from
- * the branded {@link FinalizedSignals} (host-owned-run-timing Phase 3). The
- * host run plane stamps timing + id and persists the row after the handler
- * returns — graph never writes the generic `StoredSession` itself.
- *
- * Takes the branded {@link FinalizedSignals} (not a raw `Signal[]`): the only
- * way to obtain one is to cross the single suppression chokepoint
- * (`finalizeGraphSignals`, or `assertFinalizedAcrossBoundary` after the worker
- * IPC boundary). This is the compile-time guardrail that makes the TTY-leak bug
- * un-regressable — a caller that hands raw, un-waived signals here does not
- * type-check, so the dashboard history can never record un-waived findings.
- *
- * The single-process path holds the raw engine signals (engine slugs), so the
- * session payload's per-rule keys are engine slugs directly.
- */
-function buildGraphSessionContribution(
-  opts: Pick<GraphCommandOptions, 'cwd' | 'recipe'>,
-  finalized: FinalizedSignals,
-): ToolSessionContribution {
-  return contributionFromSignals(opts, finalized.signals);
-}
-
-/**
- * Build the aggregate generic-session contribution for a `--workspace` run.
- *
- * Child envelopes carry Option-A-mapped OpenSIP rule IDs; reverse-map back to
- * engine slugs so the aggregate session payload's per-rule metric columns
- * (keyed on engine slugs in the dashboard) keep working — exactly what the old
- * `persistWorkspaceSession` did before handing off to the shared save.
- */
-function buildWorkspaceSessionContribution(
-  opts: Pick<GraphCommandOptions, 'cwd' | 'recipe'>,
-  signals: readonly Signal[],
-): ToolSessionContribution {
-  const engineSignals = signals.map((s) => {
-    const ruleId = mapOpenSipRuleIdToEngineSlug(s.ruleId);
-    return { ...s, ruleId, source: ruleId };
-  });
-  return contributionFromSignals(opts, engineSignals);
-}
-
-/**
- * Shared contribution builder: derive graph's opaque session payload + the
- * generic verdict (`score`/`passed`) from a run's engine-slug `Signal[]`. The
- * payload is graph-owned detail (summary + rule-grouped per-signal findings);
- * the generic session row holds zero graph vocabulary. `score`/`passed` mirror
- * exactly what the former `saveGraphSession` computed (pass rate over
- * passed/total rules; `passed` ⇔ no error-severity signals).
- */
-/**
- * Engine slugs of every rule a run evaluated — the session payload's full rule
- * list, so a CLEAN run still records a PASS row per rule (the session detail
- * then shows the complete rule list, exactly the way fitness shows every check,
- * not just the failing ones).
- *
- * Prefer the EXPLICITLY-resolved rule set the run actually used (the `--recipe`
- * subset, threaded from the dispatch seam as `args.rules`); otherwise read the
- * current scope's full registry — this mirrors `runGraph`'s own
- * `args.rules ?? currentRules()` resolution, so the recorded set is exactly what
- * ran. Degrades to the empty set (fired-rules-only) when no graph scope is
- * active — e.g. an isolated dispatch unit test; production always runs the
- * handler inside the entered RunScope.
- *
- * Exported so BOTH contribution-building paths derive the evaluated set
- * identically: the static `executeGraph` dispatch (below) AND the live Ink
- * runner (`graph-runner.tsx`). Before it was shared, only the static path
- * threaded it, so a clean run on the live (interactive) path persisted an empty
- * `checks[]` and the report rendered "no results" instead of the rule list.
- */
-export function evaluatedRuleSlugs(explicitRules?: readonly Rule[]): readonly string[] {
-  if (explicitRules) return explicitRules.map((r) => r.slug);
-  try {
-    return currentRules().map((r) => r.slug);
-  } catch {
-    // @swallow-ok no graph scope (isolated dispatch unit test); degrade to the
-    // fired-rule set. Production always runs the handler inside a RunScope.
-    return [];
-  }
-}
-
-/**
- * Build graph's generic-session contribution from a run's engine-slug
- * `Signal[]` plus the engine slugs of the rules it evaluated. The SINGLE
- * assembly point for both the static dispatch path and the live Ink runner, so
- * the contribution shape (and the "every evaluated rule gets a row" behaviour)
- * can never drift between them again. The payload is graph-owned detail
- * (summary + rule-grouped per-signal findings); the generic session row holds
- * zero graph vocabulary. `score`/`passed` follow fit's semantics (pass rate over
- * passed/total rules; `passed` ⇔ no error-severity signal).
- *
- * `evaluatedSlugs` defaults to {@link evaluatedRuleSlugs}() (the scope's full
- * registry) for the static callers, which build inside the entered RunScope; the
- * live runner passes its `args.rules`-derived set explicitly.
- */
-export function contributionFromSignals(
-  opts: Pick<GraphCommandOptions, 'cwd' | 'recipe'>,
-  signals: readonly Signal[],
-  evaluatedSlugs: readonly string[] = evaluatedRuleSlugs(),
-): ToolSessionContribution {
-  const payload = buildGraphSessionPayload(signals, evaluatedSlugs);
-  return {
-    tool: 'graph',
-    cwd: opts.cwd,
-    ...(opts.recipe === undefined ? {} : { recipe: opts.recipe }),
-    score: passRate(payload.summary),
-    passed: payload.summary.errors === 0,
-    payload,
-  };
-}
-
 export function handleGraphError(label: string, error: unknown, cli: ToolCliContext): void {
   logger.error({
     evt: `graph.cli.${label}.error`,
@@ -1322,4 +827,11 @@ export function handleGraphError(label: string, error: unknown, cli: ToolCliCont
   process.stderr.write(`${label}: ${error instanceof Error ? error.message : String(error)}\n`);
 }
 
+export { contributionFromSignals, evaluatedRuleSlugs } from './graph-session-contribution.js';
+export {
+  resolveLiveEngineShards,
+  resolveShardsForCwd,
+  runShardedLiveBuild,
+} from './graph-sharded-engine.js';
+export type { GraphLiveBuildArgs } from './graph-sharded-engine.js';
 export { buildUnifiedReportLines, buildLiveGraphOutput } from './graph-report.js';

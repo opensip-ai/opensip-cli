@@ -213,15 +213,6 @@ describe('resultToView', () => {
     expect(out).toContain('beta');
   });
 
-  it('renders an unsupported result type as a diagnostic instead of blank output', () => {
-    const out = renderToText(
-      resultToView({ type: 'custom-tool-result' } as unknown as CommandResult),
-    );
-
-    expect(out).toContain("Unsupported command result 'custom-tool-result'");
-    expect(out).toContain('Use --json');
-  });
-
   it('renders an error with the ✗ marker and indented suggestion', () => {
     const out = textOf({ type: 'error', message: 'boom', suggestion: 'try --help', exitCode: 1 });
     expect(out).toBe('  ✗ boom\n      try --help');

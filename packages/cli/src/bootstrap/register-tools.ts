@@ -19,10 +19,13 @@ export {
   type DiscoveryOptions,
   buildToolDiscoverySources,
   discoverAndRegisterToolPackages,
+  discoverAndRegisterAuthoredTools,
+} from './register-tools-discovery.js';
+
+export {
   type AuthoredAdmission,
   admitProjectLocalTool,
   admitUserGlobalTool,
-  discoverAndRegisterAuthoredTools,
-} from './register-tools-discovery.js';
+} from './authored-tool-admission.js';
 
 export { mountAllToolCommands } from './register-tools-mount.js';

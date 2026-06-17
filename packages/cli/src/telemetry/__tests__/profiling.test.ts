@@ -11,7 +11,8 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { logger } from '@opensip-cli/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   isProfilingEnabled,
@@ -38,6 +39,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetProfilingForTests();
+  vi.restoreAllMocks();
   for (const k of [ENDPOINT, GATE]) {
     if (saved[k] === undefined) delete process.env[k];
     else process.env[k] = saved[k];
@@ -102,6 +104,14 @@ describe('isProfilingEnabled', () => {
     process.env[ENDPOINT] = 'http://localhost:4318/v1/traces';
     expect(isProfilingEnabled()).toBe(true);
   });
+
+  it('honors explicit 0/false as force-off even when the OTLP endpoint is set', () => {
+    process.env[ENDPOINT] = 'http://localhost:4318/v1/traces';
+    process.env[GATE] = '0';
+    expect(isProfilingEnabled()).toBe(false);
+    process.env[GATE] = 'false';
+    expect(isProfilingEnabled()).toBe(false);
+  });
 });
 
 describe('startProfiling / stopProfiling — gate + idempotency', () => {
@@ -112,6 +122,22 @@ describe('startProfiling / stopProfiling — gate + idempotency', () => {
 
   it('stopProfiling when not profiling is a safe no-op', () => {
     expect(() => stopProfiling()).not.toThrow();
+  });
+
+  it('emits one cost warning in OTEL-only mode', async () => {
+    process.env[ENDPOINT] = 'http://localhost:4318/v1/traces';
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    startProfiling(scopeFor(), 'fit');
+    await waitFor(() => existsSync(profilesDir()) && readdirHasLabels());
+    startProfiling(scopeFor(), 'fit');
+    stopProfiling();
+    await waitFor(() => readdirHasCpuprofile());
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ evt: 'cli.profiling.otel_only_enabled' }),
+    );
   });
 
   it('resetProfilingForTests is safe to call repeatedly', () => {

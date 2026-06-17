@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-09
+last_verified: 2026-06-16
 release: v0.1.4
 title: "Language adapters (fitness)"
 audience: [contributors, plugin-authors]
@@ -39,7 +39,7 @@ Fitness and graph use **different registration paths** by design:
 | **Fitness** `LanguageAdapter` | Static import in [`register-language-adapters.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.4/packages/cli/src/bootstrap/register-language-adapters.ts) at CLI startup | Edit that file + add `@opensip-cli/lang-*` to `opensip-cli` `package.json` dependencies |
 | **Graph** `GraphLanguageAdapter` | Capability discovery via each tool's `capabilityRegistrars` (`graph-adapter` domain) | Ship `@opensip-cli/graph-*` with `opensipTools.kind: "graph-adapter"`; no CLI source edit |
 
-Fitness adapters are always required for check execution (string/comment stripping), so the CLI wires all six in one place and keeps fitness free of hard deps on every `lang-*` pack. Graph adapters are optional per language and load only when the graph tool's capability loader runs for an admitted `graph-*` package.
+Fitness adapters are always required for check execution (string/comment stripping), so the CLI wires all six in one place and keeps fitness free of hard deps on every `lang-*` pack. This is a product boundary, not a forgotten plugin seam: adding a fitness language adapter is a CLI release today. Graph adapters are optional per language and load only when the graph tool's capability loader runs for an admitted `graph-*` package.
 
 A check is a regex over `console.log`. The naive run flags `// console.log("debug")` (a comment) and `"console.log"` (a string literal). A `LanguageAdapter` is what makes the regex correct — it strips comments and string literals before the check sees the content.
 

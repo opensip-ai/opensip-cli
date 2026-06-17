@@ -216,7 +216,7 @@ can see the exact surface you were written against.
 
 A Tool that wants to reuse the fitness check registry (e.g. an `audit-fit` that runs a custom recipe) imports `@opensip-cli/fitness` and reuses `executeFit`, `defineRecipe`, etc. The fitness package re-exports these so a Tool author doesn't have to assemble a runner from scratch.
 
-A Tool that's structurally different (a benchmark runner, a custom report generator) doesn't need to import `@opensip-cli/fitness` at all — it can be entirely self-contained, with its own logic and its own output shape, as long as it produces a renderable `CommandResult` for the CLI's render layer to consume.
+A Tool that's structurally different (a benchmark runner, a custom report generator) doesn't need to import `@opensip-cli/fitness` at all — it can be entirely self-contained, with its own logic. For terminal output, return an existing renderable `CommandResult` shape such as `text-lines`; new host-specific result variants require a CLI/contracts change because the render mapping is intentionally closed and exhaustive.
 
 ## Participating in `init` scaffolding
 

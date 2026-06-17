@@ -182,21 +182,9 @@ function titledLinesView(title: string | undefined, lines: readonly string[]): V
   return group(children);
 }
 
-function unknownResultView(result: unknown): ViewNode {
-  const type =
-    typeof result === 'object' &&
-    result !== null &&
-    'type' in result &&
-    typeof result.type === 'string'
-      ? result.type
-      : 'unknown';
-  return group(
-    [
-      line([{ text: `Unsupported command result '${type}'`, tone: 'warning' }]),
-      line([{ text: 'Use --json to inspect the raw result payload.', dim: true }]),
-    ],
-    2,
-  );
+/** @throws {Error} When the closed command-result union and renderer drift. */
+function assertNever(result: never): never {
+  throw new Error(`Unhandled command result '${JSON.stringify(result)}'`);
 }
 
 // --- Envelope-derived terminal table (ADR-0011) -----------------------------
@@ -454,7 +442,7 @@ export function resultToView(result: CommandResult): ViewNode {
       return viewHelp();
     }
     default: {
-      return unknownResultView(result);
+      return assertNever(result);
     }
   }
 }

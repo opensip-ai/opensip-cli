@@ -30,6 +30,7 @@ import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
 import type { CommandSpec } from './command-spec.js';
 import type { ToolShortId } from './ids.js';
+import type { ScaffoldContext, ScaffoldFile } from './scaffold.js';
 import type { FingerprintStrategy } from '../baseline/fingerprint-strategy.js';
 import type { Logger } from '../lib/logger.js';
 import type { RunTimer } from '../lib/run-timer.js';
@@ -772,31 +773,6 @@ export type LicenseState = Record<string, unknown>;
  */
 
 /**
- * Inputs the host hands a tool's `scaffoldExamples` hook (ADR-0038): the
- * project's detected/selected languages (and, optionally, the scaffolded check
- * slugs). `languages` is `string[]` — core carries no language enum; the CLI
- * passes its detected list through structurally.
- */
-export interface ScaffoldContext {
-  readonly languages: readonly string[];
-  readonly slugs?: readonly string[];
-}
-
-/**
- * One example file a tool contributes to `init` (ADR-0038). The host writes
- * `content` to `userPluginDir(tool's domain, kind)/filename`. `kind` is a plain
- * string matched against the tool's own `pluginLayout.userSubdirs` (never a
- * host-side enum of `'checks'|'recipes'|…`). `stableId` is the pinned id embedded
- * in `content` that drives stale-scaffolded detection.
- */
-export interface ScaffoldFile {
-  readonly kind: string;
-  readonly filename: string;
-  readonly content: string;
-  readonly stableId: string;
-}
-
-/**
  * Bag for extension points and rarer/future hooks.
  *
  * ## Why this bag exists (discoverability)
@@ -981,8 +957,9 @@ export interface Tool {
    * tool augmentation, and `ToolScope`/`RunScope` extend it for reads.
    *
    * Default behavior (when undefined): the tool contributes no subscope.
-   * Fitness, today, carries no per-run subscope state and leaves this
-   * undefined.
+   * First-party tools that own per-run registries return namespaced slots
+   * here (fitness returns `fitness`, graph returns `graph`, simulation
+   * returns `simulation`).
    */
   readonly contributeScope?: () => ScopeContribution;
   /**

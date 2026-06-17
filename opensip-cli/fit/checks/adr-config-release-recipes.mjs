@@ -123,7 +123,7 @@ function analyzeReleaseGateParity() {
 }
 
 // ---------------------------------------------------------------------------
-// ADR-0023: one config document, with current bridge readers allowlisted.
+// ADR-0023: one config document, with sanctioned readers allowlisted.
 // ---------------------------------------------------------------------------
 
 const YAML_READER_RE =
@@ -136,14 +136,11 @@ const CONFIG_READER_ALLOWLIST = new Set([
   'packages/core/src/lib/yaml.ts',
   'packages/core/src/plugins/discover.ts',
   'packages/cli/src/bootstrap/config-and-capabilities.ts',
-  'packages/cli/src/bootstrap/load-tool-capabilities.ts',
   'packages/cli/src/commands/plugin/config-edit.ts',
-  'packages/fitness/engine/src/plugins/check-package-discovery.ts',
   'packages/fitness/engine/src/signalers/loader.ts',
   'packages/fitness/engine/src/targets/loader.ts',
   'packages/graph/engine/src/cli/graph-config.ts',
   'packages/simulation/engine/src/cli/sim-config.ts',
-  'packages/simulation/engine/src/plugins/scenario-package-discovery.ts',
 ]);
 
 function analyzeOneConfigDocumentRatchet(content, filePath) {

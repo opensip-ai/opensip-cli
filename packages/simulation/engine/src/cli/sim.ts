@@ -20,6 +20,7 @@
  *      empty registry; the fatal decision is the command's.)
  */
 
+import { resolveCapabilityPreferences } from '@opensip-cli/config';
 import {
   BUILTIN_DEFAULT_RECIPE,
   buildFindingGroups,
@@ -30,13 +31,11 @@ import {
   currentScope,
   loadCapabilityDomain,
   logger,
-  resolveScopes,
   resolveVerdictPolicy,
 } from '@opensip-cli/core';
 
 import { currentScenarioRegistry, currentSimulationLoadState } from '../framework/registry.js';
 import { loadAllSimPlugins } from '../plugins/loader.js';
-import { readScenarioPackagePreferences } from '../plugins/scenario-package-discovery.js';
 import { currentSimulationRecipeRegistry } from '../recipes/registry.js';
 import { SimulationRecipeService } from '../recipes/service.js';
 
@@ -108,27 +107,20 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
 /**
  * Drive the generic capability loader for the `sim-pack` domain. A no-op when the
  * run carries no capability registry (a programmatic sim use that never wired the
- * host capability plane), the domain is unregistered, or no projectDir. Scopes are
- * merged (default `@opensip-cli` ∪ customer `packageScopes`) here so name-pattern
- * discovery matches the prior `resolveScopes` behavior. No `@opensip-cli/config` dep.
+ * host capability plane), the domain is unregistered, or no projectDir. Preferences
+ * come from the host-validated `plugins:` block on `scope.configDocument`, using
+ * the domain's manifest-declared config keys.
  */
 async function loadSimScenarioPackages(projectDir: string): Promise<void> {
   if (projectDir === '') return;
-  const registry = currentScope()?.capabilities;
+  const scope = currentScope();
+  const registry = scope?.capabilities;
   if (!registry?.hasDomain('sim-pack') || registry.isDomainLoaded('sim-pack', projectDir)) return;
-  const prefs = readScenarioPackagePreferences(projectDir);
-  const scopes = resolveScopes(
-    '@opensip-cli',
-    prefs.packageScopes ?? [],
-    'plugin.scenario_package.invalid_scope',
-  );
-  const preferences = {
-    ...(prefs.scenarioPackages === undefined ? {} : { packages: prefs.scenarioPackages }),
-    ...(prefs.autoDiscoverScenarios === undefined
+  const descriptor = registry.getDomain('sim-pack')?.discovery;
+  const preferences =
+    descriptor === undefined
       ? {}
-      : { autoDiscover: prefs.autoDiscoverScenarios }),
-    scopes,
-  };
+      : resolveCapabilityPreferences(descriptor, scope?.configDocument?.plugins ?? {});
   await loadCapabilityDomain({ registry, domainId: 'sim-pack', projectDir, preferences });
 }
 

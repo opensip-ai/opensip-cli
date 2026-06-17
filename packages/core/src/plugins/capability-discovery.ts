@@ -4,9 +4,9 @@
  * One walker that, given a capability domain's manifest-declared discovery
  * descriptor + resolved preferences, finds every contributing package (by marker
  * OR name-pattern), dynamic-imports each one, reads its declared export, and
- * yields the raw contributions. It hoists the machinery previously split across
- * three bespoke loaders — fitness's `check-loader.ts`, simulation's
- * `scenario-package-discovery.ts`, and graph's `graph-adapter-discovery.ts`.
+ * yields the raw contributions. It hoists the common machinery behind fitness
+ * check packs, simulation scenario packs, and graph adapters into one
+ * descriptor-driven substrate.
  *
  * Pure infra: it takes NO scope, touches NO registry, and imports NO tool. It
  * yields `{ contribution, sourcePackage }` records that the host's capability

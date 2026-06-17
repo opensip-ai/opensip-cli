@@ -1,14 +1,10 @@
 // @fitness-ignore-file performance-anti-patterns -- sequential await across discovered tool packages preserves load order for plugin-conflict detection; bounded by installed plugin count
-// @fitness-ignore-file file-length-limit -- discovery admission remains one policy unit after the register-tools split; below the hard limit and slated for a later source-boundary split.
 import {
-  admitTool,
   assertManifestMatchesTool,
   discoverAuthoredToolSidecars,
   discoverToolPackagesFromAnchors,
-  loadToolManifest,
   logger,
   PluginIncompatibleError,
-  PROJECT_LOCAL_MANIFEST_FILE,
   resolveProjectContext,
   resolveProjectPaths,
   resolveUserPaths,
@@ -16,12 +12,16 @@ import {
   type ToolProvenance,
   type ToolRegistry,
   type ToolDiscoverySource,
-  type ToolSource,
 } from '@opensip-cli/core';
 
-import { importToolRuntime, type ToolRuntimeLoad } from './admit-tool-package.js';
+import { importToolRuntime } from './admit-tool-package.js';
+import {
+  admitProjectLocalTool,
+  admitUserGlobalTool,
+  type AuthoredAdmission,
+} from './authored-tool-admission.js';
+import { admitInstalledTool, emitInstalledLoadFailure } from './installed-tool-admission.js';
 import { BOOTSTRAP_MODULE } from './register-tools-shared.js';
-import { isProjectLocalToolTrusted } from './tool-trust.js';
 
 export interface DiscoveryOptions {
   /**
@@ -71,97 +71,6 @@ export function buildToolDiscoverySources(
     { dir: cliInstallDir, mode: 'walkUp' },
   );
   return sources;
-}
-
-/**
- * Run the admission gate over a discovered INSTALLED tool package
- * before its module is imported. Reads the static
- * `package.json#opensipTools` manifest and runs the shared `admitTool` gate
- * (source `'installed'`, best-effort `explicitlyRequested: false` so an
- * incompatible installed tool skips rather than failing the whole CLI).
- *
- * Returns:
- *   - `undefined` — skip this package (no conformant manifest, gate skipped
- *     it, or its id collides with a built-in). The reason is logged.
- *   - the admission `{ provenance, manifest }` — the manifest is conformant +
- *     compatible; the caller continues to import + register, and records the
- *     provenance/manifest only AFTER the runtime actually registered (so
- *     `plugin list` and the capability registry never see a tool whose import
- *     subsequently failed — matching the bundled/authored legs).
- *
- * Public launch: the grace window ended. A discovered `kind:'tool'` package whose
- * manifest is missing/malformed (`loadToolManifest` → undefined) or declares no
- * `apiVersion` (`admitTool` → skip via {@link checkCompatibility}) is no longer
- * admitted off the marker alone — it is rejected with a diagnostic.
- */
-function admitInstalledTool(
-  pkg: { readonly name: string; readonly packageDir: string },
-  builtInIds: ReadonlySet<string>,
-): AuthoredAdmission | undefined {
-  const manifest = loadToolManifest('installed', pkg.packageDir);
-  if (manifest === undefined) {
-    // Launch: a discovered tool with no conformant manifest is no longer admitted
-    // off the `kind:'tool'` marker alone (the grace window ended) — skip it.
-    process.stderr.write(
-      `opensip: tool package ${pkg.name} has no conformant package.json#opensipTools manifest — skipping\n`,
-    );
-    logger.warn({
-      evt: 'cli.tool.manifest_invalid',
-      module: BOOTSTRAP_MODULE,
-      name: pkg.name,
-    });
-    return undefined;
-  }
-  if (builtInIds.has(manifest.id)) return undefined; // builtInIds are human ids from manifests (compat)
-
-  const result = admitTool({
-    manifest,
-    source: 'installed',
-    dir: pkg.packageDir,
-    packageName: pkg.name,
-    // Best-effort: discovery alone can't tell whether THIS run targets this
-    // tool's command, so default false → incompatible installed tools skip.
-    explicitlyRequested: false,
-  });
-  if (result.decision !== 'admit') return undefined;
-  return { provenance: result.provenance, manifest: result.manifest };
-}
-
-/**
- * Emit the best-effort stderr line + structured warning for a discovered
- * INSTALLED tool whose runtime failed to load. Each `ToolRuntimeLoad` failure
- * reason maps to its own message + event (preserving the admission diagnostics) —
- * an installed tool's load failure skips it, never crashing the CLI.
- */
-function emitInstalledLoadFailure(
-  name: string,
-  load: Extract<ToolRuntimeLoad, { ok: false }>,
-): void {
-  if (load.reason === 'no-entry') {
-    process.stderr.write(
-      `opensip: tool package ${name} has no resolvable entry point — skipping\n`,
-    );
-    logger.warn({ evt: 'cli.tool.no_entry', module: BOOTSTRAP_MODULE, name });
-    return;
-  }
-  if (load.reason === 'invalid-shape') {
-    process.stderr.write(
-      `opensip: tool package ${name} does not export a valid \`tool\` — skipping\n`,
-    );
-    logger.warn({
-      evt: 'cli.tool.invalid_shape',
-      module: BOOTSTRAP_MODULE,
-      name,
-    });
-    return;
-  }
-  process.stderr.write(`opensip: failed to load tool ${name}: ${load.detail ?? 'import failed'}\n`);
-  logger.warn({
-    evt: 'cli.tool.load_failed',
-    module: BOOTSTRAP_MODULE,
-    name,
-    error: load.detail,
-  });
 }
 
 /**
@@ -242,138 +151,6 @@ export async function discoverAndRegisterToolPackages(
       });
     }
   }
-}
-
-/**
- * The outcome of admitting a tool — the recorded `ToolProvenance` plus the
- * loaded `ToolPluginManifest`. Returned by the authored legs
- * ({@link admitUserGlobalTool} / {@link admitProjectLocalTool}) and the
- * installed leg ({@link admitInstalledTool}) alike. The manifest is returned
- * (not re-read) so the register step can run the drift guard
- * (`assertManifestMatchesTool`) against the imported runtime and seed the
- * per-run capability registry, without a second filesystem read.
- */
-export interface AuthoredAdmission {
-  readonly provenance: ToolProvenance;
-  readonly manifest: ToolPluginManifest;
-}
-
-/**
- * The shared admission TAIL for both authored sources.
- * When `preloadedManifest` is supplied we use that snapshot (no re-read) so a
- * prior trust decision (project-local) and the compat gate see the identical
- * declaration. This removes the TOCTOU between the trust-bearing read and the
- * gate read for the deny-by-default authored path.
- *
- * @throws {PluginIncompatibleError} when the sidecar is missing/malformed or
- *   the tool is compatibility-incompatible.
- */
-function admitAuthoredTool(
-  source: ToolSource,
-  dir: string,
-  preloadedManifest?: ReturnType<typeof loadToolManifest>,
-): AuthoredAdmission {
-  // When a preloaded manifest is supplied (project-local trust path), we use
-  // that exact snapshot for the compat gate. This eliminates a TOCTOU between
-  // the read that decided "this id is allowlisted" and the read that feeds the
-  // compatibility check. The later dynamic import of the .mjs still sees
-  // whatever is on disk at execution time (inherent for authored code).
-  const rawManifest = preloadedManifest ?? loadToolManifest(source, dir);
-  if (rawManifest === undefined) {
-    throw new PluginIncompatibleError(
-      `${source} tool at '${dir}' has no conformant ${PROJECT_LOCAL_MANIFEST_FILE} sidecar`,
-      { diagnostic: 'manifest missing or malformed' },
-    );
-  }
-
-  const result = admitTool({
-    manifest: rawManifest,
-    source,
-    dir,
-    // An authored tool (placed in the project tree or the user's home dir) was
-    // explicitly authored by the user, so an incompatible one fails the run
-    // rather than skipping silently.
-    explicitlyRequested: true,
-  });
-  if (result.decision !== 'admit') {
-    throw new PluginIncompatibleError(
-      `${source} tool '${rawManifest.id}' is incompatible: ${result.diagnostic ?? 'compatibility gate rejected it'}`,
-      { diagnostic: result.diagnostic },
-    );
-  }
-  return { provenance: result.provenance, manifest: result.manifest };
-}
-
-/**
- * Admit (or reject) a single PROJECT-LOCAL authored tool under the
- * deny-by-default trust policy (launch, Phase 3 Task 3.2; wired into
- * production discovery in the launch contract).
- *
- * A project-local tool is authored code under
- * `<project>/opensip-cli/tools/<name>/` declaring its identity via a JSON
- * sidecar (`opensip-tool.manifest.json`). It is read + gated WITHOUT importing
- * its module:
- *
- *   1. `loadToolManifest('project-local', dir)` — identity only, no code run.
- *   2. Trust check — {@link isProjectLocalToolTrusted}. Not allowlisted ⇒
- *      throw {@link PluginIncompatibleError} (fail-closed, exit 5) before any
- *      import. Allowlisted ⇒ run the shared compatibility tail; an incompatible
- *      explicitly-trusted tool is likewise fail-closed.
- *
- * Returns the admitted tool's `{ provenance, manifest }` on success. The trust
- * decision always precedes import (it is the FIRST statement here, ahead of the
- * shared {@link admitAuthoredTool} tail).
- *
- * @throws {PluginIncompatibleError} when the tool has no conformant sidecar
- *   manifest, is not allowlisted, or is compatibility-incompatible.
- */
-export function admitProjectLocalTool(args: {
-  readonly dir: string;
-  readonly env?: NodeJS.ProcessEnv;
-}): AuthoredAdmission {
-  // Trust decision FIRST — deny-by-default, before any compatibility maths
-  // and (critically) before the tool's module could ever be imported. The id
-  // is read from the sidecar identity, so load the manifest once here for the
-  // trust check, then hand the same dir to the shared tail.
-  const manifest = loadToolManifest('project-local', args.dir);
-  if (manifest === undefined) {
-    throw new PluginIncompatibleError(
-      `project-local tool at '${args.dir}' has no conformant ${PROJECT_LOCAL_MANIFEST_FILE} sidecar`,
-      { diagnostic: 'manifest missing or malformed' },
-    );
-  }
-  if (!isProjectLocalToolTrusted(manifest.id, args.env)) {
-    throw new PluginIncompatibleError(
-      `project-local tool '${manifest.id}' is not trusted to load (deny-by-default). ` +
-        `Allowlist it via OPENSIP_CLI_ALLOW_PROJECT_TOOLS='${manifest.id}' to admit it.`,
-      { diagnostic: 'project-local tool not allowlisted (deny-by-default)' },
-    );
-  }
-  // Pass the manifest we just loaded (and whose id we just trusted) so the
-  // compat gate in the tail sees the identical declaration. Closes the
-  // read-re-read TOCTOU for the deny-by-default path.
-  return admitAuthoredTool('project-local', args.dir, manifest);
-}
-
-/**
- * Admit a single USER-GLOBAL authored tool — the trusted-by-default sibling of
- * {@link admitProjectLocalTool}.
- *
- * A user-global tool is an authored sidecar under
- * `~/.opensip-cli/tools/<name>/`. The user deliberately placed it in their
- * own home dir (the `npm i -g` analogue for authored code), so there is **no
- * allowlist gate** — it is trusted-by-default. It still reads the static
- * sidecar and runs `admitTool` BEFORE the module could be imported (the shared
- * {@link admitAuthoredTool} tail), so trust-before-import holds for this leg
- * too: a global tool the user explicitly authored is fail-closed on a
- * missing/incompatible manifest, never a silent skip.
- *
- * @throws {PluginIncompatibleError} when the tool has no conformant sidecar
- *   manifest or is compatibility-incompatible.
- */
-export function admitUserGlobalTool(args: { readonly dir: string }): AuthoredAdmission {
-  // No trust gate — `user-global` is trusted-by-shipping-into-$HOME.
-  return admitAuthoredTool('user-global', args.dir);
 }
 
 /**

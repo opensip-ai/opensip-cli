@@ -2,19 +2,17 @@
  * @fileoverview One descriptor-driven capability-preference resolver (§5.3,
  * Phase 3).
  *
- * Three bespoke readers parse three key-sets today — fitness's
- * `readCheckPackagePreferences` (`plugins.checkPackages`), simulation's
- * `readScenarioPackagePreferences` (`plugins.scenarioPackages` /
- * `autoDiscoverScenarios` / `packageScopes`), and graph's
- * `readGraphAdapterPackagePreferences` (`plugins.graphAdapters` /
- * `autoDiscoverGraphAdapters`). Each domain's discovery descriptor maps domain →
- * config keys (`descriptor.configKeys`), so this one resolver replaces all three
- * WITHOUT renaming a single key — the documented `opensip-cli.config.yml`
- * surface is byte-identical, no migration.
+ * Each domain's discovery descriptor maps domain → config keys
+ * (`descriptor.configKeys`), so this one resolver covers fitness
+ * (`plugins.checkPackages`), simulation (`plugins.scenarioPackages` /
+ * `autoDiscoverScenarios` / `packageScopes`), and graph
+ * (`plugins.graphAdapters` / `autoDiscoverGraphAdapters`) WITHOUT renaming a
+ * single key — the documented `opensip-cli.config.yml` surface is
+ * byte-identical, no migration.
  *
- * Reads from the raw `plugins` block of the project config (the same block the
- * three readers read). Lives in `@opensip-cli/config` because reading config is
- * a config-layer concern; the generic substrate (core) receives the RESOLVED
+ * Reads from the already validated `plugins` block on the run scope's config
+ * document. Lives in `@opensip-cli/config` because interpreting config is a
+ * config-layer concern; the generic substrate (core) receives the RESOLVED
  * preferences, staying config-pure.
  */
 
