@@ -17,6 +17,7 @@ PACKAGE_VERSION="${OPENSIP_CLI_VERSION:-latest}"
 INSTALL_SPEC="${PACKAGE_NAME}@${PACKAGE_VERSION}"
 MIN_NODE_MAJOR=24
 SMOKE_DIR=""
+ACTIVE_CHILD_PID=""
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   BOLD="$(printf '\033[1m')"
@@ -50,6 +51,51 @@ error() {
   printf '%s\n' "${RED}Error:${RESET} $1" >&2
 }
 
+clear_progress_line() {
+  if [ -t 1 ]; then
+    printf '\r\033[K'
+  fi
+}
+
+run_with_spinner() {
+  label="$1"
+  shift
+  : >"$LOG_FILE"
+
+  if [ -t 1 ]; then
+    "$@" >"$LOG_FILE" 2>&1 &
+    ACTIVE_CHILD_PID="$!"
+    frame=0
+
+    while kill -0 "$ACTIVE_CHILD_PID" >/dev/null 2>&1; do
+      case "$frame" in
+        0) dots="   " ;;
+        1) dots=".  " ;;
+        2) dots=".. " ;;
+        *) dots="..." ;;
+      esac
+      printf '\r%sOpenSIP CLI%s: %s%s%s%s' "$BOLD" "$RESET" "$DIM" "$label" "$dots" "$RESET"
+      frame=$(((frame + 1) % 4))
+      sleep 0.2
+    done
+
+    set +e
+    wait "$ACTIVE_CHILD_PID"
+    status="$?"
+    set -e
+    ACTIVE_CHILD_PID=""
+    clear_progress_line
+    return "$status"
+  fi
+
+  info "$label..."
+  set +e
+  "$@" >"$LOG_FILE" 2>&1
+  status="$?"
+  set -e
+  return "$status"
+}
+
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     error "$2"
@@ -76,10 +122,13 @@ if [ "$NODE_MAJOR" -lt "$MIN_NODE_MAJOR" ]; then
   exit 1
 fi
 
-info "Installing ${INSTALL_SPEC}..."
-
 LOG_FILE="$(mktemp -t opensip-cli-install.XXXXXX)"
 cleanup() {
+  if [ -n "$ACTIVE_CHILD_PID" ]; then
+    kill "$ACTIVE_CHILD_PID" >/dev/null 2>&1 || true
+    ACTIVE_CHILD_PID=""
+    clear_progress_line
+  fi
   rm -f "$LOG_FILE"
   if [ -n "$SMOKE_DIR" ]; then
     rm -rf "$SMOKE_DIR"
@@ -88,7 +137,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'cleanup; exit 1' INT TERM
 
-if ! npm install -g "$INSTALL_SPEC" --loglevel=error --no-audit --no-fund >"$LOG_FILE" 2>&1; then
+if ! run_with_spinner "Installing ${INSTALL_SPEC}" npm install -g "$INSTALL_SPEC" --loglevel=error --no-audit --no-fund; then
   error "Install failed."
   if [ -s "$LOG_FILE" ]; then
     printf '\n%s\n' "npm output:" >&2
@@ -121,9 +170,8 @@ if [ -n "$OPEN_CMD" ]; then
   fi
 
   if [ "${OPENSIP_CLI_SKIP_SMOKE:-}" != "1" ]; then
-    info "Running install smoke test..."
     SMOKE_DIR="$(mktemp -d -t opensip-cli-smoke.XXXXXX)"
-    if ! "$OPEN_CMD" init --cwd "$SMOKE_DIR" --language typescript --json >"$LOG_FILE" 2>&1; then
+    if ! run_with_spinner "Running install smoke test" "$OPEN_CMD" init --cwd "$SMOKE_DIR" --language typescript --json; then
       error "Smoke test failed while scaffolding a temporary project."
       if [ -s "$LOG_FILE" ]; then
         printf '\n%s\n' "opensip output:" >&2
@@ -132,7 +180,7 @@ if [ -n "$OPEN_CMD" ]; then
       printf '\n%s\n' "You can skip the smoke test with OPENSIP_CLI_SKIP_SMOKE=1, but the CLI may not be usable until this is resolved." >&2
       exit 1
     fi
-    if ! (cd "$SMOKE_DIR" && "$OPEN_CMD" sessions list --json >"$LOG_FILE" 2>&1); then
+    if ! run_with_spinner "Verifying install data store" sh -c 'cd "$1" && "$2" sessions list --json' sh "$SMOKE_DIR" "$OPEN_CMD"; then
       error "Smoke test failed while opening the SQLite data store."
       if [ -s "$LOG_FILE" ]; then
         printf '\n%s\n' "opensip output:" >&2
