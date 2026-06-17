@@ -36,6 +36,7 @@ import {
   toPersistedFeatures,
 } from '../pipeline/features.js';
 import { buildIndexes } from '../pipeline/indexes.js';
+import { evaluateRules } from '../rules/evaluate-rules.js';
 import { currentRules } from '../rules/registry.js';
 
 import { GRAPH_TRACER } from './graph-tracer.js';
@@ -271,20 +272,20 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       stage: 'rules',
       onProgress: input.onProgress,
       monitor,
-      fn: () => {
-        const collected: Signal[] = [];
-        for (const rule of ruleSet) {
-          // Thread the active adapter's RuleHints so non-TypeScript
-          // languages get their own side-effect primitives, throw
-          // syntax, generated-file globs, and isTestFile predicate.
-          // Without this, rules that consult `hints` silently fall
-          // back to TypeScript-shaped regex on every other language.
-          // The 5th arg is the engine-computed feature table (Plan C).
-          const out = rule.evaluate(catalog, indexes, config, adapter.ruleHints, features);
-          collected.push(...out);
-        }
-        return collected;
-      },
+      // Thread the active adapter's RuleHints so non-TypeScript languages get
+      // their own side-effect primitives, throw syntax, generated-file globs,
+      // and isTestFile predicate. Without this, rules that consult `hints`
+      // silently fall back to TypeScript-shaped regex on every other language.
+      // `features` is the engine-computed feature table (Plan C). The shared
+      // evaluateRules seam adds per-rule timing telemetry (graph.rule.*).
+      fn: () =>
+        evaluateRules(ruleSet, {
+          catalog,
+          indexes,
+          config,
+          hints: adapter.ruleHints,
+          features,
+        }),
       detailFn: (sigs) => `${String(ruleSet.length)} rule(s), ${String(sigs.length)} signal(s)`,
       attrsFn: (sigs) => ({
         'opensip_cli.graph.rule_count': ruleSet.length,

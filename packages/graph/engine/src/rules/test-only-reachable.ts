@@ -93,11 +93,11 @@ function computeProductionEntries(
 
 function bfsReachable(seeds: ReadonlySet<string>, indexes: Indexes): ReadonlySet<string> {
   const visited = new Set<string>();
+  // Iterate the growing queue directly (Array iterator reads `length` live):
+  // same FIFO traversal as Array.shift() but O(V+E), not O(V²).
   const queue: string[] = [...seeds];
-  while (queue.length > 0) {
-    const cur = queue.shift();
-    /* v8 ignore next */
-    if (cur === undefined || visited.has(cur)) continue;
+  for (const cur of queue) {
+    if (visited.has(cur)) continue;
     visited.add(cur);
     const next = indexes.callees.get(cur) ?? [];
     for (const n of next) if (!visited.has(n)) queue.push(n);

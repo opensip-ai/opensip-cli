@@ -135,7 +135,13 @@ export const noSideEffectPathRule = defineRule({
     for (const occ of indexes.byBodyHash.values()) {
       if (!isPureCandidate(occ, sideEffecting, features)) continue;
       const reachable = transitiveCallees(occ, indexes);
-      const anyEffecting = [...reachable].some((h) => sideEffecting.has(h));
+      let anyEffecting = false;
+      for (const h of reachable) {
+        if (sideEffecting.has(h)) {
+          anyEffecting = true;
+          break;
+        }
+      }
       if (anyEffecting) continue;
       if (!hasDiscardedCaller(occ, indexes)) continue;
       signals.push(
@@ -311,10 +317,13 @@ function textualSideEffect(occ: FunctionOccurrence, detector: SideEffectDetector
 
 function transitiveCallees(start: FunctionOccurrence, indexes: Indexes): ReadonlySet<string> {
   const visited = new Set<string>();
+  // Iterate the growing queue directly: the Array iterator reads `length`
+  // live, so nodes pushed mid-iteration are still visited in FIFO order —
+  // the same traversal as Array.shift() but O(V+E) instead of O(V²) (shift()
+  // is an O(n) dequeue).
   const queue: string[] = [start.bodyHash];
-  while (queue.length > 0) {
-    const cur = queue.shift();
-    if (cur === undefined || visited.has(cur)) continue;
+  for (const cur of queue) {
+    if (visited.has(cur)) continue;
     visited.add(cur);
     const next = indexes.callees.get(cur) ?? [];
     for (const n of next) {

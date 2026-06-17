@@ -82,25 +82,52 @@ function collectCreatedInlineCallableHashes(catalog: Catalog): ReadonlySet<strin
 }
 
 /**
+ * Group every catalog occurrence by its file path, in one O(N) pass, so the
+ * nested-span lookup scans only the handful of occurrences in the SAME file
+ * instead of re-walking the whole catalog per candidate.
+ *
+ * Before this index the rule was O(N²): the candidate loop iterated up to N
+ * occurrences and, for each, `nestedSpansWithin` re-scanned all N catalog
+ * occurrences to keep only the same-file ones — quadratic on large monorepos
+ * (the rule dominated the entire rules stage at repo scale). Grouping once
+ * makes the lookup O(occurrences-in-file), which is small and bounded.
+ */
+function groupOccurrencesByFile(
+  catalog: Catalog,
+): ReadonlyMap<string, readonly FunctionOccurrence[]> {
+  const byFile = new Map<string, FunctionOccurrence[]>();
+  for (const occurrences of Object.values(catalog.functions)) {
+    for (const occ of occurrences) {
+      const list = byFile.get(occ.filePath);
+      if (list) list.push(occ);
+      else byFile.set(occ.filePath, [occ]);
+    }
+  }
+  return byFile;
+}
+
+/**
  * Nested occurrences declared *inside* `outer`'s source span (same file,
  * strictly contained `[line, endLine]`, not `outer` itself). A throw edge whose
  * source line falls within one of these spans belongs to the nested function's
  * control flow, not `outer`'s.
+ *
+ * `sameFileOccurrences` is the pre-grouped occurrence list for `outer`'s file
+ * (see {@link groupOccurrencesByFile}); the same-file filter is therefore
+ * implicit in the caller's lookup, preserving the prior semantics exactly while
+ * eliminating the whole-catalog re-scan.
  */
 function nestedSpansWithin(
   outer: FunctionOccurrence,
-  catalog: Catalog,
+  sameFileOccurrences: readonly FunctionOccurrence[],
 ): readonly { readonly line: number; readonly endLine: number }[] {
   const spans: { line: number; endLine: number }[] = [];
-  for (const occurrences of Object.values(catalog.functions)) {
-    for (const occ of occurrences) {
-      if (occ.filePath !== outer.filePath) continue;
-      if (occ.bodyHash === outer.bodyHash && occ.line === outer.line && occ.column === outer.column)
-        continue;
-      // Strictly contained within the outer's declaration span.
-      if (occ.line >= outer.line && occ.endLine <= outer.endLine && occ.line > outer.line) {
-        spans.push({ line: occ.line, endLine: occ.endLine });
-      }
+  for (const occ of sameFileOccurrences) {
+    if (occ.bodyHash === outer.bodyHash && occ.line === outer.line && occ.column === outer.column)
+      continue;
+    // Strictly contained within the outer's declaration span.
+    if (occ.line >= outer.line && occ.endLine <= outer.endLine && occ.line > outer.line) {
+      spans.push({ line: occ.line, endLine: occ.endLine });
     }
   }
   return spans;
@@ -120,6 +147,9 @@ export const alwaysThrowsBranchRule = defineRule({
   evaluate({ catalog, indexes, hints, config }): readonly Signal[] {
     const throwRegex = hints?.throwSyntaxRegex ?? TYPESCRIPT_FALLBACK_THROW_REGEX;
     const createdInlineCallables = collectCreatedInlineCallableHashes(catalog);
+    // Group occurrences by file ONCE (was an O(N²) whole-catalog re-scan per
+    // candidate inside `nestedSpansWithin`).
+    const occurrencesByFile = groupOccurrencesByFile(catalog);
     const signals: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
       if (occ.kind === 'module-init') continue;
@@ -138,7 +168,7 @@ export const alwaysThrowsBranchRule = defineRule({
       // Nested-body boundary: drop edges that textually live inside a nested
       // function declared within this occurrence's span — they are the nested
       // function's control flow, not this one's.
-      const nestedSpans = nestedSpansWithin(occ, catalog);
+      const nestedSpans = nestedSpansWithin(occ, occurrencesByFile.get(occ.filePath) ?? []);
       const ownControlFlowEdges =
         nestedSpans.length === 0
           ? occ.calls

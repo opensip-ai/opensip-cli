@@ -22,6 +22,7 @@ import {
   toPersistedFeatures,
 } from '../../pipeline/features.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
+import { evaluateRules } from '../../rules/evaluate-rules.js';
 import { currentRules } from '../../rules/registry.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
 
@@ -252,15 +253,17 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   }
 
   // 6. Run rules over the unified catalog, threading the feature table (5th arg).
+  //    The shared evaluateRules seam (also used by runGraph) appends signals in
+  //    registration order and emits per-rule timing telemetry (graph.rule.*).
   const rulesStart = Date.now();
   emitStageStart(onProgress, 'rules');
-  const signals: Signal[] = [];
-  for (const rule of ruleSet) {
-    // Indexed append rather than spread-in-loop — avoids re-allocating the
-    // accumulator on every rule (O(n²)) over a potentially large rule set.
-    const ruleSignals = rule.evaluate(catalog, indexes, config, adapter.ruleHints, features);
-    for (const signal of ruleSignals) signals.push(signal);
-  }
+  const signals: Signal[] = evaluateRules(ruleSet, {
+    catalog,
+    indexes,
+    config,
+    hints: adapter.ruleHints,
+    features,
+  });
   emitStage(
     onProgress,
     'rules',

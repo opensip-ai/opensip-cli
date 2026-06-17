@@ -258,11 +258,11 @@ function computeTestReachable(indexes: Indexes): Set<string> {
 /** Forward BFS over the `callees` adjacency from a seed set. */
 function bfsForward(seeds: ReadonlySet<string>, indexes: Indexes): Set<string> {
   const visited = new Set<string>();
+  // Iterate the growing queue directly (Array iterator reads `length` live):
+  // same FIFO traversal as Array.shift() but O(V+E), not O(V²).
   const queue: string[] = [...seeds];
-  while (queue.length > 0) {
-    const cur = queue.shift();
-    /* v8 ignore next */
-    if (cur === undefined || visited.has(cur)) continue;
+  for (const cur of queue) {
+    if (visited.has(cur)) continue;
     visited.add(cur);
     for (const n of indexes.callees.get(cur) ?? []) {
       if (!visited.has(n)) queue.push(n);
