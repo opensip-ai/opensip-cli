@@ -27,10 +27,47 @@ import { logger, type RunScope } from '@opensip-cli/core';
 
 import { hostEnv } from '../env/host-env-specs.js';
 
-let session: Session | null = null;
-let isProfiling = false;
-let profilePath: string | null = null;
-let labelsPath: string | null = null;
+interface ProfilingState {
+  session: Session | null;
+  isProfiling: boolean;
+  profilePath: string | null;
+  labelsPath: string | null;
+}
+
+function createProfilingState(): ProfilingState {
+  return {
+    session: null,
+    isProfiling: false,
+    profilePath: null,
+    labelsPath: null,
+  };
+}
+
+function isProfilingState(value: unknown): value is ProfilingState {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'session' in value &&
+    'isProfiling' in value &&
+    'profilePath' in value &&
+    'labelsPath' in value
+  );
+}
+
+function profilingStateFor(scope: RunScope | undefined): ProfilingState {
+  if (scope === undefined) return fallbackProfilingState;
+  const existing = scope.telemetry.profiling;
+  if (isProfilingState(existing)) return existing;
+  const created = createProfilingState();
+  scope.telemetry.profiling = created;
+  return created;
+}
+
+const fallbackProfilingState = createProfilingState();
+// Node's inspector CPU profiler is process-global. State details live on the
+// RunScope telemetry bag; this pointer lets shutdownTelemetry stop the active
+// profile when it is invoked outside the original scope.
+let activeProfilingState: ProfilingState | null = null;
 let warnedOtelOnlyProfiling = false;
 
 /** Module tag for structured logging (also dedupes the sonarjs/no-duplicate-string occurrences). */
@@ -77,18 +114,22 @@ function warnIfOtelOnlyProfilingMode(): void {
  * Safe to call multiple times (idempotent).
  */
 export function startProfiling(scope?: RunScope, command?: string): void {
-  if (isProfiling) return;
+  if (activeProfilingState?.isProfiling === true) return;
+  const state = profilingStateFor(scope);
+  if (state.isProfiling) return;
 
   try {
     if (!isProfilingEnabled()) return;
     warnIfOtelOnlyProfilingMode();
-    session = new Session();
-    session.connect();
+    state.session = new Session();
+    state.session.connect();
+    state.isProfiling = true;
+    activeProfilingState = state;
 
-    session.post('Profiler.enable', (_err?: Error | null, _res?: unknown) => {
-      if (!session) return;
-      session.post('Profiler.start', (_err2?: Error | null, _res2?: unknown) => {
-        isProfiling = true;
+    state.session.post('Profiler.enable', (_err?: Error | null, _res?: unknown) => {
+      if (!state.session) return;
+      state.session.post('Profiler.start', (_err2?: Error | null, _res2?: unknown) => {
+        if (!state.session) return;
 
         const runId = scope?.runId ?? 'unknown';
         const safeCommand = (command ?? 'cli').replace(/[^a-z0-9_-]/gi, '_');
@@ -102,8 +143,8 @@ export function startProfiling(scope?: RunScope, command?: string): void {
 
         mkdirSync(baseDir, { recursive: true });
 
-        profilePath = join(baseDir, `${ts}-${safeCommand}-${runId}.cpuprofile`);
-        labelsPath = join(baseDir, `${ts}-${safeCommand}-${runId}.labels.json`);
+        state.profilePath = join(baseDir, `${ts}-${safeCommand}-${runId}.cpuprofile`);
+        state.labelsPath = join(baseDir, `${ts}-${safeCommand}-${runId}.labels.json`);
 
         const labels: ProfilingLabels = {
           runId,
@@ -112,14 +153,14 @@ export function startProfiling(scope?: RunScope, command?: string): void {
           // Add any OTEL_RESOURCE_ATTRIBUTES derived labels here if needed in future
         };
 
-        writeFileSync(labelsPath, JSON.stringify(labels, null, 2));
+        writeFileSync(state.labelsPath, JSON.stringify(labels, null, 2));
 
         logger.info({
           evt: 'cli.profiling.started',
           module: MODULE,
           runId,
           command,
-          profilePath,
+          profilePath: state.profilePath,
         });
       });
     });
@@ -130,7 +171,7 @@ export function startProfiling(scope?: RunScope, command?: string): void {
       error: error instanceof Error ? error.message : String(error),
     });
     // Best effort — profiling failure must never break the run
-    cleanup();
+    cleanup(state);
   }
 }
 
@@ -138,9 +179,13 @@ export function startProfiling(scope?: RunScope, command?: string): void {
  * Stop profiling and flush the .cpuprofile + labels sidecar.
  * Safe and idempotent.
  */
-export function stopProfiling(): void {
-  if (!isProfiling || !session) {
-    cleanup();
+export function stopProfiling(scope?: RunScope): void {
+  const state =
+    scope === undefined
+      ? (activeProfilingState ?? fallbackProfilingState)
+      : profilingStateFor(scope);
+  if (!state.isProfiling || !state.session) {
+    cleanup(state);
     return;
   }
 
@@ -148,7 +193,7 @@ export function stopProfiling(): void {
     // node:inspector post callbacks for Profiler.* use structural types not fully declared
     // in the ambient types we consume; the result object (incl. profile) arrives as any.
     // We narrow locally for the write path; the disable is scoped to the wire call.
-    session.post(
+    state.session.post(
       'Profiler.stop',
       (err: Error | null | undefined, result: { profile?: unknown } = {}) => {
         if (err) {
@@ -157,16 +202,16 @@ export function stopProfiling(): void {
             module: MODULE,
             error: err.message || String(err),
           });
-        } else if (result.profile && profilePath) {
-          writeFileSync(profilePath, JSON.stringify(result.profile));
+        } else if (result.profile && state.profilePath) {
+          writeFileSync(state.profilePath, JSON.stringify(result.profile));
           logger.info({
             evt: 'cli.profiling.stopped',
             module: MODULE,
-            profilePath,
-            labelsPath,
+            profilePath: state.profilePath,
+            labelsPath: state.labelsPath,
           });
         }
-        cleanup();
+        cleanup(state);
       },
     );
   } catch (error) {
@@ -175,26 +220,28 @@ export function stopProfiling(): void {
       module: MODULE,
       error: error instanceof Error ? error.message : String(error),
     });
-    cleanup();
+    cleanup(state);
   }
 }
 
-function cleanup(): void {
-  if (session) {
+function cleanup(state: ProfilingState): void {
+  if (state.session) {
     try {
-      session.disconnect();
+      state.session.disconnect();
     } catch {
       // @swallow-ok best-effort inspector session disconnect during profiling teardown
     }
   }
-  session = null;
-  isProfiling = false;
-  profilePath = null;
-  labelsPath = null;
+  state.session = null;
+  state.isProfiling = false;
+  state.profilePath = null;
+  state.labelsPath = null;
+  if (activeProfilingState === state) activeProfilingState = null;
 }
 
 /** Exposed for tests / shutdown. */
 export function resetProfilingForTests(): void {
-  cleanup();
+  if (activeProfilingState !== null) cleanup(activeProfilingState);
+  cleanup(fallbackProfilingState);
   warnedOtelOnlyProfiling = false;
 }

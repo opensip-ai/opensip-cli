@@ -102,7 +102,7 @@ describe('Tier A storage-contract scan (ADR-0042)', () => {
 describe('validate verdicts over the storage fixtures', () => {
   it('a DDL-carrying tool fails the storage-contract section (verdict failed)', async () => {
     const dir = fixtureWith(
-      'export const tool = { metadata: { id: "storage-case", name: "s", version: "0.0.0", description: "d" }, commands: [{ name: "storage-case-cmd", description: "noop" }], commandSpecs: [{ name: "storage-case-cmd", description: "noop", commonFlags: [], output: "raw-stream", rawStreamReason: "fixture", flags: [], handler: () => Promise.resolve() }], apiVersion: 1 };\nconst q = "CREATE TABLE evil (id int)";',
+      'export const tool = { metadata: { id: "storage-case", name: "s", version: "0.0.0", description: "d" }, commands: [{ name: "storage-case-cmd", description: "noop" }], commandSpecs: [{ name: "storage-case-cmd", description: "noop", commonFlags: [], scope: "project", output: "raw-stream", rawStreamReason: "diagnostic-gate", flags: [], handler: () => Promise.resolve() }], apiVersion: 1 };\nconst q = "CREATE TABLE evil (id int)";',
     );
     const { result } = await runToolValidation({ spec: dir, cwd: process.cwd() });
     expect(result.verdict).toBe('failed');

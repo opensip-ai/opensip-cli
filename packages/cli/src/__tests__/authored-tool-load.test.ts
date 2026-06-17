@@ -55,6 +55,9 @@ function stageAuthoredTool(
   commandSpecs: [{
     name: ${JSON.stringify(name)},
     description: ${JSON.stringify(`the ${name} command`)},
+    commonFlags: [],
+    scope: 'project',
+    output: 'command-result',
     handler: () => ({ type: 'success', message: 'ok' }),
   }],
 };

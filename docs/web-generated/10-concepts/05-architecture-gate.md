@@ -70,7 +70,7 @@ Unchanged (29):
 ✗ DEGRADED — 1 new violation
 ```
 
-Exit code 1 if `degraded` (any added findings, with the reserved `failOnDegraded` config key at its default `true`); 0 otherwise. Setting `failOnDegraded: 0` turns the ratchet into a report-only diff. CI gates on the exit code; humans read the diff.
+Exit code 1 if `degraded` (any added findings, with the reserved `failOnDegraded` config key at its default `true`); 0 otherwise. Setting `failOnDegraded: false` turns the ratchet into a report-only diff. CI gates on the exit code; humans read the diff.
 
 The flags are mutually exclusive — passing both raises a configuration error.
 

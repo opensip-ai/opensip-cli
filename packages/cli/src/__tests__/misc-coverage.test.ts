@@ -51,6 +51,7 @@ describe('isValidTool', () => {
             name: 'fake',
             description: 'fake',
             commonFlags: [],
+            scope: 'project',
             output: 'command-result',
             handler: () => Promise.resolve({}),
           },

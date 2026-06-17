@@ -18,7 +18,7 @@
  * and never reaches `isValidTool`.
  */
 
-import type { Tool } from '@opensip-cli/core';
+import { validateCommandSpec, type Tool } from '@opensip-cli/core';
 
 export function isValidTool(value: unknown): value is Tool {
   if (typeof value !== 'object' || value === null) return false;
@@ -33,7 +33,9 @@ export function isValidTool(value: unknown): value is Tool {
   // A tool must expose a command surface: a non-empty declarative `commandSpecs`
   // array (the one command surface, launch — `register()` was removed). A tool
   // with no commandSpecs cannot contribute any command and is rejected.
-  const hasSpecs = Array.isArray(candidate.commandSpecs) && candidate.commandSpecs.length > 0;
-  if (!hasSpecs) return false;
+  if (!Array.isArray(candidate.commandSpecs) || candidate.commandSpecs.length === 0) return false;
+  for (const spec of candidate.commandSpecs) {
+    if (!validateCommandSpec(spec)) return false;
+  }
   return true;
 }

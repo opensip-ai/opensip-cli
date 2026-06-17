@@ -1,11 +1,10 @@
 /**
  * sim-config — resolve the `sim` recipe default (ADR-0022).
  *
- * Recipes are tool-scoped: `sim` reads its own `simulation.recipe` block from
- * `opensip-cli.config.yml`. The `simulation:` block is read permissively here
- * (mirroring graph's `graph-config.ts`) — simulation must not depend on fitness,
- * which owns the strict Zod config schema, so it parses its own slice of the
- * document.
+ * Recipes are tool-scoped: `sim` reads its own `simulation.recipe` block. When
+ * a run scope exists, the host-resolved `simulation:` block is authoritative:
+ * sim never re-reads YAML behind the composition root. Scope-less direct callers
+ * keep the permissive best-effort file fallback.
  */
 
 import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-cli/contracts';
@@ -29,9 +28,13 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
  */
 function readSimulationRecipe(cwd: string, explicitPath?: string): string | undefined {
   // Scope-first: the resolved, strict-validated `simulation:` block.
-  const scoped = currentScope()?.toolConfig?.simulation;
+  const scope = currentScope();
+  const scoped = scope?.toolConfig?.simulation;
   if (isPlainObject(scoped)) {
     return typeof scoped.recipe === 'string' ? scoped.recipe : undefined;
+  }
+  if (scope !== undefined) {
+    return undefined;
   }
 
   let filePath: string;

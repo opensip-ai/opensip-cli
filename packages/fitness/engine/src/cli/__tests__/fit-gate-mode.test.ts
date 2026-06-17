@@ -12,7 +12,14 @@
  */
 
 import { type FitOptions, type SignalEnvelope } from '@opensip-cli/contracts';
-import { createRunTimer, type ToolCliContext } from '@opensip-cli/core';
+import {
+  createRunTimer,
+  LanguageRegistry,
+  RunScope,
+  runWithScope,
+  ToolRegistry,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -42,7 +49,7 @@ const fitResult = (passed: boolean): Awaited<ReturnType<typeof executeFit>> => {
   } as unknown as Awaited<ReturnType<typeof executeFit>>;
 };
 
-function mockCli(): {
+function mockCli(opts: { readonly degraded?: boolean } = {}): {
   cli: ToolCliContext;
   setExitCode: ReturnType<typeof vi.fn>;
   deliverSignals: ReturnType<typeof vi.fn>;
@@ -63,7 +70,7 @@ function mockCli(): {
     // contract these tests assert.
     saveBaseline: vi.fn(() => Promise.resolve()),
     compareBaseline: vi.fn(() =>
-      Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
+      Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: opts.degraded ?? false }),
     ),
     exportBaselineSarif: vi.fn(() => Promise.resolve()),
     exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
@@ -89,6 +96,14 @@ function gateSaveArgs(): FitOptions {
     exclude: [],
     gateSave: true,
     gateCompare: false,
+  };
+}
+
+function gateCompareArgs(): FitOptions {
+  return {
+    ...gateSaveArgs(),
+    gateSave: false,
+    gateCompare: true,
   };
 }
 
@@ -129,5 +144,20 @@ describe('runGateMode --gate-save (ADR-0020 hard-fail via the host verdict)', ()
     const [deliveredEnvelope, opts] = deliverSignals.mock.calls[0] ?? [];
     expect((deliveredEnvelope as SignalEnvelope).verdict.passed).toBe(true);
     expect(opts).not.toHaveProperty('runFailed');
+  });
+});
+
+describe('runGateMode --gate-compare (ADR-0036 failOnDegraded)', () => {
+  it('passes the host runFailed override as false when a degraded compare is configured as report-only', async () => {
+    vi.mocked(executeFit).mockResolvedValue(fitResult(true));
+    const { cli, deliverSignals } = mockCli({ degraded: true });
+    const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+    Object.assign(scope, { toolConfig: { fitness: { failOnDegraded: false } } });
+
+    await runWithScope(scope, () => runGateMode(gateCompareArgs(), cli));
+
+    expect(deliverSignals).toHaveBeenCalledTimes(1);
+    const [, opts] = deliverSignals.mock.calls[0] ?? [];
+    expect(opts).toMatchObject({ cwd: '/x', runFailed: false });
   });
 });

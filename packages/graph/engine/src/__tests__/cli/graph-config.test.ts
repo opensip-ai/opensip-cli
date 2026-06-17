@@ -124,12 +124,14 @@ describe('loadGraphConfig reads scope.toolConfig.graph when a scope is present',
     expect(config).toEqual({});
   });
 
-  it('falls back to the YAML read when the scope carries no toolConfig', () => {
-    // A scope with no toolConfig (config-less project shape) → YAML fallback.
+  it('returns {} rather than reading YAML when an active scope carries no toolConfig', () => {
+    // A scope with no toolConfig has already passed through bootstrap with no
+    // resolved graph config; a second YAML read would violate the one-reader
+    // invariant and could see a different file.
     writeConfig('graph:\n  minDuplicateBodyLines: 8\n');
     const scope = makeGraphTestScope();
 
     const config = runWithScopeSync(scope, () => loadGraphConfig(workDir));
-    expect(config.minDuplicateBodyLines).toBe(8);
+    expect(config).toEqual({});
   });
 });

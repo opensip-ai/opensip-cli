@@ -193,7 +193,13 @@ export type {
 // exports for the host to mount, plus the pure CommonFlagKey key type. The
 // Commander-touching applyCommonFlags runtime stays in @opensip-cli/contracts,
 // which re-exports CommonFlagKey from here. Re-exported by contracts.
-export { defineCommand, COMMON_FLAG_KEYS, RAW_STREAM_REASONS } from './tools/index.js';
+export {
+  assertCommandSpec,
+  defineCommand,
+  validateCommandSpec,
+  COMMON_FLAG_KEYS,
+  RAW_STREAM_REASONS,
+} from './tools/index.js';
 export type {
   CommandSpec,
   OptionSpec,

@@ -21,6 +21,8 @@
  * `Record<string, unknown>` on `scope.toolConfig` (the kernel carries no
  * config-layer dependency). The values were already strict-validated by the
  * composer before they landed on the scope, so a structural narrowing is sound.
+ * Host-reserved gate keys added by config's tool-namespace decoration are
+ * included here because they are part of the resolved runtime shape.
  */
 
 import { currentScope } from '@opensip-cli/core';
@@ -32,6 +34,7 @@ export interface ResolvedFitnessConfig {
   readonly timeout?: number;
   readonly failOnErrors?: number;
   readonly failOnWarnings?: number;
+  readonly failOnDegraded?: boolean;
   readonly disabledChecks?: readonly string[];
   readonly recipe?: string;
 }

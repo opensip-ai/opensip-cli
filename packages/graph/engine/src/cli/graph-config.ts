@@ -53,11 +53,29 @@ export function loadGraphConfig(cwd: string, explicitPath?: string): GraphConfig
   // Scope-first: the resolved, strict-validated `graph:` block (with env/flag
   // precedence already folded in). Present on every CLI dispatch path; absent
   // only off-CLI (direct unit-test calls), where we fall back to the YAML read.
-  const scoped = currentScope()?.toolConfig?.graph;
+  const scope = currentScope();
+  const scoped = scope?.toolConfig?.graph;
   if (isPlainObject(scoped)) {
     // Already validated by the composer (graph's namespaced ToolConfigDeclaration
     // is the same GraphConfigSchema), so this is a pure narrowing read.
     return scoped;
+  }
+  const documentGraph = scope?.configDocument?.graph;
+  if (isPlainObject(documentGraph)) {
+    const parsed = GraphConfigSchema.strict().safeParse(documentGraph);
+    if (parsed.success) return parsed.data;
+    logger.debug({
+      evt: 'graph.config.scope_document_schema_rejected',
+      module: 'graph:config',
+      err: parsed.error.message,
+    });
+    return {};
+  }
+  if (scope !== undefined) {
+    // A scope-bound dispatch has already had its config composed. If there is no
+    // resolved graph block, do not perform a second YAML read; use graph's
+    // in-rule defaults instead.
+    return {};
   }
 
   let filePath: string;

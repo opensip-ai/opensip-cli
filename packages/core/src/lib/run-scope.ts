@@ -113,6 +113,13 @@ export interface RunScopeOptions {
    * a module global. Defaults to `[]`.
    */
   readonly toolProvenance?: readonly ToolProvenance[];
+  /**
+   * Generic per-run telemetry scratch space. Core owns the bag lifecycle, while
+   * CLI telemetry modules own any implementation-specific values they place in
+   * it. This keeps optional SDK/profiler state off module globals without
+   * making core import telemetry implementations.
+   */
+  readonly telemetry?: Record<string, unknown>;
 }
 
 /**
@@ -169,6 +176,8 @@ export class RunScope {
    * {@link toolManifests}. Empty unless the CLI bootstrap recorded them.
    */
   readonly toolProvenance: readonly ToolProvenance[];
+  /** Per-run telemetry scratch space; see {@link RunScopeOptions.telemetry}. */
+  readonly telemetry: Record<string, unknown>;
 
   constructor(opts: RunScopeOptions = {}) {
     this.logger = opts.logger ?? defaultLogger;
@@ -185,6 +194,7 @@ export class RunScope {
     this.diagnostics = new DiagnosticsBus(this.runId);
     this.toolManifests = opts.toolManifests ?? [];
     this.toolProvenance = opts.toolProvenance ?? [];
+    this.telemetry = opts.telemetry ?? {};
   }
 
   /** Release per-run resources (caches, recipe-config slot). */

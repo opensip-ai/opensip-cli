@@ -14,6 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 
 import { composeConfigSchema, validateConfigDocument } from '../../composer.js';
+import { decorateToolConfigDeclarationsWithGateKeys } from '../../gate-keys.js';
 import { hostConfigDeclarations } from '../host-declarations.js';
 
 import type { ToolConfigDeclaration } from '../../declaration.js';
@@ -41,8 +42,7 @@ const PLUGIN_CONFIG_KEYS: readonly PluginConfigKeyDeclaration[] = [
 function schema() {
   return composeConfigSchema([
     ...hostConfigDeclarations({ pluginConfigKeys: PLUGIN_CONFIG_KEYS }),
-    fakeFitness,
-    fakeGraph,
+    ...decorateToolConfigDeclarationsWithGateKeys([fakeFitness, fakeGraph]),
   ]);
 }
 
@@ -97,6 +97,44 @@ describe('composed whole-document validation', () => {
       validateConfigDocument(schema(), {
         ...WHOLE_DOCUMENT,
         cli: { reportTo: 'https://cloud.test/api', recipe: 'example' },
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
+  it('accepts reserved gate keys in decorated tool namespaces', () => {
+    expect(() =>
+      validateConfigDocument(schema(), {
+        ...WHOLE_DOCUMENT,
+        fitness: {
+          failOnErrors: 1,
+          failOnWarnings: 0,
+          failOnDegraded: false,
+          recipe: 'example',
+        },
+        graph: {
+          minDuplicateBodyLines: 10,
+          failOnErrors: 0,
+          failOnWarnings: 2,
+          failOnDegraded: false,
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it('does not add reserved gate keys to host namespaces', () => {
+    expect(() =>
+      validateConfigDocument(schema(), {
+        ...WHOLE_DOCUMENT,
+        cli: { reportTo: 'https://cloud.test/api', failOnDegraded: false },
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
+  it('rejects numeric failOnDegraded because the reserved key is boolean-only', () => {
+    expect(() =>
+      validateConfigDocument(schema(), {
+        ...WHOLE_DOCUMENT,
+        graph: { minDuplicateBodyLines: 10, failOnDegraded: 0 },
       }),
     ).toThrow(ConfigurationError);
   });

@@ -4,7 +4,7 @@
 // @fitness-ignore-file performance-anti-patterns -- spread in CLI report aggregation iterates bounded result sets (rule counts, entry-point lists).
 // @fitness-ignore-file no-markdown-references -- docs/plans/* pointers in JSDoc are stable internal references.
 // @fitness-ignore-file public-api-jsdoc -- GraphCommandOptions interface and executeGraph are already documented with rich JSDoc on each field; the check counts the top-level export line, not the fields.
-// @fitness-ignore-file file-length-limit -- remaining top-level graph command handler still coordinates mode dispatch, output delivery, workspace aggregation, and CLI error mapping; sharded engine/session helpers are split out.
+// @fitness-ignore-file file-length-limit -- remaining top-level graph command handler still coordinates mode dispatch, output delivery, single-run engine selection, and CLI error mapping; large workspace/multi-path modes and sharded engine/session helpers are split out.
 /**
  * `opensip graph` — main subcommand handler.
  *
@@ -38,37 +38,30 @@ import {
 
 import { resolveRecipeToRules } from '../recipes/resolve.js';
 
-import {
-  assertFinalizedAcrossBoundary,
-  finalizeGraphSignals,
-  type FinalizedSignals,
-} from './apply-suppressions.js';
+import { finalizeGraphSignals, type FinalizedSignals } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { DASHBOARD_FEATURE_COLUMNS } from './graph-feature-columns.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
+import { executeMultiPathGraph } from './graph-multi-path-mode.js';
 import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './graph-report.js';
-import {
-  buildGraphSessionContribution,
-  buildWorkspaceSessionContribution,
-} from './graph-session-contribution.js';
+import { buildGraphSessionContribution } from './graph-session-contribution.js';
 import {
   engineSelectionReason,
   realpathOrSelf,
   resolveEngineShards,
   runProfiledShardedBuild,
 } from './graph-sharded-engine.js';
+import { executeWorkspaceGraph } from './graph-workspace-mode.js';
 import { loadGraphConfig, resolveGraphRecipeSelection, runGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
 import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
-import { resolveAdaptersForRun } from './resolve-adapters.js';
-import { buildWorkspaceJsonDocument, writeWorkspaceReport } from './workspace-report.js';
-import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-runner.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
-import type { Catalog, Rule } from '../types.js';
+import type { GraphRunOutcome } from './graph-run-outcome.js';
+import type { Catalog } from '../types.js';
 import type { GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-cli/contracts';
-import type { Signal, ToolCliContext, ToolSessionContribution } from '@opensip-cli/core';
+import type { ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 // Re-exports kept so the package barrel + cli/graph-runner.tsx + tests
@@ -76,31 +69,6 @@ import type { DataStore } from '@opensip-cli/datastore';
 export type { GraphCommandOptions } from './graph-options.js';
 
 export type { UnifiedReportInput, LiveGraphOutput } from './graph-report.js';
-
-/**
- * The result of a static graph run that the command handler returns to the
- * host (host-owned-run-timing Phase 3). Carries the run's deliverable
- * {@link SignalEnvelope} (for cloud + `--report-to` egress) plus the OPTIONAL
- * generic-session contribution the host run plane persists after the handler
- * resolves. `session` is present only on the human-facing render path (and the
- * `--workspace` aggregate); the export/carrier modes (`--json`, `--report-to`,
- * gate) return `{ envelope }` with no session — preserving "one human
- * invocation = one session".
- *
- * Graph never writes the generic `StoredSession` row itself: it builds the
- * contribution from BRANDED {@link FinalizedSignals} and hands it up; the host
- * stamps `startedAt`/`completedAt`/`durationMs`/`id` and performs the save.
- *
- * `envelope` is optional because the `--workspace` aggregate carries a
- * `session` (the one aggregate row the host persists) but NO deliverable
- * envelope — the parent aggregates per-unit findings for the dashboard, not
- * signals for the cloud (audit P1-2). The command handler's egress is guarded
- * on `outcome?.envelope`, so a session-only outcome cloud-emits nothing.
- */
-export interface GraphRunOutcome {
-  readonly envelope?: SignalEnvelope;
-  readonly session?: ToolSessionContribution;
-}
 
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
 const MODULE_GRAPH_CLI = 'graph:cli';
@@ -184,7 +152,7 @@ export async function executeGraph(
     const positionalPaths = resolvePositionalScope(opts);
     if (positionalPaths.length > 1) {
       const outcome = await executeMultiPathGraph(
-        { opts, cli, rules, startedAt, profile },
+        { opts, cli, rules, startedAt, profile, deliverGraphResult },
         positionalPaths,
       );
       writeProfileIfRequested(opts, profile);
@@ -394,87 +362,6 @@ function enforceLanguageMismatchPolicy(
   throw new ConfigurationError(
     `--language ${opts.language} matched 0 files under ${pathLabel}; check the flag or paths.`,
   );
-}
-
-/**
- * The ambient run context {@link executeGraph} threads into the multi-path
- * fan-out: parsed options, CLI context, recipe rules, the run's start
- * timestamp, and the optional profile builder. Grouped to keep the helper
- * under the wide-function parameter budget.
- */
-interface MultiPathContext {
-  readonly opts: GraphCommandOptions;
-  readonly cli: ToolCliContext;
-  readonly rules: readonly Rule[];
-  readonly startedAt: string;
-  readonly profile?: GraphProfileBuilder;
-}
-
-async function executeMultiPathGraph(
-  ctx: MultiPathContext,
-  paths: readonly string[],
-): Promise<GraphRunOutcome | undefined> {
-  const { opts, cli, rules, startedAt, profile } = ctx;
-  const allSignals: Signal[] = [];
-  let combinedFiles = 0;
-  let totalSuppressed = 0;
-  let lastResult: Awaited<ReturnType<typeof runGraph>> | null = null;
-  const config = loadGraphConfig(opts.cwd);
-  for (const p of paths) {
-    const profileRun = profile?.startRun({
-      label: positionalPathLabel(p, opts.cwd),
-      cwd: p,
-      mode: 'single-process',
-    });
-    const r = await runGraph({
-      cwd: p,
-      noCache: opts.noCache,
-      resolution: opts.resolution,
-      language: opts.language,
-      config,
-      rules,
-      datastore: cli.scope.datastore() as DataStore | undefined,
-      emitFeatures: DASHBOARD_FEATURE_COLUMNS,
-      onProgress: profileRun?.onProgress,
-    });
-    profileRun?.finish(r);
-    lastResult = r;
-    // Each path's signals are relative to THAT path's root — so waive them
-    // against `p` here, before aggregating. A single post-aggregation pass
-    // (the old shape) could only use one base and would leak waivers for every
-    // path but one. Each per-path call crosses the single suppression
-    // chokepoint (finalizeGraphSignals); the aggregate is then re-branded once
-    // below via assertFinalizedAcrossBoundary (an assertion that every member
-    // was finalized, NOT a second suppression pass).
-    const finalized = await finalizeGraphSignals(r.signals, p);
-    totalSuppressed += finalized.suppressedCount;
-    allSignals.push(...finalized.signals);
-    if (r.catalog !== null) combinedFiles += countFiles(r.catalog);
-  }
-  // D14: count files across every analyzed path. Zero files + a
-  // `--language` override → exit 2 with the canonical message.
-  if (typeof opts.language === 'string' && opts.language.length > 0 && combinedFiles === 0) {
-    throw new ConfigurationError(
-      `--language ${opts.language} matched 0 files under ${paths.map((p) => positionalPathLabel(p, opts.cwd)).join(', ')}; check the flag or paths.`,
-    );
-  }
-  /* v8 ignore next */
-  if (lastResult === null) return undefined;
-  const combined = {
-    catalog: lastResult.catalog,
-    indexes: lastResult.indexes,
-    signals: allSignals as readonly Signal[],
-    resolutionStats: lastResult.resolutionStats,
-    cacheHit: lastResult.cacheHit,
-    features: lastResult.features,
-  };
-  // `allSignals` is already waived per-path (each against its own root), so
-  // deliver directly — a second suppression pass would have no single correct
-  // root and risk re-resolving paths under the wrong base. Re-brand the
-  // aggregate FinalizedSignals (each member already crossed finalizeGraphSignals
-  // above) so deliverGraphResult's persist call gets the type it requires.
-  const finalizedAggregate = assertFinalizedAcrossBoundary(allSignals, totalSuppressed);
-  return await deliverGraphResult(opts, combined, cli, startedAt, finalizedAggregate);
 }
 
 /**
@@ -696,111 +583,6 @@ async function renderGraphResult(
     module: MODULE_GRAPH_RENDER,
   });
   return envelope;
-}
-
-/**
- * `graph --workspace` — fan a graph run out across every workspace
- * unit returned by the adapters' `discoverWorkspaceUnits` hook. Per
- * spec D8b, polyglot repos aggregate units from EVERY detected
- * adapter (or the single adapter named by `--language`).
- */
-async function executeWorkspaceGraph(
-  opts: GraphCommandOptions,
-  cli: ToolCliContext,
-  profile?: GraphProfileBuilder,
-): Promise<GraphRunOutcome | undefined> {
-  const cliScript = opts.cliScript ?? process.argv[1];
-  if (typeof cliScript !== 'string' || cliScript.length === 0) {
-    throw new ConfigurationError(
-      '--workspace: could not determine the CLI entry script (process.argv[1] is empty).',
-    );
-  }
-  const adapters = resolveAdaptersForRun(opts, cli);
-  const units = await discoverPolyglotUnits(opts.cwd, adapters);
-  if (units.length === 0) {
-    const adapterLabel = adapters.map((a) => a.id).join(', ') || '(no language adapters available)';
-    throw new ConfigurationError(
-      `--workspace: no workspace units detected for [${adapterLabel}]. Use 'opensip graph' for whole-project analysis.`,
-    );
-  }
-
-  const profileRun = profile?.startRun({
-    label: 'workspace',
-    cwd: opts.cwd,
-    mode: 'workspace',
-  });
-  // Internal per-run timer for the workspace REPORT artifact (durationMs in the
-  // JSON document / report header + the profile stage). NOT a session timestamp:
-  // the generic session row's timing is host-owned (host-owned-run-timing Phase
-  // 3), stamped from the host RunTimer after this handler returns.
-  const startedAt = Date.now();
-  const result = await runWorkspaceUnitsInParallel({
-    cwd: opts.cwd,
-    units,
-    cliScript,
-    concurrency: opts.concurrency,
-    noCache: opts.noCache,
-    resolution: opts.resolution,
-    recipe: opts.recipe,
-    ...(opts.language === undefined ? {} : { language: opts.language }),
-  });
-  const durationMs = Date.now() - startedAt;
-  profileRun?.recordStage('workspace-fanout', durationMs, `${String(units.length)} unit(s)`);
-
-  const allSignals: Signal[] = [];
-  for (const r of result.perUnit) allSignals.push(...r.signals);
-  profileRun?.finishSummary({
-    cacheHit: false,
-    signals: allSignals.length,
-  });
-
-  // Build exactly one aggregate session contribution for the whole --workspace
-  // invocation (non-json path only). Matches the contract "one human-facing CLI
-  // invocation = one session" that fitness/sim already follow; the per-unit child
-  // processes don't contribute because they always run with --json (see
-  // dispatchGraphResult). The host run plane persists the returned `session`
-  // after this handler resolves — graph never writes the row itself
-  // (host-owned-run-timing Phase 3).
-  //
-  // Cloud signal sync (ADR-0008) is intentionally NOT emitted for --workspace
-  // (audit P1-2): the parent aggregates per-unit signals for the dashboard, not
-  // for the cloud, and the --json children skip emit to avoid fragmented
-  // per-unit batches. So the returned outcome carries a `session` but NO
-  // envelope. A whole-project `graph` run emits normally (the root's
-  // deliverSignals on the returned envelope).
-  let session: ToolSessionContribution | undefined;
-  if (opts.json === true) {
-    // ADR-0011: emit through the CLI seam, not process.stdout directly.
-    // cli.emitJson applies the same JSON.stringify(_, null, 2) + '\n'.
-    cli.emitJson(buildWorkspaceJsonDocument(result.perUnit, durationMs));
-  } else {
-    await writeWorkspaceReport(result.perUnit, durationMs, cli);
-    session = buildWorkspaceSessionContribution(opts, allSignals);
-  }
-
-  // If any child failed to spawn or exited with an error, surface it
-  // as a runtime error. The parent itself succeeded if every child
-  // returned exit 0.
-  if (result.anyChildFailed) {
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-    process.stderr.write(
-      `graph --workspace: at least one unit run failed; see per-unit output above.\n`,
-    );
-  } else {
-    cli.setExitCode(EXIT_CODES.SUCCESS);
-  }
-  logger.info({
-    evt: EVT_GRAPH_COMPLETE,
-    module: MODULE_GRAPH_CLI,
-    units: result.perUnit.length,
-    findings: allSignals.length,
-    failed: result.anyChildFailed,
-    durationMs,
-  });
-  // The aggregate outcome carries the single session (non-json path) but NO
-  // envelope — the parent does not cloud-emit per-unit signals (audit P1-2).
-  // `undefined` on the --json carrier path keeps the host from persisting.
-  return session === undefined ? undefined : { session };
 }
 
 export function handleGraphError(label: string, error: unknown, cli: ToolCliContext): void {

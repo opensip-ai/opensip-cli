@@ -155,7 +155,7 @@ describe('registerFirstPartyTools', () => {
     );
     writeFileSync(
       join(dir, 'index.js'),
-      "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000a1', name: 'no-manifest', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
+      "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000a1', name: 'no-manifest', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], scope: 'project', output: 'command-result', handler: () => Promise.resolve({}) }] };",
       'utf8',
     );
     const registry = new ToolRegistryClass();
@@ -393,7 +393,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           },
         },
         indexJs:
-          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000b2', name: 'fixture-valid', version: '0.0.0' }, commands: [{ name: 'fixture-valid', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
+          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000b2', name: 'fixture-valid', version: '0.0.0' }, commands: [{ name: 'fixture-valid', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], scope: 'project', output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();
@@ -429,7 +429,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           },
         },
         indexJs:
-          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000c3', name: 'fixture-drift', version: '0.0.0' }, commands: [{ name: 'something-else', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
+          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000c3', name: 'fixture-drift', version: '0.0.0' }, commands: [{ name: 'something-else', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], scope: 'project', output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();
@@ -535,7 +535,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           },
         },
         indexJs:
-          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000f4', name: 'fitness', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], output: 'command-result', handler: () => Promise.resolve({}) }] };",
+          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000f4', name: 'fitness', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], scope: 'project', output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();

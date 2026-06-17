@@ -28,6 +28,7 @@
 import {
   analyzeNamespaceClaims,
   composeConfigSchema,
+  decorateToolConfigDeclarationsWithGateKeys,
   hostConfigDeclarations,
   resolveConfig,
   validateConfigDocument,
@@ -144,7 +145,7 @@ export function composeAndValidateToolConfig(args: {
   readonly env: Readonly<Record<string, string | undefined>>;
 }): { readonly config: ResolvedToolConfig | undefined; readonly document: unknown } {
   const { tools, configPath, env, manifests = [] } = args;
-  const toolDeclarations = collectDeclarations(tools);
+  const toolDeclarations = decorateToolConfigDeclarationsWithGateKeys(collectDeclarations(tools));
   // A run with no tools that declare config (e.g. a project-agnostic context)
   // carries no toolConfig — tools fall back to their in-tool defaults. The host
   // document-level blocks (cli/dashboard/schemaVersion) only need composing when
@@ -153,9 +154,10 @@ export function composeAndValidateToolConfig(args: {
   if (toolDeclarations.length === 0) return { config: undefined, document: {} };
 
   // Compose the host document-level declarations (cli/dashboard/schemaVersion,
-  // and from Phase 1 the targeting blocks) BESIDE the tool declarations, so the
-  // whole document — not just the tool namespaces — validates STRICT through the
-  // one composed schema (ADR-0023, the launch seam).
+  // and from Phase 1 the targeting blocks) BESIDE the decorated tool
+  // declarations, so the whole document — not just the tool namespaces —
+  // validates STRICT through the one composed schema (ADR-0023, the launch seam).
+  // Gate keys are added only to tool namespaces; host blocks stay strict.
   const declarations: readonly ToolConfigDeclaration[] = [
     ...hostConfigDeclarations({ pluginConfigKeys: collectPluginConfigKeys(manifests) }),
     ...toolDeclarations,

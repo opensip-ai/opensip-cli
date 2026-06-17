@@ -167,9 +167,10 @@ describe('loadSignalersConfig — scope-first (ADR-0023 one-reader)', () => {
     expect(b).toBe(a); // same frozen reference
   });
 
-  it('falls back to the file read when the scope carries no document', () => {
-    // A scope WITHOUT configDocument (config-less/agnostic run) must keep the
-    // loud missing-config error — never silently validate an empty document.
+  it('rejects scoped calls that lack the host-validated config document', () => {
+    // A scope WITHOUT configDocument has already passed through bootstrap
+    // without a document; the loader must fail closed rather than re-reading
+    // YAML from a scoped run.
     const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
     expect(() => runWithScopeSync(scope, () => loadSignalersConfig(testDir))).toThrow(
       ValidationError,

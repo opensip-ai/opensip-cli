@@ -263,6 +263,58 @@ describe('composeAndValidateToolConfig', () => {
     ).toThrow(ConfigurationError);
   });
 
+  it('accepts reserved gate keys on any tool namespace and resolves them into tool config', () => {
+    const configPath = writeConfig(
+      [
+        'graph:',
+        '  minPackages: 2',
+        '  failOnWarnings: 2',
+        '  failOnDegraded: false',
+        'fitness:',
+        '  failOnDegraded: false',
+        '',
+      ].join('\n'),
+    );
+
+    const result = composeAndValidateToolConfig({
+      tools: registryWith([graphTool, fitnessTool]),
+      configPath,
+      env: {},
+    });
+
+    expect(result.config?.graph).toMatchObject({
+      minPackages: 2,
+      failOnWarnings: 2,
+      failOnDegraded: false,
+    });
+    expect(result.config?.fitness).toMatchObject({
+      failOnErrors: 1,
+      failOnDegraded: false,
+    });
+  });
+
+  it('keeps reserved gate keys out of host namespaces', () => {
+    const configPath = writeConfig('cli:\n  failOnDegraded: false\n');
+    expect(() =>
+      composeAndValidateToolConfig({
+        tools: registryWith([graphTool, fitnessTool]),
+        configPath,
+        env: {},
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
+  it('rejects numeric failOnDegraded in tool namespaces', () => {
+    const configPath = writeConfig('graph:\n  failOnDegraded: 0\n');
+    expect(() =>
+      composeAndValidateToolConfig({
+        tools: registryWith([graphTool, fitnessTool]),
+        configPath,
+        env: {},
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
   // ADR-0023, Phase 4: env bindings are RESOLVED into the scope config, and (with
   // tools now reading scope.toolConfig at runtime) they are no longer no-ops. A
   // tool with env bindings mirroring the real fitness declaration proves the

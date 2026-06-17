@@ -20,6 +20,7 @@ export const tool = {
       commonFlags: [],
       scope: 'project',
       output: 'raw-stream',
+      rawStreamReason: 'lookup',
       handler() {
         process.stdout.write('audit-demo ran\n');
         return {};

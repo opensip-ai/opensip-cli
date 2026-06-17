@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   COMMON_FLAG_KEYS,
   defineCommand,
+  validateCommandSpec,
   type ArgSpec,
   type CommandSpec,
   type CommonFlagKey,
@@ -53,6 +54,18 @@ describe('defineCommand', () => {
     ).toThrow(/function handler/);
   });
 
+  it('rejects a missing scope', () => {
+    expect(() =>
+      defineCommand(baseSpec({ scope: undefined as unknown as CommandSpec['scope'] })),
+    ).toThrow(/scope/);
+  });
+
+  it('rejects an unknown output mode', () => {
+    expect(() => defineCommand(baseSpec({ output: 'table' as CommandSpec['output'] }))).toThrow(
+      /unknown output/,
+    );
+  });
+
   it('rejects an unknown common-flag key', () => {
     expect(() =>
       defineCommand(baseSpec({ commonFlags: ['cwd', 'bogus' as CommonFlagKey] })),
@@ -84,6 +97,12 @@ describe('defineCommand', () => {
   it('accepts documented raw-stream exceptions', () => {
     const spec = defineCommand(baseSpec({ output: 'raw-stream', rawStreamReason: 'file-export' }));
     expect(spec.rawStreamReason).toBe('file-export');
+  });
+
+  it('exposes a boolean validator for untrusted command specs', () => {
+    expect(validateCommandSpec(baseSpec())).toBe(true);
+    expect(validateCommandSpec({ ...baseSpec(), scope: undefined })).toBe(false);
+    expect(validateCommandSpec({ ...baseSpec(), commonFlags: ['cwd', 'bogus'] })).toBe(false);
   });
 });
 

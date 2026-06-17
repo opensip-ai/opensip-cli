@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { composeConfigSchema } from '../composer.js';
+import { decorateToolConfigDeclarationsWithGateKeys } from '../gate-keys.js';
 import { toJsonSchema } from '../json-schema.js';
 
 import type { ToolConfigDeclaration } from '../declaration.js';
@@ -59,5 +60,16 @@ describe('toJsonSchema', () => {
       properties: Record<string, { properties?: Record<string, unknown> }>;
     };
     expect(schema.properties.fitness.properties).toHaveProperty('failOnErrors');
+  });
+
+  it('can surface reserved gate keys when generated from decorated tool declarations', () => {
+    const schema = toJsonSchema(
+      composeConfigSchema(decorateToolConfigDeclarationsWithGateKeys(declarations)),
+    ) as {
+      properties: Record<string, { properties?: Record<string, unknown> }>;
+    };
+    expect(schema.properties.graph.properties).toHaveProperty('failOnErrors');
+    expect(schema.properties.graph.properties).toHaveProperty('failOnWarnings');
+    expect(schema.properties.graph.properties).toHaveProperty('failOnDegraded');
   });
 });

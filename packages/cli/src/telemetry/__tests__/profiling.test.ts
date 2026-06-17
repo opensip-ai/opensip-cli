@@ -4,7 +4,7 @@
  * path is an integration test that drives an actual short profile into a temp
  * project dir and asserts the .cpuprofile + labels sidecar land. The gate-closed
  * no-op, double-start idempotency, stop-when-idle, and reset paths are unit
- * tests. Module-level profiling state is reset around every test.
+ * tests. Scope-owned profiling state is reset around every test.
  */
 
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
@@ -59,6 +59,7 @@ function scopeFor(): RunScope {
   return {
     runId: 'RUN_PROF_1',
     projectContext: { scope: 'project', projectRoot: tmp },
+    telemetry: {},
   } as unknown as RunScope;
 }
 

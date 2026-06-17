@@ -78,6 +78,18 @@ function withFitScope<T>(fn: () => Promise<T>): Promise<T> {
   // registries so check loading + recipe selection resolve.
   const scope = new RunScope({ languages: new LanguageRegistry() });
   Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  Object.assign(scope, {
+    configDocument: {
+      targets: {
+        source: {
+          description: 'minimal',
+          languages: ['typescript'],
+          concerns: ['backend'],
+          include: ['src/**/*.ts'],
+        },
+      },
+    },
+  });
   return runWithScope(scope, fn);
 }
 

@@ -229,9 +229,17 @@ export function loadTargetsConfig(
   rootDir: string,
   explicitPath?: string,
 ): { registry: TargetRegistry; config: TargetsConfig } {
-  const scopeDocument = currentScope()?.configDocument;
+  const scope = currentScope();
+  const scopeDocument = scope?.configDocument;
   if (scopeDocument !== undefined) {
     return projectTargetsConfig(scopeDocument, YAML_FILENAME);
+  }
+  if (scope !== undefined) {
+    throw new ValidationError(
+      `${YAML_FILENAME}: current RunScope has no validated configDocument; ` +
+        'refusing a second config-file read from a scoped targets load.',
+      { code: 'ERRORS.TARGETS.SCOPE_CONFIG_MISSING' },
+    );
   }
   const yamlPath = resolveProjectConfigPath(rootDir, explicitPath);
   return loadYamlConfig(yamlPath);

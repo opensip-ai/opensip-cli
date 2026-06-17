@@ -114,19 +114,31 @@ function makeArgs(cwd: string): FitOptions {
  * independently-contributed scopes are exactly what proves there is no
  * cross-scope crossover.
  */
-function makeScope(): RunScope {
+function makeScope(includeGlob: string): RunScope {
   const scope = new RunScope({
     tools: new ToolRegistry(),
     languages: new LanguageRegistry(),
   });
   Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  Object.assign(scope, {
+    configDocument: {
+      targets: {
+        source: {
+          description: 'smoke fixture',
+          languages: ['typescript'],
+          concerns: ['backend'],
+          include: [includeGlob],
+        },
+      },
+    },
+  });
   return scope;
 }
 
 describe('SaaS-mode concurrent scopes', () => {
   it('two RunScopes run executeFit concurrently in one process without state crossover', async () => {
-    const scopeA = makeScope();
-    const scopeB = makeScope();
+    const scopeA = makeScope('src/**/*.ts');
+    const scopeB = makeScope('src/foo.ts');
 
     // Capture the bound scope from inside each callback. If
     // AsyncLocalStorage works correctly, each callback sees only its

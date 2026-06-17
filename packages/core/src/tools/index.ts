@@ -38,7 +38,13 @@ export { PLUGIN_API_VERSION } from './manifest.js';
 // tool exports for the host to mount, plus the CommonFlagKey key type (the pure
 // type lives in core; the Commander-touching applyCommonFlags runtime stays in
 // contracts). Re-exported by @opensip-cli/contracts for the public surface.
-export { defineCommand, COMMON_FLAG_KEYS, RAW_STREAM_REASONS } from './command-spec.js';
+export {
+  assertCommandSpec,
+  defineCommand,
+  validateCommandSpec,
+  COMMON_FLAG_KEYS,
+  RAW_STREAM_REASONS,
+} from './command-spec.js';
 export type {
   CommandSpec,
   OptionSpec,

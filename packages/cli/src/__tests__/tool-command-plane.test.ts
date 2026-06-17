@@ -212,4 +212,21 @@ describe('isValidTool — command-surface requirement', () => {
   it('rejects an empty commandSpecs array', () => {
     expect(isValidTool({ ...base, commandSpecs: [] })).toBe(false);
   });
+
+  it('rejects malformed commandSpecs before mount', () => {
+    expect(
+      isValidTool({
+        ...base,
+        commandSpecs: [
+          {
+            name: 'bad',
+            description: 'bad',
+            commonFlags: [],
+            output: 'raw-stream',
+            handler: () => undefined,
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
 });

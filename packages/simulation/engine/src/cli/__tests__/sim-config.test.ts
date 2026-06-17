@@ -104,5 +104,16 @@ describe('resolveSimRecipeSelection (ADR-0022)', () => {
       const resolved = runWithScopeSync(scope, () => resolveSimRecipeSelection(dir, undefined));
       expect(resolved).toMatchObject({ name: 'default', source: 'builtin' });
     });
+
+    it('returns builtin default when a scope exists without a simulation block', () => {
+      // A scoped CLI run treats scope.toolConfig as authoritative. If the host
+      // did not resolve a simulation block, sim must not re-read YAML and
+      // accidentally pick up a stale on-disk recipe.
+      write('simulation:\n  recipe: from-file\n');
+      const scope = makeSimTestScope();
+
+      const resolved = runWithScopeSync(scope, () => resolveSimRecipeSelection(dir, undefined));
+      expect(resolved).toMatchObject({ name: 'default', source: 'builtin' });
+    });
   });
 });

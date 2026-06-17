@@ -131,6 +131,17 @@ export function loadSignalersConfig(rootDir: string, explicitPath?: string): Sig
     scopeDocumentCache.set(scopeDocument, config);
     return config;
   }
+  if (scope !== undefined) {
+    throw new ValidationError(
+      `${PROJECT_CONFIG_FILENAME}: current RunScope has no validated configDocument; ` +
+        'refusing a second config-file read from a scoped fitness run.',
+      {
+        operation: 'load',
+        loader: 'signalers',
+        code: 'ERRORS.SIGNALERS.SCOPE_CONFIG_MISSING',
+      },
+    );
+  }
 
   const filePath = resolveProjectConfigPath(rootDir, explicitPath);
 

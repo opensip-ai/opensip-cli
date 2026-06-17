@@ -19,7 +19,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry } from '@opensip-cli/core';
+import { enterScope, LanguageRegistry, currentScope } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
@@ -175,6 +175,9 @@ describe('graph interactive --exact path honors graph config', () => {
       'graph:\n  minCrossPackageDuplicatePackages: 2\n',
       'utf8',
     );
+    Object.assign(currentScope() ?? {}, {
+      configDocument: { graph: { minCrossPackageDuplicatePackages: 2 } },
+    });
     const { cli, renderLive } = makeMockCli();
 
     // The animated live view is taken only on a TTY, under --exact.

@@ -91,6 +91,8 @@ export const toyTool: Tool = {
       name: 'toy',
       description: 'Toy tool gate (ADR-0036 zero-code ratchet proof)',
       scope: 'project',
+      output: 'raw-stream',
+      rawStreamReason: 'diagnostic-gate',
       commonFlags: ['cwd'],
       options: [
         { flag: '--gate-save', description: 'Save the toy baseline' },

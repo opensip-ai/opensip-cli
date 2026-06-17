@@ -244,7 +244,7 @@ describe('loadTargetsConfig — scope-first (ADR-0023 one-reader)', () => {
     );
   });
 
-  it('falls back to the file read when the scope carries no document', () => {
+  it('rejects scoped calls that lack the host-validated config document', () => {
     const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
     expect(() => runWithScopeSync(scope, () => loadTargetsConfig(testDir))).toThrow(
       ValidationError,

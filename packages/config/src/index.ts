@@ -19,6 +19,7 @@
 export { ConfigurationError } from '@opensip-cli/core';
 
 export { composeConfigSchema, validateConfigDocument } from './composer.js';
+export { decorateToolConfigDeclarationsWithGateKeys } from './gate-keys.js';
 // ADR-0043: the unclaimed-namespace claim report (pure; the CLI emits the
 // warning / applies the loaded-tool rejection).
 export { analyzeNamespaceClaims } from './namespace-claims.js';
