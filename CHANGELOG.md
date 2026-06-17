@@ -2,6 +2,22 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.4] - 2026-06-16
+
+A focused maintenance release for installer feedback and graph-rule runtime
+hardening. No public API changes.
+
+### Changed
+
+- The curl installer now shows TTY progress animations while npm install and
+  install smoke checks are running, while preserving quiet static output for
+  non-interactive logs.
+
+### Fixed
+
+- Hardened graph rule evaluation hot paths by avoiding an O(N²)
+  always-throws-branch lookup and tightening BFS loops in graph orchestration.
+
 ## [0.1.3] - 2026-06-16
 
 A platform-hardening maintenance release focused on release-readiness and the

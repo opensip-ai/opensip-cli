@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.1.3
+release: v0.1.4
 title: "Write your first check"
 audience: [getting-started, plugin-authors]
 purpose: "Task-led walkthrough: from `opensip init` to a passing CI gate, with one custom check you authored, in ~15 minutes."
