@@ -1,7 +1,6 @@
 {
   "name": "@opensip-cli/checks-rust",
   "version": "0.1.6",
-  "private": true,
   "license": "Apache-2.0",
   "description": "Rust fitness checks for opensip-cli",
   "keywords": [

@@ -6,7 +6,7 @@ workspace packages to npm with OIDC trusted publishing.
 
 The user-facing npm package is `opensip-cli`. It installs the `opensip` command.
 
-## The 21 packages
+## The 33 packages
 
 `scripts/release-package-order.mjs` is the source of truth for the publishable
 package set and dependency order. The release workflow, bootstrap script, and
@@ -17,7 +17,10 @@ contract tests derive from or verify against that source.
 | Kernel | `@opensip-cli/core` | `packages/core` |
 | Persistence | `@opensip-cli/datastore` | `packages/datastore` |
 | Shared CLI | `@opensip-cli/contracts` | `packages/contracts` |
+| Persistence | `@opensip-cli/session-store` | `packages/session-store` |
+| Output | `@opensip-cli/output` | `packages/output` |
 | Config | `@opensip-cli/config` | `packages/config` |
+| Targeting | `@opensip-cli/targeting` | `packages/targeting` |
 | Shared CLI | `@opensip-cli/cli-ui` | `packages/cli-ui` |
 | Languages | `@opensip-cli/tree-sitter` | `packages/tree-sitter` |
 | Languages | `@opensip-cli/lang-typescript` | `packages/languages/lang-typescript` |
@@ -26,20 +29,24 @@ contract tests derive from or verify against that source.
 | Languages | `@opensip-cli/lang-go` | `packages/languages/lang-go` |
 | Languages | `@opensip-cli/lang-java` | `packages/languages/lang-java` |
 | Languages | `@opensip-cli/lang-cpp` | `packages/languages/lang-cpp` |
+| Tools | `@opensip-cli/dashboard` | `packages/dashboard` |
 | Tools | `@opensip-cli/fitness` | `packages/fitness/engine` |
 | Tools | `@opensip-cli/simulation` | `packages/simulation/engine` |
 | Tools | `@opensip-cli/graph` | `packages/graph/engine` |
 | Graph adapters | `@opensip-cli/graph-adapter-common` | `packages/graph/graph-adapter-common` |
 | Graph adapters | `@opensip-cli/graph-typescript` | `packages/graph/graph-typescript` |
+| Graph adapters | `@opensip-cli/graph-python` | `packages/graph/graph-python` |
+| Graph adapters | `@opensip-cli/graph-rust` | `packages/graph/graph-rust` |
+| Graph adapters | `@opensip-cli/graph-go` | `packages/graph/graph-go` |
+| Graph adapters | `@opensip-cli/graph-java` | `packages/graph/graph-java` |
 | Check packs | `@opensip-cli/checks-universal` | `packages/fitness/checks-universal` |
 | Check packs | `@opensip-cli/checks-typescript` | `packages/fitness/checks-typescript` |
 | Check packs | `@opensip-cli/checks-python` | `packages/fitness/checks-python` |
+| Check packs | `@opensip-cli/checks-go` | `packages/fitness/checks-go` |
+| Check packs | `@opensip-cli/checks-java` | `packages/fitness/checks-java` |
+| Check packs | `@opensip-cli/checks-cpp` | `packages/fitness/checks-cpp` |
+| Check packs | `@opensip-cli/checks-rust` | `packages/fitness/checks-rust` |
 | CLI | `opensip-cli` (unscoped) | `packages/cli` |
-
-Twelve additional workspace packages (`dashboard`, `targeting`, `session-store`,
-`output`, the four stub graph adapters, and the four stub check packs) remain in
-the monorepo for bundling and layering but are marked `private: true` and are not
-published to npm.
 
 All publishable packages share the same version. The release workflow publishes
 them in dependency order, with `opensip-cli` last.
@@ -54,9 +61,9 @@ parts are obvious. (`git grep -n '<old-version>'` after a bump is the backstop.)
 
 ### 1. Version fields (hand-set, lockstep)
 
-All 21 publishable packages **plus** twelve bundled-only private packages, the
-private root (`@opensip-cli/root`), and the private `@opensip-cli/test-support`
-carry one shared version — 35 `package.json` files. The bump script matches `name === 'opensip-cli'`,
+All 33 publishable packages **plus** the private root (`@opensip-cli/root`) and
+the private `@opensip-cli/test-support` carry one shared version — 35
+`package.json` files. The bump script matches `name === 'opensip-cli'`,
 `name === '@opensip-cli/root'`, or `name.startsWith('@opensip-cli/')`. Fixture
 packages use other scopes (`@fixture/*`, `@example/*`, `@medium/*`,
 `@opensip-cli-fixture/*`, bare names) and are deliberately **not** touched.
@@ -72,7 +79,7 @@ Each reads `packages/core/package.json#version`:
 | Surface | Regenerate with | Pins |
 | ------- | --------------- | ---- |
 | CLI `--version` | nothing — `readPackageVersion` walks to the nearest `package.json` at runtime | the installed version |
-| Per-package `README.md` (×21 publishable) | `pnpm docs:readmes` | `tree/vX.Y.Z/…` source + catalog links |
+| Per-package `README.md` (×33) | `pnpm docs:readmes` | `tree/vX.Y.Z/…` source + catalog links |
 | `docs/web-generated/**` + `manifest.json` | `pnpm docs:build` | `blob/vX.Y.Z/…` links; manifest `version` / `rawBase` |
 
 CI fails if these are stale — `pnpm docs:readmes:check` and `pnpm docs:check`,
@@ -155,10 +162,11 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
 6. Verify npm after publish:
 
    ```bash
-   for p in core datastore contracts config cli-ui tree-sitter \
+   for p in core datastore contracts session-store output config targeting cli-ui tree-sitter \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
-            fitness simulation graph graph-adapter-common graph-typescript \
-            checks-universal checks-typescript checks-python; do
+            dashboard fitness simulation graph graph-adapter-common graph-typescript \
+            graph-python graph-rust graph-go graph-java checks-universal checks-typescript \
+            checks-python checks-go checks-java checks-cpp checks-rust; do
      printf '%-40s %s\n' "@opensip-cli/$p" "$(npm view "@opensip-cli/$p" version 2>/dev/null || echo MISSING)"
    done
    printf '%-40s %s\n' "opensip-cli" "$(npm view opensip-cli version 2>/dev/null || echo MISSING)"
@@ -169,11 +177,12 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
 The release workflow publishes packages sequentially in the order from
 `scripts/release-package-order.mjs`:
 
-1. Core, persistence, contracts, config, UI, and parser substrate packages.
+1. Core, persistence, contracts, output, config, targeting, UI, and parser
+   substrate packages.
 2. Language adapters.
 3. First-party tool packages.
-4. Graph adapter packages (TypeScript only; other language adapters are bundled-only).
-5. Fitness check packs (universal, TypeScript, Python; other language packs are bundled-only).
+4. Graph adapter packages.
+5. Fitness check packs.
 6. `opensip-cli`.
 
 Do not hand-edit package order in the workflow. Update

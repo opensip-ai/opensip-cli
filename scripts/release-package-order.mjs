@@ -76,6 +76,21 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/contracts',
     publishReason: 'Tool↔runner contract facade; breaks cycles between core and tools',
   },
+  // Layer 2 — session-store + output (extracted from contracts)
+  {
+    unscoped: 'session-store',
+    name: '@opensip-cli/session-store',
+    dir: 'packages/session-store',
+    filter: '@opensip-cli/session-store',
+    publishReason: 'Session SQLite schema and SessionRepo consumed by first-party tools',
+  },
+  {
+    unscoped: 'output',
+    name: '@opensip-cli/output',
+    dir: 'packages/output',
+    filter: '@opensip-cli/output',
+    publishReason: 'Signal formatters and sinks consumed by CLI and tool reporting paths',
+  },
   // Layer 2 — capability-configuration layer (config composer + schema registry; depends on core)
   {
     unscoped: 'config',
@@ -83,6 +98,14 @@ export const RELEASE_PACKAGE_ORDER = [
     dir: 'packages/config',
     filter: '@opensip-cli/config',
     publishReason: 'Config composer + Zod schema registry for host and tool config blocks',
+  },
+  // Layer 2.5 — file-targeting runtime substrate (ADR-0037; depends on core + config)
+  {
+    unscoped: 'targeting',
+    name: '@opensip-cli/targeting',
+    dir: 'packages/targeting',
+    filter: '@opensip-cli/targeting',
+    publishReason: 'Target registry and glob resolution substrate shared by tool engines',
   },
   // Layer 3 — shared Ink/React UI primitives
   {
@@ -143,6 +166,14 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/lang-cpp',
     publishReason: 'C/C++ language adapter for fitness targeting and graph parsing',
   },
+  // Layer 3 — dashboard (depends on contracts; consumed by CLI report composition)
+  {
+    unscoped: 'dashboard',
+    name: '@opensip-cli/dashboard',
+    dir: 'packages/dashboard',
+    filter: '@opensip-cli/dashboard',
+    publishReason: 'Self-contained HTML dashboard generator consumed by report composition',
+  },
   // Layer 3 — tools
   {
     unscoped: 'fitness',
@@ -181,6 +212,34 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/graph-typescript',
     publishReason: 'TypeScript graph adapter; largest cross-used graph language pack',
   },
+  {
+    unscoped: 'graph-python',
+    name: '@opensip-cli/graph-python',
+    dir: 'packages/graph/graph-python',
+    filter: '@opensip-cli/graph-python',
+    publishReason: 'Python graph adapter; plugin discovery target',
+  },
+  {
+    unscoped: 'graph-rust',
+    name: '@opensip-cli/graph-rust',
+    dir: 'packages/graph/graph-rust',
+    filter: '@opensip-cli/graph-rust',
+    publishReason: 'Rust graph adapter; plugin discovery target',
+  },
+  {
+    unscoped: 'graph-go',
+    name: '@opensip-cli/graph-go',
+    dir: 'packages/graph/graph-go',
+    filter: '@opensip-cli/graph-go',
+    publishReason: 'Go graph adapter; plugin discovery target',
+  },
+  {
+    unscoped: 'graph-java',
+    name: '@opensip-cli/graph-java',
+    dir: 'packages/graph/graph-java',
+    filter: '@opensip-cli/graph-java',
+    publishReason: 'Java graph adapter; plugin discovery target',
+  },
   // Layer 4 — check packs
   {
     unscoped: 'checks-universal',
@@ -202,6 +261,34 @@ export const RELEASE_PACKAGE_ORDER = [
     dir: 'packages/fitness/checks-python',
     filter: '@opensip-cli/checks-python',
     publishReason: 'Python fitness check pack; plugin discovery target',
+  },
+  {
+    unscoped: 'checks-go',
+    name: '@opensip-cli/checks-go',
+    dir: 'packages/fitness/checks-go',
+    filter: '@opensip-cli/checks-go',
+    publishReason: 'Go fitness check pack; plugin discovery target',
+  },
+  {
+    unscoped: 'checks-java',
+    name: '@opensip-cli/checks-java',
+    dir: 'packages/fitness/checks-java',
+    filter: '@opensip-cli/checks-java',
+    publishReason: 'Java fitness check pack; plugin discovery target',
+  },
+  {
+    unscoped: 'checks-cpp',
+    name: '@opensip-cli/checks-cpp',
+    dir: 'packages/fitness/checks-cpp',
+    filter: '@opensip-cli/checks-cpp',
+    publishReason: 'C/C++ fitness check pack; plugin discovery target',
+  },
+  {
+    unscoped: 'checks-rust',
+    name: '@opensip-cli/checks-rust',
+    dir: 'packages/fitness/checks-rust',
+    filter: '@opensip-cli/checks-rust',
+    publishReason: 'Rust fitness check pack; plugin discovery target',
   },
   // Layer 5 — composition root (unscoped name → opensip-cli-<ver>.tgz)
   {
