@@ -92,7 +92,7 @@ function resolveWorkerCorrelation(spec: ShardWorkerSpec): RunCorrelation {
     parentCommand: spec.correlation?.parentCommand ?? fromEnv?.parentCommand ?? '',
     workerKind: 'shard',
     shardId: spec.shard.id,
-    ...(spec.correlation ?? {}),
+    ...spec.correlation,
     // traceId: prefer the spec/env value, else the worker's live trace context.
     traceId: spec.correlation?.traceId ?? fromEnv?.traceId ?? currentTraceparent(),
   };

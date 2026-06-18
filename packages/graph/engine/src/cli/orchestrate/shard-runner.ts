@@ -288,11 +288,6 @@ function spawnShardWorker(
     };
     writeFileSync(specPath, JSON.stringify(spec), 'utf8');
 
-    let killTimer: ReturnType<typeof setTimeout> | undefined;
-    const cleanup = (): void => {
-      if (killTimer) clearTimeout(killTimer);
-      rmSync(specDir, { recursive: true, force: true });
-    };
     // Propagate the active trace context (the parent's sharded-build span) to
     // the worker as TRACEPARENT, so the worker's per-stage spans nest under our
     // build trace instead of forming orphan traces. `currentTraceparent()` is
@@ -322,11 +317,15 @@ function spawnShardWorker(
     // instead of hanging forever. `unref()` so a pending timer never keeps the
     // event loop alive past a clean settle; `cleanup` clears it on EVERY path.
     let timedOut = false;
-    killTimer = setTimeout(() => {
+    const killTimer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGKILL');
     }, SHARD_HARD_KILL_TIMEOUT_MS);
     killTimer.unref?.();
+    const cleanup = (): void => {
+      clearTimeout(killTimer);
+      rmSync(specDir, { recursive: true, force: true });
+    };
 
     let stdout = '';
     let stderr = '';

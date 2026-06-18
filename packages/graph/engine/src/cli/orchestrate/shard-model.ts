@@ -24,9 +24,8 @@
 // because the adapter contract (`lang-adapter/types.ts` → `ResolveOutput`)
 // emits it — only the adapter can extract a callee name syntactically.
 // Consumers import it from `../../types.js` (or the package barrel) directly.
-import type { RunCorrelation } from '@opensip-cli/core';
-
 import type { Catalog, CrossBoundaryCall, ParseError, ResolutionMode } from '../../types.js';
+import type { RunCorrelation } from '@opensip-cli/core';
 
 /**
  * One parallelizable unit of a sharded build. The discovery strategies
