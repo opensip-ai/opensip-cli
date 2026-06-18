@@ -14,6 +14,8 @@
  * `ProgressEvent`. Callers bind `TEvent` to `ProgressEvent` at the tool layer.
  */
 
+import type { RunCorrelation } from '../lib/run-correlation.js';
+
 /** A live run in progress: subscribe for events, await the final result. */
 export interface ProgressRun<TEvent, TResult> {
   /**
@@ -56,6 +58,20 @@ export interface SubprocessJobDescriptor {
   readonly argv: readonly string[];
   /** Extra environment for the child (merged over the parent's). */
   readonly env?: Readonly<Record<string, string>>;
+  /**
+   * The parent run's correlation bag, sans `runId` (subprocess-correlation
+   * telemetry spec, Phase 2). OPTIONAL for wire-compat: a mismatched
+   * parent↔worker build during a partial upgrade still forks (spec GAP a).
+   *
+   * `runId` is deliberately excluded — per B1 it travels via `OPENSIP_RUN_ID`
+   * env ONLY, injected from the parent scope by `createSubprocessProgressRun`
+   * (the fork path has no temp-file spec to carry it, unlike the spawn path's
+   * `ShardWorkerSpec.correlation`). The remaining fields
+   * (`tool`/`parentCommand`/`traceId`/`workerKind`/…) are folded into the child
+   * env by the transport so the forked live-engine worker can attribute its log
+   * lines to the parent run. Symmetric to `ShardWorkerSpec.correlation`.
+   */
+  readonly correlation?: Omit<RunCorrelation, 'runId'>;
 }
 
 /**
@@ -67,4 +83,23 @@ export interface SubprocessJobDescriptor {
 export type WorkerMessage<TEvent, TResult> =
   | { readonly kind: 'progress'; readonly event: TEvent }
   | { readonly kind: 'result'; readonly value: TResult }
-  | { readonly kind: 'error'; readonly message: string; readonly stack?: string };
+  | {
+      readonly kind: 'error';
+      readonly message: string;
+      readonly stack?: string;
+      /**
+       * The forked worker's correlation bag, sans `runId` (subprocess-correlation
+       * telemetry spec, Phase 2 step 4). Lets the parent log a structured
+       * `cli.subprocess.failed` attributing the IPC failure to the right worker.
+       * Optional for wire-compat (an old worker omits it).
+       */
+      readonly correlation?: Omit<RunCorrelation, 'runId'>;
+      /**
+       * The machine-filterable failure taxonomy for the worker error. Typed as a
+       * plain `string` at this core IPC layer — the concrete `FailureClass` union
+       * is owned by `@opensip-cli/graph` and core cannot import upward (layering).
+       * The parent maps an absent value to `'ipc_error'` (and a premature exit to
+       * `'exit_nonzero'`) when it logs `cli.subprocess.failed`.
+       */
+      readonly failureClass?: string;
+    };
