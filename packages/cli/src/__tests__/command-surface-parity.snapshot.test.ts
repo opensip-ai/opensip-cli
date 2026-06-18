@@ -45,6 +45,17 @@
  *    purely ADDITIVE: the two nested `export` leaves are added; nothing is
  *    removed.
  *
+ * 4. tool-command-surface-taxonomy Task 3.1/3.2/3.3/3.4: NESTED grouped
+ *    `<tool> <verb>` children — `fit list` / `fit recipes`, `graph recipes` /
+ *    `graph lookup` / `graph index` / `graph list`, and `sim recipes` — now
+ *    appear under their tool primaries (mounted via the same Phase 0
+ *    `parent`-nested mount). The grouped forms REUSE the existing flat handlers
+ *    by reference; the legacy flat `fit-list` / `fit-recipes` / `graph-recipes` /
+ *    `graph-lookup` / `graph-symbol-index` commands COEXIST as working aliases.
+ *    `sim recipes` and `graph list` are NEW discoverability commands (no flat
+ *    predecessor). The surface is purely ADDITIVE: nested leaves are added;
+ *    nothing is removed.
+ *
  * Every other command is byte-identical to 2.10.0. Any change OTHER than the
  * deltas above is a regression to investigate.
  * ─────────────────────────────────────────────────────────────────────────────
