@@ -19,12 +19,13 @@ related-docs:
 
 The customer-facing command group for whole Tool plugins (ADR-0041): packages
 declaring `package.json#opensipTools.kind: "tool"` that contribute entire
-subcommands to the CLI. Five subcommands — no flag aliases, no `tool`
+subcommands to the CLI. Six subcommands — no flag aliases, no `tool`
 singular:
 
 ```
 opensip tools list
 opensip tools validate <spec>
+opensip tools create <tool-id>
 opensip tools install <spec> [--global|--project]
 opensip tools uninstall <name-or-id> [--global|--project] [--purge-data]
 opensip tools data-purge <tool-id>
@@ -95,6 +96,20 @@ sections that fail on unresolved imports report as **skipped** and the
 verdict is `incomplete` — an unverified runtime is never a pass.
 
 Exit codes: `0` = `passed`; `2` = `failed` or `incomplete`.
+
+## `tools create <tool-id>`
+
+Scaffolds a minimal **project-local** Tool under `opensip-cli/tools/<id>/` so you
+can start authoring a whole Tool plugin without hand-writing the manifest +
+contract boilerplate. `<tool-id>` is kebab-case and also becomes the subcommand
+name. Pass `--force` to overwrite the scaffold when the tool directory already
+exists. This is the authoring on-ramp; for the full walkthrough see
+[Create your first tool](../60-guides/07-create-your-first-tool.md).
+
+```bash
+opensip tools create my-audit          # writes opensip-cli/tools/my-audit/
+opensip tools create my-audit --force  # overwrite an existing scaffold
+```
 
 ## `tools install <spec>`
 

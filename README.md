@@ -129,8 +129,8 @@ opensip report
 OpenSIP ships with `fit`, `graph`, and `sim`, but the CLI is a pluggable tool
 platform. Add project-local checks, npm-packaged recipes, custom graph rules,
 or entire tools that mount as first-class `opensip` subcommands. Use
-`opensip plugin ...` for fit/sim packs and `opensip tools ...` for whole Tool
-plugins.
+`opensip fit plugin ...` / `opensip sim plugin ...` for fit/sim packs and
+`opensip tools ...` for whole Tool plugins.
 
 ## How It Works
 
@@ -193,11 +193,19 @@ opensip configure  # stores an API key for future/private Cloud-compatible endpo
 
 ### Plugins
 
+Extension packs are managed under each pack-supporting tool (`fit` and `sim`) —
+the domain is bound from the tool, so there is no top-level `opensip plugin`.
+
 ```bash
-opensip plugin list
-opensip plugin add <package>
-opensip plugin remove <package>
-opensip plugin sync
+opensip fit plugin list
+opensip fit plugin add <package>
+opensip fit plugin remove <package>
+opensip fit plugin sync
+
+opensip sim plugin list           # same verbs for sim scenario packs
+opensip sim plugin add <package>
+opensip sim plugin remove <package>
+opensip sim plugin sync
 ```
 
 ### Tools

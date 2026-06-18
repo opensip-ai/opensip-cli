@@ -87,7 +87,7 @@ flowchart TB
   Logs["logs/YYYY-MM-DD.jsonl"]
   Dashboard["dashboard compose"]
   Report["reports/latest.html"]
-  Plugins["plugin command"]
+  Plugins["fit/sim plugin<br/>+ tools commands"]
   PluginDirs["plugins/fit + plugins/sim + plugins/tool<br/>node_modules hosts"]
 
   CLI --> Store

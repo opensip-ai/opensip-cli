@@ -34,7 +34,7 @@ first-party `@opensip-cli/*` packages in this repository.
 
 Out of scope:
 
-- Community plugins installed with `opensip plugin add`.
+- Community plugins installed with `opensip fit plugin add` / `opensip sim plugin add`.
 - Vulnerabilities in upstream dependencies, unless OpenSIP CLI usage creates a
   distinct exploitable path.
 

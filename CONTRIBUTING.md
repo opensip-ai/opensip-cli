@@ -177,11 +177,12 @@ export const checks = [
 ```
 
 **npm packages (explicitly pinned)** — install fit/sim packs via
-`opensip plugin add <package>`. The CLI runs `npm install` under
-`opensip-cli/.runtime/plugins/<domain>/node_modules/` and adds the package name
-to `plugins.<domain>:` in `opensip-cli.config.yml`. Only packages listed there
-are loaded. Whole Tool plugins are managed with `opensip tools ...` (or
-`opensip plugin add --domain tool` for the compatibility path).
+`opensip fit plugin add <package>` / `opensip sim plugin add <package>` (the
+domain is bound from the tool — there is no top-level `opensip plugin`). The CLI
+runs `npm install` under `opensip-cli/.runtime/plugins/<domain>/node_modules/`
+and adds the package name to `plugins.<domain>:` in `opensip-cli.config.yml`.
+Only packages listed there are loaded. Whole Tool plugins are managed with
+`opensip tools install|uninstall|validate|list`.
 
 ## Writing Tests
 

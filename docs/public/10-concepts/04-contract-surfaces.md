@@ -60,9 +60,19 @@ opensip
 │   ├── --gate-compare
 │   ├── list               (catalog checks)
 │   ├── recipes            (catalog recipes)
-│   └── export --format baseline   (SARIF gate baseline)
+│   ├── export --format baseline   (SARIF gate baseline)
+│   └── plugin             (manage fit extension packs)
+│       ├── list
+│       ├── add <pkg>
+│       ├── remove <pkg>
+│       └── sync
 ├── sim                    (run simulation scenarios)
-│   └── recipes            (catalog sim recipes)
+│   ├── recipes            (catalog sim recipes)
+│   └── plugin             (manage sim scenario packs)
+│       ├── list
+│       ├── add <pkg>
+│       ├── remove <pkg>
+│       └── sync
 ├── graph [paths...]       (static call-graph + dead-end analysis)
 │   ├── --json
 │   ├── --no-cache
@@ -82,13 +92,9 @@ opensip
 │   ├── list
 │   ├── show <ref>
 │   └── purge
-├── plugin
-│   ├── list
-│   ├── add <pkg>
-│   ├── remove <pkg>
-│   └── sync
 ├── tools
 │   ├── list
+│   ├── create <tool-id>
 │   ├── validate <spec>
 │   ├── install <spec>
 │   ├── uninstall <name-or-id>
@@ -98,7 +104,7 @@ opensip
 └── uninstall              (remove ~/.opensip-cli/)
 ```
 
-Each command's flag list is owned by the Tool that registers it. `fit` flags live in [`packages/fitness/engine/src/tool.ts`](../../../packages/fitness/engine/src/tool.ts); `sim` flags in [`packages/simulation/engine/src/tool.ts`](../../../packages/simulation/engine/src/tool.ts); `graph` flags in [`packages/graph/engine/src/tool.ts`](../../../packages/graph/engine/src/tool.ts); top-level commands like `init`, `plugin`, and `configure` live in [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
+Each command's flag list is owned by the Tool that registers it. `fit` flags live in [`packages/fitness/engine/src/tool.ts`](../../../packages/fitness/engine/src/tool.ts); `sim` flags in [`packages/simulation/engine/src/tool.ts`](../../../packages/simulation/engine/src/tool.ts); `graph` flags in [`packages/graph/engine/src/tool.ts`](../../../packages/graph/engine/src/tool.ts); top-level commands like `init` and `configure` live in [`packages/cli/src/commands/`](../../../packages/cli/src/commands/). The pack-management `plugin` group is mounted under each pack-supporting tool (`opensip fit plugin …`, `opensip sim plugin …`) — there is no top-level `opensip plugin`.
 
 **Stability rule.** Removing a flag, removing a command, or changing a default value is a major-version change. Adding a flag with a safe default is a minor. Adding a command alias is also a minor when it is additive and documented; renaming without an alias is a major.
 
