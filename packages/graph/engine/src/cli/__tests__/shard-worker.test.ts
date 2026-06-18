@@ -15,6 +15,7 @@ import { enterScope, LanguageRegistry } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
+import { graphShardWorkerCommandSpec } from '../graph/graph-aux-command-specs.js';
 import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
 import { executeShardWorker } from '../shard-worker.js';
 
@@ -174,5 +175,29 @@ describe('executeShardWorker', () => {
     expect(setExitCode).toHaveBeenCalledWith(1);
     expect(stderr).toContain('graph-shard-worker');
     expect(stdout).toBe('');
+  });
+
+  // Q1 (host-owned-run-timing): a worker command returns NO ToolSessionContribution
+  // — one StoredSession per PARENT command, owned by the host. This is a structural
+  // guard on that contract, not a behavioural one.
+  it('returns no session contribution and runs as a raw-stream command (Q1)', async () => {
+    currentAdapterRegistry().register(fakeAdapter());
+    const specPath = join(dir, 'spec.json');
+    const spec: ShardWorkerSpec = {
+      shard: { id: 'pkg:a', rootDir: dir, files: ['pkg/a.ts'] },
+      projectRoot: dir,
+      resolutionMode: 'exact',
+    };
+    writeFileSync(specPath, JSON.stringify(spec), 'utf8');
+
+    const { cli } = mockCli();
+    // The handler resolves to `void` — it never returns a ToolRunCompletion/
+    // ToolSessionContribution the host run plane would stamp + persist.
+    const returned = await executeShardWorker(specPath, cli);
+    expect(returned).toBeUndefined();
+
+    // The command spec stays raw-stream (worker IPC), the documented output mode
+    // for a worker that owns its own stdout and contributes no generic session.
+    expect(graphShardWorkerCommandSpec.output).toBe('raw-stream');
   });
 });
