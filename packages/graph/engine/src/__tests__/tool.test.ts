@@ -5,10 +5,10 @@
  *  - graphTool.metadata.name === 'graph' (human key); .id is stable UUID
  *  - graphTool.metadata.version matches package.json
  *  - graphTool.commands lists the unified `graph` analysis subcommand
- *    plus the two read-only catalog query commands (`graph-lookup`,
- *    `graph-symbol-index`) added alongside the codeindex-parity work.
- *    Orphans and entry-points were folded into the unified `graph`
- *    output — they remain output sections, not separate commands.
+ *    plus the nested catalog query commands (`graph lookup`, `graph index`)
+ *    added alongside the codeindex-parity work. Orphans and entry-points
+ *    were folded into the unified `graph` output — they remain output
+ *    sections, not separate commands.
  *  - Since release 2.11.0 Phase 5 graph mounts via declarative
  *    `commandSpecs`, not the deprecated `register()` hook.
  *  - graphTool does NOT import from opensip-cli (compile-time
@@ -38,29 +38,33 @@ describe('graphTool contract conformance (AC-2)', () => {
     expect(graphTool.metadata.version).toBe(pkg.version);
   });
 
-  it('commands lists the unified graph subcommand plus the lookup/symbol-index/baseline-export queries', () => {
+  it('commands lists the unified graph subcommand plus the nested export/lookup/index/recipes/list queries', () => {
     const names = graphTool.commands.map((c) => c.name);
     expect(names).toEqual([
       'graph',
-      'graph-lookup',
-      'graph-symbol-index',
-      'graph-baseline-export',
       'graph-shard-worker',
       'graph-equivalence-check',
       'graph-run-worker',
-      'catalog-export',
-      'sarif-export',
-      // Canonical nested export (tool-command-surface-taxonomy Task 2.1) —
-      // mounts as `graph export` (parent: 'graph').
+      // Canonical nested export — mounts as `graph export` (parent: 'graph').
       'export',
-      'graph-recipes',
-      // Grouped Tier-2 children (Task 3.1/3.2/3.4) — name 'recipes' / 'lookup' /
-      // 'index' / 'list', parent 'graph'.
+      // Grouped Tier-2 children (the canonical `<tool> <verb>` grammar) —
+      // name 'recipes' / 'lookup' / 'index' / 'list', parent 'graph'.
       'recipes',
       'lookup',
       'index',
       'list',
     ]);
+    // The legacy flat-root aliases are gone.
+    for (const legacy of [
+      'graph-lookup',
+      'graph-symbol-index',
+      'graph-baseline-export',
+      'catalog-export',
+      'sarif-export',
+      'graph-recipes',
+    ]) {
+      expect(names).not.toContain(legacy);
+    }
   });
 
   it('mounts via commandSpecs, not the deprecated register() hook', () => {
@@ -68,18 +72,12 @@ describe('graphTool contract conformance (AC-2)', () => {
     const specNames = (graphTool.commandSpecs ?? []).map((s) => s.name);
     expect(specNames).toEqual([
       'graph',
-      'graph-lookup',
       'graph-shard-worker',
       'graph-run-worker',
-      'graph-symbol-index',
-      'graph-baseline-export',
-      'catalog-export',
-      'sarif-export',
-      // Canonical nested export spec (Task 2.1) — name 'export', parent 'graph'.
+      // Canonical nested export spec — name 'export', parent 'graph'.
       'export',
-      'graph-recipes',
-      // Grouped Tier-2 children (Task 3.1/3.2/3.4) — name 'recipes' / 'lookup' /
-      // 'index' / 'list', parent 'graph'; reuse the flat handlers.
+      // Grouped Tier-2 children (the canonical `<tool> <verb>` grammar) —
+      // name 'recipes' / 'lookup' / 'index' / 'list', parent 'graph'.
       'recipes',
       'lookup',
       'index',

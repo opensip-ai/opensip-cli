@@ -42,15 +42,10 @@ const EXPECTED: Record<string, string[]> = {
   // Keyed by tool.metadata.name, which Task 2.4 aligned to the short command
   // verb (`fit`/`sim`/`graph`).
   fit: [
-    // release 2.11.0 Phase 4: fitness migrated to commandSpecs, so this set is
-    // now derived via recordSpecFlags. That surfaces `--out` (the
-    // `fit-baseline-export --out <path>` required flag), which the old
-    // register()-recorder missed: it only trapped `.option(...)` calls and
-    // `--out` was declared via `.requiredOption(...)`. The flag was always part
-    // of the real surface; the spec-based recorder records it faithfully.
-    //
-    // tool-command-surface-taxonomy Task 2.2: the canonical `fit export`
-    // command adds `--format` (choices: baseline).
+    // The flag set is the union across all of fit's subcommands. The canonical
+    // `fit export --format baseline` command contributes `--format` (choices:
+    // baseline) and `--out` (the SARIF baseline path). The legacy flat-root
+    // `fit-baseline-export` alias was removed — its flags live on `fit export`.
     '--api-key',
     '--check',
     '--config',
@@ -76,23 +71,18 @@ const EXPECTED: Record<string, string[]> = {
     // ADR-0011 (Phase 5): graph gained --api-key for --report-to cloud egress.
     // ADR-0021: graph gained -q/--quiet for cross-tool flag parity.
     // Post-2.7.0: graph gained --sarif (real SARIF 2.1.0 for Code Scanning via
-    // the shared cli.writeSarif seam, replacing the broken graph-baseline-export
-    // → upload path).
+    // the shared cli.writeSarif seam).
     //
-    // release 2.11.0 Phase 5: graph migrated to commandSpecs, so this set is now
-    // derived via recordSpecFlags. That surfaces the catalog-export/sarif-export
-    // REQUIRED flags — `--catalog-output`, `--git-sha`, `--output-sarif`,
-    // `--repo-id`, `--tenant-id` — which the old register()-recorder missed: it
-    // only trapped `.option(...)` calls and these were declared via
-    // `.requiredOption(...)`. They were always part of the real surface (the
-    // opensip EngineSubprocessPort contracts depend on them); the spec-based
-    // recorder records them faithfully.
+    // The flag set is the union across all of graph's subcommands. The canonical
+    // `graph export --format sarif|catalog|baseline` command contributes the
+    // export flags — `--catalog-output`, `--git-sha`, `--output-sarif`,
+    // `--repo-id`, `--tenant-id`, `--mode`, `--changed-file`, `--run-id`,
+    // `--out`, `--format`. The legacy flat-root `catalog-export` / `sarif-export`
+    // / `graph-baseline-export` aliases were removed — their flags live on
+    // `graph export`.
     //
     // graph-equivalence-check (internal real-repo sharded≡exact guardrail) adds
     // `--budget` (committed budget path) and `--update-budget` (capture/tighten).
-    // tool-command-surface-taxonomy Task 2.1: the canonical `graph export`
-    // command adds `--format` (choices: sarif|catalog|baseline) — the union of
-    // the legacy export flags is already present below.
     '--api-key',
     '--budget',
     '--catalog-output',

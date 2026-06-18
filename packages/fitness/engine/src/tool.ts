@@ -1,8 +1,8 @@
 /**
  * fitnessTool — fitness as a Tool plugin.
  *
- * Owns the `fit`, `fit-list`, `fit-recipes`, and `fit-baseline-export`
- * subcommands. Since release 2.11.0 (Phase 4) the Commander wiring is no longer
+ * Owns the `fit` primary plus its nested `fit list`, `fit recipes`, and
+ * `fit export` subcommands. Since release 2.11.0 (Phase 4) the Commander wiring is no longer
  * hand-rolled: the tool exports declarative {@link CommandSpec}s
  * (`commandSpecs`) and the host's `mountCommandSpec` mounts them
  * (name/description/aliases, the ADR-0021 common flags, each command's options)
@@ -43,7 +43,8 @@
  * -------------
  * - This file owns the command-spec assembly + the tool descriptor.
  * - `cli/fit/fit-command-spec.ts` owns the primary `fit` command spec + handler.
- * - `cli/fit/fit-aux-command-specs.ts` owns the aux command specs.
+ * - `cli/fit/fit-aux-command-specs.ts` owns the nested `fit list` / `fit recipes`
+ *   / `fit export` command specs.
  * - `cli/fit-modes.ts` owns the dispatch branches (gate/list/recipes/json/live).
  */
 
@@ -51,11 +52,8 @@ import { readPackageVersion } from '@opensip-cli/core';
 
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
 import {
-  fitBaselineExportCommandSpec,
   fitExportCommandSpec,
-  fitListCommandSpec,
   fitListGroupedCommandSpec,
-  fitRecipesCommandSpec,
   fitRecipesGroupedCommandSpec,
 } from './cli/fit/fit-aux-command-specs.js';
 import { buildFitCommandSpec, FIT_LIVE_VIEW_KEY } from './cli/fit/fit-command-spec.js';
@@ -100,22 +98,11 @@ const FIT: ToolCommandDescriptor = {
   description: 'Run fitness checks',
 };
 
-const FIT_LIST: ToolCommandDescriptor = {
-  name: 'fit-list',
-  description: 'List available fitness checks',
-};
-
-const FIT_RECIPES: ToolCommandDescriptor = {
-  name: 'fit-recipes',
-  description: 'List available fitness recipes',
-};
-
 /**
- * Grouped Tier-2 children (tool-command-surface-taxonomy Task 3.1). `fit list` /
- * `fit recipes` nest under the `fit` primary (`parent: 'fit'`) so they read as
- * the canonical `<tool> <verb>` grammar. The legacy flat `fit-list` /
- * `fit-recipes` descriptors COEXIST as working aliases; both share the same
- * handler by reference.
+ * Grouped Tier-2 children (the canonical `<tool> <verb>` grammar). `fit list` /
+ * `fit recipes` nest under the `fit` primary (`parent: 'fit'`). The legacy flat
+ * `fit-list` / `fit-recipes` aliases were removed once their deprecation window
+ * closed.
  */
 const FIT_LIST_GROUPED: ToolCommandDescriptor = {
   name: 'list',
@@ -129,16 +116,10 @@ const FIT_RECIPES_GROUPED: ToolCommandDescriptor = {
   description: 'List available fitness recipes',
 };
 
-const FIT_BASELINE_EXPORT: ToolCommandDescriptor = {
-  name: 'fit-baseline-export',
-  description: 'Export the fit gate baseline (SARIF) from the datastore to a file',
-};
-
 /**
- * The CANONICAL fitness export command (tool-command-surface-taxonomy Task 2.2).
- * Nested under the `fit` primary (`parent: 'fit'`) so it reads as `fit export
- * --format baseline`. The legacy flat-root `fit-baseline-export` descriptor
- * COEXISTS as a working command, with `legacy_alias_used` telemetry.
+ * The canonical fitness export command. Nested under the `fit` primary
+ * (`parent: 'fit'`) so it reads as `fit export --format baseline`. The legacy
+ * flat-root `fit-baseline-export` alias was removed.
  */
 const FIT_EXPORT: ToolCommandDescriptor = {
   name: 'export',
@@ -212,16 +193,13 @@ function setUpFitLiveView(cli: ToolCliContext): void {
  */
 const fitCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
   buildFitCommandSpec(setUpFitLiveView),
-  fitListCommandSpec,
-  fitRecipesCommandSpec,
-  // Grouped Tier-2 children (Task 3.1) — `fit list` / `fit recipes` nest under
-  // the `fit` primary via the Phase 0 nested-mount capability, reusing the flat
-  // handlers by reference. The flat aliases above coexist.
+  // Grouped Tier-2 children — `fit list` / `fit recipes` nest under the `fit`
+  // primary via the nested-mount capability (the canonical `<tool> <verb>`
+  // grammar; the legacy flat aliases were removed).
   fitListGroupedCommandSpec,
   fitRecipesGroupedCommandSpec,
-  fitBaselineExportCommandSpec,
-  // Canonical nested export (Task 2.2) — mounts as `fit export` under the `fit`
-  // primary via the Phase 0 nested-mount capability.
+  // Canonical nested export — mounts as `fit export` under the `fit` primary via
+  // the nested-mount capability.
   fitExportCommandSpec,
   fitRunWorkerCommandSpec,
 ];
@@ -314,16 +292,7 @@ export const fitnessTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Run fitness checks against a codebase',
   },
-  commands: [
-    FIT,
-    FIT_LIST,
-    FIT_RECIPES,
-    FIT_LIST_GROUPED,
-    FIT_RECIPES_GROUPED,
-    FIT_BASELINE_EXPORT,
-    FIT_EXPORT,
-    FIT_RUN_WORKER,
-  ],
+  commands: [FIT, FIT_LIST_GROUPED, FIT_RECIPES_GROUPED, FIT_EXPORT, FIT_RUN_WORKER],
   pluginLayout: FIT_PLUGIN_LAYOUT,
   // Release 2.11.0 Phase 4: fitness declares its command surface; the host
   // mounts each spec via mountCommandSpec. The deprecated `register()` fallback

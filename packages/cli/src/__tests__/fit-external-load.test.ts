@@ -11,9 +11,8 @@
  * mountCommandSpec` path an installed tool travels — install-source independence
  * is structural, not a special case. This test exercises that path on `fit` from
  * its package directory (as an installed plugin would), with NO reliance on the
- * static `fitnessTool` import for loading, and pins every one of fit's four
- * commands (fit, fit-list, fit-recipes, fit-baseline-export) to the bundled
- * surface.
+ * static `fitnessTool` import for loading, and pins every one of fit's nested
+ * commands (fit, fit list, fit recipes, fit export) to the bundled surface.
  *
  * The full packed-install variant (`pnpm pack` fit + its check-pack deps into a
  * sandbox and run the binary) is the CI-gated escalation of the SAME mechanism
@@ -46,7 +45,7 @@ const STUB_CTX: CommandMountContext = {
   setExitCode: () => undefined,
 };
 
-/** fit's four declared command specs, keyed by name. */
+/** fit's declared command specs, keyed by name. */
 function specsByName(tool: Tool): Map<string, CommandSpec<unknown, ToolCliContext>> {
   const specs = tool.commandSpecs ?? [];
   expect(specs.length, 'fit must export commandSpecs').toBeGreaterThan(0);
@@ -61,11 +60,13 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
     expect(manifest?.id).toBe('fit');
     // 3.0.0: the manifest MUST declare apiVersion (the grace window ended).
     expect(typeof manifest?.apiVersion).toBe('number');
-    // All four fit commands are declared in the manifest.
+    // The canonical fit commands are declared in the manifest (the legacy flat
+    // aliases were removed).
     const cmdNames = (manifest?.commands ?? []).map((c) => c.name);
-    expect(cmdNames).toEqual(
-      expect.arrayContaining(['fit', 'fit-list', 'fit-recipes', 'fit-baseline-export']),
-    );
+    expect(cmdNames).toEqual(expect.arrayContaining(['fit', 'list', 'recipes', 'export']));
+    expect(cmdNames).not.toContain('fit-list');
+    expect(cmdNames).not.toContain('fit-recipes');
+    expect(cmdNames).not.toContain('fit-baseline-export');
 
     const admission = admitTool({
       manifest: manifest!,
@@ -83,10 +84,9 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
     expect(mod.tool, 'the built module must export `tool`').toBeDefined();
     expect(mod.tool?.metadata.name).toBe('fit');
     expect(mod.tool?.metadata.id).toBe('afd68bd3-ff3c-4935-a5b6-76d8fc7a5224');
-    // fit, fit-list, fit-recipes, list (grouped, Task 3.1), recipes (grouped,
-    // Task 3.1), fit-baseline-export, export (canonical, Task 2.2),
-    // fit-run-worker (internal).
-    expect(mod.tool?.commandSpecs?.length).toBe(8);
+    // fit, list (nested), recipes (nested), export (canonical nested),
+    // fit-run-worker (internal). The legacy flat aliases were removed.
+    expect(mod.tool?.commandSpecs?.length).toBe(5);
   });
 
   it('the externally-loaded fit has a command surface identical to the bundled fit', async () => {
@@ -96,7 +96,7 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
     const external = specsByName(mod.tool!);
     const bundled = specsByName(fitnessTool);
 
-    // Same set of command names (fit, fit-list, fit-recipes, fit-baseline-export).
+    // Same set of command names (fit, list, recipes, export, fit-run-worker).
     expect([...external.keys()].sort()).toEqual([...bundled.keys()].sort());
 
     // Every command's contract — aliases, common flags, declared options, output
@@ -120,9 +120,16 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
       mountCommandSpec(program, spec as CommandSpec<unknown, CommandMountContext>, STUB_CTX);
     }
     const mounted = program.commands.map((c) => c.name());
-    expect(mounted).toEqual(
-      expect.arrayContaining(['fit', 'fit-list', 'fit-recipes', 'fit-baseline-export']),
-    );
+    // This test mounts each spec via the raw `mountCommandSpec` loop (NOT the
+    // host's two-pass `mountAllToolCommands` parent-nesting), so a `parent`-nested
+    // child is mounted onto `program` by its leaf name — the canonical
+    // list/recipes/export names are present at this level. The two-pass nesting
+    // under the `fit` primary is covered by the parity snapshot + taxonomy tests.
+    expect(mounted).toEqual(expect.arrayContaining(['fit', 'list', 'recipes', 'export']));
+    // The legacy flat aliases are gone entirely.
+    for (const legacy of ['fit-list', 'fit-recipes', 'fit-baseline-export']) {
+      expect(mounted).not.toContain(legacy);
+    }
 
     // The `fit` command carries the host-provided `--json` common flag + its own
     // `--recipe` option — proving flags + options travel the plugin path intact.
@@ -130,11 +137,5 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
     const flagNames = (fitCmd?.options ?? []).map((o) => o.long);
     expect(flagNames).toContain('--json');
     expect(flagNames).toContain('--recipe');
-
-    // 3.0 GA dropped the pre-GA legacy command aliases.
-    const listCmd = program.commands.find((c) => c.name() === 'fit-list');
-    const recipesCmd = program.commands.find((c) => c.name() === 'fit-recipes');
-    expect(listCmd?.aliases()).toEqual([]);
-    expect(recipesCmd?.aliases()).toEqual([]);
   });
 });

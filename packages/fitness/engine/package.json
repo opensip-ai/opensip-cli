@@ -49,24 +49,12 @@
         "description": "Run fitness checks"
       },
       {
-        "name": "fit-list",
-        "description": "List available fitness checks"
-      },
-      {
-        "name": "fit-recipes",
-        "description": "List available fitness recipes"
-      },
-      {
         "name": "list",
         "description": "List available fitness checks"
       },
       {
         "name": "recipes",
         "description": "List available fitness recipes"
-      },
-      {
-        "name": "fit-baseline-export",
-        "description": "Export the fit gate baseline (SARIF) from the datastore to a file"
       },
       {
         "name": "export",

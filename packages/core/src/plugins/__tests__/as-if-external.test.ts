@@ -49,18 +49,10 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
     // and unchanged.
     id: 'fit',
     dir: join(REPO_ROOT, 'packages', 'fitness', 'engine'),
-    // Task 2.2 adds the canonical nested `export` (parent: 'fit') command.
-    // Task 3.1 adds the grouped `list` / `recipes` (parent: 'fit') children.
-    commands: [
-      'fit',
-      'fit-list',
-      'fit-recipes',
-      'list',
-      'recipes',
-      'fit-baseline-export',
-      'export',
-      'fit-run-worker',
-    ],
+    // The canonical nested `<tool> <verb>` grammar: `fit` + the grouped `list` /
+    // `recipes` / `export` (parent: 'fit') children. The legacy flat-root
+    // `fit-list` / `fit-recipes` / `fit-baseline-export` aliases were removed.
+    commands: ['fit', 'list', 'recipes', 'export', 'fit-run-worker'],
   },
   {
     id: 'sim',
@@ -71,21 +63,18 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
   {
     id: 'graph',
     dir: join(REPO_ROOT, 'packages', 'graph', 'engine'),
+    // The canonical nested `<tool> <verb>` grammar: `graph` + the internal
+    // workers + the canonical nested `export` (parent: 'graph') and the grouped
+    // `recipes` / `lookup` / `index` / `list` (parent: 'graph') children. The
+    // legacy flat-root `graph-lookup` / `graph-symbol-index` /
+    // `graph-baseline-export` / `catalog-export` / `sarif-export` /
+    // `graph-recipes` aliases were removed.
     commands: [
       'graph',
-      'graph-lookup',
-      'graph-symbol-index',
-      'graph-baseline-export',
       'graph-shard-worker',
       'graph-equivalence-check',
       'graph-run-worker',
-      'catalog-export',
-      'sarif-export',
-      // Task 2.1 adds the canonical nested `export` (parent: 'graph') command.
       'export',
-      'graph-recipes',
-      // Task 3.1/3.2/3.4 add the grouped `recipes` / `lookup` / `index` / `list`
-      // (parent: 'graph') children.
       'recipes',
       'lookup',
       'index',

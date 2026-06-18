@@ -1,9 +1,9 @@
 /**
  * graphTool — branch coverage for the spec-handler paths the primary
  * tool-register suite doesn't reach: the `--resolution` choices declaration
- * (+ the `fast` path), the graph-shard-worker handler, catalog-export's
- * incremental + changed-file advisory branch, the error handler on a pipeline
- * throw, and the contributeScope / collectReportData hooks.
+ * (+ the `fast` path), the graph-shard-worker handler, `graph export --format
+ * catalog`'s incremental + changed-file advisory branch, the error handler on a
+ * pipeline throw, and the contributeScope / collectReportData hooks.
  *
  * Since release 2.11.0 Phase 5 graph mounts via `commandSpecs`; we drive each
  * spec's handler directly (the host invokes it post-parse), threading
@@ -141,19 +141,22 @@ afterEach(() => {
 
 describe('--resolution declaration', () => {
   it('declares choices exact|fast on every --resolution-bearing command', () => {
-    for (const name of ['graph', 'catalog-export', 'sarif-export']) {
+    // `graph` (the primary) and `graph export` (the canonical export command);
+    // the legacy flat-root catalog-export/sarif-export aliases were removed.
+    for (const name of ['graph', 'export']) {
       const option = (specFor(name).options ?? []).find((o) => o.flag === '--resolution');
       expect(option?.choices).toEqual(['exact', 'fast']);
       expect(option?.default).toBe('exact');
     }
   });
 
-  it('accepts --resolution fast on the sarif-export path', async () => {
+  it('accepts --resolution fast on the `graph export --format sarif` path', async () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const outPath = join(workDir, 'out.sarif');
     const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    await handlerFor('sarif-export')(
+    await handlerFor('export')(
       {
+        format: 'sarif',
         outputSarif: outPath,
         tenantId: 't',
         repoId: 'r',
@@ -268,13 +271,14 @@ describe('graph-shard-worker handler', () => {
   });
 });
 
-describe('catalog-export handler branches', () => {
+describe('graph export --format catalog handler branches', () => {
   it('logs the changed-file advisory on the incremental path and still writes the export', async () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const outPath = join(workDir, 'catalog.json');
     const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    await handlerFor('catalog-export')(
+    await handlerFor('export')(
       {
+        format: 'catalog',
         catalogOutput: outPath,
         tenantId: 't',
         repoId: 'r',
@@ -295,8 +299,9 @@ describe('catalog-export handler branches', () => {
     // the handler's catch hands to handleGraphError.
     const outPath = join(workDir, 'catalog.json');
     const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    await handlerFor('catalog-export')(
+    await handlerFor('export')(
       {
+        format: 'catalog',
         catalogOutput: outPath,
         tenantId: 't',
         repoId: 'r',

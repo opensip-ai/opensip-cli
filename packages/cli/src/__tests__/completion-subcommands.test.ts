@@ -20,7 +20,6 @@ import {
   assembleCompletionInventory,
   buildCompletionScript,
   specLongFlags,
-  DEPRECATED_EXPORT_COMMANDS,
   INTERNAL_COMMANDS,
   type CompletionInventory,
 } from '../commands/completion.js';
@@ -193,6 +192,15 @@ describe('completion plugin sub-subcommand parity', () => {
   });
 });
 
+/** The legacy flat-root export aliases that were removed entirely — they must
+ *  not surface anywhere in completion (no command spec declares them). */
+const REMOVED_FLAT_EXPORTS = [
+  'catalog-export',
+  'sarif-export',
+  'graph-baseline-export',
+  'fit-baseline-export',
+];
+
 describe('completion taxonomy — internal excluded, canonical exports advertised (Task 4.3)', () => {
   /** The five Tier-3 internal command names + the non-`*-worker` equivalence gate. */
   const INTERNAL_NAMES = [
@@ -226,7 +234,7 @@ describe('completion taxonomy — internal excluded, canonical exports advertise
     }
   });
 
-  it('offers the canonical nested `graph export` / `fit export`, not the deprecated flat verbs', async () => {
+  it('offers the canonical nested `graph export` / `fit export`; the legacy flat verbs are gone', async () => {
     const { inventory } = await buildLiveInventory();
     // Canonical nested exports flow into the group map under their tool primary.
     expect(inventory.groupSubcommands.graph, 'graph must offer the nested `export` leaf').toContain(
@@ -238,12 +246,13 @@ describe('completion taxonomy — internal excluded, canonical exports advertise
     // The nested forms carry their own flag set keyed under `${parent} export`.
     expect(inventory.commandFlags['graph export']).toBeDefined();
     expect(inventory.commandFlags['fit export']).toBeDefined();
-    // The deprecated flat export verbs are NOT offered as top-level subcommands.
-    for (const deprecated of DEPRECATED_EXPORT_COMMANDS) {
+    // The removed flat export verbs are NOT offered as subcommands (no spec
+    // declares them anymore).
+    for (const removed of REMOVED_FLAT_EXPORTS) {
       expect(
         inventory.subcommands,
-        `deprecated export '${deprecated}' must not be an offered subcommand`,
-      ).not.toContain(deprecated);
+        `removed flat export '${removed}' must not be an offered subcommand`,
+      ).not.toContain(removed);
     }
   });
 
@@ -255,14 +264,10 @@ describe('completion taxonomy — internal excluded, canonical exports advertise
     const build = (): CompletionInventory => {
       // Mirror the live call-site internal-set computation
       // (host-command-specs.ts): the descriptor-driven internal set is revealed
-      // (emptied) when the env override is on; the deprecated exports stay filtered.
-      const descriptorInternal = showInternalCommands()
+      // (emptied) when the env override is on.
+      const internalCommands = showInternalCommands()
         ? new Set<string>()
         : internalCommandNames(registry);
-      const internalCommands = new Set<string>([
-        ...descriptorInternal,
-        ...DEPRECATED_EXPORT_COMMANDS,
-      ]);
       return assembleCompletionInventory({
         toolSpecs,
         hostSpecs: buildTopLevelHostSpecs(hostCtx),
@@ -284,12 +289,13 @@ describe('completion taxonomy — internal excluded, canonical exports advertise
       for (const name of INTERNAL_NAMES) {
         expect(revealed.subcommands, `'${name}' revealed by the override`).toContain(name);
       }
-      // The reveal scopes to Tier-3 ONLY — the deprecated exports stay filtered.
-      for (const deprecated of DEPRECATED_EXPORT_COMMANDS) {
+      // The removed flat export verbs never appear — they are gone from the
+      // command surface entirely (not merely filtered).
+      for (const removed of REMOVED_FLAT_EXPORTS) {
         expect(
           revealed.subcommands,
-          `deprecated export '${deprecated}' is NOT un-hidden by the internal reveal`,
-        ).not.toContain(deprecated);
+          `removed flat export '${removed}' must never appear`,
+        ).not.toContain(removed);
       }
     } finally {
       if (prev === undefined) delete process.env.OPENSIP_CLI_SHOW_INTERNAL;

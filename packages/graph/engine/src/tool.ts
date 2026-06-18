@@ -29,19 +29,13 @@ import { logger, readPackageVersion } from '@opensip-cli/core';
 // gone.
 import { graphFingerprintStrategy } from './baseline-strategy.js';
 import {
-  graphBaselineExportCommandSpec,
-  graphCatalogExportCommandSpec,
   graphEquivalenceCheckCommandSpec,
   graphExportCommandSpec,
   graphIndexGroupedCommandSpec,
   graphListCommandSpec,
-  graphLookupCommandSpec,
   graphLookupGroupedCommandSpec,
-  graphRecipesCommandSpec,
   graphRecipesGroupedCommandSpec,
-  graphSarifExportCommandSpec,
   graphShardWorkerCommandSpec,
-  graphSymbolIndexCommandSpec,
 } from './cli/graph/graph-aux-command-specs.js';
 import { graphCommandSpec } from './cli/graph/graph-command-spec.js';
 import { graphConfigDeclaration } from './cli/graph-config-schema.js';
@@ -78,22 +72,6 @@ const GRAPH: ToolCommandDescriptor = {
     'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
 };
 
-const GRAPH_LOOKUP: ToolCommandDescriptor = {
-  name: 'graph-lookup',
-  description: 'Look up function occurrences by simple name from the persisted catalog',
-};
-
-const GRAPH_SYMBOL_INDEX: ToolCommandDescriptor = {
-  name: 'graph-symbol-index',
-  description:
-    'Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog',
-};
-
-const GRAPH_BASELINE_EXPORT: ToolCommandDescriptor = {
-  name: 'graph-baseline-export',
-  description: 'Export the graph gate baseline (JSON) from the datastore to a file',
-};
-
 const GRAPH_SHARD_WORKER: ToolCommandDescriptor = {
   name: 'graph-shard-worker',
   // Tier-3 (tool-command-surface-taxonomy): spawned by the sharded build, never
@@ -125,30 +103,12 @@ const GRAPH_RUN_WORKER: ToolCommandDescriptor = {
     '[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)',
 };
 
-const GRAPH_CATALOG_EXPORT: ToolCommandDescriptor = {
-  name: 'catalog-export',
-  description:
-    'Run graph analysis and write the CatalogExport JSON document (symbols + edges + provenance) to a file',
-};
-
-const GRAPH_SARIF_EXPORT: ToolCommandDescriptor = {
-  name: 'sarif-export',
-  description: 'Run graph analysis and write OpenSIP-convention SARIF v2.1.0 findings to a file',
-};
-
-const GRAPH_RECIPES: ToolCommandDescriptor = {
-  name: 'graph-recipes',
-  description: 'List available graph recipes',
-};
-
 /**
- * Grouped Tier-2 children (tool-command-surface-taxonomy Task 3.1 / 3.2 / 3.4).
- * `graph recipes` / `graph lookup` / `graph index` nest under the `graph`
- * primary (`parent: 'graph'`) so they read as the canonical `<tool> <verb>`
- * grammar; the legacy flat `graph-recipes` / `graph-lookup` /
- * `graph-symbol-index` descriptors COEXIST as working aliases (same handler by
- * reference). `graph list` is a NEW discoverability command (Task 3.4) — there
- * is no legacy flat `graph-list` to alias.
+ * Grouped Tier-2 children (the canonical `<tool> <verb>` grammar). `graph
+ * recipes` / `graph lookup` / `graph index` / `graph list` nest under the
+ * `graph` primary (`parent: 'graph'`). The legacy flat `graph-recipes` /
+ * `graph-lookup` / `graph-symbol-index` aliases were removed once their
+ * deprecation window closed.
  */
 const GRAPH_RECIPES_GROUPED: ToolCommandDescriptor = {
   name: 'recipes',
@@ -179,12 +139,10 @@ const GRAPH_LIST: ToolCommandDescriptor = {
 };
 
 /**
- * The CANONICAL graph export command (tool-command-surface-taxonomy Task 2.1).
- * Nested under the `graph` primary (`parent: 'graph'`) so it reads as
- * `graph export --format sarif|catalog|baseline`. The legacy flat-root
- * `catalog-export`/`sarif-export`/`graph-baseline-export` descriptors COEXIST as
- * working commands (different required-flag shapes), with `legacy_alias_used`
- * telemetry.
+ * The canonical graph export command. Nested under the `graph` primary
+ * (`parent: 'graph'`) so it reads as `graph export --format sarif|catalog|
+ * baseline`. The legacy flat-root `catalog-export`/`sarif-export`/
+ * `graph-baseline-export` aliases were removed.
  */
 const GRAPH_EXPORT: ToolCommandDescriptor = {
   name: 'export',
@@ -197,30 +155,23 @@ const GRAPH_EXPORT: ToolCommandDescriptor = {
 // =============================================================================
 
 /**
- * graph's declarative command surface (launch Phase 5). The host mounts
- * each spec via `mountCommandSpec`; graph no longer touches Commander. Order is
- * preserved from the former `register()` mount order (graph, graph-lookup,
- * graph-shard-worker, graph-symbol-index, graph-baseline-export, catalog-export,
- * sarif-export, graph-recipes). The primary `graph` spec sets its own live-view
- * renderer up lazily inside its handler's interactive branch (no mount-time
- * `register()` hook in the spec-mounted world).
+ * graph's declarative command surface. The host mounts each spec via
+ * `mountCommandSpec`; graph no longer touches Commander. The primary `graph`
+ * spec sets its own live-view renderer up lazily inside its handler's
+ * interactive branch (no mount-time `register()` hook in the spec-mounted
+ * world). The canonical surface is the nested `<tool> <verb>` grammar — `graph
+ * export` / `graph recipes` / `graph lookup` / `graph index` / `graph list` —
+ * the legacy flat-root aliases were removed.
  */
 const graphCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
   graphCommandSpec,
-  graphLookupCommandSpec,
   graphShardWorkerCommandSpec,
   graphRunWorkerCommandSpec,
-  graphSymbolIndexCommandSpec,
-  graphBaselineExportCommandSpec,
-  graphCatalogExportCommandSpec,
-  graphSarifExportCommandSpec,
-  // Canonical nested export (Task 2.1) — mounts as `graph export` under the
-  // `graph` primary via the Phase 0 nested-mount capability.
+  // Canonical nested export — mounts as `graph export` under the `graph` primary
+  // via the nested-mount capability.
   graphExportCommandSpec,
-  graphRecipesCommandSpec,
-  // Grouped Tier-2 children (Task 3.1 / 3.2 / 3.4) — `graph recipes` /
-  // `graph lookup` / `graph index` nest under the `graph` primary, reusing the
-  // flat handlers by reference; `graph list` is a new discoverability command.
+  // Grouped Tier-2 children — `graph recipes` / `graph lookup` / `graph index` /
+  // `graph list` nest under the `graph` primary via the nested-mount capability.
   graphRecipesGroupedCommandSpec,
   graphLookupGroupedCommandSpec,
   graphIndexGroupedCommandSpec,
@@ -324,16 +275,10 @@ export const graphTool: Tool = {
   },
   commands: [
     GRAPH,
-    GRAPH_LOOKUP,
-    GRAPH_SYMBOL_INDEX,
-    GRAPH_BASELINE_EXPORT,
     GRAPH_SHARD_WORKER,
     GRAPH_EQUIVALENCE_CHECK,
     GRAPH_RUN_WORKER,
-    GRAPH_CATALOG_EXPORT,
-    GRAPH_SARIF_EXPORT,
     GRAPH_EXPORT,
-    GRAPH_RECIPES,
     GRAPH_RECIPES_GROUPED,
     GRAPH_LOOKUP_GROUPED,
     GRAPH_INDEX_GROUPED,

@@ -46,40 +46,15 @@ export type Shell = 'bash' | 'zsh' | 'fish';
  * `graph-equivalence-check`).
  */
 /**
- * The DEPRECATED-but-working flat export commands — `catalog-export`,
- * `sarif-export`, `graph-baseline-export`, `fit-baseline-export`
- * (tool-command-surface-taxonomy Task 2.5). Phase 2 added the canonical NESTED
- * forms (`graph export --format sarif|catalog|baseline`, `fit export --format
- * baseline`); these flat names COEXIST as working commands (their required-flag
- * shapes diverge, so they are NOT Commander aliases) but are no longer the
- * advertised surface. Completion offers ONLY the canonical nested `<tool> export`
- * forms (which flow in via the Task 0.4 sub-subcommand emission) and suppresses
- * these deprecated flat verbs from the offered list — they remain invocable for
- * any user who still types them.
+ * Internal/machine-facing command names never offered in shell completion — the
+ * `visibility: 'internal'` Tier-3 commands: `*-run-worker` / `*-shard-worker` and
+ * `graph-equivalence-check` are machine-only IPC/CI bootstrap entry points
+ * (ADR-0028), revealed by `OPENSIP_CLI_SHOW_INTERNAL=1`.
  *
- * Held SEPARATELY from the `visibility: 'internal'` Tier-3 set because these are
- * NOT internal — they are deprecated user-facing exports. The
- * `OPENSIP_CLI_SHOW_INTERNAL=1` reveal therefore does NOT un-hide them (it scopes
- * to Tier-3 only); the completion call site always keeps them filtered.
- */
-export const DEPRECATED_EXPORT_COMMANDS: ReadonlySet<string> = new Set([
-  'catalog-export',
-  'sarif-export',
-  'graph-baseline-export',
-  'fit-baseline-export',
-]);
-
-/**
- * Internal/machine-facing command names never offered in shell completion (the
- * `visibility: 'internal'` Tier-3 commands + the deprecated flat exports).
- *
- * Two suppression reasons, deliberately combined here for the completion filter:
- *  - Tier-3 INTERNALS (`*-run-worker`, `*-shard-worker`, `graph-equivalence-check`):
- *    machine-only IPC/CI bootstrap entry points (ADR-0028), revealed by
- *    `OPENSIP_CLI_SHOW_INTERNAL=1`.
- *  - DEPRECATED EXPORTS ({@link DEPRECATED_EXPORT_COMMANDS}): user-facing but
- *    superseded by the canonical nested `<tool> export` forms; advertised only as
- *    the canonical form, never un-hidden by the internal reveal.
+ * The legacy flat-root export aliases (`catalog-export` / `sarif-export` /
+ * `graph-baseline-export` / `fit-baseline-export`) were removed entirely, so they
+ * no longer appear in the tool registry and need no completion suppression — the
+ * canonical nested `<tool> export` forms are the only export surface.
  */
 export const INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
   'graph-shard-worker',
@@ -87,7 +62,6 @@ export const INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
   'fit-run-worker',
   'sim-run-worker',
   'graph-run-worker',
-  ...DEPRECATED_EXPORT_COMMANDS,
 ]);
 
 /**

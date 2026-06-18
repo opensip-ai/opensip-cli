@@ -18,17 +18,15 @@
  * `defineCheck` from `@opensip-cli/fitness` at module load, which resolves
  * through the workspace — so the import is side-effect-safe.
  *
- * The three rules and their two-stage activation (see the check's file header):
+ * The three rules (see the check's file header):
  *  - Rule A (no masquerading export verb): activates once a canonical `export`
- *    descriptor exists in the file; the EXISTING `sarif-export`/`catalog-export`
- *    bare verbs are documented legacy aliases (Phase 2 resolved decision) and are
- *    therefore exempt via `ALLOWED_LEGACY_NAMES`. See the dead-trigger note on the
- *    Rule A `describe` block.
+ *    descriptor exists in the file; then a bare `sarif-export`/`catalog-export`
+ *    verb alongside it is a regression (the legacy flat aliases were removed, so
+ *    there is no longer an allow-list exemption).
  *  - Rule B (internal marker): activates once at least one descriptor in the file
  *    declares `visibility: 'internal'`; then EVERY worker name must be marked.
  *  - Rule C (verb shape): always active (warning) — a public descriptor name must
- *    be the bare verb, a tool-prefixed name, a `parent`-nested child, or an
- *    allowed legacy alias.
+ *    be the bare verb, a tool-prefixed name, or a `parent`-nested child.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -71,35 +69,27 @@ describe('analyzeToolCommandTaxonomy — path gate (Step 4)', () => {
 });
 
 describe('analyzeToolCommandTaxonomy — Rule A (no masquerading export verb) (Step 1)', () => {
-  // Dead-trigger note (tool-command-surface-taxonomy Phase 2 resolved decision):
-  // Rule A's masquerading regex matches ONLY `sarif-export`/`catalog-export`, and
-  // BOTH are in the check's `ALLOWED_LEGACY_NAMES` exemption (they are documented
-  // legacy aliases that coexist with the canonical `graph export`). So Rule A
-  // never FIRES on a real name today; what we assert here is its OBSERVABLE
-  // contract: the activation gate (`hasCanonicalExport`) and the legacy-alias
-  // exemption both behave as the header documents. (The dead-trigger is flagged
-  // for the Phase-2 owner — see the task report deviations.)
-
-  it('does NOT flag an allow-listed bare export verb even with the canonical export present', () => {
-    // graph declares the legacy flat `sarif-export` AND the canonical nested
-    // `graph export` — the post-Phase-2 shape. The legacy alias is exempt.
+  it('FLAGS a bare export verb when the canonical export is present (no legacy exemption)', () => {
+    // A bare flat `sarif-export` alongside the canonical nested `graph export` is
+    // a regression now that the legacy aliases were removed — Rule A fires.
     const content = [
       descriptor({ name: 'sarif-export', description: 'write SARIF' }),
       descriptor({ name: 'export', parent: 'graph', description: 'canonical' }),
     ].join('\n\n');
     const findings = analyzeToolCommandTaxonomy(content, GRAPH_TOOL);
-    expect(findings.filter((f) => /masquerade/i.test(f.message))).toEqual([]);
+    const masquerade = findings.filter((f) => /masquerade/i.test(f.message));
+    expect(masquerade).toHaveLength(1);
+    expect(masquerade[0]?.severity).toBe('error');
+    expect(masquerade[0]?.message).toContain('sarif-export');
   });
 
   it('is dormant when no canonical export descriptor exists (activation gate off)', () => {
-    // Pre-Phase-2 shape: bare `sarif-export` with NO canonical `export` in the
-    // file. Rule A must not fire (and the legacy name is an allowed alias under
-    // Rule C, so the bare verb produces no finding at all).
+    // No canonical `export` in the file: Rule A is dormant. The bare
+    // `sarif-export` is NOT tool-prefixed for graph (`graph-`) so Rule C warns —
+    // but the masquerade rule itself does not fire.
     const content = descriptor({ name: 'sarif-export', description: 'write SARIF' });
     const findings = analyzeToolCommandTaxonomy(content, GRAPH_TOOL);
     expect(findings.filter((f) => /masquerade/i.test(f.message))).toEqual([]);
-    // sarif-export is an allowed legacy alias, so Rule C is silent too.
-    expect(findings).toEqual([]);
   });
 });
 
@@ -177,7 +167,10 @@ describe('analyzeToolCommandTaxonomy — Rule C (verb shape) (Step 3)', () => {
     expect(analyzeToolCommandTaxonomy(content, GRAPH_TOOL)).toEqual([]);
   });
 
-  it('does NOT warn on an allowed legacy alias', () => {
+  it('does NOT warn on a tool-prefixed name like fit-baseline-export', () => {
+    // Tool-prefixed (`fit-...`) names satisfy Rule C even though the flat
+    // `fit-baseline-export` command itself was removed — the rule keys on shape,
+    // not on a specific allow-list.
     const content = descriptor({ name: 'fit-baseline-export', description: 'export baseline' });
     expect(analyzeToolCommandTaxonomy(content, FIT_TOOL)).toEqual([]);
   });

@@ -13,7 +13,7 @@
  * sole variadic positional (`[paths...]`), `_args[0]` is the paths array.
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -238,24 +238,25 @@ describe('graphTool command surface', () => {
     const names = (graphTool.commandSpecs ?? []).map((s) => s.name);
     expect(names).toEqual([
       'graph',
-      'graph-lookup',
       'graph-shard-worker',
       'graph-run-worker',
-      'graph-symbol-index',
-      'graph-baseline-export',
-      'catalog-export',
-      'sarif-export',
-      // Canonical nested export spec (Task 2.1) — name 'export', parent 'graph'.
+      // Canonical nested export spec — name 'export', parent 'graph'.
       'export',
-      'graph-recipes',
-      // Grouped Tier-2 children (Task 3.1/3.2/3.4) — name 'recipes' / 'lookup' /
-      // 'index' / 'list', parent 'graph'; reuse the flat handlers.
+      // Grouped Tier-2 children (the canonical `<tool> <verb>` grammar) — name
+      // 'recipes' / 'lookup' / 'index' / 'list', parent 'graph'.
       'recipes',
       'lookup',
       'index',
       'list',
       'graph-equivalence-check',
     ]);
+    // The legacy flat-root aliases are gone.
+    expect(names).not.toContain('graph-lookup');
+    expect(names).not.toContain('graph-symbol-index');
+    expect(names).not.toContain('graph-baseline-export');
+    expect(names).not.toContain('catalog-export');
+    expect(names).not.toContain('sarif-export');
+    expect(names).not.toContain('graph-recipes');
   });
 
   describe('graph handler', () => {
@@ -314,13 +315,13 @@ describe('graphTool command surface', () => {
     });
   });
 
-  describe('graph-lookup handler', () => {
+  describe('graph lookup handler (nested)', () => {
     it('routes to executeLookup with the given name', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         seedCatalog(datastore, [makeOcc({ simpleName: 'saveBaseline', bodyHash: 'h1' })]);
         const { cli, setExitCode, render } = makeMockCli(datastore);
-        await handlerFor('graph-lookup')({ _args: ['saveBaseline'] }, cli);
+        await handlerFor('lookup')({ _args: ['saveBaseline'] }, cli);
         expect(setExitCode).toHaveBeenCalledWith(0);
         // Human lookup output flows through the render seam, not stdout.
         expect(renderedLines(render)).toContain('saveBaseline');
@@ -330,13 +331,13 @@ describe('graphTool command surface', () => {
     });
   });
 
-  describe('graph-symbol-index handler', () => {
+  describe('graph index handler (nested)', () => {
     it('routes to executeSymbolIndex with cwd + out flags', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         seedCatalog(datastore, [makeOcc({ simpleName: 'fn', bodyHash: 'h1' })]);
         const { cli, setExitCode } = makeMockCli(datastore);
-        await handlerFor('graph-symbol-index')({ cwd: workDir, out: 'idx.json', _args: [] }, cli);
+        await handlerFor('index')({ cwd: workDir, out: 'idx.json', _args: [] }, cli);
         expect(setExitCode).toHaveBeenCalledWith(0);
       } finally {
         datastore.close();
@@ -344,138 +345,10 @@ describe('graphTool command surface', () => {
     });
   });
 
-  describe('graph-baseline-export handler', () => {
-    it('exports baseline to disk on success', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        new BaselineRepo(datastore).save('graph', []);
-        const outPath = join(workDir, 'baseline.json');
-        const { cli } = makeMockCli(datastore);
-        await handlerFor('graph-baseline-export')({ out: outPath, _args: [] }, cli);
-        const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-        expect(out).toContain('Exported graph baseline');
-      } finally {
-        datastore.close();
-      }
-    });
-
-    it('emits structured JSON when --json + success', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        new BaselineRepo(datastore).save('graph', []);
-        const outPath = join(workDir, 'baseline.json');
-        const { cli, emitJson } = makeMockCli(datastore);
-        await handlerFor('graph-baseline-export')({ out: outPath, json: true, _args: [] }, cli);
-        expect(emitJson.mock.calls.length).toBe(1);
-        const payload = emitJson.mock.calls[0]?.[0] as { type?: string };
-        expect(payload?.type).toBe('graph-baseline-export');
-      } finally {
-        datastore.close();
-      }
-    });
-
-    it('writes a human error to stderr when no baseline has been captured', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        const outPath = join(workDir, 'baseline.json');
-        const { cli, setExitCode } = makeMockCli(datastore);
-        await handlerFor('graph-baseline-export')({ out: outPath, _args: [] }, cli);
-        expect(setExitCode).toHaveBeenCalledWith(2);
-        const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
-        expect(err).toContain('Error');
-      } finally {
-        datastore.close();
-      }
-    });
-
-    it('emits structured JSON error when --json + missing baseline', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        const outPath = join(workDir, 'baseline.json');
-        const { cli, emitError, setExitCode } = makeMockCli(datastore);
-        await handlerFor('graph-baseline-export')({ out: outPath, json: true, _args: [] }, cli);
-        expect(setExitCode).toHaveBeenCalledWith(2);
-        // 2.12.0 (§5.5): a failed --json run emits a structured error through the
-        // `emitError` seam (host wraps it in a status:'error' CommandOutcome),
-        // not a bare `emitJson({ error })`.
-        expect(emitError.mock.calls.length).toBe(1);
-        const payload = emitError.mock.calls[0]?.[0] as { message?: string; exitCode?: number };
-        expect(payload?.message).toContain('No graph baseline');
-        expect(payload?.exitCode).toBe(2);
-      } finally {
-        datastore.close();
-      }
-    });
-  });
-
-  describe('catalog-export handler', () => {
-    it('runs the pipeline and routes through runCatalogJsonMode', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        currentAdapterRegistry().register(fakeAdapter(workDir));
-        const outPath = join(workDir, 'catalog.json');
-        const { cli, setExitCode } = makeMockCli(datastore);
-        await handlerFor('catalog-export')(
-          {
-            catalogOutput: outPath,
-            tenantId: 't1',
-            repoId: 'r1',
-            gitSha: 'abc123',
-            runId: 'run-1',
-            cwd: workDir,
-            mode: 'initial',
-            resolution: 'exact',
-            _args: [],
-          },
-          cli,
-        );
-        expect(setExitCode).toHaveBeenCalledWith(0);
-        expect(existsSync(outPath)).toBe(true);
-        const parsed = JSON.parse(readFileSync(outPath, 'utf8')) as {
-          version?: string;
-          provenance?: { runId?: string; tenantId?: string; completeness?: string };
-        };
-        expect(parsed.version).toBe('1.0');
-        expect(parsed.provenance?.runId).toBe('run-1');
-        expect(parsed.provenance?.tenantId).toBe('t1');
-        expect(parsed.provenance?.completeness).toBe('complete');
-      } finally {
-        datastore.close();
-      }
-    });
-  });
-
-  describe('sarif-export handler', () => {
-    it('runs the pipeline and writes a SARIF v2.1.0 document to the output path', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        currentAdapterRegistry().register(fakeAdapter(workDir));
-        const outPath = join(workDir, 'out.sarif');
-        const { cli, setExitCode } = makeMockCli(datastore);
-        await handlerFor('sarif-export')(
-          {
-            outputSarif: outPath,
-            tenantId: 't1',
-            repoId: 'r1',
-            cwd: workDir,
-            resolution: 'exact',
-            _args: [],
-          },
-          cli,
-        );
-        expect(setExitCode).toHaveBeenCalledWith(0);
-        expect(existsSync(outPath)).toBe(true);
-        const parsed = JSON.parse(readFileSync(outPath, 'utf8')) as { version?: string };
-        expect(parsed.version).toBe('2.1.0');
-      } finally {
-        datastore.close();
-      }
-    });
-  });
-
-  // Canonical `graph export --format <fmt>` (tool-command-surface-taxonomy
-  // Task 2.1). Same handler bodies as the legacy aliases above; the canonical
-  // spec dispatches on --format and validates the per-format required flags.
+  // Canonical `graph export --format <fmt>` — the single export command (the
+  // legacy flat-root `graph-baseline-export` / `catalog-export` / `sarif-export`
+  // aliases were removed). The canonical spec dispatches on --format and
+  // validates the per-format required flags.
   describe('graph export handler (canonical, --format dispatch)', () => {
     it('--format baseline exports the gate fingerprint JSON', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });

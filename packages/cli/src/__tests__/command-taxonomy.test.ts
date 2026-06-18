@@ -1,21 +1,13 @@
 /**
- * Command-taxonomy resolution test (tool-command-surface-taxonomy Task 4.4).
+ * Command-taxonomy resolution test.
  *
- * The spec's success criteria require that the CANONICAL `<tool> <verb>`
- * subcommands work AND the LEGACY hyphenated/bare names keep working. This test
- * mounts the full bundled program (the same `BUNDLED_TOOLS` + `mountAllToolCommands`
- * path the parity snapshot uses) and asserts BOTH forms resolve to a mounted
- * Commander command — so neither the canonical nor the legacy surface can be
- * dropped without a loud failure.
- *
- * Note on "alias": the legacy and canonical forms are NOT Commander `.aliases()`
- * (their required-flag shapes diverge for exports). They COEXIST as distinct
- * mounted commands — the legacy name is a flat top-level command; the canonical
- * name is a `parent`-nested child under its tool primary (the `<tool> <verb>`
- * grammar). "Both resolve" therefore means: the legacy flat command exists AND
- * the nested canonical child exists under its tool. (The agent-facing
- * resolution-equivalence guarantee is that a user typing either form reaches a
- * working command, which is exactly what coexistence provides.)
+ * The CANONICAL `<tool> <verb>` subcommands are the only command surface — the
+ * legacy flat hyphenated/bare aliases were removed once their deprecation window
+ * closed. This test mounts the full bundled program (the same `BUNDLED_TOOLS` +
+ * `mountAllToolCommands` path the parity snapshot uses) and asserts the canonical
+ * nested children resolve to a mounted Commander command AND that each removed
+ * legacy flat name no longer resolves — so neither the canonical surface can be
+ * dropped nor a legacy alias re-introduced without a loud failure.
  */
 
 import {
@@ -87,18 +79,19 @@ function resolveNested(program: Command, parent: string, verb: string): Command 
   return parentCmd?.commands.find((c) => c.name() === verb || c.aliases().includes(verb));
 }
 
-describe('command taxonomy — canonical + legacy both resolve (Step 2)', () => {
+describe('command taxonomy — canonical resolves, legacy is gone (Step 2)', () => {
   /**
-   * Each row pairs a LEGACY flat command name with its CANONICAL `<tool> <verb>`
-   * form. Both must resolve to a mounted command.
+   * Each row pairs a REMOVED legacy flat command name with its CANONICAL
+   * `<tool> <verb>` form. The canonical child must resolve; the legacy flat name
+   * must NOT resolve (it was deleted entirely).
    */
   const PAIRS: readonly { legacy: string; parent: string; verb: string }[] = [
-    // Export forms (Phase 2). Three legacy graph exports all map to `graph export`.
+    // Export forms. The three legacy graph exports all map to `graph export`.
     { legacy: 'sarif-export', parent: 'graph', verb: 'export' },
     { legacy: 'catalog-export', parent: 'graph', verb: 'export' },
     { legacy: 'graph-baseline-export', parent: 'graph', verb: 'export' },
     { legacy: 'fit-baseline-export', parent: 'fit', verb: 'export' },
-    // Cosmetic grouped forms (Phase 3).
+    // Cosmetic grouped forms.
     { legacy: 'fit-list', parent: 'fit', verb: 'list' },
     { legacy: 'fit-recipes', parent: 'fit', verb: 'recipes' },
     { legacy: 'graph-recipes', parent: 'graph', verb: 'recipes' },
@@ -107,13 +100,13 @@ describe('command taxonomy — canonical + legacy both resolve (Step 2)', () => 
   ];
 
   it.each(PAIRS)(
-    'legacy %s and canonical $parent $verb both resolve to a mounted command',
+    'canonical $parent $verb resolves and legacy %s is removed',
     ({ legacy, parent, verb }) => {
       const program = buildFullProgram();
       expect(
         resolveTopLevel(program, legacy),
-        `legacy flat command '${legacy}' must stay mounted`,
-      ).toBeDefined();
+        `legacy flat command '${legacy}' must be removed`,
+      ).toBeUndefined();
       expect(
         resolveNested(program, parent, verb),
         `canonical '${parent} ${verb}' must be a mounted nested child`,

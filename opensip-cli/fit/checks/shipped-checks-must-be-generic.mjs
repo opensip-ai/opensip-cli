@@ -9,7 +9,7 @@
  * (packages/graph|cli|datastore/...), cites an opensip ADR (ADR-####) or spec
  * section (§N.N), or couples to an internal engine package
  * (@opensip-cli/{graph,simulation,datastore,...}) is INERT for every adopter and
- * just clutters their `fit-list`. Per opensip-cli/fit/checks/README.md, such
+ * just clutters their `fit list`. Per opensip-cli/fit/checks/README.md, such
  * "local facts" checks belong HERE (project-local opensip-cli/fit/checks/*.mjs),
  * not in the shipped pack — "unless the rule is rewritten to apply cleanly to
  * arbitrary customer codebases."

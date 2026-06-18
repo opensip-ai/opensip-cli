@@ -36,9 +36,13 @@ describe('fitnessTool contract conformance', () => {
     expect(fitnessTool.metadata.description.length).toBeGreaterThan(0);
   });
 
-  it('commands list includes fit, fit-list, fit-recipes', () => {
+  it('commands list includes fit + the nested list/recipes/export children', () => {
     const names = fitnessTool.commands.map((c) => c.name);
-    expect(names).toEqual(expect.arrayContaining(['fit', 'fit-list', 'fit-recipes']));
+    expect(names).toEqual(expect.arrayContaining(['fit', 'list', 'recipes', 'export']));
+    // The legacy flat-root aliases are gone.
+    expect(names).not.toContain('fit-list');
+    expect(names).not.toContain('fit-recipes');
+    expect(names).not.toContain('fit-baseline-export');
   });
 
   it("does not own the cross-tool 'report' command", () => {
@@ -56,24 +60,21 @@ describe('fitnessTool contract conformance', () => {
     const specNames = (fitnessTool.commandSpecs ?? []).map((s) => s.name);
     expect(specNames).toEqual([
       'fit',
-      'fit-list',
-      'fit-recipes',
-      // Grouped Tier-2 children (tool-command-surface-taxonomy Task 3.1) —
-      // name 'list' / 'recipes', parent 'fit'; reuse the flat handlers.
+      // Grouped Tier-2 children (the canonical `<tool> <verb>` grammar) —
+      // name 'list' / 'recipes', parent 'fit'.
       'list',
       'recipes',
-      'fit-baseline-export',
-      // Canonical nested export (tool-command-surface-taxonomy Task 2.2) —
-      // name 'export', parent 'fit'.
+      // Canonical nested export — name 'export', parent 'fit'.
       'export',
       // [internal] headless run forked by the live view (ADR-0028).
       'fit-run-worker',
     ]);
   });
 
-  it('fit-list / fit-recipes do not expose pre-GA legacy aliases', () => {
+  it('the nested list/recipes/export children declare no Commander aliases', () => {
     const byName = new Map((fitnessTool.commandSpecs ?? []).map((s) => [s.name, s]));
-    expect(byName.get('fit-list')?.aliases ?? []).toEqual([]);
-    expect(byName.get('fit-recipes')?.aliases ?? []).toEqual([]);
+    expect(byName.get('list')?.aliases ?? []).toEqual([]);
+    expect(byName.get('recipes')?.aliases ?? []).toEqual([]);
+    expect(byName.get('export')?.aliases ?? []).toEqual([]);
   });
 });

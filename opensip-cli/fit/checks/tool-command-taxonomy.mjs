@@ -21,36 +21,29 @@
  * markers in the same literal, exactly the way `command-surface-parity.mjs`
  * text-scans the same files.
  *
- * ── TWO-STAGE ACTIVATION (why this lands green in Phase 0) ───────────────────
- * The taxonomy spec ships in phases; this check is authored in Phase 0 but two of
- * its rules only *activate* once a later phase introduces the construct they
- * enforce, so `pnpm fit` stays green between phases:
+ * ── RULES ────────────────────────────────────────────────────────────────────
+ * The legacy flat-root aliases were removed once their deprecation window closed,
+ * so the only command surface a first-party `tool.ts` declares is the bare tool
+ * verb, the internal workers, and the nested `<tool> <verb>` children. The three
+ * rules:
  *
  * - **Rule A (no masquerading export verb)** flags a bare `*-export` descriptor
  *   (`catalog-export` / `sarif-export`) ONLY when the same file ALSO declares a
- *   canonical `export` descriptor (`name: 'export'`) AND the bare name is NOT a
- *   documented legacy alias ({@link ALLOWED_LEGACY_NAMES}). Phase 2 adds the
- *   canonical `graph export` / `fit export` command — and THAT addition is what
- *   activates Rule A to forbid re-introducing a NEW bare top-level export verb.
- *   The EXISTING `catalog-export`/`sarif-export` commands coexist as documented
- *   legacy aliases (Phase 2 resolved decision: they keep working with
- *   `legacy_alias_used` telemetry because their required-flag shapes diverge from
- *   the canonical `export`), so they are exempt — Rule A only catches a NEW bare
- *   `*-export` verb that is not in the allow-list. Pre-Phase-2 (no canonical
- *   `export` yet) Rule A is dormant.
+ *   canonical `export` descriptor (`name: 'export'`). The canonical `graph export`
+ *   / `fit export` command exists today, so this rule forbids re-introducing a
+ *   bare top-level export verb alongside it — the export surface must be the
+ *   nested `<tool> export` form.
  *
  * - **Rule B (internal commands carry the marker)** flags a worker/equivalence
  *   descriptor (`*-run-worker`, `*-shard-worker`, `graph-equivalence-check`) that
  *   does NOT declare `visibility: 'internal'` ONLY when the same file ALSO
  *   demonstrates the marker convention is in use (at least one descriptor in the
- *   file declares `visibility: 'internal'`). Phase 1 marks the workers
- *   `visibility: 'internal'` — and THAT adoption is what activates Rule B to
- *   enforce that EVERY worker in the file is marked (catching a worker Phase 1
- *   missed). Pre-Phase-1 (no marker anywhere) Rule B is dormant.
+ *   file declares `visibility: 'internal'`). The workers carry the marker today,
+ *   so this rule catches any new worker that forgets it.
  *
  * - **Rule C (verb shape)** is always active (warning-level): every public
- *   descriptor name must be the bare tool verb, a tool-prefixed grouped name, an
- *   allowed legacy alias, or an internal worker name.
+ *   descriptor name must be the bare tool verb, a tool-prefixed grouped name, a
+ *   `parent`-nested child, or an internal worker name.
  *
  * `raw` content: the tokens we read (`name:`, `visibility:`, `ToolCommandDescriptor`)
  * are code, and the path guard restricts us to tool.ts files, so prose cannot
@@ -75,23 +68,6 @@ const TOOL_VERB = {
 /** Internal worker/equivalence command-name shapes (Tier-3). */
 const INTERNAL_NAME_RE = /-(?:run-worker|shard-worker)$/;
 const GRAPH_EQUIVALENCE = 'graph-equivalence-check';
-
-/**
- * Legacy hyphenated aliases the grammar tolerates today (Phase 3 adds the
- * cosmetic `<tool> <verb>` aliases; until then these flat names are the canonical
- * discoverability/lookup/export surfaces and must not warn under Rule C).
- */
-const ALLOWED_LEGACY_NAMES = new Set([
-  'fit-list',
-  'fit-recipes',
-  'fit-baseline-export',
-  'graph-lookup',
-  'graph-symbol-index',
-  'graph-baseline-export',
-  'graph-recipes',
-  'catalog-export',
-  'sarif-export',
-]);
 
 /** Bare masquerading export verbs (no tool prefix) — the T-2 target. */
 const MASQUERADING_EXPORT_RE = /^(?:sarif|catalog)-export$/;
@@ -164,23 +140,16 @@ export function analyzeToolCommandTaxonomy(content, filePath) {
   for (const d of descriptors) {
     const isInternalName = INTERNAL_NAME_RE.test(d.name) || d.name === GRAPH_EQUIVALENCE;
 
-    // Rule A — no NEW masquerading export verb (activates once a canonical
-    // `export` command exists in this file; see header). The EXISTING bare
-    // export commands (`catalog-export`/`sarif-export`) coexist as documented
-    // legacy aliases (Phase 2: kept working with `legacy_alias_used` telemetry
-    // because their required-flag shapes diverge from the canonical `export`), so
-    // names in ALLOWED_LEGACY_NAMES are exempt — Rule A only forbids a NEW bare
-    // `*-export` verb that is not in the allow-list.
-    if (
-      hasCanonicalExport &&
-      MASQUERADING_EXPORT_RE.test(d.name) &&
-      !ALLOWED_LEGACY_NAMES.has(d.name)
-    ) {
+    // Rule A — no masquerading export verb (activates once a canonical `export`
+    // command exists in this file; see header). The legacy flat-root export
+    // aliases were removed, so a bare `*-export` verb alongside the canonical
+    // `export` is always a regression to forbid.
+    if (hasCanonicalExport && MASQUERADING_EXPORT_RE.test(d.name)) {
       violations.push({
         message: `Export command '${d.name}' is a bare top-level verb; it must live under its tool ('${verb} export --format sarif|catalog'), not masquerade as a platform-level command.`,
         severity: 'error',
         line: d.line,
-        suggestion: `Make '${verb} export' the canonical command (declare 'export' with parent: '${verb}') and keep '${d.name}' only as a legacy alias of it.`,
+        suggestion: `Make '${verb} export' the canonical command (declare 'export' with parent: '${verb}') instead of a bare flat verb.`,
       });
       continue;
     }
@@ -201,16 +170,14 @@ export function analyzeToolCommandTaxonomy(content, filePath) {
     }
 
     // Rule C — verb shape (always active). A public descriptor name must be the
-    // bare tool verb, a tool-prefixed grouped name (`<verb>-...`), a `parent`-
-    // nested child (`graph export` IS the grammar, by construction), or a
-    // tolerated legacy alias. Anything else does not fit the
-    // `<tool> <verb> [object]` grammar and is flagged (warning — shape guidance,
-    // not a hard gate).
+    // bare tool verb, a tool-prefixed grouped name (`<verb>-...`), or a `parent`-
+    // nested child (`graph export` IS the grammar, by construction). Anything
+    // else does not fit the `<tool> <verb> [object]` grammar and is flagged
+    // (warning — shape guidance, not a hard gate).
     const isBareVerb = d.name === verb;
     const isToolPrefixed = verb !== undefined && d.name.startsWith(`${verb}-`);
     const isNested = d.parent !== undefined;
-    const isAllowedLegacy = ALLOWED_LEGACY_NAMES.has(d.name);
-    if (!isBareVerb && !isToolPrefixed && !isNested && !isAllowedLegacy) {
+    if (!isBareVerb && !isToolPrefixed && !isNested) {
       violations.push({
         message: `Command '${d.name}' does not fit the Tier-2 grammar: a public ${segment ?? 'tool'} command should be the bare verb '${verb}' or a tool-grouped form ('${verb} <object>' / nested via parent: '${verb}').`,
         severity: 'warning',

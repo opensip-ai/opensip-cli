@@ -36,25 +36,21 @@
  *    `--tags a --tags b`) now accumulate.
  *
  * 3. tool-command-surface-taxonomy Tasks 2.1/2.2: a NESTED canonical `export`
- *    subcommand now appears under BOTH `fit` (`fit export --format baseline`)
+ *    subcommand appears under BOTH `fit` (`fit export --format baseline`)
  *    and `graph` (`graph export --format sarif|catalog|baseline`). These are the
- *    canonical export-under-tool forms (mounted via the Phase 0 `parent`-nested
- *    mount). The legacy flat-root `sarif-export` / `catalog-export` /
- *    `graph-baseline-export` / `fit-baseline-export` commands COEXIST unchanged
- *    (different required-flag shapes, not Commander aliases) — so the surface is
- *    purely ADDITIVE: the two nested `export` leaves are added; nothing is
- *    removed.
+ *    canonical export-under-tool forms (mounted via the `parent`-nested mount).
  *
  * 4. tool-command-surface-taxonomy Task 3.1/3.2/3.3/3.4: NESTED grouped
  *    `<tool> <verb>` children — `fit list` / `fit recipes`, `graph recipes` /
- *    `graph lookup` / `graph index` / `graph list`, and `sim recipes` — now
- *    appear under their tool primaries (mounted via the same Phase 0
- *    `parent`-nested mount). The grouped forms REUSE the existing flat handlers
- *    by reference; the legacy flat `fit-list` / `fit-recipes` / `graph-recipes` /
- *    `graph-lookup` / `graph-symbol-index` commands COEXIST as working aliases.
- *    `sim recipes` and `graph list` are NEW discoverability commands (no flat
- *    predecessor). The surface is purely ADDITIVE: nested leaves are added;
- *    nothing is removed.
+ *    `graph lookup` / `graph index` / `graph list`, and `sim recipes` — appear
+ *    under their tool primaries (mounted via the same `parent`-nested mount).
+ *
+ * 5. The nine legacy flat-root aliases — `fit-list` / `fit-recipes` /
+ *    `fit-baseline-export` / `graph-recipes` / `graph-lookup` /
+ *    `graph-symbol-index` / `graph-baseline-export` / `sarif-export` /
+ *    `catalog-export` — were REMOVED once their deprecation window closed. The
+ *    canonical nested `<tool> <verb>` forms (deltas 3 + 4) are the only command
+ *    surface; the flat verbs no longer appear at the top level.
  *
  * Every other command is byte-identical to 2.10.0. Any change OTHER than the
  * deltas above is a regression to investigate.
@@ -305,11 +301,12 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     expect(nestedChild(program, 'graph', 'list'), '`graph list` must be mounted').toBeDefined();
   });
 
-  it('the three --resolution-bearing graph commands declare choices exact|fast (the sanctioned delta)', () => {
+  it('the --resolution-bearing graph commands declare choices exact|fast (the sanctioned delta)', () => {
     const program = buildFullProgram();
-    const RESOLUTION_COMMANDS = ['graph', 'catalog-export', 'sarif-export'];
-    for (const name of RESOLUTION_COMMANDS) {
-      const cmd = program.commands.find((c) => c.name() === name);
+    // The legacy flat-root catalog-export/sarif-export were removed; the
+    // --resolution flag now lives on the `graph` primary and the canonical
+    // nested `graph export` command.
+    const assertResolution = (cmd: Command | undefined, name: string): void => {
       expect(cmd, `expected a mounted '${name}' command`).toBeDefined();
       const resolution = cmd!.options.find((o) => o.long === '--resolution');
       expect(resolution, `${name} must declare --resolution`).toBeDefined();
@@ -318,6 +315,12 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
         'fast',
       ]);
       expect(resolution!.defaultValue).toBe('exact');
-    }
+    };
+
+    assertResolution(
+      program.commands.find((c) => c.name() === 'graph'),
+      'graph',
+    );
+    assertResolution(nestedChild(program, 'graph', 'export'), 'graph export');
   });
 });

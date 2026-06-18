@@ -1,21 +1,15 @@
 /**
- * fit-export-command-spec — the canonical `fit export --format baseline` command
- * (tool-command-surface-taxonomy Task 2.2) and its legacy `fit-baseline-export`
- * alias share ONE handler body (`runFitBaselineExport`, exercised via both specs
- * here). These tests assert: (1) the canonical spec dispatches `--format
- * baseline` to the host baseline SARIF seam; (2) the legacy alias emits
- * `legacy_alias_used` telemetry and the SAME seam call; (3) both surface the
- * ConfigurationError "no baseline" path identically (exit 2 + stderr / --json).
+ * fit-export-command-spec — the canonical `fit export --format baseline` command.
+ * These tests assert: (1) the canonical spec dispatches `--format baseline` to
+ * the host baseline SARIF seam; (2) it surfaces the ConfigurationError "no
+ * baseline" path (exit 2 + stderr / --json). The legacy flat-root
+ * `fit-baseline-export` alias was removed.
  */
 
-import { ConfigurationError, logger } from '@opensip-cli/core';
+import { ConfigurationError } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import {
-  fitBaselineExportCommandSpec,
-  fitExportCommandSpec,
-  FIT_EXPORT_FORMATS,
-} from '../fit-aux-command-specs.js';
+import { fitExportCommandSpec, FIT_EXPORT_FORMATS } from '../fit-aux-command-specs.js';
 
 import type { ToolCliContext } from '@opensip-cli/core';
 
@@ -103,21 +97,5 @@ describe('fit export (canonical) command spec', () => {
     expect(emitError.mock.calls.length).toBe(1);
     const payload = emitError.mock.calls[0]?.[0] as { exitCode?: number };
     expect(payload?.exitCode).toBe(2);
-  });
-});
-
-describe('fit-baseline-export (legacy alias) command spec', () => {
-  it('emits legacy_alias_used telemetry and calls the SAME host seam', async () => {
-    const { cli, exportBaselineSarif } = makeCli();
-    // The legacy handler logs via the module logger from @opensip-cli/core.
-    const loggerInfo = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
-    await fitBaselineExportCommandSpec.handler({ out: OUT_PATH, _args: [] }, cli);
-    expect(exportBaselineSarif).toHaveBeenCalledWith('fitness', OUT_PATH);
-    const evt = loggerInfo.mock.calls.find(
-      (c) => (c[0] as { evt?: string }).evt === 'cli.command.legacy_alias_used',
-    );
-    expect(evt, 'legacy_alias_used telemetry must be emitted').toBeDefined();
-    expect((evt?.[0] as { legacyCommand?: string }).legacyCommand).toBe('fit-baseline-export');
-    expect((evt?.[0] as { canonical?: string }).canonical).toBe('fit export --format baseline');
   });
 });

@@ -76,18 +76,16 @@ describe('buildAgentCatalog', () => {
       }
     });
 
-    it('does not advertise the deprecated flat export verbs as entry points', () => {
+    it('does not advertise the removed flat export verbs as entry points', () => {
       const c = buildAgentCatalog();
       const commands = c.entryPoints.map((e) => e.command);
-      for (const deprecated of [
+      for (const removed of [
         'sarif-export',
         'catalog-export',
         'graph-baseline-export',
         'fit-baseline-export',
       ]) {
-        expect(commands, `deprecated '${deprecated}' must not be an entry point`).not.toContain(
-          deprecated,
-        );
+        expect(commands, `removed '${removed}' must not be an entry point`).not.toContain(removed);
       }
     });
   });
