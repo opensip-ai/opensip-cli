@@ -1,0 +1,2 @@
+PASS  (0 Errors, 0 Warnings) | Duration 1.2s
+  Use --verbose for detailed results | opensip report for HTML report

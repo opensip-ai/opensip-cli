@@ -1,0 +1,8 @@
+Unit                                     | Status  | Errors | Warnings | Validated    | Ignores |
+Duration
+-----------------------------------------|---------|--------|----------|--------------|---------|---
+--------
+naming                                   | PASS    | 0      | 0        | 10 files     | 0       |
+3ms
+PASS  (0 Errors, 0 Warnings) | Duration 3ms
+  Use --verbose for detailed results | opensip report for HTML report

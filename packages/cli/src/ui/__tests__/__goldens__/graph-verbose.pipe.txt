@@ -1,0 +1,5 @@
+== Catalog ==
+5 functions across 2 files (cacheHit=false)
+
+Resolution: fast (syntactic) — edges are approximate.
+PASS  (0 Errors, 0 Warnings) | Duration 50ms
