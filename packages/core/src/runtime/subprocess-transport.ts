@@ -18,9 +18,8 @@
 import { fork } from 'node:child_process';
 
 import { EnvRegistry } from '../lib/env-registry.js';
-import { logger } from '../lib/logger.js';
 import { correlationToEnv } from '../lib/run-correlation.js';
-import { currentScope } from '../lib/run-scope.js';
+import { currentLogger, currentScope } from '../lib/run-scope.js';
 import { currentTraceparent } from '../lib/telemetry.js';
 
 import { createInProcessTransport } from './in-process-transport.js';
@@ -84,6 +83,10 @@ export function createSubprocessProgressRun<TEvent, TResult>(
   // is NOT on `descriptor.correlation` (B1: env-only) and is injected below.
   const runId = currentScope()?.runId;
   const traceId = currentTraceparent();
+  // Per-run logger (ADR-0053): the module singleton has no daily-logs file sink,
+  // so the `cli.subprocess.*` JSONL lines must route through `currentScope().logger`
+  // (the instance the bootstrap configured) to be greppable by `runId`.
+  const runLogger = currentLogger();
   // `workerKind` defaults to `'live-engine'` — the only fork-path caller today
   // (graph/fit/sim live runners). An external-tool fork (ADR-0054) would set its
   // own `descriptor.correlation.workerKind`.
@@ -142,7 +145,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
   // `cli.subprocess.spawn` (Event Catalog): the parent records that it forked a
   // worker, keyed by `runId`/`traceId`/`workerKind`/`command`, so an operator can
   // pivot from a child log line back to this fork.
-  logger.info({
+  runLogger.info({
     evt: 'cli.subprocess.spawn',
     module: 'core:subprocess-transport',
     ...(runId === undefined ? {} : { runId }),
@@ -171,7 +174,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
       (msg?.kind === 'error' ? msg.correlation?.workerKind : undefined) ?? workerKind;
     const resolvedFailureClass =
       (msg?.kind === 'error' ? msg.failureClass : undefined) ?? failureClass;
-    logger.error({
+    runLogger.error({
       evt: 'cli.subprocess.failed',
       module: 'core:subprocess-transport',
       ...(runId === undefined ? {} : { runId }),
@@ -201,7 +204,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
       // generic run-level `complete` under the inherited `runId`. This is the only
       // parent-side completion, in the `result`-success branch alone.
       done(() => {
-        logger.info({
+        runLogger.info({
           evt: 'cli.subprocess.complete',
           module: 'core:subprocess-transport',
           ...(runId === undefined ? {} : { runId }),
@@ -272,7 +275,7 @@ export function runOffThreadOrInProcess<TEvent, TResult>(opts: {
       // The child could not be forked — degrade to in-process so the run still
       // completes (the live view may stutter; output is unchanged). Log the
       // degradation so it is observable rather than a silent swallow.
-      logger.warn({
+      currentLogger().warn({
         evt: 'transport.worker.fork_failed',
         module: 'core:subprocess-transport',
         command: opts.descriptor.command,

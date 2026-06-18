@@ -13,9 +13,9 @@
  */
 
 import {
+  currentLogger,
   currentScope,
   currentTraceparent,
-  logger,
   ValidationError,
   withSpanAsync,
   type Signal,
@@ -175,8 +175,12 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     concurrency: input.concurrency,
     ...(input.language === undefined ? {} : { language: input.language }),
   });
+  // Per-run logger (ADR-0053): the singleton has no daily-logs file sink, so
+  // these merge-stage JSONL lines (`graph.sharded.shard_failed`/`graph.shard.merge`)
+  // must go through `currentScope().logger` to land in the file the operator greps.
+  const mergeLogger = currentLogger();
   for (const failure of built.failures) {
-    logger.error({
+    mergeLogger.error({
       evt: 'graph.sharded.shard_failed',
       module: 'graph:sharded',
       shardId: failure.shardId,
@@ -198,11 +202,20 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   // fragment count being merged + the ids of any shards whose worker failed,
   // stamped with the run/trace ids so it pivots to the same run as the runner's
   // events. `traceId` is omitted when OTel is off (currentTraceparent → undefined).
-  const mergeTraceId = currentTraceparent();
-  logger.info({
+  // `parentCommand` (+ tool/repo) is stamped so the operator's
+  // `runId`/`parentCommand` filter returns the merge line too (GAP e — no
+  // un-attributed shard lines).
+  const mergeCorrelation = currentScope()?.correlation;
+  const mergeTraceId = currentTraceparent() ?? mergeCorrelation?.traceId;
+  mergeLogger.info({
     evt: 'graph.shard.merge',
     module: 'graph:sharded',
-    runId: currentScope()?.runId ?? '',
+    runId: mergeCorrelation?.runId ?? currentScope()?.runId ?? '',
+    ...(mergeCorrelation?.parentCommand === undefined
+      ? {}
+      : { parentCommand: mergeCorrelation.parentCommand }),
+    ...(mergeCorrelation?.tool === undefined ? {} : { tool: mergeCorrelation.tool }),
+    ...(mergeCorrelation?.repo === undefined ? {} : { repo: mergeCorrelation.repo }),
     ...(mergeTraceId === undefined ? {} : { traceId: mergeTraceId }),
     fragmentCount: fragments.length,
     failedShardIds: built.failures.map((f) => f.shardId),
@@ -342,7 +355,7 @@ function persistShardedCatalog(
     // Best-effort write: the freshly-built catalog is returned regardless.
     // replaceAll already logged the underlying error; note the continuation
     // so the swallow isn't silent.
-    logger.debug({
+    currentLogger().debug({
       evt: 'graph.sharded.cache_write_skipped',
       module: 'graph:sharded',
       err: error instanceof Error ? error.message : String(error),

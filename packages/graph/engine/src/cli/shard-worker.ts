@@ -22,9 +22,9 @@ import { readFileSync } from 'node:fs';
 
 import {
   correlationFromEnv,
+  currentLogger,
   currentScope,
   currentTraceparent,
-  logger,
   REPO_OTEL_ATTR,
   TENANT_OTEL_ATTR,
 } from '@opensip-cli/core';
@@ -78,7 +78,7 @@ function resolveWorkerCorrelation(spec: ShardWorkerSpec): RunCorrelation {
   const runId = currentScope()?.runId ?? '';
   const fromEnv = correlationFromEnv();
   if (spec.correlation === undefined && fromEnv === undefined) {
-    logger.warn({
+    currentLogger().warn({
       evt: 'cli.subprocess.correlation_missing',
       module: 'graph:shard-worker',
       runId,
@@ -119,6 +119,11 @@ function shardSpanAttrs(corr: RunCorrelation): Attributes {
  * the error to this shard.
  */
 export async function executeShardWorker(specPath: string, cli: ToolCliContext): Promise<void> {
+  // Per-run logger (ADR-0053): the worker's own bootstrap stamped the daily-logs
+  // file sink onto `currentScope().logger`. The module singleton has no file sink,
+  // so `graph.shard.worker.*` lines must go through `currentLogger()` to land in
+  // the JSONL file the 2am playbook filters by `runId`/`shardId`.
+  const workerLogger = currentLogger();
   let shardId = '<unknown>';
   // The full correlation for failure logging. Resolved lazily once the spec
   // parses; until then a bare bag carries the env-inherited runId (B1) so even a
@@ -136,7 +141,7 @@ export async function executeShardWorker(specPath: string, cli: ToolCliContext):
     const spec = JSON.parse(readFileSync(specPath, 'utf8')) as ShardWorkerSpec;
     shardId = spec.shard.id;
     correlation = resolveWorkerCorrelation(spec);
-    logger.info({
+    workerLogger.info({
       evt: 'graph.shard.worker.start',
       module: 'graph:shard-worker',
       ...workerLogFields(correlation),
@@ -144,7 +149,7 @@ export async function executeShardWorker(specPath: string, cli: ToolCliContext):
     const result = await buildShard(spec, correlation);
     // Single write of the whole JSON document — the parent reads stdout to EOF.
     process.stdout.write(JSON.stringify(result));
-    logger.info({
+    workerLogger.info({
       evt: 'graph.shard.worker.complete',
       module: 'graph:shard-worker',
       ...workerLogFields(correlation),
@@ -152,7 +157,7 @@ export async function executeShardWorker(specPath: string, cli: ToolCliContext):
     });
     cli.setExitCode(0);
   } catch (error) {
-    logger.error({
+    workerLogger.error({
       evt: 'graph.shard.worker.error',
       module: 'graph:shard-worker',
       ...workerLogFields(correlation),

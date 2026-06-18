@@ -18,7 +18,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { cpus, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { correlationToEnv, currentScope, currentTraceparent, logger } from '@opensip-cli/core';
+import {
+  correlationToEnv,
+  currentLogger,
+  currentScope,
+  currentTraceparent,
+} from '@opensip-cli/core';
 
 import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
@@ -184,7 +189,12 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
   // snapshot's events pivot to the same trace as the JSONL events.
   const diagnostics = currentScope()?.diagnostics;
   const diagnosticsCorrelation = diagnosticsMilestoneCorrelation(correlation);
-  logger.info({
+  // Emit through the per-run logger (ADR-0053) — the singleton has no file sink,
+  // so the JSONL `graph.shard.runner.*` lines the 2am playbook greps for would be
+  // dropped. `currentLogger()` resolves `currentScope().logger`, the instance the
+  // bootstrap configured with the daily logs file.
+  const runLogger = currentLogger();
+  runLogger.info({
     evt: 'graph.shard.runner.start',
     module: 'graph:shard-runner',
     ...correlationFields,
@@ -230,7 +240,7 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
   // log; the full `failure.stderr` stays untouched on the returned ShardFailure
   // (M4) so the user-facing message keeps the complete output.
   for (const failure of failures) {
-    logger.error({
+    runLogger.error({
       evt: 'graph.shard.runner.shard_failed',
       module: 'graph:shard-runner',
       ...correlationFields,
@@ -248,7 +258,7 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
     });
   }
 
-  logger.info({
+  runLogger.info({
     evt: 'graph.shard.runner.complete',
     module: 'graph:shard-runner',
     ...correlationFields,
@@ -310,9 +320,13 @@ export function planShardWork(
     if (fragment) cached.push(fragment);
     else toBuild.push(shard);
   }
-  logger.info({
+  currentLogger().info({
     evt: 'graph.shard.plan',
     module: 'graph:shard-runner',
+    // Stamp the same correlation bag (incl. `parentCommand`) as the other
+    // `graph.shard.*` lines so an operator's `runId`/`parentCommand` filter
+    // returns this run's plan line too (GAP e — no un-attributed shard lines).
+    ...correlationLogFields(currentScope()?.correlation),
     reused: cached.length,
     rebuild: toBuild.length,
   });
