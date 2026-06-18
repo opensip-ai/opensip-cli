@@ -81,6 +81,10 @@
         "description": "Run graph analysis and write OpenSIP-convention SARIF v2.1.0 findings to a file"
       },
       {
+        "name": "export",
+        "description": "Export graph analysis artifacts (--format sarif | catalog | baseline)"
+      },
+      {
         "name": "graph-recipes",
         "description": "List available graph recipes"
       }

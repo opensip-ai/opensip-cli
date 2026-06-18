@@ -32,6 +32,7 @@ import {
   graphBaselineExportCommandSpec,
   graphCatalogExportCommandSpec,
   graphEquivalenceCheckCommandSpec,
+  graphExportCommandSpec,
   graphLookupCommandSpec,
   graphRecipesCommandSpec,
   graphSarifExportCommandSpec,
@@ -136,6 +137,21 @@ const GRAPH_RECIPES: ToolCommandDescriptor = {
   description: 'List available graph recipes',
 };
 
+/**
+ * The CANONICAL graph export command (tool-command-surface-taxonomy Task 2.1).
+ * Nested under the `graph` primary (`parent: 'graph'`) so it reads as
+ * `graph export --format sarif|catalog|baseline`. The legacy flat-root
+ * `catalog-export`/`sarif-export`/`graph-baseline-export` descriptors COEXIST as
+ * working commands (different required-flag shapes), with `legacy_alias_used`
+ * telemetry.
+ */
+const GRAPH_EXPORT: ToolCommandDescriptor = {
+  name: 'export',
+  parent: 'graph',
+  description:
+    'Export graph analysis artifacts (--format sarif | catalog | baseline)',
+};
+
 // =============================================================================
 // COMMAND-SPEC ASSEMBLY
 // =============================================================================
@@ -158,6 +174,9 @@ const graphCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
   graphBaselineExportCommandSpec,
   graphCatalogExportCommandSpec,
   graphSarifExportCommandSpec,
+  // Canonical nested export (Task 2.1) — mounts as `graph export` under the
+  // `graph` primary via the Phase 0 nested-mount capability.
+  graphExportCommandSpec,
   graphRecipesCommandSpec,
   graphEquivalenceCheckCommandSpec,
 ];
@@ -266,6 +285,7 @@ export const graphTool: Tool = {
     GRAPH_RUN_WORKER,
     GRAPH_CATALOG_EXPORT,
     GRAPH_SARIF_EXPORT,
+    GRAPH_EXPORT,
     GRAPH_RECIPES,
   ],
   // Launch Phase 5: graph declares its command surface; the host mounts

@@ -245,6 +245,8 @@ describe('graphTool command surface', () => {
       'graph-baseline-export',
       'catalog-export',
       'sarif-export',
+      // Canonical nested export spec (Task 2.1) — name 'export', parent 'graph'.
+      'export',
       'graph-recipes',
       'graph-equivalence-check',
     ]);
@@ -459,6 +461,109 @@ describe('graphTool command surface', () => {
         expect(existsSync(outPath)).toBe(true);
         const parsed = JSON.parse(readFileSync(outPath, 'utf8')) as { version?: string };
         expect(parsed.version).toBe('2.1.0');
+      } finally {
+        datastore.close();
+      }
+    });
+  });
+
+  // Canonical `graph export --format <fmt>` (tool-command-surface-taxonomy
+  // Task 2.1). Same handler bodies as the legacy aliases above; the canonical
+  // spec dispatches on --format and validates the per-format required flags.
+  describe('graph export handler (canonical, --format dispatch)', () => {
+    it('--format baseline exports the gate fingerprint JSON', async () => {
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        new BaselineRepo(datastore).save('graph', []);
+        const outPath = join(workDir, 'baseline.json');
+        const { cli } = makeMockCli(datastore);
+        await handlerFor('export')({ format: 'baseline', out: outPath, _args: [] }, cli);
+        const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
+        expect(out).toContain('Exported graph baseline');
+      } finally {
+        datastore.close();
+      }
+    });
+
+    it('--format catalog runs the pipeline and writes the CatalogExport JSON', async () => {
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        currentAdapterRegistry().register(fakeAdapter(workDir));
+        const outPath = join(workDir, 'catalog.json');
+        const { cli, setExitCode } = makeMockCli(datastore);
+        await handlerFor('export')(
+          {
+            format: 'catalog',
+            catalogOutput: outPath,
+            tenantId: 't1',
+            repoId: 'r1',
+            gitSha: 'abc123',
+            runId: 'run-1',
+            cwd: workDir,
+            mode: 'initial',
+            resolution: 'exact',
+            _args: [],
+          },
+          cli,
+        );
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        expect(existsSync(outPath)).toBe(true);
+      } finally {
+        datastore.close();
+      }
+    });
+
+    it('--format sarif runs the pipeline and writes a SARIF document', async () => {
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        currentAdapterRegistry().register(fakeAdapter(workDir));
+        const outPath = join(workDir, 'out.sarif');
+        const { cli, setExitCode } = makeMockCli(datastore);
+        await handlerFor('export')(
+          {
+            format: 'sarif',
+            outputSarif: outPath,
+            tenantId: 't1',
+            repoId: 'r1',
+            cwd: workDir,
+            resolution: 'exact',
+            _args: [],
+          },
+          cli,
+        );
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        expect(existsSync(outPath)).toBe(true);
+      } finally {
+        datastore.close();
+      }
+    });
+
+    it('rejects a missing per-format required flag with exit 2 + stderr', async () => {
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, setExitCode } = makeMockCli(datastore);
+        // --format sarif requires --output-sarif/--tenant-id/--repo-id; omit them.
+        await handlerFor('export')({ format: 'sarif', cwd: workDir, _args: [] }, cli);
+        expect(setExitCode).toHaveBeenCalledWith(2);
+        const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+        expect(err).toContain('requires');
+      } finally {
+        datastore.close();
+      }
+    });
+
+    it('emits a structured error when --json + missing required flag', async () => {
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, emitError, setExitCode } = makeMockCli(datastore);
+        await handlerFor('export')(
+          { format: 'baseline', json: true, cwd: workDir, _args: [] },
+          cli,
+        );
+        expect(setExitCode).toHaveBeenCalledWith(2);
+        expect(emitError.mock.calls.length).toBe(1);
+        const payload = emitError.mock.calls[0]?.[0] as { exitCode?: number };
+        expect(payload?.exitCode).toBe(2);
       } finally {
         datastore.close();
       }

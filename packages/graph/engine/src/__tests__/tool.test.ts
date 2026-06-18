@@ -50,6 +50,9 @@ describe('graphTool contract conformance (AC-2)', () => {
       'graph-run-worker',
       'catalog-export',
       'sarif-export',
+      // Canonical nested export (tool-command-surface-taxonomy Task 2.1) —
+      // mounts as `graph export` (parent: 'graph').
+      'export',
       'graph-recipes',
     ]);
   });
@@ -66,6 +69,8 @@ describe('graphTool contract conformance (AC-2)', () => {
       'graph-baseline-export',
       'catalog-export',
       'sarif-export',
+      // Canonical nested export spec (Task 2.1) — name 'export', parent 'graph'.
+      'export',
       'graph-recipes',
       'graph-equivalence-check',
     ]);
