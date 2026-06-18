@@ -56,6 +56,7 @@ import {
 import {
   runOffThreadOrInProcess,
   currentScope,
+  liveEngineCorrelation,
   type LiveViewContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
@@ -169,8 +170,18 @@ function FitRunner({
       const specDir = mkdtempSync(join(tmpdir(), 'fit-worker-'));
       const specPath = join(specDir, 'spec.json');
       writeFileSync(specPath, JSON.stringify(args), 'utf8');
+      // Forward the parent run's correlation bag (composition root, Phase 0) so
+      // the forked live-engine worker's logs attribute to this run — symmetric to
+      // the spawn-path shard-runner. The transport injects OPENSIP_RUN_ID from
+      // currentScope()?.runId (B1); the descriptor omits runId and marks the
+      // live-engine fork via workerKind.
+      const correlation = liveEngineCorrelation(currentScope()?.correlation);
       const run = runOffThreadOrInProcess<ProgressEvent, Awaited<ReturnType<typeof executeFit>>>({
-        descriptor: { command: process.argv[1] ?? '', argv: ['fit-run-worker', specPath] },
+        descriptor: {
+          command: process.argv[1] ?? '',
+          argv: ['fit-run-worker', specPath],
+          ...(correlation ? { correlation } : {}),
+        },
         inProcess: (emit) => executeFitWithProgress(args, emit),
       });
 

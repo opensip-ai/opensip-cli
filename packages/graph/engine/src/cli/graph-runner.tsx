@@ -56,6 +56,7 @@ import {
 import {
   runOffThreadOrInProcess,
   currentScope,
+  liveEngineCorrelation,
   type LiveViewContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
@@ -304,11 +305,18 @@ function GraphRunner({
       }),
       'utf8',
     );
+    // Forward the parent run's correlation bag (assembled at the bootstrap
+    // composition root, Phase 0) so the forked live-engine worker's log lines
+    // attribute to this run — symmetric to the spawn-path shard-runner. The
+    // transport injects OPENSIP_RUN_ID from currentScope()?.runId (B1), so the
+    // descriptor omits runId; workerKind marks this as the live-engine fork.
+    const correlation = liveEngineCorrelation(currentScope()?.correlation);
     const run = runOffThreadOrInProcess<ProgressEvent, LiveGraphOutput>({
       preferWorker: true,
       descriptor: {
         command: process.argv[1] ?? '',
         argv: ['graph-run-worker', specPath],
+        ...(correlation ? { correlation } : {}),
       },
       inProcess: (emit) =>
         sharded

@@ -49,6 +49,7 @@ import {
 import {
   runOffThreadOrInProcess,
   currentScope,
+  liveEngineCorrelation,
   type LiveViewContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
@@ -148,8 +149,18 @@ export function SimRunner({
     const specDir = mkdtempSync(join(tmpdir(), 'sim-worker-'));
     const specPath = join(specDir, 'spec.json');
     writeFileSync(specPath, JSON.stringify(args), 'utf8');
+    // Forward the parent run's correlation bag (composition root, Phase 0) so the
+    // forked live-engine worker's logs attribute to this run — symmetric to the
+    // spawn-path shard-runner. The transport injects OPENSIP_RUN_ID from
+    // currentScope()?.runId (B1); the descriptor omits runId and marks the
+    // live-engine fork via workerKind.
+    const correlation = liveEngineCorrelation(currentScope()?.correlation);
     const run = runOffThreadOrInProcess<ProgressEvent, Awaited<ReturnType<typeof executeSim>>>({
-      descriptor: { command: process.argv[1] ?? '', argv: ['sim-run-worker', specPath] },
+      descriptor: {
+        command: process.argv[1] ?? '',
+        argv: ['sim-run-worker', specPath],
+        ...(correlation ? { correlation } : {}),
+      },
       inProcess: (emit) => executeSimWithProgress(args, emit),
     });
     setState({ phase: 'running', subscribe: run.onProgress });
