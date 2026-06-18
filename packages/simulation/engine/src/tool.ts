@@ -16,6 +16,7 @@ import { defineCommand, readPackageVersion } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
+import { simRecipesCommandSpec } from './cli/sim-recipes.js';
 import { renderSimLive } from './cli/sim-runner.js';
 import { simRunWorkerCommandSpec } from './cli/sim-worker.js';
 import { executeSim } from './cli/sim.js';
@@ -51,6 +52,19 @@ import type { DataStore } from '@opensip-cli/datastore';
 const SIM: ToolCommandDescriptor = {
   name: 'sim',
   description: 'Run simulation scenarios',
+};
+
+/**
+ * `sim recipes` — the missing discoverability command
+ * (tool-command-surface-taxonomy Task 3.3). Sim could RUN a recipe
+ * (`sim --recipe`) but could not LIST recipes. Mounts as a grouped Tier-2 child
+ * under the `sim` primary (`parent: 'sim'`). There is no legacy flat
+ * `sim-recipes` to alias — this is a NEW command.
+ */
+const SIM_RECIPES: ToolCommandDescriptor = {
+  name: 'recipes',
+  parent: 'sim',
+  description: 'List available simulation recipes',
 };
 
 const SIM_RUN_WORKER: ToolCommandDescriptor = {
@@ -398,12 +412,14 @@ export const simulationTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Run simulation scenarios against a codebase',
   },
-  commands: [SIM, SIM_RUN_WORKER],
+  commands: [SIM, SIM_RECIPES, SIM_RUN_WORKER],
   pluginLayout: SIM_PLUGIN_LAYOUT,
   // Sim declares its command surface; the host mounts it via mountCommandSpec.
   // The deprecated
   // `register()` fallback is gone — sim no longer touches Commander.
-  commandSpecs: [simCommand, simRunWorkerCommandSpec],
+  // `sim recipes` (Task 3.3) nests under the `sim` primary via the Phase 0
+  // nested-mount capability.
+  commandSpecs: [simCommand, simRecipesCommandSpec, simRunWorkerCommandSpec],
   contributeScope,
   sessionReplay: {
     tool: 'sim',

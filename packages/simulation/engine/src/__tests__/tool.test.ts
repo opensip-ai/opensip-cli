@@ -182,19 +182,23 @@ describe('simulationTool metadata', () => {
     expect(simulationTool.metadata.description).toContain('simulation');
   });
 
-  it('declares the user-facing sim subcommand (+ the internal worker)', () => {
+  it('declares the user-facing sim subcommand (+ recipes + the internal worker)', () => {
     const names = simulationTool.commands.map((c) => c.name);
     expect(names).toContain('sim');
+    // tool-command-surface-taxonomy Task 3.3: the new `sim recipes`
+    // discoverability child (name 'recipes', parent 'sim').
+    expect(names).toContain('recipes');
     // The internal off-main-process worker (ADR-0028), forked by the live view.
     expect(names).toContain('sim-run-worker');
-    expect(simulationTool.commands).toHaveLength(2);
+    expect(simulationTool.commands).toHaveLength(3);
   });
 });
 
 describe('simulationTool command surface (Phase 3 — CommandSpec migration)', () => {
   it('mounts via commandSpecs — the one command surface (register() removed in 3.0.0)', () => {
-    // `sim` + the internal `sim-run-worker` (ADR-0028).
-    expect(simulationTool.commandSpecs).toHaveLength(2);
+    // `sim` + the new `sim recipes` (taxonomy Task 3.3) + the internal
+    // `sim-run-worker` (ADR-0028).
+    expect(simulationTool.commandSpecs).toHaveLength(3);
     // `register` is no longer a Tool member (3.0.0) — its absence is structural,
     // enforced by the type system, not asserted at runtime.
   });

@@ -47,6 +47,10 @@
         "description": "Run simulation scenarios"
       },
       {
+        "name": "recipes",
+        "description": "List available simulation recipes"
+      },
+      {
         "name": "sim-run-worker",
         "description": "[internal] Run sim headless and stream progress + result over IPC (forked by the live view)"
       }
