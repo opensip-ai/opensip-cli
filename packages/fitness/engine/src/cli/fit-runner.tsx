@@ -50,7 +50,7 @@ import {
 import {
   type FitOptions,
   type ErrorResult,
-  type FitDoneResult,
+  type RunPresentation,
   type SignalEnvelope,
 } from '@opensip-cli/contracts';
 import {
@@ -60,7 +60,7 @@ import {
   type ToolRunCompletion,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
-import { Box, Static, Text, useApp, render } from 'ink';
+import { Box, Static, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
 import { envelopeToFitRows } from './fit/envelope-view.js';
@@ -115,7 +115,13 @@ type FitState =
   // durationMs dropped (host-owned run timing); the RunTimingProvider + RunSummary
   // (or internal clock for live progress) supply timing. Keep only internal recipe
   // makespan if the component needs it for non-summary UI.
-  | { phase: 'done'; result: FitDoneResult; checkCount: number }
+  //
+  // envelope-first-presentation: the streamed `result` is the render-only
+  // RunPresentation (envelope + verboseDetail) — the same carrier the static
+  // path renders. `warnings` is NOT on the presentation; it rides on the
+  // executeFit result bundle, so the runner carries it as a sibling state field
+  // and renders it in the summary block (parity with the static stderr path).
+  | { phase: 'done'; result: RunPresentation; warnings: readonly string[]; checkCount: number }
   | { phase: 'error'; result: ErrorResult };
 
 interface FitRunnerProps {
@@ -186,7 +192,8 @@ function FitRunner({
         return;
       }
 
-      const { result } = fitResult as { result: FitDoneResult };
+      const { result } = fitResult as { result: RunPresentation };
+      const warnings = fitResult.warnings ?? [];
 
       // ADR-0035: the host owns the findings exit. The live renderer returns the
       // envelope to `setUpFitLiveView`, which calls `deliverSignals`; the root
@@ -211,7 +218,7 @@ function FitRunner({
       // `registerLiveView` callback delivers it once the Ink app exits.
       onEnvelope?.(result.envelope);
 
-      setState({ phase: 'done', result, checkCount });
+      setState({ phase: 'done', result, warnings, checkCount });
       setTimeout(() => exit(), 100);
     })();
 
@@ -342,8 +349,8 @@ function FitRunner({
               </Box>
             )}
             {timedSummary}
-            {!args.quiet && state.result.warnings && state.result.warnings.length > 0 && (
-              <WarningsBlock warnings={state.result.warnings} />
+            {!args.quiet && state.warnings.length > 0 && (
+              <WarningsBlock warnings={state.warnings} />
             )}
             {!args.quiet && findingsDetail !== undefined && (
               <Box>{renderToInk(viewFindingsGroups(findingsDetail.groups))}</Box>
@@ -358,14 +365,6 @@ function FitRunner({
                   },
                 ]}
               />
-            )}
-            {!args.quiet && state.result.configFound === false && (
-              <Box paddingLeft={2}>
-                <Text dimColor>
-                  No config file found. Run <Text bold>opensip init</Text> to customize targets and
-                  settings.
-                </Text>
-              </Box>
             )}
           </Box>
         </>

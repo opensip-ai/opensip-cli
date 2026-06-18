@@ -69,10 +69,14 @@ const SIM_RUNNING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Running sc
  *  live view widens the type to read `quiet`. */
 type SimLiveArgs = ToolOptions & { readonly quiet?: boolean; readonly verbose?: boolean };
 
+/**
+ * The minimal shape the live `done` frame reads — the same render carrier the
+ * static path uses (envelope + optional verboseDetail). envelope-first-presentation:
+ * this is `RunPresentation` minus the discriminator; summary duration comes from
+ * the host RunTimingProvider, so no `durationMs` is carried here.
+ */
 interface SimDoneShape {
   readonly envelope: SignalEnvelope;
-  /** Optional — only for internal; summary duration now from host provider (phase 4.3). */
-  readonly durationMs?: number;
   readonly verboseDetail?: VerboseDetail;
 }
 
@@ -168,11 +172,13 @@ export function SimRunner({
         // `deliverSignals`; the root sets the exit from `envelope.verdict.passed`.
         // Host-owned persistence (host-owned-run-timing Phase 2): surface the
         // contribution; the host persists after the live view exits.
-        if (result.type === 'sim-done') {
+        // envelope-first-presentation: `result` is the render-only RunPresentation —
+        // cwd comes from `args.cwd` (in scope), recipe from `result.envelope.recipe`.
+        if (result.type === 'run-presentation') {
           onSession?.({
             tool: 'sim',
-            cwd: result.cwd,
-            recipe: result.recipeName,
+            cwd: args.cwd,
+            recipe: result.envelope.recipe,
             score: result.envelope.verdict.score,
             passed: result.envelope.verdict.passed,
             payload: buildSimulationSessionPayload(result.envelope),
@@ -183,8 +189,6 @@ export function SimRunner({
           phase: 'done',
           result: {
             envelope: result.envelope,
-            // duration omitted for summary (host provider supplies); keep if present for other internal use
-            ...(result.durationMs === undefined ? {} : { durationMs: result.durationMs }),
             verboseDetail: result.verboseDetail,
           },
         });
