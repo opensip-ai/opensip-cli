@@ -49,9 +49,6 @@ export type {
   ClearDoneResult,
   ConfigureDoneResult,
   UninstallDoneResult,
-  FitDoneResult,
-  SimDoneResult,
-  GraphDoneResult,
   GateDoneResult,
   GraphStatusResult,
   TextLinesResult,
@@ -79,13 +76,13 @@ export type {
 } from './command-results.js';
 
 // Render-only run-presentation adjunct (envelope-first-presentation plan). The
-// single replacement for the three `*DoneResult` interfaces above: it carries
-// the SignalEnvelope (the findings currency) plus the render-only bits
-// (verboseDetail, host-owned durationMs, graph's banner caveat). It lives in its
-// own module, so it needs its own re-export. (The three `*DoneResult` exports
-// above stay until they are removed in RP-3.) It is NOT yet a `CommandResult`
-// union member — that join lands in RP-1 Task 1.0, atomically with the
-// `resultToView` case, so the exhaustive `assertNever` is never momentarily broken.
+// single run variant on `CommandResult`: it carries the SignalEnvelope (the
+// findings currency) plus the render-only bits (verboseDetail, host-owned
+// durationMs, graph's banner caveat). It lives in its own module, so it needs
+// its own re-export. It REPLACED the three per-tool fit/sim/graph done-result
+// interfaces, which were hard-removed in RP-3; the
+// `architecture-no-run-done-result` fitness check guards the surface against
+// re-introducing them.
 export type { RunPresentation } from './run-presentation.js';
 
 // Command outcome — the OUTER currency wrapping every result and error (§5.5,

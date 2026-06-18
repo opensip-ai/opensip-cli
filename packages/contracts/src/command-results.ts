@@ -14,25 +14,16 @@
 import type { RunPresentation } from './run-presentation.js';
 import type { StoredSession } from './session-types.js';
 import type { SignalEnvelope } from './signal-envelope.js';
-// The verbose-detail currency types (VerboseDetail / FindingGroup / FindingLine)
-// live in ./verbose-detail.ts — NOT here — so both this module's `*DoneResult`
-// variants and ./run-presentation.ts can name them without a `command-results →
-// run-presentation → command-results` cycle (no-circular). Re-exported from the
-// barrel from there.
-import type { VerboseDetail } from './verbose-detail.js';
 import type { ToolProvenance } from '@opensip-cli/core';
 
 /** Union type for all command results — App.tsx dispatches on result.type */
 export type CommandResult =
   // The render-only run-presentation adjunct (envelope-first-presentation plan):
-  // the single replacement for the three `*DoneResult` variants below, which it
-  // supersedes (they are removed in RP-3). Joined here (RP-1) atomically with the
-  // `resultToView` `case 'run-presentation'`, so the exhaustive `assertNever`
-  // guard is never momentarily broken.
+  // the SINGLE run variant. It replaced the three per-tool fit/sim/graph
+  // done-result interfaces, hard-removed in RP-3. `resultToView` carries exactly
+  // one run case (`run-presentation`); the `architecture-no-run-done-result`
+  // fitness check guards against re-introducing a per-tool done-result here.
   | RunPresentation
-  | FitDoneResult
-  | SimDoneResult
-  | GraphDoneResult
   | GateDoneResult
   | GraphStatusResult
   | ListChecksResult
@@ -86,82 +77,6 @@ export interface ConfigureDoneResult {
   action: 'saved' | 'cancelled';
   /** When `action === 'saved'`, the masked-for-display key (`abcd…wxyz`). */
   maskedKey?: string;
-}
-
-export interface FitDoneResult {
-  type: 'fit-done';
-  label: string;
-  cwd: string;
-  /**
-   * The run's signal envelope (ADR-0011). REQUIRED since Phase 6 (fitness is
-   * migrated): the composition root derives the terminal table (one row per
-   * check `unit`, grouped by `signal.source === checkSlug`) and the
-   * `--json`/cloud/`--report-to` paths FROM this envelope. The fitness-only
-   * `Validated`/`Ignores` columns ride on `envelope.units` as
-   * `filesValidated`/`itemType`/`ignoredCount`.
-   */
-  envelope: SignalEnvelope;
-  reportStatus?: {
-    url: string;
-    findingCount: number;
-    runCount: number;
-    success: boolean;
-    error?: string;
-    chunksTotal?: number;
-    chunksSucceeded?: number;
-  };
-  /** Whether an opensip-cli.config.yml was found in the target directory */
-  configFound?: boolean;
-  /**
-   * Verbose detail body (ADR-0021), present only on `--verbose` runs.
-   * Rendered by the shared `resultToView` seam so the detail is identical
-   * in a TTY and a pipe. Fit populates the `findings` kind.
-   */
-  readonly verboseDetail?: VerboseDetail;
-  /**
-   * User-facing non-fatal warnings collected during the run (plugin load
-   * failures, unknown languages in config, missing check packages, etc.).
-   *
-   * These flow through the result rather than direct stderr writes because
-   * the live-view renderer (Ink) owns the screen and any ambient stderr
-   * write during render desyncs Ink's cursor tracking. Renderers display
-   * these in the summary; non-Ink paths (--json, gate modes) surface them
-   * at their own boundary.
-   */
-  warnings?: readonly string[];
-}
-
-/**
- * Outcome of a `graph <scope>` run on the non-`--json` path. Carries only
- * plain data (no graph types — contracts sits below graph) so `resultToView`
- * can express it as a view-model the render seam emits as Ink or plain text.
- */
-export interface GraphDoneResult {
-  type: 'graph-done';
-  /** Fast-tier approximation caveat, or `undefined` for an exact catalog. */
-  readonly resolutionBanner?: string;
-  /** Counts for the shared one-line PASS/FAIL summary. */
-  readonly summary: {
-    readonly passed: number;
-    readonly failed: number;
-    readonly errors: number;
-    readonly warnings: number;
-  };
-  /**
-   * Duration for the top-level summary line (host-owned-run-timing).
-   * After migration this field will be omitted from the result (the host
-   * timer supplies the value that matches the persisted StoredSession so
-   * CLI summary, sessions list, and report agree). Optional during the
-   * transition; when absent the render layer falls back to the host RunTimer.
-   */
-  readonly durationMs?: number;
-  /**
-   * Verbose detail body (ADR-0021). Graph populates the `lines` kind (its
-   * catalog / findings-by-rule / entry-point dump). Rendered by the shared
-   * `resultToView` seam; the non-verbose footer hints are emitted by the seam
-   * too (the old per-result `reportLines`/`footerHints` were retired here).
-   */
-  readonly verboseDetail?: VerboseDetail;
 }
 
 /**
@@ -399,33 +314,6 @@ export interface SimNoticeResult {
   cwd: string;
 }
 
-/** Outcome of a `sim --recipe <name>` run. */
-export interface SimDoneResult {
-  type: 'sim-done';
-  recipeName: string;
-  cwd: string;
-  /**
-   * Duration for the top-level summary line (host-owned-run-timing).
-   * See GraphDoneResult.durationMs for rationale; optional in transition.
-   */
-  durationMs?: number;
-  /**
-   * The run's signal envelope (ADR-0011). REQUIRED since Phase 4 (sim is
-   * migrated): the composition root derives the terminal table (one row per
-   * scenario `unit`, grouped by `signal.source === scenarioId`) and the
-   * `--json`/cloud/`--report-to` paths FROM this envelope. The per-scenario
-   * pass/fail summary is recovered from `envelope.units`, so no scenario
-   * summary fields are duplicated on the result.
-   */
-  envelope: SignalEnvelope;
-  /**
-   * Verbose detail body (ADR-0021), present only on `--verbose` runs. Rendered
-   * by the shared `resultToView` seam. Sim populates the `findings` kind
-   * (per-scenario detail).
-   */
-  readonly verboseDetail?: VerboseDetail;
-}
-
 /**
  * Identity of a discovered plugin (exposed by `plugin list`).
  * Mirrors the `DiscoveredPlugin` shape from core, but kept here as a
@@ -452,7 +340,7 @@ export interface SyncEntry {
 /**
  * Discriminated union — one variant per `plugin` subcommand. Each
  * variant has its own top-level `type` literal, matching the rest of
- * `CommandResult` (`'fit-done'`, `'sim-done'`, `'list-checks'`, …).
+ * `CommandResult` (`'run-presentation'`, `'list-checks'`, …).
  * Consumers switch on `result.type` directly; producer/consumer drift
  * surfaces at compile time.
  */

@@ -1,9 +1,9 @@
 /**
  * RunPresentation — the single render-only adjunct to a run's SignalEnvelope.
  *
- * This is the replacement for the three near-identical `*DoneResult` interfaces
- * (`FitDoneResult` / `SimDoneResult` / `GraphDoneResult` in `command-results.ts`):
- * each of those wraps a {@link SignalEnvelope} plus `verboseDetail?` and (graph
+ * This is the SINGLE run variant on `CommandResult`. It replaced the three
+ * near-identical per-tool done-result interfaces (one per fit/sim/graph), each
+ * of which wrapped a {@link SignalEnvelope} plus `verboseDetail?` and (graph
  * only) a one-line resolution caveat. `RunPresentation` carries exactly that —
  * the envelope (the findings currency, ADR-0011), the optional verbose body
  * (ADR-0021), an optional host-owned display duration (ADR-0051), and the one
