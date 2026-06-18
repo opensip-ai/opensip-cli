@@ -3,6 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { LanguageParseCache } from '../../languages/parse-cache.js';
 import { LanguageRegistry } from '../../languages/registry.js';
 import { ToolRegistry } from '../../tools/registry.js';
+import { SystemError } from '../errors.js';
 import {
   logger as defaultLogger,
   configureLogger,
@@ -108,22 +109,62 @@ describe('runWithScope / currentScope', () => {
     scope.dispose();
   });
 
-  it('enterScope sets the current scope for the rest of the async context', async () => {
-    // Wrap in an outer runWithScope frame so the enterWith only affects
-    // this frame's async subtree and does not leak into the test runner.
+  // NOTE on the always-on enterScope guard (SYSTEM.SCOPE.REENTRANT):
+  // the `beforeEach enterScope(freshScope)` reset-pattern tests across the
+  // repo (e.g. recipes/__tests__/service.test.ts, framework/__tests__/
+  // register-helpers.test.ts, and the sibling graph/sim/fitness engine
+  // beforeEach blocks) need NO change — Vitest gives each `beforeEach` a clean
+  // ALS store, so `currentScope()` is undefined on entry and the guard never
+  // fires for them. The guard only throws on a DIFFERENT current scope.
+  it('enterScope throws SYSTEM.SCOPE.REENTRANT when a different scope is already current', async () => {
+    // Wrap in an outer runWithScope frame so the (would-be) enterWith only
+    // affects this frame's async subtree and does not leak into the test runner.
+    // The always-on guard now rejects a DIFFERENT scope: concurrent/nested work
+    // must use runWithScope, not a shared enterScope (single-slot enterWith).
     const outer = new RunScope();
     const entered = new RunScope();
     await runWithScope(outer, async () => {
       expect(currentScope()).toBe(outer);
-      enterScope(entered);
-      // After enterScope, the current scope is the entered one — without
-      // a callback wrapper, for the remainder of this async context.
-      expect(currentScope()).toBe(entered);
+      expect(() => enterScope(entered)).toThrow(SystemError);
+      try {
+        enterScope(entered);
+        expect.unreachable('enterScope should have thrown for a different current scope');
+      } catch (error) {
+        expect((error as SystemError).code).toBe('SYSTEM.SCOPE.REENTRANT');
+      }
+      // The current scope is unchanged — the guard threw before enterWith.
+      expect(currentScope()).toBe(outer);
       await Promise.resolve();
-      expect(currentScope()).toBe(entered);
+      expect(currentScope()).toBe(outer);
     });
     outer.dispose();
     entered.dispose();
+  });
+
+  it('enterScope re-entering the SAME current scope is a no-op (does not throw)', async () => {
+    // Idempotent re-entry (e.g. a retried pre-action path) must NOT trip the
+    // guard — the guard only fires for a DIFFERENT current scope.
+    const scope = new RunScope();
+    await runWithScope(scope, () => {
+      expect(currentScope()).toBe(scope);
+      expect(() => enterScope(scope)).not.toThrow();
+      expect(currentScope()).toBe(scope);
+      return Promise.resolve();
+    });
+    scope.dispose();
+  });
+
+  it('enterScope binds when no scope is current (the normal single-command path)', () => {
+    // Run OUTSIDE any runWithScope wrapper so currentScope() is undefined on
+    // entry. This is the production single-command path (the pre-action hook):
+    // entering when none is current is allowed and binds the scope. Vitest's
+    // ALS isolation gives this test a clean store, so the enterWith here does
+    // not leak into sibling tests.
+    const scope = new RunScope();
+    expect(currentScope()).toBeUndefined();
+    expect(() => enterScope(scope)).not.toThrow();
+    expect(currentScope()).toBe(scope);
+    scope.dispose();
   });
 
   it('nested runWithScope: inner overrides; outer is restored', async () => {
