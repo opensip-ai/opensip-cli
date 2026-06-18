@@ -208,15 +208,16 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
   });
 
   const hardKillTimeoutMs = input.hardKillTimeoutMs ?? SHARD_HARD_KILL_TIMEOUT_MS;
+  // Run-constant inputs shared by every shard worker — built once, passed to each.
+  const spawnCtx: ShardSpawnContext = {
+    projectRoot: input.projectRoot,
+    cliScript: input.cliScript,
+    resolutionMode: input.resolutionMode,
+    hardKillTimeoutMs,
+    ...(input.language === undefined ? {} : { language: input.language }),
+  };
   const outcomes = await runWorkerPool(input.shards, concurrency, (shard) =>
-    spawnShardWorker(
-      shard,
-      input.projectRoot,
-      input.cliScript,
-      input.resolutionMode,
-      input.language,
-      hardKillTimeoutMs,
-    ),
+    spawnShardWorker(shard, spawnCtx),
   );
 
   const fragments: ShardBuildResult[] = [];
@@ -351,14 +352,23 @@ function stripRunId({ runId: _runId, ...rest }: RunCorrelation): Omit<RunCorrela
   return rest;
 }
 
-function spawnShardWorker(
-  shard: Shard,
-  projectRoot: string,
-  cliScript: string,
-  resolutionMode: ResolutionMode,
-  language?: string,
-  hardKillTimeoutMs: number = SHARD_HARD_KILL_TIMEOUT_MS,
-): Promise<ShardOutcome> {
+/**
+ * The run-constant inputs every shard worker spawn shares (the same for all
+ * shards in one parallel build) — folded into one object so `spawnShardWorker`
+ * takes only its per-shard variable (`shard`) plus this context, instead of a
+ * wide positional parameter list (`graph:wide-function`). Built once by
+ * `runShardsInParallel` and passed to each worker.
+ */
+interface ShardSpawnContext {
+  readonly projectRoot: string;
+  readonly cliScript: string;
+  readonly resolutionMode: ResolutionMode;
+  readonly language?: string;
+  readonly hardKillTimeoutMs: number;
+}
+
+function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOutcome> {
+  const { projectRoot, cliScript, resolutionMode, language, hardKillTimeoutMs } = ctx;
   return new Promise((resolvePromise) => {
     const specDir = mkdtempSync(join(tmpdir(), 'graph-shard-'));
     const specPath = join(specDir, 'spec.json');

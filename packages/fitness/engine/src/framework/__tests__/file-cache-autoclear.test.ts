@@ -18,7 +18,7 @@
  * `setTimeout` deterministically (the 10-minute real delay is never waited on).
  * The fitness engine's own tests must NOT import `@opensip-cli/test-support`
  * (cyclic), so scopes are built from `@opensip-cli/core` directly and the
- * fitness subscope is installed via `installFitnessSubscope` (the same
+ * fitness subscope is installed via core's `applyToolContributeScope` (the same
  * unwrap-and-register seam production uses).
  */
 
@@ -90,7 +90,7 @@ describe('FileCache auto-clear timer disposal', () => {
 
       // dispose() runs the fitness-registered disposer → cache.clear() →
       // clearTimeout. (Phase 1 task 1.3 path: contributeScope returns the
-      // disposer; installFitnessSubscope registers it via scope.onDispose.)
+      // disposer; applyToolContributeScope registers it via scope.onDispose.)
       scope.dispose();
 
       expect(cache.stats.size).toBe(0);

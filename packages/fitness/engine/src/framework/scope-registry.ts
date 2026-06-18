@@ -20,14 +20,13 @@
  *   - `currentFitnessLoadState()` — reads `scope.fitness.load`; same throws.
  */
 
-import { currentScope, isContributionWithDisposer } from '@opensip-cli/core';
+import { currentScope } from '@opensip-cli/core';
 
 import { FitnessRecipeRegistry } from '../recipes/registry.js';
 
 import { CheckRegistry } from './registry.js';
 
 import type { FitnessLoadState, FitnessSubscope } from '../scope-augmentation.js';
-import type { ContributeScopeResult, RunScope } from '@opensip-cli/core';
 
 // Side-effect import: ensures the `ScopeContribution.fitness` augmentation is
 // loaded so `scope.fitness` is the correctly-typed slot at every read site.
@@ -46,28 +45,6 @@ export function createRecipeRegistry(): FitnessRecipeRegistry {
 /** Construct a fresh, empty `ensureChecksLoaded` lifecycle slot for a `RunScope`. */
 export function createFitnessLoadState(): FitnessLoadState {
   return { loadedFor: null, pluginLoadErrors: [], loadWarnings: [] };
-}
-
-/**
- * Install a fitness `contributeScope()` result onto `scope`, mirroring the
- * production CLI install loop (`build-per-run-scope.ts`): unwrap the
- * {@link ContributeScopeResult} disposer wrapper, `Object.assign` the
- * `fitness` subscope onto the scope, and register the disposer via
- * `scope.onDispose(...)` so `dispose()` clears the per-run `FileCache`.
- *
- * Exists because `fitnessTool.contributeScope()` now returns the wrapper form
- * (it owns a per-run `FileCache` needing teardown); callers that previously did
- * `Object.assign(scope, fitnessTool.contributeScope?.() ?? {})` must unwrap. The
- * fitness engine's own tests cannot use `@opensip-cli/test-support` (cyclic), so
- * this lives here as the single install seam they share with production.
- */
-export function installFitnessSubscope(scope: RunScope, result: ContributeScopeResult): void {
-  if (isContributionWithDisposer(result)) {
-    Object.assign(scope, result.contribution);
-    if (result.onDispose) scope.onDispose(result.onDispose);
-  } else {
-    Object.assign(scope, result);
-  }
 }
 
 /**

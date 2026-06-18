@@ -20,10 +20,10 @@
  * renderer leaves the column blank). This keeps ONE shared table formatter
  * (ADR-0011, Phase 6, decision B) rather than a fitness-specific rich view.
  */
+import { groupSignalsBySource } from '@opensip-cli/contracts';
 import { formatDuration, isErrorSignal } from '@opensip-cli/core';
 
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
 
 /** Per-unit terminal-table row, derived from a {@link UnitResult} + its signals. */
 export interface SignalTableRow {
@@ -60,17 +60,6 @@ export interface SignalTableSummary {
   readonly totalErrors: number;
   readonly totalWarnings: number;
   readonly durationMs: number;
-}
-
-/** Group a run's signals by their `source` (the emitting unit's slug). */
-function groupSignalsBySource(signals: readonly Signal[]): Map<string, Signal[]> {
-  const bySource = new Map<string, Signal[]>();
-  for (const signal of signals) {
-    const bucket = bySource.get(signal.source);
-    if (bucket) bucket.push(signal);
-    else bySource.set(signal.source, [signal]);
-  }
-  return bySource;
 }
 
 /** Status for a unit: ERROR when it errored, else PASS/FAIL from `unit.passed`. */

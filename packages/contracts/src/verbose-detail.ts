@@ -83,8 +83,18 @@ export interface FindingGroupUnit {
   readonly error?: string;
 }
 
-/** Group a run's signals by `signal.source` (the emitting unit's slug). */
-function indexBySource(signals: readonly Signal[]): Map<string, Signal[]> {
+/**
+ * Group a run's signals by `signal.source` (the emitting unit's slug) into a
+ * `slug → Signal[]` index.
+ *
+ * The single shared home for this mapping (this module's whole reason to exist):
+ * fitness's and graph's live-view derivations (`envelopeToFitRows` /
+ * `envelopeToGraphRows`) both bucket envelope signals by source before counting
+ * per-unit errors/warnings. They are peer packages that cannot import each other,
+ * so re-deriving it in each tripped the `graph:duplicated-function-body` dogfood
+ * check — they import this instead. `buildFindingGroups` below uses it too.
+ */
+export function groupSignalsBySource(signals: readonly Signal[]): Map<string, Signal[]> {
   const bySource = new Map<string, Signal[]>();
   for (const signal of signals) {
     const bucket = bySource.get(signal.source);
@@ -126,7 +136,7 @@ export function buildFindingGroups(
   signals: readonly Signal[],
   displayName: (slug: string) => string = (slug) => slug,
 ): FindingGroup[] {
-  const bySource = indexBySource(signals);
+  const bySource = groupSignalsBySource(signals);
   const groups: FindingGroup[] = [];
   for (const unit of units) {
     const findings = bySource.get(unit.slug) ?? [];

@@ -39,10 +39,10 @@ import {
   type Tone,
   type ViewNode,
 } from '@opensip-cli/cli-ui';
+import { groupSignalsBySource } from '@opensip-cli/contracts';
 import { formatDuration, isErrorSignal } from '@opensip-cli/core';
 
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
 
 /** A graph live-view table row — one per rule that fired. */
 interface GraphTableRow {
@@ -59,17 +59,6 @@ interface GraphTableRow {
 const COL = { status: 7, errors: 6, warnings: 8, duration: 10 } as const;
 const SEP: Span = { text: ' | ' };
 
-/** Group a run's signals by `signal.source` (the emitting rule's slug). */
-function groupBySource(signals: readonly Signal[]): Map<string, Signal[]> {
-  const bySource = new Map<string, Signal[]>();
-  for (const signal of signals) {
-    const bucket = bySource.get(signal.source);
-    if (bucket) bucket.push(signal);
-    else bySource.set(signal.source, [signal]);
-  }
-  return bySource;
-}
-
 function rowStatus(unit: UnitResult): GraphTableRow['status'] {
   if (unit.error !== undefined) return 'ERROR';
   return unit.passed ? 'PASS' : 'FAIL';
@@ -77,7 +66,7 @@ function rowStatus(unit: UnitResult): GraphTableRow['status'] {
 
 /** Build one row per unit — mirrors `formatSignalTableRows` (output) for graph. */
 function envelopeToGraphRows(envelope: SignalEnvelope): GraphTableRow[] {
-  const bySource = groupBySource(envelope.signals);
+  const bySource = groupSignalsBySource(envelope.signals);
   return envelope.units.map((unit) => {
     const unitSignals = bySource.get(unit.slug) ?? [];
     let errors = 0;

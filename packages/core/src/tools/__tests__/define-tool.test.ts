@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { defineCommand } from '../command-spec.js';
+import { defineCommand } from '../command-spec-validate.js';
 import { defineTool } from '../define-tool.js';
 import { resolveToolCommandNames } from '../derive-commands-from-specs.js';
 

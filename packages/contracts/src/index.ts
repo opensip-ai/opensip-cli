@@ -187,7 +187,10 @@ export type { CommonFlagKey, CommonFlagSpec } from './cli-flags.js';
 // so command-results and run-presentation can both name them without a cycle);
 // `buildFindingGroups` is the shared Signal[] → FindingGroup[] mapping for the
 // tools' `verboseDetail` carrier (fit + sim; one source, not per-tool).
-export { buildFindingGroups } from './verbose-detail.js';
+// `groupSignalsBySource` is the shared `slug → Signal[]` index that fit's and
+// graph's live-view row derivations both bucket through (one source, not
+// per-tool — re-deriving it tripped `graph:duplicated-function-body`).
+export { buildFindingGroups, groupSignalsBySource } from './verbose-detail.js';
 export type {
   FindingGroupUnit,
   VerboseDetail,

@@ -12,8 +12,8 @@
  * The fitness engine's own tests must NOT import `@opensip-cli/test-support`
  * (the package graph would go cyclic), so we construct the `RunScope`s directly
  * from `@opensip-cli/core` and populate each scope's fitness subscope via the
- * fitness tool's `contributeScope()` (through `installFitnessSubscope`, the same
- * unwrap-and-install seam production uses). Phase 4 adds interleaving + identity
+ * fitness tool's `contributeScope()` (through core's `applyToolContributeScope`,
+ * the same unwrap-and-install seam production uses). Phase 4 adds interleaving + identity
  * cases on top of this:
  *   - distinct object identity (`scopeA.fitness.fileCache !== scopeB.fitness.fileCache`,
  *     read through the same `currentScope()?.fitness?.fileCache` seam production uses);

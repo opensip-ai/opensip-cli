@@ -4,10 +4,9 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { defineCommand, validateCommandSpec } from '../command-spec-validate.js';
 import {
   COMMON_FLAG_KEYS,
-  defineCommand,
-  validateCommandSpec,
   type ArgSpec,
   type CommandSpec,
   type CommonFlagKey,

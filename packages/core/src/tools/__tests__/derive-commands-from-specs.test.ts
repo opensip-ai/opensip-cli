@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { defineCommand } from '../command-spec.js';
+import { defineCommand } from '../command-spec-validate.js';
 import { resolveToolCommandNames, resolveToolCommands } from '../derive-commands-from-specs.js';
 
 import type { Tool } from '../types.js';

@@ -18,13 +18,12 @@
  */
 
 import { formatValidatedColumn } from '@opensip-cli/cli-ui';
-import { buildFindingGroups } from '@opensip-cli/contracts';
+import { buildFindingGroups, groupSignalsBySource } from '@opensip-cli/contracts';
 import { formatDuration, isErrorSignal } from '@opensip-cli/core';
 
 import { getDisplayName } from './display-registry.js';
 
 import type { SignalEnvelope, UnitResult, VerboseDetail } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
 
 /** A live-view results-table row — one per check unit, with fitness columns. */
 export interface FitTableRow {
@@ -42,17 +41,6 @@ export interface FitTableRow {
   readonly durationMs: number;
 }
 
-/** Group a run's signals by `signal.source` (the emitting check's slug). */
-function groupBySource(signals: readonly Signal[]): Map<string, Signal[]> {
-  const bySource = new Map<string, Signal[]>();
-  for (const signal of signals) {
-    const bucket = bySource.get(signal.source);
-    if (bucket) bucket.push(signal);
-    else bySource.set(signal.source, [signal]);
-  }
-  return bySource;
-}
-
 function rowStatus(unit: UnitResult): FitTableRow['status'] {
   if (unit.error !== undefined) return 'ERROR';
   return unit.passed ? 'PASS' : 'FAIL';
@@ -60,7 +48,7 @@ function rowStatus(unit: UnitResult): FitTableRow['status'] {
 
 /** Build the live-view results-table rows from the envelope (one row per unit). */
 export function envelopeToFitRows(envelope: SignalEnvelope): FitTableRow[] {
-  const bySource = groupBySource(envelope.signals);
+  const bySource = groupSignalsBySource(envelope.signals);
   return envelope.units.map((unit) => {
     const unitSignals = bySource.get(unit.slug) ?? [];
     let errors = 0;
