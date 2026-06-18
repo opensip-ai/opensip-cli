@@ -20,7 +20,7 @@
  * two-tier privilege.
  *
  * Tool-owned subcommands (`fit`, `sim`, `graph`, …) are mounted separately by
- * walking the CLI-managed tool registry (`mountToolCommands`), which mounts
+ * walking the CLI-managed tool registry (`mountAllToolCommands`), which mounts
  * each tool's `commandSpecs` via the same `mountCommandSpec`.
  */
 

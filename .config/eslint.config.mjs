@@ -34,6 +34,10 @@ import { importX } from 'eslint-plugin-import-x';
 import eslintConfigPrettier from 'eslint-config-prettier';
 import globals from 'globals';
 
+import { eslintStdoutIgnorePaths } from '../scripts/load-seam-exemptions.mjs';
+
+const SEAM_STDOUT_IGNORES = eslintStdoutIgnorePaths();
+
 export default tseslint.config(
   // ---------------------------------------------------------------------------
   // Global ignores — every package's build output, every node_modules, and
@@ -451,12 +455,7 @@ export default tseslint.config(
       'packages/cli/src/index.ts', // top-level registration + buildToolCliContext call site
       'packages/cli/src/welcome.ts',
       'packages/cli/src/commands/session-show.ts', // its --raw path implements the declared RAW_STREAM CommandSpec mode for this host command (sanctioned seam, not a bypass)
-      'packages/cli/src/commands/configure.ts', // interactive TTY prompts, readline + human key verification/masking (not run output)
-      'packages/cli/src/commands/clear.ts', // confirmation prompts and pre-prompt notes (human TTY UX, not run output; has explicit comment)
-      'packages/cli/src/commands/completion.ts', // completion script writer (sanctioned output for the completion command)
-      'packages/cli/src/commands/render-outcome.ts', // host implementation of the --json emit* seams (the actual machine output write)
-      'packages/cli/src/commands/uninstall.ts', // interactive TTY UX: readline confirmation prompt + human-readable removal-progress notes via an injectable writer (defaulted to stdout), not machine run output (same category as clear.ts/configure.ts)
-      'packages/cli/src/commands/tools/runtime-probe-entry.ts', // child-process probe entry: writes the probe-report JSON to stdout as the private parent↔child IPC wire (runtime-probe.ts parses it), not user-facing run output
+      ...SEAM_STDOUT_IGNORES,
     ],
     rules: {
       'no-restricted-properties': [

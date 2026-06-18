@@ -11,7 +11,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { RunScope, runWithScope, runWithScopeSync , applyToolContributeScope} from '@opensip-cli/core';
+import {
+  RunScope,
+  runWithScope,
+  runWithScopeSync,
+  applyToolContributeScope,
+} from '@opensip-cli/core';
 import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import {
   HEAP_TARGETS,

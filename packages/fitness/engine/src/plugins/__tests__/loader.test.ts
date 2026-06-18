@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
+import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { fitnessTool } from '../../tool.js';

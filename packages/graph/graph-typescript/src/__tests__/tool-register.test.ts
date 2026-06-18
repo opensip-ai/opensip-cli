@@ -17,7 +17,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
+import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
 import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

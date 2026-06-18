@@ -49,11 +49,6 @@
  * pre-existing helpers, it does not reimplement them.
  */
 
-import { mountAllToolCommands } from './register-tools.js';
-
-import type { CliProgram } from '@opensip-cli/contracts';
-import type { ToolCliContext, ToolRegistry } from '@opensip-cli/core';
-
 /**
  * Canonical, ordered tool-lifecycle steps (launch, §5.4). The numeric
  * values are the step ordinals used in the JSDoc above and in
@@ -83,30 +78,3 @@ export const TOOL_LIFECYCLE_STEPS = {
   /** 10 — Commander dispatches the action body through the mount pipeline. */
   dispatch: 10,
 } as const;
-
-/**
- * Drive the STARTUP-phase command-mount step (step 8) for every registered
- * tool. By the time this runs, steps 1-4 have already populated `registry`
- * inside {@link bootstrapCli} (provenance no longer matters — bundled and
- * installed tools mount identically). This is the single ordered entry point
- * the composition root calls for step 8, replacing the bare
- * `mountAllToolCommands(...)` call so the lifecycle has one named seam.
- *
- * Kept THIN deliberately: it delegates straight to
- * {@link mountAllToolCommands}, which mounts each tool's declared `commandSpecs`
- * (the one command surface, launch) with per-tool failure isolation. The naming +
- * ordering is the value here, not new logic.
- *
- * @param registry The per-invocation tool registry, already populated by
- *   steps 1-4.
- * @param program The root Commander program (host-owned; passed in since the tool
- *   context no longer carries it, §8).
- * @param ctx The per-invocation handler context handed to each mounted command.
- */
-export function mountToolCommands(
-  registry: ToolRegistry,
-  program: CliProgram,
-  ctx: ToolCliContext,
-): void {
-  mountAllToolCommands(registry, program, ctx);
-}

@@ -20,7 +20,7 @@
  * re-renders.
  */
 
-import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
+import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';

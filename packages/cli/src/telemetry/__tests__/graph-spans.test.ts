@@ -29,7 +29,13 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, ToolRegistry, runWithScope , applyToolContributeScope} from '@opensip-cli/core';
+import {
+  LanguageRegistry,
+  RunScope,
+  ToolRegistry,
+  runWithScope,
+  applyToolContributeScope,
+} from '@opensip-cli/core';
 import { currentAdapterRegistry, graphTool, type GraphLanguageAdapter } from '@opensip-cli/graph';
 import { runGraph, GRAPH_STAGES } from '@opensip-cli/graph/internal';
 import {

@@ -61,7 +61,7 @@ export const BOOTSTRAP_PHASE_MAP: readonly PhaseMapEntry[] = [
   {
     lifecycleStep: TOOL_LIFECYCLE_STEPS.mount,
     module: 'bootstrap/register-tools-mount.ts',
-    symbol: 'mountAllToolCommands',
+    symbol: 'mountAllToolCommands (composition root)',
   },
   {
     lifecycleStep: TOOL_LIFECYCLE_STEPS.initialize,
@@ -80,14 +80,34 @@ export const BOOTSTRAP_PHASE_MAP: readonly PhaseMapEntry[] = [
     symbol: 'planPreActionBootstrap',
   },
   {
+    preActionPhase: PRE_ACTION_PHASES.mergeCliDefaults,
+    module: 'bootstrap/plan-pre-action-bootstrap.ts',
+    symbol: 'planPreActionBootstrap → mergeCliDefaults',
+  },
+  {
+    preActionPhase: PRE_ACTION_PHASES.resolveProject,
+    module: 'bootstrap/plan-pre-action-bootstrap.ts',
+    symbol: 'planPreActionBootstrap → resolveProjectContext',
+  },
+  {
     preActionPhase: PRE_ACTION_PHASES.bailoutWindow,
     module: 'bootstrap/pre-action-guards.ts',
     symbol: 'pre-action guards',
   },
   {
+    preActionPhase: PRE_ACTION_PHASES.projectSideEffects,
+    module: 'bootstrap/execute-post-bailout-bootstrap.ts',
+    symbol: 'executePostBailoutBootstrap → projectSideEffects',
+  },
+  {
     preActionPhase: PRE_ACTION_PHASES.enterScope,
     module: 'bootstrap/execute-post-bailout-bootstrap.ts',
     symbol: 'enterScope',
+  },
+  {
+    preActionPhase: PRE_ACTION_PHASES.hostStartEffects,
+    module: 'bootstrap/execute-post-bailout-bootstrap.ts',
+    symbol: 'executePostBailoutBootstrap → hostStartEffects',
   },
   {
     preActionPhase: PRE_ACTION_PHASES.dispose,

@@ -1,5 +1,5 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
+import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { CheckRegistry } from '../../framework/registry.js';

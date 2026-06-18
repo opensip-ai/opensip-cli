@@ -17,7 +17,7 @@
  * the wiring without spinning up a real Ink render host.
  */
 
-import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
+import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { simulationTool } from '../tool.js';

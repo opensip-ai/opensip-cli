@@ -12,8 +12,6 @@
  * `clear-done` `CommandResult` shape — no raw ANSI escapes here.
  */
 
-// @fitness-ignore-file only-documented-toolcli-seams -- interactive TTY confirmation: the pre-prompt notes printed before "Continue? (y/n)" are human-readable readline UX, not machine run output through a ToolCliContext seam (mirrors the ESLint exemption for this file). Result lines route through the Ink `clear-done` CommandResult. (Architecture review finding 5.)
-
 import { createInterface } from 'node:readline';
 
 import { SessionRepo } from '@opensip-cli/session-store';

@@ -58,6 +58,8 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { isSeamExempt } from '../../../scripts/load-seam-exemptions.mjs';
+
 /** Paths that are tool engines or host command handlers (the code that must go through seams). */
 const ENFORCED_PATH =
   /packages\/(fitness|graph|simulation)\/engine\/src\/|packages\/cli\/src\/commands\//;
@@ -149,6 +151,7 @@ const matchesAny = (patterns, line) => patterns.some((p) => p.test(line));
 export function analyzeOnlyDocumentedSeams(content, filePath) {
   if (!ENFORCED_PATH.test(filePath)) return [];
   if (BOOTSTRAP_EXEMPT.test(filePath)) return [];
+  if (isSeamExempt(filePath, 'only-documented-toolcli-seams')) return [];
   // Tests legitimately exercise these shapes (fixtures / scenario setup).
   if (TEST_PATH.test(filePath)) return [];
 

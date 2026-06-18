@@ -6,7 +6,7 @@
  *
  * The canonical ordered description of the full tool + host lifecycle lives in
  * `bootstrap/tool-lifecycle.ts` (the 10 named steps, two phases: STARTUP in
- * bootstrapCli + mountToolCommands, PER-RUN in the preAction hook + builders).
+ * bootstrapCli + mountAllToolCommands, PER-RUN in the preAction hook + builders).
  * This file wires the major seams (fresh registries per invocation, bootstrap,
  * pre-action hook install, ToolCliContext construction, command mounting,
  * host command registration, telemetry, top-level error paths) and then

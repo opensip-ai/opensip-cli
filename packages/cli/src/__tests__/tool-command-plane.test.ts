@@ -9,7 +9,7 @@
  *   2. a tool with no `commandSpecs` is a mis-declaration → a structured
  *      `cli.tool.no_command_surface` event (no fallback);
  *   3. the lifecycle step ordinals are the documented canonical sequence and
- *      `mountToolCommands` drives step 8 over every registered tool;
+ *      `mountAllToolCommands` drives step 8 over every registered tool;
  *   4. a mount failure is isolated per tool — the rest still mount;
  *   5. `isValidTool` requires a non-empty `commandSpecs` (no register surface).
  */
@@ -25,7 +25,7 @@ import { Command } from 'commander';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import { mountAllToolCommands } from '../bootstrap/register-tools.js';
-import { TOOL_LIFECYCLE_STEPS, mountToolCommands } from '../bootstrap/tool-lifecycle.js';
+import { TOOL_LIFECYCLE_STEPS } from '../bootstrap/tool-lifecycle.js';
 import { isValidTool } from '../bootstrap/validate-tool.js';
 
 /** A throwaway handler-facing `ToolCliContext` (no Commander program — 3.0.0). */
@@ -184,13 +184,13 @@ describe('tool lifecycle — canonical 10-step ordering', () => {
     expect(Object.values(TOOL_LIFECYCLE_STEPS)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   });
 
-  it('mountToolCommands (step 8) mounts every registered tool in registration order', () => {
+  it('mountAllToolCommands (step 8) mounts every registered tool in registration order', () => {
     const registry = new ToolRegistryClass();
     registry.register(specTool('first', 'firstcmd'));
     registry.register(specTool('second', 'secondcmd'));
 
     const program = new Command('opensip');
-    mountToolCommands(registry, program, makeStubContext());
+    mountAllToolCommands(registry, program, makeStubContext());
 
     // Step 8 mounts every registered tool's command, in registration (== help/
     // listing) order — provenance no longer matters at this step.

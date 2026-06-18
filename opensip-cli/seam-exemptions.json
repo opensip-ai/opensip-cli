@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "exemptions": [
+    {
+      "path": "packages/cli/src/commands/configure.ts",
+      "checks": ["only-documented-toolcli-seams"],
+      "category": "interactive-tty",
+      "eslintIgnore": true,
+      "reason": "Interactive TTY prompts via readline; result routes through Ink CommandResult."
+    },
+    {
+      "path": "packages/cli/src/commands/clear.ts",
+      "checks": ["only-documented-toolcli-seams"],
+      "category": "interactive-tty",
+      "eslintIgnore": true,
+      "reason": "Interactive TTY confirmation before destructive clear."
+    },
+    {
+      "path": "packages/cli/src/commands/uninstall.ts",
+      "checks": ["only-documented-toolcli-seams"],
+      "category": "interactive-tty",
+      "eslintIgnore": true,
+      "reason": "Interactive TTY confirmation and progress notes via injectable writer."
+    },
+    {
+      "path": "packages/cli/src/commands/completion.ts",
+      "checks": ["only-documented-toolcli-seams"],
+      "category": "completion-script",
+      "eslintIgnore": true,
+      "reason": "Shell completion script is the command output surface."
+    },
+    {
+      "path": "packages/cli/src/commands/render-outcome.ts",
+      "checks": ["only-documented-toolcli-seams"],
+      "category": "render-outcome-seam",
+      "eslintIgnore": true,
+      "reason": "Host-owned implementation of cli.emitJson / emitEnvelope / emitError."
+    },
+    {
+      "path": "packages/cli/src/commands/tools/runtime-probe-entry.ts",
+      "checks": ["only-documented-toolcli-seams"],
+      "category": "worker-ipc",
+      "eslintIgnore": true,
+      "reason": "Parent-child runtime probe IPC wire on stdout."
+    },
+    {
+      "path": "packages/fitness/engine/src/cli/fit/fit-aux-command-specs.ts",
+      "checks": ["only-documented-toolcli-seams", "no-direct-stdout-in-tool-engine"],
+      "category": "define-aux-export-command",
+      "reason": "Aux export preset: one-line file-write confirmation; --json uses cli.emitJson."
+    },
+    {
+      "path": "packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts",
+      "checks": ["only-documented-toolcli-seams", "no-direct-stdout-in-tool-engine"],
+      "category": "define-aux-export-command",
+      "reason": "Aux export/list presets: status confirmations and lookup queries own IO."
+    },
+    {
+      "path": "packages/graph/engine/src/cli/lookup.ts",
+      "checks": ["only-documented-toolcli-seams", "no-direct-stdout-in-tool-engine"],
+      "category": "lookup-query",
+      "reason": "Read-only catalog lookup; --json machine path writes structured query result."
+    },
+    {
+      "path": "packages/graph/engine/src/cli/symbol-index.ts",
+      "checks": ["only-documented-toolcli-seams", "no-direct-stdout-in-tool-engine"],
+      "category": "define-aux-export-command",
+      "reason": "One-line symbol-index write confirmation after file export."
+    },
+    {
+      "path": "packages/graph/engine/src/cli/shard-worker.ts",
+      "checks": ["only-documented-toolcli-seams", "no-direct-stdout-in-tool-engine"],
+      "category": "worker-ipc",
+      "reason": "Shard worker parent-child IPC on stdout."
+    },
+    {
+      "path": "packages/graph/engine/src/cli/equivalence-check-command.ts",
+      "checks": ["only-documented-toolcli-seams", "no-direct-stdout-in-tool-engine"],
+      "category": "diagnostic-gate",
+      "reason": "Internal CI equivalence gate owns stdout report and exit code."
+    }
+  ]
+}

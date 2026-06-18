@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { defineCommand } from '../command-spec.js';
 import { defineTool } from '../define-tool.js';
 import { resolveToolCommandNames } from '../derive-commands-from-specs.js';
+
+const noopHandler = vi.fn(async (): Promise<void> => {
+  await Promise.resolve();
+});
 
 describe('defineTool', () => {
   it('derives commands[] from commandSpecs', () => {
@@ -20,7 +24,7 @@ describe('defineTool', () => {
           commonFlags: ['json', 'cwd'],
           scope: 'project',
           output: 'signal-envelope',
-          handler: async () => {},
+          handler: noopHandler,
         }),
         defineCommand({
           name: 'demo-list',
@@ -28,11 +32,11 @@ describe('defineTool', () => {
           commonFlags: ['json', 'cwd'],
           scope: 'project',
           output: 'command-result',
-          handler: async () => {},
+          handler: noopHandler,
         }),
       ],
       extensionPoints: {
-        initialize: async () => {},
+        initialize: noopHandler,
       },
     });
 

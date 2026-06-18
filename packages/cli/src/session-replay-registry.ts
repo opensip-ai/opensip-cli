@@ -1,5 +1,4 @@
 // @fitness-ignore-file batch-operation-limits -- fromTools iterates the bounded, in-process tool registry (a handful of first-party + plugin tools registered for the run), not an unbounded external collection.
-import type { CommandResult, ToolSessionReplay } from '@opensip-cli/contracts';
 import {
   resolveToolHooks,
   type ToolRegistry,
@@ -7,6 +6,8 @@ import {
   type ToolSessionReplayContribution,
   type ToolShortId,
 } from '@opensip-cli/core';
+
+import type { CommandResult, ToolSessionReplay } from '@opensip-cli/contracts';
 
 export interface CliSessionReplayContribution {
   readonly tool: ToolShortId;

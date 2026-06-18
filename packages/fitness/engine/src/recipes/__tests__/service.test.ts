@@ -13,7 +13,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { ConfigurationError, enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
+import {
+  ConfigurationError,
+  enterScope,
+  RunScope,
+  applyToolContributeScope,
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { defineCheck } from '../../framework/define-check.js';

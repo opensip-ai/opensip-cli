@@ -13,7 +13,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
+import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { currentScenarioRegistry } from '../../framework/registry.js';

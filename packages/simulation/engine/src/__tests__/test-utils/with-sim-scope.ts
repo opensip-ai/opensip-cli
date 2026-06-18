@@ -7,7 +7,12 @@
  * boilerplate.
  */
 
-import { LanguageRegistry, RunScope, ToolRegistry , applyToolContributeScope} from '@opensip-cli/core';
+import {
+  LanguageRegistry,
+  RunScope,
+  ToolRegistry,
+  applyToolContributeScope,
+} from '@opensip-cli/core';
 
 import { simulationTool } from '../../tool.js';
 

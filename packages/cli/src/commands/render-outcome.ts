@@ -23,8 +23,6 @@
  * hand-rolled in each command body.
  */
 
-// @fitness-ignore-file only-documented-toolcli-seams -- this file IS the single sanctioned stdout-JSON serialization seam (north-star §5.5); the composition root delegates `cli.emitJson` / `emitEnvelope` / `emitError` / `emitRaw` here. The `process.stdout.write` calls are the seam implementation, not a bypass (mirrors the ESLint exemption + the `one-outcome-shape` allow-list for this file).
-
 import type { CommandOutcome, CommandResult } from '@opensip-cli/contracts';
 
 /** Pretty-print width matches the legacy `formatSignalJson` / `emitJson` writers. */

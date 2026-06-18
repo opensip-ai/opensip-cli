@@ -13,8 +13,6 @@
  * Audit 2026-05-23 M3.
  */
 
-// @fitness-ignore-file only-documented-toolcli-seams -- interactive TTY prompts: readline prompt text + masked-key verification UX, not machine run output through a ToolCliContext seam (mirrors the ESLint exemption for this file). Result lines route through the Ink `configure-done` CommandResult. (Architecture review finding 5: host UX commands have a narrow sanctioned exemption.)
-
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 

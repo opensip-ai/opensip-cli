@@ -9,7 +9,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { RunScope, runWithScope, runWithScopeSync , applyToolContributeScope} from '@opensip-cli/core';
+import {
+  RunScope,
+  runWithScope,
+  runWithScopeSync,
+  applyToolContributeScope,
+} from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import { runGraph } from '@opensip-cli/graph/internal';

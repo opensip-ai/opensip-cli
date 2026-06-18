@@ -47,6 +47,7 @@ const SCOPE = '@opensip-cli/';
  *   - `name`: the registry / package.json name.
  *   - `dir`: workspace dir (used by the contract test's discovery cross-check).
  *   - `filter`: the `pnpm --filter` selector used by the pack step.
+ *   - `publishReason`: why this package earns a distinct npm release unit.
  *   - `layer`: 'cli' marks the unscoped composition root (publishes under the
  *     bare name → `publish_unscoped`); absent for every scoped package.
  */
@@ -57,6 +58,7 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/core',
     dir: 'packages/core',
     filter: '@opensip-cli/core',
+    publishReason: 'Strict kernel: errors, logger, plugin loader, Tool contract, RunScope',
   },
   // Layer 2 — datastore (SQLite + Drizzle persistence)
   {
@@ -64,6 +66,7 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/datastore',
     dir: 'packages/datastore',
     filter: '@opensip-cli/datastore',
+    publishReason: 'SQLite + Drizzle persistence boundary consumed by host and tools',
   },
   // Layer 2 — shared CLI contract types
   {
@@ -71,6 +74,7 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/contracts',
     dir: 'packages/contracts',
     filter: '@opensip-cli/contracts',
+    publishReason: 'Tool↔runner contract facade; breaks cycles between core and tools',
   },
   // Layer 2 — capability-configuration layer (config composer + schema registry; depends on core)
   {
@@ -78,6 +82,7 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/config',
     dir: 'packages/config',
     filter: '@opensip-cli/config',
+    publishReason: 'Config composer + Zod schema registry for host and tool config blocks',
   },
   // Layer 3 — shared Ink/React UI primitives
   {
@@ -85,6 +90,7 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/cli-ui',
     dir: 'packages/cli-ui',
     filter: '@opensip-cli/cli-ui',
+    publishReason: 'Shared Ink/React primitives without pulling the CLI dispatcher',
   },
   // Layer 3 — tree-sitter parse substrate (ADR-0010)
   {
@@ -92,6 +98,7 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/tree-sitter',
     dir: 'packages/tree-sitter',
     filter: '@opensip-cli/tree-sitter',
+    publishReason: 'Grammar-agnostic web-tree-sitter substrate shared by lang-* and graph adapters',
   },
   // Layer 3 — language adapters (lang-typescript first; downstream check packs depend on it)
   {
@@ -99,36 +106,42 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/lang-typescript',
     dir: 'packages/languages/lang-typescript',
     filter: '@opensip-cli/lang-typescript',
+    publishReason: 'TypeScript language adapter; shared AST helpers for fit and graph',
   },
   {
     unscoped: 'lang-rust',
     name: '@opensip-cli/lang-rust',
     dir: 'packages/languages/lang-rust',
     filter: '@opensip-cli/lang-rust',
+    publishReason: 'Rust language adapter for fitness targeting and graph parsing',
   },
   {
     unscoped: 'lang-python',
     name: '@opensip-cli/lang-python',
     dir: 'packages/languages/lang-python',
     filter: '@opensip-cli/lang-python',
+    publishReason: 'Python language adapter for fitness targeting and graph parsing',
   },
   {
     unscoped: 'lang-go',
     name: '@opensip-cli/lang-go',
     dir: 'packages/languages/lang-go',
     filter: '@opensip-cli/lang-go',
+    publishReason: 'Go language adapter for fitness targeting and graph parsing',
   },
   {
     unscoped: 'lang-java',
     name: '@opensip-cli/lang-java',
     dir: 'packages/languages/lang-java',
     filter: '@opensip-cli/lang-java',
+    publishReason: 'Java language adapter for fitness targeting and graph parsing',
   },
   {
     unscoped: 'lang-cpp',
     name: '@opensip-cli/lang-cpp',
     dir: 'packages/languages/lang-cpp',
     filter: '@opensip-cli/lang-cpp',
+    publishReason: 'C/C++ language adapter for fitness targeting and graph parsing',
   },
   // Layer 3 — tools
   {
@@ -136,18 +149,21 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/fitness',
     dir: 'packages/fitness/engine',
     filter: '@opensip-cli/fitness',
+    publishReason: 'Fitness tool engine; plugin contract + check/recipe framework',
   },
   {
     unscoped: 'simulation',
     name: '@opensip-cli/simulation',
     dir: 'packages/simulation/engine',
     filter: '@opensip-cli/simulation',
+    publishReason: 'Simulation tool engine; scenario/recipe plugin contract',
   },
   {
     unscoped: 'graph',
     name: '@opensip-cli/graph',
     dir: 'packages/graph/engine',
     filter: '@opensip-cli/graph',
+    publishReason: 'Graph tool engine; static call-graph kernel and CLI commands',
   },
   // Layer 3.5 — shared tree-sitter adapter scaffolding (before the 4 tree-sitter packs)
   {
@@ -155,6 +171,7 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/graph-adapter-common',
     dir: 'packages/graph/graph-adapter-common',
     filter: '@opensip-cli/graph-adapter-common',
+    publishReason: 'Shared tree-sitter adapter scaffolding for graph language packs',
   },
   // Layer 3.6 — graph adapter packs
   {
@@ -162,6 +179,7 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/graph-typescript',
     dir: 'packages/graph/graph-typescript',
     filter: '@opensip-cli/graph-typescript',
+    publishReason: 'TypeScript graph adapter; largest cross-used graph language pack',
   },
   // Layer 4 — check packs
   {
@@ -169,18 +187,21 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/checks-universal',
     dir: 'packages/fitness/checks-universal',
     filter: '@opensip-cli/checks-universal',
+    publishReason: 'Universal fitness check pack; plugin discovery target',
   },
   {
     unscoped: 'checks-typescript',
     name: '@opensip-cli/checks-typescript',
     dir: 'packages/fitness/checks-typescript',
     filter: '@opensip-cli/checks-typescript',
+    publishReason: 'TypeScript AST fitness check pack; plugin discovery target',
   },
   {
     unscoped: 'checks-python',
     name: '@opensip-cli/checks-python',
     dir: 'packages/fitness/checks-python',
     filter: '@opensip-cli/checks-python',
+    publishReason: 'Python fitness check pack; plugin discovery target',
   },
   // Layer 5 — composition root (unscoped name → opensip-cli-<ver>.tgz)
   {
@@ -189,6 +210,7 @@ export const RELEASE_PACKAGE_ORDER = [
     dir: 'packages/cli',
     filter: 'opensip-cli',
     layer: 'cli',
+    publishReason: 'Composition root: generic tool dispatcher and host commands',
   },
 ];
 

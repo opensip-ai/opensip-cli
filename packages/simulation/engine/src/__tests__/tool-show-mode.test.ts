@@ -7,7 +7,7 @@
  * entry point with a fake `ToolCliContext` whose scope carries a datastore.
  */
 
-import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
+import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

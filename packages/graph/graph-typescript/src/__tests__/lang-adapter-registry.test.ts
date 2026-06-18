@@ -11,7 +11,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError, RunScope, runWithScopeSync , applyToolContributeScope} from '@opensip-cli/core';
+import {
+  ConfigurationError,
+  RunScope,
+  runWithScopeSync,
+  applyToolContributeScope,
+} from '@opensip-cli/core';
 import { currentAdapterRegistry, graphTool, pickAdapter } from '@opensip-cli/graph';
 import { pythonGraphAdapter } from '@opensip-cli/graph-python';
 import { rustGraphAdapter } from '@opensip-cli/graph-rust';

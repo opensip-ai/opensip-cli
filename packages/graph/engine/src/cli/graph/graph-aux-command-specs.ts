@@ -1,6 +1,4 @@
-// @fitness-ignore-file no-direct-stdout-in-tool-engine -- auxiliary subcommand status line: `graph-baseline-export` writes the JSON baseline to a file and prints a one-line "Exported graph baseline to <path>" confirmation (the --json path uses cli.emitJson). This is not the signal-envelope run output (ADR-0011), which routes through the composition root.
 // @fitness-ignore-file detached-promises -- async command handlers invoke synchronous helpers (runCatalogJsonMode/runSarifExportMode/handleGraphError all return void); the heuristic flags them inside the async handlers. Matches the sibling graph CLI files (graph.ts, graph-modes.ts, orchestrate.ts).
-// @fitness-ignore-file only-documented-toolcli-seams -- same rationale as the no-direct-stdout waiver above: the one-line "Exported graph baseline to <path>" status confirmation after a file write; the --json path uses cli.emitJson. Not run output through a ToolCliContext seam.
 /**
  * graph-aux-command-specs — the declarative graph auxiliary commands (release
  * launch Phase 5 Task 5.2).
@@ -21,7 +19,12 @@
  *    branch) — the documented non-Ink exception. The host renders nothing.
  */
 
-import { commonFlags, EXIT_CODES } from '@opensip-cli/contracts';
+import {
+  commonFlags,
+  defineAuxExportCommand,
+  defineListCommand,
+  EXIT_CODES,
+} from '@opensip-cli/contracts';
 import { ConfigurationError, defineCommand, logger } from '@opensip-cli/core';
 
 import { executeEquivalenceCheck } from '../equivalence-check-command.js';
@@ -175,13 +178,9 @@ export const graphSymbolIndexCommandSpec: CommandSpec<unknown, ToolCliContext> =
 });
 
 /** `graph-baseline-export` — export the graph gate baseline (JSON). */
-export const graphBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
-  unknown,
-  ToolCliContext
->({
+export const graphBaselineExportCommandSpec = defineAuxExportCommand({
   name: 'graph-baseline-export',
   description: 'Export the graph gate baseline (JSON) from the datastore to a file',
-  commonFlags: ['cwd', 'json'],
   options: [
     {
       flag: '--out',
@@ -190,11 +189,8 @@ export const graphBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext
       required: true,
     },
   ],
-  scope: 'project',
-  output: RAW_STREAM,
-  rawStreamReason: 'file-export',
   handler: async (rawOpts, cli): Promise<void> => {
-    const opts = rawOpts as { cwd: string; out: string; json?: boolean };
+    const opts = rawOpts as unknown as { cwd: string; out: string; json?: boolean };
     // ADR-0036: the host owns the byte-identical fingerprint-JSON export. The seam
     // throws ConfigurationError (→ exit 2) when no baseline exists; map it here for
     // both the --json (structured) and plain-text boundaries, as today.
@@ -227,7 +223,7 @@ export const graphBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext
     }
     process.stdout.write(`Exported graph baseline to ${opts.out}\n`);
   },
-});
+}) as CommandSpec<unknown, ToolCliContext>;
 
 /**
  * `catalog-export` — dedicated subcommand carrying the catalog-JSON renderer +
@@ -452,14 +448,8 @@ export const graphSarifExportCommandSpec: CommandSpec<unknown, ToolCliContext> =
  * `command-result`: the host dispatches the returned result through the shared
  * seam (`--json` → JSON, else render).
  */
-export const graphRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
-  unknown,
-  ToolCliContext
->({
+export const graphRecipesCommandSpec = defineListCommand({
   name: 'graph-recipes',
   description: 'List available graph recipes',
-  commonFlags: ['json'],
-  scope: 'project',
-  output: 'command-result',
   handler: async () => listGraphRecipes(),
-});
+}) as CommandSpec<unknown, ToolCliContext>;

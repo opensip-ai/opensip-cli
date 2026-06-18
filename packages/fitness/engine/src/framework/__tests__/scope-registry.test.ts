@@ -5,7 +5,7 @@
  * `runWithScope` contexts must carry INDEPENDENT check/recipe registries.
  */
 
-import { RunScope, runWithScope , applyToolContributeScope} from '@opensip-cli/core';
+import { RunScope, runWithScope, applyToolContributeScope } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { defineRecipe } from '../../recipes/types.js';

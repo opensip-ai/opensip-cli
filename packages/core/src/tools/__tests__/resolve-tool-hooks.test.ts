@@ -4,10 +4,16 @@ import { resolveToolHooks } from '../resolve-tool-hooks.js';
 
 import type { Tool } from '../types.js';
 
+async function topInit(): Promise<void> {
+  await Promise.resolve();
+}
+
+async function bagInit(): Promise<void> {
+  await Promise.resolve();
+}
+
 describe('resolveToolHooks', () => {
   it('prefers top-level hooks over extensionPoints during migration', () => {
-    const topInit = async () => {};
-    const bagInit = async () => {};
     const tool = {
       metadata: { id: 'x', name: 'x', version: '0', description: 'x' },
       commands: [{ name: 'x', description: 'x' }],
@@ -19,11 +25,10 @@ describe('resolveToolHooks', () => {
   });
 
   it('reads hooks from extensionPoints when top-level is absent', () => {
-    const bagInit = async () => {};
     const tool = {
       metadata: { id: 'x', name: 'x', version: '0', description: 'x' },
       commands: [{ name: 'x', description: 'x' }],
-      extensionPoints: { initialize: bagInit, config: { namespace: 'x', schema: {} as never } },
+      extensionPoints: { initialize: bagInit, config: { namespace: 'x', schema: {} } },
     } as Tool;
 
     const hooks = resolveToolHooks(tool);

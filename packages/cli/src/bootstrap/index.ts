@@ -36,9 +36,6 @@ import {
 } from './register-tools.js';
 
 // Re-export only the symbols the CLI composition root (`index.ts`) consumes.
-// `mountToolCommands` is the named step-8 seam of the tool lifecycle (release
-// launch, §5.4); it delegates to `mountAllToolCommands` (kept exported for the
-// existing direct unit tests).
 export { mountAllToolCommands, EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
 // The shared admission callable (ADR-0041: one validator, four consumers) —
 // consumed by the tools command group (validate/install) and the
@@ -51,7 +48,6 @@ export {
   type AdmissionSectionResult,
   type AdmitToolPackageOptions,
 } from './admit-tool-package.js';
-export { mountToolCommands } from './tool-lifecycle.js';
 export { renderResult } from './render.js';
 export { maybeOpenReport } from './report.js';
 export { installPreActionHook } from './pre-action-hook.js';

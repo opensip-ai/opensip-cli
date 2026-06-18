@@ -5,7 +5,7 @@
  * CURRENT scope's check registry — there is NO merged-display singleton (F3).
  */
 
-import { RunScope, runWithScopeSync , applyToolContributeScope} from '@opensip-cli/core';
+import { RunScope, runWithScopeSync, applyToolContributeScope } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { applyCheckDisplay } from '../../../check-utils/display.js';

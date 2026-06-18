@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
+import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';

@@ -833,6 +833,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "options": [
         {
           "choices": undefined,
+          "defaultValue": "<cwd>",
+          "description": "Target directory",
+          "flags": "--cwd <path>",
+          "negate": false,
+          "optional": false,
+          "required": true,
+          "variadic": false,
+        },
+        {
+          "choices": undefined,
           "defaultValue": false,
           "description": "Output structured JSON",
           "flags": "--json",

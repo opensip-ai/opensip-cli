@@ -46,6 +46,8 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { isSeamExempt } from '../../../scripts/load-seam-exemptions.mjs';
+
 /**
  * Resolved-path fragment that identifies a tool-engine source file. The
  * check only applies inside the three tool engines; everything else (CLI
@@ -111,6 +113,7 @@ export const checks = [
       // The contract is tool-engine-scoped. The dogfood `backend` target spans
       // every package's src; narrow to the three tool engines here.
       if (!TOOL_ENGINE_PATH.test(filePath)) return [];
+      if (isSeamExempt(filePath, 'no-direct-stdout-in-tool-engine')) return [];
       return analyzeDirectStdout(content);
     },
   }),

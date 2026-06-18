@@ -7,8 +7,7 @@
  */
 
 import type { CommandSpec } from './command-spec.js';
-import type { ToolCliContext } from './types.js';
-import type { Tool, ToolCommandDescriptor } from './types.js';
+import type { ToolCliContext, Tool, ToolCommandDescriptor } from './types.js';
 
 /** Map each mounted spec to the descriptor shape the registry and help plane consume. */
 export function deriveCommandsFromSpecs(
@@ -17,8 +16,8 @@ export function deriveCommandsFromSpecs(
   return specs.map((spec) => ({
     name: spec.name,
     description: spec.description,
-    ...(spec.aliases !== undefined ? { aliases: spec.aliases } : {}),
-    ...(spec.scope !== undefined ? { scope: spec.scope } : {}),
+    ...(spec.aliases === undefined ? {} : { aliases: spec.aliases }),
+    ...(spec.scope === undefined ? {} : { scope: spec.scope }),
   }));
 }
 

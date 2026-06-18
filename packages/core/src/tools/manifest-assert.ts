@@ -19,6 +19,7 @@
 import { ValidationError } from '../lib/errors.js';
 
 import { resolveToolCommandNames } from './derive-commands-from-specs.js';
+
 import type { ToolPluginManifest } from './manifest.js';
 import type { Tool } from './types.js';
 

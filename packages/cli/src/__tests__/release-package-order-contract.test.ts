@@ -56,6 +56,7 @@ interface ReleaseEntry {
   readonly name: string;
   readonly dir: string;
   readonly filter: string;
+  readonly publishReason: string;
   readonly layer?: string;
 }
 
@@ -74,6 +75,17 @@ const referenceNames = new Set(RELEASE_PACKAGE_ORDER.map((p) => p.name));
 const read = (relPath: string): string => readFileSync(join(REPO_ROOT, relPath), 'utf8');
 
 describe('release package-order contract (ADR-0017 — workspace invariant)', () => {
+  it('every publishable package has a publishReason (explicit allowlist)', () => {
+    const missing = RELEASE_PACKAGE_ORDER.filter(
+      (p) => typeof p.publishReason !== 'string' || p.publishReason.trim().length === 0,
+    ).map((p) => p.name);
+    expect(
+      missing,
+      'every RELEASE_PACKAGE_ORDER entry must include a non-empty publishReason:\n' +
+        missing.join('\n'),
+    ).toEqual([]);
+  });
+
   it('the source of truth is non-trivial and CLI-last (sanity)', () => {
     // Guard against a silently-passing test if the import shape ever breaks.
     expect(RELEASE_PACKAGE_ORDER.length).toBeGreaterThan(20);

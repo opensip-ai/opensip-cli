@@ -152,11 +152,7 @@ export {
   applyToolContributeScope,
   resolveToolHooks,
 } from '@opensip-cli/core';
-export {
-  defineRunCommand,
-  defineListCommand,
-  defineAuxExportCommand,
-} from './command-presets.js';
+export { defineRunCommand, defineListCommand, defineAuxExportCommand } from './command-presets.js';
 export type { DefineToolInput, ResolvedToolHooks } from '@opensip-cli/core';
 export type {
   CommandSpec,
