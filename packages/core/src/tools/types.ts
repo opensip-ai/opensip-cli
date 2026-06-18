@@ -104,6 +104,23 @@ export interface ToolCommandDescriptor {
   readonly description: string;
   readonly aliases?: readonly string[];
   /**
+   * Command visibility tier (taxonomy spec). `'public'` (default) commands
+   * appear in `--help`, shell completion, and the agent-catalog primary
+   * surface. `'internal'` commands (Tier-3: `*-run-worker`, `*-shard-worker`,
+   * `*-equivalence-check`) are IPC/CI bootstrap entry points (ADR-0028) that
+   * stay invocable directly but are hidden from those public surfaces. They
+   * are revealed only by `OPENSIP_CLI_SHOW_INTERNAL=1`. Omitted ⇒ `'public'`.
+   */
+  readonly visibility?: 'public' | 'internal';
+  /**
+   * When set, this command is mounted as a SUBCOMMAND of the named parent
+   * command (the tool's primary verb, e.g. `'graph'` / `'fit'`) instead of
+   * flat at the root program. Enables the `<tool> <verb>` grammar
+   * (`graph export`, `fit list`). The host nests `parent`-matched children
+   * onto the primary in `mountOneTool` (Task 0.4). Omitted ⇒ flat root mount.
+   */
+  readonly parent?: string;
+  /**
    * Whether this command requires a project context (RunScope with datastore etc.).
    * Mirrors CommandSpec.scope. 'project' (default for most) vs 'none' (e.g. configure).
    * Populated from the tool's CommandSpec so the declared scope drives host behavior

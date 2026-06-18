@@ -229,6 +229,16 @@ export interface CommandSpec<TOpts = unknown, TCtx = CommandContext> {
   readonly description: string;
   /** Alternate names (`'inspect'` for `'analyze'`). */
   readonly aliases?: readonly string[];
+  /**
+   * When set, the host mounts this spec as a SUBCOMMAND of the named parent
+   * command (the tool's primary verb, e.g. `'graph'` / `'fit'`) rather than
+   * flat at the root program — the handler-mount mirror of
+   * {@link ToolCommandDescriptor.parent}. Enables the `<tool> <verb>` grammar
+   * (`graph export`, `fit list`): `mountOneTool` mounts the tool's primary
+   * first, then mounts every `parent`-matched child onto it via
+   * `mountCommandSpec(primaryCmd, child, ctx)`. Omitted ⇒ flat root mount.
+   */
+  readonly parent?: string;
   /** The common flags this command exposes, applied via `applyCommonFlags` at mount. */
   readonly commonFlags: readonly CommonFlagKey[];
   /** Tool-specific options. */
