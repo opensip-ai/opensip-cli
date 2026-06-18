@@ -81,6 +81,16 @@ export type {
   FindingLine,
 } from './command-results.js';
 
+// Render-only run-presentation adjunct (envelope-first-presentation plan). The
+// single replacement for the three `*DoneResult` interfaces above: it carries
+// the SignalEnvelope (the findings currency) plus the render-only bits
+// (verboseDetail, host-owned durationMs, graph's banner caveat). It lives in its
+// own module, so it needs its own re-export. (The three `*DoneResult` exports
+// above stay until they are removed in RP-3.) It is NOT yet a `CommandResult`
+// union member — that join lands in RP-1 Task 1.0, atomically with the
+// `resultToView` case, so the exhaustive `assertNever` is never momentarily broken.
+export type { RunPresentation } from './run-presentation.js';
+
 // Command outcome — the OUTER currency wrapping every result and error (§5.5,
 // launch). `CommandOutcome<T>` nests the unchanged `SignalEnvelope` under
 // `.envelope` (run) / the `CommandResult` under `.data` (list/report) / errors
