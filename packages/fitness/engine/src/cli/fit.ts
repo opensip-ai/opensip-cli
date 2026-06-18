@@ -31,12 +31,16 @@ import { ensureChecksLoaded, getLoadWarnings } from './fit/check-loader.js';
 import { loadFitConfig, validateLanguagesAgainstAdapters } from './fit/config-loader.js';
 import { runRecipeOrAdHoc, selectRecipe } from './fit/recipe-selector.js';
 import { resolvedFitnessConfig } from './fit/resolved-fitness-config.js';
-import { buildFitEnvelope, buildFitCallbacks, buildFitDoneResult } from './fit/result-builders.js';
+import {
+  buildFitEnvelope,
+  buildFitCallbacks,
+  buildFitPresentation,
+} from './fit/result-builders.js';
 
 import type {
   FitOptions,
   SignalEnvelope,
-  FitDoneResult,
+  RunPresentation,
   ErrorResult,
 } from '@opensip-cli/contracts';
 
@@ -105,8 +109,13 @@ export async function executeFit(
   args: FitOptions,
   opts: ExecuteFitOptions = {},
 ): Promise<
-  | { result: FitDoneResult; envelope: SignalEnvelope }
-  | { result: ErrorResult; envelope?: undefined }
+  // envelope-first-presentation: the success arm carries the render-only
+  // RunPresentation plus the run envelope. `warnings` rides here as a SIBLING
+  // field (not on the presentation — it is not a display field the table view
+  // renders): the non-Ink paths surface it via `emitWarningsToStderr` and the
+  // live runner renders it in its summary block.
+  | { result: RunPresentation; envelope: SignalEnvelope; warnings?: readonly string[] }
+  | { result: ErrorResult; envelope?: undefined; warnings?: undefined }
 > {
   logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
@@ -179,13 +188,12 @@ export async function executeFit(
   // can surface them without breaking Ink's frame tracking.
   const warnings = [...getLoadWarnings(), ...validationWarnings];
 
-  const result = buildFitDoneResult({
+  const result = buildFitPresentation({
     args,
     fitnessResult,
     envelope,
     signalersConfig,
     recipeName,
-    warnings,
   });
 
   logger.info({
@@ -200,5 +208,8 @@ export async function executeFit(
   return {
     result,
     envelope,
+    // warnings ride as a sibling field (not on the presentation): the non-Ink
+    // paths surface them via emitWarningsToStderr, the live runner in its summary.
+    ...(warnings.length > 0 ? { warnings } : {}),
   };
 }

@@ -4,7 +4,7 @@
  * The animated Ink live view is a TTY-only affordance. On a TTY `runLiveMode`
  * renders live (and the tool's `registerLiveView` callback delivers signals);
  * in a pipe / CI / redirect (non-TTY) it falls back to running the engine,
- * rendering the static `fit-done` result through the seam, then delivering the
+ * rendering the static RunPresentation through the seam, then delivering the
  * envelope once at the composition root. `runJsonMode` emits the envelope via
  * `cli.emitEnvelope` and delivers once. These tests pin the dispatch + the
  * single `deliverSignals` egress call (the root owns exit 4, tested there).
@@ -118,9 +118,9 @@ describe('runLiveMode', () => {
     expect(maybeOpenReport).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to the static fit-done result + delivers once on non-TTY', async () => {
+  it('falls back to the static RunPresentation result + delivers once on non-TTY', async () => {
     setTTY(false);
-    const result = { type: 'fit-done' };
+    const result = { type: 'run-presentation', tool: 'fitness' };
     executeFitMock.mockResolvedValue({ result, envelope: envelope() });
     const { cli, renderLive, render, setExitCode, deliverSignals } = mockCli();
     await runLiveMode(args, cli, 'fit', false);
@@ -137,7 +137,7 @@ describe('runLiveMode', () => {
   it('delivers the envelope on a non-TTY run; the host owns the findings exit (ADR-0035)', async () => {
     setTTY(false);
     executeFitMock.mockResolvedValue({
-      result: { type: 'fit-done' },
+      result: { type: 'run-presentation', tool: 'fitness' },
       envelope: envelope(),
     });
     const { cli, render, deliverSignals } = mockCli();
@@ -170,7 +170,7 @@ describe('runJsonMode', () => {
   it('emits the envelope and delivers signals once (no runFailed — host derives exit)', async () => {
     const env = envelope();
     executeFitMock.mockResolvedValue({
-      result: { type: 'fit-done' },
+      result: { type: 'run-presentation', tool: 'fitness' },
       envelope: env,
     });
     const { cli, emitEnvelope, deliverSignals } = mockCli();
@@ -189,7 +189,7 @@ describe('runJsonMode', () => {
   it('delivers without runFailed on a failing run; the host owns the exit (ADR-0035)', async () => {
     const env = envelope();
     executeFitMock.mockResolvedValue({
-      result: { type: 'fit-done' },
+      result: { type: 'run-presentation', tool: 'fitness' },
       envelope: env,
     });
     const { cli, setExitCode, deliverSignals } = mockCli();
