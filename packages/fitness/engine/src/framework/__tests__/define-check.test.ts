@@ -3,13 +3,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScopeSync } from '@opensip-cli/core';
+import { enterScope, LanguageRegistry, RunScope, runWithScopeSync } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { defineCheck } from '../define-check.js';
 import { fileCache } from '../file-cache.js';
 
 import type { LanguageAdapter } from '@opensip-cli/core';
+import type { FileCache } from '../file-cache.js';
 
 const stubAdapter = (id: string, aliases: readonly string[] = []): LanguageAdapter => ({
   id,
@@ -295,8 +296,18 @@ function fixture(rel: string, content: string): string {
   return abs;
 }
 
+let runScope: RunScope;
+
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'opensip-define-check-run-'));
+  // Check.run() resolves the per-run cache from currentScope()?.fitness?.fileCache
+  // (no module-singleton fallback — parallel-tool-invocations Phase 1). These
+  // end-to-end run tests prewarm the (test-only) module singleton, so enter a
+  // scope whose fitness.fileCache IS that singleton — keeping the existing
+  // `fileCache.prewarm(...)` calls valid while the scope resolution finds it.
+  runScope = new RunScope();
+  Object.assign(runScope, { fitness: { fileCache: fileCache as FileCache } });
+  enterScope(runScope);
 });
 
 afterEach(() => {
@@ -420,6 +431,37 @@ describe('defineCheck — analyzeAll mode end-to-end run', () => {
 
     const result = await check.run(testDir, { verbose: true });
     expect(result.signals).toHaveLength(1);
+  });
+
+  it('threads the per-run scope cache into the FileAccessor (analyzeAll reads prewarmed content, not disk)', async () => {
+    // Call-site guardrail (parallel-tool-invocations Phase 1, Task 1.5): the
+    // analyzeAll executor passes currentScope()?.fitness?.fileCache into
+    // createFileAccessor. We prewarm the scope cache (the module singleton here)
+    // with the on-disk content, then MUTATE disk. If the call site threads the
+    // scope cache, the accessor returns the prewarmed bytes; if it bypassed the
+    // cache (the historical global-miss bug) it would read the mutated disk.
+    const file = fixture('only.ts', 'export const cached = true');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+    writeFileSync(file, 'export const cached = false /* DISK MUTATED */');
+
+    const check = defineCheck({
+      id: 'bb000000-bb00-4bb0-8bb0-bb0000000003',
+      slug: 'reads-scope-cache',
+      description: 'reads from the injected scope cache',
+      tags: ['quality'],
+      analyzeAll: async (accessor) => {
+        const content = await accessor.read(file);
+        return content.includes('DISK MUTATED')
+          ? [{ line: 1, message: 'read disk', severity: 'error' as const, filePath: file }]
+          : [];
+      },
+    });
+
+    const result = await check.run(testDir);
+    // No violation ⇒ the accessor returned the prewarmed (cached) content, i.e.
+    // the call site threaded the scope cache.
+    expect(result.signals).toHaveLength(0);
+    expect(result.passed).toBe(true);
   });
 });
 

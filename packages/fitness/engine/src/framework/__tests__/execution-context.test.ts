@@ -216,3 +216,36 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
     expect(out[0]).not.toBe('/some/preresolved/file.ts');
   });
 });
+
+describe('createExecutionContext > per-run FileCache is required (no global fallback)', () => {
+  it('throws SYSTEM.FITNESS.NO_FILE_CACHE when neither options.fileCache nor a scope cache is present', () => {
+    // No scope entered AND no options.fileCache → resolve-or-throw fires
+    // (parallel-tool-invocations Phase 1 removed the module-singleton fallback).
+    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    expect(() =>
+      createExecutionContext(
+        { id: 'id', slug: 'needs-cache', itemType: 'files' },
+        testDir,
+        matcher,
+      ),
+    ).toThrow(/No per-run FileCache available/);
+  });
+
+  it('resolves the scope cache (scope.fitness.fileCache) when no explicit option is passed', () => {
+    // Inside a scope carrying a fitness subscope with a fileCache, context
+    // construction succeeds without an explicit options.fileCache.
+    const scopeCache = fileCache;
+    const scope = makeTestScope();
+    Object.assign(scope, { fitness: { fileCache: scopeCache } });
+    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    withScopeSync(scope, () => {
+      expect(() =>
+        createExecutionContext(
+          { id: 'id', slug: 'scope-cache', itemType: 'files' },
+          testDir,
+          matcher,
+        ),
+      ).not.toThrow();
+    });
+  });
+});

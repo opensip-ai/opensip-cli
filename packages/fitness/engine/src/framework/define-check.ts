@@ -143,9 +143,18 @@ async function executeAnalyzeAllMode(
     throw new CheckAbortedError(config.slug);
   }
 
+  // Inject the per-run scope cache so analyzeAll checks read prewarmed content
+  // (closing the historical global-cache miss — parallel-tool-invocations Phase 1).
+  // `executeAnalyzeAllMode` runs inside the run's scope (the recipe service
+  // enters `runWithScope`), so this resolves the same prewarmed instance the
+  // ExecutionContext resolved. On the no-scope direct path it is `undefined` and
+  // the accessor falls through to disk.
   const fileAccessor = createFileAccessor(files, {
     signal: ctx.signal,
     contentFilter: config.contentFilter,
+    ...(currentScope()?.fitness?.fileCache
+      ? { fileCache: currentScope()?.fitness?.fileCache }
+      : {}),
   });
   const violations = await config.analyzeAll(fileAccessor);
 
