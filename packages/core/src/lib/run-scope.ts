@@ -31,6 +31,7 @@ import { logger as defaultLogger } from './logger.js';
 
 import type { Logger, LoggerImpl } from './logger.js';
 import type { ProjectContext } from './project-context.js';
+import type { RunCorrelation } from './run-correlation.js';
 import type { DataStoreThunk, RecipeUnitConfigSlot, ToolScope } from './scope-types.js';
 import type { UiContext } from './ui-context.js';
 import type { SignalSink } from '../signals/signal-sink.js';
@@ -121,6 +122,17 @@ export interface RunScopeOptions {
    * making core import telemetry implementations.
    */
   readonly telemetry?: Record<string, unknown>;
+  /**
+   * Cloud-aware correlation bag for this invocation (subprocess-correlation
+   * spec, B2). Assembled at the bootstrap composition root
+   * (`build-per-run-scope.ts`) from the resolved cloud config — the one place
+   * the resolved cloud identity is in hand. Core stays a kernel: it carries the
+   * pure {@link RunCorrelation} type but never resolves cloud config. Library
+   * code deep in the call tree reads it via `currentScope()?.correlation` and
+   * forwards it into spawned/forked children via `correlationToEnv`. Optional:
+   * tests and bare scopes omit it (`RunScope.correlation` is then `undefined`).
+   */
+  readonly correlation?: RunCorrelation;
 }
 
 /**
@@ -179,6 +191,13 @@ export class RunScope {
   readonly toolProvenance: readonly ToolProvenance[];
   /** Per-run telemetry scratch space; see {@link RunScopeOptions.telemetry}. */
   readonly telemetry: Record<string, unknown>;
+  /**
+   * Cloud-aware correlation bag for this invocation (B2). Assembled once at the
+   * bootstrap composition root and read by library code via
+   * `currentScope()?.correlation`; `undefined` when no caller supplied one
+   * (tests / bare scopes). See {@link RunScopeOptions.correlation}.
+   */
+  readonly correlation: RunCorrelation | undefined;
 
   /**
    * Tool-registered teardown callbacks, invoked once during {@link dispose}.
@@ -205,6 +224,9 @@ export class RunScope {
     this.toolManifests = opts.toolManifests ?? [];
     this.toolProvenance = opts.toolProvenance ?? [];
     this.telemetry = opts.telemetry ?? {};
+    // No default: `undefined` when no caller supplies one (the test/bare-scope
+    // contract). Production paths assemble it at the composition root (B2).
+    this.correlation = opts.correlation;
   }
 
   /**
