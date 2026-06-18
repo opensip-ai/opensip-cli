@@ -1,3 +1,4 @@
+// @fitness-ignore-file phantom-dependency-detection -- vitest setupFile: test-only infra in @opensip-cli/test-support (private/unpublished, ADR-0040). `vitest` is correctly a devDependency; this file runs only under the test runner and never ships. The check exempts *.test.* / __tests__ / *.config.* but not setup files; broadening a shipped check would risk false-negatives for adopters, so we exempt this single file.
 /**
  * @fileoverview Shared vitest setup for the fitness check packs.
  *
