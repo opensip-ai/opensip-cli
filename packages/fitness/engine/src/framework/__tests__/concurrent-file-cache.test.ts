@@ -24,8 +24,8 @@ import path from 'node:path';
 import { RunScope } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { installFitnessSubscope } from '../scope-registry.js';
 import { fitnessTool } from '../../tool.js';
+import { installFitnessSubscope } from '../scope-registry.js';
 
 import type { FileCache } from '../file-cache.js';
 

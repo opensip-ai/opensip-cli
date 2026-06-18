@@ -21,7 +21,7 @@
  * `vitest.config.ts`.
  */
 
-import { RunScope, enterScope } from '@opensip-cli/core';
+import { enterScope } from '@opensip-cli/core';
 import { fileCache } from '@opensip-cli/fitness';
 import { beforeEach } from 'vitest';
 
@@ -35,6 +35,6 @@ beforeEach(() => {
   // ambient scope for the test.
   const scope = makeFitnessTestScope();
   // The `fitness` slot is installed by makeFitnessTestScope; override its cache.
-  Object.assign((scope as RunScope).fitness ?? {}, { fileCache });
+  Object.assign(scope.fitness ?? {}, { fileCache });
   enterScope(scope);
 });

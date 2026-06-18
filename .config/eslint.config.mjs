@@ -250,6 +250,9 @@ export default tseslint.config(
             '**/*.test.{ts,tsx}',
             '**/__tests__/**',
             '**/*.config.{ts,mts,cts}',
+            // Vitest setup files (referenced via `setupFiles`) are test infra,
+            // not shipped runtime — they legitimately import the `vitest` devDep.
+            '**/vitest-*-setup.ts',
             'scripts/**',
             '.config/**',
           ],

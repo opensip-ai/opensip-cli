@@ -10,7 +10,6 @@ import { defineCheck } from '../define-check.js';
 import { fileCache } from '../file-cache.js';
 
 import type { LanguageAdapter } from '@opensip-cli/core';
-import type { FileCache } from '../file-cache.js';
 
 const stubAdapter = (id: string, aliases: readonly string[] = []): LanguageAdapter => ({
   id,
@@ -306,7 +305,7 @@ beforeEach(() => {
   // scope whose fitness.fileCache IS that singleton — keeping the existing
   // `fileCache.prewarm(...)` calls valid while the scope resolution finds it.
   runScope = new RunScope();
-  Object.assign(runScope, { fitness: { fileCache: fileCache as FileCache } });
+  Object.assign(runScope, { fitness: { fileCache } });
   enterScope(runScope);
 });
 

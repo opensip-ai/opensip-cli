@@ -711,31 +711,14 @@ describe('FitnessRecipeService — per-run FileCache identity', () => {
     // The `beforeEach` entered a RunScope carrying fitness's subscope, so
     // `currentScope()?.fitness?.fileCache` is the canonical per-run cache. The
     // service must resolve THAT instance for prewarm AND the exec read AND clear
-    // THAT instance in `finally` — never a divergent function-local. We capture
-    // the `this` receiver of `prewarm` (the prewarm instance) and of `get` (the
-    // exec read instance) and assert both equal the scope cache.
+    // THAT instance in `finally` — never a divergent function-local. We spy on
+    // prewarm + get (keeping the real behaviour) and read each call's receiver
+    // from the spy's `mock.contexts`, then assert both equal the scope cache.
     const scopeCache = currentScope()?.fitness?.fileCache;
     expect(scopeCache).toBeInstanceOf(FileCache);
 
-    let prewarmedInstance: FileCache | undefined;
-    let execReadInstance: FileCache | undefined;
-
-    const prewarmSpy = vi
-      .spyOn(FileCache.prototype, 'prewarm')
-      .mockImplementation(async function (this: FileCache, cwd, patterns) {
-        prewarmedInstance = this;
-        // Restore real prewarm for THIS call so the cache is populated.
-        prewarmSpy.mockRestore();
-        return this.prewarm(cwd, patterns);
-      });
-
-    const getSpy = vi
-      .spyOn(FileCache.prototype, 'get')
-      .mockImplementation(async function (this: FileCache, filePath) {
-        execReadInstance ??= this;
-        getSpy.mockRestore();
-        return this.get(filePath);
-      });
+    const prewarmSpy = vi.spyOn(FileCache.prototype, 'prewarm');
+    const getSpy = vi.spyOn(FileCache.prototype, 'get');
 
     try {
       const checkRegistry = new CheckRegistry();
@@ -751,6 +734,12 @@ describe('FitnessRecipeService — per-run FileCache identity', () => {
 
       await svc.start(makeRecipe());
 
+      // Vitest records the `this` receiver of every call in `mock.contexts`.
+      const prewarmedInstance = prewarmSpy.mock.contexts[0] as FileCache | undefined;
+      const execReadInstance = getSpy.mock.contexts[0] as FileCache | undefined;
+
+      expect(prewarmSpy).toHaveBeenCalled();
+      expect(getSpy).toHaveBeenCalled();
       // prewarmed === execOpts.fileCache (the exec read) === scope cache.
       expect(prewarmedInstance).toBe(scopeCache);
       expect(execReadInstance).toBe(scopeCache);

@@ -18,9 +18,8 @@ import { DEFAULT_EXCLUSION_PATTERNS } from './constants.js';
 import { PathMatcher } from './path-matcher.js';
 import { extractSnippet } from './result-builder.js';
 
-import type { FileCache } from './file-cache.js';
-
 import type { ResolvedScope } from './check-config.js';
+import type { FileCache } from './file-cache.js';
 
 /**
  * Check identifier (UUID format).

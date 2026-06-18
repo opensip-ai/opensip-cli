@@ -186,7 +186,7 @@ export class RunScope {
    * WITHOUT core importing any tool type — keeping `dispose()` tool-agnostic
    * and the layer rule (`core ← contracts ← {fitness,...}`) intact.
    */
-  private readonly disposers: Array<() => void> = [];
+  private readonly disposers: (() => void)[] = [];
 
   constructor(opts: RunScopeOptions = {}) {
     this.logger = opts.logger ?? defaultLogger;
