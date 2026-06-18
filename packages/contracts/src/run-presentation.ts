@@ -26,6 +26,14 @@
 import type { SignalEnvelope } from './signal-envelope.js';
 import type { VerboseDetail } from './verbose-detail.js';
 
+/**
+ * The render-only adjunct to a run's {@link SignalEnvelope} — the single
+ * `cli.render(...)` argument every analysis run command hands the host
+ * (envelope-first-presentation plan; replaces the three `*DoneResult` variants).
+ * Carries the envelope (findings currency, ADR-0011), the optional verbose body
+ * (ADR-0021), an optional host-owned display duration (ADR-0051), and graph's
+ * resolution-caveat banners. Never serialized into `--json`.
+ */
 export interface RunPresentation {
   /**
    * Render discriminator. `resultToView` switches on this literal to route a
