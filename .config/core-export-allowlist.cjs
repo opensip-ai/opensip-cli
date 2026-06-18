@@ -295,6 +295,7 @@ const EXPORT_ALLOWLIST = {
   getTracer: 'run-kernel',
   isContributionWithDisposer: 'run-kernel',
   isPathInside: 'run-kernel',
+  liveEngineCorrelation: 'run-kernel',
   logger: 'run-kernel',
   ok: 'run-kernel',
   readConfigSchemaVersion: 'run-kernel',

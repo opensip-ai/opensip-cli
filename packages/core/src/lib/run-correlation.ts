@@ -220,8 +220,14 @@ export function liveEngineCorrelation(
   c: RunCorrelation | undefined,
 ): Omit<RunCorrelation, 'runId'> | undefined {
   if (!c) return undefined;
-  const { runId: _runId, ...rest } = c;
-  return { ...rest, workerKind: 'live-engine' };
+  // Param-destructure to drop the env-only `runId` (B1) — same form as the spawn
+  // path's `stripRunId`, then stamp the fork-path `workerKind`.
+  return { ...withoutRunId(c), workerKind: 'live-engine' };
+}
+
+/** Drop the env-only `runId` (B1) from a correlation bag for the wire spec/descriptor. */
+function withoutRunId({ runId: _runId, ...rest }: RunCorrelation): Omit<RunCorrelation, 'runId'> {
+  return rest;
 }
 
 /**

@@ -148,8 +148,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
       ...(traceId === undefined ? {} : { traceId }),
       // Prefer the worker-reported kind/workerKind from the error payload; else
       // the descriptor's kind. The error payload carries no `runId` (B1).
-      workerKind:
-        (msg?.kind === 'error' ? msg.correlation?.workerKind : undefined) ?? workerKind,
+      workerKind: (msg?.kind === 'error' ? msg.correlation?.workerKind : undefined) ?? workerKind,
       failureClass: (msg?.kind === 'error' ? msg.failureClass : undefined) ?? failureClass,
     });
   };
@@ -187,9 +186,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
   child.on('exit', (code: number | null) => {
     done(() => {
       logFailed('exit_nonzero');
-      settle.reject(
-        new Error(`worker exited (code ${code ?? 'null'}) before producing a result`),
-      );
+      settle.reject(new Error(`worker exited (code ${code ?? 'null'}) before producing a result`));
     });
   });
 
